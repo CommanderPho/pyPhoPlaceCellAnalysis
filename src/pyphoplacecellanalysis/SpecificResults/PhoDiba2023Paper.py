@@ -2221,6 +2221,8 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
         a_widget.observe(self._on_widget_change, names='value')
         
 
+        
+
     @function_attributes(short_name=None, tags=['private', 'widget'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-03-27 12:18', related_items=[])
     def _setup_widgets(self):
         import plotly.subplots as sp
@@ -2425,7 +2427,8 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
 
         # Update filtered DataFrames when widget values change
         self.update_filtered_dataframes(self.replay_name_widget.value, self.time_bin_size_widget.value)
-
+        self.on_widget_update_filename()
+        
 
     @function_attributes(short_name=None, tags=['predicate', 'controls', 'filter'], input_requires=[], output_provides=[], uses=[], used_by=['.build_extra_control_widget'], creation_date='2025-03-27 14:05', related_items=[])
     def _rebuild_predicate_widget(self, initially_is_checked: Optional[Dict[str, bool]]=None):
