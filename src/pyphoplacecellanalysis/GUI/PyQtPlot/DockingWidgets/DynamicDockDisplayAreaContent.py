@@ -378,6 +378,13 @@ class DynamicDockDisplayAreaContentMixin(BaseDynamicInstanceConformingMixin):
     Known Usages:
         PhoDockAreaContainingWindow, NestedDockAreaWidget, Spike2DRaster
     
+    Signals:
+        # DynamicDockDisplayAreaContentMixin Conformance Signals _____________________________________________________________ #
+        sigDockAdded = QtCore.Signal(object, object) # (parent, Dock)
+        sigDockModified = QtCore.Signal(object, object, object) # (parent, Dock, action)
+        sigDockClosed = QtCore.Signal(object, object) # (parent, Dock)
+
+        
     """
     
     @property

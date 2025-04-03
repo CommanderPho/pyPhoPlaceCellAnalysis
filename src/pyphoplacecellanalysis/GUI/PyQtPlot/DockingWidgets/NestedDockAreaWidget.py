@@ -17,8 +17,10 @@ class NestedDockAreaWidget(DynamicDockDisplayAreaContentMixin, QtWidgets.QWidget
         pyphoplacecellanalysis.GUI.PyQtPlot.DockingWidgets.NestedDockAreaWidget.NestedDockAreaWidget
         
     """
-    sigDockClosed = QtCore.Signal(object)
-    # sigDocksModified = QtCore.Signal(object)
+    # DynamicDockDisplayAreaContentMixin Conformance Signals _____________________________________________________________ #
+    sigDockAdded = QtCore.Signal(object, object) # (parent, Dock)
+    sigDockModified = QtCore.Signal(object, object, object) # (parent, Dock, action)
+    sigDockClosed = QtCore.Signal(object, object) # (parent, Dock)
 
     @property
     def area(self) -> DockArea:

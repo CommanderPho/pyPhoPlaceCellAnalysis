@@ -114,6 +114,13 @@ class Spike2DRaster(SpecificDockWidgetManipulatingMixin, DynamicDockDisplayAreaO
     sigRenderedIntervalsListChanged = QtCore.Signal(object) # EpochRenderingMixin conformance: signal emitted whenever the list of rendered intervals changed (add/remove). Added 2023-10-16 to prevent `AttributeError: 'Spike2DRaster' does not have a signal with the signature PyQt_PyObject)`
     # sigEmbeddedWidgetHierarchyChanged = QtCore.Signal(object) # emitted when the hierarchy of nested widgets changes, such as when a new dynamic matplotlib_render_plot_widget is added
     
+
+    # DynamicDockDisplayAreaContentMixin Conformance Signals _____________________________________________________________ #
+    sigDockAdded = QtCore.Signal(object, object) # (parent, Dock)
+    sigDockModified = QtCore.Signal(object, object, object) # (parent, Dock, action)
+    sigDockClosed = QtCore.Signal(object, object) # (parent, Dock)
+
+
     sigEmbeddedMatplotlibDockWidgetAdded = QtCore.Signal(object, object, object) # self.sigEmbeddedMatplotlibDockWidgetAdded.emit(self, dDisplayItem, self.ui.matplotlib_view_widgets[name]) -  emitted when a new matplotlib dock widget is added
     sigEmbeddedMatplotlibDockWidgetRemoved = QtCore.Signal(object, object) # (self, identifier: str)
 

@@ -11,7 +11,6 @@ from neuropy.utils.mixins.dynamic_conformance_updating_mixin import BaseDynamicI
 from pyphocorehelpers.programming_helpers import metadata_attributes
 from pyphocorehelpers.function_helpers import function_attributes
 from pyphoplacecellanalysis.External.pyqtgraph.dockarea.Dock import Dock
-from pyphoplacecellanalysis.GUI.PyQtPlot.DockingWidgets.DynamicDockDisplayAreaContent import DynamicDockDisplayAreaOwningMixin, DynamicDockDisplayAreaContentMixin
 from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import BasePositionDecoder, BayesianPlacemapPositionDecoder, DecodedFilterEpochsResult
 from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import DirectionalLapsResult, TrackTemplates, TrainTestSplitResult
 from neuropy.utils.mixins.AttrsClassHelpers import AttrsBasedClassHelperMixin, custom_define, serialized_field, serialized_attribute_field, non_serialized_field
@@ -39,6 +38,15 @@ class SpecificDockWidgetManipulatingMixin(BaseDynamicInstanceConformingMixin):
     self.dock_manager_widget: DynamicDockDisplayAreaContentMixin
     self.ui.matplotlib_view_widgets: Dict
     self.ui.connections['tracks']: Dict
+    
+    
+    
+    # DynamicDockDisplayAreaContentMixin Conformance Signals _____________________________________________________________ #
+    sigDockAdded = QtCore.Signal(object, object) # (parent, Dock)
+    sigDockModified = QtCore.Signal(object, object, object) # (parent, Dock, action)
+    sigDockClosed = QtCore.Signal(object, object) # (parent, Dock)
+
+    
         
 
     """
@@ -177,6 +185,9 @@ class SpecificDockWidgetManipulatingMixin(BaseDynamicInstanceConformingMixin):
         # end if not should_defer_render
         self.sync_matplotlib_render_plot_widget(identifier_name) # Sync it with the active window:
         
+        self.sigDockAdded(self, dock_item) ## sigDockAdded signal to indicate new dock has been added
+        
+
         return identifier_name, widget, matplotlib_fig, matplotlib_fig_axes, dock_item
     
     def add_docked_decoded_posterior_slices_track(self, name: str, slices_time_window_centers: List[NDArray], slices_posteriors: List[NDArray], xbin: Optional[NDArray]=None, measured_position_df: Optional[pd.DataFrame]=None, a_variable_name: Optional[str]=None, a_dock_config: Optional[CustomDockDisplayConfig]=None, extended_dock_title_info: Optional[str]=None, should_defer_render:bool=False, **kwargs):
@@ -297,6 +308,8 @@ class SpecificDockWidgetManipulatingMixin(BaseDynamicInstanceConformingMixin):
         # end if not should_defer_render
         self.sync_matplotlib_render_plot_widget(identifier_name) # Sync it with the active window:
         
+        self.sigDockAdded(self, dock_item) ## sigDockAdded signal to indicate new dock has been added
+
         return identifier_name, widget, matplotlib_fig, matplotlib_fig_axes, dock_item
     
 
