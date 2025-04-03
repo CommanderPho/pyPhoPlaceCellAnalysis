@@ -52,7 +52,7 @@ from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.Mixins.TimeCurves.RenderTimeCur
 from pyphoplacecellanalysis.General.Mixins.DisplayHelpers import debug_print_QRect, debug_print_axes_locations, debug_print_temporal_info
 from pyphoplacecellanalysis.General.Mixins.SpikesRenderingBaseMixin import SpikeEmphasisState # required for the different emphasis states in ._build_cell_configs()
 
-from pyphoplacecellanalysis.GUI.PyQtPlot.DockingWidgets.DynamicDockDisplayAreaContent import CustomDockDisplayConfig, DockDisplayColors 
+from pyphoplacecellanalysis.GUI.PyQtPlot.DockingWidgets.DynamicDockDisplayAreaContent import CustomDockDisplayConfig, DockDisplayColors, FigureWidgetDockDisplayConfig
 from pyphoplacecellanalysis.GUI.Qt.Menus.PhoMenuHelper import PhoMenuHelper
 
 from pyphocorehelpers.DataStructure.enum_helpers import ExtendedEnum
@@ -1371,7 +1371,8 @@ class Spike2DRaster(SpecificDockWidgetManipulatingMixin, DynamicDockDisplayAreaO
         
             ## emit the signal
             self.sigEmbeddedMatplotlibDockWidgetAdded.emit(self, dDisplayItem, self.ui.matplotlib_view_widgets[name])
-            
+            self.sigDockAdded(self, dDisplayItem) ## sigDockAdded signal to indicate new dock has been added ## already has self.sigEmbeddedMatplotlibDockWidgetAdded: `self.sigEmbeddedMatplotlibDockWidgetAdded.emit(self, dDisplayItem, self.ui.matplotlib_view_widgets[name])`
+        
         else:
             # Already had the dock and widget
             print(f'already had the valid matplotlib view widget and its display dock. Returning extant.')
@@ -1389,6 +1390,8 @@ class Spike2DRaster(SpecificDockWidgetManipulatingMixin, DynamicDockDisplayAreaO
         if sync_mode is not None:
             ## sync up the widgets
             self.sync_matplotlib_render_plot_widget(identifier=name, sync_mode=sync_mode)
+
+
 
 
         return self.ui.matplotlib_view_widgets[name], fig, ax, dDisplayItem
@@ -1432,7 +1435,9 @@ class Spike2DRaster(SpecificDockWidgetManipulatingMixin, DynamicDockDisplayAreaO
 
             ## emit the signal
             self.sigEmbeddedMatplotlibDockWidgetAdded.emit(self, dDisplayItem, self.ui.matplotlib_view_widgets[name])
-                            
+            self.sigDockAdded(self, dDisplayItem) ## sigDockAdded signal to indicate new dock has been added ## already has self.sigEmbeddedMatplotlibDockWidgetAdded: `self.sigEmbeddedMatplotlibDockWidgetAdded.emit(self, dDisplayItem, self.ui.matplotlib_view_widgets[name])`
+
+
         else:
             # Already had the widget
             print(f'already had the valid pyqtgraph view widget and its display dock. Returning extant.')
@@ -1475,11 +1480,10 @@ class Spike2DRaster(SpecificDockWidgetManipulatingMixin, DynamicDockDisplayAreaO
             # self.sigEmbeddedMatplotlibDockWidgetAdded.emit(self, dDisplayItem, self.ui.matplotlib_view_widgets[name])
             # self.sigEmbeddedMatplotlibDockWidgetRemoved.emit(self, dDisplayItem, extant_widget)
             self.sigEmbeddedMatplotlibDockWidgetRemoved.emit(self, name) ## get the widget before it fails
+            self.sigDockClosed(self, name) ## sigDockClosed signal
             print(f'\tremoved.')
 
-        
-    
-
+            
 
     @function_attributes(short_name=None, tags=['matplotlib_render_widget', 'dynamic_ui', 'group_matplotlib_render_plot_widget'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-10-17 13:23', related_items=[])
     def find_matplotlib_render_plot_widget(self, identifier, include_dock=False):
@@ -1528,6 +1532,7 @@ class Spike2DRaster(SpecificDockWidgetManipulatingMixin, DynamicDockDisplayAreaO
             ## remove from the dictionary
             del self.ui.matplotlib_view_widgets[identifier]
             self.sigEmbeddedMatplotlibDockWidgetRemoved.emit(self, identifier) ## get the widget before it fails
+            self.sigDockClosed(self, identifier) ## sigDockClosed signal
             
         else:
             print(f'active_matplotlib_view_widget with identifier {identifier} was not found!')

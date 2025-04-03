@@ -1588,7 +1588,8 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
 
     @function_attributes(short_name=None, tags=['widget', 'dock_area_managing_tree', 'interactive', 'right-sidebar'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-01-28 07:22', related_items=['DockAreaDocksTree'])
     def build_dock_area_managing_tree_widget(self):
-        """ addds to the right sidebar and connects controls """
+        """ adds a tree widget containing all added Dock items to the right sidebar and connects its controls
+        """
         from pyphoplacecellanalysis.GUI.Qt.Widgets.DockAreaDocksTree.DockAreaDocksTree import DockAreaDocksTree
         from pyphoplacecellanalysis.GUI.PyQtPlot.DockingWidgets.DynamicDockDisplayAreaContent import DockDisplayColors, CustomDockDisplayConfig
 
