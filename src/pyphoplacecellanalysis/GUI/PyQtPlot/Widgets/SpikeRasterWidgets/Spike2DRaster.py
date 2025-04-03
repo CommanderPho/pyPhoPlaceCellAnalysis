@@ -1857,34 +1857,7 @@ class Spike2DRaster(SpecificDockWidgetManipulatingMixin, DynamicDockDisplayAreaO
         self.sigCrosshairsUpdated.emit(self, child_identifier, trace_value)
 
 
-@define(slots=False)
-class FigureWidgetDockDisplayConfig(CustomDockDisplayConfig):
-    """docstring for FigureWidgetDockDisplayConfig."""
 
-    def get_colors(self, orientation, is_dim):
-        # Common to all:
-        if is_dim:
-            fg_color = '#aaa' # Grey
-        else:
-            fg_color = '#fff' # White
-            
-        # Red-based:
-        if is_dim:
-            bg_color = '#aa4444' # (0°, 60%, 67%)
-            border_color = '#993232' # (0°, 67%, 60%)
-        else:
-            bg_color = '#cc6666' # (0°, 50, 80)
-            border_color = '#ba5454' # (0°, 55%, 73%)
- 
-        return fg_color, bg_color, border_color
-    
-    def __attrs_post_init__(self):
-      self.fontSize = '10px'
-      self.corner_radius = '3px'
-      if self.custom_get_colors_dict is None:
-            self.custom_get_colors_dict = {False: DockDisplayColors(fg_color='#fff', bg_color='#cc6666', border_color='#ba5454'),
-                True: DockDisplayColors(fg_color='#aaa', bg_color='#aa4444', border_color='#993232'),
-            }
     
 # Start Qt event loop unless running in interactive mode.
 # if __name__ == '__main__':
