@@ -1583,7 +1583,21 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
 
         # Display the sidebar:
         self.set_right_sidebar_visibility(True)
-        
+
+
+    # @property
+    # def dock_tree_sidebar_widget(self) -> Optional[DockAreaDocksTree]:
+    #     """The dock_tree_sidebar_widget property."""
+    #     ## Get 2D or 3D Raster from spike_raster_window
+    #     active_raster_plot = self.spike_raster_plt_2d # <pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.SpikeRasterWidgets.Spike2DRaster.Spike2DRaster at 0x196c7244280>
+    #     if active_raster_plot is None:
+    #         active_raster_plot = self.spike_raster_plt_3d # <pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.SpikeRasterWidgets.Spike2DRaster.Spike2DRaster at 0x196c7244280>
+    #         if active_raster_plot is None:
+    #             ## no available raster plots
+    #             return None
+
+    #     return active_raster_plot.ui.dockarea_dock_managing_tree_widget
+    
 
 
     @function_attributes(short_name=None, tags=['widget', 'dock_area_managing_tree', 'interactive', 'right-sidebar'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-01-28 07:22', related_items=['DockAreaDocksTree'])
@@ -1617,6 +1631,8 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
             needs_init = False
             a_docks_tree_widget: DockAreaDocksTree = an_extant_widget
             assert a_docks_tree_widget is not None
+            print(f'found existing Docks display tree widget for right sidebar. Updating existing instead of creating new.')
+            
             
 
         if needs_init:
@@ -1663,12 +1679,24 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
             _a_connection = active_raster_plot.sigEmbeddedMatplotlibDockWidgetAdded.connect(lambda active_2d_plot, dock, widget: _on_update_dock_items(active_2d_plot=active_2d_plot))
             _connections_list.append(_a_connection)
             
+            _a_sigDockAdded_connection = active_raster_plot.sigDockAdded.connect(lambda active_2d_plot, a_dock: _on_update_dock_items(active_2d_plot=active_2d_plot))
+            _connections_list.append(_a_sigDockAdded_connection)
+            
+            _a_sigDockModified_connection = active_raster_plot.sigDockModified.connect(lambda active_2d_plot, a_dock, an_action: _on_update_dock_items(active_2d_plot=active_2d_plot)) # (parent, Dock, action)
+            _connections_list.append(_a_sigDockModified_connection)
+            
+
             _a_removed_connection = active_raster_plot.sigEmbeddedMatplotlibDockWidgetRemoved.connect(lambda active_2d_plot, removed_identifier: _on_update_dock_items(active_2d_plot=active_2d_plot))
             _connections_list.append(_a_removed_connection)
+            
+            _a_sigDockClosed_connection = active_raster_plot.sigDockClosed.connect(lambda active_2d_plot, removed_identifier: _on_update_dock_items(active_2d_plot=active_2d_plot))
+            _connections_list.append(_a_sigDockClosed_connection)
             
             # ## Connect the update signal
             # _a_sigAnyConfigChanged_connection = a_docks_tree_widget.sigDockConfigChanged.connect(lambda an_updated_epochs_display_list: active_raster_plot.update_epochs_from_configs_widget())
             # _connections_list.append(_a_sigAnyConfigChanged_connection)
+            #TODO 2025-04-03 18:43: - [ ] Nothing is done with `_connections_list`. It should be appended somewhere at least
+            
 
         ## END if needs_init...
         # self.ui.rightSideContainerWidget.ui.neuron_widget_container, _connections_list = self._perform_build_attached_neuron_visual_configs_widget(neuron_plotting_configs_dict)
