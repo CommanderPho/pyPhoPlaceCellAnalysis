@@ -8,6 +8,7 @@ from datetime import datetime # for VersionedResultMixin
 
 from attrs import define, field, Factory, asdict # used for `ComputedResult`
 
+from neuropy.utils.mixins.indexing_helpers import get_dict_subset
 import numpy as np
 from neuropy import core
 from neuropy.core.session.dataSession import DataSession
@@ -330,6 +331,18 @@ class ComputedResult(SimpleFieldSizesReprMixin, VersionedResultMixin, HDFMixin, 
         ## Disabled 2024-05-28 22:11 
         # Call the superclass __init__() (from https://stackoverflow.com/a/48325758)
         # super(ComputedResult, self).__init__()
+
+    @classmethod
+    def _reload_class(cls, an_instance):
+        """ specifically updates the instance after its class definition has been updated.
+        """
+        return cls(**get_dict_subset(an_instance.__getstate__(), subset_excludelist=['_VersionedResultMixin_version']))
+
+    # def _reload_class_defn(self):
+    #     """ specifically updates the instance after its class definition has been updated.
+    #     """
+    #     self
+    #     return cls(**get_dict_subset(self.__getstate__(), subset_excludelist=['_VersionedResultMixin_version']))
 
 
 
