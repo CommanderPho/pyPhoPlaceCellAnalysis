@@ -62,7 +62,107 @@ def debug_print_QRect(rect, prefix_string='rect: ', indent_string = '\t', includ
         print(f'{indent_string}{indent_string}left: {rect.left()}\t right: {rect.right()}')    
         print(f'{indent_string}{indent_string}top: {rect.top()}\t bottom: {rect.bottom()}')
     
+
+def debug_widget_size_policy(a_size_policy):
+    """Format a QSizePolicy with relevant information.
     
+    Args:
+        obj: QSizePolicy object
+        p: IPython printer
+        
+    Returns:
+        Formatted string representation
+    """
+    from PyQt5.QtWidgets import QSizePolicy
+
+    general_policies = {QSizePolicy.Fixed: "Fixed", QSizePolicy.Minimum: "Minimum",
+                QSizePolicy.Maximum: "Maximum", QSizePolicy.Preferred: "Preferred",
+                QSizePolicy.Expanding: "Expanding", QSizePolicy.MinimumExpanding: "MinimumExpanding",
+                QSizePolicy.Ignored: "Ignored"}
+
+    h_policy_idx = a_size_policy.horizontalPolicy()
+    v_policy_idx = a_size_policy.verticalPolicy()
+    
+    h_policy = general_policies.get(h_policy_idx, f"Unknown({h_policy_idx})")
+    v_policy = general_policies.get(v_policy_idx, f"Unknown({v_policy_idx})")
+                            
+    print(f"QSizePolicy(horizontal={h_policy}, vertical={v_policy}, " \
+            f"h_stretch={a_size_policy.horizontalStretch()}, v_stretch={a_size_policy.verticalStretch()})")
+    
+
+    
+
+@function_attributes(short_name=None, tags=['debug_print', 'debug', 'print', 'pyqt5', 'pyqt', 'qwidget'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-04-04 06:45', related_items=[])
+def debug_widget_geometry(a_widget, widget_name="Unknown"):
+    """Print comprehensive debug information about a DockLabel to diagnose layout issues.
+    
+    from pyphoplacecellanalysis.General.Mixins.DisplayHelpers import debug_widget_geometry
+    
+    
+    """
+    widget_type = type(a_widget)
+    print(f"\n--- {widget_type} Debug: {widget_name} ---")
+    
+    # Basic geometry info
+    print(f"Position: ({a_widget.x()}, {a_widget.y()})")
+    print(f"Size: {a_widget.width()} × {a_widget.height()}")
+    print(f"Geometry: {a_widget.geometry()}")
+    print(f"Content rect: {a_widget.rect()}")
+    print(f"Size hint: {a_widget.sizeHint()}")
+    print(f"Minimum size hint: {a_widget.minimumSizeHint()}")
+    
+    # Size constraints
+    print(f"Minimum size: {a_widget.minimumSize()}")
+    print(f"Maximum size: {a_widget.maximumSize()}")
+    print(f"Minimum width/height: {a_widget.minimumWidth()}, {a_widget.minimumHeight()}")
+    print(f"Maximum width/height: {a_widget.maximumWidth()}, {a_widget.maximumHeight()}")
+    
+    # Layout related
+    print(f"Base size: {a_widget.baseSize()}")
+    print(f"Size increment: {a_widget.sizeIncrement()}")
+    try:
+        print(f"Contents rect: {a_widget.contentsRect()}")
+        margins = a_widget.contentsMargins()
+        print(f"Contents margins: left={margins.left()}, top={margins.top()}, right={margins.right()}, bottom={margins.bottom()}")
+    except AttributeError:
+        print("Contents rect/margins: Not available")
+    
+    print(f"Layout direction: {a_widget.layoutDirection()}")
+    
+    # Frame related
+    try:
+        print(f"Frame geometry: {a_widget.frameGeometry()}")
+        print(f"Frame size: {a_widget.frameSize()}")
+        print(f"Frame width: {a_widget.frameWidth()}")
+    except AttributeError:
+        print("Frame properties: Not available")
+    
+    # Window related
+    try:
+        print(f"Window frame geometry: {a_widget.windowFrameGeometry()}")
+        print(f"Normal geometry: {a_widget.normalGeometry()}")
+    except AttributeError:
+        print("Window frame properties: Not available")
+        
+    # Orientation and layout issues
+    # print(f"Orientation: {a_widget.orientation}")
+    # print(f"Dim state: {a_widget.dim}")
+    print(f"Size policy:", end='\t') # {a_widget.sizePolicy().horizontalPolicy()}, {a_widget.sizePolicy().verticalPolicy()}
+    debug_widget_size_policy(a_size_policy=a_widget.sizePolicy())
+    
+    # Visibility and enablement
+    print(f"Is visible: {a_widget.isVisible()}")
+    print(f"Is enabled: {a_widget.isEnabled()}")
+    print(f"Is shown: {not a_widget.isHidden()}")
+    
+    # Parent and layout context
+    print(f"Parent type: {type(a_widget.parent()).__name__}")
+    
+    print("--- End Debug Info ---\n")
+    
+
+
+
 # ==================================================================================================================== #
 # Specific                                                                                                             #
 # ==================================================================================================================== #
