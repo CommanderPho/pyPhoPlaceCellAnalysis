@@ -89,6 +89,13 @@ class DockConfigEditor(DockConfigOwningMixin, QWidget):
         self.hide_title_cb.stateChanged.connect(self.updateBoolProperty('hideTitleBar'))
         bool_layout.addRow("Hide Title Bar:", self.hide_title_cb)
         
+
+        self.enable_auto_orient_cb = QCheckBox()
+        self.enable_auto_orient_cb.setChecked(self.config.should_enable_auto_orient)
+        self.enable_auto_orient_cb.stateChanged.connect(self.updateBoolProperty('should_enable_auto_orient'))
+        bool_layout.addRow("Hide Title Bar:", self.enable_auto_orient_cb)
+        
+        
         bool_group.setLayout(bool_layout)
         
         # String properties group
