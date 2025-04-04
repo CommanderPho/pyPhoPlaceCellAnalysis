@@ -185,7 +185,7 @@ class SpecificDockWidgetManipulatingMixin(BaseDynamicInstanceConformingMixin):
         # end if not should_defer_render
         self.sync_matplotlib_render_plot_widget(identifier_name) # Sync it with the active window:
         
-        self.sigDockAdded(self, dock_item) ## sigDockAdded signal to indicate new dock has been added
+        self.sigDockAdded.emit(self, dock_item) ## sigDockAdded signal to indicate new dock has been added
         
 
         return identifier_name, widget, matplotlib_fig, matplotlib_fig_axes, dock_item
@@ -308,7 +308,7 @@ class SpecificDockWidgetManipulatingMixin(BaseDynamicInstanceConformingMixin):
         # end if not should_defer_render
         self.sync_matplotlib_render_plot_widget(identifier_name) # Sync it with the active window:
         
-        self.sigDockAdded(self, dock_item) ## sigDockAdded signal to indicate new dock has been added
+        self.sigDockAdded.emit(self, dock_item) ## sigDockAdded signal to indicate new dock has been added
 
         return identifier_name, widget, matplotlib_fig, matplotlib_fig_axes, dock_item
     

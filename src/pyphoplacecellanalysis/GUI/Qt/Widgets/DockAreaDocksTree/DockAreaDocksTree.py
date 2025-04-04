@@ -212,7 +212,10 @@ class DockAreaDocksTree(QWidget):
         # return dict(identifier=self.identifier, dockSize=(width,height), display_config=_custom_display_config, autoOrientation=False)
 
         info_text = f"Dock Name: {dock.name()}\nType: {type(dock).__name__}"
-        QtWidgets.QMessageBox.information(self, "Dock Info", info_text)
+        from pyphoplacecellanalysis.General.Mixins.DisplayHelpers import debug_widget_geometry
+
+
+        # QtWidgets.QMessageBox.information(self, "Dock Info", info_text)
 
 
 
