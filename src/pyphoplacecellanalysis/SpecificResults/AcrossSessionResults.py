@@ -2381,7 +2381,7 @@ def load_across_sessions_exported_h5_files(cuttoff_date: Optional[datetime] = No
 
 
 
-@function_attributes(short_name=None, tags=['MAIN', 'across_sessions'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-04-15 08:47', related_items=[])
+@function_attributes(short_name=None, tags=['MAIN', 'across_sessions'], input_requires=[], output_provides=[], uses=['find_csv_files', 'find_HDF5_files', 'find_most_recent_files', '_new_process_csv_files', '_common_cleanup_operations'], used_by=[], creation_date='2024-04-15 08:47', related_items=[])
 def load_across_sessions_exported_files(cuttoff_date: Optional[datetime] = None, collected_outputs_directory: Optional[Path]=None, debug_print: bool = False):
     """ Discovers all exported CSV files in collected_outputs, parses their filenames to determine the most recent one for each session, and builds joined dataframes from these values.
     
@@ -2831,13 +2831,12 @@ def _new_process_csv_files(parsed_csv_files_df: pd.DataFrame, t_delta_dict: Dict
                 print(f'WARN: curr_session_t_delta is None for session_str = "{session_str}"') # fails for 'kdiba_gor01_one_2006-6-09_1-22-43_None'
 
         
-        basic_marginals_file_types = ['laps_marginals_df', 'ripple_marginals_df', 'laps_time_bin_marginals_df', 'ripple_time_bin_marginals_df',]
+        
         # basic_marginals_file_types_dicts_list = [final_sessions_loaded_laps_dict, final_sessions_loaded_ripple_dict, final_sessions_loaded_laps_time_bin_dict, final_sessions_loaded_ripple_time_bin_dict]
         #TODO 2024-09-27 09:43: - [ ] the 4 basic marginals return two tuples ('session_id_str', 'custom_replay_name') while all the others return 3-tuples ('session_id_str', 'custom_replay_name', time_bin_size)
         ## Basic marginals: final_sessions_loaded_laps_dict, final_sessions_loaded_ripple_dict, final_sessions_loaded_laps_time_bin_dict, final_sessions_loaded_ripple_time_bin_dict
         _is_file_valid = True # shouldn't mark unknown files as invalid
         # extended_file_types_dicts_list = [final_sessions_loaded_simple_pearson_laps_dict, final_sessions_loaded_simple_pearson_ripple_dict, final_sessions_loaded_laps_wcorr_dict, final_sessions_loaded_ripple_wcorr_dict, final_sessions_loaded_laps_all_scores_dict, final_sessions_loaded_ripple_all_scores_dict, final_sessions_loaded_merged_complete_epoch_stats_df_dict]
-        
 
         if file_type in basic_marginals_file_types:
             # # Invalid files will have the form:
@@ -2877,6 +2876,7 @@ def _new_process_csv_files(parsed_csv_files_df: pd.DataFrame, t_delta_dict: Dict
             elif file_type == 'merged_complete_epoch_stats_df':
                 _is_file_valid = _subfn_new_df_process_and_load_exported_file(path, final_sessions_loaded_merged_complete_epoch_stats_df_dict, session_name, curr_session_t_delta, time_key='start', **additional_columns_dict)				
             elif file_type in extended_file_types_list:
+                ## main extended check, tests against all the known filetypes in `extended_file_types_list` so we don't have to add a new `elif` case for each new filetype`
                 _curr_dict = final_sessions_loaded_extra_df_dict[file_type]
                 _is_file_valid = _subfn_new_df_process_and_load_exported_file(path, _curr_dict, session_name, curr_session_t_delta, time_key='start', **additional_columns_dict)
                 ## update when done:
@@ -2887,8 +2887,13 @@ def _new_process_csv_files(parsed_csv_files_df: pd.DataFrame, t_delta_dict: Dict
                 ## update when done:
                 final_sessions_loaded_extra_df_dict[file_type] = _curr_dict
             elif file_type == 'FAT':
-                _is_file_valid = _subfn_new_df_process_and_load_exported_file(path, final_sessions_loaded_laps_time_bin_dict, session_name, curr_session_t_delta, time_key='t_bin_center', **common_additional_columns_dict)
+                # 2025-03-01 - a bulk export .CSV format where all results are stacked vertically and fields duplicated as needed (no attentioned paid to disk
+                # #TODO 2025-04-04 10:11: - [ ] FAT is a legit exception and shouldn't belong in `extended_file_types_list`, as it has both time bin and epoch centered items
+                _is_file_valid = _subfn_new_df_process_and_load_exported_file(path, final_sessions_loaded_laps_time_bin_dict, session_name, curr_session_t_delta, time_key='t_bin_center', **common_additional_columns_dict) ## adds to the time bins 
+                #TODO 2025-04-04 10:12: - [ ] Why does it add to `final_sessions_loaded_laps_time_bin_dict`? this seems wrong
                 
+
+
 
             else:
                 print(f'WARN: File type "{file_type}" for filename "{path.name}" not implemented.')
@@ -2913,7 +2918,13 @@ def _new_process_csv_files(parsed_csv_files_df: pd.DataFrame, t_delta_dict: Dict
     # #TODO 2024-09-27 09:48: - [ ] ERROR: the basic dataframes are now missing their 'time_bin_size' columns somehow!!
     ## Build across_sessions join dataframes:
     all_sessions_laps_df, all_sessions_ripple_df, all_sessions_laps_time_bin_df, all_sessions_ripple_time_bin_df, all_sessions_simple_pearson_laps_df, all_sessions_simple_pearson_ripple_df, all_sessions_wcorr_laps_df, all_sessions_wcorr_ripple_df, all_sessions_all_scores_ripple_df, all_sessions_merged_complete_epoch_stats_df = _concat_all_dicts_to_dfs(final_sessions_loaded_laps_dict, final_sessions_loaded_ripple_dict, final_sessions_loaded_laps_time_bin_dict, final_sessions_loaded_ripple_time_bin_dict,
-                                                                                                                                                                                                                                                                                                                                                                   final_sessions_loaded_simple_pearson_laps_dict, final_sessions_loaded_simple_pearson_ripple_dict, final_sessions_loaded_laps_wcorr_dict, final_sessions_loaded_ripple_wcorr_dict, final_sessions_loaded_laps_all_scores_dict, final_sessions_loaded_ripple_all_scores_dict, final_sessions_loaded_merged_complete_epoch_stats_df_dict)
+                                                                                                                                                                                                                                                                                                                                                                   final_sessions_loaded_simple_pearson_laps_dict, final_sessions_loaded_simple_pearson_ripple_dict, final_sessions_loaded_laps_wcorr_dict, final_sessions_loaded_ripple_wcorr_dict, final_sessions_loaded_laps_all_scores_dict, final_sessions_loaded_ripple_all_scores_dict,
+                                                                                                                                                                                                                                                                                                                                                                   final_sessions_loaded_merged_complete_epoch_stats_df_dict)
+    
+
+    # ==================================================================================================================== #
+    # Update Metadata in each dataframe (`*df.attrs.*`)                                                                    #
+    # ==================================================================================================================== #
 
     ## Set the metadata for the default-built dataframes as well:
     basic_marginals_file_types_dfs_list = [all_sessions_laps_df, all_sessions_ripple_df, all_sessions_laps_time_bin_df, all_sessions_ripple_time_bin_df]
