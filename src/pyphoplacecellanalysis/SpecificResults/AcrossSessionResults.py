@@ -3009,8 +3009,11 @@ class OldFileArchiver:
     @function_attributes(short_name=None, tags=['filesystem', 'clean', 'delete', 'temporary'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-11-06 04:27', related_items=[])
     @classmethod
     def remove_backup_files_from_session_data_folders(cls, good_session_concrete_folders: List["ConcreteSessionFolder"],
-                                                   always_delete_patterns=None, conditional_delete_patterns=None, cutoff_date: Optional[datetime.datetime]=None, is_dryrun: bool = True, debug_print:bool=False):
+                                                   always_delete_patterns=None, conditional_delete_patterns=None, conditional_delete_files_cutoff_date: Optional[datetime.datetime]=None, is_dryrun: bool = True, debug_print:bool=False):
         """ cleans up the temporary pickle files that are created during the session data loading process to recover space.
+        
+        cutoff_date: files older than this date will be removed regardless of whether they are temporary or not!!
+            conditional_delete_files_cutoff_date = datetime(2023, 9, 1)  # Example cutoff date
         
         Usage:
             from pyphoplacecellanalysis.General.Batch.runBatch import ConcreteSessionFolder, BackupMethods
@@ -3033,13 +3036,13 @@ class OldFileArchiver:
         deleted_file_list = []
 
         # Convert cutoff_date to timestamp for comparison, if provided
-        if cutoff_date is not None:
-            if cutoff_date.tzinfo is None:
+        if conditional_delete_files_cutoff_date is not None:
+            if conditional_delete_files_cutoff_date.tzinfo is None:
                 # Assume local timezone if none provided
-                cutoff_timestamp = cutoff_date.timestamp()
+                cutoff_timestamp = conditional_delete_files_cutoff_date.timestamp()
             else:
                 # Convert to UTC timestamp
-                cutoff_timestamp = cutoff_date.astimezone(datetime.timezone.utc).timestamp()
+                cutoff_timestamp = conditional_delete_files_cutoff_date.astimezone(datetime.timezone.utc).timestamp()
         else:
             cutoff_timestamp = None
             
