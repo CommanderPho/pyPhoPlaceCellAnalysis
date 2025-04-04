@@ -675,7 +675,7 @@ class SpecificDockWidgetManipulatingMixin(BaseDynamicInstanceConformingMixin):
     # MARK: PyQtGraph                                                                                                      #
     # ==================================================================================================================== #
 
-    @function_attributes(short_name=None, tags=['intervals', 'tracks', 'pyqtgraph', 'specific', 'dynamic_ui', 'group_matplotlib_render_plot_widget'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-12-31 07:29', related_items=[])
+    @function_attributes(short_name=None, tags=['intervals', 'tracks', 'pyqtgraph', 'specific', 'dynamic_ui', 'group_matplotlib_render_plot_widget'], input_requires=[], output_provides=[], uses=['self.add_new_embedded_pyqtgraph_render_plot_widget', 'self.add_rendered_intervals'], used_by=[], creation_date='2024-12-31 07:29', related_items=[])
     def prepare_pyqtgraph_intervalPlot_tracks(self, enable_interval_overview_track: bool = False, should_remove_all_and_re_add: bool=True, name_modifier_suffix: str='', should_link_to_main_plot_widget:bool=True, debug_print=False):
         """ adds to separate pyqtgraph-backed tracks to the SpikeRaster2D plotter for rendering intervals, and updates `active_2d_plot.params.custom_interval_rendering_plots` so the intervals are rendered on these new tracks in addition to any normal ones
         
@@ -688,6 +688,14 @@ class SpecificDockWidgetManipulatingMixin(BaseDynamicInstanceConformingMixin):
 
         This should be a separate file, and there should be multiple classes of tracks (raster, instervals, etc) 
             
+        Usage:
+            _interval_tracks_out_dict = active_2d_plot.prepare_pyqtgraph_intervalPlot_tracks(enable_interval_overview_track=True, should_remove_all_and_re_add=True, should_link_to_main_plot_widget=False)
+                        
+            interval_window_dock_config, intervals_time_sync_pyqtgraph_widget, intervals_root_graphics_layout_widget, intervals_plot_item = _interval_tracks_out_dict['intervals']
+            if 'interval_overview' in _interval_tracks_out_dict:
+                interval_overview_window_dock_config, intervals_overview_time_sync_pyqtgraph_widget, intervals_overview_root_graphics_layout_widget, intervals_overview_plot_item = _interval_tracks_out_dict['interval_overview']
+                intervals_overview_plot_item.setXRange(active_2d_plot.total_data_start_time, active_2d_plot.total_data_end_time, padding=0) ## global frame
+                    
         """
         import pyphoplacecellanalysis.External.pyqtgraph as pg
         from pyphoplacecellanalysis.GUI.PyQtPlot.DockingWidgets.DynamicDockDisplayAreaContent import CustomDockDisplayConfig, CustomCyclicColorsDockDisplayConfig, NamedColorScheme
@@ -781,6 +789,10 @@ class SpecificDockWidgetManipulatingMixin(BaseDynamicInstanceConformingMixin):
         Usage:
         
         _raster_tracks_out_dict = active_2d_plot.prepare_pyqtgraph_rasterPlot_track(name_modifier_suffix='raster_window', should_link_to_main_plot_widget=has_main_raster_plot)
+        ## UNpacking:
+        dock_config, time_sync_pyqtgraph_widget, raster_root_graphics_layout_widget, raster_plot_item, rasters_display_outputs_tuple = list(_raster_tracks_out_dict.values())[0]
+        an_app, a_win, a_plots, a_plots_data = rasters_display_outputs_tuple
+
         
         """
         import pyphoplacecellanalysis.External.pyqtgraph as pg
@@ -832,7 +844,7 @@ class SpecificDockWidgetManipulatingMixin(BaseDynamicInstanceConformingMixin):
                                                         scatter_plot_kwargs=dict(size=5, hoverable=False, tick_width=0.0, tick_height=1.0),
                                                         ) # defer_show=True so we can add it manually to the track view
 
-        # an_app, a_win, a_plots, a_plots_data, an_on_update_active_epoch, an_on_update_active_scatterplot_kwargs = rasters_display_outputs_tuple
+        # an_app, a_win, a_plots, a_plots_data = rasters_display_outputs_tuple = rasters_display_outputs_tuple
         # raster_root_graphics_layout_widget.addWidget(a_win, row=1, col=1)
         
         _raster_tracks_out_dict[name] = (dock_config, time_sync_pyqtgraph_widget, raster_root_graphics_layout_widget, raster_plot_item, rasters_display_outputs_tuple)
