@@ -27,7 +27,68 @@ from neuropy.utils.result_context import IdentifyingContext
 # from neuropy.core.session.Formats.BaseDataSessionFormats import find_local_session_paths
 
 # included_session_contexts, output_python_scripts, output_slurm_scripts, powershell_script_path, vscode_workspace_path
-BatchScriptsCollection = attrs.make_class("BatchScriptsCollection", {k:field() for k in ("included_session_contexts", "output_python_scripts", "output_jupyter_notebooks", "output_slurm_scripts", "output_non_slurm_bash_scripts", "vscode_workspace_path")}) # , "max_parallel_executions", "powershell_script_path"
+# BatchScriptsCollection = attrs.make_class("BatchScriptsCollection", {k:field() for k in ("included_session_contexts", "output_python_scripts", "output_jupyter_notebooks", "output_slurm_scripts", "output_non_slurm_bash_scripts", "vscode_workspace_path")}) # , "max_parallel_executions", "powershell_script_path"
+
+
+@define(slots=False, eq=False)
+class BatchScriptsCollection:
+    """ A list of outputs for batch script generation
+    
+    from pyphoplacecellanalysis.General.Batch.pythonScriptTemplating import BatchScriptsCollection
+    
+    output_slurm_scripts = {'run': [], 'figs': []}
+    output_non_slurm_bash_scripts = {'run': [], 'figs': []}
+    
+    """
+    included_session_contexts: List = field(default=Factory(list))
+    output_python_scripts: List = field(default=Factory(list))
+    output_jupyter_notebooks: List = field(default=Factory(list))
+    output_slurm_scripts: Dict = field(default=Factory(dict))
+    output_non_slurm_bash_scripts: Dict = field(default=Factory(dict))
+    vscode_workspace_path: Path = field(default=None)
+    
+
+    def __add__(self, other):
+        """Add two BatchScriptsCollection objects by appending their List fields.
+        
+        Args:
+            other (BatchScriptsCollection): Another collection to add to this one.
+            
+        Returns:
+            BatchScriptsCollection: A new collection with combined lists.
+        """
+        if not isinstance(other, BatchScriptsCollection):
+            return NotImplemented
+            
+        result = BatchScriptsCollection()
+        
+        # Combine all list fields
+        result.included_session_contexts = self.included_session_contexts + other.included_session_contexts
+        result.output_python_scripts = self.output_python_scripts + other.output_python_scripts
+        result.output_jupyter_notebooks = self.output_jupyter_notebooks + other.output_jupyter_notebooks
+        
+        assert isinstance(self.output_slurm_scripts, dict), f"self.output_slurm_scripts: type(self.output_slurm_scripts): {type(self.output_slurm_scripts)}"
+        for k, v in self.output_slurm_scripts.items():
+            ## iterate through the top-level entries like 'run', 'figs', etc. to combine the actual list items
+            result.output_slurm_scripts[k] = v + other.output_slurm_scripts.get(k, []) ## optionally empty list
+            
+        assert isinstance(self.output_non_slurm_bash_scripts, dict), f"self.output_non_slurm_bash_scripts: type(self.output_non_slurm_bash_scripts): {type(self.output_non_slurm_bash_scripts)}"
+        for k, v in self.output_non_slurm_bash_scripts.items():
+            ## iterate through the top-level entries like 'run', 'figs', etc. to combine the actual list items
+            result.output_non_slurm_bash_scripts[k] = v + other.output_non_slurm_bash_scripts.get(k, []) ## optionally empty list
+
+        # result.output_slurm_scripts = self.output_slurm_scripts | other.output_slurm_scripts
+        # result.output_non_slurm_bash_scripts = self.output_non_slurm_bash_scripts + other.output_non_slurm_bash_scripts
+        
+        # For the Path field, use the non-empty one or the first one
+        if isinstance(self.vscode_workspace_path, Path):
+            result.vscode_workspace_path = self.vscode_workspace_path
+        elif isinstance(other.vscode_workspace_path, Path):
+            result.vscode_workspace_path = other.vscode_workspace_path
+        
+        return result
+    
+
 
 from enum import Enum
 
