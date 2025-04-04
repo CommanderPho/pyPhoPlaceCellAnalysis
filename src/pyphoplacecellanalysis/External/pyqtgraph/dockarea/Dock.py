@@ -88,6 +88,8 @@ class DockDisplayConfig(object):
     corner_radius: str = field(default='2px')
     # fontSize: str = field(default='10px')
     custom_get_stylesheet_fn: Callable = field(default=None) #(self, orientation, is_dim)
+    
+    should_enable_auto_orient: bool = field(default=False, metadata={'desc': 'if enabled, the Dock tries to auto-orient (setting its self.orientation intellegently) based off of its aspect ratio.'})
     _orientation: Optional[str] = field(default=None, alias="orientation", metadata={'valid_values': [None, 'auto', 'vertical', 'horizontal']}) # alias="orientation" just refers to the initializer, it doesn't interfere with the @property
 
     additional_metadata: Dict = field(default=Factory(dict)) ## optional metadata
@@ -104,13 +106,17 @@ class DockDisplayConfig(object):
     @property
     def shouldAutoOrient(self) -> bool:
         """ Whether the dock should auto-orient based on the aspect ratioy."""
-        if self.orientation is None:
-            return True
-        else:
-            return (self.orientation == 'auto') ## only if "auto" instead of ['vertical', 'horizontal']
+        return self.should_enable_auto_orient
+        # if self.orientation is None:
+        #     return True
+        # else:
+        #     return (self.orientation == 'auto') ## only if "auto" instead of ['vertical', 'horizontal']
     @shouldAutoOrient.setter
     def shouldAutoOrient(self, value: bool):
-        if value:
+        assert value is not None
+        self.should_enable_auto_orient = value
+        
+        if self.should_enable_auto_orient:
             self.orientation = 'auto' # only if True: change the orientation to 'auto'
         else:
             print(f"WARN: setting shouldAutoOrient to False does nothing, as we do not know which concrete value (['vertical', 'horizontal']) is wanted.")
@@ -204,7 +210,7 @@ class Dock(QtWidgets.QWidget, DockDrop):
         self.label.config = value
 
 
-    def __init__(self, name, area=None, size=(10, 10), widget=None, hideTitle=False, autoOrientation=True, display_config:Optional[DockDisplayConfig]=None, **kwargs): # , closable=False, fontSize="12px"
+    def __init__(self, name, area=None, size=(10, 10), widget=None, hideTitle=False, autoOrientation=False, display_config:Optional[DockDisplayConfig]=None, **kwargs): # , closable=False, fontSize="12px"
         QtWidgets.QWidget.__init__(self)
         DockDrop.__init__(self)
         self._container = None
@@ -214,7 +220,7 @@ class Dock(QtWidgets.QWidget, DockDrop):
         
         if display_config is None:
             print(f"WARNING: Dock.__init__(...): display_config is None... using old-mode fallback. This will be eventually depricated.")
-            display_config = DockDisplayConfig(showCloseButton=kwargs.get('closable', False), fontSize=kwargs.get('fontSize', "10px"), corner_radius='2px', orientation='horizontal')
+            display_config = DockDisplayConfig(showCloseButton=kwargs.get('closable', False), fontSize=kwargs.get('fontSize', "10px"), corner_radius='2px', orientation='horizontal', should_enable_auto_orient=autoOrientation)
             if autoOrientation:
                 display_config.orientation = 'auto' # only if True: change the orientation to 'auto'
 
@@ -336,8 +342,7 @@ class Dock(QtWidgets.QWidget, DockDrop):
         # Create a special tiny button that can restore the title bar
         if not hasattr(self, 'restoreTitleButton'):
             self.restoreTitleButton = QtWidgets.QToolButton(self)
-            self.restoreTitleButton.setIcon(QtWidgets.QApplication.style().standardIcon(
-                QtWidgets.QStyle.StandardPixmap.SP_TitleBarNormalButton))
+            self.restoreTitleButton.setIcon(QtWidgets.QApplication.style().standardIcon(QtWidgets.QStyle.StandardPixmap.SP_TitleBarNormalButton))
             self.restoreTitleButton.setToolTip("Show title bar")
             self.restoreTitleButton.clicked.connect(self.showTitleBar)
             self.restoreTitleButton.setMaximumSize(16, 16)
@@ -443,17 +448,19 @@ class Dock(QtWidgets.QWidget, DockDrop):
         if self.container() is None:
             return
 
-        if o == 'auto' and self.autoOrient:
+        if o == 'auto' and (self.autoOrient):
             if self.container().type() == 'tab':
                 o = 'horizontal'
             elif self.width() > self.height()*1.5:
                 o = 'vertical'
             else:
                 o = 'horizontal'
-        if force or self.orientation != o:
+                
+        if force or (self.orientation != o):
             self.orientation = o
             self.label.setOrientation(o)
             self.updateStyle()
+
 
     def updateStyle(self):
         ## updates orientation and appearance of title bar
