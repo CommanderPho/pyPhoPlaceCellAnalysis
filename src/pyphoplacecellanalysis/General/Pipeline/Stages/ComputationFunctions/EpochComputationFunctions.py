@@ -7,6 +7,7 @@ from nptyping import NDArray
 import pyphoplacecellanalysis.General.type_aliases as types
 import numpy as np
 import pandas as pd
+from pyphocorehelpers.assertion_helpers import Assert
 
 # NeuroPy (Diba Lab Python Repo) Loading
 from neuropy.utils.mixins.binning_helpers import build_df_discretized_binned_position_columns
@@ -891,7 +892,7 @@ class Compute_NonPBE_Epochs(ComputedResult):
 # ==================================================================================================================== #
 from typing import Literal
 # Define a type that can only be one of these specific strings
-KnownNamedDecodingEpochsType = Literal['laps', 'replay', 'ripple', 'non_pbe']
+KnownNamedDecodingEpochsType = Literal['laps', 'replay', 'ripple', 'pbe', 'non_pbe', 'non_pbe_endcaps', 'global']
 from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import MaskedTimeBinFillType
 
 GenericResultTupleIndexType: TypeAlias = MaskedTimeBinFillType # an template/stand-in variable that aims to abstract away the unique-hashable index of a single result computed with a given set of parameters. Not yet fully implemented 2025-03-09 17:50 
@@ -1061,6 +1062,7 @@ class GeneralDecoderDictDecodedEpochsDictResult(ComputedResult):
         return result
 
 
+import pyphoplacecellanalysis.General.type_aliases as types
 
 
 @define(slots=False, repr=False, eq=False)
