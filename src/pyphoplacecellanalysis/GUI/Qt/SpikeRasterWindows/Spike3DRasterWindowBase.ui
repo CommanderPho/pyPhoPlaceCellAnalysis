@@ -23,7 +23,15 @@
 border-color: rgb(207, 207, 207);
 background-color: rgba(71, 65, 60, 180);
 color: rgb(244, 244, 244);
-border-color: rgb(0, 0, 0);</string>
+border-color: rgb(0, 0, 0);
+QToolTip {
+    background-color: #2a2a2a;
+    color: #ffffff;
+    border: 1px solid #3a3a3a;
+    border-radius: 3px;
+    padding: 2px;
+    font-size: 10px;
+}</string>
   </property>
   <layout class="QGridLayout" name="gridLayout" rowstretch="1,0" columnstretch="0,1" rowminimumheight="200,70" columnminimumwidth="52,200">
    <property name="leftMargin">
