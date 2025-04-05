@@ -925,7 +925,7 @@ class GenericDecoderDictDecodedEpochsDictResult(ComputedResult):
         print(f'GenericDecoderDictDecodedEpochsDictResult.computing_for_global_epoch(...):')
         
         # use global epoch
-        
+        session_name: str = curr_active_pipeline.session_name
         t_start, t_delta, t_end = curr_active_pipeline.find_LongShortDelta_times()
         # Build an Epoch object containing a single epoch, corresponding to the global epoch for the entire session:
         single_global_epoch_df: pd.DataFrame = pd.DataFrame({'start': [t_start], 'stop': [t_end], 'label': [0]})
@@ -1013,6 +1013,33 @@ class GenericDecoderDictDecodedEpochsDictResult(ComputedResult):
         # a_decoder
         if debug_print:
             print(f'a_laps_trained_decoder_ctxt: {a_laps_trained_decoder_ctxt}')
+
+
+
+
+
+        ## get the base decoder we'll use for decoding
+        print(f'trying to compute for known_named_decoding_epochs_type="non_pbe_endcaps"...')
+        # a_base_context = IdentifyingContext(trained_compute_epochs='laps', pfND_ndim=1, decoder_identifier='pseudo2D', time_bin_size=time_bin_size, data_grain='per_time_bin') # , known_named_decoding_epochs_type='laps', masked_time_bin_fill_type='ignore'
+        # a_best_matching_context, a_result, a_decoder, a_decoded_marginal_posterior_df = self.get_results_matching_contexts(a_base_context, return_multiple_matches=False)
+        new_desired_decode_epochs_name = 'non_pbe_endcaps'
+        assert hasattr(global_session, new_desired_decode_epochs_name), f"must already have the valid non_pbe_endcaps for the global_session. known_named_decoding_epochs_type: '{new_desired_decode_epochs_name}'"
+        new_desired_decode_epochs: Epoch = ensure_Epoch(deepcopy(getattr(global_session, new_desired_decode_epochs_name))) # .non_pbe_endcaps
+        
+        filter_epochs_to_decode_dict = {
+            # deepcopy(a_best_matching_context).overwriting_context(known_named_decoding_epochs_type='laps'):deepcopy(laps_df),
+            # deepcopy(a_best_matching_context).overwriting_context(known_named_decoding_epochs_type='pbes'):deepcopy(non_pbe_df),
+            deepcopy(a_laps_trained_decoder_ctxt).overwriting_context(known_named_decoding_epochs_type=new_desired_decode_epochs_name):deepcopy(new_desired_decode_epochs),
+        }
+        self = self.perform_decoding(an_all_directional_pf1D_Decoder=deepcopy(a_laps_trained_decoder), filter_epochs_to_decode_dict=filter_epochs_to_decode_dict,
+                                            spikes_df=deepcopy(get_proper_global_spikes_df(curr_active_pipeline)), epochs_decoding_time_bin_size=time_bin_size,
+                                            session_name=session_name,
+                                            t_start=t_start, t_delta=t_delta, t_end=t_end,
+                                        )
+
+        ## OUTPUTS: a_new_fully_generic_result
+
+
 
 
         # 'trained_compute_epochs' ________________________________________________________________________________________________________ #
