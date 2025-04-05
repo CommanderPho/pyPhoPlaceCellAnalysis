@@ -770,7 +770,7 @@ class Compute_NonPBE_Epochs(ComputedResult):
 
 
     @classmethod
-    @function_attributes(short_name=None, tags=['non_PBE', 'epochs', 'update', 'pipeline'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-02-18 18:49', related_items=[])
+    @function_attributes(short_name=None, tags=['non_PBE', 'non_PBE_Endcaps', 'epochs', 'update', 'pipeline'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-02-18 18:49', related_items=[])
     def update_session_non_pbe_epochs(cls, sess, filtered_sessions=None, save_on_compute=True) -> Tuple[bool, Any, Any]:
         """Updates non_PBE epochs for both main session and filtered sessions and tracks changes
 
@@ -788,24 +788,31 @@ class Compute_NonPBE_Epochs(ComputedResult):
         
         # Backup original non_pbe epochs
         original_non_pbe = deepcopy(getattr(sess, 'non_pbe', None))
+        original_non_pbe_endcaps = deepcopy(getattr(sess, 'non_pbe_endcaps', None))
         
         # Update main session
         sess.non_pbe = DataSession.compute_non_PBE_epochs(sess, save_on_compute=save_on_compute)
+        sess.non_pbe_endcaps = DataSession.compute_non_PBE_EndcapsOnly_epochs(sess, save_on_compute=save_on_compute)
         
         # Check if main session changed - compare the dataframes directly
         did_change = did_change or (original_non_pbe is None) or (not original_non_pbe.to_dataframe().equals(sess.non_pbe.to_dataframe()))
+        did_change = did_change or (original_non_pbe_endcaps is None) or (not original_non_pbe_endcaps.to_dataframe().equals(sess.non_pbe_endcaps.to_dataframe()))
         
         # Update filtered sessions if provided
         if filtered_sessions is not None:
             for filter_name, filtered_session in filtered_sessions.items():
                 original_filtered_non_pbe = deepcopy(getattr(filtered_session, 'non_pbe', None))
                 filtered_session.non_pbe = sess.non_pbe.time_slice(t_start=filtered_session.t_start, t_stop=filtered_session.t_stop)
+                # 'non_pbe_endcaps'
+                original_filtered_non_pbe_endcaps = deepcopy(getattr(filtered_session, 'non_pbe_endcaps', None))
+                filtered_session.non_pbe_endcaps = sess.non_pbe_endcaps.time_slice(t_start=filtered_session.t_start, t_stop=filtered_session.t_stop)                
+
                 # Check if filtered session changed
                 did_change = did_change or (original_filtered_non_pbe is None) or (not original_filtered_non_pbe.to_dataframe().equals(filtered_session.non_pbe.to_dataframe()))
+                # Check if filtered session changed for non_pbe_endcaps
+                did_change = did_change or (original_filtered_non_pbe_endcaps is None) or (not original_filtered_non_pbe_endcaps.to_dataframe().equals(filtered_session.non_pbe_endcaps.to_dataframe()))
                     
         return did_change, sess, filtered_sessions
-
-
 
 
     ## For serialization/pickling:
@@ -1439,7 +1446,8 @@ class EpochComputationsComputationsContainer(ComputedResult):
 
 
 def validate_has_non_PBE_epoch_results(curr_active_pipeline, computation_filter_name='maze', minimum_inclusion_fr_Hz:Optional[float]=None):
-    """ Returns True if the pipeline has a valid RankOrder results set of the latest version
+    """ for `perform_compute_non_PBE_epochs` 
+    Returns True if the pipeline has a valid RankOrder results set of the latest version
 
     TODO: make sure minimum can be passed. Actually, can get it from the pipeline.
 
