@@ -33,6 +33,10 @@ uiFile = os.path.join(path, 'EpochRenderConfigWidget.ui')
 class EpochRenderConfigWidget(pg.Qt.QtWidgets.QWidget):
     """ a widget that allows graphically configuring a single data series for rendering Epoch rectangles 
         EpochDisplayConfig
+        
+        
+        chkbtnVisible
+        
     """
     sigConfigChanged = QtCore.Signal(object)
     sigRemoveRequested = QtCore.Signal(object)  # New signal for remove requests
