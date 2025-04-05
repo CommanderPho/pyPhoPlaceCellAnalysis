@@ -925,7 +925,7 @@ class GenericDecoderDictDecodedEpochsDictResult(ComputedResult):
         print(f'GenericDecoderDictDecodedEpochsDictResult.computing_for_global_epoch(...):')
         
         # use global epoch
-        
+        session_name: str = curr_active_pipeline.session_name
         t_start, t_delta, t_end = curr_active_pipeline.find_LongShortDelta_times()
         # Build an Epoch object containing a single epoch, corresponding to the global epoch for the entire session:
         single_global_epoch_df: pd.DataFrame = pd.DataFrame({'start': [t_start], 'stop': [t_end], 'label': [0]})
@@ -1013,6 +1013,33 @@ class GenericDecoderDictDecodedEpochsDictResult(ComputedResult):
         # a_decoder
         if debug_print:
             print(f'a_laps_trained_decoder_ctxt: {a_laps_trained_decoder_ctxt}')
+
+
+
+
+
+        ## get the base decoder we'll use for decoding
+        print(f'trying to compute for known_named_decoding_epochs_type="non_pbe_endcaps"...')
+        # a_base_context = IdentifyingContext(trained_compute_epochs='laps', pfND_ndim=1, decoder_identifier='pseudo2D', time_bin_size=time_bin_size, data_grain='per_time_bin') # , known_named_decoding_epochs_type='laps', masked_time_bin_fill_type='ignore'
+        # a_best_matching_context, a_result, a_decoder, a_decoded_marginal_posterior_df = self.get_results_matching_contexts(a_base_context, return_multiple_matches=False)
+        new_desired_decode_epochs_name = 'non_pbe_endcaps'
+        assert hasattr(global_session, new_desired_decode_epochs_name), f"must already have the valid non_pbe_endcaps for the global_session. known_named_decoding_epochs_type: '{new_desired_decode_epochs_name}'"
+        new_desired_decode_epochs: Epoch = ensure_Epoch(deepcopy(getattr(global_session, new_desired_decode_epochs_name))) # .non_pbe_endcaps
+        
+        filter_epochs_to_decode_dict = {
+            # deepcopy(a_best_matching_context).overwriting_context(known_named_decoding_epochs_type='laps'):deepcopy(laps_df),
+            # deepcopy(a_best_matching_context).overwriting_context(known_named_decoding_epochs_type='pbes'):deepcopy(non_pbe_df),
+            deepcopy(a_laps_trained_decoder_ctxt).overwriting_context(known_named_decoding_epochs_type=new_desired_decode_epochs_name):deepcopy(new_desired_decode_epochs),
+        }
+        self = self.perform_decoding(an_all_directional_pf1D_Decoder=deepcopy(a_laps_trained_decoder), filter_epochs_to_decode_dict=filter_epochs_to_decode_dict,
+                                            spikes_df=deepcopy(get_proper_global_spikes_df(curr_active_pipeline)), epochs_decoding_time_bin_size=time_bin_size,
+                                            session_name=session_name,
+                                            t_start=t_start, t_delta=t_delta, t_end=t_end,
+                                        )
+
+        ## OUTPUTS: a_new_fully_generic_result
+
+
 
 
         # 'trained_compute_epochs' ________________________________________________________________________________________________________ #
@@ -1165,6 +1192,7 @@ class GenericDecoderDictDecodedEpochsDictResult(ComputedResult):
         a_new_fully_generic_result = a_new_fully_generic_result.computing_for_global_epoch(curr_active_pipeline=curr_active_pipeline, debug_print=debug_print)       
 
 
+
         # ==================================================================================================================== #
         # Phase 2.55 - Add non-PBE decoders to the .decoders dict                                                              #
         # ==================================================================================================================== #
@@ -1253,6 +1281,74 @@ class GenericDecoderDictDecodedEpochsDictResult(ComputedResult):
         return a_new_fully_generic_result
 
 
+
+    @function_attributes(short_name=None, tags=['compute', 'decode', 'epochs'], input_requires=[], output_provides=[], uses=['self.updating_results_for_context'], used_by=[], creation_date='2025-04-05 11:51', related_items=[])
+    def perform_decoding(self, an_all_directional_pf1D_Decoder: BasePositionDecoder, filter_epochs_to_decode_dict: Dict[types.GenericResultTupleIndexType, Epoch], spikes_df: pd.DataFrame, epochs_decoding_time_bin_size: float,
+                                        session_name: str, t_start: float, t_delta: float, t_end: float, unique_decoder_names: Optional[List[str]]=None, debug_print:bool=True):
+        """ Uses the provided decoder to decode each filter_epoch in the provided dict. The keys of the dict should be the IdentifyingContext of the resultant decoded values.
+
+        Usage: 
+            from pyphoplacecellanalysis.Analysis.Decoder.context_dependent import GenericDecoderDictDecodedEpochsDictResult
+
+            ## INPUTS: a_new_fully_generic_result
+            session_name: str = curr_active_pipeline.session_name
+            t_start, t_delta, t_end = curr_active_pipeline.find_LongShortDelta_times()
+            spikes_df = deepcopy(get_proper_global_spikes_df(curr_active_pipeline))
+
+            epochs_decoding_time_bin_size = 0.025
+
+            ## get the base decoder we'll use for decoding
+            a_base_context = IdentifyingContext(trained_compute_epochs='laps', pfND_ndim=1, decoder_identifier='pseudo2D', time_bin_size=time_bin_size, data_grain='per_time_bin') # , known_named_decoding_epochs_type='laps', masked_time_bin_fill_type='ignore'
+            a_best_matching_context, a_result, a_decoder, a_decoded_marginal_posterior_df = a_new_fully_generic_result.get_results_matching_contexts(a_base_context, return_multiple_matches=False)
+
+            filter_epochs_to_decode_dict = {deepcopy(a_best_matching_context).overwriting_context(known_named_decoding_epochs_type='laps'):deepcopy(laps_df),
+                                    # deepcopy(a_best_matching_context).overwriting_context(known_named_decoding_epochs_type='pbes'):deepcopy(non_pbe_df),
+                                    deepcopy(a_best_matching_context).overwriting_context(known_named_decoding_epochs_type='non_pbe_endcaps'):deepcopy(non_pbe_endcaps_df),
+            }
+
+            a_new_fully_generic_result = a_new_fully_generic_result.perform_decoding(an_all_directional_pf1D_Decoder=a_decoder, filter_epochs_to_decode_dict=filter_epochs_to_decode_dict,
+                                                spikes_df=deepcopy(get_proper_global_spikes_df(curr_active_pipeline)), epochs_decoding_time_bin_size=epochs_decoding_time_bin_size,
+                                                session_name=session_name, t_start=t_start, t_delta=t_delta, t_end=t_end,
+                                            )
+
+            ## OUTPUTS: a_new_fully_generic_result
+            
+        
+        """
+        from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.EpochComputationFunctions import EpochComputationsComputationsContainer
+
+        ## INPUTS: a_decoder
+        if unique_decoder_names is None:
+            unique_decoder_names = ['long_LR', 'long_RL', 'short_LR', 'short_RL']
+            # unique_decoder_names=['long', 'short']
+            
+
+        if len(filter_epochs_to_decode_dict) == 0:
+            print(f'nothing to decode! Skipping.')
+            return self
+        else:
+            _temp_out_tuple = EpochComputationsComputationsContainer._build_context_general_output_decoded_posteriors(non_PBE_all_directional_pf1D_Decoder=an_all_directional_pf1D_Decoder, filter_epochs_to_decode_dict=filter_epochs_to_decode_dict,
+                unique_decoder_names=unique_decoder_names,
+                spikes_df=deepcopy(spikes_df), epochs_decoding_time_bin_size=epochs_decoding_time_bin_size,
+                session_name=session_name, t_start=t_start, t_delta=t_delta, t_end=t_end,
+            )
+
+            filter_epochs_to_decoded_dict, filter_epochs_pseudo2D_continuous_specific_decoded_result, filter_epochs_decoder_dict, filter_epochs_decoded_filter_epoch_track_marginal_posterior_df_dict = _temp_out_tuple
+            ## INPUTS: filter_epochs_to_decoded_dict, filter_epochs_pseudo2D_continuous_specific_decoded_result, filter_epochs_decoder_dict, filter_epochs_decoded_filter_epoch_track_marginal_posterior_df_dict
+
+            for a_new_context, a_filter_epoch_to_decode in filter_epochs_to_decoded_dict.items():
+                a_new_result = filter_epochs_pseudo2D_continuous_specific_decoded_result[a_new_context]
+                a_decoder = filter_epochs_decoder_dict[a_new_context]
+                a_new_decoded_marginal_posterior_df = filter_epochs_decoded_filter_epoch_track_marginal_posterior_df_dict[a_new_context]
+
+                if debug_print:
+                    print(f'\tupdating results for context: {a_new_context}')
+                _was_update_success = self.updating_results_for_context(new_context=a_new_context, a_result=a_new_result, a_decoder=deepcopy(a_decoder), a_decoded_marginal_posterior_df=a_new_decoded_marginal_posterior_df, an_epoch_to_decode=a_filter_epoch_to_decode, debug_print=debug_print)
+                if not _was_update_success:
+                    print(f'\t\tWARN: update failed for context: {a_new_context}')
+
+            print(f'done.')
+            return self
 
 
 

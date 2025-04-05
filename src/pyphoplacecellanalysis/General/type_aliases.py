@@ -26,7 +26,7 @@ FilterContextName: TypeAlias = str # a string identifier of a specific filtering
 ComputationFunctionName: TypeAlias = str # a string identifier of a computation function -- can be either the long or short name -- '_split_to_directional_laps' -- used in `.get_failed_computations(...)`
 
 KnownNamedDecoderTrainedComputeEpochsType = Literal['laps', 'non_pbe']
-KnownNamedDecodingEpochsType = Literal['laps', 'replay', 'ripple', 'pbe', 'non_pbe', 'global']
+KnownNamedDecodingEpochsType = Literal['laps', 'replay', 'ripple', 'pbe', 'non_pbe', 'non_pbe_endcaps', 'global']
 # Define a type that can only be one of these specific strings
 MaskedTimeBinFillType = Literal['ignore', 'last_valid', 'nan_filled', 'dropped'] ## used in `DecodedFilterEpochsResult.mask_computed_DecodedFilterEpochsResult_by_required_spike_counts_per_time_bin(...)` to specify how invalid bins (due to too few spikes) are treated.
 DataTimeGrain = Literal['per_epoch', 'per_time_bin']
