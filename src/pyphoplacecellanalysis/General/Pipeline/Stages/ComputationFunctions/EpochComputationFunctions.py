@@ -366,7 +366,7 @@ class Compute_NonPBE_Epochs(ComputedResult):
 
 
 
-    @function_attributes(short_name=None, tags=['epochs', 'non-PBE', 'session'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-01-28 04:10', related_items=[]) 
+    @function_attributes(short_name=None, tags=['epochs', 'non-PBE', 'session', 'metadata'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-01-28 04:10', related_items=[]) 
     @classmethod
     def _adding_global_non_PBE_epochs_to_sess(cls, sess, t_start: float, t_delta: float, t_end: float, training_data_portion: float = 5.0/6.0) -> Tuple[Dict[types.DecoderName, pd.DataFrame], Dict[types.DecoderName, pd.DataFrame]]:
         """ Builds a dictionary of train/test-split epochs for ['long', 'short', 'global'] periods
@@ -387,16 +387,33 @@ class Compute_NonPBE_Epochs(ComputedResult):
             t_start, t_delta, t_end = curr_active_pipeline.find_LongShortDelta_times()
             
         
-        """                
+        """
+        maze_id_to_maze_name_map = {-1:'none', 0:'long', 1:'short'}
+        epoch_overlap_prevention_kwargs = dict(additive_factor=-0.008, final_output_minimum_epoch_duration=0.040) # passed to `*df.epochs.modify_each_epoch_by(...)`
+        
         PBE_df: pd.DataFrame = ensure_dataframe(deepcopy(sess.pbe))
+        laps_df = ensure_dataframe(deepcopy(sess.laps))
+        
+
         ## Build up a new epoch
         epochs_df: pd.DataFrame = deepcopy(sess.epochs).epochs.adding_global_epoch_row()
         global_epoch_only_df: pd.DataFrame = epochs_df.epochs.label_slice('maze')
         
         # t_start, t_stop = epochs_df.epochs.t_start, epochs_df.epochs.t_stop
         global_epoch_only_non_PBE_epoch_df: pd.DataFrame = global_epoch_only_df.epochs.subtracting(PBE_df)
-        global_epoch_only_non_PBE_epoch_df= global_epoch_only_non_PBE_epoch_df.epochs.modify_each_epoch_by(additive_factor=-0.008, final_output_minimum_epoch_duration=0.040)
+        global_epoch_only_non_PBE_epoch_df= global_epoch_only_non_PBE_epoch_df.epochs.modify_each_epoch_by(**epoch_overlap_prevention_kwargs)
         
+        ## endcap-only (non_PBE and non_lap/running) epochs:
+        a_new_global_epoch_only_non_pbe_endcaps_df: pd.DataFrame = deepcopy(global_epoch_only_non_PBE_epoch_df).epochs.subtracting(laps_df)
+        a_new_global_epoch_only_non_pbe_endcaps_df = a_new_global_epoch_only_non_pbe_endcaps_df.epochs.modify_each_epoch_by(**epoch_overlap_prevention_kwargs) # minimum length to consider is 50ms, contract each epoch inward by -8ms (4ms on each side)
+        a_new_global_epoch_only_non_pbe_endcaps_df = a_new_global_epoch_only_non_pbe_endcaps_df.epochs.adding_or_updating_metadata(track_identity='global', interval_datasource_name=f'global_EndcapsNonPBE') # train_test_period='train', training_data_portion=training_data_portion, 
+        a_new_global_epoch_only_non_pbe_endcaps_df = a_new_global_epoch_only_non_pbe_endcaps_df.epochs.adding_maze_id_if_needed(t_start=t_start, t_delta=t_delta, t_end=t_end)
+        a_new_global_epoch_only_non_pbe_endcaps_df['maze_name'] = a_new_global_epoch_only_non_pbe_endcaps_df['maze_id'].map(maze_id_to_maze_name_map)
+
+
+        # ==================================================================================================================== #
+        # training/test Split                                                                                                  #
+        # ==================================================================================================================== #
 
         ## this training/test isn't required:
         a_new_global_training_df, a_new_global_test_df = global_epoch_only_non_PBE_epoch_df.epochs.split_into_training_and_test(training_data_portion=training_data_portion, group_column_name ='label', additional_epoch_identity_column_names=['label'], skip_get_non_overlapping=False, debug_print=False) # a_laps_training_df, a_laps_test_df both comeback good here.
@@ -412,7 +429,7 @@ class Compute_NonPBE_Epochs(ComputedResult):
         a_new_global_training_df = a_new_global_training_df.epochs.adding_maze_id_if_needed(t_start=t_start, t_delta=t_delta, t_end=t_end)
         a_new_global_test_df = a_new_global_test_df.epochs.adding_maze_id_if_needed(t_start=t_start, t_delta=t_delta, t_end=t_end)
 
-        maze_id_to_maze_name_map = {-1:'none', 0:'long', 1:'short'}
+        
         a_new_global_training_df['maze_name'] = a_new_global_training_df['maze_id'].map(maze_id_to_maze_name_map)
         a_new_global_test_df['maze_name'] = a_new_global_test_df['maze_id'].map(maze_id_to_maze_name_map)
 
