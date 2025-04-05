@@ -1414,9 +1414,7 @@ class EpochComputationsComputationsContainer(ComputedResult):
             
             a_base_context = IdentifyingContext(trained_compute_epochs='laps', pfND_ndim=1, decoder_identifier='pseudo2D', time_bin_size=time_bin_size, data_grain='per_time_bin') # , known_named_decoding_epochs_type='laps', masked_time_bin_fill_type='ignore'
             a_best_matching_context, a_result, a_decoder, a_decoded_marginal_posterior_df = a_new_fully_generic_result.get_results_matching_contexts(a_base_context, return_multiple_matches=False)
-            filter_epochs = curr_active_pipeline.filtered_sessions[global_epoch_name].non_pbe_endcaps
-            a_pseudo2D_continuous_specific_decoded_result: DecodedFilterEpochsResult = a_decoder.decode_specific_epochs(spikes_df = deepcopy(get_proper_global_spikes_df(curr_active_pipeline)), filter_epochs=filter_epochs, decoding_time_bin_size=epochs_decoding_time_bin_size)
-
+            
             filter_epochs_to_decode_dict = {IdentifyingContext(known_named_decoding_epochs_type='laps'):deepcopy(laps_df),
                                             # IdentifyingContext(known_named_decoding_epochs_type='pbes'):deepcopy(non_pbe_df),
                                             IdentifyingContext(known_named_decoding_epochs_type='non_pbe_endcaps'):deepcopy(non_pbe_endcaps_df),
@@ -1463,7 +1461,7 @@ class EpochComputationsComputationsContainer(ComputedResult):
             
             for a_masked_bin_fill_mode in masked_bin_fill_modes:
                 ## MASKED:
-                a_masked_decoded_epoch_context = deepcopy(a_decoded_epoch_context).overwriting_context(masked_bin_fill_mode=a_masked_bin_fill_mode) # IdentifyingContext
+                a_masked_decoded_epoch_context = deepcopy(a_decoded_epoch_context).overwriting_context(masked_time_bin_fill_type=a_masked_bin_fill_mode) # IdentifyingContext
                 if debug_print:
                     print(f'\ta_masked_decoded_epoch_context: {a_masked_decoded_epoch_context}')
                 
