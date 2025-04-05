@@ -3028,6 +3028,7 @@ def generalized_decode_epochs_dict_and_export_results_completion_function(self, 
     """
     from typing import Literal
     from neuropy.core.epoch import EpochsAccessor, Epoch, ensure_dataframe, ensure_Epoch, TimeColumnAliasesProtocol
+    from pyphocorehelpers.print_helpers import get_now_rounded_time_str
     from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.EpochComputationFunctions import EpochComputationFunctions, EpochComputationsComputationsContainer, NonPBEDimensionalDecodingResult, Compute_NonPBE_Epochs, KnownFilterEpochs, GeneralDecoderDictDecodedEpochsDictResult
     from neuropy.analyses.placefields import PfND
     from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import filter_and_update_epochs_and_spikes
@@ -3094,12 +3095,26 @@ def generalized_decode_epochs_dict_and_export_results_completion_function(self, 
     active_context = complete_session_context
     session_name: str = curr_active_pipeline.session_name
     earliest_delta_aligned_t_start, t_delta, latest_delta_aligned_t_end = curr_active_pipeline.find_LongShortDelta_times()
+
+    ## Build the function that uses curr_active_pipeline to build the correct filename and actually output the .csv to the right place
+    def _subfn_custom_export_df_to_csv(export_df: pd.DataFrame, data_identifier_str: str = f'(laps_marginals_df)', parent_output_path: Path=None):
+        """ captures `curr_active_pipeline`
+        """
+        output_date_str: str = get_now_rounded_time_str(rounded_minutes=10)
+        out_path, out_filename, out_basename = curr_active_pipeline.build_complete_session_identifier_filename_string(output_date_str=output_date_str, data_identifier_str=data_identifier_str, parent_output_path=parent_output_path, out_extension='.csv')
+        export_df.to_csv(out_path)
+        return out_path 
+
+    custom_export_df_to_csv_fn = _subfn_custom_export_df_to_csv
+
+
     # tbin_values_dict={'laps': decoding_time_bin_size, 'pbe': decoding_time_bin_size, 'non_pbe': decoding_time_bin_size, 'FAT': decoding_time_bin_size}
 
     # csv_save_paths_dict = GenericDecoderDictDecodedEpochsDictResult._perform_export_dfs_dict_to_csvs(extracted_dfs_dict=a_new_fully_generic_result.filter_epochs_decoded_track_marginal_posterior_df_dict,
     csv_save_paths_dict = a_new_fully_generic_result.export_csvs(
                                                 parent_output_path=active_export_parent_output_path.resolve(),
                                                 active_context=active_context, session_name=session_name, #curr_active_pipeline=curr_active_pipeline,
+                                                custom_export_df_to_csv_fn=custom_export_df_to_csv_fn,
                                                 decoding_time_bin_size=decoding_time_bin_size,
                                                 curr_session_t_delta=t_delta
                                                 )

@@ -1660,24 +1660,36 @@ class GenericDecoderDictDecodedEpochsDictResult(ComputedResult):
         # BEGIN SUBN BLOCK                                                                                                                                                                 #
         # ================================================================================================================================================================================ #
         # Export CSVs:
-        def _subfn_export_df_to_csv(export_df: pd.DataFrame, data_identifier_str: str = f'(single_FAT)', parent_output_path: Path=None):
-            """ captures `active_context`, 'output_date_str'
-            """
-            # parent_output_path: Path = Path('output').resolve()
-            # active_context = curr_active_pipeline.get_session_context()
-            session_identifier_str: str = active_context.get_description() # 'kdiba_gor01_two_2006-6-12_16-53-46__withNormalComputedReplays-qclu_[1, 2, 4, 6, 7, 9]-frateThresh_1.0normal_computed-frateThresh_1.0-qclu_[1, 2, 4, 6, 7, 9]'
-            # session_identifier_str: str = active_context.get_description(subset_excludelist=['custom_suffix']) # no this is just the session
-            assert output_date_str is not None
-            out_basename = '-'.join([output_date_str, session_identifier_str, data_identifier_str]) # '2024-11-15_0200PM-kdiba_gor01_one_2006-6-09_1-22-43__withNormalComputedReplays_qclu_[1, 2, 4, 6, 7, 9]_frateThresh_5.0-(ripple_WCorrShuffle_df)_tbin-0.025'
-            out_filename = f"{out_basename}.csv"
-            out_path = parent_output_path.joinpath(out_filename).resolve()
-            export_df.to_csv(out_path)
-            return out_path 
 
+        # def _subfn_custom_export_df_to_csv(export_df: pd.DataFrame, data_identifier_str: str = f'(laps_marginals_df)', parent_output_path: Path=None):
+        #     """ captures CURR_BATCH_DATE_TO_USE, `curr_active_pipeline`
+        #     """
+        #     output_date_str: str = deepcopy(CURR_BATCH_DATE_TO_USE)
+        #     if (output_date_str is None) or (len(output_date_str) < 1):
+        #         output_date_str = get_now_rounded_time_str(rounded_minutes=10)
+        #     out_path, out_filename, out_basename = curr_active_pipeline.build_complete_session_identifier_filename_string(output_date_str=output_date_str, data_identifier_str=data_identifier_str, parent_output_path=parent_output_path, out_extension='.csv')
+        #     export_df.to_csv(out_path)
+        #     return out_path 
+        
 
-        if custom_export_df_to_csv_fn is None:
-            # use the default
-            custom_export_df_to_csv_fn = _subfn_export_df_to_csv
+        # custom_export_df_to_csv_fn = _subfn_custom_export_df_to_csv
+        
+        assert custom_export_df_to_csv_fn is not None, f"2025-04-05 - the default `_subfn_export_df_to_csv(...)` implementation provided below produces unparsable filenames, so require one passed for now."
+        # if custom_export_df_to_csv_fn is None:
+        #     def _subfn_export_df_to_csv(export_df: pd.DataFrame, data_identifier_str: str = f'(single_FAT)', parent_output_path: Path=None):
+        #         """ captures `active_context`, 'output_date_str' !! #TODO 2025-04-05 18:25: - [ ] session_identifier_str: seems a little long: 'kdiba_gor01_one_2006-6-09_1-22-43_normal_computed_[1, 2, 4, 6, 7, 9]_5.0' --- `data_identifier_str` is REALLY long tho: '(trained_compute_epochs:non_pbe|known_named_decoding_epochs_type:laps|masked_time_bin_fill_type:ignore)_tbin-0.025'
+        #         """
+        #         # parent_output_path: Path = Path('output').resolve()
+        #         # active_context = curr_active_pipeline.get_session_context()
+        #         session_identifier_str: str = active_context.get_description() # 'kdiba_gor01_two_2006-6-12_16-53-46__withNormalComputedReplays-qclu_[1, 2, 4, 6, 7, 9]-frateThresh_1.0normal_computed-frateThresh_1.0-qclu_[1, 2, 4, 6, 7, 9]'
+        #         # session_identifier_str: str = active_context.get_description(subset_excludelist=['custom_suffix']) # no this is just the session
+        #         assert output_date_str is not None
+        #         out_basename = '-'.join([output_date_str, session_identifier_str, data_identifier_str]) # '2024-11-15_0200PM-kdiba_gor01_one_2006-6-09_1-22-43__withNormalComputedReplays_qclu_[1, 2, 4, 6, 7, 9]_frateThresh_5.0-(ripple_WCorrShuffle_df)_tbin-0.025'
+        #         out_filename = f"{out_basename}.csv"
+        #         out_path = parent_output_path.joinpath(out_filename).resolve()
+        #         export_df.to_csv(out_path)
+        #         return out_path     
+        #     custom_export_df_to_csv_fn = _subfn_export_df_to_csv
 
         def _subfn_pre_process_and_export_df(export_df: pd.DataFrame, a_df_identifier: Union[str, IdentifyingContext]):
             """ 
@@ -1693,7 +1705,7 @@ class GenericDecoderDictDecodedEpochsDictResult(ComputedResult):
             a_time_col_name: str = time_col_name_dict.get(an_epochs_source_name, 't_bin_center')
             
             ## Add t_bin column method
-            export_df = export_df.across_session_identity.add_session_df_columns(session_name=session_name, time_bin_size=a_tbin_size, t_start=t_start, curr_session_t_delta=curr_session_t_delta, t_end=t_end, time_col=a_time_col_name)
+            export_df = export_df.across_session_identity.add_session_df_columns(session_name=session_name, time_bin_size=a_tbin_size, t_start=t_start, curr_session_t_delta=curr_session_t_delta, t_end=t_end, time_col=a_time_col_name) ## #TODO 2025-04-05 18:12: - [ ] what about qclu? FrHz?
             a_tbin_size_str: str = f"{round(a_tbin_size, ndigits=5)}"
             a_data_identifier_str: str = f'({a_df_identifier})_tbin-{a_tbin_size_str}' ## build the identifier '(laps_weighted_corr_merged_df)_tbin-1.5'
             
@@ -1770,7 +1782,7 @@ class GenericDecoderDictDecodedEpochsDictResult(ComputedResult):
             
         else:
             for a_df_identifier, a_df in extracted_dfs_dict.items():
-                export_files_dict[a_df_identifier] =  _subfn_pre_process_and_export_df(export_df=a_df, a_df_identifier=a_df_identifier)
+                export_files_dict[a_df_identifier] =  _subfn_pre_process_and_export_df(export_df=a_df, a_df_identifier=a_df_identifier) ## I bet `a_df_identifier` is an IdentifyingContext here, but a string in the above FAT case.
             # end for a_df_name, a_df
         # END if use_single_FAT_df
         
