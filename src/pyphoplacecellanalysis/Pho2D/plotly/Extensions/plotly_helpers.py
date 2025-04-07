@@ -1607,7 +1607,7 @@ def plot_across_sessions_scatter_results(directory: Union[Path, str], concatenat
 
 
 @function_attributes(short_name=None, tags=['plotly', 'scatter'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-03-17 12:27', related_items=[])
-def build_single_plotly_marginal_scatter_and_hist_over_time(a_decoded_posterior_df: pd.DataFrame, a_target_context: IdentifyingContext, histogram_bins: int = 25, debug_print = False):
+def build_single_plotly_marginal_scatter_and_hist_over_time(a_decoded_posterior_df: pd.DataFrame, a_target_context: IdentifyingContext, histogram_bins: int = 25, x:str='delta_aligned_start_t', y:str='P_Short', debug_print = False):
     """ adds new tracks
     
     Adds 3 tracks like: ['ContinuousDecode_longnon-PBE-pseudo2D marginals', 'ContinuousDecode_shortnon-PBE-pseudo2D marginals', 'non-PBE_marginal_over_track_ID_ContinuousDecode - t_bin_size: 0.05']
@@ -1635,13 +1635,13 @@ def build_single_plotly_marginal_scatter_and_hist_over_time(a_decoded_posterior_
         assert found_time_bin_size is not None
         a_decoded_posterior_df['time_bin_size'] = float(found_time_bin_size)
         
-    assert 'delta_aligned_start_t' in a_decoded_posterior_df
+    assert x in a_decoded_posterior_df
     # plot_row_identifier: str = f'{a_known_decoded_epochs_type.capitalize()} - {masking_bin_fill_mode.capitalize()} decoder' # should be like 'Laps (Masked) from Non-PBE decoder'    
     plot_row_identifier: str = a_target_context.get_description(subset_includelist=['known_named_decoding_epochs_type', 'masked_time_bin_fill_type'], include_property_names=True, key_value_separator=':', separator='|', replace_separator_in_property_names='-')
     plot_row_identifier = f"{plot_row_identifier} decoder" # should be like 'Laps (Masked) from Non-PBE decoder'"
     fig, figure_context = plotly_pre_post_delta_scatter(data_results_df=deepcopy(a_decoded_posterior_df), data_context=deepcopy(a_target_context), out_scatter_fig=None, 
-                                    histogram_variable_name='P_Short', hist_kwargs=dict(), histogram_bins=histogram_bins,
+                                    histogram_variable_name=y, hist_kwargs=dict(), histogram_bins=histogram_bins,
                                     common_plot_kwargs=dict(),
-                                    px_scatter_kwargs = dict(x='delta_aligned_start_t', y='P_Short', title=plot_row_identifier))
+                                    px_scatter_kwargs = dict(x=x, y=y, title=plot_row_identifier))
     return fig, figure_context
 
