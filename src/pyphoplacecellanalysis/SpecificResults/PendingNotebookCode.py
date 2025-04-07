@@ -2320,6 +2320,8 @@ def override_laps(curr_active_pipeline, override_laps_df: pd.DataFrame, debug_pr
 # ==================================================================================================================== #
 # @ 2025-01-01 - Better Aggregation of Probabilities across bins                                                       #
 # ==================================================================================================================== #
+from neuropy.utils.indexing_helpers import PandasHelpers
+
 @metadata_attributes(short_name=None, tags=['aggregation', 'UNFINSHED', 'integration', 'confidence'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-01-01 00:00', related_items=[])
 class TimeBinAggregation:
     """ Methods of aggregating over many time bins
@@ -2360,6 +2362,7 @@ class TimeBinAggregation:
 
 
     """
+    
     # ==================================================================================================================================================================================================================================================================================== #
     # ToCoarserTimeBin: Aggregation across adjacent time bins, resulting in a coarser graining than the existing time bins                                                                                                                                                                 #
     # ==================================================================================================================================================================================================================================================================================== #
@@ -2510,6 +2513,10 @@ class TimeBinAggregation:
             Returns:
                 float: The streak-weighted P_Long for the DataFrame.
             """
+            from neuropy.utils.indexing_helpers import PandasHelpers
+
+            
+
             # Define a function to get the most extreme value in each window                    
             def most_extreme(x):
                 """Return the value with the largest absolute magnitude, preserving its sign."""
@@ -2524,17 +2531,17 @@ class TimeBinAggregation:
             # Use skipna=True to handle NaN values properly
             # return df[column].rolling(window, *args, **kwargs).apply(most_extreme, raw=False).apply(most_extreme, raw=False)
 
-                    
             # return df[column].rolling(window, *args, **kwargs).max().max()
             # return df[column].rolling(window, *args, **kwargs).agg(lambda x: x[np.abs(x).argmax()]).agg(lambda x: x[np.abs(x).argmax()]) #.max()
-
+            
             # Apply the function to rolling windows
-            rolling_extreme = df[column].rolling(window, *args, **kwargs).apply(most_extreme, raw=False)
+            rolling_extreme = PandasHelpers.remap_range(df[column], from_range=(0.0, 1.0), to_range=(-1.0, 1.0), safety_check=True).rolling(window, *args, **kwargs).apply(most_extreme, raw=False)
             # rolling_extreme = df[column].rolling(window, *args, **kwargs).apply(most_extreme, raw=False).apply(most_extreme, raw=False)
             
             # Then get the most extreme value across all windows
             idx = rolling_extreme.abs().idxmax()
-            return rolling_extreme.loc[idx]
+            # return rolling_extreme.loc[idx]
+            return PandasHelpers.remap_range(rolling_extreme.loc[idx], from_range=(-1.0, 1.0), to_range=(0.0, 1.0), safety_check=False) # map back to original probability
             # # return df[column].rolling(window, *args, **kwargs).apply(most_extreme, raw=False).apply(most_extreme, raw=False)
         
 
