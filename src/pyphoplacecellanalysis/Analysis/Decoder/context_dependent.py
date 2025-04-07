@@ -1384,10 +1384,10 @@ class GenericDecoderDictDecodedEpochsDictResult(ComputedResult):
         except KeyError:
             # Find single best matching context
             if (not return_multiple_matches):
-                best_match, match_count = IdentifyingContext.find_best_matching_context(query, dictionary)
+                best_match, max_num_matching_context_attributes = IdentifyingContext.find_best_matching_context(query, dictionary)
                 if best_match:
                     if debug_print:
-                        print(f"Found best match for {item_name} with {match_count} matching attributes:\t{best_match}\n")
+                        print(f"Found best match for {item_name} with {max_num_matching_context_attributes} matching attributes:\t{best_match}\n")
                     return best_match, dictionary[best_match] # (context, value)
                 else:
                     if debug_print:
@@ -1395,7 +1395,7 @@ class GenericDecoderDictDecodedEpochsDictResult(ComputedResult):
                     return None, None # (context, value)
             else:
                 # Find multiple matching contexts
-                matching_contexts, match_count = IdentifyingContext.find_best_matching_contexts(query, dictionary)
+                matching_contexts, number_matching_context_attributes, max_num_matching_context_attributes = IdentifyingContext.find_best_matching_contexts(query, dictionary)
                 if matching_contexts:
                     if debug_print:
                         print(f"Found {len(matching_contexts)} matches for {item_name}")
