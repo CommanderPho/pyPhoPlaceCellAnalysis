@@ -1797,7 +1797,7 @@ class GenericDecoderDictDecodedEpochsDictResult(ComputedResult):
         return export_files_dict
     
     @function_attributes(short_name=None, tags=['export', 'CSV', 'main'], input_requires=['self.filter_epochs_decoded_track_marginal_posterior_df_dict'], output_provides=[], uses=['self.filter_epochs_decoded_track_marginal_posterior_df_dict', '_perform_export_dfs_dict_to_csvs'], used_by=[], creation_date='2025-03-13 08:58', related_items=[])
-    def export_csvs(self, parent_output_path: Path, active_context: IdentifyingContext, decoding_time_bin_size: float, session_name: str, curr_session_t_delta: Optional[float]=None, user_annotation_selections=None, valid_epochs_selections=None, custom_export_df_to_csv_fn=None, export_df_variable_names=None, tbin_values_dict: Optional[Dict[str, float]]=None, should_export_complete_all_scores_df:bool=True):
+    def export_csvs(self, parent_output_path: Path, active_context: IdentifyingContext, decoding_time_bin_size: float, session_name: str, curr_session_t_delta: Optional[float]=None, user_annotation_selections=None, valid_epochs_selections=None, custom_export_df_to_csv_fn=None, export_df_variable_names=None, use_single_FAT_df=True, tbin_values_dict: Optional[Dict[str, float]]=None, should_export_complete_all_scores_df:bool=True):
         """ export as a single_FAT .csv file or optionally (not yet implemented) separate .csv files.    
 
 
@@ -1853,7 +1853,7 @@ class GenericDecoderDictDecodedEpochsDictResult(ComputedResult):
         if len(extracted_dfs_dict) > 0:
             export_files_dict = export_files_dict | self._perform_export_dfs_dict_to_csvs(extracted_dfs_dict=extracted_dfs_dict, parent_output_path=parent_output_path, tbin_values_dict=tbin_values_dict,
                                                                                           active_context=active_context, session_name=session_name, curr_session_t_delta=curr_session_t_delta, user_annotation_selections=user_annotation_selections, valid_epochs_selections=valid_epochs_selections, custom_export_df_to_csv_fn=custom_export_df_to_csv_fn,
-                                                                                          use_single_FAT_df=True)
+                                                                                          use_single_FAT_df=use_single_FAT_df)
 
 
         # ## try to export the merged all_scores dataframe
