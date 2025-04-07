@@ -1372,7 +1372,7 @@ class GenericDecoderDictDecodedEpochsDictResult(ComputedResult):
     @classmethod
     def _subfn_get_value_with_context_matching(cls, dictionary: Dict, query: IdentifyingContext, item_name="item", return_multiple_matches: bool=True, debug_print:bool=True) -> Union[Dict, Tuple[IdentifyingContext, Any]]:
         """Helper function to get a value from a dictionary with context matching.
-        
+        #2025-04-07 11:51: - [X] Fixed for matching empty IdentifyingContext()
         """
         try:
             value = dictionary[query]  # Try exact match first
