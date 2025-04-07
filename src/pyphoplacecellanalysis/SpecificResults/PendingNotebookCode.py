@@ -2322,7 +2322,7 @@ def override_laps(curr_active_pipeline, override_laps_df: pd.DataFrame, debug_pr
 # ==================================================================================================================== #
 from neuropy.utils.indexing_helpers import PandasHelpers
 
-@metadata_attributes(short_name=None, tags=['aggregation', 'UNFINSHED', 'integration', 'confidence'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-01-01 00:00', related_items=[])
+@metadata_attributes(short_name=None, tags=['aggregation', 'integration', 'confidence'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-01-01 00:00', related_items=[])
 class TimeBinAggregation:
     """ Methods of aggregating over many time bins
 
@@ -2558,9 +2558,6 @@ class TimeBinAggregation:
             else:
                 return PandasHelpers.remap_range(rolling_extreme.loc[idx], from_range=(-1.0, 1.0), to_range=(0.0, 1.0), safety_check=False) # map back to original probability range 
             
-
-
-
 
 
 @metadata_attributes(short_name=None, tags=['UNUSED', 'ChatGPT', 'aggregation'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-01-01 00:00', related_items=['TimeBinAggregation'])
