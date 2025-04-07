@@ -2515,10 +2515,8 @@ class TimeBinAggregation:
             """
             from neuropy.utils.indexing_helpers import PandasHelpers
 
-            
-
             # Define a function to get the most extreme value in each window                    
-            def most_extreme(x):
+            def _subfn_most_extreme(x):
                 """Return the value with the largest absolute magnitude, preserving its sign."""
                 # Handle empty or all-NaN series
                 if (x.empty or x.isna().all()):
@@ -2528,22 +2526,13 @@ class TimeBinAggregation:
                 # Return the original value at that index
                 return x.loc[idx]
 
-            # Use skipna=True to handle NaN values properly
-            # return df[column].rolling(window, *args, **kwargs).apply(most_extreme, raw=False).apply(most_extreme, raw=False)
-
-            # return df[column].rolling(window, *args, **kwargs).max().max()
-            # return df[column].rolling(window, *args, **kwargs).agg(lambda x: x[np.abs(x).argmax()]).agg(lambda x: x[np.abs(x).argmax()]) #.max()
-            
+            # BEGIN FUNCTION BODY ________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
             # Apply the function to rolling windows
-            rolling_extreme = PandasHelpers.remap_range(df[column], from_range=(0.0, 1.0), to_range=(-1.0, 1.0), safety_check=True).rolling(window, *args, **kwargs).apply(most_extreme, raw=False)
-            # rolling_extreme = df[column].rolling(window, *args, **kwargs).apply(most_extreme, raw=False).apply(most_extreme, raw=False)
-            
+            rolling_extreme = PandasHelpers.remap_range(df[column], from_range=(0.0, 1.0), to_range=(-1.0, 1.0), safety_check=True).rolling(window, *args, **kwargs).apply(_subfn_most_extreme, raw=False) ## map original probability range to -1, +1 so the `most_extreme` function works correctly
             # Then get the most extreme value across all windows
             idx = rolling_extreme.abs().idxmax()
-            # return rolling_extreme.loc[idx]
-            return PandasHelpers.remap_range(rolling_extreme.loc[idx], from_range=(-1.0, 1.0), to_range=(0.0, 1.0), safety_check=False) # map back to original probability
-            # # return df[column].rolling(window, *args, **kwargs).apply(most_extreme, raw=False).apply(most_extreme, raw=False)
-        
+            return PandasHelpers.remap_range(rolling_extreme.loc[idx], from_range=(-1.0, 1.0), to_range=(0.0, 1.0), safety_check=False) # map back to original probability range 
+            
 
 
 
