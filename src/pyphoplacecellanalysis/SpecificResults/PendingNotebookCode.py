@@ -2501,7 +2501,7 @@ class TimeBinAggregation:
 
 
         @classmethod
-        def peak_rolling_avg(cls, df: pd.DataFrame, column: str='P_Short', window: int=3, *args, **kwargs) -> float:
+        def peak_rolling_avg(cls, df: pd.DataFrame, column: str='P_Short', window: int=3, *args, min_periods:int=0, center:bool=True, **kwargs) -> float:
             """
             Computes the streak-weighted P_Long for a given DataFrame, giving higher weight to longer sequences of adjacent bins.
 
@@ -2509,6 +2509,25 @@ class TimeBinAggregation:
                 df (pd.DataFrame): Input DataFrame containing the P_Long column.
                 column (str): The column name for P_Long.
                 threshold (float): Minimum probability to consider a bin as part of a streak. Default is 0.5.
+
+
+            KWARGS:
+                https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.rolling.html
+
+
+                min_periods (int), default (min_periods will default to the size of the window):
+                    Minimum number of observations in window required to have a value; otherwise, result is np.nan.
+
+                center (bool), default False:
+                    If False, set the window labels as the right edge of the window index.
+                    If True, set the window labels as the center of the window index.
+
+                closed (str), default 'right'
+                    If 'right', the first point in the window is excluded from calculations.
+                    If 'left', the last point in the window is excluded from calculations.
+                    If 'both', the no points in the window are excluded from calculations.
+                    If 'neither', the first and last points in the window are excluded from calculations.
+
 
             Returns:
                 float: The streak-weighted P_Long for the DataFrame.
@@ -2520,18 +2539,24 @@ class TimeBinAggregation:
                 """Return the value with the largest absolute magnitude, preserving its sign."""
                 # Handle empty or all-NaN series
                 if (x.empty or x.isna().all()):
-                    return None
+                    return np.nan
+                    # return None
                 # Find index of maximum absolute value, ignoring NaNs
                 idx = x.abs().idxmax(skipna=True)
                 # Return the original value at that index
                 return x.loc[idx]
 
+            kwargs = dict(min_periods=min_periods, center=center) | kwargs # Minimum number of observations in window required to have a value; otherwise, result is np.nan.
+
             # BEGIN FUNCTION BODY ________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
             # Apply the function to rolling windows
             rolling_extreme = PandasHelpers.remap_range(df[column], from_range=(0.0, 1.0), to_range=(-1.0, 1.0), safety_check=True).rolling(window, *args, **kwargs).apply(_subfn_most_extreme, raw=False) ## map original probability range to -1, +1 so the `most_extreme` function works correctly
             # Then get the most extreme value across all windows
-            idx = rolling_extreme.abs().idxmax()
-            return PandasHelpers.remap_range(rolling_extreme.loc[idx], from_range=(-1.0, 1.0), to_range=(0.0, 1.0), safety_check=False) # map back to original probability range 
+            idx = rolling_extreme.abs().idxmax(skipna=True)
+            if np.isnan(idx).all():
+                return idx
+            else:
+                return PandasHelpers.remap_range(rolling_extreme.loc[idx], from_range=(-1.0, 1.0), to_range=(0.0, 1.0), safety_check=False) # map back to original probability range 
             
 
 
