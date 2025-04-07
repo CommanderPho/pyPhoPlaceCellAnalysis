@@ -1903,4 +1903,50 @@ class GenericDecoderDictDecodedEpochsDictResult(ComputedResult):
                 f"    filter_epochs_decoded_filter_epoch_track_marginal_posterior_df_dict={filter_epochs_decoded_filter_epoch_track_marginal_posterior_df_dict_repr}\n"
                 f")")
 
+    @classmethod
+    def _perform_per_epoch_time_bin_aggregation(cls, a_decoded_time_bin_marginal_posterior_df: pd.DataFrame, probabilitY_column_to_aggregate:str='P_Short', n_rolling_avg_window_tbins: int = 3) -> Tuple[pd.DataFrame, pd.DataFrame]:
+        """ 
 
+        Usage:        
+            from pyphoplacecellanalysis.Analysis.Decoder.context_dependent import GenericDecoderDictDecodedEpochsDictResult
+
+            a_decoded_per_epoch_marginals_df, a_decoded_time_bin_marginal_posterior_df = GenericDecoderDictDecodedEpochsDictResult._perform_per_epoch_time_bin_aggregation(a_decoded_time_bin_marginal_posterior_df=a_decoded_time_bin_marginal_posterior_df, probabilitY_column_to_aggregate='P_Short', n_rolling_avg_window_tbins=3)
+
+        """
+        from neuropy.analyses.time_bin_aggregation import TimeBinAggregation
+
+        ## INPUTS: a_decoded_time_bin_marginal_posterior_df
+
+        
+        # Create a copy to avoid modifying the original
+        # result_df = a_decoded_time_bin_marginal_posterior_df.copy()
+        result_df = deepcopy(a_decoded_time_bin_marginal_posterior_df)
+        epoch_partitioned_dfs_dict = a_decoded_time_bin_marginal_posterior_df.pho.partition_df_dict(partitionColumn='parent_epoch_label')
+
+        # Process each partition
+        for k, df in epoch_partitioned_dfs_dict.items():
+            rolling_avg = TimeBinAggregation.ToPerEpoch.peak_rolling_avg(df=df, column=probabilitY_column_to_aggregate, window=n_rolling_avg_window_tbins)    
+            # Calculate the mean of P_Short for this group
+            mean_p_short = TimeBinAggregation.ToPerEpoch.mean(df=df, column=probabilitY_column_to_aggregate)
+
+            # Get indices from this partition
+            indices = df.index
+            # Assign the result to the corresponding rows in the result dataframe
+            result_df.loc[indices, f'rolling_avg_{probabilitY_column_to_aggregate}'] = rolling_avg
+            result_df.loc[indices, f'mean_{probabilitY_column_to_aggregate}'] = mean_p_short  # Same mean value for all rows in group
+            
+            # result_df.loc[indices
+
+        ## OUTPUTS: result_df
+
+        # Then keep only the first entry for each 'parent_epoch_label'
+        a_decoded_per_epoch_marginals_df = a_decoded_time_bin_marginal_posterior_df.groupby('parent_epoch_label').first().reset_index()
+        
+        ## fixup `data_grain` column so it's now correct
+        a_decoded_per_epoch_marginals_df = TimeBinAggregation.ToPerEpoch.fixup_data_grain_to_per_epoch(df=a_decoded_per_epoch_marginals_df)
+
+        return a_decoded_per_epoch_marginals_df, a_decoded_time_bin_marginal_posterior_df
+
+        ## OUTPUTS: a_decoded_time_bin_marginal_posterior_df, a_decoded_per_epoch_marginals_df
+        ## Columns of interest: f'rolling_avg_{probabilitY_column_to_aggregate}' (e.g. 'rolling_avg_P_Short')
+        
