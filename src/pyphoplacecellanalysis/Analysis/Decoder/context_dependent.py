@@ -1420,7 +1420,6 @@ class GenericDecoderDictDecodedEpochsDictResult(ComputedResult):
         if context_query is None:
             context_query = IdentifyingContext() ## empty context, returning all matches
             
-
         if (not return_multiple_matches):
             # ==================================================================================================================== #
             # Find single best matching context                                                                                    #
