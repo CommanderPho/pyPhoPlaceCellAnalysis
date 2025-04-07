@@ -2326,130 +2326,219 @@ class TimeBinAggregation:
 
     from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import TimeBinAggregation, ParticleFilter
 
+    ## INPUTS: a_decoded_time_bin_marginal_posterior_df
+
+    n_rolling_avg_window_tbins: int = 3
+    # Create a copy to avoid modifying the original
+    result_df = a_decoded_time_bin_marginal_posterior_df.copy()
+    epoch_partitioned_dfs_dict = a_decoded_time_bin_marginal_posterior_df.pho.partition_df_dict(partitionColumn='parent_epoch_label')
+
+    # Process each partition
+    for k, df in epoch_partitioned_dfs_dict.items():
+        rolling_avg = TimeBinAggregation.ToPerEpoch.peak_rolling_avg(df=df, column='P_Short', window=n_rolling_avg_window_tbins)    
+        # Calculate the mean of P_Short for this group
+        mean_p_short = TimeBinAggregation.ToPerEpoch.mean(df=df, column='P_Short')
+
+        # Get indices from this partition
+        indices = df.index
+        # Assign the result to the corresponding rows in the result dataframe
+        result_df.loc[indices, 'rolling_avg_P_Short'] = rolling_avg
+        result_df.loc[indices, 'mean_P_Short'] = mean_p_short  # Same mean value for all rows in group
+        
+        # result_df.loc[indices
+
+    ## OUTPUTS: result_df
+
+    a_decoded_time_bin_marginal_posterior_df = deepcopy(result_df)
+    a_decoded_time_bin_marginal_posterior_df
+
+    # Then keep only the first entry for each 'parent_epoch_label'
+    a_decoded_per_epoch_marginals_df = a_decoded_time_bin_marginal_posterior_df.groupby('parent_epoch_label').first().reset_index()
+    a_decoded_per_epoch_marginals_df
+
+    ## OUTPUTS: a_decoded_time_bin_marginal_posterior_df, a_decoded_per_epoch_marginals_df
+
 
     """
-    @function_attributes(short_name=None, tags=['NDArray', 'streak', 'sequence', 'probability', 'likelihood'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-01-01 14:00', related_items=[])
-    @classmethod
-    def compute_epoch_p_long_with_streaks(cls, p_long: List[float], min_probability_threshold: float = 0.5) -> float:
-        """ Prior to `compute_streak_weighted_p_long` version, which operates on dataframes
+    # ==================================================================================================================================================================================================================================================================================== #
+    # ToCoarserTimeBin: Aggregation across adjacent time bins, resulting in a coarser graining than the existing time bins                                                                                                                                                                 #
+    # ==================================================================================================================================================================================================================================================================================== #
+    class ToCoarserTimeBin:
+
+        @classmethod
+        def rolling_avg(cls, df: pd.DataFrame, column: str='P_Short', window: int=3, *args, **kwargs) -> float:
+            """
+            Computes the streak-weighted P_Long for a given DataFrame, giving higher weight to longer sequences of adjacent bins.
+
+            Args:
+                df (pd.DataFrame): Input DataFrame containing the P_Long column.
+                column (str): The column name for P_Long.
+                threshold (float): Minimum probability to consider a bin as part of a streak. Default is 0.5.
+
+            Returns:
+                float: The streak-weighted P_Long for the DataFrame.
+            """
+            return df[column].rolling(window, *args, **kwargs).max()
+
+    # END ToCoarserTimeBin _______________________________________________________________________________________________ #
 
 
-        Computes the overall P_Long for an epoch, giving higher weight to uninterrupted streaks.
+    # ==================================================================================================================== #
+    # ToPerEpoch: Aggregation across entire epoch, resulting in a single result summarizing each epoch 
+    # ==================================================================================================================== #
+    class ToPerEpoch:
+        """ returns a single result summarizing each epoch """
 
-        Args:
-            p_long (List[float]): Probabilities of being in the "Long" state for each time bin.
-            threshold (float): Minimum probability to consider a bin as part of a streak. Default is 0.5.
-
-        Returns:
-            float: The overall P_Long for the epoch.
-
-        Usage:
-            # Example usage
-            p_long = a_lap_df[a_var_name].to_numpy() # [0.8, 0.7, 0.2, 0.9, 0.95, 0.3, 0.85, 0.87, 0.86]
-            min_probability_threshold = 0.5  # Minimum probability to count as "Long"
-            overall_p_long = compute_epoch_p_long_with_streaks(p_long, min_probability_threshold)
-            print(f"Overall P_Long with streak weighting: {overall_p_long}")
-
-        """
-        streaks = []
-        current_streak = []
-
-        # Identify streaks
-        for i, prob in enumerate(p_long):
-            if prob >= min_probability_threshold:
-                current_streak.append(i)
-            else:
-                if current_streak:
-                    streaks.append(current_streak)
-                    current_streak = []
-        if current_streak:  # Add the last streak if it ends at the last bin
-            streaks.append(current_streak)
-
-        # Assign weights based on streak length (linearly)
-        weights = [0] * len(p_long)
-        for streak in streaks:
-            streak_length = len(streak)
-            for idx in streak:
-                weights[idx] = streak_length
-
-        # Compute weighted average
-        weighted_sum = np.sum(w * p for w, p in zip(weights, p_long))
-        total_weight = np.sum(weights)
-        return weighted_sum / total_weight if total_weight > 0 else 0.0
+        @function_attributes(short_name=None, tags=['NDArray', 'streak', 'sequence', 'probability', 'likelihood'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-01-01 14:00', related_items=[])
+        @classmethod
+        def compute_epoch_p_long_with_streaks(cls, p_long: List[float], min_probability_threshold: float = 0.5) -> float:
+            """ Prior to `compute_streak_weighted_p_long` version, which operates on dataframes
 
 
-    @classmethod
-    def mean(cls, df: pd.DataFrame, column: str='P_Short', *args, **kwargs) -> float:
-        """
-        Computes the streak-weighted P_Long for a given DataFrame, giving higher weight to longer sequences of adjacent bins.
+            Computes the overall P_Long for an epoch, giving higher weight to uninterrupted streaks.
 
-        Args:
-            df (pd.DataFrame): Input DataFrame containing the P_Long column.
-            column (str): The column name for P_Long.
-            threshold (float): Minimum probability to consider a bin as part of a streak. Default is 0.5.
+            Args:
+                p_long (List[float]): Probabilities of being in the "Long" state for each time bin.
+                threshold (float): Minimum probability to consider a bin as part of a streak. Default is 0.5.
 
-        Returns:
-            float: The streak-weighted P_Long for the DataFrame.
-        """
-        return df[column].mean(*args, skipna=True, **kwargs)
+            Returns:
+                float: The overall P_Long for the epoch.
 
+            Usage:
+                # Example usage
+                p_long = a_lap_df[a_var_name].to_numpy() # [0.8, 0.7, 0.2, 0.9, 0.95, 0.3, 0.85, 0.87, 0.86]
+                min_probability_threshold = 0.5  # Minimum probability to count as "Long"
+                overall_p_long = compute_epoch_p_long_with_streaks(p_long, min_probability_threshold)
+                print(f"Overall P_Long with streak weighting: {overall_p_long}")
 
-    @function_attributes(short_name=None, tags=['streak', 'sequence', 'dataframe', 'probability', 'likelihood'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-01-01 14:11', related_items=[])
-    @classmethod
-    def compute_streak_weighted_p_long(cls, df: pd.DataFrame, column: str, threshold: float = 0.5) -> float:
-        """
-        Computes the streak-weighted P_Long for a given DataFrame, giving higher weight to longer sequences of adjacent bins.
+            """
+            streaks = []
+            current_streak = []
 
-        Args:
-            df (pd.DataFrame): Input DataFrame containing the P_Long column.
-            column (str): The column name for P_Long.
-            threshold (float): Minimum probability to consider a bin as part of a streak. Default is 0.5.
+            # Identify streaks
+            for i, prob in enumerate(p_long):
+                if prob >= min_probability_threshold:
+                    current_streak.append(i)
+                else:
+                    if current_streak:
+                        streaks.append(current_streak)
+                        current_streak = []
+            if current_streak:  # Add the last streak if it ends at the last bin
+                streaks.append(current_streak)
 
-        Returns:
-            float: The streak-weighted P_Long for the DataFrame.
-        """
-        p_long = df[column].values
-        streaks = []
-        current_streak = []
+            # Assign weights based on streak length (linearly)
+            weights = [0] * len(p_long)
+            for streak in streaks:
+                streak_length = len(streak)
+                for idx in streak:
+                    weights[idx] = streak_length
 
-        # Identify streaks
-        for i, prob in enumerate(p_long):
-            if prob >= threshold:
-                current_streak.append(i)
-            else:
-                if current_streak:
-                    streaks.append(current_streak)
-                    current_streak = []
-        if current_streak:  # Add the last streak if it ends at the last bin
-            streaks.append(current_streak)
-
-        # Assign weights based on streak length
-        weights = [0] * len(p_long)
-        for streak in streaks:
-            streak_length = len(streak)
-            for idx in streak:
-                weights[idx] = streak_length
-
-        # Compute weighted average
-        weighted_sum = sum(w * p for w, p in zip(weights, p_long))
-        total_weight = sum(weights)
-        return weighted_sum / total_weight if total_weight > 0 else 0.0
+            # Compute weighted average
+            weighted_sum = np.sum(w * p for w, p in zip(weights, p_long))
+            total_weight = np.sum(weights)
+            return weighted_sum / total_weight if total_weight > 0 else 0.0
 
 
-    @classmethod
-    def peak_rolling_avg(cls, df: pd.DataFrame, column: str='P_Short', window: int=3, *args, **kwargs) -> float:
-        """
-        Computes the streak-weighted P_Long for a given DataFrame, giving higher weight to longer sequences of adjacent bins.
+        @classmethod
+        def mean(cls, df: pd.DataFrame, column: str='P_Short', *args, **kwargs) -> float:
+            """
+            Computes the streak-weighted P_Long for a given DataFrame, giving higher weight to longer sequences of adjacent bins.
 
-        Args:
-            df (pd.DataFrame): Input DataFrame containing the P_Long column.
-            column (str): The column name for P_Long.
-            threshold (float): Minimum probability to consider a bin as part of a streak. Default is 0.5.
+            Args:
+                df (pd.DataFrame): Input DataFrame containing the P_Long column.
+                column (str): The column name for P_Long.
+                threshold (float): Minimum probability to consider a bin as part of a streak. Default is 0.5.
 
-        Returns:
-            float: The streak-weighted P_Long for the DataFrame.
-        """
-        return df[column].rolling(window, *args, **kwargs).max().max()
+            Returns:
+                float: The streak-weighted P_Long for the DataFrame.
+            """
+            return df[column].mean(*args, skipna=True, **kwargs)
+
+
+        @function_attributes(short_name=None, tags=['streak', 'sequence', 'dataframe', 'probability', 'likelihood'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-01-01 14:11', related_items=[])
+        @classmethod
+        def compute_streak_weighted_p_long(cls, df: pd.DataFrame, column: str, threshold: float = 0.5) -> float:
+            """
+            Computes the streak-weighted P_Long for a given DataFrame, giving higher weight to longer sequences of adjacent bins.
+
+            Args:
+                df (pd.DataFrame): Input DataFrame containing the P_Long column.
+                column (str): The column name for P_Long.
+                threshold (float): Minimum probability to consider a bin as part of a streak. Default is 0.5.
+
+            Returns:
+                float: The streak-weighted P_Long for the DataFrame.
+            """
+            p_long = df[column].values
+            streaks = []
+            current_streak = []
+
+            # Identify streaks
+            for i, prob in enumerate(p_long):
+                if prob >= threshold:
+                    current_streak.append(i)
+                else:
+                    if current_streak:
+                        streaks.append(current_streak)
+                        current_streak = []
+            if current_streak:  # Add the last streak if it ends at the last bin
+                streaks.append(current_streak)
+
+            # Assign weights based on streak length
+            weights = [0] * len(p_long)
+            for streak in streaks:
+                streak_length = len(streak)
+                for idx in streak:
+                    weights[idx] = streak_length
+
+            # Compute weighted average
+            weighted_sum = sum(w * p for w, p in zip(weights, p_long))
+            total_weight = sum(weights)
+            return weighted_sum / total_weight if total_weight > 0 else 0.0
+
+
+        @classmethod
+        def peak_rolling_avg(cls, df: pd.DataFrame, column: str='P_Short', window: int=3, *args, **kwargs) -> float:
+            """
+            Computes the streak-weighted P_Long for a given DataFrame, giving higher weight to longer sequences of adjacent bins.
+
+            Args:
+                df (pd.DataFrame): Input DataFrame containing the P_Long column.
+                column (str): The column name for P_Long.
+                threshold (float): Minimum probability to consider a bin as part of a streak. Default is 0.5.
+
+            Returns:
+                float: The streak-weighted P_Long for the DataFrame.
+            """
+            # Define a function to get the most extreme value in each window                    
+            def most_extreme(x):
+                """Return the value with the largest absolute magnitude, preserving its sign."""
+                # Handle empty or all-NaN series
+                if (x.empty or x.isna().all()):
+                    return None
+                # Find index of maximum absolute value, ignoring NaNs
+                idx = x.abs().idxmax(skipna=True)
+                # Return the original value at that index
+                return x.loc[idx]
+
+            # Use skipna=True to handle NaN values properly
+            # return df[column].rolling(window, *args, **kwargs).apply(most_extreme, raw=False).apply(most_extreme, raw=False)
+
+                    
+            # return df[column].rolling(window, *args, **kwargs).max().max()
+            # return df[column].rolling(window, *args, **kwargs).agg(lambda x: x[np.abs(x).argmax()]).agg(lambda x: x[np.abs(x).argmax()]) #.max()
+
+            # Apply the function to rolling windows
+            rolling_extreme = df[column].rolling(window, *args, **kwargs).apply(most_extreme, raw=False)
+            # rolling_extreme = df[column].rolling(window, *args, **kwargs).apply(most_extreme, raw=False).apply(most_extreme, raw=False)
+            
+            # Then get the most extreme value across all windows
+            idx = rolling_extreme.abs().idxmax()
+            return rolling_extreme.loc[idx]
+            # # return df[column].rolling(window, *args, **kwargs).apply(most_extreme, raw=False).apply(most_extreme, raw=False)
+        
+
+
 
 
 
