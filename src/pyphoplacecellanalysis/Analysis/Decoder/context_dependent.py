@@ -1939,8 +1939,8 @@ class GenericDecoderDictDecodedEpochsDictResult(ComputedResult):
 
     @classmethod
     def _perform_per_epoch_time_bin_aggregation(cls, a_decoded_time_bin_marginal_posterior_df: pd.DataFrame, probabilitY_column_to_aggregate:str='P_Short', n_rolling_avg_window_tbins: int = 3) -> Tuple[pd.DataFrame, pd.DataFrame]:
-        """ 
-
+        """ For a single marginal_df, performs aggregation to get the corresponding 'per_epoch' value.
+        
         Usage:        
             from pyphoplacecellanalysis.Analysis.Decoder.context_dependent import GenericDecoderDictDecodedEpochsDictResult
 
