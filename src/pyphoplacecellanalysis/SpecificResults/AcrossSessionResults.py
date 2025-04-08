@@ -3938,7 +3938,7 @@ class SingleFatDataframe:
     
     """
     @classmethod
-    def build_fat_df(cls, dfs_dict: Dict[IdentifyingContext, pd.DataFrame]) -> pd.DataFrame:
+    def build_fat_df(cls, dfs_dict: Dict[IdentifyingContext, pd.DataFrame], additional_common_context: Optional[IdentifyingContext]=None) -> pd.DataFrame:
         """ builds a single FAT_df from a dict of identities and their corresponding dfs. Adds all of the index keys as columns, and all of their values a duplicated along all rows of the coresponding df.
         Then stacks them into a single, FAT dataframe.
 
@@ -3949,10 +3949,14 @@ class SingleFatDataframe:
         
         FAT_df_list: List[pd.DataFrame] = []
     
-        for a_df_name, a_df in dfs_dict.items():
+        for a_df_context, a_df in dfs_dict.items():
             ## In a single_FAT frame, we add columns with the context value for all entries in the dataframe.
-            for a_ctxt_key, a_ctxt_value in a_df_name.to_dict().items():
+            for a_ctxt_key, a_ctxt_value in a_df_context.to_dict().items():
                 a_df[a_ctxt_key] = a_ctxt_value
+                
+            if additional_common_context is not None:
+                for a_ctxt_key, a_ctxt_value in additional_common_context.to_dict().items():
+                    a_df[a_ctxt_key] = a_ctxt_value
                 
             # time_col = 'start' # 'ripple_start_t' for ripples, etc
             extant_time_col: str = TimeColumnAliasesProtocol.find_first_extant_suitable_columns_name(a_df, col_connonical_name='t_bin_center', required_columns_synonym_dict={"t_bin_center":{'lap_start_t','ripple_start_t','start_t','start', 't'}}, should_raise_exception_on_fail=True)

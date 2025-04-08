@@ -1733,7 +1733,8 @@ class GenericDecoderDictDecodedEpochsDictResult(ComputedResult):
         #     custom_export_df_to_csv_fn = _subfn_export_df_to_csv
 
         def _subfn_pre_process_and_export_df(export_df: pd.DataFrame, a_df_identifier: Union[str, IdentifyingContext]):
-            """ 
+            """ sets up all the important metadata and then calls `custom_export_df_to_csv_fn(....)` to actually export the CSV
+            
             captures: t_start, t_delta, t_end, tbin_values_dict, time_col_name_dict, user_annotation_selections, valid_epochs_selections, custom_export_df_to_csv_fn
             """
             if isinstance(a_df_identifier, str):
@@ -1818,7 +1819,7 @@ class GenericDecoderDictDecodedEpochsDictResult(ComputedResult):
         export_files_dict = {}
         
         if use_single_FAT_df:
-            single_FAT_df: pd.DataFrame = SingleFatDataframe.build_fat_df(dfs_dict=extracted_dfs_dict)
+            single_FAT_df: pd.DataFrame = SingleFatDataframe.build_fat_df(dfs_dict=extracted_dfs_dict, additional_common_context=active_context)
             export_files_dict['FAT'] =  _subfn_pre_process_and_export_df(export_df=single_FAT_df, a_df_identifier="FAT")
             
         else:
@@ -1882,7 +1883,7 @@ class GenericDecoderDictDecodedEpochsDictResult(ComputedResult):
         #     # export all by default
         #     export_df_variable_names = _df_variables_names
             
-        extracted_dfs_dict = self.filter_epochs_decoded_track_marginal_posterior_df_dict # {a_df_name:getattr(self, a_df_name) for a_df_name in export_df_variable_names}
+        extracted_dfs_dict: Dict[IdentifyingContext, pd.DataFrame] = self.filter_epochs_decoded_track_marginal_posterior_df_dict # {a_df_name:getattr(self, a_df_name) for a_df_name in export_df_variable_names}
         if len(extracted_dfs_dict) > 0:
             export_files_dict = export_files_dict | self._perform_export_dfs_dict_to_csvs(extracted_dfs_dict=extracted_dfs_dict, parent_output_path=parent_output_path, tbin_values_dict=tbin_values_dict,
                                                                                           active_context=active_context, session_name=session_name, curr_session_t_delta=curr_session_t_delta, user_annotation_selections=user_annotation_selections, valid_epochs_selections=valid_epochs_selections, custom_export_df_to_csv_fn=custom_export_df_to_csv_fn,
