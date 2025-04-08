@@ -1984,3 +1984,62 @@ class GenericDecoderDictDecodedEpochsDictResult(ComputedResult):
         ## OUTPUTS: a_decoded_time_bin_marginal_posterior_df, a_decoded_per_epoch_marginals_df
         ## Columns of interest: f'rolling_avg_{probabilitY_column_to_aggregate}' (e.g. 'rolling_avg_P_Short')
         
+
+
+
+    @classmethod
+    def _perform_all_per_time_bin_to_per_epoch_aggregations(cls, a_new_fully_generic_result: "GenericDecoderDictDecodedEpochsDictResult", flat_decoded_marginal_posterior_df_context_dict: Dict[IdentifyingContext, pd.DataFrame], probabilitY_column_to_aggregate:str='P_Short', n_rolling_avg_window_tbins: int = 3, **kwargs) -> Tuple[pd.DataFrame, pd.DataFrame]:
+        """ For a single marginal_df, performs aggregation to get the corresponding 'per_epoch' value.
+        
+        Usage:        
+            from pyphoplacecellanalysis.Analysis.Decoder.context_dependent import GenericDecoderDictDecodedEpochsDictResult
+
+            a_decoded_per_epoch_marginals_df, a_decoded_time_bin_marginal_posterior_df = GenericDecoderDictDecodedEpochsDictResult._perform_per_epoch_time_bin_aggregation(a_decoded_time_bin_marginal_posterior_df=a_decoded_time_bin_marginal_posterior_df, probabilitY_column_to_aggregate='P_Short', n_rolling_avg_window_tbins=3)
+
+        """
+        from neuropy.analyses.time_bin_aggregation import TimeBinAggregation
+
+        ## INPUTS: a_new_fully_generic_result
+        ## INPUTS: a_decoded_time_bin_marginal_posterior_df
+
+        ## INPUTS: flat_decoded_marginal_posterior_df_context_dict
+        per_time_bin_to_per_epoch_context_map_dict = {}
+        flat_decoded_marginal_posterior_df_per_time_bin_marginals_df_context_dict = {}
+        flat_decoded_marginal_posterior_df_per_epoch_marginals_df_context_dict = {}
+        for a_per_time_bin_ctxt, a_decoded_time_bin_marginal_posterior_df in flat_decoded_marginal_posterior_df_context_dict.items():
+            a_decoded_per_epoch_marginals_df, a_decoded_time_bin_marginal_posterior_df = GenericDecoderDictDecodedEpochsDictResult._perform_per_epoch_time_bin_aggregation(a_decoded_time_bin_marginal_posterior_df=a_decoded_time_bin_marginal_posterior_df, probabilitY_column_to_aggregate=probabilitY_column_to_aggregate, n_rolling_avg_window_tbins=n_rolling_avg_window_tbins, **kwargs)
+            a_per_epoch_ctxt = TimeBinAggregation.ToPerEpoch.get_per_epoch_ctxt_from_per_time_bin_ctxt(a_per_time_bin_ctxt=a_per_time_bin_ctxt)
+            per_time_bin_to_per_epoch_context_map_dict[a_per_time_bin_ctxt] = a_per_epoch_ctxt
+            flat_decoded_marginal_posterior_df_per_time_bin_marginals_df_context_dict[a_per_time_bin_ctxt] = deepcopy(a_decoded_time_bin_marginal_posterior_df)
+            flat_decoded_marginal_posterior_df_per_epoch_marginals_df_context_dict[a_per_epoch_ctxt] = a_decoded_per_epoch_marginals_df
+
+
+        ## OUTPUTS: per_time_bin_to_per_epoch_context_map_dict, flat_decoded_marginal_posterior_df_per_epoch_marginals_df_context_dict, flat_decoded_marginal_posterior_df_per_time_bin_marginals_df_context_dict
+        flat_decoded_marginal_posterior_df_per_time_bin_marginals_df_context_dict
+        flat_decoded_marginal_posterior_df_per_epoch_marginals_df_context_dict
+                
+
+        ## INPUTS: per_time_bin_to_per_epoch_context_map_dict, flat_decoded_marginal_posterior_df_per_epoch_marginals_df_context_dict, flat_decoded_marginal_posterior_df_per_time_bin_marginals_df_context_dict
+        # flat_decoded_marginal_posterior_df_per_time_bin_marginals_df_context_dict
+        # flat_decoded_marginal_posterior_df_per_epoch_marginals_df_context_dict
+
+        for a_per_time_bin_ctxt, a_decoded_time_bin_marginal_posterior_df in flat_decoded_marginal_posterior_df_per_time_bin_marginals_df_context_dict.items():
+            a_per_epoch_ctxt = per_time_bin_to_per_epoch_context_map_dict[a_per_time_bin_ctxt]
+            a_decoded_time_bin_marginal_posterior_df = flat_decoded_marginal_posterior_df_per_time_bin_marginals_df_context_dict[a_per_time_bin_ctxt]
+            a_decoded_per_epoch_marginals_df = flat_decoded_marginal_posterior_df_per_epoch_marginals_df_context_dict[a_per_epoch_ctxt]
+            a_new_fully_generic_result.filter_epochs_decoded_track_marginal_posterior_df_dict[a_per_time_bin_ctxt] = a_decoded_time_bin_marginal_posterior_df
+            a_best_matching_context, a_result, a_decoder, a_decoded_time_bin_marginal_posterior_df = a_new_fully_generic_result.get_results_best_matching_context(a_per_time_bin_ctxt)
+            # a_best_matching_context, a_result, a_decoder, a_decoded_marginal_posterior_df = a_new_fully_generic_result.get_results_matching_context(a_per_time_bin_ctxt, return_multiple_matches=False)
+            # a_result
+            print(f'updating: "{a_per_epoch_ctxt}"')
+            print(f"\tWARN: TODO 2025-04-07 19:22: - [ ] a_result is wrong, it's the per-time-bin version not the per-epoch version") #TODO 2025-04-07 19:22: - [ ] a_result is wrong, it's the per-time-bin version not the per-epoch version
+
+            ## need to get updated a_decoder, a_result
+            
+            # a_dropping_masked_pseudo2D_continuous_specific_decoded_result, _dropping_mask_index_tuple = a_result.mask_computed_DecodedFilterEpochsResult_by_required_spike_counts_per_time_bin(spikes_df=deepcopy(spikes_df), masked_bin_fill_mode=a_masked_bin_fill_mode) ## Masks the low-firing bins so they don't confound the analysis.
+            # ## Computes marginals for `dropping_masked_laps_pseudo2D_continuous_specific_decoded_result`
+            # a_dropping_masked_decoded_marginal_posterior_df = DirectionalPseudo2DDecodersResult.perform_compute_specific_marginals(a_result=a_dropping_masked_pseudo2D_continuous_specific_decoded_result, marginal_context=a_masked_updated_context)
+            a_new_fully_generic_result.updating_results_for_context(new_context=a_per_epoch_ctxt, a_result=deepcopy(a_result), a_decoder=deepcopy(a_decoder), a_decoded_marginal_posterior_df=deepcopy(a_decoded_per_epoch_marginals_df)) ## update using the result
+            
+
+
