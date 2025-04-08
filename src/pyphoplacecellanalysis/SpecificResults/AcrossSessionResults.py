@@ -3971,9 +3971,17 @@ class SingleFatDataframe:
                     #     custom_suffix_string_parts.append(f"frateThresh_{ctxt.get('minimum_inclusion_fr_Hz', None):.1f}")
 
                     specially_formatted_key_names_dict = {'epochs_source':'', 'included_qclu_values':f"qclu_", 'minimum_inclusion_fr_Hz':f"frateThresh_"}
-                    specially_formatted_values_dict = {'epochs_source':SingleFatDataframe.to_filename_conversion_dict[a_ctxt_value], 'included_qclu_values':f"{a_ctxt_value}", 'minimum_inclusion_fr_Hz':f"{a_ctxt_value:.1f}"}
+                    # specially_formatted_values_dict = {'epochs_source':SingleFatDataframe.to_filename_conversion_dict.get(a_ctxt_value, f'{a_ctxt_value}'), 'included_qclu_values':f"{a_ctxt_value}", 'minimum_inclusion_fr_Hz':f"{a_ctxt_value:.1f}"}
                     
-                    a_ctxt_value_str: str = specially_formatted_values_dict.get(a_ctxt_value, f'{a_ctxt_value}')
+                    _default_formatter_fn = lambda v: f'{v}'
+                    specially_formatted_values_dict = {'epochs_source': lambda v: SingleFatDataframe.to_filename_conversion_dict.get(v, f'{v}'), 'included_qclu_values': (lambda v: f"{v}"), 'minimum_inclusion_fr_Hz': (lambda v: f"{v:.1f}")}
+                    
+
+
+                    a_ctxt_value_formatter_fn = specially_formatted_values_dict.get(a_ctxt_key, _default_formatter_fn)
+                    a_ctxt_value_str: str = a_ctxt_value_formatter_fn(a_ctxt_value)
+
+                    # a_ctxt_value_str: str = specially_formatted_values_dict.get(a_ctxt_value, f'{a_ctxt_value}')
 
                     a_df[a_ctxt_key] = a_ctxt_value_str ## need to turn this into a flat string ValueError: Length of values (6) does not match length of index (19102)
                 
