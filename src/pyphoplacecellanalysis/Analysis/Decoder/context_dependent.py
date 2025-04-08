@@ -1381,7 +1381,8 @@ class GenericDecoderDictDecodedEpochsDictResult(ComputedResult):
             else:
                 ## format as a single-item dictionary with value for compatibility
                 return {query: value} # {context:value}-dict <single-item>
-        except KeyError:
+        except (KeyError, TypeError):
+            ## TypeError: unhashable type: 'list -- occurs when the query contains multiple values
             # Find single best matching context
             if (not return_multiple_matches):
                 best_match, max_num_matching_context_attributes = IdentifyingContext.find_best_matching_context(query, dictionary)
@@ -1442,7 +1443,7 @@ class GenericDecoderDictDecodedEpochsDictResult(ComputedResult):
             if debug_print and len(set(contexts)) > 1:
                 print(f"Warning: Different contexts matched: result={result_context}, decoder={decoder_context}, posterior={posterior_context}")
 
-            return best_matching_context, a_result, a_decoder, a_decoded_marginal_posterior_df
+            return best_matching_context
         
         else:
             # ==================================================================================================================== #
@@ -1458,12 +1459,20 @@ class GenericDecoderDictDecodedEpochsDictResult(ComputedResult):
             else:
                 return self.get_flattened_contexts_for_posteriors_dfs(decoded_marginal_posterior_df_context_dict) ## a bit inefficient but there's never that many contexts
             
+    @function_attributes(short_name=None, tags=['contexts', 'matching', 'single-context', 'best'], input_requires=[], output_provides=[], uses=['get_matching_contexts'], used_by=[], creation_date='2025-04-07 18:44', related_items=[])
+    def get_best_matching_context(self, context_query: Optional[IdentifyingContext]=None, debug_print:bool=True) -> Optional[IdentifyingContext]: 
+        """ contexts only, no results returned.
+        This doesn't quite make sense because each results dictionary may have different contexts
+        
+        
+        """
+        return self.get_matching_contexts(context_query=context_query, return_multiple_matches=False, debug_print=debug_print)
+        
 
 
 
 
-
-    @function_attributes(short_name=None, tags=['contexts', 'matching'], input_requires=[], output_provides=[], uses=['get_flattened_contexts_for_posteriors_dfs'], used_by=[], creation_date='2025-03-12 11:30', related_items=['get_results_matching_context'])
+    @function_attributes(short_name=None, tags=['contexts', 'matching'], input_requires=[], output_provides=[], uses=['get_flattened_contexts_for_posteriors_dfs'], used_by=[], creation_date='2025-03-12 11:30', related_items=['get_results_matching_context', 'get_matching_contexts'])
     def get_results_matching_contexts(self, context_query: Optional[IdentifyingContext]=None, return_multiple_matches: bool=True, debug_print:bool=True): 
         """ Get a specific contexts
         
@@ -1523,7 +1532,7 @@ class GenericDecoderDictDecodedEpochsDictResult(ComputedResult):
                 return self.get_flattened_contexts_for_posteriors_dfs(decoded_marginal_posterior_df_context_dict) ## a bit inefficient but there's never that many contexts
             
 
-    @function_attributes(short_name=None, tags=['contexts', 'matching'], input_requires=[], output_provides=[], uses=['get_results_matching_contexts'], used_by=[], creation_date='2025-03-12 11:30', related_items=['get_results_matching_contexts'])
+    @function_attributes(short_name=None, tags=['contexts', 'matching', 'single-context', 'best'], input_requires=[], output_provides=[], uses=['get_results_matching_contexts'], used_by=[], creation_date='2025-04-07 00:00', related_items=['get_results_matching_contexts', 'get_best_matching_context'])
     def get_results_best_matching_context(self, context_query: Optional[IdentifyingContext]=None, debug_print:bool=True): 
         """ Gets the results that best match a specific context
         
@@ -1535,7 +1544,7 @@ class GenericDecoderDictDecodedEpochsDictResult(ComputedResult):
         
         
         """
-        return self.get_matching_contexts(context_query=context_query, return_multiple_matches=False, debug_print=debug_print)
+        return self.get_results_matching_contexts(context_query=context_query, return_multiple_matches=False, debug_print=debug_print)
       
 
 
