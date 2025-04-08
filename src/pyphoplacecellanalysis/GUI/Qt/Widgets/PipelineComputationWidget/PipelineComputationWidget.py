@@ -315,7 +315,7 @@ class PipelineComputationWidget(TableContextMenuProviderDelegate, PipelineOwning
     # Computation/Pipeline Action Functions                                                                                #
     # ==================================================================================================================== #
     
-    def _perform_run_compute_function(self, curr_compute_fcn, debug_print=False):
+    def _perform_run_compute_function(self, curr_compute_fcn_name: str, specific_epoch_name: Optional[str]=None, debug_print=False):
         """ tries to use the pipeline to execute the named curr_compute_fcn """
         # custom_args = {} # TODO
         # custom_args = self.active_figure_format_config or {}
@@ -334,9 +334,14 @@ class PipelineComputationWidget(TableContextMenuProviderDelegate, PipelineOwning
 
         # custom_kwargs = {'num_shuffles': 5, 'skip_laps': False, 'minimum_inclusion_fr_Hz':2.0, 'included_qclu_values':[1,2,4,5,6,7]}
         # computation_kwargs_list = [custom_kwargs]
+
+        if specific_epoch_name is None:
+            print(f"Recomputing Computation `{curr_compute_fcn_name}` - for ALL epochs")
+        else:
+            print(f"Recomputing Computation `{curr_compute_fcn_name}` - for specific epoch '{specific_epoch_name}'")
         
         computation_kwargs_list = None
-        compute_outputs = curr_active_pipeline.perform_specific_computation(computation_functions_name_includelist=[curr_compute_fcn], computation_kwargs_list=computation_kwargs_list, 
+        compute_outputs = curr_active_pipeline.perform_specific_computation(computation_functions_name_includelist=[curr_compute_fcn_name], computation_kwargs_list=computation_kwargs_list, 
                                                         enabled_filter_names=None, fail_on_exception=True, debug_print=False)
 
 
@@ -376,7 +381,7 @@ class PipelineComputationWidget(TableContextMenuProviderDelegate, PipelineOwning
             curr_global_comp_fn_name: str = self.params.required_unique_global_comp_names_list[row_index]
             action_recompute = QAction(f"Recompute `{curr_global_comp_fn_name}`", target_table)
             # action_recompute.triggered.connect(lambda: print(f"Recomputing Global Computation `{curr_global_comp_fn_name}` - {row_index}"); self._perform_run_compute_function(curr_compute_fcn=curr_global_comp_fn_name);)
-            action_recompute.triggered.connect(lambda: self._perform_run_compute_function(curr_compute_fcn=curr_global_comp_fn_name))
+            action_recompute.triggered.connect(lambda: self._perform_run_compute_function(curr_compute_fcn_name=curr_global_comp_fn_name))
             menu.addAction(action_recompute)
 
         else:
@@ -395,7 +400,7 @@ class PipelineComputationWidget(TableContextMenuProviderDelegate, PipelineOwning
                 assert row_index is not None
                 curr_comp_fn_name: str = self.params.required_unique_comp_names_list[row_index]
                 action_recompute = QAction(f"Recompute `{curr_comp_fn_name}` for ALL epochs.", target_table)
-                action_recompute.triggered.connect(lambda: print(f"Recomputing Local Computation `{curr_comp_fn_name}` - for ALL epochs"))
+                action_recompute.triggered.connect(lambda: self._perform_run_compute_function(curr_compute_fcn_name=curr_comp_fn_name, specific_epoch_name=None))
                 menu.addAction(action_recompute)
                 return menu
 
@@ -404,7 +409,7 @@ class PipelineComputationWidget(TableContextMenuProviderDelegate, PipelineOwning
                 curr_epoch_name: str = self.params.filtered_epoch_column_names[column_index]
                 curr_comp_fn_name: str = self.params.required_unique_comp_names_list[row_index]
                 action_recompute = QAction(f"Recompute `{curr_comp_fn_name}` for epoch '{curr_epoch_name}'.", target_table)
-                action_recompute.triggered.connect(lambda: print(f"Recomputing Local Computation `{curr_comp_fn_name}` - for specific epoch '{curr_epoch_name}'"))
+                action_recompute.triggered.connect(lambda: self._perform_run_compute_function(curr_compute_fcn_name=curr_comp_fn_name, specific_epoch_name=curr_epoch_name))
                 menu.addAction(action_recompute)
                 return menu
 

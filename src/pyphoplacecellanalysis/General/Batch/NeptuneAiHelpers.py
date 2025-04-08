@@ -5,6 +5,7 @@ from attrs import define, Factory, field
 from typing import Dict, List, Tuple, Optional, Callable, Union, Any
 from typing_extensions import TypeAlias  # "from typing_extensions" in Python 3.9 and earlier
 from typing import NewType
+import nptyping as ND
 from nptyping import NDArray
 import neuropy.utils.type_aliases as types
 

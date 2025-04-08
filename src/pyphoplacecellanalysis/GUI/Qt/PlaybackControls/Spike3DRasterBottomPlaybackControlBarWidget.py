@@ -24,7 +24,8 @@ from PyQt5.QtCore import Qt, QPoint, QRect, QObject, QEvent, pyqtSignal, pyqtSlo
 from pyphocorehelpers.gui.Qt.HighlightedJumpSlider import HighlightedJumpSlider
 from pyphocorehelpers.gui.Qt.ToggleButton import ToggleButtonModel, ToggleButton
 from pyphocorehelpers.gui.Qt.ExceptionPrintingSlot import pyqtExceptionPrintingSlot
-
+from pyphocorehelpers.gui.Qt.QtUIC_Helpers import load_ui_with_named_spacers
+from pyphocorehelpers.gui.Qt.QtUIC_Helpers import get_all_spacer_items, get_spacer_at
 # For extra button symbols:
 import qtawesome as qta
 
@@ -49,7 +50,7 @@ RenderPlaybackControlsMixin
 
 
 btnJumpToPrevious
-comboActiveJumpTargetSeries
+comboActiveJumpTargetSeries - Combo box that allows the user to specify the "jump to" target
 btnJumpToNext
 
 # TODO:
@@ -62,13 +63,22 @@ btnJumpToSpecifiedTime
 jumpToHourMinSecTimeEdit
 
 
+
+# Edit Double Fields _________________________________________________________________________________________________ #
+btnEditNumberField_Revert
+btnEditNumberField_Toggle
+doubleSpinBox_ActiveWindowStartTime
+doubleSpinBox_ActiveWindowEndTime
+
+
+
 ## Logging Widgets:
 txtLogLine -- shows a preview of the last log entries
 btnToggleExternalLogWindow -- opens the separate logging window
 
-playback_controls = [self.ui.button_play_pause, self.ui.button_reverse, self.ui.horizontalSpacer_5]
+playback_controls = [self.ui.button_play_pause, self.ui.button_reverse] # , self.ui.horizontalSpacer_playback
 
-speed_controls = [self.ui.button_slow_down, self.ui.doubleSpinBoxPlaybackSpeed, self.ui.toolButton_SpeedBurstEnabled, self.ui.button_speed_up, self.ui.horizontalSpacer_6]
+speed_controls = [self.ui.button_slow_down, self.ui.doubleSpinBoxPlaybackSpeed, self.ui.toolButton_SpeedBurstEnabled, self.ui.button_speed_up] # , self.ui.horizontalSpacer_6
 
 mark_controls = [self.ui.button_mark_start, self.ui.button_mark_end, self.ui.horizontalSpacer_2]
 
@@ -88,6 +98,14 @@ standalone_extra_controls = [self.ui.btnHelp, self.ui.btnToggleRightSidebar]
 self.ui.btnJoystickMove
 .on_joystick_delta_state_changed
 .sig_joystick_delta_occured (float, float)
+
+
+
+# Dock/Track Controls ________________________________________________________________________________________________ #
+btnAddDockedTrack
+
+
+
 
 
 """
@@ -111,6 +129,7 @@ class Spike3DRasterBottomPlaybackControlBar(ComboBoxCtrlOwningMixin, QWidget):
     jump_series_selection_changed = QtCore.pyqtSignal(str)
     
     jump_specific_time = QtCore.pyqtSignal(float)
+    jump_specific_time_window = QtCore.pyqtSignal(float, float)
     
     # Series Target Actions
     series_remove_pressed = QtCore.pyqtSignal(str)    
@@ -123,11 +142,17 @@ class Spike3DRasterBottomPlaybackControlBar(ComboBoxCtrlOwningMixin, QWidget):
 
     sigToggleRightSidebarVisibility = QtCore.pyqtSignal(bool)
 
+    sigAddDockedTrackRequested = QtCore.pyqtSignal()
+
+
+    ## Editing Start/End Window
+    sigManualEditWindowStartEndToggled = QtCore.pyqtSignal(bool) # whether the user is manually editing
+
 
     def __init__(self, parent=None):
         # super().__init__(parent=parent) # Call the inherited classes __init__ method
         QWidget.__init__(self, parent=parent)
-        self.ui = uic.loadUi(uiFile, self) # Load the .ui file
+        self.ui = load_ui_with_named_spacers(uiFile, self) # Load the .ui file
         self.ui.connections = ConnectionsContainer() 
         self.params = VisualizationParameters(name='Spike3DRasterBottomPlaybackControlBar', debug_print=False)  
         
@@ -144,12 +169,22 @@ class Spike3DRasterBottomPlaybackControlBar(ComboBoxCtrlOwningMixin, QWidget):
         """ setup the UI
         """
    
+        ## Enumeration of several control groups, for the purpose of turning them enable/disabled and visible/hidden as a group
+        playback_controls = [self.ui.button_play_pause, self.ui.button_reverse, self.ui.horizontalSpacer_1] # 
 
-        move_controls = [self.ui.btnSkipLeft, self.ui.btnLeft, self.ui.spinBoxFrameJumpMultiplier, self.ui.btnRight, self.ui.btnSkipRight] # , self.ui.horizontalSpacer_3
+        speed_controls = [self.ui.button_slow_down, self.ui.doubleSpinBoxPlaybackSpeed, self.ui.toolButton_SpeedBurstEnabled, self.ui.button_speed_up, self.ui.horizontalSpacer_6] # 
+
+        jump_to_destination_controls = [self.ui.frame_JumpToDestination, self.ui.spinBoxJumpDestination, self.ui.btnJumpToDestination]
+
+        move_controls = [self.ui.btnSkipLeft, self.ui.btnLeft, self.ui.spinBoxFrameJumpMultiplier, self.ui.btnRight, self.ui.btnSkipRight, self.ui.horizontalSpacer_3] # 
         # debug_log_controls = [self.ui.txtLogLine, self.ui.btnToggleExternalLogWindow]
         standalone_extra_controls = [self.ui.btnHelp]
         
-        controls_to_hide = [self.ui.slider_progress, self.ui.button_full_screen, self.ui.btnCurrentIntervals_Customize, *move_controls, *standalone_extra_controls]
+        controls_to_hide = [self.ui.slider_progress, self.ui.button_full_screen, self.ui.btnCurrentIntervals_Customize, 
+                            *playback_controls,
+                            *speed_controls,
+                            *jump_to_destination_controls,
+                            *standalone_extra_controls] # , *move_controls
 
 
         # Setup Button: Play/Pause
@@ -179,7 +214,8 @@ class Spike3DRasterBottomPlaybackControlBar(ComboBoxCtrlOwningMixin, QWidget):
         self.ui.btnRight.clicked.connect(self.on_jump_right)
         
         self._INIT_UI_initialize_jump_time_edit()
-
+        self._INIT_UI_initialize_active_window_time_double_spinboxes()
+        
         ## Remove Extra Buttons:
         self.ui.btnSkipLeft.hide()
         self.ui.btnSkipRight.hide()
@@ -194,7 +230,8 @@ class Spike3DRasterBottomPlaybackControlBar(ComboBoxCtrlOwningMixin, QWidget):
         self.ui.btnJumpToPrevious.pressed.connect(self.on_jump_prev_series_item)
         self.ui.btnJumpToNext.pressed.connect(self.on_jump_next_series_item)
         self.ui.comboActiveJumpTargetSeries.currentTextChanged.connect(self.on_jump_combo_series_changed)
-
+        
+        self.ui.btnCurrentIntervals_Remove.setHidden(True) ## Hide the dedicated "Remove" button, add it as an entry to the "Extra" menu
         self.ui.btnCurrentIntervals_Customize.pressed.connect(self.on_series_customize_button_pressed)
         self.ui.btnCurrentIntervals_Remove.pressed.connect(self.on_series_remove_button_pressed)
 
@@ -202,14 +239,26 @@ class Spike3DRasterBottomPlaybackControlBar(ComboBoxCtrlOwningMixin, QWidget):
         # self.ui.btnCurrentIntervals_Extra.pressed.connect(self.on_series_customize_button_pressed)
         self.ui._series_extra_menu = QtWidgets.QMenu()
         self.ui._series_extra_menu.addAction('Clear all', self.on_action_clear_all_pressed)
+        self.ui._series_extra_menu.addAction('Remove current', self.on_series_remove_button_pressed)
         self.ui._series_extra_menu.addAction('Add Intervals...', self.on_action_request_add_intervals_pressed)
         self.ui.btnCurrentIntervals_Extra.setMenu(self.ui._series_extra_menu)
         self._update_series_action_buttons(self.has_valid_current_target_series_name) # should disable the action buttons to start
 
         ## Hide any controls in `controls_to_hide`
         for a_ctrl in controls_to_hide:
-            a_ctrl.hide()
-        
+            if hasattr(a_ctrl, 'hide'):
+                a_ctrl.hide()
+            else:
+                a_ctrl.changeSize(0, 0, QtWidgets.QSizePolicy.Fixed, QtWidgets.QSizePolicy.Fixed)
+                self.ui.layout().removeItem(a_ctrl)
+                # self.ui.layout().invalidate()
+
+        # Force the layout to recalc: assume ui is the parent widget holding the layout
+        self.ui.layout().invalidate()  # invalidates the layout cache
+        self.ui.layout().update()      # requests a relayout/redraw
+        # Optionally, you can also trigger a geometry update on the widget:
+        self.ui.updateGeometry()
+
         # debug_log_controls _________________________________________________________________________________________________ #
         self.ui._attached_log_window = None
         self.ui.connections['_logger_sigLogUpdated'] = self._logger.sigLogUpdated.connect(self.on_log_updated)
@@ -226,10 +275,13 @@ class Spike3DRasterBottomPlaybackControlBar(ComboBoxCtrlOwningMixin, QWidget):
         # pg.JoystickButton
         self.ui.connections['btnJoystickMove_sigStateChanged'] = self.ui.btnJoystickMove.sigStateChanged.connect(self.on_joystick_delta_state_changed)
         
+        self.ui.connections['btnAddDockedTrack_pressed'] = self.ui.btnAddDockedTrack.pressed.connect(self.on_add_docked_track_widget_button_pressed)
 
         self.ui.btnToggleRightSidebar.pressed.connect(self.on_right_sidebar_toggle_button_pressed)
 
+
     def on_joystick_delta_state_changed(self, joystick_ctrl, new_state):
+        """ called when the little analog joystick in the UI is manipulated to control the timeline """
         print(f"on_joystick_delta_state_changed(joystick_ctrl: {joystick_ctrl} new_state: {new_state})")
         # new_state = joystick_ctrl.getState()
         dx, dy = new_state
@@ -581,13 +633,133 @@ class Spike3DRasterBottomPlaybackControlBar(ComboBoxCtrlOwningMixin, QWidget):
         """)
         
 
+    # ==================================================================================================================== #
+    # Start/End Double Spin Boxes                                                                                          #
+    # ==================================================================================================================== #
+    #     
+    def _INIT_UI_initialize_active_window_time_double_spinboxes(self):
+        """ sets up `doubleSpinBox_ActiveWindowStartTime` and `doubleSpinBox_ActiveWindowEndTime`
+        
+        """
+        # Connect toggle button to toggle edit mode
+        self.ui.btnEditNumberField_Revert.setVisible(False) ## hide
+        self.ui.btnEditNumberField_Toggle.toggled.connect(self.on_edit_number_field_toggle_changed)
+        self.ui.btnEditNumberField_Revert.pressed.connect(self.on_edit_number_field_revert_button_pressed)
+        
+        # Connect signals to handle focus and editing states
+        self.ui.doubleSpinBox_ActiveWindowStartTime.editingFinished.connect(self.on_active_window_start_time_editing_finished)
+        self.ui.doubleSpinBox_ActiveWindowStartTime.installEventFilter(self)
+        
+        self.ui.doubleSpinBox_ActiveWindowEndTime.editingFinished.connect(self.on_active_window_end_time_editing_finished)
+        self.ui.doubleSpinBox_ActiveWindowEndTime.installEventFilter(self)
+        
+        # Initialize in non-editable mode
+        self.on_start_end_doubleSpinBox_edit_mode_changed(False)
+        
+
+    @pyqtExceptionPrintingSlot()
+    def on_edit_number_field_revert_button_pressed(self):
+        """Handles when the edit number field toggle button is toggled
+        
+        """
+        self.log_print(f'on_edit_number_field_revert_button_pressed()')
+        
+        # Format the toggle button based on checked state
+        self._format_boolean_toggle_button(button=self.ui.btnEditNumberField_Toggle)
+        
+        # Update the editability of the spinboxes
+        self.on_start_end_doubleSpinBox_edit_mode_changed(is_checked)
+        
+        # Emit signal to notify other components
+        self.sigManualEditWindowStartEndToggled.emit(is_checked)
+        
+        # If editing is enabled, set focus to the start time spinbox
+        if is_checked:
+            self.ui.doubleSpinBox_ActiveWindowStartTime.setFocus()
+            
+
+    @pyqtExceptionPrintingSlot(bool)
+    def on_edit_number_field_toggle_changed(self, is_checked):
+        """Handles when the edit number field toggle button is toggled
+        
+        Args:
+            is_checked (bool): Whether the button is toggled/checked
+        """
+        self.log_print(f'on_edit_number_field_toggle_changed(is_checked: {is_checked})')
+        
+        # Format the toggle button based on checked state
+        self._format_boolean_toggle_button(button=self.ui.btnEditNumberField_Toggle)
+        
+        # Update the editability of the spinboxes
+        self.on_start_end_doubleSpinBox_edit_mode_changed(is_checked)
+        
+        # Emit signal to notify other components
+        self.sigManualEditWindowStartEndToggled.emit(is_checked)
+        
+        # If editing is enabled, set focus to the start time spinbox
+        if is_checked:
+            self.ui.doubleSpinBox_ActiveWindowStartTime.setFocus()
+
+
+    def on_start_end_doubleSpinBox_edit_mode_changed(self, are_controls_editable: bool):
+        """ called to enable user editing of the two doubleSpinBox controls for start/end times 
+        """
+        print(f'Spike3DRasterBottomPlaybackControlBar.on_start_end_doubleSpinBox_edit_mode_changed(are_controls_editable: {are_controls_editable})')
+        if not are_controls_editable:
+            # Clear focus from both spinboxes
+            self.ui.doubleSpinBox_ActiveWindowStartTime.clearFocus()
+            self.ui.doubleSpinBox_ActiveWindowEndTime.clearFocus()
+            # Deselect any selected text using the underlying QLineEdit
+            self.ui.doubleSpinBox_ActiveWindowStartTime.lineEdit().deselect()
+            self.ui.doubleSpinBox_ActiveWindowEndTime.lineEdit().deselect()
+                    
+        if are_controls_editable:
+            focus_policy = QtCore.Qt.ClickFocus
+        else:
+            ## not editable
+            focus_policy = QtCore.Qt.NoFocus
+            
+        self.ui.doubleSpinBox_ActiveWindowStartTime.setReadOnly(not are_controls_editable)
+        self.ui.doubleSpinBox_ActiveWindowStartTime.setKeyboardTracking(are_controls_editable)
+        self.ui.doubleSpinBox_ActiveWindowStartTime.setFocusPolicy(focus_policy)
+        
+        self.ui.doubleSpinBox_ActiveWindowEndTime.setReadOnly(not are_controls_editable)
+        self.ui.doubleSpinBox_ActiveWindowEndTime.setKeyboardTracking(are_controls_editable)
+        self.ui.doubleSpinBox_ActiveWindowEndTime.setFocusPolicy(focus_policy)
+
+
+    def on_active_window_start_time_editing_finished(self):
+        """Editing of the time has finished """
+        start_t_seconds: float = float(self.ui.doubleSpinBox_ActiveWindowStartTime.value())
+        end_t_seconds: float = float(self.ui.doubleSpinBox_ActiveWindowEndTime.value())
+        self.log_print(f'start_t_seconds: {start_t_seconds}, end_t_seconds: {end_t_seconds}')
+        
+        self.ui.doubleSpinBox_ActiveWindowStartTime.clearFocus()
+        ## emit the event
+        self.jump_specific_time_window.emit(start_t_seconds, end_t_seconds)
+
+
+    def on_active_window_end_time_editing_finished(self):
+        """Editing of the time has finished """
+        start_t_seconds: float = float(self.ui.doubleSpinBox_ActiveWindowStartTime.value())
+        end_t_seconds: float = float(self.ui.doubleSpinBox_ActiveWindowEndTime.value())
+        self.log_print(f'start_t_seconds: {start_t_seconds}, end_t_seconds: {end_t_seconds}')
+        
+        self.ui.doubleSpinBox_ActiveWindowEndTime.clearFocus()
+        ## emit the event
+        self.jump_specific_time_window.emit(start_t_seconds, end_t_seconds)
+        
+
+        
+        
+
     @pyqtExceptionPrintingSlot(float, float)
     def on_window_changed(self, start_t, end_t):
         if self.params.debug_print:
             self.log_print(f'Spike3DRasterBottomPlaybackControlBar.on_time_window_changed(start_t: {start_t}, end_t: {end_t})')
         # need to block signals:
-        # self.ui.doubleSpinBox_ActiveWindowStartTime.blockSignals(True)
-        # self.ui.doubleSpinBox_ActiveWindowEndTime.blockSignals(True)
+        self.ui.doubleSpinBox_ActiveWindowStartTime.blockSignals(True)
+        self.ui.doubleSpinBox_ActiveWindowEndTime.blockSignals(True)
         if (start_t is not None):
             self.ui.doubleSpinBox_ActiveWindowStartTime.setValue(start_t)
             # self.ui.jumpToHourMinSecTimeEdit.blockSignals(True)
@@ -603,8 +775,8 @@ class Spike3DRasterBottomPlaybackControlBar(ComboBoxCtrlOwningMixin, QWidget):
 
         if (end_t is not None):
             self.ui.doubleSpinBox_ActiveWindowEndTime.setValue(end_t)
-        # self.ui.doubleSpinBox_ActiveWindowStartTime.blockSignals(False) # unblock the signals when done
-        # self.ui.doubleSpinBox_ActiveWindowEndTime.blockSignals(False)
+        self.ui.doubleSpinBox_ActiveWindowStartTime.blockSignals(False) # unblock the signals when done
+        self.ui.doubleSpinBox_ActiveWindowEndTime.blockSignals(False)
         # self.ui.doubleSpinBox_ActiveWindowStartTime.setValue(start_t)
         # self.ui.doubleSpinBox_ActiveWindowEndTime.setValue(end_t)
         if self.params.debug_print:
@@ -720,6 +892,11 @@ class Spike3DRasterBottomPlaybackControlBar(ComboBoxCtrlOwningMixin, QWidget):
         
         self.sigToggleRightSidebarVisibility.emit(should_sidebar_be_visible)
 
+    def on_add_docked_track_widget_button_pressed(self):
+        """ btnAddDockedTrack """
+        self.log_print(f'on_add_docked_track_widget_button_pressed()')
+        self.sigAddDockedTrackRequested.emit()
+
     # ==================================================================================================================== #
     # eventFilter                                                                                                          #
     # ==================================================================================================================== #
@@ -739,8 +916,18 @@ class Spike3DRasterBottomPlaybackControlBar(ComboBoxCtrlOwningMixin, QWidget):
                 self.time_edit.clearFocus()  # Finalize and lose focus
                 return True  # Mark event as handled
             
+        elif (source == self.ui.doubleSpinBox_ActiveWindowStartTime) or (source == self.ui.doubleSpinBox_ActiveWindowEndTime):
+            if event.type() == event.KeyPress:
+                # """Handle Enter key to finalize and lose focus."""
+                if event.key() in (Qt.Key_Return, Qt.Key_Enter):
+                    source.clearFocus()  # Finalize and lose focus
+                    return True  # Mark event as handled
+                else: 
+                    ## other key presses, such as type numbers and such
+                    pass
+
         if self.params.debug_print:
-            print(f'.eventFilter(source: {source}, event: {event})')
+            print(f'Spike3DRasterBottomPlaybackControlBar.eventFilter(source: {source}, event: {event})')
             
         return super().eventFilter(source, event)
     
@@ -764,6 +951,26 @@ class SpikeRasterBottomFrameControlsMixin(LoggingBaseClassLoggerOwningMixin):
     def bottom_playback_control_bar_logger(self) -> LoggingBaseClass:
         """The logger property."""
         return self.bottom_playback_control_bar_widget.logger
+
+    # @property
+    # def logger(self) -> LoggingBaseClass:
+    #     """The logger property."""
+    #     if not hasattr(self, '_logger'):
+    #         return None # not initialized yet
+    #     return self._logger
+    # @logger.setter
+    # def logger(self, value: LoggingBaseClass):
+    #     self._logger = value
+        
+    # @property
+    # def attached_log_window(self) -> Optional[LoggingOutputWidget]:
+    #     """The attached_log_window property."""
+    #     try:
+    #         if not hasattr(self, '_attached_log_window'):
+    #             return None # not initialized yet
+    #         return self._attached_log_window
+    #     except (AttributeError, NameError):
+    #         return None
 
 
     @QtCore.pyqtSlot()
@@ -817,15 +1024,20 @@ class SpikeRasterBottomFrameControlsMixin(LoggingBaseClassLoggerOwningMixin):
         print(f'SpikeRasterBottomFrameControlsMixin_on_window_update(new_start: {new_start}, new_end: {new_end}')
         #TODO 2023-11-21 18:49: - [ ] Doesn't work :[
         # need to block signals:
+        
+        self.blockSignals(True)
         # doubleSpinBox_ActiveWindowStartTime.blockSignals(True)
         # doubleSpinBox_ActiveWindowEndTime.blockSignals(True)
         # if new_start is not None:
         #     self.ui.doubleSpinBox_ActiveWindowStartTime.setValue(new_start)
         # if new_end is not None:
         #     self.ui.doubleSpinBox_ActiveWindowEndTime.setValue(new_end)
+        self.bottom_playback_control_bar_widget.on_window_changed(new_start, new_end)
+        
         # doubleSpinBox_ActiveWindowStartTime.blockSignals(False) # unblock the signals when done
         # doubleSpinBox_ActiveWindowEndTime.blockSignals(False)
-        self.bottom_playback_control_bar_widget.on_window_changed(new_start, new_end)
+        self.blockSignals(False) # unblock the signals when done
+
         # if new_start is not None:
         #     ## update the jump time when it scrolls
         #     ## should rate-limit it:

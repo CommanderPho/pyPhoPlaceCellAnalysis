@@ -19,7 +19,11 @@ __all__ = ['VerticalLabel']
             #return QtCore.QSize(16, 50)
 
 class VerticalLabel(QtWidgets.QLabel):
-    """ 
+    """ A flexible label that adjusts its orientation and size based on the orientation and available space.
+    
+    When text is ellided (which means to cut out a portion of it and replace it with ellipses ("...") so it fits in the available space, the label's text is actualy replaced by the ellided version.
+    The original is only accessible via the .toolTip()
+    
     
     VerticalLabel: .forceWidth, .orientation
     """
@@ -85,6 +89,18 @@ class VerticalLabel(QtWidgets.QLabel):
                 return QtCore.QSize(self.hint.width(), self.hint.height())
             else:
                 return QtCore.QSize(50, 19)
+            
+    def relayout_text(self):
+        """ forces text update by directly manipulating the label"""
+        # ellided_text = self.text()
+        original_text: str = self.toolTip()
+        print(f'\toriginal_text: "{original_text}"')
+        # self.elided_text_mode = QtCore.Qt.TextElideMode.ElideLeft  # Ensure elision is enabled
+        self.setText("")  # Clear text temporarily
+        self.setText(original_text)  # Reset text to trigger recalculation
+
+        # self.updateStyle()
+        # self.resizeEvent(QtGui.QResizeEvent(self.size(), self.size()))
 
 
 if __name__ == '__main__':

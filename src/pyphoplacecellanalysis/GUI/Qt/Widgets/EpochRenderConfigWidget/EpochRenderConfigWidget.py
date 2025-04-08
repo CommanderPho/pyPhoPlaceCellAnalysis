@@ -33,8 +33,14 @@ uiFile = os.path.join(path, 'EpochRenderConfigWidget.ui')
 class EpochRenderConfigWidget(pg.Qt.QtWidgets.QWidget):
     """ a widget that allows graphically configuring a single data series for rendering Epoch rectangles 
         EpochDisplayConfig
+        
+        
+        chkbtnVisible
+        
     """
     sigConfigChanged = QtCore.Signal(object)
+    sigRemoveRequested = QtCore.Signal(object)  # New signal for remove requests
+    
     # sigCollapseClicked = QtCore.Signal(object)
     # sigGroupClicked = QtCore.Signal(object)
     config: EpochDisplayConfig = field(default=Factory(EpochDisplayConfig))
@@ -80,7 +86,10 @@ class EpochRenderConfigWidget(pg.Qt.QtWidgets.QWidget):
         #         found_binding.set_value(a_widget, desired_value)
         #     else:
         #         print(f'no binding for {a_widget} of type: {type(a_widget)}')
-                
+
+        self.setupContextMenu()  # Add this line
+
+
 
     def get_ui_element_list(self):
         return [self.ui.btnTitle, self.ui.btnPenColor, self.ui.btnFillColor, self.ui.doubleSpinBoxHeight, self.ui.doubleSpinBoxOffset, self.ui.chkbtnVisible]
@@ -173,7 +182,35 @@ class EpochRenderConfigWidget(pg.Qt.QtWidgets.QWidget):
         ## UPDATE: this doesn't seem to be a problem. The name is successfully set to the ACLU value in the current state.
         # return SingleNeuronPlottingExtended(name=self.name, isVisible=self.isVisible, color=color_hex_str, spikesVisible=self.spikesVisible)
         return a_config
+
+    # ================================================================================================================================================================================ #
+    # Context Menu Methods                                                                                                                                                             #
+    # ================================================================================================================================================================================ #
+    def setupContextMenu(self):
+        """Setup the context menu for the widget"""
+        self.setContextMenuPolicy(QtCore.Qt.ContextMenuPolicy.CustomContextMenu)
+        self.customContextMenuRequested.connect(self.showContextMenu)
         
+        # Create the action if it's not already part of the UI
+        if not hasattr(self.ui, 'actionRemoveEpochSeries'):
+            self.ui.actionRemoveEpochSeries = QtWidgets.QAction("Remove Epoch Series", self)
+            # You can set the icon if available in your resources
+            # self.ui.actionRemoveEpochSeries.setIcon(QtGui.QIcon(":/Icons/Icons/actions/pencil--minus.png"))
+        
+        # Connect the action to a slot
+        self.ui.actionRemoveEpochSeries.triggered.connect(self.onRemoveEpochSeries)
+    
+    def showContextMenu(self, position):
+        """Show the context menu at the requested position"""
+        menu = QtWidgets.QMenu(self)
+        menu.addAction(self.ui.actionRemoveEpochSeries)
+        menu.exec_(self.mapToGlobal(position))
+    
+    def onRemoveEpochSeries(self):
+        """Handler for the remove action"""
+        self.sigRemoveRequested.emit(self)
+        
+
 
 
 def clear_layout(layout):
@@ -275,7 +312,8 @@ class EpochRenderConfigsListWidget(pg.Qt.QtWidgets.QWidget):
                 for a_widget in a_widget_list:
                     # self.ui.out_render_config_widgets_dict[a_config_name]
                     _connections_dict[a_config].append(a_widget.sigConfigChanged.connect(self.on_config_ui_updated))
-
+                    _connections_dict[a_config].append(a_widget.sigRemoveRequested.connect(self.on_remove_epoch_series))
+                    
 
     def initUI(self):
         # self.ui.rootWidget = pg.Qt.QtWidgets.QWidget()
@@ -348,6 +386,52 @@ class EpochRenderConfigsListWidget(pg.Qt.QtWidgets.QWidget):
         self.sigAnyConfigChanged.emit(self)
 
 
+    # Add this method to handle the remove request
+    def on_remove_epoch_series(self, widget):
+        """Handle a request to remove an epoch series"""
+        print(f'EpochRenderConfigsListWidget.on_remove_epoch_series(widget: {widget})')
+        
+        # Find the config name for this widget
+        config_name = None
+        widget_or_list = None
+        
+        for name, widget_or_widget_list in self.ui.out_render_config_widgets_dict.items():
+            if isinstance(widget_or_widget_list, list):
+                if widget in widget_or_widget_list:
+                    config_name = name
+                    widget_or_list = widget_or_widget_list
+                    break
+            elif widget_or_widget_list == widget:
+                config_name = name
+                widget_or_list = widget_or_widget_list
+                break
+        
+        if config_name is not None:
+            # Remove the widget from the layout
+            if isinstance(widget_or_list, list):
+                # If it's in a list, remove just that one widget
+                idx = widget_or_list.index(widget)
+                self.ui.config_widget_layout.removeWidget(widget)
+                widget.deleteLater()
+                widget_or_list.pop(idx)
+                
+                # If the list is now empty, remove the whole entry
+                if len(widget_or_list) == 0:
+                    del self.ui.out_render_config_widgets_dict[config_name]
+                    del self.configs[config_name]
+            else:
+                # Remove the single widget
+                self.ui.config_widget_layout.removeWidget(widget)
+                widget.deleteLater()
+                del self.ui.out_render_config_widgets_dict[config_name]
+                del self.configs[config_name]
+            
+            # Emit signal to notify of the change
+            self.sigAnyConfigChanged.emit(self)
+            
+
+
+
 def build_single_epoch_display_config_widget(render_config: EpochDisplayConfig) -> EpochRenderConfigWidget:
     """ builds a simple EpochRenderConfigWidget widget from a simple EpochDisplayConfig
     
@@ -369,6 +453,16 @@ def build_single_epoch_display_config_widget(render_config: EpochDisplayConfig) 
 ## Start Qt event loop
 if __name__ == '__main__':
     app = pg.mkQApp('test EpochRenderConfigWidget')
+    app.setStyleSheet("""
+        QToolTip {
+            background-color: #2a2a2a;
+            color: #ffffff;
+            border: 1px solid #3a3a3a;
+            border-radius: 3px;
+            padding: 2px;
+            font-size: 12px;
+        }
+    """)
     test_config = EpochDisplayConfig()
     widget = EpochRenderConfigWidget(config=test_config)
     # widget = EpochRenderConfigWidget()

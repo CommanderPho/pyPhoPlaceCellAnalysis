@@ -562,16 +562,36 @@ class PipelinePickleFileSelectorWidget:
         return (self.on_compute_callback is None) or (self.on_get_global_variable_callback is None)
 
 
+
+
+    @property
+    def is_local_file_names_list_empty(self) -> bool:
+        """The discovered local filenames."""
+        return not ((len(self.local_file_browser_widget._data) > 0) and ('File Name' in self.local_file_browser_widget._data))
+
+
+    @property
+    def is_global_file_names_list_empty(self) -> bool:
+        """The discovered global filenames."""
+        return not ((len(self.global_file_browser_widget._data) > 0) and ('File Name' in self.global_file_browser_widget._data))
+
+
+
     @property
     def active_local_file_names_list(self) -> List[str]:
         """The discovered local filenames."""
-        return self.local_file_browser_widget._data['File Name'].tolist()
+        if (len(self.local_file_browser_widget._data) > 0) and ('File Name' in self.local_file_browser_widget._data):
+            return self.local_file_browser_widget._data['File Name'].tolist()
+        else:
+            return []
         
     @property
     def active_global_file_names_list(self) -> List[str]:
         """The discovered global filenames."""
-        return self.global_file_browser_widget._data['File Name'].tolist()
-
+        if (len(self.global_file_browser_widget._data) > 0) and ('File Name' in self.global_file_browser_widget._data):
+            return self.global_file_browser_widget._data['File Name'].tolist()
+        else:
+            return []
 
     def try_extract_custom_suffix(self) -> Optional[str]:
         """ uses the local pkl first 

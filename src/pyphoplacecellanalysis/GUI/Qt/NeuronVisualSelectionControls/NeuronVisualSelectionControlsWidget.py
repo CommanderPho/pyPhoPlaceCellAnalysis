@@ -1,5 +1,6 @@
 # NeuronVisualSelectionControlsWidget.py
 # Generated from NeuronVisualSelectionControlsWidget.ui automatically by PhoPyQtClassGenerator VSCode Extension
+from copy import deepcopy
 import sys
 import os
 from typing import Dict, List, Optional
@@ -32,6 +33,10 @@ class NeuronVisualSelectionControlsWidget(QtWidgets.QWidget):
     """ Copied from PlacefieldVisualSelectionWidget on 2023-10-18 
     
     Change .ui.groupBox to .ui.mainFrame
+    
+    
+    .ui.chkbtnVisible
+    
     """
     # spike_config_changed = QtCore.pyqtSignal(bool) # change_unit_spikes_included(self, neuron_IDXs=None, cell_IDs=None, are_included=True)
     # tuning_curve_display_config_changed = QtCore.pyqtSignal(list) # on_update_tuning_curve_display_config(self, updated_config_indicies, updated_configs)
@@ -40,6 +45,8 @@ class NeuronVisualSelectionControlsWidget(QtWidgets.QWidget):
     # Send a SingleNeuronPlottingExtended config state instead of a QtGui.QColor for easy access.
     sig_neuron_color_changed = QtCore.pyqtSignal(object) # send the updated color as a QtGui.QColor
     
+    sig_neuron_visibility_changed = QtCore.pyqtSignal(bool) # send the updated is_visible as a bool
+
     # update_signal = QtCore.pyqtSignal(list, list, float, float, list, list, list, list)
     # finish_signal = QtCore.pyqtSignal(float, float)
  
@@ -76,12 +83,15 @@ class NeuronVisualSelectionControlsWidget(QtWidgets.QWidget):
     def isVisible(self):
         """The isVisible property."""
         if self._isVisible is None:
-            self._isVisible = self.ui.chkbtnPlacefield.checked
+            # self._isVisible = self.ui.chkbtnPlacefield.checked
+            self._isVisible = self.ui.chkbtnVisible.checked
+            
         return self._isVisible 
     @isVisible.setter
     def isVisible(self, value):
         self._isVisible = value
         self.ui.chkbtnPlacefield.setChecked(self._isVisible)
+        self.ui.chkbtnVisible.setChecked(self._isVisible)
         
     @property
     def color(self):
@@ -138,7 +148,8 @@ class NeuronVisualSelectionControlsWidget(QtWidgets.QWidget):
         # Setup self.ui.chkbtnPlacefield:
         self.ui.chkbtnPlacefield.toggled.connect(self.togglePlacefieldVisibility)
         self.ui.chkbtnSpikes.toggled.connect(self.toggleSpikeVisibility)
-  
+        self.ui.chkbtnVisible.toggled.connect(self.toggleAllNeuronVisibility)
+        
         # Connect the color button:
         self.ui.btnColorButton.sigColorChanging.connect(self.on_color_button_changing)
         self.ui.btnColorButton.sigColorChanged.connect(self.on_color_button_changed)  
@@ -149,6 +160,7 @@ class NeuronVisualSelectionControlsWidget(QtWidgets.QWidget):
 
     def initUI(self):
         self.ui.btnColorButton.setEnabled(True)
+        self.ui.chkbtnVisible.setEnabled(True)
 
 
     @QtCore.pyqtSlot(object)
@@ -194,6 +206,18 @@ class NeuronVisualSelectionControlsWidget(QtWidgets.QWidget):
             print(f'_on_toggle_spikes_visible_changed(value: {value})')
         self._spikesVisible = bool(value)
         self.spike_config_changed.emit(bool(self.spikesVisible)) # emit signal
+
+    @QtCore.pyqtSlot(bool)
+    def toggleAllNeuronVisibility(self, value):
+        if self.enable_debug_print:
+            print(f'toggleAllNeuronVisibility(value: {value})')
+        prev_is_visible = deepcopy(self._isVisible)
+        did_change: bool = (prev_is_visible != value)
+        if did_change:
+            self._isVisible = value
+            self.sig_neuron_visibility_changed.emit()
+            self.tuning_curve_display_config_changed.emit([self.config_from_state()]) # emit signal
+
 
     ## Programmatic Update/Retrieval:    
     def update_from_config(self, config):

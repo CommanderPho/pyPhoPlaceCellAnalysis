@@ -11,6 +11,7 @@ import plotly.io as pio
 from typing import Dict, List, Tuple, Optional, Callable, Union, Any
 from plotly import graph_objs as go
 from typing_extensions import TypeAlias
+import nptyping as ND
 from nptyping import NDArray
 import neuropy.utils.type_aliases as types
 from pyphocorehelpers.programming_helpers import metadata_attributes
@@ -217,12 +218,7 @@ class PlotlyFigureContainer:
         """ Adds a trace to the figure while managing legend entries to avoid duplicates. """
         a_full_trace_name: str = '_'.join([v for v in [trace_name_prefix, trace.name] if (len(v)>0)]) ## build new trace name
         # fig.update_trace(
-        fig.update_traces(patch=trace,
-				  selector={'name': a_full_trace_name}, row=row, col=col)
-        
-        
-                  
-                  
+        fig.update_traces(patch=trace, selector={'name': a_full_trace_name}, row=row, col=col)
         trace_name = trace.name
         trace.legendgroup = trace_name  # Set the legend group so all related traces can be toggled together
         if trace_name in already_added_legend_entries:
@@ -404,7 +400,7 @@ def plotly_pre_post_delta_scatter(data_results_df: pd.DataFrame, data_context: O
         import plotly.io as pio
         template: str = 'plotly_dark' # set plotl template
         pio.templates.default = template
-        from pyphoplacecellanalysis.SpecificResults.AcrossSessionResults import plotly_pre_post_delta_scatter
+        from pyphoplacecellanalysis.Pho2D.plotly.Extensions.plotly_helpers import plotly_pre_post_delta_scatter
 
 
         histogram_bins: int = 25
@@ -430,6 +426,9 @@ def plotly_pre_post_delta_scatter(data_results_df: pd.DataFrame, data_context: O
         post_delta_label: str = 'Post-delta'
 
     # figure_context_dict ________________________________________________________________________________________________ #
+    if data_context is None:
+        data_context = IdentifyingContext() ## empty context
+        
     data_context = data_context.adding_context_if_missing(variable_name=histogram_variable_name)
     
     figure_context_dict = {'histogram_variable_name': histogram_variable_name}
@@ -768,31 +767,8 @@ def plotly_pre_post_delta_scatter(data_results_df: pd.DataFrame, data_context: O
                 line=dict(color="Black", width=2),
                 name='figure_sup_huge_title_text_line'
             )
-                
-            # else:
-            #     ## need to update properties of the existing figure:
-            #     print(f'trying to update existing figure "figure_sup_huge_title_text_annotation"')
-            #     # fig.update_annotations(selector={'name':'figure_sup_huge_title_text_annotation'},
-            #     #                     patch=dict(
-            #     #                         text=figure_sup_huge_title_text,
-            #     #                         **annotation_kwargs,
-            #     #                         y=0.5,
-            #     #                         xref="paper",
-            #     #                         yref="paper",
-            #     #                         showarrow=False,
-            #     #                         textangle=-90,
-            #     #                         xanchor='center',
-            #     #                         yanchor='middle',
-            #     #                         name='figure_sup_huge_title_text_annotation',
-            #     #                     ),
-            #     # )
-            #     annotation_idx: int = -1
-            #     fig.layout.annotations[annotation_idx].text = figure_sup_huge_title_text
-            ## TODO: update shape 'figure_sup_huge_title_text_line'
-                    
-            
-            
-
+        # END if is_top_supertitle
+    # END if figure_sup_huge_title_text is not None
 
     # Add footer text if provided
     if figure_footer_text:
@@ -805,7 +781,7 @@ def plotly_pre_post_delta_scatter(data_results_df: pd.DataFrame, data_context: O
                 'name': 'figure_footer_text_annotation'
             },
         )
-            
+    # END if figure_footer_text 
     return fig, figure_context
 
 
@@ -1137,7 +1113,7 @@ def _helper_build_figure(data_results_df: pd.DataFrame, histogram_bins:int=25, e
 
     return fig, figure_context
 
-@function_attributes(short_name=None, tags=['plotly', 'blue_yellow'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-02-06 06:04', related_items=[])
+@function_attributes(short_name=None, tags=['plotly', 'blue_yellow'], input_requires=[], output_provides=[], uses=['plotly_plot_1D_most_likely_position_comparsions'], used_by=[], creation_date='2024-02-06 06:04', related_items=[])
 def plot_blue_yellow_points(a_df, specific_point_list):
     """ Renders a figure containing one or more yellow-blue plots (marginals) for a given hoverred point. Used with Dash app.
 
@@ -1484,6 +1460,51 @@ def _build_dash_app(final_dfs_dict, earliest_delta_aligned_t_start: float, lates
 
     return app
 
+
+@function_attributes(short_name=None, tags=['plotly', 'scatter', 'hist', 'posterior'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-03-13 15:04', related_items=[])
+def build_single_plotly_marginal_scatter_and_hist_over_time(a_decoded_posterior_df: pd.DataFrame, a_target_context: IdentifyingContext, histogram_bins: int = 25, debug_print = False):
+    """ builds a single [hist_Long, ScatterTimeSeries, hist_Short] plotly figure, returned a dictionary.
+    
+    Usage:
+        from pyphoplacecellanalysis.Pho2D.plotly.Extensions.plotly_helpers import build_single_plotly_marginal_scatter_and_hist_over_time
+                
+        #INPUTS: a_target_context: IdentifyingContext, a_result: DecodedFilterEpochsResult, a_decoded_marginal_posterior_df: pd.DataFrame, a_decoder: BasePositionDecoder
+        _flat_out_figs_dict = {}
+        a_fig, a_figure_context = build_single_plotly_marginal_scatter_and_hist_over_time(a_decoded_posterior_df=a_decoded_marginal_posterior_df, a_target_context=a_target_context)
+        _flat_out_figs_dict[a_figure_context] = a_fig
+
+        a_fig.show()
+
+    """
+    import plotly.io as pio
+    template: str = 'plotly_dark' # set plotl template
+    pio.templates.default = template
+    from pyphoplacecellanalysis.Pho2D.plotly.Extensions.plotly_helpers import plotly_pre_post_delta_scatter
+
+    if 'time_bin_size' not in a_decoded_posterior_df:
+        ## add the missing column from the context
+        found_time_bin_size: float = a_target_context.get('time_bin_size', None)
+        assert found_time_bin_size is not None
+        a_decoded_posterior_df['time_bin_size'] = float(found_time_bin_size)
+        
+    assert 'delta_aligned_start_t' in a_decoded_posterior_df
+    # plot_row_identifier: str = f'{a_known_decoded_epochs_type.capitalize()} - {masking_bin_fill_mode.capitalize()} decoder' # should be like 'Laps (Masked) from Non-PBE decoder'    
+    plot_row_identifier: str = a_target_context.get_description(subset_includelist=['a_known_decoded_epochs_type', 'masking_bin_fill_mode'], include_property_names=True)
+    plot_row_identifier = f"{plot_row_identifier} decoder" # should be like 'Laps (Masked) from Non-PBE decoder'"
+    fig, figure_context = plotly_pre_post_delta_scatter(data_results_df=deepcopy(a_decoded_posterior_df), data_context=deepcopy(a_target_context), out_scatter_fig=None, 
+                                    histogram_variable_name='P_Short', hist_kwargs=dict(), histogram_bins=histogram_bins,
+                                    common_plot_kwargs=dict(height=300),
+                                    px_scatter_kwargs = dict(x='delta_aligned_start_t', y='P_Short', title=plot_row_identifier))
+    fig = fig.update_layout(height=300, margin=dict(t=20, b=0),  # Set top and bottom margins to 0
+                    )  # Set your desired height
+        
+
+    return fig, figure_context
+
+
+
+
+
 @function_attributes(short_name=None, tags=['scatter', 'multi-session', 'plot', 'figure', 'plotly', 'IMPORTANT'], input_requires=[], output_provides=[], uses=['_helper_build_figure'], used_by=[], creation_date='2024-01-29 20:47', related_items=[])
 def plot_across_sessions_scatter_results(directory: Union[Path, str], concatenated_laps_df: pd.DataFrame, concatenated_ripple_df: pd.DataFrame,
                                           earliest_delta_aligned_t_start: float=0.0, latest_delta_aligned_t_end: float=666.0,
@@ -1507,16 +1528,6 @@ def plot_across_sessions_scatter_results(directory: Union[Path, str], concatenat
 
     """
     from pyphocorehelpers.Filesystem.path_helpers import file_uri_from_path
-    # import plotly.graph_objs as go
-
-    # def _subfn_build_figure(data, **build_fig_kwargs):
-    #     return go.Figure(data=data, **(dict(layout_yaxis_range=[0.0, 1.0]) | build_fig_kwargs))
-
-    # def _subfn_build_figure(data_results_df: pd.DataFrame, **build_fig_kwargs):
-    #     # return go.Figure(data=data, **(dict(layout_yaxis_range=[0.0, 1.0]) | build_fig_kwargs))
-    #     scatter_title = build_fig_kwargs.pop('title', None)
-    #     return go.Figure(px.scatter(data_results_df, x='delta_aligned_start_t', y='P_Long', color='session_name', size='time_bin_size', title=scatter_title), layout_yaxis_range=[0.0, 1.0])
-    # , 'histnorm': 'probability density'
 
     # BEGIN FUNCTION BODY ________________________________________________________________________________________________ #
     if not isinstance(directory, Path):
@@ -1534,21 +1545,28 @@ def plot_across_sessions_scatter_results(directory: Union[Path, str], concatenat
     all_figures = []
 
     ## delta_t aligned:
-    # num_unique_sessions: int = len(concatenated_laps_df['session_name'].unique())
-    # Create a bubble chart for laps
-    laps_num_unique_sessions: int = concatenated_laps_df.session_name.nunique(dropna=True) # number of unique sessions, ignoring the NA entries
-    laps_num_unique_time_bins: int = concatenated_laps_df.time_bin_size.nunique(dropna=True)
-    laps_title_string_suffix: str = f'{laps_num_unique_sessions} Sessions'
-    laps_title: str = f"{laps_title_prefix} - {laps_title_string_suffix}"
-    fig_laps, figure_laps_context = _helper_build_figure(data_results_df=concatenated_laps_df, histogram_bins=25, earliest_delta_aligned_t_start=earliest_delta_aligned_t_start, latest_delta_aligned_t_end=latest_delta_aligned_t_end, enabled_time_bin_sizes=enabled_time_bin_sizes, main_plot_mode=main_plot_mode, title=laps_title, variable_name=variable_name, is_dark_mode=is_dark_mode)
+    if concatenated_laps_df is not None:
+        # num_unique_sessions: int = len(concatenated_laps_df['session_name'].unique())
+        # Create a bubble chart for laps
+        laps_num_unique_sessions: int = concatenated_laps_df.session_name.nunique(dropna=True) # number of unique sessions, ignoring the NA entries
+        laps_num_unique_time_bins: int = concatenated_laps_df.time_bin_size.nunique(dropna=True)
+        laps_title_string_suffix: str = f'{laps_num_unique_sessions} Sessions'
+        laps_title: str = f"{laps_title_prefix} - {laps_title_string_suffix}"
+        fig_laps, figure_laps_context = _helper_build_figure(data_results_df=concatenated_laps_df, histogram_bins=25, earliest_delta_aligned_t_start=earliest_delta_aligned_t_start, latest_delta_aligned_t_end=latest_delta_aligned_t_end, enabled_time_bin_sizes=enabled_time_bin_sizes, main_plot_mode=main_plot_mode, title=laps_title, variable_name=variable_name, is_dark_mode=is_dark_mode)
+    else:
+        fig_laps = None
 
-    # Create a bubble chart for ripples
-    # num_unique_sessions: int = len(concatenated_ripple_df['session_name'].unique())
-    ripple_num_unique_sessions: int = concatenated_ripple_df.session_name.nunique(dropna=True) # number of unique sessions, ignoring the NA entries
-    ripple_num_unique_time_bins: int = concatenated_ripple_df.time_bin_size.nunique(dropna=True)
-    ripple_title_string_suffix: str = f'{ripple_num_unique_sessions} Sessions'
-    ripple_title: str = f"{ripple_title_prefix} - {ripple_title_string_suffix}"
-    fig_ripples, figure_ripples_context = _helper_build_figure(data_results_df=concatenated_ripple_df, histogram_bins=25, earliest_delta_aligned_t_start=earliest_delta_aligned_t_start, latest_delta_aligned_t_end=latest_delta_aligned_t_end, enabled_time_bin_sizes=enabled_time_bin_sizes, main_plot_mode=main_plot_mode, title=ripple_title, variable_name=variable_name, is_dark_mode=is_dark_mode)
+
+    # Create a bubble chart for ripples\
+    if concatenated_ripple_df is not None:
+        # num_unique_sessions: int = len(concatenated_ripple_df['session_name'].unique())
+        ripple_num_unique_sessions: int = concatenated_ripple_df.session_name.nunique(dropna=True) # number of unique sessions, ignoring the NA entries
+        ripple_num_unique_time_bins: int = concatenated_ripple_df.time_bin_size.nunique(dropna=True)
+        ripple_title_string_suffix: str = f'{ripple_num_unique_sessions} Sessions'
+        ripple_title: str = f"{ripple_title_prefix} - {ripple_title_string_suffix}"
+        fig_ripples, figure_ripples_context = _helper_build_figure(data_results_df=concatenated_ripple_df, histogram_bins=25, earliest_delta_aligned_t_start=earliest_delta_aligned_t_start, latest_delta_aligned_t_end=latest_delta_aligned_t_end, enabled_time_bin_sizes=enabled_time_bin_sizes, main_plot_mode=main_plot_mode, title=ripple_title, variable_name=variable_name, is_dark_mode=is_dark_mode)
+    else:
+        fig_ripples = None
 
     if save_figures:
         # Save the figures to the 'figures' subfolder
@@ -1563,16 +1581,67 @@ def plot_across_sessions_scatter_results(directory: Union[Path, str], concatenat
             else:
                  a_save_fn = lambda a_fig, a_save_name: a_fig.write_image(a_save_name)
 
-            fig_laps_name = Path(figures_folder, f"{laps_title_string_suffix.replace(' ', '-')}_{laps_title_prefix.lower()}_marginal{a_fig_save_extension}").resolve()
-            print(f'\tsaving "{file_uri_from_path(fig_laps_name)}"...')
-            a_save_fn(fig_laps, fig_laps_name)
-            fig_ripple_name = Path(figures_folder, f"{ripple_title_string_suffix.replace(' ', '-')}_{ripple_title_prefix.lower()}_marginal{a_fig_save_extension}").resolve()
-            print(f'\tsaving "{file_uri_from_path(fig_ripple_name)}"...')
-            a_save_fn(fig_ripples, fig_ripple_name)
+            if fig_laps is not None:
+                fig_laps_name = Path(figures_folder, f"{laps_title_string_suffix.replace(' ', '-')}_{laps_title_prefix.lower()}_marginal{a_fig_save_extension}").resolve()
+                print(f'\tsaving "{file_uri_from_path(fig_laps_name)}"...')
+                a_save_fn(fig_laps, fig_laps_name)
+                
+            if fig_ripples is not None:
+                fig_ripple_name = Path(figures_folder, f"{ripple_title_string_suffix.replace(' ', '-')}_{ripple_title_prefix.lower()}_marginal{a_fig_save_extension}").resolve()
+                print(f'\tsaving "{file_uri_from_path(fig_ripple_name)}"...')
+                a_save_fn(fig_ripples, fig_ripple_name)
 
 
     # Append both figures to the list
-    all_figures.append((fig_laps, fig_ripples))
+    _out_list = []
+    # if fig_laps is not None:
+    _out_list.append(fig_laps)
+        
+    # if fig_ripples is not None:
+    _out_list.append(fig_ripples)
+
+    all_figures.append(tuple(_out_list))
 
     return all_figures
+
+
+
+@function_attributes(short_name=None, tags=['plotly', 'scatter'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-03-17 12:27', related_items=[])
+def build_single_plotly_marginal_scatter_and_hist_over_time(a_decoded_posterior_df: pd.DataFrame, a_target_context: IdentifyingContext, histogram_bins: int = 25, x:str='delta_aligned_start_t', y:str='P_Short', debug_print = False):
+    """ adds new tracks
+    
+    Adds 3 tracks like: ['ContinuousDecode_longnon-PBE-pseudo2D marginals', 'ContinuousDecode_shortnon-PBE-pseudo2D marginals', 'non-PBE_marginal_over_track_ID_ContinuousDecode - t_bin_size: 0.05']
+
+    
+    from pyphoplacecellanalysis.Pho2D.plotly.Extensions.plotly_helpers import build_single_plotly_marginal_scatter_and_hist_over_time
+    
+    ## Compute and plot the new tracks:
+    non_PBE_all_directional_pf1D_Decoder, pseudo2D_continuous_specific_decoded_result, continuous_decoded_results_dict, non_PBE_marginal_over_track_ID, (time_bin_containers, time_window_centers) = nonPBE_results._build_merged_joint_placefields_and_decode(spikes_df=deepcopy(get_proper_global_spikes_df(curr_active_pipeline)))
+    unique_added_track_identifiers = nonPBE_results.add_to_SpikeRaster2D_tracks(active_2d_plot=active_2d_plot, non_PBE_all_directional_pf1D_Decoder=non_PBE_all_directional_pf1D_Decoder, pseudo2D_continuous_specific_decoded_result=pseudo2D_continuous_specific_decoded_result, continuous_decoded_results_dict=continuous_decoded_results_dict, non_PBE_marginal_over_track_ID=non_PBE_marginal_over_track_ID, time_window_centers=time_window_centers)
+    
+    _flat_out_figs_dict = {}
+    
+    
+    _flat_out_figs_dict[figure_context] = fig
+    
+    """
+    import plotly.io as pio
+    template: str = 'plotly_dark' # set plotl template
+    pio.templates.default = template
+
+    if 'time_bin_size' not in a_decoded_posterior_df:
+        ## add the missing column from the context
+        found_time_bin_size: float = a_target_context.get('time_bin_size', None)
+        assert found_time_bin_size is not None
+        a_decoded_posterior_df['time_bin_size'] = float(found_time_bin_size)
+        
+    assert x in a_decoded_posterior_df
+    # plot_row_identifier: str = f'{a_known_decoded_epochs_type.capitalize()} - {masking_bin_fill_mode.capitalize()} decoder' # should be like 'Laps (Masked) from Non-PBE decoder'    
+    plot_row_identifier: str = a_target_context.get_description(subset_includelist=['known_named_decoding_epochs_type', 'masked_time_bin_fill_type'], include_property_names=True, key_value_separator=':', separator='|', replace_separator_in_property_names='-')
+    plot_row_identifier = f"{plot_row_identifier} decoder" # should be like 'Laps (Masked) from Non-PBE decoder'"
+    fig, figure_context = plotly_pre_post_delta_scatter(data_results_df=deepcopy(a_decoded_posterior_df), data_context=deepcopy(a_target_context), out_scatter_fig=None, 
+                                    histogram_variable_name=y, hist_kwargs=dict(), histogram_bins=histogram_bins,
+                                    common_plot_kwargs=dict(),
+                                    px_scatter_kwargs = dict(x=x, y=y, title=plot_row_identifier))
+    return fig, figure_context
 

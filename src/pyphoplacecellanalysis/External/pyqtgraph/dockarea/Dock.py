@@ -1,9 +1,78 @@
-from typing import Optional, Callable
+from typing import Dict, List, Tuple, Optional, Callable, Union, Any
+from typing_extensions import TypeAlias
+from nptyping import NDArray
 import warnings
 from attrs import define, field, Factory
 from ..Qt import QtCore, QtGui, QtWidgets
 from ..widgets.VerticalLabel import VerticalLabel
 from .DockDrop import DockDrop
+
+def debug_widget_geometry(a_widget, widget_name="Unknown"):
+    """Print comprehensive debug information about a DockLabel to diagnose layout issues."""
+    widget_type = type(a_widget)
+    print(f"\n--- {widget_type} Debug: {widget_name} ---")
+    
+    # Basic geometry info
+    print(f"Position: ({a_widget.x()}, {a_widget.y()})")
+    print(f"Size: {a_widget.width()} × {a_widget.height()}")
+    print(f"Geometry: {a_widget.geometry()}")
+    print(f"Content rect: {a_widget.rect()}")
+    print(f"Size hint: {a_widget.sizeHint()}")
+    print(f"Minimum size hint: {a_widget.minimumSizeHint()}")
+    
+    # Orientation and layout issues
+    print(f"Orientation: {a_widget.orientation}")
+    # print(f"Dim state: {a_widget.dim}")
+    print(f"Size policy: {a_widget.sizePolicy().horizontalPolicy()}, {a_widget.sizePolicy().verticalPolicy()}")
+    print(f"stretch: {a_widget.stretch()}")
+    print(f"container: {a_widget.container()}")
+    
+    # Visibility and enablement
+    print(f"Is visible: {a_widget.isVisible()}")
+    print(f"Is enabled: {a_widget.isEnabled()}")
+    print(f"Is shown: {not a_widget.isHidden()}")
+    
+    # Parent and layout context
+    print(f"Parent type: {type(a_widget.parent()).__name__}")
+    
+    print("--- End Debug Info ---\n")
+    
+
+
+
+
+def debug_print_dock(a_dock, widget_name="Unknown"):
+    """Print comprehensive debug information about a DockLabel to diagnose layout issues."""
+    print(f"\n--- Dock Debug: {widget_name} ---")
+    
+    # Basic geometry info
+    print(f"Position: ({a_dock.x()}, {a_dock.y()})")
+    print(f"Size: {a_dock.width()} × {a_dock.height()}")
+    print(f"Geometry: {a_dock.geometry()}")
+    print(f"Content rect: {a_dock.rect()}")
+    print(f"Size hint: {a_dock.sizeHint()}")
+    print(f"Minimum size hint: {a_dock.minimumSizeHint()}")
+    
+    # Orientation and layout issues
+    print(f"Orientation: {a_dock.orientation}")
+    # print(f"Dim state: {a_widget.dim}")
+    print(f"Size policy: {a_dock.sizePolicy().horizontalPolicy()}, {a_dock.sizePolicy().verticalPolicy()}")
+    print(f"stretch: {a_dock.stretch()}")
+    print(f"container: {a_dock.container()}")
+    print(f"title: {a_dock.title()}")
+    
+    # Visibility and enablement
+    print(f"Is visible: {a_dock.isVisible()}")
+    print(f"Is enabled: {a_dock.isEnabled()}")
+    print(f"Is shown: {not a_dock.isHidden()}")
+    
+    # Parent and layout context
+    print(f"Parent type: {type(a_dock.parent()).__name__}")
+    
+    print("--- End Debug Info ---\n")
+
+
+
 
 
 @define(slots=False)
@@ -14,13 +83,17 @@ class DockDisplayConfig(object):
     showGroupButton: bool = field(default=False)
     showOrientationButton: bool = field(default=False)
     
-
     hideTitleBar: bool = field(default=False)
     fontSize: str = field(default='10px')
     corner_radius: str = field(default='2px')
     # fontSize: str = field(default='10px')
     custom_get_stylesheet_fn: Callable = field(default=None) #(self, orientation, is_dim)
+    
+    should_enable_auto_orient: bool = field(default=False, metadata={'desc': 'if enabled, the Dock tries to auto-orient (setting its self.orientation intellegently) based off of its aspect ratio.'})
     _orientation: Optional[str] = field(default=None, alias="orientation", metadata={'valid_values': [None, 'auto', 'vertical', 'horizontal']}) # alias="orientation" just refers to the initializer, it doesn't interfere with the @property
+
+    additional_metadata: Dict = field(default=Factory(dict)) ## optional metadata
+
 
     @property
     def orientation(self) -> str:
@@ -33,13 +106,17 @@ class DockDisplayConfig(object):
     @property
     def shouldAutoOrient(self) -> bool:
         """ Whether the dock should auto-orient based on the aspect ratioy."""
-        if self.orientation is None:
-            return True
-        else:
-            return (self.orientation == 'auto') ## only if "auto" instead of ['vertical', 'horizontal']
+        return self.should_enable_auto_orient
+        # if self.orientation is None:
+        #     return True
+        # else:
+        #     return (self.orientation == 'auto') ## only if "auto" instead of ['vertical', 'horizontal']
     @shouldAutoOrient.setter
     def shouldAutoOrient(self, value: bool):
-        if value:
+        assert value is not None
+        self.should_enable_auto_orient = value
+        
+        if self.should_enable_auto_orient:
             self.orientation = 'auto' # only if True: change the orientation to 'auto'
         else:
             print(f"WARN: setting shouldAutoOrient to False does nothing, as we do not know which concrete value (['vertical', 'horizontal']) is wanted.")
@@ -133,7 +210,7 @@ class Dock(QtWidgets.QWidget, DockDrop):
         self.label.config = value
 
 
-    def __init__(self, name, area=None, size=(10, 10), widget=None, hideTitle=False, autoOrientation=True, display_config:Optional[DockDisplayConfig]=None, **kwargs): # , closable=False, fontSize="12px"
+    def __init__(self, name, area=None, size=(10, 10), widget=None, hideTitle=False, autoOrientation=False, display_config:Optional[DockDisplayConfig]=None, **kwargs): # , closable=False, fontSize="12px"
         QtWidgets.QWidget.__init__(self)
         DockDrop.__init__(self)
         self._container = None
@@ -143,7 +220,7 @@ class Dock(QtWidgets.QWidget, DockDrop):
         
         if display_config is None:
             print(f"WARNING: Dock.__init__(...): display_config is None... using old-mode fallback. This will be eventually depricated.")
-            display_config = DockDisplayConfig(showCloseButton=kwargs.get('closable', False), fontSize=kwargs.get('fontSize', "10px"), corner_radius='2px', orientation='horizontal')
+            display_config = DockDisplayConfig(showCloseButton=kwargs.get('closable', False), fontSize=kwargs.get('fontSize', "10px"), corner_radius='2px', orientation='horizontal', should_enable_auto_orient=autoOrientation)
             if autoOrientation:
                 display_config.orientation = 'auto' # only if True: change the orientation to 'auto'
 
@@ -160,7 +237,9 @@ class Dock(QtWidgets.QWidget, DockDrop):
             self.label.sigGroupClicked.connect(self.on_group_btn_clicked)
         if display_config.showOrientationButton:
             self.label.sigToggleOrientationClicked.connect(self.on_orientation_btn_toggled)
-
+        # Add this line to connect the new rename signal
+        self.label.sigRenamed.connect(self.on_renamed)
+        
         self.contentsHidden = False
         self.labelHidden = False
         self.moveLabel = True  ## If false, the dock is no longer allowed to move the label.
@@ -222,6 +301,12 @@ class Dock(QtWidgets.QWidget, DockDrop):
         if hideTitle:
             self.hideTitleBar()
 
+
+    def debug_print(self, widget_name: str="Unknown"):
+        """Print comprehensive debug information about a Dock to diagnose layout issues."""
+        return debug_print_dock(self, widget_name=widget_name)
+    
+
     def implements(self, name=None):
         if name is None:
             return ['dock']
@@ -254,6 +339,30 @@ class Dock(QtWidgets.QWidget, DockDrop):
         if 'center' in self.allowedAreas:
             self.allowedAreas.remove('center')
         self.updateStyle()
+        # Create a special tiny button that can restore the title bar
+        if not hasattr(self, 'restoreTitleButton'):
+            self.restoreTitleButton = QtWidgets.QToolButton(self)
+            self.restoreTitleButton.setIcon(QtWidgets.QApplication.style().standardIcon(QtWidgets.QStyle.StandardPixmap.SP_TitleBarNormalButton))
+            self.restoreTitleButton.setToolTip("Show title bar")
+            self.restoreTitleButton.clicked.connect(self.showTitleBar)
+            self.restoreTitleButton.setMaximumSize(16, 16)
+            self.restoreTitleButton.setStyleSheet("""
+                QToolButton {
+                    background-color: rgba(100, 100, 100, 60);
+                    border-radius: 2px;
+                }
+                QToolButton:hover {
+                    background-color: rgba(100, 100, 100, 100);
+                }
+            """)
+            
+        # Position in top-right corner and make visible
+        self.restoreTitleButton.show()
+        self.restoreTitleButton.raise_()
+        
+
+
+
 
     def showTitleBar(self):
         """
@@ -263,7 +372,11 @@ class Dock(QtWidgets.QWidget, DockDrop):
         self.labelHidden = False
         self.allowedAreas.add('center')
         self.updateStyle()
-        
+
+        # Hide the restore button if it exists
+        if hasattr(self, 'restoreTitleButton'):
+            self.restoreTitleButton.hide()
+
 
     def toggleContentVisibility(self):
         """ toggles the visibility of the contents (everything except the title bar) for this Dock.
@@ -335,17 +448,19 @@ class Dock(QtWidgets.QWidget, DockDrop):
         if self.container() is None:
             return
 
-        if o == 'auto' and self.autoOrient:
+        if o == 'auto' and (self.autoOrient):
             if self.container().type() == 'tab':
                 o = 'horizontal'
             elif self.width() > self.height()*1.5:
                 o = 'vertical'
             else:
                 o = 'horizontal'
-        if force or self.orientation != o:
+                
+        if force or (self.orientation != o):
             self.orientation = o
             self.label.setOrientation(o)
             self.updateStyle()
+
 
     def updateStyle(self):
         ## updates orientation and appearance of title bar
@@ -474,8 +589,197 @@ class Dock(QtWidgets.QWidget, DockDrop):
         self.sigToggleOrientationClicked.emit(self)
         
 
+    # ==================================================================================================================== #
+    # Context Menu Providing                                                                                               #
+    # ==================================================================================================================== #
+    def buildContextMenu(self):
+        """
+        Build and return a context menu for this dock.
+        This method can be overridden by subclasses to customize the context menu.
+        Widgets in the dock can also add their own menu items by connecting to 
+        the label's sigContextMenuRequested signal.
+        
+        Returns:
+            QtWidgets.QMenu: The context menu to display
+        """
+        menu = QtWidgets.QMenu()
+        
+        # Create standard actions
+        showTitleAction = menu.addAction("Show title bar")
+        showTitleAction.triggered.connect(self.showTitleBar)
+        menu.addSeparator()
+
+        renameAction = menu.addAction("Rename dock...")
+        renameAction.triggered.connect(lambda: self.label.promptRename())
+        
+        toggleOrientationAction = menu.addAction("Toggle orientation")
+        toggleOrientationAction.triggered.connect(
+            lambda: self.setOrientation('vertical' if self.orientation == 'horizontal' else 'horizontal', force=True)
+        )
+        
+        # Add Close action if close button is available
+        if self.config.showCloseButton:
+            closeAction = menu.addAction("Close dock")
+            closeAction.triggered.connect(self.close)
+        
+        # Add buttons visibility submenu
+        buttonVisibilityMenu = menu.addMenu("Show dock buttons")
+        
+        # Close button toggle
+        showCloseAction = buttonVisibilityMenu.addAction("Close button")
+        showCloseAction.setCheckable(True)
+        showCloseAction.setChecked(self.config.showCloseButton)
+        showCloseAction.toggled.connect(lambda checked: self.updateButtonVisibility('close', checked))
+        
+        # Collapse button toggle
+        showCollapseAction = buttonVisibilityMenu.addAction("Collapse button")
+        showCollapseAction.setCheckable(True)
+        showCollapseAction.setChecked(self.config.showCollapseButton)
+        showCollapseAction.toggled.connect(lambda checked: self.updateButtonVisibility('collapse', checked))
+        
+        # Group button toggle
+        showGroupAction = buttonVisibilityMenu.addAction("Group button")
+        showGroupAction.setCheckable(True)
+        showGroupAction.setChecked(self.config.showGroupButton)
+        showGroupAction.toggled.connect(lambda checked: self.updateButtonVisibility('group', checked))
+        
+        # Orientation button toggle
+        showOrientationAction = buttonVisibilityMenu.addAction("Orientation button")
+        showOrientationAction.setCheckable(True)
+        showOrientationAction.setChecked(self.config.showOrientationButton)
+        showOrientationAction.toggled.connect(lambda checked: self.updateButtonVisibility('orientation', checked))
+        
+        # Add visibility options
+        collapseAction = menu.addAction("Toggle content visibility")
+        collapseAction.triggered.connect(self.toggleContentVisibility)
+        
+        # Allow widgets to extend this menu
+        self.extendContextMenu(menu)
+        
+        return menu
+    
+    def extendContextMenu(self, menu):
+        """
+        This method can be overridden by subclasses to add additional items to the context menu.
+        The default implementation checks if any widgets in the dock have a method named
+        'extendDockContextMenu' and calls it if present.
+        
+        Args:
+            menu (QtWidgets.QMenu): The context menu to extend
+        """
+        # Check if any widgets want to add menu items
+        for widget in self.widgets:
+            if hasattr(widget, 'extendDockContextMenu') and callable(getattr(widget, 'extendDockContextMenu')):
+                widget.extendDockContextMenu(menu, self)
+
+    def contextMenuEvent(self, event):
+        """
+        Handle right-click events on the dock itself (but not its contents).
+        This gives access to the context menu when clicking on the dock frame.
+        """
+        # Check if the event occurred directly on the dock widget, not on a child widget
+        if self.childAt(event.pos()) is None:
+            menu = self.buildContextMenu()
+            if menu and not menu.isEmpty():
+                menu.exec(event.globalPos())
+            event.accept()
+        else:
+            # Let the event propagate to children
+            super().contextMenuEvent(event)
+            
+        
+
+    # ==================================================================================================================== #
+    # Specific context menu action handlers                                                                                #
+    # ==================================================================================================================== #
+    # @function_attributes(short_name=None, tags=['context_menu', 'action'], input_requires=[], output_provides=[], uses=[], used_by=['buildContextMenu'], creation_date='2025-03-25 16:56', related_items=[])
+    def updateButtonVisibility(self, button_type, visible):
+        """Update the visibility of a specific button in the dock label."""
+        if button_type == 'close':
+            self.config.showCloseButton = visible
+        elif button_type == 'collapse':
+            self.config.showCollapseButton = visible
+        elif button_type == 'group':
+            self.config.showGroupButton = visible
+        elif button_type == 'orientation':
+            self.config.showOrientationButton = visible
+        
+        # Update the buttons in the UI
+        self.label.updateButtonsFromConfig()
+    
+    # @function_attributes(short_name=None, tags=['context_menu', 'action'], input_requires=[], output_provides=[], uses=[], used_by=['buildContextMenu'], creation_date='2025-03-25 16:55', related_items=[])
+    def on_renamed(self, dock, new_name):
+        """Handle renaming of the dock."""
+        self._name = new_name
+        self.sigRenamed.emit(self, new_name)
+        
 
 
+def debug_dock_label(dock_label, label_name="Unknown"):
+    """Print comprehensive debug information about a DockLabel to diagnose layout issues."""
+    print(f"\n--- DockLabel Debug: {label_name} ---")
+    
+    # Basic geometry info
+    print(f"Position: ({dock_label.x()}, {dock_label.y()})")
+    print(f"Size: {dock_label.width()} × {dock_label.height()}")
+    print(f"Geometry: {dock_label.geometry()}")
+    print(f"Content rect: {dock_label.rect()}")
+    print(f"Size hint: {dock_label.sizeHint()}")
+    print(f"Minimum size hint: {dock_label.minimumSizeHint()}")
+    
+    # Text content issues
+    print(f"Text content: '{dock_label.text()}'")
+    print(f"Text length: {len(dock_label.text())}")
+    print(f"Has tooltip: {bool(dock_label.toolTip())}")
+    
+    # Orientation and layout issues
+    print(f"Orientation: {dock_label.orientation}")
+    print(f"Dim state: {dock_label.dim}")
+    print(f"Size policy: {dock_label.sizePolicy().horizontalPolicy()}, {dock_label.sizePolicy().verticalPolicy()}")
+    
+    # Button presence and sizes
+    print(f"Has closeButton: {dock_label.closeButton is not None}")
+    if dock_label.closeButton:
+        print(f"  - closeButton size: {dock_label.closeButton.size()}")
+    
+    print(f"Has collapseButton: {dock_label.collapseButton is not None}")
+    if dock_label.collapseButton:
+        print(f"  - collapseButton size: {dock_label.collapseButton.size()}")
+    
+    print(f"Has groupButton: {dock_label.groupButton is not None}")
+    if dock_label.groupButton:
+        print(f"  - groupButton size: {dock_label.groupButton.size()}")
+    
+    print(f"Has orientationButton: {dock_label.orientationButton is not None}")
+    if dock_label.orientationButton:
+        print(f"  - orientationButton size: {dock_label.orientationButton.size()}")
+    
+    # Visibility and enablement
+    print(f"Is visible: {dock_label.isVisible()}")
+    print(f"Is enabled: {dock_label.isEnabled()}")
+    print(f"Is shown: {not dock_label.isHidden()}")
+    
+    # Parent and layout context
+    print(f"Parent type: {type(dock_label.parent()).__name__}")
+    
+    # Font metrics for text rendering
+    font_metrics = dock_label.fontMetrics()
+    if dock_label.text():
+        text_width = font_metrics.horizontalAdvance(dock_label.text())
+        print(f"Text width by font metrics: {text_width}px")
+    
+    # Check elided text mode
+    if hasattr(dock_label, 'elided_text_mode'):
+        print(f"Elided text mode: {dock_label.elided_text_mode}")
+    
+    # Check stylesheet
+    if dock_label.styleSheet():
+        print(f"Has custom stylesheet: Yes")
+        # print(f"Stylesheet: {dock_label.styleSheet()}")
+    else:
+        print(f"Has custom stylesheet: No")
+    
+    print("--- End Debug Info ---\n")
 
 
 
@@ -490,6 +794,11 @@ class DockLabel(VerticalLabel):
     sigCollapseClicked = QtCore.Signal()
     sigGroupClicked = QtCore.Signal()
     sigToggleOrientationClicked = QtCore.Signal(bool)
+    
+    sigContextMenuRequested = QtCore.Signal(object, object)  # Emits dock label and QPoint
+    sigRenamed = QtCore.Signal(object, str)  # Emits dock and new name
+    
+
 
     def __init__(self, text, dock, display_config:DockDisplayConfig):
         self.dim = False
@@ -503,38 +812,79 @@ class DockLabel(VerticalLabel):
         self.updateStyle()
         self.setAutoFillBackground(False)
         self.mouseMoved = False
-        self.setToolTip(self.text())
+        self.setToolTip(self.text()) ## the original text is only preserved in the label's .toolTip()
         self.closeButton = None
         self.collapseButton = None
         self.groupButton = None
         self.orientationButton = None
-        self.num_total_title_bar_buttons: int = int(display_config.showCloseButton) + int(display_config.showCollapseButton) + int(display_config.showGroupButton)
-        # if self.num_total_title_bar_buttons > 1:
-        #     ## use a layout instead
-        #     # self.buttonBarLayout = QtWidgets.
-        #     pass
-        if display_config.showCloseButton:
-            self.closeButton = QtWidgets.QToolButton(self)
-            self.closeButton.clicked.connect(self.sigCloseClicked)
-            self.closeButton.setIcon(QtWidgets.QApplication.style().standardIcon(QtWidgets.QStyle.StandardPixmap.SP_TitleBarCloseButton))
-        if display_config.showCollapseButton:
-            self.collapseButton = QtWidgets.QToolButton(self)
-            self.collapseButton.clicked.connect(self.sigCollapseClicked)
-            self.collapseButton.setIcon(QtWidgets.QApplication.style().standardIcon(QtWidgets.QStyle.StandardPixmap.SP_TitleBarMinButton))
-        if display_config.showGroupButton:
-            self.groupButton = QtWidgets.QToolButton(self)
-            self.groupButton.clicked.connect(self.sigGroupClicked)
-            self.groupButton.setIcon(QtWidgets.QApplication.style().standardIcon(QtWidgets.QStyle.StandardPixmap.SP_FileDialogListView))
-        if display_config.showOrientationButton:
-            self.orientationButton = QtWidgets.QToolButton(self)
-            self.orientationButton.setCheckable(True)
-            # self.orientationButton.clicked.connect(self.sigToggleOrientationClicked)
-            self.orientationButton.toggled.connect(self.sigToggleOrientationClicked)
-            self.orientationButton.setIcon(QtWidgets.QApplication.style().standardIcon(QtWidgets.QStyle.StandardPixmap.SP_ToolBarHorizontalExtensionButton))
-            # self.orientationButton.setIcon(QtWidgets.QApplication.style().????(QtWidgets.QStyle.StandardPixmap.SP_ToolBarVerticalExtensionButton))
+        
+        # Create all possible buttons (always create them)
+        MIN_BUTTON_SIZE = 12
+        
+        # Create close button
+        self.closeButton = QtWidgets.QToolButton(self)
+        self.closeButton.clicked.connect(self.sigCloseClicked)
+        self.closeButton.setIcon(QtWidgets.QApplication.style().standardIcon(QtWidgets.QStyle.StandardPixmap.SP_TitleBarCloseButton))
+        self.closeButton.setMinimumSize(MIN_BUTTON_SIZE, MIN_BUTTON_SIZE)
+        self.closeButton.setFixedSize(MIN_BUTTON_SIZE, MIN_BUTTON_SIZE)
+        
+        # Create collapse button
+        self.collapseButton = QtWidgets.QToolButton(self)
+        self.collapseButton.clicked.connect(self.sigCollapseClicked)
+        self.collapseButton.setIcon(QtWidgets.QApplication.style().standardIcon(QtWidgets.QStyle.StandardPixmap.SP_TitleBarMinButton))
+        self.collapseButton.setMinimumSize(MIN_BUTTON_SIZE, MIN_BUTTON_SIZE)
+        self.collapseButton.setFixedSize(MIN_BUTTON_SIZE, MIN_BUTTON_SIZE)
+        
+        # Create group button
+        self.groupButton = QtWidgets.QToolButton(self)
+        self.groupButton.clicked.connect(self.sigGroupClicked)
+        self.groupButton.setIcon(QtWidgets.QApplication.style().standardIcon(QtWidgets.QStyle.StandardPixmap.SP_FileDialogListView))
+        self.groupButton.setMinimumSize(MIN_BUTTON_SIZE, MIN_BUTTON_SIZE)
+        self.groupButton.setFixedSize(MIN_BUTTON_SIZE, MIN_BUTTON_SIZE)
+        
+        # Create orientation button
+        self.orientationButton = QtWidgets.QToolButton(self)
+        self.orientationButton.setCheckable(True)
+        self.orientationButton.toggled.connect(self.sigToggleOrientationClicked)
+        self.orientationButton.setIcon(QtWidgets.QApplication.style().standardIcon(QtWidgets.QStyle.StandardPixmap.SP_ToolBarHorizontalExtensionButton))
+        self.orientationButton.setMinimumSize(MIN_BUTTON_SIZE, MIN_BUTTON_SIZE)
+        self.orientationButton.setFixedSize(MIN_BUTTON_SIZE, MIN_BUTTON_SIZE)
+        
+        # Set initial visibility based on config
+        self.updateButtonsFromConfig()
+        
+        # Connect config property changes to UI updates
+        # self.config.propertyChanged.connect(self.updateButtonsFromConfig)
+    
+
+
+    def updateButtonsFromConfig(self):
+        """Updates button visibility and state based on current config."""
+        # Set visibility based on config
+        self.closeButton.setVisible(self.config.showCloseButton)
+        self.collapseButton.setVisible(self.config.showCollapseButton)
+        self.groupButton.setVisible(self.config.showGroupButton)
+        self.orientationButton.setVisible(self.config.showOrientationButton)
+        
+        # Update count of buttons
+        self.num_total_title_bar_buttons = (int(self.config.showCloseButton) + 
+                                        int(self.config.showCollapseButton) + 
+                                        int(self.config.showGroupButton) +
+                                        int(self.config.showOrientationButton))
+        
+        # Force a resize to update button positions
+        self.updateGeometry()
+        self.update()
 
 
 
+
+    def debug_print(self, label_name: str="Unknown"):
+        """Print comprehensive debug information about a DockLabel to diagnose layout issues."""
+        return debug_dock_label(self, label_name=label_name)
+    
+
+    """Print comprehensive debug information about a DockLabel to diagnose layout issues."""
     def updateStyle(self):
         updated_stylesheet = self.config.get_stylesheet(orientation=self.orientation, is_dim=self.dim)
         if self.orientation == 'vertical':
@@ -660,8 +1010,7 @@ class DockLabel(VerticalLabel):
                 current_x += button_size
         ## END if self.groupButton...   
         
-
-
+        ## See how much space is left for the text label after subtracting away the buttons:
         button_occupied_space = ((button_size if button_size else 0) * num_total_title_bar_buttons)
 
         if self.elided_text_mode is not None:
@@ -685,7 +1034,8 @@ class DockLabel(VerticalLabel):
                 print(f'\tavailable_text_space: {available_text_space}')
             # Skip elision if available space is insufficient
             if available_text_space > 0:
-                elided_text = font_metrics.elidedText(self.text(), self.elided_text_mode, available_text_space)
+                original_text: str = self.toolTip()
+                elided_text = font_metrics.elidedText(original_text, self.elided_text_mode, available_text_space)
                 self.setText(elided_text)
             else:
                 if debug_print:
@@ -716,3 +1066,88 @@ class DockLabel(VerticalLabel):
             # """)
         # self.collapseButton.setIcon(QtWidgets.QApplication.style().standardIcon(QtWidgets.QStyle.StandardPixmap.SP_TitleBarMinButton))
         
+
+    def contextMenuEvent(self, event):
+        """Handle right-click events on the dock label by showing a context menu."""
+        # First emit signal to allow external handlers to process this event
+        self.sigContextMenuRequested.emit(self, event.globalPos())
+        
+        # Create the context menu
+        menu = self.dock.buildContextMenu()
+        if menu and not menu.isEmpty():
+            menu.exec(event.globalPos())
+
+        # menu = QtWidgets.QMenu(self)
+        
+        # # Create standard actions
+        # renameAction = menu.addAction("Rename dock...")
+        # toggleOrientationAction = menu.addAction("Toggle orientation")
+        
+        # # Add Close action if close button is available
+        # closeAction = None
+        # if self.config.showCloseButton:
+        #     closeAction = menu.addAction("Close dock")
+        
+        # # Add buttons visibility submenu
+        # buttonVisibilityMenu = menu.addMenu("Show dock buttons")
+        # showCloseAction = buttonVisibilityMenu.addAction("Close button")
+        # showCloseAction.setCheckable(True)
+        # showCloseAction.setChecked(self.config.showCloseButton)
+        
+        # showCollapseAction = buttonVisibilityMenu.addAction("Collapse button")
+        # showCollapseAction.setCheckable(True)
+        # showCollapseAction.setChecked(self.config.showCollapseButton)
+        
+        # showGroupAction = buttonVisibilityMenu.addAction("Group button")
+        # showGroupAction.setCheckable(True)
+        # showGroupAction.setChecked(self.config.showGroupButton)
+        
+        # showOrientationAction = buttonVisibilityMenu.addAction("Orientation button")
+        # showOrientationAction.setCheckable(True)
+        # showOrientationAction.setChecked(self.config.showOrientationButton)
+        
+        # # Add visibility options
+        # collapseAction = menu.addAction("Toggle content visibility")
+        
+        # # Show menu and get selected action
+        # action = menu.exec(event.globalPos())
+        
+        # # Handle actions
+        # if action == renameAction:
+        #     self.promptRename()
+        # elif action == toggleOrientationAction:
+        #     new_orientation = 'vertical' if self.orientation == 'horizontal' else 'horizontal'
+        #     self.dock.setOrientation(new_orientation, force=True)
+        # elif closeAction is not None and action == closeAction:
+        #     self.sigCloseClicked.emit()
+        # elif action == collapseAction:
+        #     self.sigCollapseClicked.emit()
+        # elif action == showCloseAction:
+        #     self.config.showCloseButton = showCloseAction.isChecked()
+        #     self.updateButtonsFromConfig()
+        # elif action == showCollapseAction:
+        #     self.config.showCollapseButton = showCollapseAction.isChecked()
+        #     self.updateButtonsFromConfig()
+        # elif action == showGroupAction:
+        #     self.config.showGroupButton = showGroupAction.isChecked()
+        #     self.updateButtonsFromConfig()
+        # elif action == showOrientationAction:
+        #     self.config.showOrientationButton = showOrientationAction.isChecked()
+        #     self.updateButtonsFromConfig()
+        
+
+    def promptRename(self):
+        """Show a dialog to rename the dock."""
+        current_name = self.text()
+        new_name, ok = QtWidgets.QInputDialog.getText(
+            self, 
+            "Rename Dock", 
+            "New dock name:", 
+            QtWidgets.QLineEdit.Normal, 
+            current_name
+        )
+        
+        if ok and new_name:
+            self.dock.setTitle(new_name)
+            self.sigRenamed.emit(self.dock, new_name)
+            

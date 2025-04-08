@@ -2,8 +2,9 @@ from copy import deepcopy
 import shutil
 from typing import Dict, List, Tuple, Optional, Callable, Union, Any
 from neuropy.analyses import Epoch
-from neuropy.core.epoch import ensure_dataframe
+from neuropy.core.epoch import TimeColumnAliasesProtocol, ensure_dataframe
 from typing_extensions import TypeAlias
+import nptyping as ND
 from nptyping import NDArray
 import neuropy.utils.type_aliases as types
 
@@ -11,7 +12,6 @@ from pathlib import Path
 import inspect
 from jinja2 import Template
 from neuropy.utils.result_context import IdentifyingContext
-from nptyping import NDArray
 import numpy as np
 import pandas as pd
 
@@ -92,9 +92,6 @@ def perform_sweep_decoding_time_bin_sizes_marginals_dfs_completion_function(self
     custom_all_param_sweep_options, param_sweep_option_n_values = parameter_sweeps(desired_laps_decoding_time_bin_size=np.linspace(start=0.030, stop=0.10, num=6),
                                                                             use_single_time_bin_per_epoch=[False],
                                                                             minimum_event_duration=[desired_shared_decoding_time_bin_sizes[-1]])
-
-
-
     additional_session_context if provided, this is combined with the session context.
     ## CSVs are saved out in `_subfn_process_time_bin_swept_results`
 
@@ -102,6 +99,25 @@ def perform_sweep_decoding_time_bin_sizes_marginals_dfs_completion_function(self
     'K:/scratch/collected_outputs/2024-09-25_Apogee-2006-4-28_12-38-13-None_time_bin_size_sweep_results.h5'
     'K:/scratch/collected_outputs/2024-09-25-kdiba_vvp01_two_2006-4-28_12-38-13_None-(ripple_time_bin_marginals_df).csv'
     
+
+
+    Outputs:
+
+        After the sweeps are complete and multiple (one for each time_bin_size swept) indepdnent dfs are had with the four results types this function concatenates each of the four into a single dataframe for all time_bin_size values with a column 'time_bin_size'. 
+        It also saves them out to CSVs in a manner similar to what `compute_and_export_marginals_dfs_completion_function` did to be compatible with `2024-01-23 - Across Session Point and YellowBlue Marginal CSV Exports.ipynb`
+        Captures: save_csvs
+        GLOBAL Captures: collected_outputs_path
+        
+        Produces: a single output df flattened acrossed all time bin sizes
+        
+        Outputs:
+        [laps_time_bin_marginals_out_path, laps_out_path, ripple_time_bin_marginals_out_path, ripple_out_path]:
+            '2024-01-04-kdiba_gor01_one_2006-6-09_1-22-43|(laps_time_bin_marginals_df).csv'
+            '2024-01-04-kdiba_gor01_one_2006-6-09_1-22-43|(laps_marginals_df).csv'
+            '2024-01-04-kdiba_gor01_one_2006-6-09_1-22-43|(ripple_time_bin_marginals_df).csv'
+            '2024-01-04-kdiba_gor01_one_2006-6-09_1-22-43|(ripple_marginals_df).csv'
+        
+        
     
     """
     print(f'<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<')
@@ -117,6 +133,7 @@ def perform_sweep_decoding_time_bin_sizes_marginals_dfs_completion_function(self
     from neuropy.utils.indexing_helpers import PandasHelpers
     from neuropy.utils.debug_helpers import parameter_sweeps
     from neuropy.core.laps import Laps
+    from neuropy.core.epoch import TimeColumnAliasesProtocol, ensure_dataframe
     from neuropy.utils.mixins.binning_helpers import find_minimum_time_bin_duration
     from pyphocorehelpers.print_helpers import get_now_day_str, get_now_rounded_time_str
     from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import _check_result_laps_epochs_df_performance
@@ -128,7 +145,7 @@ def perform_sweep_decoding_time_bin_sizes_marginals_dfs_completion_function(self
     from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import _compute_lap_and_ripple_epochs_decoding_for_decoder, _perform_compute_custom_epoch_decoding, _compute_all_df_score_metrics
     from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import get_proper_global_spikes_df, co_filter_epochs_and_spikes
     from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import filter_and_update_epochs_and_spikes
-
+    
     DecodedEpochsResultsDict = NewType('DecodedEpochsResultsDict', Dict[types.DecoderName, DecodedFilterEpochsResult]) # A Dict containing the decoded filter epochs result for each of the four 1D decoder names
 
     suppress_exceptions: bool = (not self.fail_on_exception)
@@ -706,7 +723,7 @@ def perform_sweep_decoding_time_bin_sizes_marginals_dfs_completion_function(self
     return across_session_results_extended_dict
 
 
-@function_attributes(short_name=None, tags=['CSVs', 'export', 'across-sessions', 'batch', 'single-time-bin-size', 'ripple_all_scores_merged_df'], input_requires=['DirectionalLaps', 'RankOrder', 'DirectionalDecodersEpochsEvaluations'], output_provides=[], uses=['filter_and_update_epochs_and_spikes', 'DecoderDecodedEpochsResult', 'DecoderDecodedEpochsResult.export_csvs'], used_by=[], creation_date='2024-04-27 21:20', related_items=[])
+@function_attributes(short_name=None, tags=['CSVs', 'export', 'across-sessions', 'batch', 'single-time-bin-size', 'ripple_all_scores_merged_df', 'DIRECTIONAL-ONLY'], input_requires=['DirectionalLaps', 'RankOrder', 'DirectionalDecodersEpochsEvaluations'], output_provides=[], uses=['filter_and_update_epochs_and_spikes', 'DecoderDecodedEpochsResult', 'DecoderDecodedEpochsResult.export_csvs'], used_by=[], creation_date='2024-04-27 21:20', related_items=[])
 def compute_and_export_decoders_epochs_decoding_and_evaluation_dfs_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict,
                                                ripple_decoding_time_bin_size_override: Optional[float]=None, laps_decoding_time_bin_size_override: Optional[float]=None,
                                                 needs_recompute_heuristics: bool = False, force_recompute_all_decoding: bool = False,
@@ -1407,7 +1424,7 @@ def figures_rank_order_results_completion_function(self, global_data_root_parent
     return across_session_results_extended_dict
 
 
-@function_attributes(short_name=None, tags=['wcorr', 'shuffle'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-01-01 00:00', related_items=[])
+@function_attributes(short_name=None, tags=['wcorr', 'shuffle', 'export', 'mat', 'pkl', 'csv'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-01-01 00:00', related_items=[])
 def compute_and_export_session_wcorr_shuffles_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict,
                                    should_skip_previous_saved_shuffles:bool=False, with_data_name: Optional[str]=None) -> dict:
     """  Computes the shuffled wcorrs and export them to several formats: .mat, .pkl, and .csv
@@ -1892,6 +1909,9 @@ def compute_and_export_session_alternative_replay_wcorr_shuffles_completion_func
     return across_session_results_extended_dict
 
 
+# ==================================================================================================================== #
+# cell_first_spikes_characteristics                                                                                    #
+# ==================================================================================================================== #
 @function_attributes(short_name=None, tags=['first-spikes', 'neurons', 'HDF5', 'export'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-11-01 18:30', related_items=[])
 def compute_and_export_cell_first_spikes_characteristics_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict) -> dict:
     """ Exports this session's cell first-firing information (HDF5) with custom suffix derived from parameters
@@ -1995,8 +2015,6 @@ def figures_plot_cell_first_spikes_characteristics_completion_function(self, glo
 # ==================================================================================================================== #
 # Unsorted                                                                                                             #
 # ==================================================================================================================== #
-
-
 
 @function_attributes(short_name=None, tags=['recomputed_inst_firing_rate', 'inst_fr', 'independent'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-01-01 00:00', related_items=[])
 def compute_and_export_session_instantaneous_spike_rates_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict,
@@ -2293,7 +2311,18 @@ class PostHocPipelineFixup:
                 # did_change: bool = ((_bak_loaded_track_limits is None) or (_new_loaded_track_limits != _bak_loaded_track_limits))
                 # change_dict[f'filtered_sessions["{a_decoder_name}"]'] = {}
                 # did_loaded_track_limits_change: bool = ((_bak_loaded_track_limits is None) or np.any([np.array(_bak_loaded_track_limits.get(k, [])) != np.array(v) for k, v in _new_loaded_track_limits.items()]))
-                did_loaded_track_limits_change: bool = (((_bak_loaded_track_limits is None) and (_new_loaded_track_limits is not None)) or np.any([_sub_sub_fn_did_potentially_arr_or_None_variable_change(np.array(_bak_loaded_track_limits.get(k, [])), np.array(v)) for k, v in _new_loaded_track_limits.items()]))
+                try:
+                    did_loaded_track_limits_change: bool = (((_bak_loaded_track_limits is None) and (_new_loaded_track_limits is not None)) or np.any([_sub_sub_fn_did_potentially_arr_or_None_variable_change(np.array(_bak_loaded_track_limits.get(k, [])), np.array(v)) for k, v in _new_loaded_track_limits.items()]))
+                                
+                except ValueError as e:
+                    ## something went wrong with the values! Consider them changed.
+                    print(f'\tsomething went wrong with the values, consider them changed!')
+                    did_loaded_track_limits_change: bool = True
+                    pass
+                except Exception as e:
+                    raise
+
+                
                 change_dict[f'filtered_sessions["{a_decoder_name}"].loaded_track_limits'] = did_loaded_track_limits_change
                 if did_loaded_track_limits_change:
                     did_any_change = True
@@ -2557,8 +2586,6 @@ class PostHocPipelineFixup:
         print('\tdone.')
         return across_session_results_extended_dict
 
-
-
 @function_attributes(short_name=None, tags=['IMPORTANT', 'PostHocPipelineFixup', 'non_PBE'], input_requires=[], output_provides=[], uses=['PostHocPipelineFixup'], used_by=[], creation_date='2025-02-19 00:00', related_items=['PostHocPipelineFixup'])
 def kdiba_session_post_fixup_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict, force_recompute:bool=True, is_dry_run: bool=False) -> dict:
     """ Called to update the pipeline's important position info parameters (such as the grid_bin_bounds, positions, etc) from a loaded .mat file
@@ -2594,114 +2621,6 @@ def kdiba_session_post_fixup_completion_function(self, global_data_root_parent_p
     print(f'>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>')
 
     return across_session_results_extended_dict
-
-
-
-
-
-
-# @function_attributes(short_name=None, tags=['UNFINISHED'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-01-01 00:00', related_items=[])
-# def kdiba_session_post_fixup_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict) -> dict:
-#     """ Called to update the pipeline's important position info parameters (such as the grid_bin_bounds, positions, etc) from a loaded .mat file
-    
-    
-#     from pyphoplacecellanalysis.General.Batch.BatchJobCompletion.UserCompletionHelpers.batch_user_completion_helpers import kdiba_session_post_fixup_completion_function
-    
-#     Results can be extracted from batch output by 
-    
-#     # Extracts the callback results 'determine_session_t_delta_completion_function':
-#     extracted_callback_fn_results = {a_sess_ctxt:a_result.across_session_results.get('determine_session_t_delta_completion_function', {}) for a_sess_ctxt, a_result in global_batch_run.session_batch_outputs.items() if a_result is not None}
-
-#     ['basepath', 'session_spec', 'session_name', 'session_context', 'format_name', 'preprocessing_parameters', 'absolute_start_timestamp', 'position_sampling_rate_Hz', 'microseconds_to_seconds_conversion_factor', 'pix2cm', 'x_midpoint', 'loaded_track_limits', 'is_resolved', 'resolved_required_filespecs_dict', 'resolved_optional_filespecs_dict', 'x_unit_midpoint', 'first_valid_pos_time', 'last_valid_pos_time']
-
-#     """
-#     from neuropy.core.session.Formats.BaseDataSessionFormats import DataSessionFormatRegistryHolder
-#     from neuropy.core.session.Formats.Specific.KDibaOldDataSessionFormat import KDibaOldDataSessionFormatRegisteredClass
-#     from neuropy.core.session.Formats.SessionSpecifications import SessionConfig
-
-#     print(f'<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<')
-#     print(f'kdiba_session_post_fixup_completion_function(curr_session_context: {curr_session_context}, curr_session_basedir: {str(curr_session_basedir)}, ...)')
-#     active_data_mode_name: str = curr_active_pipeline.session_data_type
-#     active_data_session_types_registered_classes_dict = DataSessionFormatRegistryHolder.get_registry_data_session_type_class_name_dict()
-#     active_data_mode_registered_class = active_data_session_types_registered_classes_dict[active_data_mode_name]
-#     # active_data_mode_type_properties = known_data_session_type_properties_dict[active_data_mode_name]
-
-
-#     def _update_loaded_track_limits(a_session):
-#         """ captures: curr_active_pipeline
-#         """
-#         # sess_config: SessionConfig = SessionConfig(**deepcopy(a_session.config.__getstate__()))
-#         sess_config: SessionConfig = deepcopy(a_session.config)
-        
-#         # 'first_valid_pos_time'
-#         a_session.config = sess_config
-#         _bak_loaded_track_limits = deepcopy(a_session.config.loaded_track_limits)
-#         ## Apply fn
-#         a_session = active_data_mode_registered_class._default_kdiba_exported_load_position_info_mat(basepath=curr_active_pipeline.sess.basepath, session_name=curr_active_pipeline.session_name, session=a_session)
-#         _new_loaded_track_limits = deepcopy(a_session.config.loaded_track_limits)
-#         # did_change: bool = ((_bak_loaded_track_limits is None) or (_new_loaded_track_limits != _bak_loaded_track_limits))
-#         did_change: bool = ((_bak_loaded_track_limits is None) or np.any((np.array(_new_loaded_track_limits) != np.array(_bak_loaded_track_limits))))
-#         return did_change, a_session
-
-#     ## Check if they changed
-#     did_change: bool = False
-
-#     ## Do main session:
-#     a_session = deepcopy(curr_active_pipeline.sess)
-#     new_did_change, a_session = _update_loaded_track_limits(a_session=a_session)
-#     curr_active_pipeline.stage.sess = a_session ## apply the session
-#     did_change = did_change | new_did_change
-#     print(f'curr_active_pipeline.sess changed its track limits!')
-#     # curr_active_pipeline.sess.config = a_session.config # apply the config only...
-
-#     # --------------------- Do for filtered sessions as well --------------------- #
-
-#     # did_change = did_change or np.any(ensure_dataframe(_backup_session_configs['sess']).to_numpy() != ensure_dataframe(new_replay_epochs).to_numpy())
-
-#     _new_sessions = {}
-
-#     # curr_active_pipeline.sess.replay = deepcopy(new_replay_epochs)
-#     for k, a_filtered_session in curr_active_pipeline.filtered_sessions.items():
-#         ## backup original values:
-#         # _backup_session_replay_epochs[k] = deepcopy(a_filtered_session.config.preprocessing_parameters.epoch_estimation_parameters.replays)
-#         # _backup_session_configs[k] = deepcopy(a_filtered_session.replay)
-
-
-#         a_filtered_session = deepcopy(a_filtered_session)
-#         # sess_config: SessionConfig = SessionConfig(**deepcopy(a_filtered_session.config.__getstate__()))
-#         # a_filtered_session.config = sess_config
-#         # _new_sessions[k] = active_data_mode_registered_class._default_kdiba_exported_load_position_info_mat(basepath=curr_active_pipeline.sess.basepath, session_name=curr_active_pipeline.session_name, session=a_filtered_session)
-#         new_did_change, a_filtered_session = _update_loaded_track_limits(a_session=a_filtered_session)
-#         if new_did_change:
-#             print(f'\tfiltered_session[{k}] changed!')
-#         did_change = did_change | new_did_change
-        
-
-#     for k, a_filtered_session in _new_sessions.items():
-#         curr_active_pipeline.filtered_sessions[k] = a_filtered_session
-
-
-
-#     loaded_track_limits = a_session.config.loaded_track_limits
-    
-#     a_config_dict = a_session.config.to_dict()
-
-#     t_start, t_delta, t_end = curr_active_pipeline.find_LongShortDelta_times()
-#     print(f'\t{curr_session_basedir}:\tloaded_track_limits: {loaded_track_limits}, a_config_dict: {a_config_dict}')  # , t_end: {t_end}
-    
-#     callback_outputs = {
-#      'loaded_track_limits': loaded_track_limits, 'a_config_dict':a_config_dict, #'t_end': t_end   
-#     }
-#     across_session_results_extended_dict['position_info_mat_reload_completion_function'] = callback_outputs
-    
-#     # print(f'>>\t done with {curr_session_context}')
-#     print(f'>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>')
-#     print(f'>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>')
-
-#     return across_session_results_extended_dict
-
-
-
 
 @function_attributes(short_name=None, tags=['hdf5', 'h5'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-01-01 00:00', related_items=[])
 def export_session_h5_file_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict) -> dict:
@@ -2815,7 +2734,6 @@ def save_custom_session_files_completion_function(self, global_data_root_parent_
     print(f'>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>')
 
     return across_session_results_extended_dict
-
 
 @function_attributes(short_name=None, tags=['backup', 'versioning', 'copy'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-09-25 06:22', related_items=[])
 def backup_previous_session_files_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict, desired_suffix: str = 'Pre2024-07-16') -> dict:
@@ -3076,6 +2994,144 @@ def compute_and_export_session_extended_placefield_peak_information_completion_f
 
 
 
+@function_attributes(short_name=None, tags=['posterior', 'marginal', 'CSV', 'non-PBE', 'epochs', 'decoding'], input_requires=[], output_provides=[], uses=['GenericDecoderDictDecodedEpochsDictResult', 'pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.EpochComputationFunctions.EpochComputationFunctions.perform_compute_non_PBE_epochs'], used_by=[], creation_date='2025-03-09 16:35', related_items=[])
+def generalized_decode_epochs_dict_and_export_results_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict, epochs_decoding_time_bin_size:float=0.025, force_recompute:bool=True, debug_print:bool=True) -> dict:
+    """ Aims to generally:
+    1. Build a dict of decoders (usually 1D) built on several different subsets of input epochs (long_LR_laps-only, long_laps-only, long_non_PBE-only, ...etc
+    2. Use these decoders and the neural data to decode posteriors for a variety of parameters (e.g. cell types, epochs-to-be-decoded, time_bin_sizes, etc)
+    3. Compute Pseudo2D (Context x Position) versions of these sets of decoders and decode using thse
+    4. Compute a variety of marginals for each result (track_ID marginals, run_dir_marginals, etc)
+    5. Export all the results to .CSV for later plotting and across-session analysis 
+    
+    Calls 'non_PBE_epochs_results' global computation function
+    
+    
+    USES: `GenericDecoderDictDecodedEpochsDictResult`
+    
+    from pyphoplacecellanalysis.General.Batch.BatchJobCompletion.UserCompletionHelpers.batch_user_completion_helpers import generalized_decode_epochs_dict_and_export_results_completion_function
+    
+    Results can be extracted from batch output by 
+    
+    # Extracts the callback results 'determine_session_t_delta_completion_function':
+    extracted_callback_fn_results = {a_sess_ctxt:a_result.across_session_results.get('determine_session_t_delta_completion_function', {}) for a_sess_ctxt, a_result in global_batch_run.session_batch_outputs.items() if a_result is not None}
+
+    ['basepath', 'session_spec', 'session_name', 'session_context', 'format_name', 'preprocessing_parameters', 'absolute_start_timestamp', 'position_sampling_rate_Hz', 'microseconds_to_seconds_conversion_factor', 'pix2cm', 'x_midpoint', 'loaded_track_limits', 'is_resolved', 'resolved_required_filespecs_dict', 'resolved_optional_filespecs_dict', 'x_unit_midpoint', 'first_valid_pos_time', 'last_valid_pos_time']
+
+    
+    OUTPUTS:
+    
+        callback_outputs = _across_session_results_extended_dict['generalized_decode_epochs_dict_and_export_results_completion_function'] # 'PostHocPipelineFixup'
+        a_new_fully_generic_result: GenericDecoderDictDecodedEpochsDictResult = callback_outputs['a_new_fully_generic_result']
+        csv_save_paths_dict: Dict[str, Path] = callback_outputs['csv_save_paths_dict']
+        a_new_fully_generic_result
+
+    """
+    from typing import Literal
+    from neuropy.core.epoch import EpochsAccessor, Epoch, ensure_dataframe, ensure_Epoch, TimeColumnAliasesProtocol
+    from pyphocorehelpers.print_helpers import get_now_rounded_time_str
+    from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.EpochComputationFunctions import EpochComputationFunctions, EpochComputationsComputationsContainer, NonPBEDimensionalDecodingResult, Compute_NonPBE_Epochs, KnownFilterEpochs, GeneralDecoderDictDecodedEpochsDictResult
+    from neuropy.analyses.placefields import PfND
+    from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import filter_and_update_epochs_and_spikes
+    from neuropy.utils.result_context import DisplaySpecifyingIdentifyingContext
+    from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import EpochFilteringMode, _compute_proper_filter_epochs
+    from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import DecodedFilterEpochsResult, SingleEpochDecodedResult
+    from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import DirectionalLapsResult, TrackTemplates, DecoderDecodedEpochsResult
+    from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import DirectionalPseudo2DDecodersResult
+    from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import TrainTestSplitResult, TrainTestLapsSplitting, CustomDecodeEpochsResult, decoder_name, epoch_split_key, get_proper_global_spikes_df, DirectionalPseudo2DDecodersResult
+    from pyphoplacecellanalysis.Analysis.Decoder.context_dependent import GenericDecoderDictDecodedEpochsDictResult #, KnownNamedDecoderTrainedComputeEpochsType, KnownNamedDecodingEpochsType, MaskedTimeBinFillType, DataTimeGrain, GenericResultTupleIndexType
+    
+    KnownNamedDecoderTrainedComputeEpochsType = Literal['laps', 'non_pbe']
+
+    # ==================================================================================================================== #
+    # BEGIN FUNCTION BODY                                                                                                  #
+    # ==================================================================================================================== #
+
+
+    print(f'<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<')
+    print(f'generalized_decode_epochs_dict_and_export_results_completion_function(curr_session_context: {curr_session_context}, curr_session_basedir: {str(curr_session_basedir)}, ...)')
+
+    # ==================================================================================================================== #
+    # New 2025-03-11 Generic Result:                                                                                       #
+    # ==================================================================================================================== #
+
+    if ('generalized_decode_epochs_dict_and_export_results_completion_function' in across_session_results_extended_dict) and force_recompute:
+        ## drop the existing
+        del across_session_results_extended_dict['generalized_decode_epochs_dict_and_export_results_completion_function']
+
+    a_new_fully_generic_result: GenericDecoderDictDecodedEpochsDictResult = GenericDecoderDictDecodedEpochsDictResult.batch_user_compute_fn(curr_active_pipeline=curr_active_pipeline, force_recompute=force_recompute, time_bin_size=epochs_decoding_time_bin_size, debug_print=debug_print)
+                    
+    ## Unpack from pipeline:
+    nonPBE_results: EpochComputationsComputationsContainer = curr_active_pipeline.global_computation_results.computed_data['EpochComputations']
+    epochs_decoding_time_bin_size: float = nonPBE_results.epochs_decoding_time_bin_size ## just get the standard size. Currently assuming all things are the same size!
+    print(f'\tepochs_decoding_time_bin_size: {epochs_decoding_time_bin_size}')
+    assert epochs_decoding_time_bin_size == nonPBE_results.epochs_decoding_time_bin_size, f"\tERROR: nonPBE_results.epochs_decoding_time_bin_size: {nonPBE_results.epochs_decoding_time_bin_size} != epochs_decoding_time_bin_size: {epochs_decoding_time_bin_size}"
+
+    # ==================================================================================================================== #
+    # Create and add the output                                                                                            #
+    # ==================================================================================================================== #
+    if 'generalized_decode_epochs_dict_and_export_results_completion_function' not in across_session_results_extended_dict:
+        ## create
+        print(f"\t creating new across_session_results_extended_dict['generalized_decode_epochs_dict_and_export_results_completion_function']['a_new_fully_generic_result'] result.")
+        across_session_results_extended_dict['generalized_decode_epochs_dict_and_export_results_completion_function'] = {
+            'a_new_fully_generic_result': deepcopy(a_new_fully_generic_result),
+            'csv_save_paths_dict': {},
+        }
+    else:
+        ## update the existing result
+        print(f'\t updating existing result.')
+        across_session_results_extended_dict['generalized_decode_epochs_dict_and_export_results_completion_function']['a_new_fully_generic_result'] = deepcopy(a_new_fully_generic_result)
+
+
+
+    ## Export to CSVs:
+    csv_save_paths = {}
+    active_export_parent_output_path = self.collected_outputs_path.resolve()
+    # Assert.path_exists(parent_output_path)
+
+    ## INPUTS: collected_outputs_path
+    decoding_time_bin_size: float = epochs_decoding_time_bin_size
+
+    complete_session_context, (session_context, additional_session_context) = curr_active_pipeline.get_complete_session_context()
+    active_context = complete_session_context
+    session_name: str = curr_active_pipeline.session_name
+    earliest_delta_aligned_t_start, t_delta, latest_delta_aligned_t_end = curr_active_pipeline.find_LongShortDelta_times()
+
+    ## Build the function that uses curr_active_pipeline to build the correct filename and actually output the .csv to the right place
+    def _subfn_custom_export_df_to_csv(export_df: pd.DataFrame, data_identifier_str: str = f'(laps_marginals_df)', parent_output_path: Path=None):
+        """ captures `curr_active_pipeline`
+        """
+        output_date_str: str = get_now_rounded_time_str(rounded_minutes=10)
+        out_path, out_filename, out_basename = curr_active_pipeline.build_complete_session_identifier_filename_string(output_date_str=output_date_str, data_identifier_str=data_identifier_str, parent_output_path=parent_output_path, out_extension='.csv')
+        export_df.to_csv(out_path)
+        return out_path 
+
+    custom_export_df_to_csv_fn = _subfn_custom_export_df_to_csv
+
+
+    # tbin_values_dict={'laps': decoding_time_bin_size, 'pbe': decoding_time_bin_size, 'non_pbe': decoding_time_bin_size, 'FAT': decoding_time_bin_size}
+
+    # csv_save_paths_dict = GenericDecoderDictDecodedEpochsDictResult._perform_export_dfs_dict_to_csvs(extracted_dfs_dict=a_new_fully_generic_result.filter_epochs_decoded_track_marginal_posterior_df_dict,
+    csv_save_paths_dict = a_new_fully_generic_result.export_csvs(
+                                                parent_output_path=active_export_parent_output_path.resolve(),
+                                                active_context=active_context, session_name=session_name, #curr_active_pipeline=curr_active_pipeline,
+                                                custom_export_df_to_csv_fn=custom_export_df_to_csv_fn,
+                                                decoding_time_bin_size=decoding_time_bin_size,
+                                                curr_session_t_delta=t_delta
+                                                )
+    
+    across_session_results_extended_dict['generalized_decode_epochs_dict_and_export_results_completion_function']['csv_save_paths_dict'] = deepcopy(csv_save_paths_dict)
+
+    print(f'csv_save_paths_dict: {csv_save_paths_dict}\n')
+
+
+    print('\t\tdone.')
+
+    # print(f'>>\t done with {curr_session_context}')
+    print(f'>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>')
+    print(f'>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>')
+
+    return across_session_results_extended_dict
+
 
 
 
@@ -3140,7 +3196,8 @@ def MAIN_get_template_string(BATCH_DATE_TO_USE: str, collected_outputs_path:Path
                                     'compute_and_export_session_trial_by_trial_performance_completion_function': compute_and_export_session_trial_by_trial_performance_completion_function,
                                     'save_custom_session_files_completion_function': save_custom_session_files_completion_function,
                                     'compute_and_export_cell_first_spikes_characteristics_completion_function': compute_and_export_cell_first_spikes_characteristics_completion_function,
-                                    'figures_plot_cell_first_spikes_characteristics_completion_function': figures_plot_cell_first_spikes_characteristics_completion_function
+                                    'figures_plot_cell_first_spikes_characteristics_completion_function': figures_plot_cell_first_spikes_characteristics_completion_function,
+                                    'generalized_decode_epochs_dict_and_export_results_completion_function': generalized_decode_epochs_dict_and_export_results_completion_function,
                                     }
     else:
         # use the user one:
@@ -3166,3 +3223,5 @@ def MAIN_get_template_string(BATCH_DATE_TO_USE: str, collected_outputs_path:Path
 
 
 
+
+# %%

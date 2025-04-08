@@ -23,7 +23,7 @@ as 'np' and 'pg'.
 
 Go, play.
 """
-c = pyqtgraph.console.ConsoleWidget(namespace=namespace, text=text)
+c = pg.console.ConsoleWidget(namespace=namespace, text=text)
 c.show()
 c.setWindowTitle('pyqtgraph example: ConsoleWidget')
 

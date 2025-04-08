@@ -1,5 +1,8 @@
-import keyword
 import os
+# Set PyQt5 as the default Qt library before any imports
+os.environ['PYQTGRAPH_QT_LIB'] = 'PyQt5'
+
+import keyword
 import re
 import subprocess
 import sys
@@ -308,7 +311,16 @@ class ExampleLoader(QtWidgets.QMainWindow):
         self.setCentralWidget(self.cw)
         self.ui.setupUi(self.cw)
         self.setWindowTitle("PyQtGraph Examples")
+
+        # Set the self.ui.qtLibCombo to match our Qt library
+        # Find the index of "PyQt5" in the combo box items
+        qt_lib_index = self.ui.qtLibCombo.findText("PyQt5")
+        if qt_lib_index >= 0:
+            self.ui.qtLibCombo.setCurrentIndex(qt_lib_index)
+
         self.codeBtn = QtWidgets.QPushButton('Run Edited Code')
+        # Add a Save button
+        self.saveBtn = QtWidgets.QPushButton('Save Changes')
         self.codeLayout = QtWidgets.QGridLayout()
         self.ui.codeView.setLayout(self.codeLayout)
         self.hl = PythonHighlighter(self.ui.codeView.document())
@@ -316,8 +328,12 @@ class ExampleLoader(QtWidgets.QMainWindow):
         app.paletteChanged.connect(self.updateTheme)
         policy = QtWidgets.QSizePolicy.Policy.Expanding
         self.codeLayout.addItem(QtWidgets.QSpacerItem(100,100, policy, policy), 0, 0)
+        # Add both buttons in a row
         self.codeLayout.addWidget(self.codeBtn, 1, 1)
+        self.codeLayout.addWidget(self.saveBtn, 1, 2)
         self.codeBtn.hide()
+        self.saveBtn.hide()
+        
 
         textFil = self.ui.exampleFilter
         self.curListener = None
@@ -352,6 +368,9 @@ class ExampleLoader(QtWidgets.QMainWindow):
         self.ui.exampleTree.itemDoubleClicked.connect(self.loadFile)
         self.ui.codeView.textChanged.connect(self.onTextChange)
         self.codeBtn.clicked.connect(self.runEditedCode)
+        # Connect save button
+        self.saveBtn.clicked.connect(self.saveEditedCode)
+        
 
     def onTextChange(self):
         """
@@ -497,6 +516,8 @@ class ExampleLoader(QtWidgets.QMainWindow):
         self.ui.codeView.setPlainText(text)
         self.ui.loadedFileLabel.setText(fn)
         self.codeBtn.hide()
+        self.saveBtn.hide()
+        
 
     @lru_cache(100)
     def getExampleContent(self, filename):
@@ -511,9 +532,42 @@ class ExampleLoader(QtWidgets.QMainWindow):
 
     def codeEdited(self):
         self.codeBtn.show()
+        # Also show save button when code is edited
+        self.saveBtn.show()
+        
 
     def runEditedCode(self):
         self.loadFile(edited=True)
+
+    # Add this method to save edited code
+    def saveEditedCode(self):
+        """Save the edited code back to the original source file."""
+        filename = self.currentFile()
+        if filename is None or not os.path.isfile(filename):
+            QtWidgets.QMessageBox.warning(self, "Save Failed", "No valid source file selected.")
+            return
+            
+        try:
+            # Get the current text from the editor
+            edited_code = self.ui.codeView.toPlainText()
+            
+            # Create a backup of the original file
+            backup_filename = filename + ".backup"
+            if not os.path.exists(backup_filename):
+                with open(filename, 'r') as src, open(backup_filename, 'w') as dst:
+                    dst.write(src.read())
+                    
+            # Write the edited code to the original file
+            with open(filename, 'w') as f:
+                f.write(edited_code)
+                
+            # Update oldText to prevent "run edited code" button from showing
+            self.oldText = edited_code
+                
+            QtWidgets.QMessageBox.information(self, "Save Successful", f"Changes saved to {os.path.basename(filename)}.\nBackup created at {os.path.basename(backup_filename)}")
+        except Exception as e:
+            QtWidgets.QMessageBox.critical(self, "Save Failed", f"Error saving file: {str(e)}")
+
 
     def keyPressEvent(self, event):
         super().keyPressEvent(event)

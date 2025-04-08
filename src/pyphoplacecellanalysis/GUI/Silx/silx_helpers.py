@@ -1,6 +1,7 @@
 import functools
 from functools import partial
 from typing import Dict, List, Tuple, Optional, Callable, Union, Any
+import nptyping as ND
 from nptyping import NDArray
 import numpy as np
 import pandas as pd

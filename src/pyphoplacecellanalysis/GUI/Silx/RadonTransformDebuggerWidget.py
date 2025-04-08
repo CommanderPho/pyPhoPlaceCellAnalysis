@@ -5,6 +5,7 @@ pd.options.mode.chained_assignment = None  # default='warn'
 from attrs import define, field, fields, Factory
 from typing import Dict, List, Tuple, Optional, Callable, Union, Any
 from typing_extensions import TypeAlias
+import nptyping as ND
 from nptyping import NDArray
 from copy import deepcopy
 

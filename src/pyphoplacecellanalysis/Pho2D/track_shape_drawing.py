@@ -1,6 +1,7 @@
 import sys
 from copy import deepcopy
 from typing import Tuple, Optional, List, Dict, Union
+import nptyping as ND
 from nptyping import NDArray
 from enum import Enum # for TrackPositionClassification
 from attrs import define, field, Factory
@@ -25,6 +26,7 @@ ScaleFactors = namedtuple("ScaleFactors", ["major", "minor"])
 from typing import Dict, List, Tuple, Optional, Callable, Union, Any, Iterable
 from typing import NewType
 from typing_extensions import TypeAlias
+import nptyping as ND
 from nptyping import NDArray
 import neuropy.utils.type_aliases as types
 decoder_name: TypeAlias = str # a string that describes a decoder, such as 'LongLR' or 'ShortRL'

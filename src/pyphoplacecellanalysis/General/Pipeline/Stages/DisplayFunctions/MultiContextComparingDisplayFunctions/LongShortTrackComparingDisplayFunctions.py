@@ -10,6 +10,7 @@ from flexitext import flexitext ## flexitext for formatted matplotlib text
 
 from typing import Dict, List, Tuple, Optional, Callable, Union, Any
 from typing_extensions import TypeAlias
+import nptyping as ND
 from nptyping import NDArray
 import neuropy.utils.type_aliases as types
 
@@ -528,7 +529,8 @@ class LongShortTrackComparingDisplayFunctions(AllFunctionEnumeratingMixin, metac
 
     @function_attributes(short_name='short_long_firing_rate_index_comparison', tags=['display','long_short','short_long','firing_rate', 'fr_index'], conforms_to=['output_registering', 'figure_saving'], input_requires=[], output_provides=[], uses=['_plot_long_short_firing_rate_indicies'], used_by=[], creation_date='2023-04-11 08:08', is_global=True)
     def _display_short_long_firing_rate_index_comparison(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, defer_render=False, save_figure=True, **kwargs):
-            """ Displays a figure for comparing the 1D placefields across-epochs (between the short and long tracks)
+            """ Displays a figure for comparing the 1D placefields across-epochs (between the short and long tracks) and shows two histograms along the x and y axes
+            
                 Usage:
 
                     %matplotlib qt
@@ -1986,9 +1988,10 @@ def plot_short_v_long_pf1D_scalar_overlap_comparison(overlap_scalars_df, pf_neur
 
 
 @function_attributes(short_name='long_short_fr_indicies', tags=['private', 'long_short', 'long_short_firing_rate', 'firing_rate', 'display', 'matplotlib'], input_requires=[], output_provides=[], uses=[], used_by=['_display_short_long_firing_rate_index_comparison', 'AcrossSessionsVisualizations.across_sessions_firing_rate_index_figure'], creation_date='2023-03-28 14:20')
-def _plot_long_short_firing_rate_indicies(x_frs_index, y_frs_index, active_context, neurons_colors=None, debug_print=False, is_centered = False, enable_hover_labels=True, enable_tiny_point_labels=True, swap_xy_axis=False, include_axes_lines=True, enable_histograms=True, enable_subplot_mosaic_style:bool=True, **scatter_params):
+def _plot_long_short_firing_rate_indicies(x_frs_index, y_frs_index, active_context, neurons_colors=None, debug_print=False, is_centered = False, enable_hover_labels=True, enable_tiny_point_labels=True, swap_xy_axis=False, include_axes_lines=True, enable_histograms=True, enable_subplot_mosaic_style:bool=True, enable_diagonal_histogram: bool = True, **scatter_params):
     """ Plot long|short firing rate index 
     Each datapoint is a neuron.
+    Shows two histograms for the marginals along each axis
 
     used in `_display_short_long_firing_rate_index_comparison()`
 
@@ -2008,7 +2011,7 @@ def _plot_long_short_firing_rate_indicies(x_frs_index, y_frs_index, active_conte
     # rc('text',usetex=True)
     # rc('text.latex', preamble=r'\usepackage{color}')
 
-    enable_diagonal_histogram: bool = True      
+        
     diagonal_y_equals_x_line_kwargs = dict(linestyle='--', color='gray', label='y=x')
     fig_kwargs = dict(figsize=(8.5, 7.25), num=f'long|short fr indicies_{active_context.get_description(separator="/")}', clear=True)
     

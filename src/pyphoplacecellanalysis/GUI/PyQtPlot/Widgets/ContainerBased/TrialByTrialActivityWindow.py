@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import List, Optional, Dict, Tuple, Any, Union
 from matplotlib import cm, pyplot as plt
 from neuropy.utils.result_context import IdentifyingContext
+import nptyping as ND
 from nptyping import NDArray
 import attrs
 import matplotlib as mpl
@@ -21,6 +22,7 @@ from pyphocorehelpers.programming_helpers import metadata_attributes
 from typing import Dict, List, Tuple, Optional, Callable, Union, Any
 from typing import NewType
 from typing_extensions import TypeAlias
+import nptyping as ND
 from nptyping import NDArray
 import neuropy.utils.type_aliases as types
 decoder_name: TypeAlias = str # a string that describes a decoder, such as 'LongLR' or 'ShortRL'

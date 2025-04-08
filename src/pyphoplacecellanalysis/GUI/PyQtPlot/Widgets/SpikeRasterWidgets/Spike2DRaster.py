@@ -11,6 +11,7 @@ from matplotlib.figure import Figure
 from typing import Dict, List, Tuple, Optional, Callable, Union, Any, NewType, TypeVar
 from neuropy.utils.indexing_helpers import find_desired_sort_indicies
 from typing_extensions import TypeAlias
+import nptyping as ND
 from nptyping import NDArray
 import neuropy.utils.type_aliases as types
 import numpy as np
@@ -51,12 +52,12 @@ from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.Mixins.TimeCurves.RenderTimeCur
 from pyphoplacecellanalysis.General.Mixins.DisplayHelpers import debug_print_QRect, debug_print_axes_locations, debug_print_temporal_info
 from pyphoplacecellanalysis.General.Mixins.SpikesRenderingBaseMixin import SpikeEmphasisState # required for the different emphasis states in ._build_cell_configs()
 
-from pyphoplacecellanalysis.GUI.PyQtPlot.DockingWidgets.DynamicDockDisplayAreaContent import CustomDockDisplayConfig, DockDisplayColors 
+from pyphoplacecellanalysis.GUI.PyQtPlot.DockingWidgets.DynamicDockDisplayAreaContent import CustomDockDisplayConfig, DockDisplayColors, FigureWidgetDockDisplayConfig
 from pyphoplacecellanalysis.GUI.Qt.Menus.PhoMenuHelper import PhoMenuHelper
 
 from pyphocorehelpers.DataStructure.enum_helpers import ExtendedEnum
 from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.GraphicsWidgets.CustomGraphicsLayoutWidget import CustomViewBox
-
+from pyphoplacecellanalysis.GUI.PyQtPlot.DockingWidgets.SpecificDockWidgetManipulatingMixin import SpecificDockWidgetManipulatingMixin
 
 
 class SynchronizedPlotMode(ExtendedEnum):
@@ -78,7 +79,7 @@ class SynchronizedPlotMode(ExtendedEnum):
 
 
 @metadata_attributes(short_name=None, tags=['raster', 'gui'], input_requires=[], output_provides=[], uses=['LiveWindowedData'], used_by=[], creation_date='2024-12-18 12:45', related_items=[])
-class Spike2DRaster(DynamicDockDisplayAreaOwningMixin, PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Render2DScrollWindowPlotMixin, SpikeRasterBase):
+class Spike2DRaster(SpecificDockWidgetManipulatingMixin, DynamicDockDisplayAreaOwningMixin, PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Render2DScrollWindowPlotMixin, SpikeRasterBase):
     """ Displays a 2D version of a raster plot with the spikes occuring along a plane. 
     
     Usage:
@@ -105,12 +106,21 @@ class Spike2DRaster(DynamicDockDisplayAreaOwningMixin, PyQtGraphSpecificTimeCurv
     Includes2DActiveWindowScatter = True # Includes2DActiveWindowScatter: if True, it displays the main scatter plot for the active window.
     
     ## Scrollable Window Signals
+    window_scrolled = QtCore.Signal(float, float) # overriding from Render2DScrollWindowPlotMixin - signal is emitted on updating the 2D sliding window, where the first argument is the new start value and the 2nd is the new end value
+    
     # window_scrolled = QtCore.pyqtSignal(float, float) # signal is emitted on updating the 2D sliding window, where the first argument is the new start value and the 2nd is the new end value
     sigOnIntervalEnteredWindow = QtCore.Signal(object) # pyqtSignal(object)
     sigOnIntervalExitedindow = QtCore.Signal(object)
     sigRenderedIntervalsListChanged = QtCore.Signal(object) # EpochRenderingMixin conformance: signal emitted whenever the list of rendered intervals changed (add/remove). Added 2023-10-16 to prevent `AttributeError: 'Spike2DRaster' does not have a signal with the signature PyQt_PyObject)`
     # sigEmbeddedWidgetHierarchyChanged = QtCore.Signal(object) # emitted when the hierarchy of nested widgets changes, such as when a new dynamic matplotlib_render_plot_widget is added
     
+
+    # DynamicDockDisplayAreaContentMixin Conformance Signals _____________________________________________________________ #
+    sigDockAdded = QtCore.Signal(object, object) # (parent, Dock)
+    sigDockModified = QtCore.Signal(object, object, object) # (parent, Dock, action)
+    sigDockClosed = QtCore.Signal(object, object) # (parent, Dock)
+
+
     sigEmbeddedMatplotlibDockWidgetAdded = QtCore.Signal(object, object, object) # self.sigEmbeddedMatplotlibDockWidgetAdded.emit(self, dDisplayItem, self.ui.matplotlib_view_widgets[name]) -  emitted when a new matplotlib dock widget is added
     sigEmbeddedMatplotlibDockWidgetRemoved = QtCore.Signal(object, object) # (self, identifier: str)
 
@@ -371,10 +381,10 @@ class Spike2DRaster(DynamicDockDisplayAreaOwningMixin, PyQtGraphSpecificTimeCurv
         }
         
         # state_color_adjust_fcns: functions that take the base color and call build_adjusted_color to get the adjusted color for each state
-        state_color_adjust_fcns = {SpikeEmphasisState.Hidden: lambda x: build_adjusted_color(x),
-                       SpikeEmphasisState.Deemphasized: lambda x: build_adjusted_color(x, saturation_scale=0.35, value_scale=0.8),
-                       SpikeEmphasisState.Default: lambda x: build_adjusted_color(x),
-                       SpikeEmphasisState.Emphasized: lambda x: build_adjusted_color(x, value_scale=1.25),
+        state_color_adjust_fcns = {SpikeEmphasisState.Hidden: lambda x: build_adjusted_color(x, alpha_scale=0.01),
+                        SpikeEmphasisState.Deemphasized: lambda x: build_adjusted_color(x, saturation_scale=0.35, value_scale=0.8, alpha_scale=0.1),
+                        SpikeEmphasisState.Default: lambda x: build_adjusted_color(x, alpha_scale=0.95),
+                        SpikeEmphasisState.Emphasized: lambda x: build_adjusted_color(x, value_scale=1.25, alpha_scale=1.0),
         }
         
         # self._build_neuron_id_graphics(self.ui.main_gl_widget, self.y)
@@ -615,7 +625,7 @@ class Spike2DRaster(DynamicDockDisplayAreaOwningMixin, PyQtGraphSpecificTimeCurv
         """ called when the self._delayed_gui_timer QTimer fires. """
         #Stop the timer.
         self._delayed_gui_timer.stop()
-        print(f'_run_delayed_gui_load_code() called!')
+        print(f'Spike2DRaster._run_delayed_gui_load_code() called!')
         ## Make sure to set the initial linear scroll region size/location to something reasonable and not cut-off so the user can adjust it:
         self._fix_initial_linearRegionLocation() # Implemented in Render2DScrollWindowPlotMixin, since it's the one that creates the Scrollwindow anyways
 
@@ -1282,6 +1292,7 @@ class Spike2DRaster(DynamicDockDisplayAreaOwningMixin, PyQtGraphSpecificTimeCurv
         
         return new_curves_separate_plot
         
+
     @function_attributes(short_name=None, tags=['pyqtgraph', 'render_plot_group'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-12-31 04:59', related_items=[])
     def remove_separate_render_plot_items(self, separate_plot_item):
         """ removes the PlotItem separate_plot_item created by calling self.create_separate_render_plot_item(...) from the layout. """
@@ -1325,8 +1336,8 @@ class Spike2DRaster(DynamicDockDisplayAreaOwningMixin, PyQtGraphSpecificTimeCurv
         self.ui.connections['tracks'] = {}
         
 
-    @function_attributes(short_name=None, tags=['matplotlib_render_widget', 'dynamic_ui', 'group_matplotlib_render_plot_widget'], input_requires=[], output_provides=[], uses=['FigureWidgetDockDisplayConfig'], used_by=[], creation_date='2023-10-17 13:26', related_items=['add_new_embedded_pyqtgraph_render_plot_widget'])
-    def add_new_matplotlib_render_plot_widget(self, row=1, col=0, name='matplotlib_view_widget', dockSize=(500,50), dockAddLocationOpts=['bottom'], display_config:CustomDockDisplayConfig=None, return_dock_object:bool=False, sync_mode:Optional[SynchronizedPlotMode]=None) -> Tuple[MatplotlibTimeSynchronizedWidget, Figure, List[Axis]]:
+    @function_attributes(short_name=None, tags=['matplotlib_render_widget', 'dynamic_ui', 'group_matplotlib_render_plot_widget', 'track'], input_requires=[], output_provides=[], uses=['MatplotlibTimeSynchronizedWidget', 'FigureWidgetDockDisplayConfig'], used_by=[], creation_date='2023-10-17 13:26', related_items=['add_new_embedded_pyqtgraph_render_plot_widget'])
+    def add_new_matplotlib_render_plot_widget(self, row=1, col=0, name='matplotlib_view_widget', dockSize=(500,50), dockAddLocationOpts=['bottom'], display_config:CustomDockDisplayConfig=None, sync_mode:Optional[SynchronizedPlotMode]=None) -> Tuple[MatplotlibTimeSynchronizedWidget, Figure, List[Axis]]:
         """ creates a new dynamic MatplotlibTimeSynchronizedWidget, a container widget that holds a matplotlib figure, and adds it as a row to the main layout
         
         emit an event so the parent can call `self.update_scrolling_event_filters()` to add the new item
@@ -1344,17 +1355,6 @@ class Spike2DRaster(DynamicDockDisplayAreaOwningMixin, PyQtGraphSpecificTimeCurv
             self.ui.matplotlib_view_widgets[name].installEventFilter(self)
             
             ## Add directly to the main grid layout:
-            # self.ui.layout.addWidget(self.ui.matplotlib_view_widget, row, col)
-            
-            ## Add to dynamic_docked_widget_container:
-            # min_width = 500
-            # min_height = 50
-            # if _last_dock_outer_nested_item is not None:
-            #     #NOTE: to stack two dock widgets on top of each other, do area.moveDock(d6, 'above', d4)   ## move d6 to stack on top of d4
-            #     dockAddLocationOpts = ['above', _last_dock_outer_nested_item] # position relative to the _last_dock_outer_nested_item for this figure
-            # else:
-            # dockAddLocationOpts = ['bottom'] #no previous dock for this filter, so use absolute positioning
-            
             if display_config is None:
                 display_config = FigureWidgetDockDisplayConfig(showCloseButton=True)
             
@@ -1364,18 +1364,17 @@ class Spike2DRaster(DynamicDockDisplayAreaOwningMixin, PyQtGraphSpecificTimeCurv
             dDisplayItem.updateStyle()
             dDisplayItem.update()
             
-            #TODO 2024-12-18 08:54: - [ ] Where the red must be coming in
-            ## Add the plot:
+            ## Add the initial plot:
             fig = self.ui.matplotlib_view_widgets[name].getFigure()
             _single_ax = self.ui.matplotlib_view_widgets[name].getFigure().add_subplot(111) # Adds a single axes to the figure
             ax = self.ui.matplotlib_view_widgets[name].axes # return all axes instead of just the first one
         
             ## emit the signal
             self.sigEmbeddedMatplotlibDockWidgetAdded.emit(self, dDisplayItem, self.ui.matplotlib_view_widgets[name])
-            
-
+            self.sigDockAdded.emit(self, dDisplayItem) ## sigDockAdded signal to indicate new dock has been added ## already has self.sigEmbeddedMatplotlibDockWidgetAdded: `self.sigEmbeddedMatplotlibDockWidgetAdded.emit(self, dDisplayItem, self.ui.matplotlib_view_widgets[name])`
+        
         else:
-            # Already had the widget
+            # Already had the dock and widget
             print(f'already had the valid matplotlib view widget and its display dock. Returning extant.')
             fig = self.ui.matplotlib_view_widgets[name].getFigure()
             ax = self.ui.matplotlib_view_widgets[name].axes # return all axes instead of just the first one
@@ -1392,51 +1391,33 @@ class Spike2DRaster(DynamicDockDisplayAreaOwningMixin, PyQtGraphSpecificTimeCurv
             ## sync up the widgets
             self.sync_matplotlib_render_plot_widget(identifier=name, sync_mode=sync_mode)
 
-        # self.sync_matplotlib_render_plot_widget()
-        if not return_dock_object:
-            return self.ui.matplotlib_view_widgets[name], fig, ax
-        else:
-            return self.ui.matplotlib_view_widgets[name], fig, ax, dDisplayItem
+
+
+
+        return self.ui.matplotlib_view_widgets[name], fig, ax, dDisplayItem
     
 
     @function_attributes(short_name=None, tags=['pyqtgraph_render_widget', 'dynamic_ui', 'group_matplotlib_render_plot_widget', 'pyqtgraph', 'docked_widget'], input_requires=[], output_provides=[], uses=['PyqtgraphTimeSynchronizedWidget'], used_by=[], creation_date='2024-12-31 03:35', related_items=['add_new_matplotlib_render_plot_widget'])
     def add_new_embedded_pyqtgraph_render_plot_widget(self, name='pyqtgraph_view_widget', dockSize=(500,50), dockAddLocationOpts=['bottom'], display_config:CustomDockDisplayConfig=None, sync_mode:Optional[SynchronizedPlotMode]=None) -> Tuple[PyqtgraphTimeSynchronizedWidget, Any, Any, Dock]:
-        """ creates a new dynamic PyqtgraphTimeSynchronizedWidget, a container widget that holds a matplotlib figure, and adds it as a row to the main layout
+        """ creates a new dynamic PyqtgraphTimeSynchronizedWidget, a container widget that holds a pyqtgraph-based figure, and adds it as a row to the main layout
         
         based off of `add_new_matplotlib_render_plot_widget`, but to support embedded pyqtgraph plots instead of matplotlib plots
         
         emit an event so the parent can call `self.update_scrolling_event_filters()` to add the new item
+        Uses: self.ui.matplotlib_view_widgets
         
         Usage:
         
             a_time_sync_pyqtgraph_widget, root_graphics_layout_widget, plot_item = self.add_new_embedded_pyqtgraph_render_plot_widget(name='test_pyqtgraph_view_widget', dockSize=(500,50))
             
         """
-        
-        
         dDisplayItem = self.ui.dynamic_docked_widget_container.find_display_dock(identifier=name) # Dock
         if dDisplayItem is None:
             # No extant matplotlib_view_widget and display_dock currently, create a new one:
             ## TODO: hardcoded single-widget: used to be named `self.ui.matplotlib_view_widget`
             self.ui.matplotlib_view_widgets[name] = PyqtgraphTimeSynchronizedWidget(name=name) # Matplotlib widget directly
             self.ui.matplotlib_view_widgets[name].setObjectName(name)
-            # self.ui.matplotlib_view_widgets[name].plots.fig.subplots_adjust(top=1.0, bottom=0.0, left=0.0, right=1.0, hspace=0.0, wspace=0.0)
 
-            ## Enable scrollability
-            # self.ui.matplotlib_view_widgets[name].installEventFilter(self)
-            
-            ## Add directly to the main grid layout:
-            # self.ui.layout.addWidget(self.ui.matplotlib_view_widget, row, col)
-            
-            ## Add to dynamic_docked_widget_container:
-            # min_width = 500
-            # min_height = 50
-            # if _last_dock_outer_nested_item is not None:
-            #     #NOTE: to stack two dock widgets on top of each other, do area.moveDock(d6, 'above', d4)   ## move d6 to stack on top of d4
-            #     dockAddLocationOpts = ['above', _last_dock_outer_nested_item] # position relative to the _last_dock_outer_nested_item for this figure
-            # else:
-            # dockAddLocationOpts = ['bottom'] #no previous dock for this filter, so use absolute positioning
-            
             if display_config is None:
                 display_config = FigureWidgetDockDisplayConfig(showCloseButton=True, showCollapseButton=False, showGroupButton=False)
                 
@@ -1454,18 +1435,19 @@ class Spike2DRaster(DynamicDockDisplayAreaOwningMixin, PyQtGraphSpecificTimeCurv
 
             ## emit the signal
             self.sigEmbeddedMatplotlibDockWidgetAdded.emit(self, dDisplayItem, self.ui.matplotlib_view_widgets[name])
-            
-            if sync_mode is not None:
-                ## sync up the widgets
-                self.sync_matplotlib_render_plot_widget(identifier=name, sync_mode=sync_mode)
-                
+            self.sigDockAdded.emit(self, dDisplayItem) ## sigDockAdded signal to indicate new dock has been added ## already has self.sigEmbeddedMatplotlibDockWidgetAdded: `self.sigEmbeddedMatplotlibDockWidgetAdded.emit(self, dDisplayItem, self.ui.matplotlib_view_widgets[name])`
+
+
         else:
             # Already had the widget
             print(f'already had the valid pyqtgraph view widget and its display dock. Returning extant.')
             root_graphics_layout_widget = self.ui.matplotlib_view_widgets[name].getRootGraphicsLayoutWidget()
             plot_item = self.ui.matplotlib_view_widgets[name].getRootPlotItem()
+
+        if sync_mode is not None:
+            ## sync up the widgets
+            self.sync_matplotlib_render_plot_widget(identifier=name, sync_mode=sync_mode)
             
-        # self.sync_matplotlib_render_plot_widget()
         return self.ui.matplotlib_view_widgets[name], root_graphics_layout_widget, plot_item, dDisplayItem
     
 
@@ -1498,11 +1480,10 @@ class Spike2DRaster(DynamicDockDisplayAreaOwningMixin, PyQtGraphSpecificTimeCurv
             # self.sigEmbeddedMatplotlibDockWidgetAdded.emit(self, dDisplayItem, self.ui.matplotlib_view_widgets[name])
             # self.sigEmbeddedMatplotlibDockWidgetRemoved.emit(self, dDisplayItem, extant_widget)
             self.sigEmbeddedMatplotlibDockWidgetRemoved.emit(self, name) ## get the widget before it fails
+            self.sigDockClosed.emit(self, name) ## sigDockClosed signal
             print(f'\tremoved.')
 
-        
-    
-
+            
 
     @function_attributes(short_name=None, tags=['matplotlib_render_widget', 'dynamic_ui', 'group_matplotlib_render_plot_widget'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-10-17 13:23', related_items=[])
     def find_matplotlib_render_plot_widget(self, identifier, include_dock=False):
@@ -1551,6 +1532,7 @@ class Spike2DRaster(DynamicDockDisplayAreaOwningMixin, PyQtGraphSpecificTimeCurv
             ## remove from the dictionary
             del self.ui.matplotlib_view_widgets[identifier]
             self.sigEmbeddedMatplotlibDockWidgetRemoved.emit(self, identifier) ## get the widget before it fails
+            self.sigDockClosed(self, identifier) ## sigDockClosed signal
             
         else:
             print(f'active_matplotlib_view_widget with identifier {identifier} was not found!')
@@ -1612,194 +1594,6 @@ class Spike2DRaster(DynamicDockDisplayAreaOwningMixin, PyQtGraphSpecificTimeCurv
     # ==================================================================================================================== #
     # MARK: PyQtGraph                                                                                                      #
     # ==================================================================================================================== #
-
-    @function_attributes(short_name=None, tags=['intervals', 'tracks', 'pyqtgraph', 'specific', 'dynamic_ui', 'group_matplotlib_render_plot_widget'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-12-31 07:29', related_items=[])
-    def prepare_pyqtgraph_intervalPlot_tracks(self, enable_interval_overview_track: bool = False, should_remove_all_and_re_add: bool=True, name_modifier_suffix: str='', should_link_to_main_plot_widget:bool=True, debug_print=False):
-        """ adds to separate pyqtgraph-backed tracks to the SpikeRaster2D plotter for rendering intervals, and updates `active_2d_plot.params.custom_interval_rendering_plots` so the intervals are rendered on these new tracks in addition to any normal ones
-        
-        enable_interval_overview_track: bool: if True, renders a track to show all the intervals during the sessions (overview) in addition to the track for the intervals within the current active window
-        should_remove_all_and_re_add: bool: if True, all intervals are removed from all plots and then re-added (safer) method
-        
-        Updates:
-            active_2d_plot.params.custom_interval_rendering_plots
-
-
-        This should be a separate file, and there should be multiple classes of tracks (raster, instervals, etc) 
-            
-        """
-        from pyphoplacecellanalysis.GUI.PyQtPlot.DockingWidgets.DynamicDockDisplayAreaContent import CustomDockDisplayConfig, CustomCyclicColorsDockDisplayConfig, NamedColorScheme
-
-        _interval_tracks_out_dict = {}
-        if enable_interval_overview_track:
-            dock_config = CustomCyclicColorsDockDisplayConfig(named_color_scheme=NamedColorScheme.grey, showCloseButton=False, corner_radius='0px', hideTitleBar=True)
-            name = f'interval_overview{name_modifier_suffix}'
-            intervals_overview_time_sync_pyqtgraph_widget, intervals_overview_root_graphics_layout_widget, intervals_overview_plot_item, intervals_overview_dock = self.add_new_embedded_pyqtgraph_render_plot_widget(name=name, dockSize=(500, 60), display_config=dock_config)
-            _interval_tracks_out_dict[name] = (dock_config, intervals_overview_time_sync_pyqtgraph_widget, intervals_overview_root_graphics_layout_widget, intervals_overview_plot_item)
-        ## Enables creating a new pyqtgraph-based track to display the intervals/epochs
-        interval_window_dock_config = CustomCyclicColorsDockDisplayConfig(named_color_scheme=NamedColorScheme.grey, showCloseButton=False, corner_radius='0px', hideTitleBar=True)
-        name = f'intervals{name_modifier_suffix}'
-        intervals_time_sync_pyqtgraph_widget, intervals_root_graphics_layout_widget, intervals_plot_item, intervals_dock = self.add_new_embedded_pyqtgraph_render_plot_widget(name=name, dockSize=(500, 40), display_config=interval_window_dock_config)
-        
-        self.params.custom_interval_rendering_plots.append(intervals_plot_item) # = [self.plots.background_static_scroll_window_plot, self.plots.main_plot_widget, intervals_plot_item]
-
-        # self.params.custom_interval_rendering_plots = [self.plots.background_static_scroll_window_plot, self.plots.main_plot_widget, intervals_plot_item]
-        # active_2d_plot.params.custom_interval_rendering_plots = [active_2d_plot.plots.background_static_scroll_window_plot, active_2d_plot.plots.main_plot_widget, intervals_plot_item, intervals_overview_plot_item]
-        if enable_interval_overview_track:
-            self.params.custom_interval_rendering_plots.append(intervals_overview_plot_item)
-            
-        # active_2d_plot.interval_rendering_plots
-
-        _interval_tracks_out_dict[name] = (interval_window_dock_config, intervals_time_sync_pyqtgraph_widget, intervals_root_graphics_layout_widget, intervals_plot_item)
-
-        ## #TODO 2024-12-31 07:20: - [ ] need to clear/re-add the epochs to make this work
-        extant_rendered_interval_plots_lists = {k:list(v.keys()) for k, v in self.list_all_rendered_intervals(debug_print=False).items()}
-        # active_target_interval_render_plots = active_2d_plot.params.custom_interval_rendering_plots
-
-        # active_target_interval_render_plots = [v.objectName() for v in active_2d_plot.interval_rendering_plots]
-        active_target_interval_render_plots_dict = {v.objectName():v for v in self.interval_rendering_plots}
-
-        for a_name in self.interval_datasource_names:
-            a_ds = self.interval_datasources[a_name]
-            an_already_added_plot_list = extant_rendered_interval_plots_lists[a_name]
-            if debug_print:
-                print(f'a_name: {a_name}\n\tan_already_added_plot_list: {an_already_added_plot_list}')
-                
-
-            if should_remove_all_and_re_add:
-                extant_already_added_plots = {k:v for k, v in active_target_interval_render_plots_dict.items() if k in an_already_added_plot_list}
-                extant_already_added_plots_list = list(extant_already_added_plots.values())
-                self.remove_rendered_intervals(name=a_name, child_plots_removal_list=extant_already_added_plots_list)
-                self.add_rendered_intervals(interval_datasource=a_ds, name=a_name, child_plots=self.interval_rendering_plots) ## re-add ALL
-                
-            else:
-                remaining_new_plots = {k:v for k, v in active_target_interval_render_plots_dict.items() if k not in an_already_added_plot_list}
-                remaining_new_plots_list = list(remaining_new_plots.values())
-                self.add_rendered_intervals(interval_datasource=a_ds, name=a_name, child_plots=remaining_new_plots_list) ## ADD only the new
-            
-        if should_link_to_main_plot_widget and (self.plots.main_plot_widget is not None):
-            main_plot_widget = self.plots.main_plot_widget # PlotItem
-            intervals_plot_item.setXLink(main_plot_widget) # works to synchronize the main zoomed plot (current window) with the epoch_rect_separate_plot (rectangles plotter)
-        else:
-            ## setup the synchronization:
-            # Perform Initial (one-time) update from source -> controlled:
-            # intervals_time_sync_pyqtgraph_widget.on_window_changed(self.spikes_window.active_window_start_time, self.spikes_window.active_window_end_time)
-            intervals_plot_item.setXRange(self.spikes_window.active_window_start_time, self.spikes_window.active_window_end_time, padding=0)
-            # disable active window syncing if it's enabled:
-            sync_connection = self.ui.connections.get(name, None)
-            if sync_connection is not None:
-                # have an existing sync connection, need to disconnect it.
-                print(f'disconnecting window_scrolled for "{name}"')
-                self.window_scrolled.disconnect(sync_connection)
-                    
-            # sync_connection = self.window_scrolled.connect(intervals_time_sync_pyqtgraph_widget.on_window_changed)
-            sync_connection = self.window_scrolled.connect(lambda earliest_t, latest_t: intervals_plot_item.setXRange(earliest_t, latest_t, padding=0)) ## explicitly captures `raster_plot_item`
-            self.ui.connections[name] = sync_connection # add the connection to the connections array
-
-        return _interval_tracks_out_dict
-
-
-    @function_attributes(short_name=None, tags=['raster', 'tracks', 'pyqtgraph', 'specific', 'dynamic_ui', 'group_matplotlib_render_plot_widget'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-01-09 10:50', related_items=[])
-    def prepare_pyqtgraph_rasterPlot_track(self, name_modifier_suffix: str='', should_link_to_main_plot_widget:bool=True, debug_print=False):
-        """ adds to separate pyqtgraph-backed tracks to the SpikeRaster2D plotter for rendering a 2D raster `active_2d_plot.params.custom_interval_rendering_plots` so the intervals are rendered on these new tracks in addition to any normal ones
-        
-        enable_interval_overview_track: bool: if True, renders a track to show all the intervals during the sessions (overview) in addition to the track for the intervals within the current active window
-        should_remove_all_and_re_add: bool: if True, all intervals are removed from all plots and then re-added (safer) method
-        
-        Updates:
-            active_2d_plot.params.custom_interval_rendering_plots
-
-
-        This should be a separate file, and there should be multiple classes of tracks (raster, instervals, etc) 
-            
-
-        #TODO 2025-01-09 12:04: - [ ] Needs to respond to signals:
-        self.on_neuron_colors_changed
-
-        Usage:
-        
-        _raster_tracks_out_dict = active_2d_plot.prepare_pyqtgraph_rasterPlot_track(name_modifier_suffix='raster_window', should_link_to_main_plot_widget=has_main_raster_plot)
-        
-        """
-        from pyphoplacecellanalysis.GUI.PyQtPlot.DockingWidgets.DynamicDockDisplayAreaContent import CustomDockDisplayConfig, CustomCyclicColorsDockDisplayConfig, NamedColorScheme
-        from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.SpikeRasters import new_plot_raster_plot #, NewSimpleRaster, paired_separately_sort_neurons
-        
-        _raster_tracks_out_dict = {}
-        ## Enables creating a new pyqtgraph-based track to display the intervals/epochs
-        dock_config = CustomCyclicColorsDockDisplayConfig(named_color_scheme=NamedColorScheme.grey, showCloseButton=True, showCollapseButton=False, showGroupButton=False, corner_radius="0px", hideTitleBar=True)
-        name = f'rasters[{name_modifier_suffix}]'
-        time_sync_pyqtgraph_widget, raster_root_graphics_layout_widget, raster_plot_item, raster_dock = self.add_new_embedded_pyqtgraph_render_plot_widget(name=name, dockSize=(500, 120), display_config=dock_config)
-
-        if raster_plot_item not in self.params.custom_interval_rendering_plots:
-            self.params.custom_interval_rendering_plots.append(raster_plot_item) ## this signals that it should recieve updates for its intervals somewhere else
-        
-        # active_2d_plot.params.custom_interval_rendering_plots = [active_2d_plot.plots.background_static_scroll_window_plot, active_2d_plot.plots.main_plot_widget, raster_plot_item, intervals_overview_plot_item]
-
-        # active_2d_plot.interval_rendering_plots
-        # main_plot_widget = self.plots.main_plot_widget # PlotItem
-        # raster_plot_item.setXLink(main_plot_widget) # works to synchronize the main zoomed plot (current window) with the epoch_rect_separate_plot (rectangles plotter)
-        
-        # self.unit_sort_order exists too
-
-        # self.spikes_window # SpikesDataframeWindow
-        spikes_df: pd.DataFrame = self.spikes_window.df ## all spikes ( for all time )
-        # self.spikes_df # use this instead?
-        
-        # # an_included_unsorted_neuron_ids = deepcopy(included_any_context_neuron_ids_dict[a_decoder_name])
-        an_included_unsorted_neuron_ids = deepcopy(self.neuron_ids)
-        a_sorted_neuron_ids = deepcopy(self.ordered_neuron_ids)
-
-        unit_sort_order, desired_sort_arr = find_desired_sort_indicies(an_included_unsorted_neuron_ids, a_sorted_neuron_ids)
-        
-        #TODO 2025-01-09 11:32: - [ ] Ignores each cell's actual emphasis state and forces default:
-        curr_spike_emphasis_state: SpikeEmphasisState = SpikeEmphasisState.Default
-        unsorted_unit_colors_map: Dict[types.aclu_index, pg.QColor] = {aclu:v[2][curr_spike_emphasis_state].color() for aclu, v in self.params.config_items.items()} # [2] is hardcoded and the only element of the tuple used, something legacy I guess
-
-        # Get only the spikes for the shared_aclus:
-        a_spikes_df = deepcopy(spikes_df).spikes.sliced_by_neuron_id(an_included_unsorted_neuron_ids)
-        a_spikes_df, neuron_id_to_new_IDX_map = a_spikes_df.spikes.rebuild_fragile_linear_neuron_IDXs() # rebuild the fragile indicies afterwards
-
-        time_sync_pyqtgraph_widget.plots.root_plot = raster_plot_item # name the plotItem "root_plot" so `new_plot_raster_plot` can reuse it
-        rasters_display_outputs_tuple = new_plot_raster_plot(a_spikes_df, an_included_unsorted_neuron_ids, unit_sort_order=unit_sort_order, unit_colors_list=deepcopy(unsorted_unit_colors_map),
-                                                        scatter_app_name=name, defer_show=True, active_context=None,
-                                                        win=raster_root_graphics_layout_widget, plots_data=time_sync_pyqtgraph_widget.plots_data, plots=time_sync_pyqtgraph_widget.plots,
-                                                        add_debug_header_label=False,
-                                                        scatter_plot_kwargs=dict(size=5, hoverable=False, tick_width=0.0, tick_height=1.0),
-                                                        ) # defer_show=True so we can add it manually to the track view
-
-        # an_app, a_win, a_plots, a_plots_data, an_on_update_active_epoch, an_on_update_active_scatterplot_kwargs = rasters_display_outputs_tuple
-        # raster_root_graphics_layout_widget.addWidget(a_win, row=1, col=1)
-        
-        _raster_tracks_out_dict[name] = (dock_config, time_sync_pyqtgraph_widget, raster_root_graphics_layout_widget, raster_plot_item, rasters_display_outputs_tuple)
-        # Setup range for plot:
-        # earliest_t, latest_t = active_2d_plot.spikes_window.total_df_start_end_times # global
-        earliest_t, latest_t = self.spikes_window.active_time_window # current
-        raster_plot_item.setXRange(earliest_t, latest_t, padding=0)
-        neuron_y_pos = np.array(list(deepcopy(time_sync_pyqtgraph_widget.plots_data.new_sorted_raster.neuron_y_pos).values()))
-        raster_plot_item.setYRange(np.nanmin(neuron_y_pos), np.nanmax(neuron_y_pos), padding=0)
-
-        if should_link_to_main_plot_widget:
-            main_plot_widget = self.plots.main_plot_widget # PlotItem
-            raster_plot_item.setXLink(main_plot_widget) # works to synchronize the main zoomed plot (current window) with the epoch_rect_separate_plot (rectangles plotter)
-        else:
-            ## setup the synchronization:
-            # Perform Initial (one-time) update from source -> controlled:
-            # time_sync_pyqtgraph_widget.on_window_changed(self.spikes_window.active_window_start_time, self.spikes_window.active_window_end_time)
-            # disable active window syncing if it's enabled:
-            sync_connection = self.ui.connections.get(name, None)
-            if sync_connection is not None:
-                # have an existing sync connection, need to disconnect it.
-                print(f'disconnecting window_scrolled for "{name}"')
-                self.window_scrolled.disconnect(sync_connection)
-                        
-            # sync_connection = self.window_scrolled.connect(time_sync_pyqtgraph_widget.on_window_changed)
-            sync_connection = self.window_scrolled.connect(lambda earliest_t, latest_t: raster_plot_item.setXRange(earliest_t, latest_t, padding=0)) ## explicitly captures `raster_plot_item`
-            self.ui.connections[name] = sync_connection # add the connection to the connections array
-            
-
-        return _raster_tracks_out_dict
-
-
-
 
     @function_attributes(short_name=None, tags=['UNFINISHED', 'DOCKs', 'tracks', 'dock'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-01-14 03:43', related_items=[])
     def perform_remove_dockgroup(self, flat_group_dockitems_list):
@@ -2068,34 +1862,7 @@ class Spike2DRaster(DynamicDockDisplayAreaOwningMixin, PyQtGraphSpecificTimeCurv
         self.sigCrosshairsUpdated.emit(self, child_identifier, trace_value)
 
 
-@define(slots=False)
-class FigureWidgetDockDisplayConfig(CustomDockDisplayConfig):
-    """docstring for FigureWidgetDockDisplayConfig."""
 
-    def get_colors(self, orientation, is_dim):
-        # Common to all:
-        if is_dim:
-            fg_color = '#aaa' # Grey
-        else:
-            fg_color = '#fff' # White
-            
-        # Red-based:
-        if is_dim:
-            bg_color = '#aa4444' # (0°, 60%, 67%)
-            border_color = '#993232' # (0°, 67%, 60%)
-        else:
-            bg_color = '#cc6666' # (0°, 50, 80)
-            border_color = '#ba5454' # (0°, 55%, 73%)
- 
-        return fg_color, bg_color, border_color
-    
-    def __attrs_post_init__(self):
-      self.fontSize = '10px'
-      self.corner_radius = '3px'
-      if self.custom_get_colors_dict is None:
-            self.custom_get_colors_dict = {False: DockDisplayColors(fg_color='#fff', bg_color='#cc6666', border_color='#ba5454'),
-                True: DockDisplayColors(fg_color='#aaa', bg_color='#aa4444', border_color='#993232'),
-            }
     
 # Start Qt event loop unless running in interactive mode.
 # if __name__ == '__main__':

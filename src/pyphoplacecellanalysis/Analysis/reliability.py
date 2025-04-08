@@ -5,6 +5,7 @@ from pyphocorehelpers.programming_helpers import metadata_attributes
 from pyphocorehelpers.function_helpers import function_attributes
 from typing import Dict, List, Tuple, Optional, Callable, Union, Any
 from typing_extensions import TypeAlias
+import nptyping as ND
 from nptyping import NDArray
 from attrs import define, field, Factory
 

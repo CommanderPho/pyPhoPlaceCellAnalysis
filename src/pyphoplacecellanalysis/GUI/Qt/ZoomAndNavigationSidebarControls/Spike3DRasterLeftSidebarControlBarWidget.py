@@ -10,6 +10,7 @@ from PyQt5.QtCore import Qt, QPoint, QRect, QObject, QEvent, pyqtSignal, pyqtSlo
 
 # from pyphoplacecellanalysis.GUI.Qt.ZoomAndNavigationSidebarControls.Spike3DRasterLeftSidebarControlBarBase import Ui_leftSideToolbarWidget # Generated file from .ui
 from pyphocorehelpers.gui.Qt.ExceptionPrintingSlot import pyqtExceptionPrintingSlot
+from pyphocorehelpers.gui.Qt.QtUIC_Helpers import load_ui_with_named_spacers
 # from qtpy import QtCore, QtWidgets
 # Generated from c:\Users\pho\repos\Spike3DWorkEnv\pyPhoPlaceCellAnalysis\src\pyphoplacecellanalysis\GUI\Qt\ZoomAndNavigationSidebarControls\Spike3DRasterLeftSidebarControlBarBase.ui automatically by PhoPyQtClassGenerator VSCode Extension
 
@@ -32,8 +33,13 @@ uiFile = os.path.join(path, 'Spike3DRasterLeftSidebarControlBarWidget.ui')
 # sys.excepthook = trap_exc_during_debug
 
 
+
+
+
 class Spike3DRasterLeftSidebarControlBar(QWidget):
     """ A controls bar with buttons loaded from a Qt .ui file. 
+    
+    self.ui.btnToggleDebugEnabled -- toggles whether debug printing is enabled/disabled
     
     self.ui.btnToggleCrosshairTrace
     self.ui.lblCrosshairTraceStaticLabel
@@ -41,12 +47,19 @@ class Spike3DRasterLeftSidebarControlBar(QWidget):
     
     self.ui.verticalScrollBar
     
+    spinAnimationTimeStep
+    spinRenderWindowDuration
+    spinTemporalZoomFactor
+    
+    self.ui.btnToggleCollapseExpand
+    
     """
     
     animation_time_step_changed = pyqtSignal(float) # returns bool indicating whether is_playing
     temporal_zoom_factor_changed = pyqtSignal(float)
     render_window_duration_changed = pyqtSignal(float)
-        
+    
+    debug_mode_toggled = pyqtSignal()
     crosshair_trace_toggled = pyqtSignal()
 
     # @property
@@ -74,13 +87,17 @@ class Spike3DRasterLeftSidebarControlBar(QWidget):
 
     def __init__(self, parent=None):
         super().__init__(parent=parent) # Call the inherited classes __init__ method
-        self.ui = uic.loadUi(uiFile, self) # Load the .ui file
+        # self.ui = uic.loadUi(uiFile, self) # Load the .ui file
+        self.ui = load_ui_with_named_spacers(uiFile, self) # Load the .ui file
         
         self.initUI() ## when did this get disabled?
         self.show() # Show the GUI
 
 
     def initUI(self):
+        
+        self.ui.btnToggleCollapseExpand.setVisible(False)
+        
         # Disable the scroll bar
         self.ui.verticalScrollBar.hide()
         self.ui.verticalScrollBar.setVisible(False)
@@ -95,11 +112,12 @@ class Spike3DRasterLeftSidebarControlBar(QWidget):
         self.ui.spinTemporalZoomFactor.sigValueChanged.connect(self.temporal_zoom_factor_valueChanged)
         self.ui.spinRenderWindowDuration.sigValueChanged.connect(self.render_window_duration_valueChanged)
         self.ui.btnToggleCrosshairTrace.clicked.connect(self.crosshair_trace_button_Toggled)
+        self.ui.btnToggleDebugEnabled.clicked.connect(self.debug_mode_button_Toggled)
         # self.ui.btnToggleCrosshairTrace.clicked.
 
         
         
-
+        self.ui.btnToggleDebugEnabled.setVisible(True)
         self.ui.btnToggleCrosshairTrace.setVisible(True)
         self.ui.lblCrosshairTraceStaticLabel.setVisible(False)
         self.ui.lblCrosshairTraceValue.setVisible(False)
@@ -139,21 +157,37 @@ class Spike3DRasterLeftSidebarControlBar(QWidget):
     @pyqtExceptionPrintingSlot(int)
     def temporal_zoom_slider_valueChanged(self, int_slider_val):
         # print(f'sb: {sb}, sb.value(): {str(sb.value())}')
-        print(f'temporal_zoom_slider_valueChanged({int_slider_val})')
+        if self.enable_debug_print:
+            print(f'temporal_zoom_slider_valueChanged({int_slider_val})')
         float_slider_val = (float(int_slider_val)-0.0)/1000.0
-        print(f'\t float_slider_val: {float_slider_val}')
+        if self.enable_debug_print:
+            print(f'\t float_slider_val: {float_slider_val}')
         # TODO: emit the temporal changed signal:    
         # self.temporal_zoom_factor_changed.emit(float_slider_val)
                         
 
     # @pyqtExceptionPrintingSlot()
     def crosshair_trace_button_Toggled(self):
-        print(f'Spike3DRasterLeftSidebarControlBar.crosshair_trace_button_Toggled(): self.ui.btnToggleCrosshairTrace.isChecked(): {self.ui.btnToggleCrosshairTrace.isChecked()}')
+        if self.enable_debug_print:
+            print(f'Spike3DRasterLeftSidebarControlBar.crosshair_trace_button_Toggled(): self.ui.btnToggleCrosshairTrace.isChecked(): {self.ui.btnToggleCrosshairTrace.isChecked()}')
         wants_crosshair_trace_visible: bool = self.ui.btnToggleCrosshairTrace.isChecked()
         self.ui.lblCrosshairTraceStaticLabel.setVisible(wants_crosshair_trace_visible)
         self.ui.lblCrosshairTraceValue.setVisible(wants_crosshair_trace_visible)
         # self.crosshair_trace_toggled.emit(wants_crosshair_trace_visible)
         self.crosshair_trace_toggled.emit()
+
+
+
+    def debug_mode_button_Toggled(self):
+        print(f'Spike3DRasterLeftSidebarControlBar.debug_mode_button_Toggled(): self.ui.btnToggleDebugEnabled.isChecked(): {self.ui.btnToggleDebugEnabled.isChecked()}')
+        # wants_debug_mode_enabled: bool = self.ui.btnToggleDebugEnabled.isChecked()
+        # self.crosshair_trace_toggled.emit(wants_crosshair_trace_visible)
+        self.debug_mode_toggled.emit()
+
+
+
+
+
 
     # def __str__(self):
     #      return
@@ -202,6 +236,7 @@ class SpikeRasterLeftSidebarControlsMixin:
         left_side_bar_connections.append(left_side_bar_controls.temporal_zoom_factor_changed.connect(self.on_temporal_zoom_factor_valueChanged))
         left_side_bar_connections.append(left_side_bar_controls.render_window_duration_changed.connect(self.on_render_window_duration_valueChanged))
         left_side_bar_connections.append(left_side_bar_controls.crosshair_trace_toggled.connect(self.on_crosshair_trace_toggled)) # #TODO 2025-02-10 16:50: - [ ] Add handler for enable/disable crosshairs trace
+        left_side_bar_connections.append(left_side_bar_controls.debug_mode_button_Toggled.connect(self.on_debug_mode_Toggled))
         return left_side_bar_connections
         
             
@@ -238,33 +273,70 @@ class SpikeRasterLeftSidebarControlsMixin:
     def SpikeRasterLeftSidebarControlsMixin_on_window_update(self, new_start=None, new_end=None):
         """ called to perform updates when the active window changes. Redraw, recompute data, etc. """
         # Called in the Implementor's update_window(...) function
-        print(f'SpikeRasterLeftSidebarControlsMixin_on_window_update(new_start: {new_start}, new_end: {new_end}')
+        if self.enable_debug_print:
+            print(f'SpikeRasterLeftSidebarControlsMixin_on_window_update(new_start: {new_start}, new_end: {new_end}')
         
         left_side_bar_controls = self.ui.leftSideToolbarWidget
 
         if (new_start is not None) and (new_end is not None):
             ## Block signals:
-            # left_side_bar_controls.ui.verticalSliderZoom.blockSignals(True)
-            # left_side_bar_controls.ui.spinAnimationTimeStep.blockSignals(True)
-            # left_side_bar_controls.ui.spinTemporalZoomFactor.blockSignals(True)
-            left_side_bar_controls.ui.spinRenderWindowDuration.blockSignals(True)            
+            left_side_bar_controls.ui.spinRenderWindowDuration.blockSignals(True)
+
+            # Force completion of any ongoing edits to prevent conflicts
+            if left_side_bar_controls.ui.spinRenderWindowDuration.hasFocus():
+                # First interpret any text in the editor
+                left_side_bar_controls.ui.spinRenderWindowDuration.interpretText()
+                # Then remove focus to cancel any ongoing edit
+                left_side_bar_controls.ui.spinRenderWindowDuration.clearFocus()
 
             ## Update values:
             new_duration: float = new_end - new_start
-            # print(f'\tnew_duration: {new_duration}, self.render_window_duration: {self.render_window_duration}')
-            # left_side_bar_controls.ui.verticalSliderZoom.setValue(round(self.temporal_zoom_factor))
-            # left_side_bar_controls.ui.spinAnimationTimeStep.setValue(self.animation_time_step)
-            # left_side_bar_controls.ui.spinTemporalZoomFactor.setValue(round(self.temporal_zoom_factor))
-            # left_side_bar_controls.ui.spinRenderWindowDuration.setValue(self.render_window_duration)
-            left_side_bar_controls.ui.spinRenderWindowDuration.setValue(new_duration)
+            
+            # Check if value is actually different to avoid unnecessary updates
+            current_value = left_side_bar_controls.ui.spinRenderWindowDuration.value()
+            if abs(current_value - new_duration) > 1e-6:  # Compare with small epsilon for float comparison
+                left_side_bar_controls.ui.spinRenderWindowDuration.setValue(new_duration)
 
             ## Unblock when done:
-            # left_side_bar_controls.ui.verticalSliderZoom.blockSignals(False)
-            # left_side_bar_controls.ui.spinAnimationTimeStep.blockSignals(False)
-            # left_side_bar_controls.ui.spinTemporalZoomFactor.blockSignals(False)
             left_side_bar_controls.ui.spinRenderWindowDuration.blockSignals(False)
-       
-    
+
+
+
+    # ==================================================================================================================== #
+    # Debug Mode                                                                                                           #
+    # ==================================================================================================================== #
+    def on_debug_mode_Toggled(self):
+        """ 
+        Uses/requires/updates: self.params.debug_print
+        
+        """
+        updated_is_debug_mode_enabled: bool = self.ui.leftSideToolbarWidget.ui.btnToggleDebugEnabled.isChecked()
+        # if self.enable_debug_print:
+        print(f'Spike3DRasterWindowWidget.on_debug_mode_Toggled(): updated_is_debug_mode_enabled: {updated_is_debug_mode_enabled}')            
+        old_value = self.params.debug_print
+        did_update: bool = (old_value != updated_is_debug_mode_enabled)
+        self.params.debug_print = updated_is_debug_mode_enabled
+        self.should_debug_print_interaction_events = updated_is_debug_mode_enabled
+        self.enable_debug_print = updated_is_debug_mode_enabled
+        # self.debug_print = updated_is_debug_mode_enabled
+        print(f'\tself.debug_print: {self.debug_print}')
+        print(f'\tself.should_debug_print_interaction_events: {self.should_debug_print_interaction_events}')
+        
+        # if updated_is_debug_mode_enabled:
+        #     ## enable crosshairs callback        
+        #     if self.spike_raster_plt_2d is not None:
+        #         ## set SpikeRaster2D's is_crosshair_trace_enabled
+        #         # self.debug_print = True
+        #         self.spike_raster_plt_2d.params.debug_print = True
+
+        # else:
+        #     print(f'\tshould disable debug mode.')
+        #     # self.params.debug_print = False
+        #     if self.spike_raster_plt_2d is not None:
+        #         ## set SpikeRaster2D's is_crosshair_trace_enabled
+        #         self.spike_raster_plt_2d.params.debug_print = False
+
+
 
         
     

@@ -24,6 +24,12 @@ class ScatterItemData:
 class Render2DScrollWindowPlotMixin:
     """ Adds a LinearRegionItem to the plot that represents the entire data timerange which defines a user-adjustable window into the data. Finally, also adds a plot that shows only the zoomed-in data within the window. 
     
+    Controls/Manages:
+        Two PyQtGraph-based PlotItems 
+        - a static overview of the whole recording session with a user-adjustable window slider into the data
+        - a dynamically scrolling zoomed-in view of the above raster, controlled by the adjustable window
+        
+        
     Known Uses:
         Implemented by Spike2DRaster
     
@@ -37,7 +43,7 @@ class Render2DScrollWindowPlotMixin:
     """
     
     ## Scrollable Window Signals
-    window_scrolled = QtCore.pyqtSignal(float, float) # signal is emitted on updating the 2D sliding window, where the first argument is the new start value and the 2nd is the new end value
+    window_scrolled = QtCore.Signal(float, float) # signal is emitted on updating the 2D sliding window, where the first argument is the new start value and the 2nd is the new end value
     
     
     def ScrollRasterPreviewWindow_on_BuildUI(self, background_static_scroll_window_plot):
@@ -75,7 +81,7 @@ class Render2DScrollWindowPlotMixin:
         
         #############################
         ## Bottom Windowed Scroll Plot/Widget:
-        scroll_window_plot_downsampling_rate: int = self.params.setdefault('scroll_window_plot_downsampling_rate', 100)
+        scroll_window_plot_downsampling_rate: int = self.params.setdefault('scroll_window_plot_downsampling_rate', 5) ## reduced downsample rate from 100 -> 5 after noticing that it was very desceptive how many spikes it was missing
         
         # ALL Spikes in the preview window:
         # curr_spike_x, curr_spike_y, curr_spike_pens, _all_scatterplot_tooltips_kwargs, self.plots_data.all_spots, curr_n = self._build_all_spikes_data_values(should_return_data_tooltips_kwargs=False, downsampling_rate=scroll_window_plot_downsampling_rate) #TODO 2023-06-28 21:18: - [ ] Could use returned tooltips to set the spike hover text

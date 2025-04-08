@@ -5,6 +5,7 @@ from copy import deepcopy
 from pathlib import Path
 from typing import Dict, List, Tuple, Optional, Callable, Union, Any
 from typing_extensions import TypeAlias
+import nptyping as ND
 from nptyping import NDArray
 from typing import NewType
 
@@ -49,6 +50,7 @@ import os
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from typing import Dict, List, Tuple, Optional, Callable, Union, Any, NewType
+import nptyping as ND
 from nptyping import NDArray
 
 import neuropy.utils.type_aliases as types
@@ -286,8 +288,6 @@ class WCorrShuffle(ComputedResult):
         extracted_merged_scores_df: pd.DataFrame = directional_decoders_epochs_decode_result.build_complete_all_scores_merged_df()
         
         extracted_merged_scores_df = extracted_merged_scores_df.loc[:, ~extracted_merged_scores_df.columns.duplicated()] # drops the duplicate columns, keeping only the first instance
-
-
         extracted_merged_scores_df['is_most_likely_direction_LR'] = (extracted_merged_scores_df['P_LR'] > 0.5) # ValueError: Cannot set a DataFrame with multiple columns to the single column is_most_likely_direction_LR. Have duplicate columns for 'P_LR' unfortunately.
 
         ## Find the correct indicies corresponding to the filtered events

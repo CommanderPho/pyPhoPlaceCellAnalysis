@@ -12,6 +12,7 @@ from neuropy.core.user_annotations import UserAnnotationsManager
 from neuropy.utils.dynamic_container import DynamicContainer
 from neuropy.utils.indexing_helpers import union_of_arrays
 from neuropy.utils.result_context import IdentifyingContext
+import nptyping as ND
 from nptyping import NDArray
 import attrs
 import matplotlib as mpl
@@ -26,13 +27,14 @@ from pyphocorehelpers.function_helpers import function_attributes
 from pyphocorehelpers.programming_helpers import metadata_attributes
 
 from functools import wraps, partial
-from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import BasePositionDecoder, DecodedFilterEpochsResult
+from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import BasePositionDecoder, DecodedFilterEpochsResult, SingleEpochDecodedResult
 
 
 # from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError import plot_1D_most_likely_position_comparsions
 from typing import Dict, List, Tuple, Optional, Callable, Union, Any
 from typing import NewType
 from typing_extensions import TypeAlias
+import nptyping as ND
 from nptyping import NDArray
 import neuropy.utils.type_aliases as types
 decoder_name: TypeAlias = str # a string that describes a decoder, such as 'LongLR' or 'ShortRL'
@@ -55,6 +57,1541 @@ from attrs import define, field, Factory, asdict # used for `ComputedResult`
 
 from neuropy.utils.indexing_helpers import get_values_from_keypaths, set_value_by_keypath, update_nested_dict
 
+from pyphoplacecellanalysis.GUI.PyQtPlot.BinnedImageRenderingWindow import BasicBinnedImageRenderingWidget
+from pyphoplacecellanalysis.GUI.PyQtPlot.BinnedImageRenderingWindow import BasicBinnedImageRenderingWindow, LayoutScrollability
+from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.SpikeRasterWidgets.Spike2DRaster import SynchronizedPlotMode
+from pyphoplacecellanalysis.Pho2D.PyQtPlots.TimeSynchronizedPlotters.PyqtgraphTimeSynchronizedWidget import PyqtgraphTimeSynchronizedWidget
+
+
+import numpy as np
+import pyphoplacecellanalysis.External.pyqtgraph as pg
+from pyphoplacecellanalysis.External.pyqtgraph.Qt import QtWidgets, QtCore
+
+from copy import deepcopy
+from typing import Optional, Union, List, Tuple, Dict, Any
+import numpy as np
+import pandas as pd
+from pathlib import Path
+
+from pyphoplacecellanalysis.External.pyqtgraph import QtCore, QtGui, QtWidgets
+import pyphoplacecellanalysis.External.pyqtgraph as pg
+from pyphoplacecellanalysis.External.pyqtgraph.Qt import mkQApp
+
+from neuropy.utils.result_context import IdentifyingContext
+from pyphocorehelpers.programming_helpers import metadata_attributes
+from pyphocorehelpers.function_helpers import function_attributes
+from pyphocorehelpers.Filesystem.path_helpers import sanitize_filename_for_Windows
+from pyphoplacecellanalysis.General.Model.Configs.LongShortDisplayConfig import LongShortDisplayConfigManager
+
+
+
+
+from pyphoplacecellanalysis.Pho2D.plotly.Extensions.plotly_helpers import build_single_plotly_marginal_scatter_and_hist_over_time
+
+@function_attributes(short_name=None, tags=['plotly', 'plotting'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-03-24 14:55', related_items=[])
+def _plot_plotly_stack_marginal_scatter_and_hist_over_time(flat_decoded_marginal_posterior_df_context_dict, session_name: str, t_delta: float, epochs_decoding_time_bin_size: float ) -> Dict:
+    """ 
+    from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import _plot_plotly_stack_marginal_scatter_and_hist_over_time
+    
+    session_name: str = curr_active_pipeline.session_name
+    t_start, t_delta, t_end = curr_active_pipeline.find_LongShortDelta_times()
+    epochs_decoding_time_bin_size: float = 0.025
+
+    a_target_context: IdentifyingContext = IdentifyingContext(trained_compute_epochs='laps', pfND_ndim=1, decoder_identifier='pseudo2D', time_bin_size= 0.025, known_named_decoding_epochs_type='laps', data_grain='per_time_bin') # , known_named_decoding_epochs_type='laps'
+    flat_context_list, flat_result_context_dict, flat_decoder_context_dict, flat_decoded_marginal_posterior_df_context_dict = a_new_fully_generic_result.get_results_matching_contexts(context_query=a_target_context, return_multiple_matches=True, debug_print=True)
+    _flat_out_figs_dict = _plot_plotly_stack_marginal_scatter_and_hist_over_time(flat_decoded_marginal_posterior_df_context_dict=flat_decoded_marginal_posterior_df_context_dict, session_name=session_name, t_delta=t_delta, epochs_decoding_time_bin_size=epochs_decoding_time_bin_size)
+
+
+    
+    """
+    #INPUTS: a_target_context: IdentifyingContext, a_result: DecodedFilterEpochsResult, a_decoded_marginal_posterior_df: pd.DataFrame, a_decoder: BasePositionDecoder
+    _flat_out_figs_dict = {}
+
+    for a_ctxt, a_decoded_marginal_posterior_df in flat_decoded_marginal_posterior_df_context_dict.items():
+        print(a_ctxt)
+        
+        # Add the maze_id to the active_filter_epochs so we can see how properties change as a function of which track the replay event occured on:
+        # a_decoded_marginal_posterior_df['delta_aligned_start_t'] = a_decoded_marginal_posterior_df['start'] - t_delta ## subtract off t_delta
+        a_decoded_marginal_posterior_df = a_decoded_marginal_posterior_df.across_session_identity.add_session_df_columns(session_name=session_name, time_bin_size=epochs_decoding_time_bin_size, curr_session_t_delta=t_delta) # , time_col='t'
+            
+        a_fig, a_figure_context = build_single_plotly_marginal_scatter_and_hist_over_time(a_decoded_posterior_df=a_decoded_marginal_posterior_df, a_target_context=a_ctxt)
+        a_fig = a_fig.update_layout(height=300, # Set your desired height
+                                    margin=dict(t=20, b=0),  # Set top and bottom margins to 0
+                                    )
+        _flat_out_figs_dict[a_figure_context] = a_fig
+        a_fig.show()
+	## END FOR
+    return _flat_out_figs_dict
+
+
+
+
+
+
+
+
+
+@function_attributes(short_name=None, tags=['pyqtgraph', 'scatter', 'histogram', 'AI', 'testing', 'unused'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-12-15 14:30', related_items=['plotly_pre_post_delta_scatter'])
+def pyqtgraph_pre_post_delta_scatter(data_results_df: pd.DataFrame, data_context: Optional[IdentifyingContext]=None, 
+                                     histogram_bins:int=25, common_plot_kwargs=None, scatter_kwargs=None,
+                                     histogram_variable_name='P_Long', hist_kwargs=None,
+                                     forced_range_y=[0.0, 1.0], time_delta_tuple=None, is_dark_mode: bool = True,
+                                     figure_sup_huge_title_text: str=None, is_top_supertitle: bool = False, figure_footer_text: Optional[str]=None,
+                                     existing_widget=None, **kwargs):
+    """ Plots a scatter plot of a variable pre/post delta, with a histogram on each end corresponding to the pre/post delta distribution using PyQtGraph
+    
+    Args:
+        data_results_df (pd.DataFrame): DataFrame containing the data to plot
+        data_context (Optional[IdentifyingContext], optional): Context info for the plot. Defaults to None.
+        histogram_bins (int, optional): Number of bins for histograms. Defaults to 25.
+        common_plot_kwargs (dict, optional): Common kwargs for all plots. Defaults to None.
+        scatter_kwargs (dict, optional): Kwargs for scatter plot. Defaults to None.
+        histogram_variable_name (str, optional): Variable to plot. Defaults to 'P_Long'.
+        hist_kwargs (dict, optional): Kwargs for histograms. Defaults to None.
+        forced_range_y (list, optional): Y-axis range. Defaults to [0.0, 1.0].
+        time_delta_tuple (tuple, optional): Tuple of (start, delta, end) times. Defaults to None.
+        is_dark_mode (bool, optional): Use dark mode theme. Defaults to True.
+        figure_sup_huge_title_text (str, optional): Super title text. Defaults to None.
+        is_top_supertitle (bool, optional): Place supertitle at top. Defaults to False.
+        figure_footer_text (Optional[str], optional): Footer text. Defaults to None.
+        existing_widget (QWidget, optional): Existing widget to use. Defaults to None.
+
+    Returns:
+        tuple: (main_widget, figure_context) - the widget containing the plot and context info
+    
+    Usage:
+        from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import pyqtgraph_pre_post_delta_scatter
+
+        ## test AI-generated pyqtgraph version
+        plot_row_identifier: str = f'{a_known_decoded_epochs_type.capitalize()} - {a_prefix.capitalize()} - {a_suffix} decoder' # should be like 'Laps (Masked) from Non-PBE decoder'
+
+        fig_widget, figure_context = pyqtgraph_pre_post_delta_scatter(data_results_df=deepcopy(a_decoded_posterior_df), out_scatter_fig=None, 
+                                        histogram_variable_name='P_Short', hist_kwargs=dict(), histogram_bins=histogram_bins,
+                                        common_plot_kwargs=dict(),
+                                        px_scatter_kwargs = dict(x='delta_aligned_start_t', y='P_Short', title=plot_row_identifier))
+        fig_widget.show()
+    """
+    # Create app if needed
+    app = mkQApp("Pre-Post Delta Scatter")
+    
+    # Copy dataframe to avoid modifying the original
+    data_results_df = data_results_df.copy()
+    debug_print = kwargs.get('debug_print', False)
+    
+    # Set up display labels
+    pre_delta_label = 'Pre-delta'
+    post_delta_label = 'Post-delta'
+
+    # Initialize context and figure context dictionary
+    if data_context is None:
+        data_context = IdentifyingContext()  # empty context
+    
+    data_context = data_context.adding_context_if_missing(variable_name=histogram_variable_name)
+    figure_context_dict = {'histogram_variable_name': histogram_variable_name}
+    
+    # Get session info
+    if 'session_name' in data_results_df.columns:
+        num_unique_sessions = data_results_df['session_name'].nunique(dropna=True)
+    else:
+        num_unique_sessions = 1
+    
+    data_context = data_context.adding_context_if_missing(num_sessions=num_unique_sessions)
+    figure_context_dict['num_unique_sessions'] = num_unique_sessions
+    
+    # Get time bin size info
+    num_unique_time_bin_sizes = data_results_df.time_bin_size.nunique(dropna=True)
+    unique_time_bin_sizes = np.unique(data_results_df.time_bin_size.to_numpy())
+    
+    if debug_print:
+        print(f'num_unique_sessions: {num_unique_sessions}, num_unique_time_bins: {num_unique_time_bin_sizes}')
+    
+    if num_unique_time_bin_sizes == 1:
+        assert len(unique_time_bin_sizes) == 1
+        figure_context_dict['t_bin_size'] = unique_time_bin_sizes[0]
+    else:
+        figure_context_dict['n_unique_t_bin_sizes'] = num_unique_time_bin_sizes
+    
+    # Initialize plotting kwargs
+    if hist_kwargs is None:
+        hist_kwargs = {}
+    
+    if scatter_kwargs is None:
+        scatter_kwargs = {}
+    
+    if common_plot_kwargs is None:
+        common_plot_kwargs = {}
+    
+    # Build title
+    if num_unique_sessions == 1:
+        main_title = f"Session {scatter_kwargs.get('title', 'UNKNOWN')}"
+    else:
+        main_title = f"Across Sessions {scatter_kwargs.get('title', 'UNKNOWN')} ({num_unique_sessions} Sessions)"
+    
+    if num_unique_time_bin_sizes > 1:
+        main_title = main_title + f" - {num_unique_time_bin_sizes} Time Bin Sizes"
+        figure_context_dict['n_tbin'] = num_unique_time_bin_sizes
+    elif num_unique_time_bin_sizes == 1:
+        time_bin_size = unique_time_bin_sizes[0]
+        main_title = main_title + f" - time bin size: {time_bin_size} sec"
+    else:
+        main_title = main_title + f" - ERR: <No Entries in DataFrame>"
+    
+    figure_context_dict['title'] = main_title
+    
+    # Filter data for pre-delta and post-delta
+    pre_delta_df = data_results_df[data_results_df['delta_aligned_start_t'] <= 0]
+    post_delta_df = data_results_df[data_results_df['delta_aligned_start_t'] > 0]
+    
+    # ==================================================================================================================== #
+    # Build PyQtGraph Widget                                                                                               #
+    # ==================================================================================================================== #
+    
+    # Create main widget if not provided
+    if existing_widget is None:
+        main_widget = QtWidgets.QWidget()
+        layout = QtWidgets.QVBoxLayout()
+        main_widget.setLayout(layout)
+    else:
+        main_widget = existing_widget
+        layout = main_widget.layout()
+        if layout is None:
+            layout = QtWidgets.QVBoxLayout()
+            main_widget.setLayout(layout)
+        
+        # Clear existing layout
+        while layout.count():
+            child = layout.takeAt(0)
+            if child.widget():
+                child.widget().deleteLater()
+    
+    # Create title label if needed
+    if figure_sup_huge_title_text:
+        title_label = QtWidgets.QLabel(figure_sup_huge_title_text)
+        title_label.setAlignment(QtCore.Qt.AlignCenter)
+        font = title_label.font()
+        font.setBold(True)
+        font.setPointSize(14)
+        title_label.setFont(font)
+        layout.addWidget(title_label)
+    
+    # Create GraphicsLayoutWidget for plots
+    plot_widget = pg.GraphicsLayoutWidget()
+    layout.addWidget(plot_widget)
+    
+    # Configure plot widget
+    if is_dark_mode:
+        plot_widget.setBackground('k')
+    else:
+        plot_widget.setBackground('w')
+    
+    # Create three plots side by side
+    pre_hist_plot = plot_widget.addPlot(row=0, col=0)
+    scatter_plot = plot_widget.addPlot(row=0, col=1)
+    post_hist_plot = plot_widget.addPlot(row=0, col=2)
+    
+    # Link y axes
+    pre_hist_plot.setYLink(scatter_plot)
+    post_hist_plot.setYLink(scatter_plot)
+    
+    # Set titles
+    pre_hist_plot.setTitle(pre_delta_label)
+    scatter_plot.setTitle(main_title)
+    post_hist_plot.setTitle(post_delta_label)
+    
+    # Set axis labels
+    pre_hist_plot.setLabel('bottom', "# Events")
+    scatter_plot.setLabel('bottom', "Delta-aligned Event Time (seconds)")
+    scatter_plot.setLabel('left', "Probability of Short Track")  # This should be based on histogram_variable_name
+    post_hist_plot.setLabel('bottom', "# Events")
+    
+    # Set y range
+    if forced_range_y:
+        pre_hist_plot.setYRange(forced_range_y[0], forced_range_y[1], padding=0)
+        scatter_plot.setYRange(forced_range_y[0], forced_range_y[1], padding=0)
+        post_hist_plot.setYRange(forced_range_y[0], forced_range_y[1], padding=0)
+    
+    # Create legends
+    legend = scatter_plot.addLegend()
+    
+    # ==================================================================================================================== #
+    # Add data to plots                                                                                                    #
+    # ==================================================================================================================== #
+    
+    # Plot functions
+    def plot_scatter_data(df, plot):
+        """Plot scatter data, colored by time_bin_size or other variable"""
+        if 'color' in common_plot_kwargs:
+            color_by = common_plot_kwargs['color']
+            unique_values = df[color_by].unique()
+            
+            for i, val in enumerate(unique_values):
+                subset = df[df[color_by] == val]
+                color = pg.intColor(i, len(unique_values))
+                scatter = pg.ScatterPlotItem(
+                    x=subset['delta_aligned_start_t'].values,
+                    y=subset[histogram_variable_name].values,
+                    pen=None, brush=color, size=8, alpha=0.5,
+                    name=f"{val}"
+                )
+                plot.addItem(scatter)
+        else:
+            # Default scatter with single color
+            scatter = pg.ScatterPlotItem(
+                x=df['delta_aligned_start_t'].values,
+                y=df[histogram_variable_name].values,
+                pen=None, brush=(0, 135, 255, 150), size=8,
+                name="Data"
+            )
+            plot.addItem(scatter)
+    
+    def plot_histogram_data(df, plot, is_vertical=True, align="left"):
+        """Plot histogram of data
+        
+        Args:
+            df: DataFrame with data
+            plot: PyQtGraph plot item
+            is_vertical: Whether the histogram is vertical (True) or horizontal (False)
+            align: For horizontal histograms, whether to align "left", "right" or "center"
+        """
+        if len(df) == 0:
+            return
+            
+        y = df[histogram_variable_name].values
+        
+        # Create bins
+        bin_min, bin_max = 0, 1
+        if forced_range_y:
+            bin_min, bin_max = forced_range_y[0], forced_range_y[1]
+        else:
+            bin_min, bin_max = np.min(y), np.max(y)
+        
+        bins = np.linspace(bin_min, bin_max, histogram_bins)
+        
+        # Get histogram counts
+        hist, bin_edges = np.histogram(y, bins=bins)
+        bin_width = bin_edges[1] - bin_edges[0]
+        
+        # For handling different colors
+        if 'color' in common_plot_kwargs:
+            color_by = common_plot_kwargs['color']
+            unique_values = df[color_by].unique()
+            
+            for i, val in enumerate(unique_values):
+                subset = df[df[color_by] == val]
+                if len(subset) == 0:
+                    continue
+                    
+                y_subset = subset[histogram_variable_name].values
+                hist, bin_edges = np.histogram(y_subset, bins=bins)
+                
+                color = pg.intColor(i, len(unique_values))
+                
+                if is_vertical:
+                    # Vertical bars - height is the histogram count
+                    bars = pg.BarGraphItem(
+                        x=bin_edges[:-1], height=hist, 
+                        width=bin_width * 0.8,
+                        brush=color, pen=None
+                    )
+                    plot.addItem(bars)
+                else:
+                    # Horizontal bars with alignment options
+                    if align == "left":
+                        # Left-aligned: starts at x=0, extends right
+                        bars = pg.BarGraphItem(
+                            x=0, y=bin_edges[:-1], width=hist,
+                            height=bin_width * 0.8,
+                            brush=color, pen=None
+                        )
+                    elif align == "right":
+                        # Right-aligned: ends at right edge, extends left
+                        # Find the maximum histogram value for scaling
+                        max_hist = hist.max() if len(hist) > 0 else 1
+                        # Create bars with negative width to extend left
+                        bars = pg.BarGraphItem(
+                            x=max_hist, y=bin_edges[:-1], width=-hist,
+                            height=bin_width * 0.8,
+                            brush=color, pen=None
+                        )
+                    else:  # center
+                        # Center-aligned
+                        bars = pg.BarGraphItem(
+                            x=-hist/2, y=bin_edges[:-1], width=hist,
+                            height=bin_width * 0.8,
+                            brush=color, pen=None
+                        )
+                    plot.addItem(bars)
+        else:
+            # Default histogram with single color
+            if is_vertical:
+                # Vertical histogram
+                bars = pg.BarGraphItem(
+                    x=bin_edges[:-1], height=hist, 
+                    width=bin_width * 0.8,
+                    brush=(100, 100, 255, 150), pen=None
+                )
+                plot.addItem(bars)
+            else:
+                # Horizontal histogram with alignment
+                if align == "left":
+                    bars = pg.BarGraphItem(
+                        x=0, y=bin_edges[:-1], width=hist,
+                        height=bin_width * 0.8,
+                        brush=(100, 100, 255, 150), pen=None
+                    )
+                elif align == "right":
+                    # Find max for scaling
+                    max_hist = hist.max() if len(hist) > 0 else 1
+                    bars = pg.BarGraphItem(
+                        x=max_hist, y=bin_edges[:-1], width=-hist,
+                        height=bin_width * 0.8,
+                        brush=(100, 100, 255, 150), pen=None
+                    )
+                else:  # center
+                    bars = pg.BarGraphItem(
+                        x=-hist/2, y=bin_edges[:-1], width=hist,
+                        height=bin_width * 0.8,
+                        brush=(100, 100, 255, 150), pen=None
+                    )
+                plot.addItem(bars)
+
+
+    # Plot pre-delta histogram (horizontal, left-aligned)
+    plot_histogram_data(pre_delta_df, pre_hist_plot, is_vertical=False, align="left")
+
+    # Plot scatter plot
+    plot_scatter_data(data_results_df, scatter_plot)
+
+    # Plot post-delta histogram (horizontal, right-aligned)
+    plot_histogram_data(post_delta_df, post_hist_plot, is_vertical=False, align="right")
+
+    
+    # Add epoch shapes if provided
+    if time_delta_tuple is not None:
+        assert len(time_delta_tuple) == 3
+        earliest_delta_aligned_t_start, t_delta, latest_delta_aligned_t_end = time_delta_tuple
+        delta_relative_t_start, delta_relative_t_delta, delta_relative_t_end = (
+            np.array([earliest_delta_aligned_t_start, t_delta, latest_delta_aligned_t_end]) - t_delta
+        )
+        
+        # Get track config colors
+        long_short_display_config_manager = LongShortDisplayConfigManager()
+        
+        if is_dark_mode:
+            long_epoch_color = pg.mkColor(long_short_display_config_manager.long_epoch_config.mpl_color)
+            short_epoch_color = pg.mkColor(long_short_display_config_manager.short_epoch_config.mpl_color)
+            y_zero_line_color = pg.mkColor('rgba(50,50,50,100)')  # dark grey
+            vertical_epoch_divider_line_color = pg.mkColor('rgba(0,0,0,100)')  # black
+        else:
+            long_epoch_color = pg.mkColor(long_short_display_config_manager.long_epoch_config_light_mode.mpl_color)
+            short_epoch_color = pg.mkColor(long_short_display_config_manager.short_epoch_config_light_mode.mpl_color)
+            y_zero_line_color = pg.mkColor('rgba(200,200,200,100)')  # light grey
+            vertical_epoch_divider_line_color = pg.mkColor('rgba(255,255,255,100)')  # white
+        
+        # Add horizontal zero line
+        zero_line = pg.InfiniteLine(pos=0, angle=0, pen=pg.mkPen(y_zero_line_color, width=9))
+        scatter_plot.addItem(zero_line)
+        
+        # Add vertical divider line at x=0
+        divider_line = pg.InfiniteLine(pos=0, angle=90, pen=pg.mkPen(vertical_epoch_divider_line_color, width=3))
+        scatter_plot.addItem(divider_line)
+        
+        # Add region items for Long and Short epochs
+        long_region = pg.LinearRegionItem(
+            values=[delta_relative_t_start, delta_relative_t_delta],
+            brush=long_epoch_color,
+            alpha=0.3,
+            movable=False
+        )
+        scatter_plot.addItem(long_region)
+        
+        short_region = pg.LinearRegionItem(
+            values=[delta_relative_t_delta, delta_relative_t_end],
+            brush=short_epoch_color,
+            alpha=0.3,
+            movable=False
+        )
+        scatter_plot.addItem(short_region)
+        
+        # Add text labels for regions
+        long_text = pg.TextItem("Long", anchor=(0.5, 0))
+        long_text.setPos((delta_relative_t_start + delta_relative_t_delta) / 2, 0.95)
+        scatter_plot.addItem(long_text)
+        
+        short_text = pg.TextItem("Short", anchor=(0.5, 0))
+        short_text.setPos((delta_relative_t_delta + delta_relative_t_end) / 2, 0.95)
+        scatter_plot.addItem(short_text)
+    
+    # Add footer text if provided
+    if figure_footer_text:
+        footer_label = QtWidgets.QLabel(figure_footer_text)
+        footer_label.setAlignment(QtCore.Qt.AlignCenter)
+        font = footer_label.font()
+        font.setPointSize(10)
+        footer_label.setFont(font)
+        footer_label.setStyleSheet("color: gray;")
+        layout.addWidget(footer_label)
+    
+    # Set column stretch factors to match the original Plotly layout
+    plot_widget.ci.layout.setColumnStretchFactor(0, 1)  # Pre-delta histogram (10%)
+    plot_widget.ci.layout.setColumnStretchFactor(1, 8)  # Scatter plot (80%)
+    plot_widget.ci.layout.setColumnStretchFactor(2, 1)  # Post-delta histogram (10%)
+    
+    # Create context info
+    figure_context = IdentifyingContext(**figure_context_dict)
+    figure_context = figure_context.adding_context_if_missing(
+        **data_context.get_subset(subset_includelist=['epochs_name', 'data_grain']).to_dict(),
+        plot_type='scatter+hist', 
+        comparison='pre-post-delta', 
+        variable_name=histogram_variable_name
+    )
+    
+    # Create a preferred filename for exporting
+    preferred_filename = sanitize_filename_for_Windows(figure_context.get_subset(subset_excludelist=[]).get_description())
+    
+    # Store metadata with the widget for later access
+    main_widget.setProperty('figure_context', figure_context.to_dict())
+    main_widget.setProperty('preferred_filename', preferred_filename)
+    
+    # Add export functionality
+    def export_to_png(path=None):
+        if path is None:
+            path = f"{preferred_filename}.png"
+        
+        exporter = pg.exporters.ImageExporter(plot_widget.scene())
+        exporter.export(path)
+        return path
+    
+    def export_to_svg(path=None):
+        if path is None:
+            path = f"{preferred_filename}.svg"
+        
+        exporter = pg.exporters.SVGExporter(plot_widget.scene())
+        exporter.export(path)
+        return path
+    
+    # Attach export methods to the widget
+    main_widget.export_to_png = export_to_png
+    main_widget.export_to_svg = export_to_svg
+    
+    return main_widget, figure_context
+
+
+# ==================================================================================================================== #
+# 2025-03-03 - Unit Time Binned Spike Count Masking of Decoding                                                        #
+# ==================================================================================================================== #
+
+
+@function_attributes(short_name=None, tags=['plot-helper', 'matplotlib', 'unit-activity', 'black-inactive-time-bins', 'time-bin'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-03-04 10:11', related_items=[])
+def _plot_low_firing_time_bins_overlay_image(widget, time_bin_edges, mask_rgba):
+    """ plots the black masks for low-firing time bins on the specified widget track
+    
+    Usage:
+        from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import _plot_low_firing_time_bins_overlay_image
+
+        _plot_low_firing_time_bins_overlay_image(widget=widget, time_bin_edges=time_bin_edges, mask_rgba=mask_rgba)
+    """
+	## INPUTS: is_time_bin_active
+    # Create mask of inactive time bins
+    # inactive_mask = ~is_time_bin_active
+    # mask_rgba = np.zeros((1, len(is_time_bin_active), 4), dtype=np.uint8)
+    # mask_rgba[0, inactive_mask, :] = [0, 0, 0, 200]  # Black with 80% opacity for inactive bins
+    an_ax = widget.axes[0]
+
+    ## OUTPUTS: mask_rgba
+    xmin = time_bin_edges[0]
+    xmax = time_bin_edges[-1]
+    ymin, ymax = an_ax.get_ylim()
+    x_first_extent = (xmin, xmax, ymin, ymax)
+
+    # Setup the heatmap colormap
+    low_spiking_heatmap_imshow_kwargs = dict(
+        origin='lower',
+        aspect='auto',
+        interpolation='nearest',
+        extent=x_first_extent,
+        animated=False,
+    )
+
+    # Plot the spike counts as a heatmap
+    low_firing_bins_image = an_ax.imshow(mask_rgba, **low_spiking_heatmap_imshow_kwargs)
+    widget.plots.low_firing_bins_image = low_firing_bins_image
+
+
+@function_attributes(short_name=None, tags=['timeline-track', 'firing-rate', 'unit-spiking'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-03-03 15:28', related_items=[])
+def add_unit_spike_count_visualization(active_2d_plot, neuron_ids: NDArray, time_bin_edges: NDArray, unit_specific_time_binned_spike_counts: NDArray, a_dock_config=None, extended_dock_title_info=None, neuron_colors_map=None, use_neuron_colors=True):
+    """Adds a new row visualization for unit-specific time binned spike counts
+    
+    Args:
+        active_2d_plot: The plot container to add this visualization to
+        a_decoder_name (str): Name of the decoder for display purposes
+        a_position_decoder: The decoder object containing neuron information
+        time_window_centers (np.ndarray): Centers of time bins (n_time_bins,)
+        unit_specific_time_binned_spike_counts (np.ndarray): Spike counts for each unit over time (n_aclus, n_time_bins)
+        a_dock_config: Configuration for the dock
+        extended_dock_title_info: Additional title info to append
+    
+    Returns:
+        tuple: The created widget and figure components
+        
+        
+    Usage:
+        from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import add_unit_spike_count_visualization
+        
+        time_bin_edges: NDArray = deepcopy(results1D.continuous_results['global'].time_bin_edges[0])
+        spikes_df: pd.DataFrame = deepcopy(get_proper_global_spikes_df(curr_active_pipeline))
+
+        unique_units = np.unique(spikes_df['aclu']) # sorted
+        unit_specific_time_binned_spike_counts: NDArray = np.array([
+            np.histogram(spikes_df.loc[spikes_df['aclu'] == unit, 't_rel_seconds'], bins=time_bin_edges)[0]
+            for unit in unique_units
+        ])
+
+        # unique_units.shape
+        unit_specific_time_binned_spike_counts # .shape (n_aclus, n_time_bins)
+
+        ## INPUTS: unique_units, time_bin_edges, unit_specific_time_binned_spike_counts
+        widget, matplotlib_fig, matplotlib_fig_axes, dDisplayItem = add_unit_spike_count_visualization(active_2d_plot, neuron_ids=unique_units, time_bin_edges=time_bin_edges, unit_specific_time_binned_spike_counts=unit_specific_time_binned_spike_counts, a_dock_config=None, extended_dock_title_info=None)
+
+    """
+    
+
+    
+    ## Add a new row displaying unit spike counts over time
+    identifier_name: str = f'SpikeCountsOverTime'
+    if extended_dock_title_info is not None:
+        identifier_name += extended_dock_title_info
+    print(f'identifier_name: {identifier_name}')
+
+    widget, matplotlib_fig, matplotlib_fig_axes, dDisplayItem = active_2d_plot.add_new_matplotlib_render_plot_widget(name=identifier_name, dockSize=(80, 200), display_config=a_dock_config)
+    an_ax = matplotlib_fig_axes[0]
+
+    variable_name: str = f'Spike Counts'
+    
+    # Get neuron IDs for y-axis labels
+    # neuron_ids = a_position_decoder.pf.ratemap.neuron_ids
+    n_neurons, n_time_bins = np.shape(unit_specific_time_binned_spike_counts)
+    assert len(neuron_ids) == n_neurons
+    n_neurons = len(neuron_ids)
+    
+    xmin = time_bin_edges[0]
+    xmax = time_bin_edges[-1]
+    ymin = 0
+    ymax = n_neurons
+    x_first_extent = (xmin, xmax, ymin, ymax)
+    
+    # Generate neuron colors if not provided
+    if neuron_colors_map is None and use_neuron_colors:
+        # from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.SpikeRasters import paired_separately_sort_neurons, paired_incremental_sort_neurons # _display_directional_template_debugger
+        # from neuropy.utils.indexing_helpers import paired_incremental_sorting, union_of_arrays, intersection_of_arrays
+        # from pyphoplacecellanalysis.General.Mixins.DataSeriesColorHelpers import UnitColoringMode, DataSeriesColorHelpers
+        # from pyphocorehelpers.gui.Qt.color_helpers import QColor, build_adjusted_color
+        from pyphoplacecellanalysis.General.Mixins.CrossComputationComparisonHelpers import build_neurons_color_map
+        neurons_colors_array = build_neurons_color_map(n_neurons)
+        neuron_colors_map = {neuron_id: neurons_colors_array[:, i] for i, neuron_id in enumerate(neuron_ids)}
+    
+    if use_neuron_colors:
+        # Create a colored image matrix where each row uses the neuron's color with intensity proportional to spike count
+        image_matrix = np.zeros((n_neurons, n_time_bins, 4))  # RGBA format
+        
+        # Find max count for normalization
+        max_count = np.max(unit_specific_time_binned_spike_counts)
+        
+        for i, neuron_id in enumerate(neuron_ids):
+            base_color = neuron_colors_map[neuron_id]
+            for j in range(n_time_bins):
+                # Scale color intensity by spike count
+                normalized_count = unit_specific_time_binned_spike_counts[i, j] / max_count if max_count > 0 else 0
+                # Create a color with intensity proportional to spike count
+                image_matrix[i, j] = [
+                    base_color[0] * normalized_count,
+                    base_color[1] * normalized_count,
+                    base_color[2] * normalized_count,
+                    1.0  # Full alpha
+                ]
+        
+        # Plot the custom colored spike counts
+        image = an_ax.imshow(image_matrix, origin='lower', aspect='auto', extent=x_first_extent, interpolation='nearest')
+    else:
+        # Use standard heatmap as before
+        from neuropy.utils.matplotlib_helpers import get_heatmap_cmap
+        
+        spike_count_heatmap_imshow_kwargs = dict(
+            origin='lower',
+            cmap=get_heatmap_cmap(cmap='viridis', bad_color='black', under_color='white', over_color='red'),
+            aspect='auto',
+            interpolation='nearest',
+            extent=x_first_extent,
+            animated=False,
+        )
+        image = an_ax.imshow(unit_specific_time_binned_spike_counts, **spike_count_heatmap_imshow_kwargs)
+    
+
+    widget.plots.image = image
+    
+    # Configure axes
+    an_ax.set_xlabel('Time Window')
+    an_ax.set_ylabel('Neuron ID')
+    
+
+    # Add title
+    an_ax.set_title(f'{variable_name} over Time')
+
+    # Update the params
+    widget.params.variable_name = variable_name
+    if extended_dock_title_info is not None:
+        widget.params.extended_dock_title_info = deepcopy(extended_dock_title_info)
+    
+    ## Update the plots_data - used for crosshairs tracing and other things
+    if time_bin_edges is not None:
+        widget.plots_data.time_bin_edges = deepcopy(time_bin_edges)
+    widget.plots_data.unit_specific_time_binned_spike_counts = deepcopy(unit_specific_time_binned_spike_counts)
+    widget.plots_data.neuron_ids = deepcopy(neuron_ids)
+    
+    active_2d_plot.sync_matplotlib_render_plot_widget(identifier=identifier_name)
+    widget.draw()
+    return widget, matplotlib_fig, matplotlib_fig_axes, dDisplayItem
+
+
+
+
+
+
+
+
+
+
+
+
+# ==================================================================================================================== #
+# 2025-02-27 - Filtering Pipeline                                                                                      #
+# ==================================================================================================================== #
+
+@function_attributes(short_name=None, tags=['pipeline', 'filter', 'qclu'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-02-27 14:31', related_items=[])
+def filtered_by_frate_and_qclu(curr_active_pipeline, desired_qclu_subset=[1, 2], desired_minimum_inclusion_fr_Hz: float = 4.0):
+    """ Filter and return a copy of pipeline components by qclus and min_fr_Hz
+    
+    Parameters
+    ----------
+    curr_active_pipeline : NeuropyPipeline
+        The pipeline containing computation results to filter
+    desired_qclu_subset : list, optional
+        List of quality cluster values to include, by default [1, 2]
+    desired_minimum_inclusion_fr_Hz : float, optional
+        Minimum firing rate threshold in Hz, by default 4.0
+        
+    Returns
+    -------
+    tuple
+        (filtered_directional_laps_results, filtered_track_templates, filtered_directional_merged_decoders, filtered_rank_order_results)
+        All components filtered to include only specified neurons
+
+
+    Usage:
+
+        from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import filtered_by_frate_and_qclu
+
+        # Get filtered pipeline components
+        filtered_directional_laps_results, filtered_track_templates, filtered_merged_decoders, filtered_rank_order = filtered_by_frate_and_qclu(
+            curr_active_pipeline, 
+            desired_qclu_subset=[1, 2], 
+            desired_minimum_inclusion_fr_Hz=4.0
+        )
+
+        # Display summary of filtered results
+        print(f"Filtered neurons: {len(filtered_track_templates.any_decoder_neuron_IDs)}")
+        if filtered_merged_decoders is not None:
+            print(f"Filtered decoders available: Yes")
+        if filtered_rank_order is not None:
+            print(f"Filtered rank order available: Yes")
+
+    """
+    filtered_pipeline = deepcopy(curr_active_pipeline)
+
+    # Get the original components from the pipeline
+    directional_laps_results = filtered_pipeline.global_computation_results.computed_data['DirectionalLaps']
+    
+    # Get templates with filtering criteria
+    track_templates = directional_laps_results.get_templates(
+        minimum_inclusion_fr_Hz=desired_minimum_inclusion_fr_Hz, 
+        included_qclu_values=desired_qclu_subset
+    )
+    
+    # Apply filtering to get neurons that meet criteria
+    filtered_track_templates = track_templates.filtered_by_frate_and_qclu(
+        minimum_inclusion_fr_Hz=desired_minimum_inclusion_fr_Hz, 
+        included_qclu_values=desired_qclu_subset
+    )
+    
+    # Get the neuron IDs that passed filtering
+    filtered_any_decoder_neuron_IDs = deepcopy(filtered_track_templates.any_decoder_neuron_IDs)
+    
+    # Filter the directional laps results by these neuron IDs
+    filtered_directional_laps_results = directional_laps_results.filtered_by_included_aclus(
+        filtered_any_decoder_neuron_IDs
+    )
+    
+    # Filter additional components if they exist in the pipeline
+    filtered_directional_merged_decoders = None
+    if 'DirectionalMergedDecoders' in filtered_pipeline.global_computation_results.computed_data:
+        directional_merged_decoders_result = filtered_pipeline.global_computation_results.computed_data['DirectionalMergedDecoders']
+        filtered_directional_merged_decoders = directional_merged_decoders_result.filtered_by_included_aclus(
+            filtered_any_decoder_neuron_IDs
+        )
+    
+    filtered_rank_order_results = None
+    if 'RankOrder' in filtered_pipeline.global_computation_results.computed_data:
+        rank_order_results = filtered_pipeline.global_computation_results.computed_data['RankOrder']
+        if hasattr(rank_order_results, 'filtered_by_included_aclus'):
+            filtered_rank_order_results = rank_order_results.filtered_by_included_aclus(
+                filtered_any_decoder_neuron_IDs
+            )
+    
+    # Return all filtered components
+    return filtered_pipeline
+
+
+# ==================================================================================================================== #
+# Pre 2025-02-27                                                                                                       #
+# ==================================================================================================================== #
+
+def plot_attached_BinByBinDecodingDebugger(spike_raster_window, curr_active_pipeline, a_decoder: BasePositionDecoder, a_decoded_result: Union[DecodedFilterEpochsResult, SingleEpochDecodedResult]):
+    """ 
+    
+    from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import plot_attached_BinByBinDecodingDebugger
+
+    ## INPUTS: a_decoder, a_decoded_result
+    win, out_pf1D_decoder_template_objects, (plots_container, plots_data), _on_update_fcn = plot_attached_BinByBinDecodingDebugger(spike_raster_window, curr_active_pipeline, a_decoder=a_decoder, a_decoded_result=a_decoded_result)
+        
+    """
+    from pyphocorehelpers.DataStructure.RenderPlots.PyqtgraphRenderPlots import PyqtgraphRenderPlots
+    from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.ContainerBased.BinByBinDecodingDebugger import BinByBinDebuggingData, BinByBinDecodingDebugger
+
+
+    neuron_IDs = deepcopy(a_decoder.neuron_IDs)
+    global_spikes_df = get_proper_global_spikes_df(curr_active_pipeline).spikes.sliced_by_neuron_id(neuron_IDs) ## only get the relevant spikes
+    ## OUTPUTS: neuron_IDs, global_spikes_df, active_window_time_bins
+    active_2d_plot = spike_raster_window.spike_raster_plt_2d
+    active_spikes_window = active_2d_plot.spikes_window
+
+    if isinstance(a_decoded_result, SingleEpochDecodedResult):
+        single_continuous_result = a_decoded_result ## already have this
+        decoding_time_bin_size: float = single_continuous_result.time_bin_container.edge_info.step
+    else:
+        ## extract it
+        single_continuous_result: SingleEpochDecodedResult = a_decoded_result.get_result_for_epoch(0) # SingleEpochDecodedResult            
+        decoding_time_bin_size: float = a_decoded_result.decoding_time_bin_size
+
+
+    # decoding_bins_epochs_df: pd.DataFrame = single_continuous_result.build_pseudo_epochs_df_from_decoding_bins().epochs.get_valid_df()
+    bin_by_bin_data: BinByBinDebuggingData = BinByBinDebuggingData.init_from_single_continuous_result(a_decoder=a_decoder, global_spikes_df=global_spikes_df, single_continuous_result=single_continuous_result, decoding_time_bin_size=decoding_time_bin_size, n_max_debugged_time_bins=25)
+    ## OUTPUTS: bin_by_bin_data
+
+    ## INPUTS: active_spikes_window, global_spikes_df, decoding_bins_epochs_df
+    ## Slice to current window:
+    active_window_t_start, active_window_t_end = active_spikes_window.active_time_window
+    print(f'active_window_t_start: {active_window_t_start}, active_window_t_end: {active_window_t_end}')
+    active_global_spikes_df, active_window_decoded_epochs_df, active_epoch_active_aclu_spike_counts_list, (active_window_slice_idxs, active_window_time_bin_edges, active_p_x_given_n) = bin_by_bin_data.sliced_to_current_window(active_window_t_start, active_window_t_end)
+
+    ## OUTPUTS: active_window_slice_idxs, active_window_time_bin_edges, active_p_x_given_n
+
+    ## OUTPUTS: active_global_spikes_df, active_window_decoded_epochs_df, active_epoch_active_aclu_spike_counts_list
+
+    ## INPUTS: neuron_IDs, (active_global_spikes_df, active_window_decoded_epochs_df, active_aclu_spike_counts_dict_list)
+    ## INPUTS: active_window_slice_idxs, active_window_time_bin_edges, active_p_x_given_n
+    plots_container = PyqtgraphRenderPlots(name='PhoTest', root_plot=None) # Create a new one
+    plots_data = RenderPlotsData(name=f'epoch[Test]', spikes_df=active_global_spikes_df, a_decoder=a_decoder, active_aclus=neuron_IDs, bin_by_bin_data=bin_by_bin_data)
+    win, out_pf1D_decoder_template_objects, (plots_container, plots_data) = BinByBinDecodingDebugger._perform_build_time_binned_decoder_debug_plots(a_decoder=a_decoder, time_bin_edges=active_window_time_bin_edges, p_x_given_n=active_p_x_given_n, active_epoch_active_aclu_spike_counts_list=active_epoch_active_aclu_spike_counts_list,
+                                                                                                                                plots_data=plots_data, plots_container=plots_container,
+                                                                                                                                debug_print=False)
+
+
+    # Later when data changes:
+    def _on_update_fcn():
+        """ captures: active_spikes_window, bin_by_bin_data, 
+        """
+        ## INPUTS: active_spikes_window, global_spikes_df, decoding_bins_epochs_df
+        ## Slice to current window:
+        active_window_t_start, active_window_t_end = active_spikes_window.active_time_window
+        print(f'active_window_t_start: {active_window_t_start}, active_window_t_end: {active_window_t_end}')
+        active_global_spikes_df, active_window_decoded_epochs_df, active_epoch_active_aclu_spike_counts_list, (active_window_slice_idxs, active_window_time_bin_edges, active_p_x_given_n) = bin_by_bin_data.sliced_to_current_window(active_window_t_start, active_window_t_end)
+        win, out_pf1D_decoder_template_objects, (plots_container, plots_data) = BinByBinDecodingDebugger.update_time_binned_decoder_debug_plots(win, out_pf1D_decoder_template_objects, plots_container, plots_data, new_time_bin_edges=active_window_time_bin_edges, new_p_x_given_n=active_p_x_given_n, new_active_aclu_spike_counts_list=active_epoch_active_aclu_spike_counts_list)
+
+    ## END def _on_update_fcn()...
+    return win, out_pf1D_decoder_template_objects, (plots_container, plots_data), _on_update_fcn
+
+
+
+@function_attributes(short_name=None, tags=['mixin', 'sync', 'QT'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-02-24 17:07', related_items=[])
+class Decoded2DPosteriorTimeSyncMixin:
+    """ Implementors recieve simple time updates from another plot """
+    
+    def update(self, t, defer_render=False):
+        raise NotImplementedError
+
+    def _update_plots(self):
+        """ Implementor must override! """
+        raise NotImplementedError
+    
+        
+    # ==================================================================================================================== #
+    # QT Slots                                                                                                             #
+    # ==================================================================================================================== #
+    
+    @QtCore.pyqtSlot(float, float)
+    def on_window_changed(self, start_t, end_t):
+        # called when the window is updated
+        # print(f'Decoded2DPosteriorTimeSyncMixin.on_window_changed(start_t: {start_t}, end_t: {end_t})')
+        self.update(end_t, defer_render=False)
+        pass
+
+    @QtCore.pyqtSlot(float, float, float)
+    def on_window_duration_changed(self, start_t, end_t, duration):
+        """ changes self.half_render_window_duration """
+        # print(f'LiveWindowedData.on_window_duration_changed(start_t: {start_t}, end_t: {end_t}, duration: {duration})')
+        pass        
+
+
+    ############### Rate-Limited SLots ###############:
+    ##################################################
+    ## For use with pg.SignalProxy
+    # using signal proxy turns original arguments into a tuple
+    @QtCore.pyqtSlot(object)
+    def on_window_changed_rate_limited(self, evt):
+        self.on_window_changed(*evt)
+        
+
+    # @property
+    # def n_epochs(self) -> int:
+    #     return np.shape(self.active_epochs_df)[0]
+
+    # def lookup_label_from_index(self, an_idx: int) -> int:
+    #     """ Looks of the proper epoch "label", as in the value in the 'label' column of active_epochs_df, from a linear index such as that provided by the slider control.
+
+    #     curr_epoch_label = lookup_label_from_index(a_plotter, an_idx)
+    #     print(f'curr_epoch_label: {curr_epoch_label} :::') ## end line
+
+    #     """
+    #     curr_epoch_label = self.active_epochs_df['label'].iloc[an_idx] # gets the correct epoch label for the linear IDX
+    #     curr_redundant_label_lookup_label = self.active_epochs_df.label.to_numpy()[an_idx]
+    #     # print(f'curr_redundant_label_lookup_label: {curr_redundant_label_lookup_label} :::') ## end line
+    #     assert str(curr_redundant_label_lookup_label) == str(curr_epoch_label), f"curr_epoch_label: {str(curr_epoch_label)} != str(curr_redundant_label_lookup_label): {str(curr_redundant_label_lookup_label)}"
+    #     return curr_epoch_label
+
+
+    # def find_nearest_time_index(self, target_time: float) -> Optional[int]:
+    #     """ finds the index of the nearest time from the active epochs
+    #     """
+    #     from neuropy.utils.indexing_helpers import find_nearest_time
+    #     df = self.active_epochs_df
+    #     df, closest_index, closest_time, matched_time_difference = find_nearest_time(df=df, target_time=target_time, time_column_name='start', max_allowed_deviation=0.01, debug_print=False)
+    #     # df.iloc[closest_index]
+    #     return closest_index
+    
+
+@function_attributes(short_name=None, tags=['mixin'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-02-24 17:08', related_items=[])
+class DataSlicingVisualizer(Decoded2DPosteriorTimeSyncMixin):
+    """Visualizes 3D data slicing using ImageView widget and time slider
+    
+    Args:
+        data (np.ndarray): 3D numpy array to visualize (P[x][y][t]). If None, generates demo data
+        title (str, optional): Window title. Defaults to 'Data Slicing Visualizer'
+        
+        
+    Usage:
+    
+        from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import DataSlicingVisualizer
+
+        ## INPUTS: time_bin_edges, p_x_given_n
+
+        # p_x_given_n.shape # (59, 8, 103512)
+        visualizer = DataSlicingVisualizer(time_bin_edges=time_bin_edges, data=p_x_given_n)
+        visualizer.set_data(time_bin_edges=time_bin_edges, new_data=p_x_given_n)
+        visualizer.show()
+
+        _out_conn = spike_raster_window.spike_raster_plt_2d.window_scrolled.connect(lambda start_t, end_t: visualizer.on_window_changed(start_t=start_t, end_t=end_t))
+
+    """
+    
+    def __init__(self, time_bin_edges=None, data=None, measured_df=None, x_bin_edges=None, y_bin_edges=None, title='Data Slicing Visualizer'):
+        self.app = pg.mkQApp("Data Slicing Example")
+        self.title = title
+        self.setup_ui()
+
+        assert time_bin_edges is not None
+        assert data is not None
+        self.time_bin_edges = time_bin_edges
+        self.data = data
+        self.measured_df = measured_df
+        self.x_bin_edges = x_bin_edges
+        self.y_bin_edges = y_bin_edges
+        self.position_marker = None
+
+    def setup_ui(self):
+        """Initialize the UI components"""
+        self.win = QtWidgets.QMainWindow()
+        self.win.resize(800, 800)
+        self.win.setWindowTitle(self.title)
+        
+        # Setup central widget and layout
+        self.cw = QtWidgets.QWidget()
+        self.win.setCentralWidget(self.cw)
+        self.layout = QtWidgets.QGridLayout()
+        self.cw.setLayout(self.layout)
+        
+        # Create image view
+        self.imv = pg.ImageView()
+        self.layout.addWidget(self.imv, 0, 0)
+        
+        # Add time slider
+        self.time_slider = QtWidgets.QSlider(QtCore.Qt.Horizontal)
+        self.layout.addWidget(self.time_slider, 1, 0)
+        self.time_slider.valueChanged.connect(self.update_time_slice)
+
+    def set_data(self, time_bin_edges, new_data, measured_df=None, x_bin_edges=None, y_bin_edges=None):
+        self.time_bin_edges = time_bin_edges
+        self.data = new_data
+        if measured_df is not None:
+            self.measured_df = measured_df
+        if x_bin_edges is not None:
+            self.x_bin_edges = x_bin_edges
+        if y_bin_edges is not None:
+            self.y_bin_edges = y_bin_edges
+
+        self.time_bin_edges = time_bin_edges
+        self.data = new_data
+        if measured_df is not None:
+            self.measured_df = measured_df
+        
+        print(f"Data shape: {self.data.shape}, expecting (x, y, t)")
+        assert np.shape(self.data)[-1] == (len(self.time_bin_edges)-1), f"np.shape(self.data)[-1]: {np.shape(self.data)[-1]}, (len(self.time_bin_edges)-1): {(len(self.time_bin_edges)-1)}"
+        self.time_slider.setMaximum(self.data.shape[-1] - 1) ## last dimension
+        self.update_time_slice()
+
+
+
+    def update_time_slice(self):
+        """Update the image view based on current time slider value"""
+        t = self.time_slider.value()
+        
+        # Get current slice and create normalized version for display
+        current_slice = self.data[:,:,t]
+        
+        # Debug information
+        print(f"Slice {t}: Shape={current_slice.shape}, min={np.min(current_slice):.8f}, max={np.max(current_slice):.8f}")
+        
+        # Set the image with transposition
+        self.imv.setImage(current_slice.T)
+        
+        # Force update the histogram levels based on current data
+        min_val = np.min(current_slice)
+        max_val = np.max(current_slice)
+        if min_val != max_val:  # Avoid division by zero
+            self.imv.setLevels(min_val, max_val)
+        
+        # Add the animal's position marker if we have position data
+        self.add_position_marker(t)
+
+
+    def add_position_marker(self, t_index):
+        """Add a marker showing the animal's current position"""
+        if self.measured_df is None:
+            return
+        
+        # Get the time for the current slice
+        current_time = self.time_bin_edges[t_index]
+        
+        # Find the closest time point in the measured_df
+        if 't' in self.measured_df.columns:
+            # Find the closest timestamp
+            closest_idx = (self.measured_df['t'] - current_time).abs().idxmin()
+            real_x = self.measured_df.loc[closest_idx, 'x']
+            real_y = self.measured_df.loc[closest_idx, 'y']
+            
+            # Convert real coordinates to bin indices
+            if hasattr(self, 'x_bin_edges') and hasattr(self, 'y_bin_edges'):
+                x_idx = np.digitize(real_x, self.x_bin_edges) - 1
+                y_idx = np.digitize(real_y, self.y_bin_edges) - 1
+                
+                # Clip to valid range
+                x_idx = np.clip(x_idx, 0, len(self.x_bin_edges)-2)
+                y_idx = np.clip(y_idx, 0, len(self.y_bin_edges)-2)
+            else:
+                # Estimate using data shape
+                x_bins, y_bins = self.data.shape[0:2]
+                x_min, x_max = self.measured_df['x'].min(), self.measured_df['x'].max()
+                y_min, y_max = self.measured_df['y'].min(), self.measured_df['y'].max()
+                
+                x_idx = int((real_x - x_min) / (x_max - x_min) * (x_bins-1))
+                y_idx = int((real_y - y_min) / (y_max - y_min) * (y_bins-1))
+                
+                x_idx = np.clip(x_idx, 0, x_bins-1)
+                y_idx = np.clip(y_idx, 0, y_bins-1)
+            
+            # Remove previous marker if it exists
+            if self.position_marker is not None:
+                self.imv.getView().removeItem(self.position_marker)
+            
+            # CORRECTED: When we transpose the image, x becomes the second dimension 
+            # and y becomes the first dimension in the displayed image
+            self.position_marker = pg.ScatterPlotItem()
+            self.position_marker.setData(
+                [x_idx],  # This is now correctly the horizontal axis in the displayed image
+                [y_idx],  # This is now correctly the vertical axis in the displayed image
+                size=15, 
+                pen=pg.mkPen('w', width=2), 
+                brush=pg.mkBrush(255, 0, 0, 200)
+            )
+            
+            # Add marker to the view
+            self.imv.getView().addItem(self.position_marker)
+            print(f"Added position marker at real position (x={real_x:.2f}, y={real_y:.2f}), bin indices (x={x_idx}, y={y_idx})")
+
+
+
+    def show(self):
+        """Display the visualization window"""
+        self.time_slider.setMaximum(self.data.shape[2] - 1)
+        self.update_time_slice()
+        
+        # Use a better colormap for small probability values
+        # self.imv.setColorMap(pg.colormap.get('viridis'))
+         # Use a better colormap for small probability values
+        self.imv.setColorMap(pg.colormap.get('inferno'))  # 'inferno' or 'hot' work well for log-transformed data
+    
+
+        # Don't manually set levels - let the data range drive it
+        # self.imv.setHistogramRange(0.0, 1.0)
+        # self.imv.setLevels(0.0, 1.0)
+        
+        self.win.show()
+
+
+    def test_image_display(self):
+        """Generate and display a simple test image to verify ImageView is working"""
+        # Create a test pattern - a simple gradient
+        test_width, test_height = 100, 100
+        test_image = np.zeros((test_width, test_height))
+        
+        # Create a gradient pattern
+        for i in range(test_width):
+            for j in range(test_height):
+                test_image[i, j] = (i + j) / (test_width + test_height)
+        
+        # Alternatively, create a checkerboard pattern
+        # checkerboard = np.zeros((test_width, test_height))
+        # for i in range(test_width):
+        #     for j in range(test_height):
+        #         checkerboard[i, j] = (i % 20 < 10) ^ (j % 20 < 10)
+        
+        # Display the test image
+        self.imv.setImage(test_image)
+        self.imv.setLevels(0, 1)
+        print(f"Displaying test image with shape {test_image.shape}")
+        print(f"Test image min: {np.min(test_image)}, max: {np.max(test_image)}")
+        
+
+
+    # ==================================================================================================================== #
+    # Decoded2DPosteriorTimeSyncMixin Conformances                                                                         #
+    # ==================================================================================================================== #
+    def find_nearest_time_index(self, target_time: float) -> Optional[int]:
+        """ finds the index of the nearest time from the active epochs
+        """
+        from neuropy.utils.indexing_helpers import find_nearest_time
+        time_bin_edges, closest_index, closest_time, matched_time_difference = find_nearest_time(self.time_bin_edges, target_time=target_time, max_allowed_deviation=0.1, debug_print=False)
+        return closest_index
+
+
+    def update(self, t, defer_render=False):
+        """ updates the slider 
+        """
+        closest_index = self.find_nearest_time_index(target_time=t)
+        print(f'closest_index: {closest_index}')
+        if closest_index is not None:
+            # closest_index
+            self.time_slider.setValue(closest_index)
+
+
+    # def _update_plots(self):
+    #     """ Implementor must override! """
+    #     raise NotImplementedError
+    
+        
+    # ==================================================================================================================== #
+    # QT Slots                                                                                                             #
+    # ==================================================================================================================== #
+    
+    @QtCore.pyqtSlot(float, float)
+    def on_window_changed(self, start_t, end_t):
+        # called when the window is updated
+        # print(f'Decoded2DPosteriorTimeSyncMixin.on_window_changed(start_t: {start_t}, end_t: {end_t})')
+        self.update(start_t, defer_render=False)
+        
+
+    @QtCore.pyqtSlot(float, float, float)
+    def on_window_duration_changed(self, start_t, end_t, duration):
+        """ changes self.half_render_window_duration """
+        # print(f'LiveWindowedData.on_window_duration_changed(start_t: {start_t}, end_t: {end_t}, duration: {duration})')
+        pass        
+
+
+    ############### Rate-Limited SLots ###############:
+    ##################################################
+    ## For use with pg.SignalProxy
+    # using signal proxy turns original arguments into a tuple
+    @QtCore.pyqtSlot(object)
+    def on_window_changed_rate_limited(self, evt):
+        self.on_window_changed(*evt)
+        
+
+
+
+
+# class TwoDimensionalPosteriorDisplayingTSWidget(PyqtgraphTimeSynchronizedWidget):
+#     """ Plots the decoded position posterior (2D) at a given moment in time. 
+
+#     Usage:
+            # from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import TwoDimensionalPosteriorDisplayingTSWidget
+                        
+            # new_widget: TwoDimensionalPosteriorDisplayingTSWidget = TwoDimensionalPosteriorDisplayingTSWidget(plot_function_name="pho_test_2025-02-21", data=results2D.continuous_results['long'])
+            # new_widget.show()
+
+#     """
+#     # Application/Window Configuration Options:
+#     applicationName = 'TwoDimensionalPosteriorDisplayingTSApp'
+#     windowName = 'TwoDimensionalPosteriorDisplayingTSWidgetWindow'
+    
+#     enable_debug_print = True
+    
+#     # sigCrosshairsUpdated = QtCore.Signal(object, str, str) # (self, name, trace_value) - CrosshairsTracingMixin Conformance
+
+#     # @property
+#     # def time_window_centers(self):
+#     #     """The time_window_centers property."""
+#     #     return self.active_one_step_decoder.time_window_centers # get time window centers (n_time_window_centers,)
+    
+
+#     # @property
+#     # def posterior_variable_to_render(self):
+#     #     """The occupancy_mode_to_render property."""
+#     #     return self.params.posterior_variable_to_render
+#     # @posterior_variable_to_render.setter
+#     # def posterior_variable_to_render(self, value):
+#     #     self.params.posterior_variable_to_render = value
+#     #     # on update, be sure to call self._update_plots()
+#     #     self._update_plots()
+    
+#     @property
+#     def last_t(self):
+#         raise NotImplementedError(f'Parent property that should not be accessed!')
+
+#     @property
+#     def active_plot_target(self):
+#         """The active_plot_target property."""
+#         return self.getRootPlotItem()
+    
+
+
+#     def __init__(self, name='TwoDimensionalPosteriorDisplayingTSWidget', plot_function_name=None, scrollable_figure=True, application_name=None, window_name=None, parent=None, data=None, **kwargs):
+#         """_summary_
+#         , disable_toolbar=True, size=(5.0, 4.0), dpi=72
+#         ## allows toggling between the various computed occupancies: such as raw counts,  normalized location, and seconds_occupancy
+#             occupancy_mode_to_render: ['seconds_occupancy', 'num_pos_samples_occupancy', 'num_pos_samples_smoothed_occupancy', 'normalized_occupancy']
+        
+#         Calls self.setup(), self.buildUI(), self._update_plots()
+#         """
+#         self.data = deepcopy(data)
+#         super().__init__(application_name=application_name, window_name=(window_name or PyqtgraphTimeSynchronizedWidget.windowName), debug_print=False, **kwargs, parent=parent) # Call the inherited classes __init__ method    
+        
+
+#     def setup(self):
+#         assert hasattr(self.ui, 'connections')
+        
+#         # self.setup_spike_rendering_mixin() # NeuronIdentityAccessingMixin
+#         # self.app = pg.mkQApp(self.applicationName)
+#         # self.params = VisualizationParameters(self.applicationName)
+        
+
+#         # # Add a trace region (initially hidden)
+#         # self.trace_region = pg.LinearRegionItem(movable=True, brush=(0, 0, 255, 50))
+#         # self.trace_region.setZValue(10)  # Ensure it appears above the plot
+#         # self.trace_region.hide()  # Initially hide the trace region
+#         # self.plot_widget.addItem(self.trace_region)
+
+#         # # Override the PlotWidget's mouse events
+#         # self.plot_widget.scene().sigMouseClicked.connect(self.mouse_clicked)
+#         # self.plot_widget.scene().sigMouseMoved.connect(self.mouse_moved)
+#         # self.plot_widget.scene().sigMouseReleased.connect(self.mouse_released)
+#         # self.dragging = False
+#         # self.start_pos = None
+
+#         # self.params.shared_axis_order = 'row-major'
+#         # self.params.shared_axis_order = 'column-major'
+#         # self.params.shared_axis_order = None
+        
+#         ## Build the colormap to be used:
+#         # self.params.cmap = pg.ColorMap(pos=np.linspace(0.0, 1.0, 6), color=colors)
+#         # self.params.cmap = pg.colormap.get('jet','matplotlib') # prepare a linear color map
+#         # self.params.image_margins = 0.0
+#         # self.params.image_bounds_extent, self.params.x_range, self.params.y_range = pyqtplot_build_image_bounds_extent(self.active_one_step_decoder.xbin, self.active_one_step_decoder.ybin, margin=self.params.image_margins, debug_print=self.enable_debug_print)
+#         pass
+
+
+#     def _buildGraphics(self):
+#         """ called by self.buildUI() which usually is not overriden. """
+#         from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.GraphicsWidgets.CustomGraphicsLayoutWidget import CustomViewBox, CustomGraphicsLayoutWidget
+
+#         ## More Involved Mode:
+#         # self.ui.root_graphics_layout_widget = pg.GraphicsLayoutWidget()
+#         self.ui.root_graphics_layout_widget = CustomGraphicsLayoutWidget()
+
+#         # self.ui.root_view = self.ui.root_graphics_layout_widget.addViewBox()
+#         ## lock the aspect ratio so pixels are always square
+#         # self.ui.root_view.setAspectLocked(True)
+
+#         ## Create image item
+        
+#         # self.ui.imv = pg.ImageItem(border='w')
+#         # self.ui.root_view.addItem(self.ui.imv)
+#         # self.ui.root_view.setRange(QtCore.QRectF(*self.params.image_bounds_extent))
+
+#         self.ui.root_plot_viewBox = None
+#         self.ui.root_plot_viewBox = CustomViewBox()
+#         self.ui.root_plot_viewBox.setObjectName('RootPlotCustomViewBox')
+        
+#         # self.ui.root_plot = self.ui.root_graphics_layout_widget.addPlot(row=0, col=0, title=None) # , name=f'PositionDecoder'
+#         self.ui.root_plot = self.ui.root_graphics_layout_widget.addPlot(row=0, col=0, title=None, viewBox=self.ui.root_plot_viewBox)
+#         self.ui.root_plot.setObjectName('RootPlot')
+#         # self.ui.root_plot.addItem(self.ui.imv, defaultPadding=0.0)  # add ImageItem to PlotItem
+#         ## TODO: add item here
+#         # self.ui.root_plot.showAxes(True)
+#         self.ui.root_plot.hideButtons() # Hides the auto-scale button
+        
+#         self.ui.root_plot.showAxes(False)     
+#         # self.ui.root_plot.setRange(xRange=self.params.x_range, yRange=self.params.y_range, padding=0.0)
+#         # Sets only the panning limits:
+#         # self.ui.root_plot.setLimits(xMin=self.params.x_range[0], xMax=self.params.x_range[-1], yMin=self.params.y_range[0], yMax=self.params.y_range[-1])
+
+#         ## Sets all limits:
+#         # _x, _y, _width, _height = self.params.image_bounds_extent # [23.923329354140844, 123.85967782096927, 241.7178791533281, 30.256480996256016]
+#         # self.ui.root_plot.setLimits(minXRange=_width, maxXRange=_width, minYRange=_height, maxYRange=_height)
+#         # self.ui.root_plot.setLimits(xMin=self.params.x_range[0], xMax=self.params.x_range[-1], yMin=self.params.y_range[0], yMax=self.params.y_range[-1],
+#         #                             minXRange=_width, maxXRange=_width, minYRange=_height, maxYRange=_height)
+        
+#         self.ui.root_plot.setMouseEnabled(x=False, y=False)
+#         self.ui.root_plot.setMenuEnabled(enableMenu=False)
+        
+#         # ## Optional Interactive Color Bar:
+#         # bar = pg.ColorBarItem(values= (0, 1), colorMap=self.params.cmap, width=5, interactive=False) # prepare interactive color bar
+#         # # Have ColorBarItem control colors of img and appear in 'plot':
+#         # bar.setImageItem(self.ui.imv, insert_in=self.ui.root_plot)
+        
+#         self.ui.layout.addWidget(self.ui.root_graphics_layout_widget, 0, 0) # add the GLViewWidget to the layout at 0, 0
+        
+#         # Set the color map:
+#         # self.ui.imv.setColorMap(self.params.cmap)
+#         ## Set initial view bounds
+#         # self.ui.root_view.setRange(QtCore.QRectF(0, 0, 600, 600))
+
+    
+#     def update(self, t, defer_render=False):
+#         if self.enable_debug_print:
+#             print(f'PyqtgraphTimeSynchronizedWidget.update(t: {t})')
+    
+#         # # Finds the nearest previous decoded position for the time t:
+#         # self.last_window_index = np.searchsorted(self.time_window_centers, t, side='left') # side='left' ensures that no future values (later than 't') are ever returned
+#         # self.last_window_time = self.time_window_centers[self.last_window_index] # If there is no suitable index, return either 0 or N (where N is the length of `a`).
+#         # Update the plots:
+#         if not defer_render:
+#             self._update_plots()
+
+
+#     def _update_plots(self):
+#         if self.enable_debug_print:
+#             print(f'PyqtgraphTimeSynchronizedWidget._update_plots()')
+
+#         # Update the existing one:
+#         # self.ui.root_plot.setRange(xRange=self.params.x_range, yRange=self.params.y_range, padding=0.0)
+#         # Sets only the panning limits:
+#         # self.ui.root_plot.setLimits(xMin=self.params.x_range[0], xMax=self.params.x_range[-1], yMin=self.params.y_range[0], yMax=self.params.y_range[-1])
+
+#         ## Sets all limits:
+#         # _x, _y, _width, _height = self.params.image_bounds_extent # [23.923329354140844, 123.85967782096927, 241.7178791533281, 30.256480996256016]
+#         # self.ui.root_plot.setLimits(minXRange=_width, maxXRange=_width, minYRange=_height, maxYRange=_height)
+#         # self.ui.root_plot.setLimits(xMin=self.params.x_range[0], xMax=self.params.x_range[-1], yMin=self.params.y_range[0], yMax=self.params.y_range[-1],
+#         #                             minXRange=_width, maxXRange=_width, minYRange=_height, maxYRange=_height)
+        
+#         # Update the plots:
+#         # curr_time_window_index = self.last_window_index
+#         # curr_t = self.last_window_time
+
+#         # if curr_time_window_index is None or curr_t is None:
+#         #     return # return without updating
+
+#         # self.setWindowTitle(f'{self.windowName} - {image_title} t = {curr_t}')
+#         # self.setWindowTitle(f'PyqtgraphTimeSynchronizedWidget - {image_title} t = {curr_t}')
+#         pass
+
+#     # ==================================================================================================================== #
+#     # QT Slots                                                                                                             #
+#     # ==================================================================================================================== #
+    
+#     @pg.QtCore.Slot(float, float)
+#     def on_window_changed(self, start_t, end_t):
+#         # called when the window is updated
+#         if self.enable_debug_print:
+#             print(f'PyqtgraphTimeSynchronizedWidget.on_window_changed(start_t: {start_t}, end_t: {end_t})')
+#         # if self.enable_debug_print:
+#         #     profiler = pg.debug.Profiler(disabled=True, delayed=True)
+
+#         self.update(end_t, defer_render=False)
+#         # if self.enable_debug_print:
+#         #     profiler('Finished calling _update_plots()')
+        
+
+
+# ==================================================================================================================== #
+# 2025-02-21 - Angular Binning, Transition Matricies, and More                                                         #
+# ==================================================================================================================== #
+
+@function_attributes(short_name=None, tags=['working', 'angular'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-02-21 00:48', related_items=[])
+def compute_3d_occupancy_map(df, n_x_bins=50, n_y_bins=50, n_dir_bins=8):
+    """Creates a 3D occupancy map with fixed dimensions regardless of observed data
+    
+    Args:
+        df (pd.DataFrame): DataFrame with binned columns
+        n_x_bins (int): Number of x position bins
+        n_y_bins (int): Number of y position bins
+        n_dir_bins (int): Number of head direction bins
+        
+    Usage:
+        from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import compute_3d_occupancy_map
+        # 1. Compute the 3D occupancy map
+        # occupancy_map, bin_counts = compute_3d_occupancy_map(global_pos_df)
+
+        occupancy_map, bin_counts = compute_3d_occupancy_map(global_pos_df, n_x_bins=n_xbins, n_y_bins=n_ybins, n_dir_bins=n_dir_bins)
+
+        # Print the shape and counts
+        print(f"Occupancy map shape: {occupancy_map.shape}")
+        print(f"Unique bins per dimension: {bin_counts}")
+
+    """
+    # Create all possible combinations
+    x_bins = range(n_x_bins)
+    y_bins = range(n_y_bins)
+    dir_bins = range(n_dir_bins)
+    
+    # Use crosstab with specific bins to force output size
+    occupancy_map = pd.crosstab(
+        index=[df['binned_x'], df['binned_y']], 
+        columns=df['head_dir_angle_binned'],
+        dropna=False  # Keep all combinations
+    ).reindex(
+        index=pd.MultiIndex.from_product([x_bins, y_bins]),
+        columns=dir_bins,
+        fill_value=0  # Fill missing combinations with 0
+    ).values.reshape(n_x_bins, n_y_bins, n_dir_bins)
+    
+    return occupancy_map, {'x': n_x_bins, 'y': n_y_bins, 'dir': n_dir_bins}
+
+
+
+import numpy as np
+import pandas as pd
+from scipy.sparse import coo_matrix, csr_matrix
+from neuropy.utils.mixins.binning_helpers import get_bin_centers, get_bin_edges
+
+@function_attributes(short_name=None, tags=['sparse', 'transition-matrix', 'N-dimensional', 'binning', 'sparse'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-02-21 12:35', related_items=[])
+def create_sparse_matrix_from_bins(df: pd.DataFrame, bin_edges_dict: Dict[str, NDArray]) -> Optional[csr_matrix]:
+    """
+    Creates a sparse matrix from a DataFrame, using a dictionary to specify
+    bin edges for each relevant column.
+
+    Args:
+        df: Pandas DataFrame with columns to be binned.
+        bin_edges_dict: Dictionary where keys are column names in `df`
+                           and values are 1D arrays of bin edges for that column.
+
+    Returns:
+        A scipy.sparse.csr_matrix.  Returns None if the input is invalid.
+    """
+
+    # Input validation: Check if all columns in bin_edges_dict exist in df
+    if not all(col in df.columns for col in bin_edges_dict):
+        print("Error: Not all columns in bin_edges_dict are present in the DataFrame.")
+        return None
+    if not bin_edges_dict:
+        print("Error: bin_edges_dict is empty")
+        return None
+
+    # Calculate bin indices for each column
+    indices_dict: Dict[str, NDArray] = {}
+    for col, edges in bin_edges_dict.items():
+        indices_dict[col] = np.digitize(df[col], edges) - 1
+
+    # Determine the dimensionality of the sparse matrix
+    num_dimensions: int = len(bin_edges_dict)
+
+    # Create row and column indices based on dimensionality
+    row_indices: NDArray
+    col_indices: NDArray
+    shape: Tuple[int, int]
+    data_values: NDArray
+
+    if num_dimensions == 1:
+        # 1D case:  Row indices are just the bin indices of the single column
+        col_name: str = list(bin_edges_dict.keys())[0]
+        row_indices = np.zeros(len(df), dtype=int) # all rows are in the 0th "row"
+        col_indices = indices_dict[col_name]
+        shape = (1, len(bin_edges_dict[col_name]) - 1) # 1 row, num_bins columns (edges are one longer than centers)
+        data_values = df[col_name].to_numpy() # Or a constant, like np.ones(len(df))
+
+    elif num_dimensions == 2:
+        # 2D case: Row and column indices from the two columns
+        col_names: List[str] = list(bin_edges_dict.keys())
+        row_indices = indices_dict[col_names[0]]
+        col_indices = indices_dict[col_names[1]]
+        shape = (len(bin_edges_dict[col_names[0]]) - 1, len(bin_edges_dict[col_names[1]]) - 1)
+        # Assuming you want to count occurrences, use ones as data values
+        data_values = np.ones(len(df))
+
+    elif num_dimensions >= 3:
+        # "nD" case (represented as a flattened 2D matrix)
+        col_names = list(bin_edges_dict.keys())
+        row_indices = indices_dict[col_names[0]]  # First column is the row
+        col_indices = np.zeros(len(df), dtype=int)
+
+        # Accumulate column indices, multiplying by the size of each dimension
+        multiplier: int = 1
+        for i in range(1, num_dimensions):
+            col_indices += indices_dict[col_names[i]] * multiplier
+            # Subtract 1 from the length because edges are one element longer than centers
+            multiplier *= (len(bin_edges_dict[col_names[i]]) - 1)
+
+        shape = (len(bin_edges_dict[col_names[0]]) - 1, multiplier)
+        data_values = np.ones(len(df)) # Or a constant, like np.ones(len(df))
+
+    else:
+        print("Error: Invalid number of dimensions (must be 1, 2, or 3+).")
+        return None
+
+    # Remove out-of-bounds indices
+    valid_indices: NDArray[np.bool_] = (row_indices >= 0) & (row_indices < shape[0]) & (col_indices >= 0) & (col_indices < shape[1])
+    row_indices = row_indices[valid_indices]
+    col_indices = col_indices[valid_indices]
+    data_values = data_values[valid_indices]
+
+    # Create the sparse matrix (using coo_matrix for efficient construction)
+    sparse_matrix: coo_matrix = coo_matrix((data_values, (row_indices, col_indices)), shape=shape)
+    return sparse_matrix.tocsr()  # Convert to CSR for efficient row operations
+
+
+
+
+
+
+
 
 # ==================================================================================================================== #
 # 2025-02-14 - Drawing Final 2D Time Snapshots on Track                                                                #
@@ -74,10 +1611,15 @@ from neuropy.utils.mixins.HDF5_representable import HDF_DeserializationMixin, po
 from neuropy.utils.mixins.indexing_helpers import UnpackableMixin
 from neuropy.utils.indexing_helpers import PandasHelpers
 
-@function_attributes(short_name=None, tags=['UNFINISHED', 'plotting', 'computing'], input_requires=[], output_provides=[], uses=['_perform_plot_multi_decoder_meas_pred_position_track'], used_by=[], creation_date='2025-02-13 14:58', related_items=['_perform_plot_multi_decoder_meas_pred_position_track'])
+@function_attributes(short_name=None, tags=['UNFINISHED', 'plotting', 'computing'], input_requires=[], output_provides=[], uses=['AddNewDecodedPosteriors_MatplotlibPlotCommand', '_perform_plot_multi_decoder_meas_pred_position_track'], used_by=[], creation_date='2025-02-13 14:58', related_items=['_perform_plot_multi_decoder_meas_pred_position_track'])
 def add_continuous_decoded_posterior(spike_raster_window, curr_active_pipeline, desired_time_bin_size: float, debug_print=True):
     """ computes the continuously decoded position posteriors (if needed) using the pipeline, then adds them as a new track to the SpikeRaster2D 
     
+    Usage:
+        from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import add_continuous_decoded_posterior
+
+        (nested_dock_items, nested_dynamic_docked_widget_container_widgets), (a_continuously_decoded_dict, pseudo2D_decoder, all_directional_pf1D_Decoder_dict) = add_continuous_decoded_posterior(spike_raster_window=spike_raster_window, curr_active_pipeline=curr_active_pipeline, desired_time_bin_size=0.05, debug_print=True)
+
     """
     # ==================================================================================================================== #
     # COMPUTING                                                                                                            #
@@ -87,7 +1629,38 @@ def add_continuous_decoded_posterior(spike_raster_window, curr_active_pipeline, 
     #                                                   enabled_filter_names=None, fail_on_exception=True, debug_print=False)
     # curr_active_pipeline.perform_specific_computation(computation_functions_name_includelist=['merged_directional_placefields', 'directional_decoders_decode_continuous'], computation_kwargs_list=[{'laps_decoding_time_bin_size': 0.058}, {'time_bin_size': 0.058, 'should_disable_cache':False}], enabled_filter_names=None, fail_on_exception=True, debug_print=False)
     curr_active_pipeline.perform_specific_computation(computation_functions_name_includelist=['directional_decoders_decode_continuous'], computation_kwargs_list=[{'time_bin_size': desired_time_bin_size, 'should_disable_cache': False}], enabled_filter_names=None, fail_on_exception=True, debug_print=False)
-    
+    ## get the result data:
+    try:
+        ## Uses the `global_computation_results.computed_data['DirectionalDecodersDecoded']`
+        directional_decoders_decode_result: DirectionalDecodersContinuouslyDecodedResult = curr_active_pipeline.global_computation_results.computed_data['DirectionalDecodersDecoded']
+        pseudo2D_decoder: BasePositionDecoder = directional_decoders_decode_result.pseudo2D_decoder
+        all_directional_pf1D_Decoder_dict: Dict[str, BasePositionDecoder] = directional_decoders_decode_result.pf1D_Decoder_dict
+        a_continuously_decoded_dict = directional_decoders_decode_result.continuously_decoded_result_cache_dict.get(desired_time_bin_size, None)
+        info_string: str = f" - t_bin_size: {desired_time_bin_size}"
+
+    except (KeyError, AttributeError) as e:
+        # KeyError: 'DirectionalDecodersDecoded'
+        print(f'add_all_computed_time_bin_sizes_pseudo2D_decoder_decoded_epochs(...) failed to add any tracks, perhaps because the pipeline is missing any computed "DirectionalDecodersDecoded" global results. Error: "{e}". Skipping.')
+        a_continuously_decoded_dict = None
+        pseudo2D_decoder = None        
+        pass
+
+    except Exception as e:
+        raise
+
+
+    # # output_dict = _cmd.prepare_and_perform_add_pseudo2D_decoder_decoded_epoch_marginals(curr_active_pipeline=_cmd._active_pipeline, active_2d_plot=active_2d_plot, continuously_decoded_dict=deepcopy(a_continuously_decoded_dict), info_string=info_string, **enable_rows_config_kwargs)
+    # output_dict = AddNewDecodedPosteriors_MatplotlibPlotCommand.prepare_and_perform_add_add_pseudo2D_decoder_decoded_epochs(curr_active_pipeline=curr_active_pipeline, active_2d_plot=active_2d_plot, continuously_decoded_dict=deepcopy(a_continuously_decoded_dict), info_string=info_string, a_pseudo2D_decoder=pseudo2D_decoder, debug_print=debug_print, **kwargs)
+    # for a_key, an_output_tuple in output_dict.items():
+    #     identifier_name, widget, matplotlib_fig, matplotlib_fig_axes, dDisplayItem = an_output_tuple                
+    #     # if a_key not in all_time_bin_sizes_output_dict:
+    #     #     all_time_bin_sizes_output_dict[a_key] = [] ## init empty list
+    #     # all_time_bin_sizes_output_dict[a_key].append(an_output_tuple)
+        
+    #     assert (identifier_name not in flat_all_time_bin_sizes_output_tuples_dict), f"identifier_name: {identifier_name} already in flat_all_time_bin_sizes_output_tuples_dict: {list(flat_all_time_bin_sizes_output_tuples_dict.keys())}"
+    #     flat_all_time_bin_sizes_output_tuples_dict[identifier_name] = an_output_tuple
+
+
 
     # ==================================================================================================================== #
     # PLOTTING                                                                                                             #
@@ -95,7 +1668,7 @@ def add_continuous_decoded_posterior(spike_raster_window, curr_active_pipeline, 
     from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import AddNewDecodedPosteriors_MatplotlibPlotCommand
 
     display_output = {}
-    AddNewDecodedPosteriors_MatplotlibPlotCommand(spike_raster_window, curr_active_pipeline, active_config_name=active_config_name, active_context=active_context, display_output=display_output, action_identifier='actionPseudo2DDecodedEpochsDockedMatplotlibView')
+    AddNewDecodedPosteriors_MatplotlibPlotCommand(spike_raster_window, curr_active_pipeline, active_config_name=None, active_context=None, display_output=display_output, action_identifier='actionPseudo2DDecodedEpochsDockedMatplotlibView')
 
     all_global_menus_actionsDict, global_flat_action_dict = spike_raster_window.build_all_menus_actions_dict()
     if debug_print:
@@ -111,7 +1684,6 @@ def add_continuous_decoded_posterior(spike_raster_window, curr_active_pipeline, 
 
 
     menu_commands = [
-        'AddTimeCurves.Position',
         # 'DockedWidgets.LongShortDecodedEpochsDockedMatplotlibView',
         # 'DockedWidgets.DirectionalDecodedEpochsDockedMatplotlibView',
         # 'DockedWidgets.TrackTemplatesDecodedEpochsDockedMatplotlibView',
@@ -137,8 +1709,7 @@ def add_continuous_decoded_posterior(spike_raster_window, curr_active_pipeline, 
 
     ## OUTPUTS: nested_dock_items, nested_dynamic_docked_widget_container_widgets
 
-
-    pass
+    return (nested_dock_items, nested_dynamic_docked_widget_container_widgets), (a_continuously_decoded_dict, pseudo2D_decoder, all_directional_pf1D_Decoder_dict)
 
 
 
@@ -176,6 +1747,7 @@ def _single_compute_train_test_split_epochs_decoders(a_decoder: BasePositionDeco
     split_train_test_epoch_specific_pf1D_Decoder_dict[an_epoch_period_description] = a_sliced_pf1D_Decoder
     
     """
+    import nptyping as ND
     from nptyping import NDArray
     from neuropy.core.epoch import Epoch, ensure_dataframe
     from neuropy.analyses.placefields import PfND
@@ -244,6 +1816,7 @@ def compute_train_test_split_epochs_decoders(directional_laps_results: Direction
     from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import compute_train_test_split_epochs_decoders, _single_compute_train_test_split_epochs_decoders
     
     """
+    import nptyping as ND
     from nptyping import NDArray
     from neuropy.core.epoch import Epoch, ensure_dataframe
     from neuropy.analyses.placefields import PfND
@@ -349,269 +1922,12 @@ def compute_train_test_split_epochs_decoders(directional_laps_results: Direction
 
 
 
-# ==================================================================================================================== #
-# 2025-01-21 - Bin-by-bin decoding examples                                                                            #
-# ==================================================================================================================== #
-import numpy as np
-import pyqtgraph as pg
-from copy import deepcopy
-from pyphocorehelpers.DataStructure.general_parameter_containers import VisualizationParameters, RenderPlotsData, RenderPlots # PyqtgraphRenderPlots
-from pyphocorehelpers.gui.PhoUIContainer import PhoUIContainer
-from pyphocorehelpers.print_helpers import strip_type_str_to_classname
-from neuropy.utils.mixins.AttrsClassHelpers import keys_only_repr
-from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import DirectionalPseudo2DDecodersResult, TrainTestSplitResult
-from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import get_proper_global_spikes_df
-
-# @define(slots=False, eq=False)
-@metadata_attributes(short_name=None, tags=['pyqtgraph'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-01-24 17:22', related_items=[])
-class BinByBinDecodingDebugger:
-    """ handles displaying the process of debugging decoding for each time bin
-    
-    Usage:    
-        from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import BinByBinDecodingDebugger    
-        from pyphoplacecellanalysis.Pho2D.PyQtPlots.Extensions.pyqtgraph_helpers import LayoutScrollability, pyqtplot_build_image_bounds_extent
-        from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.ContainerBased.TemplateDebugger import BaseTemplateDebuggingMixin, build_pf1D_heatmap_with_labels_and_peaks, TrackTemplates
-        from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import BinByBinDecodingDebugger
-
-        # Example usage:
-        long_epoch_name, short_epoch_name, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
-        global_spikes_df = deepcopy(curr_active_pipeline.computation_results[global_epoch_name]['computed_data'].pf1D.spikes_df)
-        global_laps = deepcopy(curr_active_pipeline.filtered_sessions[global_epoch_name].laps).trimmed_to_non_overlapping() 
-        global_laps_epochs_df = global_laps.to_dataframe()
-        global_laps_epochs_df
-
-        ## INPUTS: 
-        time_bin_size: float = 0.250
-        a_lap_id: int = 9
-        a_decoder_name = 'long_LR'
-
-        ## COMPUTED: 
-        a_decoder_idx: int = track_templates.get_decoder_names().index(a_decoder_name)
-        a_decoder = deepcopy(track_templates.long_LR_decoder)
-        (_out_decoded_time_bin_edges, _out_decoded_unit_specific_time_binned_spike_counts, _out_decoded_active_unit_lists, _out_decoded_active_p_x_given_n, _out_decoded_active_plots_data) = BinByBinDecodingDebugger.build_spike_counts_and_decoder_outputs(track_templates=track_templates, global_laps_epochs_df=global_laps_epochs_df, spikes_df=global_spikes_df, a_decoder_name=a_decoder_name, time_bin_size=time_bin_size)
-        win, out_pf1D_decoder_template_objects, (_out_decoded_active_plots, _out_decoded_active_plots_data) = BinByBinDecodingDebugger.build_time_binned_decoder_debug_plots(a_decoder=a_decoder, a_lap_id=a_lap_id, _out_decoded_time_bin_edges=_out_decoded_time_bin_edges, _out_decoded_active_p_x_given_n=_out_decoded_active_p_x_given_n, _out_decoded_unit_specific_time_binned_spike_counts=_out_decoded_unit_specific_time_binned_spike_counts, _out_decoded_active_unit_lists=_out_decoded_active_unit_lists, _out_decoded_active_plots_data=_out_decoded_active_plots_data, debug_print=True)
-        print(f"Returned window: {win}")
-        print(f"Returned decoder objects: {out_pf1D_decoder_template_objects}")
-
-
-    """
-    plots: RenderPlots = field(repr=keys_only_repr)
-    plots_data: RenderPlotsData = field(repr=keys_only_repr)
-    ui: PhoUIContainer = field(repr=keys_only_repr)
-    params: VisualizationParameters = field(repr=keys_only_repr)
-
-    # time_bin_size: float = field(default=0.500) # 500ms
-    # spikes_df: pd.DataFrame = field()
-    # global_laps_epochs_df: pd.DataFrame = field()
-    @classmethod
-    def build_spike_counts_and_decoder_outputs(cls, track_templates, global_laps_epochs_df, spikes_df, a_decoder_name='long_LR', time_bin_size=0.500, debug_print=False):
-        """
-            a_decoder_name: types.DecoderName = 'long_LR'
-            
-        """
-        ## Get a specific decoder
-        
-        a_decoder_idx: int = track_templates.get_decoder_names().index(a_decoder_name)
-        a_decoder = deepcopy(track_templates.long_LR_decoder)
-
-        neuron_IDs = deepcopy(a_decoder.neuron_IDs)
-        spikes_df = deepcopy(spikes_df).spikes.sliced_by_neuron_id(neuron_IDs)
-        unique_units = np.unique(spikes_df['aclu'])
-        _out_decoded_time_bin_edges = {}
-        _out_decoded_unit_specific_time_binned_spike_counts = {}
-        _out_decoded_active_unit_lists = {}
-        _out_decoded_active_p_x_given_n = {}
-        _out_decoded_active_plots_data: Dict[str, RenderPlotsData]  = {}
-
-        for a_row in global_laps_epochs_df.itertuples():
-            t_start = a_row.start
-            t_end = a_row.stop
-            time_bin_edges = np.arange(t_start, (t_end + time_bin_size), time_bin_size)
-            n_time_bins = len(time_bin_edges) - 1
-            assert n_time_bins > 0
-            _out_decoded_time_bin_edges[a_row.lap_id] = time_bin_edges
-            unit_specific_time_binned_spike_counts = np.array([
-                np.histogram(spikes_df.loc[spikes_df['aclu'] == unit, 't_rel_seconds'], bins=time_bin_edges)[0]
-                for unit in unique_units
-            ])
-            all_lap_active_units_list = []
-            active_units_list = []
-            for a_time_bin_idx in np.arange(n_time_bins):
-                unit_spike_counts = np.squeeze(unit_specific_time_binned_spike_counts[:, a_time_bin_idx])
-                normalized_unit_spike_counts = (unit_spike_counts / np.sum(unit_spike_counts))
-                active_unit_idxs = np.where(unit_spike_counts > 0)[0]
-                active_units = neuron_IDs[active_unit_idxs]
-                active_aclu_spike_counts_dict = dict(zip(active_units, unit_spike_counts[active_unit_idxs]))
-                active_units_list.append(active_aclu_spike_counts_dict)
-                all_lap_active_units_list.extend(active_units)
-
-            _out_decoded_active_unit_lists[a_row.lap_id] = active_units_list
-            _out_decoded_unit_specific_time_binned_spike_counts[a_row.lap_id] = unit_specific_time_binned_spike_counts
-
-            # all_lap_active_units_list = np.unique(list(Set(all_lap_active_units_list)))
-            all_lap_active_units_list = np.unique(all_lap_active_units_list)
-            if debug_print:
-                print(f'all_lap_active_units_list: {all_lap_active_units_list}')
-            lap_specific_spikes_df = deepcopy(spikes_df).spikes.time_sliced(t_start=t_start, t_stop=t_end).spikes.sliced_by_neuron_id(all_lap_active_units_list)
-            lap_specific_spikes_df, neuron_id_to_new_IDX_map = lap_specific_spikes_df.spikes.rebuild_fragile_linear_neuron_IDXs()  # rebuild the fragile indicies afterwards
-            _decoded_pos_outputs = a_decoder.decode(unit_specific_time_binned_spike_counts=unit_specific_time_binned_spike_counts, time_bin_size=time_bin_size, output_flat_versions=True, debug_print=False)
-            _out_decoded_active_p_x_given_n[a_row.lap_id] = _decoded_pos_outputs
-            _out_decoded_active_plots_data[a_row.lap_id] = RenderPlotsData(name=f'lap[{a_row.lap_id}]', spikes_df=lap_specific_spikes_df, active_aclus=all_lap_active_units_list)
-
-        return (_out_decoded_time_bin_edges, _out_decoded_unit_specific_time_binned_spike_counts, _out_decoded_active_unit_lists, _out_decoded_active_p_x_given_n, _out_decoded_active_plots_data)
-
-
-    @classmethod
-    def build_time_binned_decoder_debug_plots(cls, a_decoder, a_lap_id, _out_decoded_time_bin_edges, _out_decoded_active_p_x_given_n, _out_decoded_unit_specific_time_binned_spike_counts, _out_decoded_active_unit_lists, _out_decoded_active_plots_data, debug_print=False):
-        """ builds the plots 
-        """
-        from pyphoplacecellanalysis.Pho2D.PyQtPlots.Extensions.pyqtgraph_helpers import pyqtplot_build_image_bounds_extent
-        from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.ContainerBased.TemplateDebugger import BaseTemplateDebuggingMixin
-        from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.SpikeRasters import new_plot_raster_plot, NewSimpleRaster
-
-        def _simply_plot_posterior_in_pyqtgraph_plotitem(curr_plot, image, xbin_edges, ybin_edges):
-            pg.setConfigOptions(imageAxisOrder='row-major')
-            pg.setConfigOptions(antialias=True)
-            cmap = pg.colormap.get('jet','matplotlib')
-            image_bounds_extent, x_range, y_range = pyqtplot_build_image_bounds_extent(xbin_edges, ybin_edges, margin=0.0, debug_print=debug_print)
-            curr_plot.hideButtons()
-            img_item = pg.ImageItem(image=image, levels=(0,1))
-            curr_plot.addItem(img_item, defaultPadding=0.0)
-            img_item.setImage(image, rect=image_bounds_extent, autoLevels=False)
-            img_item.setLookupTable(cmap.getLookupTable(nPts=256), update=False)
-            curr_plot.setRange(xRange=x_range, yRange=y_range, padding=0.0, update=False, disableAutoRange=True)
-            curr_plot.setLimits(xMin=x_range[0], xMax=x_range[-1], yMin=y_range[0], yMax=y_range[-1])
-            return img_item
-
-        time_bin_edges = _out_decoded_time_bin_edges[a_lap_id]
-        n_epoch_time_bins = len(time_bin_edges) - 1
-        if debug_print:
-            print(f'a_lap_id: {a_lap_id}, n_epoch_time_bins: {n_epoch_time_bins}')
-
-        win = pg.GraphicsLayoutWidget()
-        plots = []
-        out_pf1D_decoder_template_objects = []
-        _out_decoded_active_plots = {}
-
-        plots_data = _out_decoded_active_plots_data[a_lap_id]
-        plots_container = RenderPlots(name=a_lap_id, root_plot=None) # [a_lap_id]
-
-        # Epoch Active Spikes, takes up a row _______________________________________________________________ #
-        spanning_spikes_raster_plot = win.addPlot(title="spikes_raster Plot", row=0, rowspan=1, col=0, colspan=n_epoch_time_bins)
-        spanning_spikes_raster_plot.setTitle("spikes_raster Plot")
-        plots_container.root_plot = spanning_spikes_raster_plot
-        app, raster_win, plots_container, plots_data = new_plot_raster_plot(plots_data.spikes_df, plots_data.active_aclus, scatter_plot_kwargs=None, win=spanning_spikes_raster_plot, plots_data=plots_data, plots=plots_container,
-                                                            scatter_app_name=f'lap_specific_spike_raster', defer_show=True, active_context=None, add_debug_header_label=False)
-
-
-
-        _out_decoded_active_plots[a_lap_id] = plots_container
-        win.nextRow()
-
-        # Decoded Epoch Posterior (bin-by-bin), takes up a row _______________________________________________________________ #
-        spanning_posterior_plot = win.addPlot(title="P_x_given_n Plot", row=1, rowspan=1, col=0, colspan=n_epoch_time_bins)
-        spanning_posterior_plot.setTitle("P_x_given_n Plot - Decoded over lap")
-
-        most_likely_positions, p_x_given_n, most_likely_position_indicies, flat_outputs_container = _out_decoded_active_p_x_given_n[a_lap_id]
-        flat_p_x_given_n = deepcopy(p_x_given_n)
-        _simply_plot_posterior_in_pyqtgraph_plotitem(
-            curr_plot=spanning_posterior_plot,
-            image=flat_p_x_given_n,
-            xbin_edges=np.arange(n_epoch_time_bins+1),
-            ybin_edges=deepcopy(a_decoder.xbin)
-        )
-        win.nextRow()
-
-        # Bin-by-bin active spike templates/pf1D fields ______________________________________________________________________ #
-        active_bin_unit_specific_time_binned_spike_counts = _out_decoded_unit_specific_time_binned_spike_counts[a_lap_id]
-        active_lap_active_aclu_spike_counts_list = _out_decoded_active_unit_lists[a_lap_id]
-
-        for a_time_bin_idx in np.arange(n_epoch_time_bins):
-            active_bin_active_aclu_spike_counts_dict = active_lap_active_aclu_spike_counts_list[a_time_bin_idx]
-            active_bin_active_aclu_spike_count_values = np.array(list(active_bin_active_aclu_spike_counts_dict.values()))
-            active_bin_active_aclu_bin_normalized_spike_count_values = active_bin_active_aclu_spike_count_values / np.sum(
-                active_bin_active_aclu_spike_count_values)
-
-            aclu_override_alpha_weights = 0.8 + (0.2 * active_bin_active_aclu_bin_normalized_spike_count_values)
-            active_bin_aclus = np.array(list(active_bin_active_aclu_spike_counts_dict.keys()))
-            active_solo_override_num_spikes_weights = dict(zip(active_bin_aclus, active_bin_active_aclu_bin_normalized_spike_count_values))
-            active_aclu_override_alpha_weights_dict = dict(zip(active_bin_aclus, aclu_override_alpha_weights))
-            if debug_print:
-                print(f'a_time_bin_idx: {a_time_bin_idx}/{n_epoch_time_bins} - active_bin_aclus: {active_bin_aclus}')
-
-            plot = win.addPlot(title=f"Plot {a_time_bin_idx+1}", row=2, rowspan=1, col=a_time_bin_idx, colspan=1)
-            plot.getViewBox().setBorder(color=(200, 200, 200), width=1)
-            spanning_posterior_plot.showGrid(x=True, y=True)
-            x_axis = spanning_posterior_plot.getAxis('bottom')
-            x_axis.setTickSpacing(major=5, minor=1)
-
-            plots.append(plot)
-            _obj = BaseTemplateDebuggingMixin.init_from_decoder(a_decoder=a_decoder, win=plot, title_str=f't={a_time_bin_idx}')
-            _obj.update_base_decoder_debugger_data(
-                included_neuron_ids=active_bin_aclus,
-                solo_override_alpha_weights=active_aclu_override_alpha_weights_dict,
-                solo_override_num_spikes_weights=active_solo_override_num_spikes_weights
-            )
-            out_pf1D_decoder_template_objects.append(_obj)
-
-        win.nextRow()
-        win.show()
-        return win, out_pf1D_decoder_template_objects, (_out_decoded_active_plots, _out_decoded_active_plots_data)
-
-
-    @classmethod
-    def plot_bin_by_bin_decoding_example(cls, curr_active_pipeline, track_templates, time_bin_size: float = 0.250, a_lap_id: int = 9, a_decoder_name = 'long_LR'):
-        """
-        from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import plot_bin_by_bin_decoding_example
-
-                ## INPUTS: time_bin_size
-        time_bin_size: float = 0.500 # 500ms
-
-        ## any (generic) directionald decoder
-        # neuron_IDs = deepcopy(track_templates.any_decoder_neuron_IDs) # array([  2,   5,   8,  10,  14,  15,  23,  24,  25,  26,  31,  32,  33,  41,  49,  50,  51,  55,  58,  64,  69,  70,  73,  74,  75,  76,  78,  82,  83,  85,  86,  90,  92,  93,  96, 109])
-
-        ## Get a specific decoder
-        a_decoder_name: types.DecoderName = 'long_LR'
-        a_decoder_idx: int = track_templates.get_decoder_names().index(a_decoder_name)
-        a_decoder = deepcopy(track_templates.long_LR_decoder)
-
-        
-        
-        """
-        from pyphoplacecellanalysis.Pho2D.PyQtPlots.Extensions.pyqtgraph_helpers import LayoutScrollability, pyqtplot_build_image_bounds_extent
-        from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.ContainerBased.TemplateDebugger import BaseTemplateDebuggingMixin, build_pf1D_heatmap_with_labels_and_peaks, TrackTemplates
-        from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import BinByBinDecodingDebugger
-
-        # Example usage:
-        long_epoch_name, short_epoch_name, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
-        global_spikes_df = deepcopy(curr_active_pipeline.computation_results[global_epoch_name]['computed_data'].pf1D.spikes_df)
-        global_laps = deepcopy(curr_active_pipeline.filtered_sessions[global_epoch_name].laps).trimmed_to_non_overlapping() 
-        global_laps_epochs_df = global_laps.to_dataframe()
-        global_laps_epochs_df
-
-
-
-        ## COMPUTED: 
-        a_decoder_idx: int = track_templates.get_decoder_names().index(a_decoder_name)
-        a_decoder = deepcopy(track_templates.long_LR_decoder)
-        (_out_decoded_time_bin_edges, _out_decoded_unit_specific_time_binned_spike_counts, _out_decoded_active_unit_lists, _out_decoded_active_p_x_given_n, _out_decoded_active_plots_data) = BinByBinDecodingDebugger.build_spike_counts_and_decoder_outputs(track_templates=track_templates, global_laps_epochs_df=global_laps_epochs_df, spikes_df=global_spikes_df, a_decoder_name=a_decoder_name, time_bin_size=time_bin_size)
-        win, out_pf1D_decoder_template_objects, (_out_decoded_active_plots, _out_decoded_active_plots_data) = BinByBinDecodingDebugger.build_time_binned_decoder_debug_plots(a_decoder=a_decoder, a_lap_id=a_lap_id, _out_decoded_time_bin_edges=_out_decoded_time_bin_edges, _out_decoded_active_p_x_given_n=_out_decoded_active_p_x_given_n, _out_decoded_unit_specific_time_binned_spike_counts=_out_decoded_unit_specific_time_binned_spike_counts, _out_decoded_active_unit_lists=_out_decoded_active_unit_lists, _out_decoded_active_plots_data=_out_decoded_active_plots_data, debug_print=True)
-        print(f"Returned window: {win}")
-        print(f"Returned decoder objects: {out_pf1D_decoder_template_objects}")
-
-        return win, out_pf1D_decoder_template_objects, (_out_decoded_active_plots, _out_decoded_active_plots_data)
-    
-
-
-
-    ## OUTPUTS: _out_decoded_time_bin_edges, _out_decoded_unit_specific_time_binned_spike_counts, _out_decoded_active_unit_lists, _out_decoded_active_p_x_given_n
-
 
 # ==================================================================================================================== #
 # 2025-01-20 - Easy Decoding                                                                                           #
 # ==================================================================================================================== #
 @function_attributes(short_name=None, tags=['decoding', 'ACTIVE', 'useful'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-01-20 15:26', related_items=[])
-def easy_independent_decoding(long_LR_decoder: BasePositionDecoder, spikes_df: pd.DataFrame, time_bin_size: float = 0.025, t_start: float = 0.0, t_end: float = 2093.8978568242164):
+def easy_independent_decoding(a_decoder: BasePositionDecoder, spikes_df: pd.DataFrame, time_bin_size: float = 0.025, t_start: float = 0.0, t_end: float = 2093.8978568242164):
     """ Uses the provieded decoder, spikes, and time binning parameters to decode the neural activity for the specified epoch.
 
     from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import easy_independent_decoding
@@ -621,11 +1937,11 @@ def easy_independent_decoding(long_LR_decoder: BasePositionDecoder, spikes_df: p
     t_start = 0.0
     t_end = 2093.8978568242164
     _decoded_pos_outputs, (unit_specific_time_binned_spike_counts, time_bin_edges, spikes_df) = easy_independent_decoding(long_LR_decoder, spikes_df=spikes_df, time_bin_size=time_bin_size, t_start=t_start, t_end=t_end)
-
+    most_likely_positions, p_x_given_n, most_likely_position_indicies, flat_outputs_container = _decoded_pos_outputs
 
 
     """
-    neuron_IDs = deepcopy(long_LR_decoder.neuron_IDs) # array([  2,   5,   8,  10,  14,  15,  23,  24,  25,  26,  31,  32,  33,  41,  49,  50,  51,  55,  58,  64,  69,  70,  73,  74,  75,  76,  78,  82,  83,  85,  86,  90,  92,  93,  96, 109])
+    neuron_IDs = deepcopy(a_decoder.neuron_IDs) # array([  2,   5,   8,  10,  14,  15,  23,  24,  25,  26,  31,  32,  33,  41,  49,  50,  51,  55,  58,  64,  69,  70,  73,  74,  75,  76,  78,  82,  83,  85,  86,  90,  92,  93,  96, 109])
     spikes_df: pd.DataFrame = deepcopy(spikes_df).spikes.sliced_by_neuron_id(neuron_IDs) ## filter everything down
     time_bin_edges: NDArray = np.arange(t_start, t_end + time_bin_size, time_bin_size)
     unique_units = np.unique(spikes_df['aclu']) # sorted
@@ -635,7 +1951,7 @@ def easy_independent_decoding(long_LR_decoder: BasePositionDecoder, spikes_df: p
     ])
 
     ## OUTPUT: time_bin_edges, unit_specific_time_binned_spike_counts
-    _decoded_pos_outputs = long_LR_decoder.decode(unit_specific_time_binned_spike_counts=unit_specific_time_binned_spike_counts, time_bin_size=time_bin_size, output_flat_versions=True, debug_print=True)
+    _decoded_pos_outputs = a_decoder.decode(unit_specific_time_binned_spike_counts=unit_specific_time_binned_spike_counts, time_bin_size=time_bin_size, output_flat_versions=True, debug_print=True)
     # _decoded_pos_outputs = all_directional_pf1D_Decoder.decode(unit_specific_time_binned_spike_counts=unit_specific_time_binned_spike_counts, time_bin_size=0.020, output_flat_versions=True, debug_print=True)
     return _decoded_pos_outputs, (unit_specific_time_binned_spike_counts, time_bin_edges, spikes_df)
 
@@ -1000,222 +2316,6 @@ def override_laps(curr_active_pipeline, override_laps_df: pd.DataFrame, debug_pr
 
 
 
-
-# ==================================================================================================================== #
-# @ 2025-01-01 - Better Aggregation of Probabilities across bins                                                       #
-# ==================================================================================================================== #
-@metadata_attributes(short_name=None, tags=['aggregation', 'UNFINSHED', 'integration', 'confidence'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-01-01 00:00', related_items=[])
-class TimeBinAggregation:
-    """ Methods of aggregating over many time bins
-
-    from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import TimeBinAggregation, ParticleFilter
-
-
-    """
-    @function_attributes(short_name=None, tags=['NDArray', 'streak', 'sequence', 'probability', 'likelihood'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-01-01 14:00', related_items=[])
-    @classmethod
-    def compute_epoch_p_long_with_streaks(cls, p_long: List[float], min_probability_threshold: float = 0.5) -> float:
-        """ Prior to `compute_streak_weighted_p_long` version, which operates on dataframes
-
-
-        Computes the overall P_Long for an epoch, giving higher weight to uninterrupted streaks.
-
-        Args:
-            p_long (List[float]): Probabilities of being in the "Long" state for each time bin.
-            threshold (float): Minimum probability to consider a bin as part of a streak. Default is 0.5.
-
-        Returns:
-            float: The overall P_Long for the epoch.
-
-        Usage:
-            # Example usage
-            p_long = a_lap_df[a_var_name].to_numpy() # [0.8, 0.7, 0.2, 0.9, 0.95, 0.3, 0.85, 0.87, 0.86]
-            min_probability_threshold = 0.5  # Minimum probability to count as "Long"
-            overall_p_long = compute_epoch_p_long_with_streaks(p_long, min_probability_threshold)
-            print(f"Overall P_Long with streak weighting: {overall_p_long}")
-
-        """
-        streaks = []
-        current_streak = []
-
-        # Identify streaks
-        for i, prob in enumerate(p_long):
-            if prob >= min_probability_threshold:
-                current_streak.append(i)
-            else:
-                if current_streak:
-                    streaks.append(current_streak)
-                    current_streak = []
-        if current_streak:  # Add the last streak if it ends at the last bin
-            streaks.append(current_streak)
-
-        # Assign weights based on streak length (linearly)
-        weights = [0] * len(p_long)
-        for streak in streaks:
-            streak_length = len(streak)
-            for idx in streak:
-                weights[idx] = streak_length
-
-        # Compute weighted average
-        weighted_sum = np.sum(w * p for w, p in zip(weights, p_long))
-        total_weight = np.sum(weights)
-        return weighted_sum / total_weight if total_weight > 0 else 0.0
-
-
-
-    @function_attributes(short_name=None, tags=['streak', 'sequence', 'dataframe', 'probability', 'likelihood'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-01-01 14:11', related_items=[])
-    @classmethod
-    def compute_streak_weighted_p_long(cls, df: pd.DataFrame, column: str, threshold: float = 0.5) -> float:
-        """
-        Computes the streak-weighted P_Long for a given DataFrame, giving higher weight to longer sequences of adjacent bins.
-
-        Args:
-            df (pd.DataFrame): Input DataFrame containing the P_Long column.
-            column (str): The column name for P_Long.
-            threshold (float): Minimum probability to consider a bin as part of a streak. Default is 0.5.
-
-        Returns:
-            float: The streak-weighted P_Long for the DataFrame.
-        """
-        p_long = df[column].values
-        streaks = []
-        current_streak = []
-
-        # Identify streaks
-        for i, prob in enumerate(p_long):
-            if prob >= threshold:
-                current_streak.append(i)
-            else:
-                if current_streak:
-                    streaks.append(current_streak)
-                    current_streak = []
-        if current_streak:  # Add the last streak if it ends at the last bin
-            streaks.append(current_streak)
-
-        # Assign weights based on streak length
-        weights = [0] * len(p_long)
-        for streak in streaks:
-            streak_length = len(streak)
-            for idx in streak:
-                weights[idx] = streak_length
-
-        # Compute weighted average
-        weighted_sum = sum(w * p for w, p in zip(weights, p_long))
-        total_weight = sum(weights)
-        return weighted_sum / total_weight if total_weight > 0 else 0.0
-
-
-    @classmethod
-    def peak_rolling_avg(cls, df: pd.DataFrame, column: str, window: int=3, *args, **kwargs) -> float:
-        """
-        Computes the streak-weighted P_Long for a given DataFrame, giving higher weight to longer sequences of adjacent bins.
-
-        Args:
-            df (pd.DataFrame): Input DataFrame containing the P_Long column.
-            column (str): The column name for P_Long.
-            threshold (float): Minimum probability to consider a bin as part of a streak. Default is 0.5.
-
-        Returns:
-            float: The streak-weighted P_Long for the DataFrame.
-        """
-        return df[column].rolling(window, *args, **kwargs).max().max()
-
-@metadata_attributes(short_name=None, tags=['UNUSED', 'ChatGPT', 'aggregation'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-01-01 00:00', related_items=['TimeBinAggregation'])
-class ParticleFilter:
-    """ Example: Generated by ChatGPT, does something about aggregating time bins
-
-        ## TEST
-
-        # Example usage
-        def state_transition_func(particles):
-            # Example state transition function: simple linear motion.
-            return particles + 1  # Each state increases by 1
-
-        def measurement_func(state):
-            # Example measurement function: identity mapping.
-            return state
-
-
-
-        num_particles = 1000
-        state_dim = 1
-        process_noise = 1.0
-        measurement_noise = 2.0
-
-        pf = ParticleFilter(num_particles, state_dim, process_noise, measurement_noise)
-
-        # Simulate a series of observations
-        # observations = np.array([5, 6, 7, 8, 9])
-        observations = a_lap_df[a_var_name].to_numpy()
-
-        for obs in observations:
-            pf.predict(state_transition_func)
-            pf.update(obs, measurement_func)
-            pf.resample()
-
-            estimated_state = pf.estimate()
-            print(f"Estimated State: {estimated_state}")
-
-
-    """
-    def __init__(self, num_particles: int, state_dim: int, process_noise: float, measurement_noise: float):
-        """
-        Initialize the Particle Filter.
-
-        :param num_particles: Number of particles to use.
-        :param state_dim: Dimension of the state space.
-        :param process_noise: Standard deviation of process noise.
-        :param measurement_noise: Standard deviation of measurement noise.
-        """
-        self.num_particles = num_particles
-        self.state_dim = state_dim
-        self.process_noise = process_noise
-        self.measurement_noise = measurement_noise
-
-        # Initialize particles randomly within the state space
-        self.particles = np.random.rand(num_particles, state_dim)
-        self.weights = np.ones(num_particles) / num_particles
-
-    def predict(self, state_transition_func):
-        """
-        Predict the next state of each particle using the state transition function.
-
-        :param state_transition_func: A function to apply the state transition.
-        """
-        noise = np.random.normal(0, self.process_noise, size=(self.num_particles, self.state_dim))
-        self.particles = state_transition_func(self.particles) + noise
-
-    def update(self, observation: np.ndarray, measurement_func):
-        """
-        Update the particle weights based on the observation.
-
-        :param observation: The observed data.
-        :param measurement_func: A function to calculate the expected observation from a particle state.
-        """
-        for i in range(self.num_particles):
-            predicted_obs = measurement_func(self.particles[i])
-            error = observation - predicted_obs
-            likelihood = np.exp(-0.5 * np.sum(error**2) / self.measurement_noise**2)
-            self.weights[i] = likelihood
-
-        # Normalize weights to sum to 1
-        self.weights /= np.sum(self.weights)
-
-    def resample(self):
-        """
-        Resample particles based on their weights.
-        """
-        indices = np.random.choice(self.num_particles, self.num_particles, p=self.weights)
-        self.particles = self.particles[indices]
-        self.weights.fill(1.0 / self.num_particles)
-
-    def estimate(self) -> np.ndarray:
-        """
-        Estimate the state as the weighted mean of the particles.
-
-        :return: The estimated state.
-        """
-        return np.average(self.particles, weights=self.weights, axis=0)
 
 
 
@@ -3832,6 +4932,7 @@ from pyphocorehelpers.assertion_helpers import Assert
 from pyphocorehelpers.indexing_helpers import partition_df_dict, partition
 from typing import Dict, List, Tuple, Optional, Callable, Union, Any, NewType
 from typing_extensions import TypeAlias
+import nptyping as ND
 from nptyping import NDArray
 import neuropy.utils.type_aliases as types
 
@@ -4110,6 +5211,7 @@ def plot_grad_quiver(sobel_x, sobel_y, downsample_step=1):
 # ==================================================================================================================== #
 from typing import Dict, List, Tuple, Optional, Callable, Union, Any
 from typing_extensions import TypeAlias
+import nptyping as ND
 from nptyping import NDArray
 from typing import NewType
 

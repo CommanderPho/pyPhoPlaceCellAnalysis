@@ -7,6 +7,7 @@ from datetime import datetime
 import pathlib
 from pathlib import Path
 import shutil
+import nptyping as ND
 from nptyping import NDArray
 import numpy as np # for _backup_extant_file(...)
 
@@ -159,6 +160,11 @@ global_move_modules_list:Dict={
 
 
 def loadData(pkl_path, debug_print=False, **kwargs):
+    """ 
+    from pyphoplacecellanalysis.General.Pipeline.Stages.Loading import loadData
+
+    loadData(
+    """
     # for reading also binary mode is important
     db = None
     active_move_modules_list: Dict = kwargs.pop('move_modules_list', global_move_modules_list)

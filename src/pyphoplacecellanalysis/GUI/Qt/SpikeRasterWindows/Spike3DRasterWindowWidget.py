@@ -34,6 +34,7 @@ from pyphoplacecellanalysis.GUI.Qt.NeuronVisualSelectionControls.NeuronVisualSel
 
 from pyphoplacecellanalysis.GUI.Qt.Menus.PhoMenuHelper import PhoMenuHelper
 from pyphocorehelpers.DataStructure.logging_data_structures import LoggingBaseClass, LoggingBaseClassLoggerOwningMixin
+from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.SpikeRasterWidgets.Spike2DRaster import SynchronizedPlotMode
 
 # remove TimeWindowPlaybackControllerActionsMixin
 # class Spike3DRasterWindowWidget(SpikeRasterBottomFrameControlsMixin, TimeWindowPlaybackControllerActionsMixin, TimeWindowPlaybackPropertiesMixin, QtWidgets.QWidget):
@@ -242,7 +243,7 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
         # self.ui.splitter.setStretchFactor(0, 5) # have the top widget by 3x the height as the bottom widget
         # self.ui.splitter.setStretchFactor(1, 1) # have the top widget by 3x the height as the bottom widget        
         
-        self.params = VisualizationParameters(self.applicationName, _menu_action_history_list=[], type_of_3d_plotter=type_of_3d_plotter, is_crosshair_trace_enabled=False)
+        self.params = VisualizationParameters(self.applicationName, _menu_action_history_list=[], type_of_3d_plotter=type_of_3d_plotter, is_crosshair_trace_enabled=False, debug_print=False)
         self.params.type_of_3d_plotter = type_of_3d_plotter
         self.params._menu_action_history_list = []
         # Helper Mixins: INIT:
@@ -261,6 +262,12 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
         # Update the windows once before showing the UI:
         self.spike_raster_plt_2d.update_scroll_window_region(window_start_time, window_start_time+window_duration, block_signals=False)
         
+        ## Starts the delayed_gui_itemer which will run after 1-second to update the GUI:
+        self._delayed_gui_timer = QtCore.QTimer(self)
+        self._delayed_gui_timer.timeout.connect(self._run_delayed_gui_load_code)
+        #Set the interval and start the timer.
+        self._delayed_gui_timer.start(1000)
+
         self.show() # Show the GUI
 
     def initUI(self, curr_spikes_df, core_app_name='UnifiedSpikeRasterApp', window_duration=15.0, window_start_time=30.0, neuron_colors=None, neuron_sort_order=None, type_of_3d_plotter='pyqtgraph'):
@@ -328,6 +335,9 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
         self.ui.bottom_bar_connections = None 
         self.ui.bottom_bar_connections = self.SpikeRasterBottomFrameControlsMixin_connectSignals(self.ui.bottomPlaybackControlBarWidget)
         self.ui.bottom_bar_connections.append(self.ui.bottomPlaybackControlBarWidget.sig_joystick_delta_occured.connect(self.perform_slide_relative_time))
+        if self.ui.spike_raster_plt_2d is not None:
+            ## connect the btnAddDockedTrack to the 2D plotter's add track function:
+            self.ui.bottom_bar_connections.append(self.ui.bottomPlaybackControlBarWidget.sigAddDockedTrackRequested.connect(lambda: self.ui.spike_raster_plt_2d.add_new_matplotlib_render_plot_widget(name='newDockedWidget', sync_mode=SynchronizedPlotMode.TO_WINDOW)))
 
         self.ui.left_side_bar_connections = None
         self.ui.left_side_bar_connections = self.SpikeRasterLeftSidebarControlsMixin_connectSignals(self.ui.leftSideToolbarWidget)
@@ -370,6 +380,10 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
             self.ui.bottom_bar_connections.append(self.ui.bottomPlaybackControlBarWidget.series_add_pressed.connect(self.perform_interval_series_request_add))
             
             self.ui.bottom_bar_connections.append(self.ui.bottomPlaybackControlBarWidget.jump_specific_time.connect(self.perform_jump_specific_timestamp_only))
+            self.ui.bottom_bar_connections.append(self.ui.bottomPlaybackControlBarWidget.jump_specific_time_window.connect(lambda start_t, end_t: self.perform_jump_specific_timestamp(start_t, (end_t - start_t))))
+            
+
+
             # self.ui.bottom_bar_connections.append(self.ui.bottomPlaybackControlBarWidget.jump_specific_time.connect(self.update_animation)
             # self.ui.bottom_bar_connections.append(self.ui.bottomPlaybackControlBarWidget.jump_specific_time.connect((lambda new_time: self.update_animation(new_time))))
             self.ui.bottom_bar_connections.append(self.ui.spike_raster_plt_2d.sigEmbeddedMatplotlibDockWidgetAdded.connect(lambda spike_raster_plt_2D, added_dock_item, added_widget: self.update_scrolling_event_filters())) ## not really a bottom_bar_connections, but who cares
@@ -423,6 +437,24 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
             
         
 
+
+
+    def _run_delayed_gui_load_code(self):
+        """ called when the self._delayed_gui_timer QTimer fires. """
+        #Stop the timer.
+        self._delayed_gui_timer.stop()
+        print(f'Spike3DRasterWindowWidget._run_delayed_gui_load_code() called!')
+        ## Make sure to set the initial linear scroll region size/location to something reasonable and not cut-off so the user can adjust it:
+        bottom_playback_control_bar_widget = self.bottom_playback_control_bar_widget # Spike3DRasterBottomPlaybackControlBar
+        if bottom_playback_control_bar_widget is not None:
+            # comboActiveJumpTargetSeries = bottom_playback_control_bar_widget.ui.comboActiveJumpTargetSeries # QComboBox 
+            bottom_playback_control_bar_widget.current_selected_jump_target_series_name = 'Laps' ## tries to select the "Laps" epochs fromt he jump-to-comobo box
+
+        self.init_left_and_bottom_bar_times_from_active_window() ## Initialize
+
+
+
+
     @function_attributes(short_name=None, tags=['interactivity', 'event', 'scrolling', 'children'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-12-18 10:29', related_items=[])
     def update_scrolling_event_filters(self, debug_print=False):
         """ enables scrollability in the added matplotlib views just like the two upper views 
@@ -453,7 +485,10 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
          return
       
 
-
+    # ==================================================================================================================== #
+    # GlobalConnectionManagerAccessingMixin Conformances                                                                   #
+    # ==================================================================================================================== #
+    
     def connect_plotter_time_windows(self):
         """ connects the controlled plotter (usually the 3D plotter) to the 2D plotter that controls it. """
         # self.spike_3d_to_2d_window_connection = self.spike_raster_plt_2d.window_scrolled.connect(self.spike_raster_plt_3d.spikes_window.update_window_start_end)        
@@ -470,9 +505,19 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
         
     def connect_controlled_time_synchronized_plotter(self, controlled_plt):
         """ try to connect the controlled_plt to the current controller (usually the 2D plot). """
-        return self.connection_man.connect_drivable_to_driver(drivable=controlled_plt, driver=self.spike_raster_plt_2d,
-                                                       custom_connect_function=(lambda driver, drivable: pg.SignalProxy(driver.window_scrolled, delay=0.2, rateLimit=60, slot=drivable.spikes_window.update_window_start_end_rate_limited)))
-     
+        if hasattr(controlled_plt, 'spikes_window'):
+            return self.connection_man.connect_drivable_to_driver(drivable=controlled_plt, driver=self.spike_raster_plt_2d,
+                                                custom_connect_function=(lambda driver, drivable: pg.SignalProxy(driver.window_scrolled, delay=0.2, rateLimit=60, slot=drivable.spikes_window.update_window_start_end_rate_limited)))
+
+        if hasattr(controlled_plt, 'on_window_changed_rate_limited'):
+            return self.connection_man.connect_drivable_to_driver(drivable=controlled_plt, driver=self.spike_raster_plt_2d,
+                                                        custom_connect_function=(lambda driver, drivable: pg.SignalProxy(driver.window_scrolled, delay=0.2, rateLimit=60, slot=drivable.on_window_changed_rate_limited)))
+                
+        else:
+            raise NotImplementedError(f'') 
+
+
+
     def create_new_connected_widget(self, type_of_3d_plotter='vedo'):
         """ called to create a new/independent widget instance that's connected to this window's driver. """
         
@@ -633,15 +678,63 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
             print(f'Spike3DRasterWindowWidget.on_temporal_zoom_factor_valueChanged(updated_val: {updated_val})')
         old_value = self.temporal_zoom_factor        
         self.temporal_zoom_factor = updated_val
-                
+
     @pyqtExceptionPrintingSlot(float)
     def on_render_window_duration_valueChanged(self, updated_val):
         if self.enable_debug_print:
             print(f'Spike3DRasterWindowWidget.on_render_window_duration_valueChanged(updated_val: {updated_val})')
-        old_value = self.render_window_duration
+
+        # Add a guard to prevent circular updates
+        if abs(self.render_window_duration - updated_val) < 1e-6:
+            # Skip if value is essentially the same
+            return
+            
+        old_value = deepcopy(self.render_window_duration)
         self.render_window_duration = updated_val
-        # TODO 2023-03-29 19:14: - [ ] need to set self.render_window_duration.timeWindow.window_duration = updated_val
         
+        window_duration = float(updated_val)
+        if window_duration is not None:
+            if abs(window_duration - self.animation_active_time_window.window_duration) > 1e-6:
+                if self.enable_debug_print:
+                    print(f'\ton_render_window_duration_valueChanged(updated_val: {updated_val}): window_duration changed: new_window_duration {window_duration} != self.animation_active_time_window.window_duration: {self.animation_active_time_window.window_duration}')
+                # Block programmatic updates from triggering more signals
+                self._updating_window_programmatically = True
+                try:
+                    self.animation_active_time_window.timeWindow.window_duration = window_duration
+                finally:
+                    self._updating_window_programmatically = False
+                    
+
+        # old_value = deepcopy(self.render_window_duration)
+        # self.render_window_duration = updated_val
+        # # self.spikes_window.window_duration = float(updated_val)
+        # # self.spikes_window.timeWindow.window_duration = float(updated_val)
+
+        # # TODO 2023-03-29 19:14: - [ ] need to set self.animation_active_time_window.timeWindow.window_duration = updated_val
+        # window_duration = float(updated_val)
+        # if window_duration is not None:
+        #     if window_duration != self.animation_active_time_window.window_duration:
+        #         if self.enable_debug_print:
+        #             print(f'\ton_render_window_duration_valueChanged(updated_val: {updated_val}): window_duration changed: new_window_duration {window_duration} != self.animation_active_time_window.window_duration: {self.animation_active_time_window.window_duration}')
+        #         self.animation_active_time_window.timeWindow.window_duration = window_duration
+        #         # TODO 2023-03-29 19:18: - [ ] See if anything needs to be updated manually when window duration changes.
+
+
+
+    def init_left_and_bottom_bar_times_from_active_window(self):
+        """ Initializes the left and bottom time controls from the actual visable window
+        """
+        window_duration = self.animation_active_time_window.timeWindow.window_duration
+        start_time, end_time = self.animation_active_time_window.timeWindow.active_time_window
+        self.SpikeRasterBottomFrameControlsMixin_on_window_update(start_time, end_time) ## indirect 
+        self.SpikeRasterLeftSidebarControlsMixin_on_window_update(start_time, end_time)
+        return (start_time, end_time), window_duration
+
+
+
+    # ==================================================================================================================== #
+    # Crosshairs                                                                                                           #
+    # ==================================================================================================================== #
     # @pyqtExceptionPrintingSlot(bool)
     def on_crosshair_trace_toggled(self):
         # def on_crosshair_trace_toggled(self, updated_is_crosshair_trace_enabled):
@@ -1406,7 +1499,11 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
 
     @function_attributes(short_name=None, tags=['widget', 'interactive', 'display', 'config', 'intervals', 'epoch', 'visual'], input_requires=[], output_provides=[], uses=['EpochRenderConfigsListWidget'], used_by=[], creation_date='2025-01-27 14:06', related_items=[])
     def build_epoch_intervals_visual_configs_widget(self):
-        """ addds to the right sidebar and connects controls """
+        """ addds to the right sidebar and connects controls 
+        
+        active_raster_plot.ui.epochs_render_configs_widget
+        
+        """
         from pyphoplacecellanalysis.GUI.Qt.Widgets.EpochRenderConfigWidget.EpochRenderConfigWidget import EpochRenderConfigWidget, EpochRenderConfigsListWidget
         from pyphoplacecellanalysis.GUI.PyQtPlot.DockingWidgets.DynamicDockDisplayAreaContent import DockDisplayColors, CustomDockDisplayConfig
 
@@ -1486,12 +1583,27 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
 
         # Display the sidebar:
         self.set_right_sidebar_visibility(True)
-        
+
+
+    # @property
+    # def dock_tree_sidebar_widget(self) -> Optional[DockAreaDocksTree]:
+    #     """The dock_tree_sidebar_widget property."""
+    #     ## Get 2D or 3D Raster from spike_raster_window
+    #     active_raster_plot = self.spike_raster_plt_2d # <pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.SpikeRasterWidgets.Spike2DRaster.Spike2DRaster at 0x196c7244280>
+    #     if active_raster_plot is None:
+    #         active_raster_plot = self.spike_raster_plt_3d # <pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.SpikeRasterWidgets.Spike2DRaster.Spike2DRaster at 0x196c7244280>
+    #         if active_raster_plot is None:
+    #             ## no available raster plots
+    #             return None
+
+    #     return active_raster_plot.ui.dockarea_dock_managing_tree_widget
+    
 
 
     @function_attributes(short_name=None, tags=['widget', 'dock_area_managing_tree', 'interactive', 'right-sidebar'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-01-28 07:22', related_items=['DockAreaDocksTree'])
     def build_dock_area_managing_tree_widget(self):
-        """ addds to the right sidebar and connects controls """
+        """ adds a tree widget containing all added Dock items to the right sidebar and connects its controls
+        """
         from pyphoplacecellanalysis.GUI.Qt.Widgets.DockAreaDocksTree.DockAreaDocksTree import DockAreaDocksTree
         from pyphoplacecellanalysis.GUI.PyQtPlot.DockingWidgets.DynamicDockDisplayAreaContent import DockDisplayColors, CustomDockDisplayConfig
 
@@ -1519,6 +1631,8 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
             needs_init = False
             a_docks_tree_widget: DockAreaDocksTree = an_extant_widget
             assert a_docks_tree_widget is not None
+            print(f'found existing Docks display tree widget for right sidebar. Updating existing instead of creating new.')
+            
             
 
         if needs_init:
@@ -1565,12 +1679,24 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
             _a_connection = active_raster_plot.sigEmbeddedMatplotlibDockWidgetAdded.connect(lambda active_2d_plot, dock, widget: _on_update_dock_items(active_2d_plot=active_2d_plot))
             _connections_list.append(_a_connection)
             
+            _a_sigDockAdded_connection = active_raster_plot.sigDockAdded.connect(lambda active_2d_plot, a_dock: _on_update_dock_items(active_2d_plot=active_2d_plot))
+            _connections_list.append(_a_sigDockAdded_connection)
+            
+            _a_sigDockModified_connection = active_raster_plot.sigDockModified.connect(lambda active_2d_plot, a_dock, an_action: _on_update_dock_items(active_2d_plot=active_2d_plot)) # (parent, Dock, action)
+            _connections_list.append(_a_sigDockModified_connection)
+            
+
             _a_removed_connection = active_raster_plot.sigEmbeddedMatplotlibDockWidgetRemoved.connect(lambda active_2d_plot, removed_identifier: _on_update_dock_items(active_2d_plot=active_2d_plot))
             _connections_list.append(_a_removed_connection)
+            
+            _a_sigDockClosed_connection = active_raster_plot.sigDockClosed.connect(lambda active_2d_plot, removed_identifier: _on_update_dock_items(active_2d_plot=active_2d_plot))
+            _connections_list.append(_a_sigDockClosed_connection)
             
             # ## Connect the update signal
             # _a_sigAnyConfigChanged_connection = a_docks_tree_widget.sigDockConfigChanged.connect(lambda an_updated_epochs_display_list: active_raster_plot.update_epochs_from_configs_widget())
             # _connections_list.append(_a_sigAnyConfigChanged_connection)
+            #TODO 2025-04-03 18:43: - [ ] Nothing is done with `_connections_list`. It should be appended somewhere at least
+            
 
         ## END if needs_init...
         # self.ui.rightSideContainerWidget.ui.neuron_widget_container, _connections_list = self._perform_build_attached_neuron_visual_configs_widget(neuron_plotting_configs_dict)
@@ -1669,7 +1795,7 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
             if self.should_debug_print_interaction_events:
                 print(f'\t unhandled event {QEventLookupHelpers.get_event_string(event)}')
                 
-        if (delta is not None) and (delta > 0):
+        if (delta is not None) and (abs(delta) > 0):
             ## do the scroll
             if self.should_debug_print_interaction_events:
                 print(f'\tperofmring scroll with delta: {delta}')
@@ -1906,10 +2032,11 @@ if __name__ == "__main__":
 
     # args = parser.parse_args()
     
-    # pkl_path = Path('W:/Data/KDIBA/gor01/one/2006-6-09_1-22-43/loadedSessPickle.pkl')
+    pkl_path = Path('W:/Data/KDIBA/gor01/one/2006-6-09_1-22-43/loadedSessPickle.pkl')
     # pkl_path = Path('W:/Data/KDIBA/vvp01/one/2006-4-09_17-29-30/loadedSessPickle.pkl')
     # pkl_path = Path('W:/Data/KDIBA/vvp01/one/2006-4-09_17-29-30/loadedSessPickle.pkl')
-    pkl_path = Path('W:/Data/KDIBA/vvp01/two/2006-4-10_12-58-3/loadedSessPickle.pkl')
+    # pkl_path = Path('W:/Data/KDIBA/vvp01/two/2006-4-10_12-58-3/loadedSessPickle.pkl')
+    
     Assert.path_exists(pkl_path)
 
     app = QtWidgets.QApplication(sys.argv)

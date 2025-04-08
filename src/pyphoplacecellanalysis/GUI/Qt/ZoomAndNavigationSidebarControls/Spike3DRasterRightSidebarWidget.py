@@ -24,25 +24,43 @@ class Spike3DRasterRightSidebarWidget(QtWidgets.QWidget):
     """ A simple container to hold interactive widgets
     
     btnToggleDockManager
-    btnToggleIntervalManager
+    # btnToggleIntervalManager
     
+    btnToggleIntervalConfigManager
+    btnToggleIntervalTableManager
+    btnToggleNeuronVisualConfigManager
     
     btnAddDockTrack
     
     
     btnToggleCollapseExpand
     """
-    sigToggleIntervalManagerPressed = QtCore.pyqtSignal()
+    sigToggleIntervalEpochsDisplayManagerPressed = QtCore.pyqtSignal()
+    sigToggleIntervalActiveWindowTableManagerPressed = QtCore.pyqtSignal()
+    sigToggleNeuronDisplayConfigManagerPressed = QtCore.pyqtSignal()
     sigToggleDockManagerPressed = QtCore.pyqtSignal()
 
     
     @property
     def right_sidebar_contents_container(self) -> LayoutWidget:
-        return self.ui.layout_widget # AttributeError: 'Spike3DRasterRightSidebarWidget' object has no attribute 'ui'
-    
+        try:
+            return self.ui.layout_widget # AttributeError: 'Spike3DRasterRightSidebarWidget' object has no attribute 'ui'
+        except AttributeError as e:
+            ## occurs before class is initialized by uic.loadUi(...)
+            pass
+        except Exception as e:
+            raise e        
+
     @property
     def right_sidebar_contents_container_dockarea(self) -> NestedDockAreaWidget:
-        return self.ui.dynamic_docked_widget_container    
+        try:
+            return self.ui.dynamic_docked_widget_container
+        except AttributeError as e:
+            ## occurs before class is initialized by uic.loadUi(...)
+            pass
+        except Exception as e:
+            raise e
+        
 
     def __init__(self, parent=None):
         super().__init__(parent=parent) # Call the inherited classes __init__ method
@@ -83,8 +101,11 @@ class Spike3DRasterRightSidebarWidget(QtWidgets.QWidget):
         self.ui.dock_items = {}  # Store dock items
         
         self.ui.btnToggleDockManager.clicked.connect(self.toggle_dock_manager)
-        self.ui.btnToggleIntervalManager.clicked.connect(self.toggle_interval_manager)
+        self.ui.btnToggleIntervalTableManager.clicked.connect(self.toggle_interval_active_window_table_manager)
+        self.ui.btnToggleIntervalConfigManager.clicked.connect(self.toggle_interval_visual_configs_manager)
+        self.ui.btnToggleNeuronVisualConfigManager.clicked.connect(self.toggle_neuron_configs_manager)
         
+
         # self.setVisible(True) # shows the sidebar
 
     def toggle_dock_manager(self):
@@ -92,10 +113,28 @@ class Spike3DRasterRightSidebarWidget(QtWidgets.QWidget):
         print("toggle_dock_manager()")
         self.sigToggleDockManagerPressed.emit()
         
-    def toggle_interval_manager(self):
+    # def toggle_interval_manager(self):
+    #     """ Toggles the visibility of the interval manager """
+    #     print("toggle_interval_manager()")
+    #     self.sigToggleDockManagerPressed.emit()
+    
+
+    def toggle_interval_visual_configs_manager(self):
         """ Toggles the visibility of the interval manager """
         print("toggle_interval_manager()")
-        self.sigToggleDockManagerPressed.emit()
+        self.sigToggleIntervalEpochsDisplayManagerPressed.emit()
+        
+
+    def toggle_interval_active_window_table_manager(self):
+        """ Toggles the visibility of the interval manager """
+        print("toggle_interval_active_window_table_manager()")
+        self.sigToggleIntervalActiveWindowTableManagerPressed.emit()
+        
+
+    def toggle_neuron_configs_manager(self):
+        """ Toggles the visibility of the interval manager """
+        print("toggle_neuron_configs_manager()")
+        self.sigToggleNeuronDisplayConfigManagerPressed.emit()
 
 
 
@@ -128,13 +167,35 @@ class SpikeRasterRightSidebarOwningMixin:
         """ called when the right sidebar is made Visible or non_visible"""
         self.right_sidebar_widget.setVisible(is_visible) 
 
+    # @pyqtExceptionPrintingSlot()
+    # def on_toggle_interval_manager(self):
+    #     """ Toggles the visibility of the interval manager """
+    #     print(f'SpikeRasterRightSidebarOwningMixin.on_toggle_interval_manager()')
+    #     self.build_epoch_intervals_visual_configs_widget()
+    #     print(f'\tdone.')
+
+
     @pyqtExceptionPrintingSlot()
-    def on_toggle_interval_manager(self):
+    def on_toggle_interval_visual_configs_manager(self):
         """ Toggles the visibility of the interval manager """
-        print(f'SpikeRasterRightSidebarOwningMixin.on_toggle_interval_manager()')
+        print(f'SpikeRasterRightSidebarOwningMixin.on_toggle_interval_visual_configs_manager()')
         self.build_epoch_intervals_visual_configs_widget()
         print(f'\tdone.')
+        
 
+    @pyqtExceptionPrintingSlot()
+    def on_toggle_interval_active_window_tables_manager(self):
+        """ Toggles the visibility of the interval manager """
+        print(f'SpikeRasterRightSidebarOwningMixin.on_toggle_interval_active_window_tables_manager()')
+        self.on_update_right_sidebar_visible_interval_info_tables()
+        print(f'\tdone.')
+
+    @pyqtExceptionPrintingSlot()
+    def on_toggle_neuron_visual_configs_manager(self):
+        """ Toggles the visibility of the interval manager """
+        print(f'SpikeRasterRightSidebarOwningMixin.on_toggle_neuron_visual_configs_manager()')
+        self.build_neuron_visual_configs_widget()
+        print(f'\tdone.')
 
     @pyqtExceptionPrintingSlot()
     def on_toggle_dock_manager(self):
@@ -163,8 +224,9 @@ class SpikeRasterRightSidebarOwningMixin:
         # right_side_bar_connections.append(right_side_bar_controls.temporal_zoom_factor_changed.connect(self.on_temporal_zoom_factor_valueChanged))
         # right_side_bar_connections.append(right_side_bar_controls.render_window_duration_changed.connect(self.on_render_window_duration_valueChanged))        
         right_side_bar_connections.append(right_side_bar_controls.sigToggleDockManagerPressed.connect(self.on_toggle_dock_manager))
-        right_side_bar_connections.append(right_side_bar_controls.sigToggleIntervalManagerPressed.connect(self.on_toggle_interval_manager))
-        
+        right_side_bar_connections.append(right_side_bar_controls.sigToggleIntervalActiveWindowTableManagerPressed.connect(self.on_toggle_interval_active_window_tables_manager))
+        right_side_bar_connections.append(right_side_bar_controls.sigToggleIntervalEpochsDisplayManagerPressed.connect(self.on_toggle_interval_visual_configs_manager))
+        right_side_bar_connections.append(right_side_bar_controls.sigToggleNeuronDisplayConfigManagerPressed.connect(self.on_toggle_neuron_visual_configs_manager))
         return right_side_bar_connections
         
 

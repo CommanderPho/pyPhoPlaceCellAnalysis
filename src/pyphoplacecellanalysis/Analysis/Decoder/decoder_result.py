@@ -15,6 +15,7 @@ from attrs import define, field, Factory
 import attrs # used for several things
 import matplotlib.pyplot as plt
 from matplotlib import cm
+import nptyping as ND
 from nptyping import NDArray # used for plot_kourosh_activity_style_figure version too to get a good colormap 
 import numpy as np
 import numpy.ma as ma # for masked array
@@ -44,6 +45,8 @@ from neuropy.utils.mixins.HDF5_representable import HDFMixin
 from pyphocorehelpers.indexing_helpers import find_neighbours
 from pyphocorehelpers.function_helpers import function_attributes
 from pyphocorehelpers.indexing_helpers import safe_np_vstack # for `_new_compute_surprise`
+from pyphocorehelpers.programming_helpers import metadata_attributes
+from pyphocorehelpers.function_helpers import function_attributes
 
 from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import BayesianPlacemapPositionDecoder, DecodedFilterEpochsResult # perform_leave_one_aclu_out_decoding_analysis
 
@@ -119,6 +122,7 @@ class DecoderResultDisplayingBaseClass:
     def most_likely_positions(self):
         return self.decoder.most_likely_positions
 
+@metadata_attributes(short_name=None, tags=['matplotlib', 'figure'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-02-20 18:36', related_items=[])
 class DecoderResultDisplayingPlot2D(DecoderResultDisplayingBaseClass):
     """ Displays the decoder for 2D position.
 

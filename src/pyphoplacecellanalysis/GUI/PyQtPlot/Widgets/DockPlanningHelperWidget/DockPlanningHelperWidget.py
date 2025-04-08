@@ -7,8 +7,10 @@ import pyphoplacecellanalysis.External.pyqtgraph as pg
 from pyphoplacecellanalysis.External.pyqtgraph.Qt import QtCore, QtGui, QtWidgets, mkQApp, uic
 ## IMPORTS:
 # from ...pyPhoPlaceCellAnalysis.src.pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.DockPlanningHelperWidget import DockPlanningHelperWidget
-from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.DockPlanningHelperWidget.Uic_AUTOGEN_DockPlanningHelperWidget import Ui_Form
+# from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.DockPlanningHelperWidget.Uic_AUTOGEN_DockPlanningHelperWidget import Ui_Form
 # from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.DockPlanningHelperWidget.Uic_AUTOGEN_TinyDockPlanningHelperWidget import Ui_Form
+from pyqtgraph.widgets.ColorButton import ColorButton
+from pyphoplacecellanalysis.Resources import ActionIcons
 
 from pyphoplacecellanalysis.External.pyqtgraph.dockarea.Dock import Dock
 # from pyphoplacecellanalysis.External.pyqtgraph.dockarea.DockArea import DockArea
@@ -39,10 +41,9 @@ class DockPlanningHelperWidget(QtWidgets.QWidget):
     
     def __init__(self, dock_title='Position Decoder', dock_id='PositionDecoder', color=None, defer_show=False, parent=None):
         super().__init__(parent=parent) # Call the inherited classes __init__ method
-        self.ui = Ui_Form()
-        # self.ui = uic.loadUi(uiFile, self) # Load the .ui file
-        self.ui.setupUi(self) # builds the design from the .ui onto this widget.
-
+        # self.ui = Ui_Form()
+        # self.ui.setupUi(self) # builds the design from the .ui onto this widget.
+        self.ui = uic.loadUi(uiFile, self) # Load the .ui file
         self.initUI()
         self.title = dock_title
         self.identifier = dock_id
@@ -171,8 +172,12 @@ class DockPlanningHelperWidget(QtWidgets.QWidget):
             btnLog
             btnSave
             
+            btnAddWidgetLeft
             btnAddWidgetRight
             btnAddWidgetBelow
+            btnAddWidgetAbove
+            btnAddWidgetNewTab
+            btnCreateNewGroup
             
             
         """
@@ -189,9 +194,13 @@ class DockPlanningHelperWidget(QtWidgets.QWidget):
         self.ui.btnSave.clicked.connect(self.on_save)
         self.ui.btnRefresh.clicked.connect(self.on_refresh)
         
+        self.ui.btnAddWidgetLeft.clicked.connect(self.on_click_create_new_dock_left)        
         self.ui.btnAddWidgetRight.clicked.connect(self.on_click_create_new_dock_right)
         self.ui.btnAddWidgetBelow.clicked.connect(self.on_click_create_new_dock_below)
-        self.ui.btnAddWidgetAbove.clicked.connect(self.on_click_create_new_dock_tab_on_top_of)
+        self.ui.btnAddWidgetAbove.clicked.connect(self.on_click_create_new_dock_above)
+        self.ui.btnAddWidgetNewTab.clicked.connect(self.on_click_create_new_dock_tab_on_top_of)
+        self.ui.btnCreateNewGroup.clicked.connect(self.on_click_create_new_nested_containing_group_dock)
+        
         
         # self.ui.spinBox_Width.valueChanged.connect(self.on_values_updated)
 
@@ -207,8 +216,8 @@ class DockPlanningHelperWidget(QtWidgets.QWidget):
         self.ui.btnLog.setHidden(True)
         self.ui.lblInfoTextLine.setHidden(True)
         self.ui.line.setHidden(True)
-        self.ui.groupBox.setHidden(True)
-        self.ui.groupBoxActions.setHidden(True)                
+        # self.ui.groupBox.setHidden(True)
+        # self.ui.groupBoxActions.setHidden(True)                
         self.ui.txtDockIdentifier.setHidden(True)
         self.ui.label_2.setHidden(True)
         self.ui.lblInfoTextLine.setHidden(True)
@@ -311,6 +320,20 @@ class DockPlanningHelperWidget(QtWidgets.QWidget):
         print(f'DockPlanningHelperWidget.on_click_create_new_dock_right()')
         # self.action_create_new_dock.emit(self.embedding_dock_item, 'right')
         self.sigCreateNewDock.emit(self, 'right')
+        
+
+    def on_click_create_new_dock_left(self):
+        # [self.embedding_dock_item, 'right']
+        print(f'DockPlanningHelperWidget.on_click_create_new_dock_left()')
+        # self.action_create_new_dock.emit(self.embedding_dock_item, 'right')
+        self.sigCreateNewDock.emit(self, 'left')
+        
+
+    def on_click_create_new_dock_above(self):
+        # [self.embedding_dock_item, 'right']
+        print(f'DockPlanningHelperWidget.on_click_create_new_dock_above()')
+        # self.action_create_new_dock.emit(self.embedding_dock_item, 'right')
+        self.sigCreateNewDock.emit(self, 'top')
 
 
     def on_click_create_new_dock_tab_on_top_of(self):
@@ -320,6 +343,15 @@ class DockPlanningHelperWidget(QtWidgets.QWidget):
         
         # self.sigCreateNewDock.emit(self, ('above', self.identifier,))
         self.sigCreateNewDock.emit(self, f'above, {self.identifier}')
+        
+
+    def on_click_create_new_nested_containing_group_dock(self):
+        # [self.embedding_dock_item, 'bottom']
+        print(f'DockPlanningHelperWidget.on_click_create_new_nested_containing_group_dock()')
+        # self.action_create_new_dock.emit(self.embedding_dock_item, 'bottom')
+        
+        # self.sigCreateNewDock.emit(self, ('above', self.identifier,))
+        self.sigCreateNewDock.emit(self, f'containing, {self.identifier}') ## NOTE: "containing, " is not processed by the standard handlers!
         
 
     def on_change_dock_config_color(self, a_color_button):

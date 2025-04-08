@@ -33,7 +33,13 @@
 border-color: rgb(207, 207, 207);
 background-color: rgba(71, 65, 60, 180);
 color: rgb(244, 244, 244);
-border-color: rgb(0, 0, 0);</string>
+border-color: rgb(0, 0, 0);
+QToolTip {
+    color: white;
+    background-color: #353535;
+    border: 1px solid white;
+    padding: 2px;
+}</string>
   </property>
   <layout class="QVBoxLayout" name="verticalLayout_2">
    <property name="spacing">
@@ -104,7 +110,7 @@ border-color: rgb(0, 0, 0);</string>
         </widget>
        </item>
        <item>
-        <widget class="QToolButton" name="btnToggleIntervalManager">
+        <widget class="QToolButton" name="btnToggleIntervalConfigManager">
          <property name="toolTip">
           <string>Displays the Epoch Interval Rectangle Visual Appearance Management Widget</string>
          </property>
@@ -115,7 +121,7 @@ border-color: rgb(0, 0, 0);</string>
           <string>Displays the Epoch Interval Rectangle Visual Appearance Management Widget</string>
          </property>
          <property name="text">
-          <string>Interval</string>
+          <string>Interval Appearance</string>
          </property>
          <property name="icon">
           <iconset resource="../../../Resources/ActionIcons.qrc">
@@ -137,16 +143,39 @@ border-color: rgb(0, 0, 0);</string>
      <item>
       <layout class="QGridLayout" name="gridLayout">
        <item row="1" column="1">
-        <widget class="QToolButton" name="toolButton">
+        <widget class="QToolButton" name="btnToggleNeuronVisualConfigManager">
          <property name="text">
           <string>...</string>
+         </property>
+         <property name="icon">
+          <iconset resource="../../../Resources/ActionIcons.qrc">
+           <normaloff>:/Graphics/Icons/graphics/Spikes.png</normaloff>:/Graphics/Icons/graphics/Spikes.png</iconset>
+         </property>
+         <property name="checkable">
+          <bool>true</bool>
          </property>
         </widget>
        </item>
        <item row="1" column="2">
-        <widget class="QToolButton" name="toolButton_3">
+        <widget class="QToolButton" name="btnToggleIntervalTableManager">
+         <property name="toolTip">
+          <string>Toggle Epoch Active Window Tables</string>
+         </property>
+         <property name="statusTip">
+          <string>Toggle Epoch Active Window Tables</string>
+         </property>
+         <property name="whatsThis">
+          <string>Toggle Epoch Active Window Tables</string>
+         </property>
          <property name="text">
-          <string>...</string>
+          <string>Toggle Epoch Active Window Tables</string>
+         </property>
+         <property name="icon">
+          <iconset resource="../../../Resources/ActionIcons.qrc">
+           <normaloff>:/Icons/Icons/Icon/application-table.png</normaloff>:/Icons/Icons/Icon/application-table.png</iconset>
+         </property>
+         <property name="checkable">
+          <bool>true</bool>
          </property>
         </widget>
        </item>
@@ -229,7 +258,6 @@ border-color: rgb(0, 0, 0);</string>
   </customwidget>
  </customwidgets>
  <resources>
-  <include location="../../../Resources/ActionIcons.qrc"/>
   <include location="../../../Resources/ActionIcons.qrc"/>
   <include location="../../../Resources/GuiResources.qrc"/>
  </resources>

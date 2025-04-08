@@ -2,6 +2,7 @@ from copy import deepcopy
 from pathlib import Path
 from typing import Dict, Callable, List, Optional, Tuple
 from attrs import define, field
+import nptyping as ND
 from nptyping import NDArray
 import numpy as np
 import pandas as pd
@@ -1899,7 +1900,7 @@ class DataframeFilterPredicates(HDF_SerializationMixin, AttrsBasedClassHelperMix
 
 @custom_define(slots=False, eq=False)
 class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
-    """ handles interactive filtering of dataframes by presenting a jupyter widget interface.
+    """ Involves an interactive ipywidget, and handles interactive filtering of dataframes by presenting a jupyter widget interface.
     
     
     Usage:
@@ -1991,6 +1992,7 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
     active_filter_predicate_selector_widget: CheckBoxListWidget = non_serialized_field(init=False)
     active_plot_df_name_selector_widget = non_serialized_field(init=False)
     active_plot_variable_name_widget = non_serialized_field(init=False)
+    custom_dynamic_filter_widgets_list: List = non_serialized_field(init=False, metadata={'desc': 'stores references to the widgets with knowledge of which properties to update to filter the dataframe.'})
     
     output_widget: widgets.Output = non_serialized_field(init=False)
     figure_widget: go.FigureWidget = non_serialized_field(init=False)
@@ -2135,6 +2137,7 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
     @property
     def active_plot_df(self) -> pd.DataFrame:
         """The selected filtered dataframe to use with the plot."""
+        assert self.active_plot_df_name in list(self.filtered_df_dict.keys()), f"self.active_plot_df_name: '{self.active_plot_df_name}' not in list(self.filtered_df_dict.keys()): {list(self.filtered_df_dict.keys())}"
         return self.filtered_df_dict[self.active_plot_df_name]
 
 
@@ -2155,10 +2158,79 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
         # Set up the buttons after figure_widget is created
         self._setup_widgets_buttons()
 
+
+    @function_attributes(short_name=None, tags=['filter', 'dynamic', 'ui', 'widget'], input_requires=[], output_provides=[], uses=['._rebuild_predicate_widget()'], used_by=[], creation_date='2025-03-27 14:05', related_items=[])
+    def build_extra_control_widget(self, a_name: str = 'replay_name', df_col_name: str = 'custom_replay_name', a_widget_label: str = 'Replay Name:'):
+        """ adds a new dropdown widget to refine the active points, triggers `self._on_widget_change` when a selection is made
+
+        Works by adding the widget as property of this instance, and imposing the widget's selection criteria by adding a custom predicate to `self.additional_filter_predicates`. 
+        The predicate selector widget is then rebuilt by calling `self._rebuild_predicate_widget(...)`
+        
+        
+        Usage:        
+            df_filter.build_extra_control_widget(a_name='trained_compute_epochs', df_col_name='trained_compute_epochs', a_widget_label='TrainedComputeEpochs :')
+            df_filter.build_extra_control_widget(a_name='pfND_ndim', df_col_name='pfND_ndim', a_widget_label='pfND_ndim:')
+            df_filter.build_extra_control_widget(a_name='decoder_identifier', df_col_name='decoder_identifier', a_widget_label='decoder_identifier:')
+            df_filter.build_extra_control_widget(a_name='data_grain', df_col_name='data_grain', a_widget_label='data_grain:')
+            df_filter.build_extra_control_widget(a_name='masked_time_bin_fill_type', df_col_name='masked_time_bin_fill_type', a_widget_label='masked_time_bin_fill_type:')
+            df_filter.build_extra_control_widget(a_name='known_named_decoding_epochs_type', df_col_name='known_named_decoding_epochs_type', a_widget_label='known_named_decoding_epochs_type:')
+
+        """
+        import ipywidgets as widgets
+        from traitlets import Dict as TraitDict  # Import the Dict traitlet
+
+        a_widget_name: str = f"{a_name}_widget" # replay_name_widget
+        extant_widget = getattr(self, a_widget_name, None)
+        if extant_widget is not None:
+            raise NotImplementedError(f'Not sure what to do with extant widgets yet! a_widget_label: "{a_widget_label}".')
+
+        ## Create and add new widget:
+        a_col_values_options = sorted(self.active_plot_df[df_col_name].astype(str).unique())    
+        a_widget = widgets.Dropdown(
+                    options=a_col_values_options,
+                    description=a_widget_label,
+                    disabled=False,
+                    layout=widgets.Layout(width='500px'),
+                    style={'description_width': 'initial'},
+                    # metadata={"desc": "build_extra_control_widget", "df_col_name": df_col_name, "name": a_name, "widget_name": a_widget_name, }, ## DOES NOT WORK
+                )
+        
+        ## add_traits (does work)
+        a_widget.metadata = TraitDict({  # Use the Dict traitlet here
+            "desc": "build_extra_control_widget",
+            "df_col_name": df_col_name,
+            "name": a_name,
+            "widget_name": a_widget_name,
+        })
+        
+        # Build the appropriate filter predicate to go along with the custom control _________________________________________ #
+        self.additional_filter_predicates.update({
+            f'{a_widget_name}': (lambda df: (df[df_col_name].astype(str) == str(a_widget.value))),
+        })
+
+        ## INPUTS: self.custom_dynamic_filter_widgets_list
+        ## Add to output widgets list
+        self.custom_dynamic_filter_widgets_list.append(a_widget)
+        setattr(self, a_widget_name, a_widget) # self.replay_name_widget
+        ## INPUTS: self.custom_dynamic_filter_widgets_dict, self.custom_dynamic_filter_widgets_property_map
+
+        ## Update the predicate enabled selection widget and default to enabling this predicate:
+        self._rebuild_predicate_widget(initially_is_checked={f'{a_widget_name}':True})
+
+        # Set up observers to handle changes in widget values
+        a_widget.observe(self._on_widget_change, names='value')
+        
+
+        
+
+    @function_attributes(short_name=None, tags=['private', 'widget'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-03-27 12:18', related_items=[])
     def _setup_widgets(self):
         import plotly.subplots as sp
         from pyphoplacecellanalysis.Pho2D.plotly.Extensions.plotly_helpers import PlotlyFigureContainer
         
+
+        self.custom_dynamic_filter_widgets_list = [] ## start with an empty list of additional filter widgets
+
         # Extract unique options for the widgets
         replay_name_options = sorted(self.active_plot_df['custom_replay_name'].astype(str).unique())
         time_bin_size_options = sorted(self.active_plot_df['time_bin_size'].unique())
@@ -2227,7 +2299,7 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
         self.active_plot_df_name_selector_widget.observe(self._on_widget_change, names='value')
         self.active_plot_variable_name_widget.observe(self._on_widget_change, names='value')
         
-
+        ## the table at the bottom that shows the active number of filtered points
         self.table_widget = DataGrid(self.filtered_size_info_df,
                                 base_row_size=15, base_column_size=300, horizontal_stripes=True,
                                 #  renderers=renderers,
@@ -2337,13 +2409,46 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
         self.on_widget_update_filename()
 
 
+    @function_attributes(short_name=None, tags=['MAIN', 'update', 'filter'], input_requires=[], output_provides=[], uses=['.update_filtered_dataframes'], used_by=[], creation_date='2025-03-27 12:20', related_items=[])
     def _on_widget_change(self, change):
+        """ this is the main update function that is called whenever an observed widget's value changes to update the filtered dataframe.
+        Updates the bound variables from the widget's new value!
+        """
+        # self.output_widget.clear_output()
+        with self.output_widget:
+            print(f'._on_widget_change(change: {change})') # ._on_widget_change(change: {'name': 'value', 'old': 'dropped', 'new': 'ignore', 'owner': Dropdown(description='masked_time_bin_fill_type:', index=1, layout=Layout(width='500px'), options=('dropped', 'ignore', 'last_valid', 'nan_filled'), style=DescriptionStyle(description_
+
+        # changing_widget = change['owner'] # Dropdown(description='masked_time_bin_fill_type:', index=1, layout=Layout(width='500px'), options=('dropped', 'ignore', 'last_valid', 'nan_filled'), 
+        # widget_metadata: Dict = changing_widget.metadata.__dict__['default_args'][0] # {'desc': 'TEST!', 'df_col_name': 'trained_compute_epochs', 'name': 'trained_compute_epochs', 'widget_name': 'trained_compute_epochs_widget'}
+                
         active_plot_df_name = self.active_plot_df_name_selector_widget.value
         self.active_plot_df_name = self.active_plot_df_name_selector_widget.value
         self.active_plot_variable_name = self.active_plot_variable_name_widget.value
-        
+
         # Update filtered DataFrames when widget values change
         self.update_filtered_dataframes(self.replay_name_widget.value, self.time_bin_size_widget.value)
+        self.on_widget_update_filename()
+        
+
+    @function_attributes(short_name=None, tags=['predicate', 'controls', 'filter'], input_requires=[], output_provides=[], uses=[], used_by=['.build_extra_control_widget'], creation_date='2025-03-27 14:05', related_items=[])
+    def _rebuild_predicate_widget(self, initially_is_checked: Optional[Dict[str, bool]]=None):
+        """ remove existing if needed, then rebuild """
+        if hasattr(self, 'active_filter_predicate_selector_widget'):
+            ## get existing is_checked values
+            existing_options_dict = deepcopy(self.active_filter_predicate_selector_widget.options_dict)
+            self.active_filter_predicate_selector_widget.unobserve(self._on_widget_change, names='value') ## stop observing changes
+            self.active_filter_predicate_selector_widget.close()
+            delattr(self, 'active_filter_predicate_selector_widget')
+        else:
+            existing_options_dict = {}
+
+        if initially_is_checked is not None:
+            existing_options_dict.update(initially_is_checked)
+            
+        # options_list = list(self.additional_filter_predicates.keys())
+        new_options_dict = {k:existing_options_dict.get(k, False) for k in list(self.additional_filter_predicates.keys())} ## use the existing key value if there was one (user's selection), else default to False
+        self.active_filter_predicate_selector_widget = CheckBoxListWidget(options_list=new_options_dict) ## create widget
+        self.active_filter_predicate_selector_widget.observe(self._on_widget_change, names='value') ## observe changes
 
 
     def display(self):
@@ -2361,6 +2466,8 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
                 self.active_filter_predicate_selector_widget,
                 # self.table_widget
             ], #layout=widgets.Layout(width='100%'),
+            ),
+            widgets.HBox([*self.custom_dynamic_filter_widgets_list], #layout=widgets.Layout(width='100%'),
             ),
             widgets.HBox([
                 self.active_plot_df_name_selector_widget, 
@@ -2492,8 +2599,6 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
                     print(f'NOPE! points: {points}, trace: {trace}')
             
 
-
-
     def on_update_selected_scatter_points(self, trace, points, selector):
         """ 
         updates self.selected_points
@@ -2531,15 +2636,15 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
             print(f'self.selected_points: {self.selected_points}')
             
 
-
     @function_attributes(short_name=None, tags=['plotting'], input_requires=[], output_provides=[], uses=['_perform_plot_pre_post_delta_scatter'], used_by=[], creation_date='2024-11-20 13:08', related_items=[])
     @classmethod
-    def _build_plot_callback(cls, earliest_delta_aligned_t_start, latest_delta_aligned_t_end, save_plotly, should_save: bool = False, resolution_multiplier=1, enable_debug_print=False, **extra_plot_kwargs):
+    def _build_plot_callback(cls, earliest_delta_aligned_t_start, latest_delta_aligned_t_end, save_plotly, should_save: bool = False, should_prepare_full_hover_click_interactivity: bool = False, resolution_multiplier: float=1, enable_debug_print=False, **extra_plot_kwargs):
+        """ 
+        
+        should_prepare_full_hover_click_interactivity: bool:  ## slow when enabled
+        
+        """
         # fig_size_kwargs = {'width': 1650, 'height': 480}
-        
-        
-                
-
         # fig_size_kwargs = {'width': resolution_multiplier*1650, 'height': resolution_multiplier*480}
         ## set up figure size
         fig_size_kwargs = {'width': (resolution_multiplier * 1800), 'height': (resolution_multiplier*480)}
@@ -2565,6 +2670,7 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
         
         extra_plot_kwargs = deepcopy(extra_plot_kwargs)
 
+
         def _build_filter_changed_plotly_plotting_callback_fn(df_filter: "DataFrameFilter", should_save:bool=False, **kwargs):
             """ `filtered_all_sessions_all_scores_ripple_df` versions -
             captures: _perform_plot_pre_post_delta_scatter_with_embedded_context, should_save, extra_plot_kwargs
@@ -2579,8 +2685,7 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
                 # a_heatmap_img = df_filter.hover_posterior_data.ripple_img_dict['long_LR'][last_selected_idx]    
                 ## update the plot
                 df_filter.hover_posterior_preview_figure_widget.add_heatmap(z=a_heatmap_img, showscale=False, name='selected_posterior', )
-
-
+            ## END def _plot_hoverred_heatmap_preview_post....
 
             # df_filter.output_widget.clear_output(wait=True)
             active_plot_df_name: str = df_filter.active_plot_df_name
@@ -2594,138 +2699,145 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
             fig, new_fig_context, _extras_output_dict, figure_out_paths = _new_perform_plot_pre_post_delta_scatter_with_embedded_context(concatenated_ripple_df=deepcopy(active_plot_df), is_dark_mode=False, should_save=should_save, extant_figure=df_filter.figure_widget,
                                                                                                                                     variable_name=plot_variable_name, **active_plot_kwargs) # , enable_custom_widget_buttons=True
             
-            fig = fig.update_layout(clickmode="event+select", hovermode='closest', dragmode='select')
-            
-            
-            # Customize the hovertemplate
-            fig.update_traces(
-                # hovertemplate="<b>sess:</b> %{customdata[0]}<br>"
-                #             # "<b>X:</b> %{x}<br>"
-                #             "<b>start, duration:</b> %{customdata[3]}, %{customdata[4]}<br>"
-                #             "<b>Y:</b> %{y}<br>"
-                #             "<b>custom_replay:</b> %{customdata[1]}",
+
+            # ==================================================================================================================== #
+            # Hover/Click Interactivity (Slow)                                                                                     #
+            # ==================================================================================================================== #
+            if should_prepare_full_hover_click_interactivity:
+                fig = fig.update_layout(clickmode="event+select", hovermode='closest', dragmode='select')
                 
-                hovertemplate="<b>sess:</b> %{customdata[0]} | <b>replay_name:</b> %{customdata[1]} | <b>time_bin_size:</b> %{customdata[2]}<br>"
-                            "<b>start:</b> %{customdata[3]}<br>",
-                customdata=active_plot_df[["session_name", "custom_replay_name", "time_bin_size", "start", "duration"]].values,
-                hoverlabel=dict(bgcolor="rgba(255, 255, 255, 0.4)", font=dict(color="black")),
-            )
-
-            if df_filter.hover_posterior_data is not None:
-                if df_filter.hover_posterior_data.plot_heatmap_fn is None:
-                    df_filter.hover_posterior_data.plot_heatmap_fn = (lambda a_df_filter, a_heatmap_img, *args, **kwargs: a_df_filter.hover_posterior_preview_figure_widget.add_heatmap(z=a_heatmap_img, showscale=False, name='selected_posterior', ))
+                
+                # Customize the hovertemplate
+                fig.update_traces(
+                    # hovertemplate="<b>sess:</b> %{customdata[0]}<br>"
+                    #             # "<b>X:</b> %{x}<br>"
+                    #             "<b>start, duration:</b> %{customdata[3]}, %{customdata[4]}<br>"
+                    #             "<b>Y:</b> %{y}<br>"
+                    #             "<b>custom_replay:</b> %{customdata[1]}",
                     
+                    hovertemplate="<b>sess:</b> %{customdata[0]} | <b>replay_name:</b> %{customdata[1]} | <b>time_bin_size:</b> %{customdata[2]}<br>"
+                                "<b>start:</b> %{customdata[3]}<br>",
+                    customdata=active_plot_df[["session_name", "custom_replay_name", "time_bin_size", "start", "duration"]].values,
+                    hoverlabel=dict(bgcolor="rgba(255, 255, 255, 0.4)", font=dict(color="black")),
+                )
 
-            allow_single_selection_only: bool = True
-            # replace_selected_points: bool = True
-            
-            def on_click(trace, points, selector):
-                if points.point_inds:
-                    df_filter.on_click_scatter_points(trace=trace, points=points, selector=selector) ## pass through call to `df_filter.on_click_scatter_points(...)`                    
-
-                    ## has selection:
-                    if (allow_single_selection_only or (len(points.point_inds) < 2)):
-                        ind = points.point_inds[0]
-                        num_new_selections = 1
-                    else:
-                        ind = points.point_inds # allows multiple selections
-                        num_new_selections = len(ind)
-
-                    session_name = df_filter.active_plot_df['session_name'].iloc[ind]
-                    custom_replay_name = df_filter.active_plot_df['custom_replay_name'].iloc[ind]
-                    time_bin_size = df_filter.active_plot_df['time_bin_size'].iloc[ind]
-                    start_t = df_filter.active_plot_df['start'].iloc[ind]
-                    stop_t = df_filter.active_plot_df['stop'].iloc[ind]
-
-
-                    # # df_filter.output_widget.clear_output()
-                    # with df_filter.output_widget:
-                    #     print(f"Clicked point index: {ind}")
-                    #     print(f'start_t, stop_t: {start_t}, {stop_t}')
-                    #     print(f"session_name: {session_name}")
-                    #     print(f"custom_replay_name: {custom_replay_name}")
-                    #     print(f"time_bin_size: {time_bin_size}")                        
-                    #     print(f'num_new_selections: {num_new_selections}')
+                if df_filter.hover_posterior_data is not None:
+                    if df_filter.hover_posterior_data.plot_heatmap_fn is None:
+                        df_filter.hover_posterior_data.plot_heatmap_fn = (lambda a_df_filter, a_heatmap_img, *args, **kwargs: a_df_filter.hover_posterior_preview_figure_widget.add_heatmap(z=a_heatmap_img, showscale=False, name='selected_posterior', ))
                         
 
-                    # with df_filter.output_widget:
-                    # print(f'num_new_selections: {num_new_selections}')
-                    # if (num_new_selections == 1):
-                    #     selected_event_session_context: IdentifyingContext = IdentifyingContext(session_name=session_name, custom_replay_name=custom_replay_name, time_bin_size=time_bin_size)
-                    #     print(f'selected_event_session_context: {selected_event_session_context}')
-                    #     # selected_event_context: IdentifyingContext = IdentifyingContext(start_t=start_t, stop_t=stop_t)
-                    #     curr_selected_points_dict = df_filter.selected_points.get(selected_event_session_context, None)
-                    #     if curr_selected_points_dict is None:
-                    #         df_filter.selected_points[selected_event_session_context] = [] # [start_t, ] ## add start_t only
-                            
-                    #     if replace_selected_points:
-                    #         df_filter.selected_points[selected_event_session_context]
-                    #     else:
-                    #         if start_t not in df_filter.selected_points[selected_event_session_context]:
-                    #             df_filter.selected_points[selected_event_session_context].append(start_t) # add to the selection points list
-                                                
-                    # else:
-                    #     # greater than one selection
-                    #     for i, (a_session_name, a_custom_replay_name, a_time_bin_size, a_start_t, a_stop_t) in enumerate(zip(session_name, custom_replay_name, time_bin_size, start_t, stop_t)):
-                            
-                    #         a_selected_event_session_context: IdentifyingContext = IdentifyingContext(session_name=a_session_name, custom_replay_name=a_custom_replay_name, time_bin_size=a_time_bin_size)
-                    #         print(f'a_selected_event_session_context: {a_selected_event_session_context}')
-                    #         # a_selected_event_context: IdentifyingContext = IdentifyingContext(start_t=a_start_t, stop_t=a_stop_t)
+                allow_single_selection_only: bool = True
+                # replace_selected_points: bool = True
 
-                    #         curr_selected_points_dict = df_filter.selected_points.get(a_selected_event_session_context, None)
-                    #         if curr_selected_points_dict is None:
-                    #             df_filter.selected_points[a_selected_event_session_context] = [] # [start_t, ] ## add start_t only                                
-                    #         # if replace_selected_points:
-                    #         #     df_filter.selected_points[a_selected_event_session_context]
-                    #         # else:
-                    #         if a_start_t not in df_filter.selected_points[a_selected_event_session_context]:
-                    #             df_filter.selected_points[a_selected_event_session_context].append(a_start_t) # add to the selection points list
+              
+                def on_click(trace, points, selector):
+                    if points.point_inds:
+                        df_filter.on_click_scatter_points(trace=trace, points=points, selector=selector) ## pass through call to `df_filter.on_click_scatter_points(...)`                    
+
+                        ## has selection:
+                        if (allow_single_selection_only or (len(points.point_inds) < 2)):
+                            ind = points.point_inds[0]
+                            num_new_selections = 1
+                        else:
+                            ind = points.point_inds # allows multiple selections
+                            num_new_selections = len(ind)
+
+                        session_name = df_filter.active_plot_df['session_name'].iloc[ind]
+                        custom_replay_name = df_filter.active_plot_df['custom_replay_name'].iloc[ind]
+                        time_bin_size = df_filter.active_plot_df['time_bin_size'].iloc[ind]
+                        start_t = df_filter.active_plot_df['start'].iloc[ind]
+                        stop_t = df_filter.active_plot_df['stop'].iloc[ind]
+
+
+                        # # df_filter.output_widget.clear_output()
+                        # with df_filter.output_widget:
+                        #     print(f"Clicked point index: {ind}")
+                        #     print(f'start_t, stop_t: {start_t}, {stop_t}')
+                        #     print(f"session_name: {session_name}")
+                        #     print(f"custom_replay_name: {custom_replay_name}")
+                        #     print(f"time_bin_size: {time_bin_size}")                        
+                        #     print(f'num_new_selections: {num_new_selections}')
+                            
+
+                        # with df_filter.output_widget:
+                        # print(f'num_new_selections: {num_new_selections}')
+                        # if (num_new_selections == 1):
+                        #     selected_event_session_context: IdentifyingContext = IdentifyingContext(session_name=session_name, custom_replay_name=custom_replay_name, time_bin_size=time_bin_size)
+                        #     print(f'selected_event_session_context: {selected_event_session_context}')
+                        #     # selected_event_context: IdentifyingContext = IdentifyingContext(start_t=start_t, stop_t=stop_t)
+                        #     curr_selected_points_dict = df_filter.selected_points.get(selected_event_session_context, None)
+                        #     if curr_selected_points_dict is None:
+                        #         df_filter.selected_points[selected_event_session_context] = [] # [start_t, ] ## add start_t only
                                 
-                    
-                    # df_filter.output_widget.clear_output()
-                    # with df_filter.output_widget:
-                    #     print(f"Clicked point index: {ind}")
-                    #     print(f'start_t, stop_t: {start_t}, {stop_t}')
-                    #     print(f"session_name: {session_name}")
-                    #     print(f"custom_replay_name: {custom_replay_name}")
-                    #     print(f"time_bin_size: {time_bin_size}")
+                        #     if replace_selected_points:
+                        #         df_filter.selected_points[selected_event_session_context]
+                        #     else:
+                        #         if start_t not in df_filter.selected_points[selected_event_session_context]:
+                        #             df_filter.selected_points[selected_event_session_context].append(start_t) # add to the selection points list
+                                                    
+                        # else:
+                        #     # greater than one selection
+                        #     for i, (a_session_name, a_custom_replay_name, a_time_bin_size, a_start_t, a_stop_t) in enumerate(zip(session_name, custom_replay_name, time_bin_size, start_t, stop_t)):
+                                
+                        #         a_selected_event_session_context: IdentifyingContext = IdentifyingContext(session_name=a_session_name, custom_replay_name=a_custom_replay_name, time_bin_size=a_time_bin_size)
+                        #         print(f'a_selected_event_session_context: {a_selected_event_session_context}')
+                        #         # a_selected_event_context: IdentifyingContext = IdentifyingContext(start_t=a_start_t, stop_t=a_stop_t)
+
+                        #         curr_selected_points_dict = df_filter.selected_points.get(a_selected_event_session_context, None)
+                        #         if curr_selected_points_dict is None:
+                        #             df_filter.selected_points[a_selected_event_session_context] = [] # [start_t, ] ## add start_t only                                
+                        #         # if replace_selected_points:
+                        #         #     df_filter.selected_points[a_selected_event_session_context]
+                        #         # else:
+                        #         if a_start_t not in df_filter.selected_points[a_selected_event_session_context]:
+                        #             df_filter.selected_points[a_selected_event_session_context].append(a_start_t) # add to the selection points list
+                                    
                         
-                 ## update selected points
-                    
-
-                    ## try to update the selected heatmap posterior:
-                    try:
-                        ## try to update by start_t, stop_t
-                        _heatmap_data = df_filter.hover_posterior_data.get_posterior_data(session_name=session_name, custom_replay_name=custom_replay_name,
-                                                                          a_decoder_name='long_LR', last_selected_idx=ind)
+                        # df_filter.output_widget.clear_output()
+                        # with df_filter.output_widget:
+                        #     print(f"Clicked point index: {ind}")
+                        #     print(f'start_t, stop_t: {start_t}, {stop_t}')
+                        #     print(f"session_name: {session_name}")
+                        #     print(f"custom_replay_name: {custom_replay_name}")
+                        #     print(f"time_bin_size: {time_bin_size}")
+                            
+                    ## update selected points
                         
-                        # _plot_hoverred_heatmap_preview_posterior(df_filter=df_filter, last_selected_idx=ind) #TODO 2024-11-26 07:32: - [ ] does this work?
-                        _plot_hoverred_heatmap_preview_posterior(df_filter=df_filter, a_heatmap_img=_heatmap_data)
 
-                    except Exception as e:
-                        print(f'encountered exception when trying to call `_plot_hoverred_heatmap_preview_posterior(..., last_selected_idx={ind}, start_t: {start_t}, stop_t: {stop_t}). Error {e}. Skipping.')
-                                            
-                else:
-                    ## no selection:
-                    # print(f'NOPE! points: {points}, trace: {trace}')
-                    # df_filter.output_widget.clear_output()
-                    if enable_debug_print:
-                        with df_filter.output_widget:
-                            print(f'NOPE! points: {points}, trace: {trace}')
+                        ## try to update the selected heatmap posterior:
+                        try:
+                            ## try to update by start_t, stop_t
+                            _heatmap_data = df_filter.hover_posterior_data.get_posterior_data(session_name=session_name, custom_replay_name=custom_replay_name,
+                                                                            a_decoder_name='long_LR', last_selected_idx=ind)
+                            
+                            # _plot_hoverred_heatmap_preview_posterior(df_filter=df_filter, last_selected_idx=ind) #TODO 2024-11-26 07:32: - [ ] does this work?
+                            _plot_hoverred_heatmap_preview_posterior(df_filter=df_filter, a_heatmap_img=_heatmap_data)
+
+                        except Exception as e:
+                            print(f'encountered exception when trying to call `_plot_hoverred_heatmap_preview_posterior(..., last_selected_idx={ind}, start_t: {start_t}, stop_t: {stop_t}). Error {e}. Skipping.')
+                                                
+                    else:
+                        ## no selection:
+                        # print(f'NOPE! points: {points}, trace: {trace}')
+                        # df_filter.output_widget.clear_output()
+                        if enable_debug_print:
+                            with df_filter.output_widget:
+                                print(f'NOPE! points: {points}, trace: {trace}')
+                ## END def on_click(t...     
+
+                fig.layout.hovermode = 'closest'
+                if len(fig.data) > 0:
+                    ## prevent IndexError: tuple index out of range
+                    fig.data[0].on_click(on_click)
+                    fig.data[0].on_selection(df_filter.on_update_selected_scatter_points)
                     
 
-            fig.layout.hovermode = 'closest'
-            if len(fig.data) > 0:
-                ## prevent IndexError: tuple index out of range
-                fig.data[0].on_click(on_click)
-                fig.data[0].on_selection(df_filter.on_update_selected_scatter_points)
-                
-
-            scatter_traces = list(fig.select_traces(selector=None, row=1, col=2))
-            for trace in scatter_traces:
-                trace.on_click(on_click)
-                trace.on_selection(df_filter.on_update_selected_scatter_points)
-                
+                scatter_traces = list(fig.select_traces(selector=None, row=1, col=2))
+                for trace in scatter_traces:
+                    trace.on_click(on_click)
+                    trace.on_selection(df_filter.on_update_selected_scatter_points)
+            ## END if should_prepare_hover_tooltips...
+            
             if fig is not None:
                 df_filter.figure_widget = fig
 
@@ -2749,8 +2861,12 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
             setattr(self, filtered_name, filtered_df)
 
 
+    @function_attributes(short_name=None, tags=['update', 'MAIN', 'callback'], input_requires=['self.additional_filter_predicates'], output_provides=[], uses=[], used_by=['self._on_widget_change'], creation_date='2025-03-27 12:49', related_items=[])
     def update_filtered_dataframes(self, replay_name, time_bin_sizes, debug_print=True, enable_overwrite_is_filter_included_column: bool=True):
-        """ Perform filtering on each DataFrame
+        """ Perform filtering on each DataFrame. Called by `self._on_widget_change` when a widget's value is changed
+        
+        
+        Uses: self.additional_filter_predicates, .original_df_dict, 
         """
         if not time_bin_sizes:
             print("Please select at least one Time Bin Size.")
@@ -2823,9 +2939,8 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
             
             if did_applying_predicate_fail_for_df_dict[self.active_plot_df_name]:
                 print(f'!!! Warning!!! applying predicates failed for the current active plot df (self.active_plot_df_name: {self.active_plot_df_name})!\n\tthe plotted output has NOT been filtered!')
-                
-
         ## end with self.output_widget
+        
         for k, a_callback_fn in self.on_filtered_dataframes_changed_callback_fns.items():
             # print(f'k: {k}')
             try:

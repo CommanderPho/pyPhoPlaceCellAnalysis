@@ -1,6 +1,7 @@
 from typing import Any, Dict, List, Optional, Union, Tuple
 from collections import namedtuple
 from copy import deepcopy
+import nptyping as ND
 from nptyping import NDArray
 import numpy as np
 import pandas as pd
@@ -441,10 +442,10 @@ class RasterScatterPlotManager(NeuronIdentityAccessingMixin):
         }
         
         # state_color_adjust_fcns: functions that take the base color and call build_adjusted_color to get the adjusted color for each state
-        state_color_adjust_fcns = {SpikeEmphasisState.Hidden: lambda x: build_adjusted_color(x),
-                        SpikeEmphasisState.Deemphasized: lambda x: build_adjusted_color(x, saturation_scale=0.35, value_scale=0.8),
-                        SpikeEmphasisState.Default: lambda x: build_adjusted_color(x),
-                        SpikeEmphasisState.Emphasized: lambda x: build_adjusted_color(x, value_scale=1.25),
+        state_color_adjust_fcns = {SpikeEmphasisState.Hidden: lambda x: build_adjusted_color(x, alpha_scale=0.01),
+                        SpikeEmphasisState.Deemphasized: lambda x: build_adjusted_color(x, saturation_scale=0.35, value_scale=0.8, alpha_scale=0.1),
+                        SpikeEmphasisState.Default: lambda x: build_adjusted_color(x, alpha_scale=0.95),
+                        SpikeEmphasisState.Emphasized: lambda x: build_adjusted_color(x, value_scale=1.25, alpha_scale=1.0),
         }
         
         # self._build_neuron_id_graphics(self.ui.main_gl_widget, self.y)

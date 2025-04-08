@@ -37,7 +37,15 @@
 border-color: rgb(207, 207, 207);
 background-color: rgba(71, 65, 60, 180);
 color: rgb(244, 244, 244);
-border-color: rgb(0, 0, 0);</string>
+border-color: rgb(0, 0, 0);
+QToolTip {
+    background-color: #2a2a2a;
+    color: #ffffff;
+    border: 1px solid #3a3a3a;
+    border-radius: 3px;
+    padding: 2px;
+    font-size: 12px;
+}</string>
   </property>
   <layout class="QGridLayout" name="gridLayout">
    <property name="leftMargin">
@@ -320,6 +328,18 @@ QToolButton:!checked{
     </widget>
    </item>
   </layout>
+  <action name="actionRemoveEpochSeries">
+   <property name="icon">
+    <iconset resource="../../../../Resources/ActionIcons.qrc">
+     <normaloff>:/Icons/Icons/actions/pencil--minus.png</normaloff>:/Icons/Icons/actions/pencil--minus.png</iconset>
+   </property>
+   <property name="text">
+    <string>Remove Epoch Series</string>
+   </property>
+   <property name="toolTip">
+    <string>Remove Epoch Series</string>
+   </property>
+  </action>
  </widget>
  <customwidgets>
   <customwidget>

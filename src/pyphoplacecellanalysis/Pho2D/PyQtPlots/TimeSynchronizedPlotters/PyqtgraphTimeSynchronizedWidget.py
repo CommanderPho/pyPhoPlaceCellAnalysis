@@ -9,6 +9,7 @@ from qtpy import QtCore, QtWidgets
 import pyphoplacecellanalysis.External.pyqtgraph as pg
 # from pyphoplacecellanalysis.External.pyqtgraph.Qt import QtCore, QtGui
 from pyphocorehelpers.DataStructure.general_parameter_containers import VisualizationParameters, RenderPlotsData, RenderPlots
+from pyphocorehelpers.DataStructure.RenderPlots.PyqtgraphRenderPlots import PyqtgraphRenderPlots
 from pyphocorehelpers.gui.PhoUIContainer import PhoUIContainer
 
 from pyphoplacecellanalysis.Pho2D.PyQtPlots.TimeSynchronizedPlotters.TimeSynchronizedPlotterBase import TimeSynchronizedPlotterBase
@@ -98,7 +99,7 @@ class PyqtgraphTimeSynchronizedWidget(CrosshairsTracingMixin, PlottingBackendSpe
         ## Init containers:
         self.params = VisualizationParameters(name=name, plot_function_name=plot_function_name, debug_print=False, wants_crosshairs=kwargs.get('wants_crosshairs', False), should_force_discrete_to_bins=kwargs.get('should_force_discrete_to_bins', False))
         self.plots_data = RenderPlotsData(name=name)
-        self.plots = RenderPlots(name=name)
+        self.plots = PyqtgraphRenderPlots(name=name)
         self.ui = PhoUIContainer(name=name, connections=None)
         self.ui.connections = PhoUIContainer(name=name)
 
@@ -311,6 +312,111 @@ class PyqtgraphTimeSynchronizedWidget(CrosshairsTracingMixin, PlottingBackendSpe
     # ==================================================================================================================== #
     # CrosshairsTracingMixin Conformances                                                                                  #
     # ==================================================================================================================== #
+    def on_crosshair_mouse_moved(self, pos, plot_item, vb, vLine, name, matrix=None, xbins=None, ybins=None):
+        """Handles crosshair updates when mouse moves
+        
+        Args:
+            pos: Mouse position in scene coordinates
+            plot_item: The plot item containing the crosshair
+            vb: ViewBox reference
+            vLine: The vertical line object
+            name: Identifier for this crosshair
+            matrix: Optional data matrix
+            xbins: Optional x bin edges
+            ybins: Optional y bin edges
+        """
+        # Check if mouse is within the plot area
+        if not plot_item.sceneBoundingRect().contains(pos):
+            # Hide crosshairs when outside plot
+            vLine.setVisible(False)
+            if self.params.crosshairs_enable_y_trace and 'crosshairs_hLine' in self.plots[name]:
+                self.plots[name]['crosshairs_hLine'].setVisible(False)
+            return
+            
+        # Map scene coordinates to data coordinates
+        mousePoint = vb.mapSceneToView(pos)
+        x_point = mousePoint.x()
+        y_point = mousePoint.y() if self.params.crosshairs_enable_y_trace else 0
+        
+        # Handle discrete vs continuous formatting
+        if self.params.should_force_discrete_to_bins:
+            x_point_discrete = float(int(round(x_point)))
+            y_point_discrete = float(int(round(y_point))) if self.params.crosshairs_enable_y_trace else 0
+            
+            # Snap to center of bin for display
+            x_point = x_point_discrete + 0.5
+            y_point = y_point_discrete + 0.5 if self.params.crosshairs_enable_y_trace else 0
+            
+            index_x = int(x_point_discrete)
+            index_y = int(y_point_discrete) if self.params.crosshairs_enable_y_trace else 0
+        else:
+            index_x = int(x_point)
+            index_y = int(y_point) if self.params.crosshairs_enable_y_trace else 0
+        
+        # Format value string
+        value_str = ""
+        if matrix is not None:
+            shape = np.shape(matrix)
+            valid_x = (index_x >= 0 and index_x < shape[0])
+            valid_y = (index_y >= 0 and index_y < shape[1]) if self.params.crosshairs_enable_y_trace else True
+            
+            if valid_x and valid_y:
+                # Position component
+                position_str = ""
+                if self.params.should_force_discrete_to_bins:
+                    if (xbins is not None) and (ybins is not None) and self.params.crosshairs_enable_y_trace:
+                        position_str = f"(x[{index_x}]={xbins[index_x]:.3f}, y[{index_y}]={ybins[index_y]:.3f})"
+                    else:
+                        position_str = f"(x={index_x}, y={index_y if self.params.crosshairs_enable_y_trace else index_x})"
+                else:
+                    position_str = f"(x={x_point:.1f}, y={y_point:.1f})" if self.params.crosshairs_enable_y_trace else f"(x={x_point:.1f})"
+                
+                # Value component
+                value_component = ""
+                if valid_x and valid_y:
+                    value_component = f"value={matrix[index_x][index_y if self.params.crosshairs_enable_y_trace else 0]:.3f}"
+                
+                # Final formatted string for PyQtGraph (can use HTML)
+                value_str = f"<span style='font-size: 12pt'>{position_str}, <span style='color: green'>{value_component}</span></span>"
+        else:
+            # No matrix, just show coordinates
+            if self.params.should_force_discrete_to_bins:
+                if (xbins is not None) and (ybins is not None) and self.params.crosshairs_enable_y_trace:
+                    value_str = f"<span style='font-size: 12pt'>(x[{index_x}]={xbins[index_x]:.3f}, y[{index_y}]={ybins[index_y]:.3f})</span>"
+                else:
+                    value_str = f"<span style='font-size: 12pt'>(x={index_x}, y={index_y if self.params.crosshairs_enable_y_trace else index_x})</span>"
+            else:
+                value_str = f"<span style='font-size: 12pt'>(x={x_point:.1f}, y={y_point:.1f})</span>" if self.params.crosshairs_enable_y_trace else f"<span style='font-size: 12pt'>(x={x_point:.1f})</span>"
+        
+        # Update crosshair positions
+        vLine.setPos(x_point)
+        vLine.setVisible(True)
+        
+        if self.params.crosshairs_enable_y_trace and 'crosshairs_hLine' in self.plots[name]:
+            self.plots[name]['crosshairs_hLine'].setPos(y_point)
+            self.plots[name]['crosshairs_hLine'].setVisible(True)
+        
+        # Emit signal with formatted value
+        self.sigCrosshairsUpdated.emit(self, name, value_str)
+
+
+    def on_crosshair_enter_view(self, plot_item, name):
+        """Called when mouse enters the view"""
+        if name in self.plots and 'crosshairs_vLine' in self.plots[name]:
+            self.plots[name]['crosshairs_vLine'].setVisible(True)
+            if 'crosshairs_hLine' in self.plots[name]:
+                self.plots[name]['crosshairs_hLine'].setVisible(True)
+
+    def on_crosshair_leave_view(self, plot_item, name):
+        """Called when mouse leaves the view"""
+        if name in self.plots and 'crosshairs_vLine' in self.plots[name]:
+            self.plots[name]['crosshairs_vLine'].setVisible(False)
+            if 'crosshairs_hLine' in self.plots[name]:
+                self.plots[name]['crosshairs_hLine'].setVisible(False)
+
+
+
+
     def add_crosshairs(self, plot_item, name, matrix=None, xbins=None, ybins=None, enable_y_trace:bool=False, should_force_discrete_to_bins:Optional[bool]=True, **kwargs):
         """ adds crosshairs that allow the user to hover a bin and have the label dynamically display the bin (x, y) and value.
         
@@ -323,103 +429,80 @@ class PyqtgraphTimeSynchronizedWidget(CrosshairsTracingMixin, PlottingBackendSpe
         
         """
         print(f'PyqtgraphTimeSynchronizedWidget.add_crosshairs(plot_item: {plot_item}, name: "{name}", ...):')
-        extant_plots_dict_for_item = self.plots.get(name, {})
-        vLine = extant_plots_dict_for_item.get('crosshairs_vLine', None)
-        has_extant_crosshairs: bool = (vLine is not None)
-         
-        if should_force_discrete_to_bins is not None:
-            self.params.should_force_discrete_to_bins = should_force_discrete_to_bins
-        should_force_discrete_to_bins: bool = self.params.should_force_discrete_to_bins
-        
-        if not has_extant_crosshairs:
-            ## create new:
-            if name not in self.plots:
-                self.plots[name] = {} # initialize new dictionary
-                
+        try:
+            # Create ViewBox and crosshair lines
+            vb = plot_item.getViewBox()
+            
+            # Create vertical line for crosshair
             vLine = pg.InfiniteLine(angle=90, movable=False)
-            self.plots[name]['crosshairs_vLine'] = vLine        
             plot_item.addItem(vLine, ignoreBounds=True)
-        
+            self.plots[name]['crosshairs_vLine'] = vLine
+            vLine.setVisible(False)
+            
+            # Create horizontal line if y-trace is enabled
             if enable_y_trace:
                 hLine = pg.InfiniteLine(angle=0, movable=False)
-                self.plots[name]['crosshairs_hLine'] = hLine
                 plot_item.addItem(hLine, ignoreBounds=True)
-        
-            vb = plot_item.vb
-            should_force_discrete_to_bins: bool = self.params.get('crosshairs_discrete', True)
-
-            def mouseMoved(evt):
-                pos = evt[0]  ## using signal proxy turns original arguments into a tuple
-                if plot_item.sceneBoundingRect().contains(pos):
-                    mousePoint = vb.mapSceneToView(pos)
-
-                    if should_force_discrete_to_bins:
-                        x_point = float(int(round(mousePoint.x())))
-                        if enable_y_trace:
-                            y_point = float(int(round(mousePoint.y())))
-
-                        x_point = x_point + 0.5 # Snap point to center. Does not affect indexing because it truncates
-                        if enable_y_trace:
-                            y_point = y_point + 0.5 
-                    else:
-                        x_point = mousePoint.x()
-                        if enable_y_trace:
-                            y_point = mousePoint.y()
-                    
-                    # Note that int(...) truncates towards zero (floor effect)
-                    index_x = int(x_point)
-                    if enable_y_trace:
-                        index_y = int(y_point)
-                    
-
-                    # Getting Value (Z-level from Matrix) ________________________________________________________________________________ #
-                    value_str = '' # empty string by default
-                    if matrix is not None:
-                        matrix_shape = np.shape(matrix)
-                        # is_valid_x_index = (index_x > 0 and index_x < matrix_shape[0])
-                        # is_valid_y_index = (index_y > 0 and index_y < matrix_shape[1])
-                        is_valid_x_index = (index_x >= 0 and index_x < matrix_shape[0])
-                        if enable_y_trace:
-                            is_valid_y_index = (index_y >= 0 and index_y < matrix_shape[1])
-                        
-                        if is_valid_x_index and is_valid_y_index:
-                            if should_force_discrete_to_bins:
-                                if (xbins is not None) and (ybins is not None):
-                                    # Display special xbins/ybins if we have em
-                                    bin_x = xbins[index_x]
-                                    if enable_y_trace:
-                                        bin_y = ybins[index_y]
-                                    value_str = "<span style='font-size: 12pt'>(x[%d]=%0.3f, y[%d]=%0.3f), <span style='color: green'>value=%0.3f</span>" % (index_x, bin_x, index_y, bin_y, matrix[index_x][index_y])
-                                else:
-                                    value_str = "<span style='font-size: 12pt'>(x=%d, y=%d), <span style='color: green'>value=%0.3f</span>" % (index_x, index_y, matrix[index_x][index_y])
-
-                                print(f'value_str: {value_str}')
-                                # self.ui.mainLabel.setText(value_str)
-                            else:
-                                value_str = "<span style='font-size: 12pt'>(x=%0.1f, y=%0.1f), <span style='color: green'>value=%0.3f</span>" % (index_x, index_y, matrix[index_x][index_y])
-                                print(f'value_str: {value_str}')
-                                # self.ui.mainLabel.setText("<span style='font-size: 12pt'>(x=%0.1f, y=%0.1f), <span style='color: green'>value=%0.3f</span>" % (index_x, index_y, matrix[index_x][index_y]))
-                    ## END if matrix is not None ...
-                    
-                    ## Move the lines:
-                    vLine.setPos(x_point)
-                    if enable_y_trace:
-                        hLine.setPos(y_point)
-
-                    ## emit the signal:
-                    self.sigCrosshairsUpdated.emit(self, name, value_str)
-            ## END def mouseMoved(evt)
-            self.ui.connections[name] = pg.SignalProxy(plot_item.scene().sigMouseMoved, rateLimit=60, slot=mouseMoved)
+                self.plots[name]['crosshairs_hLine'] = hLine
+                hLine.setVisible(False)
             
-        else:
-            ## already exists: update it?
-            hLine = extant_plots_dict_for_item.get('crosshairs_hLine', None)
-            pass
+            # Store parameters
+            self.params.crosshairs_enable_y_trace = enable_y_trace
+            self.params.should_force_discrete_to_bins = should_force_discrete_to_bins
+            
+            # Connect signals with better error handling
+            self.ui.connections[name] = pg.SignalProxy(plot_item.scene().sigMouseMoved, 
+                                                    rateLimit=60, 
+                                                    slot=lambda evt: self.on_crosshair_mouse_moved(evt[0], vb, vLine, name, matrix, xbins, ybins))
+            
+            # Connect enter/leave events
+            plot_item.getViewBox().setMouseEnabled(x=True, y=True)
+            plot_item.scene().sigMouseEntered.connect(lambda: self.on_crosshair_enter_view(plot_item, name))
+            plot_item.scene().sigMouseExited.connect(lambda: self.on_crosshair_leave_view(plot_item, name))
+            
+            # Success message
+            print(f"Successfully added crosshairs for {name}")
+        except Exception as e:
+            print(f"Failed to add crosshair traces for widget: {self}. Error: {str(e)}")
+
 
 
     def remove_crosshairs(self, plot_item, name=None):
         print(f'PyqtgraphTimeSynchronizedWidget.remove_crosshairs(plot_item: {plot_item}, name: "{name}"):')
-        raise NotImplementedError(f'')
+        try:
+            # Logic to remove specific or all crosshairs
+            if name is None:
+                # Remove all crosshairs
+                for key in list(self.plots.keys()):
+                    if 'crosshairs_vLine' in self.plots[key]:
+                        self.plots[key]['crosshairs_vLine'].setParent(None)
+                        del self.plots[key]['crosshairs_vLine']
+                    if 'crosshairs_hLine' in self.plots[key]:
+                        self.plots[key]['crosshairs_hLine'].setParent(None)
+                        del self.plots[key]['crosshairs_hLine']
+                    # Disconnect signals
+                    if key in self.ui.connections:
+                        self.ui.connections[key].disconnect()
+                        del self.ui.connections[key]
+            else:
+                # Remove specific crosshair
+                if name in self.plots:
+                    if 'crosshairs_vLine' in self.plots[name]:
+                        self.plots[name]['crosshairs_vLine'].setParent(None)
+                        del self.plots[name]['crosshairs_vLine']
+                    if 'crosshairs_hLine' in self.plots[name]:
+                        self.plots[name]['crosshairs_hLine'].setParent(None)
+                        del self.plots[name]['crosshairs_hLine']
+                    # Disconnect signal
+                    if name in self.ui.connections:
+                        self.ui.connections[name].disconnect()
+                        del self.ui.connections[name]
+            
+            # Trigger update
+            plot_item.update()
+        except Exception as e:
+            print(f"Error removing crosshairs: {str(e)}")
+
 
 
     def update_crosshair_trace(self, wants_crosshairs_trace: bool):
@@ -431,11 +514,17 @@ class PyqtgraphTimeSynchronizedWidget(CrosshairsTracingMixin, PlottingBackendSpe
         if did_change:
             self.params.wants_crosshairs = wants_crosshairs_trace
             root_plot_item = self.getRootPlotItem()
-            print(f'\tadding crosshairs...')
-            self.add_crosshairs(plot_item=root_plot_item, name='root_plot_item', matrix=None, xbins=None, ybins=None, enable_y_trace=False)
-            print(f'\tdone.')
+            if wants_crosshairs_trace:
+                print(f'\tadding crosshairs...')
+                self.add_crosshairs(plot_item=root_plot_item, name='root_plot_item', matrix=None, xbins=None, ybins=None, enable_y_trace=False)
+                print(f'\tdone.')
+            else:
+                print(f'\tremoving crosshairs...')
+                self.remove_crosshairs(plot_item=root_plot_item, name='root_plot_item')
+                print(f'\tdone.')
         else:
             print(f'\tno change!')
+            
 
 # included_epochs = None
 # computation_config = active_session_computation_configs[0]

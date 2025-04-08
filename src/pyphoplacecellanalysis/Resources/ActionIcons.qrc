@@ -1,5 +1,20 @@
 <RCC>
   <qresource prefix="Icons">
+    <file>Icons/Icon/balloons-box.png</file>
+    <file>Icons/Icon/bug--arrow.png</file>
+    <file>Icons/actions/pencil.png</file>
+    <file>Icons/actions/pencil-button.png</file>
+    <file>Icons/actions/pencil-color.png</file>
+    <file>Icons/actions/pencil--exclamation.png</file>
+    <file>Icons/actions/pencil-field.png</file>
+    <file>Icons/actions/pencil--minus.png</file>
+    <file>Icons/actions/pencil--plus.png</file>
+    <file>Icons/actions/pencil-prohibition.png</file>
+    <file>Icons/actions/pencil-ruler.png</file>
+    <file>Icons/actions/pencil-small.png</file>
+    <file>Icons/actions/AdjustFrameBounds.png</file>
+    <file>Icons/actions/Crosshairs.png</file>
+    <file>Icons/actions/CrosshairsWithDot.png</file>
     <file>Icons/Icon/application--arrow.png</file>
     <file>Icons/Icon/application-blue.png</file>
     <file>Icons/Icon/application-dock.png</file>
@@ -30,6 +45,12 @@
     <file>Icons/actions/fast-download-white.png</file>
     <file>Icons/actions/slow-download-white.png</file>
     <file>Icons/actions/fast-forward.png</file>
+    <file>Icons/actions/JumpSkipLeft.png</file>
+    <file>Icons/actions/JumpSkipRight.png</file>
+    <file>Icons/actions/JumpSwerveLeft.png</file>
+    <file>Icons/actions/JumpSwerveRight.png</file>
+    <file>Icons/actions/ToEnd.png</file>
+    <file>Icons/actions/ToStart.png</file>
     <file>Icons/Icon/log-40.png</file>
     <file>Icons/Icon/JumpToNext.png</file>
     <file>Icons/Icon/JumpToPrev.png</file>
@@ -49,6 +70,9 @@
     <file>Icons/actions/eye-half.png</file>
   </qresource>
   <qresource prefix="Graphics">
+    <file>Icons/Icon/Config/Docks.png</file>
+    <file>Icons/Icon/Config/Epochs.png</file>
+    <file>Icons/Icon/Config/Neurons.png</file>
     <file>Icons/Icon/CalculationsWindow@22w.png</file>
     <file>Icons/Icon/LauncherWidget@22w.png</file>
     <file>Icons/graphics/long_short_laps.png</file>

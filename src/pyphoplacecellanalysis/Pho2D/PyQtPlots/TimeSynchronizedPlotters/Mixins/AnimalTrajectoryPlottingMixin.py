@@ -4,8 +4,7 @@ import pyphoplacecellanalysis.External.pyqtgraph as pg
 from qtpy import QtCore, QtWidgets
 
 class AnimalTrajectoryPlottingMixin:
-    """ custom mixin class 
-    
+    """ Implementors render a trajectory through space
     
     Used by TimeSynchronizedOccupancyPlotter and TimeSynchronizedPlacefieldsPlotter
     """

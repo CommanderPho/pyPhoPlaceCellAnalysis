@@ -18,6 +18,9 @@ class CrosshairsTracingMixin:
     
         from pyphoplacecellanalysis.Pho2D.PyQtPlots.TimeSynchronizedPlotters.Mixins.CrosshairsTracingMixin import CrosshairsTracingMixin
     
+        
+    #TODO 2025-02-21 05:20: - [ ] NOTE - `pyphoplacecellanalysis.Pho2D.PyQtPlots.Extensions.pyqtgraph_helpers.PyQtGraphCrosshairs` seems related (but is from a long time ago) and might be useful to get the pytqtgraph parts working
+    
     
     """
     sigCrosshairsUpdated = QtCore.Signal(object, str, str) # (self, name, trace_value) - CrosshairsTracingMixin Conformance

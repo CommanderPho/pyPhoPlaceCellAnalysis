@@ -4,6 +4,7 @@ import pathlib
 from pathlib import Path
 from typing import Dict, List, Tuple, Optional, Callable, Union, Any
 from typing_extensions import TypeAlias
+import nptyping as ND
 from nptyping import NDArray
 import pyphoplacecellanalysis.General.type_aliases as types
 from pyphocorehelpers.programming_helpers import metadata_attributes
@@ -469,6 +470,33 @@ class wcorr_shuffle_analysis_Parameters(HDF_SerializationMixin, AttrsBasedClassH
         super().to_hdf(file_path, key=key, **kwargs)
 
 @define(slots=False, eq=False, repr=False)
+class non_PBE_epochs_results_Parameters(HDF_SerializationMixin, AttrsBasedClassHelperMixin, BaseGlobalComputationParameters):
+    """ Docstring for non_PBE_epochs_results_Parameters. 
+    """
+    training_data_portion: float = serialized_attribute_field(default=0.8333333333333334)
+    epochs_decoding_time_bin_size: float = serialized_attribute_field(default=0.025)
+    frame_divide_bin_size: float = serialized_attribute_field(default=10.0)
+    compute_1D: bool = serialized_attribute_field(default=True)
+    compute_2D: bool = serialized_attribute_field(default=True)
+    drop_previous_result_and_compute_fresh: bool = serialized_attribute_field(default=False)
+    skip_training_test_split: bool = serialized_attribute_field(default=True)
+    debug_print_memory_breakdown: bool = serialized_attribute_field(default=False)
+    ## PARAMS - these are class properties
+    training_data_portion_PARAM = param.Number(default=0.8333333333333334, doc='training_data_portion param', label='training_data_portion')
+    epochs_decoding_time_bin_size_PARAM = param.Number(default=0.025, doc='epochs_decoding_time_bin_size param', label='epochs_decoding_time_bin_size')
+    frame_divide_bin_size_PARAM = param.Number(default=10.0, doc='frame_divide_bin_size param', label='frame_divide_bin_size')
+    compute_1D_PARAM = param.Boolean(default=True, doc='compute_1D param', label='compute_1D')
+    compute_2D_PARAM = param.Boolean(default=True, doc='compute_2D param', label='compute_2D')
+    drop_previous_result_and_compute_fresh_PARAM = param.Boolean(default=False, doc='drop_previous_result_and_compute_fresh param', label='drop_previous_result_and_compute_fresh')
+    skip_training_test_split_PARAM = param.Boolean(default=True, doc='skip_training_test_split param', label='skip_training_test_split')
+    debug_print_memory_breakdown_PARAM = param.Boolean(default=False, doc='debug_print_memory_breakdown param', label='debug_print_memory_breakdown')
+    # HDFMixin Conformances ______________________________________________________________________________________________ #
+    def to_hdf(self, file_path, key: str, **kwargs):
+        """ Saves the object to key in the hdf5 file specified by file_path"""
+        super().to_hdf(file_path, key=key, **kwargs)
+        
+
+@define(slots=False, eq=False, repr=False)
 class position_decoding_Parameters(HDF_SerializationMixin, AttrsBasedClassHelperMixin, BaseGlobalComputationParameters):
     """ Docstring for position_decoding_Parameters. 
     """
@@ -571,6 +599,7 @@ class ComputationKWargParameters(BaseContainerAttrsParameterizedParametersToDict
     long_short_rate_remapping: long_short_rate_remapping_Parameters = serialized_field(default=Factory(long_short_rate_remapping_Parameters))	
     long_short_inst_spike_rate_groups: long_short_inst_spike_rate_groups_Parameters = serialized_field(default=Factory(long_short_inst_spike_rate_groups_Parameters))	
     wcorr_shuffle_analysis: wcorr_shuffle_analysis_Parameters = serialized_field(default=Factory(wcorr_shuffle_analysis_Parameters))	
+    non_pbe_epochs_results: non_PBE_epochs_results_Parameters = serialized_field(default=Factory(non_PBE_epochs_results_Parameters))    
     position_decoding: position_decoding_Parameters = serialized_field(default=Factory(position_decoding_Parameters))	
     perform_specific_epochs_decoding: perform_specific_epochs_decoding_Parameters = serialized_field(default=Factory(perform_specific_epochs_decoding_Parameters))	
     DEP_ratemap_peaks: DEP_ratemap_peaks_Parameters = serialized_field(default=Factory(DEP_ratemap_peaks_Parameters))	

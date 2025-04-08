@@ -1,6 +1,10 @@
 from pyphoplacecellanalysis.External.pyqtgraph.Qt import QtCore
 import numpy as np
 import pandas as pd
+from typing import Dict, List, Tuple, Optional, Callable, Union, Any
+from typing_extensions import TypeAlias
+import nptyping as ND
+from nptyping import NDArray
 from pyphocorehelpers.print_helpers import SimplePrintable, PrettyPrintable
 from pyphocorehelpers.gui.Qt.ExceptionPrintingSlot import pyqtExceptionPrintingSlot
 
@@ -37,18 +41,18 @@ class TimeWindow(SimplePrintable, PrettyPrintable, QtCore.QObject):
     window_changed_signal = QtCore.pyqtSignal(float, float) # (start_time, end_time)
     
     @property
-    def active_time_window(self):
+    def active_time_window(self) -> Tuple[float, float]:
         """ a 2-element time window [start_time, end_time]"""
         return (self.active_window_start_time, self.active_window_end_time)
         
     @property
-    def active_window_end_time(self):
+    def active_window_end_time(self) -> float:
         """The active_window_end_time property."""
         return (self.active_window_start_time + self.window_duration)
                 
     ##### Get/Set Properties ####:
     @property
-    def window_duration(self):
+    def window_duration(self) -> float:
         """The window_duration property."""
         return self._window_duration
     @window_duration.setter
@@ -59,7 +63,7 @@ class TimeWindow(SimplePrintable, PrettyPrintable, QtCore.QObject):
         
 
     @property
-    def active_window_start_time(self):
+    def active_window_start_time(self) -> float:
         """The current start time of the sliding time window"""
         return self._active_window_start_time
     @active_window_start_time.setter
@@ -122,19 +126,19 @@ class TimeWindowOwningMixin:
     
     """    
     @property
-    def time_window(self):
+    def time_window(self) -> TimeWindow:
         """The spikes_window property."""
         return self._time_window
     
     @property
-    def render_window_duration(self):
+    def render_window_duration(self) -> float:
         return float(self.time_window.window_duration)
     @render_window_duration.setter
     def render_window_duration(self, value):
         self.time_window.window_duration = value
     
     @property
-    def half_render_window_duration(self):
+    def half_render_window_duration(self) -> float:
         """ """
         return np.ceil(float(self.time_window.window_duration)/2.0) # 10 by default 
     

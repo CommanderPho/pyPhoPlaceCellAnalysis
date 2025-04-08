@@ -28,12 +28,18 @@
     <height>0</height>
    </size>
   </property>
+  <property name="font">
+   <font>
+    <pointsize>7</pointsize>
+   </font>
+  </property>
   <property name="styleSheet">
    <string notr="true">background-color: rgb(71, 58, 46);
 border-color: rgb(207, 207, 207);
 background-color: rgba(71, 65, 60, 180);
 color: rgb(244, 244, 244);
-border-color: rgb(0, 0, 0);</string>
+border-color: rgb(0, 0, 0);
+font: 7pt &quot;MS Shell Dlg 2&quot;;</string>
   </property>
   <layout class="QVBoxLayout" name="verticalLayout_2">
    <property name="spacing">
@@ -52,7 +58,7 @@ border-color: rgb(0, 0, 0);</string>
     <number>0</number>
    </property>
    <item>
-    <layout class="QVBoxLayout" name="verticalLayout" stretch="0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0">
+    <layout class="QVBoxLayout" name="verticalLayout" stretch="0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0">
      <property name="leftMargin">
       <number>2</number>
      </property>
@@ -74,6 +80,15 @@ border-color: rgb(0, 0, 0);</string>
      </item>
      <item>
       <widget class="SpinBox" name="spinAnimationTimeStep">
+       <property name="enabled">
+        <bool>false</bool>
+       </property>
+       <property name="readOnly">
+        <bool>true</bool>
+       </property>
+       <property name="buttonSymbols">
+        <enum>QAbstractSpinBox::NoButtons</enum>
+       </property>
        <property name="suffix">
         <string>s</string>
        </property>
@@ -94,6 +109,15 @@ border-color: rgb(0, 0, 0);</string>
      </item>
      <item>
       <widget class="SpinBox" name="spinTemporalZoomFactor">
+       <property name="enabled">
+        <bool>false</bool>
+       </property>
+       <property name="readOnly">
+        <bool>true</bool>
+       </property>
+       <property name="buttonSymbols">
+        <enum>QAbstractSpinBox::NoButtons</enum>
+       </property>
        <property name="suffix">
         <string>x</string>
        </property>
@@ -114,7 +138,7 @@ border-color: rgb(0, 0, 0);</string>
      <item>
       <widget class="SpinBox" name="spinRenderWindowDuration">
        <property name="readOnly">
-        <bool>true</bool>
+        <bool>false</bool>
        </property>
        <property name="buttonSymbols">
         <enum>QAbstractSpinBox::NoButtons</enum>
@@ -130,6 +154,35 @@ border-color: rgb(0, 0, 0);</string>
        </property>
        <property name="value">
         <double>1.000000000000000</double>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QToolButton" name="btnToggleDebugEnabled">
+       <property name="toolTip">
+        <string>Toggle Debug Printing</string>
+       </property>
+       <property name="statusTip">
+        <string>Toggle Debug Printing</string>
+       </property>
+       <property name="whatsThis">
+        <string>Toggle Debug Printing</string>
+       </property>
+       <property name="text">
+        <string>Debug</string>
+       </property>
+       <property name="icon">
+        <iconset resource="../../../Resources/ActionIcons.qrc">
+         <normaloff>:/Icons/Icons/Icon/bug--arrow.png</normaloff>:/Icons/Icons/Icon/bug--arrow.png</iconset>
+       </property>
+       <property name="iconSize">
+        <size>
+         <width>16</width>
+         <height>16</height>
+        </size>
+       </property>
+       <property name="checkable">
+        <bool>true</bool>
        </property>
       </widget>
      </item>
@@ -225,7 +278,7 @@ border-color: rgb(0, 0, 0);</string>
        </property>
        <property name="icon">
         <iconset resource="../../../Resources/ActionIcons.qrc">
-         <normaloff>:/Graphics/Icons/graphics/Crosshairs.svg</normaloff>:/Graphics/Icons/graphics/Crosshairs.svg</iconset>
+         <normaloff>:/Icons/Icons/actions/CrosshairsWithDot.png</normaloff>:/Icons/Icons/actions/CrosshairsWithDot.png</iconset>
        </property>
        <property name="iconSize">
         <size>
@@ -283,11 +336,27 @@ border-color: rgb(0, 0, 0);</string>
          <height>100</height>
         </size>
        </property>
+       <property name="font">
+        <font>
+         <pointsize>7</pointsize>
+        </font>
+       </property>
        <property name="text">
-        <string/>
+        <string notr="true">x=13.9
+y=11.2
+value=0.001</string>
+       </property>
+       <property name="textFormat">
+        <enum>Qt::PlainText</enum>
+       </property>
+       <property name="scaledContents">
+        <bool>true</bool>
        </property>
        <property name="alignment">
         <set>Qt::AlignLeading|Qt::AlignLeft|Qt::AlignTop</set>
+       </property>
+       <property name="wordWrap">
+        <bool>true</bool>
        </property>
       </widget>
      </item>
@@ -387,6 +456,10 @@ border-color: rgb(0, 0, 0);</string>
        <property name="text">
         <string/>
        </property>
+       <property name="icon">
+        <iconset resource="../../../Resources/ActionIcons.qrc">
+         <normaloff>:/Icons/Icons/Icon/bug--arrow.png</normaloff>:/Icons/Icons/Icon/bug--arrow.png</iconset>
+       </property>
        <property name="checkable">
         <bool>true</bool>
        </property>
@@ -414,7 +487,6 @@ border-color: rgb(0, 0, 0);</string>
  </customwidgets>
  <resources>
   <include location="../../../Resources/GuiResources.qrc"/>
-  <include location="../../../Resources/ActionIcons.qrc"/>
   <include location="../../../Resources/ActionIcons.qrc"/>
  </resources>
  <connections/>

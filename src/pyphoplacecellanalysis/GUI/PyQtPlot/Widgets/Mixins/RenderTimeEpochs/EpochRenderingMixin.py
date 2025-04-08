@@ -15,6 +15,7 @@ import pandas as pd
 from qtpy import QtCore
 
 from typing import Dict, List, Tuple, Optional, Callable, Union, Any
+import nptyping as ND
 from nptyping import NDArray
 
 from pyphocorehelpers.print_helpers import SimplePrintable, PrettyPrintable, iPythonKeyCompletingMixin

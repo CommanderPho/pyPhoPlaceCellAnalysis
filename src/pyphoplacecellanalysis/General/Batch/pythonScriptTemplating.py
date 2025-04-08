@@ -27,7 +27,68 @@ from neuropy.utils.result_context import IdentifyingContext
 # from neuropy.core.session.Formats.BaseDataSessionFormats import find_local_session_paths
 
 # included_session_contexts, output_python_scripts, output_slurm_scripts, powershell_script_path, vscode_workspace_path
-BatchScriptsCollection = attrs.make_class("BatchScriptsCollection", {k:field() for k in ("included_session_contexts", "output_python_scripts", "output_jupyter_notebooks", "output_slurm_scripts", "output_non_slurm_bash_scripts", "vscode_workspace_path")}) # , "max_parallel_executions", "powershell_script_path"
+# BatchScriptsCollection = attrs.make_class("BatchScriptsCollection", {k:field() for k in ("included_session_contexts", "output_python_scripts", "output_jupyter_notebooks", "output_slurm_scripts", "output_non_slurm_bash_scripts", "vscode_workspace_path")}) # , "max_parallel_executions", "powershell_script_path"
+
+
+@define(slots=False, eq=False)
+class BatchScriptsCollection:
+    """ A list of outputs for batch script generation
+    
+    from pyphoplacecellanalysis.General.Batch.pythonScriptTemplating import BatchScriptsCollection
+    
+    output_slurm_scripts = {'run': [], 'figs': []}
+    output_non_slurm_bash_scripts = {'run': [], 'figs': []}
+    
+    """
+    included_session_contexts: List = field(default=Factory(list))
+    output_python_scripts: List = field(default=Factory(list))
+    output_jupyter_notebooks: List = field(default=Factory(list))
+    output_slurm_scripts: Dict = field(default=Factory(dict))
+    output_non_slurm_bash_scripts: Dict = field(default=Factory(dict))
+    vscode_workspace_path: Path = field(default=None)
+    
+
+    def __add__(self, other):
+        """Add two BatchScriptsCollection objects by appending their List fields.
+        
+        Args:
+            other (BatchScriptsCollection): Another collection to add to this one.
+            
+        Returns:
+            BatchScriptsCollection: A new collection with combined lists.
+        """
+        if not isinstance(other, BatchScriptsCollection):
+            return NotImplemented
+            
+        result = BatchScriptsCollection()
+        
+        # Combine all list fields
+        result.included_session_contexts = self.included_session_contexts + other.included_session_contexts
+        result.output_python_scripts = self.output_python_scripts + other.output_python_scripts
+        result.output_jupyter_notebooks = self.output_jupyter_notebooks + other.output_jupyter_notebooks
+        
+        assert isinstance(self.output_slurm_scripts, dict), f"self.output_slurm_scripts: type(self.output_slurm_scripts): {type(self.output_slurm_scripts)}"
+        for k, v in self.output_slurm_scripts.items():
+            ## iterate through the top-level entries like 'run', 'figs', etc. to combine the actual list items
+            result.output_slurm_scripts[k] = v + other.output_slurm_scripts.get(k, []) ## optionally empty list
+            
+        assert isinstance(self.output_non_slurm_bash_scripts, dict), f"self.output_non_slurm_bash_scripts: type(self.output_non_slurm_bash_scripts): {type(self.output_non_slurm_bash_scripts)}"
+        for k, v in self.output_non_slurm_bash_scripts.items():
+            ## iterate through the top-level entries like 'run', 'figs', etc. to combine the actual list items
+            result.output_non_slurm_bash_scripts[k] = v + other.output_non_slurm_bash_scripts.get(k, []) ## optionally empty list
+
+        # result.output_slurm_scripts = self.output_slurm_scripts | other.output_slurm_scripts
+        # result.output_non_slurm_bash_scripts = self.output_non_slurm_bash_scripts + other.output_non_slurm_bash_scripts
+        
+        # For the Path field, use the non-empty one or the first one
+        if isinstance(self.vscode_workspace_path, Path):
+            result.vscode_workspace_path = self.vscode_workspace_path
+        elif isinstance(other.vscode_workspace_path, Path):
+            result.vscode_workspace_path = other.vscode_workspace_path
+        
+        return result
+    
+
 
 from enum import Enum
 
@@ -58,13 +119,20 @@ class ProcessingScriptPhases(Enum):
         else:
             return False
         
+
+    @property
+    def phase_job_suffix(self) -> str:
+        """The string indicating which phase/stage we're in to be used in the job_suffix."""
+        return self.value.removesuffix('_run').capitalize() # ["Clean", "Continued", "Final", "Figure"]
+    
+
+
     def get_custom_user_completion_functions_dict(self, extra_run_functions=None) -> Dict:
         """ get the extra user_completion functions
         
         """
         from pyphoplacecellanalysis.General.Batch.BatchJobCompletion.UserCompletionHelpers.batch_user_completion_helpers import export_session_h5_file_completion_function, curr_runtime_context_header_template, export_rank_order_results_completion_function, figures_rank_order_results_completion_function, determine_session_t_delta_completion_function, perform_sweep_decoding_time_bin_sizes_marginals_dfs_completion_function, compute_and_export_decoders_epochs_decoding_and_evaluation_dfs_completion_function, compute_and_export_session_wcorr_shuffles_completion_function, compute_and_export_session_instantaneous_spike_rates_completion_function, compute_and_export_session_extended_placefield_peak_information_completion_function, compute_and_export_session_alternative_replay_wcorr_shuffles_completion_function, backup_previous_session_files_completion_function, compute_and_export_session_trial_by_trial_performance_completion_function, save_custom_session_files_completion_function, compute_and_export_cell_first_spikes_characteristics_completion_function, figures_plot_cell_first_spikes_characteristics_completion_function
-        # from pyphoplacecellanalysis.General.Batch.BatchJobCompletion.UserCompletionHelpers.batch_user_completion_helpers import  kdiba_session_post_fixup_completion_function
-        from pyphoplacecellanalysis.General.Batch.BatchJobCompletion.UserCompletionHelpers.batch_user_completion_helpers import  kdiba_session_post_fixup_completion_function
+        from pyphoplacecellanalysis.General.Batch.BatchJobCompletion.UserCompletionHelpers.batch_user_completion_helpers import  kdiba_session_post_fixup_completion_function, generalized_decode_epochs_dict_and_export_results_completion_function
         
         if self.value == ProcessingScriptPhases.figure_run.value:
             # figure stage:
@@ -89,7 +157,7 @@ class ProcessingScriptPhases(Enum):
             phase0_any_run_custom_user_completion_functions_dict = {
                 # 'backup_previous_session_files_completion_function': backup_previous_session_files_completion_function, # disabled 2024-10-29
                 # "determine_session_t_delta_completion_function": determine_session_t_delta_completion_function,  # ran 2024-05-28 6am
-                # 'kdiba_session_post_fixup_completion_function': kdiba_session_post_fixup_completion_function, 2025-01-15 10:16 REMOVED
+                'kdiba_session_post_fixup_completion_function': kdiba_session_post_fixup_completion_function, # 2025-01-15 10:16 REMOVED
             }
 
             # Unused:
@@ -122,6 +190,7 @@ class ProcessingScriptPhases(Enum):
                 'compute_and_export_cell_first_spikes_characteristics_completion_function': compute_and_export_cell_first_spikes_characteristics_completion_function,
                 'export_session_h5_file_completion_function': export_session_h5_file_completion_function, # ran 2024-09-26 3pm
                 'save_custom_session_files_completion_function': save_custom_session_files_completion_function,
+                # 'generalized_decode_epochs_dict_and_export_results_completion_function': generalized_decode_epochs_dict_and_export_results_completion_function, # Not yet implemented 2025-03-10 19:56 
             }
 
             if self.value == ProcessingScriptPhases.clean_run.value:
@@ -237,6 +306,8 @@ class ProcessingScriptPhases(Enum):
         else:
             _out_run_config.update(dict(create_slurm_scripts=True, should_create_vscode_workspace=False))
 
+        _out_run_config['phase_job_suffix'] = self.phase_job_suffix
+
         return _out_run_config
 
 
@@ -289,11 +360,19 @@ def generate_batch_single_session_scripts(global_data_root_parent_path, session_
             script_file.write(script_content)
         return bash_script_path
 
+
+    # ==================================================================================================================== #
+    # BEGIN FUNCTION BODY                                                                                                  #
+    # ==================================================================================================================== #
     assert isinstance(session_batch_basedirs, dict)
 
     if not isinstance(output_directory, Path):
         output_directory = Path(output_directory).resolve()
 
+    # if job_suffix is None:
+    #     job_suffix = ''
+        
+    # job_suffix = f"{job_suffix}_{}"
 
     separate_execute_and_figure_gen_scripts = renderer_script_generation_kwargs.pop('separate_execute_and_figure_gen_scripts', True)
     assert separate_execute_and_figure_gen_scripts, f"Old non-separate mode not supported"

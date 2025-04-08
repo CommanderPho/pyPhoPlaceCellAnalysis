@@ -841,7 +841,13 @@ class NeuropyPipeline(PipelineWithInputStage, PipelineWithLoadableStage, Filtere
             print(f'finalized_loaded_sess_pickle_path: {finalized_loaded_sess_pickle_path}')
             self.logger.info(f'\tfinalized_loaded_sess_pickle_path: {finalized_loaded_sess_pickle_path}')
 
-            new_obj_memory_usage_MB = print_object_memory_usage(self, enable_print=False)
+
+            try:
+                new_obj_memory_usage_MB = print_object_memory_usage(self, enable_print=False)
+            except ValueError:
+                print("Warning: Cannot calculate memory usage, but continuing with save...")
+                new_obj_memory_usage_MB = None
+            # Continue with pickling...
 
             is_temporary_file_used:bool = False
             _desired_finalized_loaded_sess_pickle_path = None

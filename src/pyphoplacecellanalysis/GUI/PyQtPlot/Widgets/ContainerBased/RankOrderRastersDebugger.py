@@ -1,6 +1,7 @@
 from copy import deepcopy
 from typing import Optional, Dict, List, Tuple, Callable, Union
 from attrs import define, field, Factory
+import nptyping as ND
 from nptyping import NDArray
 import numpy as np
 import pandas as pd
@@ -161,7 +162,7 @@ class RankOrderRastersDebugger:
         """
         from neuropy.utils.indexing_helpers import find_nearest_time
         df = self.active_epochs_df
-        df, closest_index, closest_time, matched_time_difference = find_nearest_time(df=df, target_time=target_time, time_column_name='start', max_allowed_deviation=0.01, debug_print=False)
+        df, closest_index, closest_time, matched_time_difference = find_nearest_time(df, target_time=target_time, time_column_name='start', max_allowed_deviation=0.01, debug_print=False)
         # df.iloc[closest_index]
         return closest_index
     

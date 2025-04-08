@@ -2,6 +2,7 @@ from typing import Dict, List, Tuple, Optional, Callable, Union, Any
 from typing import NewType
 from neuropy.utils.result_context import IdentifyingContext
 from typing_extensions import TypeAlias
+import nptyping as ND
 from nptyping import NDArray
 
 

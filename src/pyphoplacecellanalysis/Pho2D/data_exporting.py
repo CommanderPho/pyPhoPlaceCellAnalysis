@@ -2,6 +2,7 @@ from copy import deepcopy
 from pathlib import Path
 from typing import Dict, List, Tuple, Optional, Callable, Union, Any
 from typing_extensions import TypeAlias
+import nptyping as ND
 from nptyping import NDArray
 from typing import NewType
 import neuropy.utils.type_aliases as types
@@ -27,6 +28,7 @@ from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import BasePositionD
 # from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError import plot_1D_most_likely_position_comparsions
 from typing import Dict, List, Tuple, Optional, Callable, Union, Any, Literal, NewType
 from typing_extensions import TypeAlias
+import nptyping as ND
 from nptyping import NDArray
 import neuropy.utils.type_aliases as types
 
@@ -178,6 +180,9 @@ class PosteriorExporting:
 
         decoding_realtime_FPS: float = 1.0 / float(a_decoder_continuously_decoded_result.decoding_time_bin_size)
         print(f'decoding_realtime_FPS: {decoding_realtime_FPS}')
+
+        ## Check the parent path exists, as it previously failed silently (after doing all the work) if the directory wasn't present
+        
         ## save video
         video_out_path = save_array_as_video(array=a_p_x_given_n, video_filename=f'output/videos/{result_name}.avi', isColor=False, fps=decoding_realtime_FPS)
         print(f'video_out_path: {video_out_path}')
