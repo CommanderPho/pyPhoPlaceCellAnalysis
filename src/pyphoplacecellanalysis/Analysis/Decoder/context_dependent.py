@@ -1230,7 +1230,7 @@ class GenericDecoderDictDecodedEpochsDictResult(ComputedResult):
         ## INPUTS: time_bin_size, 
 
         ## Common/shared for all decoded epochs:
-        for a_masked_bin_fill_mode in ['nan_filled', 'last_valid', 'dropped']:
+        for a_masked_bin_fill_mode in ['dropped']: # , 'last_valid'
             # a_masked_bin_fill_mode = 'nan_filled'
 
             ## INPUTS: a_new_fully_generic_result
@@ -1269,6 +1269,21 @@ class GenericDecoderDictDecodedEpochsDictResult(ComputedResult):
             a_df['delta_aligned_start_t'] = a_df[time_column_name] - t_delta ## subtract off t_delta
             a_df = a_df.across_session_identity.add_session_df_columns(session_name=session_name, time_bin_size=epochs_decoding_time_bin_size, curr_session_t_delta=t_delta, time_col=time_column_name)
             a_new_fully_generic_result.filter_epochs_decoded_track_marginal_posterior_df_dict[k] = a_df
+
+
+        # ==================================================================================================================================================================================================================================================================================== #
+        # Phase 5 - Get the corrected 'per_epoch' results from the 'per_time_bin' versions                                                                                                                                                                                                     #
+        # ==================================================================================================================================================================================================================================================================================== #
+        ## get all non-global, `data_grain= 'per_time_bin'`
+        flat_context_list, flat_result_context_dict, flat_decoder_context_dict, flat_decoded_marginal_posterior_df_context_dict = a_new_fully_generic_result.get_results_matching_contexts(context_query=IdentifyingContext(trained_compute_epochs='laps', decoder_identifier='pseudo2D',
+                                                                                                                                                                                                                            time_bin_size=time_bin_size,
+                                                                                                                                                                                                                            known_named_decoding_epochs_type=['pbe', 'laps', 'non_pbe'],
+                                                                                                                                                                                                                            masked_time_bin_fill_type=('ignore', 'dropped'), data_grain= 'per_time_bin'))        
+
+        _newly_updated_values_tuple = a_new_fully_generic_result.compute_all_per_epoch_aggregations_from_per_time_bin_results(flat_decoded_marginal_posterior_df_context_dict=flat_decoded_marginal_posterior_df_context_dict)
+        # per_time_bin_to_per_epoch_context_map_dict, flat_decoded_marginal_posterior_df_per_epoch_marginals_df_context_dict, flat_decoded_marginal_posterior_df_per_time_bin_marginals_df_context_dict = _newly_updated_values_tuple
+
+
 
 
         # ==================================================================================================================== #
