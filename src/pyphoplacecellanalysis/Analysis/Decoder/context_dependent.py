@@ -2008,7 +2008,7 @@ class GenericDecoderDictDecodedEpochsDictResult(ComputedResult):
         flat_decoded_marginal_posterior_df_per_time_bin_marginals_df_context_dict = {}
         flat_decoded_marginal_posterior_df_per_epoch_marginals_df_context_dict = {}
         for a_per_time_bin_ctxt, a_decoded_time_bin_marginal_posterior_df in flat_decoded_marginal_posterior_df_context_dict.items():
-            a_decoded_per_epoch_marginals_df, a_decoded_time_bin_marginal_posterior_df = GenericDecoderDictDecodedEpochsDictResult._perform_per_epoch_time_bin_aggregation(a_decoded_time_bin_marginal_posterior_df=a_decoded_time_bin_marginal_posterior_df, probabilitY_column_to_aggregate=probabilitY_column_to_aggregate, n_rolling_avg_window_tbins=n_rolling_avg_window_tbins, **kwargs)
+            a_decoded_per_epoch_marginals_df, a_decoded_time_bin_marginal_posterior_df = cls._perform_per_epoch_time_bin_aggregation(a_decoded_time_bin_marginal_posterior_df=a_decoded_time_bin_marginal_posterior_df, probabilitY_column_to_aggregate=probabilitY_column_to_aggregate, n_rolling_avg_window_tbins=n_rolling_avg_window_tbins, **kwargs)
             a_per_epoch_ctxt = TimeBinAggregation.ToPerEpoch.get_per_epoch_ctxt_from_per_time_bin_ctxt(a_per_time_bin_ctxt=a_per_time_bin_ctxt)
             per_time_bin_to_per_epoch_context_map_dict[a_per_time_bin_ctxt] = a_per_epoch_ctxt
             flat_decoded_marginal_posterior_df_per_time_bin_marginals_df_context_dict[a_per_time_bin_ctxt] = deepcopy(a_decoded_time_bin_marginal_posterior_df)
