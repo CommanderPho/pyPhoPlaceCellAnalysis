@@ -1898,6 +1898,57 @@ class DataframeFilterPredicates(HDF_SerializationMixin, AttrsBasedClassHelperMix
     is_enabled: bool = serialized_attribute_field(default=True)
     
 
+
+from enum import Enum, auto
+
+class InitialSelectionModeEnum(Enum):
+    """Defines how the initial selection of a widget should be set (none selected, all selected, first selected
+    
+    from pyphoplacecellanalysis.SpecificResults.PhoDiba2023Paper import InitialSelectionModeEnum
+    
+    
+    , initial_selection_mode: InitialSelectionModeEnum=InitialSelectionModeEnum.NO_SELECTION, custom_selection: Optional[List]=None
+    
+    
+        # Set initial widget selection/selections ____________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
+        initial_selection = []
+        if (initial_selection_mode.value == InitialSelectionModeEnum.NO_SELECTION.value):
+            initial_selection = []
+        elif (initial_selection_mode.value == InitialSelectionModeEnum.FIRST_SELECTED.value):
+            if len(a_col_values_options) > 0:
+                initial_selection = [a_col_values_options[0]]
+        elif (initial_selection_mode.value == InitialSelectionModeEnum.CUSTOM_SELECTED.value):
+            assert custom_selection is not None, f"with this mode you must provide a custom_selection"
+            initial_selection = deepcopy(custom_selection)
+        elif (initial_selection_mode.value == InitialSelectionModeEnum.ALL_SELECTED.value):
+            initial_selection = deepcopy(a_col_values_options)
+        else:
+            raise NotImplementedError(f'{initial_selection_mode} is not VALID')
+
+        a_widget.value = initial_selection
+        
+
+    
+    """
+    NO_SELECTION = auto()
+    FIRST_SELECTED = auto()
+    CUSTOM_SELECTED = auto()
+    ALL_SELECTED = auto()
+
+    def __str__(self):
+        return self.name
+
+    @classmethod
+    def list_values(cls):
+        """Returns a list of all enum values"""
+        return list(cls)
+
+    @classmethod
+    def list_names(cls):
+        """Returns a list of all enum names"""
+        return [e.name for e in cls]
+
+
 @custom_define(slots=False, eq=False)
 class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
     """ Involves an interactive ipywidget, and handles interactive filtering of dataframes by presenting a jupyter widget interface.
