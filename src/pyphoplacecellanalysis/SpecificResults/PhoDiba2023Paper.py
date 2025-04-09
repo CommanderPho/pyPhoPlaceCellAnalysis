@@ -2210,8 +2210,72 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
         self._setup_widgets_buttons()
 
 
+    # @function_attributes(short_name=None, tags=['filter', 'dynamic', 'ui', 'widget'], input_requires=[], output_provides=[], uses=['._rebuild_predicate_widget()'], used_by=[], creation_date='2025-03-27 14:05', related_items=[])
+    # def build_extra_control_widget(self, a_name: str = 'replay_name', df_col_name: str = 'custom_replay_name', a_widget_label: str = 'Replay Name:'):
+    #     """ adds a new dropdown widget to refine the active points, triggers `self._on_widget_change` when a selection is made
+
+    #     Works by adding the widget as property of this instance, and imposing the widget's selection criteria by adding a custom predicate to `self.additional_filter_predicates`. 
+    #     The predicate selector widget is then rebuilt by calling `self._rebuild_predicate_widget(...)`
+        
+        
+    #     Usage:        
+    #         df_filter.build_extra_control_widget(a_name='trained_compute_epochs', df_col_name='trained_compute_epochs', a_widget_label='TrainedComputeEpochs :')
+    #         df_filter.build_extra_control_widget(a_name='pfND_ndim', df_col_name='pfND_ndim', a_widget_label='pfND_ndim:')
+    #         df_filter.build_extra_control_widget(a_name='decoder_identifier', df_col_name='decoder_identifier', a_widget_label='decoder_identifier:')
+    #         df_filter.build_extra_control_widget(a_name='data_grain', df_col_name='data_grain', a_widget_label='data_grain:')
+    #         df_filter.build_extra_control_widget(a_name='masked_time_bin_fill_type', df_col_name='masked_time_bin_fill_type', a_widget_label='masked_time_bin_fill_type:')
+    #         df_filter.build_extra_control_widget(a_name='known_named_decoding_epochs_type', df_col_name='known_named_decoding_epochs_type', a_widget_label='known_named_decoding_epochs_type:')
+
+    #     """
+    #     import ipywidgets as widgets
+    #     from traitlets import Dict as TraitDict  # Import the Dict traitlet
+
+    #     a_widget_name: str = f"{a_name}_widget" # replay_name_widget
+    #     extant_widget = getattr(self, a_widget_name, None)
+    #     if extant_widget is not None:
+    #         raise NotImplementedError(f'Not sure what to do with extant widgets yet! a_widget_label: "{a_widget_label}".')
+
+    #     ## Create and add new widget:
+    #     a_col_values_options = sorted(self.active_plot_df[df_col_name].astype(str).unique())    
+    #     a_widget = widgets.Dropdown(
+    #                 options=a_col_values_options,
+    #                 description=a_widget_label,
+    #                 disabled=False,
+    #                 layout=widgets.Layout(width='500px'),
+    #                 style={'description_width': 'initial'},
+    #                 # metadata={"desc": "build_extra_control_widget", "df_col_name": df_col_name, "name": a_name, "widget_name": a_widget_name, }, ## DOES NOT WORK
+    #             )
+        
+    #     ## add_traits (does work)
+    #     a_widget.metadata = TraitDict({  # Use the Dict traitlet here
+    #         "desc": "build_extra_control_widget",
+    #         "df_col_name": df_col_name,
+    #         "name": a_name,
+    #         "widget_name": a_widget_name,
+    #     })
+        
+    #     # Build the appropriate filter predicate to go along with the custom control _________________________________________ #
+    #     self.additional_filter_predicates.update({
+    #         f'{a_widget_name}': (lambda df: (df[df_col_name].astype(str) == str(a_widget.value))),
+    #     })
+
+    #     ## INPUTS: self.custom_dynamic_filter_widgets_list
+    #     ## Add to output widgets list
+    #     self.custom_dynamic_filter_widgets_list.append(a_widget)
+    #     setattr(self, a_widget_name, a_widget) # self.replay_name_widget
+    #     ## INPUTS: self.custom_dynamic_filter_widgets_dict, self.custom_dynamic_filter_widgets_property_map
+
+    #     ## Update the predicate enabled selection widget and default to enabling this predicate:
+    #     self._rebuild_predicate_widget(initially_is_checked={f'{a_widget_name}':True})
+
+    #     # Set up observers to handle changes in widget values
+    #     a_widget.observe(self._on_widget_change, names='value')
+        
+
+# SelectMultiple
+
     @function_attributes(short_name=None, tags=['filter', 'dynamic', 'ui', 'widget'], input_requires=[], output_provides=[], uses=['._rebuild_predicate_widget()'], used_by=[], creation_date='2025-03-27 14:05', related_items=[])
-    def build_extra_control_widget(self, a_name: str = 'replay_name', df_col_name: str = 'custom_replay_name', a_widget_label: str = 'Replay Name:'):
+    def build_extra_dropdown_widget(self, a_name: str = 'replay_name', df_col_name: str = 'custom_replay_name', a_widget_label: str = 'Replay Name:') -> widgets.Dropdown:
         """ adds a new dropdown widget to refine the active points, triggers `self._on_widget_change` when a selection is made
 
         Works by adding the widget as property of this instance, and imposing the widget's selection criteria by adding a custom predicate to `self.additional_filter_predicates`. 
@@ -2248,7 +2312,7 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
         
         ## add_traits (does work)
         a_widget.metadata = TraitDict({  # Use the Dict traitlet here
-            "desc": "build_extra_control_widget",
+            "desc": "build_extra_dropdown_widget",
             "df_col_name": df_col_name,
             "name": a_name,
             "widget_name": a_widget_name,
@@ -2270,16 +2334,76 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
 
         # Set up observers to handle changes in widget values
         a_widget.observe(self._on_widget_change, names='value')
-        
 
+        return a_widget
+
+
+    @function_attributes(short_name=None, tags=['filter', 'dynamic', 'ui', 'widget'], input_requires=[], output_provides=[], uses=['._rebuild_predicate_widget()'], used_by=[], creation_date='2025-03-27 14:05', related_items=[])
+    def build_extra_selectMultiple_widget(self, a_name: str = 'replay_name', df_col_name: str = 'custom_replay_name', a_widget_label: str = 'Replay Name:') -> widgets.SelectMultiple:
+        """ adds a new dropdown widget to refine the active points, triggers `self._on_widget_change` when a selection is made
+
+        Works by adding the widget as property of this instance, and imposing the widget's selection criteria by adding a custom predicate to `self.additional_filter_predicates`. 
+        The predicate selector widget is then rebuilt by calling `self._rebuild_predicate_widget(...)`
         
+        
+        Usage:        
+            _a_time_bin_size_widget = df_filter.build_extra_selectMultiple_widget(a_name='time_bin_size', df_col_name='time_bin_size', a_widget_label='Time Bin Size:')
+
+        """
+        import ipywidgets as widgets
+        from traitlets import Dict as TraitDict  # Import the Dict traitlet
+
+        a_widget_name: str = f"{a_name}_widget" # replay_name_widget
+        extant_widget = getattr(self, a_widget_name, None)
+        if extant_widget is not None:
+            raise NotImplementedError(f'Not sure what to do with extant widgets yet! a_widget_label: "{a_widget_label}".')
+
+        ## Create and add new widget:
+        a_col_values_options = sorted(self.active_plot_df[df_col_name].astype(str).unique())    
+        a_widget = widgets.SelectMultiple(
+            options=a_col_values_options,
+            description=a_widget_label,
+            disabled=False,
+            layout=widgets.Layout(width='300px'),
+            style={'description_width': 'initial'},
+        )
+
+
+        ## add_traits (does work)
+        a_widget.metadata = TraitDict({  # Use the Dict traitlet here
+            "desc": "build_extra_selectMultiple_widget",
+            "df_col_name": df_col_name,
+            "name": a_name,
+            "widget_name": a_widget_name,
+        })
+        
+        # Build the appropriate filter predicate to go along with the custom control _________________________________________ #
+        # [str(v) for v in a_widget.value]
+        self.additional_filter_predicates.update({
+            f'{a_widget_name}': (lambda df: (df[df_col_name].astype(str).isin([str(v) for v in a_widget.value]))),
+        })
+
+        ## INPUTS: self.custom_dynamic_filter_widgets_list
+        ## Add to output widgets list
+        self.custom_dynamic_filter_widgets_list.append(a_widget)
+        setattr(self, a_widget_name, a_widget) # self.replay_name_widget
+        ## INPUTS: self.custom_dynamic_filter_widgets_dict, self.custom_dynamic_filter_widgets_property_map
+
+        ## Update the predicate enabled selection widget and default to enabling this predicate:
+        self._rebuild_predicate_widget(initially_is_checked={f'{a_widget_name}':True})
+
+        # Set up observers to handle changes in widget values
+        a_widget.observe(self._on_widget_change, names='value')
+
+        return a_widget
+
+
 
     @function_attributes(short_name=None, tags=['private', 'widget'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-03-27 12:18', related_items=[])
     def _setup_widgets(self):
         import plotly.subplots as sp
         from pyphoplacecellanalysis.Pho2D.plotly.Extensions.plotly_helpers import PlotlyFigureContainer
         
-
         self.custom_dynamic_filter_widgets_list = [] ## start with an empty list of additional filter widgets
 
         # Extract unique options for the widgets
@@ -2321,6 +2445,9 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
             layout=widgets.Layout(width='300px', height='100px'),
             style={'description_width': 'initial'},
         )
+        
+        # self.time_bin_size_widget = self.build_extra_selectMultiple_widget(a_name='time_bin_size', df_col_name='time_bin_size', a_widget_label='Time Bin Size:')
+
 
         self.active_filter_predicate_selector_widget = CheckBoxListWidget(options_list=list(self.additional_filter_predicates.keys()))
             # description='Filter Predicates:',
