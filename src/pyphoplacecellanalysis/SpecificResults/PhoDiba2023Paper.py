@@ -2203,11 +2203,17 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
         
         self._setup_widgets()
         # Initial filtering with default widget values
-        self.update_filtered_dataframes(self.replay_name_widget.value, self.time_bin_size_widget.value)
-        
+        if getattr(self, 'time_bin_size_widget', None) is not None:
+            self.update_filtered_dataframes(self.replay_name_widget.value, self.time_bin_size_widget.value)
+        # else:
+        #     self.update_filtered_dataframes(self.replay_name_widget.value)
+
         # Button Widget Initialize ___________________________________________________________________________________________ #
         # Set up the buttons after figure_widget is created
         self._setup_widgets_buttons()
+
+        ## set time_bin_size selections to the first value by default
+        initial_selection = self.set_initial_selection(a_widget=self.time_bin_size_widget, initial_selection_mode=InitialSelectionModeEnum.FIRST_SELECTED)
 
 
     # @function_attributes(short_name=None, tags=['filter', 'dynamic', 'ui', 'widget'], input_requires=[], output_provides=[], uses=['._rebuild_predicate_widget()'], used_by=[], creation_date='2025-03-27 14:05', related_items=[])
@@ -2273,6 +2279,31 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
         
 
 # SelectMultiple
+
+    @classmethod
+    def set_initial_selection(cls, a_widget, initial_selection_mode: InitialSelectionModeEnum=InitialSelectionModeEnum.FIRST_SELECTED, custom_initial_selections: Optional[List]=None):
+        # Set initial widget selection/selections ____________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
+        
+        a_col_values_options = deepcopy(a_widget.options)
+
+        initial_selection = []
+        if (initial_selection_mode.value == InitialSelectionModeEnum.NO_SELECTION.value):
+            initial_selection = []
+        elif (initial_selection_mode.value == InitialSelectionModeEnum.FIRST_SELECTED.value):
+            if len(a_col_values_options) > 0:
+                initial_selection = [a_col_values_options[0]]
+        elif (initial_selection_mode.value == InitialSelectionModeEnum.CUSTOM_SELECTED.value):
+            assert custom_initial_selections is not None, f"with this mode you must provide a custom_selection"
+            initial_selection = deepcopy(custom_initial_selections)
+        elif (initial_selection_mode.value == InitialSelectionModeEnum.ALL_SELECTED.value):
+            initial_selection = deepcopy(a_col_values_options)
+        else:
+            raise NotImplementedError(f'{initial_selection_mode} is not VALID')
+
+        a_widget.value = initial_selection
+        return initial_selection
+    
+
 
     @function_attributes(short_name=None, tags=['filter', 'dynamic', 'ui', 'widget'], input_requires=[], output_provides=[], uses=['._rebuild_predicate_widget()'], used_by=[], creation_date='2025-03-27 14:05', related_items=[])
     def build_extra_dropdown_widget(self, a_name: str = 'replay_name', df_col_name: str = 'custom_replay_name', a_widget_label: str = 'Replay Name:') -> widgets.Dropdown:
@@ -2397,21 +2428,22 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
 
 
         # Set initial widget selection/selections ____________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
-        initial_selection = []
-        if (initial_selection_mode.value == InitialSelectionModeEnum.NO_SELECTION.value):
-            initial_selection = []
-        elif (initial_selection_mode.value == InitialSelectionModeEnum.FIRST_SELECTED.value):
-            if len(a_col_values_options) > 0:
-                initial_selection = [a_col_values_options[0]]
-        elif (initial_selection_mode.value == InitialSelectionModeEnum.CUSTOM_SELECTED.value):
-            assert custom_initial_selections is not None, f"with this mode you must provide a custom_selection"
-            initial_selection = deepcopy(custom_initial_selections)
-        elif (initial_selection_mode.value == InitialSelectionModeEnum.ALL_SELECTED.value):
-            initial_selection = deepcopy(a_col_values_options)
-        else:
-            raise NotImplementedError(f'{initial_selection_mode} is not VALID')
+        initial_selection = self.set_initial_selection(a_widget=a_widget, initial_selection_mode=initial_selection_mode, custom_initial_selections=custom_initial_selections)
+        # initial_selection = []
+        # if (initial_selection_mode.value == InitialSelectionModeEnum.NO_SELECTION.value):
+        #     initial_selection = []
+        # elif (initial_selection_mode.value == InitialSelectionModeEnum.FIRST_SELECTED.value):
+        #     if len(a_col_values_options) > 0:
+        #         initial_selection = [a_col_values_options[0]]
+        # elif (initial_selection_mode.value == InitialSelectionModeEnum.CUSTOM_SELECTED.value):
+        #     assert custom_initial_selections is not None, f"with this mode you must provide a custom_selection"
+        #     initial_selection = deepcopy(custom_initial_selections)
+        # elif (initial_selection_mode.value == InitialSelectionModeEnum.ALL_SELECTED.value):
+        #     initial_selection = deepcopy(a_col_values_options)
+        # else:
+        #     raise NotImplementedError(f'{initial_selection_mode} is not VALID')
 
-        a_widget.value = initial_selection
+        # a_widget.value = initial_selection
         
         return a_widget
 
@@ -2427,6 +2459,10 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
         # Extract unique options for the widgets
         replay_name_options = sorted(self.active_plot_df['custom_replay_name'].astype(str).unique())
         time_bin_size_options = sorted(self.active_plot_df['time_bin_size'].unique())
+        
+        self.output_widget = widgets.Output(layout=widgets.Layout(width='100%', # min_width='200px', height='100px',
+                                                                  border='1px solid black'),
+                                                                  ) #  {'border': '1px solid black'}
         
         # Create dropdown widgets with adjusted layout and style
         self.replay_name_widget = widgets.Dropdown(
@@ -2455,6 +2491,12 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
         )
         self.active_plot_variable_name_widget.value = self.active_plot_variable_name
         
+        self.active_filter_predicate_selector_widget = CheckBoxListWidget(options_list=list(self.additional_filter_predicates.keys()))
+            # description='Filter Predicates:',
+            # disabled=False,
+        # )
+        self.active_filter_predicate_selector_widget.observe(self._on_widget_change, names='value')
+
         # Use SelectMultiple widget for time_bin_size
         self.time_bin_size_widget = widgets.SelectMultiple(
             options=time_bin_size_options,
@@ -2464,17 +2506,8 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
             style={'description_width': 'initial'},
         )
         
-        # self.time_bin_size_widget = self.build_extra_selectMultiple_widget(a_name='time_bin_size', df_col_name='time_bin_size', a_widget_label='Time Bin Size:')
+        # self.time_bin_size_widget = self.build_extra_selectMultiple_widget(a_name='time_bin_size', df_col_name='time_bin_size', a_widget_label='Time Bin Size:', initial_selection_mode=InitialSelectionModeEnum.FIRST_SELECTED)
 
-
-        self.active_filter_predicate_selector_widget = CheckBoxListWidget(options_list=list(self.additional_filter_predicates.keys()))
-            # description='Filter Predicates:',
-            # disabled=False,
-        # )
-
-        self.output_widget = widgets.Output(layout=widgets.Layout(width='100%', # min_width='200px', height='100px',
-                                                                  border='1px solid black'),
-                                                                  ) #  {'border': '1px solid black'}
         self.figure_widget, did_create_new_figure = PlotlyFigureContainer._helper_build_pre_post_delta_figure_if_needed(extant_figure=None, use_latex_labels=False, main_title='test', figure_class=go.FigureWidget)
         self.figure_widget.layout.dragmode = 'select'
         # self.figure_widget.layout.dragmode = 'lasso'
@@ -2491,7 +2524,7 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
         # Set up observers to handle changes in widget values
         self.replay_name_widget.observe(self._on_widget_change, names='value')
         self.time_bin_size_widget.observe(self._on_widget_change, names='value')
-        self.active_filter_predicate_selector_widget.observe(self._on_widget_change, names='value')
+        # self.active_filter_predicate_selector_widget.observe(self._on_widget_change, names='value')
         self.active_plot_df_name_selector_widget.observe(self._on_widget_change, names='value')
         self.active_plot_variable_name_widget.observe(self._on_widget_change, names='value')
         
@@ -3058,12 +3091,16 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
 
 
     @function_attributes(short_name=None, tags=['update', 'MAIN', 'callback'], input_requires=['self.additional_filter_predicates'], output_provides=[], uses=[], used_by=['self._on_widget_change'], creation_date='2025-03-27 12:49', related_items=[])
-    def update_filtered_dataframes(self, replay_name, time_bin_sizes, debug_print=True, enable_overwrite_is_filter_included_column: bool=True):
+    def update_filtered_dataframes(self, replay_name, time_bin_sizes=None, debug_print=True, enable_overwrite_is_filter_included_column: bool=True):
         """ Perform filtering on each DataFrame. Called by `self._on_widget_change` when a widget's value is changed
         
         
         Uses: self.additional_filter_predicates, .original_df_dict, 
         """
+        # if time_bin_sizes is None:
+        #     print("WARN: time_bin_sizes is None, falling back to widget's values.")
+        #     time_bin_sizes = self.time_bin_size
+            
         if not time_bin_sizes:
             print("Please select at least one Time Bin Size.")
             return
