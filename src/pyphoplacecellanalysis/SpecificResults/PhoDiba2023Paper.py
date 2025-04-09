@@ -2339,7 +2339,7 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
 
 
     @function_attributes(short_name=None, tags=['filter', 'dynamic', 'ui', 'widget'], input_requires=[], output_provides=[], uses=['._rebuild_predicate_widget()'], used_by=[], creation_date='2025-03-27 14:05', related_items=[])
-    def build_extra_selectMultiple_widget(self, a_name: str = 'replay_name', df_col_name: str = 'custom_replay_name', a_widget_label: str = 'Replay Name:') -> widgets.SelectMultiple:
+    def build_extra_selectMultiple_widget(self, a_name: str = 'replay_name', df_col_name: str = 'custom_replay_name', a_widget_label: str = 'Replay Name:', initial_selection_mode: InitialSelectionModeEnum=InitialSelectionModeEnum.FIRST_SELECTED, custom_initial_selections: Optional[List]=None) -> widgets.SelectMultiple:
         """ adds a new dropdown widget to refine the active points, triggers `self._on_widget_change` when a selection is made
 
         Works by adding the widget as property of this instance, and imposing the widget's selection criteria by adding a custom predicate to `self.additional_filter_predicates`. 
@@ -2395,6 +2395,24 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
         # Set up observers to handle changes in widget values
         a_widget.observe(self._on_widget_change, names='value')
 
+
+        # Set initial widget selection/selections ____________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
+        initial_selection = []
+        if (initial_selection_mode.value == InitialSelectionModeEnum.NO_SELECTION.value):
+            initial_selection = []
+        elif (initial_selection_mode.value == InitialSelectionModeEnum.FIRST_SELECTED.value):
+            if len(a_col_values_options) > 0:
+                initial_selection = [a_col_values_options[0]]
+        elif (initial_selection_mode.value == InitialSelectionModeEnum.CUSTOM_SELECTED.value):
+            assert custom_initial_selections is not None, f"with this mode you must provide a custom_selection"
+            initial_selection = deepcopy(custom_initial_selections)
+        elif (initial_selection_mode.value == InitialSelectionModeEnum.ALL_SELECTED.value):
+            initial_selection = deepcopy(a_col_values_options)
+        else:
+            raise NotImplementedError(f'{initial_selection_mode} is not VALID')
+
+        a_widget.value = initial_selection
+        
         return a_widget
 
 
