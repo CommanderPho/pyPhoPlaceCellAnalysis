@@ -2872,6 +2872,8 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
         
         should_prepare_full_hover_click_interactivity: bool:  ## slow when enabled
         
+        legend_groups_to_hide=[0.05]
+        
         """
         # fig_size_kwargs = {'width': 1650, 'height': 480}
         # fig_size_kwargs = {'width': resolution_multiplier*1650, 'height': resolution_multiplier*480}
@@ -2923,8 +2925,20 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
             
             assert plot_variable_name in active_plot_df.columns, f"plot_variable_name: '{plot_variable_name}' is not present in active_plot_df.columns! Cannot plot!"
             
+            
+            
+            if len(df_filter.time_bin_size) > 2:
+                non_selected_options = df_filter.time_bin_size[1:] # all but the first
+                legend_groups_to_hide = (deepcopy(non_selected_options))
+            else:
+                legend_groups_to_hide = [] # Hide none. df_filter.time_bin_size # [0.05]
+                
+            #TODO 2025-04-09 14:00: - [ ] Customization here -- which are enabled by default            
+
             # extra_plot_kwargs = deepcopy(extra_plot_kwargs)
-            active_plot_kwargs = (extra_plot_kwargs | kwargs) 
+            # active_plot_kwargs = extra_plot_kwargs | {'legend_groups_to_hide': legend_groups_to_hide}
+            # active_plot_kwargs = active_plot_kwargs | kwargs
+            active_plot_kwargs = (extra_plot_kwargs | {'legend_groups_to_hide': legend_groups_to_hide} | kwargs) 
             fig, new_fig_context, _extras_output_dict, figure_out_paths = _new_perform_plot_pre_post_delta_scatter_with_embedded_context(concatenated_ripple_df=deepcopy(active_plot_df), is_dark_mode=False, should_save=should_save, extant_figure=df_filter.figure_widget,
                                                                                                                                     variable_name=plot_variable_name, **active_plot_kwargs) # , enable_custom_widget_buttons=True
             
