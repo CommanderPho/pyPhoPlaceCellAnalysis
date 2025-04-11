@@ -1135,6 +1135,10 @@ class DynamicDockDisplayAreaOwningMixin(BaseDynamicInstanceConformingMixin):
     
     def get_flat_dock_item_tuple_dict(self, debug_print=False) -> Dict[str, Tuple[Dock, Optional["QtWidgets.QWidget"]]]:
         return self.dock_manager_widget.get_flat_dock_item_tuple_dict(debug_print=debug_print)
+    
+    def find_dock_item_tuple(self, identifier) -> Tuple[Dock, Optional["QtWidgets.QWidget"]]:
+        return self.dock_manager_widget.get_flat_dock_item_tuple_dict()[identifier]
+
 
     def get_dockGroup_dock_dict(self, debug_print=False) -> Dict[str, List[Dock]]:
         """Delegates to child widget's get_dockGroup_dock_dict"""
