@@ -74,7 +74,7 @@ class SpecificDockWidgetManipulatingMixin(BaseDynamicInstanceConformingMixin):
         pass
 
 
-    @function_attributes(short_name=None, tags=['IMPORTANT', 'FINAL', 'track', 'posterior', '1D'], input_requires=[], output_provides=[], uses=[], used_by=['add_docked_decoded_posterior_track_from_result'], creation_date='2025-03-21 08:32', related_items=[])
+    @function_attributes(short_name=None, tags=['IMPORTANT', 'FINAL', 'track', 'posterior', '1D'], input_requires=[], output_provides=[], uses=['plot_1D_most_likely_position_comparsions', 'add_new_matplotlib_render_plot_widget', 'PlottingHelpers.helper_matplotlib_add_pseudo2D_marginal_labels'], used_by=['add_docked_decoded_posterior_track_from_result'], creation_date='2025-03-21 08:32', related_items=[])
     def add_docked_decoded_posterior_track(self, name: str, time_window_centers: NDArray, a_1D_posterior: NDArray, xbin: Optional[NDArray]=None, measured_position_df: Optional[pd.DataFrame]=None, a_variable_name: Optional[str]=None, a_dock_config: Optional[CustomDockDisplayConfig]=None, extended_dock_title_info: Optional[str]=None, should_defer_render:bool=False, **kwargs):
         """ adds a decoded 1D posterior 
 
@@ -313,7 +313,7 @@ class SpecificDockWidgetManipulatingMixin(BaseDynamicInstanceConformingMixin):
         return identifier_name, widget, matplotlib_fig, matplotlib_fig_axes, dock_item
     
 
-    @function_attributes(short_name=None, tags=['IMPORTANT', 'FINAL', 'track', 'posterior'], input_requires=[], output_provides=[], uses=['add_docked_decoded_posterior_track'], used_by=[], creation_date='2025-03-21 08:10', related_items=[])
+    @function_attributes(short_name=None, tags=['IMPORTANT', 'FINAL', 'track', 'posterior'], input_requires=[], output_provides=[], uses=['add_docked_decoded_posterior_track', 'add_docked_decoded_posterior_slices_track'], used_by=[], creation_date='2025-03-21 08:10', related_items=[])
     def add_docked_decoded_posterior_track_from_result(self, name: str, a_1D_decoded_result: Union[SingleEpochDecodedResult, DecodedFilterEpochsResult], xbin: Optional[NDArray]=None, measured_position_df: Optional[pd.DataFrame]=None, **kwargs):
             """ adds a decoded 1D posterior from a decoded result
 
@@ -432,7 +432,8 @@ class SpecificDockWidgetManipulatingMixin(BaseDynamicInstanceConformingMixin):
     # Multiple Tracks at once:                                                                                             #
     # ==================================================================================================================== #
     def add_docked_decoded_results_dict_tracks(self, name: str, a_decoded_result_dict: Dict[str, Union[SingleEpochDecodedResult, DecodedFilterEpochsResult]], dock_configs: Dict[str, CustomDockDisplayConfig], pf1D_Decoder_dict: Dict[str, BasePositionDecoder], measured_position_df: Optional[pd.DataFrame]=None, **kwargs):
-        """
+        """ Adds multiple timeline tracks from a dict of decoded results
+        
         info_string: str = f'{active_time_bin_size:.3f}'
         dock_group_sep_character: str = '_'
         showCloseButton = True
