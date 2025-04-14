@@ -85,6 +85,96 @@ from pyphoplacecellanalysis.General.Model.Configs.LongShortDisplayConfig import 
 
 
 
+from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.SpikeRasterWidgets.Spike2DRaster import Spike2DRaster, SynchronizedPlotMode
+
+@function_attributes(short_name=None, tags=['plot', 'figure', 'export'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-04-14 10:50', related_items=[])
+def _plot_all_time_decoded_marginal_figures(curr_active_pipeline, flat_decoded_marginal_posterior_df_context_dict, active_2d_plot: Spike2DRaster):
+    """ exports the components needed to show the decoded P_Short/P_Long likelihoods over time
+
+
+    from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import _plot_all_time_decoded_marginal_figures
+
+    
+    """
+
+
+    from pyphoplacecellanalysis.Pho2D.PyQtPlots.TimeSynchronizedPlotters.PyqtgraphTimeSynchronizedWidget import PyqtgraphTimeSynchronizedWidget
+
+
+
+
+
+    # epochs_decoding_time_bin_size: float = 0.025
+    epochs_decoding_time_bin_size: float = 0.025
+
+    _all_tracks_out_artists = {}
+    for a_ctxt, a_df in flat_decoded_marginal_posterior_df_context_dict.items():
+        time_bin_size = epochs_decoding_time_bin_size
+        info_string: str = f" - t_bin_size: {time_bin_size}"
+        plot_row_identifier: str = a_ctxt.get_description(subset_includelist=['known_named_decoding_epochs_type', 'masked_time_bin_fill_type'], include_property_names=True, key_value_separator=':', separator='|', replace_separator_in_property_names='-')
+        a_time_window_centers = a_df['t_bin_center'].to_numpy() 
+        a_1D_posterior = a_df[['P_Long', 'P_Short']].to_numpy().T
+
+        identifier_name, widget, matplotlib_fig, matplotlib_fig_axes, dock_item = active_2d_plot.add_docked_marginal_track(name=plot_row_identifier, time_window_centers=a_time_window_centers, a_1D_posterior=a_1D_posterior, extended_dock_title_info=info_string)
+        _all_tracks_out_artists[identifier_name] = widget
+        intervals_overview_plot_item.setXRange(active_2d_plot.total_data_start_time, active_2d_plot.total_data_end_time, padding=0) ## global frame
+        matplotlib_fig_axes[0].set_xlim(active_2d_plot.total_data_start_time, active_2d_plot.total_data_end_time)
+        widget.draw()
+
+
+
+    dock_item.hideTitleBar()
+
+    complete_session_context, (session_context, additional_session_context) = curr_active_pipeline.get_complete_session_context()
+
+    active_out_figure_paths, final_context = curr_active_pipeline.output_figure(final_context=complete_session_context.overwriting_context(display='decoded_P_Short_Posterior'), fig=matplotlib_fig)
+
+
+
+
+    # Position over time _________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
+
+
+    a_dock = active_2d_plot.find_display_dock(identifier='new_curves_separate_plot')
+    widget: PyqtgraphTimeSynchronizedWidget = a_dock.widgets[0]
+
+    widget.getRootPlotItem().setXRange(active_2d_plot.total_data_start_time, active_2d_plot.total_data_end_time, padding=0) ## global frame
+    # widget.getRootPlotItem().set_xlim(active_2d_plot.total_data_start_time, active_2d_plot.total_data_end_time)
+    widget.update(None)
+
+    # get_flat_widgets_list(
+
+    ## Export Position over time Figure:
+    complete_session_context, (session_context, additional_session_context) = curr_active_pipeline.get_complete_session_context()
+
+    active_out_figure_paths, final_context = curr_active_pipeline.output_figure(final_context=complete_session_context.overwriting_context(display='pos_over_t'), fig=widget.getRootPlotItem())
+    active_out_figure_paths
+
+
+    # Epoch Intervals figure: ____________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
+
+    _interval_tracks_out_dict = active_2d_plot.prepare_pyqtgraph_intervalPlot_tracks(enable_interval_overview_track=True, should_remove_all_and_re_add=True, should_link_to_main_plot_widget=False)
+    interval_window_dock_config, intervals_dock, intervals_time_sync_pyqtgraph_widget, intervals_root_graphics_layout_widget, intervals_plot_item = _interval_tracks_out_dict['intervals']
+    if 'interval_overview' in _interval_tracks_out_dict:
+        interval_overview_window_dock_config, intervals_overview_dock, intervals_overview_time_sync_pyqtgraph_widget, intervals_overview_root_graphics_layout_widget, intervals_overview_plot_item = _interval_tracks_out_dict['interval_overview']
+        intervals_overview_plot_item.setXRange(active_2d_plot.total_data_start_time, active_2d_plot.total_data_end_time, padding=0) ## global frame
+        # intervals_overview_time_sync_pyqtgraph_widget.setMaximumHeight(39)
+
+
+
+    a_dock, widget = active_2d_plot.find_dock_item_tuple(identifier='interval_overview')
+    widget.getRootPlotItem().setXRange(active_2d_plot.total_data_start_time, active_2d_plot.total_data_end_time, padding=0) ## global frame
+    widget.update(None)
+    complete_session_context, (session_context, additional_session_context) = curr_active_pipeline.get_complete_session_context()
+    active_out_figure_paths, final_context = curr_active_pipeline.output_figure(final_context=complete_session_context.overwriting_context(display='interval_epochs_overview'), fig=widget.getRootPlotItem())
+    active_out_figure_paths
+
+
+
+
+
+
+
 
 from pyphoplacecellanalysis.Pho2D.plotly.Extensions.plotly_helpers import build_single_plotly_marginal_scatter_and_hist_over_time
 
