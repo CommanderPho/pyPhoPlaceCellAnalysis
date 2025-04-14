@@ -1088,7 +1088,19 @@ class DynamicDockDisplayAreaOwningMixin(BaseDynamicInstanceConformingMixin):
         raise NotImplementedError
         
     def find_display_dock(self, identifier) -> Optional[Dock]:
-        """Delegates to child widget's find_display_dock"""
+        """Delegates to child widget's find_display_dock
+
+        Usage:        
+            from pyphoplacecellanalysis.Pho2D.PyQtPlots.TimeSynchronizedPlotters.PyqtgraphTimeSynchronizedWidget import PyqtgraphTimeSynchronizedWidget
+
+            active_2d_plot: Spike2DRaster = active_2d_plot
+            a_dock = active_2d_plot.find_display_dock(identifier='new_curves_separate_plot')
+            widget: PyqtgraphTimeSynchronizedWidget = a_dock.widgets[0]
+
+            widget.getRootPlotItem().setXRange(active_2d_plot.total_data_start_time, active_2d_plot.total_data_end_time, padding=0) ## global frame
+            widget.update(None)
+
+        """
         return self.dock_manager_widget.find_display_dock(identifier)
         
     def add_display_dock(self, identifier=None, widget=None, dockSize=(300,200), dockAddLocationOpts=['bottom'], **kwargs):
@@ -1134,9 +1146,27 @@ class DynamicDockDisplayAreaOwningMixin(BaseDynamicInstanceConformingMixin):
         return self.dock_manager_widget.get_flat_widgets_list(debug_print=debug_print)
     
     def get_flat_dock_item_tuple_dict(self, debug_print=False) -> Dict[str, Tuple[Dock, Optional["QtWidgets.QWidget"]]]:
+        """ 
+        
+        
+        Usage:
+        
+        get_flat_dock_item_tuple_dict(
+        """
         return self.dock_manager_widget.get_flat_dock_item_tuple_dict(debug_print=debug_print)
     
     def find_dock_item_tuple(self, identifier) -> Tuple[Dock, Optional["QtWidgets.QWidget"]]:
+        """ returns a tuple containing the dockItem and its main widget
+        
+        Usage:        
+            from pyphoplacecellanalysis.Pho2D.PyQtPlots.TimeSynchronizedPlotters.PyqtgraphTimeSynchronizedWidget import PyqtgraphTimeSynchronizedWidget
+
+            active_2d_plot: Spike2DRaster = active_2d_plot
+            a_dock, widget = active_2d_plot.find_dock_item_tuple(identifier='new_curves_separate_plot')
+            widget.getRootPlotItem().setXRange(active_2d_plot.total_data_start_time, active_2d_plot.total_data_end_time, padding=0) ## global frame
+            widget.update(None)
+
+        """
         return self.dock_manager_widget.get_flat_dock_item_tuple_dict()[identifier]
 
 

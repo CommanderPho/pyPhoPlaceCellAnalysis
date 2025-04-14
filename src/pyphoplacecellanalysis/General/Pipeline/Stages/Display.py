@@ -668,7 +668,11 @@ class PipelineWithDisplaySavingMixin:
 
     @function_attributes(short_name=None, tags=['save','figure'], input_requires=[], output_provides=[], uses=['build_and_write_to_file'], used_by=[], creation_date='2023-06-14 19:26', related_items=[])
     def output_figure(self, final_context: IdentifyingContext, fig, context_tuple_join_character='_', write_vector_format:bool=False, write_png:bool=True, debug_print=True):
-        """ outputs the figure using the provided context. """
+        """ outputs the figure using the provided context. 
+        
+        Usage:
+            active_out_figure_paths, final_context = 
+        """
         from pyphoplacecellanalysis.General.Mixins.ExportHelpers import build_and_write_to_file
         # fig_man: FileOutputManager = self.get_output_manager() # get the output manager
         # figures_parent_out_path, fig_save_basename = fig_man.get_figure_output_parent_and_basename(final_context, make_folder_if_needed=True)
