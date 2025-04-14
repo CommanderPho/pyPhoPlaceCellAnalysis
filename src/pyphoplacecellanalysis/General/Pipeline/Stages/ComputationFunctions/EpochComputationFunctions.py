@@ -1665,11 +1665,17 @@ def estimate_memory_requirements_bytes(epochs_decoding_time_bin_size: float, fra
         session_duration = 3600  # Default 1 hour
 
     # Calculate array dimensions
+
+    # Use Python's arbitrary precision integers for calculations
+    n_flattened_position_bins = int(n_flattened_position_bins)
+    n_neurons = int(n_neurons)
+    session_duration = int(np.ceil(session_duration))
+    n_maze_contexts = int(n_maze_contexts)
     n_time_bins = int(np.ceil(session_duration / epochs_decoding_time_bin_size))
-    n_frame_divided_bins = int(np.ceil(session_duration / frame_divide_bin_size))
+    n_frame_divided_bins = int(np.ceil(session_duration / frame_divide_bin_size))    
+    n_max_decoded_bins = int(max(n_time_bins, n_frame_divided_bins))
     
-    n_max_decoded_bins: int = max(n_time_bins, n_frame_divided_bins)
-    bytes_per_float = 8  # float64
+    bytes_per_float = int(8)
     
     # Calculate memory for each major array type
     itemized_memory_breakdown = {
@@ -1686,8 +1692,11 @@ def estimate_memory_requirements_bytes(epochs_decoding_time_bin_size: float, fra
     # Account for multiple maze contexts
     total_memory = sum(itemized_memory_breakdown.values()) * n_maze_contexts
     
+    # Calculate the worst case scenario separately to avoid overflow
+    worst_case_memory = int(n_max_decoded_bins) * int(n_flattened_position_bins) * int(n_neurons) * int(bytes_per_float)
+
     intermediate_itemized_memory_breakdown = {
-        'worst_case_scenario': (n_max_decoded_bins * n_flattened_position_bins * n_neurons) * bytes_per_float, 
+        'worst_case_scenario': worst_case_memory, 
     }
     total_memory += sum(intermediate_itemized_memory_breakdown.values())
     
@@ -1708,8 +1717,8 @@ class EpochComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Computati
         input_requires=[], output_provides=[], uses=['EpochComputationsComputationsContainer'], used_by=[], creation_date='2025-02-18 09:45', related_items=[],
         requires_global_keys=[], provides_global_keys=['EpochComputations'],
         validate_computation_test=validate_has_non_PBE_epoch_results, is_global=True)
-    def perform_compute_non_PBE_epochs(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, debug_print=False, training_data_portion: float=(5.0/6.0), epochs_decoding_time_bin_size: float = 0.025, frame_divide_bin_size:float=10.0,
-                                        compute_1D: bool = True, compute_2D: bool = True, drop_previous_result_and_compute_fresh:bool=False, skip_training_test_split: bool = True, debug_print_memory_breakdown: bool=False):
+    def perform_compute_non_PBE_epochs(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, debug_print=False, training_data_portion: float=(5.0/6.0), epochs_decoding_time_bin_size: float = 0.050, frame_divide_bin_size:float=10.0,
+                                        compute_1D: bool = True, compute_2D: bool = False, drop_previous_result_and_compute_fresh:bool=False, skip_training_test_split: bool = True, debug_print_memory_breakdown: bool=False):
         """ Performs the computation of non-PBE epochs for the session and all filtered epochs. Stacks things up hardcore yeah.
 
         Requires:
@@ -1743,7 +1752,7 @@ class EpochComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Computati
                 """ captures: epochs_decoding_time_bin_size, frame_divide_bin_size, active_sess
                 """
                 required_memory_bytes, itemized_mem_breakdown = estimate_memory_requirements_bytes(epochs_decoding_time_bin_size=epochs_decoding_time_bin_size, frame_divide_bin_size=frame_divide_bin_size, n_flattened_position_bins=specific_n_flattened_position_bins, n_neurons=active_sess.neurons.n_neurons, session_duration=active_sess.duration)
-                required_memory_GB: int = required_memory_bytes / 1e9 # Gigabytes
+                required_memory_GB: int = int(required_memory_bytes) / int(1e9) # Gigabytes
                 itemized_mem_breakdown = {f"{k}_{n_dim_str}":v for k, v in itemized_mem_breakdown.items()}
                 return required_memory_GB, itemized_mem_breakdown
 
@@ -1753,14 +1762,14 @@ class EpochComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Computati
                 n_flattened_position_bins_1D: int = computation_results[global_epoch_name].computed_data.pf1D.n_flattened_position_bins
                 required_memory_GB_1D, breakdown1D = _subfn_perform_estimate_required_memory(specific_n_flattened_position_bins=n_flattened_position_bins_1D, n_dim_str="1D")
                 itemized_mem_breakdown.update(breakdown1D)
-                total_required_memory_GB += required_memory_GB_1D
+                total_required_memory_GB += int(required_memory_GB_1D)
             if compute_2D:
                 n_flattened_position_bins_2D: int = computation_results[global_epoch_name].computed_data.pf2D.n_flattened_position_bins
                 required_memory_GB_2D, breakdown2D = _subfn_perform_estimate_required_memory(specific_n_flattened_position_bins=n_flattened_position_bins_2D, n_dim_str="2D")
                 itemized_mem_breakdown.update(breakdown2D)
-                total_required_memory_GB += required_memory_GB_2D
+                total_required_memory_GB += int(required_memory_GB_2D)
             
-            itemized_mem_breakdown_GB = {k:v/1e9 for k, v in itemized_mem_breakdown.items()}
+            itemized_mem_breakdown_GB = {k:int(v)/int(1e9) for k, v in itemized_mem_breakdown.items()}
             if debug_print_memory_breakdown:
                     print("Memory breakdown (GB):")
                     for k, v in itemized_mem_breakdown_GB.items():
@@ -1918,17 +1927,15 @@ class EpochComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Computati
         # ==================================================================================================================== #
 
         ## Unpack from pipeline:
-        nonPBE_results: EpochComputationsComputationsContainer = owning_pipeline_reference.global_computation_results.computed_data['EpochComputations']
-        epochs_decoding_time_bin_size: float = nonPBE_results.epochs_decoding_time_bin_size ## just get the standard size. Currently assuming all things are the same size!
+        valid_EpochComputations_result: EpochComputationsComputationsContainer = global_computation_results.computed_data['EpochComputations'] # owning_pipeline_reference.global_computation_results.computed_data['EpochComputations']
+        assert valid_EpochComputations_result is not None
+        epochs_decoding_time_bin_size: float = valid_EpochComputations_result.epochs_decoding_time_bin_size ## just get the standard size. Currently assuming all things are the same size!
         print(f'\tepochs_decoding_time_bin_size: {epochs_decoding_time_bin_size}')
-        assert epochs_decoding_time_bin_size == nonPBE_results.epochs_decoding_time_bin_size, f"\tERROR: nonPBE_results.epochs_decoding_time_bin_size: {nonPBE_results.epochs_decoding_time_bin_size} != epochs_decoding_time_bin_size: {epochs_decoding_time_bin_size}"
+        assert epochs_decoding_time_bin_size == valid_EpochComputations_result.epochs_decoding_time_bin_size, f"\tERROR: nonPBE_results.epochs_decoding_time_bin_size: {valid_EpochComputations_result.epochs_decoding_time_bin_size} != epochs_decoding_time_bin_size: {epochs_decoding_time_bin_size}"
 
         # ==================================================================================================================== #
         # Create and add the output                                                                                            #
-        # ==================================================================================================================== #
-        valid_EpochComputations_result: EpochComputationsComputationsContainer = global_computation_results.computed_data['EpochComputations']
-        assert valid_EpochComputations_result is not None
-        
+        # ==================================================================================================================== #        
         if drop_previous_result_and_compute_fresh:            
             removed_epoch_computations_result = getattr(valid_EpochComputations_result, 'a_generic_decoder_dict_decoded_epochs_dict_result', None)
             valid_EpochComputations_result.a_generic_decoder_dict_decoded_epochs_dict_result = None # set to None to drop the result
