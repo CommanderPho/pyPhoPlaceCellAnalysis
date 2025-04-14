@@ -1,3 +1,12 @@
+ 
+from __future__ import annotations # prevents having to specify types for typehinting as strings
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    ## typehinting only imports here
+    from pyphoplacecellanalysis.Analysis.Decoder.context_dependent import GenericDecoderDictDecodedEpochsDictResult
+
+
 from copy import deepcopy
 import sys
 from typing import Dict, List, Tuple, Optional, Callable, Union, Any
@@ -36,12 +45,15 @@ from attrs import asdict, astuple, define, field, Factory
 from neuropy.utils.indexing_helpers import PandasHelpers
 from neuropy.core.epoch import EpochsAccessor, Epoch, ensure_dataframe
 from neuropy.core.position import Position
+from neuropy.utils.mixins.AttrsClassHelpers import AttrsBasedClassHelperMixin, SimpleFieldSizesReprMixin
+
 # import portion as P # Required for interval search: portion~=2.3.0
 from pyphocorehelpers.indexing_helpers import partition_df_dict, partition_df
 
 from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import get_proper_global_spikes_df
 
-from neuropy.utils.mixins.AttrsClassHelpers import AttrsBasedClassHelperMixin, SimpleFieldSizesReprMixin
+import pyphoplacecellanalysis.General.type_aliases as types
+
 
 
 # ### For _perform_recursive_latent_placefield_decoding
@@ -1062,7 +1074,6 @@ class GeneralDecoderDictDecodedEpochsDictResult(ComputedResult):
         return result
 
 
-import pyphoplacecellanalysis.General.type_aliases as types
 
 
 @define(slots=False, repr=False, eq=False)
@@ -1109,7 +1120,8 @@ class EpochComputationsComputationsContainer(ComputedResult):
     results2D: Optional[NonPBEDimensionalDecodingResult] = serialized_field(default=None, repr=False)
 
     a_general_decoder_dict_decoded_epochs_dict_result: GeneralDecoderDictDecodedEpochsDictResult = serialized_field(default=None, is_computable=True, repr=False, metadata={'field_added': '2025.03.09_0'})
-    
+    a_generic_decoder_dict_decoded_epochs_dict_result: GenericDecoderDictDecodedEpochsDictResult = serialized_field(default=None, is_computable=True, repr=False, metadata={'field_added': '2025.04.14_0'})
+
     # Utility Methods ____________________________________________________________________________________________________ #
 
     # def to_dict(self) -> Dict:
@@ -1576,7 +1588,7 @@ class EpochComputationsComputationsContainer(ComputedResult):
 
 
 def validate_has_non_PBE_epoch_results(curr_active_pipeline, computation_filter_name='maze', minimum_inclusion_fr_Hz:Optional[float]=None):
-    """ for `perform_compute_non_PBE_epochs` 
+    """ for `EpochComputationFunctions.perform_compute_non_PBE_epochs` 
     Returns True if the pipeline has a valid RankOrder results set of the latest version
 
     TODO: make sure minimum can be passed. Actually, can get it from the pipeline.
@@ -1598,6 +1610,30 @@ def validate_has_non_PBE_epoch_results(curr_active_pipeline, computation_filter_
 
     # _computationPrecidence = 2 # must be done after PlacefieldComputations, DefaultComputationFunctions
     # _is_global = False
+
+
+def validate_has_generalized_specific_epochs_decoding(curr_active_pipeline, computation_filter_name='maze', minimum_inclusion_fr_Hz:Optional[float]=None):
+    """ for `EpochComputationFunctions.perform_generalized_specific_epochs_decoding` 
+    Returns True if the pipeline has a valid RankOrder results set of the latest version
+
+    TODO: make sure minimum can be passed. Actually, can get it from the pipeline.
+
+    """
+    # Unpacking:
+    seq_results: EpochComputationsComputationsContainer = curr_active_pipeline.global_computation_results.computed_data['EpochComputations']
+    if seq_results is None:
+        return False
+    
+    a_new_NonPBE_Epochs_obj = seq_results.a_new_NonPBE_Epochs_obj
+    if a_new_NonPBE_Epochs_obj is None:
+        return False
+    
+
+    a_generic_decoder_dict_decoded_epochs_dict_result = seq_results.a_generic_decoder_dict_decoded_epochs_dict_result
+    if a_generic_decoder_dict_decoded_epochs_dict_result is None:
+        return False
+
+
 
 
 from pyphocorehelpers.programming_helpers import MemoryManagement # used in `EpochComputationFunctions.perform_compute_non_PBE_epochs`
@@ -1669,7 +1705,7 @@ class EpochComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Computati
     _is_global = True
 
     @function_attributes(short_name='non_PBE_epochs_results', tags=['epochs', 'nonPBE'],
-        input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-02-18 09:45', related_items=[],
+        input_requires=[], output_provides=[], uses=['EpochComputationsComputationsContainer'], used_by=[], creation_date='2025-02-18 09:45', related_items=[],
         requires_global_keys=[], provides_global_keys=['EpochComputations'],
         validate_computation_test=validate_has_non_PBE_epoch_results, is_global=True)
     def perform_compute_non_PBE_epochs(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, debug_print=False, training_data_portion: float=(5.0/6.0), epochs_decoding_time_bin_size: float = 0.025, frame_divide_bin_size:float=10.0,
@@ -1825,9 +1861,6 @@ class EpochComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Computati
             ## OUTPUTS: filter_epochs_pseudo2D_continuous_specific_decoded_result, filter_epochs_decoded_filter_epoch_track_marginal_posterior_df_dict
             # 58sec
 
-
-
-            
         except MemoryError as mem_err:
             print(f"Insufficient memory: {str(mem_err)}")
             raise 
@@ -1842,58 +1875,136 @@ class EpochComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Computati
     
 
 
+    @function_attributes(short_name='generalized_specific_epochs_decoding', tags=['BasePositionDecoder', 'computation', 'decoder', 'epoch'],
+                          input_requires=[], output_provides=[],
+                          requires_global_keys=['EpochComputations'], provides_global_keys=['EpochComputations'],
+                          uses=['GeneralizedDecodedEpochsComputationsContainer', 'GenericDecoderDictDecodedEpochsDictResult'], used_by=[], creation_date='2025-04-14 12:40',
+        validate_computation_test=validate_has_generalized_specific_epochs_decoding, is_global=True)
+    def perform_generalized_specific_epochs_decoding(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, debug_print=False, epochs_decoding_time_bin_size: float = 0.050, drop_previous_result_and_compute_fresh:bool=False, force_recompute:bool=False):
+        """ 
 
-    # @computation_precidence_specifying_function(overriden_computation_precidence=-0.1)
-    # @function_attributes(short_name='local_compute_non_PBE_epochs', tags=['epochs', 'nonPBE'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-02-18 09:45', related_items=[],
-    #     validate_computation_test=lambda curr_active_pipeline, computation_filter_name='maze': (curr_active_pipeline.computation_results[computation_filter_name].computed_data['firing_rate_trends'], curr_active_pipeline.computation_results[computation_filter_name].computed_data['extended_stats']['time_binned_position_df']), is_global=False)
-    # def local_perform_compute_non_PBE_epochs(computation_result: ComputationResult, **kwargs):
-    #     """ Adds the 'is_LR_dir' column to the laps dataframe and updates 'lap_dir' if needed.        
-    #     """
-    #     a_new_NonPBE_Epochs_obj: Compute_NonPBE_Epochs = Compute_NonPBE_Epochs.ini (curr_active_pipeline=owning_pipeline_reference, training_data_portion=training_data_portion)
+        Refactored from `generalized_decode_epochs_dict_and_export_results_completion_function`
+
+
+        Usage:
+            ## Test _perform_specific_epochs_decoding
+            from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.EpochComputationFunctions import EpochComputationFunctions
+            computation_result = curr_active_pipeline.computation_results['maze1_PYR']
+            computation_result = EpochComputationFunctions._perform_specific_epochs_decoding(computation_result, curr_active_pipeline.active_configs['maze1_PYR'], filter_epochs='ripple', decoding_time_bin_size=0.02)
+            filter_epochs_decoder_result, active_filter_epochs, default_figure_name = computation_result.computed_data['specific_epochs_decoding'][('Ripples', 0.02)]
+
+        """
+        from typing import Literal
+        from neuropy.core.epoch import EpochsAccessor, Epoch, ensure_dataframe, ensure_Epoch, TimeColumnAliasesProtocol
+        from pyphocorehelpers.print_helpers import get_now_rounded_time_str
+        from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.EpochComputationFunctions import EpochComputationFunctions, EpochComputationsComputationsContainer, NonPBEDimensionalDecodingResult, Compute_NonPBE_Epochs, KnownFilterEpochs, GeneralDecoderDictDecodedEpochsDictResult
+        from neuropy.analyses.placefields import PfND
+        from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import filter_and_update_epochs_and_spikes
+        from neuropy.utils.result_context import DisplaySpecifyingIdentifyingContext
+        from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import EpochFilteringMode, _compute_proper_filter_epochs
+        from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import DecodedFilterEpochsResult, SingleEpochDecodedResult
+        from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import DirectionalLapsResult, TrackTemplates, DecoderDecodedEpochsResult
+        from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import DirectionalPseudo2DDecodersResult
+        from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import TrainTestSplitResult, TrainTestLapsSplitting, CustomDecodeEpochsResult, decoder_name, epoch_split_key, get_proper_global_spikes_df, DirectionalPseudo2DDecodersResult
+        from pyphoplacecellanalysis.Analysis.Decoder.context_dependent import GenericDecoderDictDecodedEpochsDictResult #, KnownNamedDecoderTrainedComputeEpochsType, KnownNamedDecodingEpochsType, MaskedTimeBinFillType, DataTimeGrain, GenericResultTupleIndexType
         
-    #     computation_result.sess.laps.update_lap_dir_from_smoothed_velocity(pos_input=computation_result.sess.position) # confirmed in-place
-    #     # computation_result.sess.laps.update_lap_dir_from_smoothed_velocity(pos_input=computation_result.sess.position)
-    #     # curr_sess.laps.update_maze_id_if_needed(t_start=t_start, t_delta=t_delta, t_end=t_end) # this doesn't make sense for the filtered sessions unfortunately.
-    #     return computation_result # no changes except to the internal sessions
-    
 
-    # @function_attributes(short_name='_perform_specific_epochs_decoding', tags=['BasePositionDecoder', 'computation', 'decoder', 'epoch'],
-    #                       input_requires=[ "computation_result.computed_data['pf1D_Decoder']", "computation_result.computed_data['pf2D_Decoder']"], output_provides=["computation_result.computed_data['specific_epochs_decoding']"],
-    #                       uses=[], used_by=[], creation_date='2023-04-07 02:16',
-    #     validate_computation_test=lambda curr_active_pipeline, computation_filter_name='maze': (curr_active_pipeline.computation_results[computation_filter_name].computed_data['specific_epochs_decoding']), is_global=False)
-    # def _perform_specific_epochs_decoding(computation_result: ComputationResult, active_config, decoder_ndim:int=2, filter_epochs='ripple', decoding_time_bin_size=0.02, **kwargs):
-    #     """ TODO: meant to be used by `_display_plot_decoded_epoch_slices` but needs a smarter way to cache the computations and etc. 
-    #     Eventually to replace `pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError._compute_specific_decoded_epochs`
+        # ==================================================================================================================== #
+        # BEGIN FUNCTION BODY                                                                                                  #
+        # ==================================================================================================================== #
 
-    #     Usage:
-    #         ## Test _perform_specific_epochs_decoding
-    #         from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.EpochComputationFunctions import EpochComputationFunctions
-    #         computation_result = curr_active_pipeline.computation_results['maze1_PYR']
-    #         computation_result = EpochComputationFunctions._perform_specific_epochs_decoding(computation_result, curr_active_pipeline.active_configs['maze1_PYR'], filter_epochs='ripple', decoding_time_bin_size=0.02)
-    #         filter_epochs_decoder_result, active_filter_epochs, default_figure_name = computation_result.computed_data['specific_epochs_decoding'][('Ripples', 0.02)]
+        # ==================================================================================================================== #
+        # New 2025-03-11 Generic Result:                                                                                       #
+        # ==================================================================================================================== #
 
-    #     """
-    #     ## BEGIN_FUNCTION_BODY _perform_specific_epochs_decoding:
-    #     ## Check for previous computations:
-    #     needs_compute = True # default to needing to recompute.
-    #     computation_tuple_key = (filter_epochs, decoding_time_bin_size, decoder_ndim) # used to be (default_figure_name, decoding_time_bin_size) only
+        ## Unpack from pipeline:
+        nonPBE_results: EpochComputationsComputationsContainer = owning_pipeline_reference.global_computation_results.computed_data['EpochComputations']
+        epochs_decoding_time_bin_size: float = nonPBE_results.epochs_decoding_time_bin_size ## just get the standard size. Currently assuming all things are the same size!
+        print(f'\tepochs_decoding_time_bin_size: {epochs_decoding_time_bin_size}')
+        assert epochs_decoding_time_bin_size == nonPBE_results.epochs_decoding_time_bin_size, f"\tERROR: nonPBE_results.epochs_decoding_time_bin_size: {nonPBE_results.epochs_decoding_time_bin_size} != epochs_decoding_time_bin_size: {epochs_decoding_time_bin_size}"
 
-    #     curr_result = computation_result.computed_data.get('specific_epochs_decoding', {})
-    #     found_result = curr_result.get(computation_tuple_key, None)
-    #     if found_result is not None:
-    #         # Unwrap and reuse the result:
-    #         filter_epochs_decoder_result, active_filter_epochs, default_figure_name = found_result # computation_result.computed_data['specific_epochs_decoding'][('Laps', decoding_time_bin_size)]
-    #         needs_compute = False # we don't need to recompute
+        # ==================================================================================================================== #
+        # Create and add the output                                                                                            #
+        # ==================================================================================================================== #
+        valid_EpochComputations_result: EpochComputationsComputationsContainer = global_computation_results.computed_data['EpochComputations']
+        assert valid_EpochComputations_result is not None
+        
+        if drop_previous_result_and_compute_fresh:            
+            removed_epoch_computations_result = getattr(valid_EpochComputations_result, 'a_generic_decoder_dict_decoded_epochs_dict_result', None)
+            valid_EpochComputations_result.a_generic_decoder_dict_decoded_epochs_dict_result = None # set to None to drop the result
+            if removed_epoch_computations_result is not None:
+                print(f'removed previous "EpochComputations.a_generic_decoder_dict_decoded_epochs_dict_result" result and computing fresh since `drop_previous_result_and_compute_fresh == True`')
 
-    #     if needs_compute:
-    #         ## Do the computation:
-    #         filter_epochs_decoder_result, active_filter_epochs, default_figure_name = _subfn_compute_decoded_epochs(computation_result, active_config, filter_epochs=filter_epochs, decoding_time_bin_size=decoding_time_bin_size, decoder_ndim=decoder_ndim)
+        if (not hasattr(valid_EpochComputations_result, 'a_generic_decoder_dict_decoded_epochs_dict_result')) or (getattr(valid_EpochComputations_result, 'a_generic_decoder_dict_decoded_epochs_dict_result', None) is None):
+            # initialize
+            a_new_fully_generic_result: GenericDecoderDictDecodedEpochsDictResult = GenericDecoderDictDecodedEpochsDictResult.batch_user_compute_fn(curr_active_pipeline=owning_pipeline_reference, force_recompute=force_recompute, time_bin_size=epochs_decoding_time_bin_size, debug_print=debug_print)
+            valid_EpochComputations_result.a_generic_decoder_dict_decoded_epochs_dict_result = a_new_fully_generic_result
+            global_computation_results.computed_data['EpochComputations'].a_generic_decoder_dict_decoded_epochs_dict_result = a_new_fully_generic_result
 
-    #         ## Cache the computation result via the tuple key: (default_figure_name, decoding_time_bin_size) e.g. ('Laps', 0.02) or ('Ripples', 0.02)
-    #         curr_result[computation_tuple_key] = (filter_epochs_decoder_result, active_filter_epochs, default_figure_name)
+        else:
+            ## get and update existing:
+            a_new_fully_generic_result: GenericDecoderDictDecodedEpochsDictResult = valid_EpochComputations_result.a_generic_decoder_dict_decoded_epochs_dict_result ## get existing
+            ## TODO: update as needed here
+            print(f'WARN 2025-04-14 - Not yet finished -- perform update here.')
+            global_computation_results.computed_data['EpochComputations'].a_generic_decoder_dict_decoded_epochs_dict_result = a_new_fully_generic_result
+            
 
-    #     computation_result.computed_data['specific_epochs_decoding'] = curr_result
-    #     return computation_result
+        # # global_computation_results.computed_data['EpochComputations'].included_qclu_values = included_qclu_values
+        # if (not hasattr(global_computation_results.computed_data['EpochComputations'], 'a_generic_decoder_dict_decoded_epochs_dict_result') or (global_computation_results.computed_data['EpochComputations'].a_generic_decoder_dict_decoded_epochs_dict_result is None)):
+        #     # initialize a new result
+        #     a_new_NonPBE_Epochs_obj: Compute_NonPBE_Epochs = Compute_NonPBE_Epochs.init_from_pipeline(curr_active_pipeline=owning_pipeline_reference, training_data_portion=training_data_portion, skip_training_test_split=skip_training_test_split)
+        #     global_computation_results.computed_data['EpochComputations'].a_generic_decoder_dict_decoded_epochs_dict_result = a_new_NonPBE_Epochs_obj
+        # else:
+        #     ## get the existing one:
+        #     a_new_NonPBa_generic_decoder_dict_decoded_epochs_dict_resultE_Epochs_obj: Compute_NonPBE_Epochs = global_computation_results.computed_data['EpochComputations'].a_generic_decoder_dict_decoded_epochs_dict_result
+
+
+
+        # ## Export to CSVs:
+        # csv_save_paths = {}
+        # active_export_parent_output_path = self.collected_outputs_path.resolve()
+        # # Assert.path_exists(parent_output_path)
+
+        # ## INPUTS: collected_outputs_path
+        # decoding_time_bin_size: float = epochs_decoding_time_bin_size
+
+        # complete_session_context, (session_context, additional_session_context) = owning_pipeline_reference.get_complete_session_context()
+        # active_context = complete_session_context
+        # session_name: str = owning_pipeline_reference.session_name
+        # earliest_delta_aligned_t_start, t_delta, latest_delta_aligned_t_end = owning_pipeline_reference.find_LongShortDelta_times()
+
+        # ## Build the function that uses owning_pipeline_reference to build the correct filename and actually output the .csv to the right place
+        # def _subfn_custom_export_df_to_csv(export_df: pd.DataFrame, data_identifier_str: str = f'(laps_marginals_df)', parent_output_path: Path=None):
+        #     """ captures `owning_pipeline_reference`
+        #     """
+        #     output_date_str: str = get_now_rounded_time_str(rounded_minutes=10)
+        #     out_path, out_filename, out_basename = owning_pipeline_reference.build_complete_session_identifier_filename_string(output_date_str=output_date_str, data_identifier_str=data_identifier_str, parent_output_path=parent_output_path, out_extension='.csv')
+        #     export_df.to_csv(out_path)
+        #     return out_path 
+
+        # custom_export_df_to_csv_fn = _subfn_custom_export_df_to_csv
+
+
+        # # tbin_values_dict={'laps': decoding_time_bin_size, 'pbe': decoding_time_bin_size, 'non_pbe': decoding_time_bin_size, 'FAT': decoding_time_bin_size}
+
+        # # csv_save_paths_dict = GenericDecoderDictDecodedEpochsDictResult._perform_export_dfs_dict_to_csvs(extracted_dfs_dict=a_new_fully_generic_result.filter_epochs_decoded_track_marginal_posterior_df_dict,
+        # csv_save_paths_dict = a_new_fully_generic_result.export_csvs(
+        #                                             parent_output_path=active_export_parent_output_path.resolve(),
+        #                                             active_context=active_context, session_name=session_name, #curr_active_pipeline=owning_pipeline_reference,
+        #                                             custom_export_df_to_csv_fn=custom_export_df_to_csv_fn,
+        #                                             decoding_time_bin_size=decoding_time_bin_size,
+        #                                             curr_session_t_delta=t_delta
+        #                                             )
+        
+        # across_session_results_extended_dict['generalized_decode_epochs_dict_and_export_results_completion_function']['csv_save_paths_dict'] = deepcopy(csv_save_paths_dict)
+
+        # print(f'csv_save_paths_dict: {csv_save_paths_dict}\n')
+
+        return global_computation_results
+
+
+
+
 
 
 
