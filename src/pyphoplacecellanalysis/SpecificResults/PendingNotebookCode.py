@@ -29,8 +29,6 @@ from pyphocorehelpers.programming_helpers import metadata_attributes
 from functools import wraps, partial
 from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import BasePositionDecoder, DecodedFilterEpochsResult, SingleEpochDecodedResult
 
-
-# from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError import plot_1D_most_likely_position_comparsions
 from typing import Dict, List, Tuple, Optional, Callable, Union, Any
 from typing import NewType
 from typing_extensions import TypeAlias
@@ -85,89 +83,215 @@ from pyphoplacecellanalysis.General.Model.Configs.LongShortDisplayConfig import 
 
 
 
-from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.SpikeRasterWidgets.Spike2DRaster import Spike2DRaster, SynchronizedPlotMode
 
-@function_attributes(short_name=None, tags=['plot', 'figure', 'export'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-04-14 10:50', related_items=[])
-def _plot_all_time_decoded_marginal_figures(curr_active_pipeline, flat_decoded_marginal_posterior_df_context_dict, active_2d_plot: Spike2DRaster):
+@function_attributes(short_name=None, tags=['plot', 'figure', 'matplotlib'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-04-14 17:55', related_items=[])
+def _plot_all_time_decoded_marginal_figures_non_interactive(curr_active_pipeline, best_matching_context: IdentifyingContext, a_decoded_marginal_posterior_df: pd.DataFrame, epochs_decoding_time_bin_size: float = 0.025):
     """ exports the components needed to show the decoded P_Short/P_Long likelihoods over time
 
 
     from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import _plot_all_time_decoded_marginal_figures
 
-    
+    search_context = IdentifyingContext(known_named_decoding_epochs_type='global') # , data_grain= 'per_time_bin -- not really relevant: ['masked_time_bin_fill_type', 'known_named_decoding_epochs_type', 'data_grain']
+    flat_context_list, flat_result_context_dict, flat_decoder_context_dict, flat_decoded_marginal_posterior_df_context_dict = a_new_fully_generic_result.get_results_matching_contexts(context_query=search_context, return_multiple_matches=True, debug_print=True)
+    _all_tracks_active_out_figure_paths, _all_tracks_out_artists, _all_tracks_out_axes = 
+
     """
-
-
+    from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.SpikeRasterWidgets.Spike2DRaster import Spike2DRaster
+    from pyphoplacecellanalysis.GUI.Qt.SpikeRasterWindows.Spike3DRasterWindowWidget import Spike3DRasterWindowWidget
+    from pyphoplacecellanalysis.GUI.Qt.PlaybackControls.Spike3DRasterBottomPlaybackControlBarWidget import Spike3DRasterBottomPlaybackControlBar
     from pyphoplacecellanalysis.Pho2D.PyQtPlots.TimeSynchronizedPlotters.PyqtgraphTimeSynchronizedWidget import PyqtgraphTimeSynchronizedWidget
+    # from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.SpikeRasterWidgets.spike_raster_widgets import _setup_spike_raster_window_for_debugging
+
+    all_global_menus_actionsDict, global_flat_action_dict = spike_raster_window.build_all_menus_actions_dict()
+    complete_session_context, (session_context, additional_session_context) = curr_active_pipeline.get_complete_session_context()
 
 
+    # Gets the existing SpikeRasterWindow or creates a new one if one doesn't already exist:
+    # spike_raster_window, (active_2d_plot, active_3d_plot, main_graphics_layout_widget, main_plot_widget, background_static_scroll_plot_widget) = Spike3DRasterWindowWidget.find_or_create_if_needed(curr_active_pipeline, force_create_new=True)
+    # spike_raster_window = active_2d_plot.window()
 
-
-
-    # epochs_decoding_time_bin_size: float = 0.025
-    epochs_decoding_time_bin_size: float = 0.025
-
+    _all_tracks_active_out_figure_paths = {}
     _all_tracks_out_artists = {}
-    for a_ctxt, a_df in flat_decoded_marginal_posterior_df_context_dict.items():
-        time_bin_size = epochs_decoding_time_bin_size
-        info_string: str = f" - t_bin_size: {time_bin_size}"
-        plot_row_identifier: str = a_ctxt.get_description(subset_includelist=['known_named_decoding_epochs_type', 'masked_time_bin_fill_type'], include_property_names=True, key_value_separator=':', separator='|', replace_separator_in_property_names='-')
-        a_time_window_centers = a_df['t_bin_center'].to_numpy() 
-        a_1D_posterior = a_df[['P_Long', 'P_Short']].to_numpy().T
+    _all_tracks_out_axes = {}
+    # for best_matching_context, a_decoded_marginal_posterior_df in flat_decoded_marginal_posterior_df_context_dict.items():
+    time_bin_size = epochs_decoding_time_bin_size
+    info_string: str = f" - t_bin_size: {time_bin_size}"
+    plot_row_identifier: str = best_matching_context.get_description(subset_includelist=['known_named_decoding_epochs_type', 'masked_time_bin_fill_type'], include_property_names=True, key_value_separator=':', separator='|', replace_separator_in_property_names='-')
+    a_time_window_centers = a_decoded_marginal_posterior_df['t_bin_center'].to_numpy() 
+    a_1D_posterior = a_decoded_marginal_posterior_df[['P_Long', 'P_Short']].to_numpy().T
 
-        identifier_name, widget, matplotlib_fig, matplotlib_fig_axes, dock_item = active_2d_plot.add_docked_marginal_track(name=plot_row_identifier, time_window_centers=a_time_window_centers, a_1D_posterior=a_1D_posterior, extended_dock_title_info=info_string)
-        _all_tracks_out_artists[identifier_name] = widget
-        intervals_overview_plot_item.setXRange(active_2d_plot.total_data_start_time, active_2d_plot.total_data_end_time, padding=0) ## global frame
-        matplotlib_fig_axes[0].set_xlim(active_2d_plot.total_data_start_time, active_2d_plot.total_data_end_time)
-        widget.draw()
-
-
+    identifier_name, widget, matplotlib_fig, matplotlib_fig_axes, dock_item = active_2d_plot.add_docked_marginal_track(name=plot_row_identifier, time_window_centers=a_time_window_centers, a_1D_posterior=a_1D_posterior, extended_dock_title_info=info_string)
+    _all_tracks_out_artists[identifier_name] = widget
+    _all_tracks_out_axes[identifier_name] = matplotlib_fig_axes[0]
+    matplotlib_fig_axes[0].set_xlim(active_2d_plot.total_data_start_time, active_2d_plot.total_data_end_time)
+    widget.draw()
 
     dock_item.hideTitleBar()
 
     complete_session_context, (session_context, additional_session_context) = curr_active_pipeline.get_complete_session_context()
 
     active_out_figure_paths, final_context = curr_active_pipeline.output_figure(final_context=complete_session_context.overwriting_context(display='decoded_P_Short_Posterior'), fig=matplotlib_fig)
-
-
+    _all_tracks_active_out_figure_paths[final_context] = deepcopy(active_out_figure_paths)
 
 
     # Position over time _________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
+    curr_identifier_name = 'new_curves_separate_plot'
 
+    menu_commands = [
+        'AddTimeCurves.Position', ## 2025-03-11 02:32 Running this too soon after launching the window causes weird black bars on the top and bottom of the window
+    ]
+    # menu_commands = ['actionPseudo2DDecodedEpochsDockedMatplotlibView', 'actionContinuousPseudo2DDecodedMarginalsDockedMatplotlibView'] # , 'AddTimeIntervals.SessionEpochs'
 
-    a_dock = active_2d_plot.find_display_dock(identifier='new_curves_separate_plot')
+    a_dock = active_2d_plot.find_display_dock(identifier=curr_identifier_name)
+    if a_dock is None:
+        global_flat_action_dict['AddTimeCurves.Position'].trigger()
+        a_dock = active_2d_plot.find_display_dock(identifier=curr_identifier_name)
+
     widget: PyqtgraphTimeSynchronizedWidget = a_dock.widgets[0]
 
     widget.getRootPlotItem().setXRange(active_2d_plot.total_data_start_time, active_2d_plot.total_data_end_time, padding=0) ## global frame
     # widget.getRootPlotItem().set_xlim(active_2d_plot.total_data_start_time, active_2d_plot.total_data_end_time)
     widget.update(None)
 
-    # get_flat_widgets_list(
+    _all_tracks_out_artists[curr_identifier_name] = widget
+    _all_tracks_out_axes[curr_identifier_name] = widget.getRootPlotItem()
 
     ## Export Position over time Figure:
-    complete_session_context, (session_context, additional_session_context) = curr_active_pipeline.get_complete_session_context()
-
     active_out_figure_paths, final_context = curr_active_pipeline.output_figure(final_context=complete_session_context.overwriting_context(display='pos_over_t'), fig=widget.getRootPlotItem())
-    active_out_figure_paths
+    _all_tracks_active_out_figure_paths[final_context] = deepcopy(active_out_figure_paths)
+
 
 
     # Epoch Intervals figure: ____________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
-
+    curr_identifier_name = 'interval_overview'
     _interval_tracks_out_dict = active_2d_plot.prepare_pyqtgraph_intervalPlot_tracks(enable_interval_overview_track=True, should_remove_all_and_re_add=True, should_link_to_main_plot_widget=False)
     interval_window_dock_config, intervals_dock, intervals_time_sync_pyqtgraph_widget, intervals_root_graphics_layout_widget, intervals_plot_item = _interval_tracks_out_dict['intervals']
-    if 'interval_overview' in _interval_tracks_out_dict:
-        interval_overview_window_dock_config, intervals_overview_dock, intervals_overview_time_sync_pyqtgraph_widget, intervals_overview_root_graphics_layout_widget, intervals_overview_plot_item = _interval_tracks_out_dict['interval_overview']
+    if curr_identifier_name in _interval_tracks_out_dict:
+        interval_overview_window_dock_config, intervals_overview_dock, intervals_overview_time_sync_pyqtgraph_widget, intervals_overview_root_graphics_layout_widget, intervals_overview_plot_item = _interval_tracks_out_dict[curr_identifier_name]
         intervals_overview_plot_item.setXRange(active_2d_plot.total_data_start_time, active_2d_plot.total_data_end_time, padding=0) ## global frame
         # intervals_overview_time_sync_pyqtgraph_widget.setMaximumHeight(39)
 
-
-
-    a_dock, widget = active_2d_plot.find_dock_item_tuple(identifier='interval_overview')
+    a_dock, widget = active_2d_plot.find_dock_item_tuple(identifier=curr_identifier_name)
     widget.getRootPlotItem().setXRange(active_2d_plot.total_data_start_time, active_2d_plot.total_data_end_time, padding=0) ## global frame
     widget.update(None)
-    complete_session_context, (session_context, additional_session_context) = curr_active_pipeline.get_complete_session_context()
+    _all_tracks_out_artists[curr_identifier_name] = widget
+    _all_tracks_out_axes[curr_identifier_name] = widget.getRootPlotItem()
+
     active_out_figure_paths, final_context = curr_active_pipeline.output_figure(final_context=complete_session_context.overwriting_context(display='interval_epochs_overview'), fig=widget.getRootPlotItem())
-    active_out_figure_paths
+    _all_tracks_active_out_figure_paths[final_context] = deepcopy(active_out_figure_paths)
+
+    return _all_tracks_active_out_figure_paths, _all_tracks_out_artists, _all_tracks_out_axes
+
+
+
+
+
+
+from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.SpikeRasterWidgets.Spike2DRaster import Spike2DRaster, SynchronizedPlotMode
+from pyphoplacecellanalysis.GUI.Qt.SpikeRasterWindows.Spike3DRasterWindowWidget import Spike3DRasterWindowWidget
+
+
+@function_attributes(short_name=None, tags=['plot', 'figure', 'export'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-04-14 10:50', related_items=[])
+def _plot_all_time_decoded_marginal_figures(curr_active_pipeline, best_matching_context: IdentifyingContext, a_decoded_marginal_posterior_df: pd.DataFrame, spike_raster_window: Spike3DRasterWindowWidget, active_2d_plot: Spike2DRaster, epochs_decoding_time_bin_size: float = 0.025):
+    """ exports the components needed to show the decoded P_Short/P_Long likelihoods over time
+
+
+    from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import _plot_all_time_decoded_marginal_figures
+
+    ## INPUTS: a_new_fully_generic_result
+    a_target_context: IdentifyingContext = IdentifyingContext(trained_compute_epochs='laps', pfND_ndim=1, decoder_identifier='pseudo2D', known_named_decoding_epochs_type='global', masked_time_bin_fill_type='nan_filled', data_grain='per_time_bin')
+    best_matching_context, a_result, a_decoder, a_decoded_marginal_posterior_df = a_new_fully_generic_result.get_results_best_matching_context(context_query=a_target_context, debug_print=False)
+    epochs_decoding_time_bin_size = best_matching_context.get('time_bin_size', None)
+    assert epochs_decoding_time_bin_size is not None
+    _all_tracks_active_out_figure_paths, _all_tracks_out_artists, _all_tracks_out_axes = _plot_all_time_decoded_marginal_figures(curr_active_pipeline=curr_active_pipeline, best_matching_context=best_matching_context, a_decoded_marginal_posterior_df=a_decoded_marginal_posterior_df, spike_raster_window=spike_raster_window, active_2d_plot=active_2d_plot, epochs_decoding_time_bin_size=epochs_decoding_time_bin_size)
+    _all_tracks_active_out_figure_paths
+
+    """
+    from neuropy.utils.result_context import IdentifyingContext
+    from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.SpikeRasterWidgets.Spike2DRaster import Spike2DRaster
+    from pyphoplacecellanalysis.GUI.Qt.SpikeRasterWindows.Spike3DRasterWindowWidget import Spike3DRasterWindowWidget
+    from pyphoplacecellanalysis.GUI.Qt.PlaybackControls.Spike3DRasterBottomPlaybackControlBarWidget import Spike3DRasterBottomPlaybackControlBar
+    from pyphoplacecellanalysis.Pho2D.PyQtPlots.TimeSynchronizedPlotters.PyqtgraphTimeSynchronizedWidget import PyqtgraphTimeSynchronizedWidget
+    # from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.SpikeRasterWidgets.spike_raster_widgets import _setup_spike_raster_window_for_debugging
+
+    all_global_menus_actionsDict, global_flat_action_dict = spike_raster_window.build_all_menus_actions_dict()
+    complete_session_context, (session_context, additional_session_context) = curr_active_pipeline.get_complete_session_context()
+
+
+    # Gets the existing SpikeRasterWindow or creates a new one if one doesn't already exist:
+    # spike_raster_window, (active_2d_plot, active_3d_plot, main_graphics_layout_widget, main_plot_widget, background_static_scroll_plot_widget) = Spike3DRasterWindowWidget.find_or_create_if_needed(curr_active_pipeline, force_create_new=True)
+    # spike_raster_window = active_2d_plot.window()
+
+    _all_tracks_active_out_figure_paths = {}
+    _all_tracks_out_artists = {}
+    _all_tracks_out_axes = {}
+    # for best_matching_context, a_decoded_marginal_posterior_df in flat_decoded_marginal_posterior_df_context_dict.items():
+    time_bin_size = epochs_decoding_time_bin_size
+    info_string: str = f" - t_bin_size: {time_bin_size}"
+    plot_row_identifier: str = best_matching_context.get_description(subset_includelist=['known_named_decoding_epochs_type', 'masked_time_bin_fill_type'], include_property_names=True, key_value_separator=':', separator='|', replace_separator_in_property_names='-')
+    a_time_window_centers = a_decoded_marginal_posterior_df['t_bin_center'].to_numpy() 
+    a_1D_posterior = a_decoded_marginal_posterior_df[['P_Long', 'P_Short']].to_numpy().T
+
+    identifier_name, widget, matplotlib_fig, matplotlib_fig_axes, dock_item = active_2d_plot.add_docked_marginal_track(name=plot_row_identifier, time_window_centers=a_time_window_centers, a_1D_posterior=a_1D_posterior, extended_dock_title_info=info_string)
+    _all_tracks_out_artists[identifier_name] = widget
+    _all_tracks_out_axes[identifier_name] = matplotlib_fig_axes[0]
+    matplotlib_fig_axes[0].set_xlim(active_2d_plot.total_data_start_time, active_2d_plot.total_data_end_time)
+    widget.draw()
+
+    dock_item.hideTitleBar()
+
+    complete_session_context, (session_context, additional_session_context) = curr_active_pipeline.get_complete_session_context()
+
+    active_out_figure_paths, final_context = curr_active_pipeline.output_figure(final_context=complete_session_context.overwriting_context(display='decoded_P_Short_Posterior'), fig=matplotlib_fig)
+    _all_tracks_active_out_figure_paths[final_context] = deepcopy(active_out_figure_paths[0])
+
+
+    # Position over time _________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
+    curr_identifier_name = 'new_curves_separate_plot'
+
+    menu_commands = [
+        'AddTimeCurves.Position', ## 2025-03-11 02:32 Running this too soon after launching the window causes weird black bars on the top and bottom of the window
+    ]
+    # menu_commands = ['actionPseudo2DDecodedEpochsDockedMatplotlibView', 'actionContinuousPseudo2DDecodedMarginalsDockedMatplotlibView'] # , 'AddTimeIntervals.SessionEpochs'
+
+    a_dock = active_2d_plot.find_display_dock(identifier=curr_identifier_name)
+    if a_dock is None:
+        global_flat_action_dict['AddTimeCurves.Position'].trigger()
+        a_dock = active_2d_plot.find_display_dock(identifier=curr_identifier_name)
+
+    widget: PyqtgraphTimeSynchronizedWidget = a_dock.widgets[0]
+
+    widget.getRootPlotItem().setXRange(active_2d_plot.total_data_start_time, active_2d_plot.total_data_end_time, padding=0) ## global frame
+    # widget.getRootPlotItem().set_xlim(active_2d_plot.total_data_start_time, active_2d_plot.total_data_end_time)
+    widget.update(None)
+
+    _all_tracks_out_artists[curr_identifier_name] = widget
+    _all_tracks_out_axes[curr_identifier_name] = widget.getRootPlotItem()
+
+    ## Export Position over time Figure:
+    active_out_figure_paths, final_context = curr_active_pipeline.output_figure(final_context=complete_session_context.overwriting_context(display='pos_over_t'), fig=widget.getRootPlotItem())
+    _all_tracks_active_out_figure_paths[final_context] = deepcopy(active_out_figure_paths[0])
+
+
+    # Epoch Intervals figure: ____________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
+    curr_identifier_name = 'interval_overview'
+    _interval_tracks_out_dict = active_2d_plot.prepare_pyqtgraph_intervalPlot_tracks(enable_interval_overview_track=True, should_remove_all_and_re_add=True, should_link_to_main_plot_widget=False)
+    interval_window_dock_config, intervals_dock, intervals_time_sync_pyqtgraph_widget, intervals_root_graphics_layout_widget, intervals_plot_item = _interval_tracks_out_dict['intervals']
+    if curr_identifier_name in _interval_tracks_out_dict:
+        interval_overview_window_dock_config, intervals_overview_dock, intervals_overview_time_sync_pyqtgraph_widget, intervals_overview_root_graphics_layout_widget, intervals_overview_plot_item = _interval_tracks_out_dict[curr_identifier_name]
+        intervals_overview_plot_item.setXRange(active_2d_plot.total_data_start_time, active_2d_plot.total_data_end_time, padding=0) ## global frame
+        # intervals_overview_time_sync_pyqtgraph_widget.setMaximumHeight(39)
+
+    a_dock, widget = active_2d_plot.find_dock_item_tuple(identifier=curr_identifier_name)
+    widget.getRootPlotItem().setXRange(active_2d_plot.total_data_start_time, active_2d_plot.total_data_end_time, padding=0) ## global frame
+    widget.update(None)
+    _all_tracks_out_artists[curr_identifier_name] = widget
+    _all_tracks_out_axes[curr_identifier_name] = widget.getRootPlotItem()
+
+    active_out_figure_paths, final_context = curr_active_pipeline.output_figure(final_context=complete_session_context.overwriting_context(display='interval_epochs_overview'), fig=widget.getRootPlotItem())
+    _all_tracks_active_out_figure_paths[final_context] = deepcopy(active_out_figure_paths[0])
+
+    return _all_tracks_active_out_figure_paths, _all_tracks_out_artists, _all_tracks_out_axes
 
 
 
@@ -210,7 +334,7 @@ def _plot_plotly_stack_marginal_scatter_and_hist_over_time(flat_decoded_marginal
                                     )
         _flat_out_figs_dict[a_figure_context] = a_fig
         a_fig.show()
-	## END FOR
+    ## END FOR
     return _flat_out_figs_dict
 
 
@@ -681,7 +805,7 @@ def _plot_low_firing_time_bins_overlay_image(widget, time_bin_edges, mask_rgba):
 
         _plot_low_firing_time_bins_overlay_image(widget=widget, time_bin_edges=time_bin_edges, mask_rgba=mask_rgba)
     """
-	## INPUTS: is_time_bin_active
+    ## INPUTS: is_time_bin_active
     # Create mask of inactive time bins
     # inactive_mask = ~is_time_bin_active
     # mask_rgba = np.zeros((1, len(is_time_bin_active), 4), dtype=np.uint8)

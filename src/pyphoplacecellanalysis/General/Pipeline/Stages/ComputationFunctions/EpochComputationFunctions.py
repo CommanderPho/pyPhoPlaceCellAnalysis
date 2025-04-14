@@ -1958,6 +1958,246 @@ class EpochComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Computati
 
 
 
+# ==================================================================================================================== #
+# Display Functions/Plotting                                                                                           #
+# ==================================================================================================================== #
+
+from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DisplayFunctionRegistryHolder import DisplayFunctionRegistryHolder
+import pyqtgraph as pg
+import pyqtgraph.exporters
+from pyphoplacecellanalysis.General.Mixins.ExportHelpers import export_pyqtgraph_plot
+from pyphocorehelpers.DataStructure.general_parameter_containers import VisualizationParameters, RenderPlotsData, RenderPlots
+from pyphocorehelpers.gui.PhoUIContainer import PhoUIContainer # for context_nested_docks/single_context_nested_docks
+
+from neuropy.utils.indexing_helpers import paired_incremental_sorting, union_of_arrays, intersection_of_arrays
+import plotly.express as px
+
+class EpochComputationDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=DisplayFunctionRegistryHolder):
+    """ RankOrderGlobalDisplayFunctions
+    These display functions compare results across several contexts.
+    Must have a signature of: (owning_pipeline_reference, global_computation_results, computation_results, active_configs, ..., **kwargs) at a minimum
+    """
+
+
+    @function_attributes(short_name='generalized_decoded_yellow_blue_marginal_epochs', tags=['yellow-blue-plots', 'directional_merged_decoder_decoded_epochs', 'directional'], conforms_to=['output_registering', 'figure_saving'], input_requires=[], output_provides=[], uses=['plot_decoded_epoch_slices'], used_by=[], creation_date='2024-01-04 02:59', related_items=[], is_global=True)
+    def _display_generalized_decoded_yellow_blue_marginal_epochs(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, save_figure=True, included_any_context_neuron_ids=None,
+                                                    single_plot_fixed_height=50.0, max_num_lap_epochs: int = 25, max_num_ripple_epochs: int = 45, size=(15,7), dpi=72, constrained_layout=True, scrollable_figure=True,
+                                                    skip_plotting_measured_positions=True, skip_plotting_most_likely_positions=True, **kwargs):
+            """ Renders two windows, one with the decoded laps and another with the decoded ripple posteriors, computed using the merged pseudo-2D decoder.
+
+            """
+            from neuropy.utils.mixins.time_slicing import TimeColumnAliasesProtocol
+            # from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError import plot_decoded_epoch_slices
+            from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError import plot_1D_most_likely_position_comparsions
+            from neuropy.utils.matplotlib_helpers import get_heatmap_cmap
+            from pyphoplacecellanalysis.General.Model.Configs.LongShortDisplayConfig import PlottingHelpers
+
+            import matplotlib as mpl
+            import matplotlib.pyplot as plt
+            from flexitext import flexitext ## flexitext for formatted matplotlib text
+
+            from pyphocorehelpers.DataStructure.RenderPlots.MatplotLibRenderPlots import FigureCollector
+            from pyphoplacecellanalysis.General.Model.Configs.LongShortDisplayConfig import PlottingHelpers
+            from neuropy.utils.matplotlib_helpers import FormattedFigureText
+        
+
+            active_context = kwargs.pop('active_context', None)
+            if active_context is not None:
+                # Update the existing context:
+                display_context = active_context.adding_context('display_fn', display_fn_name='generalized_decoded_yellow_blue_marginal_epochs')
+            else:
+                active_context = owning_pipeline_reference.sess.get_context()
+                # Build the active context directly:
+                display_context = owning_pipeline_reference.build_display_context_for_session('generalized_decoded_yellow_blue_marginal_epochs')
+
+            fignum = kwargs.pop('fignum', None)
+            if fignum is not None:
+                print(f'WARNING: fignum will be ignored but it was specified as fignum="{fignum}"!')
+
+            defer_render = kwargs.pop('defer_render', False)
+            debug_print: bool = kwargs.pop('debug_print', False)
+            active_config_name: bool = kwargs.pop('active_config_name', None)
+
+            perform_write_to_file_callback = kwargs.pop('perform_write_to_file_callback', (lambda final_context, fig: owning_pipeline_reference.output_figure(final_context, fig)))
+
+
+            ## INPUTS: a_new_fully_generic_result
+
+            # a_target_context: IdentifyingContext = IdentifyingContext(trained_compute_epochs='laps', pfND_ndim=1, decoder_identifier='pseudo2D', masked_time_bin_fill_type='dropped', data_grain='per_time_bin') # , known_named_decoding_epochs_type='laps', time_bin_size=0.025
+            a_target_context: IdentifyingContext = IdentifyingContext(trained_compute_epochs='laps', pfND_ndim=1, decoder_identifier='pseudo2D', known_named_decoding_epochs_type='global', masked_time_bin_fill_type='nan_filled', data_grain='per_time_bin') # , known_named_decoding_epochs_type='laps', time_bin_size=0.025
+            # flat_context_list, flat_result_context_dict, flat_decoder_context_dict, flat_decoded_marginal_posterior_df_context_dict = a_new_fully_generic_result.get_results_matching_contexts(context_query=a_target_context, return_multiple_matches=True, debug_print=False)
+            # flat_context_list
+            # flat_decoded_marginal_posterior_df_context_dict
+            best_matching_context, a_result, a_decoder, a_decoded_marginal_posterior_df = a_new_fully_generic_result.get_results_best_matching_context(context_query=a_target_context, debug_print=False)
+
+            print(f'best_matching_context: {best_matching_context}')
+            ## OUTPUTS: flat_decoder_context_dict
+
+
+            # Extract kwargs for figure rendering
+            render_merged_pseudo2D_decoder_laps = kwargs.pop('render_merged_pseudo2D_decoder_laps', False)
+            
+            render_directional_marginal_laps = kwargs.pop('render_directional_marginal_laps', True)
+            render_directional_marginal_ripples = kwargs.pop('render_directional_marginal_ripples', False)
+            render_track_identity_marginal_laps = kwargs.pop('render_track_identity_marginal_laps', False)
+            render_track_identity_marginal_ripples = kwargs.pop('render_track_identity_marginal_ripples', False)
+
+            directional_merged_decoders_result = kwargs.pop('directional_merged_decoders_result', None)
+            if directional_merged_decoders_result is not None:
+                print("WARN: User provided a custom directional_merged_decoders_result as a kwarg. This will be used instead of the computed result global_computation_results.computed_data['DirectionalMergedDecoders'].")
+                
+            else:
+                directional_merged_decoders_result = global_computation_results.computed_data['DirectionalMergedDecoders']
+
+
+            # get the time bin size from the decoder:
+            laps_decoding_time_bin_size: float = directional_merged_decoders_result.laps_decoding_time_bin_size
+            ripple_decoding_time_bin_size: float = directional_merged_decoders_result.ripple_decoding_time_bin_size
+
+
+            # figure_name: str = kwargs.pop('figure_name', 'directional_laps_overview_figure')
+            # _out_data = RenderPlotsData(name=figure_name, out_colors_heatmap_image_matrix_dicts={})
+
+            # Recover from the saved global result:
+            # directional_laps_results = global_computation_results.computed_data['DirectionalLaps']
+            # directional_merged_decoders_result = global_computation_results.computed_data['DirectionalMergedDecoders']
+
+            # requires `laps_is_most_likely_direction_LR_dir` from `laps_marginals`
+            long_epoch_name, short_epoch_name, global_epoch_name = owning_pipeline_reference.find_LongShortGlobal_epoch_names()
+
+            graphics_output_dict = {}
+
+            # Shared active_decoder, global_session:
+            active_decoder = directional_merged_decoders_result.all_directional_pf1D_Decoder
+            global_session = deepcopy(owning_pipeline_reference.filtered_sessions[global_epoch_name]) # used for validate_lap_dir_estimations(...) 
+
+            # 'figure.constrained_layout.use': False, 'figure.autolayout': False, 'figure.subplot.bottom': 0.11, 'figure.figsize': (6.4, 4.8)
+            # 'figure.constrained_layout.use': constrained_layout, 'figure.autolayout': False, 'figure.subplot.bottom': 0.11, 'figure.figsize': (6.4, 4.8)
+            with mpl.rc_context({'figure.dpi': '220', 'savefig.transparent': True, 'ps.fonttype': 42, 'figure.constrained_layout.use': (constrained_layout or False), 'figure.frameon': False, }): # 'figure.figsize': (12.4, 4.8), 
+                # Create a FigureCollector instance
+                with FigureCollector(name='plot_directional_merged_pf_decoded_epochs', base_context=display_context) as collector:
+
+                    ## Define the overriden plot function that internally calls the normal plot function but also permits doing operations before and after, such as building titles or extracting figures to save them:
+                    def _mod_plot_decoded_epoch_slices(*args, **subfn_kwargs):
+                        """ implicitly captures: owning_pipeline_reference, collector, perform_write_to_file_callback, save_figure, skip_plotting_measured_positions=True, skip_plotting_most_likely_positions=True
+
+                        NOTE: each call requires adding the additional kwarg: `_main_context=_main_context`
+                        """
+                        assert '_mod_plot_kwargs' in subfn_kwargs
+                        _mod_plot_kwargs = subfn_kwargs.pop('_mod_plot_kwargs')
+                        assert 'final_context' in _mod_plot_kwargs
+                        _main_context = _mod_plot_kwargs['final_context']
+                        assert _main_context is not None
+                        # Build the rest of the properties:
+                        sub_context: IdentifyingContext = owning_pipeline_reference.build_display_context_for_session('directional_merged_pf_decoded_epochs', **_main_context)
+                        sub_context_str: str = sub_context.get_description(subset_includelist=['t_bin'], include_property_names=True) # 't-bin_0.5' # str(sub_context.get_description())
+                        modified_name: str = subfn_kwargs.pop('name', '')
+                        if len(sub_context_str) > 0:
+                            modified_name = f"{modified_name}_{sub_context_str}"
+                        subfn_kwargs['name'] = modified_name # update the name by appending 't-bin_0.5'
+                        
+                        # Call the main plot function:
+                        out_plot_tuple = plot_decoded_epoch_slices(*args, skip_plotting_measured_positions=skip_plotting_measured_positions, skip_plotting_most_likely_positions=skip_plotting_most_likely_positions, **subfn_kwargs)
+                        # Post-plot call:
+                        assert len(out_plot_tuple) == 4
+                        params, plots_data, plots, ui = out_plot_tuple # [2] corresponds to 'plots' in params, plots_data, plots, ui = laps_plots_tuple
+                        # post_hoc_append to collector
+                        mw = ui.mw # MatplotlibTimeSynchronizedWidget
+                        
+                        y_bin_labels = _mod_plot_kwargs.get('y_bin_labels', None)
+                        if y_bin_labels is not None:
+                            label_artists_dict = {}
+                            for i, ax in enumerate(plots.axs):
+                                label_artists_dict[ax] = PlottingHelpers.helper_matplotlib_add_pseudo2D_marginal_labels(ax, y_bin_labels=y_bin_labels, enable_draw_decoder_colored_lines=False)
+                            plots['label_artists_dict'] = label_artists_dict
+                            
+
+                        if mw is not None:
+                            fig = mw.getFigure()
+                            collector.post_hoc_append(figs=mw.fig, axes=mw.axes, contexts=sub_context)
+                            title = mw.params.name
+                        else:
+                            fig = plots.fig
+                            collector.post_hoc_append(figs=fig, axes=plots.axs, contexts=sub_context)
+                            title = params.name
+
+                        # Recover the proper title:
+                        assert title is not None, f"title: {title}"
+                        print(f'title: {title}')
+                        
+                        if ((perform_write_to_file_callback is not None) and (sub_context is not None)):
+                            if save_figure:
+                                perform_write_to_file_callback(sub_context, fig)
+                            
+                        # Close if defer_render
+                        if defer_render:
+                            if mw is not None:
+                                mw.close()
+
+                        return out_plot_tuple
+                    ## END def _mod_plot_decoded_epoch_slices...
+
+
+                    if render_merged_pseudo2D_decoder_laps:
+                        # Merged Pseduo2D Decoder Posteriors:
+                        _main_context = {'decoded_epochs': 'Laps', 'Pseudo2D': 'Posterior', 't_bin': laps_decoding_time_bin_size}
+                        global_any_laps_epochs_obj = deepcopy(owning_pipeline_reference.computation_results[global_epoch_name].computation_config.pf_params.computation_epochs) # global_epoch_name='maze_any'
+                        graphics_output_dict['raw_posterior_laps_plot_tuple'] = _mod_plot_decoded_epoch_slices(
+                            global_any_laps_epochs_obj, directional_merged_decoders_result.all_directional_laps_filter_epochs_decoder_result,
+                            global_pos_df=global_session.position.to_dataframe(), xbin=active_decoder.xbin,
+                            name='Directional_Posterior',
+                            active_marginal_fn=lambda filter_epochs_decoder_result: DirectionalPseudo2DDecodersResult.build_non_marginalized_raw_posteriors(filter_epochs_decoder_result),
+                            single_plot_fixed_height=single_plot_fixed_height, debug_test_max_num_slices=max_num_lap_epochs,
+                            size=size, dpi=dpi, constrained_layout=constrained_layout, scrollable_figure=scrollable_figure,
+                            _mod_plot_kwargs=dict(final_context=_main_context, y_bin_labels=['long_LR', 'long_RL', 'short_LR', 'short_RL']),
+                            **deepcopy(kwargs)
+                        )            
+                        # identifier_name, widget, matplotlib_fig, matplotlib_fig_axes = output_dict[a_posterior_name]
+                        # label_artists_dict = {}
+                        # for i, ax in enumerate(matplotlib_fig_axes):
+                        #     label_artists_dict[ax] = PlottingHelpers.helper_matplotlib_add_pseudo2D_marginal_labels(ax, y_bin_labels=['long_LR', 'long_RL', 'short_LR', 'short_RL'], enable_draw_decoder_colored_lines=False)
+                        # output_dict[a_posterior_name] = (identifier_name, widget, matplotlib_fig, matplotlib_fig_axes, label_artists_dict)
+                        
+                        
+
+                    if render_track_identity_marginal_laps:
+                        # Laps Track-identity (Long/Short) Marginal:
+                        _main_context = {'decoded_epochs': 'Laps', 'Marginal': 'TrackID', 't_bin': laps_decoding_time_bin_size}
+                        global_any_laps_epochs_obj = deepcopy(owning_pipeline_reference.computation_results[global_epoch_name].computation_config.pf_params.computation_epochs) # global_epoch_name='maze_any'
+                        # global_session = deepcopy(owning_pipeline_reference.filtered_sessions[global_epoch_name]) # used for validate_lap_dir_estimations(...) 
+                        graphics_output_dict['track_identity_marginal_laps_plot_tuple'] = _mod_plot_decoded_epoch_slices(
+                            global_any_laps_epochs_obj, directional_merged_decoders_result.all_directional_laps_filter_epochs_decoder_result,
+                            global_pos_df=global_session.position.to_dataframe(), xbin=active_decoder.xbin,
+                            name='TrackIdentity_Marginal_LAPS',
+                            active_marginal_fn=lambda filter_epochs_decoder_result: DirectionalPseudo2DDecodersResult.build_custom_marginal_over_long_short(filter_epochs_decoder_result),
+                            single_plot_fixed_height=single_plot_fixed_height, debug_test_max_num_slices=max_num_lap_epochs,
+                            size=size, dpi=dpi, constrained_layout=constrained_layout, scrollable_figure=scrollable_figure,
+                            _mod_plot_kwargs=dict(final_context=_main_context, y_bin_labels=['long', 'short']),
+                            **deepcopy(kwargs)
+                        )
+
+
+                    if render_track_identity_marginal_ripples:
+                        # Ripple Track-identity (Long/Short) Marginal:
+                        _main_context = {'decoded_epochs': 'Ripple', 'Marginal': 'TrackID', 't_bin': ripple_decoding_time_bin_size}
+                        global_replays = TimeColumnAliasesProtocol.renaming_synonym_columns_if_needed(deepcopy(global_session.replay))
+                        # global_session = deepcopy(owning_pipeline_reference.filtered_sessions[global_epoch_name]) # used for validate_lap_dir_estimations(...) 
+                        graphics_output_dict['track_identity_marginal_ripples_plot_tuple'] = _mod_plot_decoded_epoch_slices(
+                            global_replays, directional_merged_decoders_result.all_directional_ripple_filter_epochs_decoder_result,
+                            global_pos_df=global_session.position.to_dataframe(), xbin=active_decoder.xbin,
+                            name='TrackIdentity_Marginal_Ripples',
+                            active_marginal_fn=lambda filter_epochs_decoder_result: DirectionalPseudo2DDecodersResult.build_custom_marginal_over_long_short(filter_epochs_decoder_result),
+                            single_plot_fixed_height=single_plot_fixed_height, debug_test_max_num_slices=max_num_ripple_epochs,
+                            size=size, dpi=dpi, constrained_layout=constrained_layout, scrollable_figure=scrollable_figure,
+                            _mod_plot_kwargs=dict(final_context=_main_context, y_bin_labels=['long', 'short']),
+                            **deepcopy(kwargs)
+                        )
+
+
+            graphics_output_dict['collector'] = collector
+
+            return graphics_output_dict
+
 
 
 # ==================================================================================================================== #

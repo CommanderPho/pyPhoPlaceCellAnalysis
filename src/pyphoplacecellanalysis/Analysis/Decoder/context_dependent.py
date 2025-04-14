@@ -1475,11 +1475,13 @@ class GenericDecoderDictDecodedEpochsDictResult(ComputedResult):
                 return self.get_flattened_contexts_for_posteriors_dfs(decoded_marginal_posterior_df_context_dict) ## a bit inefficient but there's never that many contexts
             
     @function_attributes(short_name=None, tags=['contexts', 'matching', 'single-context', 'best'], input_requires=[], output_provides=[], uses=['get_matching_contexts'], used_by=[], creation_date='2025-04-07 18:44', related_items=[])
-    def get_best_matching_context(self, context_query: Optional[IdentifyingContext]=None, debug_print:bool=True) -> Optional[IdentifyingContext]: 
+    def get_best_matching_context(self, context_query: Optional[IdentifyingContext]=None, debug_print:bool=False) -> Optional[IdentifyingContext]: 
         """ contexts only, no results returned.
         This doesn't quite make sense because each results dictionary may have different contexts
         
-        
+        ## Get single set of results best matching the context:
+        best_matching_context, a_result, a_decoder, a_decoded_marginal_posterior_df = a_new_fully_generic_result.get_results_matching_context(context_query=a_target_context)
+
         """
         return self.get_matching_contexts(context_query=context_query, return_multiple_matches=False, debug_print=debug_print)
         
@@ -1488,7 +1490,7 @@ class GenericDecoderDictDecodedEpochsDictResult(ComputedResult):
 
 
     @function_attributes(short_name=None, tags=['contexts', 'matching'], input_requires=[], output_provides=[], uses=['get_flattened_contexts_for_posteriors_dfs'], used_by=[], creation_date='2025-03-12 11:30', related_items=['get_results_matching_context', 'get_matching_contexts'])
-    def get_results_matching_contexts(self, context_query: Optional[IdentifyingContext]=None, return_multiple_matches: bool=True, debug_print:bool=True): 
+    def get_results_matching_contexts(self, context_query: Optional[IdentifyingContext]=None, return_multiple_matches: bool=True, debug_print:bool=False): 
         """ Get a specific contexts
         
         a_target_context: IdentifyingContext = IdentifyingContext(trained_compute_epochs='laps', pfND_ndim=1, decoder_identifier='long_LR', time_bin_size=0.025, known_named_decoding_epochs_type='pbe', masked_time_bin_fill_type='ignore')
@@ -1919,7 +1921,7 @@ class GenericDecoderDictDecodedEpochsDictResult(ComputedResult):
         return export_files_dict
 
 
-
+    @function_attributes(short_name=None, tags=['export', 'CSV'], input_requires=[], output_provides=[], uses=['export_csvs'], used_by=[], creation_date='2025-04-14 17:56', related_items=[])
     def default_export_all_CSVs(self, active_export_parent_output_path: Path, owning_pipeline_reference, decoding_time_bin_size: float):
         """ 
         active_export_parent_output_path = self.collected_outputs_path.resolve()
@@ -1928,10 +1930,11 @@ class GenericDecoderDictDecodedEpochsDictResult(ComputedResult):
         csv_save_paths_dict
         
         """ 
+        from pyphocorehelpers.assertion_helpers import Assert
         ## Unpack from pipeline:
         ## Export to CSVs:
         
-        # Assert.path_exists(parent_output_path)
+        Assert.path_exists(active_export_parent_output_path)
 
         ## INPUTS: collected_outputs_path
         # decoding_time_bin_size: float = epochs_decoding_time_bin_size
