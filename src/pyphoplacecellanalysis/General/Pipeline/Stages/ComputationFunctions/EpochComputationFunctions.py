@@ -17,6 +17,7 @@ import pyphoplacecellanalysis.General.type_aliases as types
 import numpy as np
 import pandas as pd
 from pyphocorehelpers.assertion_helpers import Assert
+from pathlib import Path
 
 # NeuroPy (Diba Lab Python Repo) Loading
 from neuropy.utils.mixins.binning_helpers import build_df_discretized_binned_position_columns
@@ -1896,24 +1897,20 @@ class EpochComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Computati
 
 
         Usage:
-            ## Test _perform_specific_epochs_decoding
-            from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.EpochComputationFunctions import EpochComputationFunctions
-            computation_result = curr_active_pipeline.computation_results['maze1_PYR']
-            computation_result = EpochComputationFunctions._perform_specific_epochs_decoding(computation_result, curr_active_pipeline.active_configs['maze1_PYR'], filter_epochs='ripple', decoding_time_bin_size=0.02)
-            filter_epochs_decoder_result, active_filter_epochs, default_figure_name = computation_result.computed_data['specific_epochs_decoding'][('Ripples', 0.02)]
+            from pyphoplacecellanalysis.Analysis.Decoder.context_dependent import GenericDecoderDictDecodedEpochsDictResult
+            from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.EpochComputationFunctions import EpochComputationFunctions, EpochComputationsComputationsContainer
+
+            valid_EpochComputations_result: EpochComputationsComputationsContainer = curr_active_pipeline.global_computation_results.computed_data['EpochComputations']
+            a_new_fully_generic_result: GenericDecoderDictDecodedEpochsDictResult = valid_EpochComputations_result.a_generic_decoder_dict_decoded_epochs_dict_result
+
 
         """
-        from typing import Literal
         from neuropy.core.epoch import EpochsAccessor, Epoch, ensure_dataframe, ensure_Epoch, TimeColumnAliasesProtocol
         from pyphocorehelpers.print_helpers import get_now_rounded_time_str
-        from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.EpochComputationFunctions import EpochComputationFunctions, EpochComputationsComputationsContainer, NonPBEDimensionalDecodingResult, Compute_NonPBE_Epochs, KnownFilterEpochs, GeneralDecoderDictDecodedEpochsDictResult
-        from neuropy.analyses.placefields import PfND
-        from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import filter_and_update_epochs_and_spikes
         from neuropy.utils.result_context import DisplaySpecifyingIdentifyingContext
         from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import EpochFilteringMode, _compute_proper_filter_epochs
         from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import DecodedFilterEpochsResult, SingleEpochDecodedResult
         from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import DirectionalLapsResult, TrackTemplates, DecoderDecodedEpochsResult
-        from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import DirectionalPseudo2DDecodersResult
         from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import TrainTestSplitResult, TrainTestLapsSplitting, CustomDecodeEpochsResult, decoder_name, epoch_split_key, get_proper_global_spikes_df, DirectionalPseudo2DDecodersResult
         from pyphoplacecellanalysis.Analysis.Decoder.context_dependent import GenericDecoderDictDecodedEpochsDictResult #, KnownNamedDecoderTrainedComputeEpochsType, KnownNamedDecodingEpochsType, MaskedTimeBinFillType, DataTimeGrain, GenericResultTupleIndexType
         
@@ -1955,58 +1952,6 @@ class EpochComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Computati
             print(f'WARN 2025-04-14 - Not yet finished -- perform update here.')
             global_computation_results.computed_data['EpochComputations'].a_generic_decoder_dict_decoded_epochs_dict_result = a_new_fully_generic_result
             
-
-        # # global_computation_results.computed_data['EpochComputations'].included_qclu_values = included_qclu_values
-        # if (not hasattr(global_computation_results.computed_data['EpochComputations'], 'a_generic_decoder_dict_decoded_epochs_dict_result') or (global_computation_results.computed_data['EpochComputations'].a_generic_decoder_dict_decoded_epochs_dict_result is None)):
-        #     # initialize a new result
-        #     a_new_NonPBE_Epochs_obj: Compute_NonPBE_Epochs = Compute_NonPBE_Epochs.init_from_pipeline(curr_active_pipeline=owning_pipeline_reference, training_data_portion=training_data_portion, skip_training_test_split=skip_training_test_split)
-        #     global_computation_results.computed_data['EpochComputations'].a_generic_decoder_dict_decoded_epochs_dict_result = a_new_NonPBE_Epochs_obj
-        # else:
-        #     ## get the existing one:
-        #     a_new_NonPBa_generic_decoder_dict_decoded_epochs_dict_resultE_Epochs_obj: Compute_NonPBE_Epochs = global_computation_results.computed_data['EpochComputations'].a_generic_decoder_dict_decoded_epochs_dict_result
-
-
-
-        # ## Export to CSVs:
-        # csv_save_paths = {}
-        # active_export_parent_output_path = self.collected_outputs_path.resolve()
-        # # Assert.path_exists(parent_output_path)
-
-        # ## INPUTS: collected_outputs_path
-        # decoding_time_bin_size: float = epochs_decoding_time_bin_size
-
-        # complete_session_context, (session_context, additional_session_context) = owning_pipeline_reference.get_complete_session_context()
-        # active_context = complete_session_context
-        # session_name: str = owning_pipeline_reference.session_name
-        # earliest_delta_aligned_t_start, t_delta, latest_delta_aligned_t_end = owning_pipeline_reference.find_LongShortDelta_times()
-
-        # ## Build the function that uses owning_pipeline_reference to build the correct filename and actually output the .csv to the right place
-        # def _subfn_custom_export_df_to_csv(export_df: pd.DataFrame, data_identifier_str: str = f'(laps_marginals_df)', parent_output_path: Path=None):
-        #     """ captures `owning_pipeline_reference`
-        #     """
-        #     output_date_str: str = get_now_rounded_time_str(rounded_minutes=10)
-        #     out_path, out_filename, out_basename = owning_pipeline_reference.build_complete_session_identifier_filename_string(output_date_str=output_date_str, data_identifier_str=data_identifier_str, parent_output_path=parent_output_path, out_extension='.csv')
-        #     export_df.to_csv(out_path)
-        #     return out_path 
-
-        # custom_export_df_to_csv_fn = _subfn_custom_export_df_to_csv
-
-
-        # # tbin_values_dict={'laps': decoding_time_bin_size, 'pbe': decoding_time_bin_size, 'non_pbe': decoding_time_bin_size, 'FAT': decoding_time_bin_size}
-
-        # # csv_save_paths_dict = GenericDecoderDictDecodedEpochsDictResult._perform_export_dfs_dict_to_csvs(extracted_dfs_dict=a_new_fully_generic_result.filter_epochs_decoded_track_marginal_posterior_df_dict,
-        # csv_save_paths_dict = a_new_fully_generic_result.export_csvs(
-        #                                             parent_output_path=active_export_parent_output_path.resolve(),
-        #                                             active_context=active_context, session_name=session_name, #curr_active_pipeline=owning_pipeline_reference,
-        #                                             custom_export_df_to_csv_fn=custom_export_df_to_csv_fn,
-        #                                             decoding_time_bin_size=decoding_time_bin_size,
-        #                                             curr_session_t_delta=t_delta
-        #                                             )
-        
-        # across_session_results_extended_dict['generalized_decode_epochs_dict_and_export_results_completion_function']['csv_save_paths_dict'] = deepcopy(csv_save_paths_dict)
-
-        # print(f'csv_save_paths_dict: {csv_save_paths_dict}\n')
-
         return global_computation_results
 
 
