@@ -656,6 +656,10 @@ def write_to_file(a_fig, active_identifying_ctx: IdentifyingContext, final_fig_s
         ∙
         ➗
     """
+    import PIL
+    from PIL import Image # Pillow Images
+    
+
     # period_replacement_char: str = '-'
     # period_replacement_char: str = '➗'
     period_replacement_char: str = '•'
@@ -681,8 +685,10 @@ def write_to_file(a_fig, active_identifying_ctx: IdentifyingContext, final_fig_s
         erronious_suffixes = final_fig_save_basename_path.suffixes
         assert len(erronious_suffixes) == 0, f"erronious_suffixes: {erronious_suffixes} is still not empty after renaming!"
         
-    is_matplotlib_figure = isinstance(a_fig, plt.FigureBase)
-    is_plotly_figure = isinstance(a_fig, PlotlyBaseFigure)
+    is_matplotlib_figure: bool = isinstance(a_fig, plt.FigureBase)
+    is_plotly_figure: bool = isinstance(a_fig, PlotlyBaseFigure)
+    is_pillow_image: bool = isinstance(a_fig, Image.Image) # PIL.Image
+    
 
     # PDF: .pdf versions:
     if write_vector_format:
@@ -703,6 +709,13 @@ def write_to_file(a_fig, active_identifying_ctx: IdentifyingContext, final_fig_s
                 a_fig.write_image(fig_vector_save_path)
                 additional_output_metadata = {'fig_format':'plotly'}
 
+            elif is_pillow_image:
+                ## Pillow Image only:
+                raise NotImplementedError(f'Pillow Images cannot be saved out to a vector format!')
+                # fig_vector_save_path = final_fig_save_basename_path.with_suffix('.pdf')
+                # a_fig.save(fig_vector_save_path)                 # Save image to file
+                # additional_output_metadata = {'fig_format':'pillow'} # Unused here
+                
             else:
                 # pyqtgraph figure: pyqtgraph's exporter can't currently do PDF, so we'll do .svg instead:
                 fig_vector_save_path = final_fig_save_basename_path.with_suffix('.svg')
@@ -732,6 +745,12 @@ def write_to_file(a_fig, active_identifying_ctx: IdentifyingContext, final_fig_s
                 ## Plotly only:
                 a_fig.write_image(fig_png_out_path)
                 additional_output_metadata = {'fig_format':'plotly'} # Unused here
+
+            elif is_pillow_image:
+                ## Pillow Image only:
+                # Save image to file
+                a_fig.save(fig_png_out_path)
+                additional_output_metadata = {'fig_format':'pillow'} # Unused here
 
             else:
                 # pyqtgraph
