@@ -17,8 +17,7 @@ dependencies = [
     "pyopengl-accelerate>=3.1.6,<4",
     "sqlalchemy>=2.0.2,<3",
     "pip~=24.0",
-    "setuptools>=67.3.1,<68",
-    "wheel>=0.38.4,<0.39",
+    "setuptools>=78.1.0",
     "srsly>=2.4.5,<3",
     "tables>=3.8.0,<4",
     "hdf5plugin>=4.1.1,<5",
@@ -45,9 +44,8 @@ dev = [
     "pytest>=7.2.1,<8",
     "ipython>=8.9.0,<9",
     "viztracer>=0.15.6,<0.16",
-    "setuptools>=67.1.0,<68",
+    "setuptools>=78.1.0",
     "ansi2html",
-    "wheel>=0.38.4,<0.39",
     "snakeviz>=2.1.1,<3",
     "pyan>=0.1.3,<0.2",
     "dvc[gdrive]>=3.59.0,<4",
@@ -71,8 +69,6 @@ gui = [
 remote = [
     "neuropy",
     "pyphocorehelpers",
-    "pyqode-core",
-    "pyqode-python",
 ]
 testing = ["mplcursors>=0.5.2,<0.6"]
 
@@ -90,8 +86,6 @@ mpl-multitab = { git = "https://github.com/CommanderPho/mpl-multitab.git", rev =
 vedo = { git = "https://github.com/CommanderPho/vedo.git", rev = "release/pho-working" }
 neuropy = { git = "https://github.com/CommanderPho/NeuroPy.git", rev = "feature/safe-advance" }
 pyphocorehelpers = { git = "https://github.com/CommanderPho/pyPhoCoreHelpers.git" }
-pyqode-core = { path = "../pyqode.core/dist/current.whl" }
-pyqode-python = { path = "../pyqode.python/dist/current.whl" }
 pybursts = { git = "https://github.com/CommanderPho/pybursts.git", rev = "master" }
 
 [build-system]
