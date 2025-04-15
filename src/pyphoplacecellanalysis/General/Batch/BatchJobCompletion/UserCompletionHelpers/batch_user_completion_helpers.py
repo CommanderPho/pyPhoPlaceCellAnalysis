@@ -3003,7 +3003,7 @@ def generalized_decode_epochs_dict_and_export_results_completion_function(self, 
     4. Compute a variety of marginals for each result (track_ID marginals, run_dir_marginals, etc)
     5. Export all the results to .CSV for later plotting and across-session analysis 
     
-    Calls 'non_PBE_epochs_results' global computation function
+    Calls ['non_PBE_epochs_results', 'generalized_specific_epochs_decoding'] global computation functions
     
     
     USES: `GenericDecoderDictDecodedEpochsDictResult`
