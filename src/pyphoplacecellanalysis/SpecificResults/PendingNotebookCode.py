@@ -220,10 +220,10 @@ def _plot_all_time_decoded_marginal_figures(curr_active_pipeline, best_matching_
     figsize_inches = (width_pixels/dpi, height_pixels/dpi) # (12.4, 4.8)
     print(f'figsize_inches: {figsize_inches}')
 
+    # width_pixels = 1389 ## Computed
     kwargs = {}
-    kwargs = ({'width': 4096} | kwargs) # add 'width' to kwargs if not specified
+    output_figure_kwargs = ({'width': 3072} | kwargs) # add 'width' to kwargs if not specified
     
-
     all_global_menus_actionsDict, global_flat_action_dict = spike_raster_window.build_all_menus_actions_dict()
     complete_session_context, (session_context, additional_session_context) = curr_active_pipeline.get_complete_session_context()
 
@@ -245,6 +245,15 @@ def _plot_all_time_decoded_marginal_figures(curr_active_pipeline, best_matching_
 
     constrained_layout = False
 
+
+    # Update the window to the full data extent: _________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
+    start_t = active_2d_plot.total_data_start_time # spike_raster_window.total_data_start_time
+    end_t = active_2d_plot.total_data_end_time # spike_raster_window.total_data_end_time
+    print(f'start_t: {start_t}, end_t: {end_t}')
+    active_2d_plot.Render2DScrollWindowPlot_on_window_update(start_t, end_t)
+
+
+
     with mpl.rc_context({'figure.dpi': str(dpi), 'savefig.transparent': True, 'ps.fonttype': 42, 'figure.constrained_layout.use': (constrained_layout or False), 'figure.frameon': False, 'figure.figsize': figsize_inches, }): # 'figure.figsize': (12.4, 4.8), 
         # Create a FigureCollector instance
         # with FigureCollector(name='plot_directional_merged_pf_decoded_epochs', base_context=display_context) as collector:
@@ -262,9 +271,7 @@ def _plot_all_time_decoded_marginal_figures(curr_active_pipeline, best_matching_
 
         dock_item.hideTitleBar()
 
-        complete_session_context, (session_context, additional_session_context) = curr_active_pipeline.get_complete_session_context()
-
-        active_out_figure_paths, final_context = curr_active_pipeline.output_figure(final_context=complete_session_context.overwriting_context(display='decoded_P_Short_Posterior'), fig=matplotlib_fig, write_vector_format=write_vector_format, write_png=write_png, width=width_pixels)
+        active_out_figure_paths, final_context = curr_active_pipeline.output_figure(final_context=complete_session_context.overwriting_context(display='decoded_P_Short_Posterior'), fig=matplotlib_fig, write_vector_format=write_vector_format, write_png=write_png) # , **output_figure_kwargs
         _all_tracks_active_out_figure_paths[final_context] = deepcopy(active_out_figure_paths[0])
 
 
@@ -282,16 +289,17 @@ def _plot_all_time_decoded_marginal_figures(curr_active_pipeline, best_matching_
             a_dock = active_2d_plot.find_display_dock(identifier=curr_identifier_name)
 
         widget: PyqtgraphTimeSynchronizedWidget = a_dock.widgets[0]
+        # active_2d_plot.sync_matplotlib_render_plot_widget(identifier=curr_identifier_name, sync_mode=sync_mode) ## set sync mode
         widget.getRootPlotItem().setXRange(active_2d_plot.total_data_start_time, active_2d_plot.total_data_end_time, padding=0) ## global frame
         # widget.getRootPlotItem().set_xlim(active_2d_plot.total_data_start_time, active_2d_plot.total_data_end_time)
-        active_2d_plot.sync_matplotlib_render_plot_widget(identifier=curr_identifier_name, sync_mode=sync_mode) ## set sync mode
-        widget.update(None)
-
+        # widget.update(None)
+        # widget.draw()
+        
         _all_tracks_out_artists[curr_identifier_name] = widget
         _all_tracks_out_axes[curr_identifier_name] = widget.getRootPlotItem()
 
         ## Export Position over time Figure:
-        active_out_figure_paths, final_context = curr_active_pipeline.output_figure(final_context=complete_session_context.overwriting_context(display='pos_over_t'), fig=widget.getRootPlotItem(), write_vector_format=write_vector_format, write_png=write_png, width=width_pixels)
+        active_out_figure_paths, final_context = curr_active_pipeline.output_figure(final_context=complete_session_context.overwriting_context(display='pos_over_t'), fig=widget.getRootPlotItem(), write_vector_format=write_vector_format, write_png=write_png, **output_figure_kwargs)
         _all_tracks_active_out_figure_paths[final_context] = deepcopy(active_out_figure_paths[0])
 
 
@@ -305,32 +313,30 @@ def _plot_all_time_decoded_marginal_figures(curr_active_pipeline, best_matching_
             # intervals_overview_time_sync_pyqtgraph_widget.setMaximumHeight(39)
 
         a_dock, widget = active_2d_plot.find_dock_item_tuple(identifier=curr_identifier_name)
-        widget.getRootPlotItem().setXRange(active_2d_plot.total_data_start_time, active_2d_plot.total_data_end_time, padding=0) ## global frame
-        active_2d_plot.sync_matplotlib_render_plot_widget(identifier=curr_identifier_name, sync_mode=sync_mode) ## set sync mode
-        widget.update(None)
-
+        # active_2d_plot.sync_matplotlib_render_plot_widget(identifier=curr_identifier_name, sync_mode=sync_mode) ## set sync mode        
+        widget.getRootPlotItem().setXRange(active_2d_plot.total_data_start_time, active_2d_plot.total_data_end_time, padding=0) ## global frame        
+        # widget.update(None)
+        # widget.draw()
         _all_tracks_out_artists[curr_identifier_name] = widget
         _all_tracks_out_axes[curr_identifier_name] = widget.getRootPlotItem()
 
-        active_out_figure_paths, final_context = curr_active_pipeline.output_figure(final_context=complete_session_context.overwriting_context(display='interval_epochs_overview'), fig=widget.getRootPlotItem(), write_vector_format=write_vector_format, write_png=write_png, width=width_pixels)
+        active_out_figure_paths, final_context = curr_active_pipeline.output_figure(final_context=complete_session_context.overwriting_context(display='interval_epochs_overview'), fig=widget.getRootPlotItem(), write_vector_format=write_vector_format, write_png=write_png, **output_figure_kwargs)
         _all_tracks_active_out_figure_paths[final_context] = deepcopy(active_out_figure_paths[0])
 
 
-
-    # from PIL import Image # create_gif_from_images
-    # from pyphocorehelpers.plotting.media_output_helpers import get_array_as_image_stack, save_array_as_image_stack, vertical_image_stack
+    # ==================================================================================================================================================================================================================================================================================== #
+    # Export the combined item:                                                                                                                                                                                                                                                            #
+    # ==================================================================================================================================================================================================================================================================================== #
+    from PIL import Image 
+    from pyphocorehelpers.plotting.media_output_helpers import vertical_image_stack
 
     # # Let's assume you have a list of images
-    # out_figs_paths = list(_all_tracks_active_out_figure_paths.values()) # ['image1.png', 'image2.png', 'image3.png']  # replace this with actual paths to your images
-    # imgs = [Image.open(i) for i in out_figs_paths]
-    # output_img = vertical_image_stack(imgs, v_overlap=0, padding=0)
-
-    # output_img
-
-    # out_path = Path(out_path).resolve()
-    # # Save image to file
-    # image.save(out_path)
-
+    out_figs_paths = list(_all_tracks_active_out_figure_paths.values()) # ['image1.png', 'image2.png', 'image3.png']  # replace this with actual paths to your images
+    imgs = [Image.open(i) for i in out_figs_paths]
+    output_img = vertical_image_stack(imgs, v_overlap=0, padding=0)
+    # Save image to file
+    active_out_figure_paths, final_context = curr_active_pipeline.output_figure(final_context=complete_session_context.overwriting_context(display='decoded_P_Short_Posterior_global_epoch'), fig=output_img, write_png=True, write_vector_format=False)
+    _all_tracks_active_out_figure_paths[final_context] = deepcopy(active_out_figure_paths[0])
 
 
     return _all_tracks_active_out_figure_paths, _all_tracks_out_artists, _all_tracks_out_axes
