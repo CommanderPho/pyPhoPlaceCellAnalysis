@@ -192,7 +192,7 @@ from pyphoplacecellanalysis.GUI.Qt.SpikeRasterWindows.Spike3DRasterWindowWidget 
 
 
 @function_attributes(short_name=None, tags=['plot', 'figure', 'export'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-04-14 10:50', related_items=[])
-def _plot_all_time_decoded_marginal_figures(curr_active_pipeline, best_matching_context: IdentifyingContext, a_decoded_marginal_posterior_df: pd.DataFrame, spike_raster_window: Spike3DRasterWindowWidget, active_2d_plot: Spike2DRaster, epochs_decoding_time_bin_size: float = 0.025):
+def _plot_all_time_decoded_marginal_figures(curr_active_pipeline, best_matching_context: IdentifyingContext, a_decoded_marginal_posterior_df: pd.DataFrame, spike_raster_window: Spike3DRasterWindowWidget, active_2d_plot: Spike2DRaster, epochs_decoding_time_bin_size: float = 0.025, write_vector_format:bool=False, write_png:bool=True):
     """ exports the components needed to show the decoded P_Short/P_Long likelihoods over time
 
 
@@ -213,10 +213,17 @@ def _plot_all_time_decoded_marginal_figures(curr_active_pipeline, best_matching_
     from pyphoplacecellanalysis.GUI.Qt.PlaybackControls.Spike3DRasterBottomPlaybackControlBarWidget import Spike3DRasterBottomPlaybackControlBar
     from pyphoplacecellanalysis.Pho2D.PyQtPlots.TimeSynchronizedPlotters.PyqtgraphTimeSynchronizedWidget import PyqtgraphTimeSynchronizedWidget
     # from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.SpikeRasterWidgets.spike_raster_widgets import _setup_spike_raster_window_for_debugging
+    width_pixels = 4096
+    height_pixels = 135
+    # dpi = 100
+    dpi = 96
+    figsize_inches = (width_pixels/dpi, height_pixels/dpi) # (12.4, 4.8)
+    print(f'figsize_inches: {figsize_inches}')
 
     all_global_menus_actionsDict, global_flat_action_dict = spike_raster_window.build_all_menus_actions_dict()
     complete_session_context, (session_context, additional_session_context) = curr_active_pipeline.get_complete_session_context()
 
+    sync_mode: SynchronizedPlotMode = SynchronizedPlotMode.TO_GLOBAL_DATA
 
     # Gets the existing SpikeRasterWindow or creates a new one if one doesn't already exist:
     # spike_raster_window, (active_2d_plot, active_3d_plot, main_graphics_layout_widget, main_plot_widget, background_static_scroll_plot_widget) = Spike3DRasterWindowWidget.find_or_create_if_needed(curr_active_pipeline, force_create_new=True)
@@ -232,64 +239,95 @@ def _plot_all_time_decoded_marginal_figures(curr_active_pipeline, best_matching_
     a_time_window_centers = a_decoded_marginal_posterior_df['t_bin_center'].to_numpy() 
     a_1D_posterior = a_decoded_marginal_posterior_df[['P_Long', 'P_Short']].to_numpy().T
 
-    identifier_name, widget, matplotlib_fig, matplotlib_fig_axes, dock_item = active_2d_plot.add_docked_marginal_track(name=plot_row_identifier, time_window_centers=a_time_window_centers, a_1D_posterior=a_1D_posterior, extended_dock_title_info=info_string)
-    _all_tracks_out_artists[identifier_name] = widget
-    _all_tracks_out_axes[identifier_name] = matplotlib_fig_axes[0]
-    matplotlib_fig_axes[0].set_xlim(active_2d_plot.total_data_start_time, active_2d_plot.total_data_end_time)
-    widget.draw()
+    constrained_layout = False
 
-    dock_item.hideTitleBar()
+    with mpl.rc_context({'figure.dpi': str(dpi), 'savefig.transparent': True, 'ps.fonttype': 42, 'figure.constrained_layout.use': (constrained_layout or False), 'figure.frameon': False, 'figure.figsize': figsize_inches, }): # 'figure.figsize': (12.4, 4.8), 
+        # Create a FigureCollector instance
+        # with FigureCollector(name='plot_directional_merged_pf_decoded_epochs', base_context=display_context) as collector:
 
-    complete_session_context, (session_context, additional_session_context) = curr_active_pipeline.get_complete_session_context()
+        curr_identifier_name, widget, matplotlib_fig, matplotlib_fig_axes, dock_item = active_2d_plot.add_docked_marginal_track(name=plot_row_identifier, time_window_centers=a_time_window_centers, a_1D_posterior=a_1D_posterior, extended_dock_title_info=info_string, sync_mode=sync_mode)
+        _all_tracks_out_artists[curr_identifier_name] = widget
+        _all_tracks_out_axes[curr_identifier_name] = matplotlib_fig_axes[0]
+        matplotlib_fig_axes[0].set_xlim(active_2d_plot.total_data_start_time, active_2d_plot.total_data_end_time)
+        active_2d_plot.sync_matplotlib_render_plot_widget(identifier=curr_identifier_name, sync_mode=sync_mode) ## set sync mode
+        ## set figure size:
+        matplotlib_fig.set_size_inches(*figsize_inches) #width_pixels/dpi, height_pixels/dpi)
+        matplotlib_fig.set_dpi(dpi)
 
-    active_out_figure_paths, final_context = curr_active_pipeline.output_figure(final_context=complete_session_context.overwriting_context(display='decoded_P_Short_Posterior'), fig=matplotlib_fig)
-    _all_tracks_active_out_figure_paths[final_context] = deepcopy(active_out_figure_paths[0])
+        widget.draw()
+
+        dock_item.hideTitleBar()
+
+        complete_session_context, (session_context, additional_session_context) = curr_active_pipeline.get_complete_session_context()
+
+        active_out_figure_paths, final_context = curr_active_pipeline.output_figure(final_context=complete_session_context.overwriting_context(display='decoded_P_Short_Posterior'), fig=matplotlib_fig, write_vector_format=write_vector_format, write_png=write_png)
+        _all_tracks_active_out_figure_paths[final_context] = deepcopy(active_out_figure_paths[0])
 
 
-    # Position over time _________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
-    curr_identifier_name = 'new_curves_separate_plot'
+        # Position over time _________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
+        curr_identifier_name = 'new_curves_separate_plot'
 
-    menu_commands = [
-        'AddTimeCurves.Position', ## 2025-03-11 02:32 Running this too soon after launching the window causes weird black bars on the top and bottom of the window
-    ]
-    # menu_commands = ['actionPseudo2DDecodedEpochsDockedMatplotlibView', 'actionContinuousPseudo2DDecodedMarginalsDockedMatplotlibView'] # , 'AddTimeIntervals.SessionEpochs'
+        menu_commands = [
+            'AddTimeCurves.Position', ## 2025-03-11 02:32 Running this too soon after launching the window causes weird black bars on the top and bottom of the window
+        ]
+        # menu_commands = ['actionPseudo2DDecodedEpochsDockedMatplotlibView', 'actionContinuousPseudo2DDecodedMarginalsDockedMatplotlibView'] # , 'AddTimeIntervals.SessionEpochs'
 
-    a_dock = active_2d_plot.find_display_dock(identifier=curr_identifier_name)
-    if a_dock is None:
-        global_flat_action_dict['AddTimeCurves.Position'].trigger()
         a_dock = active_2d_plot.find_display_dock(identifier=curr_identifier_name)
+        if a_dock is None:
+            global_flat_action_dict['AddTimeCurves.Position'].trigger()
+            a_dock = active_2d_plot.find_display_dock(identifier=curr_identifier_name)
 
-    widget: PyqtgraphTimeSynchronizedWidget = a_dock.widgets[0]
+        widget: PyqtgraphTimeSynchronizedWidget = a_dock.widgets[0]
+        widget.getRootPlotItem().setXRange(active_2d_plot.total_data_start_time, active_2d_plot.total_data_end_time, padding=0) ## global frame
+        # widget.getRootPlotItem().set_xlim(active_2d_plot.total_data_start_time, active_2d_plot.total_data_end_time)
+        active_2d_plot.sync_matplotlib_render_plot_widget(identifier=curr_identifier_name, sync_mode=sync_mode) ## set sync mode
+        widget.update(None)
 
-    widget.getRootPlotItem().setXRange(active_2d_plot.total_data_start_time, active_2d_plot.total_data_end_time, padding=0) ## global frame
-    # widget.getRootPlotItem().set_xlim(active_2d_plot.total_data_start_time, active_2d_plot.total_data_end_time)
-    widget.update(None)
+        _all_tracks_out_artists[curr_identifier_name] = widget
+        _all_tracks_out_axes[curr_identifier_name] = widget.getRootPlotItem()
 
-    _all_tracks_out_artists[curr_identifier_name] = widget
-    _all_tracks_out_axes[curr_identifier_name] = widget.getRootPlotItem()
-
-    ## Export Position over time Figure:
-    active_out_figure_paths, final_context = curr_active_pipeline.output_figure(final_context=complete_session_context.overwriting_context(display='pos_over_t'), fig=widget.getRootPlotItem())
-    _all_tracks_active_out_figure_paths[final_context] = deepcopy(active_out_figure_paths[0])
+        ## Export Position over time Figure:
+        active_out_figure_paths, final_context = curr_active_pipeline.output_figure(final_context=complete_session_context.overwriting_context(display='pos_over_t'), fig=widget.getRootPlotItem(), write_vector_format=write_vector_format, write_png=write_png)
+        _all_tracks_active_out_figure_paths[final_context] = deepcopy(active_out_figure_paths[0])
 
 
-    # Epoch Intervals figure: ____________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
-    curr_identifier_name = 'interval_overview'
-    _interval_tracks_out_dict = active_2d_plot.prepare_pyqtgraph_intervalPlot_tracks(enable_interval_overview_track=True, should_remove_all_and_re_add=True, should_link_to_main_plot_widget=False)
-    interval_window_dock_config, intervals_dock, intervals_time_sync_pyqtgraph_widget, intervals_root_graphics_layout_widget, intervals_plot_item = _interval_tracks_out_dict['intervals']
-    if curr_identifier_name in _interval_tracks_out_dict:
-        interval_overview_window_dock_config, intervals_overview_dock, intervals_overview_time_sync_pyqtgraph_widget, intervals_overview_root_graphics_layout_widget, intervals_overview_plot_item = _interval_tracks_out_dict[curr_identifier_name]
-        intervals_overview_plot_item.setXRange(active_2d_plot.total_data_start_time, active_2d_plot.total_data_end_time, padding=0) ## global frame
-        # intervals_overview_time_sync_pyqtgraph_widget.setMaximumHeight(39)
+        # Epoch Intervals figure: ____________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
+        curr_identifier_name = 'interval_overview'
+        _interval_tracks_out_dict = active_2d_plot.prepare_pyqtgraph_intervalPlot_tracks(enable_interval_overview_track=True, should_remove_all_and_re_add=True, should_link_to_main_plot_widget=False)
+        interval_window_dock_config, intervals_dock, intervals_time_sync_pyqtgraph_widget, intervals_root_graphics_layout_widget, intervals_plot_item = _interval_tracks_out_dict['intervals']
+        if curr_identifier_name in _interval_tracks_out_dict:
+            interval_overview_window_dock_config, intervals_overview_dock, intervals_overview_time_sync_pyqtgraph_widget, intervals_overview_root_graphics_layout_widget, intervals_overview_plot_item = _interval_tracks_out_dict[curr_identifier_name]
+            intervals_overview_plot_item.setXRange(active_2d_plot.total_data_start_time, active_2d_plot.total_data_end_time, padding=0) ## global frame
+            # intervals_overview_time_sync_pyqtgraph_widget.setMaximumHeight(39)
 
-    a_dock, widget = active_2d_plot.find_dock_item_tuple(identifier=curr_identifier_name)
-    widget.getRootPlotItem().setXRange(active_2d_plot.total_data_start_time, active_2d_plot.total_data_end_time, padding=0) ## global frame
-    widget.update(None)
-    _all_tracks_out_artists[curr_identifier_name] = widget
-    _all_tracks_out_axes[curr_identifier_name] = widget.getRootPlotItem()
+        a_dock, widget = active_2d_plot.find_dock_item_tuple(identifier=curr_identifier_name)
+        widget.getRootPlotItem().setXRange(active_2d_plot.total_data_start_time, active_2d_plot.total_data_end_time, padding=0) ## global frame
+        active_2d_plot.sync_matplotlib_render_plot_widget(identifier=curr_identifier_name, sync_mode=sync_mode) ## set sync mode
+        widget.update(None)
 
-    active_out_figure_paths, final_context = curr_active_pipeline.output_figure(final_context=complete_session_context.overwriting_context(display='interval_epochs_overview'), fig=widget.getRootPlotItem())
-    _all_tracks_active_out_figure_paths[final_context] = deepcopy(active_out_figure_paths[0])
+        _all_tracks_out_artists[curr_identifier_name] = widget
+        _all_tracks_out_axes[curr_identifier_name] = widget.getRootPlotItem()
+
+        active_out_figure_paths, final_context = curr_active_pipeline.output_figure(final_context=complete_session_context.overwriting_context(display='interval_epochs_overview'), fig=widget.getRootPlotItem(), write_vector_format=write_vector_format, write_png=write_png)
+        _all_tracks_active_out_figure_paths[final_context] = deepcopy(active_out_figure_paths[0])
+
+
+
+    # from PIL import Image # create_gif_from_images
+    # from pyphocorehelpers.plotting.media_output_helpers import get_array_as_image_stack, save_array_as_image_stack, vertical_image_stack
+
+    # # Let's assume you have a list of images
+    # out_figs_paths = list(_all_tracks_active_out_figure_paths.values()) # ['image1.png', 'image2.png', 'image3.png']  # replace this with actual paths to your images
+    # imgs = [Image.open(i) for i in out_figs_paths]
+    # output_img = vertical_image_stack(imgs, v_overlap=0, padding=0)
+
+    # output_img
+
+    # out_path = Path(out_path).resolve()
+    # # Save image to file
+    # image.save(out_path)
+
+
 
     return _all_tracks_active_out_figure_paths, _all_tracks_out_artists, _all_tracks_out_axes
 
