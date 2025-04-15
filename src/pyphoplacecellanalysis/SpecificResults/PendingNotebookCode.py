@@ -180,7 +180,11 @@ def _plot_all_time_decoded_marginal_figures_non_interactive(curr_active_pipeline
     active_out_figure_paths, final_context = curr_active_pipeline.output_figure(final_context=complete_session_context.overwriting_context(display='interval_epochs_overview'), fig=widget.getRootPlotItem())
     _all_tracks_active_out_figure_paths[final_context] = deepcopy(active_out_figure_paths)
 
+
+
     return _all_tracks_active_out_figure_paths, _all_tracks_out_artists, _all_tracks_out_axes
+
+
 
 
 
@@ -258,7 +262,75 @@ def _plot_all_time_decoded_marginal_figures(curr_active_pipeline, best_matching_
         # Create a FigureCollector instance
         # with FigureCollector(name='plot_directional_merged_pf_decoded_epochs', base_context=display_context) as collector:
 
-        curr_identifier_name, widget, matplotlib_fig, matplotlib_fig_axes, dock_item = active_2d_plot.add_docked_marginal_track(name=plot_row_identifier, time_window_centers=a_time_window_centers, a_1D_posterior=a_1D_posterior, extended_dock_title_info=info_string, sync_mode=sync_mode)
+        # curr_identifier_name, widget, matplotlib_fig, matplotlib_fig_axes, dock_item = active_2d_plot.add_docked_marginal_track(name=plot_row_identifier, time_window_centers=a_time_window_centers, a_1D_posterior=a_1D_posterior, extended_dock_title_info=info_string, sync_mode=sync_mode)
+        
+        from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError import plot_1D_most_likely_position_comparsions
+        from neuropy.utils.matplotlib_helpers import get_heatmap_cmap
+        from pyphoplacecellanalysis.General.Model.Configs.LongShortDisplayConfig import PlottingHelpers
+        
+        if a_variable_name is None:
+            a_variable_name = name
+
+        if a_dock_config is None:
+            override_dock_group_name: str = None ## this feature doesn't work
+            a_dock_config = CustomCyclicColorsDockDisplayConfig(showCloseButton=True, named_color_scheme=NamedColorScheme.grey)
+            a_dock_config.dock_group_names = [override_dock_group_name] # , 'non-PBE Continuous Decoding'
+
+
+        n_xbins, n_t_bins = np.shape(a_1D_posterior)
+
+        if xbin is None:
+            xbin = np.arange(n_xbins)
+
+        ## ✅ Add a new row for each of the four 1D directional decoders:
+        identifier_name: str = name
+        if extended_dock_title_info is not None:
+            identifier_name += extended_dock_title_info ## add extra info like the time_bin_size in ms
+        print(f'identifier_name: {identifier_name}')
+        widget, matplotlib_fig, matplotlib_fig_axes, dock_item = self.add_new_matplotlib_render_plot_widget(name=identifier_name, dockSize=(25, 200), display_config=a_dock_config, **kwargs)
+        an_ax = matplotlib_fig_axes[0]
+
+        variable_name: str = a_variable_name
+        
+        # active_most_likely_positions = active_marginals.most_likely_positions_1D # Raw decoded positions
+        active_most_likely_positions = None
+        active_posterior = deepcopy(a_1D_posterior)
+        a_time_window_centers = a_df['t_bin_center'].to_numpy() 
+        a_1D_posterior = a_df[['P_Long', 'P_Short']].to_numpy().T
+
+        posterior_heatmap_imshow_kwargs = dict()
+        
+        # most_likely_positions_mode: 'standard'|'corrected'
+        ## Actual plotting portion:
+        fig, an_ax = plot_1D_most_likely_position_comparsions(measured_position_df=None, time_window_centers=time_window_centers, xbin=deepcopy(xbin),
+                                                                posterior=active_posterior,
+                                                                active_most_likely_positions_1D=active_most_likely_positions,
+                                                                ax=an_ax, variable_name=variable_name, debug_print=True, enable_flat_line_drawing=False,
+                                                                posterior_heatmap_imshow_kwargs=posterior_heatmap_imshow_kwargs)
+
+        
+    
+        # return identifier_name, widget, matplotlib_fig, matplotlib_fig_axes, dock_item
+        ## END EXPANSION
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
         _all_tracks_out_artists[curr_identifier_name] = widget
         _all_tracks_out_axes[curr_identifier_name] = matplotlib_fig_axes[0]
         matplotlib_fig_axes[0].set_xlim(active_2d_plot.total_data_start_time, active_2d_plot.total_data_end_time)

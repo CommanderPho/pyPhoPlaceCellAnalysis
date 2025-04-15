@@ -1,83 +1,99 @@
-[tool.poetry]
+[project]
 name = "pyphoplacecellanalysis"
 version = "0.2.3"
 description = ""
-authors = ["Pho Hale <halechr@umich.edu>"]
+authors = [{ name = "Pho Hale", email = "halechr@umich.edu" }]
+requires-python = ">=3.9,<3.12"
 readme = "README.md"
+dependencies = [
+    "param>=1.12.3,<2",
+    "qtmodern>=0.2.0,<0.3",
+    "elephant>=0.11.2,<0.12",
+    "dill[graph]==0.3.5.1",
+    "klepto==0.2.2",
+    "findpeaks>=2.4.4,<3",
+    "shapely>=2.0.1,<3",
+    "pybursts",
+    "pyopengl-accelerate>=3.1.6,<4",
+    "sqlalchemy>=2.0.2,<3",
+    "pip~=24.0",
+    "setuptools>=67.3.1,<68",
+    "wheel>=0.38.4,<0.39",
+    "srsly>=2.4.5,<3",
+    "tables>=3.8.0,<4",
+    "hdf5plugin>=4.1.1,<5",
+    "magicgui>=0.6.1,<0.7",
+    "deeptime>=0.4.4,<0.5",
+    "attrs>=22.2.0,<23",
+    "jinja2==3.0.3",
+    "pandas==1.5.3",
+    "napari[pyqt5]>=0.4.18,<0.5",
+    "napari-animated-gif-io>=0.1.2,<0.2",
+    "napari-animation>=0.0.8,<0.0.9",
+    "panel>=1.2.3,<2",
+    "params>=0.9.0,<0.10",
+    "jupyter-bokeh>=3.0.7,<4",
+    "pyqt-builder>=1.15.3,<2",
+    "pyqt5-qt5==5.15.2",
+    "pycscope>=1.2.1,<2",
+    "scikit-learn~=1.5",
+    "opencv-contrib-python>=4.10.0.84,<5",
+]
 
-[tool.poetry.dependencies]
-python = ">=3.9,<3.12"
-param = "^1.12.3"
-qtmodern = "^0.2.0"
-elephant = "^0.11.2"
-dill = {version="==0.3.5.1", extras=["graph"]} #objgraph diagnostic tool
-klepto = "0.2.2" # {version = "^0.2.3", extras="archives"}
-findpeaks = "^2.4.4"
-shapely = "^2.0.1"
-pybursts = {git = "https://github.com/CommanderPho/pybursts.git", rev = "master"}
-pyopengl-accelerate = {version = "^3.1.6", optional = true}
-sqlalchemy = {version = "^2.0.2", optional = false}
-pip = "^24.0"
-setuptools = "^67.3.1"
-wheel = "^0.38.4"
-srsly = "^2.4.5"
-tables = "^3.8.0"
-hdf5plugin = "^4.1.1"
-magicgui = "^0.6.1"
-deeptime = "^0.4.4"
-attrs = "^22.2.0"
-jinja2 = "3.0.3"
-pandas = "1.5.3"
-napari = {extras = ["pyqt5"], version = "^0.4.18"}
-napari-animated-gif-io = "^0.1.2"
-napari-animation = "^0.0.8"
-panel = "^1.2.3"
-params = "^0.9.0"
-jupyter-bokeh = "^3.0.7"
-pyqt-builder = "^1.15.3"
-pyqt5-qt5 = "5.15.2"
-pycscope = "^1.2.1"
-scikit-learn = "^1.5"
-opencv-contrib-python = "^4.10.0.84"
+[dependency-groups]
+dev = [
+    "pytest>=7.2.1,<8",
+    "ipython>=8.9.0,<9",
+    "viztracer>=0.15.6,<0.16",
+    "setuptools>=67.1.0,<68",
+    "ansi2html",
+    "wheel>=0.38.4,<0.39",
+    "snakeviz>=2.1.1,<3",
+    "pyan>=0.1.3,<0.2",
+    "dvc[gdrive]>=3.59.0,<4",
+]
+gui = [
+    "click>=8.1.3,<9",
+    "pyqt5==5.15.7",
+    "pyqt-checkbox-table-widget>=0.0.14,<0.0.15",
+    "pyqt5-qt5>=5.15.2,<6",
+    "pyqt-custom-titlebar-window>=0.0.50,<0.0.51",
+    "qtawesome>=1.2.2,<2",
+    "pyvista==0.36.*",
+    "pyvistaqt>=0.9.0,<0.10",
+    "loguru>=0.6.0,<0.7",
+    "pyopengl>=3.1.6,<4",
+    "mpl-multitab",
+    "patchworklib>=0.5.2,<0.6",
+    "vedo",
+    "pyqt-responsive-label>=0.0.3,<0.0.4",
+]
+remote = [
+    "neuropy",
+    "pyphocorehelpers",
+    "pyqode-core",
+    "pyqode-python",
+]
+testing = ["mplcursors>=0.5.2,<0.6"]
 
-[tool.poetry.group.dev.dependencies]
-pytest = "^7.2.1"
-ipython = "^8.9.0"
-viztracer = "^0.15.6"
-setuptools = "^67.1.0"
-ansi2html = {git = "https://github.com/CommanderPho/ansi2html.git", rev = "main"} # poetry add git+https://github.com/CommanderPho/ansi2html.git
-wheel = "^0.38.4"
-snakeviz = "^2.1.1"
-pyan = "^0.1.3"
-dvc = {version = "^3.59.0", extras = ["gdrive"]}
+[tool.uv]
+default-groups = [
+    "dev",
+    "gui",
+    "remote",
+    "testing",
+]
 
-[tool.poetry.group.gui.dependencies]
-click = "^8.1.3"
-pyqt5 = "5.15.7"
-pyqt-checkbox-table-widget = "^0.0.14"
-pyqt5-qt5 = "^5.15.2"
-pyqt-custom-titlebar-window = "^0.0.50"
-qtawesome = "^1.2.2"
-pyvista = "0.36.*"
-pyvistaqt = "^0.9.0"
-loguru = "^0.6.0" # required for mpl-multitab
-pyopengl = "^3.1.6"
-mpl-multitab = {git = "https://github.com/CommanderPho/mpl-multitab.git", rev = "pho_compat"} # poetry add git+https://github.com/CommanderPho/mpl-multitab.git
-patchworklib = "^0.5.2"
-vedo = {git = "https://github.com/CommanderPho/vedo.git", rev = "release/pho-working"} # poetry add git+https://github.com/CommanderPho/vedo.git#release/pho-working
-pyqt-responsive-label = "^0.0.3"
-
-[tool.poetry.group.remote.dependencies]
-neuropy = {git = "https://github.com/CommanderPho/NeuroPy.git", rev = "feature/safe-advance"} # , rev = "main", extras = ["acceleration"]
-pyphocorehelpers = {git = "https://github.com/CommanderPho/pyPhoCoreHelpers.git"}
-pyqode-core = {path = "../pyqode.core/dist/current.whl"} # pyqode_core-3.0.0-py2.py3-none-any.whl
-pyqode-python = {path = "../pyqode.python/dist/current.whl"}
-# haesleinhuepf-pyqode-python = {path = "../pyqode.python/dist/current.whl"}
-
-
-[tool.poetry.group.testing.dependencies]
-mplcursors = "^0.5.2"
+[tool.uv.sources]
+ansi2html = { git = "https://github.com/CommanderPho/ansi2html.git", rev = "main" }
+mpl-multitab = { git = "https://github.com/CommanderPho/mpl-multitab.git", rev = "pho_compat" }
+vedo = { git = "https://github.com/CommanderPho/vedo.git", rev = "release/pho-working" }
+neuropy = { git = "https://github.com/CommanderPho/NeuroPy.git", rev = "feature/safe-advance" }
+pyphocorehelpers = { git = "https://github.com/CommanderPho/pyPhoCoreHelpers.git" }
+pyqode-core = { path = "../pyqode.core/dist/current.whl" }
+pyqode-python = { path = "../pyqode.python/dist/current.whl" }
+pybursts = { git = "https://github.com/CommanderPho/pybursts.git", rev = "master" }
 
 [build-system]
-requires = ["poetry-core"]
-build-backend = "poetry.core.masonry.api"
+requires = ["hatchling"]
+build-backend = "hatchling.build"
