@@ -351,7 +351,7 @@ class SpecificDockWidgetManipulatingMixin(BaseDynamicInstanceConformingMixin):
                 raise NotImplementedError(f'type(a_1D_decoded_result): {type(a_1D_decoded_result)} is unknown')
 
     @function_attributes(short_name=None, tags=['IMPORTANT', 'track', 'posterior', 'marginal'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-03-21 08:10', related_items=[])
-    def add_docked_marginal_track(self, name: str, time_window_centers: NDArray, a_1D_posterior: NDArray, xbin: Optional[NDArray]=None, a_variable_name: Optional[str]=None, a_dock_config: Optional[CustomDockDisplayConfig]=None, extended_dock_title_info: Optional[str]=None):
+    def add_docked_marginal_track(self, name: str, time_window_centers: NDArray, a_1D_posterior: NDArray, xbin: Optional[NDArray]=None, a_variable_name: Optional[str]=None, a_dock_config: Optional[CustomDockDisplayConfig]=None, extended_dock_title_info: Optional[str]=None, **kwargs):
         """ adds a marginal (such as Long v. Short, or Long_LR v. Long_RL v. Short_LR v. Short_RL) 
         
         time_bin_size = epochs_decoding_time_bin_size
@@ -382,7 +382,7 @@ class SpecificDockWidgetManipulatingMixin(BaseDynamicInstanceConformingMixin):
         if extended_dock_title_info is not None:
             identifier_name += extended_dock_title_info ## add extra info like the time_bin_size in ms
         print(f'identifier_name: {identifier_name}')
-        widget, matplotlib_fig, matplotlib_fig_axes, dock_item = self.add_new_matplotlib_render_plot_widget(name=identifier_name, dockSize=(25, 200), display_config=a_dock_config)
+        widget, matplotlib_fig, matplotlib_fig_axes, dock_item = self.add_new_matplotlib_render_plot_widget(name=identifier_name, dockSize=(25, 200), display_config=a_dock_config, **kwargs)
         an_ax = matplotlib_fig_axes[0]
 
         variable_name: str = a_variable_name
@@ -423,7 +423,10 @@ class SpecificDockWidgetManipulatingMixin(BaseDynamicInstanceConformingMixin):
 
 
         widget.draw() # alternative to accessing through full path?
-        self.sync_matplotlib_render_plot_widget(identifier_name) # Sync it with the active window:
+        sync_mode = kwargs.get('sync_mode', None)
+        if sync_mode is None:
+            self.sync_matplotlib_render_plot_widget(identifier_name) # Sync it with the active window:
+            
         return identifier_name, widget, matplotlib_fig, matplotlib_fig_axes, dock_item
 
 
