@@ -2086,8 +2086,6 @@ class GenericDecoderDictDecodedEpochsDictResult(ComputedResult):
         flat_decoded_marginal_posterior_df_per_epoch_marginals_df_context_dict = {}
         for a_per_time_bin_ctxt, a_decoded_time_bin_marginal_posterior_df in flat_decoded_marginal_posterior_df_context_dict.items():
             a_per_epoch_ctxt = TimeBinAggregation.ToPerEpoch.get_per_epoch_ctxt_from_per_time_bin_ctxt(a_per_time_bin_ctxt=a_per_time_bin_ctxt)
-            
-
 
             a_decoded_per_epoch_marginals_df, a_decoded_time_bin_marginal_posterior_df = cls._perform_per_epoch_time_bin_aggregation(a_decoded_time_bin_marginal_posterior_df=a_decoded_time_bin_marginal_posterior_df, probabilitY_column_to_aggregate=probabilitY_column_to_aggregate, n_rolling_avg_window_tbins=n_rolling_avg_window_tbins, **kwargs)            
             per_time_bin_to_per_epoch_context_map_dict[a_per_time_bin_ctxt] = a_per_epoch_ctxt
@@ -2111,7 +2109,6 @@ class GenericDecoderDictDecodedEpochsDictResult(ComputedResult):
         # flat_decoded_marginal_posterior_df_per_time_bin_marginals_df_context_dict
         # flat_decoded_marginal_posterior_df_per_epoch_marginals_df_context_dict
                 
-
         ## INPUTS: per_time_bin_to_per_epoch_context_map_dict, flat_decoded_marginal_posterior_df_per_epoch_marginals_df_context_dict, flat_decoded_marginal_posterior_df_per_time_bin_marginals_df_context_dict
         # flat_decoded_marginal_posterior_df_per_time_bin_marginals_df_context_dict
         # flat_decoded_marginal_posterior_df_per_epoch_marginals_df_context_dict
@@ -2144,3 +2141,18 @@ class GenericDecoderDictDecodedEpochsDictResult(ComputedResult):
         # per_time_bin_to_per_epoch_context_map_dict, flat_decoded_marginal_posterior_df_per_epoch_marginals_df_context_dict, flat_decoded_marginal_posterior_df_per_time_bin_marginals_df_context_dict = _newly_updated_values_tuple
         return _newly_updated_values_tuple
 
+
+
+    def has_all_per_epoch_aggregations(self) -> bool:
+        """ return True if we have the needed aggegrations, or False if they need to be computed.
+        
+        """
+        ## Check if TimeBinAggegreations are performed:
+        per_time_bin_flat_context_list, per_time_bin_flat_result_context_dict, per_time_bin_flat_decoder_context_dict, per_time_bin_flat_decoded_marginal_posterior_df_context_dict = self.get_results_matching_contexts(context_query=IdentifyingContext(trained_compute_epochs='laps', decoder_identifier='pseudo2D', known_named_decoding_epochs_type=['pbe', 'laps'], data_grain= 'per_time_bin'))        
+        per_time_bin_keys = list(per_time_bin_flat_decoded_marginal_posterior_df_context_dict.keys())
+
+        ## get all non-global, `data_grain= 'per_time_bin'`
+        per_epoch_flat_context_list, per_epoch_flat_result_context_dict, per_epoch_flat_decoder_context_dict, per_epoch_flat_decoded_marginal_posterior_df_context_dict = self.get_results_matching_contexts(context_query=IdentifyingContext(trained_compute_epochs='laps', decoder_identifier='pseudo2D', known_named_decoding_epochs_type=['pbe', 'laps'], data_grain= 'per_epoch'))        
+        per_epoch_keys = list(per_epoch_flat_decoded_marginal_posterior_df_context_dict.keys())
+        return (len(per_time_bin_keys) == len(per_epoch_keys))
+        

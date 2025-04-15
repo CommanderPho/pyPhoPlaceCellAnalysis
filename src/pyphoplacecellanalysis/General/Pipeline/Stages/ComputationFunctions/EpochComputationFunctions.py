@@ -2,6 +2,8 @@
 from __future__ import annotations # prevents having to specify types for typehinting as strings
 from typing import TYPE_CHECKING
 
+from neuropy.utils.result_context import IdentifyingContext
+
 if TYPE_CHECKING:
     ## typehinting only imports here
     from pyphoplacecellanalysis.Analysis.Decoder.context_dependent import GenericDecoderDictDecodedEpochsDictResult
@@ -1634,6 +1636,9 @@ def validate_has_generalized_specific_epochs_decoding(curr_active_pipeline, comp
     if a_generic_decoder_dict_decoded_epochs_dict_result is None:
         return False
 
+    if not a_generic_decoder_dict_decoded_epochs_dict_result.has_all_per_epoch_aggregations():
+        return False
+        
 
 
 
@@ -1952,6 +1957,27 @@ class EpochComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Computati
             print(f'WARN 2025-04-14 - Not yet finished -- perform update here.')
             global_computation_results.computed_data['EpochComputations'].a_generic_decoder_dict_decoded_epochs_dict_result = a_new_fully_generic_result
             
+
+
+        # ==================================================================================================================== #
+        # Compute `TimeBinAggregation` results                                                                                 #
+        # ==================================================================================================================== #
+        from neuropy.analyses.time_bin_aggregation import TimeBinAggregation
+
+        if not a_new_fully_generic_result.has_all_per_epoch_aggregations():
+            print(f'\tMissing TimeBinAggregation computations. Recomputing...')
+            # ==================================================================================================================================================================================================================================================================================== #
+            # Phase 5 - Get the corrected 'per_epoch' results from the 'per_time_bin' versions                                                                                                                                                                                                     #
+            # ==================================================================================================================================================================================================================================================================================== #
+            ## get all non-global, `data_grain= 'per_time_bin'`
+            flat_context_list, flat_result_context_dict, flat_decoder_context_dict, flat_decoded_marginal_posterior_df_context_dict = a_new_fully_generic_result.get_results_matching_contexts(context_query=IdentifyingContext(trained_compute_epochs='laps', decoder_identifier='pseudo2D',
+                                                                                                                                                                                                                                time_bin_size=epochs_decoding_time_bin_size,
+                                                                                                                                                                                                                                known_named_decoding_epochs_type=['pbe', 'laps', 'non_pbe'],
+                                                                                                                                                                                                                                masked_time_bin_fill_type=('ignore', 'dropped'), data_grain= 'per_time_bin'))        
+
+            _newly_updated_values_tuple = a_new_fully_generic_result.compute_all_per_epoch_aggregations_from_per_time_bin_results(flat_decoded_marginal_posterior_df_context_dict=flat_decoded_marginal_posterior_df_context_dict)
+            # per_time_bin_to_per_epoch_context_map_dict, flat_decoded_marginal_posterior_df_per_epoch_marginals_df_context_dict, flat_decoded_marginal_posterior_df_per_time_bin_marginals_df_context_dict = _newly_updated_values_tuple
+
         return global_computation_results
 
 
