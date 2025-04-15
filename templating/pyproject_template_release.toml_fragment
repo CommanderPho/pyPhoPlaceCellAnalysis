@@ -1,7 +1,7 @@
 [tool.poetry.group.remote.dependencies]
-neuropy = {git = "https://github.com/CommanderPho/NeuroPy.git"} # , rev = "main", extras = ["acceleration"]
+neuropy = {git = "https://github.com/CommanderPho/NeuroPy.git", rev = "feature/safe-advance"}
 pyphocorehelpers = {git = "https://github.com/CommanderPho/pyPhoCoreHelpers.git"}
 pyqode-core = {path = "../pyqode.core/dist/current.whl"} # pyqode_core-3.0.0-py2.py3-none-any.whl
 pyqode-python = {path = "../pyqode.python/dist/current.whl"}
-# haesleinhuepf-pyqode-python = {path = "../pyqode.python/dist/current.whl"}
+
 

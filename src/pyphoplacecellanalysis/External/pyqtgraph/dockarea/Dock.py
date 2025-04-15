@@ -329,6 +329,20 @@ class Dock(QtWidgets.QWidget, DockDrop):
     def stretch(self):
         return self._stretch
 
+
+
+    def toggleTitleBarVisibility(self):
+        """ toggles the visibility of the contents (everything except the title bar) for this Dock.
+        """
+        new_is_hidden: bool = (not self.labelHidden)
+        if new_is_hidden:
+            ## now hidden
+            self.hideTitleBar()
+        else:
+            ## now visible
+            self.showTitleBar()
+
+
     def hideTitleBar(self):
         """
         Hide the title bar for this Dock.
@@ -605,8 +619,18 @@ class Dock(QtWidgets.QWidget, DockDrop):
         menu = QtWidgets.QMenu()
         
         # Create standard actions
-        showTitleAction = menu.addAction("Show title bar")
-        showTitleAction.triggered.connect(self.showTitleBar)
+
+
+        new_is_TitleBar_hidden: bool = (not self.labelHidden)
+        if new_is_TitleBar_hidden:
+            ## now hidden
+            showTitleAction = menu.addAction("Show title bar")
+            showTitleAction.triggered.connect(self.showTitleBar)
+        else:
+            ## now visible
+            hideTitleAction = menu.addAction("Hide title bar")
+            hideTitleAction.triggered.connect(self.hideTitleBar)
+
         menu.addSeparator()
 
         renameAction = menu.addAction("Rename dock...")
