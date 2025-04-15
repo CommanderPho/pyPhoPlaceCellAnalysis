@@ -166,6 +166,7 @@ class CustomProcessingPhases(OrderedEnum):
             'extended_pf_peak_information':CustomProcessingPhases.final_run,
             'perform_wcorr_shuffle_analysis':CustomProcessingPhases.final_run,
             'non_PBE_epochs_results':CustomProcessingPhases.continued_run, # #TODO 2025-02-18 20:15: - [ ] Added to compute the new non_PBE results
+            'generalized_specific_epochs_decoding':CustomProcessingPhases.continued_run, # 2025-04-15 00:25 added
         }
 
 

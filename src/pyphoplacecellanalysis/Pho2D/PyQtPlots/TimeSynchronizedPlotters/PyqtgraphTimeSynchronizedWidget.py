@@ -263,6 +263,9 @@ class PyqtgraphTimeSynchronizedWidget(CrosshairsTracingMixin, PlottingBackendSpe
         # if self.enable_debug_print:
         #     profiler = pg.debug.Profiler(disabled=True, delayed=True)
 
+        if (start_t is not None) and (end_t is not None):            
+            self.getRootPlotItem().setXRange(start_t, end_t, padding=0) ## global frame
+
         self.update(end_t, defer_render=False)
         # if self.enable_debug_print:
         #     profiler('Finished calling _update_plots()')

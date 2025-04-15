@@ -3937,8 +3937,11 @@ class SingleFatDataframe:
     
     
     """
+    to_filename_conversion_dict = {'compute_diba_quiescent_style_replay_events':'_withNewComputedReplays', 'diba_evt_file':'_withNewKamranExportedReplays', 'initial_loaded': '_withOldestImportedReplays', 'normal_computed': '_withNormalComputedReplays'}
+    
+
     @classmethod
-    def build_fat_df(cls, dfs_dict: Dict[IdentifyingContext, pd.DataFrame]) -> pd.DataFrame:
+    def build_fat_df(cls, dfs_dict: Dict[IdentifyingContext, pd.DataFrame], additional_common_context: Optional[IdentifyingContext]=None) -> pd.DataFrame:
         """ builds a single FAT_df from a dict of identities and their corresponding dfs. Adds all of the index keys as columns, and all of their values a duplicated along all rows of the coresponding df.
         Then stacks them into a single, FAT dataframe.
 
@@ -3946,13 +3949,41 @@ class SingleFatDataframe:
            
         """
         from neuropy.utils.mixins.time_slicing import TimeColumnAliasesProtocol
+        # from pyphoplacecellanalysis.General.Pipeline.Stages.Computation import to_filename_conversion_dict
         
+
+
         FAT_df_list: List[pd.DataFrame] = []
     
-        for a_df_name, a_df in dfs_dict.items():
+        for a_df_context, a_df in dfs_dict.items():
             ## In a single_FAT frame, we add columns with the context value for all entries in the dataframe.
-            for a_ctxt_key, a_ctxt_value in a_df_name.to_dict().items():
+            for a_ctxt_key, a_ctxt_value in a_df_context.to_dict().items():
                 a_df[a_ctxt_key] = a_ctxt_value
+                
+            if additional_common_context is not None:
+                for a_ctxt_key, a_ctxt_value in additional_common_context.to_dict().items():
+                    ## need to handle lists
+                    # if (ctxt.get('epochs_source', None) is not None) and (len(str(ctxt.get('epochs_source', None))) > 0) and ('epochs_source' not in subset_excludelist):
+                    #     custom_suffix_string_parts.append(to_filename_conversion_dict[ctxt.get('epochs_source', None)])
+                    # if (ctxt.get('included_qclu_values', None) is not None) and (len(str(ctxt.get('included_qclu_values', None))) > 0) and ('included_qclu_values' not in subset_excludelist):
+                    #     custom_suffix_string_parts.append(f"qclu_{ctxt.get('included_qclu_values', None)}")
+                    # if (ctxt.get('minimum_inclusion_fr_Hz', None) is not None) and (len(str(ctxt.get('minimum_inclusion_fr_Hz', None))) > 0) and ('minimum_inclusion_fr_Hz' not in subset_excludelist):
+                    #     custom_suffix_string_parts.append(f"frateThresh_{ctxt.get('minimum_inclusion_fr_Hz', None):.1f}")
+
+                    specially_formatted_key_names_dict = {'epochs_source':'', 'included_qclu_values':f"qclu_", 'minimum_inclusion_fr_Hz':f"frateThresh_"}
+                    # specially_formatted_values_dict = {'epochs_source':SingleFatDataframe.to_filename_conversion_dict.get(a_ctxt_value, f'{a_ctxt_value}'), 'included_qclu_values':f"{a_ctxt_value}", 'minimum_inclusion_fr_Hz':f"{a_ctxt_value:.1f}"}
+                    
+                    _default_formatter_fn = lambda v: f'{v}'
+                    specially_formatted_values_dict = {'epochs_source': lambda v: SingleFatDataframe.to_filename_conversion_dict.get(v, f'{v}'), 'included_qclu_values': (lambda v: f"{v}"), 'minimum_inclusion_fr_Hz': (lambda v: f"{v:.1f}")}
+                    
+
+
+                    a_ctxt_value_formatter_fn = specially_formatted_values_dict.get(a_ctxt_key, _default_formatter_fn)
+                    a_ctxt_value_str: str = a_ctxt_value_formatter_fn(a_ctxt_value)
+
+                    # a_ctxt_value_str: str = specially_formatted_values_dict.get(a_ctxt_value, f'{a_ctxt_value}')
+
+                    a_df[a_ctxt_key] = a_ctxt_value_str ## need to turn this into a flat string ValueError: Length of values (6) does not match length of index (19102)
                 
             # time_col = 'start' # 'ripple_start_t' for ripples, etc
             extant_time_col: str = TimeColumnAliasesProtocol.find_first_extant_suitable_columns_name(a_df, col_connonical_name='t_bin_center', required_columns_synonym_dict={"t_bin_center":{'lap_start_t','ripple_start_t','start_t','start', 't'}}, should_raise_exception_on_fail=True)

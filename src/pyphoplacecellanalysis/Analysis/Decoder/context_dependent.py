@@ -1230,7 +1230,7 @@ class GenericDecoderDictDecodedEpochsDictResult(ComputedResult):
         ## INPUTS: time_bin_size, 
 
         ## Common/shared for all decoded epochs:
-        for a_masked_bin_fill_mode in ['nan_filled', 'last_valid', 'dropped']:
+        for a_masked_bin_fill_mode in ['dropped']: # , 'last_valid'
             # a_masked_bin_fill_mode = 'nan_filled'
 
             ## INPUTS: a_new_fully_generic_result
@@ -1269,6 +1269,21 @@ class GenericDecoderDictDecodedEpochsDictResult(ComputedResult):
             a_df['delta_aligned_start_t'] = a_df[time_column_name] - t_delta ## subtract off t_delta
             a_df = a_df.across_session_identity.add_session_df_columns(session_name=session_name, time_bin_size=epochs_decoding_time_bin_size, curr_session_t_delta=t_delta, time_col=time_column_name)
             a_new_fully_generic_result.filter_epochs_decoded_track_marginal_posterior_df_dict[k] = a_df
+
+
+        # ==================================================================================================================================================================================================================================================================================== #
+        # Phase 5 - Get the corrected 'per_epoch' results from the 'per_time_bin' versions                                                                                                                                                                                                     #
+        # ==================================================================================================================================================================================================================================================================================== #
+        ## get all non-global, `data_grain= 'per_time_bin'`
+        flat_context_list, flat_result_context_dict, flat_decoder_context_dict, flat_decoded_marginal_posterior_df_context_dict = a_new_fully_generic_result.get_results_matching_contexts(context_query=IdentifyingContext(trained_compute_epochs='laps', decoder_identifier='pseudo2D',
+                                                                                                                                                                                                                            time_bin_size=time_bin_size,
+                                                                                                                                                                                                                            known_named_decoding_epochs_type=['pbe', 'laps', 'non_pbe'],
+                                                                                                                                                                                                                            masked_time_bin_fill_type=('ignore', 'dropped'), data_grain= 'per_time_bin'))        
+
+        _newly_updated_values_tuple = a_new_fully_generic_result.compute_all_per_epoch_aggregations_from_per_time_bin_results(flat_decoded_marginal_posterior_df_context_dict=flat_decoded_marginal_posterior_df_context_dict)
+        # per_time_bin_to_per_epoch_context_map_dict, flat_decoded_marginal_posterior_df_per_epoch_marginals_df_context_dict, flat_decoded_marginal_posterior_df_per_time_bin_marginals_df_context_dict = _newly_updated_values_tuple
+
+
 
 
         # ==================================================================================================================== #
@@ -1460,11 +1475,13 @@ class GenericDecoderDictDecodedEpochsDictResult(ComputedResult):
                 return self.get_flattened_contexts_for_posteriors_dfs(decoded_marginal_posterior_df_context_dict) ## a bit inefficient but there's never that many contexts
             
     @function_attributes(short_name=None, tags=['contexts', 'matching', 'single-context', 'best'], input_requires=[], output_provides=[], uses=['get_matching_contexts'], used_by=[], creation_date='2025-04-07 18:44', related_items=[])
-    def get_best_matching_context(self, context_query: Optional[IdentifyingContext]=None, debug_print:bool=True) -> Optional[IdentifyingContext]: 
+    def get_best_matching_context(self, context_query: Optional[IdentifyingContext]=None, debug_print:bool=False) -> Optional[IdentifyingContext]: 
         """ contexts only, no results returned.
         This doesn't quite make sense because each results dictionary may have different contexts
         
-        
+        ## Get single set of results best matching the context:
+        best_matching_context, a_result, a_decoder, a_decoded_marginal_posterior_df = a_new_fully_generic_result.get_results_matching_context(context_query=a_target_context)
+
         """
         return self.get_matching_contexts(context_query=context_query, return_multiple_matches=False, debug_print=debug_print)
         
@@ -1473,7 +1490,7 @@ class GenericDecoderDictDecodedEpochsDictResult(ComputedResult):
 
 
     @function_attributes(short_name=None, tags=['contexts', 'matching'], input_requires=[], output_provides=[], uses=['get_flattened_contexts_for_posteriors_dfs'], used_by=[], creation_date='2025-03-12 11:30', related_items=['get_results_matching_context', 'get_matching_contexts'])
-    def get_results_matching_contexts(self, context_query: Optional[IdentifyingContext]=None, return_multiple_matches: bool=True, debug_print:bool=True): 
+    def get_results_matching_contexts(self, context_query: Optional[IdentifyingContext]=None, return_multiple_matches: bool=True, debug_print:bool=False): 
         """ Get a specific contexts
         
         a_target_context: IdentifyingContext = IdentifyingContext(trained_compute_epochs='laps', pfND_ndim=1, decoder_identifier='long_LR', time_bin_size=0.025, known_named_decoding_epochs_type='pbe', masked_time_bin_fill_type='ignore')
@@ -1733,7 +1750,8 @@ class GenericDecoderDictDecodedEpochsDictResult(ComputedResult):
         #     custom_export_df_to_csv_fn = _subfn_export_df_to_csv
 
         def _subfn_pre_process_and_export_df(export_df: pd.DataFrame, a_df_identifier: Union[str, IdentifyingContext]):
-            """ 
+            """ sets up all the important metadata and then calls `custom_export_df_to_csv_fn(....)` to actually export the CSV
+            
             captures: t_start, t_delta, t_end, tbin_values_dict, time_col_name_dict, user_annotation_selections, valid_epochs_selections, custom_export_df_to_csv_fn
             """
             if isinstance(a_df_identifier, str):
@@ -1818,7 +1836,7 @@ class GenericDecoderDictDecodedEpochsDictResult(ComputedResult):
         export_files_dict = {}
         
         if use_single_FAT_df:
-            single_FAT_df: pd.DataFrame = SingleFatDataframe.build_fat_df(dfs_dict=extracted_dfs_dict)
+            single_FAT_df: pd.DataFrame = SingleFatDataframe.build_fat_df(dfs_dict=extracted_dfs_dict, additional_common_context=active_context)
             export_files_dict['FAT'] =  _subfn_pre_process_and_export_df(export_df=single_FAT_df, a_df_identifier="FAT")
             
         else:
@@ -1882,7 +1900,7 @@ class GenericDecoderDictDecodedEpochsDictResult(ComputedResult):
         #     # export all by default
         #     export_df_variable_names = _df_variables_names
             
-        extracted_dfs_dict = self.filter_epochs_decoded_track_marginal_posterior_df_dict # {a_df_name:getattr(self, a_df_name) for a_df_name in export_df_variable_names}
+        extracted_dfs_dict: Dict[IdentifyingContext, pd.DataFrame] = self.filter_epochs_decoded_track_marginal_posterior_df_dict # {a_df_name:getattr(self, a_df_name) for a_df_name in export_df_variable_names}
         if len(extracted_dfs_dict) > 0:
             export_files_dict = export_files_dict | self._perform_export_dfs_dict_to_csvs(extracted_dfs_dict=extracted_dfs_dict, parent_output_path=parent_output_path, tbin_values_dict=tbin_values_dict,
                                                                                           active_context=active_context, session_name=session_name, curr_session_t_delta=curr_session_t_delta, user_annotation_selections=user_annotation_selections, valid_epochs_selections=valid_epochs_selections, custom_export_df_to_csv_fn=custom_export_df_to_csv_fn,
@@ -1901,6 +1919,56 @@ class GenericDecoderDictDecodedEpochsDictResult(ComputedResult):
         #     export_files_dict = export_files_dict | self.perform_export_dfs_dict_to_csvs(extracted_dfs_dict=export_df_dict, parent_output_path=parent_output_path, active_context=active_context, session_name=session_name, curr_session_t_delta=curr_session_t_delta, user_annotation_selections=None, valid_epochs_selections=None, custom_export_df_to_csv_fn=custom_export_df_to_csv_fn)
 
         return export_files_dict
+
+
+    @function_attributes(short_name=None, tags=['export', 'CSV'], input_requires=[], output_provides=[], uses=['export_csvs'], used_by=[], creation_date='2025-04-14 17:56', related_items=[])
+    def default_export_all_CSVs(self, active_export_parent_output_path: Path, owning_pipeline_reference, decoding_time_bin_size: float):
+        """ 
+        active_export_parent_output_path = self.collected_outputs_path.resolve()
+        Assert.path_exists(parent_output_path)
+        csv_save_paths_dict = a_new_fully_generic_result.default_export_all_CSVs(active_export_parent_output_path=active_export_parent_output_path, owning_pipeline_reference=owning_pipeline_reference, decoding_time_bin_size=decoding_time_bin_size)
+        csv_save_paths_dict
+        
+        """ 
+        from pyphocorehelpers.assertion_helpers import Assert
+        ## Unpack from pipeline:
+        ## Export to CSVs:
+        
+        Assert.path_exists(active_export_parent_output_path)
+
+        ## INPUTS: collected_outputs_path
+        # decoding_time_bin_size: float = epochs_decoding_time_bin_size
+
+        complete_session_context, (session_context, additional_session_context) = owning_pipeline_reference.get_complete_session_context()
+        active_context = complete_session_context
+        session_name: str = owning_pipeline_reference.session_name
+        earliest_delta_aligned_t_start, t_delta, latest_delta_aligned_t_end = owning_pipeline_reference.find_LongShortDelta_times()
+
+        ## Build the function that uses owning_pipeline_reference to build the correct filename and actually output the .csv to the right place
+        def _subfn_custom_export_df_to_csv(export_df: pd.DataFrame, data_identifier_str: str = f'(laps_marginals_df)', parent_output_path: Path=None):
+            """ captures `owning_pipeline_reference`
+            """
+            output_date_str: str = get_now_rounded_time_str(rounded_minutes=10)
+            out_path, out_filename, out_basename = owning_pipeline_reference.build_complete_session_identifier_filename_string(output_date_str=output_date_str, data_identifier_str=data_identifier_str, parent_output_path=parent_output_path, out_extension='.csv')
+            export_df.to_csv(out_path)
+            return out_path 
+
+        custom_export_df_to_csv_fn = _subfn_custom_export_df_to_csv
+
+
+        # tbin_values_dict={'laps': decoding_time_bin_size, 'pbe': decoding_time_bin_size, 'non_pbe': decoding_time_bin_size, 'FAT': decoding_time_bin_size}
+
+        # csv_save_paths_dict = GenericDecoderDictDecodedEpochsDictResult._perform_export_dfs_dict_to_csvs(extracted_dfs_dict=a_new_fully_generic_result.filter_epochs_decoded_track_marginal_posterior_df_dict,
+        csv_save_paths_dict = self.export_csvs(parent_output_path=active_export_parent_output_path.resolve(),
+                                                    active_context=active_context, session_name=session_name, #curr_active_pipeline=owning_pipeline_reference,
+                                                    custom_export_df_to_csv_fn=custom_export_df_to_csv_fn,
+                                                    decoding_time_bin_size=decoding_time_bin_size,
+                                                    curr_session_t_delta=t_delta
+                                                    )
+        
+        # across_session_results_extended_dict['generalized_decode_epochs_dict_and_export_results_completion_function']['csv_save_paths_dict'] = deepcopy(csv_save_paths_dict)
+        print(f'csv_save_paths_dict: {csv_save_paths_dict}\n')
+        return csv_save_paths_dict
 
 
     def __repr__(self):
@@ -1939,8 +2007,8 @@ class GenericDecoderDictDecodedEpochsDictResult(ComputedResult):
 
     @classmethod
     def _perform_per_epoch_time_bin_aggregation(cls, a_decoded_time_bin_marginal_posterior_df: pd.DataFrame, probabilitY_column_to_aggregate:str='P_Short', n_rolling_avg_window_tbins: int = 3) -> Tuple[pd.DataFrame, pd.DataFrame]:
-        """ 
-
+        """ For a single marginal_df, performs aggregation to get the corresponding 'per_epoch' value.
+        
         Usage:        
             from pyphoplacecellanalysis.Analysis.Decoder.context_dependent import GenericDecoderDictDecodedEpochsDictResult
 
@@ -1984,3 +2052,95 @@ class GenericDecoderDictDecodedEpochsDictResult(ComputedResult):
         ## OUTPUTS: a_decoded_time_bin_marginal_posterior_df, a_decoded_per_epoch_marginals_df
         ## Columns of interest: f'rolling_avg_{probabilitY_column_to_aggregate}' (e.g. 'rolling_avg_P_Short')
         
+
+
+
+    @classmethod
+    def _perform_all_per_time_bin_to_per_epoch_aggregations(cls, a_new_fully_generic_result: "GenericDecoderDictDecodedEpochsDictResult", flat_decoded_marginal_posterior_df_context_dict: Dict[IdentifyingContext, pd.DataFrame], probabilitY_column_to_aggregate:str='P_Short', n_rolling_avg_window_tbins: int = 3, **kwargs) -> Tuple["GenericDecoderDictDecodedEpochsDictResult", Tuple[Dict[IdentifyingContext, IdentifyingContext], Dict[IdentifyingContext, pd.DataFrame], Dict[IdentifyingContext, pd.DataFrame]]]:
+        """ For a single marginal_df, performs aggregation to get the corresponding 'per_epoch' value.
+        
+        Usage:        
+            from pyphoplacecellanalysis.Analysis.Decoder.context_dependent import GenericDecoderDictDecodedEpochsDictResult
+            from neuropy.utils.result_context import IdentifyingContext, CollisionOutcome
+            from neuropy.analyses.time_bin_aggregation import TimeBinAggregation
+
+            ## get all non-global, `data_grain= 'per_time_bin'`
+            flat_context_list, flat_result_context_dict, flat_decoder_context_dict, flat_decoded_marginal_posterior_df_context_dict = a_new_fully_generic_result.get_results_matching_contexts(context_query=IdentifyingContext(trained_compute_epochs='laps', decoder_identifier='pseudo2D', time_bin_size=0.025,
+                                                                                                                                                                                                                                known_named_decoding_epochs_type=['pbe', 'laps'],
+                masked_time_bin_fill_type=('ignore', 'dropped'),
+                # masked_time_bin_fill_type='dropped',
+                data_grain= 'per_time_bin'))        
+                
+            a_new_fully_generic_result, (per_time_bin_to_per_epoch_context_map_dict, flat_decoded_marginal_posterior_df_per_epoch_marginals_df_context_dict, flat_decoded_marginal_posterior_df_per_time_bin_marginals_df_context_dict) = GenericDecoderDictDecodedEpochsDictResult._perform_all_per_time_bin_to_per_epoch_aggregations(a_new_fully_generic_result=a_new_fully_generic_result,
+                    flat_decoded_marginal_posterior_df_context_dict=flat_decoded_marginal_posterior_df_context_dict)
+
+        """
+        from neuropy.analyses.time_bin_aggregation import TimeBinAggregation
+
+        ## INPUTS: a_new_fully_generic_result
+        ## INPUTS: a_decoded_time_bin_marginal_posterior_df
+
+        ## INPUTS: flat_decoded_marginal_posterior_df_context_dict
+        per_time_bin_to_per_epoch_context_map_dict = {}
+        flat_decoded_marginal_posterior_df_per_time_bin_marginals_df_context_dict = {}
+        flat_decoded_marginal_posterior_df_per_epoch_marginals_df_context_dict = {}
+        for a_per_time_bin_ctxt, a_decoded_time_bin_marginal_posterior_df in flat_decoded_marginal_posterior_df_context_dict.items():
+            a_per_epoch_ctxt = TimeBinAggregation.ToPerEpoch.get_per_epoch_ctxt_from_per_time_bin_ctxt(a_per_time_bin_ctxt=a_per_time_bin_ctxt)
+            
+
+
+            a_decoded_per_epoch_marginals_df, a_decoded_time_bin_marginal_posterior_df = cls._perform_per_epoch_time_bin_aggregation(a_decoded_time_bin_marginal_posterior_df=a_decoded_time_bin_marginal_posterior_df, probabilitY_column_to_aggregate=probabilitY_column_to_aggregate, n_rolling_avg_window_tbins=n_rolling_avg_window_tbins, **kwargs)            
+            per_time_bin_to_per_epoch_context_map_dict[a_per_time_bin_ctxt] = a_per_epoch_ctxt
+            flat_decoded_marginal_posterior_df_per_time_bin_marginals_df_context_dict[a_per_time_bin_ctxt] = deepcopy(a_decoded_time_bin_marginal_posterior_df)
+            flat_decoded_marginal_posterior_df_per_epoch_marginals_df_context_dict[a_per_epoch_ctxt] = a_decoded_per_epoch_marginals_df
+
+            ## INLINE UPDATE
+            a_decoded_time_bin_marginal_posterior_df = deepcopy(a_decoded_time_bin_marginal_posterior_df)
+            a_new_fully_generic_result.filter_epochs_decoded_track_marginal_posterior_df_dict[a_per_time_bin_ctxt] = a_decoded_time_bin_marginal_posterior_df
+            a_best_matching_context, a_result, a_decoder, a_decoded_time_bin_marginal_posterior_df = a_new_fully_generic_result.get_results_best_matching_context(a_per_time_bin_ctxt)
+            # a_best_matching_context, a_result, a_decoder, a_decoded_marginal_posterior_df = a_new_fully_generic_result.get_results_matching_context(a_per_time_bin_ctxt, return_multiple_matches=False)
+            # a_result
+            # print(f'updating: "{a_per_epoch_ctxt}"')
+            # print(f"\tWARN: TODO 2025-04-07 19:22: - [ ] a_result is wrong, it's the per-time-bin version not the per-epoch version") #TODO 2025-04-07 19:22: - [ ] a_result is wrong, it's the per-time-bin version not the per-epoch version
+            ## #TODO 2025-04-08 07:05: - [ ] Actually this is surprisingly just fine, as the incoming `a_result` which is supposed to belong to the 'per_time_bin' context actually has the original 'per_epoch' values that were split up anyway! (e.g. `len(a_result.filter_epochs)`: 84 laps, 
+            ## need to get updated a_decoder, a_result
+            a_new_fully_generic_result.updating_results_for_context(new_context=deepcopy(a_per_epoch_ctxt), a_result=deepcopy(a_result), a_decoder=deepcopy(a_decoder), a_decoded_marginal_posterior_df=deepcopy(a_decoded_per_epoch_marginals_df)) ## update using the result
+            
+
+        ## OUTPUTS: per_time_bin_to_per_epoch_context_map_dict, flat_decoded_marginal_posterior_df_per_epoch_marginals_df_context_dict, flat_decoded_marginal_posterior_df_per_time_bin_marginals_df_context_dict
+        # flat_decoded_marginal_posterior_df_per_time_bin_marginals_df_context_dict
+        # flat_decoded_marginal_posterior_df_per_epoch_marginals_df_context_dict
+                
+
+        ## INPUTS: per_time_bin_to_per_epoch_context_map_dict, flat_decoded_marginal_posterior_df_per_epoch_marginals_df_context_dict, flat_decoded_marginal_posterior_df_per_time_bin_marginals_df_context_dict
+        # flat_decoded_marginal_posterior_df_per_time_bin_marginals_df_context_dict
+        # flat_decoded_marginal_posterior_df_per_epoch_marginals_df_context_dict
+
+
+        return a_new_fully_generic_result, (per_time_bin_to_per_epoch_context_map_dict, flat_decoded_marginal_posterior_df_per_epoch_marginals_df_context_dict, flat_decoded_marginal_posterior_df_per_time_bin_marginals_df_context_dict)
+
+
+    def compute_all_per_epoch_aggregations_from_per_time_bin_results(self, flat_decoded_marginal_posterior_df_context_dict: Dict[IdentifyingContext, pd.DataFrame], **kwargs) -> Tuple[Dict[IdentifyingContext, IdentifyingContext], Dict[IdentifyingContext, pd.DataFrame], Dict[IdentifyingContext, pd.DataFrame]]:
+        """ For a single marginal_df, performs aggregation to get the corresponding 'per_epoch' value.
+        
+        Usage:        
+            from pyphoplacecellanalysis.Analysis.Decoder.context_dependent import GenericDecoderDictDecodedEpochsDictResult
+            from neuropy.utils.result_context import IdentifyingContext, CollisionOutcome
+            from neuropy.analyses.time_bin_aggregation import TimeBinAggregation
+
+            ## get all non-global, `data_grain= 'per_time_bin'`
+            flat_context_list, flat_result_context_dict, flat_decoder_context_dict, flat_decoded_marginal_posterior_df_context_dict = a_new_fully_generic_result.get_results_matching_contexts(context_query=IdentifyingContext(trained_compute_epochs='laps', decoder_identifier='pseudo2D', time_bin_size=0.025,
+                                                                                                                                                                                                                                known_named_decoding_epochs_type=['pbe', 'laps'],
+                masked_time_bin_fill_type=('ignore', 'dropped'),
+                # masked_time_bin_fill_type='dropped',
+                data_grain= 'per_time_bin'))        
+                
+            _newly_updated_values_tuple = a_new_fully_generic_result.compute_all_per_epoch_aggregations_from_per_time_bin_results(flat_decoded_marginal_posterior_df_context_dict=flat_decoded_marginal_posterior_df_context_dict)
+            per_time_bin_to_per_epoch_context_map_dict, flat_decoded_marginal_posterior_df_per_epoch_marginals_df_context_dict, flat_decoded_marginal_posterior_df_per_time_bin_marginals_df_context_dict = _newly_updated_values_tuple
+            
+        """
+        
+        self, _newly_updated_values_tuple = GenericDecoderDictDecodedEpochsDictResult._perform_all_per_time_bin_to_per_epoch_aggregations(a_new_fully_generic_result=self, flat_decoded_marginal_posterior_df_context_dict=flat_decoded_marginal_posterior_df_context_dict, **kwargs)
+        # per_time_bin_to_per_epoch_context_map_dict, flat_decoded_marginal_posterior_df_per_epoch_marginals_df_context_dict, flat_decoded_marginal_posterior_df_per_time_bin_marginals_df_context_dict = _newly_updated_values_tuple
+        return _newly_updated_values_tuple
+

@@ -1898,6 +1898,57 @@ class DataframeFilterPredicates(HDF_SerializationMixin, AttrsBasedClassHelperMix
     is_enabled: bool = serialized_attribute_field(default=True)
     
 
+
+from enum import Enum, auto
+
+class InitialSelectionModeEnum(Enum):
+    """Defines how the initial selection of a widget should be set (none selected, all selected, first selected
+    
+    from pyphoplacecellanalysis.SpecificResults.PhoDiba2023Paper import InitialSelectionModeEnum
+    
+    
+    , initial_selection_mode: InitialSelectionModeEnum=InitialSelectionModeEnum.NO_SELECTION, custom_selection: Optional[List]=None
+    
+    
+        # Set initial widget selection/selections ____________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
+        initial_selection = []
+        if (initial_selection_mode.value == InitialSelectionModeEnum.NO_SELECTION.value):
+            initial_selection = []
+        elif (initial_selection_mode.value == InitialSelectionModeEnum.FIRST_SELECTED.value):
+            if len(a_col_values_options) > 0:
+                initial_selection = [a_col_values_options[0]]
+        elif (initial_selection_mode.value == InitialSelectionModeEnum.CUSTOM_SELECTED.value):
+            assert custom_selection is not None, f"with this mode you must provide a custom_selection"
+            initial_selection = deepcopy(custom_selection)
+        elif (initial_selection_mode.value == InitialSelectionModeEnum.ALL_SELECTED.value):
+            initial_selection = deepcopy(a_col_values_options)
+        else:
+            raise NotImplementedError(f'{initial_selection_mode} is not VALID')
+
+        a_widget.value = initial_selection
+        
+
+    
+    """
+    NO_SELECTION = auto()
+    FIRST_SELECTED = auto()
+    CUSTOM_SELECTED = auto()
+    ALL_SELECTED = auto()
+
+    def __str__(self):
+        return self.name
+
+    @classmethod
+    def list_values(cls):
+        """Returns a list of all enum values"""
+        return list(cls)
+
+    @classmethod
+    def list_names(cls):
+        """Returns a list of all enum names"""
+        return [e.name for e in cls]
+
+
 @custom_define(slots=False, eq=False)
 class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
     """ Involves an interactive ipywidget, and handles interactive filtering of dataframes by presenting a jupyter widget interface.
@@ -2152,15 +2203,110 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
         
         self._setup_widgets()
         # Initial filtering with default widget values
-        self.update_filtered_dataframes(self.replay_name_widget.value, self.time_bin_size_widget.value)
-        
+        if getattr(self, 'time_bin_size_widget', None) is not None:
+            self.update_filtered_dataframes(self.replay_name_widget.value, self.time_bin_size_widget.value)
+        # else:
+        #     self.update_filtered_dataframes(self.replay_name_widget.value)
+
         # Button Widget Initialize ___________________________________________________________________________________________ #
         # Set up the buttons after figure_widget is created
         self._setup_widgets_buttons()
 
+        ## set time_bin_size selections to the first value by default
+        initial_selection = self.set_initial_selection(a_widget=self.time_bin_size_widget, initial_selection_mode=InitialSelectionModeEnum.FIRST_SELECTED)
+
+
+    # @function_attributes(short_name=None, tags=['filter', 'dynamic', 'ui', 'widget'], input_requires=[], output_provides=[], uses=['._rebuild_predicate_widget()'], used_by=[], creation_date='2025-03-27 14:05', related_items=[])
+    # def build_extra_control_widget(self, a_name: str = 'replay_name', df_col_name: str = 'custom_replay_name', a_widget_label: str = 'Replay Name:'):
+    #     """ adds a new dropdown widget to refine the active points, triggers `self._on_widget_change` when a selection is made
+
+    #     Works by adding the widget as property of this instance, and imposing the widget's selection criteria by adding a custom predicate to `self.additional_filter_predicates`. 
+    #     The predicate selector widget is then rebuilt by calling `self._rebuild_predicate_widget(...)`
+        
+        
+    #     Usage:        
+    #         df_filter.build_extra_control_widget(a_name='trained_compute_epochs', df_col_name='trained_compute_epochs', a_widget_label='TrainedComputeEpochs :')
+    #         df_filter.build_extra_control_widget(a_name='pfND_ndim', df_col_name='pfND_ndim', a_widget_label='pfND_ndim:')
+    #         df_filter.build_extra_control_widget(a_name='decoder_identifier', df_col_name='decoder_identifier', a_widget_label='decoder_identifier:')
+    #         df_filter.build_extra_control_widget(a_name='data_grain', df_col_name='data_grain', a_widget_label='data_grain:')
+    #         df_filter.build_extra_control_widget(a_name='masked_time_bin_fill_type', df_col_name='masked_time_bin_fill_type', a_widget_label='masked_time_bin_fill_type:')
+    #         df_filter.build_extra_control_widget(a_name='known_named_decoding_epochs_type', df_col_name='known_named_decoding_epochs_type', a_widget_label='known_named_decoding_epochs_type:')
+
+    #     """
+    #     import ipywidgets as widgets
+    #     from traitlets import Dict as TraitDict  # Import the Dict traitlet
+
+    #     a_widget_name: str = f"{a_name}_widget" # replay_name_widget
+    #     extant_widget = getattr(self, a_widget_name, None)
+    #     if extant_widget is not None:
+    #         raise NotImplementedError(f'Not sure what to do with extant widgets yet! a_widget_label: "{a_widget_label}".')
+
+    #     ## Create and add new widget:
+    #     a_col_values_options = sorted(self.active_plot_df[df_col_name].astype(str).unique())    
+    #     a_widget = widgets.Dropdown(
+    #                 options=a_col_values_options,
+    #                 description=a_widget_label,
+    #                 disabled=False,
+    #                 layout=widgets.Layout(width='500px'),
+    #                 style={'description_width': 'initial'},
+    #                 # metadata={"desc": "build_extra_control_widget", "df_col_name": df_col_name, "name": a_name, "widget_name": a_widget_name, }, ## DOES NOT WORK
+    #             )
+        
+    #     ## add_traits (does work)
+    #     a_widget.metadata = TraitDict({  # Use the Dict traitlet here
+    #         "desc": "build_extra_control_widget",
+    #         "df_col_name": df_col_name,
+    #         "name": a_name,
+    #         "widget_name": a_widget_name,
+    #     })
+        
+    #     # Build the appropriate filter predicate to go along with the custom control _________________________________________ #
+    #     self.additional_filter_predicates.update({
+    #         f'{a_widget_name}': (lambda df: (df[df_col_name].astype(str) == str(a_widget.value))),
+    #     })
+
+    #     ## INPUTS: self.custom_dynamic_filter_widgets_list
+    #     ## Add to output widgets list
+    #     self.custom_dynamic_filter_widgets_list.append(a_widget)
+    #     setattr(self, a_widget_name, a_widget) # self.replay_name_widget
+    #     ## INPUTS: self.custom_dynamic_filter_widgets_dict, self.custom_dynamic_filter_widgets_property_map
+
+    #     ## Update the predicate enabled selection widget and default to enabling this predicate:
+    #     self._rebuild_predicate_widget(initially_is_checked={f'{a_widget_name}':True})
+
+    #     # Set up observers to handle changes in widget values
+    #     a_widget.observe(self._on_widget_change, names='value')
+        
+
+# SelectMultiple
+
+    @classmethod
+    def set_initial_selection(cls, a_widget, initial_selection_mode: InitialSelectionModeEnum=InitialSelectionModeEnum.FIRST_SELECTED, custom_initial_selections: Optional[List]=None):
+        # Set initial widget selection/selections ____________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
+        
+        a_col_values_options = deepcopy(a_widget.options)
+
+        initial_selection = []
+        if (initial_selection_mode.value == InitialSelectionModeEnum.NO_SELECTION.value):
+            initial_selection = []
+        elif (initial_selection_mode.value == InitialSelectionModeEnum.FIRST_SELECTED.value):
+            if len(a_col_values_options) > 0:
+                initial_selection = [a_col_values_options[0]]
+        elif (initial_selection_mode.value == InitialSelectionModeEnum.CUSTOM_SELECTED.value):
+            assert custom_initial_selections is not None, f"with this mode you must provide a custom_selection"
+            initial_selection = deepcopy(custom_initial_selections)
+        elif (initial_selection_mode.value == InitialSelectionModeEnum.ALL_SELECTED.value):
+            initial_selection = deepcopy(a_col_values_options)
+        else:
+            raise NotImplementedError(f'{initial_selection_mode} is not VALID')
+
+        a_widget.value = initial_selection
+        return initial_selection
+    
+
 
     @function_attributes(short_name=None, tags=['filter', 'dynamic', 'ui', 'widget'], input_requires=[], output_provides=[], uses=['._rebuild_predicate_widget()'], used_by=[], creation_date='2025-03-27 14:05', related_items=[])
-    def build_extra_control_widget(self, a_name: str = 'replay_name', df_col_name: str = 'custom_replay_name', a_widget_label: str = 'Replay Name:'):
+    def build_extra_dropdown_widget(self, a_name: str = 'replay_name', df_col_name: str = 'custom_replay_name', a_widget_label: str = 'Replay Name:') -> widgets.Dropdown:
         """ adds a new dropdown widget to refine the active points, triggers `self._on_widget_change` when a selection is made
 
         Works by adding the widget as property of this instance, and imposing the widget's selection criteria by adding a custom predicate to `self.additional_filter_predicates`. 
@@ -2197,7 +2343,7 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
         
         ## add_traits (does work)
         a_widget.metadata = TraitDict({  # Use the Dict traitlet here
-            "desc": "build_extra_control_widget",
+            "desc": "build_extra_dropdown_widget",
             "df_col_name": df_col_name,
             "name": a_name,
             "widget_name": a_widget_name,
@@ -2219,21 +2365,104 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
 
         # Set up observers to handle changes in widget values
         a_widget.observe(self._on_widget_change, names='value')
-        
 
+        return a_widget
+
+
+    @function_attributes(short_name=None, tags=['filter', 'dynamic', 'ui', 'widget'], input_requires=[], output_provides=[], uses=['._rebuild_predicate_widget()'], used_by=[], creation_date='2025-03-27 14:05', related_items=[])
+    def build_extra_selectMultiple_widget(self, a_name: str = 'replay_name', df_col_name: str = 'custom_replay_name', a_widget_label: str = 'Replay Name:', initial_selection_mode: InitialSelectionModeEnum=InitialSelectionModeEnum.FIRST_SELECTED, custom_initial_selections: Optional[List]=None) -> widgets.SelectMultiple:
+        """ adds a new dropdown widget to refine the active points, triggers `self._on_widget_change` when a selection is made
+
+        Works by adding the widget as property of this instance, and imposing the widget's selection criteria by adding a custom predicate to `self.additional_filter_predicates`. 
+        The predicate selector widget is then rebuilt by calling `self._rebuild_predicate_widget(...)`
         
+        
+        Usage:        
+            _a_time_bin_size_widget = df_filter.build_extra_selectMultiple_widget(a_name='time_bin_size', df_col_name='time_bin_size', a_widget_label='Time Bin Size:')
+
+        """
+        import ipywidgets as widgets
+        from traitlets import Dict as TraitDict  # Import the Dict traitlet
+
+        a_widget_name: str = f"{a_name}_widget" # replay_name_widget
+        extant_widget = getattr(self, a_widget_name, None)
+        if extant_widget is not None:
+            raise NotImplementedError(f'Not sure what to do with extant widgets yet! a_widget_label: "{a_widget_label}".')
+
+        ## Create and add new widget:
+        a_col_values_options = sorted(self.active_plot_df[df_col_name].astype(str).unique())    
+        a_widget = widgets.SelectMultiple(
+            options=a_col_values_options,
+            description=a_widget_label,
+            disabled=False,
+            layout=widgets.Layout(width='300px'),
+            style={'description_width': 'initial'},
+        )
+
+
+        ## add_traits (does work)
+        a_widget.metadata = TraitDict({  # Use the Dict traitlet here
+            "desc": "build_extra_selectMultiple_widget",
+            "df_col_name": df_col_name,
+            "name": a_name,
+            "widget_name": a_widget_name,
+        })
+        
+        # Build the appropriate filter predicate to go along with the custom control _________________________________________ #
+        # [str(v) for v in a_widget.value]
+        self.additional_filter_predicates.update({
+            f'{a_widget_name}': (lambda df: (df[df_col_name].astype(str).isin([str(v) for v in a_widget.value]))),
+        })
+
+        ## INPUTS: self.custom_dynamic_filter_widgets_list
+        ## Add to output widgets list
+        self.custom_dynamic_filter_widgets_list.append(a_widget)
+        setattr(self, a_widget_name, a_widget) # self.replay_name_widget
+        ## INPUTS: self.custom_dynamic_filter_widgets_dict, self.custom_dynamic_filter_widgets_property_map
+
+        ## Update the predicate enabled selection widget and default to enabling this predicate:
+        self._rebuild_predicate_widget(initially_is_checked={f'{a_widget_name}':True})
+
+        # Set up observers to handle changes in widget values
+        a_widget.observe(self._on_widget_change, names='value')
+
+
+        # Set initial widget selection/selections ____________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
+        initial_selection = self.set_initial_selection(a_widget=a_widget, initial_selection_mode=initial_selection_mode, custom_initial_selections=custom_initial_selections)
+        # initial_selection = []
+        # if (initial_selection_mode.value == InitialSelectionModeEnum.NO_SELECTION.value):
+        #     initial_selection = []
+        # elif (initial_selection_mode.value == InitialSelectionModeEnum.FIRST_SELECTED.value):
+        #     if len(a_col_values_options) > 0:
+        #         initial_selection = [a_col_values_options[0]]
+        # elif (initial_selection_mode.value == InitialSelectionModeEnum.CUSTOM_SELECTED.value):
+        #     assert custom_initial_selections is not None, f"with this mode you must provide a custom_selection"
+        #     initial_selection = deepcopy(custom_initial_selections)
+        # elif (initial_selection_mode.value == InitialSelectionModeEnum.ALL_SELECTED.value):
+        #     initial_selection = deepcopy(a_col_values_options)
+        # else:
+        #     raise NotImplementedError(f'{initial_selection_mode} is not VALID')
+
+        # a_widget.value = initial_selection
+        
+        return a_widget
+
+
 
     @function_attributes(short_name=None, tags=['private', 'widget'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-03-27 12:18', related_items=[])
     def _setup_widgets(self):
         import plotly.subplots as sp
         from pyphoplacecellanalysis.Pho2D.plotly.Extensions.plotly_helpers import PlotlyFigureContainer
         
-
         self.custom_dynamic_filter_widgets_list = [] ## start with an empty list of additional filter widgets
 
         # Extract unique options for the widgets
         replay_name_options = sorted(self.active_plot_df['custom_replay_name'].astype(str).unique())
         time_bin_size_options = sorted(self.active_plot_df['time_bin_size'].unique())
+        
+        self.output_widget = widgets.Output(layout=widgets.Layout(width='100%', # min_width='200px', height='100px',
+                                                                  border='1px solid black'),
+                                                                  ) #  {'border': '1px solid black'}
         
         # Create dropdown widgets with adjusted layout and style
         self.replay_name_widget = widgets.Dropdown(
@@ -2262,6 +2491,12 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
         )
         self.active_plot_variable_name_widget.value = self.active_plot_variable_name
         
+        self.active_filter_predicate_selector_widget = CheckBoxListWidget(options_list=list(self.additional_filter_predicates.keys()))
+            # description='Filter Predicates:',
+            # disabled=False,
+        # )
+        self.active_filter_predicate_selector_widget.observe(self._on_widget_change, names='value')
+
         # Use SelectMultiple widget for time_bin_size
         self.time_bin_size_widget = widgets.SelectMultiple(
             options=time_bin_size_options,
@@ -2270,15 +2505,9 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
             layout=widgets.Layout(width='300px', height='100px'),
             style={'description_width': 'initial'},
         )
+        
+        # self.time_bin_size_widget = self.build_extra_selectMultiple_widget(a_name='time_bin_size', df_col_name='time_bin_size', a_widget_label='Time Bin Size:', initial_selection_mode=InitialSelectionModeEnum.FIRST_SELECTED)
 
-        self.active_filter_predicate_selector_widget = CheckBoxListWidget(options_list=list(self.additional_filter_predicates.keys()))
-            # description='Filter Predicates:',
-            # disabled=False,
-        # )
-
-        self.output_widget = widgets.Output(layout=widgets.Layout(width='100%', # min_width='200px', height='100px',
-                                                                  border='1px solid black'),
-                                                                  ) #  {'border': '1px solid black'}
         self.figure_widget, did_create_new_figure = PlotlyFigureContainer._helper_build_pre_post_delta_figure_if_needed(extant_figure=None, use_latex_labels=False, main_title='test', figure_class=go.FigureWidget)
         self.figure_widget.layout.dragmode = 'select'
         # self.figure_widget.layout.dragmode = 'lasso'
@@ -2295,7 +2524,7 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
         # Set up observers to handle changes in widget values
         self.replay_name_widget.observe(self._on_widget_change, names='value')
         self.time_bin_size_widget.observe(self._on_widget_change, names='value')
-        self.active_filter_predicate_selector_widget.observe(self._on_widget_change, names='value')
+        # self.active_filter_predicate_selector_widget.observe(self._on_widget_change, names='value')
         self.active_plot_df_name_selector_widget.observe(self._on_widget_change, names='value')
         self.active_plot_variable_name_widget.observe(self._on_widget_change, names='value')
         
@@ -2643,6 +2872,8 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
         
         should_prepare_full_hover_click_interactivity: bool:  ## slow when enabled
         
+        legend_groups_to_hide=[0.05]
+        
         """
         # fig_size_kwargs = {'width': 1650, 'height': 480}
         # fig_size_kwargs = {'width': resolution_multiplier*1650, 'height': resolution_multiplier*480}
@@ -2694,8 +2925,20 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
             
             assert plot_variable_name in active_plot_df.columns, f"plot_variable_name: '{plot_variable_name}' is not present in active_plot_df.columns! Cannot plot!"
             
+            
+            
+            if len(df_filter.time_bin_size) > 2:
+                non_selected_options = df_filter.time_bin_size[1:] # all but the first
+                legend_groups_to_hide = (deepcopy(non_selected_options))
+            else:
+                legend_groups_to_hide = [] # Hide none. df_filter.time_bin_size # [0.05]
+                
+            #TODO 2025-04-09 14:00: - [ ] Customization here -- which are enabled by default            
+
             # extra_plot_kwargs = deepcopy(extra_plot_kwargs)
-            active_plot_kwargs = (extra_plot_kwargs | kwargs) 
+            # active_plot_kwargs = extra_plot_kwargs | {'legend_groups_to_hide': legend_groups_to_hide}
+            # active_plot_kwargs = active_plot_kwargs | kwargs
+            active_plot_kwargs = (extra_plot_kwargs | {'legend_groups_to_hide': legend_groups_to_hide} | kwargs) 
             fig, new_fig_context, _extras_output_dict, figure_out_paths = _new_perform_plot_pre_post_delta_scatter_with_embedded_context(concatenated_ripple_df=deepcopy(active_plot_df), is_dark_mode=False, should_save=should_save, extant_figure=df_filter.figure_widget,
                                                                                                                                     variable_name=plot_variable_name, **active_plot_kwargs) # , enable_custom_widget_buttons=True
             
@@ -2862,12 +3105,16 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
 
 
     @function_attributes(short_name=None, tags=['update', 'MAIN', 'callback'], input_requires=['self.additional_filter_predicates'], output_provides=[], uses=[], used_by=['self._on_widget_change'], creation_date='2025-03-27 12:49', related_items=[])
-    def update_filtered_dataframes(self, replay_name, time_bin_sizes, debug_print=True, enable_overwrite_is_filter_included_column: bool=True):
+    def update_filtered_dataframes(self, replay_name, time_bin_sizes=None, debug_print=True, enable_overwrite_is_filter_included_column: bool=True):
         """ Perform filtering on each DataFrame. Called by `self._on_widget_change` when a widget's value is changed
         
         
         Uses: self.additional_filter_predicates, .original_df_dict, 
         """
+        # if time_bin_sizes is None:
+        #     print("WARN: time_bin_sizes is None, falling back to widget's values.")
+        #     time_bin_sizes = self.time_bin_size
+            
         if not time_bin_sizes:
             print("Please select at least one Time Bin Size.")
             return

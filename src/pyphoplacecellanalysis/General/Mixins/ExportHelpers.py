@@ -614,7 +614,7 @@ def programmatic_render_to_file(curr_active_pipeline, curr_display_function_name
 
 
 @function_attributes(short_name=None, tags=['file','export','output','matplotlib','display','active','PDF','batch','automated'], input_requires=[], output_provides=[], uses=['write_to_file'], used_by=[], creation_date='2023-06-14 19:06', related_items=[])
-def build_and_write_to_file(a_fig, active_identifying_ctx, fig_man:Optional[FileOutputManager]=None, subset_includelist=None, subset_excludelist=None, context_tuple_join_character='_', write_vector_format=False, write_png=True, register_output_file_fn=None, progress_print=True, debug_print=False):
+def build_and_write_to_file(a_fig, active_identifying_ctx, fig_man:Optional[FileOutputManager]=None, subset_includelist=None, subset_excludelist=None, context_tuple_join_character='_', write_vector_format=False, write_png=True, register_output_file_fn=None, progress_print=True, debug_print=False, **kwargs):
     """ From the context, fig_man, and arguments builds the final save path for the figure and calls `write_to_file` with these values. """
     active_out_figure_paths = []
     write_any_figs = write_vector_format or write_png
@@ -625,11 +625,11 @@ def build_and_write_to_file(a_fig, active_identifying_ctx, fig_man:Optional[File
     fig_man = fig_man or FileOutputManager(figure_output_location=FigureOutputLocation.DAILY_PROGRAMMATIC_OUTPUT_FOLDER, context_to_path_mode=ContextToPathMode.GLOBAL_UNIQUE)
     curr_fig_save_path = fig_man.get_figure_save_file_path(active_identifying_ctx, make_folder_if_needed=True, subset_includelist=subset_includelist, subset_excludelist=subset_excludelist, context_tuple_join_character=context_tuple_join_character)
 
-    return write_to_file(a_fig, active_identifying_ctx, final_fig_save_basename_path=curr_fig_save_path, subset_includelist=subset_includelist, subset_excludelist=subset_excludelist, write_vector_format=write_vector_format, write_png=write_png, register_output_file_fn=register_output_file_fn, progress_print=progress_print, debug_print=debug_print)
+    return write_to_file(a_fig, active_identifying_ctx, final_fig_save_basename_path=curr_fig_save_path, subset_includelist=subset_includelist, subset_excludelist=subset_excludelist, write_vector_format=write_vector_format, write_png=write_png, register_output_file_fn=register_output_file_fn, progress_print=progress_print, debug_print=debug_print, **kwargs)
     
 
 @function_attributes(short_name=None, tags=['file','export','output','matplotlib','display','active','PDF','batch','automated'], input_requires=[], output_provides=[], uses=[], used_by=['build_and_write_to_file'], creation_date='2023-05-31 19:16', related_items=['build_and_write_to_file'])
-def write_to_file(a_fig, active_identifying_ctx: IdentifyingContext, final_fig_save_basename_path:Path, subset_includelist=None, subset_excludelist=None, write_vector_format=False, write_png=True, register_output_file_fn=None, progress_print=True, debug_print=False):
+def write_to_file(a_fig, active_identifying_ctx: IdentifyingContext, final_fig_save_basename_path:Path, subset_includelist=None, subset_excludelist=None, write_vector_format=False, write_png=True, register_output_file_fn=None, progress_print=True, debug_print=False, **kwargs):
     """ Lowest level figure write function. Writes a single matplotlib figure out to one or more files based on whether write_png and write_vector_format are specified AND registers the output using `register_output_file_fn` if one is provided. 
     
     History: `perform_write_to_file`
@@ -656,6 +656,10 @@ def write_to_file(a_fig, active_identifying_ctx: IdentifyingContext, final_fig_s
         ∙
         ➗
     """
+    import PIL
+    from PIL import Image # Pillow Images
+    
+
     # period_replacement_char: str = '-'
     # period_replacement_char: str = '➗'
     period_replacement_char: str = '•'
@@ -681,8 +685,10 @@ def write_to_file(a_fig, active_identifying_ctx: IdentifyingContext, final_fig_s
         erronious_suffixes = final_fig_save_basename_path.suffixes
         assert len(erronious_suffixes) == 0, f"erronious_suffixes: {erronious_suffixes} is still not empty after renaming!"
         
-    is_matplotlib_figure = isinstance(a_fig, plt.FigureBase)
-    is_plotly_figure = isinstance(a_fig, PlotlyBaseFigure)
+    is_matplotlib_figure: bool = isinstance(a_fig, plt.FigureBase)
+    is_plotly_figure: bool = isinstance(a_fig, PlotlyBaseFigure)
+    is_pillow_image: bool = isinstance(a_fig, Image.Image) # PIL.Image
+    
 
     # PDF: .pdf versions:
     if write_vector_format:
@@ -703,10 +709,17 @@ def write_to_file(a_fig, active_identifying_ctx: IdentifyingContext, final_fig_s
                 a_fig.write_image(fig_vector_save_path)
                 additional_output_metadata = {'fig_format':'plotly'}
 
+            elif is_pillow_image:
+                ## Pillow Image only:
+                raise NotImplementedError(f'Pillow Images cannot be saved out to a vector format!')
+                # fig_vector_save_path = final_fig_save_basename_path.with_suffix('.pdf')
+                # a_fig.save(fig_vector_save_path)                 # Save image to file
+                # additional_output_metadata = {'fig_format':'pillow'} # Unused here
+                
             else:
                 # pyqtgraph figure: pyqtgraph's exporter can't currently do PDF, so we'll do .svg instead:
                 fig_vector_save_path = final_fig_save_basename_path.with_suffix('.svg')
-                export_pyqtgraph_plot(a_fig, savepath=fig_vector_save_path)
+                export_pyqtgraph_plot(a_fig, savepath=fig_vector_save_path, **kwargs)
                 additional_output_metadata = {'fig_format':'pyqtgraph'}
 
             if register_output_file_fn is not None:
@@ -715,7 +728,7 @@ def write_to_file(a_fig, active_identifying_ctx: IdentifyingContext, final_fig_s
                 print(f'\t saved "{file_uri_from_path(fig_vector_save_path)}"')
             active_out_figure_paths.append(fig_vector_save_path)
 
-        except BaseException as e:
+        except Exception as e:
             print(f'Error occured while writing vector format for fig. {e}. Skipping.')
 
     # PNG: .png versions:
@@ -733,9 +746,15 @@ def write_to_file(a_fig, active_identifying_ctx: IdentifyingContext, final_fig_s
                 a_fig.write_image(fig_png_out_path)
                 additional_output_metadata = {'fig_format':'plotly'} # Unused here
 
+            elif is_pillow_image:
+                ## Pillow Image only:
+                # Save image to file
+                a_fig.save(fig_png_out_path)
+                additional_output_metadata = {'fig_format':'pillow'} # Unused here
+
             else:
                 # pyqtgraph
-                export_pyqtgraph_plot(a_fig, savepath=fig_png_out_path)
+                export_pyqtgraph_plot(a_fig, savepath=fig_png_out_path, **kwargs)
 
             if register_output_file_fn is not None:
                 register_output_file_fn(output_path=fig_png_out_path, output_metadata={'context': active_identifying_ctx, 'fig': (a_fig)})

@@ -1,3 +1,12 @@
+ 
+from __future__ import annotations # prevents having to specify types for typehinting as strings
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    ## typehinting only imports here
+    from pyphoplacecellanalysis.Analysis.Decoder.context_dependent import GenericDecoderDictDecodedEpochsDictResult
+
+
 from copy import deepcopy
 import sys
 from typing import Dict, List, Tuple, Optional, Callable, Union, Any
@@ -8,6 +17,7 @@ import pyphoplacecellanalysis.General.type_aliases as types
 import numpy as np
 import pandas as pd
 from pyphocorehelpers.assertion_helpers import Assert
+from pathlib import Path
 
 # NeuroPy (Diba Lab Python Repo) Loading
 from neuropy.utils.mixins.binning_helpers import build_df_discretized_binned_position_columns
@@ -36,12 +46,15 @@ from attrs import asdict, astuple, define, field, Factory
 from neuropy.utils.indexing_helpers import PandasHelpers
 from neuropy.core.epoch import EpochsAccessor, Epoch, ensure_dataframe
 from neuropy.core.position import Position
+from neuropy.utils.mixins.AttrsClassHelpers import AttrsBasedClassHelperMixin, SimpleFieldSizesReprMixin
+
 # import portion as P # Required for interval search: portion~=2.3.0
 from pyphocorehelpers.indexing_helpers import partition_df_dict, partition_df
 
 from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import get_proper_global_spikes_df
 
-from neuropy.utils.mixins.AttrsClassHelpers import AttrsBasedClassHelperMixin, SimpleFieldSizesReprMixin
+import pyphoplacecellanalysis.General.type_aliases as types
+
 
 
 # ### For _perform_recursive_latent_placefield_decoding
@@ -1062,7 +1075,6 @@ class GeneralDecoderDictDecodedEpochsDictResult(ComputedResult):
         return result
 
 
-import pyphoplacecellanalysis.General.type_aliases as types
 
 
 @define(slots=False, repr=False, eq=False)
@@ -1109,7 +1121,8 @@ class EpochComputationsComputationsContainer(ComputedResult):
     results2D: Optional[NonPBEDimensionalDecodingResult] = serialized_field(default=None, repr=False)
 
     a_general_decoder_dict_decoded_epochs_dict_result: GeneralDecoderDictDecodedEpochsDictResult = serialized_field(default=None, is_computable=True, repr=False, metadata={'field_added': '2025.03.09_0'})
-    
+    a_generic_decoder_dict_decoded_epochs_dict_result: GenericDecoderDictDecodedEpochsDictResult = serialized_field(default=None, is_computable=True, repr=False, metadata={'field_added': '2025.04.14_0'})
+
     # Utility Methods ____________________________________________________________________________________________________ #
 
     # def to_dict(self) -> Dict:
@@ -1576,7 +1589,7 @@ class EpochComputationsComputationsContainer(ComputedResult):
 
 
 def validate_has_non_PBE_epoch_results(curr_active_pipeline, computation_filter_name='maze', minimum_inclusion_fr_Hz:Optional[float]=None):
-    """ for `perform_compute_non_PBE_epochs` 
+    """ for `EpochComputationFunctions.perform_compute_non_PBE_epochs` 
     Returns True if the pipeline has a valid RankOrder results set of the latest version
 
     TODO: make sure minimum can be passed. Actually, can get it from the pipeline.
@@ -1598,6 +1611,30 @@ def validate_has_non_PBE_epoch_results(curr_active_pipeline, computation_filter_
 
     # _computationPrecidence = 2 # must be done after PlacefieldComputations, DefaultComputationFunctions
     # _is_global = False
+
+
+def validate_has_generalized_specific_epochs_decoding(curr_active_pipeline, computation_filter_name='maze', minimum_inclusion_fr_Hz:Optional[float]=None):
+    """ for `EpochComputationFunctions.perform_generalized_specific_epochs_decoding` 
+    Returns True if the pipeline has a valid RankOrder results set of the latest version
+
+    TODO: make sure minimum can be passed. Actually, can get it from the pipeline.
+
+    """
+    # Unpacking:
+    seq_results: EpochComputationsComputationsContainer = curr_active_pipeline.global_computation_results.computed_data['EpochComputations']
+    if seq_results is None:
+        return False
+    
+    a_new_NonPBE_Epochs_obj = seq_results.a_new_NonPBE_Epochs_obj
+    if a_new_NonPBE_Epochs_obj is None:
+        return False
+    
+
+    a_generic_decoder_dict_decoded_epochs_dict_result = seq_results.a_generic_decoder_dict_decoded_epochs_dict_result
+    if a_generic_decoder_dict_decoded_epochs_dict_result is None:
+        return False
+
+
 
 
 from pyphocorehelpers.programming_helpers import MemoryManagement # used in `EpochComputationFunctions.perform_compute_non_PBE_epochs`
@@ -1629,11 +1666,17 @@ def estimate_memory_requirements_bytes(epochs_decoding_time_bin_size: float, fra
         session_duration = 3600  # Default 1 hour
 
     # Calculate array dimensions
+
+    # Use Python's arbitrary precision integers for calculations
+    n_flattened_position_bins = int(n_flattened_position_bins)
+    n_neurons = int(n_neurons)
+    session_duration = int(np.ceil(session_duration))
+    n_maze_contexts = int(n_maze_contexts)
     n_time_bins = int(np.ceil(session_duration / epochs_decoding_time_bin_size))
-    n_frame_divided_bins = int(np.ceil(session_duration / frame_divide_bin_size))
+    n_frame_divided_bins = int(np.ceil(session_duration / frame_divide_bin_size))    
+    n_max_decoded_bins = int(max(n_time_bins, n_frame_divided_bins))
     
-    n_max_decoded_bins: int = max(n_time_bins, n_frame_divided_bins)
-    bytes_per_float = 8  # float64
+    bytes_per_float = int(8)
     
     # Calculate memory for each major array type
     itemized_memory_breakdown = {
@@ -1650,8 +1693,11 @@ def estimate_memory_requirements_bytes(epochs_decoding_time_bin_size: float, fra
     # Account for multiple maze contexts
     total_memory = sum(itemized_memory_breakdown.values()) * n_maze_contexts
     
+    # Calculate the worst case scenario separately to avoid overflow
+    worst_case_memory = int(n_max_decoded_bins) * int(n_flattened_position_bins) * int(n_neurons) * int(bytes_per_float)
+
     intermediate_itemized_memory_breakdown = {
-        'worst_case_scenario': (n_max_decoded_bins * n_flattened_position_bins * n_neurons) * bytes_per_float, 
+        'worst_case_scenario': worst_case_memory, 
     }
     total_memory += sum(intermediate_itemized_memory_breakdown.values())
     
@@ -1669,11 +1715,11 @@ class EpochComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Computati
     _is_global = True
 
     @function_attributes(short_name='non_PBE_epochs_results', tags=['epochs', 'nonPBE'],
-        input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-02-18 09:45', related_items=[],
+        input_requires=[], output_provides=[], uses=['EpochComputationsComputationsContainer'], used_by=[], creation_date='2025-02-18 09:45', related_items=[],
         requires_global_keys=[], provides_global_keys=['EpochComputations'],
         validate_computation_test=validate_has_non_PBE_epoch_results, is_global=True)
-    def perform_compute_non_PBE_epochs(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, debug_print=False, training_data_portion: float=(5.0/6.0), epochs_decoding_time_bin_size: float = 0.025, frame_divide_bin_size:float=10.0,
-                                        compute_1D: bool = True, compute_2D: bool = True, drop_previous_result_and_compute_fresh:bool=False, skip_training_test_split: bool = True, debug_print_memory_breakdown: bool=False):
+    def perform_compute_non_PBE_epochs(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, debug_print=False, training_data_portion: float=(5.0/6.0), epochs_decoding_time_bin_size: float = 0.050, frame_divide_bin_size:float=10.0,
+                                        compute_1D: bool = True, compute_2D: bool = False, drop_previous_result_and_compute_fresh:bool=False, skip_training_test_split: bool = True, debug_print_memory_breakdown: bool=False):
         """ Performs the computation of non-PBE epochs for the session and all filtered epochs. Stacks things up hardcore yeah.
 
         Requires:
@@ -1707,7 +1753,7 @@ class EpochComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Computati
                 """ captures: epochs_decoding_time_bin_size, frame_divide_bin_size, active_sess
                 """
                 required_memory_bytes, itemized_mem_breakdown = estimate_memory_requirements_bytes(epochs_decoding_time_bin_size=epochs_decoding_time_bin_size, frame_divide_bin_size=frame_divide_bin_size, n_flattened_position_bins=specific_n_flattened_position_bins, n_neurons=active_sess.neurons.n_neurons, session_duration=active_sess.duration)
-                required_memory_GB: int = required_memory_bytes / 1e9 # Gigabytes
+                required_memory_GB: int = int(required_memory_bytes) / int(1e9) # Gigabytes
                 itemized_mem_breakdown = {f"{k}_{n_dim_str}":v for k, v in itemized_mem_breakdown.items()}
                 return required_memory_GB, itemized_mem_breakdown
 
@@ -1717,14 +1763,14 @@ class EpochComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Computati
                 n_flattened_position_bins_1D: int = computation_results[global_epoch_name].computed_data.pf1D.n_flattened_position_bins
                 required_memory_GB_1D, breakdown1D = _subfn_perform_estimate_required_memory(specific_n_flattened_position_bins=n_flattened_position_bins_1D, n_dim_str="1D")
                 itemized_mem_breakdown.update(breakdown1D)
-                total_required_memory_GB += required_memory_GB_1D
+                total_required_memory_GB += int(required_memory_GB_1D)
             if compute_2D:
                 n_flattened_position_bins_2D: int = computation_results[global_epoch_name].computed_data.pf2D.n_flattened_position_bins
                 required_memory_GB_2D, breakdown2D = _subfn_perform_estimate_required_memory(specific_n_flattened_position_bins=n_flattened_position_bins_2D, n_dim_str="2D")
                 itemized_mem_breakdown.update(breakdown2D)
-                total_required_memory_GB += required_memory_GB_2D
+                total_required_memory_GB += int(required_memory_GB_2D)
             
-            itemized_mem_breakdown_GB = {k:v/1e9 for k, v in itemized_mem_breakdown.items()}
+            itemized_mem_breakdown_GB = {k:int(v)/int(1e9) for k, v in itemized_mem_breakdown.items()}
             if debug_print_memory_breakdown:
                     print("Memory breakdown (GB):")
                     for k, v in itemized_mem_breakdown_GB.items():
@@ -1825,9 +1871,6 @@ class EpochComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Computati
             ## OUTPUTS: filter_epochs_pseudo2D_continuous_specific_decoded_result, filter_epochs_decoded_filter_epoch_track_marginal_posterior_df_dict
             # 58sec
 
-
-
-            
         except MemoryError as mem_err:
             print(f"Insufficient memory: {str(mem_err)}")
             raise 
@@ -1842,58 +1885,318 @@ class EpochComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Computati
     
 
 
+    @function_attributes(short_name='generalized_specific_epochs_decoding', tags=['BasePositionDecoder', 'computation', 'decoder', 'epoch'],
+                          input_requires=[], output_provides=[],
+                          requires_global_keys=['EpochComputations'], provides_global_keys=['EpochComputations'],
+                          uses=['GeneralizedDecodedEpochsComputationsContainer', 'GenericDecoderDictDecodedEpochsDictResult'], used_by=[], creation_date='2025-04-14 12:40',
+        validate_computation_test=validate_has_generalized_specific_epochs_decoding, is_global=True)
+    def perform_generalized_specific_epochs_decoding(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, debug_print=False, epochs_decoding_time_bin_size: float = 0.050, drop_previous_result_and_compute_fresh:bool=False, force_recompute:bool=False):
+        """ 
 
-    # @computation_precidence_specifying_function(overriden_computation_precidence=-0.1)
-    # @function_attributes(short_name='local_compute_non_PBE_epochs', tags=['epochs', 'nonPBE'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-02-18 09:45', related_items=[],
-    #     validate_computation_test=lambda curr_active_pipeline, computation_filter_name='maze': (curr_active_pipeline.computation_results[computation_filter_name].computed_data['firing_rate_trends'], curr_active_pipeline.computation_results[computation_filter_name].computed_data['extended_stats']['time_binned_position_df']), is_global=False)
-    # def local_perform_compute_non_PBE_epochs(computation_result: ComputationResult, **kwargs):
-    #     """ Adds the 'is_LR_dir' column to the laps dataframe and updates 'lap_dir' if needed.        
-    #     """
-    #     a_new_NonPBE_Epochs_obj: Compute_NonPBE_Epochs = Compute_NonPBE_Epochs.ini (curr_active_pipeline=owning_pipeline_reference, training_data_portion=training_data_portion)
+        Refactored from `generalized_decode_epochs_dict_and_export_results_completion_function`
+
+
+        Usage:
+            from pyphoplacecellanalysis.Analysis.Decoder.context_dependent import GenericDecoderDictDecodedEpochsDictResult
+            from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.EpochComputationFunctions import EpochComputationFunctions, EpochComputationsComputationsContainer
+
+            valid_EpochComputations_result: EpochComputationsComputationsContainer = curr_active_pipeline.global_computation_results.computed_data['EpochComputations']
+            a_new_fully_generic_result: GenericDecoderDictDecodedEpochsDictResult = valid_EpochComputations_result.a_generic_decoder_dict_decoded_epochs_dict_result
+
+
+        """
+        from neuropy.core.epoch import EpochsAccessor, Epoch, ensure_dataframe, ensure_Epoch, TimeColumnAliasesProtocol
+        from pyphocorehelpers.print_helpers import get_now_rounded_time_str
+        from neuropy.utils.result_context import DisplaySpecifyingIdentifyingContext
+        from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import EpochFilteringMode, _compute_proper_filter_epochs
+        from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import DecodedFilterEpochsResult, SingleEpochDecodedResult
+        from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import DirectionalLapsResult, TrackTemplates, DecoderDecodedEpochsResult
+        from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import TrainTestSplitResult, TrainTestLapsSplitting, CustomDecodeEpochsResult, decoder_name, epoch_split_key, get_proper_global_spikes_df, DirectionalPseudo2DDecodersResult
+        from pyphoplacecellanalysis.Analysis.Decoder.context_dependent import GenericDecoderDictDecodedEpochsDictResult #, KnownNamedDecoderTrainedComputeEpochsType, KnownNamedDecodingEpochsType, MaskedTimeBinFillType, DataTimeGrain, GenericResultTupleIndexType
         
-    #     computation_result.sess.laps.update_lap_dir_from_smoothed_velocity(pos_input=computation_result.sess.position) # confirmed in-place
-    #     # computation_result.sess.laps.update_lap_dir_from_smoothed_velocity(pos_input=computation_result.sess.position)
-    #     # curr_sess.laps.update_maze_id_if_needed(t_start=t_start, t_delta=t_delta, t_end=t_end) # this doesn't make sense for the filtered sessions unfortunately.
-    #     return computation_result # no changes except to the internal sessions
-    
 
-    # @function_attributes(short_name='_perform_specific_epochs_decoding', tags=['BasePositionDecoder', 'computation', 'decoder', 'epoch'],
-    #                       input_requires=[ "computation_result.computed_data['pf1D_Decoder']", "computation_result.computed_data['pf2D_Decoder']"], output_provides=["computation_result.computed_data['specific_epochs_decoding']"],
-    #                       uses=[], used_by=[], creation_date='2023-04-07 02:16',
-    #     validate_computation_test=lambda curr_active_pipeline, computation_filter_name='maze': (curr_active_pipeline.computation_results[computation_filter_name].computed_data['specific_epochs_decoding']), is_global=False)
-    # def _perform_specific_epochs_decoding(computation_result: ComputationResult, active_config, decoder_ndim:int=2, filter_epochs='ripple', decoding_time_bin_size=0.02, **kwargs):
-    #     """ TODO: meant to be used by `_display_plot_decoded_epoch_slices` but needs a smarter way to cache the computations and etc. 
-    #     Eventually to replace `pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError._compute_specific_decoded_epochs`
+        # ==================================================================================================================== #
+        # BEGIN FUNCTION BODY                                                                                                  #
+        # ==================================================================================================================== #
 
-    #     Usage:
-    #         ## Test _perform_specific_epochs_decoding
-    #         from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.EpochComputationFunctions import EpochComputationFunctions
-    #         computation_result = curr_active_pipeline.computation_results['maze1_PYR']
-    #         computation_result = EpochComputationFunctions._perform_specific_epochs_decoding(computation_result, curr_active_pipeline.active_configs['maze1_PYR'], filter_epochs='ripple', decoding_time_bin_size=0.02)
-    #         filter_epochs_decoder_result, active_filter_epochs, default_figure_name = computation_result.computed_data['specific_epochs_decoding'][('Ripples', 0.02)]
+        # ==================================================================================================================== #
+        # New 2025-03-11 Generic Result:                                                                                       #
+        # ==================================================================================================================== #
 
-    #     """
-    #     ## BEGIN_FUNCTION_BODY _perform_specific_epochs_decoding:
-    #     ## Check for previous computations:
-    #     needs_compute = True # default to needing to recompute.
-    #     computation_tuple_key = (filter_epochs, decoding_time_bin_size, decoder_ndim) # used to be (default_figure_name, decoding_time_bin_size) only
+        ## Unpack from pipeline:
+        valid_EpochComputations_result: EpochComputationsComputationsContainer = global_computation_results.computed_data['EpochComputations'] # owning_pipeline_reference.global_computation_results.computed_data['EpochComputations']
+        assert valid_EpochComputations_result is not None
+        epochs_decoding_time_bin_size: float = valid_EpochComputations_result.epochs_decoding_time_bin_size ## just get the standard size. Currently assuming all things are the same size!
+        print(f'\tepochs_decoding_time_bin_size: {epochs_decoding_time_bin_size}')
+        assert epochs_decoding_time_bin_size == valid_EpochComputations_result.epochs_decoding_time_bin_size, f"\tERROR: nonPBE_results.epochs_decoding_time_bin_size: {valid_EpochComputations_result.epochs_decoding_time_bin_size} != epochs_decoding_time_bin_size: {epochs_decoding_time_bin_size}"
 
-    #     curr_result = computation_result.computed_data.get('specific_epochs_decoding', {})
-    #     found_result = curr_result.get(computation_tuple_key, None)
-    #     if found_result is not None:
-    #         # Unwrap and reuse the result:
-    #         filter_epochs_decoder_result, active_filter_epochs, default_figure_name = found_result # computation_result.computed_data['specific_epochs_decoding'][('Laps', decoding_time_bin_size)]
-    #         needs_compute = False # we don't need to recompute
+        # ==================================================================================================================== #
+        # Create and add the output                                                                                            #
+        # ==================================================================================================================== #        
+        if drop_previous_result_and_compute_fresh:            
+            removed_epoch_computations_result = getattr(valid_EpochComputations_result, 'a_generic_decoder_dict_decoded_epochs_dict_result', None)
+            valid_EpochComputations_result.a_generic_decoder_dict_decoded_epochs_dict_result = None # set to None to drop the result
+            if removed_epoch_computations_result is not None:
+                print(f'removed previous "EpochComputations.a_generic_decoder_dict_decoded_epochs_dict_result" result and computing fresh since `drop_previous_result_and_compute_fresh == True`')
 
-    #     if needs_compute:
-    #         ## Do the computation:
-    #         filter_epochs_decoder_result, active_filter_epochs, default_figure_name = _subfn_compute_decoded_epochs(computation_result, active_config, filter_epochs=filter_epochs, decoding_time_bin_size=decoding_time_bin_size, decoder_ndim=decoder_ndim)
+        if (not hasattr(valid_EpochComputations_result, 'a_generic_decoder_dict_decoded_epochs_dict_result')) or (getattr(valid_EpochComputations_result, 'a_generic_decoder_dict_decoded_epochs_dict_result', None) is None):
+            # initialize
+            a_new_fully_generic_result: GenericDecoderDictDecodedEpochsDictResult = GenericDecoderDictDecodedEpochsDictResult.batch_user_compute_fn(curr_active_pipeline=owning_pipeline_reference, force_recompute=force_recompute, time_bin_size=epochs_decoding_time_bin_size, debug_print=debug_print)
+            valid_EpochComputations_result.a_generic_decoder_dict_decoded_epochs_dict_result = a_new_fully_generic_result
+            global_computation_results.computed_data['EpochComputations'].a_generic_decoder_dict_decoded_epochs_dict_result = a_new_fully_generic_result
 
-    #         ## Cache the computation result via the tuple key: (default_figure_name, decoding_time_bin_size) e.g. ('Laps', 0.02) or ('Ripples', 0.02)
-    #         curr_result[computation_tuple_key] = (filter_epochs_decoder_result, active_filter_epochs, default_figure_name)
+        else:
+            ## get and update existing:
+            a_new_fully_generic_result: GenericDecoderDictDecodedEpochsDictResult = valid_EpochComputations_result.a_generic_decoder_dict_decoded_epochs_dict_result ## get existing
+            ## TODO: update as needed here
+            print(f'WARN 2025-04-14 - Not yet finished -- perform update here.')
+            global_computation_results.computed_data['EpochComputations'].a_generic_decoder_dict_decoded_epochs_dict_result = a_new_fully_generic_result
+            
+        return global_computation_results
 
-    #     computation_result.computed_data['specific_epochs_decoding'] = curr_result
-    #     return computation_result
+
+
+
+
+# ==================================================================================================================== #
+# Display Functions/Plotting                                                                                           #
+# ==================================================================================================================== #
+
+from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DisplayFunctionRegistryHolder import DisplayFunctionRegistryHolder
+import pyqtgraph as pg
+import pyqtgraph.exporters
+from pyphoplacecellanalysis.General.Mixins.ExportHelpers import export_pyqtgraph_plot
+from pyphocorehelpers.DataStructure.general_parameter_containers import VisualizationParameters, RenderPlotsData, RenderPlots
+from pyphocorehelpers.gui.PhoUIContainer import PhoUIContainer # for context_nested_docks/single_context_nested_docks
+
+from neuropy.utils.indexing_helpers import paired_incremental_sorting, union_of_arrays, intersection_of_arrays
+import plotly.express as px
+
+class EpochComputationDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=DisplayFunctionRegistryHolder):
+    """ RankOrderGlobalDisplayFunctions
+    These display functions compare results across several contexts.
+    Must have a signature of: (owning_pipeline_reference, global_computation_results, computation_results, active_configs, ..., **kwargs) at a minimum
+    """
+
+
+    @function_attributes(short_name='generalized_decoded_yellow_blue_marginal_epochs', tags=['yellow-blue-plots', 'directional_merged_decoder_decoded_epochs', 'directional'], conforms_to=['output_registering', 'figure_saving'], input_requires=[], output_provides=[], uses=['plot_decoded_epoch_slices'], used_by=[], creation_date='2024-01-04 02:59', related_items=[], is_global=True)
+    def _display_generalized_decoded_yellow_blue_marginal_epochs(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, save_figure=True, included_any_context_neuron_ids=None,
+                                                    single_plot_fixed_height=50.0, max_num_lap_epochs: int = 25, max_num_ripple_epochs: int = 45, size=(15,7), dpi=72, constrained_layout=True, scrollable_figure=True,
+                                                    skip_plotting_measured_positions=True, skip_plotting_most_likely_positions=True, **kwargs):
+            """ Renders two windows, one with the decoded laps and another with the decoded ripple posteriors, computed using the merged pseudo-2D decoder.
+
+            """
+            from neuropy.utils.mixins.time_slicing import TimeColumnAliasesProtocol
+            # from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError import plot_decoded_epoch_slices
+            from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError import plot_1D_most_likely_position_comparsions
+            from neuropy.utils.matplotlib_helpers import get_heatmap_cmap
+            from pyphoplacecellanalysis.General.Model.Configs.LongShortDisplayConfig import PlottingHelpers
+
+            import matplotlib as mpl
+            import matplotlib.pyplot as plt
+            from flexitext import flexitext ## flexitext for formatted matplotlib text
+
+            from pyphocorehelpers.DataStructure.RenderPlots.MatplotLibRenderPlots import FigureCollector
+            from pyphoplacecellanalysis.General.Model.Configs.LongShortDisplayConfig import PlottingHelpers
+            from neuropy.utils.matplotlib_helpers import FormattedFigureText
+        
+
+            active_context = kwargs.pop('active_context', None)
+            if active_context is not None:
+                # Update the existing context:
+                display_context = active_context.adding_context('display_fn', display_fn_name='generalized_decoded_yellow_blue_marginal_epochs')
+            else:
+                active_context = owning_pipeline_reference.sess.get_context()
+                # Build the active context directly:
+                display_context = owning_pipeline_reference.build_display_context_for_session('generalized_decoded_yellow_blue_marginal_epochs')
+
+            fignum = kwargs.pop('fignum', None)
+            if fignum is not None:
+                print(f'WARNING: fignum will be ignored but it was specified as fignum="{fignum}"!')
+
+            defer_render = kwargs.pop('defer_render', False)
+            debug_print: bool = kwargs.pop('debug_print', False)
+            active_config_name: bool = kwargs.pop('active_config_name', None)
+
+            perform_write_to_file_callback = kwargs.pop('perform_write_to_file_callback', (lambda final_context, fig: owning_pipeline_reference.output_figure(final_context, fig)))
+
+
+            ## INPUTS: a_new_fully_generic_result
+
+            # a_target_context: IdentifyingContext = IdentifyingContext(trained_compute_epochs='laps', pfND_ndim=1, decoder_identifier='pseudo2D', masked_time_bin_fill_type='dropped', data_grain='per_time_bin') # , known_named_decoding_epochs_type='laps', time_bin_size=0.025
+            a_target_context: IdentifyingContext = IdentifyingContext(trained_compute_epochs='laps', pfND_ndim=1, decoder_identifier='pseudo2D', known_named_decoding_epochs_type='global', masked_time_bin_fill_type='nan_filled', data_grain='per_time_bin') # , known_named_decoding_epochs_type='laps', time_bin_size=0.025
+            # flat_context_list, flat_result_context_dict, flat_decoder_context_dict, flat_decoded_marginal_posterior_df_context_dict = a_new_fully_generic_result.get_results_matching_contexts(context_query=a_target_context, return_multiple_matches=True, debug_print=False)
+            # flat_context_list
+            # flat_decoded_marginal_posterior_df_context_dict
+            best_matching_context, a_result, a_decoder, a_decoded_marginal_posterior_df = a_new_fully_generic_result.get_results_best_matching_context(context_query=a_target_context, debug_print=False)
+
+            print(f'best_matching_context: {best_matching_context}')
+            ## OUTPUTS: flat_decoder_context_dict
+
+
+            # Extract kwargs for figure rendering
+            render_merged_pseudo2D_decoder_laps = kwargs.pop('render_merged_pseudo2D_decoder_laps', False)
+            
+            render_directional_marginal_laps = kwargs.pop('render_directional_marginal_laps', True)
+            render_directional_marginal_ripples = kwargs.pop('render_directional_marginal_ripples', False)
+            render_track_identity_marginal_laps = kwargs.pop('render_track_identity_marginal_laps', False)
+            render_track_identity_marginal_ripples = kwargs.pop('render_track_identity_marginal_ripples', False)
+
+            directional_merged_decoders_result = kwargs.pop('directional_merged_decoders_result', None)
+            if directional_merged_decoders_result is not None:
+                print("WARN: User provided a custom directional_merged_decoders_result as a kwarg. This will be used instead of the computed result global_computation_results.computed_data['DirectionalMergedDecoders'].")
+                
+            else:
+                directional_merged_decoders_result = global_computation_results.computed_data['DirectionalMergedDecoders']
+
+
+            # get the time bin size from the decoder:
+            laps_decoding_time_bin_size: float = directional_merged_decoders_result.laps_decoding_time_bin_size
+            ripple_decoding_time_bin_size: float = directional_merged_decoders_result.ripple_decoding_time_bin_size
+
+
+            # figure_name: str = kwargs.pop('figure_name', 'directional_laps_overview_figure')
+            # _out_data = RenderPlotsData(name=figure_name, out_colors_heatmap_image_matrix_dicts={})
+
+            # Recover from the saved global result:
+            # directional_laps_results = global_computation_results.computed_data['DirectionalLaps']
+            # directional_merged_decoders_result = global_computation_results.computed_data['DirectionalMergedDecoders']
+
+            # requires `laps_is_most_likely_direction_LR_dir` from `laps_marginals`
+            long_epoch_name, short_epoch_name, global_epoch_name = owning_pipeline_reference.find_LongShortGlobal_epoch_names()
+
+            graphics_output_dict = {}
+
+            # Shared active_decoder, global_session:
+            active_decoder = directional_merged_decoders_result.all_directional_pf1D_Decoder
+            global_session = deepcopy(owning_pipeline_reference.filtered_sessions[global_epoch_name]) # used for validate_lap_dir_estimations(...) 
+
+            # 'figure.constrained_layout.use': False, 'figure.autolayout': False, 'figure.subplot.bottom': 0.11, 'figure.figsize': (6.4, 4.8)
+            # 'figure.constrained_layout.use': constrained_layout, 'figure.autolayout': False, 'figure.subplot.bottom': 0.11, 'figure.figsize': (6.4, 4.8)
+            with mpl.rc_context({'figure.dpi': '220', 'savefig.transparent': True, 'ps.fonttype': 42, 'figure.constrained_layout.use': (constrained_layout or False), 'figure.frameon': False, }): # 'figure.figsize': (12.4, 4.8), 
+                # Create a FigureCollector instance
+                with FigureCollector(name='plot_directional_merged_pf_decoded_epochs', base_context=display_context) as collector:
+
+                    ## Define the overriden plot function that internally calls the normal plot function but also permits doing operations before and after, such as building titles or extracting figures to save them:
+                    def _mod_plot_decoded_epoch_slices(*args, **subfn_kwargs):
+                        """ implicitly captures: owning_pipeline_reference, collector, perform_write_to_file_callback, save_figure, skip_plotting_measured_positions=True, skip_plotting_most_likely_positions=True
+
+                        NOTE: each call requires adding the additional kwarg: `_main_context=_main_context`
+                        """
+                        assert '_mod_plot_kwargs' in subfn_kwargs
+                        _mod_plot_kwargs = subfn_kwargs.pop('_mod_plot_kwargs')
+                        assert 'final_context' in _mod_plot_kwargs
+                        _main_context = _mod_plot_kwargs['final_context']
+                        assert _main_context is not None
+                        # Build the rest of the properties:
+                        sub_context: IdentifyingContext = owning_pipeline_reference.build_display_context_for_session('directional_merged_pf_decoded_epochs', **_main_context)
+                        sub_context_str: str = sub_context.get_description(subset_includelist=['t_bin'], include_property_names=True) # 't-bin_0.5' # str(sub_context.get_description())
+                        modified_name: str = subfn_kwargs.pop('name', '')
+                        if len(sub_context_str) > 0:
+                            modified_name = f"{modified_name}_{sub_context_str}"
+                        subfn_kwargs['name'] = modified_name # update the name by appending 't-bin_0.5'
+                        
+                        # Call the main plot function:
+                        out_plot_tuple = plot_decoded_epoch_slices(*args, skip_plotting_measured_positions=skip_plotting_measured_positions, skip_plotting_most_likely_positions=skip_plotting_most_likely_positions, **subfn_kwargs)
+                        # Post-plot call:
+                        assert len(out_plot_tuple) == 4
+                        params, plots_data, plots, ui = out_plot_tuple # [2] corresponds to 'plots' in params, plots_data, plots, ui = laps_plots_tuple
+                        # post_hoc_append to collector
+                        mw = ui.mw # MatplotlibTimeSynchronizedWidget
+                        
+                        y_bin_labels = _mod_plot_kwargs.get('y_bin_labels', None)
+                        if y_bin_labels is not None:
+                            label_artists_dict = {}
+                            for i, ax in enumerate(plots.axs):
+                                label_artists_dict[ax] = PlottingHelpers.helper_matplotlib_add_pseudo2D_marginal_labels(ax, y_bin_labels=y_bin_labels, enable_draw_decoder_colored_lines=False)
+                            plots['label_artists_dict'] = label_artists_dict
+                            
+
+                        if mw is not None:
+                            fig = mw.getFigure()
+                            collector.post_hoc_append(figs=mw.fig, axes=mw.axes, contexts=sub_context)
+                            title = mw.params.name
+                        else:
+                            fig = plots.fig
+                            collector.post_hoc_append(figs=fig, axes=plots.axs, contexts=sub_context)
+                            title = params.name
+
+                        # Recover the proper title:
+                        assert title is not None, f"title: {title}"
+                        print(f'title: {title}')
+                        
+                        if ((perform_write_to_file_callback is not None) and (sub_context is not None)):
+                            if save_figure:
+                                perform_write_to_file_callback(sub_context, fig)
+                            
+                        # Close if defer_render
+                        if defer_render:
+                            if mw is not None:
+                                mw.close()
+
+                        return out_plot_tuple
+                    ## END def _mod_plot_decoded_epoch_slices...
+
+
+                    if render_merged_pseudo2D_decoder_laps:
+                        # Merged Pseduo2D Decoder Posteriors:
+                        _main_context = {'decoded_epochs': 'Laps', 'Pseudo2D': 'Posterior', 't_bin': laps_decoding_time_bin_size}
+                        global_any_laps_epochs_obj = deepcopy(owning_pipeline_reference.computation_results[global_epoch_name].computation_config.pf_params.computation_epochs) # global_epoch_name='maze_any'
+                        graphics_output_dict['raw_posterior_laps_plot_tuple'] = _mod_plot_decoded_epoch_slices(
+                            global_any_laps_epochs_obj, directional_merged_decoders_result.all_directional_laps_filter_epochs_decoder_result,
+                            global_pos_df=global_session.position.to_dataframe(), xbin=active_decoder.xbin,
+                            name='Directional_Posterior',
+                            active_marginal_fn=lambda filter_epochs_decoder_result: DirectionalPseudo2DDecodersResult.build_non_marginalized_raw_posteriors(filter_epochs_decoder_result),
+                            single_plot_fixed_height=single_plot_fixed_height, debug_test_max_num_slices=max_num_lap_epochs,
+                            size=size, dpi=dpi, constrained_layout=constrained_layout, scrollable_figure=scrollable_figure,
+                            _mod_plot_kwargs=dict(final_context=_main_context, y_bin_labels=['long_LR', 'long_RL', 'short_LR', 'short_RL']),
+                            **deepcopy(kwargs)
+                        )            
+                        # identifier_name, widget, matplotlib_fig, matplotlib_fig_axes = output_dict[a_posterior_name]
+                        # label_artists_dict = {}
+                        # for i, ax in enumerate(matplotlib_fig_axes):
+                        #     label_artists_dict[ax] = PlottingHelpers.helper_matplotlib_add_pseudo2D_marginal_labels(ax, y_bin_labels=['long_LR', 'long_RL', 'short_LR', 'short_RL'], enable_draw_decoder_colored_lines=False)
+                        # output_dict[a_posterior_name] = (identifier_name, widget, matplotlib_fig, matplotlib_fig_axes, label_artists_dict)
+                        
+                        
+
+                    if render_track_identity_marginal_laps:
+                        # Laps Track-identity (Long/Short) Marginal:
+                        _main_context = {'decoded_epochs': 'Laps', 'Marginal': 'TrackID', 't_bin': laps_decoding_time_bin_size}
+                        global_any_laps_epochs_obj = deepcopy(owning_pipeline_reference.computation_results[global_epoch_name].computation_config.pf_params.computation_epochs) # global_epoch_name='maze_any'
+                        # global_session = deepcopy(owning_pipeline_reference.filtered_sessions[global_epoch_name]) # used for validate_lap_dir_estimations(...) 
+                        graphics_output_dict['track_identity_marginal_laps_plot_tuple'] = _mod_plot_decoded_epoch_slices(
+                            global_any_laps_epochs_obj, directional_merged_decoders_result.all_directional_laps_filter_epochs_decoder_result,
+                            global_pos_df=global_session.position.to_dataframe(), xbin=active_decoder.xbin,
+                            name='TrackIdentity_Marginal_LAPS',
+                            active_marginal_fn=lambda filter_epochs_decoder_result: DirectionalPseudo2DDecodersResult.build_custom_marginal_over_long_short(filter_epochs_decoder_result),
+                            single_plot_fixed_height=single_plot_fixed_height, debug_test_max_num_slices=max_num_lap_epochs,
+                            size=size, dpi=dpi, constrained_layout=constrained_layout, scrollable_figure=scrollable_figure,
+                            _mod_plot_kwargs=dict(final_context=_main_context, y_bin_labels=['long', 'short']),
+                            **deepcopy(kwargs)
+                        )
+
+
+                    if render_track_identity_marginal_ripples:
+                        # Ripple Track-identity (Long/Short) Marginal:
+                        _main_context = {'decoded_epochs': 'Ripple', 'Marginal': 'TrackID', 't_bin': ripple_decoding_time_bin_size}
+                        global_replays = TimeColumnAliasesProtocol.renaming_synonym_columns_if_needed(deepcopy(global_session.replay))
+                        # global_session = deepcopy(owning_pipeline_reference.filtered_sessions[global_epoch_name]) # used for validate_lap_dir_estimations(...) 
+                        graphics_output_dict['track_identity_marginal_ripples_plot_tuple'] = _mod_plot_decoded_epoch_slices(
+                            global_replays, directional_merged_decoders_result.all_directional_ripple_filter_epochs_decoder_result,
+                            global_pos_df=global_session.position.to_dataframe(), xbin=active_decoder.xbin,
+                            name='TrackIdentity_Marginal_Ripples',
+                            active_marginal_fn=lambda filter_epochs_decoder_result: DirectionalPseudo2DDecodersResult.build_custom_marginal_over_long_short(filter_epochs_decoder_result),
+                            single_plot_fixed_height=single_plot_fixed_height, debug_test_max_num_slices=max_num_ripple_epochs,
+                            size=size, dpi=dpi, constrained_layout=constrained_layout, scrollable_figure=scrollable_figure,
+                            _mod_plot_kwargs=dict(final_context=_main_context, y_bin_labels=['long', 'short']),
+                            **deepcopy(kwargs)
+                        )
+
+
+            graphics_output_dict['collector'] = collector
+
+            return graphics_output_dict
 
 
 

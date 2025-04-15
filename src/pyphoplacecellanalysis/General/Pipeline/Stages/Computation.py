@@ -74,6 +74,10 @@ class FunctionsSearchMode(Enum):
 
 
 
+
+to_filename_conversion_dict = {'compute_diba_quiescent_style_replay_events':'_withNewComputedReplays', 'diba_evt_file':'_withNewKamranExportedReplays', 'initial_loaded': '_withOldestImportedReplays', 'normal_computed': '_withNormalComputedReplays'}
+
+
 def session_context_filename_formatting_fn(ctxt: DisplaySpecifyingIdentifyingContext, subset_includelist=None, subset_excludelist=None, parts_separator:str='-') -> str:
     """ `neuropy.utils.result_context.ContextFormatRenderingFn` protocol format callable 
     specific_purpose='filename_prefix'

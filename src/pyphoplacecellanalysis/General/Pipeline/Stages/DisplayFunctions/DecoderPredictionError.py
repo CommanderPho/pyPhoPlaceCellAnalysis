@@ -434,7 +434,7 @@ def _subfn_try_plot_posterior_image(ax, time_window_centers, posterior, xbin, en
     return im_posterior_x
 
 
-@function_attributes(short_name=None, tags=['decoder', 'plot', '1D', 'matplotlib'], input_requires=[], output_provides=[], uses=['perform_plot_1D_single_most_likely_position_curve', '_subfn_try_plot_posterior_image'], used_by=['plot_most_likely_position_comparsions', '_helper_update_decoded_single_epoch_slice_plot'], creation_date='2023-05-01 00:00', related_items=['plot_slices_1D_most_likely_position_comparsions'])
+@function_attributes(short_name=None, tags=['IMPORTANT', 'decoder', 'plot', '1D', 'matplotlib'], input_requires=[], output_provides=[], uses=['perform_plot_1D_single_most_likely_position_curve', '_subfn_try_plot_posterior_image'], used_by=['plot_most_likely_position_comparsions', '_helper_update_decoded_single_epoch_slice_plot'], creation_date='2023-05-01 00:00', related_items=['plot_slices_1D_most_likely_position_comparsions'])
 def plot_1D_most_likely_position_comparsions(measured_position_df, time_window_centers, xbin, ax=None, posterior=None, active_most_likely_positions_1D=None, enable_flat_line_drawing=False, variable_name = 'x', debug_print=False, 
                                              skip_plotting_measured_positions=False, skip_plotting_most_likely_positions=False, posterior_heatmap_imshow_kwargs=None, use_original_bounds=False):
     """ renders a single 2D subplot in MATPLOTLIB for a 1D position axes: the computed posterior for the position from the Bayesian decoder and overlays the animal's actual position over the top.

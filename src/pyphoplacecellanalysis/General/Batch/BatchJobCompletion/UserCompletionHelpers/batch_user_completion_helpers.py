@@ -3003,7 +3003,7 @@ def generalized_decode_epochs_dict_and_export_results_completion_function(self, 
     4. Compute a variety of marginals for each result (track_ID marginals, run_dir_marginals, etc)
     5. Export all the results to .CSV for later plotting and across-session analysis 
     
-    Calls 'non_PBE_epochs_results' global computation function
+    Calls ['non_PBE_epochs_results', 'generalized_specific_epochs_decoding'] global computation functions
     
     
     USES: `GenericDecoderDictDecodedEpochsDictResult`
@@ -3035,13 +3035,10 @@ def generalized_decode_epochs_dict_and_export_results_completion_function(self, 
     from neuropy.utils.result_context import DisplaySpecifyingIdentifyingContext
     from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import EpochFilteringMode, _compute_proper_filter_epochs
     from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import DecodedFilterEpochsResult, SingleEpochDecodedResult
-    from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import DirectionalLapsResult, TrackTemplates, DecoderDecodedEpochsResult
-    from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import DirectionalPseudo2DDecodersResult
     from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import TrainTestSplitResult, TrainTestLapsSplitting, CustomDecodeEpochsResult, decoder_name, epoch_split_key, get_proper_global_spikes_df, DirectionalPseudo2DDecodersResult
     from pyphoplacecellanalysis.Analysis.Decoder.context_dependent import GenericDecoderDictDecodedEpochsDictResult #, KnownNamedDecoderTrainedComputeEpochsType, KnownNamedDecodingEpochsType, MaskedTimeBinFillType, DataTimeGrain, GenericResultTupleIndexType
+    from pyphocorehelpers.assertion_helpers import Assert
     
-    KnownNamedDecoderTrainedComputeEpochsType = Literal['laps', 'non_pbe']
-
     # ==================================================================================================================== #
     # BEGIN FUNCTION BODY                                                                                                  #
     # ==================================================================================================================== #
@@ -3058,13 +3055,15 @@ def generalized_decode_epochs_dict_and_export_results_completion_function(self, 
         ## drop the existing
         del across_session_results_extended_dict['generalized_decode_epochs_dict_and_export_results_completion_function']
 
-    a_new_fully_generic_result: GenericDecoderDictDecodedEpochsDictResult = GenericDecoderDictDecodedEpochsDictResult.batch_user_compute_fn(curr_active_pipeline=curr_active_pipeline, force_recompute=force_recompute, time_bin_size=epochs_decoding_time_bin_size, debug_print=debug_print)
+    # a_new_fully_generic_result: GenericDecoderDictDecodedEpochsDictResult = GenericDecoderDictDecodedEpochsDictResult.batch_user_compute_fn(curr_active_pipeline=curr_active_pipeline, force_recompute=force_recompute, time_bin_size=epochs_decoding_time_bin_size, debug_print=debug_print)
                     
     ## Unpack from pipeline:
-    nonPBE_results: EpochComputationsComputationsContainer = curr_active_pipeline.global_computation_results.computed_data['EpochComputations']
-    epochs_decoding_time_bin_size: float = nonPBE_results.epochs_decoding_time_bin_size ## just get the standard size. Currently assuming all things are the same size!
+    valid_EpochComputations_result: EpochComputationsComputationsContainer = curr_active_pipeline.global_computation_results.computed_data['EpochComputations']
+    a_new_fully_generic_result: GenericDecoderDictDecodedEpochsDictResult = valid_EpochComputations_result.a_generic_decoder_dict_decoded_epochs_dict_result
+
+    epochs_decoding_time_bin_size: float = valid_EpochComputations_result.epochs_decoding_time_bin_size ## just get the standard size. Currently assuming all things are the same size!
     print(f'\tepochs_decoding_time_bin_size: {epochs_decoding_time_bin_size}')
-    assert epochs_decoding_time_bin_size == nonPBE_results.epochs_decoding_time_bin_size, f"\tERROR: nonPBE_results.epochs_decoding_time_bin_size: {nonPBE_results.epochs_decoding_time_bin_size} != epochs_decoding_time_bin_size: {epochs_decoding_time_bin_size}"
+    assert epochs_decoding_time_bin_size == valid_EpochComputations_result.epochs_decoding_time_bin_size, f"\tERROR: valid_EpochComputations_result.epochs_decoding_time_bin_size: {valid_EpochComputations_result.epochs_decoding_time_bin_size} != epochs_decoding_time_bin_size: {epochs_decoding_time_bin_size}"
 
     # ==================================================================================================================== #
     # Create and add the output                                                                                            #
@@ -3081,49 +3080,14 @@ def generalized_decode_epochs_dict_and_export_results_completion_function(self, 
         print(f'\t updating existing result.')
         across_session_results_extended_dict['generalized_decode_epochs_dict_and_export_results_completion_function']['a_new_fully_generic_result'] = deepcopy(a_new_fully_generic_result)
 
-
-
     ## Export to CSVs:
-    csv_save_paths = {}
-    active_export_parent_output_path = self.collected_outputs_path.resolve()
-    # Assert.path_exists(parent_output_path)
-
-    ## INPUTS: collected_outputs_path
     decoding_time_bin_size: float = epochs_decoding_time_bin_size
 
-    complete_session_context, (session_context, additional_session_context) = curr_active_pipeline.get_complete_session_context()
-    active_context = complete_session_context
-    session_name: str = curr_active_pipeline.session_name
-    earliest_delta_aligned_t_start, t_delta, latest_delta_aligned_t_end = curr_active_pipeline.find_LongShortDelta_times()
-
-    ## Build the function that uses curr_active_pipeline to build the correct filename and actually output the .csv to the right place
-    def _subfn_custom_export_df_to_csv(export_df: pd.DataFrame, data_identifier_str: str = f'(laps_marginals_df)', parent_output_path: Path=None):
-        """ captures `curr_active_pipeline`
-        """
-        output_date_str: str = get_now_rounded_time_str(rounded_minutes=10)
-        out_path, out_filename, out_basename = curr_active_pipeline.build_complete_session_identifier_filename_string(output_date_str=output_date_str, data_identifier_str=data_identifier_str, parent_output_path=parent_output_path, out_extension='.csv')
-        export_df.to_csv(out_path)
-        return out_path 
-
-    custom_export_df_to_csv_fn = _subfn_custom_export_df_to_csv
-
-
-    # tbin_values_dict={'laps': decoding_time_bin_size, 'pbe': decoding_time_bin_size, 'non_pbe': decoding_time_bin_size, 'FAT': decoding_time_bin_size}
-
-    # csv_save_paths_dict = GenericDecoderDictDecodedEpochsDictResult._perform_export_dfs_dict_to_csvs(extracted_dfs_dict=a_new_fully_generic_result.filter_epochs_decoded_track_marginal_posterior_df_dict,
-    csv_save_paths_dict = a_new_fully_generic_result.export_csvs(
-                                                parent_output_path=active_export_parent_output_path.resolve(),
-                                                active_context=active_context, session_name=session_name, #curr_active_pipeline=curr_active_pipeline,
-                                                custom_export_df_to_csv_fn=custom_export_df_to_csv_fn,
-                                                decoding_time_bin_size=decoding_time_bin_size,
-                                                curr_session_t_delta=t_delta
-                                                )
-    
+    active_export_parent_output_path = self.collected_outputs_path.resolve()
+    Assert.path_exists(active_export_parent_output_path)
+    csv_save_paths_dict = a_new_fully_generic_result.default_export_all_CSVs(active_export_parent_output_path=active_export_parent_output_path, owning_pipeline_reference=curr_active_pipeline, decoding_time_bin_size=decoding_time_bin_size)
     across_session_results_extended_dict['generalized_decode_epochs_dict_and_export_results_completion_function']['csv_save_paths_dict'] = deepcopy(csv_save_paths_dict)
-
     print(f'csv_save_paths_dict: {csv_save_paths_dict}\n')
-
-
     print('\t\tdone.')
 
     # print(f'>>\t done with {curr_session_context}')
