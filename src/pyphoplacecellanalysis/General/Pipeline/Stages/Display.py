@@ -667,7 +667,7 @@ class PipelineWithDisplaySavingMixin:
         return active_identifying_session_ctx.merging_context('display_', display_subcontext)
 
     @function_attributes(short_name=None, tags=['save','figure'], input_requires=[], output_provides=[], uses=['build_and_write_to_file'], used_by=[], creation_date='2023-06-14 19:26', related_items=[])
-    def output_figure(self, final_context: IdentifyingContext, fig, context_tuple_join_character='_', write_vector_format:bool=False, write_png:bool=True, debug_print=True):
+    def output_figure(self, final_context: IdentifyingContext, fig, context_tuple_join_character='_', write_vector_format:bool=False, write_png:bool=True, debug_print=True, **kwargs):
         """ outputs the figure using the provided context. 
         
         Usage:
@@ -678,7 +678,7 @@ class PipelineWithDisplaySavingMixin:
         # figures_parent_out_path, fig_save_basename = fig_man.get_figure_output_parent_and_basename(final_context, make_folder_if_needed=True)
         # active_out_figure_paths = perform_write_to_file(fig, final_context, figures_parent_out_path=figures_parent_out_path, write_vector_format=write_vector_format, write_png=write_png, register_output_file_fn=self.register_output_file)
         # final_context = final_context.adding_context_if_missing(self.sess.get_context()) # add the session context if it's missing
-        active_out_figure_paths = build_and_write_to_file(fig, final_context, self.get_output_manager(), context_tuple_join_character=context_tuple_join_character, write_vector_format=write_vector_format, write_png=write_png, register_output_file_fn=self.register_output_file)
+        active_out_figure_paths = build_and_write_to_file(fig, final_context, self.get_output_manager(), context_tuple_join_character=context_tuple_join_character, write_vector_format=write_vector_format, write_png=write_png, register_output_file_fn=self.register_output_file, **kwargs)
         return active_out_figure_paths, final_context
 
 

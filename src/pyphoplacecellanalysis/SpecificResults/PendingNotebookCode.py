@@ -220,6 +220,10 @@ def _plot_all_time_decoded_marginal_figures(curr_active_pipeline, best_matching_
     figsize_inches = (width_pixels/dpi, height_pixels/dpi) # (12.4, 4.8)
     print(f'figsize_inches: {figsize_inches}')
 
+    kwargs = {}
+    kwargs = ({'width': 4096} | kwargs) # add 'width' to kwargs if not specified
+    
+
     all_global_menus_actionsDict, global_flat_action_dict = spike_raster_window.build_all_menus_actions_dict()
     complete_session_context, (session_context, additional_session_context) = curr_active_pipeline.get_complete_session_context()
 
@@ -260,7 +264,7 @@ def _plot_all_time_decoded_marginal_figures(curr_active_pipeline, best_matching_
 
         complete_session_context, (session_context, additional_session_context) = curr_active_pipeline.get_complete_session_context()
 
-        active_out_figure_paths, final_context = curr_active_pipeline.output_figure(final_context=complete_session_context.overwriting_context(display='decoded_P_Short_Posterior'), fig=matplotlib_fig, write_vector_format=write_vector_format, write_png=write_png)
+        active_out_figure_paths, final_context = curr_active_pipeline.output_figure(final_context=complete_session_context.overwriting_context(display='decoded_P_Short_Posterior'), fig=matplotlib_fig, write_vector_format=write_vector_format, write_png=write_png, width=width_pixels)
         _all_tracks_active_out_figure_paths[final_context] = deepcopy(active_out_figure_paths[0])
 
 
@@ -287,7 +291,7 @@ def _plot_all_time_decoded_marginal_figures(curr_active_pipeline, best_matching_
         _all_tracks_out_axes[curr_identifier_name] = widget.getRootPlotItem()
 
         ## Export Position over time Figure:
-        active_out_figure_paths, final_context = curr_active_pipeline.output_figure(final_context=complete_session_context.overwriting_context(display='pos_over_t'), fig=widget.getRootPlotItem(), write_vector_format=write_vector_format, write_png=write_png)
+        active_out_figure_paths, final_context = curr_active_pipeline.output_figure(final_context=complete_session_context.overwriting_context(display='pos_over_t'), fig=widget.getRootPlotItem(), write_vector_format=write_vector_format, write_png=write_png, width=width_pixels)
         _all_tracks_active_out_figure_paths[final_context] = deepcopy(active_out_figure_paths[0])
 
 
@@ -308,7 +312,7 @@ def _plot_all_time_decoded_marginal_figures(curr_active_pipeline, best_matching_
         _all_tracks_out_artists[curr_identifier_name] = widget
         _all_tracks_out_axes[curr_identifier_name] = widget.getRootPlotItem()
 
-        active_out_figure_paths, final_context = curr_active_pipeline.output_figure(final_context=complete_session_context.overwriting_context(display='interval_epochs_overview'), fig=widget.getRootPlotItem(), write_vector_format=write_vector_format, write_png=write_png)
+        active_out_figure_paths, final_context = curr_active_pipeline.output_figure(final_context=complete_session_context.overwriting_context(display='interval_epochs_overview'), fig=widget.getRootPlotItem(), write_vector_format=write_vector_format, write_png=write_png, width=width_pixels)
         _all_tracks_active_out_figure_paths[final_context] = deepcopy(active_out_figure_paths[0])
 
 
