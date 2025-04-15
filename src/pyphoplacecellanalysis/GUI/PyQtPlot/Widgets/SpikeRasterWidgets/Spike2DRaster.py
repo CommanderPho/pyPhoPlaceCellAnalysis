@@ -1509,7 +1509,7 @@ class Spike2DRaster(SpecificDockWidgetManipulatingMixin, DynamicDockDisplayAreaO
             else:
                 raise NotImplementedError(f'active_matplotlib_view_widget: {active_matplotlib_view_widget}')
         else:
-            print(f'active_matplotlib_view_widget with identifier {identifier} was not found!')
+            print(f'WARNING: active_matplotlib_view_widget with identifier "{identifier}" was not found!')
             if include_dock:
                 return None, None, None, None
             else:
@@ -1535,7 +1535,7 @@ class Spike2DRaster(SpecificDockWidgetManipulatingMixin, DynamicDockDisplayAreaO
             self.sigDockClosed(self, identifier) ## sigDockClosed signal
             
         else:
-            print(f'active_matplotlib_view_widget with identifier {identifier} was not found!')
+            print(f'WARNING: active_matplotlib_view_widget with identifier "{identifier}" was not found!')
 
     @function_attributes(short_name=None, tags=['matplotlib_render_widget', 'dynamic_ui', 'group_matplotlib_render_plot_widget', 'sync'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-10-17 13:27', related_items=[])
     def sync_matplotlib_render_plot_widget(self, identifier, sync_mode=SynchronizedPlotMode.TO_WINDOW):
@@ -1561,7 +1561,7 @@ class Spike2DRaster(SpecificDockWidgetManipulatingMixin, DynamicDockDisplayAreaO
                 sync_connection = self.ui.connections.get(identifier, None)
                 if sync_connection is not None:
                     # have an existing sync connection, need to disconnect it.
-                    print(f'disconnecting window_scrolled for "{identifier}"')
+                    print(f'\tdisconnecting window_scrolled for "{identifier}"')
                     self.window_scrolled.disconnect(sync_connection)
                     # print(f'WARNING: connection exists!')
                     self.ui.connections[identifier] = None
@@ -1581,7 +1581,7 @@ class Spike2DRaster(SpecificDockWidgetManipulatingMixin, DynamicDockDisplayAreaO
                 raise NotImplementedError
 
         else:
-            print(f'active_matplotlib_view_widget with identifier {identifier} was not found!')
+            print(f'WARNING: active_matplotlib_view_widget with identifier "{identifier}" was not found!')
             return None
 
     
