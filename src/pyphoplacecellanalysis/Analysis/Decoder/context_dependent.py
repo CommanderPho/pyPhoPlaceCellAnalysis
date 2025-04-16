@@ -1101,7 +1101,7 @@ class GenericDecoderDictDecodedEpochsDictResult(ComputedResult):
         # ==================================================================================================================== #
 
         if force_recompute and ('EpochComputations' in curr_active_pipeline.global_computation_results.computed_data):
-            print(f'\t recomputing...')
+            print(f'\t dropping "EpochComputations" and recomputing...')
             del curr_active_pipeline.global_computation_results.computed_data['EpochComputations'] ## drop the old result
 
         curr_active_pipeline.reload_default_computation_functions()

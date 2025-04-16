@@ -1893,7 +1893,7 @@ class EpochComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Computati
     @function_attributes(short_name='generalized_specific_epochs_decoding', tags=['BasePositionDecoder', 'computation', 'decoder', 'epoch'],
                           input_requires=[], output_provides=[],
                           requires_global_keys=['EpochComputations'], provides_global_keys=['EpochComputations'],
-                          uses=['GeneralizedDecodedEpochsComputationsContainer', 'GenericDecoderDictDecodedEpochsDictResult'], used_by=[], creation_date='2025-04-14 12:40',
+                          uses=['GeneralizedDecodedEpochsComputationsContainer', 'GenericDecoderDictDecodedEpochsDictResult', 'GenericDecoderDictDecodedEpochsDictResult.batch_user_compute_fn(...)'], used_by=[], creation_date='2025-04-14 12:40',
         validate_computation_test=validate_has_generalized_specific_epochs_decoding, is_global=True)
     def perform_generalized_specific_epochs_decoding(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, debug_print=False, epochs_decoding_time_bin_size: float = 0.050, drop_previous_result_and_compute_fresh:bool=False, force_recompute:bool=False):
         """ 

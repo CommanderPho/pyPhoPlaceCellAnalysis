@@ -352,7 +352,10 @@ def _plot_all_time_decoded_marginal_figures(curr_active_pipeline, best_matching_
         # widget.getRootPlotItem().set_xlim(active_2d_plot.total_data_start_time, active_2d_plot.total_data_end_time)
         # widget.update(None)
         # widget.draw()
-        
+        widget.getRootPlotItem().update()
+
+
+
         _all_tracks_out_artists[curr_identifier_name] = widget
         _all_tracks_out_axes[curr_identifier_name] = widget.getRootPlotItem()
 
