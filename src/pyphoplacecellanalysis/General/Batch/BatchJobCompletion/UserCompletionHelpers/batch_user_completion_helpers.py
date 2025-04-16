@@ -3058,6 +3058,7 @@ def generalized_decode_epochs_dict_and_export_results_completion_function(self, 
                     
     ## Unpack from pipeline:
     # valid_EpochComputations_result: EpochComputationsComputationsContainer = curr_active_pipeline.global_computation_results.computed_data['EpochComputations']
+    fail_on_exception = True
     
     valid_EpochComputations_result: EpochComputationsComputationsContainer = curr_active_pipeline.global_computation_results.computed_data.get('EpochComputations', None)
     if valid_EpochComputations_result is None:
@@ -3096,14 +3097,14 @@ def generalized_decode_epochs_dict_and_export_results_completion_function(self, 
         extended_computations_include_includelist=['generalized_specific_epochs_decoding',] # do only specified
         force_recompute_override_computations_includelist = []
         needs_computation_output_dict, valid_computed_results_output_list, remaining_include_function_names = batch_evaluate_required_computations(curr_active_pipeline, include_includelist=extended_computations_include_includelist, include_global_functions=True, fail_on_exception=False, progress_print=True,
-                                                            force_recompute=True, force_recompute_override_computations_includelist=force_recompute_override_computations_includelist, debug_print=False)
+                                                            force_recompute=False, force_recompute_override_computations_includelist=force_recompute_override_computations_includelist, debug_print=False)
         if debug_print:
             print(f'\tPost-load global computations: needs_computation_output_dict: {[k for k,v in needs_computation_output_dict.items() if (v is not None)]}')
         # Post-hoc verification that the computations worked and that the validators reflect that. The list should be empty now.
-        newly_computed_values = batch_extended_computations(curr_active_pipeline, include_includelist=extended_computations_include_includelist, include_global_functions=True, fail_on_exception=False, progress_print=True,
-                                                            force_recompute=True, force_recompute_override_computations_includelist=force_recompute_override_computations_includelist, debug_print=False)
+        newly_computed_values = batch_extended_computations(curr_active_pipeline, include_includelist=extended_computations_include_includelist, include_global_functions=True, fail_on_exception=fail_on_exception, progress_print=True,
+                                                            force_recompute=False, force_recompute_override_computations_includelist=force_recompute_override_computations_includelist, debug_print=False)
         needs_computation_output_dict, valid_computed_results_output_list, remaining_include_function_names = batch_evaluate_required_computations(curr_active_pipeline, include_includelist=extended_computations_include_includelist, include_global_functions=True, fail_on_exception=False, progress_print=True,
-                                                            force_recompute=True, force_recompute_override_computations_includelist=force_recompute_override_computations_includelist, debug_print=False)
+                                                            force_recompute=False, force_recompute_override_computations_includelist=force_recompute_override_computations_includelist, debug_print=False)
         if debug_print:
             print(f'\tPost-load global computations: needs_computation_output_dict: {[k for k,v in needs_computation_output_dict.items() if (v is not None)]}')
         print(f'\t...a_generic_decoder_dict_decoded_epochs_dict_result recomputation done.')
