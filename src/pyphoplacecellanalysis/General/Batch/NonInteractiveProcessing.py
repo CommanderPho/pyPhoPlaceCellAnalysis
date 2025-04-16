@@ -743,6 +743,16 @@ def batch_extended_programmatic_figures(curr_active_pipeline, write_vector_forma
 
 
 
+	# _display_generalized_decoded_yellow_blue_marginal_epochs ___________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
+	try:
+		_out = curr_active_pipeline.display('_display_generalized_decoded_yellow_blue_marginal_epochs', curr_active_pipeline.get_session_context(), defer_render=True, save_figure=save_figure, is_dark_mode=False)
+	except Exception as e:
+		print(f'batch_extended_programmatic_figures(...): "_display_generalized_decoded_yellow_blue_marginal_epochs" failed with error: {e}\n skipping.')
+
+
+	
+
+
 
 @metadata_attributes(short_name=None, tags=['PhoJonathan', 'figure', 'batch', 'LxC', 'SxC', 'LongShort'], input_requires=[], output_provides=[], uses=[], used_by=['batch_programmatic_figures', 'batch_extended_programmatic_figures'],
 					 creation_date='2024-09-16 17:34', related_items=['PhoJonathanPlotHelpers'])
