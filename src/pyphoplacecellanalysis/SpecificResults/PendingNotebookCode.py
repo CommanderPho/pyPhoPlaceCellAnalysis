@@ -85,15 +85,26 @@ from pyphoplacecellanalysis.General.Model.Configs.LongShortDisplayConfig import 
 
 
 @function_attributes(short_name=None, tags=['plot', 'figure', 'matplotlib'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-04-14 17:55', related_items=[])
-def _plot_all_time_decoded_marginal_figures_non_interactive(curr_active_pipeline, best_matching_context: IdentifyingContext, a_decoded_marginal_posterior_df: pd.DataFrame, epochs_decoding_time_bin_size: float = 0.025, constrained_layout=True, **kwargs):
+def _plot_all_time_decoded_marginal_figures_non_interactive(curr_active_pipeline, best_matching_context: IdentifyingContext, a_decoded_marginal_posterior_df: pd.DataFrame, epochs_decoding_time_bin_size: float = 0.025, constrained_layout=False, **kwargs):
     """ exports the components needed to show the decoded P_Short/P_Long likelihoods over time
 
+    Usage:
+        from neuropy.utils.result_context import IdentifyingContext
+        from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import _plot_all_time_decoded_marginal_figures_non_interactive
+        from pyphocorehelpers.plotting.media_output_helpers import save_array_as_image, get_array_as_image
 
-    from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import _plot_all_time_decoded_marginal_figures_non_interactive
+        curr_active_pipeline.reload_default_display_functions()
 
-    search_context = IdentifyingContext(known_named_decoding_epochs_type='global') # , data_grain= 'per_time_bin -- not really relevant: ['masked_time_bin_fill_type', 'known_named_decoding_epochs_type', 'data_grain']
-    flat_context_list, flat_result_context_dict, flat_decoder_context_dict, flat_decoded_marginal_posterior_df_context_dict = a_new_fully_generic_result.get_results_matching_contexts(context_query=search_context, return_multiple_matches=True, debug_print=True)
-    _all_tracks_active_out_figure_paths, _all_tracks_out_artists, _all_tracks_out_axes = 
+        ## INPUTS: a_new_fully_generic_result
+        # a_target_context: IdentifyingContext = IdentifyingContext(trained_compute_epochs='laps', pfND_ndim=1, decoder_identifier='pseudo2D', known_named_decoding_epochs_type='global', masked_time_bin_fill_type='nan_filled', data_grain='per_time_bin')
+        a_target_context: IdentifyingContext = IdentifyingContext(trained_compute_epochs='laps', pfND_ndim=1, decoder_identifier='pseudo2D', known_named_decoding_epochs_type='global', masked_time_bin_fill_type='ignore', data_grain='per_time_bin')
+        best_matching_context, a_result, a_decoder, a_decoded_marginal_posterior_df = a_new_fully_generic_result.get_results_best_matching_context(context_query=a_target_context, debug_print=False)
+        epochs_decoding_time_bin_size = best_matching_context.get('time_bin_size', None)
+        assert epochs_decoding_time_bin_size is not None
+
+        graphics_output_dict = _plot_all_time_decoded_marginal_figures_non_interactive(curr_active_pipeline=curr_active_pipeline, best_matching_context=best_matching_context, a_decoded_marginal_posterior_df=a_decoded_marginal_posterior_df, epochs_decoding_time_bin_size=epochs_decoding_time_bin_size)
+
+
 
     """
     from pyphocorehelpers.DataStructure.RenderPlots.MatplotLibRenderPlots import FigureCollector    
@@ -327,7 +338,8 @@ def _plot_all_time_decoded_marginal_figures_non_interactive(curr_active_pipeline
 
     # 'figure.constrained_layout.use': False, 'figure.autolayout': False, 'figure.subplot.bottom': 0.11, 'figure.figsize': (6.4, 4.8)
     # 'figure.constrained_layout.use': constrained_layout, 'figure.autolayout': False, 'figure.subplot.bottom': 0.11, 'figure.figsize': (6.4, 4.8)
-    with mpl.rc_context({'figure.dpi': '220', 'savefig.transparent': True, 'ps.fonttype': 42, 'figure.constrained_layout.use': (constrained_layout or False), 'figure.frameon': False, }): # 'figure.figsize': (12.4, 4.8), 
+    # with mpl.rc_context({'figure.dpi': '220', 'savefig.transparent': True, 'ps.fonttype': 42, 'figure.constrained_layout.use': (constrained_layout or False), 'figure.frameon': False, 'figure.figsize': (35, 3), }):
+    with mpl.rc_context({'figure.dpi': '100', 'savefig.transparent': True, 'ps.fonttype': 42, 'figure.constrained_layout.use': (constrained_layout or False), 'figure.frameon': False, 'figure.figsize': (35, 3), }): # 'figure.figsize': (12.4, 4.8), 
         # Create a FigureCollector instance
         with FigureCollector(name='plot_all_time_decoded_marginal_figures', base_context=display_context) as collector:
             fig, ax_dict = collector.subplot_mosaic(
@@ -336,13 +348,11 @@ def _plot_all_time_decoded_marginal_figures_non_interactive(curr_active_pipeline
                 [
                     ["ax_top"],
                     ["ax_decodedMarginal_P_Short_v_time"],
-                    ["ax_position_and_laps_v_time"],
+                    # ["ax_position_and_laps_v_time"],
                 ],
-                # set the height ratios between the rows
-                # height_ratios=[8, 1],
-                # height_ratios=[1, 1],
                 # set the width ratios between the columns
-                height_ratios=[2, 1, 4],
+                # height_ratios=[2, 1, 4],
+                height_ratios=[3, 1],
                 sharex=True,
                 gridspec_kw=dict(wspace=0, hspace=0) # `wspace=0`` is responsible for sticking the pf and the activity axes together with no spacing
             )
@@ -353,6 +363,7 @@ def _plot_all_time_decoded_marginal_figures_non_interactive(curr_active_pipeline
 
             # decoded posterior overlay __________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
             variable_name: str = ''
+            y_bin_labels = ['P_Long', 'P_Short']
             xbin = None
             active_most_likely_positions = None
             active_posterior = deepcopy(a_1D_posterior)
@@ -370,15 +381,16 @@ def _plot_all_time_decoded_marginal_figures_non_interactive(curr_active_pipeline
                                                                     ax=an_ax, variable_name=variable_name, debug_print=True, enable_flat_line_drawing=False,
                                                                     posterior_heatmap_imshow_kwargs=posterior_heatmap_imshow_kwargs)
             
+            label_artists_dict = PlottingHelpers.helper_matplotlib_add_pseudo2D_marginal_labels(an_ax, y_bin_labels=y_bin_labels, enable_draw_decoder_colored_lines=False)
             _subfn_clean_axes_decorations(an_ax=ax_dict["ax_decodedMarginal_P_Short_v_time"])
         
 
-            # Position/bounds lines ______________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
-            an_ax = ax_dict["ax_position_and_laps_v_time"]
-            graphics_output_dict: MatplotlibRenderPlots = _subfn_display_grid_bin_bounds_validation(owning_pipeline_reference=curr_active_pipeline, pos_var_names_override=['lin_pos'], ax=an_ax) # (or ['x']) build basic position/bounds figure as a starting point
-            an_ax = graphics_output_dict.axes[0]
-            fig = graphics_output_dict.figures[0]
-            _subfn_clean_axes_decorations(an_ax=ax_dict["ax_position_and_laps_v_time"])
+            # # Position/bounds lines ______________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
+            # an_ax = ax_dict["ax_position_and_laps_v_time"]
+            # graphics_output_dict: MatplotlibRenderPlots = _subfn_display_grid_bin_bounds_validation(owning_pipeline_reference=curr_active_pipeline, pos_var_names_override=['lin_pos'], ax=an_ax) # (or ['x']) build basic position/bounds figure as a starting point
+            # an_ax = graphics_output_dict.axes[0]
+            # fig = graphics_output_dict.figures[0]
+            # _subfn_clean_axes_decorations(an_ax=ax_dict["ax_position_and_laps_v_time"])
 
 
             # Add Epochs (Laps/PBEs/Delta_t/etc) _________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
@@ -388,6 +400,8 @@ def _plot_all_time_decoded_marginal_figures_non_interactive(curr_active_pipeline
             an_ax = ax_dict["ax_top"]
             fig, out_axes_list = plot_laps_2d(global_session, legacy_plotting_mode=False, include_velocity=False, include_accel=False, axes_list=[an_ax], **kwargs)
             _subfn_clean_axes_decorations(an_ax=ax_dict["ax_top"])
+
+
 
             # final_context = curr_active_pipeline.sess.get_context().adding_context('display_fn', display_fn_name='display_long_short_laps')
 
