@@ -108,20 +108,13 @@ def _plot_all_time_decoded_marginal_figures_non_interactive(curr_active_pipeline
     import matplotlib as mpl
     import matplotlib.pyplot as plt
     from flexitext import flexitext ## flexitext for formatted matplotlib text
-
-    from pyphocorehelpers.DataStructure.RenderPlots.MatplotLibRenderPlots import FigureCollector
     from pyphoplacecellanalysis.General.Model.Configs.LongShortDisplayConfig import PlottingHelpers
     from neuropy.utils.matplotlib_helpers import FormattedFigureText
-    from pyphocorehelpers.DataStructure.RenderPlots.MatplotLibRenderPlots import MatplotlibRenderPlots
-
 
     # For decoded posterior overlay ______________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
     from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError import plot_1D_most_likely_position_comparsions
     from neuropy.utils.matplotlib_helpers import get_heatmap_cmap
     from pyphoplacecellanalysis.General.Model.Configs.LongShortDisplayConfig import PlottingHelpers
-
-
-
 
 
     complete_session_context, (session_context, additional_session_context) = curr_active_pipeline.get_complete_session_context()
@@ -315,32 +308,8 @@ def _plot_all_time_decoded_marginal_figures_non_interactive(curr_active_pipeline
     # Begin Function Body                                                                                                                                                                                                                                                                  #
     # ==================================================================================================================================================================================================================================================================================== #
 
-    # # Extract kwargs for figure rendering
-    # render_merged_pseudo2D_decoder_laps = kwargs.pop('render_merged_pseudo2D_decoder_laps', False)
-
-    # render_directional_marginal_laps = kwargs.pop('render_directional_marginal_laps', True)
-    # render_directional_marginal_ripples = kwargs.pop('render_directional_marginal_ripples', False)
-    # render_track_identity_marginal_laps = kwargs.pop('render_track_identity_marginal_laps', False)
-    # render_track_identity_marginal_ripples = kwargs.pop('render_track_identity_marginal_ripples', False)
-
-    # directional_merged_decoders_result = kwargs.pop('directional_merged_decoders_result', None)
-    # if directional_merged_decoders_result is not None:
-    #     print("WARN: User provided a custom directional_merged_decoders_result as a kwarg. This will be used instead of the computed result global_computation_results.computed_data['DirectionalMergedDecoders'].")
-        
-    # else:
-    #     directional_merged_decoders_result = curr_active_pipeline.global_computation_results.computed_data['DirectionalMergedDecoders']
 
 
-    # # get the time bin size from the decoder:
-    # laps_decoding_time_bin_size: float = directional_merged_decoders_result.laps_decoding_time_bin_size
-    # ripple_decoding_time_bin_size: float = directional_merged_decoders_result.ripple_decoding_time_bin_size
-
-    # figure_name: str = kwargs.pop('figure_name', 'directional_laps_overview_figure')
-    # _out_data = RenderPlotsData(name=figure_name, out_colors_heatmap_image_matrix_dicts={})
-
-    # Recover from the saved global result:
-    # directional_laps_results = global_computation_results.computed_data['DirectionalLaps']
-    # directional_merged_decoders_result = global_computation_results.computed_data['DirectionalMergedDecoders']
 
     # requires `laps_is_most_likely_direction_LR_dir` from `laps_marginals`
     long_epoch_name, short_epoch_name, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
@@ -352,130 +321,156 @@ def _plot_all_time_decoded_marginal_figures_non_interactive(curr_active_pipeline
 
     # 'figure.constrained_layout.use': False, 'figure.autolayout': False, 'figure.subplot.bottom': 0.11, 'figure.figsize': (6.4, 4.8)
     # 'figure.constrained_layout.use': constrained_layout, 'figure.autolayout': False, 'figure.subplot.bottom': 0.11, 'figure.figsize': (6.4, 4.8)
-    with mpl.rc_context({'figure.dpi': '220', 'savefig.transparent': True, 'ps.fonttype': 42, 'figure.constrained_layout.use': (constrained_layout or False), 'figure.frameon': False, }): # 'figure.figsize': (12.4, 4.8), 
-        # Create a FigureCollector instance
-        with FigureCollector(name='plot_directional_merged_pf_decoded_epochs', base_context=display_context) as collector:
+    # with mpl.rc_context({'figure.dpi': '220', 'savefig.transparent': True, 'ps.fonttype': 42, 'figure.constrained_layout.use': (constrained_layout or False), 'figure.frameon': False, }): # 'figure.figsize': (12.4, 4.8), 
+    #     # Create a FigureCollector instance
+    #     with FigureCollector(name='plot_all_time_decoded_marginal_figures', base_context=display_context) as collector:
+            # fig, ax_dict = collector.subplot_mosaic(
+            
+    fig = plt.figure(layout="constrained")
+    ax_dict = fig.subplot_mosaic(
+        [
+            ["ax_top"],
+            ["ax_decodedMarginal_P_Short_v_time"],
+            ["ax_position_and_laps_v_time"],
+        ],
+        # set the height ratios between the rows
+        # height_ratios=[8, 1],
+        # height_ratios=[1, 1],
+        # set the width ratios between the columns
+        height_ratios=[2, 1, 4],
+        sharey=False,
+        gridspec_kw=dict(wspace=0, hspace=0) # `wspace=0`` is responsible for sticking the pf and the activity axes together with no spacing
+    )
+    # hist_data = np.random.randn(1_500)
+    # xbin_centers = np.arange(len(hist_data))+0.5
+    ax_dict["ax_top"].set_xticklabels([])
+    ax_dict["ax_top"].set_yticklabels([])
+    ax_dict["ax_decodedMarginal_P_Short_v_time"].set_xticklabels([])
+    ax_dict["ax_decodedMarginal_P_Short_v_time"].set_yticklabels([])
+    ax_dict["ax_position_and_laps_v_time"].set_xticklabels([])
+    ax_dict["ax_position_and_laps_v_time"].set_yticklabels([])
+    # ax_dict["ax_SHORT_pf_tuning_curve"].set_box
 
-            # ## Define the overriden plot function that internally calls the normal plot function but also permits doing operations before and after, such as building titles or extracting figures to save them:
-            # def _mod_plot_decoded_epoch_slices(*args, **subfn_kwargs):
-            #     """ implicitly captures: owning_pipeline_reference, collector, perform_write_to_file_callback, save_figure, skip_plotting_measured_positions=True, skip_plotting_most_likely_positions=True
 
-            #     NOTE: each call requires adding the additional kwarg: `_main_context=_main_context`
-            #     """
-            #     assert '_mod_plot_kwargs' in subfn_kwargs
-            #     _mod_plot_kwargs = subfn_kwargs.pop('_mod_plot_kwargs')
-            #     assert 'final_context' in _mod_plot_kwargs
-            #     _main_context = _mod_plot_kwargs['final_context']
-            #     assert _main_context is not None
-            #     # Build the rest of the properties:
-            #     sub_context: IdentifyingContext = curr_active_pipeline.build_display_context_for_session('directional_merged_pf_decoded_epochs', **_main_context)
-            #     sub_context_str: str = sub_context.get_description(subset_includelist=['t_bin'], include_property_names=True) # 't-bin_0.5' # str(sub_context.get_description())
-            #     modified_name: str = subfn_kwargs.pop('name', '')
-            #     if len(sub_context_str) > 0:
-            #         modified_name = f"{modified_name}_{sub_context_str}"
-            #     subfn_kwargs['name'] = modified_name # update the name by appending 't-bin_0.5'
-                
-            #     # Call the main plot function:
-            #     out_plot_tuple = plot_decoded_epoch_slices(*args, skip_plotting_measured_positions=skip_plotting_measured_positions, skip_plotting_most_likely_positions=skip_plotting_most_likely_positions, **subfn_kwargs)
-            #     # Post-plot call:
-            #     assert len(out_plot_tuple) == 4
-            #     params, plots_data, plots, ui = out_plot_tuple # [2] corresponds to 'plots' in params, plots_data, plots, ui = laps_plots_tuple
-            #     # post_hoc_append to collector
-            #     mw = ui.mw # MatplotlibTimeSynchronizedWidget
-                
-            #     y_bin_labels = _mod_plot_kwargs.get('y_bin_labels', None)
-            #     if y_bin_labels is not None:
-            #         label_artists_dict = {}
-            #         for i, ax in enumerate(plots.axs):
-            #             label_artists_dict[ax] = PlottingHelpers.helper_matplotlib_add_pseudo2D_marginal_labels(ax, y_bin_labels=y_bin_labels, enable_draw_decoder_colored_lines=False)
-            #         plots['label_artists_dict'] = label_artists_dict
+    # ## Define the overriden plot function that internally calls the normal plot function but also permits doing operations before and after, such as building titles or extracting figures to save them:
+    # def _mod_plot_decoded_epoch_slices(*args, **subfn_kwargs):
+    #     """ implicitly captures: owning_pipeline_reference, collector, perform_write_to_file_callback, save_figure, skip_plotting_measured_positions=True, skip_plotting_most_likely_positions=True
+
+    #     NOTE: each call requires adding the additional kwarg: `_main_context=_main_context`
+    #     """
+    #     assert '_mod_plot_kwargs' in subfn_kwargs
+    #     _mod_plot_kwargs = subfn_kwargs.pop('_mod_plot_kwargs')
+    #     assert 'final_context' in _mod_plot_kwargs
+    #     _main_context = _mod_plot_kwargs['final_context']
+    #     assert _main_context is not None
+    #     # Build the rest of the properties:
+    #     sub_context: IdentifyingContext = curr_active_pipeline.build_display_context_for_session('directional_merged_pf_decoded_epochs', **_main_context)
+    #     sub_context_str: str = sub_context.get_description(subset_includelist=['t_bin'], include_property_names=True) # 't-bin_0.5' # str(sub_context.get_description())
+    #     modified_name: str = subfn_kwargs.pop('name', '')
+    #     if len(sub_context_str) > 0:
+    #         modified_name = f"{modified_name}_{sub_context_str}"
+    #     subfn_kwargs['name'] = modified_name # update the name by appending 't-bin_0.5'
+        
+    #     # Call the main plot function:
+    #     out_plot_tuple = plot_decoded_epoch_slices(*args, skip_plotting_measured_positions=skip_plotting_measured_positions, skip_plotting_most_likely_positions=skip_plotting_most_likely_positions, **subfn_kwargs)
+    #     # Post-plot call:
+    #     assert len(out_plot_tuple) == 4
+    #     params, plots_data, plots, ui = out_plot_tuple # [2] corresponds to 'plots' in params, plots_data, plots, ui = laps_plots_tuple
+    #     # post_hoc_append to collector
+    #     mw = ui.mw # MatplotlibTimeSynchronizedWidget
+        
+    #     y_bin_labels = _mod_plot_kwargs.get('y_bin_labels', None)
+    #     if y_bin_labels is not None:
+    #         label_artists_dict = {}
+    #         for i, ax in enumerate(plots.axs):
+    #             label_artists_dict[ax] = PlottingHelpers.helper_matplotlib_add_pseudo2D_marginal_labels(ax, y_bin_labels=y_bin_labels, enable_draw_decoder_colored_lines=False)
+    #         plots['label_artists_dict'] = label_artists_dict
+            
+
+    #     if mw is not None:
+    #         fig = mw.getFigure()
+    #         collector.post_hoc_append(figs=mw.fig, axes=mw.axes, contexts=sub_context)
+    #         title = mw.params.name
+    #     else:
+    #         fig = plots.fig
+    #         collector.post_hoc_append(figs=fig, axes=plots.axs, contexts=sub_context)
+    #         title = params.name
+
+    #     # Recover the proper title:
+    #     assert title is not None, f"title: {title}"
+    #     print(f'title: {title}')
+        
+    #     if ((perform_write_to_file_callback is not None) and (sub_context is not None)):
+    #         if save_figure:
+    #             perform_write_to_file_callback(sub_context, fig)
+            
+    #     # Close if defer_render
+    #     if defer_render:
+    #         if mw is not None:
+    #             mw.close()
+
+    #     return out_plot_tuple
+    # ## END def _mod_plot_decoded_epoch_slices...
+
+    # fig = None
+    an_ax = ax_dict["ax_decodedMarginal_P_Short_v_time"] ## no figure (should I be using collector??)
+
+    # decoded posterior overlay __________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
+    variable_name: str = ''
+    xbin = None
+    active_most_likely_positions = None
+    active_posterior = deepcopy(a_1D_posterior)
+    posterior_heatmap_imshow_kwargs = dict(zorder=-1, alpha=0.1)
+    
+    ### construct fake position axis (xbin):
+    n_xbins, n_t_bins = np.shape(a_1D_posterior)
+    if xbin is None:
+        xbin = np.arange(n_xbins)
+
+    ## Actual plotting portion:
+    fig, an_ax = plot_1D_most_likely_position_comparsions(measured_position_df=None, time_window_centers=a_time_window_centers, xbin=deepcopy(xbin),
+                                                            posterior=active_posterior,
+                                                            active_most_likely_positions_1D=active_most_likely_positions,
+                                                            ax=an_ax, variable_name=variable_name, debug_print=True, enable_flat_line_drawing=False,
+                                                            posterior_heatmap_imshow_kwargs=posterior_heatmap_imshow_kwargs)
+    
+
+
+    # Position/bounds lines ______________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
+    an_ax = ax_dict["ax_position_and_laps_v_time"]
+    graphics_output_dict: MatplotlibRenderPlots = _subfn_display_grid_bin_bounds_validation(owning_pipeline_reference=curr_active_pipeline, pos_var_names_override=['lin_pos'], ax=an_ax) # (or ['x']) build basic position/bounds figure as a starting point
+    an_ax = graphics_output_dict.axes[0]
+    fig = graphics_output_dict.figures[0]
+
+
+
+
+    # Add Epochs (Laps/PBEs/Delta_t/etc) _________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
+    ## from `_display_long_short_laps`
+    from pyphoplacecellanalysis.PhoPositionalData.plotting.laps import plot_laps_2d
+
+    # active_config_name = kwargs.pop('active_config_name', None)
+
+    long_epoch_name, short_epoch_name, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
+    # long_epoch_context, short_epoch_context, global_epoch_context = [curr_active_pipeline.filtered_contexts[a_name] for a_name in (long_epoch_name, short_epoch_name, global_epoch_name)]
+    long_session, short_session, global_session = [curr_active_pipeline.filtered_sessions[an_epoch_name] for an_epoch_name in [long_epoch_name, short_epoch_name, global_epoch_name]]
+    
+    an_ax = ax_dict["ax_top"]
+    fig, out_axes_list = plot_laps_2d(global_session, legacy_plotting_mode=False, include_velocity=False, include_accel=False, axes_list=[an_ax], **kwargs)
+    out_axes_list[0].set_title('Estimated Laps')
+    fig.canvas.manager.set_window_title('Estimated Laps')
+
+    # final_context = curr_active_pipeline.sess.get_context().adding_context('display_fn', display_fn_name='display_long_short_laps')
+
+    # def _perform_write_to_file_callback():
+    #     return curr_active_pipeline.output_figure(final_context, fig)
+
+    # if save_figure:
+    #     active_out_figure_paths = _perform_write_to_file_callback()
+    # else:
+    #     active_out_figure_paths = []
                     
-
-            #     if mw is not None:
-            #         fig = mw.getFigure()
-            #         collector.post_hoc_append(figs=mw.fig, axes=mw.axes, contexts=sub_context)
-            #         title = mw.params.name
-            #     else:
-            #         fig = plots.fig
-            #         collector.post_hoc_append(figs=fig, axes=plots.axs, contexts=sub_context)
-            #         title = params.name
-
-            #     # Recover the proper title:
-            #     assert title is not None, f"title: {title}"
-            #     print(f'title: {title}')
-                
-            #     if ((perform_write_to_file_callback is not None) and (sub_context is not None)):
-            #         if save_figure:
-            #             perform_write_to_file_callback(sub_context, fig)
-                    
-            #     # Close if defer_render
-            #     if defer_render:
-            #         if mw is not None:
-            #             mw.close()
-
-            #     return out_plot_tuple
-            # ## END def _mod_plot_decoded_epoch_slices...
-
-            fig = None
-            an_ax = None ## no figure (should I be using collector??)
-
-
-            # decoded posterior overlay __________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
-            variable_name: str = ''
-            xbin = None
-            active_most_likely_positions = None
-            active_posterior = deepcopy(a_1D_posterior)
-            posterior_heatmap_imshow_kwargs = dict(zorder=-1, alpha=0.1)
-            
-            ### construct fake position axis (xbin):
-            n_xbins, n_t_bins = np.shape(a_1D_posterior)
-            if xbin is None:
-                xbin = np.arange(n_xbins)
-
-            ## Actual plotting portion:
-            fig, an_ax = plot_1D_most_likely_position_comparsions(measured_position_df=None, time_window_centers=a_time_window_centers, xbin=deepcopy(xbin),
-                                                                    posterior=active_posterior,
-                                                                    active_most_likely_positions_1D=active_most_likely_positions,
-                                                                    ax=an_ax, variable_name=variable_name, debug_print=True, enable_flat_line_drawing=False,
-                                                                    posterior_heatmap_imshow_kwargs=posterior_heatmap_imshow_kwargs)
-            
-
-
-            # Position/bounds lines ______________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
-            graphics_output_dict: MatplotlibRenderPlots = _subfn_display_grid_bin_bounds_validation(owning_pipeline_reference=curr_active_pipeline, pos_var_names_override=['lin_pos'], ax=an_ax) # (or ['x']) build basic position/bounds figure as a starting point
-
-            an_ax = graphics_output_dict.axes[0]
-            fig = graphics_output_dict.figures[0]
-
-
-
-
-            # Add Epochs (Laps/PBEs/Delta_t/etc) _________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
-            ## from `_display_long_short_laps`
-            from pyphoplacecellanalysis.PhoPositionalData.plotting.laps import plot_laps_2d
-
-            # active_config_name = kwargs.pop('active_config_name', None)
-
-            long_epoch_name, short_epoch_name, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
-            # long_epoch_context, short_epoch_context, global_epoch_context = [curr_active_pipeline.filtered_contexts[a_name] for a_name in (long_epoch_name, short_epoch_name, global_epoch_name)]
-            long_session, short_session, global_session = [curr_active_pipeline.filtered_sessions[an_epoch_name] for an_epoch_name in [long_epoch_name, short_epoch_name, global_epoch_name]]
-            
-
-            fig, out_axes_list = plot_laps_2d(global_session, legacy_plotting_mode=False, include_velocity=False, include_accel=False, axes_list=[an_ax], **kwargs)
-            out_axes_list[0].set_title('Estimated Laps')
-            fig.canvas.manager.set_window_title('Estimated Laps')
-
-            # final_context = curr_active_pipeline.sess.get_context().adding_context('display_fn', display_fn_name='display_long_short_laps')
-
-            # def _perform_write_to_file_callback():
-            #     return curr_active_pipeline.output_figure(final_context, fig)
-
-            # if save_figure:
-            #     active_out_figure_paths = _perform_write_to_file_callback()
-            # else:
-            #     active_out_figure_paths = []
-                            
-            # graphics_output_dict = MatplotlibRenderPlots(name='_display_long_short_laps', figures=(fig,), axes=out_axes_list, plot_data={}, context=final_context, saved_figures=active_out_figure_paths)
+    # graphics_output_dict = MatplotlibRenderPlots(name='_display_long_short_laps', figures=(fig,), axes=out_axes_list, plot_data={}, context=final_context, saved_figures=active_out_figure_paths)
 
 
 
