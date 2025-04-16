@@ -135,6 +135,14 @@ def _plot_all_time_decoded_marginal_figures_non_interactive(curr_active_pipeline
     perform_write_to_file_callback = kwargs.pop('perform_write_to_file_callback', (lambda final_context, fig: curr_active_pipeline.output_figure(final_context, fig)))
 
 
+    # active_config_name = kwargs.pop('active_config_name', None)
+
+    long_epoch_name, short_epoch_name, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
+    # long_epoch_context, short_epoch_context, global_epoch_context = [curr_active_pipeline.filtered_contexts[a_name] for a_name in (long_epoch_name, short_epoch_name, global_epoch_name)]
+    long_session, short_session, global_session = [curr_active_pipeline.filtered_sessions[an_epoch_name] for an_epoch_name in [long_epoch_name, short_epoch_name, global_epoch_name]]
+    long_epoch_name, short_epoch_name, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
+
+
     # ==================================================================================================================================================================================================================================================================================== #
     # Start Building Figure                                                                                                                                                                                                                                                                #
     # ==================================================================================================================================================================================================================================================================================== #
@@ -158,6 +166,17 @@ def _plot_all_time_decoded_marginal_figures_non_interactive(curr_active_pipeline
     # ==================================================================================================================================================================================================================================================================================== #
     # Begin Subfunctions                                                                                                                                                                                                                                                                   #
     # ==================================================================================================================================================================================================================================================================================== #
+
+    def _subfn_clean_axes_decorations(an_ax):
+        """ removes ticks, titles, and other intrusive elements from each axes
+        _subfn_clean_axes_decorations(an_ax=ax_dict["ax_top"])
+        """
+        an_ax.set_xticklabels([])
+        an_ax.set_yticklabels([])    
+        an_ax.set_title('') ## remove title
+        # fig.canvas.manager.set_window_title()
+        
+
 
     def _subfn_display_grid_bin_bounds_validation(owning_pipeline_reference, is_x_axis: bool = True, pos_var_names_override=None, ax=None): # , global_computation_results, computation_results, active_configs, include_includelist=None, defer_render=False, save_figure=True
         """ Renders a single figure that shows the 1D linearized position from several different sources to ensure sufficient overlap. Useful for validating that the grid_bin_bounds are chosen reasonably.
@@ -301,9 +320,6 @@ def _plot_all_time_decoded_marginal_figures_non_interactive(curr_active_pipeline
     # Begin Function Body                                                                                                                                                                                                                                                                  #
     # ==================================================================================================================================================================================================================================================================================== #
 
-    # requires `laps_is_most_likely_direction_LR_dir` from `laps_marginals`
-    long_epoch_name, short_epoch_name, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
-
     graphics_output_dict = {}
 
     # Shared active_decoder, global_session:
@@ -311,96 +327,79 @@ def _plot_all_time_decoded_marginal_figures_non_interactive(curr_active_pipeline
 
     # 'figure.constrained_layout.use': False, 'figure.autolayout': False, 'figure.subplot.bottom': 0.11, 'figure.figsize': (6.4, 4.8)
     # 'figure.constrained_layout.use': constrained_layout, 'figure.autolayout': False, 'figure.subplot.bottom': 0.11, 'figure.figsize': (6.4, 4.8)
-    # with mpl.rc_context({'figure.dpi': '220', 'savefig.transparent': True, 'ps.fonttype': 42, 'figure.constrained_layout.use': (constrained_layout or False), 'figure.frameon': False, }): # 'figure.figsize': (12.4, 4.8), 
-    #     # Create a FigureCollector instance
-    #     with FigureCollector(name='plot_all_time_decoded_marginal_figures', base_context=display_context) as collector:
-            # fig, ax_dict = collector.subplot_mosaic(
+    with mpl.rc_context({'figure.dpi': '220', 'savefig.transparent': True, 'ps.fonttype': 42, 'figure.constrained_layout.use': (constrained_layout or False), 'figure.frameon': False, }): # 'figure.figsize': (12.4, 4.8), 
+        # Create a FigureCollector instance
+        with FigureCollector(name='plot_all_time_decoded_marginal_figures', base_context=display_context) as collector:
+            fig, ax_dict = collector.subplot_mosaic(
+                # fig = plt.figure(layout="constrained")
+                # ax_dict = fig.subplot_mosaic(
+                [
+                    ["ax_top"],
+                    ["ax_decodedMarginal_P_Short_v_time"],
+                    ["ax_position_and_laps_v_time"],
+                ],
+                # set the height ratios between the rows
+                # height_ratios=[8, 1],
+                # height_ratios=[1, 1],
+                # set the width ratios between the columns
+                height_ratios=[2, 1, 4],
+                sharex=True,
+                gridspec_kw=dict(wspace=0, hspace=0) # `wspace=0`` is responsible for sticking the pf and the activity axes together with no spacing
+            )
+
+
+            # fig = None
+            an_ax = ax_dict["ax_decodedMarginal_P_Short_v_time"] ## no figure (should I be using collector??)
+
+            # decoded posterior overlay __________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
+            variable_name: str = ''
+            xbin = None
+            active_most_likely_positions = None
+            active_posterior = deepcopy(a_1D_posterior)
+            posterior_heatmap_imshow_kwargs = dict() # zorder=-1, alpha=0.1
             
-    fig = plt.figure(layout="constrained")
-    ax_dict = fig.subplot_mosaic(
-        [
-            ["ax_top"],
-            ["ax_decodedMarginal_P_Short_v_time"],
-            ["ax_position_and_laps_v_time"],
-        ],
-        # set the height ratios between the rows
-        # height_ratios=[8, 1],
-        # height_ratios=[1, 1],
-        # set the width ratios between the columns
-        height_ratios=[2, 1, 4],
-        sharey=False,
-        gridspec_kw=dict(wspace=0, hspace=0) # `wspace=0`` is responsible for sticking the pf and the activity axes together with no spacing
-    )
-    # hist_data = np.random.randn(1_500)
-    # xbin_centers = np.arange(len(hist_data))+0.5
+            ### construct fake position axis (xbin):
+            n_xbins, n_t_bins = np.shape(a_1D_posterior)
+            if xbin is None:
+                xbin = np.arange(n_xbins)
+
+            ## Actual plotting portion:
+            fig, an_ax = plot_1D_most_likely_position_comparsions(measured_position_df=None, time_window_centers=a_time_window_centers, xbin=deepcopy(xbin),
+                                                                    posterior=active_posterior,
+                                                                    active_most_likely_positions_1D=active_most_likely_positions,
+                                                                    ax=an_ax, variable_name=variable_name, debug_print=True, enable_flat_line_drawing=False,
+                                                                    posterior_heatmap_imshow_kwargs=posterior_heatmap_imshow_kwargs)
+            
+            _subfn_clean_axes_decorations(an_ax=ax_dict["ax_decodedMarginal_P_Short_v_time"])
+        
+
+            # Position/bounds lines ______________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
+            an_ax = ax_dict["ax_position_and_laps_v_time"]
+            graphics_output_dict: MatplotlibRenderPlots = _subfn_display_grid_bin_bounds_validation(owning_pipeline_reference=curr_active_pipeline, pos_var_names_override=['lin_pos'], ax=an_ax) # (or ['x']) build basic position/bounds figure as a starting point
+            an_ax = graphics_output_dict.axes[0]
+            fig = graphics_output_dict.figures[0]
+            _subfn_clean_axes_decorations(an_ax=ax_dict["ax_position_and_laps_v_time"])
 
 
+            # Add Epochs (Laps/PBEs/Delta_t/etc) _________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
+            ## from `_display_long_short_laps`
+            from pyphoplacecellanalysis.PhoPositionalData.plotting.laps import plot_laps_2d
+            
+            an_ax = ax_dict["ax_top"]
+            fig, out_axes_list = plot_laps_2d(global_session, legacy_plotting_mode=False, include_velocity=False, include_accel=False, axes_list=[an_ax], **kwargs)
+            _subfn_clean_axes_decorations(an_ax=ax_dict["ax_top"])
 
+            # final_context = curr_active_pipeline.sess.get_context().adding_context('display_fn', display_fn_name='display_long_short_laps')
 
-    # fig = None
-    an_ax = ax_dict["ax_decodedMarginal_P_Short_v_time"] ## no figure (should I be using collector??)
+            # def _perform_write_to_file_callback():
+            #     return curr_active_pipeline.output_figure(final_context, fig)
 
-    # decoded posterior overlay __________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
-    variable_name: str = ''
-    xbin = None
-    active_most_likely_positions = None
-    active_posterior = deepcopy(a_1D_posterior)
-    posterior_heatmap_imshow_kwargs = dict() # zorder=-1, alpha=0.1
-    
-    ### construct fake position axis (xbin):
-    n_xbins, n_t_bins = np.shape(a_1D_posterior)
-    if xbin is None:
-        xbin = np.arange(n_xbins)
-
-    ## Actual plotting portion:
-    fig, an_ax = plot_1D_most_likely_position_comparsions(measured_position_df=None, time_window_centers=a_time_window_centers, xbin=deepcopy(xbin),
-                                                            posterior=active_posterior,
-                                                            active_most_likely_positions_1D=active_most_likely_positions,
-                                                            ax=an_ax, variable_name=variable_name, debug_print=True, enable_flat_line_drawing=False,
-                                                            posterior_heatmap_imshow_kwargs=posterior_heatmap_imshow_kwargs)
-    
-    ax_dict["ax_decodedMarginal_P_Short_v_time"].set_xticklabels([])
-    ax_dict["ax_decodedMarginal_P_Short_v_time"].set_yticklabels([])
-    
-
-    # Position/bounds lines ______________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
-    an_ax = ax_dict["ax_position_and_laps_v_time"]
-    graphics_output_dict: MatplotlibRenderPlots = _subfn_display_grid_bin_bounds_validation(owning_pipeline_reference=curr_active_pipeline, pos_var_names_override=['lin_pos'], ax=an_ax) # (or ['x']) build basic position/bounds figure as a starting point
-    an_ax = graphics_output_dict.axes[0]
-    fig = graphics_output_dict.figures[0]
-    ax_dict["ax_position_and_laps_v_time"].set_xticklabels([])
-    ax_dict["ax_position_and_laps_v_time"].set_yticklabels([])
-
-
-    # Add Epochs (Laps/PBEs/Delta_t/etc) _________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
-    ## from `_display_long_short_laps`
-    from pyphoplacecellanalysis.PhoPositionalData.plotting.laps import plot_laps_2d
-
-    # active_config_name = kwargs.pop('active_config_name', None)
-
-    long_epoch_name, short_epoch_name, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
-    # long_epoch_context, short_epoch_context, global_epoch_context = [curr_active_pipeline.filtered_contexts[a_name] for a_name in (long_epoch_name, short_epoch_name, global_epoch_name)]
-    long_session, short_session, global_session = [curr_active_pipeline.filtered_sessions[an_epoch_name] for an_epoch_name in [long_epoch_name, short_epoch_name, global_epoch_name]]
-    
-    an_ax = ax_dict["ax_top"]
-    fig, out_axes_list = plot_laps_2d(global_session, legacy_plotting_mode=True, include_velocity=False, include_accel=False, axes_list=[an_ax], **kwargs)
-    ax_dict["ax_top"].set_xticklabels([])
-    ax_dict["ax_top"].set_yticklabels([])    
-
-    # out_axes_list[0].set_title('Estimated Laps')
-    # fig.canvas.manager.set_window_title('Estimated Laps')
-
-    # final_context = curr_active_pipeline.sess.get_context().adding_context('display_fn', display_fn_name='display_long_short_laps')
-
-    # def _perform_write_to_file_callback():
-    #     return curr_active_pipeline.output_figure(final_context, fig)
-
-    # if save_figure:
-    #     active_out_figure_paths = _perform_write_to_file_callback()
-    # else:
-    #     active_out_figure_paths = []
-                    
-    # graphics_output_dict = MatplotlibRenderPlots(name='_display_long_short_laps', figures=(fig,), axes=out_axes_list, plot_data={}, context=final_context, saved_figures=active_out_figure_paths)
+            # if save_figure:
+            #     active_out_figure_paths = _perform_write_to_file_callback()
+            # else:
+            #     active_out_figure_paths = []
+                            
+            # graphics_output_dict = MatplotlibRenderPlots(name='_display_long_short_laps', figures=(fig,), axes=out_axes_list, plot_data={}, context=final_context, saved_figures=active_out_figure_paths)
 
     return graphics_output_dict
 
