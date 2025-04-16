@@ -2004,8 +2004,7 @@ class EpochComputationDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Di
     Must have a signature of: (owning_pipeline_reference, global_computation_results, computation_results, active_configs, ..., **kwargs) at a minimum
     """
 
-
-    @function_attributes(short_name='generalized_decoded_yellow_blue_marginal_epochs', tags=['yellow-blue-plots', 'directional_merged_decoder_decoded_epochs', 'directional'], conforms_to=['output_registering', 'figure_saving'], input_requires=[], output_provides=[], uses=['plot_decoded_epoch_slices'], used_by=[], creation_date='2024-01-04 02:59', related_items=[], is_global=True)
+    @function_attributes(short_name='generalized_decoded_yellow_blue_marginal_epochs', tags=['yellow-blue-plots', 'directional_merged_decoder_decoded_epochs', 'directional'], conforms_to=['output_registering', 'figure_saving'], input_requires=[], output_provides=[], uses=['plot_decoded_epoch_slices'], used_by=[], creation_date='2025-04-16 05:49', related_items=[], is_global=True)
     def _display_generalized_decoded_yellow_blue_marginal_epochs(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, save_figure=True, included_any_context_neuron_ids=None,
                                                     single_plot_fixed_height=50.0, size=(35, 3), dpi=100, constrained_layout=True, skip_plotting_measured_positions=True, skip_plotting_most_likely_positions=True, **kwargs):
             """ Renders two windows, one with the decoded laps and another with the decoded ripple posteriors, computed using the merged pseudo-2D decoder.
@@ -2013,7 +2012,14 @@ class EpochComputationDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Di
             
             Based off of ``
             
-            
+            Usage:
+                # getting `_display_generalized_decoded_yellow_blue_marginal_epochs` into shape
+                curr_active_pipeline.reload_default_display_functions()
+
+
+                _out = dict()
+                _out['_display_generalized_decoded_yellow_blue_marginal_epochs'] = curr_active_pipeline.display(display_function='_display_generalized_decoded_yellow_blue_marginal_epochs', active_session_configuration_context=None) # _display_directional_track_template_pf1Ds
+
 
             """
             from neuropy.utils.result_context import IdentifyingContext
@@ -2298,7 +2304,7 @@ class EpochComputationDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Di
 
                     # decoded posterior overlay __________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
                     variable_name: str = ''
-                    y_bin_labels = ['P_Long', 'P_Short']
+                    y_bin_labels = ['long', 'short']
                     xbin = None
                     active_most_likely_positions = None
                     active_posterior = deepcopy(a_1D_posterior)
