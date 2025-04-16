@@ -2005,8 +2005,8 @@ class EpochComputationDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Di
     """
 
     @function_attributes(short_name='generalized_decoded_yellow_blue_marginal_epochs', tags=['yellow-blue-plots', 'directional_merged_decoder_decoded_epochs', 'directional'], conforms_to=['output_registering', 'figure_saving'], input_requires=[], output_provides=[], uses=['plot_decoded_epoch_slices'], used_by=[], creation_date='2025-04-16 05:49', related_items=[], is_global=True)
-    def _display_generalized_decoded_yellow_blue_marginal_epochs(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, save_figure=True, included_any_context_neuron_ids=None,
-                                                    single_plot_fixed_height=50.0, size=(35, 3), dpi=100, constrained_layout=True, skip_plotting_measured_positions=True, skip_plotting_most_likely_positions=True, **kwargs):
+    def _display_generalized_decoded_yellow_blue_marginal_epochs(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, save_figure=True,
+                                                    single_plot_fixed_height=50.0, size=(35, 3), dpi=100, constrained_layout=True, **kwargs):
             """ Renders two windows, one with the decoded laps and another with the decoded ripple posteriors, computed using the merged pseudo-2D decoder.
             
             
