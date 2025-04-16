@@ -85,7 +85,7 @@ from pyphoplacecellanalysis.General.Model.Configs.LongShortDisplayConfig import 
 
 
 @function_attributes(short_name=None, tags=['plot', 'figure', 'matplotlib'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-04-14 17:55', related_items=[])
-def _plot_all_time_decoded_marginal_figures_non_interactive(curr_active_pipeline, best_matching_context: IdentifyingContext, a_decoded_marginal_posterior_df: pd.DataFrame, epochs_decoding_time_bin_size: float = 0.025):
+def _plot_all_time_decoded_marginal_figures_non_interactive(curr_active_pipeline, best_matching_context: IdentifyingContext, a_decoded_marginal_posterior_df: pd.DataFrame, epochs_decoding_time_bin_size: float = 0.025, constrained_layout=True, **kwargs):
     """ exports the components needed to show the decoded P_Short/P_Long likelihoods over time
 
 
@@ -96,32 +96,388 @@ def _plot_all_time_decoded_marginal_figures_non_interactive(curr_active_pipeline
     _all_tracks_active_out_figure_paths, _all_tracks_out_artists, _all_tracks_out_axes = 
 
     """
+    from pyphocorehelpers.DataStructure.RenderPlots.MatplotLibRenderPlots import FigureCollector    
+    from pyphocorehelpers.DataStructure.RenderPlots.MatplotLibRenderPlots import MatplotlibRenderPlots
     from pyphocorehelpers.plotting.media_output_helpers import save_array_as_image
+    from neuropy.utils.mixins.time_slicing import TimeColumnAliasesProtocol
+    # from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError import plot_decoded_epoch_slices
+    from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError import plot_1D_most_likely_position_comparsions
+    from neuropy.utils.matplotlib_helpers import get_heatmap_cmap
+    from pyphoplacecellanalysis.General.Model.Configs.LongShortDisplayConfig import PlottingHelpers
+
+    import matplotlib as mpl
+    import matplotlib.pyplot as plt
+    from flexitext import flexitext ## flexitext for formatted matplotlib text
+
+    from pyphocorehelpers.DataStructure.RenderPlots.MatplotLibRenderPlots import FigureCollector
+    from pyphoplacecellanalysis.General.Model.Configs.LongShortDisplayConfig import PlottingHelpers
+    from neuropy.utils.matplotlib_helpers import FormattedFigureText
+    from pyphocorehelpers.DataStructure.RenderPlots.MatplotLibRenderPlots import MatplotlibRenderPlots
+
+
+    # For decoded posterior overlay ______________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
+    from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError import plot_1D_most_likely_position_comparsions
+    from neuropy.utils.matplotlib_helpers import get_heatmap_cmap
+    from pyphoplacecellanalysis.General.Model.Configs.LongShortDisplayConfig import PlottingHelpers
+
+
+
+
 
     complete_session_context, (session_context, additional_session_context) = curr_active_pipeline.get_complete_session_context()
 
     desired_width = 4096
-    # Gets the existing SpikeRasterWindow or creates a new one if one doesn't already exist:
-    # spike_raster_window, (active_2d_plot, active_3d_plot, main_graphics_layout_widget, main_plot_widget, background_static_scroll_plot_widget) = Spike3DRasterWindowWidget.find_or_create_if_needed(curr_active_pipeline, force_create_new=True)
-    # spike_raster_window = active_2d_plot.window()
 
-    _all_tracks_active_out_figure_paths = {}
-    _all_tracks_out_artists = {}
-    _all_tracks_out_axes = {}
+    active_context = kwargs.pop('active_context', None)
+    if active_context is not None:
+        # Update the existing context:
+        display_context = active_context.adding_context('display_fn', display_fn_name='generalized_decoded_yellow_blue_marginal_epochs')
+    else:
+        active_context = curr_active_pipeline.sess.get_context()
+        # Build the active context directly:
+        display_context = curr_active_pipeline.build_display_context_for_session('generalized_decoded_yellow_blue_marginal_epochs')
+
+    fignum = kwargs.pop('fignum', None)
+    if fignum is not None:
+        print(f'WARNING: fignum will be ignored but it was specified as fignum="{fignum}"!')
+
+    defer_render = kwargs.pop('defer_render', False)
+    debug_print: bool = kwargs.pop('debug_print', False)
+    active_config_name: bool = kwargs.pop('active_config_name', None)
+
+    perform_write_to_file_callback = kwargs.pop('perform_write_to_file_callback', (lambda final_context, fig: curr_active_pipeline.output_figure(final_context, fig)))
+
+
+    # ==================================================================================================================================================================================================================================================================================== #
+    # Start Building Figure                                                                                                                                                                                                                                                                #
+    # ==================================================================================================================================================================================================================================================================================== #
+
+    graphics_output_dict = None
+
+
     # for best_matching_context, a_decoded_marginal_posterior_df in flat_decoded_marginal_posterior_df_context_dict.items():
     time_bin_size = epochs_decoding_time_bin_size
     info_string: str = f" - t_bin_size: {time_bin_size}"
     plot_row_identifier: str = best_matching_context.get_description(subset_includelist=['known_named_decoding_epochs_type', 'masked_time_bin_fill_type'], include_property_names=True, key_value_separator=':', separator='|', replace_separator_in_property_names='-')
     a_time_window_centers = a_decoded_marginal_posterior_df['t_bin_center'].to_numpy() 
-    # a_1D_posterior = a_decoded_marginal_posterior_df[['P_Long', 'P_Short']].to_numpy().T
-    a_1D_posterior = a_decoded_marginal_posterior_df[['P_Long', 'P_Short']].to_numpy()
+    a_1D_posterior = a_decoded_marginal_posterior_df[['P_Long', 'P_Short']].to_numpy().T
+    # a_1D_posterior = a_decoded_marginal_posterior_df[['P_Long', 'P_Short']].to_numpy()
 
-    image, out_path = save_array_as_image(a_1D_posterior, desired_height=None, desired_width=desired_width, skip_img_normalization=True)
+    # image, out_path = save_array_as_image(a_1D_posterior, desired_height=None, desired_width=desired_width, skip_img_normalization=True)
     
-    # Save image to file
-    active_out_figure_paths, final_context = curr_active_pipeline.output_figure(final_context=complete_session_context.overwriting_context(display='decoded_P_Short_Posterior_global_epoch'), fig=image, write_png=True, write_vector_format=False)
-    _all_tracks_active_out_figure_paths[final_context] = deepcopy(active_out_figure_paths[0])
+    # # Save image to file
+    # active_out_figure_paths, final_context = curr_active_pipeline.output_figure(final_context=complete_session_context.overwriting_context(display='decoded_P_Short_Posterior_global_epoch'), fig=image, write_png=True, write_vector_format=False)
+    # _all_tracks_active_out_figure_paths[final_context] = deepcopy(active_out_figure_paths[0])
     
+    # ==================================================================================================================================================================================================================================================================================== #
+    # Begin Subfunctions                                                                                                                                                                                                                                                                   #
+    # ==================================================================================================================================================================================================================================================================================== #
+
+    def _subfn_display_grid_bin_bounds_validation(owning_pipeline_reference, is_x_axis: bool = True, pos_var_names_override=None, ax=None): # , global_computation_results, computation_results, active_configs, include_includelist=None, defer_render=False, save_figure=True
+        """ Renders a single figure that shows the 1D linearized position from several different sources to ensure sufficient overlap. Useful for validating that the grid_bin_bounds are chosen reasonably.
+
+        """
+        from pyphoplacecellanalysis.Pho2D.track_shape_drawing import NotableTrackPositions, perform_add_1D_track_bounds_lines
+
+        assert owning_pipeline_reference is not None
+        long_epoch_name, short_epoch_name, global_epoch_name = owning_pipeline_reference.find_LongShortGlobal_epoch_names()
+        long_grid_bin_bounds, short_grid_bin_bounds, global_grid_bin_bounds = [owning_pipeline_reference.computation_results[a_name].computation_config['pf_params'].grid_bin_bounds for a_name in (long_epoch_name, short_epoch_name, global_epoch_name)]
+        # print(long_grid_bin_bounds, short_grid_bin_bounds, global_grid_bin_bounds)
+        
+        long_epoch_context, short_epoch_context, global_epoch_context = [owning_pipeline_reference.filtered_contexts[a_name] for a_name in (long_epoch_name, short_epoch_name, global_epoch_name)]
+        long_session, short_session, global_session = [owning_pipeline_reference.filtered_sessions[an_epoch_name] for an_epoch_name in [long_epoch_name, short_epoch_name, global_epoch_name]]
+        
+        long_pos_df, short_pos_df, global_pos_df, all_pos_df = [a_sess.position.to_dataframe() for a_sess in (long_session, short_session, global_session, owning_pipeline_reference.sess)]
+        combined_pos_df = deepcopy(all_pos_df)
+        combined_pos_df.loc[long_pos_df.index, 'long_lin_pos'] = long_pos_df.lin_pos
+        combined_pos_df.loc[short_pos_df.index, 'short_pos_df'] = short_pos_df.lin_pos
+        combined_pos_df.loc[global_pos_df.index, 'global_lin_pos'] = global_pos_df.lin_pos
+
+        title = f'grid_bin_bounds validation across epochs'
+        if is_x_axis:
+            title = f'{title} - X-axis'
+        else:
+            title = f'{title} - Y-axis'
+            
+        const_line_text_label_y_offset: float = 0.05
+        const_line_text_label_x_offset: float = 0.1
+        
+        if is_x_axis:
+            ## plot x-positions
+            if (pos_var_names_override is not None) and (len(pos_var_names_override) > 0):
+                pos_var_names = pos_var_names_override
+            else:
+                pos_var_names = ['x', 'lin_pos', 'long_lin_pos', 'short_pos_df', 'global_lin_pos'] # use the appropriate defaults
+                
+            combined_pos_df_plot_kwargs = dict(x='t', y=pos_var_names, title='grid_bin_bounds validation across epochs - positions along x-axis', ax=ax)
+        else:
+            ## plot y-positions
+            if (pos_var_names_override is not None) and (len(pos_var_names_override) > 0):
+                pos_var_names = pos_var_names_override
+            else:
+                pos_var_names = ['y']
+            # combined_pos_df_plot_kwargs = dict(x='y', y='t', title='grid_bin_bounds validation across epochs - positions along y-axis')
+            combined_pos_df_plot_kwargs = dict(x='t', y=pos_var_names, title='grid_bin_bounds validation across epochs - positions along y-axis', ax=ax)
+            
+        # Plot all 1D position variables:
+        combined_pos_df.plot(**combined_pos_df_plot_kwargs)
+        fig = plt.gcf() ## always get the figure and set the title
+        if ax is None:
+            ax = plt.gca()
+        ax.set_title(title)
+        fig.canvas.manager.set_window_title(title)
+        
+        ax.legend(loc='upper left') # Move legend inside the plot, in the top-left corner
+        # ax.legend(loc='upper left', bbox_to_anchor=(1, 1)) # Move legend outside the plot
+        
+        final_context = owning_pipeline_reference.sess.get_context().adding_context('display_fn', display_fn_name='_display_grid_bin_bounds_validation')
+        
+        ## Add grid_bin_bounds, track limits, and midpoint lines:
+        curr_config = owning_pipeline_reference.active_configs['maze_any']
+
+        grid_bin_bounds = curr_config.computation_config.pf_params.grid_bin_bounds # ((37.0773897438341, 250.69004399129707), (137.925447118083, 145.16448776601297))
+        # curr_config.computation_config.pf_params.grid_bin # (3.793023081021702, 1.607897707662558)
+        # loaded_track_limits = curr_config.active_session_config.loaded_track_limits
+
+
+        # curr_config.active_session_config.y_midpoint
+        
+        (long_notable_x_platform_positions, short_notable_x_platform_positions), (long_notable_y_platform_positions, short_notable_y_platform_positions) = NotableTrackPositions.init_notable_track_points_from_session_config(owning_pipeline_reference.sess.config)
+        
+        if is_x_axis:
+            ## plot x-positions
+            perform_add_1D_track_bounds_lines_kwargs = dict(long_notable_x_platform_positions=tuple(long_notable_x_platform_positions), short_notable_x_platform_positions=tuple(short_notable_x_platform_positions), is_vertical=False)
+        else:
+            ## plot y-positions
+            perform_add_1D_track_bounds_lines_kwargs = dict(long_notable_x_platform_positions=tuple(long_notable_y_platform_positions), short_notable_x_platform_positions=tuple(short_notable_y_platform_positions), is_vertical=False)
+            
+        long_track_line_collection, short_track_line_collection = perform_add_1D_track_bounds_lines(**perform_add_1D_track_bounds_lines_kwargs, ax=ax)
+
+
+        # Plot REAL `grid_bin_bounds` ________________________________________________________________________________________ #
+        ((grid_bin_bounds_x0, grid_bin_bounds_x1), (grid_bin_bounds_y0, grid_bin_bounds_y1)) = grid_bin_bounds
+        if is_x_axis:
+            ## horizontal lines:
+            common_ax_bound_kwargs = dict(xmin=ax.get_xbound()[0], xmax=ax.get_xbound()[1])
+        else:
+            # common_ax_bound_kwargs = dict(ymin=ax.get_ybound()[0], ymax=ax.get_ybound()[1]) 
+            common_ax_bound_kwargs = dict(xmin=ax.get_xbound()[0], xmax=ax.get_xbound()[1])  ## y-axis along x (like a 1D plot) Mode
+
+        if is_x_axis:
+            ## plot x-positions
+            ## horizontal lines:
+            ## midpoint line: dotted blue line centered in the bounds (along y)
+            x_midpoint = curr_config.active_session_config.x_midpoint # 143.88489208633095
+            midpoint_line_collection = ax.hlines(x_midpoint, label='x_midpoint', xmin=ax.get_xbound()[0], xmax=ax.get_xbound()[1], colors='#0000FFAA', linewidths=1.0, linestyles='dashed', zorder=-98) # matplotlib.collections.LineCollection midpoint_line_collection
+            ax.text(ax.get_xbound()[1], (x_midpoint + const_line_text_label_y_offset), 'x_mid', ha='right', va='bottom', fontsize=8, color='#0000FFAA', zorder=-98) # Add right-aligned text label slightly above the hline
+        
+            ## 2 lines corresponding to the x0 and x1 of the grid_bin_bounds:
+            grid_bin_bounds_line_collection = ax.hlines([grid_bin_bounds_x0, grid_bin_bounds_x1], label='grid_bin_bounds - after - dark blue', **common_ax_bound_kwargs, colors='#2e2e20', linewidths=2.0, linestyles='solid', zorder=-98) # grid_bin_bounds_line_collection
+            # _grid_bin_bound_labels_x_pos = (ax.get_xbound()[1] - const_line_text_label_x_offset)
+            _grid_bin_bound_labels_x_pos: float = ax.get_xbound()[0] + ((ax.get_xbound()[1] - ax.get_xbound()[0])/2.0) # center point
+            print(f'_grid_bin_bound_labels_x_pos: {_grid_bin_bound_labels_x_pos}')
+            ax.text(_grid_bin_bound_labels_x_pos, (grid_bin_bounds_x0 - const_line_text_label_y_offset), 'grid_bin_bounds[x0]', ha='center', va='bottom', fontsize=9, color='#2e2d20', zorder=-97) # Add right-aligned text label slightly above the hline
+            ax.text(_grid_bin_bound_labels_x_pos, (grid_bin_bounds_x1 + const_line_text_label_y_offset), 'grid_bin_bounds[x1]', ha='center', va='top', fontsize=9, color='#2e2d20', zorder=-97) # this will be the top (highest y-pos) line.
+            
+        else:
+            ## plot y-positions
+            midpoint_line_collection = None
+            # grid_bin_bounds_line_collection = None
+            grid_bin_bounds_positions_list = [grid_bin_bounds_y0, grid_bin_bounds_y1]
+            grid_bin_bounds_label_names_list = ['grid_bin_bounds[y0]', 'grid_bin_bounds[y1]']
+            ## 2 lines corresponding to the x0 and x1 of the grid_bin_bounds:
+            grid_bin_bounds_line_collection = ax.hlines(grid_bin_bounds_positions_list, label='grid_bin_bounds - after - dark blue', **common_ax_bound_kwargs, colors='#2e2e20', linewidths=2.0, linestyles='solid', zorder=-98) # grid_bin_bounds_line_collection
+            # _grid_bin_bound_labels_x_pos = (ax.get_xbound()[1] - const_line_text_label_x_offset)
+            _grid_bin_bound_labels_x_pos: float = ax.get_xbound()[0] + ((ax.get_xbound()[1] - ax.get_xbound()[0])/2.0) # center point
+            # print(f'_grid_bin_bound_labels_y_pos: {_grid_bin_bound_labels_y_pos}')
+            # ax.text(_grid_bin_bound_labels_y_pos, (grid_bin_bounds_y0 - const_line_text_label_y_offset), 'grid_bin_bounds[x0]', ha='center', va='bottom', fontsize=9, color='#2e2d20', zorder=-97) # Add right-aligned text label slightly above the hline
+            # ax.text(_grid_bin_bound_labels_y_pos, (grid_bin_bounds_x1 + const_line_text_label_y_offset), 'grid_bin_bounds[x1]', ha='center', va='top', fontsize=9, color='#2e2d20', zorder=-97) # this will be the top (highest y-pos) line.	
+            # Iterate through the hlines in the LineCollection and add labels
+            assert len(grid_bin_bounds_label_names_list) == len(grid_bin_bounds_positions_list)
+            for pos, a_txt_label in zip(grid_bin_bounds_positions_list, grid_bin_bounds_label_names_list):
+                # ax.text(ax.get_xbound()[1], (pos + const_line_text_label_y_offset), a_txt_label, color='#2e2d20', fontsize=9, ha='center', va='center', zorder=-97)
+                ax.text(_grid_bin_bound_labels_x_pos, (pos + const_line_text_label_y_offset), a_txt_label, color='#2e2d20', fontsize=9, ha='center', va='center', zorder=-97)
+        
+        # Show legend
+        # ax.legend()
+
+        # if save_figure:
+        #     saved_figure_paths = owning_pipeline_reference.output_figure(final_context, fig)
+        # else:
+        #     saved_figure_paths = []
+
+        graphics_output_dict = MatplotlibRenderPlots(name='_display_grid_bin_bounds_validation', figures=(fig,), axes=(ax,), plot_data={'midpoint_line_collection': midpoint_line_collection, 'grid_bin_bounds_line_collection': grid_bin_bounds_line_collection, 'long_track_line_collection': long_track_line_collection, 'short_track_line_collection': short_track_line_collection}, context=final_context, saved_figures=[])
+        return graphics_output_dict
+    ## END _subfn_display_grid_bin_bounds_validation...
+
+
+    # ==================================================================================================================================================================================================================================================================================== #
+    # Begin Function Body                                                                                                                                                                                                                                                                  #
+    # ==================================================================================================================================================================================================================================================================================== #
+
+    # # Extract kwargs for figure rendering
+    # render_merged_pseudo2D_decoder_laps = kwargs.pop('render_merged_pseudo2D_decoder_laps', False)
+
+    # render_directional_marginal_laps = kwargs.pop('render_directional_marginal_laps', True)
+    # render_directional_marginal_ripples = kwargs.pop('render_directional_marginal_ripples', False)
+    # render_track_identity_marginal_laps = kwargs.pop('render_track_identity_marginal_laps', False)
+    # render_track_identity_marginal_ripples = kwargs.pop('render_track_identity_marginal_ripples', False)
+
+    # directional_merged_decoders_result = kwargs.pop('directional_merged_decoders_result', None)
+    # if directional_merged_decoders_result is not None:
+    #     print("WARN: User provided a custom directional_merged_decoders_result as a kwarg. This will be used instead of the computed result global_computation_results.computed_data['DirectionalMergedDecoders'].")
+        
+    # else:
+    #     directional_merged_decoders_result = curr_active_pipeline.global_computation_results.computed_data['DirectionalMergedDecoders']
+
+
+    # # get the time bin size from the decoder:
+    # laps_decoding_time_bin_size: float = directional_merged_decoders_result.laps_decoding_time_bin_size
+    # ripple_decoding_time_bin_size: float = directional_merged_decoders_result.ripple_decoding_time_bin_size
+
+    # figure_name: str = kwargs.pop('figure_name', 'directional_laps_overview_figure')
+    # _out_data = RenderPlotsData(name=figure_name, out_colors_heatmap_image_matrix_dicts={})
+
+    # Recover from the saved global result:
+    # directional_laps_results = global_computation_results.computed_data['DirectionalLaps']
+    # directional_merged_decoders_result = global_computation_results.computed_data['DirectionalMergedDecoders']
+
+    # requires `laps_is_most_likely_direction_LR_dir` from `laps_marginals`
+    long_epoch_name, short_epoch_name, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
+
+    graphics_output_dict = {}
+
+    # Shared active_decoder, global_session:
+    global_session = deepcopy(curr_active_pipeline.filtered_sessions[global_epoch_name]) # used for validate_lap_dir_estimations(...) 
+
+    # 'figure.constrained_layout.use': False, 'figure.autolayout': False, 'figure.subplot.bottom': 0.11, 'figure.figsize': (6.4, 4.8)
+    # 'figure.constrained_layout.use': constrained_layout, 'figure.autolayout': False, 'figure.subplot.bottom': 0.11, 'figure.figsize': (6.4, 4.8)
+    with mpl.rc_context({'figure.dpi': '220', 'savefig.transparent': True, 'ps.fonttype': 42, 'figure.constrained_layout.use': (constrained_layout or False), 'figure.frameon': False, }): # 'figure.figsize': (12.4, 4.8), 
+        # Create a FigureCollector instance
+        with FigureCollector(name='plot_directional_merged_pf_decoded_epochs', base_context=display_context) as collector:
+
+            # ## Define the overriden plot function that internally calls the normal plot function but also permits doing operations before and after, such as building titles or extracting figures to save them:
+            # def _mod_plot_decoded_epoch_slices(*args, **subfn_kwargs):
+            #     """ implicitly captures: owning_pipeline_reference, collector, perform_write_to_file_callback, save_figure, skip_plotting_measured_positions=True, skip_plotting_most_likely_positions=True
+
+            #     NOTE: each call requires adding the additional kwarg: `_main_context=_main_context`
+            #     """
+            #     assert '_mod_plot_kwargs' in subfn_kwargs
+            #     _mod_plot_kwargs = subfn_kwargs.pop('_mod_plot_kwargs')
+            #     assert 'final_context' in _mod_plot_kwargs
+            #     _main_context = _mod_plot_kwargs['final_context']
+            #     assert _main_context is not None
+            #     # Build the rest of the properties:
+            #     sub_context: IdentifyingContext = curr_active_pipeline.build_display_context_for_session('directional_merged_pf_decoded_epochs', **_main_context)
+            #     sub_context_str: str = sub_context.get_description(subset_includelist=['t_bin'], include_property_names=True) # 't-bin_0.5' # str(sub_context.get_description())
+            #     modified_name: str = subfn_kwargs.pop('name', '')
+            #     if len(sub_context_str) > 0:
+            #         modified_name = f"{modified_name}_{sub_context_str}"
+            #     subfn_kwargs['name'] = modified_name # update the name by appending 't-bin_0.5'
+                
+            #     # Call the main plot function:
+            #     out_plot_tuple = plot_decoded_epoch_slices(*args, skip_plotting_measured_positions=skip_plotting_measured_positions, skip_plotting_most_likely_positions=skip_plotting_most_likely_positions, **subfn_kwargs)
+            #     # Post-plot call:
+            #     assert len(out_plot_tuple) == 4
+            #     params, plots_data, plots, ui = out_plot_tuple # [2] corresponds to 'plots' in params, plots_data, plots, ui = laps_plots_tuple
+            #     # post_hoc_append to collector
+            #     mw = ui.mw # MatplotlibTimeSynchronizedWidget
+                
+            #     y_bin_labels = _mod_plot_kwargs.get('y_bin_labels', None)
+            #     if y_bin_labels is not None:
+            #         label_artists_dict = {}
+            #         for i, ax in enumerate(plots.axs):
+            #             label_artists_dict[ax] = PlottingHelpers.helper_matplotlib_add_pseudo2D_marginal_labels(ax, y_bin_labels=y_bin_labels, enable_draw_decoder_colored_lines=False)
+            #         plots['label_artists_dict'] = label_artists_dict
+                    
+
+            #     if mw is not None:
+            #         fig = mw.getFigure()
+            #         collector.post_hoc_append(figs=mw.fig, axes=mw.axes, contexts=sub_context)
+            #         title = mw.params.name
+            #     else:
+            #         fig = plots.fig
+            #         collector.post_hoc_append(figs=fig, axes=plots.axs, contexts=sub_context)
+            #         title = params.name
+
+            #     # Recover the proper title:
+            #     assert title is not None, f"title: {title}"
+            #     print(f'title: {title}')
+                
+            #     if ((perform_write_to_file_callback is not None) and (sub_context is not None)):
+            #         if save_figure:
+            #             perform_write_to_file_callback(sub_context, fig)
+                    
+            #     # Close if defer_render
+            #     if defer_render:
+            #         if mw is not None:
+            #             mw.close()
+
+            #     return out_plot_tuple
+            # ## END def _mod_plot_decoded_epoch_slices...
+
+            fig = None
+            an_ax = None ## no figure (should I be using collector??)
+
+
+            # decoded posterior overlay __________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
+            variable_name: str = ''
+            xbin = None
+            active_most_likely_positions = None
+            active_posterior = deepcopy(a_1D_posterior)
+            posterior_heatmap_imshow_kwargs = dict(zorder=-1, alpha=0.1)
+            
+            ### construct fake position axis (xbin):
+            n_xbins, n_t_bins = np.shape(a_1D_posterior)
+            if xbin is None:
+                xbin = np.arange(n_xbins)
+
+            ## Actual plotting portion:
+            fig, an_ax = plot_1D_most_likely_position_comparsions(measured_position_df=None, time_window_centers=a_time_window_centers, xbin=deepcopy(xbin),
+                                                                    posterior=active_posterior,
+                                                                    active_most_likely_positions_1D=active_most_likely_positions,
+                                                                    ax=an_ax, variable_name=variable_name, debug_print=True, enable_flat_line_drawing=False,
+                                                                    posterior_heatmap_imshow_kwargs=posterior_heatmap_imshow_kwargs)
+            
+
+
+            # Position/bounds lines ______________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
+            graphics_output_dict: MatplotlibRenderPlots = _subfn_display_grid_bin_bounds_validation(owning_pipeline_reference=curr_active_pipeline, pos_var_names_override=['lin_pos'], ax=an_ax) # (or ['x']) build basic position/bounds figure as a starting point
+
+            an_ax = graphics_output_dict.axes[0]
+            fig = graphics_output_dict.figures[0]
+
+
+
+
+            # Add Epochs (Laps/PBEs/Delta_t/etc) _________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
+            ## from `_display_long_short_laps`
+            from pyphoplacecellanalysis.PhoPositionalData.plotting.laps import plot_laps_2d
+
+            # active_config_name = kwargs.pop('active_config_name', None)
+
+            long_epoch_name, short_epoch_name, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
+            # long_epoch_context, short_epoch_context, global_epoch_context = [curr_active_pipeline.filtered_contexts[a_name] for a_name in (long_epoch_name, short_epoch_name, global_epoch_name)]
+            long_session, short_session, global_session = [curr_active_pipeline.filtered_sessions[an_epoch_name] for an_epoch_name in [long_epoch_name, short_epoch_name, global_epoch_name]]
+            
+
+            fig, out_axes_list = plot_laps_2d(global_session, legacy_plotting_mode=False, include_velocity=False, include_accel=False, axes_list=[an_ax], **kwargs)
+            out_axes_list[0].set_title('Estimated Laps')
+            fig.canvas.manager.set_window_title('Estimated Laps')
+
+            # final_context = curr_active_pipeline.sess.get_context().adding_context('display_fn', display_fn_name='display_long_short_laps')
+
+            # def _perform_write_to_file_callback():
+            #     return curr_active_pipeline.output_figure(final_context, fig)
+
+            # if save_figure:
+            #     active_out_figure_paths = _perform_write_to_file_callback()
+            # else:
+            #     active_out_figure_paths = []
+                            
+            # graphics_output_dict = MatplotlibRenderPlots(name='_display_long_short_laps', figures=(fig,), axes=out_axes_list, plot_data={}, context=final_context, saved_figures=active_out_figure_paths)
+
+
 
 
     # identifier_name, widget, matplotlib_fig, matplotlib_fig_axes, dock_item = active_2d_plot.add_docked_marginal_track(name=plot_row_identifier, time_window_centers=a_time_window_centers, a_1D_posterior=a_1D_posterior, extended_dock_title_info=info_string)
@@ -165,7 +521,6 @@ def _plot_all_time_decoded_marginal_figures_non_interactive(curr_active_pipeline
     # _all_tracks_active_out_figure_paths[final_context] = deepcopy(active_out_figure_paths)
 
 
-
     # # Epoch Intervals figure: ____________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
     # curr_identifier_name = 'interval_overview'
     # _interval_tracks_out_dict = active_2d_plot.prepare_pyqtgraph_intervalPlot_tracks(enable_interval_overview_track=True, should_remove_all_and_re_add=True, should_link_to_main_plot_widget=False)
@@ -187,7 +542,7 @@ def _plot_all_time_decoded_marginal_figures_non_interactive(curr_active_pipeline
     # output_img = vertical_image_stack(imgs, v_overlap=0, padding=0)
 
 
-    return _all_tracks_active_out_figure_paths, _all_tracks_out_artists, _all_tracks_out_axes
+    return graphics_output_dict
 
 
 
@@ -343,8 +698,8 @@ def _plot_all_time_decoded_marginal_figures(curr_active_pipeline, best_matching_
 
         a_dock = active_2d_plot.find_display_dock(identifier=curr_identifier_name)
         if a_dock is None:
-            global_flat_action_dict['AddTimeCurves.Position'].trigger()
-            a_dock = active_2d_plot.find_display_dock(identifier=curr_identifier_name)
+            global_flat_action_dict['AddTimeCurves.Position'].trigger() ## build the item
+            a_dock = active_2d_plot.find_display_dock(identifier=curr_identifier_name) ## get the item
 
         widget: PyqtgraphTimeSynchronizedWidget = a_dock.widgets[0]
         # active_2d_plot.sync_matplotlib_render_plot_widget(identifier=curr_identifier_name, sync_mode=sync_mode) ## set sync mode
@@ -353,8 +708,6 @@ def _plot_all_time_decoded_marginal_figures(curr_active_pipeline, best_matching_
         # widget.update(None)
         # widget.draw()
         widget.getRootPlotItem().update()
-
-
 
         _all_tracks_out_artists[curr_identifier_name] = widget
         _all_tracks_out_axes[curr_identifier_name] = widget.getRootPlotItem()
