@@ -2034,10 +2034,6 @@ class EpochComputationDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Di
             from flexitext import flexitext ## flexitext for formatted matplotlib text
 
             from pyphocorehelpers.DataStructure.RenderPlots.MatplotLibRenderPlots import FigureCollector
-
-            import matplotlib as mpl
-            import matplotlib.pyplot as plt
-            from flexitext import flexitext ## flexitext for formatted matplotlib text
             from neuropy.utils.matplotlib_helpers import FormattedFigureText
 
 
@@ -2181,7 +2177,7 @@ class EpochComputationDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Di
                                                                             active_most_likely_positions_1D=active_most_likely_positions,
                                                                             ax=an_ax, variable_name=variable_name, debug_print=True, enable_flat_line_drawing=False,
                                                                             posterior_heatmap_imshow_kwargs=posterior_heatmap_imshow_kwargs)
-                    label_artists_dict = PlottingHelpers.helper_matplotlib_add_pseudo2D_marginal_labels(an_ax, y_bin_labels=y_bin_labels, enable_draw_decoder_colored_lines=False)
+                    label_artists_dict = PlottingHelpers.helper_matplotlib_add_pseudo2D_marginal_labels(an_ax, y_bin_labels=y_bin_labels, enable_draw_decoder_colored_lines=False, should_use_outer_labels=False)
                     _subfn_clean_axes_decorations(an_ax=ax_dict["ax_decodedMarginal_P_Short_v_time"])
                 
 
@@ -2202,7 +2198,9 @@ class EpochComputationDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Di
                     _subfn_clean_axes_decorations(an_ax=ax_dict["ax_top"])
                     
 
-
+                    # ==================================================================================================================================================================================================================================================================================== #
+                    # Titles/Formatting/Marginas and Saving                                                                                                                                                                                                                                                #
+                    # ==================================================================================================================================================================================================================================================================================== #
                     active_config = deepcopy(a_decoder.pf.config)
 
                     subtitle_string = active_config.str_for_display(is_2D=False) # , normal_to_extras_line_sep=","
@@ -2211,22 +2209,26 @@ class EpochComputationDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Di
                     ## BUild figure titles:
                     # INPUTS: main_fig
                     fig.suptitle('')
-                    text_formatter = FormattedFigureText() # .init_from_margins(left_margin=0.01)
+                    # text_formatter = FormattedFigureText() # .init_from_margins(left_margin=0.01)
                     # text_formatter.setup_margins(fig, left_margin=0.01) # , left_margin=0.1
-                    # text_formatter = FormattedFigureText.init_from_margins(left_margin=0.01) # , top_margin=0.9
+                    text_formatter = FormattedFigureText.init_from_margins(left_margin=0.01, right_margin=0.99) # , top_margin=0.9
                     # text_formatter.setup_margins(fig, left_margin=0.01, top_margin=0.9)
                     text_formatter.setup_margins(fig)
                     title_string: str = f"generalized_decoded_yellow_blue_marginal_epochs"
+                    # session_footer_string: str =  active_context.get_description(subset_includelist=['format_name', 'animal', 'exper_name', 'session_name'], separator=' | ') 
+                    session_footer_string: str =  active_context.get_description(separator=' | ') 
+
                     # subtitle_string = '\n'.join([f'{active_config.str_for_display(is_2D)}'])
                     # header_text_obj = flexitext(text_formatter.left_margin, 0.9, f'<size:22><weight:bold>{title_string}</></>\n<size:10>{subtitle_string}</>', va="bottom", xycoords="figure fraction") # , wrap=False
                     header_text_obj = flexitext(0.01, 0.85, f'<size:20><weight:bold>{title_string}</></>\n<size:9>{subtitle_string}</>', va="bottom", xycoords="figure fraction") # , wrap=False
                     footer_text_obj = text_formatter.add_flexitext_context_footer(active_context=active_context) # flexitext((text_formatter.left_margin*0.1), (text_formatter.bottom_margin*0.25), text_formatter._build_footer_string(active_context=active_context), va="top", xycoords="figure fraction")
-                    fig.canvas.manager.set_window_title(title_string) # sets the window's title
+                    
+                    window_title_string: str = f"{title_string} - {session_footer_string}"
+                    fig.canvas.manager.set_window_title(window_title_string) # sets the window's title
                     if ((_perform_write_to_file_callback is not None) and (display_context is not None)):
                         _perform_write_to_file_callback(display_context, fig)
-                        
 
-
+                    graphics_output_dict['label_objects'] = {'header': header_text_obj, 'footer': footer_text_obj, 'formatter': text_formatter}
             ## END with mpl.rc_context({'figure.dpi': '...
 
 
