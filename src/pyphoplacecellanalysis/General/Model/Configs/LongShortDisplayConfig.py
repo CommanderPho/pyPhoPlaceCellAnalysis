@@ -569,7 +569,7 @@ class PlottingHelpers:
 
     @function_attributes(short_name=None, tags=['matplotlib', 'draw'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-01-01 18:44', related_items=[])
     @classmethod
-    def helper_matplotlib_add_pseudo2D_marginal_labels(cls, ax, y_bin_labels: List[str], enable_draw_decoder_labels: bool = True, enable_draw_decoder_colored_lines: bool = False, should_use_ax_fraction_positioning: bool = True) -> Dict[str, Dict]:
+    def helper_matplotlib_add_pseudo2D_marginal_labels(cls, ax, y_bin_labels: List[str], enable_draw_decoder_labels: bool = True, enable_draw_decoder_colored_lines: bool = False, should_use_ax_fraction_positioning: bool = True, should_use_outer_labels: bool=False) -> Dict[str, Dict]:
         """ adds fixed inner-y labels (along the inside left edge of the ax) containing reference names -- such as ('Long_LR', etc)
         
         should_use_ax_fraction_positioning: bool : if True, the labels and lines are positioned relative to the ax frame in [0, 1] coords, independent of the data ylims
@@ -633,7 +633,19 @@ class PlottingHelpers:
             track_ID_line_y = y_bin_centers - center_offset_px
             track_dir_line_y = y_bin_centers + center_offset_px
             
-            
+        # Determine label position based on should_use_outer_labels
+        if should_use_outer_labels:
+            if should_use_ax_fraction_positioning:
+                label_x_position = -0.01  # Just outside the axis on the left
+                _common_label_kwargs.update(ha='right')  # Right-align text to place near axis
+            else:
+                label_x_position = x_start_ax - 0.05 * (x_stop_ax - x_start_ax)  # Outside left in data coordinates
+                _common_label_kwargs.update(ha='right')
+        else:
+            label_x_position = x_start_ax  # Default - inside left edge
+            _common_label_kwargs.update(ha='left')            
+
+
         output_dict = {}
         for i, (decoder_name, (a_track_id_color, a_track_dir_color)) in enumerate(active_color_dict.items()):
             if enable_draw_decoder_colored_lines:
@@ -642,7 +654,8 @@ class PlottingHelpers:
                 if a_track_dir_color is not None:
                     output_dict[f"{decoder_name}_track_dir"] = ax.hlines(track_dir_line_y[i], xmin=x_start_ax, xmax=x_stop_ax, color=a_track_dir_color, zorder=25, label=f'{decoder_name}', **_common_hlines_kwargs) # divider should be in very front
             if enable_draw_decoder_labels:
-                output_dict[f"{decoder_name}_label"] = ax.annotate(f'{decoder_name}', (x_start_ax, y_bin_centers[i]), **_common_label_kwargs)
+                # output_dict[f"{decoder_name}_label"] = ax.annotate(f'{decoder_name}', (x_start_ax, y_bin_centers[i]), **_common_label_kwargs)
+                output_dict[f"{decoder_name}_label"] = ax.annotate(f'{decoder_name}', (label_x_position, y_bin_centers[i]), **_common_label_kwargs)
 
         return output_dict
         
