@@ -1991,7 +1991,7 @@ class EpochComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Computati
 from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DisplayFunctionRegistryHolder import DisplayFunctionRegistryHolder
 import pyqtgraph as pg
 import pyqtgraph.exporters
-from pyphoplacecellanalysis.General.Mixins.ExportHelpers import export_pyqtgraph_plot
+from pyphoplacecellanalysis.General.Mixins.ExportHelpers import FileOutputManager, export_pyqtgraph_plot
 from pyphocorehelpers.DataStructure.general_parameter_containers import VisualizationParameters, RenderPlotsData, RenderPlots
 from pyphocorehelpers.gui.PhoUIContainer import PhoUIContainer # for context_nested_docks/single_context_nested_docks
 
@@ -2006,7 +2006,7 @@ class EpochComputationDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Di
 
     @function_attributes(short_name='generalized_decoded_yellow_blue_marginal_epochs', tags=['yellow-blue-plots', 'directional_merged_decoder_decoded_epochs', 'directional'], conforms_to=['output_registering', 'figure_saving'], input_requires=[], output_provides=[], requires_global_keys=["global_computation_results.computed_data['EpochComputations']"], uses=['plot_1D_most_likely_position_comparsions', 'FigureCollector'], used_by=[], creation_date='2025-04-16 05:49', related_items=[], is_global=True)
     def _display_generalized_decoded_yellow_blue_marginal_epochs(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, save_figure=True,
-                                                    single_plot_fixed_height=50.0, size=(35, 3), dpi=100, constrained_layout=True, **kwargs):
+                                                    single_plot_fixed_height=50.0, size=(35, 3), dpi=100, constrained_layout=True, override_fig_man: Optional[FileOutputManager]=None, **kwargs):
             """ Displays one figure containing the track_ID marginal, decoded continuously over the entire recording session along with the animal's position.
             
             
@@ -2028,6 +2028,8 @@ class EpochComputationDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Di
             from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError import plot_1D_most_likely_position_comparsions
             from neuropy.utils.matplotlib_helpers import get_heatmap_cmap
             from pyphoplacecellanalysis.General.Model.Configs.LongShortDisplayConfig import PlottingHelpers
+            from pyphoplacecellanalysis.General.Mixins.ExportHelpers import FileOutputManager, FigureOutputLocation, ContextToPathMode	
+            
 
             import matplotlib as mpl
             import matplotlib.pyplot as plt
@@ -2044,7 +2046,6 @@ class EpochComputationDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Di
             print(f'\tepochs_decoding_time_bin_size: {epochs_decoding_time_bin_size}')
             assert epochs_decoding_time_bin_size == valid_EpochComputations_result.epochs_decoding_time_bin_size, f"\tERROR: nonPBE_results.epochs_decoding_time_bin_size: {valid_EpochComputations_result.epochs_decoding_time_bin_size} != epochs_decoding_time_bin_size: {epochs_decoding_time_bin_size}"
             a_new_fully_generic_result: GenericDecoderDictDecodedEpochsDictResult = valid_EpochComputations_result.a_generic_decoder_dict_decoded_epochs_dict_result ## get existing
-            a_new_fully_generic_result
 
             ## INPUTS: a_new_fully_generic_result
             # a_target_context: IdentifyingContext = IdentifyingContext(trained_compute_epochs='laps', pfND_ndim=1, decoder_identifier='pseudo2D', known_named_decoding_epochs_type='global', masked_time_bin_fill_type='nan_filled', data_grain='per_time_bin')
@@ -2079,7 +2080,6 @@ class EpochComputationDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Di
             long_epoch_name, short_epoch_name, global_epoch_name = owning_pipeline_reference.find_LongShortGlobal_epoch_names()
             # long_epoch_context, short_epoch_context, global_epoch_context = [curr_active_pipeline.filtered_contexts[a_name] for a_name in (long_epoch_name, short_epoch_name, global_epoch_name)]
             long_session, short_session, global_session = [owning_pipeline_reference.filtered_sessions[an_epoch_name] for an_epoch_name in [long_epoch_name, short_epoch_name, global_epoch_name]]
-
 
             # ==================================================================================================================================================================================================================================================================================== #
             # Start Building Figure                                                                                                                                                                                                                                                                #
@@ -2134,9 +2134,16 @@ class EpochComputationDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Di
             if active_context is not None:
                     display_context = active_context.adding_context('display_fn', display_fn_name='generalized_decoded_yellow_blue_marginal_epochs')
 
+            if override_fig_man is not None:
+                print(f'override_fig_man is not None! Custom output path will be used!')
+                test_display_output_path = override_fig_man.get_figure_save_file_path(display_context, make_folder_if_needed=False)
+                print(f'\ttest_display_output_path: "{test_display_output_path}"')
+    
+
             def _perform_write_to_file_callback(final_context, fig):
+                """ captures: override_fig_man """
                 if save_figure:
-                    return owning_pipeline_reference.output_figure(final_context, fig)
+                    return owning_pipeline_reference.output_figure(final_context, fig, override_fig_man=override_fig_man)
                 else:
                     pass # do nothing, don't save
                 

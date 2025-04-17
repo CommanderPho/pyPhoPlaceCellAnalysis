@@ -27,6 +27,8 @@ from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.FiringStati
 from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.MultiContextComparingDisplayFunctions.MultiContextComparingDisplayFunctions import MultiContextComparingDisplayFunctions
 from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.MultiContextComparingDisplayFunctions.LongShortTrackComparingDisplayFunctions import LongShortTrackComparingDisplayFunctions
 
+from pyphoplacecellanalysis.General.Mixins.ExportHelpers import FileOutputManager, FigureOutputLocation, ContextToPathMode	
+
 
 def has_good_str_value(a_str_val) -> bool:
     return ((a_str_val is not None) and (len(a_str_val) > 0))
@@ -537,6 +539,7 @@ class PipelineWithDisplayPipelineStageMixin:
             assert (display_function in self.registered_display_function_names), f"ERROR: The display function with the name {display_function} could not be found! Is it registered?"
             display_function = self.registered_display_function_dict[display_function] # find the actual function from the name
         
+
         # Determine whether the `active_session_configuration_context` passed was really a context or str which should be used as `active_session_configuration_name` (and the real context must be extracted from `self.filtered_contexts`):
         active_session_configuration_name: Optional[str] = None
         
@@ -667,18 +670,25 @@ class PipelineWithDisplaySavingMixin:
         return active_identifying_session_ctx.merging_context('display_', display_subcontext)
 
     @function_attributes(short_name=None, tags=['save','figure'], input_requires=[], output_provides=[], uses=['build_and_write_to_file'], used_by=[], creation_date='2023-06-14 19:26', related_items=[])
-    def output_figure(self, final_context: IdentifyingContext, fig, context_tuple_join_character='_', write_vector_format:bool=False, write_png:bool=True, debug_print=True, **kwargs):
+    def output_figure(self, final_context: IdentifyingContext, fig, context_tuple_join_character='_', write_vector_format:bool=False, write_png:bool=True, debug_print=True, override_fig_man: Optional[FileOutputManager]=None, **kwargs):
         """ outputs the figure using the provided context. 
         
         Usage:
             active_out_figure_paths, final_context = 
         """
         from pyphoplacecellanalysis.General.Mixins.ExportHelpers import build_and_write_to_file
+        
+        if override_fig_man is None:
+            fig_man = self.get_output_manager()
+        else:
+            # use custom figure manager
+            fig_man = override_fig_man
+
         # fig_man: FileOutputManager = self.get_output_manager() # get the output manager
         # figures_parent_out_path, fig_save_basename = fig_man.get_figure_output_parent_and_basename(final_context, make_folder_if_needed=True)
         # active_out_figure_paths = perform_write_to_file(fig, final_context, figures_parent_out_path=figures_parent_out_path, write_vector_format=write_vector_format, write_png=write_png, register_output_file_fn=self.register_output_file)
         # final_context = final_context.adding_context_if_missing(self.sess.get_context()) # add the session context if it's missing
-        active_out_figure_paths = build_and_write_to_file(fig, final_context, self.get_output_manager(), context_tuple_join_character=context_tuple_join_character, write_vector_format=write_vector_format, write_png=write_png, register_output_file_fn=self.register_output_file, **kwargs)
+        active_out_figure_paths = build_and_write_to_file(fig, final_context, fig_man=fig_man, context_tuple_join_character=context_tuple_join_character, write_vector_format=write_vector_format, write_png=write_png, register_output_file_fn=self.register_output_file, **kwargs)
         return active_out_figure_paths, final_context
 
 

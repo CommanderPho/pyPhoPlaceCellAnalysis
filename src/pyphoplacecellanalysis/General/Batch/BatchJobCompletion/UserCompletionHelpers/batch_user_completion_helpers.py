@@ -3156,7 +3156,9 @@ def figures_plot_generalized_decode_epochs_dict_and_export_results_completion_fu
     
     """
     from pyphoplacecellanalysis.General.Mixins.ExportHelpers import FileOutputManager, FigureOutputLocation, ContextToPathMode	
+    from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.EpochComputationFunctions import EpochComputationDisplayFunctions
     
+
     assert self.collected_outputs_path.exists()
     curr_session_name: str = curr_active_pipeline.session_name # '2006-6-08_14-26-15'
     CURR_BATCH_OUTPUT_PREFIX: str = f"{self.BATCH_DATE_TO_USE}-{curr_session_name}"
@@ -3164,16 +3166,21 @@ def figures_plot_generalized_decode_epochs_dict_and_export_results_completion_fu
     
     print(f'<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<')
     print(f'figures_plot_generalized_decode_epochs_dict_and_export_results_completion_function(curr_session_context: {curr_session_context}, curr_session_basedir: {str(curr_session_basedir)}, ...)')
-    # custom_figure_output_path = self.collected_outputs_path
-    # custom_fig_man: FileOutputManager = FileOutputManager(figure_output_location=FigureOutputLocation.CUSTOM, context_to_path_mode=ContextToPathMode.GLOBAL_UNIQUE, override_output_parent_path=custom_figure_output_path)
+    custom_figure_output_path = self.collected_outputs_path
+    assert custom_figure_output_path.exists(), f"custom_figure_output_path: '{custom_figure_output_path}' does not exist!"
+    
+    custom_fig_man: FileOutputManager = FileOutputManager(figure_output_location=FigureOutputLocation.CUSTOM, context_to_path_mode=ContextToPathMode.GLOBAL_UNIQUE, override_output_parent_path=custom_figure_output_path)
+    
+    # print(f'custom_figure_output_path: "{custom_figure_output_path}"')
     # test_context = IdentifyingContext(format_name='kdiba',animal='gor01',exper_name='one',session_name='2006-6-08_14-26-15',display_fn_name='display_long_short_laps')
-    # custom_fig_man.get_figure_save_file_path(test_context, make_folder_if_needed=False)
+    test_display_output_path = custom_fig_man.get_figure_save_file_path(curr_active_pipeline.get_session_context(), make_folder_if_needed=False)
+    print(f'test_display_output_path: "{test_display_output_path}"')
 
     curr_active_pipeline.reload_default_display_functions()
 
     # _display_generalized_decoded_yellow_blue_marginal_epochs ___________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
     try:
-        _out = curr_active_pipeline.display('_display_generalized_decoded_yellow_blue_marginal_epochs', curr_active_pipeline.get_session_context(), defer_render=True, save_figure=True, is_dark_mode=False) # , override_fig_man=custom_fig_man
+        _out = curr_active_pipeline.display('_display_generalized_decoded_yellow_blue_marginal_epochs', curr_active_pipeline.get_session_context(), defer_render=True, save_figure=True, is_dark_mode=False, override_fig_man=custom_fig_man)
     except Exception as e:
         print(f'\tfigures_plot_generalized_decode_epochs_dict_and_export_results_completion_function(...): "_display_generalized_decoded_yellow_blue_marginal_epochs" failed with error: {e}\n skipping.')
 
