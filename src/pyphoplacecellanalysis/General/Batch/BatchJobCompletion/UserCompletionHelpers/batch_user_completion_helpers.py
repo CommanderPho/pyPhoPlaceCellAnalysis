@@ -3150,7 +3150,7 @@ def generalized_decode_epochs_dict_and_export_results_completion_function(self, 
 
     return across_session_results_extended_dict
 
-@function_attributes(short_name=None, tags=['posterior'], input_requires=[], output_provides=[], uses=['_display_generalized_decoded_yellow_blue_marginal_epochs'], used_by=[], creation_date='2025-04-16 15:17', related_items=['generalized_decode_epochs_dict_and_export_results_completion_function'])
+@function_attributes(short_name=None, tags=['figure', 'posterior'], input_requires=[], output_provides=[], uses=['_display_generalized_decoded_yellow_blue_marginal_epochs'], used_by=[], creation_date='2025-04-16 15:17', related_items=['generalized_decode_epochs_dict_and_export_results_completion_function'])
 def figures_plot_generalized_decode_epochs_dict_and_export_results_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict) -> dict:
     """ Simple function that just plots the figure corresponding to by `generalized_decode_epochs_dict_and_export_results_completion_function` so we don't have to wait for the entire batch_figures_plotting on 2025-04-16 15:22.
     
