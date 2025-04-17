@@ -2114,7 +2114,9 @@ class EpochComputationDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Di
                 _subfn_clean_axes_decorations(an_ax=ax_dict["ax_top"])
                 """
                 an_ax.set_xticklabels([])
-                an_ax.set_yticklabels([])    
+                an_ax.set_yticklabels([])
+                an_ax.set_xticks([])  # Remove tick marks
+                an_ax.set_yticks([])
                 an_ax.set_title('') ## remove title
                 
 
@@ -2177,9 +2179,12 @@ class EpochComputationDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Di
                                                                             active_most_likely_positions_1D=active_most_likely_positions,
                                                                             ax=an_ax, variable_name=variable_name, debug_print=True, enable_flat_line_drawing=False,
                                                                             posterior_heatmap_imshow_kwargs=posterior_heatmap_imshow_kwargs)
-                    label_artists_dict = PlottingHelpers.helper_matplotlib_add_pseudo2D_marginal_labels(an_ax, y_bin_labels=y_bin_labels, enable_draw_decoder_colored_lines=False, should_use_outer_labels=False)
+                    
+                    label_artists_dict = PlottingHelpers.helper_matplotlib_add_pseudo2D_marginal_labels(an_ax, y_bin_labels=y_bin_labels, enable_draw_decoder_colored_lines=False, should_use_outer_labels=False,
+                                                                                                                # additional_label_kwargs = dict(fontsize=12, fontweight='bold'),
+                                                                                                                )
                     _subfn_clean_axes_decorations(an_ax=ax_dict["ax_decodedMarginal_P_Short_v_time"])
-                
+                    # an_ax.set_ylabel('marginal long/short')
 
                     # # Position/bounds lines ______________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
                     # an_ax = ax_dict["ax_position_and_laps_v_time"]
@@ -2196,7 +2201,7 @@ class EpochComputationDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Di
                     an_ax = ax_dict["ax_top"]
                     fig, out_axes_list = plot_laps_2d(global_session, legacy_plotting_mode=False, include_velocity=False, include_accel=False, axes_list=[an_ax], **kwargs)
                     _subfn_clean_axes_decorations(an_ax=ax_dict["ax_top"])
-                    
+                    # an_ax.set_xlabel('')
 
                     # ==================================================================================================================================================================================================================================================================================== #
                     # Titles/Formatting/Marginas and Saving                                                                                                                                                                                                                                                #

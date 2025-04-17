@@ -569,7 +569,7 @@ class PlottingHelpers:
 
     @function_attributes(short_name=None, tags=['matplotlib', 'draw'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-01-01 18:44', related_items=[])
     @classmethod
-    def helper_matplotlib_add_pseudo2D_marginal_labels(cls, ax, y_bin_labels: List[str], enable_draw_decoder_labels: bool = True, enable_draw_decoder_colored_lines: bool = False, should_use_ax_fraction_positioning: bool = True, should_use_outer_labels: bool=False) -> Dict[str, Dict]:
+    def helper_matplotlib_add_pseudo2D_marginal_labels(cls, ax, y_bin_labels: List[str], enable_draw_decoder_labels: bool = True, enable_draw_decoder_colored_lines: bool = False, should_use_ax_fraction_positioning: bool = True, should_use_outer_labels: bool=False, additional_label_kwargs:dict=None, **kwargs) -> Dict[str, Dict]:
         """ adds fixed inner-y labels (along the inside left edge of the ax) containing reference names -- such as ('Long_LR', etc)
         
         should_use_ax_fraction_positioning: bool : if True, the labels and lines are positioned relative to the ax frame in [0, 1] coords, independent of the data ylims
@@ -606,8 +606,10 @@ class PlottingHelpers:
 
 
         # BEGIN PLOTTING: ____________________________________________________________________________________________________ #
-        
-        _common_label_kwargs = dict(alpha=0.8, fontsize=10, va='center')
+        if additional_label_kwargs is None:
+            additional_label_kwargs = {} ## empty        
+
+        _common_label_kwargs = (dict(alpha=0.8, fontsize=10, va='center') | additional_label_kwargs)
         _common_hlines_kwargs = dict(alpha=0.6, linewidths=4)
         
         if should_use_ax_fraction_positioning:
