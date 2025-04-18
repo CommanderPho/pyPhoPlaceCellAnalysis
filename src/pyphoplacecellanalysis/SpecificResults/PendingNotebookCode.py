@@ -3886,8 +3886,81 @@ def perform_timeseries_stationarity_tests(time_series) -> Tuple[ADFResult, KPSSR
 # ==================================================================================================================== #
 import shutil
 
+@function_attributes(short_name=None, tags=['AcrossSessionHelpers'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-04-18 06:44', related_items=[])
 def try_perform_move(src_file, target_file, is_dryrun: bool, allow_overwrite_existing: bool):
-    """ tries to move the file from src_file to target_file """
+    """ tries to move the file from src_file to target_file
+    
+    
+    Usage:
+    
+        from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import try_perform_move
+
+        script_output_folders = [Path(v).parent for v in computation_script_paths]
+
+        excluded_session_keys = ['kdiba_pin01_one_fet11-01_12-58-54', 'kdiba_gor01_one_2006-6-08_14-26-15', 'kdiba_gor01_two_2006-6-07_16-40-19']
+        excluded_session_contexts = [IdentifyingContext(**dict(zip(IdentifyingContext._get_session_context_keys(), v.split('_', maxsplit=3)))) for v in excluded_session_keys]
+        # excluded_session_contexts
+
+        all_found_pkl_files_dict = {}
+        all_found_pipeline_pkl_files_dict = {}
+        all_found_global_pkl_files_dict = {}
+        all_found_pipeline_h5_files_dict = {}
+
+        copy_dict = {}
+        moved_dict = {}
+
+        # scripts_output_path
+        for a_good_session_concrete_folder, a_session_basedir, a_script_folder in zip(good_session_concrete_folders, session_basedirs_dict, script_output_folders):
+            if debug_print:
+                print(f'a_good_session_concrete_folder: {a_good_session_concrete_folder}, a_session_basedir: {a_session_basedir}. a_script_folder: {a_script_folder}')
+            if a_good_session_concrete_folder.context in excluded_session_contexts:
+                if debug_print:
+                    print(f'skipping excluded session: {a_good_session_concrete_folder.context}')
+            else:
+                all_found_global_pkl_files_dict[a_session_basedir] = list(a_script_folder.glob('global_computation_results*.pkl'))
+                
+                for a_global_file in all_found_global_pkl_files_dict[a_session_basedir]:
+                    ## iterate through the found global files:
+                    target_file = a_good_session_concrete_folder.global_computation_result_pickle.with_name(a_global_file.name)
+                    copy_dict[a_global_file] = target_file
+                    # if not is_dryrun:
+                    ## perform the move/copy
+                    was_success = try_perform_move(src_file=a_global_file, target_file=target_file, is_dryrun=is_dryrun)
+                    if was_success:
+                        moved_dict[a_file] = target_file
+                all_found_pipeline_pkl_files_dict[a_session_basedir] = list(a_script_folder.glob('loadedSessPickle*.pkl'))
+                for a_file in all_found_pipeline_pkl_files_dict[a_session_basedir]:
+                    ## iterate through the found global files:
+                    target_file = a_good_session_concrete_folder.session_pickle.with_name(a_file.name)
+                    copy_dict[a_file] = target_file
+                    # if not is_dryrun:
+                    ## perform the move/copy
+                    was_success = try_perform_move(src_file=a_file, target_file=target_file, is_dryrun=is_dryrun)
+                    if was_success:
+                        moved_dict[a_file] = target_file
+                all_found_pipeline_h5_files_dict[a_session_basedir] = list(a_script_folder.glob('loadedSessPickle*.h5'))
+                for a_file in all_found_pipeline_h5_files_dict[a_session_basedir]:
+                    ## iterate through the found global files:
+                    target_file = a_good_session_concrete_folder.pipeline_results_h5.with_name(a_file.name)
+                    copy_dict[a_file] = target_file
+                    # if not is_dryrun:
+                    ## perform the move/copy
+                    was_success = try_perform_move(src_file=a_file, target_file=target_file, is_dryrun=is_dryrun)
+                    if was_success:
+                        moved_dict[a_file] = target_file
+                # all_found_pkl_files_dict[a_session_basedir] = find_pkl_files(a_script_folder)
+
+        ## discover .pkl files in the root of each folder:
+        # all_found_pipeline_pkl_files_dict
+        # all_found_global_pkl_files_dict
+        ## OUTPUTS: copy_dict
+        # copy_dict
+        moved_dict
+
+    
+    #TODO 2025-04-18 06:44: - [ ] Move to AcrossSessionHelpers or something filesystem related
+    """
+    import shutil
     print(f'try_perform_move(src_file: "{src_file}", target_file: "{target_file}")')
     if not src_file.exists():
         print(f'\tsrc_file "{src_file}" does not exist!')
