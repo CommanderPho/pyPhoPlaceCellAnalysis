@@ -2322,8 +2322,12 @@ def _common_cleanup_operations(a_df):
 def load_across_sessions_exported_h5_files(cuttoff_date: Optional[datetime] = None, collected_outputs_directory: Optional[Path]=None, known_bad_session_strs=None, debug_print: bool = False):
     """
 
+    #TODO 2025-04-18 06:22: - [ ] Where do the returned `h5_contexts_paths_dict` come frome?
+    
+    
     from pyphoplacecellanalysis.SpecificResults.AcrossSessionResults import load_across_sessions_exported_h5_files
 
+    
 
     """
     from neuropy.core.user_annotations import UserAnnotationsManager
@@ -2364,9 +2368,20 @@ def load_across_sessions_exported_h5_files(cuttoff_date: Optional[datetime] = No
     ## INPUTS: h5_sessions
     h5_session_names = list(h5_sessions.keys())
     good_sessions = UserAnnotationsManager.get_hardcoded_good_sessions()
-    h5_session_contexts = [a_good_session_ctxt for a_good_session_ctxt in good_sessions if (a_good_session_ctxt.session_name in h5_session_names)]
+    
+
+    def _subfn_session_ctxt_to_dict_key(a_ctxt: IdentifyingContext):
+        # return a_ctxt.session_name #TODO 2025-04-18 06:34: - [ ] OLD, uses session name '2006-6-08_14-26-15'
+        return a_ctxt.get_description(subset_includelist=['format_name', 'animal', 'exper_name', 'session_name'], separator='_') #TODO 2025-04-18 06:34: - [ ] NEW: entire session context string like 'kdiba_gor01_one_2006-6-08_14-26-15'
+    
+    # [a_good_session_ctxt.get_description(subset_includelist=['format_name', 'animal', 'exper_name', 'session_name'], separator='_') for a_good_session_ctxt in good_sessions]
+
+    # h5_session_contexts = [a_good_session_ctxt for a_good_session_ctxt in good_sessions if (a_good_session_ctxt.session_name in h5_session_names)]
+    h5_session_contexts = [a_good_session_ctxt for a_good_session_ctxt in good_sessions if (_subfn_session_ctxt_to_dict_key(a_good_session_ctxt) in h5_session_names)] #TODO 2025-04-18 06:28: - [ ] Had to change to match on just session name to matching on entire string, might need to go farther and add qclu and frHZ filter
+
     # included_h5_paths = [a_session_dict.get('pipeline_results', None)[0] for a_sess_name, a_session_dict in h5_sessions.items()] # these are mis-ordered
-    included_h5_paths = [safe_get_if_not_None(h5_sessions[a_good_session_ctxt.session_name].get('pipeline_results', None), 0, None) for a_good_session_ctxt in h5_session_contexts]
+    # included_h5_paths = [safe_get_if_not_None(h5_sessions[a_good_session_ctxt.session_name].get('pipeline_results', None), 0, None) for a_good_session_ctxt in h5_session_contexts]
+    included_h5_paths = [safe_get_if_not_None(h5_sessions[_subfn_session_ctxt_to_dict_key(a_good_session_ctxt)].get('pipeline_results', None), 0, None) for a_good_session_ctxt in h5_session_contexts]
     assert len(included_h5_paths) == len(h5_session_contexts)
 
     h5_contexts_paths_dict = dict(zip(h5_session_contexts, included_h5_paths))
