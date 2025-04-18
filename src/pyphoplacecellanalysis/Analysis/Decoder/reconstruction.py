@@ -432,8 +432,8 @@ class SingleEpochDecodedResult(HDF_SerializationMixin, AttrsBasedClassHelperMixi
     time_bin_container: Any = non_serialized_field()
     time_bin_edges: NDArray = non_serialized_field()
 
-    marginal_x: NDArray = non_serialized_field()
-    marginal_y: Optional[NDArray] = non_serialized_field()
+    marginal_x: DynamicContainer = non_serialized_field()
+    marginal_y: Optional[DynamicContainer] = non_serialized_field()
 
     epoch_data_index: Optional[int] = non_serialized_field()
 
