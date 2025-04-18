@@ -177,7 +177,7 @@ def helper_perform_pickle_pipeline(a_curr_active_pipeline, custom_save_filenames
             custom_save_filepaths_dict['global_computation_pkl'] = a_curr_active_pipeline.save_global_computation_results(override_global_pickle_filename=custom_save_filenames['global_computation_pkl'])
 
         if enable_save_h5:
-            custom_save_filepaths_dict['pipeline_h5'] = a_curr_active_pipeline.export_pipeline_to_h5(override_filename=custom_save_filenames['pipeline_h5'])
+            custom_save_filepaths_dict['pipeline_h5'], _HDF5_err = a_curr_active_pipeline.export_pipeline_to_h5(override_filename=custom_save_filenames['pipeline_h5'])
         
         print(f'custom_save_filepaths: {custom_save_filepaths_dict}')
 
@@ -1033,7 +1033,7 @@ class NeuropyPipeline(PipelineWithInputStage, PipelineWithLoadableStage, Filtere
 
 
     @function_attributes(short_name=None, tags=['h5', 'export', 'output', 'filesystem'], input_requires=[], output_provides=[], uses=['FilesystemMetadata'], used_by=[], creation_date='2023-09-26 06:38', related_items=[])
-    def export_pipeline_to_h5(self, override_path: Optional[Path]=None, override_filename: Optional[str]=None, fail_on_exception:bool=True, skip_overwriting_files_newer_than_specified:bool=False):
+    def export_pipeline_to_h5(self, override_path: Optional[Path]=None, override_filename: Optional[str]=None, fail_on_exception:bool=True, skip_overwriting_files_newer_than_specified:bool=False) -> Tuple[Path, Optional[CapturedException]]:
         """ Export the pipeline's HDF5 as 'pipeline_results.h5'
 
         #2025-04-18 06:57: - [X] check timestamp of last exported file, and prevent overwriting if newer than the specified date if `skip_overwriting_files_newer_than_specified` is True
