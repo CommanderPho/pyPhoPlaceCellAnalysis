@@ -4,6 +4,8 @@
 @author: pho
 NeuropyPipeline.py
 """
+import sys
+from datetime import timedelta, datetime
 from copy import deepcopy
 import importlib
 import sys
@@ -32,6 +34,7 @@ from pyphocorehelpers.mixins.diffable import DiffableObject
 from pyphocorehelpers.print_helpers import print_filesystem_file_size, print_object_memory_usage
 from pyphocorehelpers.print_helpers import build_run_log_task_identifier, build_logger
 from pyphocorehelpers.Filesystem.path_helpers import build_unique_filename, backup_extant_file
+from pyphocorehelpers.Filesystem.metadata_helpers import FilesystemMetadata
 
 from neuropy.core.session.Formats.BaseDataSessionFormats import DataSessionFormatRegistryHolder # hopefully this works without all the other imports
 from neuropy.core.session.KnownDataSessionTypeProperties import KnownDataSessionTypeProperties
@@ -1029,12 +1032,12 @@ class NeuropyPipeline(PipelineWithInputStage, PipelineWithLoadableStage, Filtere
         return hdf5_output_path
 
 
-    @function_attributes(short_name=None, tags=['h5', 'export', 'output', 'filesystem'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-09-26 06:38', related_items=[])
-    def export_pipeline_to_h5(self, override_path: Optional[Path]=None, override_filename: Optional[str]=None, fail_on_exception:bool=True):
+    @function_attributes(short_name=None, tags=['h5', 'export', 'output', 'filesystem'], input_requires=[], output_provides=[], uses=['FilesystemMetadata'], used_by=[], creation_date='2023-09-26 06:38', related_items=[])
+    def export_pipeline_to_h5(self, override_path: Optional[Path]=None, override_filename: Optional[str]=None, fail_on_exception:bool=True, skip_overwriting_files_newer_than_specified:bool=False):
         """ Export the pipeline's HDF5 as 'pipeline_results.h5'
 
-        TODO: check timestamp of last computed file.
-
+        #2025-04-18 06:57: - [X] check timestamp of last exported file, and prevent overwriting if newer than the specified date if `skip_overwriting_files_newer_than_specified` is True
+        
         """
         ## Case 1. `override_path` is provided:
         if override_path is not None:
@@ -1058,19 +1061,41 @@ class NeuropyPipeline(PipelineWithInputStage, PipelineWithLoadableStage, Filtere
                 # Otherwise use default output path but specified override_global_pickle_filename:
                 hdf5_output_path = self.get_output_path().joinpath(override_filename).resolve() 
 
-        print(f'pipeline hdf5_output_path: {hdf5_output_path}')
-        e = None
-        try:
-            self.to_hdf(file_path=hdf5_output_path, key="/")
+        print(f'pipeline hdf5_output_path: "{hdf5_output_path}"')
+        err = None
+        was_write_good: bool = False
+        can_skip_if_allowed: bool = False
+        if skip_overwriting_files_newer_than_specified:
+            ## only if datetime checking of existing file is active should we waste time checking:
+            newest_file_to_overwrite_date = datetime.now() - timedelta(days=1) # don't overwrite any files more recent than 1 day ago
+            can_skip_if_allowed = (hdf5_output_path.exists() and (FilesystemMetadata.get_last_modified_time(hdf5_output_path)<=newest_file_to_overwrite_date))
+            
+        if (not skip_overwriting_files_newer_than_specified) or (not can_skip_if_allowed):
+            # if skipping is disabled OR skipping is enabled but it's not valid to skip, overwrite.
+            # file is folder than the date to overwrite, so overwrite it
+            print(f'\tOVERWRITING (or writing) the file "{hdf5_output_path}"!')
+            try:
+                self.to_hdf(file_path=hdf5_output_path, key="/")
+                was_write_good = True
+                return (hdf5_output_path, None)
+
+            except Exception as err:
+                exception_info = sys.exc_info()
+                err = CapturedException(err, exception_info)
+                print(f"ERROR: encountered exception {err} while trying to build the session HDF output.")
+                if fail_on_exception:
+                    raise
+                hdf5_output_path = None # set to None because it failed.
+                return (hdf5_output_path, err)
+            
+        else:
+            print(f'\tWARNING: file "{hdf5_output_path}" is newer than the allowed overwrite date, so it will be skipped.')
+            print(f'\t\tnewest_file_to_overwrite_date: {newest_file_to_overwrite_date}\t can_skip_if_allowed: {can_skip_if_allowed}\n')
             return (hdf5_output_path, None)
-        except Exception as e:
-            exception_info = sys.exc_info()
-            e = CapturedException(e, exception_info)
-            print(f"ERROR: encountered exception {e} while trying to build the session HDF output.")
-            if fail_on_exception:
-                raise
-            hdf5_output_path = None # set to None because it failed.
-            return (hdf5_output_path, e)
+
+
+
+
 
     @classmethod
     def read_hdf(cls, file_path, key: str, **kwargs) -> "NeuropyPipeline":
