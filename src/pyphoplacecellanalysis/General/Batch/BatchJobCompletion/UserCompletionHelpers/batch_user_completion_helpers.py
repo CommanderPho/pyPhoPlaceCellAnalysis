@@ -2622,6 +2622,7 @@ def kdiba_session_post_fixup_completion_function(self, global_data_root_parent_p
 
     return across_session_results_extended_dict
 
+
 @function_attributes(short_name=None, tags=['hdf5', 'h5'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-01-01 00:00', related_items=[])
 def export_session_h5_file_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict) -> dict:
     """  Export the pipeline's HDF5 as 'pipeline_results.h5'
@@ -2645,36 +2646,25 @@ def export_session_h5_file_completion_function(self, global_data_root_parent_pat
     print(f'<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<')
     print(f'export_session_h5_file_completion_function(curr_session_context: {curr_session_context}, curr_session_basedir: {str(curr_session_basedir)}, ...)')
     
-
-    hdf5_output_path: Path = curr_active_pipeline.get_output_path().joinpath('pipeline_results.h5').resolve()
-    print(f'\tpipeline hdf5_output_path: {hdf5_output_path}')
+    # custom_save_filepaths, custom_save_filenames, custom_suffix = curr_active_pipeline.get_custom_pipeline_filenames_from_parameters()
+    # print(f'\tcustom_save_filenames: {custom_save_filenames}')
+    # print(f'\tcustom_suffix: "{custom_suffix}"')
     err = None
-    # Only get files newer than date
-    skip_overwriting_files_newer_than_specified:bool = False
-
+    hdf5_output_path: Path = None
     was_write_good: bool = False
-    newest_file_to_overwrite_date = datetime.now() - timedelta(days=1) # don't overwrite any files more recent than 1 day ago
-    can_skip_if_allowed: bool = (hdf5_output_path.exists() and (FilesystemMetadata.get_last_modified_time(hdf5_output_path)<=newest_file_to_overwrite_date))
-    if (not skip_overwriting_files_newer_than_specified) or (not can_skip_if_allowed):
-        # if skipping is disabled OR skipping is enabled but it's not valid to skip, overwrite.
-        # file is folder than the date to overwrite, so overwrite it
-        print(f'\tOVERWRITING (or writing) the file {hdf5_output_path}!')
-        # with ExceptionPrintingContext(suppress=False):
-        try:
-            curr_active_pipeline.export_pipeline_to_h5()
-            was_write_good = True
-        except Exception as e:
-            exception_info = sys.exc_info()
-            err = CapturedException(e, exception_info)
-            print(f"ERROR: encountered exception {err} while trying to build the session HDF output for {curr_session_context}")
-            hdf5_output_path = None # set to None because it failed.
-            if self.fail_on_exception:
-                raise err.exc
-    else:
-        print(f'\tWARNING: file {hdf5_output_path} is newer than the allowed overwrite date, so it will be skipped.')
-        print(f'\t\tnewest_file_to_overwrite_date: {newest_file_to_overwrite_date}\t can_skip_if_allowed: {can_skip_if_allowed}\n')
-        # return (hdf5_output_path, None)
+    
+    try:
+        custom_save_filepaths_dict, custom_suffix = curr_active_pipeline.custom_save_pipeline_as(enable_save_pipeline_pkl=False, enable_save_global_computations_pkl=False, enable_save_h5=True)
+        was_write_good = True
+        hdf5_output_path = custom_save_filepaths_dict['pipeline_h5']
+        print(f'\tpipeline hdf5_output_path: "{hdf5_output_path}"')
 
+    except Exception as e:
+        exception_info = sys.exc_info()
+        err = CapturedException(e, exception_info)
+        print(f"\tERROR: encountered exception {err} while trying to build the session HDF output for {curr_session_context}")
+        if self.fail_on_exception:
+            raise err.exc
 
     callback_outputs = {
      'hdf5_output_path': hdf5_output_path, 'e':err, #'t_end': t_end   
@@ -2687,6 +2677,7 @@ def export_session_h5_file_completion_function(self, global_data_root_parent_pat
     print(f'>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>')
 
     return across_session_results_extended_dict
+
 
 @function_attributes(short_name=None, tags=['save_custom', 'versioning', 'backup', 'export'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-10-28 14:25', related_items=[])
 def save_custom_session_files_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict) -> dict:
@@ -2704,7 +2695,7 @@ def save_custom_session_files_completion_function(self, global_data_root_parent_
     from datetime import timedelta, datetime
     from pyphocorehelpers.exception_helpers import ExceptionPrintingContext, CapturedException
 
-    custom_save_filepaths, custom_save_filenames, custom_suffix = curr_active_pipeline.get_custom_pipeline_filenames_from_parameters()
+    custom_save_filepaths_dict, custom_save_filenames, custom_suffix = curr_active_pipeline.get_custom_pipeline_filenames_from_parameters()
     
     print(f'<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<')
     print(f'save_custom_session_files_completion_function(curr_session_context: {curr_session_context}, curr_session_basedir: {str(curr_session_basedir)}, ...)')
@@ -2714,7 +2705,7 @@ def save_custom_session_files_completion_function(self, global_data_root_parent_
     
     was_write_good: bool = False
     try:
-        custom_save_filepaths = curr_active_pipeline.custom_save_pipeline_as(enable_save_pipeline_pkl=True, enable_save_global_computations_pkl=True, enable_save_h5=True)
+        custom_save_filepaths_dict, custom_suffix = curr_active_pipeline.custom_save_pipeline_as(enable_save_pipeline_pkl=True, enable_save_global_computations_pkl=True, enable_save_h5=True)
         was_write_good = True
 
     except Exception as e:
@@ -2727,7 +2718,7 @@ def save_custom_session_files_completion_function(self, global_data_root_parent_
     callback_outputs = {
      'desired_suffix': custom_suffix,
     #  'session_files_dict': _existing_session_files_dict, 'successfully_copied_files_dict':_successful_copies_dict,
-     'session_files_dict': custom_save_filepaths, 'successfully_copied_files_dict': custom_save_filepaths,
+     'session_files_dict': custom_save_filepaths_dict, 'successfully_copied_files_dict': custom_save_filepaths_dict,
      'was_write_good': was_write_good,
     }
     across_session_results_extended_dict['save_custom_session_files_completion_function'] = callback_outputs
@@ -2736,6 +2727,7 @@ def save_custom_session_files_completion_function(self, global_data_root_parent_
     print(f'>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>')
 
     return across_session_results_extended_dict
+
 
 @function_attributes(short_name=None, tags=['backup', 'versioning', 'copy'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-09-25 06:22', related_items=[])
 def backup_previous_session_files_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict, desired_suffix: str = 'Pre2024-07-16') -> dict:

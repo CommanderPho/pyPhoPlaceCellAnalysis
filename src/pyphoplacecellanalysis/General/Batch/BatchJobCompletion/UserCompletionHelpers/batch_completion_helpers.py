@@ -376,7 +376,7 @@ class BatchCompletionHelpers:
 			curr_active_pipeline.perform_specific_computation(computation_functions_name_includelist=['wcorr_shuffle_analysis'], computation_kwargs_list=[{'num_shuffles': num_wcorr_shuffles, 'drop_previous_result_and_compute_fresh': drop_previous_result_and_compute_fresh}], enabled_filter_names=None, fail_on_exception=fail_on_exception, debug_print=False)
 
 			## Pickle again after recomputing:
-			custom_save_filepaths = helper_perform_pickle_pipeline(a_curr_active_pipeline=curr_active_pipeline, custom_save_filenames=custom_save_filenames, custom_save_filepaths=custom_save_filepaths,
+			custom_save_filepaths = helper_perform_pickle_pipeline(a_curr_active_pipeline=curr_active_pipeline, custom_save_filenames=custom_save_filenames, custom_save_filepaths_dict=custom_save_filepaths,
 																	enable_save_pipeline_pkl=enable_save_pipeline_pkl, enable_save_global_computations_pkl=enable_save_global_computations_pkl, enable_save_h5=enable_save_h5)
 
 		try:
