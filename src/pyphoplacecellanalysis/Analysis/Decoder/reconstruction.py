@@ -1256,6 +1256,8 @@ class DecodedFilterEpochsResult(HDF_SerializationMixin, AttrsBasedClassHelperMix
             result_t_bin_idx_column = np.concatenate([np.full((an_epoch_time_bins, ), fill_value=i) for i, an_epoch_time_bins in enumerate(n_epoch_time_bins)])
             epoch_df_idx_column = np.concatenate([np.full((an_epoch_time_bins, ), fill_value=filter_epochs_df.index[i]) for i, an_epoch_time_bins in enumerate(n_epoch_time_bins)])
             epoch_label_column = np.concatenate([np.full((an_epoch_time_bins, ), fill_value=filter_epochs_df[parent_epoch_label_col_name].values[i]) for i, an_epoch_time_bins in enumerate(n_epoch_time_bins)])
+            epoch_duration_column = np.concatenate([np.full((an_epoch_time_bins, ), fill_value=filter_epochs_df['duration'].values[i]) for i, an_epoch_time_bins in enumerate(n_epoch_time_bins)]) #TODO 2025-04-18 21:05: - [ ] Added 'parent_epoch_duration' to output dataframe!
+            # epoch_neuronal_participation_column = np.concatenate([np.full((an_epoch_time_bins, ), fill_value=filter_epochs_df['participation'].values[i]) for i, an_epoch_time_bins in enumerate(n_epoch_time_bins)])
             all_columns.extend(active_columns)
             # all_epoch_extracted_posteriors = np.hstack((all_epoch_extracted_posteriors, epoch_extracted_posteriors))
             all_epoch_extracted_posteriors.append(np.hstack((epoch_extracted_posteriors)))
@@ -1266,7 +1268,11 @@ class DecodedFilterEpochsResult(HDF_SerializationMixin, AttrsBasedClassHelperMix
         epoch_time_bin_marginals_df['result_t_bin_idx'] = result_t_bin_idx_column # a.k.a result label
         epoch_time_bin_marginals_df['epoch_df_idx'] = epoch_df_idx_column
         epoch_time_bin_marginals_df['parent_epoch_label'] = epoch_label_column
-        
+        epoch_time_bin_marginals_df['parent_epoch_duration'] = epoch_duration_column
+        # epoch_time_bin_marginals_df['parent_epoch_neuronal_participation'] = epoch_neuronal_participation_column
+
+
+
         if (len(flat_time_bin_centers_column) < len(epoch_time_bin_marginals_df)):
             # 2024-01-25 - This fix DOES NOT HELP. The constructed size is the same as the existing `flat_time_bin_centers_column`.
             

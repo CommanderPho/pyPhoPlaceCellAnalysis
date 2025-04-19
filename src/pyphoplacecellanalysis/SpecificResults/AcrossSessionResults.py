@@ -3966,8 +3966,6 @@ class SingleFatDataframe:
         from neuropy.utils.mixins.time_slicing import TimeColumnAliasesProtocol
         # from pyphoplacecellanalysis.General.Pipeline.Stages.Computation import to_filename_conversion_dict
         
-
-
         FAT_df_list: List[pd.DataFrame] = []
     
         for a_df_context, a_df in dfs_dict.items():
@@ -3985,7 +3983,7 @@ class SingleFatDataframe:
                     # if (ctxt.get('minimum_inclusion_fr_Hz', None) is not None) and (len(str(ctxt.get('minimum_inclusion_fr_Hz', None))) > 0) and ('minimum_inclusion_fr_Hz' not in subset_excludelist):
                     #     custom_suffix_string_parts.append(f"frateThresh_{ctxt.get('minimum_inclusion_fr_Hz', None):.1f}")
 
-                    specially_formatted_key_names_dict = {'epochs_source':'', 'included_qclu_values':f"qclu_", 'minimum_inclusion_fr_Hz':f"frateThresh_"}
+                    # specially_formatted_key_names_dict = {'epochs_source':'', 'included_qclu_values':f"qclu_", 'minimum_inclusion_fr_Hz':f"frateThresh_"}
                     # specially_formatted_values_dict = {'epochs_source':SingleFatDataframe.to_filename_conversion_dict.get(a_ctxt_value, f'{a_ctxt_value}'), 'included_qclu_values':f"{a_ctxt_value}", 'minimum_inclusion_fr_Hz':f"{a_ctxt_value:.1f}"}
                     
                     _default_formatter_fn = lambda v: f'{v}'

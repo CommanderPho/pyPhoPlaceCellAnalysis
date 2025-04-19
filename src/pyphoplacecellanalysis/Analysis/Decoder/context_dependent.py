@@ -1847,6 +1847,7 @@ class GenericDecoderDictDecodedEpochsDictResult(ComputedResult):
         
         return export_files_dict
     
+
     @function_attributes(short_name=None, tags=['export', 'CSV', 'main'], input_requires=['self.filter_epochs_decoded_track_marginal_posterior_df_dict'], output_provides=[], uses=['self.filter_epochs_decoded_track_marginal_posterior_df_dict', '_perform_export_dfs_dict_to_csvs'], used_by=[], creation_date='2025-03-13 08:58', related_items=[])
     def export_csvs(self, parent_output_path: Path, active_context: IdentifyingContext, decoding_time_bin_size: float, session_name: str, curr_session_t_delta: Optional[float]=None, user_annotation_selections=None, valid_epochs_selections=None, custom_export_df_to_csv_fn=None, export_df_variable_names=None, use_single_FAT_df=True, tbin_values_dict: Optional[Dict[str, float]]=None, should_export_complete_all_scores_df:bool=True):
         """ export as a single_FAT .csv file or optionally (not yet implemented) separate .csv files.    
