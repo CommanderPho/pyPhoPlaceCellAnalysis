@@ -81,10 +81,10 @@ def debug_print_dock(a_dock, widget_name="Unknown"):
 class DockDisplayConfig(object):
     """Holds the display and configuration options for a Dock, such as how to format its title bar (color and font), whether it's closable, etc."""
     showCloseButton: bool = field(default=True)
-    showCollapseButton: bool = field(default=False)
+    showCollapseButton: bool = field(default=True)
     showGroupButton: bool = field(default=False)
     showOrientationButton: bool = field(default=False)
-    showTimelineSyncModeButton: bool = field(default=False)
+    showTimelineSyncModeButton: bool = field(default=True)
     # showCustomButtons: Dict[str, bool] = field(default=Factory(dict))
     
     

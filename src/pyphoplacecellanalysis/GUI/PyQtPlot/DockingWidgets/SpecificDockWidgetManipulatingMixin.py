@@ -205,6 +205,9 @@ class SpecificDockWidgetManipulatingMixin(BaseDynamicInstanceConformingMixin):
         self.sync_matplotlib_render_plot_widget(identifier_name) # Sync it with the active window:
         
         # dock_item.connections['button_action_callbacks'] = {}
+        if 'button_action_callbacks' not in dock_item.connections:
+            dock_item.connections['button_action_callbacks'] = {} ## initialize to new
+
         _out_connections = dock_item.connections['button_action_callbacks']
         _prev_conn = _out_connections.pop(identifier_name, None)
         if _prev_conn is not None:
@@ -340,7 +343,8 @@ class SpecificDockWidgetManipulatingMixin(BaseDynamicInstanceConformingMixin):
         # end if not should_defer_render
         self.sync_matplotlib_render_plot_widget(identifier_name) # Sync it with the active window:
         
-        # dock_item.connections['button_action_callbacks'] = {}
+        if 'button_action_callbacks' not in dock_item.connections:
+            dock_item.connections['button_action_callbacks'] = {} ## initialize to new
         _out_connections = dock_item.connections['button_action_callbacks']
         _prev_conn = _out_connections.pop(identifier_name, None)
         if _prev_conn is not None:
@@ -413,7 +417,7 @@ class SpecificDockWidgetManipulatingMixin(BaseDynamicInstanceConformingMixin):
 
         if a_dock_config is None:
             override_dock_group_name: str = None ## this feature doesn't work
-            a_dock_config = CustomCyclicColorsDockDisplayConfig(showCloseButton=True, named_color_scheme=NamedColorScheme.grey)
+            a_dock_config = CustomCyclicColorsDockDisplayConfig(showCloseButton=True, showTimelineSyncModeButton=True, named_color_scheme=NamedColorScheme.grey)
             a_dock_config.dock_group_names = [override_dock_group_name] # , 'non-PBE Continuous Decoding'
 
 
@@ -464,16 +468,23 @@ class SpecificDockWidgetManipulatingMixin(BaseDynamicInstanceConformingMixin):
         if a_1D_posterior is not None:
             widget.plots_data.matrix = deepcopy(a_1D_posterior)
 
-
-
-
         widget.draw() # alternative to accessing through full path?
         sync_mode = kwargs.get('sync_mode', None)
         if sync_mode is None:
             self.sync_matplotlib_render_plot_widget(identifier_name) # Sync it with the active window:
+        else:
+            self.sync_matplotlib_render_plot_widget(identifier_name, sync_mode=sync_mode)
             
 
-        # dock_item.connections['button_action_callbacks'] = {}
+        def pyqtgraph_widget_on_toggle_timeline_sync_mode(an_item, is_checked):
+            """ Captures: widget
+            """
+            print(f'pyqtgraph_widget_on_toggle_timeline_sync_mode(an_item: {an_item}, is_checked: {is_checked})')
+            self.on_toggle_timeline_sync_mode(an_item=an_item, is_checked=is_checked)
+            widget.draw()
+            
+        if 'button_action_callbacks' not in dock_item.connections:
+            dock_item.connections['button_action_callbacks'] = {} ## initialize to new
         _out_connections = dock_item.connections['button_action_callbacks']
         _prev_conn = _out_connections.pop(identifier_name, None)
         if _prev_conn is not None:
@@ -482,10 +493,11 @@ class SpecificDockWidgetManipulatingMixin(BaseDynamicInstanceConformingMixin):
 
         assert identifier_name == dock_item._name
         # sync_connection = _out_connections.get(identifier_name, None)
-        _out_connections[identifier_name] = dock_item.sigToggleTimelineSyncModeClicked.connect(self.on_toggle_timeline_sync_mode)
+        # _out_connections[identifier_name] = dock_item.sigToggleTimelineSyncModeClicked.connect(self.on_toggle_timeline_sync_mode)
+        _out_connections[identifier_name] = dock_item.sigToggleTimelineSyncModeClicked.connect(pyqtgraph_widget_on_toggle_timeline_sync_mode)
         # dock_item.connections['button_action_callbacks'].update(_out_connections)
         dock_item.connections['button_action_callbacks'] = _out_connections
-        
+        widget.draw()
 
         return identifier_name, widget, matplotlib_fig, matplotlib_fig_axes, dock_item
 
