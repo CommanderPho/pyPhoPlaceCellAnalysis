@@ -94,6 +94,7 @@ from neuropy.utils.mixins.binning_helpers import BinningContainer, BinningInfo
 from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import DecodedFilterEpochsResult
 
 
+@function_attributes(short_name=None, tags=['pre_post_delta', 'transition-matrix'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-04-22 18:09', related_items=[])
 def split_transition_matricies_results_pre_post_delta_category(an_out_decoded_marginal_posterior_df: pd.DataFrame, a_context_state_transition_matrix_list: List[NDArray]) -> Dict[str, NDArray]:
     """ 
     Usage:
@@ -212,7 +213,7 @@ def complete_all_transition_matricies(a_new_fully_generic_result: GenericDecoder
         a_result: DecodedFilterEpochsResult = a_result
         # a_decoder: BasePositionDecoder = decoder_context_dict[a_ctxt]
         if debug_print:
-        print(f'a_ctxt: {a_ctxt}')
+            print(f'a_ctxt: {a_ctxt}')
         
         out_matched_result_tuple_context_dict[a_ctxt] = (a_best_matching_context, a_result, a_decoder, a_decoded_marginal_posterior_df)
 
