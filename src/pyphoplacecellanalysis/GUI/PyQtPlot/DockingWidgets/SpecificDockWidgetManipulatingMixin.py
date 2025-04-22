@@ -50,6 +50,24 @@ class SpecificDockWidgetManipulatingMixin(BaseDynamicInstanceConformingMixin):
         
 
     """
+    def on_toggle_timeline_sync_mode(self, an_item, is_checked):
+        """ Called to update the sync mode
+        """
+        from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.SpikeRasterWidgets.Spike2DRaster import SynchronizedPlotMode
+
+        print(f'on_toggle_timeline_sync_mode(an_item: {an_item}, is_checked: {is_checked})')
+        identifier_name = an_item._name
+        print(f'\tidentifier_name: "{identifier_name}"')
+        if is_checked:
+            sync_mode: SynchronizedPlotMode = SynchronizedPlotMode.TO_GLOBAL_DATA
+        else:
+            sync_mode: SynchronizedPlotMode = SynchronizedPlotMode.TO_WINDOW
+        print(f'\tsync_mode: {sync_mode}')
+        self.sync_matplotlib_render_plot_widget(identifier_name, sync_mode=sync_mode)
+        print('\tdone.')
+
+
+
     @classmethod
     def _perform_overlay_measured_position(cls, matplotlib_fig_axes, measured_position_df: pd.DataFrame, variable_name = 'x'):
         """ 
@@ -183,10 +201,24 @@ class SpecificDockWidgetManipulatingMixin(BaseDynamicInstanceConformingMixin):
         if not should_defer_render:
             widget.draw() # alternative to accessing through full path?
         # end if not should_defer_render
+        
         self.sync_matplotlib_render_plot_widget(identifier_name) # Sync it with the active window:
         
-        self.sigDockAdded.emit(self, dock_item) ## sigDockAdded signal to indicate new dock has been added
-        
+        # dock_item.connections['button_action_callbacks'] = {}
+        _out_connections = dock_item.connections['button_action_callbacks']
+        _prev_conn = _out_connections.pop(identifier_name, None)
+        if _prev_conn is not None:
+            dock_item.sigToggleTimelineSyncModeClicked.disconnect(_prev_conn)
+            _prev_conn = None
+
+        assert identifier_name == dock_item._name
+        # sync_connection = _out_connections.get(identifier_name, None)
+        _out_connections[identifier_name] = dock_item.sigToggleTimelineSyncModeClicked.connect(self.on_toggle_timeline_sync_mode)
+        # dock_item.connections['button_action_callbacks'].update(_out_connections)
+        dock_item.connections['button_action_callbacks'] = _out_connections
+
+
+        self.sigDockAdded.emit(self, dock_item) ## sigDockAdded signal to indicate new dock has been added        
 
         return identifier_name, widget, matplotlib_fig, matplotlib_fig_axes, dock_item
     
@@ -308,6 +340,19 @@ class SpecificDockWidgetManipulatingMixin(BaseDynamicInstanceConformingMixin):
         # end if not should_defer_render
         self.sync_matplotlib_render_plot_widget(identifier_name) # Sync it with the active window:
         
+        # dock_item.connections['button_action_callbacks'] = {}
+        _out_connections = dock_item.connections['button_action_callbacks']
+        _prev_conn = _out_connections.pop(identifier_name, None)
+        if _prev_conn is not None:
+            dock_item.sigToggleTimelineSyncModeClicked.disconnect(_prev_conn)
+            _prev_conn = None
+
+        assert identifier_name == dock_item._name
+        # sync_connection = _out_connections.get(identifier_name, None)
+        _out_connections[identifier_name] = dock_item.sigToggleTimelineSyncModeClicked.connect(self.on_toggle_timeline_sync_mode)
+        # dock_item.connections['button_action_callbacks'].update(_out_connections)
+        dock_item.connections['button_action_callbacks'] = _out_connections
+
         self.sigDockAdded.emit(self, dock_item) ## sigDockAdded signal to indicate new dock has been added
 
         return identifier_name, widget, matplotlib_fig, matplotlib_fig_axes, dock_item
@@ -427,6 +472,21 @@ class SpecificDockWidgetManipulatingMixin(BaseDynamicInstanceConformingMixin):
         if sync_mode is None:
             self.sync_matplotlib_render_plot_widget(identifier_name) # Sync it with the active window:
             
+
+        # dock_item.connections['button_action_callbacks'] = {}
+        _out_connections = dock_item.connections['button_action_callbacks']
+        _prev_conn = _out_connections.pop(identifier_name, None)
+        if _prev_conn is not None:
+            dock_item.sigToggleTimelineSyncModeClicked.disconnect(_prev_conn)
+            _prev_conn = None
+
+        assert identifier_name == dock_item._name
+        # sync_connection = _out_connections.get(identifier_name, None)
+        _out_connections[identifier_name] = dock_item.sigToggleTimelineSyncModeClicked.connect(self.on_toggle_timeline_sync_mode)
+        # dock_item.connections['button_action_callbacks'].update(_out_connections)
+        dock_item.connections['button_action_callbacks'] = _out_connections
+        
+
         return identifier_name, widget, matplotlib_fig, matplotlib_fig_axes, dock_item
 
 
