@@ -1487,14 +1487,22 @@ class TransitionMatrixComputations:
         # p_x_given_n = np.random.rand(57, 4, 29951)
 
         n_position_bins, n_decoding_models, n_time_bins = p_x_given_n.shape
+        if debug_print:
+            print(f'\tn_position_bins, n_decoding_models, n_time_bins = p_x_given_n.shape')
+            print(f'\t\tn_position_bins: {n_position_bins}, n_decoding_models: {n_decoding_models}, n_time_bins: {n_time_bins}')
+            
 
         # 1. Determine the most likely model for each time bin
         sum_over_positions = p_x_given_n.sum(axis=0)  # (n_decoding_models, n_time_bins)
         best_model_each_bin = sum_over_positions.argmax(axis=0)  # (n_time_bins,)
         if debug_print:
-            print(f'sum_over_positions.shape: {np.shape(sum_over_positions)}')
-            print(f'best_model_each_bin.shape: {np.shape(best_model_each_bin)}')
+            print(f'\tsum_over_positions.shape: {np.shape(sum_over_positions)}')
+            print(f'\tbest_model_each_bin.shape: {np.shape(best_model_each_bin)}')
             
+
+        sum_over_context_states = np.squeeze(p_x_given_n.sum(axis=1))  # (n_position_bins, n_time_bins)
+        if debug_print:
+            print(f'\tsum_over_context_states.shape: {np.shape(sum_over_context_states)}')
 
         # 2. Determine the most likely position for each time bin (conditional on chosen model)
         best_position_each_bin = np.array([
@@ -1502,29 +1510,46 @@ class TransitionMatrixComputations:
             for t in range(n_time_bins)
         ])
         if debug_print:
-            print(f'best_position_each_bin.shape: {np.shape(best_position_each_bin)}')
+            print(f'\tbest_position_each_bin.shape: {np.shape(best_position_each_bin)}')
             
 
+        # Context Marginal Computation _______________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
         marginal_p_x_given_n_over_positions = deepcopy(sum_over_positions).T
         if debug_print:
-            print(f'marginal_p_x_given_n_over_positions: {np.shape(marginal_p_x_given_n_over_positions)}')
+            print(f'\tmarginal_p_x_given_n_over_positions: {np.shape(marginal_p_x_given_n_over_positions)}')
         marginal_p_x_given_n_over_positions = cls.normalize_probabilities_along_axis(marginal_p_x_given_n_over_positions, axis=-1)
         if debug_print:
-            print(f'marginal_p_x_given_n_over_positions: {np.shape(marginal_p_x_given_n_over_positions)}')
+            print(f'\tmarginal_p_x_given_n_over_positions: {np.shape(marginal_p_x_given_n_over_positions)}')
 
         A_model_transition_matrix: NDArray = cls.estimate_transition_matrix_weighted_avg(state_probs=marginal_p_x_given_n_over_positions)
         A_model = A_model_transition_matrix
         A_model = np.nan_to_num(A_model)
         if debug_print:
-            print(f'np.shape(A_model): {np.shape(A_model)}')
+            print(f'\tnp.shape(A_model): {np.shape(A_model)}')
 
 
-        # 3. Build position transition matrix
-        A_position_counts = np.zeros((n_position_bins, n_position_bins))
-        for t in range(n_time_bins - 1):
-            A_position_counts[best_position_each_bin[t], best_position_each_bin[t+1]] += 1
-        A_position = A_position_counts / A_position_counts.sum(axis=1, keepdims=True)
-        A_position = np.nan_to_num(A_position)  # handle rows with zero counts
+
+        # Position Marginal Computation _______________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
+        marginal_p_x_given_n_over_context_states = deepcopy(sum_over_context_states).T
+        if debug_print:
+            print(f'\tmarginal_p_x_given_n_over_context_states: {np.shape(marginal_p_x_given_n_over_context_states)}')
+        marginal_p_x_given_n_over_context_states = cls.normalize_probabilities_along_axis(marginal_p_x_given_n_over_context_states, axis=-1)
+        if debug_print:
+            print(f'\tmarginal_p_x_given_n_over_context_states: {np.shape(marginal_p_x_given_n_over_context_states)}')
+
+        A_position_transition_matrix: NDArray = cls.estimate_transition_matrix_weighted_avg(state_probs=marginal_p_x_given_n_over_context_states)
+        A_position = A_position_transition_matrix
+        A_position = np.nan_to_num(A_position)
+        if debug_print:
+            print(f'\tnp.shape(A_position): {np.shape(A_position)}')
+
+
+        # # 3. Build position transition matrix
+        # A_position_counts = np.zeros((n_position_bins, n_position_bins))
+        # for t in range(n_time_bins - 1):
+        #     A_position_counts[best_position_each_bin[t], best_position_each_bin[t+1]] += 1
+        # A_position = A_position_counts / A_position_counts.sum(axis=1, keepdims=True)
+        # A_position = np.nan_to_num(A_position)  # handle rows with zero counts
 
         # # 4. Build model transition matrix
         # A_model_counts = np.zeros((n_decoding_models, n_decoding_models))
@@ -1535,9 +1560,9 @@ class TransitionMatrixComputations:
 
         # 5. Construct combined transition matrix (Kronecker product)
         A_combined = np.kron(A_position, A_model)
-        if debug_print:
-            print("A_position:", A_position)
-            print("A_model:", A_model)
-            print("A_big shape:", A_combined.shape)
+        # if debug_print:
+        #     print("\tA_position:", A_position)
+        #     print("\tA_model:", A_model)
+        #     print("\tA_big shape:", A_combined.shape)
         return A_position, A_model, A_combined
 
