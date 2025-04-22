@@ -3282,12 +3282,21 @@ def build_position_by_decoder_transition_matrix(p_x_given_n, debug_print=False):
     return A_position, A_model, A_combined
 
 
-
-def plot_blocked_transition_matrix(A_big, n_position_bins, n_decoding_models, tick_labels=('long_LR', 'long_RL', 'short_LR', 'short_RL'), should_show_marginals:bool=True, extra_title_suffix:str=''):
+@function_attributes(short_name=None, tags=['figure', 'heatmap', 'matplotlib', 'transition-matrix'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-04-22 15:52', related_items=[])
+def plot_blocked_transition_matrix(A_big: NDArray, n_position_bins: int, n_decoding_models: int, tick_labels=('long_LR', 'long_RL', 'short_LR', 'short_RL'), should_show_marginals:bool=True, extra_title_suffix:str=''):
     """
 
-    plot_blocked_transition_matrix(A_big, n_position_bins, n_decoding_models)
+    Usage:
+        import numpy as np
+        import matplotlib.pyplot as plt
+        import seaborn as sns
+        import matplotlib.gridspec as gridspec
 
+        # plt.figure(figsize=(8,6)); sns.heatmap(A_big, cmap='viridis'); plt.title("Transition Matrix A_big"); plt.show()
+        plt.figure(figsize=(8,6)); sns.heatmap(A_position, cmap='viridis'); perform_update_title_subtitle(title_string=f"Transition Matrix A_position - t_bin: {a_time_bin_size}"); plt.show(); 
+        plt.figure(figsize=(8,6)); sns.heatmap(A_model, cmap='viridis'); perform_update_title_subtitle(title_string=f"Transition Matrix A_model - t_bin: {a_time_bin_size}"); plt.show()
+
+        _out = plot_blocked_transition_matrix(A_big, n_position_bins, n_decoding_models, extra_title_suffix=f' - t_bin: {a_time_bin_size}')
 
     """
     import matplotlib.pyplot as plt
