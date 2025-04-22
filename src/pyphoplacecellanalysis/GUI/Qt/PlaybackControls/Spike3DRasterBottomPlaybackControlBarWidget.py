@@ -181,7 +181,7 @@ class Spike3DRasterBottomPlaybackControlBar(ComboBoxCtrlOwningMixin, QWidget):
         standalone_extra_controls = [self.ui.btnHelp]
         
         controls_to_hide = [self.ui.slider_progress, self.ui.button_full_screen, self.ui.btnCurrentIntervals_Customize, 
-                            *playback_controls,
+                            # *playback_controls,
                             *speed_controls,
                             *jump_to_destination_controls,
                             *standalone_extra_controls] # , *move_controls
@@ -195,11 +195,11 @@ class Spike3DRasterBottomPlaybackControlBar(ComboBoxCtrlOwningMixin, QWidget):
             {
                 True: {
                     "text": "",
-                    "icon": qta.icon("fa.play", scale_factor=0.7, color='white', color_active='orange')
+                    "icon": qta.icon("ri.play-fill", scale_factor=0.7, color='white', color_active='orange')
                 },
                 False: {
                     "text": "",
-                    "icon": qta.icon("fa.pause", scale_factor=0.7, color='white', color_active='orange')
+                    "icon": qta.icon("ri.pause-fill", scale_factor=0.7, color='white', color_active='orange')
                 }
             }
         )
