@@ -1298,41 +1298,61 @@ class TransitionMatrixComputations:
         if num_time_bins < 2:
             raise ValueError("Need at least 2 time bins to estimate transitions.")
 
-        # Probabilities at time t (from states)
-        probs_t = state_probs[:-1, :] # Shape (N-1, num_states)
-        # Probabilities at time t+1 (to states)
-        probs_t_plus_1 = state_probs[1:, :] # Shape (N-1, num_states)
-
-        # Calculate expected counts (numerators and denominators)
-        # Numerator: Sum over t of P(state=i at t) * P(state=j at t+1)
-        # Denominator: Sum over t of P(state=i at t)
-
-        # Expected transition counts (Numerator for T_ij)
-        # Element-wise multiplication and sum:
-        # We want Sum_t [ p_t(i) * p_{t+1}(j) ] for each (i, j)
-        # This can be computed via matrix multiplication: probs_t.T @ probs_t_plus_1
-        # (num_states, N-1) @ (N-1, num_states) -> (num_states, num_states)
-        expected_transition_counts = probs_t.T @ probs_t_plus_1
-
-        # Expected occurrences of 'from' states (Denominator for T_ij)
-        # Sum over t of p_t(i) for each i
-        expected_state_counts = np.sum(probs_t, axis=0) # Shape (num_states,)
-
-        # Estimate Transition Matrix
+        # Initialize transition matrix
         transition_matrix = np.zeros((num_states, num_states))
+        
+        # For each time step t, compute the outer product of probabilities at t and t+1
+        for t in range(num_time_bins - 1):
+            p_t = state_probs[t, :]
+            p_t_plus_1 = state_probs[t + 1, :]
+            
+            # Outer product gives transition probabilities weighted by current state probabilities
+            transition_matrix += np.outer(p_t, p_t_plus_1)
+            
+        # # Probabilities at time t (from states)
+        # probs_t = state_probs[:-1, :] # Shape (N-1, num_states)
+        # # Probabilities at time t+1 (to states)
+        # probs_t_plus_1 = state_probs[1:, :] # Shape (N-1, num_states)
 
-        # Add epsilon to avoid division by zero if a state has near-zero probability mass
-        denominator = expected_state_counts + epsilon
+        # # Calculate expected counts (numerators and denominators)
+        # # Numerator: Sum over t of P(state=i at t) * P(state=j at t+1)
+        # # Denominator: Sum over t of P(state=i at t)
 
-        # Calculate T[i, j] = expected_transition_counts[i, j] / expected_state_counts[i]
-        # We need to divide each row i of expected_transition_counts by denominator[i]
-        transition_matrix = expected_transition_counts / denominator[:, np.newaxis]
+        # # Expected transition counts (Numerator for T_ij)
+        # # Element-wise multiplication and sum:
+        # # We want Sum_t [ p_t(i) * p_{t+1}(j) ] for each (i, j)
+        # # This can be computed via matrix multiplication: probs_t.T @ probs_t_plus_1
+        # # (num_states, N-1) @ (N-1, num_states) -> (num_states, num_states)
+        # expected_transition_counts = probs_t.T @ probs_t_plus_1
+
+        # # Expected occurrences of 'from' states (Denominator for T_ij)
+        # # Sum over t of p_t(i) for each i
+        # expected_state_counts = np.sum(probs_t, axis=0) # Shape (num_states,)
+
+        # # Estimate Transition Matrix
+        # transition_matrix = np.zeros((num_states, num_states))
+
+        # # Add epsilon to avoid division by zero if a state has near-zero probability mass
+        # denominator = expected_state_counts + epsilon
+
+        # # Calculate T[i, j] = expected_transition_counts[i, j] / expected_state_counts[i]
+        # # We need to divide each row i of expected_transition_counts by denominator[i]
+        # transition_matrix = expected_transition_counts / denominator[:, np.newaxis]
 
         # Normalize rows to ensure they sum to 1 (handles epsilon effect and floating point)
         row_sums = transition_matrix.sum(axis=1, keepdims=True)
+        
         # Avoid division by zero for rows that are all zero
-        non_zero_rows = row_sums > 1e-12
-        transition_matrix[non_zero_rows[:,0]] /= row_sums[non_zero_rows]
+        non_zero_mask = row_sums > epsilon
+        
+        # Safe division - only divide non-zero rows
+        safe_row_sums = np.where(non_zero_mask, row_sums, 1.0)
+        transition_matrix = transition_matrix / safe_row_sums
+        
+        # For rows that were all zeros, set to uniform distribution
+        zero_rows = ~non_zero_mask.squeeze()
+        if np.any(zero_rows):
+            transition_matrix[zero_rows, :] = 1.0 / num_states
 
         return transition_matrix
 
@@ -1438,7 +1458,7 @@ class TransitionMatrixComputations:
 
     @function_attributes(short_name=None, tags=['transition_matrix', 'position', 'decoder_id', '2D'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-12-31 10:05', related_items=[])
     @classmethod
-    def build_position_by_decoder_transition_matrix(cls, p_x_given_n: NDArray, debug_print=True):
+    def build_position_by_decoder_transition_matrix(cls, p_x_given_n: NDArray, debug_print=False):
         """
         given a decoder that gives a probability that the generating process is one of two possibilities, what methods are available to estimate the probability for a contiguous epoch made of many time bins?
         Note: there is most certainly temporal dependence, how should I go about dealing with this?
