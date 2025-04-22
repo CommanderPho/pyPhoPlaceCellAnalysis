@@ -94,6 +94,38 @@ from neuropy.utils.mixins.binning_helpers import BinningContainer, BinningInfo
 from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import DecodedFilterEpochsResult
 
 
+def split_transition_matricies_results_pre_post_delta_category(an_out_decoded_marginal_posterior_df: pd.DataFrame, a_context_state_transition_matrix_list: List[NDArray]) -> Dict[str, NDArray]:
+    """ 
+    Usage:
+        from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import split_transition_matricies_results_pre_post_delta_category
+        ## INPUTS: laps_context_state_transition_matrix_context_dict
+        out_context_state_transition_matrix_context_dict = deepcopy(laps_context_state_transition_matrix_context_dict)
+        out_matched_result_tuple_context_dict = deepcopy(laps_matched_result_tuple_context_dict)
+
+        an_out_best_matching_context, an_out_result, an_out_decoder, an_out_decoded_marginal_posterior_df = list(out_matched_result_tuple_context_dict.values())[0] # [-1]
+        a_context_state_transition_matrix_list: List[NDArray] = list(out_context_state_transition_matrix_context_dict.values())[0]
+
+        a_mean_context_state_transition_matrix_dict = split_transition_matricies_results_pre_post_delta_category(an_out_decoded_marginal_posterior_df=an_out_decoded_marginal_posterior_df, a_context_state_transition_matrix_list=a_context_state_transition_matrix_list)
+        
+    """
+    ## INPUTS: an_out_decoded_marginal_posterior_df, a_context_state_transition_matrix_list
+
+    assert 'pre_post_delta_category' in an_out_decoded_marginal_posterior_df
+    is_pre_delta = (an_out_decoded_marginal_posterior_df['pre_post_delta_category'] == 'pre-delta')
+
+    a_context_state_transition_matrix: NDArray = np.stack(a_context_state_transition_matrix_list) # np.stack(out_context_state_transition_matrix_context_dict[a_ctxt]).shape
+
+    ## split on first index:
+    a_context_state_transition_matrix_dict = {'pre-delta': a_context_state_transition_matrix[is_pre_delta], 'post-delta': a_context_state_transition_matrix[np.logical_not(is_pre_delta)]}
+    a_mean_context_state_transition_matrix_dict = {k:np.nanmean(v, axis=0) for k, v in a_context_state_transition_matrix_dict.items()}
+
+    # np.shape(a_context_state_transition_matrix) # (84, 4, 4) - (n_epochs, n_states, n_states)
+    # a_mean_context_state_transition_matrix: NDArray = np.nanmean(a_context_state_transition_matrix, axis=0) #.shape (4, 4)
+    # a_mean_context_state_transition_matrix
+    return a_mean_context_state_transition_matrix_dict
+
+
+
 @function_attributes(short_name=None, tags=['transition-matrix'], input_requires=[], output_provides=[], uses=['TransitionMatrixComputations.build_position_by_decoder_transition_matrix'], used_by=['complete_all_transition_matricies'], creation_date='2025-04-22 13:52', related_items=[])
 def build_transition_matricies(a_result: DecodedFilterEpochsResult, debug_print: bool = False):
     """ 
@@ -179,8 +211,8 @@ def complete_all_transition_matricies(a_new_fully_generic_result: GenericDecoder
         # a_result: DecodedFilterEpochsResult = result_context_dict[a_ctxt]
         a_result: DecodedFilterEpochsResult = a_result
         # a_decoder: BasePositionDecoder = decoder_context_dict[a_ctxt]
+        if debug_print:
         print(f'a_ctxt: {a_ctxt}')
-        # a_result.compute_marginals(
         
         out_matched_result_tuple_context_dict[a_ctxt] = (a_best_matching_context, a_result, a_decoder, a_decoded_marginal_posterior_df)
 
@@ -3218,68 +3250,58 @@ class EstimationCorrectnessPlots:
         plt.show()
 
 
-@function_attributes(short_name=None, tags=['transition_matrix', 'position', 'decoder_id', '2D'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-12-31 10:05', related_items=[])
-def build_position_by_decoder_transition_matrix(p_x_given_n, debug_print=False):
-    """
-    given a decoder that gives a probability that the generating process is one of two possibilities, what methods are available to estimate the probability for a contiguous epoch made of many time bins?
-    Note: there is most certainly temporal dependence, how should I go about dealing with this?
 
+# ==================================================================================================================== #
+# 2025-04-22 - Transition Matrix                                                                                       #
+# ==================================================================================================================== #
+from neuropy.utils.matplotlib_helpers import perform_update_title_subtitle
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+
+def _perform_plot_P_Context_State_Transition_Matrix(context_state_transition_matrix: NDArray, num='laps', **kwargs):
+    """ 
+    
+    Usage:    
+        from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import _perform_plot_P_Context_State_Transition_Matrix, _perform_plot_position_Transition_Matrix
+        _perform_plot_P_Context_State_Transition_Matrix(context_state_transition_matrix=laps_mean_context_state_transition_matrix_context_dict[a_laps_best_matching_context], num='laps')
+        _perform_plot_P_Context_State_Transition_Matrix(context_state_transition_matrix=pbes_mean_context_state_transition_matrix_context_dict[a_pbes_best_matching_context], num='PBEs')
+
+    """
+    from neuropy.utils.matplotlib_helpers import perform_update_title_subtitle
+    import matplotlib.pyplot as plt
+    import seaborn as sns
+
+    plt.figure(figsize=(8,6), num=num, **kwargs); sns.heatmap(context_state_transition_matrix, cmap='viridis'); plt.title("Transition Matrix P_Context State"); 
+    plt.xlabel('P[t+1]')
+    plt.ylabel('P[t]')
+    state_labels = ['Long_LR', 'Long_RL', 'Short_LR', 'Short_RL']
+    plt.xticks(ticks=(np.arange(len(state_labels))+0.5), labels=state_labels)
+    plt.yticks(ticks=(np.arange(len(state_labels))+0.5), labels=state_labels)
+    plt.show()
+
+def _perform_plot_position_Transition_Matrix(a_position_transition_matrix: NDArray, num='laps', clear=True, **kwargs):
+    """ 
     Usage:
-
-        from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import build_position_by_decoder_transition_matrix, plot_blocked_transition_matrix
-
-        ## INPUTS: p_x_given_n
-        n_position_bins, n_decoding_models, n_time_bins = p_x_given_n.shape
-        A_position, A_model, A_big = build_position_by_decoder_transition_matrix(p_x_given_n)
-
-        ## Plotting:
-        import matplotlib.pyplot as plt; import seaborn as sns
-
-        # plt.figure(figsize=(8,6)); sns.heatmap(A_big, cmap='viridis'); plt.title("Transition Matrix A_big"); plt.show()
-        plt.figure(figsize=(8,6)); sns.heatmap(A_position, cmap='viridis'); plt.title("Transition Matrix A_position"); plt.show()
-        plt.figure(figsize=(8,6)); sns.heatmap(A_model, cmap='viridis'); plt.title("Transition Matrix A_model"); plt.show()
-
-        plot_blocked_transition_matrix(A_big, n_position_bins, n_decoding_models)
-
+        from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import _perform_plot_P_Context_State_Transition_Matrix, _perform_plot_position_Transition_Matrix
+        _perform_plot_position_Transition_Matrix(a_position_transition_matrix=laps_mean_position_transition_matrix_context_dict[a_laps_best_matching_context], num='laps')
+        _perform_plot_position_Transition_Matrix(a_position_transition_matrix=pbes_mean_position_transition_matrix_context_dict[a_pbes_best_matching_context], num='PBEs')
 
     """
-    # Assume p_x_given_n is already loaded with shape (57, 4, 29951).
-    # We'll demonstrate by generating random data:
-    # p_x_given_n = np.random.rand(57, 4, 29951)
+    from neuropy.utils.matplotlib_helpers import perform_update_title_subtitle
+    import matplotlib.pyplot as plt
+    import seaborn as sns
 
-    n_position_bins, n_decoding_models, n_time_bins = p_x_given_n.shape
+    plt.figure(figsize=(8,6), num=num, **kwargs); sns.heatmap(a_position_transition_matrix, cmap='viridis'); plt.title("Transition Matrix Position"); 
+    plt.xlabel('P(Pos[t+1])')
+    plt.ylabel('P(Pos[t]]')
+    # state_labels = ['Long_LR', 'Long_RL', 'Short_LR', 'Short_RL']
+    # plt.xticks(ticks=(np.arange(len(state_labels))+0.5), labels=state_labels)
+    # plt.yticks(ticks=(np.arange(len(state_labels))+0.5), labels=state_labels)
+    plt.show()
 
-    # 1. Determine the most likely model for each time bin
-    sum_over_positions = p_x_given_n.sum(axis=0)  # (n_decoding_models, n_time_bins)
-    best_model_each_bin = sum_over_positions.argmax(axis=0)  # (n_time_bins,)
 
-    # 2. Determine the most likely position for each time bin (conditional on chosen model)
-    best_position_each_bin = np.array([
-        p_x_given_n[:, best_model_each_bin[t], t].argmax()
-        for t in range(n_time_bins)
-    ])
 
-    # 3. Build position transition matrix
-    A_position_counts = np.zeros((n_position_bins, n_position_bins))
-    for t in range(n_time_bins - 1):
-        A_position_counts[best_position_each_bin[t], best_position_each_bin[t+1]] += 1
-    A_position = A_position_counts / A_position_counts.sum(axis=1, keepdims=True)
-    A_position = np.nan_to_num(A_position)  # handle rows with zero counts
-
-    # 4. Build model transition matrix
-    A_model_counts = np.zeros((n_decoding_models, n_decoding_models))
-    for t in range(n_time_bins - 1):
-        A_model_counts[best_model_each_bin[t], best_model_each_bin[t+1]] += 1
-    A_model = A_model_counts / A_model_counts.sum(axis=1, keepdims=True)
-    A_model = np.nan_to_num(A_model)
-
-    # 5. Construct combined transition matrix (Kronecker product)
-    A_combined = np.kron(A_position, A_model)
-    if debug_print:
-        print("A_position:", A_position)
-        print("A_model:", A_model)
-        print("A_big shape:", A_combined.shape)
-    return A_position, A_model, A_combined
 
 
 @function_attributes(short_name=None, tags=['figure', 'heatmap', 'matplotlib', 'transition-matrix'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-04-22 15:52', related_items=[])
