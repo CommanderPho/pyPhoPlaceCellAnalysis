@@ -82,6 +82,132 @@ from pyphocorehelpers.Filesystem.path_helpers import sanitize_filename_for_Windo
 from pyphoplacecellanalysis.General.Model.Configs.LongShortDisplayConfig import LongShortDisplayConfigManager
 
 
+from neuropy.utils.mixins.binning_helpers import BinningContainer, BinningInfo
+from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import DecodedFilterEpochsResult
+
+
+
+import numpy as np
+from pyphoplacecellanalysis.Analysis.Decoder.transition_matrix import TransitionMatrixComputations
+from pyphoplacecellanalysis.Analysis.Decoder.context_dependent import GenericDecoderDictDecodedEpochsDictResult
+from neuropy.utils.mixins.binning_helpers import BinningContainer, BinningInfo
+from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import DecodedFilterEpochsResult
+
+
+@function_attributes(short_name=None, tags=['transition-matrix'], input_requires=[], output_provides=[], uses=['TransitionMatrixComputations.build_position_by_decoder_transition_matrix'], used_by=['complete_all_transition_matricies'], creation_date='2025-04-22 13:52', related_items=[])
+def build_transition_matricies(a_result: DecodedFilterEpochsResult, debug_print: bool = False):
+    """ 
+    
+    
+    (out_time_bin_container_list, out_position_transition_matrix_list, out_context_state_transition_matrix_list, out_combined_transition_matrix_list), (a_mean_context_state_transition_matrix, a_mean_position_transition_matrix) = build_transition_matricies(a_result=a_result)
+    out_mean_context_state_transition_matrix_context_dict[a_ctxt] = deepcopy(a_mean_context_state_transition_matrix)
+    
+    """
+    p_x_given_n_list = deepcopy(a_result.p_x_given_n_list)
+    
+    ## initialize result output
+    out_time_bin_container_list = []
+    out_position_transition_matrix_list = []
+    out_context_state_transition_matrix_list = []
+    out_combined_transition_matrix_list = []
+    ## Iterate through the epochs:
+    for a_time_bin_container, a_p_x_given_n in zip(a_result.time_bin_containers, p_x_given_n_list):
+        if debug_print:
+            print(f'np.shape(a_p_x_given_n): {np.shape(a_p_x_given_n)}')
+        try:
+            A_position, A_model, A_combined = TransitionMatrixComputations.build_position_by_decoder_transition_matrix(a_p_x_given_n, debug_print=debug_print)    
+            out_position_transition_matrix_list.append(A_position)
+            out_context_state_transition_matrix_list.append(A_model)
+            out_combined_transition_matrix_list.append(A_combined)
+            out_time_bin_container_list.append(deepcopy(a_time_bin_container))
+
+        except ValueError as err:
+            print(f'err: {err}')
+        except Exception as err:
+            raise ## unhandled exception
+        
+    ## END for a_...
+    
+    a_context_state_transition_matrix: NDArray = np.stack(out_context_state_transition_matrix_list) # np.stack(out_context_state_transition_matrix_context_dict[a_ctxt]).shape
+    a_mean_context_state_transition_matrix: NDArray = np.nanmean(a_context_state_transition_matrix, axis=0) #.shape (4, 4)
+    
+    a_position_transition_matrix: NDArray = np.stack(out_position_transition_matrix_list) # np.stack(out_context_state_transition_matrix_context_dict[a_ctxt]).shape
+    a_mean_position_transition_matrix: NDArray = np.nanmean(a_position_transition_matrix, axis=0) #.shape (4, 4)
+    
+    
+    return (out_time_bin_container_list, out_position_transition_matrix_list, out_context_state_transition_matrix_list, out_combined_transition_matrix_list), (a_mean_context_state_transition_matrix, a_mean_position_transition_matrix)
+
+
+@function_attributes(short_name=None, tags=['transition-matrix'], input_requires=[], output_provides=[], uses=['build_transition_matricies'], used_by=[], creation_date='2025-04-22 14:49', related_items=[])
+def complete_all_transition_matricies(a_new_fully_generic_result: GenericDecoderDictDecodedEpochsDictResult, a_target_context: IdentifyingContext, debug_print: bool = False):
+    """ Computes all transition matrix outputs for all found results for the provided target_context
+    
+    
+    complete_all_transition_matricies(a_new_fully_generic_result=a_new_fully_generic_result, a_target_context=a_target_context)
+    
+    Usage:
+        from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import complete_all_transition_matricies, build_transition_matricies
+        ## Laps context:
+        a_laps_target_context: IdentifyingContext = IdentifyingContext(trained_compute_epochs='laps', pfND_ndim=1, time_bin_size=0.025, known_named_decoding_epochs_type='laps', masked_time_bin_fill_type='ignore', data_grain='per_epoch') ## Laps
+        laps_target_context_results = complete_all_transition_matricies(a_new_fully_generic_result=a_new_fully_generic_result, a_target_context=a_laps_target_context)
+        out_matched_result_tuple_context_dict, (out_time_bin_container_context_dict, out_position_transition_matrix_context_dict, out_context_state_transition_matrix_context_dict, out_combined_transition_matrix_context_dict), (out_mean_context_state_transition_matrix_context_dict, out_mean_position_transition_matrix_context_dict) = laps_target_context_results
+        # a_best_matching_context, a_result, a_decoder, a_decoded_marginal_posterior_df = out_matched_result_tuple_context_dict[a_ctxt]
+
+
+
+    """
+    any_matching_contexts_list, result_context_dict, decoder_context_dict, decoded_marginal_posterior_df_context_dict = a_new_fully_generic_result.get_results_matching_contexts(context_query=a_target_context)
+
+    
+    
+    out_matched_result_tuple_context_dict = {}
+    
+    out_time_bin_container_context_dict: Dict[IdentifyingContext, List[BinningContainer]] = {}
+
+    out_position_transition_matrix_context_dict: Dict[IdentifyingContext, List[NDArray]] = {}
+    out_context_state_transition_matrix_context_dict: Dict[IdentifyingContext, List[NDArray]] = {}
+    out_combined_transition_matrix_context_dict: Dict[IdentifyingContext, List[NDArray]] = {}
+
+    out_mean_context_state_transition_matrix_context_dict: Dict[IdentifyingContext, NDArray] = {}
+    out_mean_position_transition_matrix_context_dict: Dict[IdentifyingContext, NDArray] = {}
+
+    # for a_ctxt, a_posterior_df in decoded_marginal_posterior_df_context_dict.items():
+    for a_ctxt, a_result in result_context_dict.items():
+        a_best_matching_context, a_result, a_decoder, a_decoded_marginal_posterior_df = a_new_fully_generic_result.get_results_best_matching_context(context_query=a_ctxt)
+        
+        # a_posterior_df: pd.DataFrame = decoded_marginal_posterior_df_context_dict[a_ctxt]
+        # a_result: DecodedFilterEpochsResult = result_context_dict[a_ctxt]
+        a_result: DecodedFilterEpochsResult = a_result
+        # a_decoder: BasePositionDecoder = decoder_context_dict[a_ctxt]
+        print(f'a_ctxt: {a_ctxt}')
+        # a_result.compute_marginals(
+        
+        out_matched_result_tuple_context_dict[a_ctxt] = (a_best_matching_context, a_result, a_decoder, a_decoded_marginal_posterior_df)
+
+        (out_time_bin_container_list, out_position_transition_matrix_list, out_context_state_transition_matrix_list, out_combined_transition_matrix_list), (a_mean_context_state_transition_matrix, a_mean_position_transition_matrix) = build_transition_matricies(a_result=a_result)
+        out_time_bin_container_context_dict[a_ctxt] = out_time_bin_container_list
+        out_position_transition_matrix_context_dict[a_ctxt] = out_position_transition_matrix_list
+        out_context_state_transition_matrix_context_dict[a_ctxt] = out_context_state_transition_matrix_list
+        out_combined_transition_matrix_context_dict[a_ctxt] = out_combined_transition_matrix_list
+
+        out_mean_context_state_transition_matrix_context_dict[a_ctxt] = deepcopy(a_mean_context_state_transition_matrix)
+        out_mean_position_transition_matrix_context_dict[a_ctxt] = deepcopy(a_mean_position_transition_matrix)
+
+        # ## Plotting:
+        # # # plt.figure(figsize=(8,6)); sns.heatmap(A_big, cmap='viridis'); plt.title("Transition Matrix A_big"); plt.show()
+        # # plt.figure(figsize=(8,6)); sns.heatmap(A_position, cmap='viridis'); plt.title("Transition Matrix A_position"); plt.show()
+        # # plt.figure(figsize=(8,6)); sns.heatmap(A_model, cmap='viridis'); plt.title("Transition Matrix A_model"); plt.show()
+
+        # # plot_blocked_transition_matrix(A_combined, n_position_bins, n_decoding_models)
+    # END for a_ctxt, a_result in result_con....
+
+    return out_matched_result_tuple_context_dict, (out_time_bin_container_context_dict, out_position_transition_matrix_context_dict, out_context_state_transition_matrix_context_dict, out_combined_transition_matrix_context_dict), (out_mean_context_state_transition_matrix_context_dict, out_mean_position_transition_matrix_context_dict)
+
+
+
+
+
+
 
 
 @function_attributes(short_name=None, tags=['plot', 'figure', 'matplotlib'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-04-14 17:55', related_items=[])
