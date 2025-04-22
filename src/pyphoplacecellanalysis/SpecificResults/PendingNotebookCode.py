@@ -3148,12 +3148,12 @@ def build_position_by_decoder_transition_matrix(p_x_given_n, debug_print=False):
     A_model = np.nan_to_num(A_model)
 
     # 5. Construct combined transition matrix (Kronecker product)
-    A_big = np.kron(A_position, A_model)
+    A_combined = np.kron(A_position, A_model)
     if debug_print:
         print("A_position:", A_position)
         print("A_model:", A_model)
-        print("A_big shape:", A_big.shape)
-    return A_position, A_model, A_big
+        print("A_big shape:", A_combined.shape)
+    return A_position, A_model, A_combined
 
 
 

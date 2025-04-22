@@ -1263,3 +1263,261 @@ class TransitionMatrixComputations:
                                     out_fwd=fwd_expected_out_velocity, out_bkwd=bkwd_expected_out_velocity, out_combined=combined_expected_out_velocity)
                 )
         return expected_velocity_list_dict
+
+
+
+
+    @function_attributes(short_name=None, tags=['testing', 'transition-matrix', 'posterior'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-04-22 01:08', related_items=[])
+    @classmethod
+    def estimate_transition_matrix_weighted_avg(cls, state_probs, epsilon=1e-12) -> NDArray:
+        """
+        Estimates the transition matrix using weighted averaging based on state probabilities.
+
+        Args:
+            state_probs (np.ndarray): Array of shape (N, num_states) where N is the
+                                    number of time bins and num_states is the number
+                                    of states (e.g., 2). state_probs[t, i] is the
+                                    probability of being in state i at time t.
+                                    Rows should sum to 1.
+            epsilon (float): Small value to add to denominator to avoid division by zero.
+
+        Returns:
+            np.ndarray: Estimated transition matrix of shape (num_states, num_states).
+                        T[i, j] is the probability of transitioning from state i to state j.
+                        
+        Usage:
+        
+            transition_matrix: NDArray = TransitionMatrixComputations.estimate_transition_matrix_weighted_avg(state_probs=a_p_x_given_n)
+            
+        """
+        if not np.allclose(np.sum(state_probs, axis=1), 1.0):
+            raise ValueError("Input probabilities for each time bin must sum to 1.")
+
+        num_time_bins, num_states = state_probs.shape
+
+        if num_time_bins < 2:
+            raise ValueError("Need at least 2 time bins to estimate transitions.")
+
+        # Probabilities at time t (from states)
+        probs_t = state_probs[:-1, :] # Shape (N-1, num_states)
+        # Probabilities at time t+1 (to states)
+        probs_t_plus_1 = state_probs[1:, :] # Shape (N-1, num_states)
+
+        # Calculate expected counts (numerators and denominators)
+        # Numerator: Sum over t of P(state=i at t) * P(state=j at t+1)
+        # Denominator: Sum over t of P(state=i at t)
+
+        # Expected transition counts (Numerator for T_ij)
+        # Element-wise multiplication and sum:
+        # We want Sum_t [ p_t(i) * p_{t+1}(j) ] for each (i, j)
+        # This can be computed via matrix multiplication: probs_t.T @ probs_t_plus_1
+        # (num_states, N-1) @ (N-1, num_states) -> (num_states, num_states)
+        expected_transition_counts = probs_t.T @ probs_t_plus_1
+
+        # Expected occurrences of 'from' states (Denominator for T_ij)
+        # Sum over t of p_t(i) for each i
+        expected_state_counts = np.sum(probs_t, axis=0) # Shape (num_states,)
+
+        # Estimate Transition Matrix
+        transition_matrix = np.zeros((num_states, num_states))
+
+        # Add epsilon to avoid division by zero if a state has near-zero probability mass
+        denominator = expected_state_counts + epsilon
+
+        # Calculate T[i, j] = expected_transition_counts[i, j] / expected_state_counts[i]
+        # We need to divide each row i of expected_transition_counts by denominator[i]
+        transition_matrix = expected_transition_counts / denominator[:, np.newaxis]
+
+        # Normalize rows to ensure they sum to 1 (handles epsilon effect and floating point)
+        row_sums = transition_matrix.sum(axis=1, keepdims=True)
+        # Avoid division by zero for rows that are all zero
+        non_zero_rows = row_sums > 1e-12
+        transition_matrix[non_zero_rows[:,0]] /= row_sums[non_zero_rows]
+
+        return transition_matrix
+
+
+    @classmethod
+    def normalize_probabilities_along_axis(cls, data: NDArray, axis=-1, equal_probs_for_zeros=True, debug_print=False) -> NDArray:
+        """
+        Normalizes probabilities along the specified axis, handling edge cases like zeros and NaNs.
+        
+        Args:
+            data: NDArray - The array to normalize
+            axis: int - The axis along which to normalize (default: -1, the last axis)
+            equal_probs_for_zeros: bool - Whether to set equal probabilities for rows that sum to zero
+            debug_print: bool - Whether to print debug information
+            
+        Returns:
+            NDArray - The normalized array where values along the specified axis sum to 1.0
+        """
+        # Make a copy to avoid modifying the original data
+        normalized_data = data.copy()
+        
+        # Check for zeros or NaNs before normalization
+        sum_before_norm = np.nansum(normalized_data, axis=axis, keepdims=True)
+        if debug_print:
+            print(f"Before normalization - min sum: {np.min(sum_before_norm)}, has NaNs: {np.isnan(sum_before_norm).any()}")
+
+        # Safe normalization with handling for zeros
+        # Replace zeros with ones in the denominator to avoid division by zero
+        safe_sums = np.where(sum_before_norm == 0, 1.0, sum_before_norm)
+        normalized_data = normalized_data / safe_sums
+
+        # For rows that summed to zero, set all values to equal probabilities (e.g., 1/n)
+        if equal_probs_for_zeros:
+            zero_sum_rows = (sum_before_norm == 0).squeeze()
+            if np.any(zero_sum_rows):
+                n_values = normalized_data.shape[axis]
+                equal_probs = np.ones(n_values) / n_values
+                # Create indexing for the array
+                idx = [slice(None)] * normalized_data.ndim
+                
+                # Iterate through the array and replace zero-sum rows with equal probabilities
+                # This is a simpler approach that avoids complex reshaping
+                it = np.nditer(zero_sum_rows, flags=['multi_index'])
+                for x in it:
+                    if x:
+                        # Get the multi_index but replace the axis dimension with a full slice
+                        idx_list = list(it.multi_index)
+                        # Remove the last dimension which was kept by keepdims=True
+                        if axis == -1:
+                            idx_list = idx_list[:-1]
+                        else:
+                            idx_list.pop(axis)
+                        
+                        # Create the full indexing tuple
+                        full_idx = tuple(idx_list)
+                        
+                        # Set the values along the axis to equal probabilities
+                        if axis == -1:
+                            normalized_data[full_idx] = equal_probs
+                        else:
+                            # For other axes, we need to use advanced indexing
+                            idx = [slice(None)] * normalized_data.ndim
+                            for i, val in enumerate(full_idx):
+                                dim = i if i < axis else i + 1
+                                idx[dim] = val
+                            idx[axis] = slice(None)
+                            normalized_data[tuple(idx)] = equal_probs
+
+                # # Apply equal probabilities to rows with zero sums
+                # if zero_sum_rows.ndim > 0:  # If it's not a scalar
+                #     # Create indexing tuple to properly assign values
+                #     idx = [slice(None)] * normalized_data.ndim
+                #     idx[axis] = slice(None)
+                #     idx_tuple = tuple(idx)
+                    
+                #     # Create a boolean mask for indexing
+                #     mask_idx = [slice(None)] * normalized_data.ndim
+                #     mask_idx[axis] = np.newaxis
+                #     mask = zero_sum_rows.reshape([zero_sum_rows.shape[0] if i == j else 1 
+                #                                 for i, j in enumerate(range(normalized_data.ndim)) 
+                #                                 if i != axis])
+                    
+                #     # Broadcast the mask to the correct shape
+                #     broadcast_shape = list(normalized_data.shape)
+                #     broadcast_shape[axis] = 1
+                #     mask = np.broadcast_to(mask.reshape(tuple(broadcast_shape)), normalized_data.shape)
+                    
+                #     # Apply equal probabilities where the mask is True
+                #     normalized_data = np.where(mask, equal_probs, normalized_data)
+                # else:
+                #     # Handle the case where there's only one row
+                #     normalized_data[:] = equal_probs
+
+        # Verify normalization
+        verification = np.sum(normalized_data, axis=axis)
+        if debug_print:
+            print(f"Normalized sums: min={verification.min()}, max={verification.max()}, has NaNs: {np.isnan(verification).any()}")
+        
+        return normalized_data
+
+
+
+
+    @function_attributes(short_name=None, tags=['transition_matrix', 'position', 'decoder_id', '2D'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-12-31 10:05', related_items=[])
+    @classmethod
+    def build_position_by_decoder_transition_matrix(cls, p_x_given_n: NDArray, debug_print=True):
+        """
+        given a decoder that gives a probability that the generating process is one of two possibilities, what methods are available to estimate the probability for a contiguous epoch made of many time bins?
+        Note: there is most certainly temporal dependence, how should I go about dealing with this?
+
+        Usage:
+
+            from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import build_position_by_decoder_transition_matrix, plot_blocked_transition_matrix
+
+            ## INPUTS: p_x_given_n
+            n_position_bins, n_decoding_models, n_time_bins = p_x_given_n.shape
+            A_position, A_model, A_combined = TransitionMatrixComputations.build_position_by_decoder_transition_matrix(a_p_x_given_n)
+            
+            ## Plotting:
+            import matplotlib.pyplot as plt; import seaborn as sns
+
+            # plt.figure(figsize=(8,6)); sns.heatmap(A_big, cmap='viridis'); plt.title("Transition Matrix A_big"); plt.show()
+            plt.figure(figsize=(8,6)); sns.heatmap(A_position, cmap='viridis'); plt.title("Transition Matrix A_position"); plt.show()
+            plt.figure(figsize=(8,6)); sns.heatmap(A_model, cmap='viridis'); plt.title("Transition Matrix A_model"); plt.show()
+
+            plot_blocked_transition_matrix(A_big, n_position_bins, n_decoding_models)
+
+
+        """
+        # Assume p_x_given_n is already loaded with shape (57, 4, 29951).
+        # We'll demonstrate by generating random data:
+        # p_x_given_n = np.random.rand(57, 4, 29951)
+
+        n_position_bins, n_decoding_models, n_time_bins = p_x_given_n.shape
+
+        # 1. Determine the most likely model for each time bin
+        sum_over_positions = p_x_given_n.sum(axis=0)  # (n_decoding_models, n_time_bins)
+        best_model_each_bin = sum_over_positions.argmax(axis=0)  # (n_time_bins,)
+        if debug_print:
+            print(f'sum_over_positions.shape: {np.shape(sum_over_positions)}')
+            print(f'best_model_each_bin.shape: {np.shape(best_model_each_bin)}')
+            
+
+        # 2. Determine the most likely position for each time bin (conditional on chosen model)
+        best_position_each_bin = np.array([
+            p_x_given_n[:, best_model_each_bin[t], t].argmax()
+            for t in range(n_time_bins)
+        ])
+        if debug_print:
+            print(f'best_position_each_bin.shape: {np.shape(best_position_each_bin)}')
+            
+
+        marginal_p_x_given_n_over_positions = deepcopy(sum_over_positions).T
+        if debug_print:
+            print(f'marginal_p_x_given_n_over_positions: {np.shape(marginal_p_x_given_n_over_positions)}')
+        marginal_p_x_given_n_over_positions = cls.normalize_probabilities_along_axis(marginal_p_x_given_n_over_positions, axis=-1)
+        if debug_print:
+            print(f'marginal_p_x_given_n_over_positions: {np.shape(marginal_p_x_given_n_over_positions)}')
+
+        A_model_transition_matrix: NDArray = cls.estimate_transition_matrix_weighted_avg(state_probs=marginal_p_x_given_n_over_positions)
+        A_model = A_model_transition_matrix
+        A_model = np.nan_to_num(A_model)
+        if debug_print:
+            print(f'np.shape(A_model): {np.shape(A_model)}')
+
+
+        # 3. Build position transition matrix
+        A_position_counts = np.zeros((n_position_bins, n_position_bins))
+        for t in range(n_time_bins - 1):
+            A_position_counts[best_position_each_bin[t], best_position_each_bin[t+1]] += 1
+        A_position = A_position_counts / A_position_counts.sum(axis=1, keepdims=True)
+        A_position = np.nan_to_num(A_position)  # handle rows with zero counts
+
+        # # 4. Build model transition matrix
+        # A_model_counts = np.zeros((n_decoding_models, n_decoding_models))
+        # for t in range(n_time_bins - 1):
+        #     A_model_counts[best_model_each_bin[t], best_model_each_bin[t+1]] += 1
+        # A_model = A_model_counts / A_model_counts.sum(axis=1, keepdims=True)
+        # A_model = np.nan_to_num(A_model)
+
+        # 5. Construct combined transition matrix (Kronecker product)
+        A_combined = np.kron(A_position, A_model)
+        if debug_print:
+            print("A_position:", A_position)
+            print("A_model:", A_model)
+            print("A_big shape:", A_combined.shape)
+        return A_position, A_model, A_combined
+
