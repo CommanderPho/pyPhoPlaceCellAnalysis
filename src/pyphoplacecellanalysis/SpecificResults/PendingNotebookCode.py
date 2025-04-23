@@ -215,6 +215,42 @@ def complete_all_transition_matricies(a_new_fully_generic_result: GenericDecoder
         if debug_print:
             print(f'a_ctxt: {a_ctxt}')
         
+
+
+        # Drop Epochs that are too short from all results: ___________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
+        replay_epochs_df = deepcopy(a_result.filter_epochs)
+        if not isinstance(replay_epochs_df, pd.DataFrame):
+            replay_epochs_df = replay_epochs_df.to_dataframe()
+        # min_possible_ripple_time_bin_size: float = find_minimum_time_bin_duration(replay_epochs_df['duration'].to_numpy())
+        # min_bounded_ripple_decoding_time_bin_size: float = min(desired_ripple_decoding_time_bin_size, min_possible_ripple_time_bin_size) # 10ms # 0.002
+        # if desired_ripple_decoding_time_bin_size < min_bounded_ripple_decoding_time_bin_size:
+        #     print(f'WARN: desired_ripple_decoding_time_bin_size: {desired_ripple_decoding_time_bin_size} < min_bounded_ripple_decoding_time_bin_size: {min_bounded_ripple_decoding_time_bin_size}... hopefully it works.')
+        decoding_time_bin_size: float = a_best_matching_context.get('time_bin_size',  a_ctxt.get('time_bin_size', None)) 
+        assert decoding_time_bin_size is not None
+        minimum_event_duration: float = 2.0 * decoding_time_bin_size
+
+        ## Drop those less than the time bin duration
+        print(f'DropShorterMode:')
+        pre_drop_n_epochs = len(replay_epochs_df)
+        if minimum_event_duration is not None:                
+            replay_epochs_df = replay_epochs_df[replay_epochs_df['duration'] > minimum_event_duration]
+            post_drop_n_epochs = len(replay_epochs_df)
+            n_dropped_epochs = post_drop_n_epochs - pre_drop_n_epochs
+            print(f'\tminimum_event_duration present (minimum_event_duration={minimum_event_duration}).\n\tdropping {n_dropped_epochs} that are shorter than our minimum_event_duration of {minimum_event_duration}.', end='\t')
+        else:
+            replay_epochs_df = replay_epochs_df[replay_epochs_df['duration'] > desired_ripple_decoding_time_bin_size]
+            post_drop_n_epochs = len(replay_epochs_df)
+            n_dropped_epochs = post_drop_n_epochs - pre_drop_n_epochs
+            print(f'\tdropping {n_dropped_epochs} that are shorter than our ripple decoding time bin size of {desired_ripple_decoding_time_bin_size}', end='\t') 
+
+        print(f'{post_drop_n_epochs} remain.')
+
+        epoch_data_indicies = a_result.find_data_indicies_from_epoch_times(replay_epochs_df['start'])
+        ## filter the output
+        a_result = a_result.filtered_by_epoch_times(replay_epochs_df['start'])
+        # a_decoded_marginal_posterior_df = a_decoded_marginal_posterior_df.epochs.filtered_by_epoch_times(replay_epochs_df['start'])
+        a_decoded_marginal_posterior_df = a_decoded_marginal_posterior_df.loc[epoch_data_indicies]
+
         out_matched_result_tuple_context_dict[a_ctxt] = (a_best_matching_context, a_result, a_decoder, a_decoded_marginal_posterior_df)
 
         (out_time_bin_container_list, out_position_transition_matrix_list, out_context_state_transition_matrix_list, out_combined_transition_matrix_list), (a_mean_context_state_transition_matrix, a_mean_position_transition_matrix) = build_transition_matricies(a_result=a_result)
