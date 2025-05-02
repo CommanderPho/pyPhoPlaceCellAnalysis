@@ -30,6 +30,9 @@ KnownNamedDecodingEpochsType = Literal['laps', 'replay', 'ripple', 'pbe', 'non_p
 # Define a type that can only be one of these specific strings
 MaskedTimeBinFillType = Literal['ignore', 'last_valid', 'nan_filled', 'dropped'] ## used in `DecodedFilterEpochsResult.mask_computed_DecodedFilterEpochsResult_by_required_spike_counts_per_time_bin(...)` to specify how invalid bins (due to too few spikes) are treated.
 DataTimeGrain = Literal['per_epoch', 'per_time_bin']
+PrePostDeltaCategory = Literal['pre_delta', 'post_delta']
+
+
 
 GenericResultTupleIndexType: TypeAlias = IdentifyingContext # an template/stand-in variable that aims to abstract away the unique-hashable index of a single result computed with a given set of parameters. Not yet fully implemented 2025-03-09 17:50 
 
