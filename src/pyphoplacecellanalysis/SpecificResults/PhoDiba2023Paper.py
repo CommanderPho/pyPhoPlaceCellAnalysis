@@ -3378,3 +3378,96 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
 
             return instance
         
+
+from neuropy.utils.mixins.time_slicing import TimeColumnAliasesProtocol
+
+@pd.api.extensions.register_dataframe_accessor("pho_LS_epoch")
+class LongShortTrackDataframeAccessor(TimeColumnAliasesProtocol):
+    """ Describes a dataframe with at least a neuron_id (aclu) column. Provides functionality regarding building globally (across-sessions) unique neuron identifiers.
+    
+
+    from pyphoplacecellanalysis.SpecificResults.AcrossSessionResults import AcrossSessionIdentityDataframeAccessor
+    from neuropy.utils.indexing_helpers import NeuroPyDataframeAccessor
+    from pyphocorehelpers.indexing_helpers import PhoDataframeAccessor
+    from pyphoplacecellanalysis.SpecificResults.PhoDiba2023Paper import LongShortTrackDataframeAccessor
+    
+    
+    """
+    _time_column_name_synonyms = {"start":{'begin','start_t','lap_start_t'},
+        "stop":['end','stop_t'],
+        "label":['name', 'id', 'flat_replay_idx','lap_id']
+    }
+
+    _required_column_names = ['start', 'stop']
+
+
+    def __init__(self, pandas_obj: pd.DataFrame):
+        pandas_obj = self.renaming_synonym_columns_if_needed(pandas_obj, required_columns_synonym_dict=self._time_column_name_synonyms)       #@IgnoreException 
+        self._validate(pandas_obj)
+        self._df = pandas_obj
+
+    @staticmethod
+    def _validate(obj):
+        """ verify there is a column that identifies the spike's neuron, the type of cell of this neuron ('neuron_type'), and the timestamp at which each spike occured ('t'||'t_rel_seconds') """
+        if not isinstance(obj, pd.DataFrame):
+            raise ValueError(f"object must be a pandas Dataframe but is of type: {type(obj)}!\nobj: {obj}")
+
+    @classmethod
+    def add_pre_post_delta_category_column_if_needed(cls, epochs_df: pd.DataFrame, t_delta:float, replace_existing:bool=True, start_time_col_name: str='start', end_time_col_name: Optional[str]=None) -> pd.DataFrame:
+        """ 2025-05-01 - adds the 'pre_post_delta_category' column if it doesn't exist
+
+        Add the maze_id to the active_filter_epochs so we can see how properties change as a function of which track the replay event occured on
+        
+        WARNING: does NOT modify in place!
+
+        Adds Columns: ['pre_post_delta_category']
+
+        Usage:
+            from pyphoplacecellanalysis.SpecificResults.PhoDiba2023Paper import LongShortTrackDataframeAccessor
+
+            t_start, t_delta, t_end = curr_active_pipeline.find_LongShortDelta_times()
+
+            a_laps_decoded_marginal_posterior_df = LongShortTrackDataframeAccessor.add_pre_post_delta_category_column_if_needed(epochs_df=a_laps_decoded_marginal_posterior_df, t_delta=t_delta, start_time_col_name='lap_start_t')
+            a_laps_decoded_marginal_posterior_df
+
+        """
+        # epochs_df = epochs_df.epochs.to_dataframe()
+        # epochs_df[[labels_column_name]] = epochs_df[[labels_column_name]].astype('int')
+        is_missing_column: bool = ('pre_post_delta_category' not in epochs_df.columns)
+        if (is_missing_column or replace_existing):
+            # Create the maze_id column:
+            epochs_df['pre_post_delta_category'] = 'pre-delta' # all 'pre-delta' to start 
+            if (end_time_col_name is not None):
+                Assert.require_columns(dfs=epochs_df, required_columns=[start_time_col_name, end_time_col_name])
+                epochs_df.loc[np.logical_and((epochs_df[start_time_col_name].to_numpy() >= t_delta), (epochs_df[end_time_col_name].to_numpy() >= t_delta)), 'pre_post_delta_category'] = 'post-delta' # second epoch, 'post-delta'
+            else:
+                ## no end-column
+                Assert.require_columns(dfs=epochs_df, required_columns=[start_time_col_name])
+                epochs_df.loc[(epochs_df[start_time_col_name].to_numpy() >= t_delta), 'pre_post_delta_category'] = 'post-delta' # second epoch, 'post-delta'
+                
+            epochs_df['pre_post_delta_category'] = epochs_df['pre_post_delta_category'].astype('str') # note the single vs. double brakets in the two cases. Not sure if it makes a difference or not
+        else:
+            # already exists and we shouldn't overwrite it:
+            epochs_df[['pre_post_delta_category']] = epochs_df[['pre_post_delta_category']].astype('str') # note the single vs. double brakets in the two cases. Not sure if it makes a difference or not
+        return epochs_df
+            
+
+    def adding_pre_post_delta_category_if_needed(self, t_delta:float, replace_existing:bool=True, start_time_col_name: str='start', end_time_col_name: Optional[str]=None) -> pd.DataFrame:
+        """ 2025-05-01 - adds the 'pre_post_delta_category' column if it doesn't exist
+
+        Add the pre_post_delta_category to the active_filter_epochs so we can see how properties change as a function of which track the replay event occured on
+        
+        WARNING: does NOT modify in place!
+
+        Adds Columns: ['pre_post_delta_category']
+        Usage:
+            from pyphoplacecellanalysis.SpecificResults.PhoDiba2023Paper import LongShortTrackDataframeAccessor
+
+            t_start, t_delta, t_end = curr_active_pipeline.find_LongShortDelta_times()
+            filter_epochs = an_out_result.filter_epochs.pho_LS_epoch.adding_pre_post_delta_category_if_needed(t_delta=t_delta)
+            filter_epochs
+
+        """
+        epochs_df: pd.DataFrame = self._df
+        return self.add_pre_post_delta_category_column_if_needed(epochs_df=epochs_df, t_delta=t_delta, replace_existing=replace_existing, start_time_col_name=start_time_col_name, end_time_col_name=end_time_col_name)
+    
