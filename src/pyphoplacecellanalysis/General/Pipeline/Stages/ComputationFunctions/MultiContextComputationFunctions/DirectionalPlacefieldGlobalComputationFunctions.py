@@ -1528,7 +1528,7 @@ class DirectionalPseudo2DDecodersResult(ComputedResult):
         
 
     # Low-level direct marginal computation functions ____________________________________________________________________ #
-    @function_attributes(short_name=None, tags=['pseudo2D', 'marginal', 'laps', 'pbe'], input_requires=[], output_provides=[], uses=[], used_by=['GenericDecoderDictDecodedEpochsDictResult'], creation_date='2025-03-20 08:30', related_items=[])
+    @function_attributes(short_name=None, tags=['pseudo2D', 'marginal', 'laps', 'pbe'], input_requires=[], output_provides=[], uses=['cls.build_generalized_non_marginalized_raw_posteriors'], used_by=['GenericDecoderDictDecodedEpochsDictResult'], creation_date='2025-03-20 08:30', related_items=[])
     @classmethod
     def perform_compute_specific_marginals(cls, a_result: DecodedFilterEpochsResult, marginal_context: IdentifyingContext) -> pd.DataFrame:
         """ Computes the appropriate pseudo2D marginals for the result given the context (requires laps/pbe)        

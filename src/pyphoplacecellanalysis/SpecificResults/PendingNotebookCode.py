@@ -126,7 +126,8 @@ def _subfn_helper_process_epochs_result_dict(epochs_result_dict: Dict[types.Know
 
 
 @function_attributes(short_name=None, tags=['position'], input_requires=[], output_provides=[], uses=['_subfn_helper_process_epochs_result_dict'], used_by=[], creation_date='2025-05-02 12:54', related_items=[])
-def build_decoder_prob_as_a_function_of_position(epochs_result_dict: Dict[types.KnownNamedDecodingEpochsType, DecodedFilterEpochsResult], xbin_centers, t_delta: float, grid_bin_bounds=None, is_split_by_all_decoders:bool = True, debug_print=False):
+def build_decoder_prob_as_a_function_of_position(epochs_result_dict: Dict[types.KnownNamedDecodingEpochsType, DecodedFilterEpochsResult], xbin_centers, t_delta: float, grid_bin_bounds=None, is_split_by_all_decoders:bool = True, debug_print=False,
+                                                 enable_per_decoder_renormalization: bool=True, enable_per_position_bin_renormalization: bool=False, enable_LS_renormalization: bool=False):
     """ Plots the Decoder Context Probability as a function of position (split by pre/post-delta, decoded epochs) to check for bias of certain positions to decode to certain decoder-context (like the right-long endcap region might have a strong bias towards 'long_LR' pre-delta.)
 
     Usage:
@@ -141,10 +142,10 @@ def build_decoder_prob_as_a_function_of_position(epochs_result_dict: Dict[types.
         }
         
         ## all four decoders as separate rows:
-        fig, ax_dict, epoch_name_by_pre_post_delta_category_output_dict_dict = build_decoder_prob_as_a_function_of_position(epochs_result_dict=epochs_result_dict, xbin_centers=deepcopy(a_laps_decoder.xbin_centers), t_delta=t_delta, grid_bin_bounds=deepcopy(a_laps_decoder.pf.config.grid_bin_bounds), is_split_by_all_decoders=True)
+        fig, ax_dict, epoch_name_by_pre_post_delta_category_output_dict_dict, epoch_name_by_probability_values_output_dict_dict = build_decoder_prob_as_a_function_of_position(epochs_result_dict=epochs_result_dict, xbin_centers=deepcopy(a_laps_decoder.xbin_centers), t_delta=t_delta, grid_bin_bounds=deepcopy(a_laps_decoder.pf.config.grid_bin_bounds), is_split_by_all_decoders=True)
 
         ## just long/short
-        fig, ax_dict, epoch_name_by_pre_post_delta_category_output_dict_dict = build_decoder_prob_as_a_function_of_position(epochs_result_dict=epochs_result_dict, xbin_centers=deepcopy(a_laps_decoder.xbin_centers), t_delta=t_delta, grid_bin_bounds=deepcopy(a_laps_decoder.pf.config.grid_bin_bounds), is_split_by_all_decoders=False)
+        fig, ax_dict, epoch_name_by_pre_post_delta_category_output_dict_dict, epoch_name_by_probability_values_output_dict_dict = build_decoder_prob_as_a_function_of_position(epochs_result_dict=epochs_result_dict, xbin_centers=deepcopy(a_laps_decoder.xbin_centers), t_delta=t_delta, grid_bin_bounds=deepcopy(a_laps_decoder.pf.config.grid_bin_bounds), is_split_by_all_decoders=False)
         
     """
     from pyphoplacecellanalysis.General.Model.Configs.LongShortDisplayConfig import DecoderIdentityColors   
@@ -156,6 +157,9 @@ def build_decoder_prob_as_a_function_of_position(epochs_result_dict: Dict[types.
     ## INPUTS: epochs_result_dict, a_laps_decoder, 
 
     epoch_name_by_pre_post_delta_category_output_dict_dict: Dict[types.KnownNamedDecodingEpochsType, Dict[types.PrePostDeltaCategory, DecodedFilterEpochsResult]] = _subfn_helper_process_epochs_result_dict(epochs_result_dict=epochs_result_dict, t_delta=t_delta)
+    
+    epoch_name_by_probability_values_output_dict_dict: Dict[types.KnownNamedDecodingEpochsType, Dict[str, NDArray]] = {}
+
 
     fig = plt.figure(layout="constrained")
     if is_split_by_all_decoders:
@@ -186,7 +190,8 @@ def build_decoder_prob_as_a_function_of_position(epochs_result_dict: Dict[types.
 
     decoder_idx_to_name_map: Dict[int, str] = {0: 'long_LR', 1: 'long_RL', 2:'short_LR', 3:'short_RL'}
     # pre_post_delta_category_name_to_scatter_kwargs_map = {'long': dict(marker='.'), 'short': dict(marker='<')}
-    pre_post_delta_category_name_to_scatter_kwargs_map = {'pre_delta': dict(marker='<'), 'post_delta': dict(marker='>')}
+    # pre_post_delta_category_name_to_scatter_kwargs_map = {'pre_delta': dict(marker='<'), 'post_delta': dict(marker='>')}
+    pre_post_delta_category_name_to_scatter_kwargs_map = {'pre_delta': dict(marker='<'), 'post_delta': dict(marker='.')}
 
     for an_epoch_name, an_out_result_dict in epoch_name_by_pre_post_delta_category_output_dict_dict.items():
         for a_pre_post_delta_category_name, an_out_result in an_out_result_dict.items():
@@ -199,29 +204,38 @@ def build_decoder_prob_as_a_function_of_position(epochs_result_dict: Dict[types.
                 summary_values_dict[a_decoder_name] = np.squeeze(np.hstack([np.squeeze(v[:,a_decoder_idx,:]) for v in an_out_result.p_x_given_n_list])) # (n_pos_bins, n_time_bins)
                 probability_values = np.nansum(summary_values_dict[a_decoder_name], axis=-1) # sum over time
                 
-                # ## normalize over decoder
-                # sum_over_all_decoder_p_values = np.nansum(probability_values) # sum over time
-                # probability_values = probability_values / sum_over_all_decoder_p_values ## normalize over decoder
+                ## normalize over decoder
+                if enable_per_decoder_renormalization:
+                    sum_over_all_decoder_p_values = np.nansum(probability_values) # sum over time
+                    probability_values = probability_values / sum_over_all_decoder_p_values ## normalize over decoder
 
                 summary_values_dict[a_decoder_name] = probability_values # (n_pos_bins)
                 
 
 
             ## normalize over each position decoder
-            sum_over_all_decoders_per_position = summary_values_dict['long_LR'] + summary_values_dict['long_RL'] + summary_values_dict['short_LR'] + summary_values_dict['short_RL'] # sum for each position, .shape (n_pos_bins,)
-            if debug_print:
-                print(f'sum_over_all_decoders_per_position.shape: {sum_over_all_decoders_per_position.shape}')
-            # probability_values = probability_values / sum_over_all_decoders_per_position ## normalize over decoder
-            for a_decoder_idx, a_decoder_name in decoder_idx_to_name_map.items():
-                ## normalize each one at a time
-                summary_values_dict[a_decoder_name] = summary_values_dict[a_decoder_name] / sum_over_all_decoders_per_position
+            if enable_per_position_bin_renormalization:
+                sum_over_all_decoders_per_position = summary_values_dict['long_LR'] + summary_values_dict['long_RL'] + summary_values_dict['short_LR'] + summary_values_dict['short_RL'] # sum for each position, .shape (n_pos_bins,)
+                if debug_print:
+                    print(f'sum_over_all_decoders_per_position.shape: {sum_over_all_decoders_per_position.shape}')
+                # probability_values = probability_values / sum_over_all_decoders_per_position ## normalize over decoder
+                for a_decoder_idx, a_decoder_name in decoder_idx_to_name_map.items():
+                    ## normalize each one at a time
+                    summary_values_dict[a_decoder_name] = summary_values_dict[a_decoder_name] / sum_over_all_decoders_per_position
 
 
             summary_values_dict['long'] = summary_values_dict['long_LR'] + summary_values_dict['long_RL'] #np.squeeze(np.hstack([np.squeeze(v[:,0,:]) for v in an_out_result.p_x_given_n_list])) +  np.squeeze(np.hstack([np.squeeze(v[:,1,:]) for v in an_out_result.p_x_given_n_list]))
             summary_values_dict['short'] = summary_values_dict['short_LR'] + summary_values_dict['short_RL'] # np.squeeze(np.hstack([np.squeeze(v[:,2,:]) for v in an_out_result.p_x_given_n_list])) + np.squeeze(np.hstack([np.squeeze(v[:,3,:]) for v in an_out_result.p_x_given_n_list]))        
 
-            scatter_kwargs = {}
-            # scatter_kwargs = pre_post_delta_category_name_to_scatter_kwargs_map[a_pre_post_delta_category_name] # dict(marker='.')
+
+            ## potentially redundant long/short renormalization:
+            if enable_LS_renormalization:
+                any_long_or_short = summary_values_dict['long'] + summary_values_dict['short']
+                summary_values_dict['long'] = summary_values_dict['long'] / any_long_or_short
+                summary_values_dict['short'] = summary_values_dict['short'] / any_long_or_short
+
+            # scatter_kwargs = {}
+            scatter_kwargs = pre_post_delta_category_name_to_scatter_kwargs_map[a_pre_post_delta_category_name] # dict(marker='.')
             
             # fig1, ax, prob_values1 = plot_linearized_position_probability(an_out_result=an_out_result, label=a_combined_str_name, figure_title=f'Joint Position Probability', ax=ax_dict[an_epoch_name], xbin_centers=xbin_centers, is_P_long=True)
             
@@ -229,7 +243,8 @@ def build_decoder_prob_as_a_function_of_position(epochs_result_dict: Dict[types.
                 active_decoder_names_list = ['long_LR', 'long_RL', 'short_LR', 'short_RL']
             else:
                 active_decoder_names_list = ['long', 'short']
-
+                # active_decoder_names_list = ['long_LR', 'long_RL', 'short_LR', 'short_RL']
+                
             # for a_decoder_idx, a_decoder_name in decoder_idx_to_name_map.items():
             for a_decoder_name in active_decoder_names_list:
                 a_full_combined_str_name: str = f'{a_combined_str_name}|{a_decoder_name}'
@@ -238,14 +253,25 @@ def build_decoder_prob_as_a_function_of_position(epochs_result_dict: Dict[types.
                     ax = ax_dict[a_combined_str_name]
                     a_decoder_color = decoder_color_dict[a_decoder_name]
                     scatter_kwargs['color'] = a_decoder_color
+                    a_p_x_given_n = summary_values_dict[a_decoder_name]
+                    active_combined_str_name: str = a_full_combined_str_name
                 else:
                     ax = ax_dict[an_epoch_name]
                     a_decoder_color = decoder_color_dict[f"{a_decoder_name}_LR"]
+                    # a_decoder_color = decoder_color_dict[a_decoder_name]
                     scatter_kwargs['color'] = a_decoder_color
-                    
-                fig1, ax, prob_values1 = plot_linearized_position_prob_p(a_p_x_given_n=summary_values_dict[a_decoder_name], label=a_full_combined_str_name, figure_title=f'Joint Position Probability', ax=ax, xbin_centers=xbin_centers, y_label=f'P({a_decoder_name}|x)', **scatter_kwargs)
+                    a_p_x_given_n = summary_values_dict[a_decoder_name]
+                    # active_combined_str_name: str = a_combined_str_name
+                    active_combined_str_name: str = a_full_combined_str_name
+
+                fig1, ax, prob_values1 = plot_linearized_position_prob_p(a_p_x_given_n=a_p_x_given_n, label=active_combined_str_name, figure_title=f'Joint Position Probability', ax=ax, xbin_centers=xbin_centers, y_label=f'P({a_decoder_name}|x)', **scatter_kwargs)
+            ## END for a_decoder_name in active_de...
             
 
+            epoch_name_by_probability_values_output_dict_dict[an_epoch_name] = deepcopy(summary_values_dict)
+        ## END for a_pre_post_delta_c...
+    ## END for an_epoch_name, an_....
+    
     if grid_bin_bounds is not None:
         for k, ax in ax_dict.items():
             long_track_line_collection, short_track_line_collection = add_vertical_track_bounds_lines(grid_bin_bounds=grid_bin_bounds, ax=ax)
@@ -257,7 +283,7 @@ def build_decoder_prob_as_a_function_of_position(epochs_result_dict: Dict[types.
     # long_rects_outputs, short_rects_outputs = add_track_shapes(grid_bin_bounds=grid_bin_bounds, ax=ax_dict['laps'])
 
     # fig2, ax2, prob_values2 = plot_linearized_position_probability(an_out_result=an_out_result_dict['post_delta'], figure_title='post-delta Linearized Position Probability', ax=ax1)
-    return fig, ax_dict, epoch_name_by_pre_post_delta_category_output_dict_dict
+    return fig, ax_dict, epoch_name_by_pre_post_delta_category_output_dict_dict, epoch_name_by_probability_values_output_dict_dict
 
 
 
@@ -265,8 +291,8 @@ def build_decoder_prob_as_a_function_of_position(epochs_result_dict: Dict[types.
 
 
 @function_attributes(short_name=None, tags=['plotting', 'prob_v_position'], input_requires=[], output_provides=[], uses=[], used_by=['plot_linearized_position_probability'], creation_date='2025-05-01 17:00', related_items=[])
-def plot_linearized_position_prob_p(a_p_x_given_n: NDArray, figure_title='Linearized Position Probability', 
-                                         save_path=None, show_figure=True, ax=None, figsize=(10, 6), label=None, y_label: str = 'P(Long|x)', xbin_centers=None, **kwargs):
+def plot_linearized_position_prob_p(a_p_x_given_n: NDArray, figure_title='Linearized Position Probability', save_path=None, show_figure=True, ax=None, figsize=(10, 6), label=None, y_label: str = 'P(Long|x)', xbin_centers=None,
+                                    add_connecting_line=True, line_alpha=0.2, line_width=0.5, **kwargs):
     """
     Produces a figure showing the probability distribution across linearized positions.
     
@@ -310,7 +336,24 @@ def plot_linearized_position_prob_p(a_p_x_given_n: NDArray, figure_title='Linear
     if xbin_centers is None:
         xbin_centers = np.arange(len(a_p_x_given_n))
 
-    ax.scatter(xbin_centers, a_p_x_given_n, label=label, **kwargs)
+    scatter = ax.scatter(xbin_centers, a_p_x_given_n, label=label, **kwargs)
+
+    # Add connecting line if requested
+    if add_connecting_line:
+        # Get the color from the scatter plot if not specified in kwargs
+        if 'color' in kwargs:
+            line_color = kwargs['color']
+        elif hasattr(scatter, 'get_facecolor'):
+            # For single color scatter
+            line_color = scatter.get_facecolor()[0]
+        else:
+            # Default color
+            line_color = 'blue'
+            
+        # Plot the connecting line with transparency
+        ax.plot(xbin_centers, a_p_x_given_n, color=line_color, alpha=line_alpha, linewidth=line_width)
+
+
     ax.set_title(figure_title)
     ax.set_ylabel(y_label)
     ax.set_xlabel('Position x <linearized>')
