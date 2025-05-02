@@ -60,6 +60,7 @@
      <addaction name="actionAddTimeIntervals_Laps"/>
      <addaction name="actionAddTimeIntervals_PBEs"/>
      <addaction name="actionAddTimeIntervals_NonPBEs"/>
+     <addaction name="actionAddTimeIntervals_NonPBEEndcaps"/>
      <addaction name="actionAddTimeIntervals_Ripples"/>
      <addaction name="actionAddTimeIntervals_Replays"/>
      <addaction name="actionAddTimeIntervals_Bursts"/>
@@ -386,6 +387,11 @@
   <action name="actionDecoded_Epoch_Slices_NonPBEs">
    <property name="text">
     <string>Non-PBEs</string>
+   </property>
+  </action>
+  <action name="actionAddTimeIntervals_NonPBEEndcaps">
+   <property name="text">
+    <string>Non-PBE Endcaps (Only)</string>
    </property>
   </action>
  </widget>

@@ -44,7 +44,7 @@ class LocalMenus_AddRenderable(QtWidgets.QMainWindow):
     actionDecoded_Epoch_Slices_NonPBEs
     actionAddTimeIntervals_NonPBEs
     actionSpike3DLauncher
-
+    NewNonPBEEndcaps_2DRenderTimeEpochs
     
     """
     def __init__(self, parent=None):
@@ -88,6 +88,7 @@ class LocalMenus_AddRenderable(QtWidgets.QMainWindow):
         submenu_addTimeIntervals: List[QtWidgets.QAction] = [widget.ui.actionAddTimeIntervals_Laps,
                                     widget.ui.actionAddTimeIntervals_PBEs,
                                     widget.ui.actionAddTimeIntervals_NonPBEs,
+                                    widget.ui.actionAddTimeIntervals_NonPBEEndcaps,
                                     widget.ui.actionAddTimeIntervals_SessionEpochs,
                                     widget.ui.actionAddTimeIntervals_Ripples,
                                     widget.ui.actionAddTimeIntervals_Replays,
@@ -96,6 +97,7 @@ class LocalMenus_AddRenderable(QtWidgets.QMainWindow):
         submenu_addTimeIntervalCallbacks: List[Callable] = [lambda evt=None: Laps2DRenderTimeEpochs.add_render_time_epochs(curr_sess=sess.laps, destination_plot=destination_plot),
                                             lambda evt=None: PBE_2DRenderTimeEpochs.add_render_time_epochs(curr_sess=sess.pbe, destination_plot=destination_plot),
                                             lambda evt=None: NewNonPBE_2DRenderTimeEpochs.add_render_time_epochs(curr_sess=sess.non_pbe, destination_plot=destination_plot),
+                                            lambda evt=None: NewNonPBEEndcaps_2DRenderTimeEpochs.add_render_time_epochs(curr_sess=sess.non_pbe_endcaps, destination_plot=destination_plot),
                                             lambda evt=None: SessionEpochs2DRenderTimeEpochs.add_render_time_epochs(curr_sess=sess.epochs, destination_plot=destination_plot),
                                             lambda evt=None: Ripples_2DRenderTimeEpochs.add_render_time_epochs(curr_sess=sess.ripple, destination_plot=destination_plot),
                                             lambda evt=None: Replays_2DRenderTimeEpochs.add_render_time_epochs(curr_sess=sess.replay, destination_plot=destination_plot),
@@ -118,6 +120,7 @@ class LocalMenus_AddRenderable(QtWidgets.QMainWindow):
         widget.ui.actionAddTimeIntervals_Ripples.setEnabled(Ripples_2DRenderTimeEpochs.is_render_time_epochs_enabled(sess.ripple))
         widget.ui.actionAddTimeIntervals_PBEs.setEnabled(PBE_2DRenderTimeEpochs.is_render_time_epochs_enabled(sess.pbe))
         widget.ui.actionAddTimeIntervals_NonPBEs.setEnabled(NewNonPBE_2DRenderTimeEpochs.is_render_time_epochs_enabled(sess.non_pbe))
+        widget.ui.actionAddTimeIntervals_NonPBEEndcaps.setEnabled(NewNonPBEEndcaps_2DRenderTimeEpochs.is_render_time_epochs_enabled(sess.non_pbe_endcaps))
         widget.ui.actionAddTimeIntervals_Replays.setEnabled(Replays_2DRenderTimeEpochs.is_render_time_epochs_enabled(sess.replay))
         widget.ui.actionAddTimeIntervals_Bursts.setEnabled(SpikeBurstIntervals_2DRenderTimeEpochs.is_render_time_epochs_enabled(curr_sess=curr_active_pipeline, active_config_name=active_config_name)) # disable by default        
 
