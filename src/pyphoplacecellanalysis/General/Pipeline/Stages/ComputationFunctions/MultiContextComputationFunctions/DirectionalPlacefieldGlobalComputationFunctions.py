@@ -1612,8 +1612,6 @@ class DirectionalPseudo2DDecodersResult(ComputedResult):
 
         ## OUTPUTS: epoch_idx_col_name, epoch_start_t_col_name, additional_transfer_column_names
 
-
-
         if data_grain == 'per_time_bin':
             
             additional_column_kwargs = dict(epoch_idx_col_name=epoch_idx_col_name, epoch_start_t_col_name=None, additional_transfer_column_names=None) # set to None because we aren't doing epochs, we're doing time bins , epoch_start_t_col_name=epoch_start_t_col_name, additional_transfer_column_names=additional_transfer_column_names

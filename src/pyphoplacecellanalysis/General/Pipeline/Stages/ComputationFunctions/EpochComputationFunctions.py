@@ -1483,7 +1483,12 @@ class EpochComputationsComputationsContainer(ComputedResult):
                 
 
                 a_masked_decoded_result, _mask_index_tuple = a_pseudo2D_continuous_specific_decoded_result.mask_computed_DecodedFilterEpochsResult_by_required_spike_counts_per_time_bin(spikes_df=deepcopy(spikes_df), masked_bin_fill_mode=a_masked_bin_fill_mode) ## Masks the low-firing bins so they don't confound the analysis.
-                _a_masked_unused_marginal, a_masked_posterior_df = DirectionalPseudo2DDecodersResult.build_generalized_non_marginalized_raw_posteriors(a_masked_decoded_result, unique_decoder_names=unique_decoder_names) #[0]['p_x_given_n']
+
+                # _a_masked_unused_marginal, a_masked_posterior_df = DirectionalPseudo2DDecodersResult.build_generalized_non_marginalized_raw_posteriors(a_masked_decoded_result, unique_decoder_names=unique_decoder_names) #[0]['p_x_given_n']
+
+                a_masked_posterior_df = DirectionalPseudo2DDecodersResult.perform_compute_specific_marginals(a_result=a_masked_decoded_result, marginal_context=a_masked_decoded_epoch_context) # 2025-05-02 - improved method
+                
+
                 ## spruce up the `a_masked_posterior_df` with some extra fields
                 a_masked_posterior_df['delta_aligned_start_t'] = a_masked_posterior_df['t'] - t_delta ## subtract off t_delta    
                 a_masked_posterior_df = a_masked_posterior_df.across_session_identity.add_session_df_columns(session_name=session_name, time_bin_size=epochs_decoding_time_bin_size, curr_session_t_delta=t_delta, time_col='t')
