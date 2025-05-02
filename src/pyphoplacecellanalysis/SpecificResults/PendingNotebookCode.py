@@ -126,7 +126,7 @@ def _subfn_helper_process_epochs_result_dict(epochs_result_dict: Dict[types.Know
 
 
 @function_attributes(short_name=None, tags=['position'], input_requires=[], output_provides=[], uses=['_subfn_helper_process_epochs_result_dict'], used_by=[], creation_date='2025-05-02 12:54', related_items=[])
-def build_decoder_prob_as_a_function_of_position(epochs_result_dict: Dict[types.KnownNamedDecodingEpochsType, DecodedFilterEpochsResult], xbin_centers, t_delta: float, grid_bin_bounds=None):
+def build_decoder_prob_as_a_function_of_position(epochs_result_dict: Dict[types.KnownNamedDecodingEpochsType, DecodedFilterEpochsResult], xbin_centers, t_delta: float, grid_bin_bounds=None, is_split_by_all_decoders:bool = True, debug_print=False):
     """ Plots the Decoder Context Probability as a function of position (split by pre/post-delta, decoded epochs) to check for bias of certain positions to decode to certain decoder-context (like the right-long endcap region might have a strong bias towards 'Long_LR' pre-delta.)
 
     Usage:
@@ -153,27 +153,28 @@ def build_decoder_prob_as_a_function_of_position(epochs_result_dict: Dict[types.
     epoch_name_by_pre_post_delta_category_output_dict_dict: Dict[types.KnownNamedDecodingEpochsType, Dict[types.PrePostDeltaCategory, DecodedFilterEpochsResult]] = _subfn_helper_process_epochs_result_dict(epochs_result_dict=epochs_result_dict, t_delta=t_delta)
 
     fig = plt.figure(layout="constrained")
-    # ax_dict = fig.subplot_mosaic(
-    #     [
-    #         ["laps"],
-    #         ["pbe"],
-    #     ],
-    # 	# set the height ratios between the rows
-    #     sharex=True, sharey=True,
-    #     gridspec_kw=dict(wspace=0, hspace=0.15) # `wspace=0`` is responsible for sticking the pf and the activity axes together with no spacing
-    # )
-
-    ax_dict = fig.subplot_mosaic(
-        [
-            ["laps|pre_delta"],
-            ["laps|post_delta"],
-            ["pbe|pre_delta"],
-            ["pbe|post_delta"],        
-        ],
-        # set the height ratios between the rows
-        sharex=True, sharey=True,
-        gridspec_kw=dict(wspace=0, hspace=0.15) # `wspace=0`` is responsible for sticking the pf and the activity axes together with no spacing
-    )
+    if is_split_by_all_decoders:
+        ax_dict = fig.subplot_mosaic(
+            [
+                ["laps|pre_delta"],
+                ["laps|post_delta"],
+                ["pbe|pre_delta"],
+                ["pbe|post_delta"],        
+            ],
+            # set the height ratios between the rows
+            sharex=True, sharey=True,
+            gridspec_kw=dict(wspace=0, hspace=0.15) # `wspace=0`` is responsible for sticking the pf and the activity axes together with no spacing
+        ) 
+    else:
+        ax_dict = fig.subplot_mosaic(
+            [
+                ["laps"],
+                ["pbe"],
+            ],
+            # set the height ratios between the rows
+            sharex=True, sharey=True,
+            gridspec_kw=dict(wspace=0, hspace=0.15) # `wspace=0`` is responsible for sticking the pf and the activity axes together with no spacing
+        )
 
     # ax = None
 
@@ -203,7 +204,8 @@ def build_decoder_prob_as_a_function_of_position(epochs_result_dict: Dict[types.
 
             ## normalize over each position decoder
             sum_over_all_decoders_per_position = summary_values_dict['Long_LR'] + summary_values_dict['Long_RL'] + summary_values_dict['Short_LR'] + summary_values_dict['Short_RL'] # sum for each position, .shape (n_pos_bins,)
-            print(f'sum_over_all_decoders_per_position.shape: {sum_over_all_decoders_per_position.shape}')
+            if debug_print:
+                print(f'sum_over_all_decoders_per_position.shape: {sum_over_all_decoders_per_position.shape}')
             # probability_values = probability_values / sum_over_all_decoders_per_position ## normalize over decoder
             for a_decoder_idx, a_decoder_name in decoder_idx_to_name_map.items():
                 ## normalize each one at a time
@@ -217,18 +219,29 @@ def build_decoder_prob_as_a_function_of_position(epochs_result_dict: Dict[types.
             # scatter_kwargs = pre_post_delta_category_name_to_scatter_kwargs_map[a_pre_post_delta_category_name] # dict(marker='.')
             
             # fig1, ax, prob_values1 = plot_linearized_position_probability(an_out_result=an_out_result, label=a_combined_str_name, figure_title=f'Joint Position Probability', ax=ax_dict[an_epoch_name], xbin_centers=xbin_centers, is_P_long=True)
-            for a_decoder_idx, a_decoder_name in decoder_idx_to_name_map.items():
+            
+            if is_split_by_all_decoders:
+                active_decoder_names_list = ['Long_LR', 'Long_RL', 'Short_LR', 'Short_RL']
+            else:
+                active_decoder_names_list = ['long', 'short']
+
+            # for a_decoder_idx, a_decoder_name in decoder_idx_to_name_map.items():
+            for a_decoder_name in active_decoder_names_list:
                 a_full_combined_str_name: str = f'{a_combined_str_name}|{a_decoder_name}'
                 print(f'a_full_combined_str_name: "{a_full_combined_str_name}"')
-                # ax = ax_dict[an_epoch_name]
-                ax = ax_dict[a_combined_str_name]
+                if is_split_by_all_decoders:
+                    ax = ax_dict[a_combined_str_name]
+                else:
+                    ax = ax_dict[an_epoch_name]
                 fig1, ax, prob_values1 = plot_linearized_position_prob_p(a_p_x_given_n=summary_values_dict[a_decoder_name], label=a_full_combined_str_name, figure_title=f'Joint Position Probability', ax=ax, xbin_centers=xbin_centers, y_label=f'P({a_decoder_name}|x)', **scatter_kwargs)
             
 
     if grid_bin_bounds is not None:
         for k, ax in ax_dict.items():
             long_track_line_collection, short_track_line_collection = add_vertical_track_bounds_lines(grid_bin_bounds=grid_bin_bounds, ax=ax)
-
+    else:
+        print(f'WARN: grid_bin_bounds is None so we cannot show the track endcap positions!')
+        
     # long_track_line_collection, short_track_line_collection = add_vertical_track_bounds_lines(grid_bin_bounds=grid_bin_bounds, ax=ax_dict['laps'])
     # long_track_line_collection, short_track_line_collection = add_vertical_track_bounds_lines(grid_bin_bounds=grid_bin_bounds, ax=ax_dict['pbe'])
     # long_rects_outputs, short_rects_outputs = add_track_shapes(grid_bin_bounds=grid_bin_bounds, ax=ax_dict['laps'])
