@@ -1090,10 +1090,10 @@ def add_track_shapes(grid_bin_bounds, ax=None, include_long:bool=True, include_s
     """ Plots the two track shapes on the plot. Kinda inflexible right now. 
     
     Usage:
-        from pyphoplacecellanalysis.Pho2D.track_shape_drawing import add_vertical_track_bounds_lines
+        from pyphoplacecellanalysis.Pho2D.track_shape_drawing import add_track_shapes, add_vertical_track_bounds_lines
         grid_bin_bounds = deepcopy(long_pf2D.config.grid_bin_bounds)
         long_track_line_collection, short_track_line_collection = add_vertical_track_bounds_lines(grid_bin_bounds=grid_bin_bounds, ax=None)
-
+        long_rects_outputs, short_rects_outputs = add_track_shapes(grid_bin_bounds=grid_bin_bounds, ax=None)
     """
     if not isinstance(grid_bin_bounds, BoundsRect):
         grid_bin_bounds = BoundsRect.init_from_grid_bin_bounds(grid_bin_bounds)
