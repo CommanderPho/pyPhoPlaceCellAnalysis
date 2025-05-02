@@ -140,8 +140,12 @@ def build_decoder_prob_as_a_function_of_position(epochs_result_dict: Dict[types.
                             'pbe': deepcopy(a_pbes_result),
         }
         
-        fig, ax_dict, epoch_name_by_pre_post_delta_category_output_dict_dict = build_decoder_prob_as_a_function_of_position(epochs_result_dict=epochs_result_dict, xbin_centers=deepcopy(a_laps_decoder.xbin_centers), t_delta=t_delta, grid_bin_bounds=deepcopy(a_laps_decoder.pf.config.grid_bin_bounds))
+        ## all four decoders as separate rows:
+        fig, ax_dict, epoch_name_by_pre_post_delta_category_output_dict_dict = build_decoder_prob_as_a_function_of_position(epochs_result_dict=epochs_result_dict, xbin_centers=deepcopy(a_laps_decoder.xbin_centers), t_delta=t_delta, grid_bin_bounds=deepcopy(a_laps_decoder.pf.config.grid_bin_bounds), is_split_by_all_decoders=True)
 
+        ## just long/short
+        fig, ax_dict, epoch_name_by_pre_post_delta_category_output_dict_dict = build_decoder_prob_as_a_function_of_position(epochs_result_dict=epochs_result_dict, xbin_centers=deepcopy(a_laps_decoder.xbin_centers), t_delta=t_delta, grid_bin_bounds=deepcopy(a_laps_decoder.pf.config.grid_bin_bounds), is_split_by_all_decoders=False)
+        
     """
     
     from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import plot_linearized_position_probability, plot_linearized_position_prob_p
