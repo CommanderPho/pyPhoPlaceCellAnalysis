@@ -1182,6 +1182,13 @@ class DecodedFilterEpochsResult(HDF_SerializationMixin, AttrsBasedClassHelperMix
         epochs_marginals_df = pd.DataFrame(np.hstack((non_marginalized_decoder_all_epoch_bins_marginal, epochs_directional_all_epoch_bins_marginal, epochs_track_identity_all_epoch_bins_marginal)), columns=['long_LR', 'long_RL', 'short_LR', 'short_RL', 'P_LR', 'P_RL', 'P_Long', 'P_Short'])
         epochs_marginals_df[epoch_idx_col_name] = epochs_marginals_df.index.to_numpy()
         epochs_marginals_df[epoch_start_t_col_name] = epochs_df['start'].to_numpy()
+        
+        ## ensure we have the generic columns too (duplicated):
+        if (epoch_idx_col_name != 'epoch_idx') and ('epoch_idx' not in epochs_marginals_df):
+            epochs_marginals_df['epoch_idx'] = epochs_marginals_df[epoch_idx_col_name]
+        if (epoch_start_t_col_name != 'epoch_start_t') and ('epoch_start_t' not in epochs_marginals_df):
+            epochs_marginals_df['epoch_start_t'] = epochs_marginals_df[epoch_start_t_col_name]
+
         # epochs_marginals_df['stop'] = epochs_epochs_df['stop'].to_numpy()
         # epochs_marginals_df['label'] = epochs_epochs_df['label'].to_numpy()
         if auto_transfer_all_columns and (additional_transfer_column_names is None):
