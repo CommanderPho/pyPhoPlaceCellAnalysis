@@ -2649,8 +2649,8 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
             self.filename_label.value = title
 
         ## rebuild the download widget with the current figure
-        self.button_download =  _build_solera_file_download_widget(fig=self.figure_widget, filename=Path(self.filename).with_suffix('.png').as_posix())
-
+        # self.button_download =  _build_solera_file_download_widget(fig=self.figure_widget, filename=Path(self.filename).with_suffix('.png').as_posix())
+        
 
     def on_fig_layout_change(self, layout, *args):
         """Callback for when the figure's layout changes."""
@@ -3333,7 +3333,11 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
         import json
         with pd.HDFStore(filename, 'w') as store:
             # Save dataframes
-            for attr_name in self.DATAFRAME_ATTR_NAMES:
+            ## DATAFRAME_ATTR_NAMES
+            DATAFRAME_ATTR_NAMES = self.original_df_names + self.filtered_df_names  # for 2025-05-02 - self._original_df_dict and self._filtered_df_dict mode
+
+            # for attr_name in self.DATAFRAME_ATTR_NAMES:
+            for attr_name in DATAFRAME_ATTR_NAMES:            
                 df = getattr(self, attr_name, None)
                 if df is not None:
                     store.put(attr_name, df)
@@ -3356,8 +3360,12 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
 
     @classmethod
     def load_from_hdf(cls, filename) -> "DataFrameFilter":
-        """Loads data from a .hdf file and returns a new instance."""
+        """Loads data from a .hdf file and returns a new instance.
+        
+        WARN: doesn't get all the exported DFs beyond the defaults (not addapted to the 2025-05-02 - self._original_df_dict and self._filtered_df_dict mode format)
+        """
         import json
+
         with pd.HDFStore(filename, 'r') as store:
             # Load dataframes
             dataframes = {}
@@ -3372,21 +3380,39 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
             scalar_attrs = json.loads(attrs.scalar_attrs)
 
             # Create a new instance with loaded data
+            # instance = cls(
+            #     all_sessions_ripple_df=dataframes.get('all_sessions_ripple_df', None),
+            #     all_sessions_ripple_time_bin_df=dataframes.get('all_sessions_ripple_time_bin_df', None),
+            #     all_sessions_MultiMeasure_ripple_df=dataframes.get('all_sessions_MultiMeasure_ripple_df', None),
+            #     all_sessions_all_scores_ripple_df=dataframes.get('all_sessions_all_scores_ripple_df', None),
+            #     all_sessions_laps_df=dataframes.get('all_sessions_laps_df', None),
+            #     all_sessions_laps_time_bin_df=dataframes.get('all_sessions_laps_time_bin_df', None),
+            #     all_sessions_MultiMeasure_laps_df=dataframes.get('all_sessions_MultiMeasure_laps_df', None),
+            #     additional_filter_predicates={}  # Functions can't be serialized
+            # )
+
+
             instance = cls(
-                all_sessions_ripple_df=dataframes.get('all_sessions_ripple_df', None),
-                all_sessions_ripple_time_bin_df=dataframes.get('all_sessions_ripple_time_bin_df', None),
-                all_sessions_MultiMeasure_ripple_df=dataframes.get('all_sessions_MultiMeasure_ripple_df', None),
-                all_sessions_all_scores_ripple_df=dataframes.get('all_sessions_all_scores_ripple_df', None),
-                all_sessions_laps_df=dataframes.get('all_sessions_laps_df', None),
-                all_sessions_laps_time_bin_df=dataframes.get('all_sessions_laps_time_bin_df', None),
-                all_sessions_MultiMeasure_laps_df=dataframes.get('all_sessions_MultiMeasure_laps_df', None),
+                original_df_dict=dict(
+                    all_sessions_ripple_df=dataframes.get('all_sessions_ripple_df', None),
+                    all_sessions_ripple_time_bin_df=dataframes.get('all_sessions_ripple_time_bin_df', None),
+                    all_sessions_MultiMeasure_ripple_df=dataframes.get('all_sessions_MultiMeasure_ripple_df', None),
+                    all_sessions_all_scores_ripple_df=dataframes.get('all_sessions_all_scores_ripple_df', None),
+                    all_sessions_laps_df=dataframes.get('all_sessions_laps_df', None),
+                    all_sessions_laps_time_bin_df=dataframes.get('all_sessions_laps_time_bin_df', None),
+                    all_sessions_MultiMeasure_laps_df=dataframes.get('all_sessions_MultiMeasure_laps_df', None),
+                ),
                 additional_filter_predicates={}  # Functions can't be serialized
             )
+
+
+
 
             # Set filtered dataframes
             for attr_name in cls.DATAFRAME_ATTR_NAMES:
                 if attr_name.startswith('filtered_'):
-                    setattr(instance, attr_name, dataframes.get(attr_name, None))
+                    # setattr(instance, attr_name, dataframes.get(attr_name, None))
+                    instance._filtered_df_dict[attr_name] = dataframes.get(attr_name, None)
 
             # Set scalar attributes
             for attr_name in cls.SCALAR_ATTR_NAMES:
