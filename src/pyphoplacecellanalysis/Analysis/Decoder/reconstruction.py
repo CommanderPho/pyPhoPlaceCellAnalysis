@@ -1232,6 +1232,7 @@ class DecodedFilterEpochsResult(HDF_SerializationMixin, AttrsBasedClassHelperMix
         
         History: Extracted from `pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions.DirectionalPseudo2DDecodersResult._build_multiple_per_time_bin_marginals` on 2024-10-09 
         
+        History #TODO 2025-05-02 18:53: - [ ] renamed ['parent_epoch_df_idx', ] to ['parent_epoch_df_idx', ]
         """
         parent_epoch_label_col_name: str = 'label' # column in `filter_epochs_df` that can be used to index into the epochs
         filter_epochs_df = deepcopy(self.filter_epochs)
@@ -1250,14 +1251,43 @@ class DecodedFilterEpochsResult(HDF_SerializationMixin, AttrsBasedClassHelperMix
         all_epoch_extracted_posteriors = []
         assert len(active_marginals_tuple) == len(columns_tuple)
         
+        # _common_epoch_df_column_dict = {}
+        _common_epoch_df_column_dict = None
         for active_marginals, active_columns in zip(active_marginals_tuple, columns_tuple):
             epoch_extracted_posteriors = [a_result['p_x_given_n'] for a_result in active_marginals]
-            n_epoch_time_bins = [np.shape(a_posterior)[-1] for a_posterior in epoch_extracted_posteriors]
-            result_t_bin_idx_column = np.concatenate([np.full((an_epoch_time_bins, ), fill_value=i) for i, an_epoch_time_bins in enumerate(n_epoch_time_bins)])
-            epoch_df_idx_column = np.concatenate([np.full((an_epoch_time_bins, ), fill_value=filter_epochs_df.index[i]) for i, an_epoch_time_bins in enumerate(n_epoch_time_bins)])
-            epoch_label_column = np.concatenate([np.full((an_epoch_time_bins, ), fill_value=filter_epochs_df[parent_epoch_label_col_name].values[i]) for i, an_epoch_time_bins in enumerate(n_epoch_time_bins)])
-            epoch_duration_column = np.concatenate([np.full((an_epoch_time_bins, ), fill_value=filter_epochs_df['duration'].values[i]) for i, an_epoch_time_bins in enumerate(n_epoch_time_bins)]) #TODO 2025-04-18 21:05: - [ ] Added 'parent_epoch_duration' to output dataframe!
-            # epoch_neuronal_participation_column = np.concatenate([np.full((an_epoch_time_bins, ), fill_value=filter_epochs_df['participation'].values[i]) for i, an_epoch_time_bins in enumerate(n_epoch_time_bins)])
+            
+            if _common_epoch_df_column_dict is None:
+                # NOTE: these values are the same for every iteration of this loop (as the number of epochs in filter_epochs don't change:
+                n_epoch_time_bins = [np.shape(a_posterior)[-1] for a_posterior in epoch_extracted_posteriors]
+                result_t_bin_idx_column = np.concatenate([np.full((an_epoch_time_bins, ), fill_value=i) for i, an_epoch_time_bins in enumerate(n_epoch_time_bins)])
+                epoch_df_idx_column = np.concatenate([np.full((an_epoch_time_bins, ), fill_value=filter_epochs_df.index[i]) for i, an_epoch_time_bins in enumerate(n_epoch_time_bins)])
+
+
+                # set `_common_epoch_df_column_dict` so it is no longer None:
+                # _common_epoch_df_column_dict = {'result_t_bin_idx': result_t_bin_idx_column, 'epoch_df_idx': epoch_df_idx_column, 'parent_epoch_label': epoch_label_column, 'parent_epoch_duration': epoch_duration_column}
+                # _common_epoch_df_column_dict = {'result_t_bin_idx': result_t_bin_idx_column, 'epoch_df_idx': epoch_df_idx_column}
+                _common_epoch_df_column_dict = {'parent_epoch_df_idx': epoch_df_idx_column, 'result_t_bin_idx': result_t_bin_idx_column}
+
+                # ## All
+                # epochs_repeated_epoch_index: NDArray = np.hstack([np.full((n_bins, ), i) for i, n_bins in enumerate(n_epoch_time_bins)]) # np.shape(epochs_p_x_given_n) # (2, 19018)
+                # epochs_repeated_sub_epoch_time_bin_index: NDArray = np.hstack([np.arange(n_bins) for n_bins in n_epoch_time_bins]) # np.shape(epochs_t_centers) # (19018,)
+                # ## Redundant but very helpful parent_epoch_* columns
+                # epochs_repeated_parent_epoch_start_t: NDArray = np.hstack([np.full((n_bins, ), filter_epochs_df['start'].values[i]) for i, n_bins in enumerate(n_epoch_time_bins)]) # np.shape(epochs_p_x_given_n) # (2, 19018)
+                # epochs_repeated_parent_epoch_stop_t: NDArray = np.hstack([np.full((n_bins, ), filter_epochs_df['stop'].values[i]) for i, n_bins in enumerate(n_epoch_time_bins)]) # np.shape(epochs_p_x_given_n) # (2, 19018)
+
+                ## All
+                epochs_repeated_epoch_index: NDArray = np.concatenate([np.full((n_bins, ), i) for i, n_bins in enumerate(n_epoch_time_bins)]) # np.shape(epochs_p_x_given_n) # (2, 19018)
+                epochs_repeated_sub_epoch_time_bin_index: NDArray = np.concatenate([np.arange(n_bins) for n_bins in n_epoch_time_bins]) # np.shape(epochs_t_centers) # (19018,)
+                ## Redundant but very helpful parent_epoch_* columns
+                epochs_repeated_parent_epoch_start_t: NDArray = np.concatenate([np.full((n_bins, ), filter_epochs_df['start'].values[i]) for i, n_bins in enumerate(n_epoch_time_bins)]) # np.shape(epochs_p_x_given_n) # (2, 19018)
+                epochs_repeated_parent_epoch_stop_t: NDArray = np.concatenate([np.full((n_bins, ), filter_epochs_df['stop'].values[i]) for i, n_bins in enumerate(n_epoch_time_bins)]) # np.shape(epochs_p_x_given_n) # (2, 19018)
+                epoch_label_column = np.concatenate([np.full((an_epoch_time_bins, ), fill_value=filter_epochs_df[parent_epoch_label_col_name].values[i]) for i, an_epoch_time_bins in enumerate(n_epoch_time_bins)])
+                epoch_duration_column = np.concatenate([np.full((an_epoch_time_bins, ), fill_value=filter_epochs_df['duration'].values[i]) for i, an_epoch_time_bins in enumerate(n_epoch_time_bins)]) #TODO 2025-04-18 21:05: - [ ] Added 'parent_epoch_duration' to output dataframe!
+                # epoch_neuronal_participation_column = np.concatenate([np.full((an_epoch_time_bins, ), fill_value=filter_epochs_df['participation'].values[i]) for i, an_epoch_time_bins in enumerate(n_epoch_time_bins)])
+                
+                _common_epoch_df_column_dict.update(**{'epoch_id': epochs_repeated_epoch_index, 'sub_epoch_time_bin_index': epochs_repeated_sub_epoch_time_bin_index, 'parent_epoch_id': epochs_repeated_epoch_index, 'parent_epoch_label': epoch_label_column, 'parent_epoch_start_t': epochs_repeated_parent_epoch_start_t, 'parent_epoch_end_t': epochs_repeated_parent_epoch_stop_t, 'parent_epoch_duration': epoch_duration_column})
+
+
             all_columns.extend(active_columns)
             # all_epoch_extracted_posteriors = np.hstack((all_epoch_extracted_posteriors, epoch_extracted_posteriors))
             all_epoch_extracted_posteriors.append(np.hstack((epoch_extracted_posteriors)))
@@ -1265,13 +1295,15 @@ class DecodedFilterEpochsResult(HDF_SerializationMixin, AttrsBasedClassHelperMix
 
         all_epoch_extracted_posteriors = np.vstack(all_epoch_extracted_posteriors) # (4, n_time_bins) - (4, 5495)
         epoch_time_bin_marginals_df = pd.DataFrame(all_epoch_extracted_posteriors.T, columns=all_columns)
-        epoch_time_bin_marginals_df['result_t_bin_idx'] = result_t_bin_idx_column # a.k.a result label
-        epoch_time_bin_marginals_df['epoch_df_idx'] = epoch_df_idx_column
-        epoch_time_bin_marginals_df['parent_epoch_label'] = epoch_label_column
-        epoch_time_bin_marginals_df['parent_epoch_duration'] = epoch_duration_column
+        ## add all extra columns (parent epoch columns, etc):
+        for k, v in _common_epoch_df_column_dict.items():
+            epoch_time_bin_marginals_df[k] = v
+            
+        # epoch_time_bin_marginals_df['result_t_bin_idx'] = result_t_bin_idx_column # a.k.a result label
+        # epoch_time_bin_marginals_df['epoch_df_idx'] = epoch_df_idx_column
+        # epoch_time_bin_marginals_df['parent_epoch_label'] = epoch_label_column
+        # epoch_time_bin_marginals_df['parent_epoch_duration'] = epoch_duration_column
         # epoch_time_bin_marginals_df['parent_epoch_neuronal_participation'] = epoch_neuronal_participation_column
-
-
 
         if (len(flat_time_bin_centers_column) < len(epoch_time_bin_marginals_df)):
             # 2024-01-25 - This fix DOES NOT HELP. The constructed size is the same as the existing `flat_time_bin_centers_column`.
@@ -1305,7 +1337,7 @@ class DecodedFilterEpochsResult(HDF_SerializationMixin, AttrsBasedClassHelperMix
         if transfer_column_names_list is not None:
             for a_test_transfer_column_name in transfer_column_names_list:
                 # a_test_transfer_column_name: str = 'maze_id'
-                epoch_time_bin_marginals_df[a_test_transfer_column_name] = epoch_time_bin_marginals_df['epoch_df_idx'].map(lambda idx: filter_epochs_df.loc[idx, a_test_transfer_column_name])
+                epoch_time_bin_marginals_df[a_test_transfer_column_name] = epoch_time_bin_marginals_df['parent_epoch_df_idx'].map(lambda idx: filter_epochs_df.loc[idx, a_test_transfer_column_name])
             
         return epoch_time_bin_marginals_df
     
