@@ -30,7 +30,7 @@ KnownNamedDecodingEpochsType = Literal['laps', 'replay', 'ripple', 'pbe', 'non_p
 # Define a type that can only be one of these specific strings
 MaskedTimeBinFillType = Literal['ignore', 'last_valid', 'nan_filled', 'dropped'] ## used in `DecodedFilterEpochsResult.mask_computed_DecodedFilterEpochsResult_by_required_spike_counts_per_time_bin(...)` to specify how invalid bins (due to too few spikes) are treated.
 DataTimeGrain = Literal['per_epoch', 'per_time_bin'] # 'data_grain'
-PrePostDeltaCategory = Literal['pre_delta', 'post_delta']
+PrePostDeltaCategory = Literal['pre_delta', 'post_delta'] # 'pre_post_delta_category'
 
 
 
@@ -40,6 +40,9 @@ GenericResultTupleIndexType: TypeAlias = IdentifyingContext # an template/stand-
 type_to_name_mapping: Dict = dict(zip([KnownNamedDecoderTrainedComputeEpochsType, KnownNamedDecodingEpochsType, MaskedTimeBinFillType, DataTimeGrain, PrePostDeltaCategory], ['known_named_decoder_trained_compute_epochs_type', 'known_named_decoding_epochs_type', 'masked_time_bin_fill_type', 'data_time_grain', 'pre_post_delta_category']))
 name_to_short_name_dict: Dict = dict(zip(['known_named_decoder_trained_compute_epochs_type', 'known_named_decoding_epochs_type', 'masked_time_bin_fill_type', 'data_time_grain', 'pre_post_delta_category'], ['train', 'decode', 'mfill', 'grain', 'ppdelta']))
 
+
+type_to_df_column_name_mapping: Dict = dict(zip([KnownNamedDecoderTrainedComputeEpochsType, KnownNamedDecodingEpochsType, MaskedTimeBinFillType, DataTimeGrain, PrePostDeltaCategory], ['trained_compute_epochs', 'known_named_decoding_epochs_type', 'masked_time_bin_fill_type', 'data_grain', 'pre_post_delta_category']))
+# other columns: ['time_bin_size']
 
 # FilterContextName = NewType('FilterContextName', str) 
 # ComputationFunctionName = NewType('ComputationFunctionName', str) 
