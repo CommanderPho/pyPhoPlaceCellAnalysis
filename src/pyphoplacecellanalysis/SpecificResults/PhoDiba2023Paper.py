@@ -2040,7 +2040,7 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
     _filtered_df_dict: Dict[str, Optional[pd.DataFrame]] = serialized_field(default=Factory(dict))
     
 
-    active_plot_df_name: str = serialized_attribute_field(default='filtered_all_sessions_all_scores_ripple_df')
+    active_plot_df_name: str = serialized_attribute_field(default='filtered_FAT_df')
     active_plot_variable_name: str = serialized_attribute_field(default='P_Short')
     active_plot_fn_kwargs: Dict = serialized_field(default=Factory(dict))
     # Add filename attribute
@@ -2118,9 +2118,10 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
                 raise ValueError("initial_time_bin_sizes must be a float, int, list, or tuple")
 
         try:
+            value = tuple([str(v) for v in value]) ## convert all values to string types
             self.time_bin_size_widget.value = value
         except Exception as e:
-            print(f'value: {value} is no in the list of valid options: {self.time_bin_size_widget.options}')
+            print(f'value: {value} is not in the list of valid options: {self.time_bin_size_widget.options}')
             raise e
         
 
@@ -2131,61 +2132,15 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
         return IdentifyingContext(time_bin_sizes=self.time_bin_size, custom_suffix=self.replay_name)
     
 
-    # @property
-    # def original_df_list(self) -> Tuple[pd.DataFrame]:
-    #     """The original_df_list property."""
-    #     return (
-    #         self.all_sessions_ripple_df,
-    #         self.all_sessions_ripple_time_bin_df,
-    #         self.all_sessions_MultiMeasure_ripple_df,
-    #         self.all_sessions_all_scores_ripple_df,
-    #         self.all_sessions_laps_df,
-    #         self.all_sessions_laps_time_bin_df,
-    #         self.all_sessions_MultiMeasure_laps_df
-    #     )
-        
-    # @property
-    # def filtered_df_list(self) -> Tuple[pd.DataFrame]:
-    #     """The original_df_list property."""
-    #     return (
-    #         self.filtered_all_sessions_ripple_df,
-    #         self.filtered_all_sessions_ripple_time_bin_df,
-    #         self.filtered_all_sessions_MultiMeasure_ripple_df,
-    #         self.filtered_all_sessions_all_scores_ripple_df,
-    #         self.filtered_all_sessions_laps_df,
-    #         self.filtered_all_sessions_laps_time_bin_df,
-    #         self.filtered_all_sessions_MultiMeasure_laps_df
-    #     )
-
-
     @property
     def original_df_dict(self) -> Dict[str, pd.DataFrame]:
         """The original_df_list property."""
-        # return {k:v for k, v in dict(
-        #     all_sessions_ripple_df=self.all_sessions_ripple_df,
-        #     all_sessions_ripple_time_bin_df=self.all_sessions_ripple_time_bin_df,
-        #     all_sessions_MultiMeasure_ripple_df=self.all_sessions_MultiMeasure_ripple_df,
-        #     all_sessions_all_scores_ripple_df=self.all_sessions_all_scores_ripple_df,
-        #     all_sessions_laps_df=self.all_sessions_laps_df,
-        #     all_sessions_laps_time_bin_df=self.all_sessions_laps_time_bin_df,
-        #     all_sessions_MultiMeasure_laps_df=self.all_sessions_MultiMeasure_laps_df
-        # ).items() if (v is not None)}
         return {k:v for k, v in self._original_df_dict.items() if (v is not None)}
             
 
-        
     @property
     def filtered_df_dict(self) -> Dict[str, pd.DataFrame]:
         """The original_df_list property."""
-        # return {k:v for k, v in dict(
-        #     filtered_all_sessions_ripple_df=self.filtered_all_sessions_ripple_df,
-        #     filtered_all_sessions_ripple_time_bin_df=self.filtered_all_sessions_ripple_time_bin_df,
-        #     filtered_all_sessions_MultiMeasure_ripple_df=self.filtered_all_sessions_MultiMeasure_ripple_df,
-        #     filtered_all_sessions_all_scores_ripple_df=self.filtered_all_sessions_all_scores_ripple_df,
-        #     filtered_all_sessions_laps_df=self.filtered_all_sessions_laps_df,
-        #     filtered_all_sessions_laps_time_bin_df=self.filtered_all_sessions_laps_time_bin_df,
-        #     filtered_all_sessions_MultiMeasure_laps_df=self.filtered_all_sessions_MultiMeasure_laps_df
-        # ).items() if (v is not None)}
         return {k:v for k, v in self._filtered_df_dict.items() if (v is not None)}
 
 
@@ -2228,7 +2183,8 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
         self._setup_widgets()
         # Initial filtering with default widget values
         if getattr(self, 'time_bin_size_widget', None) is not None:
-            self.update_filtered_dataframes(self.replay_name_widget.value, self.time_bin_size_widget.value)
+            if (self.replay_name_widget is not None) and (self.time_bin_size_widget is not None):
+                self.update_filtered_dataframes(self.replay_name_widget.value, self.time_bin_size_widget.value)
         # else:
         #     self.update_filtered_dataframes(self.replay_name_widget.value)
 
@@ -2240,70 +2196,7 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
         initial_selection = self.set_initial_selection(a_widget=self.time_bin_size_widget, initial_selection_mode=InitialSelectionModeEnum.FIRST_SELECTED)
 
 
-    # @function_attributes(short_name=None, tags=['filter', 'dynamic', 'ui', 'widget'], input_requires=[], output_provides=[], uses=['._rebuild_predicate_widget()'], used_by=[], creation_date='2025-03-27 14:05', related_items=[])
-    # def build_extra_control_widget(self, a_name: str = 'replay_name', df_col_name: str = 'custom_replay_name', a_widget_label: str = 'Replay Name:'):
-    #     """ adds a new dropdown widget to refine the active points, triggers `self._on_widget_change` when a selection is made
-
-    #     Works by adding the widget as property of this instance, and imposing the widget's selection criteria by adding a custom predicate to `self.additional_filter_predicates`. 
-    #     The predicate selector widget is then rebuilt by calling `self._rebuild_predicate_widget(...)`
-        
-        
-    #     Usage:        
-    #         df_filter.build_extra_control_widget(a_name='trained_compute_epochs', df_col_name='trained_compute_epochs', a_widget_label='TrainedComputeEpochs :')
-    #         df_filter.build_extra_control_widget(a_name='pfND_ndim', df_col_name='pfND_ndim', a_widget_label='pfND_ndim:')
-    #         df_filter.build_extra_control_widget(a_name='decoder_identifier', df_col_name='decoder_identifier', a_widget_label='decoder_identifier:')
-    #         df_filter.build_extra_control_widget(a_name='data_grain', df_col_name='data_grain', a_widget_label='data_grain:')
-    #         df_filter.build_extra_control_widget(a_name='masked_time_bin_fill_type', df_col_name='masked_time_bin_fill_type', a_widget_label='masked_time_bin_fill_type:')
-    #         df_filter.build_extra_control_widget(a_name='known_named_decoding_epochs_type', df_col_name='known_named_decoding_epochs_type', a_widget_label='known_named_decoding_epochs_type:')
-
-    #     """
-    #     import ipywidgets as widgets
-    #     from traitlets import Dict as TraitDict  # Import the Dict traitlet
-
-    #     a_widget_name: str = f"{a_name}_widget" # replay_name_widget
-    #     extant_widget = getattr(self, a_widget_name, None)
-    #     if extant_widget is not None:
-    #         raise NotImplementedError(f'Not sure what to do with extant widgets yet! a_widget_label: "{a_widget_label}".')
-
-    #     ## Create and add new widget:
-    #     a_col_values_options = sorted(self.active_plot_df[df_col_name].astype(str).unique())    
-    #     a_widget = widgets.Dropdown(
-    #                 options=a_col_values_options,
-    #                 description=a_widget_label,
-    #                 disabled=False,
-    #                 layout=widgets.Layout(width='500px'),
-    #                 style={'description_width': 'initial'},
-    #                 # metadata={"desc": "build_extra_control_widget", "df_col_name": df_col_name, "name": a_name, "widget_name": a_widget_name, }, ## DOES NOT WORK
-    #             )
-        
-    #     ## add_traits (does work)
-    #     a_widget.metadata = TraitDict({  # Use the Dict traitlet here
-    #         "desc": "build_extra_control_widget",
-    #         "df_col_name": df_col_name,
-    #         "name": a_name,
-    #         "widget_name": a_widget_name,
-    #     })
-        
-    #     # Build the appropriate filter predicate to go along with the custom control _________________________________________ #
-    #     self.additional_filter_predicates.update({
-    #         f'{a_widget_name}': (lambda df: (df[df_col_name].astype(str) == str(a_widget.value))),
-    #     })
-
-    #     ## INPUTS: self.custom_dynamic_filter_widgets_list
-    #     ## Add to output widgets list
-    #     self.custom_dynamic_filter_widgets_list.append(a_widget)
-    #     setattr(self, a_widget_name, a_widget) # self.replay_name_widget
-    #     ## INPUTS: self.custom_dynamic_filter_widgets_dict, self.custom_dynamic_filter_widgets_property_map
-
-    #     ## Update the predicate enabled selection widget and default to enabling this predicate:
-    #     self._rebuild_predicate_widget(initially_is_checked={f'{a_widget_name}':True})
-
-    #     # Set up observers to handle changes in widget values
-    #     a_widget.observe(self._on_widget_change, names='value')
-        
-
-# SelectMultiple
-
+    
     @classmethod
     def set_initial_selection(cls, a_widget, initial_selection_mode: InitialSelectionModeEnum=InitialSelectionModeEnum.FIRST_SELECTED, custom_initial_selections: Optional[Union[List, Any]]=None):
         # Set initial widget selection/selections ____________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
@@ -2665,11 +2558,13 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
         preferred_filename = fig.layout.meta.get('preferred_filename') if fig.layout.meta else None
         if preferred_filename:
             self.filename = f"{preferred_filename}.png"
-            self.filename_label.value = preferred_filename
+            if self.filename_label is not None:
+                self.filename_label.value = preferred_filename
         else:
             title = fig.layout.title.text if fig.layout.title and fig.layout.title.text else "figure"
             self.filename = f"{title.replace(' ', '_')}.png"
-            self.filename_label.value = title
+            if self.filename_label is not None:
+                self.filename_label.value = title
 
         ## rebuild the download widget with the current figure
         # self.button_download =  _build_solera_file_download_widget(fig=self.figure_widget, filename=Path(self.filename).with_suffix('.png').as_posix())
@@ -2695,7 +2590,8 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
         self.debounce_timer = threading.Timer(
             (self.debounce_delay_ms/1000.0), 
             self._debounced_update,
-            [self.replay_name_widget.value, self.time_bin_size_widget.value, self.active_plot_df_name_selector_widget.value, self.active_plot_variable_name_widget.value]
+            args=[],
+            kwargs={**{k.removesuffix('_widget'):v.value for k, v in self.custom_dynamic_filter_widgets_dict.items()}} # [self.replay_name_widget.value, self.time_bin_size_widget.value, self.active_plot_df_name_selector_widget.value, self.active_plot_variable_name_widget.value]
         )
         self.debounce_timer.start()
         
@@ -2705,15 +2601,24 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
 
 
     @function_attributes(short_name=None, tags=['update', 'debounce', 'efficiency'], input_requires=[], output_provides=[], uses=['.update_filtered_dataframes', '.on_widget_update_filename'], used_by=['_on_widget_change'], creation_date='2025-05-02 06:23', related_items=[])
-    def _debounced_update(self, replay_name, time_bin_sizes, active_plot_df_name, active_plot_variable_name):
+    # def _debounced_update(self, replay_name, time_bin_sizes, active_plot_df_name, active_plot_variable_name):
+    def _debounced_update(self, *args, **kwargs):
         """Called after debounce delay"""
         ## do simple updates:
         # active_plot_df_name = self.active_plot_df_name_selector_widget.value
-        self.active_plot_df_name = active_plot_df_name # self.active_plot_df_name_selector_widget.value
-        self.active_plot_variable_name = active_plot_variable_name # self.active_plot_variable_name_widget.value             
+        active_plot_df_name = kwargs.get('replay_name', None)
+        if (active_plot_df_name is not None) and (len(active_plot_df_name) > 0):
+            self.active_plot_df_name = active_plot_df_name # self.active_plot_df_name_selector_widget.value
+            
+        active_plot_variable_name = kwargs.get('active_plot_variable_name', None)
+        if (active_plot_variable_name is not None) and (len(active_plot_variable_name) > 0):
+            self.active_plot_variable_name = active_plot_variable_name # self.active_plot_variable_name_widget.value             
 
-        self.update_filtered_dataframes(replay_name, time_bin_sizes)
-        self.on_widget_update_filename()
+        replay_name = kwargs.get('replay_name', None)
+        time_bin_sizes = kwargs.get('time_bin_size', None)
+        if (replay_name is not None) and (time_bin_sizes is not None):                    
+            self.update_filtered_dataframes(replay_name, time_bin_sizes)
+            self.on_widget_update_filename()
         
 
 
