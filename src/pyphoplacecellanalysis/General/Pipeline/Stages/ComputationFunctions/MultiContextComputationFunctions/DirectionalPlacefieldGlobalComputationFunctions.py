@@ -1599,6 +1599,13 @@ class DirectionalPseudo2DDecodersResult(ComputedResult):
             epoch_idx_col_name='epoch_idx'
             epoch_start_t_col_name='epoch_start_t'
             additional_transfer_column_names=['start', 'stop', 'label', 'duration']
+
+
+        elif known_named_decoding_epochs_type in ('replay', 'ripple', 'non_pbe', 'non_pbe_endcaps'):
+            # Case: Per-epoch global marginals
+            epoch_idx_col_name='epoch_idx'
+            epoch_start_t_col_name='epoch_start_t'
+            additional_transfer_column_names=['start', 'stop', 'label', 'duration']
     
         else:
             raise ValueError(f"Unexpected value for known_named_decoding_epochs_type: {known_named_decoding_epochs_type}")
