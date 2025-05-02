@@ -3968,6 +3968,7 @@ class SingleFatDataframe:
         
         FAT_df_list: List[pd.DataFrame] = []
     
+        df_col_names_dict: Dict[IdentifyingContext, List[str]] = {k:list(v.columns) for k, v in dfs_dict.items()}
         for a_df_context, a_df in dfs_dict.items():
             ## In a single_FAT frame, we add columns with the context value for all entries in the dataframe.
             for a_ctxt_key, a_ctxt_value in a_df_context.to_dict().items():

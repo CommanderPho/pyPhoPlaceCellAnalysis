@@ -1,6 +1,6 @@
 from copy import deepcopy
 from pathlib import Path
-from typing import Dict, Callable, List, Optional, Tuple
+from typing import Dict, Callable, List, Optional, Tuple, Union, Any
 from attrs import define, field
 import nptyping as ND
 from nptyping import NDArray
@@ -2300,22 +2300,34 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
 # SelectMultiple
 
     @classmethod
-    def set_initial_selection(cls, a_widget, initial_selection_mode: InitialSelectionModeEnum=InitialSelectionModeEnum.FIRST_SELECTED, custom_initial_selections: Optional[List]=None):
+    def set_initial_selection(cls, a_widget, initial_selection_mode: InitialSelectionModeEnum=InitialSelectionModeEnum.FIRST_SELECTED, custom_initial_selections: Optional[Union[List, Any]]=None):
         # Set initial widget selection/selections ____________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
-        
+        import ipywidgets as widgets        
+
         a_col_values_options = deepcopy(a_widget.options)
+        allows_multiple_selection: bool = (isinstance(a_widget, (widgets.SelectMultiple, )))
+        
 
         initial_selection = []
         if (initial_selection_mode.value == InitialSelectionModeEnum.NO_SELECTION.value):
-            initial_selection = []
+            if allows_multiple_selection:
+                initial_selection = []
+            else:
+                initial_selection = ''
         elif (initial_selection_mode.value == InitialSelectionModeEnum.FIRST_SELECTED.value):
             if len(a_col_values_options) > 0:
-                initial_selection = [a_col_values_options[0]]
+                if allows_multiple_selection:
+                    initial_selection = [a_col_values_options[0]]
+                else:
+                    initial_selection = a_col_values_options[0]
         elif (initial_selection_mode.value == InitialSelectionModeEnum.CUSTOM_SELECTED.value):
             assert custom_initial_selections is not None, f"with this mode you must provide a custom_selection"
             initial_selection = deepcopy(custom_initial_selections)
         elif (initial_selection_mode.value == InitialSelectionModeEnum.ALL_SELECTED.value):
-            initial_selection = deepcopy(a_col_values_options)
+            if allows_multiple_selection:
+                initial_selection = deepcopy(a_col_values_options)
+            else:
+                raise ValueError(f'{initial_selection_mode} is not VALID - `InitialSelectionModeEnum.ALL_SELECTED` mode is not allowed for widgets that do not permit multiple selections (such as widgets.Dropdown). type(a_widget): {type(a_widget)}')
         else:
             raise NotImplementedError(f'{initial_selection_mode} is not VALID')
 
@@ -2325,7 +2337,7 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
 
 
     @function_attributes(short_name=None, tags=['filter', 'dynamic', 'ui', 'widget'], input_requires=[], output_provides=[], uses=['._rebuild_predicate_widget()'], used_by=[], creation_date='2025-03-27 14:05', related_items=[])
-    def build_extra_dropdown_widget(self, a_name: str = 'replay_name', df_col_name: str = 'custom_replay_name', a_widget_label: str = 'Replay Name:') -> widgets.Dropdown:
+    def build_extra_dropdown_widget(self, a_name: str = 'replay_name', df_col_name: str = 'custom_replay_name', a_widget_label: str = 'Replay Name:', initial_selection_mode: InitialSelectionModeEnum=InitialSelectionModeEnum.FIRST_SELECTED, custom_initial_selection: Optional[Any]=None) -> widgets.Dropdown:
         """ adds a new dropdown widget to refine the active points, triggers `self._on_widget_change` when a selection is made
 
         Works by adding the widget as property of this instance, and imposing the widget's selection criteria by adding a custom predicate to `self.additional_filter_predicates`. 
@@ -2384,6 +2396,11 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
 
         # Set up observers to handle changes in widget values
         a_widget.observe(self._on_widget_change, names='value')
+
+        # Set initial widget selection/selections ____________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
+        if custom_initial_selection is not None:
+            initial_selection_mode = InitialSelectionModeEnum.CUSTOM_SELECTED
+        initial_selection = self.set_initial_selection(a_widget=a_widget, initial_selection_mode=initial_selection_mode, custom_initial_selections=custom_initial_selection)
 
         return a_widget
 
