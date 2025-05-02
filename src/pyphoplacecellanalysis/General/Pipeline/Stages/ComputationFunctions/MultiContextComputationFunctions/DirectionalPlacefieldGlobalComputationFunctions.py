@@ -39,7 +39,7 @@ from neuropy.utils.indexing_helpers import union_of_arrays # `paired_incremental
 from neuropy.utils.mixins.AttrsClassHelpers import AttrsBasedClassHelperMixin, custom_define, serialized_field, serialized_attribute_field, non_serialized_field, keys_only_repr
 from neuropy.utils.mixins.HDF5_representable import HDFMixin
 from neuropy.utils.indexing_helpers import PandasHelpers, NumpyHelpers, flatten
- from neuropy.utils.misc import capitalize_after_underscore
+from neuropy.utils.misc import capitalize_after_underscore
 
 
 from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import BasePositionDecoder # used for `complete_directional_pfs_computations`
