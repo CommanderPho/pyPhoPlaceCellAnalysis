@@ -1134,7 +1134,7 @@ class DecodedFilterEpochsResult(HDF_SerializationMixin, AttrsBasedClassHelperMix
             # assert a_time_window_centers_n_time_bins == n_time_bins, f"a_time_window_centers_n_time_bins: {a_time_window_centers_n_time_bins} != n_time_bins_posterior: {n_time_bins}"
 
 
-    @function_attributes(short_name=None, tags=['marginal', 'direction', 'track_id', 'NEEDS_GENERALIZATION'], input_requires=[], output_provides=[], uses=[], used_by=['self.compute_marginals'], creation_date='2024-10-08 00:40', related_items=[]) 
+    @function_attributes(short_name=None, tags=['marginal', 'direction', 'track_id', 'NEEDS_GENERALIZATION'], input_requires=[], output_provides=[], uses=['DirectionalPseudo2DDecodersResult.determine_directional_likelihoods', 'DirectionalPseudo2DDecodersResult.determine_long_short_likelihoods', 'DirectionalPseudo2DDecodersResult.determine_non_marginalized_decoder_likelihoods'], used_by=['self.compute_marginals'], creation_date='2024-10-08 00:40', related_items=[]) 
     @classmethod
     def perform_compute_marginals(cls, filter_epochs_decoder_result: Union[List[NDArray], List[DynamicContainer], NDArray, "DecodedFilterEpochsResult"], filter_epochs: pd.DataFrame, epoch_idx_col_name: str = 'lap_idx', epoch_start_t_col_name: str = 'lap_start_t', additional_transfer_column_names: Optional[List[str]]=None, auto_transfer_all_columns:bool=True): # -> tuple[tuple["DecodedMarginalResultTuple", "DecodedMarginalResultTuple", Tuple[List[DynamicContainer], Any, Any, pd.DataFrame]], pd.DataFrame]:
         """Computes and initializes the marginal properties
@@ -1200,7 +1200,7 @@ class DecodedFilterEpochsResult(HDF_SerializationMixin, AttrsBasedClassHelperMix
         
 
 
-    @function_attributes(short_name=None, tags=['marginal', 'direction', 'track_id', 'NEEDS_GENERALIZATION'], input_requires=[], output_provides=[], uses=['self.perform_compute_marginals'], used_by=[], creation_date='2024-10-08 00:40', related_items=[]) 
+    @function_attributes(short_name=None, tags=['marginal', 'direction', 'track_id', 'NEEDS_GENERALIZATION'], input_requires=[], output_provides=[], uses=['cls.perform_compute_marginals'], used_by=[], creation_date='2024-10-08 00:40', related_items=[]) 
     def compute_marginals(self, epoch_idx_col_name: str = 'lap_idx', epoch_start_t_col_name: str = 'lap_start_t', additional_transfer_column_names: Optional[List[str]]=None, auto_transfer_all_columns:bool=True): # -> tuple[tuple["DecodedMarginalResultTuple", "DecodedMarginalResultTuple", Tuple[List[DynamicContainer], Any, Any, pd.DataFrame]], pd.DataFrame]:
         """Computes and initializes the marginal properties
         

@@ -1560,7 +1560,7 @@ class DirectionalPseudo2DDecodersResult(ComputedResult):
         
         known_named_decoding_epochs_type = marginal_context.get('known_named_decoding_epochs_type', None)
         assert known_named_decoding_epochs_type is not None
-        assert known_named_decoding_epochs_type in ['laps', 'pbe', 'global']
+        assert known_named_decoding_epochs_type in ['laps', 'replay', 'ripple', 'pbe', 'non_pbe', 'non_pbe_endcaps', 'global'], f"known_named_decoding_epochs_type: {known_named_decoding_epochs_type}" # ['laps', 'pbe', 'global']
 
         # ==================================================================================================================== #
         # See if it is a 4-tuple Pseudo2D (all-directional) decoder or a 2-tuple version by checking shape:                    #
@@ -1786,7 +1786,7 @@ class DirectionalPseudo2DDecodersResult(ComputedResult):
         return custom_curr_unit_marginal_list
 
 
-    @function_attributes(short_name=None, tags=['ACTIVE', 'general', 'non_PBE'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-02-20 16:16', related_items=[])
+    @function_attributes(short_name=None, tags=['ACTIVE', 'general', 'non_PBE'], input_requires=[], output_provides=[], uses=[], used_by=['EpochComputationsComputationsContainer._build_merged_joint_placefields_and_decode', 'DirectionalPseudo2DDecodersResult.perform_compute_specific_marginals', 'EpochComputationsComputationsContainer._build_output_decoded_posteriors'], creation_date='2025-02-20 16:16', related_items=[])
     @classmethod
     def build_generalized_non_marginalized_raw_posteriors(cls, filter_epochs_decoder_result: Union[List[NDArray], List[DynamicContainer], NDArray, DecodedFilterEpochsResult], unique_decoder_names: List[str], epoch_idx_col_name: Optional[str]=None, epoch_start_t_col_name: Optional[str]=None, additional_transfer_column_names: Optional[List[str]]=None, auto_transfer_all_columns:bool=True, debug_print=False) -> Tuple[List[DynamicContainer], pd.DataFrame]:
         """ works for an all-directional coder with an arbitrary (but specified as `unique_decoder_names`) n_decoders items
@@ -2053,7 +2053,7 @@ class DirectionalPseudo2DDecodersResult(ComputedResult):
         return custom_curr_unit_marginal_list, track_marginal_posterior_df
 
 
-
+    @function_attributes(short_name=None, tags=['marginal'], input_requires=[], output_provides=[], uses=[], used_by=['cls.determine_non_marginalized_decoder_likelihoods', 'AddNewDecodedEpochMarginal_MatplotlibPlotCommand.prepare_and_perform_add_pseudo2D_decoder_decoded_epoch_marginals', '_display_directional_merged_pf_decoded_epochs'], creation_date='2025-05-02 17:29', related_items=[])
     @classmethod
     def build_non_marginalized_raw_posteriors(cls, filter_epochs_decoder_result: Union[List[NDArray], List[DynamicContainer], NDArray, DecodedFilterEpochsResult], debug_print=False) -> List[DynamicContainer]:
         """ only works for the all-directional coder with the four items
@@ -2109,7 +2109,7 @@ class DirectionalPseudo2DDecodersResult(ComputedResult):
             custom_curr_unit_marginal_list.append(curr_unit_marginal_x)
         return custom_curr_unit_marginal_list
 
-
+    @function_attributes(short_name=None, tags=['marginal'], input_requires=[], output_provides=[], uses=[], used_by=['determine_directional_likelihoods'], creation_date='2025-05-02 17:30', related_items=[])
     @classmethod
     def build_custom_marginal_over_direction(cls, filter_epochs_decoder_result: Union[List[NDArray], List[DynamicContainer], NDArray, DecodedFilterEpochsResult], debug_print=False) -> List[DynamicContainer]:
         """ only works for the all-directional coder with the four items
@@ -2185,6 +2185,8 @@ class DirectionalPseudo2DDecodersResult(ComputedResult):
             custom_curr_unit_marginal_list.append(curr_unit_marginal_y)
         return custom_curr_unit_marginal_list
 
+
+    @function_attributes(short_name=None, tags=['marginal'], input_requires=[], output_provides=[], uses=[], used_by=['determine_long_short_likelihoods', 'prepare_and_perform_add_pseudo2D_decoder_decoded_epoch_marginals'], creation_date='2025-05-02 17:30', related_items=[])
     @classmethod
     def build_custom_marginal_over_long_short(cls, filter_epochs_decoder_result: Union[List[NDArray], List[DynamicContainer], NDArray, DecodedFilterEpochsResult], debug_print=False) -> List[DynamicContainer]:
         """ only works for the all-directional coder with the four items
@@ -2283,6 +2285,7 @@ class DirectionalPseudo2DDecodersResult(ComputedResult):
         return custom_curr_unit_marginal_list
         
     # Higher-level likelihood access functions ___________________________________________________________________________ #
+    @function_attributes(short_name=None, tags=['marginal', 'MAIN'], input_requires=[], output_provides=[], uses=['cls.build_custom_marginal_over_direction'], used_by=['DecodedFilterEpochsResult.perform_compute_marginals'], creation_date='2025-04-01 00:00', related_items=[])
     @classmethod
     def determine_directional_likelihoods(cls, all_directional_laps_filter_epochs_decoder_result: Union[List[NDArray], List[DynamicContainer], NDArray, DecodedFilterEpochsResult]) -> DecodedMarginalResultTuple:
         """ 
@@ -2311,6 +2314,7 @@ class DirectionalPseudo2DDecodersResult(ComputedResult):
         is_most_likely_direction_LR_dir = np.logical_not(most_likely_direction_from_decoder) # consistent with 'is_LR_dir' column. for LR_dir, values become more positive with time
         return directional_marginals, directional_all_epoch_bins_marginal, most_likely_direction_from_decoder, is_most_likely_direction_LR_dir
     
+    @function_attributes(short_name=None, tags=['marginal', 'MAIN'], input_requires=[], output_provides=[], uses=['cls.build_custom_marginal_over_direction'], used_by=['DecodedFilterEpochsResult.perform_compute_marginals'], creation_date='2025-04-01 00:00', related_items=[])
     @classmethod
     def determine_long_short_likelihoods(cls, all_directional_laps_filter_epochs_decoder_result: Union[List[NDArray], List[DynamicContainer], NDArray, DecodedFilterEpochsResult]) -> DecodedMarginalResultTuple:
         """ 
@@ -2337,6 +2341,7 @@ class DirectionalPseudo2DDecodersResult(ComputedResult):
         is_most_likely_track_identity_Long = np.logical_not(most_likely_track_identity_from_decoder) # consistent with 'is_LR_dir' column. for LR_dir, values become more positive with time
         return track_identity_marginals, track_identity_all_epoch_bins_marginal, most_likely_track_identity_from_decoder, is_most_likely_track_identity_Long
 
+    @function_attributes(short_name=None, tags=['marginal', 'MAIN'], input_requires=[], output_provides=[], uses=['cls.build_custom_marginal_over_direction'], used_by=['DecodedFilterEpochsResult.perform_compute_marginals'], creation_date='2025-04-01 00:00', related_items=[])
     @classmethod
     def determine_non_marginalized_decoder_likelihoods(cls, all_directional_laps_filter_epochs_decoder_result: Union[List[NDArray], List[DynamicContainer], NDArray, DecodedFilterEpochsResult], debug_print=False) -> Tuple[List[DynamicContainer], NDArray[float], NDArray[int], pd.DataFrame]:
         """ 

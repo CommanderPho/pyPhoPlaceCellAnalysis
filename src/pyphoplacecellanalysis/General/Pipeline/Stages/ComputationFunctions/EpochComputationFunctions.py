@@ -1397,6 +1397,7 @@ class EpochComputationsComputationsContainer(ComputedResult):
     # ==================================================================================================================== #
     # NEW Context-General Method 2025-04-05 10:12                                                                          #
     # ==================================================================================================================== #
+    @function_attributes(short_name=None, tags=['posteriors'], input_requires=[], output_provides=[], uses=['DirectionalPseudo2DDecodersResult.perform_compute_specific_marginals'], used_by=['_do_perform_decoding'], creation_date='2025-05-02 16:16', related_items=[])
     @classmethod
     def _build_context_general_output_decoded_posteriors(cls, non_PBE_all_directional_pf1D_Decoder: BasePositionDecoder, filter_epochs_to_decode_dict: Dict[types.GenericResultTupleIndexType, Epoch], unique_decoder_names: List[str], spikes_df: pd.DataFrame, epochs_decoding_time_bin_size: float,
                                         session_name: str, t_start: float, t_delta: float, t_end: float, debug_print:bool=True) -> Tuple:
