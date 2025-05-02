@@ -39,7 +39,9 @@ from neuropy.utils.indexing_helpers import union_of_arrays # `paired_incremental
 from neuropy.utils.mixins.AttrsClassHelpers import AttrsBasedClassHelperMixin, custom_define, serialized_field, serialized_attribute_field, non_serialized_field, keys_only_repr
 from neuropy.utils.mixins.HDF5_representable import HDFMixin
 from neuropy.utils.indexing_helpers import PandasHelpers, NumpyHelpers, flatten
- 
+ from neuropy.utils.misc import capitalize_after_underscore
+
+
 from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import BasePositionDecoder # used for `complete_directional_pfs_computations`
 from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import DecodedFilterEpochsResult # needed in DirectionalPseudo2DDecodersResult
 from pyphoplacecellanalysis.General.Model.ComputationResults import ComputedResult
@@ -1942,6 +1944,8 @@ class DirectionalPseudo2DDecodersResult(ComputedResult):
         1: RL
         
         """
+        from neuropy.utils.misc import capitalize_after_underscore
+
         p_x_given_n_list = cls.get_proper_p_x_given_n_list(filter_epochs_decoder_result)
         n_decoders: int = len(unique_decoder_names)
         
@@ -2001,8 +2005,10 @@ class DirectionalPseudo2DDecodersResult(ComputedResult):
         
         assert np.shape(epochs_p_x_given_n)[0] == len(unique_decoder_names), f"unique_decoder_names: {unique_decoder_names} len(unique_decoder_names) != np.shape(epochs_p_x_given_n)[0]: {np.shape(epochs_p_x_given_n)[0]}"
 
-        _marginal_prob_var_names = [f"P_{v.capitalize()}" for v in unique_decoder_names] # ['P_Long', 'P_Short']
+        # _marginal_prob_var_names = [f"P_{v.capitalize()}" for v in unique_decoder_names] # ['P_Long', 'P_Short']
+        _marginal_prob_var_names = [f"P_{capitalize_after_underscore(v, should_capitalize_start=True)}" for v in unique_decoder_names] # ['P_Long', 'P_Short']
         
+
         _marginal_probs_dict = {a_marginal_prob_col_name:np.squeeze(epochs_p_x_given_n[i, :]) for i, (a_marginal_prob_col_name, a_decoder_name) in enumerate(zip(_marginal_prob_var_names, unique_decoder_names))} # 'P_Long': np.squeeze(epochs_p_x_given_n[0, :]), 'P_Short': np.squeeze(epochs_p_x_given_n[1, :]),
         if debug_print:
             print(f'_marginal_probs_dict: {_marginal_probs_dict}')
