@@ -1602,7 +1602,7 @@ class DirectionalPseudo2DDecodersResult(ComputedResult):
 
 
         elif known_named_decoding_epochs_type in ('replay', 'ripple', 'non_pbe', 'non_pbe_endcaps'):
-            # Case: Per-epoch global marginals
+            # Case: Per-epoch any marginals
             epoch_idx_col_name='epoch_idx'
             epoch_start_t_col_name='epoch_start_t'
             additional_transfer_column_names=['start', 'stop', 'label', 'duration']
@@ -1662,6 +1662,21 @@ class DirectionalPseudo2DDecodersResult(ComputedResult):
                         epoch_idx_col_name='epoch_idx',
                         epoch_start_t_col_name='epoch_start_t',
                         additional_transfer_column_names=['start', 'stop', 'label', 'duration']
+                    )
+                    
+                    # Expanded implementation of build_epoch_time_bin_marginals_df
+                    epoch_directional_marginals, _, _, _ = epoch_directional_marginals_tuple
+                    epoch_track_identity_marginals, _, _, _ = epoch_track_identity_marginals_tuple
+                    non_marginalized_decoder_marginals, _, _, _ = epoch_non_marginalized_decoder_marginals_tuple
+
+
+                elif known_named_decoding_epochs_type in ('replay', 'ripple', 'non_pbe', 'non_pbe_endcaps'):
+                    # Case: Per-time-bin any marginals
+                    # Compute the marginals from the result
+                    (epoch_directional_marginals_tuple, epoch_track_identity_marginals_tuple, epoch_non_marginalized_decoder_marginals_tuple), _ = a_result.compute_marginals(
+                        epoch_idx_col_name=epoch_idx_col_name,
+                        epoch_start_t_col_name=epoch_start_t_col_name,
+                        additional_transfer_column_names=additional_transfer_column_names
                     )
                     
                     # Expanded implementation of build_epoch_time_bin_marginals_df
@@ -1737,6 +1752,21 @@ class DirectionalPseudo2DDecodersResult(ComputedResult):
                     epoch_marginals_df['epoch_idx'] = epoch_marginals_df.index.to_numpy()
                     epoch_marginals_df['epoch_start_t'] = a_result.filter_epochs['start'].to_numpy()
                     
+                elif known_named_decoding_epochs_type in ('replay', 'ripple', 'non_pbe', 'non_pbe_endcaps'):
+                    # Case: Per-epoch any marginals
+                    # Compute the marginals from the result                    
+                    overrides_dict = dict(epoch_idx_col_name=epoch_idx_col_name, epoch_start_t_col_name=epoch_start_t_col_name, additional_transfer_column_names=additional_transfer_column_names)
+                    
+                    (epoch_directional_marginals_tuple, epoch_track_identity_marginals_tuple, _), _ = a_result.compute_marginals(**(additional_column_kwargs | overrides_dict))
+                    
+                    # Expanded implementation of build_epoch_all_epoch_bins_marginals_df
+                    epoch_directional_marginals, epoch_directional_all_epoch_bins_marginal, epoch_most_likely_direction_from_decoder, epoch_is_most_likely_direction_LR_dir = epoch_directional_marginals_tuple
+                    epoch_track_identity_marginals, epoch_track_identity_all_epoch_bins_marginal, epoch_most_likely_track_identity_from_decoder, epoch_is_most_likely_track_identity_Long = epoch_track_identity_marginals_tuple
+
+                    epoch_marginals_df = pd.DataFrame(np.hstack((epoch_directional_all_epoch_bins_marginal, epoch_track_identity_all_epoch_bins_marginal)), columns=['P_LR', 'P_RL', 'P_Long', 'P_Short'])
+                    epoch_marginals_df['epoch_idx'] = epoch_marginals_df.index.to_numpy()
+                    epoch_marginals_df['epoch_start_t'] = a_result.filter_epochs['start'].to_numpy()
+
                 else:
                     raise ValueError(f"Unexpected value for known_named_decoding_epochs_type: {known_named_decoding_epochs_type}")
                 ## END if known_named_decoding...
