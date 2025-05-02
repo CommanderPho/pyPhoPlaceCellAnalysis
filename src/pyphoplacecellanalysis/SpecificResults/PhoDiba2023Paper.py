@@ -2687,12 +2687,7 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
         # Cancel any pending timer
         if self.debounce_timer:
             self.debounce_timer.cancel()
-        
-        # ## do simple updates:
-        # active_plot_df_name = self.active_plot_df_name_selector_widget.value
-        # self.active_plot_df_name = self.active_plot_df_name_selector_widget.value
-        # self.active_plot_variable_name = self.active_plot_variable_name_widget.value        
-
+ 
         # Set a new timer
         self.debounce_timer = threading.Timer(
             (self.debounce_delay_ms/1000.0), 
@@ -2704,21 +2699,6 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
         # Show immediate feedback
         with self.output_widget:
             print("Filter update scheduled...")
-
-        # self.output_widget.clear_output()
-        # with self.output_widget:
-        #     print(f'._on_widget_change(change: {change})') # ._on_widget_change(change: {'name': 'value', 'old': 'dropped', 'new': 'ignore', 'owner': Dropdown(description='masked_time_bin_fill_type:', index=1, layout=Layout(width='500px'), options=('dropped', 'ignore', 'last_valid', 'nan_filled'), style=DescriptionStyle(description_
-
-        # # changing_widget = change['owner'] # Dropdown(description='masked_time_bin_fill_type:', index=1, layout=Layout(width='500px'), options=('dropped', 'ignore', 'last_valid', 'nan_filled'), 
-        # # widget_metadata: Dict = changing_widget.metadata.__dict__['default_args'][0] # {'desc': 'TEST!', 'df_col_name': 'trained_compute_epochs', 'name': 'trained_compute_epochs', 'widget_name': 'trained_compute_epochs_widget'}
-                
-        # active_plot_df_name = self.active_plot_df_name_selector_widget.value
-        # self.active_plot_df_name = self.active_plot_df_name_selector_widget.value
-        # self.active_plot_variable_name = self.active_plot_variable_name_widget.value
-
-        # # Update filtered DataFrames when widget values change
-        # self.update_filtered_dataframes(self.replay_name_widget.value, self.time_bin_size_widget.value)
-        # self.on_widget_update_filename()
 
 
     @function_attributes(short_name=None, tags=['update', 'debounce', 'efficiency'], input_requires=[], output_provides=[], uses=['.update_filtered_dataframes', '.on_widget_update_filename'], used_by=['_on_widget_change'], creation_date='2025-05-02 06:23', related_items=[])
@@ -2979,7 +2959,7 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
 
         def _build_filter_changed_plotly_plotting_callback_fn(df_filter: "DataFrameFilter", should_save:bool=False, **kwargs):
             """ `filtered_all_sessions_all_scores_ripple_df` versions -
-            captures: _perform_plot_pre_post_delta_scatter_with_embedded_context, should_save, extra_plot_kwargs
+            captures: _new_perform_plot_pre_post_delta_scatter_with_embedded_context, should_prepare_full_hover_click_interactivity, _perform_plot_pre_post_delta_scatter_with_embedded_context, should_save, extra_plot_kwargs
             
             """
             # def _plot_hoverred_heatmap_preview_posterior(df_filter: DataFrameFilter, last_selected_idx: Optional[int] = 0):
@@ -2999,8 +2979,6 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
             plot_variable_name: str = df_filter.active_plot_variable_name
             
             assert plot_variable_name in active_plot_df.columns, f"plot_variable_name: '{plot_variable_name}' is not present in active_plot_df.columns! Cannot plot!"
-            
-            
             
             if len(df_filter.time_bin_size) > 2:
                 non_selected_options = df_filter.time_bin_size[1:] # all but the first
@@ -3066,61 +3044,8 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
                         start_t = df_filter.active_plot_df['start'].iloc[ind]
                         stop_t = df_filter.active_plot_df['stop'].iloc[ind]
 
-
-                        # # df_filter.output_widget.clear_output()
-                        # with df_filter.output_widget:
-                        #     print(f"Clicked point index: {ind}")
-                        #     print(f'start_t, stop_t: {start_t}, {stop_t}')
-                        #     print(f"session_name: {session_name}")
-                        #     print(f"custom_replay_name: {custom_replay_name}")
-                        #     print(f"time_bin_size: {time_bin_size}")                        
-                        #     print(f'num_new_selections: {num_new_selections}')
                             
-
-                        # with df_filter.output_widget:
-                        # print(f'num_new_selections: {num_new_selections}')
-                        # if (num_new_selections == 1):
-                        #     selected_event_session_context: IdentifyingContext = IdentifyingContext(session_name=session_name, custom_replay_name=custom_replay_name, time_bin_size=time_bin_size)
-                        #     print(f'selected_event_session_context: {selected_event_session_context}')
-                        #     # selected_event_context: IdentifyingContext = IdentifyingContext(start_t=start_t, stop_t=stop_t)
-                        #     curr_selected_points_dict = df_filter.selected_points.get(selected_event_session_context, None)
-                        #     if curr_selected_points_dict is None:
-                        #         df_filter.selected_points[selected_event_session_context] = [] # [start_t, ] ## add start_t only
-                                
-                        #     if replace_selected_points:
-                        #         df_filter.selected_points[selected_event_session_context]
-                        #     else:
-                        #         if start_t not in df_filter.selected_points[selected_event_session_context]:
-                        #             df_filter.selected_points[selected_event_session_context].append(start_t) # add to the selection points list
-                                                    
-                        # else:
-                        #     # greater than one selection
-                        #     for i, (a_session_name, a_custom_replay_name, a_time_bin_size, a_start_t, a_stop_t) in enumerate(zip(session_name, custom_replay_name, time_bin_size, start_t, stop_t)):
-                                
-                        #         a_selected_event_session_context: IdentifyingContext = IdentifyingContext(session_name=a_session_name, custom_replay_name=a_custom_replay_name, time_bin_size=a_time_bin_size)
-                        #         print(f'a_selected_event_session_context: {a_selected_event_session_context}')
-                        #         # a_selected_event_context: IdentifyingContext = IdentifyingContext(start_t=a_start_t, stop_t=a_stop_t)
-
-                        #         curr_selected_points_dict = df_filter.selected_points.get(a_selected_event_session_context, None)
-                        #         if curr_selected_points_dict is None:
-                        #             df_filter.selected_points[a_selected_event_session_context] = [] # [start_t, ] ## add start_t only                                
-                        #         # if replace_selected_points:
-                        #         #     df_filter.selected_points[a_selected_event_session_context]
-                        #         # else:
-                        #         if a_start_t not in df_filter.selected_points[a_selected_event_session_context]:
-                        #             df_filter.selected_points[a_selected_event_session_context].append(a_start_t) # add to the selection points list
-                                    
-                        
-                        # df_filter.output_widget.clear_output()
-                        # with df_filter.output_widget:
-                        #     print(f"Clicked point index: {ind}")
-                        #     print(f'start_t, stop_t: {start_t}, {stop_t}')
-                        #     print(f"session_name: {session_name}")
-                        #     print(f"custom_replay_name: {custom_replay_name}")
-                        #     print(f"time_bin_size: {time_bin_size}")
-                            
-                    ## update selected points
-                        
+                        ## update selected points
 
                         ## try to update the selected heatmap posterior:
                         try:
