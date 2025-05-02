@@ -1890,7 +1890,7 @@ from neuropy.utils.result_context import DisplaySpecifyingIdentifyingContext
 from pyphocorehelpers.assertion_helpers import Assert
 from attrs import define, field, Factory
 from pyphoplacecellanalysis.Pho2D.data_exporting import PosteriorPlottingDatasource, LoadedPosteriorContainer
-
+import threading
 
 def _build_solera_file_download_widget(fig, filename="figure-image.png", label="Save Figure"):
     """ 
@@ -2074,6 +2074,9 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
     # hover_posterior_data: LoadedPosteriorContainer = non_serialized_field()
     hover_posterior_data: PosteriorPlottingDatasource = non_serialized_field()
     
+    debounce_timer: Optional[threading.Timer] = non_serialized_field(default=None) 
+    debounce_delay_ms: int = non_serialized_field(default=300)  # milliseconds
+
 
     # Begin Properties ___________________________________________________________________________________________________ #
     @property
@@ -2674,26 +2677,62 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
         self.on_widget_update_filename()
 
 
-    @function_attributes(short_name=None, tags=['MAIN', 'update', 'filter'], input_requires=[], output_provides=[], uses=['.update_filtered_dataframes'], used_by=[], creation_date='2025-03-27 12:20', related_items=[])
+    @function_attributes(short_name=None, tags=['MAIN', 'update', 'filter'], input_requires=[], output_provides=[], uses=['_debounced_update'], used_by=[], creation_date='2025-03-27 12:20', related_items=[])
     def _on_widget_change(self, change):
         """ this is the main update function that is called whenever an observed widget's value changes to update the filtered dataframe.
         Updates the bound variables from the widget's new value!
         """
-        # self.output_widget.clear_output()
+        import threading
+        
+        # Cancel any pending timer
+        if self.debounce_timer:
+            self.debounce_timer.cancel()
+        
+        # ## do simple updates:
+        # active_plot_df_name = self.active_plot_df_name_selector_widget.value
+        # self.active_plot_df_name = self.active_plot_df_name_selector_widget.value
+        # self.active_plot_variable_name = self.active_plot_variable_name_widget.value        
+
+        # Set a new timer
+        self.debounce_timer = threading.Timer(
+            (self.debounce_delay_ms/1000.0), 
+            self._debounced_update,
+            [self.replay_name_widget.value, self.time_bin_size_widget.value, self.active_plot_df_name_selector_widget.value, self.active_plot_variable_name_widget.value]
+        )
+        self.debounce_timer.start()
+        
+        # Show immediate feedback
         with self.output_widget:
-            print(f'._on_widget_change(change: {change})') # ._on_widget_change(change: {'name': 'value', 'old': 'dropped', 'new': 'ignore', 'owner': Dropdown(description='masked_time_bin_fill_type:', index=1, layout=Layout(width='500px'), options=('dropped', 'ignore', 'last_valid', 'nan_filled'), style=DescriptionStyle(description_
+            print("Filter update scheduled...")
 
-        # changing_widget = change['owner'] # Dropdown(description='masked_time_bin_fill_type:', index=1, layout=Layout(width='500px'), options=('dropped', 'ignore', 'last_valid', 'nan_filled'), 
-        # widget_metadata: Dict = changing_widget.metadata.__dict__['default_args'][0] # {'desc': 'TEST!', 'df_col_name': 'trained_compute_epochs', 'name': 'trained_compute_epochs', 'widget_name': 'trained_compute_epochs_widget'}
+        # self.output_widget.clear_output()
+        # with self.output_widget:
+        #     print(f'._on_widget_change(change: {change})') # ._on_widget_change(change: {'name': 'value', 'old': 'dropped', 'new': 'ignore', 'owner': Dropdown(description='masked_time_bin_fill_type:', index=1, layout=Layout(width='500px'), options=('dropped', 'ignore', 'last_valid', 'nan_filled'), style=DescriptionStyle(description_
+
+        # # changing_widget = change['owner'] # Dropdown(description='masked_time_bin_fill_type:', index=1, layout=Layout(width='500px'), options=('dropped', 'ignore', 'last_valid', 'nan_filled'), 
+        # # widget_metadata: Dict = changing_widget.metadata.__dict__['default_args'][0] # {'desc': 'TEST!', 'df_col_name': 'trained_compute_epochs', 'name': 'trained_compute_epochs', 'widget_name': 'trained_compute_epochs_widget'}
                 
-        active_plot_df_name = self.active_plot_df_name_selector_widget.value
-        self.active_plot_df_name = self.active_plot_df_name_selector_widget.value
-        self.active_plot_variable_name = self.active_plot_variable_name_widget.value
+        # active_plot_df_name = self.active_plot_df_name_selector_widget.value
+        # self.active_plot_df_name = self.active_plot_df_name_selector_widget.value
+        # self.active_plot_variable_name = self.active_plot_variable_name_widget.value
 
-        # Update filtered DataFrames when widget values change
-        self.update_filtered_dataframes(self.replay_name_widget.value, self.time_bin_size_widget.value)
+        # # Update filtered DataFrames when widget values change
+        # self.update_filtered_dataframes(self.replay_name_widget.value, self.time_bin_size_widget.value)
+        # self.on_widget_update_filename()
+
+
+    @function_attributes(short_name=None, tags=['update', 'debounce', 'efficiency'], input_requires=[], output_provides=[], uses=['.update_filtered_dataframes', '.on_widget_update_filename'], used_by=['_on_widget_change'], creation_date='2025-05-02 06:23', related_items=[])
+    def _debounced_update(self, replay_name, time_bin_sizes, active_plot_df_name, active_plot_variable_name):
+        """Called after debounce delay"""
+        ## do simple updates:
+        # active_plot_df_name = self.active_plot_df_name_selector_widget.value
+        self.active_plot_df_name = active_plot_df_name # self.active_plot_df_name_selector_widget.value
+        self.active_plot_variable_name = active_plot_variable_name # self.active_plot_variable_name_widget.value             
+
+        self.update_filtered_dataframes(replay_name, time_bin_sizes)
         self.on_widget_update_filename()
         
+
 
     @function_attributes(short_name=None, tags=['predicate', 'controls', 'filter'], input_requires=[], output_provides=[], uses=[], used_by=['.build_extra_control_widget'], creation_date='2025-03-27 14:05', related_items=[])
     def _rebuild_predicate_widget(self, initially_is_checked: Optional[Dict[str, bool]]=None):
