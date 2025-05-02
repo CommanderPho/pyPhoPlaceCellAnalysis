@@ -2059,6 +2059,8 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
     active_plot_df_name_selector_widget = non_serialized_field(init=False)
     active_plot_variable_name_widget = non_serialized_field(init=False)
     custom_dynamic_filter_widgets_list: List = non_serialized_field(init=False, metadata={'desc': 'stores references to the widgets with knowledge of which properties to update to filter the dataframe.'})
+    custom_dynamic_filter_widgets_dict: Dict = non_serialized_field(init=False, metadata={'desc': 'stores references to the widgets with knowledge of which properties to update to filter the dataframe.'})
+    
     
     output_widget: widgets.Output = non_serialized_field(init=False)
     figure_widget: go.FigureWidget = non_serialized_field(init=False)
@@ -2360,7 +2362,8 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
         from traitlets import Dict as TraitDict  # Import the Dict traitlet
 
         a_widget_name: str = f"{a_name}_widget" # replay_name_widget
-        extant_widget = getattr(self, a_widget_name, None)
+        # extant_widget = getattr(self, a_widget_name, None)
+        extant_widget = self.custom_dynamic_filter_widgets_dict.get(a_widget_name, None)
         if extant_widget is not None:
             raise NotImplementedError(f'Not sure what to do with extant widgets yet! a_widget_label: "{a_widget_label}".')
 
@@ -2391,7 +2394,9 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
         ## INPUTS: self.custom_dynamic_filter_widgets_list
         ## Add to output widgets list
         self.custom_dynamic_filter_widgets_list.append(a_widget)
-        setattr(self, a_widget_name, a_widget) # self.replay_name_widget
+        # setattr(self, a_widget_name, a_widget)
+        self.custom_dynamic_filter_widgets_dict[a_widget_name] = a_widget
+
         ## INPUTS: self.custom_dynamic_filter_widgets_dict, self.custom_dynamic_filter_widgets_property_map
 
         ## Update the predicate enabled selection widget and default to enabling this predicate:
@@ -2424,7 +2429,8 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
         from traitlets import Dict as TraitDict  # Import the Dict traitlet
 
         a_widget_name: str = f"{a_name}_widget" # replay_name_widget
-        extant_widget = getattr(self, a_widget_name, None)
+        # extant_widget = getattr(self, a_widget_name, None)
+        extant_widget = self.custom_dynamic_filter_widgets_dict.get(a_widget_name, None)
         if extant_widget is not None:
             raise NotImplementedError(f'Not sure what to do with extant widgets yet! a_widget_label: "{a_widget_label}".')
 
@@ -2437,7 +2443,6 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
             layout=widgets.Layout(width='300px'),
             style={'description_width': 'initial'},
         )
-
 
         ## add_traits (does work)
         a_widget.metadata = TraitDict({  # Use the Dict traitlet here
@@ -2456,7 +2461,8 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
         ## INPUTS: self.custom_dynamic_filter_widgets_list
         ## Add to output widgets list
         self.custom_dynamic_filter_widgets_list.append(a_widget)
-        setattr(self, a_widget_name, a_widget) # self.replay_name_widget
+        # setattr(self, a_widget_name, a_widget) # self.replay_name_widget
+        self.custom_dynamic_filter_widgets_dict[a_widget_name] = a_widget
         ## INPUTS: self.custom_dynamic_filter_widgets_dict, self.custom_dynamic_filter_widgets_property_map
 
         ## Update the predicate enabled selection widget and default to enabling this predicate:
@@ -2468,21 +2474,6 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
 
         # Set initial widget selection/selections ____________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
         initial_selection = self.set_initial_selection(a_widget=a_widget, initial_selection_mode=initial_selection_mode, custom_initial_selections=custom_initial_selections)
-        # initial_selection = []
-        # if (initial_selection_mode.value == InitialSelectionModeEnum.NO_SELECTION.value):
-        #     initial_selection = []
-        # elif (initial_selection_mode.value == InitialSelectionModeEnum.FIRST_SELECTED.value):
-        #     if len(a_col_values_options) > 0:
-        #         initial_selection = [a_col_values_options[0]]
-        # elif (initial_selection_mode.value == InitialSelectionModeEnum.CUSTOM_SELECTED.value):
-        #     assert custom_initial_selections is not None, f"with this mode you must provide a custom_selection"
-        #     initial_selection = deepcopy(custom_initial_selections)
-        # elif (initial_selection_mode.value == InitialSelectionModeEnum.ALL_SELECTED.value):
-        #     initial_selection = deepcopy(a_col_values_options)
-        # else:
-        #     raise NotImplementedError(f'{initial_selection_mode} is not VALID')
-
-        # a_widget.value = initial_selection
         
         return a_widget
 
@@ -2494,6 +2485,8 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
         from pyphoplacecellanalysis.Pho2D.plotly.Extensions.plotly_helpers import PlotlyFigureContainer
         
         self.custom_dynamic_filter_widgets_list = [] ## start with an empty list of additional filter widgets
+        self.custom_dynamic_filter_widgets_dict = {}
+        
 
         # Extract unique options for the widgets
         replay_name_options = sorted(self.active_plot_df['custom_replay_name'].astype(str).unique())
@@ -2503,15 +2496,24 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
                                                                   border='1px solid black'),
                                                                   ) #  {'border': '1px solid black'}
         
-        # Create dropdown widgets with adjusted layout and style
-        self.replay_name_widget = widgets.Dropdown(
-            options=replay_name_options,
-            description='Replay Name:',
-            disabled=False,
-            layout=widgets.Layout(width='500px'),
-            style={'description_width': 'initial'}
-        )
+
+        self.active_filter_predicate_selector_widget = CheckBoxListWidget(options_list=list(self.additional_filter_predicates.keys()))
+            # description='Filter Predicates:',
+            # disabled=False,
+        # )
+        self.active_filter_predicate_selector_widget.observe(self._on_widget_change, names='value')
         
+        # Create dropdown widgets with adjusted layout and style
+        # self.replay_name_widget = widgets.Dropdown(
+        #     options=replay_name_options,
+        #     description='Replay Name:',
+        #     disabled=False,
+        #     layout=widgets.Layout(width='500px'),
+        #     style={'description_width': 'initial'}
+        # )
+        
+        self.replay_name_widget = self.build_extra_dropdown_widget(a_name='replay_name', df_col_name='custom_replay_name', a_widget_label='Replay Name:')
+
         self.active_plot_df_name_selector_widget = widgets.Dropdown(
             options=sorted(self.filtered_df_names),
             description='Plot df Name:',
@@ -2521,6 +2523,11 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
         )
         self.active_plot_df_name_selector_widget.value = self.active_plot_df_name
         
+
+        # self.active_plot_df_name_selector_widget = self.build_extra_dropdown_widget(a_name='active_plot_df_name_selector', df_col_name='custom_replay_name', a_widget_label='Plot df Name:', custom_initial_selection=self.active_plot_df_name)
+
+
+        ## 2025-05-02 - this one is required to be hardcoded
         self.active_plot_variable_name_widget = widgets.Dropdown(
             options=sorted(self.plot_variable_name_options),
             description='Plot Variable Name:',
@@ -2530,22 +2537,18 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
         )
         self.active_plot_variable_name_widget.value = self.active_plot_variable_name
         
-        self.active_filter_predicate_selector_widget = CheckBoxListWidget(options_list=list(self.additional_filter_predicates.keys()))
-            # description='Filter Predicates:',
-            # disabled=False,
-        # )
-        self.active_filter_predicate_selector_widget.observe(self._on_widget_change, names='value')
+
 
         # Use SelectMultiple widget for time_bin_size
-        self.time_bin_size_widget = widgets.SelectMultiple(
-            options=time_bin_size_options,
-            description='Time Bin Size:',
-            disabled=False,
-            layout=widgets.Layout(width='300px', height='100px'),
-            style={'description_width': 'initial'},
-        )
+        # self.time_bin_size_widget = widgets.SelectMultiple(
+        #     options=time_bin_size_options,
+        #     description='Time Bin Size:',
+        #     disabled=False,
+        #     layout=widgets.Layout(width='300px', height='100px'),
+        #     style={'description_width': 'initial'},
+        # )
         
-        # self.time_bin_size_widget = self.build_extra_selectMultiple_widget(a_name='time_bin_size', df_col_name='time_bin_size', a_widget_label='Time Bin Size:', initial_selection_mode=InitialSelectionModeEnum.FIRST_SELECTED)
+        self.time_bin_size_widget = self.build_extra_selectMultiple_widget(a_name='time_bin_size', df_col_name='time_bin_size', a_widget_label='Time Bin Size:', initial_selection_mode=InitialSelectionModeEnum.FIRST_SELECTED)
 
         self.figure_widget, did_create_new_figure = PlotlyFigureContainer._helper_build_pre_post_delta_figure_if_needed(extant_figure=None, use_latex_labels=False, main_title='test', figure_class=go.FigureWidget)
         self.figure_widget.layout.dragmode = 'select'
@@ -2561,8 +2564,8 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
         
 
         # Set up observers to handle changes in widget values
-        self.replay_name_widget.observe(self._on_widget_change, names='value')
-        self.time_bin_size_widget.observe(self._on_widget_change, names='value')
+        # self.replay_name_widget.observe(self._on_widget_change, names='value')
+        # self.time_bin_size_widget.observe(self._on_widget_change, names='value')
         # self.active_filter_predicate_selector_widget.observe(self._on_widget_change, names='value')
         self.active_plot_df_name_selector_widget.observe(self._on_widget_change, names='value')
         self.active_plot_variable_name_widget.observe(self._on_widget_change, names='value')
@@ -2745,8 +2748,8 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
         # Arrange your widgets as needed
         out = widgets.VBox([
             widgets.HBox([
-                self.replay_name_widget, 
-                self.time_bin_size_widget, 
+                # self.replay_name_widget, 
+                # self.time_bin_size_widget, 
                 self.active_filter_predicate_selector_widget,
                 # self.table_widget
             ], #layout=widgets.Layout(width='100%'),
