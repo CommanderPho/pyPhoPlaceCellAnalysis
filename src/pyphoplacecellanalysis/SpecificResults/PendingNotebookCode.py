@@ -101,10 +101,72 @@ from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import DecodedFilter
 
 
 
+@function_attributes(short_name=None, tags=['plotting', 'prob_v_position'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-05-01 17:00', related_items=[])
+def plot_linearized_position_prob_p(a_p_x_given_n: NDArray, figure_title='Linearized Position Probability', 
+                                         save_path=None, show_figure=True, ax=None, figsize=(10, 6), label=None, y_label: str = 'P(Long|x)', xbin_centers=None, **kwargs):
+    """
+    Produces a figure showing the probability distribution across linearized positions.
+    
+    Parameters:
+    -----------
+    an_out_result : object
+        Result object containing p_x_given_n_list attribute
+    figure_title : str, optional
+        Title for the figure window
+    save_path : str, optional
+        If provided, saves the figure to this path
+    show_figure : bool, optional
+        Whether to display the figure
+        
+    Returns:
+    --------
+    fig : matplotlib.figure.Figure
+        The generated figure object
+    probability_values : numpy.ndarray
+        The normalized probability values plotted
+
+
+    Usage:
+
+        from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import plot_linearized_position_prob_p
+        
+        fig1, ax1, prob_values1 = plot_linearized_position_probability(an_out_result=an_out_result_dict['pre-delta'], figure_title='pre-delta Linearized Position Probability')
+        fig2, ax2, prob_values2 = plot_linearized_position_probability(an_out_result=an_out_result_dict['post-delta'], figure_title='post-delta Linearized Position Probability', ax=ax1)
+
+    """
+    import numpy as np
+    import matplotlib.pyplot as plt
+    
+    # Create figure and axis if not provided
+    if ax is None:
+        fig, ax = plt.subplots(num=figure_title, figsize=figsize, clear=True)
+    else:
+        fig = ax.figure
+    
+    # Plot the data
+    if xbin_centers is None:
+        xbin_centers = np.arange(len(a_p_x_given_n))
+
+    ax.scatter(xbin_centers, a_p_x_given_n, label=label, **kwargs)
+    ax.set_title(figure_title)
+    ax.set_ylabel(y_label)
+    ax.set_xlabel('Position x <linearized>')
+    
+    ax.legend()
+
+    # Optional: save the figure
+    if save_path is not None:
+        plt.savefig(save_path, dpi=300, bbox_inches='tight')
+    
+    # Show or close the figure based on parameter
+    if not show_figure:
+        plt.close(fig)
+        
+    return fig, ax, a_p_x_given_n
+
 
 @function_attributes(short_name=None, tags=['plotting', 'prob_v_position'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-05-01 17:00', related_items=[])
-def plot_linearized_position_probability(an_out_result: DecodedFilterEpochsResult, figure_title='Linearized Position Probability', 
-                                         save_path=None, show_figure=True, ax=None, figsize=(10, 6), label=None, is_P_long:bool=False, xbin_centers=None):
+def plot_linearized_position_probability(an_out_result: DecodedFilterEpochsResult, is_P_long:bool=False, **kwargs):
     """
     Produces a figure showing the probability distribution across linearized positions.
     
@@ -135,9 +197,6 @@ def plot_linearized_position_probability(an_out_result: DecodedFilterEpochsResul
         fig2, ax2, prob_values2 = plot_linearized_position_probability(an_out_result=an_out_result_dict['post-delta'], figure_title='post-delta Linearized Position Probability', ax=ax1)
 
     """
-    import numpy as np
-    import matplotlib.pyplot as plt
-
     # Compute the sum of probabilities from the p_x_given_n_list
     if is_P_long:
         y_label: str = 'P(Long|x)'
@@ -155,32 +214,8 @@ def plot_linearized_position_probability(an_out_result: DecodedFilterEpochsResul
     normalization_factor = np.nansum(probability_values)
     # probability_values = probability_values / normalization_factor
     
-    # Create figure and axis if not provided
-    if ax is None:
-        fig, ax = plt.subplots(num=figure_title, figsize=figsize, clear=True)
-    else:
-        fig = ax.figure
-    
-    # Plot the data
-    if xbin_centers is None:
-        xbin_centers = np.arange(len(probability_values))
+    return plot_linearized_position_prob_p(a_p_x_given_n=probability_values, y_label=y_label, **kwargs)
 
-    ax.scatter(xbin_centers, probability_values, label=label)
-    ax.set_title(figure_title)
-    ax.set_ylabel(y_label)
-    ax.set_xlabel('Position x <linearized>')
-    
-    ax.legend()
-
-    # Optional: save the figure
-    if save_path is not None:
-        plt.savefig(save_path, dpi=300, bbox_inches='tight')
-    
-    # Show or close the figure based on parameter
-    if not show_figure:
-        plt.close(fig)
-        
-    return fig, ax, probability_values
 
 
 
