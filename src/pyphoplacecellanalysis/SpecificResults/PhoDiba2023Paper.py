@@ -2012,27 +2012,33 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
         df_filter.display()
 
     """
-    # Original DataFrames passed during initialization
-    all_sessions_ripple_df: pd.DataFrame = serialized_field()
-    all_sessions_ripple_time_bin_df: pd.DataFrame = serialized_field()
-    all_sessions_MultiMeasure_ripple_df: pd.DataFrame = serialized_field()
-    all_sessions_all_scores_ripple_df: pd.DataFrame = serialized_field()
+    # # Original DataFrames passed during initialization
+    # all_sessions_ripple_df: pd.DataFrame = serialized_field()
+    # all_sessions_ripple_time_bin_df: pd.DataFrame = serialized_field()
+    # all_sessions_MultiMeasure_ripple_df: pd.DataFrame = serialized_field()
+    # all_sessions_all_scores_ripple_df: pd.DataFrame = serialized_field()
 
-    # Original DataFrames for laps
-    all_sessions_laps_df: pd.DataFrame = serialized_field()
-    all_sessions_laps_time_bin_df: pd.DataFrame = serialized_field()
-    all_sessions_MultiMeasure_laps_df: pd.DataFrame = serialized_field()
+    # # Original DataFrames for laps
+    # all_sessions_laps_df: pd.DataFrame = serialized_field()
+    # all_sessions_laps_time_bin_df: pd.DataFrame = serialized_field()
+    # all_sessions_MultiMeasure_laps_df: pd.DataFrame = serialized_field()
 
-    # Filtered DataFrames (initialized to None)
-    filtered_all_sessions_ripple_df: pd.DataFrame = non_serialized_field(init=False, default=None)
-    filtered_all_sessions_ripple_time_bin_df: pd.DataFrame = non_serialized_field(init=False, default=None)
-    filtered_all_sessions_MultiMeasure_ripple_df: pd.DataFrame = non_serialized_field(init=False, default=None)
-    filtered_all_sessions_all_scores_ripple_df: pd.DataFrame = non_serialized_field(init=False, default=None)
+    # # Filtered DataFrames (initialized to None)
+    # filtered_all_sessions_ripple_df: pd.DataFrame = non_serialized_field(init=False, default=None)
+    # filtered_all_sessions_ripple_time_bin_df: pd.DataFrame = non_serialized_field(init=False, default=None)
+    # filtered_all_sessions_MultiMeasure_ripple_df: pd.DataFrame = non_serialized_field(init=False, default=None)
+    # filtered_all_sessions_all_scores_ripple_df: pd.DataFrame = non_serialized_field(init=False, default=None)
 
-    # Filtered DataFrames for laps
-    filtered_all_sessions_laps_df: pd.DataFrame = non_serialized_field(init=False, default=None)
-    filtered_all_sessions_laps_time_bin_df: pd.DataFrame = non_serialized_field(init=False, default=None)
-    filtered_all_sessions_MultiMeasure_laps_df: pd.DataFrame = non_serialized_field(init=False, default=None)
+    # # Filtered DataFrames for laps
+    # filtered_all_sessions_laps_df: pd.DataFrame = non_serialized_field(init=False, default=None)
+    # filtered_all_sessions_laps_time_bin_df: pd.DataFrame = non_serialized_field(init=False, default=None)
+    # filtered_all_sessions_MultiMeasure_laps_df: pd.DataFrame = non_serialized_field(init=False, default=None)
+
+    ## Original DataFrames passed during initialization
+    _original_df_dict: Dict[str, Optional[pd.DataFrame]] = serialized_field()
+    # Filtered DataFrames
+    _filtered_df_dict: Dict[str, Optional[pd.DataFrame]] = serialized_field(default=Factory(dict))
+    
 
     active_plot_df_name: str = serialized_attribute_field(default='filtered_all_sessions_all_scores_ripple_df')
     active_plot_variable_name: str = serialized_attribute_field(default='P_Short')
@@ -2120,58 +2126,62 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
         return IdentifyingContext(time_bin_sizes=self.time_bin_size, custom_suffix=self.replay_name)
     
 
-    @property
-    def original_df_list(self) -> Tuple[pd.DataFrame]:
-        """The original_df_list property."""
-        return (
-            self.all_sessions_ripple_df,
-            self.all_sessions_ripple_time_bin_df,
-            self.all_sessions_MultiMeasure_ripple_df,
-            self.all_sessions_all_scores_ripple_df,
-            self.all_sessions_laps_df,
-            self.all_sessions_laps_time_bin_df,
-            self.all_sessions_MultiMeasure_laps_df
-        )
+    # @property
+    # def original_df_list(self) -> Tuple[pd.DataFrame]:
+    #     """The original_df_list property."""
+    #     return (
+    #         self.all_sessions_ripple_df,
+    #         self.all_sessions_ripple_time_bin_df,
+    #         self.all_sessions_MultiMeasure_ripple_df,
+    #         self.all_sessions_all_scores_ripple_df,
+    #         self.all_sessions_laps_df,
+    #         self.all_sessions_laps_time_bin_df,
+    #         self.all_sessions_MultiMeasure_laps_df
+    #     )
         
-    @property
-    def filtered_df_list(self) -> Tuple[pd.DataFrame]:
-        """The original_df_list property."""
-        return (
-            self.filtered_all_sessions_ripple_df,
-            self.filtered_all_sessions_ripple_time_bin_df,
-            self.filtered_all_sessions_MultiMeasure_ripple_df,
-            self.filtered_all_sessions_all_scores_ripple_df,
-            self.filtered_all_sessions_laps_df,
-            self.filtered_all_sessions_laps_time_bin_df,
-            self.filtered_all_sessions_MultiMeasure_laps_df
-        )
+    # @property
+    # def filtered_df_list(self) -> Tuple[pd.DataFrame]:
+    #     """The original_df_list property."""
+    #     return (
+    #         self.filtered_all_sessions_ripple_df,
+    #         self.filtered_all_sessions_ripple_time_bin_df,
+    #         self.filtered_all_sessions_MultiMeasure_ripple_df,
+    #         self.filtered_all_sessions_all_scores_ripple_df,
+    #         self.filtered_all_sessions_laps_df,
+    #         self.filtered_all_sessions_laps_time_bin_df,
+    #         self.filtered_all_sessions_MultiMeasure_laps_df
+    #     )
 
 
     @property
     def original_df_dict(self) -> Dict[str, pd.DataFrame]:
         """The original_df_list property."""
-        return {k:v for k, v in dict(
-            all_sessions_ripple_df=self.all_sessions_ripple_df,
-            all_sessions_ripple_time_bin_df=self.all_sessions_ripple_time_bin_df,
-            all_sessions_MultiMeasure_ripple_df=self.all_sessions_MultiMeasure_ripple_df,
-            all_sessions_all_scores_ripple_df=self.all_sessions_all_scores_ripple_df,
-            all_sessions_laps_df=self.all_sessions_laps_df,
-            all_sessions_laps_time_bin_df=self.all_sessions_laps_time_bin_df,
-            all_sessions_MultiMeasure_laps_df=self.all_sessions_MultiMeasure_laps_df
-        ).items() if (v is not None)}
+        # return {k:v for k, v in dict(
+        #     all_sessions_ripple_df=self.all_sessions_ripple_df,
+        #     all_sessions_ripple_time_bin_df=self.all_sessions_ripple_time_bin_df,
+        #     all_sessions_MultiMeasure_ripple_df=self.all_sessions_MultiMeasure_ripple_df,
+        #     all_sessions_all_scores_ripple_df=self.all_sessions_all_scores_ripple_df,
+        #     all_sessions_laps_df=self.all_sessions_laps_df,
+        #     all_sessions_laps_time_bin_df=self.all_sessions_laps_time_bin_df,
+        #     all_sessions_MultiMeasure_laps_df=self.all_sessions_MultiMeasure_laps_df
+        # ).items() if (v is not None)}
+        return {k:v for k, v in self._original_df_dict.items() if (v is not None)}
+            
+
         
     @property
     def filtered_df_dict(self) -> Dict[str, pd.DataFrame]:
         """The original_df_list property."""
-        return {k:v for k, v in dict(
-            filtered_all_sessions_ripple_df=self.filtered_all_sessions_ripple_df,
-            filtered_all_sessions_ripple_time_bin_df=self.filtered_all_sessions_ripple_time_bin_df,
-            filtered_all_sessions_MultiMeasure_ripple_df=self.filtered_all_sessions_MultiMeasure_ripple_df,
-            filtered_all_sessions_all_scores_ripple_df=self.filtered_all_sessions_all_scores_ripple_df,
-            filtered_all_sessions_laps_df=self.filtered_all_sessions_laps_df,
-            filtered_all_sessions_laps_time_bin_df=self.filtered_all_sessions_laps_time_bin_df,
-            filtered_all_sessions_MultiMeasure_laps_df=self.filtered_all_sessions_MultiMeasure_laps_df
-        ).items() if (v is not None)}
+        # return {k:v for k, v in dict(
+        #     filtered_all_sessions_ripple_df=self.filtered_all_sessions_ripple_df,
+        #     filtered_all_sessions_ripple_time_bin_df=self.filtered_all_sessions_ripple_time_bin_df,
+        #     filtered_all_sessions_MultiMeasure_ripple_df=self.filtered_all_sessions_MultiMeasure_ripple_df,
+        #     filtered_all_sessions_all_scores_ripple_df=self.filtered_all_sessions_all_scores_ripple_df,
+        #     filtered_all_sessions_laps_df=self.filtered_all_sessions_laps_df,
+        #     filtered_all_sessions_laps_time_bin_df=self.filtered_all_sessions_laps_time_bin_df,
+        #     filtered_all_sessions_MultiMeasure_laps_df=self.filtered_all_sessions_MultiMeasure_laps_df
+        # ).items() if (v is not None)}
+        return {k:v for k, v in self._filtered_df_dict.items() if (v is not None)}
 
 
     @property
@@ -3110,7 +3120,8 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
                 df['is_filter_included'] = True  # Initialize with default value
             filtered_name: str = f"filtered_{name}"
             filtered_df = deepcopy(df[df['is_filter_included']])
-            setattr(self, filtered_name, filtered_df)
+            # setattr(self, filtered_name, filtered_df) # instance-attributes method
+            self._filtered_df_dict[filtered_name] = filtered_df # instance-dict method
 
 
     @function_attributes(short_name=None, tags=['update', 'MAIN', 'callback'], input_requires=['self.additional_filter_predicates'], output_provides=[], uses=[], used_by=['self._on_widget_change'], creation_date='2025-03-27 12:49', related_items=[])
@@ -3186,7 +3197,10 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
                     df_context_dict['filter'] = active_predicate_filter_name_modifier
                 filtered_df.attrs['data_context'] = IdentifyingContext.init_from_dict(df_context_dict) ## update
                 filtered_df.attrs['did_filter_predicate_fail'] = did_applying_predicate_fail_for_df_dict[filtered_name]
-                setattr(self, filtered_name, filtered_df)
+                # setattr(self, filtered_name, filtered_df) # instance-attributes method
+                self._filtered_df_dict[filtered_name] = filtered_df # instance-dict method
+                                
+
             # END for name, df
 
             ## Update sizes table:
@@ -3221,16 +3235,19 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
         ipython = get_ipython()
         user_ns = ipython.user_ns
 
-        # Update ripple DataFrames
-        user_ns['filtered_all_sessions_ripple_df'] = self.filtered_all_sessions_ripple_df
-        user_ns['filtered_all_sessions_ripple_time_bin_df'] = self.filtered_all_sessions_ripple_time_bin_df
-        user_ns['filtered_all_sessions_MultiMeasure_ripple_df'] = self.filtered_all_sessions_MultiMeasure_ripple_df
-        user_ns['filtered_all_sessions_all_scores_ripple_df'] = self.filtered_all_sessions_all_scores_ripple_df
+        for k, a_df in self.filtered_df_dict.items():
+            user_ns[k] = a_df
+
+        # # Update ripple DataFrames
+        # user_ns['filtered_all_sessions_ripple_df'] = self.filtered_all_sessions_ripple_df
+        # user_ns['filtered_all_sessions_ripple_time_bin_df'] = self.filtered_all_sessions_ripple_time_bin_df
+        # user_ns['filtered_all_sessions_MultiMeasure_ripple_df'] = self.filtered_all_sessions_MultiMeasure_ripple_df
+        # user_ns['filtered_all_sessions_all_scores_ripple_df'] = self.filtered_all_sessions_all_scores_ripple_df
         
-        # Update laps DataFrames
-        user_ns['filtered_all_sessions_laps_df'] = self.filtered_all_sessions_laps_df
-        user_ns['filtered_all_sessions_laps_time_bin_df'] = self.filtered_all_sessions_laps_time_bin_df
-        user_ns['filtered_all_sessions_MultiMeasure_laps_df'] = self.filtered_all_sessions_MultiMeasure_laps_df
+        # # Update laps DataFrames
+        # user_ns['filtered_all_sessions_laps_df'] = self.filtered_all_sessions_laps_df
+        # user_ns['filtered_all_sessions_laps_time_bin_df'] = self.filtered_all_sessions_laps_time_bin_df
+        # user_ns['filtered_all_sessions_MultiMeasure_laps_df'] = self.filtered_all_sessions_MultiMeasure_laps_df
 
     # Update instance values from a dictionary
     def update_instance_from_dict(self, update_dict):
@@ -3238,33 +3255,35 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
         field_names = {field.name for field in self.__attrs_attrs__}
         filtered_dict = {k: v for k, v in update_dict.items() if k in field_names}
         for k, v in filtered_dict.items():
-            setattr(self, k, v)
+            # setattr(self, k, v) # instance-attributes method
+            self._filtered_df_dict[k] = v # instance-dict method
+            
         # return evolve(self, **filtered_dict)
 
 
     # Accessor methods for the filtered DataFrames _______________________________________________________________________ #
-    # Accessor methods for ripple DataFrames
-    def get_filtered_all_sessions_ripple_df(self):
-        return self.filtered_all_sessions_ripple_df
+    # # Accessor methods for ripple DataFrames
+    # def get_filtered_all_sessions_ripple_df(self):
+    #     return self.filtered_all_sessions_ripple_df
     
-    def get_filtered_all_sessions_ripple_time_bin_df(self):
-        return self.filtered_all_sessions_ripple_time_bin_df
+    # def get_filtered_all_sessions_ripple_time_bin_df(self):
+    #     return self.filtered_all_sessions_ripple_time_bin_df
     
-    def get_filtered_all_sessions_MultiMeasure_ripple_df(self):
-        return self.filtered_all_sessions_MultiMeasure_ripple_df
+    # def get_filtered_all_sessions_MultiMeasure_ripple_df(self):
+    #     return self.filtered_all_sessions_MultiMeasure_ripple_df
     
-    def get_filtered_all_sessions_all_scores_ripple_df(self):
-        return self.filtered_all_sessions_all_scores_ripple_df
+    # def get_filtered_all_sessions_all_scores_ripple_df(self):
+    #     return self.filtered_all_sessions_all_scores_ripple_df
     
-    # Accessor methods for laps DataFrames
-    def get_filtered_all_sessions_laps_df(self):
-        return self.filtered_all_sessions_laps_df
+    # # Accessor methods for laps DataFrames
+    # def get_filtered_all_sessions_laps_df(self):
+    #     return self.filtered_all_sessions_laps_df
     
-    def get_filtered_all_sessions_laps_time_bin_df(self):
-        return self.filtered_all_sessions_laps_time_bin_df
+    # def get_filtered_all_sessions_laps_time_bin_df(self):
+    #     return self.filtered_all_sessions_laps_time_bin_df
     
-    def get_filtered_all_sessions_MultiMeasure_laps_df(self):
-        return self.filtered_all_sessions_MultiMeasure_laps_df
+    # def get_filtered_all_sessions_MultiMeasure_laps_df(self):
+    #     return self.filtered_all_sessions_MultiMeasure_laps_df
 
 
     @classmethod
