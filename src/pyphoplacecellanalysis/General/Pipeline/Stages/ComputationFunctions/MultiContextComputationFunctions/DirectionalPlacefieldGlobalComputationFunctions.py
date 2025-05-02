@@ -1945,22 +1945,23 @@ class DirectionalPseudo2DDecodersResult(ComputedResult):
         p_x_given_n_list = cls.get_proper_p_x_given_n_list(filter_epochs_decoder_result)
         n_decoders: int = len(unique_decoder_names)
         
-        custom_curr_unit_marginal_list = []
+        custom_curr_unit_marginal_list: List[DynamicContainer] = []
         
-        for a_p_x_given_n in p_x_given_n_list:
+        for epoch_i, a_p_x_given_n in enumerate(p_x_given_n_list):
             # an_array = all_directional_laps_filter_epochs_decoder_result.p_x_given_n_list[0] # .shape # (62, 4, 236)
             curr_array_shape = np.shape(a_p_x_given_n) # .shape # (62, 4, 236) - (n_pos_bins, 4, n_epoch_t_bins[i])
             if debug_print:
-                print(f'a_p_x_given_n.shape: {curr_array_shape}')
+                print(f'p_x_given_n_list[{epoch_i}]:')
+                print(f'\ta_p_x_given_n.shape: {curr_array_shape}')
 
             if debug_print:
-                print(f'np.shape(a_p_x_given_n): {np.shape(curr_array_shape)}')
+                print(f'\tnp.shape(a_p_x_given_n): {np.shape(curr_array_shape)}')
                 
             assert curr_array_shape[1] == n_decoders, f"only works when curr_array_shape[1]: {curr_array_shape[1]} correspond to the unique_decoder_names: {unique_decoder_names}. (typically all-directional decoder)."                
             curr_unit_marginal_x = DynamicContainer(p_x_given_n=a_p_x_given_n, most_likely_positions_1D=None)
             
             if debug_print:
-                print(f'np.shape(curr_unit_posterior_list.p_x_given_n): {np.shape(curr_unit_marginal_x.p_x_given_n)}')
+                print(f'\tnp.shape(curr_unit_posterior_list.p_x_given_n): {np.shape(curr_unit_marginal_x.p_x_given_n)}')
             
             # y-axis marginal:
             curr_unit_marginal_x.p_x_given_n = np.squeeze(np.sum(a_p_x_given_n, axis=0)) # sum over all x. Result should be (n_decoders, n_epoch_t_bins[i])
@@ -1972,14 +1973,21 @@ class DirectionalPseudo2DDecodersResult(ComputedResult):
             elif curr_unit_marginal_x.p_x_given_n.ndim == 1:
                 curr_unit_marginal_x.p_x_given_n = curr_unit_marginal_x.p_x_given_n[:, np.newaxis]
                 if debug_print:
-                    print(f'\t added dimension to curr_posterior for marginal_y: {curr_unit_marginal_x.p_x_given_n.shape}')
+                    print(f'\t\t added dimension to curr_posterior for marginal_y: {curr_unit_marginal_x.p_x_given_n.shape}')
             custom_curr_unit_marginal_list.append(curr_unit_marginal_x)
-
+        ## END for epoch_i, a_p_x_given_...
+        
         # ## INPUTS: custom_curr_unit_marginal_list
         
         ## All
         epochs_repeated_epoch_index: NDArray = np.hstack([np.full((n_bins, ), i) for i, n_bins in enumerate(filter_epochs_decoder_result.nbins)]) # np.shape(epochs_p_x_given_n) # (2, 19018)
         epochs_repeated_sub_epoch_time_bin_index: NDArray = np.hstack([np.arange(n_bins) for n_bins in filter_epochs_decoder_result.nbins]) # np.shape(epochs_t_centers) # (19018,)
+        
+        ## Redundant but very helpful parent_epoch_* columns
+        epochs_repeated_parent_epoch_start_t: NDArray = np.hstack([np.full((n_bins, ), filter_epochs_decoder_result.time_bin_containers[i].edge_info.variable_extents[0]) for i, n_bins in enumerate(filter_epochs_decoder_result.nbins)]) # np.shape(epochs_p_x_given_n) # (2, 19018)
+        epochs_repeated_parent_epoch_stop_t: NDArray = np.hstack([np.full((n_bins, ), filter_epochs_decoder_result.time_bin_containers[i].edge_info.variable_extents[-1]) for i, n_bins in enumerate(filter_epochs_decoder_result.nbins)]) # np.shape(epochs_p_x_given_n) # (2, 19018)
+
+        # a_masked_decoded_result.time_bin_containers[0].edge_info.variable_extents
 
         ## Non-masked
         epochs_p_x_given_n: NDArray = np.hstack([v['p_x_given_n'] for v in custom_curr_unit_marginal_list]) # np.shape(epochs_p_x_given_n) # (2, 19018)
@@ -1987,8 +1995,10 @@ class DirectionalPseudo2DDecodersResult(ComputedResult):
         assert np.shape(epochs_p_x_given_n)[-1] == np.shape(epochs_t_centers)[0]
 
         ## OUTPUTS: epochs_repeated_epoch_index, epochs_repeated_sub_epoch_time_bin_index, epochs_t_centers, epochs_p_x_given_n
+        # _common_epoch_df_dict = {'epoch_id': epochs_repeated_epoch_index, 'sub_epoch_time_bin_index': epochs_repeated_sub_epoch_time_bin_index}
         _common_epoch_df_dict = {'epoch_id': epochs_repeated_epoch_index, 'sub_epoch_time_bin_index': epochs_repeated_sub_epoch_time_bin_index}
-
+        _common_epoch_df_dict.update(**{'parent_epoch_id': epochs_repeated_epoch_index, 'parent_epoch_start_t': epochs_repeated_parent_epoch_start_t, 'parent_epoch_end_t': epochs_repeated_parent_epoch_stop_t})
+        
         assert np.shape(epochs_p_x_given_n)[0] == len(unique_decoder_names), f"unique_decoder_names: {unique_decoder_names} len(unique_decoder_names) != np.shape(epochs_p_x_given_n)[0]: {np.shape(epochs_p_x_given_n)[0]}"
 
         _marginal_prob_var_names = [f"P_{v.capitalize()}" for v in unique_decoder_names] # ['P_Long', 'P_Short']
