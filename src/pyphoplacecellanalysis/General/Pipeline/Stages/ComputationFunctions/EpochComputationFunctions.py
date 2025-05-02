@@ -1490,8 +1490,11 @@ class EpochComputationsComputationsContainer(ComputedResult):
                 
 
                 ## spruce up the `a_masked_posterior_df` with some extra fields
-                a_masked_posterior_df['delta_aligned_start_t'] = a_masked_posterior_df['t'] - t_delta ## subtract off t_delta    
-                a_masked_posterior_df = a_masked_posterior_df.across_session_identity.add_session_df_columns(session_name=session_name, time_bin_size=epochs_decoding_time_bin_size, curr_session_t_delta=t_delta, time_col='t')
+                # t_bin_col_name: str = 't'
+                # t_bin_col_name: str = 't_bin_center'
+                t_bin_col_name: str = TimeColumnAliasesProtocol.find_first_extant_suitable_columns_name(df=a_masked_posterior_df, col_connonical_name='t', required_columns_synonym_dict={'t':['t','t_bin_center']}, should_raise_exception_on_fail=True)
+                a_masked_posterior_df['delta_aligned_start_t'] = a_masked_posterior_df[t_bin_col_name] - t_delta ## subtract off t_delta    
+                a_masked_posterior_df = a_masked_posterior_df.across_session_identity.add_session_df_columns(session_name=session_name, time_bin_size=epochs_decoding_time_bin_size, curr_session_t_delta=t_delta, time_col=t_bin_col_name)
                 
                 ## OUPUTS: a_masked_decoded_result, a_masked_posterior_df
                 filter_epochs_to_decoded_dict[a_masked_decoded_epoch_context] = deepcopy(active_filter_epochs)

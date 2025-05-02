@@ -1232,7 +1232,7 @@ class DecodedFilterEpochsResult(HDF_SerializationMixin, AttrsBasedClassHelperMix
         
         History: Extracted from `pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions.DirectionalPseudo2DDecodersResult._build_multiple_per_time_bin_marginals` on 2024-10-09 
         
-        History #TODO 2025-05-02 18:53: - [ ] renamed ['parent_epoch_df_idx', ] to ['parent_epoch_df_idx', ]
+        History #TODO 2025-05-02 18:53: - [ ] renamed ['epoch_df_idx', ] to ['parent_epoch_df_idx', ]
         """
         parent_epoch_label_col_name: str = 'label' # column in `filter_epochs_df` that can be used to index into the epochs
         filter_epochs_df = deepcopy(self.filter_epochs)
