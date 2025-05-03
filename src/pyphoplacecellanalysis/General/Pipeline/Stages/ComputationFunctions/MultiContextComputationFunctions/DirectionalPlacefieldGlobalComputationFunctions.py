@@ -3944,7 +3944,7 @@ class CustomDecodeEpochsResult(UnpackableMixin):
         
 
     @classmethod
-    def build_single_measured_decoded_position_comparison(cls, a_decoder_decoding_result: DecodedFilterEpochsResult, global_measured_position_df: pd.DataFrame) -> MeasuredDecodedPositionComparison:
+    def build_single_measured_decoded_position_comparison(cls, a_decoder_decoding_result: DecodedFilterEpochsResult, global_measured_position_df: pd.DataFrame, should_drop_epochs_with_no_valid_timebins: bool = True) -> MeasuredDecodedPositionComparison:
         """ compare the decoded most-likely-positions and the measured positions interpolated to the same time bins.
         
         """
@@ -3967,16 +3967,48 @@ class CustomDecodeEpochsResult(UnpackableMixin):
                 assert np.ndim(decoded_positions) < 2, f" the new decoded positions should now be 1D but instead: np.ndim(decoded_positions): {np.ndim(decoded_positions)}, and np.shape(decoded_positions): {np.shape(decoded_positions)}"
             assert len(a_sample_times) == len(decoded_positions), f"len(a_sample_times): {len(a_sample_times)} == len(decoded_positions): {len(decoded_positions)}"
             
+
+            interpolated_measured_x = interpolated_measured_df['x'].to_numpy()
+
+            timebin_is_valid_for_both: NDArray = np.logical_and(np.isfinite(decoded_positions), np.isfinite(interpolated_measured_x)) # bool array of valid indicies for both
+            num_valid_timebins = np.sum(timebin_is_valid_for_both)
+            
+            a_valid_sample_times = a_sample_times[timebin_is_valid_for_both]
+            a_valid_decoded_positions = decoded_positions[timebin_is_valid_for_both]
+            a_valid_interpolated_measured_x = interpolated_measured_x[timebin_is_valid_for_both]
+            assert len(a_valid_sample_times) == len(a_valid_decoded_positions), f"len(a_valid_sample_times): {len(a_valid_sample_times)} == len(a_valid_decoded_positions): {len(a_valid_decoded_positions)}"
+            
+
             ## one for each decoder:
-            test_decoded_positions_df = pd.DataFrame({'t':a_sample_times, 'x':decoded_positions})
+            # test_decoded_positions_df = pd.DataFrame({'t':a_sample_times, 'x':decoded_positions, 'is_timebin_valid_for_both': timebin_is_valid_for_both})
+
+            ## only get valid bins: do we need all bins?
+            test_decoded_positions_df = pd.DataFrame({'t':a_valid_sample_times, 'x':a_valid_decoded_positions})
             center_epoch_time = np.mean(a_sample_times)
 
             decoded_positions_df_list.append(test_decoded_positions_df)
             # compute the diff error:
             # mean_squared_error(y_true, y_pred)
-            # test_decoded_measured_diff_df = (interpolated_measured_df[['x']] - pd.DataFrame({'x':v.most_likely_positions_list[epoch_idx]})) ## error at each point
-            test_decoded_measured_diff: float = mean_squared_error(interpolated_measured_df['x'].to_numpy(), decoded_positions) # single float error
-            test_decoded_measured_diff_cm: float = np.sqrt(test_decoded_measured_diff)
+            
+
+            if (num_valid_timebins == 0):
+                print(f'WARN: encountered epoch[{epoch_idx}] with no valid timebins.')
+                if not should_drop_epochs_with_no_valid_timebins:
+                    print(f'\tskipping because `should_drop_epochs_with_no_valid_timebins = True`. Output will have diff number of epochs than input!')
+                    pass
+                else:
+                    print(f'\tfilling with NaN and continuing.')
+                    ## have to fill with something!
+                    test_decoded_measured_diff: float = np.nan
+                    test_decoded_measured_diff_cm: float = np.nan
+                    
+            else:
+                ## has some timebins that are valid:
+
+                # test_decoded_measured_diff_df = (interpolated_measured_df[['x']] - pd.DataFrame({'x':v.most_likely_positions_list[epoch_idx]})) ## error at each point
+                # test_decoded_measured_diff: float = mean_squared_error(interpolated_measured_df['x'].to_numpy(), decoded_positions) # single float error
+                test_decoded_measured_diff: float = mean_squared_error(a_valid_interpolated_measured_x, a_valid_decoded_positions) # single float error
+                test_decoded_measured_diff_cm: float = np.sqrt(test_decoded_measured_diff)
 
             decoded_measured_diff_df.append((center_epoch_time, test_decoded_measured_diff, test_decoded_measured_diff_cm))
 
