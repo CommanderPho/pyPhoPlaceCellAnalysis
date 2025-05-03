@@ -5935,10 +5935,6 @@ def _subfn_compute_complete_df_metrics(directional_merged_decoders_result: "Dire
 
 
 
-
-
-
-
 #TODO 2024-07-03 17:17: - [ ] NOT YET FINISHED
 @function_attributes(short_name=None, tags=['NOT_YET_FINISHED'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-07-03 17:18', related_items=[])
 def _compute_arbitrary_epochs_all_df_score_metrics(directional_merged_decoders_result: "DirectionalPseudo2DDecodersResult", track_templates, new_epochs_decoder_result_dict: Dict[str, Optional[DecodedFilterEpochsResult]],
@@ -6039,11 +6035,6 @@ def _compute_arbitrary_epochs_all_df_score_metrics(directional_merged_decoders_r
     raw_dict_outputs_tuple = (decoder_ripple_radon_transform_df_dict, decoder_ripple_radon_transform_extras_dict, decoder_ripple_weighted_corr_df_dict)
     merged_df_outputs_tuple = (ripple_radon_transform_merged_df, ripple_weighted_corr_merged_df, ripple_simple_pf_pearson_merged_df)
     return (new_epochs_decoder_result_dict, new_epochs_decoder_result_dict), merged_df_outputs_tuple, raw_dict_outputs_tuple
-
-
-
-
-
 
 
 
@@ -6217,6 +6208,54 @@ def _perform_compute_custom_epoch_decoding(curr_active_pipeline, directional_mer
         # decoder_laps_radon_transform_df_dict ## ~4m
         ## OUTPUTS: decoder_laps_filter_epochs_decoder_result_dict, decoder_ripple_filter_epochs_decoder_result_dict, decoder_laps_filter_epochs_decoder_result_dict, decoder_laps_radon_transform_df_dict, decoder_ripple_radon_transform_df_dict
         return decoder_laps_filter_epochs_decoder_result_dict, decoder_ripple_filter_epochs_decoder_result_dict
+
+
+@function_attributes(short_name=None, tags=['add_position_columns', 'decoded_df'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-05-03 17:14', related_items=[])
+def _helper_add_interpolated_position_columns_to_decoded_result_df(a_result: DecodedFilterEpochsResult, a_decoder: BasePositionDecoder, a_decoded_marginal_posterior_df: pd.DataFrame, global_measured_position_df: pd.DataFrame):
+    """ adds the measured positions as columns in the decoded epochs/epoch_time_bins df
+    
+    
+        from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import _helper_add_interpolated_position_columns_to_decoded_result_df
+
+        ## INPUTS: curr_active_pipeline, a_result, a_decoder, a_decoded_marginal_posterior_df
+
+        global_measured_position_df: pd.DataFrame = deepcopy(curr_active_pipeline.sess.position.to_dataframe())
+        
+        a_decoded_marginal_posterior_df: pd.DataFrame = _helper_add_interpolated_position_columns_to_decoded_result_df(a_result=a_result, a_decoder=a_decoder, a_decoded_marginal_posterior_df=a_decoded_marginal_posterior_df, global_measured_position_df=global_measured_position_df)
+    
+    """
+    from neuropy.utils.indexing_helpers import PandasHelpers
+
+    ## add in measured position columns
+    global_measured_position_df: pd.DataFrame = deepcopy(global_measured_position_df) # computation_result.sess.position.to_dataframe()
+    global_all_directional_decoder_result: CustomDecodeEpochsResult = CustomDecodeEpochsResult.init_from_single_decoder_decoding_result_and_measured_pos_df(a_result, global_measured_position_df=global_measured_position_df)
+
+    xbin_edges = deepcopy(a_decoder.xbin)
+    # ybin_edges = deepcopy(a_decoder.ybin)
+    # xbin_edges = None
+    ybin_edges = None
+    active_computation_config = deepcopy(a_decoder.pf.config)
+    # grid_bin_bounds = deepcopy(a_decoder.pf.config.grid_bin_bounds)
+
+    measured_positions_df: pd.DataFrame = deepcopy(global_all_directional_decoder_result.measured_decoded_position_comparion.measured_positions_dfs_list[0])
+    measured_positions_df = measured_positions_df.position.adding_binned_position_columns(xbin_edges=xbin_edges, ybin_edges=ybin_edges, active_computation_config=active_computation_config)
+    measured_positions_df = measured_positions_df.rename(columns={'x':'x_meas', 'y':'y_meas', 'binned_x':'binned_x_meas', 'binned_y':'binned_y_meas'}, inplace=False).drop(columns=['t'], inplace=False) ## measured
+
+    decoded_positions_df: pd.DataFrame = deepcopy(global_all_directional_decoder_result.measured_decoded_position_comparion.decoded_positions_df_list[0])
+    decoded_positions_df = decoded_positions_df.position.adding_binned_position_columns(xbin_edges=xbin_edges, ybin_edges=ybin_edges, active_computation_config=active_computation_config)
+    decoded_positions_df = decoded_positions_df.rename(columns={'x':'x_decoded_most_likely', 'binned_x':'binned_x_decoded_most_likely'}, inplace=False).drop(columns=['t'], inplace=False) ## decoded most likely
+
+    ## OUTPUTS: measured_positions_df, decoded_positions_df
+
+    ## Add directly to `a_decoded_marginal_posterior_df` (concatenating columns to existing rows)
+    a_decoded_marginal_posterior_df = PandasHelpers.adding_additional_df_columns(original_df=a_decoded_marginal_posterior_df,
+                                                                                additional_cols_df=measured_positions_df,
+                                                                                )
+
+    a_decoded_marginal_posterior_df = PandasHelpers.adding_additional_df_columns(original_df=a_decoded_marginal_posterior_df,
+                                                                                additional_cols_df=decoded_positions_df,
+                                                                                )
+    return a_decoded_marginal_posterior_df
 
 
 

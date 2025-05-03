@@ -1993,6 +1993,88 @@ class EpochComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Computati
 
 
 
+@function_attributes(short_name=None, tags=['figure', 'matplotlib', 'confidence', 'position', 'laps'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-05-03 15:44', related_items=[])
+def _perform_plot_overlayed_context_active_region_glows(df: pd.DataFrame, ax, extreme_threshold: float=0.9, opacity_max:float=0.7, thickness_ramping_multiplier:float=35.0, a_var_name_to_color_map = {'P_Long': 'red', 'P_Short': 'blue'}):
+    """ plots only the extremely confident context periods on the position trajectory over time (red when sure it's Long, blue when sure it's Short)
+    
+    -  I have a line that's already plotted on a matplotlib axes based on two df columns: ['t', 'x_meas']. I want to draw a "glow" effect over it using the two new df columns (P_Long_Score, P_Long_Opacity) the follows the line perfectly and only draws when the threshold is exceeded. Higher P_Long values should be bolder, meaning more thick or more opaque
+    - determine render thickness and opacity by how much greater ['P_Long'] is than the threshold value (0.8)
+
+    Usage:
+        from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.EpochComputationFunctions import _perform_plot_overlayed_context_active_region_glows
+        
+        ## INPUTS: a_decoded_marginal_posterior_df
+
+        ## plot the basic lap-positions (measured) over time figure:
+        _out = dict()
+        _out['_display_grid_bin_bounds_validation'] = curr_active_pipeline.display(display_function='_display_grid_bin_bounds_validation', active_session_configuration_context=None, include_includelist=[], save_figure=False) # _display_grid_bin_bounds_validation
+        fig = _out['_display_grid_bin_bounds_validation'].figures[0]
+        out_axes_list =_out['_display_grid_bin_bounds_validation'].axes
+        out_plot_data =_out['_display_grid_bin_bounds_validation'].plot_data
+
+        ## get the lines2D object to turn off the default position lines:
+        position_lines_2D = out_plot_data['position_lines_2D']
+        ## hide all inactive lines:
+        for a_line in position_lines_2D:
+            a_line.set_visible(False)
+            
+
+        an_pos_line_artist, df_viz = _perform_plot_overlayed_context_active_region_glows(df=deepcopy(a_decoded_marginal_posterior_df), ax=out_axes_list[0], extreme_threshold=0.7) # , thickness_ramping_multiplier=5
+        df_viz
+
+        _out
+
+
+    """
+    from matplotlib.collections import LineCollection
+    from matplotlib.colors import to_rgba
+
+    ## determine render thickness and opacity by how much greater ['P_Long'] is than the threshold value (0.8)
+    ## INPUTS: a_decoded_marginal_posterior_df
+
+    ## add plotting utility columns:
+    df_viz: pd.DataFrame = deepcopy(df)
+
+    for a_var_name in a_var_name_to_color_map:
+        df_viz[f'{a_var_name}_Score'] = df_viz[a_var_name].apply(lambda p: max(0.0, (p - extreme_threshold) * thickness_ramping_multiplier)) ## How the THICKNESS of the overlay line ramps with value
+        df_viz[f'{a_var_name}_Opacity'] = df_viz[a_var_name].apply(lambda p: 0.0 if p < extreme_threshold else min(opacity_max, (p - extreme_threshold) * 20)) ## OPACITY of the line ramps with value
+
+    for a_var_name, a_colors in a_var_name_to_color_map.items():
+        # Extract full segments before masking
+        points = np.array([df_viz['t'].values, df_viz['x_meas'].values]).T
+        segments = np.stack([points[:-1], points[1:]], axis=1)
+
+        # Compute attributes for each segment (use start of segment)
+        prob_var_values = df_viz[f'{a_var_name}'].values
+        mask = (prob_var_values[:-1] > extreme_threshold) & (prob_var_values[1:] > extreme_threshold) ## if the values don't exceed the `extreme_threshold`, they aren't drawn (nothing is drawn there)
+
+        linewidths = df_viz[f'{a_var_name}_Score'].values[:-1][mask]
+        alphas = df_viz[f'{a_var_name}_Opacity'].values[:-1][mask]
+
+        ## build the appropriate colors
+        # inside loop
+        base_rgba = np.array(to_rgba(a_colors))  # converts color name to RGBA
+        base_rgba = base_rgba[:3]  # strip alpha, we'll set it per-segment
+        colors = np.tile(base_rgba, (len(alphas), 1))
+        colors = np.hstack([colors, alphas[:, None]])  # append alphas column-wise
+
+        # Apply mask to segments
+        segments = segments[mask]
+
+        lc = LineCollection(segments, linewidths=linewidths, colors=colors)
+        ax.add_collection(lc)
+
+
+    ## draw a constant-thickness solid black lines for position - do only once, post-hoc:
+    pos_line_artist = ax.plot(df_viz['t'].values,
+            df_viz['x_meas'].values,
+            color='black', linewidth=1, zorder=10)
+
+    return pos_line_artist, df_viz
+
+
+
+
 # ==================================================================================================================== #
 # Display Functions/Plotting                                                                                           #
 # ==================================================================================================================== #
@@ -2236,6 +2318,179 @@ class EpochComputationDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Di
                     # text_formatter.setup_margins(fig, left_margin=0.01, top_margin=0.9)
                     text_formatter.setup_margins(fig)
                     title_string: str = f"generalized_decoded_yellow_blue_marginal_epochs"
+                    # session_footer_string: str =  active_context.get_description(subset_includelist=['format_name', 'animal', 'exper_name', 'session_name'], separator=' | ') 
+                    session_footer_string: str =  active_context.get_description(separator=' | ') 
+
+                    # subtitle_string = '\n'.join([f'{active_config.str_for_display(is_2D)}'])
+                    # header_text_obj = flexitext(text_formatter.left_margin, 0.9, f'<size:22><weight:bold>{title_string}</></>\n<size:10>{subtitle_string}</>', va="bottom", xycoords="figure fraction") # , wrap=False
+                    header_text_obj = flexitext(0.01, 0.85, f'<size:20><weight:bold>{title_string}</></>\n<size:9>{subtitle_string}</>', va="bottom", xycoords="figure fraction") # , wrap=False
+                    footer_text_obj = text_formatter.add_flexitext_context_footer(active_context=active_context) # flexitext((text_formatter.left_margin*0.1), (text_formatter.bottom_margin*0.25), text_formatter._build_footer_string(active_context=active_context), va="top", xycoords="figure fraction")
+                    
+                    window_title_string: str = f"{title_string} - {session_footer_string}"
+                    fig.canvas.manager.set_window_title(window_title_string) # sets the window's title
+                    if ((_perform_write_to_file_callback is not None) and (display_context is not None)):
+                        _perform_write_to_file_callback(display_context, fig)
+
+                    graphics_output_dict['label_objects'] = {'header': header_text_obj, 'footer': footer_text_obj, 'formatter': text_formatter}
+            ## END with mpl.rc_context({'figure.dpi': '...
+
+
+            graphics_output_dict['collector'] = collector
+
+            return graphics_output_dict
+
+
+
+
+    @function_attributes(short_name='context_marginal_overlaying_measured_position', tags=['context-decoder-comparison', 'decoded_position', 'directional'], conforms_to=['output_registering', 'figure_saving'], input_requires=[], output_provides=[], requires_global_keys=["global_computation_results.computed_data['EpochComputations']"], uses=['_perform_plot_overlayed_context_active_region_glows', '_helper_add_interpolated_position_columns_to_decoded_result_df', '_display_grid_bin_bounds_validation', 'FigureCollector'], used_by=[], creation_date='2025-05-03 00:00', related_items=[], is_global=True)
+    def _display_decoded_context_marginal_overlaying_measured_position(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, save_figure=True,
+                                                    size=(35, 3), dpi=100, constrained_layout=True, override_fig_man: Optional[FileOutputManager]=None, extreme_threshold: float=0.8, opacity_max:float=0.7, thickness_ramping_multiplier:float=35.0, a_var_name_to_color_map = {'P_Long': 'red', 'P_Short': 'blue'}, **kwargs):
+            """ Displays one figure containing the track_ID marginal, decoded continuously over the entire recording session along with the animal's position.
+            
+            
+            Based off of ``
+            
+            Usage:
+                # getting `_display_generalized_decoded_yellow_blue_marginal_epochs` into shape
+                curr_active_pipeline.reload_default_display_functions()
+
+
+                _out = dict()
+                _out['context_marginal_overlaying_measured_position'] = curr_active_pipeline.display(display_function='context_marginal_overlaying_measured_position', active_session_configuration_context=None) # _display_directional_track_template_pf1Ds
+
+
+            """
+            from neuropy.utils.result_context import IdentifyingContext
+            from neuropy.utils.mixins.time_slicing import TimeColumnAliasesProtocol
+            # from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError import plot_decoded_epoch_slices
+            from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError import plot_1D_most_likely_position_comparsions
+            from neuropy.utils.matplotlib_helpers import get_heatmap_cmap
+            from pyphoplacecellanalysis.General.Model.Configs.LongShortDisplayConfig import PlottingHelpers
+            from pyphoplacecellanalysis.General.Mixins.ExportHelpers import FileOutputManager, FigureOutputLocation, ContextToPathMode	
+            
+
+            import matplotlib as mpl
+            import matplotlib.pyplot as plt
+            from flexitext import flexitext ## flexitext for formatted matplotlib text
+
+            from pyphocorehelpers.DataStructure.RenderPlots.MatplotLibRenderPlots import FigureCollector
+            from neuropy.utils.matplotlib_helpers import FormattedFigureText
+
+            from neuropy.utils.result_context import IdentifyingContext
+            from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import _helper_add_interpolated_position_columns_to_decoded_result_df
+
+            ## Unpack from pipeline:
+            valid_EpochComputations_result: EpochComputationsComputationsContainer = owning_pipeline_reference.global_computation_results.computed_data['EpochComputations'] # owning_pipeline_reference.global_computation_results.computed_data['EpochComputations']
+            assert valid_EpochComputations_result is not None
+            epochs_decoding_time_bin_size: float = valid_EpochComputations_result.epochs_decoding_time_bin_size ## just get the standard size. Currently assuming all things are the same size!
+            print(f'\tepochs_decoding_time_bin_size: {epochs_decoding_time_bin_size}')
+            assert epochs_decoding_time_bin_size == valid_EpochComputations_result.epochs_decoding_time_bin_size, f"\tERROR: nonPBE_results.epochs_decoding_time_bin_size: {valid_EpochComputations_result.epochs_decoding_time_bin_size} != epochs_decoding_time_bin_size: {epochs_decoding_time_bin_size}"
+            a_new_fully_generic_result: GenericDecoderDictDecodedEpochsDictResult = valid_EpochComputations_result.a_generic_decoder_dict_decoded_epochs_dict_result ## get existing
+
+            ## INPUTS: a_new_fully_generic_result
+            # a_target_context: IdentifyingContext = IdentifyingContext(trained_compute_epochs='laps', pfND_ndim=1, decoder_identifier='pseudo2D', known_named_decoding_epochs_type='global', masked_time_bin_fill_type='nan_filled', data_grain='per_time_bin')
+            a_target_context: IdentifyingContext = IdentifyingContext(trained_compute_epochs='laps', pfND_ndim=1, decoder_identifier='pseudo2D', known_named_decoding_epochs_type='global', masked_time_bin_fill_type='ignore', data_grain='per_time_bin')
+            best_matching_context, a_result, a_decoder, a_decoded_marginal_posterior_df = a_new_fully_generic_result.get_results_best_matching_context(context_query=a_target_context, debug_print=False)
+            epochs_decoding_time_bin_size = best_matching_context.get('time_bin_size', None)
+            assert epochs_decoding_time_bin_size is not None
+
+            ## OUTPUTS: a_decoded_marginal_posterior_df
+
+            complete_session_context, (session_context, additional_session_context) = owning_pipeline_reference.get_complete_session_context()
+
+            active_context = kwargs.pop('active_context', None)
+            if active_context is not None:
+                # Update the existing context:
+                display_context = active_context.adding_context('display_fn', display_fn_name='context_marginal_overlaying_measured_position')
+            else:
+                active_context = owning_pipeline_reference.sess.get_context()
+                # Build the active context directly:
+                display_context = owning_pipeline_reference.build_display_context_for_session('context_marginal_overlaying_measured_position')
+
+            fignum = kwargs.pop('fignum', None)
+            if fignum is not None:
+                print(f'WARNING: fignum will be ignored but it was specified as fignum="{fignum}"!')
+
+            # defer_render = kwargs.pop('defer_render', False)
+            # debug_print: bool = kwargs.pop('debug_print', False)
+            # active_config_name: bool = kwargs.pop('active_config_name', None)
+
+            # perform_write_to_file_callback = kwargs.pop('perform_write_to_file_callback', (lambda final_context, fig: owning_pipeline_reference.output_figure(final_context, fig)))
+
+            # long_epoch_name, short_epoch_name, global_epoch_name = owning_pipeline_reference.find_LongShortGlobal_epoch_names()
+            # long_epoch_context, short_epoch_context, global_epoch_context = [curr_active_pipeline.filtered_contexts[a_name] for a_name in (long_epoch_name, short_epoch_name, global_epoch_name)]
+            # long_session, short_session, global_session = [owning_pipeline_reference.filtered_sessions[an_epoch_name] for an_epoch_name in [long_epoch_name, short_epoch_name, global_epoch_name]]
+
+            global_measured_position_df: pd.DataFrame = deepcopy(owning_pipeline_reference.sess.position.to_dataframe())
+            a_decoded_marginal_posterior_df: pd.DataFrame = _helper_add_interpolated_position_columns_to_decoded_result_df(a_result=a_result, a_decoder=a_decoder, a_decoded_marginal_posterior_df=a_decoded_marginal_posterior_df, global_measured_position_df=global_measured_position_df)
+
+
+            # ==================================================================================================================================================================================================================================================================================== #
+            # Start Building Figure                                                                                                                                                                                                                                                                #
+            # ==================================================================================================================================================================================================================================================================================== #
+
+            graphics_output_dict = {}
+
+            active_context = kwargs.pop('active_context', owning_pipeline_reference.sess.get_context())
+            if active_context is not None:
+                    display_context = active_context.adding_context('display_fn', display_fn_name='context_marginal_overlaying_measured_position')
+
+            if override_fig_man is not None:
+                print(f'override_fig_man is not None! Custom output path will be used!')
+                test_display_output_path = override_fig_man.get_figure_save_file_path(display_context, make_folder_if_needed=False)
+                print(f'\ttest_display_output_path: "{test_display_output_path}"')
+    
+
+            def _perform_write_to_file_callback(final_context, fig):
+                """ captures: override_fig_man """
+                if save_figure:
+                    return owning_pipeline_reference.output_figure(final_context, fig, override_fig_man=override_fig_man)
+                else:
+                    pass # do nothing, don't save
+                
+
+            with mpl.rc_context({'figure.dpi': str(dpi), 'savefig.transparent': True, 'ps.fonttype': 42, 'figure.constrained_layout.use': (constrained_layout or False), 'figure.frameon': False, 'figure.figsize': size, }): # 'figure.figsize': (12.4, 4.8), 
+                # Create a FigureCollector instance
+                with FigureCollector(name='context_marginal_overlaying_measured_position', base_context=display_context) as collector:
+                    # from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import _perform_plot_overlayed_context_active_region_glows
+
+                    ## INPUTS: a_decoded_marginal_posterior_df
+
+                    ## plot the basic lap-positions (measured) over time figure:
+                    graphics_output_dict = owning_pipeline_reference.display(display_function='_display_grid_bin_bounds_validation', active_session_configuration_context=None, include_includelist=[], save_figure=False) # _display_grid_bin_bounds_validation
+                    fig = graphics_output_dict.figures[0]
+                    out_axes_list =graphics_output_dict.axes
+                    out_plot_data = graphics_output_dict.plot_data
+
+                    ## get the lines2D object to turn off the default position lines:
+                    position_lines_2D = out_plot_data['position_lines_2D']
+                    ## hide all inactive lines:
+                    for a_line in position_lines_2D:
+                        a_line.set_visible(False)
+                        
+                    an_pos_line_artist, df_viz = _perform_plot_overlayed_context_active_region_glows(df=deepcopy(a_decoded_marginal_posterior_df), ax=out_axes_list[0],
+                                                                                                     extreme_threshold=extreme_threshold, opacity_max=opacity_max, thickness_ramping_multiplier=thickness_ramping_multiplier, a_var_name_to_color_map = a_var_name_to_color_map) # , thickness_ramping_multiplier=5
+
+                    collector.post_hoc_append(figs=graphics_output_dict.figures, axes=out_axes_list, contexts=[display_context])
+
+
+                    # ==================================================================================================================================================================================================================================================================================== #
+                    # Titles/Formatting/Marginas and Saving                                                                                                                                                                                                                                                #
+                    # ==================================================================================================================================================================================================================================================================================== #
+                    active_config = deepcopy(a_decoder.pf.config)
+
+                    subtitle_string = active_config.str_for_display(is_2D=False) # , normal_to_extras_line_sep=","
+                    # print(f'subtitle_string: {subtitle_string}')
+
+                    ## BUild figure titles:
+                    # INPUTS: main_fig
+                    fig.suptitle('')
+                    # text_formatter = FormattedFigureText() # .init_from_margins(left_margin=0.01)
+                    # text_formatter.setup_margins(fig, left_margin=0.01) # , left_margin=0.1
+                    text_formatter = FormattedFigureText.init_from_margins(left_margin=0.01, right_margin=0.99) # , top_margin=0.9
+                    # text_formatter.setup_margins(fig, left_margin=0.01, top_margin=0.9)
+                    text_formatter.setup_margins(fig)
+                    title_string: str = f"context_marginal_overlaying_measured_position"
                     # session_footer_string: str =  active_context.get_description(subset_includelist=['format_name', 'animal', 'exper_name', 'session_name'], separator=' | ') 
                     session_footer_string: str =  active_context.get_description(separator=' | ') 
 
