@@ -35,7 +35,7 @@ class MultiContextComparingDisplayFunctions(AllFunctionEnumeratingMixin, metacla
 	Must have a signature of: (owning_pipeline_reference, global_computation_results, computation_results, active_configs, ..., **kwargs) at a minimum
 	"""
 
-	@function_attributes(short_name='grid_bin_bounds_validation', tags=['grid_bin_bounds','validation','pandas','1D','position'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-06-14 18:17', related_items=[], is_global=True)
+	@function_attributes(short_name='grid_bin_bounds_validation', tags=['grid_bin_bounds','validation','pandas','1D','position', 'LONG_SHORT_SPECIFIC'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-06-14 18:17', related_items=[], is_global=True)
 	def _display_grid_bin_bounds_validation(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, defer_render=False, save_figure=True, is_x_axis: bool = True, **kwargs):
 		""" Renders a single figure that shows the 1D linearized position from several different sources to ensure sufficient overlap. Useful for validating that the grid_bin_bounds are chosen reasonably.
 
@@ -50,11 +50,36 @@ class MultiContextComparingDisplayFunctions(AllFunctionEnumeratingMixin, metacla
 		long_epoch_context, short_epoch_context, global_epoch_context = [owning_pipeline_reference.filtered_contexts[a_name] for a_name in (long_epoch_name, short_epoch_name, global_epoch_name)]
 		long_session, short_session, global_session = [owning_pipeline_reference.filtered_sessions[an_epoch_name] for an_epoch_name in [long_epoch_name, short_epoch_name, global_epoch_name]]
 		
-		long_pos_df, short_pos_df, global_pos_df, all_pos_df = [a_sess.position.to_dataframe() for a_sess in (long_session, short_session, global_session, owning_pipeline_reference.sess)]
+		long_pos_df, short_pos_df, global_pos_df, all_pos_df = [a_sess.position.to_dataframe() for a_sess in (long_session, short_session, global_session, owning_pipeline_reference.sess)] ## note I add `, owning_pipeline_reference.sess` at the end
+	
 		combined_pos_df = deepcopy(all_pos_df)
-		combined_pos_df.loc[long_pos_df.index, 'long_lin_pos'] = long_pos_df.lin_pos
-		combined_pos_df.loc[short_pos_df.index, 'short_pos_df'] = short_pos_df.lin_pos
-		combined_pos_df.loc[global_pos_df.index, 'global_lin_pos'] = global_pos_df.lin_pos
+		
+		if include_includelist is None:
+			# include_includelist = owning_pipeline_reference.active_completed_computation_result_names
+			include_includelist = ['long', 'short', 'global']
+			
+
+		if is_x_axis:
+			## plot x-positions
+			pos_var_names = ['x', 'lin_pos'] # , 'long_lin_pos', 'short_pos_df', 'global_lin_pos'
+			
+			if 'long' in include_includelist:
+				combined_pos_df.loc[long_pos_df.index, 'long_lin_pos'] = long_pos_df.lin_pos
+				pos_var_names.append('long_lin_pos')
+			if 'short' in include_includelist:
+				combined_pos_df.loc[short_pos_df.index, 'short_pos_df'] = short_pos_df.lin_pos
+				pos_var_names.append('short_pos_df')
+			if 'global' in include_includelist:
+				combined_pos_df.loc[global_pos_df.index, 'global_lin_pos'] = global_pos_df.lin_pos
+				pos_var_names.append('global_lin_pos')
+
+			combined_pos_df_plot_kwargs = dict(x='t', y=pos_var_names, title='grid_bin_bounds validation across epochs - positions along x-axis')
+		else:
+			## plot y-positions
+			pos_var_names = ['y']
+			# combined_pos_df_plot_kwargs = dict(x='y', y='t', title='grid_bin_bounds validation across epochs - positions along y-axis')
+			combined_pos_df_plot_kwargs = dict(x='t', y=pos_var_names, title='grid_bin_bounds validation across epochs - positions along y-axis')
+
 
 		title = f'grid_bin_bounds validation across epochs'
 		if is_x_axis:
@@ -64,16 +89,6 @@ class MultiContextComparingDisplayFunctions(AllFunctionEnumeratingMixin, metacla
 			
 		const_line_text_label_y_offset: float = 0.05
 		const_line_text_label_x_offset: float = 0.1
-		
-		if is_x_axis:
-			## plot x-positions
-			pos_var_names = ['x', 'lin_pos', 'long_lin_pos', 'short_pos_df', 'global_lin_pos']
-			combined_pos_df_plot_kwargs = dict(x='t', y=pos_var_names, title='grid_bin_bounds validation across epochs - positions along x-axis')
-		else:
-			## plot y-positions
-			pos_var_names = ['y']
-			# combined_pos_df_plot_kwargs = dict(x='y', y='t', title='grid_bin_bounds validation across epochs - positions along y-axis')
-			combined_pos_df_plot_kwargs = dict(x='t', y=pos_var_names, title='grid_bin_bounds validation across epochs - positions along y-axis')
 			
 		# Plot all 1D position variables:
 		combined_pos_df.plot(**combined_pos_df_plot_kwargs)
@@ -82,6 +97,9 @@ class MultiContextComparingDisplayFunctions(AllFunctionEnumeratingMixin, metacla
 		ax.set_title(title)
 		fig.canvas.manager.set_window_title(title)
 		
+		# Accessing the lines after plotting
+		position_lines_2D = ax.get_lines() # plt.Lines2D
+
 		ax.legend(loc='upper left') # Move legend inside the plot, in the top-left corner
 		# ax.legend(loc='upper left', bbox_to_anchor=(1, 1)) # Move legend outside the plot
 		
@@ -161,7 +179,7 @@ class MultiContextComparingDisplayFunctions(AllFunctionEnumeratingMixin, metacla
 		else:
 			saved_figure_paths = []
 
-		graphics_output_dict = MatplotlibRenderPlots(name='_display_grid_bin_bounds_validation', figures=(fig,), axes=(ax,), plot_data={'midpoint_line_collection': midpoint_line_collection, 'grid_bin_bounds_line_collection': grid_bin_bounds_line_collection, 'long_track_line_collection': long_track_line_collection, 'short_track_line_collection': short_track_line_collection}, context=final_context, saved_figures=[])
+		graphics_output_dict = MatplotlibRenderPlots(name='_display_grid_bin_bounds_validation', figures=(fig,), axes=(ax,), plot_data={'position_lines_2D': position_lines_2D, 'midpoint_line_collection': midpoint_line_collection, 'grid_bin_bounds_line_collection': grid_bin_bounds_line_collection, 'long_track_line_collection': long_track_line_collection, 'short_track_line_collection': short_track_line_collection}, context=final_context, saved_figures=[])
 		return graphics_output_dict
  
 
