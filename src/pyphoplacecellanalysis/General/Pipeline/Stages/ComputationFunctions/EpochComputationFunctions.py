@@ -49,6 +49,7 @@ from neuropy.utils.indexing_helpers import PandasHelpers
 from neuropy.core.epoch import EpochsAccessor, Epoch, ensure_dataframe
 from neuropy.core.position import Position
 from neuropy.utils.mixins.AttrsClassHelpers import AttrsBasedClassHelperMixin, SimpleFieldSizesReprMixin
+from neuropy.core.epoch import Epoch, TimeColumnAliasesProtocol, subdivide_epochs, ensure_dataframe, ensure_Epoch
 
 # import portion as P # Required for interval search: portion~=2.3.0
 from pyphocorehelpers.indexing_helpers import partition_df_dict, partition_df
@@ -1450,6 +1451,7 @@ class EpochComputationsComputationsContainer(ComputedResult):
         from pyphocorehelpers.assertion_helpers import Assert
         from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import DirectionalDecodersContinuouslyDecodedResult, DecodedFilterEpochsResult, DirectionalPseudo2DDecodersResult
         from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import SingleEpochDecodedResult, MaskedTimeBinFillType
+        from neuropy.core.epoch import Epoch, TimeColumnAliasesProtocol, subdivide_epochs, ensure_dataframe, ensure_Epoch
 
         assert epochs_decoding_time_bin_size is not None, f"epochs_decoding_time_bin_size: {epochs_decoding_time_bin_size}"
 
@@ -2029,7 +2031,7 @@ def _perform_plot_overlayed_context_active_region_glows(df: pd.DataFrame, ax, ex
     from matplotlib.collections import LineCollection
     from matplotlib.colors import to_rgba
     from matplotlib.lines import Line2D
-
+    from neuropy.core.epoch import Epoch, TimeColumnAliasesProtocol, subdivide_epochs, ensure_dataframe, ensure_Epoch
     ## determine render thickness and opacity by how much greater ['P_Long'] is than the threshold value (0.8)
     ## INPUTS: a_decoded_marginal_posterior_df
 
@@ -2040,9 +2042,12 @@ def _perform_plot_overlayed_context_active_region_glows(df: pd.DataFrame, ax, ex
         df_viz[f'{a_var_name}_Score'] = df_viz[a_var_name].apply(lambda p: max(0.0, (p - extreme_threshold) * thickness_ramping_multiplier)) ## How the THICKNESS of the overlay line ramps with value
         df_viz[f'{a_var_name}_Opacity'] = df_viz[a_var_name].apply(lambda p: 0.0 if p < extreme_threshold else min(opacity_max, (p - extreme_threshold) * 20)) ## OPACITY of the line ramps with value
 
+
+    t_bin_col_name: str = TimeColumnAliasesProtocol.find_first_extant_suitable_columns_name(df=df_viz, col_connonical_name='t', required_columns_synonym_dict={'t':['t','t_bin_center']}, should_raise_exception_on_fail=True)
+
     for a_var_name, a_colors in a_var_name_to_color_map.items():
         # Extract full segments before masking
-        points = np.array([df_viz['t'].values, df_viz['x_meas'].values]).T
+        points = np.array([df_viz[t_bin_col_name].values, df_viz['x_meas'].values]).T
         segments = np.stack([points[:-1], points[1:]], axis=1)
 
         # Compute attributes for each segment (use start of segment)
@@ -2067,7 +2072,7 @@ def _perform_plot_overlayed_context_active_region_glows(df: pd.DataFrame, ax, ex
 
 
     ## draw a constant-thickness solid black lines for position - do only once, post-hoc:
-    pos_line_artist = ax.plot(df_viz['t'].values,
+    pos_line_artist = ax.plot(df_viz[t_bin_col_name].values,
             df_viz['x_meas'].values,
             color='black', linewidth=1, zorder=10)
 
