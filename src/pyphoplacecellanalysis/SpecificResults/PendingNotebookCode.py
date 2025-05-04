@@ -3947,8 +3947,11 @@ def _plot_heuristic_evaluation_epochs(curr_active_pipeline, track_templates, fil
     active_cmap = FixedCustomColormaps.get_custom_greyscale_with_low_values_dropped_cmap(low_value_cutoff=0.05, full_opacity_threshold=0.4)
 
     ## filter by 'is_valid_epoch' first:
-    ripple_merged_complete_epoch_stats_df = ripple_merged_complete_epoch_stats_df[ripple_merged_complete_epoch_stats_df['is_valid_epoch']] ## 136, 71 included requiring both
-
+    if 'is_valid_epoch' in ripple_merged_complete_epoch_stats_df:
+        ripple_merged_complete_epoch_stats_df = ripple_merged_complete_epoch_stats_df[ripple_merged_complete_epoch_stats_df['is_valid_epoch']] ## 136, 71 included requiring both
+    else:
+        print(f'WARN: missing column "is_valid_epoch" in `ripple_merged_complete_epoch_stats_df`')
+        
     ## filter by `included_epoch_indicies`
     # filter_thresholds_dict = {'mseq_len_ignoring_intrusions': 5, 'mseq_tcov': 0.35}
     # df_is_included_criteria_fn = lambda df: NumpyHelpers.logical_and(*[(df[f'overall_best_{a_col_name}'] >= a_thresh) for a_col_name, a_thresh in filter_thresholds_dict.items()])

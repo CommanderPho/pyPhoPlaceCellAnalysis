@@ -21,6 +21,7 @@ from pyphocorehelpers.assertion_helpers import Assert
 
 from neuropy.utils.mixins.indexing_helpers import UnpackableMixin, get_dict_subset
 from neuropy.utils.indexing_helpers import PandasHelpers, flatten, ListHelpers, NumpyHelpers
+from neuropy.utils.mixins.time_slicing import TimeColumnAliasesProtocol
 
 from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import DecodedFilterEpochsResult # used in compute_pho_heuristic_replay_scores
 from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import DecoderDecodedEpochsResult, TrackTemplates
@@ -3536,6 +3537,10 @@ class HeuristicThresholdFiltering:
 
 
         """
+        from neuropy.utils.mixins.time_slicing import TimeColumnAliasesProtocol
+
+        start_col_name: str = TimeColumnAliasesProtocol.find_first_extant_suitable_columns_name(df, col_connonical_name='start', required_columns_synonym_dict={"start":{'begin','start_t','ripple_start_t'}, "stop":['end','stop_t']}, should_raise_exception_on_fail=True)
+
         assert PandasHelpers.require_columns(df, required_columns=[start_col_name], print_missing_columns=True)
         if override_filter_thresholds_dict is not None:
             _tmp_backup_default_filter_thresholds_dict = deepcopy(cls.filter_thresholds_dict)
