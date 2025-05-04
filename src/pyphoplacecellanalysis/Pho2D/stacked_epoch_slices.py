@@ -3260,7 +3260,7 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
 
 
 
-    @function_attributes(short_name=None, tags=['export', 'image', 'marginal'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-10-09 16:29', related_items=[])
+    @function_attributes(short_name=None, tags=['export', 'image', 'marginal'], input_requires=[], output_provides=[], uses=['PosteriorExporting._perform_export_current_epoch_marginal_and_raster_images'], used_by=[], creation_date='2024-10-09 16:29', related_items=[])
     def export_current_epoch_marginal_and_raster_images(self, directional_merged_decoders_result, root_export_path: Path, active_context: Optional[IdentifyingContext]=None):
         """ Export Marginal Pseudo2D posteriors and rasters for middle-clicked epochs
         """
