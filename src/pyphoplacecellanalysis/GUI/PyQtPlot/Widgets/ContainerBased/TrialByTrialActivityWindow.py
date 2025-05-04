@@ -351,7 +351,7 @@ class TrialByTrialActivityWindow:
 
 
         """
-        from neuropy.utils.matplotlib_helpers import _determine_best_placefield_2D_layout, _scale_current_placefield_to_acceptable_range, _build_neuron_identity_label # for display_all_pf_2D_pyqtgraph_binned_image_rendering
+        from neuropy.utils.matplotlib_helpers import _scale_current_placefield_to_acceptable_range # for display_all_pf_2D_pyqtgraph_binned_image_rendering
         from pyphoplacecellanalysis.General.Model.Configs.LongShortDisplayConfig import DecoderIdentityColors, long_short_display_config_manager, apply_LR_to_RL_adjustment
         from pyphocorehelpers.gui.Qt.color_helpers import ColorFormatConverter, debug_print_color, build_adjusted_color
         from pyphocorehelpers.gui.Qt.color_helpers import ColormapHelpers

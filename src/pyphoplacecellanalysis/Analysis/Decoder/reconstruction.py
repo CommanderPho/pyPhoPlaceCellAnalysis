@@ -30,7 +30,8 @@ from pyphocorehelpers.function_helpers import function_attributes
 from pyphocorehelpers.general_helpers import OrderedMeta
 from pyphocorehelpers.indexing_helpers import np_ffill_1D # for compute_corrected_positions(...)
 from neuropy.utils.mixins.binning_helpers import compute_spanning_bins, build_spanning_grid_matrix # for compute_corrected_positions(...)
-from pyphocorehelpers.print_helpers import WrappingMessagePrinter, SimplePrintable, safe_get_variable_shape
+from pyphocorehelpers.print_helpers import WrappingMessagePrinter
+from pyphocorehelpers.indexing_helpers import safe_get_variable_shape
 from pyphocorehelpers.mixins.serialized import SerializedAttributesAllowBlockSpecifyingClass
 
 from pyphoplacecellanalysis.General.Mixins.CrossComputationComparisonHelpers import _compare_computation_results # for finding common neurons in `prune_to_shared_aclus_only`
