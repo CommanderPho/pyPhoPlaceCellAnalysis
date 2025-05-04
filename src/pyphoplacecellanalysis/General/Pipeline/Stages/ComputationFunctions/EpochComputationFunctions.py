@@ -1993,7 +1993,7 @@ class EpochComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Computati
 
 
 
-@function_attributes(short_name=None, tags=['figure', 'matplotlib', 'confidence', 'position', 'laps'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-05-03 15:44', related_items=[])
+@function_attributes(short_name=None, tags=['figure', 'matplotlib', 'confidence', 'position', 'laps'], input_requires=[], output_provides=[], uses=[], used_by=['_display_decoded_context_marginal_overlaying_measured_position'], creation_date='2025-05-03 15:44', related_items=[])
 def _perform_plot_overlayed_context_active_region_glows(df: pd.DataFrame, ax, extreme_threshold: float=0.9, opacity_max:float=0.7, thickness_ramping_multiplier:float=35.0, a_var_name_to_color_map = {'P_Long': 'red', 'P_Short': 'blue'}):
     """ plots only the extremely confident context periods on the position trajectory over time (red when sure it's Long, blue when sure it's Short)
     
@@ -2028,6 +2028,7 @@ def _perform_plot_overlayed_context_active_region_glows(df: pd.DataFrame, ax, ex
     """
     from matplotlib.collections import LineCollection
     from matplotlib.colors import to_rgba
+    from matplotlib.lines import Line2D
 
     ## determine render thickness and opacity by how much greater ['P_Long'] is than the threshold value (0.8)
     ## INPUTS: a_decoded_marginal_posterior_df
@@ -2069,6 +2070,10 @@ def _perform_plot_overlayed_context_active_region_glows(df: pd.DataFrame, ax, ex
     pos_line_artist = ax.plot(df_viz['t'].values,
             df_viz['x_meas'].values,
             color='black', linewidth=1, zorder=10)
+
+    
+    legend_handles = [Line2D([0], [0], color=color, lw=3, label=label.replace('P_', '')) for label, color in a_var_name_to_color_map.items()]
+    ax.legend(handles=legend_handles, loc='upper right')
 
     return pos_line_artist, df_viz
 
@@ -2344,7 +2349,7 @@ class EpochComputationDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Di
 
     @function_attributes(short_name='context_marginal_overlaying_measured_position', tags=['context-decoder-comparison', 'decoded_position', 'directional'], conforms_to=['output_registering', 'figure_saving'], input_requires=[], output_provides=[], requires_global_keys=["global_computation_results.computed_data['EpochComputations']"], uses=['_perform_plot_overlayed_context_active_region_glows', '_helper_add_interpolated_position_columns_to_decoded_result_df', '_display_grid_bin_bounds_validation', 'FigureCollector'], used_by=[], creation_date='2025-05-03 00:00', related_items=[], is_global=True)
     def _display_decoded_context_marginal_overlaying_measured_position(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, save_figure=True,
-                                                    size=(35, 3), dpi=100, constrained_layout=True, override_fig_man: Optional[FileOutputManager]=None, extreme_threshold: float=0.8, opacity_max:float=0.7, thickness_ramping_multiplier:float=35.0, a_var_name_to_color_map = {'P_Long': 'red', 'P_Short': 'blue'}, **kwargs):
+                                                    size=(35, 6), dpi=100, constrained_layout=True, override_fig_man: Optional[FileOutputManager]=None, extreme_threshold: float=0.8, opacity_max:float=0.7, thickness_ramping_multiplier:float=35.0, a_var_name_to_color_map = {'P_Long': 'red', 'P_Short': 'blue'}, **kwargs):
             """ Displays one figure containing the track_ID marginal, decoded continuously over the entire recording session along with the animal's position.
             
             
@@ -2362,13 +2367,9 @@ class EpochComputationDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Di
             """
             from neuropy.utils.result_context import IdentifyingContext
             from neuropy.utils.mixins.time_slicing import TimeColumnAliasesProtocol
-            # from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError import plot_decoded_epoch_slices
-            from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError import plot_1D_most_likely_position_comparsions
-            from neuropy.utils.matplotlib_helpers import get_heatmap_cmap
             from pyphoplacecellanalysis.General.Model.Configs.LongShortDisplayConfig import PlottingHelpers
             from pyphoplacecellanalysis.General.Mixins.ExportHelpers import FileOutputManager, FigureOutputLocation, ContextToPathMode	
             
-
             import matplotlib as mpl
             import matplotlib.pyplot as plt
             from flexitext import flexitext ## flexitext for formatted matplotlib text
@@ -2416,10 +2417,6 @@ class EpochComputationDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Di
             # active_config_name: bool = kwargs.pop('active_config_name', None)
 
             # perform_write_to_file_callback = kwargs.pop('perform_write_to_file_callback', (lambda final_context, fig: owning_pipeline_reference.output_figure(final_context, fig)))
-
-            # long_epoch_name, short_epoch_name, global_epoch_name = owning_pipeline_reference.find_LongShortGlobal_epoch_names()
-            # long_epoch_context, short_epoch_context, global_epoch_context = [curr_active_pipeline.filtered_contexts[a_name] for a_name in (long_epoch_name, short_epoch_name, global_epoch_name)]
-            # long_session, short_session, global_session = [owning_pipeline_reference.filtered_sessions[an_epoch_name] for an_epoch_name in [long_epoch_name, short_epoch_name, global_epoch_name]]
 
             global_measured_position_df: pd.DataFrame = deepcopy(owning_pipeline_reference.sess.position.to_dataframe())
             a_decoded_marginal_posterior_df: pd.DataFrame = _helper_add_interpolated_position_columns_to_decoded_result_df(a_result=a_result, a_decoder=a_decoder, a_decoded_marginal_posterior_df=a_decoded_marginal_posterior_df, global_measured_position_df=global_measured_position_df)
@@ -2480,11 +2477,15 @@ class EpochComputationDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Di
                     active_config = deepcopy(a_decoder.pf.config)
 
                     subtitle_string = active_config.str_for_display(is_2D=False) # , normal_to_extras_line_sep=","
+                    subtitle_string = f"{subtitle_string} - only extreme context probs (P(Ctx) > {extreme_threshold}) are shown"
+
                     # print(f'subtitle_string: {subtitle_string}')
 
                     ## BUild figure titles:
                     # INPUTS: main_fig
                     fig.suptitle('')
+                    out_axes_list[0].set_title('')
+                    
                     # text_formatter = FormattedFigureText() # .init_from_margins(left_margin=0.01)
                     # text_formatter.setup_margins(fig, left_margin=0.01) # , left_margin=0.1
                     text_formatter = FormattedFigureText.init_from_margins(left_margin=0.01, right_margin=0.99) # , top_margin=0.9
