@@ -3178,6 +3178,14 @@ def figures_plot_generalized_decode_epochs_dict_and_export_results_completion_fu
     except Exception as e:
         print(f'\tfigures_plot_generalized_decode_epochs_dict_and_export_results_completion_function(...): "_display_generalized_decoded_yellow_blue_marginal_epochs" failed with error: {e}\n skipping.')
 
+
+    # _display_decoded_context_marginal_overlaying_measured_position ___________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
+    try:
+        _out = curr_active_pipeline.display('_display_decoded_context_marginal_overlaying_measured_position', curr_active_pipeline.get_session_context(), defer_render=True, save_figure=True, override_fig_man=custom_fig_man)
+    except Exception as e:
+        print(f'\tfigures_plot_generalized_decode_epochs_dict_and_export_results_completion_function(...): "_display_decoded_context_marginal_overlaying_measured_position" failed with error: {e}\n skipping.')
+
+
     print(f'>>\t done with {curr_session_context}')
     print(f'>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>')
     print(f'>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>')
