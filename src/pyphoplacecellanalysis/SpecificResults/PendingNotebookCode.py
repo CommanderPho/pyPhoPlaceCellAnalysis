@@ -110,7 +110,7 @@ class MultiDecoderColorOverlayedPosteriors:
     """
 
     @classmethod
-    def _test_single_t_bin(cls, probability_values: NDArray[ND.Shape["N_POS_BINS, 4"], np.floating], additional_cmaps: Dict, drop_below_threshold: float = 1e-2, produce_debug_outputs:bool=True, color_blend_fn=None):
+    def _test_single_t_bin(cls, probability_values: NDArray[ND.Shape["N_POS_BINS, 4"], np.floating], additional_cmaps: Optional[Dict]=None, drop_below_threshold: float = 1e-2, produce_debug_outputs:bool=True, color_blend_fn=None):
         """ 
         
         Usage:
@@ -126,6 +126,22 @@ class MultiDecoderColorOverlayedPosteriors:
         if color_blend_fn is None:
             # color_blend_fn = cls.composite_multiplied_alpha
             color_blend_fn = cls.composite_over
+
+
+        if additional_cmaps is None:
+            from pyphoplacecellanalysis.General.Model.Configs.LongShortDisplayConfig import DecoderIdentityColors, long_short_display_config_manager, apply_LR_to_RL_adjustment
+            from pyphocorehelpers.gui.Qt.color_helpers import ColorFormatConverter, debug_print_color, build_adjusted_color
+            from pyphocorehelpers.gui.Qt.color_helpers import ColormapHelpers
+            import numpy as np, matplotlib.pyplot as plt, matplotlib as mpl
+
+
+            decoder_names_to_idx_map: Dict[int, types.DecoderName] = {0: 'long_LR', 1: 'long_RL', 2: 'short_LR', 3: 'short_RL'}
+            color_dict: Dict[types.DecoderName, pg.QtGui.QColor] = DecoderIdentityColors.build_decoder_color_dict(wants_hex_str=False)
+            additional_cmap_names: Dict[types.DecoderName, str] = {k: ColorFormatConverter.qColor_to_hexstring(v) for k, v in color_dict.items()}
+            # additional_cmap_names = {'long_LR': '#4169E1', 'long_RL': '#607B00', 'short_LR': '#DC143C', 'short_RL': '#990099'} ## Just hardcoded version of `additional_cmap_names`
+            additional_cmaps = {k:ColormapHelpers.create_transparent_colormap(color_literal_name=v, lower_bound_alpha=0.1, should_return_LinearSegmentedColormap=True) for k, v in additional_cmap_names.items()}
+
+
 
         probability_values: NDArray[ND.Shape["N_POS_BINS, 4"], np.floating] = deepcopy(probability_values)
         n_pos_bins, n_decoders = np.shape(probability_values)
@@ -314,17 +330,6 @@ class MultiDecoderColorOverlayedPosteriors:
         return np.nansum((single_t_bin_out_RGBA * decoder_alphas[None, :, None]), axis=1) # (n_pos_bins, 4)
 
 
-    # def composite_over(colors):
-    #     out_rgb = np.zeros(3)
-    #     out_alpha = 0.0
-
-    #     for rgba in colors:
-    #         src_rgb = rgba[:3]
-    #         src_alpha = rgba[3]
-    #         out_rgb = src_rgb * src_alpha + out_rgb * (1 - src_alpha)
-    #         out_alpha = src_alpha + out_alpha * (1 - src_alpha)
-
-    #     return out_rgb, out_alpha
     @classmethod
     def composite_over(cls, single_t_bin_out_RGBA, decoder_alphas):
         """
@@ -350,10 +355,12 @@ class MultiDecoderColorOverlayedPosteriors:
         return out_rgba
 
 
-
+    @function_attributes(short_name=None, tags=['HACK', 'matplotlib', 'overlay', 'figure'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-05-04 18:19', related_items=[])
     @classmethod
     def extract_center_rgba_from_figure(cls, fig, axd, n_pos_bins, subplot_name='matplotlib_combined_rgba', debug_print=False):
-        """
+        """ Used to reverse-engeinerr the overlayed colors from the matplotlib plot figure
+
+
         Extract RGBA values from the center of each position bin in a matplotlib figure.
         
         Parameters:
@@ -373,6 +380,18 @@ class MultiDecoderColorOverlayedPosteriors:
         --------
         center_rgba : ndarray
             RGBA values at the center of each position bin, shape (n_pos_bins, 4)
+
+
+        Usage:
+
+            center_rgba = MultiDecoderColorOverlayedPosteriors.extract_center_rgba_from_figure(fig, axd, n_pos_bins, debug_print=False)
+            # Now you can use center_rgba for further processing
+            center_rgba
+
+            plt.figure()
+            plt.imshow(center_rgba[:, None, :])
+
+
         """
         # Render the figure to get pixel data
         fig.canvas.draw()
