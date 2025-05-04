@@ -102,6 +102,365 @@ from nptyping import NDArray
 import pyphoplacecellanalysis.General.type_aliases as types
 from neuropy.utils.mixins.time_slicing import TimeColumnAliasesProtocol
 
+@metadata_attributes(short_name=None, tags=['figure', 'posteriors'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-05-04 18:05', related_items=[])
+class MultiDecoderColorOverlayedPosteriors:
+    """
+        from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import MultiDecoderColorOverlayedPosteriors
+
+    """
+
+    @classmethod
+    def _test_single_t_bin(cls, probability_values: NDArray[ND.Shape["N_POS_BINS, 4"], np.floating], additional_cmaps: Dict, drop_below_threshold: float = 1e-2, produce_debug_outputs:bool=True, color_blend_fn=None):
+        """ 
+        
+        Usage:
+        
+        
+            probability_values: NDArray[ND.Shape["N_POS_BINS, 4"], np.floating] = deepcopy(p_x_given_n[:, :, a_t_bin_idx])
+            decoder_alphas = np.nansum(p_x_given_n, axis=0) # .shape (4, n_t_bins)
+
+            final_overlayed_single_t_bin_out_RGBA, single_t_bin_out_RGBA, probability_values, _pre_norm_prob_vals, _all_normed_prob_vals = MultiDecoderColorOverlayedPosteriors._test_single_t_bin(probability_values=probability_values, additional_cmaps=additional_cmaps)
+            final_overlayed_single_t_bin_out_RGBA # (n_pos_bins, 4) - 4 for RGBA
+
+        """
+        if color_blend_fn is None:
+            # color_blend_fn = cls.composite_multiplied_alpha
+            color_blend_fn = cls.composite_over
+
+        probability_values: NDArray[ND.Shape["N_POS_BINS, 4"], np.floating] = deepcopy(probability_values)
+        n_pos_bins, n_decoders = np.shape(probability_values)
+        assert n_decoders == 4, f"n_decoders: {n_decoders}"
+
+
+        _pre_norm_prob_vals = None
+        _all_normed_prob_vals = None
+        _realphaed_single_t_bin_out_RGBA = None
+        
+        if produce_debug_outputs:
+            _pre_norm_prob_vals = deepcopy(probability_values)
+
+        # DEBUGONLY __________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
+        if produce_debug_outputs:
+            ## normalize over (decoder, position)
+            sum_over_all_decoder_pos_values: float = np.nansum(_pre_norm_prob_vals, axis=(0, 1)) # sum over pos
+            print(f'sum_over_all_decoder_pos_values: {sum_over_all_decoder_pos_values}')
+            _all_normed_prob_vals = _pre_norm_prob_vals / sum_over_all_decoder_pos_values ## normalize
+
+        ## normalize over decoder
+        sum_over_all_pos_values: NDArray[ND.Shape["4"], np.floating] = np.nansum(probability_values, axis=0) # sum over pos
+        if produce_debug_outputs:
+            print(f'sum_over_all_pos_values: {sum_over_all_pos_values}')
+            
+        decoder_alphas = sum_over_all_pos_values.copy()
+        print(f'decoder_alphas: {decoder_alphas}')
+        # sum_over_all_values: NDArray[ND.Shape["4, "], np.floating] = np.nansum(probability_values, axis=0)
+        probability_values = probability_values / sum_over_all_pos_values ## normalize over decoder
+
+        ## OUT: probability_values
+        ## INPUTS: probability_values (n_pos_bins, 4)
+        single_t_bin_out_RGBA = np.zeros((n_pos_bins, 4, 4))
+        final_overlayed_single_t_bin_out_RGBA = np.zeros((n_pos_bins, 4)) 
+
+        ## pre-plotting only: mask the tiny values:
+        probability_values = cls._prepare_arr_for_conversion_to_RGBA(probability_values, drop_below_threshold=drop_below_threshold)
+
+        ## for each decoder:
+        for i, (a_decoder_name, a_cmap) in enumerate(additional_cmaps.items()):
+            if produce_debug_outputs:
+                # print(f'i: {i}, a_decoder_name: {a_decoder_name}')
+                pass
+
+            data = probability_values[:, i]
+            # ignore NaNs when finding data range
+            norm = mpl.colors.Normalize(vmin=np.nanmin(data), vmax=np.nanmax(data))
+            # mask the NaNs so the cmap knows to use the “bad” color
+            masked = np.ma.masked_invalid(data)
+            rgba = a_cmap(norm(masked)) # rgba.shape (n_pos_bins, 4) # the '4' here is for RGBA, not the decoders, RGB per bin
+            # rgb = rgba[..., :3] 
+            single_t_bin_out_RGBA[:, i, :] = rgba
+            
+            # all_t_bins_out_RGBA[a_t_bin_idx, :, i, :] = rgba
+            
+        ## compute the final merged color
+        if produce_debug_outputs:
+            _realphaed_single_t_bin_out_RGBA = (deepcopy(single_t_bin_out_RGBA) * decoder_alphas[None, :, None]) # (n_pos_bins, 4, 4)
+        # final_overlayed_single_t_bin_out_RGBA = np.nansum(_realphaed_single_t_bin_out_RGBA, axis=1) # (n_pos_bins, 4)
+        final_overlayed_single_t_bin_out_RGBA = color_blend_fn(single_t_bin_out_RGBA, decoder_alphas=decoder_alphas) # (n_pos_bins, 4, 4)
+        # final_overlayed_single_t_bin_out_RGBA = np.nansum((single_t_bin_out_RGBA * decoder_alphas[None, :, None]), axis=1)  # shape (3,)
+        print(f'final_overlayed_single_t_bin_out_RGBA.shape: {final_overlayed_single_t_bin_out_RGBA.shape}')
+        # final_overlayed_single_t_bin_out_RGBA = 
+
+        return final_overlayed_single_t_bin_out_RGBA, single_t_bin_out_RGBA, _realphaed_single_t_bin_out_RGBA, probability_values, _pre_norm_prob_vals, _all_normed_prob_vals
+
+
+    @function_attributes(short_name=None, tags=['MAIN', 'all_t'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-05-04 18:00', related_items=[])
+    @classmethod
+    def compute_all_time_bins(cls, p_x_given_n: NDArray, additional_cmaps: Optional[Dict]=None, produce_debug_outputs: bool = False, drop_below_threshold: float = 1e-2, progress_print: bool = True):
+        """ 
+        all_t_bins_out_RGBA = MultiDecoderColorOverlayedPosteriors.compute_all_time_bins(p_x_given_n=p_x_given_n, additional_cmaps=additional_cmaps, produce_debug_outputs=False, drop_below_threshold=1e-1)
+        
+        """
+        ## INPUTS: p_x_given_n, drop_below_threshold, additional_cmaps, produce_debug_outputs
+
+        if additional_cmaps is None:
+            from pyphoplacecellanalysis.General.Model.Configs.LongShortDisplayConfig import DecoderIdentityColors, long_short_display_config_manager, apply_LR_to_RL_adjustment
+            from pyphocorehelpers.gui.Qt.color_helpers import ColorFormatConverter, debug_print_color, build_adjusted_color
+            from pyphocorehelpers.gui.Qt.color_helpers import ColormapHelpers
+            import numpy as np, matplotlib.pyplot as plt, matplotlib as mpl
+
+
+            decoder_names_to_idx_map: Dict[int, types.DecoderName] = {0: 'long_LR', 1: 'long_RL', 2: 'short_LR', 3: 'short_RL'}
+            color_dict: Dict[types.DecoderName, pg.QtGui.QColor] = DecoderIdentityColors.build_decoder_color_dict(wants_hex_str=False)
+            additional_cmap_names: Dict[types.DecoderName, str] = {k: ColorFormatConverter.qColor_to_hexstring(v) for k, v in color_dict.items()}
+            # additional_cmap_names = {'long_LR': '#4169E1', 'long_RL': '#607B00', 'short_LR': '#DC143C', 'short_RL': '#990099'} ## Just hardcoded version of `additional_cmap_names`
+            additional_cmaps = {k:ColormapHelpers.create_transparent_colormap(color_literal_name=v, lower_bound_alpha=0.1, should_return_LinearSegmentedColormap=True) for k, v in additional_cmap_names.items()}
+
+
+        n_pos_bins, n_decoders, n_time_bins = np.shape(p_x_given_n)
+        assert n_decoders == 4, f"n_decoders: {n_decoders}"
+
+        ## INPUTS: probability_values (n_pos_bins, 4)
+        all_t_bins_out_RGBA = np.zeros((n_time_bins, n_pos_bins, 4, 4))
+
+        for a_t_bin_idx in np.arange(n_time_bins):
+            if progress_print:
+                is_every_hundreth_t_bin = (a_t_bin_idx % 1000 == 0)
+                if is_every_hundreth_t_bin:        
+                    print(f'a_t_bin_idx: [{a_t_bin_idx}/{n_time_bins}]')
+
+            probability_values: NDArray[ND.Shape["N_POS_BINS, 4"], np.floating] = deepcopy(p_x_given_n[:, :, a_t_bin_idx])
+
+            if produce_debug_outputs:
+                _pre_norm_prob_vals = deepcopy(probability_values)
+
+            # DEBUGONLY __________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
+            if produce_debug_outputs:
+                ## normalize over (decoder, position)
+                sum_over_all_decoder_pos_values: float = np.nansum(_pre_norm_prob_vals, axis=(0, 1)) # sum over pos
+                print(f'sum_over_all_decoder_pos_values: {sum_over_all_decoder_pos_values}')
+                _all_normed_prob_vals = _pre_norm_prob_vals / sum_over_all_decoder_pos_values ## normalize
+
+            ## normalize over decoder
+            sum_over_all_pos_values: NDArray[ND.Shape["4"], np.floating] = np.nansum(probability_values, axis=0) # sum over pos
+            if produce_debug_outputs:
+                print(f'sum_over_all_pos_values: {sum_over_all_pos_values}')
+            # sum_over_all_values: NDArray[ND.Shape["4, "], np.floating] = np.nansum(probability_values, axis=0)
+            probability_values = probability_values / sum_over_all_pos_values ## normalize over decoder
+
+            ## OUT: probability_values
+            ## INPUTS: probability_values (n_pos_bins, 4)
+            # single_t_bin_out_RGBA = np.zeros((n_pos_bins, 4, 4))
+
+            ## pre-plotting only: mask the tiny values:
+            probability_values = cls._prepare_arr_for_conversion_to_RGBA(probability_values, drop_below_threshold=drop_below_threshold)
+
+            ## for each decoder:
+            for i, (a_decoder_name, a_cmap) in enumerate(additional_cmaps.items()):
+                if produce_debug_outputs:
+                    # print(f'i: {i}, a_decoder_name: {a_decoder_name}')
+                    pass
+
+                data = probability_values[:, i]
+                # ignore NaNs when finding data range
+                norm = mpl.colors.Normalize(vmin=np.nanmin(data), vmax=np.nanmax(data))
+                # mask the NaNs so the cmap knows to use the “bad” color
+                masked = np.ma.masked_invalid(data)
+                rgba = a_cmap(norm(masked)) # rgba.shape (n_pos_bins, 4) # the '4' here is for RGBA, not the decoders, RGB per bin
+                # rgb = rgba[..., :3] 
+                # single_t_bin_out_RGBA[:, i, :] = rgba
+                
+                all_t_bins_out_RGBA[a_t_bin_idx, :, i, :] = rgba
+
+        return all_t_bins_out_RGBA
+
+
+    @classmethod
+    def _prepare_arr_for_conversion_to_RGBA(cls, arr: NDArray, alt_arr_to_use_for_drops: Optional[NDArray]=None, drop_below_threshold: float=0.0000001, skip_scaling:bool=True):
+        """ Universally used to prepare the pfmap to be displayed (across every plot time)
+        
+        Regardless of `occupancy` and `drop_below_threshold`, the image is rescaled to fill its dynamic range by its maximum (meaning the output will be normalized between zero and one).
+        `occupancy` is not used unless `drop_below_threshold` is non-None
+        
+        Input:
+            drop_below_threshold: if None, no indicies are dropped. Otherwise, values of occupancy less than the threshold specified are used to build a mask, which is subtracted from the returned image (the image is NaN'ed out in these places).
+
+        Known Uses:
+                NeuroPy.neuropy.plotting.ratemaps.plot_single_tuning_map_2D(...)
+                pyphoplacecellanalysis.Pho2D.PyQtPlots.plot_placefields.pyqtplot_plot_image_array(...)
+                
+        # image = np.squeeze(images[a_linear_index,:,:])
+        """
+        # Pre-filter the data:
+        with np.errstate(divide='ignore', invalid='ignore'):
+            arr = np.array(arr.copy())
+            if not skip_scaling:
+                arr = arr / np.nanmax(arr) # note scaling by maximum here!
+            if (drop_below_threshold is not None):          
+                if (alt_arr_to_use_for_drops is not None):
+                    Assert.same_shape(arr, alt_arr_to_use_for_drops)
+                else:
+                    alt_arr_to_use_for_drops = arr
+
+                arr[np.where(alt_arr_to_use_for_drops < drop_below_threshold)] = np.nan # null out the occupancy
+                
+            # arr = np.nan_to_num(arr, nan=0.0, posinf=1.0, neginf=0.0) # from prepare_data_for_plotting
+            return arr # return the modified and masked image
+        
+
+    @classmethod
+    def composite_multiplied_alpha(cls, single_t_bin_out_RGBA, decoder_alphas):
+        """ final_overlayed_single_t_bin_out_RGBA = composite_multiplied_alpha(single_t_bin_out_RGBA=single_t_bin_out_RGBA) """
+        # out_rgb = np.zeros(3)
+        return np.nansum((single_t_bin_out_RGBA * decoder_alphas[None, :, None]), axis=1) # (n_pos_bins, 4)
+
+
+    # def composite_over(colors):
+    #     out_rgb = np.zeros(3)
+    #     out_alpha = 0.0
+
+    #     for rgba in colors:
+    #         src_rgb = rgba[:3]
+    #         src_alpha = rgba[3]
+    #         out_rgb = src_rgb * src_alpha + out_rgb * (1 - src_alpha)
+    #         out_alpha = src_alpha + out_alpha * (1 - src_alpha)
+
+    #     return out_rgb, out_alpha
+    @classmethod
+    def composite_over(cls, single_t_bin_out_RGBA, decoder_alphas):
+        """
+        single_t_bin_out_RGBA: (n_pos_bins, n_decoders, 4)
+        decoder_alphas: (n_decoders,)
+        Returns: (n_pos_bins, 4)
+        """
+        n_pos_bins, n_decoders, _ = single_t_bin_out_RGBA.shape
+        out_rgba = np.zeros((n_pos_bins, 4))
+
+        for i in range(n_decoders):
+            src = single_t_bin_out_RGBA[:, i, :]  # (n_pos_bins, 4)
+            valid = ~np.isnan(src).any(axis=1)    # mask for valid RGBA values
+
+            src_rgb = src[valid, :3]
+            src_alpha = decoder_alphas[i]
+            dst_rgb = out_rgba[valid, :3]
+            dst_alpha = out_rgba[valid, 3]
+
+            out_rgba[valid, :3] = src_rgb * src_alpha + dst_rgb * (1 - src_alpha)
+            out_rgba[valid, 3] = src_alpha + dst_alpha * (1 - src_alpha)
+
+        return out_rgba
+
+
+
+    @classmethod
+    def extract_center_rgba_from_figure(cls, fig, axd, n_pos_bins, subplot_name='matplotlib_combined_rgba', debug_print=False):
+        """
+        Extract RGBA values from the center of each position bin in a matplotlib figure.
+        
+        Parameters:
+        -----------
+        fig : matplotlib.figure.Figure
+            The figure containing the subplot
+        axd : dict
+            Dictionary of axes from subplot_mosaic
+        n_pos_bins : int
+            Number of position bins
+        subplot_name : str, optional
+            Name of the subplot to extract from, default 'matplotlib_combined_rgba'
+        debug_print : bool, optional
+            Whether to print debug information, default False
+            
+        Returns:
+        --------
+        center_rgba : ndarray
+            RGBA values at the center of each position bin, shape (n_pos_bins, 4)
+        """
+        # Render the figure to get pixel data
+        fig.canvas.draw()
+
+        # Get the dimensions of the figure
+        img_w, img_h = fig.canvas.get_width_height()
+        if debug_print:
+            print(f"Figure dimensions: {img_w} x {img_h}")
+
+        # Get the raw pixel data
+        img_data = np.frombuffer(fig.canvas.tostring_argb(), dtype=np.uint8)
+        if debug_print:
+            print(f"Raw data shape: {img_data.shape}")
+            unique_values = np.unique(img_data)
+            print(f"Number of unique values: {len(unique_values)}")
+            print(f"Min/max values: {unique_values.min()}, {unique_values.max()}")
+
+        # Reshape the data - ARGB format needs special handling
+        img = img_data.reshape(img_h, img_w, 4)
+
+        # Convert from ARGB to RGBA (move alpha from first to last position)
+        img = np.roll(img, 3, axis=2)
+
+        if debug_print:
+            print(f"Reshaped image dimensions: {img.shape}")
+
+        # Verify we have the subplot we're looking for
+        if subplot_name not in axd:
+            error_msg = f"ERROR: '{subplot_name}' subplot not found! Available subplots: {list(axd.keys())}"
+            if debug_print:
+                print(error_msg)
+            raise KeyError(error_msg)
+        
+        # Get the position of the specific subplot
+        bbox = axd[subplot_name].get_window_extent().transformed(fig.dpi_scale_trans.inverted())
+        if debug_print:
+            print(f"Subplot bbox: {bbox}")
+        
+        # Calculate pixel coordinates for the subplot
+        x_start = int(bbox.x0 * fig.dpi)
+        y_start = int(bbox.y0 * fig.dpi)
+        x_end = int(bbox.x1 * fig.dpi)
+        y_end = int(bbox.y1 * fig.dpi)
+        
+        if debug_print:
+            print(f"Subplot pixel coordinates: ({x_start}, {y_start}) to ({x_end}, {y_end})")
+        
+        # Extract just the subplot region
+        subplot_img = img[y_start:y_end, x_start:x_end, :]
+        if debug_print:
+            print(f"Subplot image shape: {subplot_img.shape}")
+        
+        # Calculate center indices
+        if debug_print:
+            print(f"n_pos_bins: {n_pos_bins}")
+        
+        # Calculate center indices - assuming vertical arrangement
+        subplot_height = subplot_img.shape[0]
+        center_indices = np.ceil(subplot_height * (np.arange(n_pos_bins) + 0.5)/float(n_pos_bins)).astype(int)
+        if debug_print:
+            print(f"Center indices: {center_indices}")
+        
+        # Check if indices are within bounds
+        if max(center_indices) >= subplot_height:
+            warning_msg = "WARNING: Some center indices are out of bounds!"
+            if debug_print:
+                print(warning_msg)
+            center_indices = np.clip(center_indices, 0, subplot_height-1)
+        
+        # Extract center RGBA values - assuming we want the middle of each row
+        center_x = subplot_img.shape[1] // 2
+        center_rgba = subplot_img[center_indices, center_x, :]
+        
+        if debug_print:
+            print(f"Extracted center RGBA values shape: {center_rgba.shape}")
+            print("Sample RGBA values:")
+            for i in range(min(5, len(center_indices))):
+                print(f"Position {i}: {center_rgba[i]}")
+        
+        return center_rgba
+
+
+
+
+
+
+
+
 
 @function_attributes(short_name=None, tags=['private'], input_requires=[], output_provides=[], uses=[], used_by=['build_decoder_prob_as_a_function_of_position'], creation_date='2025-05-02 12:54', related_items=[])
 def _subfn_helper_process_epochs_result_dict(epochs_result_dict: Dict[types.KnownNamedDecodingEpochsType, DecodedFilterEpochsResult], t_delta: float):
