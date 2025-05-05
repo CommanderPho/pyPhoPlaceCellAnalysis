@@ -2389,7 +2389,7 @@ class EpochComputationDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Di
 
     @function_attributes(short_name='context_marginal_overlaying_measured_position', tags=['context-decoder-comparison', 'hairly-plot', 'decoded_position', 'directional'], conforms_to=['output_registering', 'figure_saving'], input_requires=[], output_provides=[], requires_global_keys=["global_computation_results.computed_data['EpochComputations']"], uses=['_perform_plot_overlayed_context_active_region_glows', '_helper_add_interpolated_position_columns_to_decoded_result_df', '_display_grid_bin_bounds_validation', 'FigureCollector'], used_by=[], creation_date='2025-05-03 00:00', related_items=[], is_global=True)
     def _display_decoded_context_marginal_overlaying_measured_position(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, save_figure=True,
-                                                    size=(35, 9), dpi=100, constrained_layout=True, override_fig_man: Optional[FileOutputManager]=None, extreme_threshold: float=0.8, opacity_max:float=0.7, thickness_ramping_multiplier:float=35.0, prob_to_thickness_ramping_function=None, disable_all_grid_bin_bounds_lines: bool = True,
+                                                    size=(35, 6), dpi=100, constrained_layout=True, override_fig_man: Optional[FileOutputManager]=None, extreme_threshold: float=0.8, opacity_max:float=0.7, thickness_ramping_multiplier:float=35.0, prob_to_thickness_ramping_function=None, disable_all_grid_bin_bounds_lines: bool = True,
                                                     a_var_name_to_color_map = {'P_Long': 'red', 'P_Short': 'blue'}, ax=None, **kwargs):
             """ Displays one figure containing the track_ID marginal, decoded continuously over the entire recording session along with the animal's position.
             
@@ -2454,6 +2454,12 @@ class EpochComputationDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Di
 
 
 
+            export_dpi_multiplier: float = kwargs.pop('export_dpi_multiplier', 2.0)
+            export_dpi: int = int(np.ceil(dpi * export_dpi_multiplier))
+            
+            # ==================================================================================================================================================================================================================================================================================== #
+            # BEGIN FUNCTION BODY                                                                                                                                                                                                                                                                  #
+            # ==================================================================================================================================================================================================================================================================================== #
 
             ## Unpack from pipeline:
             valid_EpochComputations_result: EpochComputationsComputationsContainer = owning_pipeline_reference.global_computation_results.computed_data['EpochComputations'] # owning_pipeline_reference.global_computation_results.computed_data['EpochComputations']
@@ -2517,9 +2523,9 @@ class EpochComputationDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Di
     
 
             def _perform_write_to_file_callback(final_context, fig):
-                """ captures: override_fig_man """
+                """ captures: override_fig_man, export_dpi """
                 if save_figure:
-                    return owning_pipeline_reference.output_figure(final_context, fig, override_fig_man=override_fig_man)
+                    return owning_pipeline_reference.output_figure(final_context, fig, override_fig_man=override_fig_man, dpi=export_dpi)
                 else:
                     pass # do nothing, don't save
                 

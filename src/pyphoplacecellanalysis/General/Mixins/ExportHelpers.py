@@ -739,7 +739,7 @@ def write_to_file(a_fig, active_identifying_ctx: IdentifyingContext, final_fig_s
             # fig_png_out_path = fig_png_out_path.with_stem(f'{curr_pdf_save_path.stem}_{curr_page_str}') # note this replaces the current .pdf extension with .png, resulting in a good filename for a .png
             if is_matplotlib_figure:
                 ## MATPLOTLIB only:
-                a_fig.savefig(fig_png_out_path)
+                a_fig.savefig(fig_png_out_path, **kwargs) ## pass kwargs so things like dpi and etc can be passed.
             
             elif is_plotly_figure:
                 ## Plotly only:
