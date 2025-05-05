@@ -1996,12 +1996,17 @@ class EpochComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Computati
 
 
 @function_attributes(short_name=None, tags=['figure', 'matplotlib', 'confidence', 'position', 'laps'], input_requires=[], output_provides=[], uses=[], used_by=['_display_decoded_context_marginal_overlaying_measured_position'], creation_date='2025-05-03 15:44', related_items=[])
-def _perform_plot_overlayed_context_active_region_glows(df: pd.DataFrame, ax, extreme_threshold: float=0.9, opacity_max:float=0.7, thickness_ramping_multiplier:float=35.0, a_var_name_to_color_map = {'P_Long': 'red', 'P_Short': 'blue'}):
+def _perform_plot_overlayed_context_active_region_glows(df: pd.DataFrame, ax, extreme_threshold: float=0.9, opacity_max:float=0.7, thickness_ramping_multiplier:float=35.0, prob_to_thickness_ramping_function=None, a_var_name_to_color_map = {'P_Long': 'red', 'P_Short': 'blue'}):
     """ plots only the extremely confident context periods on the position trajectory over time (red when sure it's Long, blue when sure it's Short)
     
     -  I have a line that's already plotted on a matplotlib axes based on two df columns: ['t', 'x_meas']. I want to draw a "glow" effect over it using the two new df columns (P_Long_Score, P_Long_Opacity) the follows the line perfectly and only draws when the threshold is exceeded. Higher P_Long values should be bolder, meaning more thick or more opaque
     - determine render thickness and opacity by how much greater ['P_Long'] is than the threshold value (0.8)
 
+    
+    #TODO 2025-05-05 15:02: - [ ] Increasing `extreme_threshold` should not have an effect on the thicknesses, only the masked/unmasked regions extreme_threshold=0.9, thickness_ramping_multiplier=50
+        - fix the mapping functions here and I think it would be a lot better
+        
+        
     Usage:
         from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.EpochComputationFunctions import _perform_plot_overlayed_context_active_region_glows
         
@@ -2025,6 +2030,21 @@ def _perform_plot_overlayed_context_active_region_glows(df: pd.DataFrame, ax, ex
         df_viz
 
         _out
+        
+        
+        
+        NOTE: Interesting thickness/opacity modulators:
+
+        
+        interesting_hair_parameter_kwarg_dict = {
+            'defaults': dict(extreme_threshold=0.8, opacity_max=0.7, thickness_ramping_multiplier=35),
+            '50_sec_window_scale': dict(extreme_threshold=0.5, thickness_ramping_multiplier=50),
+        }
+
+                
+        #  prob_to_thickness_ramping_function= lambda p: max(0.0, (p - 0.5) * 15),
+        #  extreme_threshold=0.9, prob_to_thickness_ramping_function= lambda p: 6.0, ## constant for all probabilities
+        extreme_threshold=0.1, prob_to_thickness_ramping_function= lambda p: (5.0 * p), 
 
 
     """
@@ -2035,11 +2055,26 @@ def _perform_plot_overlayed_context_active_region_glows(df: pd.DataFrame, ax, ex
     ## determine render thickness and opacity by how much greater ['P_Long'] is than the threshold value (0.8)
     ## INPUTS: a_decoded_marginal_posterior_df
 
+
+    assert ax is not None, f"this function does not create its own figure or axes. pass one in."
+
     ## add plotting utility columns:
     df_viz: pd.DataFrame = deepcopy(df)
 
+
+    if prob_to_thickness_ramping_function is None:
+        prob_to_thickness_ramping_function = lambda p: max(0.0, (p - extreme_threshold) * thickness_ramping_multiplier)
+    else:
+        print(f'using custom `prob_to_thickness_ramping_function` provided, and ignoring `thickness_ramping_multiplier`')
+
+
     for a_var_name in a_var_name_to_color_map:
-        df_viz[f'{a_var_name}_Score'] = df_viz[a_var_name].apply(lambda p: max(0.0, (p - extreme_threshold) * thickness_ramping_multiplier)) ## How the THICKNESS of the overlay line ramps with value
+        if thickness_ramping_multiplier is None:
+            df_viz[f'{a_var_name}_Score'] = df_viz[a_var_name].apply(lambda p: max(0.0, p)) ## How the THICKNESS of the overlay line ramps with value
+        else:
+            ## normal ramping function applied:
+            df_viz[f'{a_var_name}_Score'] = df_viz[a_var_name].apply(prob_to_thickness_ramping_function) ## How the THICKNESS of the overlay line ramps with value    
+
         df_viz[f'{a_var_name}_Opacity'] = df_viz[a_var_name].apply(lambda p: 0.0 if p < extreme_threshold else min(opacity_max, (p - extreme_threshold) * 20)) ## OPACITY of the line ramps with value
 
 
@@ -2354,10 +2389,14 @@ class EpochComputationDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Di
 
     @function_attributes(short_name='context_marginal_overlaying_measured_position', tags=['context-decoder-comparison', 'decoded_position', 'directional'], conforms_to=['output_registering', 'figure_saving'], input_requires=[], output_provides=[], requires_global_keys=["global_computation_results.computed_data['EpochComputations']"], uses=['_perform_plot_overlayed_context_active_region_glows', '_helper_add_interpolated_position_columns_to_decoded_result_df', '_display_grid_bin_bounds_validation', 'FigureCollector'], used_by=[], creation_date='2025-05-03 00:00', related_items=[], is_global=True)
     def _display_decoded_context_marginal_overlaying_measured_position(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, save_figure=True,
-                                                    size=(35, 6), dpi=100, constrained_layout=True, override_fig_man: Optional[FileOutputManager]=None, extreme_threshold: float=0.8, opacity_max:float=0.7, thickness_ramping_multiplier:float=35.0, a_var_name_to_color_map = {'P_Long': 'red', 'P_Short': 'blue'}, **kwargs):
+                                                    size=(35, 9), dpi=100, constrained_layout=True, override_fig_man: Optional[FileOutputManager]=None, extreme_threshold: float=0.8, opacity_max:float=0.7, thickness_ramping_multiplier:float=35.0, prob_to_thickness_ramping_function=None, disable_all_grid_bin_bounds_lines: bool = True,
+                                                    a_var_name_to_color_map = {'P_Long': 'red', 'P_Short': 'blue'}, ax=None, **kwargs):
             """ Displays one figure containing the track_ID marginal, decoded continuously over the entire recording session along with the animal's position.
             
             
+            #TODO 2025-05-05 15:02: - [ ] Increasing `extreme_threshold` should not have an effect on the thicknesses, only the masked/unmasked regions extreme_threshold=0.9, thickness_ramping_multiplier=50
+
+                        
             Based off of ``
             
             Usage:
@@ -2385,6 +2424,37 @@ class EpochComputationDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Di
             from neuropy.utils.result_context import IdentifyingContext
             from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import _helper_add_interpolated_position_columns_to_decoded_result_df
 
+
+            def _subfn_hide_all_plot_lines(out_plot_data, should_fully_remove_items:bool=False):
+                ## get the lines2D object to turn off the default position lines:
+                removed_item_names = []
+                for a_lines_name, a_lines_collection in out_plot_data.items():
+                    ## hide all inactive lines:
+                    print(f'hiding: "{a_lines_name}"')        
+                    try:
+                        ## try iteratring the object
+                        for a_line in a_lines_collection:
+                            a_line.set_visible(False)
+                        removed_item_names.append(a_lines_name)
+                    except TypeError:
+                        a_lines_collection.set_visible(False)
+                        removed_item_names.append(a_lines_name)
+                    # except AttributeError:
+                        # when we try to set_visible on non-type
+                    except Exception as e:
+                        raise e
+                ## end for a_lines_name, a_lin....
+                
+                ## remove theitems
+                if should_fully_remove_items:
+                    for a_rm_item_name in removed_item_names:
+                        out_plot_data.pop(a_rm_item_name, None) ## remove the the array
+
+                return out_plot_data           
+
+
+
+
             ## Unpack from pipeline:
             valid_EpochComputations_result: EpochComputationsComputationsContainer = owning_pipeline_reference.global_computation_results.computed_data['EpochComputations'] # owning_pipeline_reference.global_computation_results.computed_data['EpochComputations']
             assert valid_EpochComputations_result is not None
@@ -2409,13 +2479,20 @@ class EpochComputationDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Di
                 # Update the existing context:
                 display_context = active_context.adding_context('display_fn', display_fn_name='context_marginal_overlaying_measured_position')
             else:
-                active_context = owning_pipeline_reference.sess.get_context()
+                # active_context = owning_pipeline_reference.sess.get_context()
+                active_context = deepcopy(complete_session_context) # owning_pipeline_reference.sess.get_context()
+                
                 # Build the active context directly:
                 display_context = owning_pipeline_reference.build_display_context_for_session('context_marginal_overlaying_measured_position')
 
             fignum = kwargs.pop('fignum', None)
             if fignum is not None:
                 print(f'WARNING: fignum will be ignored but it was specified as fignum="{fignum}"!')
+
+
+            ## OUTPUTS: active_context, display_context
+            active_display_context = display_context.overwriting_context(extreme_threshold=extreme_threshold, opacity_max=opacity_max, thickness_ramping_multiplier=thickness_ramping_multiplier) ## include any that are just the slightest big different
+            # active_display_context = deepcopy(display_context)
 
             # defer_render = kwargs.pop('defer_render', False)
             # debug_print: bool = kwargs.pop('debug_print', False)
@@ -2433,13 +2510,9 @@ class EpochComputationDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Di
 
             graphics_output_dict = {}
 
-            active_context = kwargs.pop('active_context', owning_pipeline_reference.sess.get_context())
-            if active_context is not None:
-                    display_context = active_context.adding_context('display_fn', display_fn_name='context_marginal_overlaying_measured_position')
-
             if override_fig_man is not None:
                 print(f'override_fig_man is not None! Custom output path will be used!')
-                test_display_output_path = override_fig_man.get_figure_save_file_path(display_context, make_folder_if_needed=False)
+                test_display_output_path = override_fig_man.get_figure_save_file_path(active_display_context, make_folder_if_needed=False)
                 print(f'\ttest_display_output_path: "{test_display_output_path}"')
     
 
@@ -2453,27 +2526,33 @@ class EpochComputationDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Di
 
             with mpl.rc_context({'figure.dpi': str(dpi), 'savefig.transparent': True, 'ps.fonttype': 42, 'figure.constrained_layout.use': (constrained_layout or False), 'figure.frameon': False, 'figure.figsize': size, }): # 'figure.figsize': (12.4, 4.8), 
                 # Create a FigureCollector instance
-                with FigureCollector(name='context_marginal_overlaying_measured_position', base_context=display_context) as collector:
+                with FigureCollector(name='context_marginal_overlaying_measured_position', base_context=active_display_context) as collector:
                     # from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import _perform_plot_overlayed_context_active_region_glows
 
                     ## INPUTS: a_decoded_marginal_posterior_df
 
                     ## plot the basic lap-positions (measured) over time figure:
-                    graphics_output_dict = owning_pipeline_reference.display(display_function='_display_grid_bin_bounds_validation', active_session_configuration_context=None, include_includelist=[], save_figure=False) # _display_grid_bin_bounds_validation
+                    graphics_output_dict = owning_pipeline_reference.display(display_function='_display_grid_bin_bounds_validation', active_session_configuration_context=None, include_includelist=[], save_figure=False, ax=ax) # _display_grid_bin_bounds_validation
                     fig = graphics_output_dict.figures[0]
                     out_axes_list = graphics_output_dict.axes
                     out_plot_data = graphics_output_dict.plot_data
 
                     ## get the lines2D object to turn off the default position lines:
-                    position_lines_2D = out_plot_data['position_lines_2D']
-                    ## hide all inactive lines:
-                    for a_line in position_lines_2D:
-                        a_line.set_visible(False)
-                        
+                    position_lines_2D = out_plot_data.get('position_lines_2D', None)
+                    if position_lines_2D is not None:
+                        ## hide all inactive lines:
+                        for a_line in position_lines_2D:
+                            a_line.set_visible(False)
+                
+                    if disable_all_grid_bin_bounds_lines:
+                        out_plot_data = _subfn_hide_all_plot_lines(out_plot_data=out_plot_data)
+                    
                     an_pos_line_artist, df_viz = _perform_plot_overlayed_context_active_region_glows(df=deepcopy(a_decoded_marginal_posterior_df), ax=out_axes_list[0],
-                                                                                                     extreme_threshold=extreme_threshold, opacity_max=opacity_max, thickness_ramping_multiplier=thickness_ramping_multiplier, a_var_name_to_color_map = a_var_name_to_color_map) # , thickness_ramping_multiplier=5
-
-                    collector.post_hoc_append(figs=graphics_output_dict.figures, axes=out_axes_list, contexts=[display_context])
+                                                                                                     extreme_threshold=extreme_threshold, opacity_max=opacity_max, thickness_ramping_multiplier=thickness_ramping_multiplier, prob_to_thickness_ramping_function=prob_to_thickness_ramping_function, a_var_name_to_color_map=a_var_name_to_color_map) # , thickness_ramping_multiplier=5
+                    out_plot_data['an_pos_line_artist'] = an_pos_line_artist
+                    out_plot_data['df_viz'] = df_viz
+                    
+                    collector.post_hoc_append(figs=graphics_output_dict.figures, axes=out_axes_list, contexts=[active_display_context])
 
 
                     # ==================================================================================================================================================================================================================================================================================== #
@@ -2505,10 +2584,15 @@ class EpochComputationDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Di
                     header_text_obj = flexitext(0.01, 0.85, f'<size:20><weight:bold>{title_string}</></>\n<size:9>{subtitle_string}</>', va="bottom", xycoords="figure fraction") # , wrap=False
                     footer_text_obj = text_formatter.add_flexitext_context_footer(active_context=active_context) # flexitext((text_formatter.left_margin*0.1), (text_formatter.bottom_margin*0.25), text_formatter._build_footer_string(active_context=active_context), va="top", xycoords="figure fraction")
                     
-                    window_title_string: str = f"{title_string} - {session_footer_string}"
+
+                    complete_title_string: str = f"{title_string} - {session_footer_string}"
+                    # complete_title_string: str = f"{complete_title_string} - {subtitle_string}"
+                    
+                    window_title_string: str = complete_title_string
+                    
                     fig.canvas.manager.set_window_title(window_title_string) # sets the window's title
-                    if ((_perform_write_to_file_callback is not None) and (display_context is not None)):
-                        _perform_write_to_file_callback(display_context, fig)
+                    if ((_perform_write_to_file_callback is not None) and (active_display_context is not None)):
+                        _perform_write_to_file_callback(active_display_context, fig)
 
                     graphics_output_dict['label_objects'] = {'header': header_text_obj, 'footer': footer_text_obj, 'formatter': text_formatter}
             ## END with mpl.rc_context({'figure.dpi': '...
