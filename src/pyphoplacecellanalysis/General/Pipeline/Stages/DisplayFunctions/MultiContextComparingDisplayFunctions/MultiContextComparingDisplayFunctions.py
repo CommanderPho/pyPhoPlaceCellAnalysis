@@ -28,9 +28,6 @@ from pyphoplacecellanalysis.Pho2D.PyQtPlots.plot_placefields import pyqtplot_plo
 from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.ContainerBased.PhoContainerTool import GenericPyQtGraphContainer
 
 
-from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.MultiContextComparingDisplayFunctions.MultiContextComparingDisplayFunctions import MultiContextComparingDisplayFunctions
-
-
 class MultiContextComparingDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=DisplayFunctionRegistryHolder):
 	""" MultiContextComparingDisplayFunctions
 	These display functions compare results across several contexts.
