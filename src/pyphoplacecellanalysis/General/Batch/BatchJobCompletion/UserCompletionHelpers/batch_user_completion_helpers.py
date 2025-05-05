@@ -3144,7 +3144,7 @@ def generalized_decode_epochs_dict_and_export_results_completion_function(self, 
 
     return across_session_results_extended_dict
 
-@function_attributes(short_name=None, tags=['figure', 'posterior'], input_requires=[], output_provides=[], uses=['_display_generalized_decoded_yellow_blue_marginal_epochs', '_display_decoded_context_marginal_overlaying_measured_position'], used_by=[], creation_date='2025-04-16 15:17', related_items=['generalized_decode_epochs_dict_and_export_results_completion_function'])
+@function_attributes(short_name=None, tags=['figure', 'posterior', 'hairly-plot'], input_requires=[], output_provides=[], uses=['_display_generalized_decoded_yellow_blue_marginal_epochs', '_display_decoded_context_marginal_overlaying_measured_position'], used_by=[], creation_date='2025-04-16 15:17', related_items=['generalized_decode_epochs_dict_and_export_results_completion_function'])
 def figures_plot_generalized_decode_epochs_dict_and_export_results_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict,
                                                                                         included_figures_names=['_display_generalized_decoded_yellow_blue_marginal_epochs', '_display_decoded_context_marginal_overlaying_measured_position'],
                                                                                         extreme_threshold: float=0.8, opacity_max:float=0.7, thickness_ramping_multiplier:float=35.0, **additional_marginal_overlaying_measured_position_kwargs) -> dict:

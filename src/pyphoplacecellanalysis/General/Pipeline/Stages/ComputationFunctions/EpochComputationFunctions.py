@@ -1995,7 +1995,7 @@ class EpochComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Computati
 
 
 
-@function_attributes(short_name=None, tags=['figure', 'matplotlib', 'confidence', 'position', 'laps'], input_requires=[], output_provides=[], uses=[], used_by=['_display_decoded_context_marginal_overlaying_measured_position'], creation_date='2025-05-03 15:44', related_items=[])
+@function_attributes(short_name=None, tags=['figure', 'hairly-plot', 'matplotlib', 'confidence', 'position', 'laps'], input_requires=[], output_provides=[], uses=[], used_by=['_display_decoded_context_marginal_overlaying_measured_position'], creation_date='2025-05-03 15:44', related_items=[])
 def _perform_plot_overlayed_context_active_region_glows(df: pd.DataFrame, ax, extreme_threshold: float=0.9, opacity_max:float=0.7, thickness_ramping_multiplier:float=35.0, prob_to_thickness_ramping_function=None, a_var_name_to_color_map = {'P_Long': 'red', 'P_Short': 'blue'}):
     """ plots only the extremely confident context periods on the position trajectory over time (red when sure it's Long, blue when sure it's Short)
     
@@ -2387,7 +2387,7 @@ class EpochComputationDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Di
 
 
 
-    @function_attributes(short_name='context_marginal_overlaying_measured_position', tags=['context-decoder-comparison', 'decoded_position', 'directional'], conforms_to=['output_registering', 'figure_saving'], input_requires=[], output_provides=[], requires_global_keys=["global_computation_results.computed_data['EpochComputations']"], uses=['_perform_plot_overlayed_context_active_region_glows', '_helper_add_interpolated_position_columns_to_decoded_result_df', '_display_grid_bin_bounds_validation', 'FigureCollector'], used_by=[], creation_date='2025-05-03 00:00', related_items=[], is_global=True)
+    @function_attributes(short_name='context_marginal_overlaying_measured_position', tags=['context-decoder-comparison', 'hairly-plot', 'decoded_position', 'directional'], conforms_to=['output_registering', 'figure_saving'], input_requires=[], output_provides=[], requires_global_keys=["global_computation_results.computed_data['EpochComputations']"], uses=['_perform_plot_overlayed_context_active_region_glows', '_helper_add_interpolated_position_columns_to_decoded_result_df', '_display_grid_bin_bounds_validation', 'FigureCollector'], used_by=[], creation_date='2025-05-03 00:00', related_items=[], is_global=True)
     def _display_decoded_context_marginal_overlaying_measured_position(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, save_figure=True,
                                                     size=(35, 9), dpi=100, constrained_layout=True, override_fig_man: Optional[FileOutputManager]=None, extreme_threshold: float=0.8, opacity_max:float=0.7, thickness_ramping_multiplier:float=35.0, prob_to_thickness_ramping_function=None, disable_all_grid_bin_bounds_lines: bool = True,
                                                     a_var_name_to_color_map = {'P_Long': 'red', 'P_Short': 'blue'}, ax=None, **kwargs):
