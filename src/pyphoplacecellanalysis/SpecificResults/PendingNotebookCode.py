@@ -85,8 +85,6 @@ from pyphoplacecellanalysis.General.Model.Configs.LongShortDisplayConfig import 
 from neuropy.utils.mixins.binning_helpers import BinningContainer, BinningInfo
 from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import DecodedFilterEpochsResult
 
-
-
 import numpy as np
 from pyphoplacecellanalysis.Analysis.Decoder.transition_matrix import TransitionMatrixComputations
 from pyphoplacecellanalysis.Analysis.Decoder.context_dependent import GenericDecoderDictDecodedEpochsDictResult
@@ -98,14 +96,70 @@ from typing import Dict, List, Tuple, Optional, Callable, Union, Any, TypeVar
 from typing_extensions import TypeAlias
 import nptyping as ND
 from nptyping import NDArray
+
 # import neuropy.utils.type_aliases as types
 import pyphoplacecellanalysis.General.type_aliases as types
 from neuropy.utils.mixins.time_slicing import TimeColumnAliasesProtocol
+
+from pyphoplacecellanalysis.General.Model.Configs.LongShortDisplayConfig import DecoderIdentityColors, long_short_display_config_manager, apply_LR_to_RL_adjustment
+from pyphocorehelpers.gui.Qt.color_helpers import ColormapHelpers, ColorFormatConverter, debug_print_color, build_adjusted_color
+
+
+# def blend_over_white(rgba):
+#     rgb = rgba[:, :3]
+#     alpha = rgba[:, 3:4]
+#     return rgb * alpha + (1 - alpha) * 1  # white background (RGB = 1)
+
+def numpy_rgba_composite(rgba_layers):
+    """
+    rgba_layers: (n_layers, H, W, 4) — ordered bottom to top
+    Returns: (H, W, 4) — final composited RGBA image
+    """
+    out_rgb = np.zeros_like(rgba_layers[0, ..., :3])
+    out_alpha = np.zeros_like(rgba_layers[0, ..., 3])
+
+    for rgba in rgba_layers:
+        src_rgb = rgba[..., :3]
+        src_alpha = rgba[..., 3]
+
+        out_rgb = src_rgb * src_alpha[..., None] + out_rgb * (1 - src_alpha)[..., None]
+        out_alpha = src_alpha + out_alpha * (1 - src_alpha)
+
+    return np.concatenate([out_rgb, out_alpha[..., None]], axis=-1)
+
+
+
+
 
 @metadata_attributes(short_name=None, tags=['figure', 'posteriors'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-05-04 18:05', related_items=[])
 class MultiDecoderColorOverlayedPosteriors:
     """
         from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import MultiDecoderColorOverlayedPosteriors
+
+
+        import nptyping as ND
+        from nptyping import NDArray
+        from neuropy.utils.result_context import IdentifyingContext
+        from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import _helper_add_interpolated_position_columns_to_decoded_result_df
+        from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import MultiDecoderColorOverlayedPosteriors
+
+        ## INPUTS: a_new_fully_generic_result
+        # a_target_context: IdentifyingContext = IdentifyingContext(trained_compute_epochs='laps', pfND_ndim=1, decoder_identifier='pseudo2D', known_named_decoding_epochs_type='global', masked_time_bin_fill_type='nan_filled', data_grain='per_time_bin')
+        a_target_context: IdentifyingContext = IdentifyingContext(trained_compute_epochs='laps', pfND_ndim=1, decoder_identifier='pseudo2D', known_named_decoding_epochs_type='global', masked_time_bin_fill_type='ignore', data_grain='per_time_bin')
+        best_matching_context, a_result, a_decoder, a_decoded_marginal_posterior_df = a_new_fully_generic_result.get_results_best_matching_context(context_query=a_target_context, debug_print=False)
+        ## OUTPUTS: a_result, a_decoder, a_decoded_marginal_posterior_df
+        ## INPUTS: curr_active_pipeline, a_result, a_decoder, a_decoded_marginal_posterior_df
+        global_measured_position_df: pd.DataFrame = deepcopy(curr_active_pipeline.sess.position.to_dataframe())
+        a_decoded_marginal_posterior_df: pd.DataFrame = _helper_add_interpolated_position_columns_to_decoded_result_df(a_result=a_result, a_decoder=a_decoder, a_decoded_marginal_posterior_df=a_decoded_marginal_posterior_df, global_measured_position_df=global_measured_position_df)
+
+        global_decoded_result: SingleEpochDecodedResult = a_result.get_result_for_epoch(0)
+        p_x_given_n: NDArray[ND.Shape["N_POS_BINS, 4, N_TIME_BINS"], np.floating] = deepcopy(global_decoded_result.p_x_given_n) # .shape # (59, 4, 69488)
+        # p_x_given_n
+
+        ## INPUTS: p_x_given_n
+        all_t_bins_final_overlayed_out_RGBA, all_t_bins_out_RGBA = MultiDecoderColorOverlayedPosteriors.compute_all_time_bins(p_x_given_n=p_x_given_n, produce_debug_outputs=False, drop_below_threshold=1e-1)
+
+
 
     """
 
@@ -146,7 +200,6 @@ class MultiDecoderColorOverlayedPosteriors:
         probability_values: NDArray[ND.Shape["N_POS_BINS, 4"], np.floating] = deepcopy(probability_values)
         n_pos_bins, n_decoders = np.shape(probability_values)
         assert n_decoders == 4, f"n_decoders: {n_decoders}"
-
 
         _pre_norm_prob_vals = None
         _all_normed_prob_vals = None
@@ -211,32 +264,60 @@ class MultiDecoderColorOverlayedPosteriors:
 
     @function_attributes(short_name=None, tags=['MAIN', 'all_t'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-05-04 18:00', related_items=[])
     @classmethod
-    def compute_all_time_bins(cls, p_x_given_n: NDArray, additional_cmaps: Optional[Dict]=None, produce_debug_outputs: bool = False, drop_below_threshold: float = 1e-2, progress_print: bool = True):
+    def compute_all_time_bins(cls, p_x_given_n: NDArray, additional_cmaps: Optional[Dict]=None, produce_debug_outputs: bool = False, drop_below_threshold: float = 1e-2, progress_print: bool = True, color_blend_fn=None) -> Tuple[NDArray, NDArray]:
         """ 
-        all_t_bins_out_RGBA = MultiDecoderColorOverlayedPosteriors.compute_all_time_bins(p_x_given_n=p_x_given_n, additional_cmaps=additional_cmaps, produce_debug_outputs=False, drop_below_threshold=1e-1)
-        
+
+
+        import nptyping as ND
+        from nptyping import NDArray
+        from neuropy.utils.result_context import IdentifyingContext
+        from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import _helper_add_interpolated_position_columns_to_decoded_result_df
+        from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import MultiDecoderColorOverlayedPosteriors
+
+        ## INPUTS: a_new_fully_generic_result
+        # a_target_context: IdentifyingContext = IdentifyingContext(trained_compute_epochs='laps', pfND_ndim=1, decoder_identifier='pseudo2D', known_named_decoding_epochs_type='global', masked_time_bin_fill_type='nan_filled', data_grain='per_time_bin')
+        a_target_context: IdentifyingContext = IdentifyingContext(trained_compute_epochs='laps', pfND_ndim=1, decoder_identifier='pseudo2D', known_named_decoding_epochs_type='global', masked_time_bin_fill_type='ignore', data_grain='per_time_bin')
+        best_matching_context, a_result, a_decoder, a_decoded_marginal_posterior_df = a_new_fully_generic_result.get_results_best_matching_context(context_query=a_target_context, debug_print=False)
+        ## OUTPUTS: a_result, a_decoder, a_decoded_marginal_posterior_df
+        ## INPUTS: curr_active_pipeline, a_result, a_decoder, a_decoded_marginal_posterior_df
+        global_measured_position_df: pd.DataFrame = deepcopy(curr_active_pipeline.sess.position.to_dataframe())
+        a_decoded_marginal_posterior_df: pd.DataFrame = _helper_add_interpolated_position_columns_to_decoded_result_df(a_result=a_result, a_decoder=a_decoder, a_decoded_marginal_posterior_df=a_decoded_marginal_posterior_df, global_measured_position_df=global_measured_position_df)
+
+        global_decoded_result: SingleEpochDecodedResult = a_result.get_result_for_epoch(0)
+        p_x_given_n: NDArray[ND.Shape["N_POS_BINS, 4, N_TIME_BINS"], np.floating] = deepcopy(global_decoded_result.p_x_given_n) # .shape # (59, 4, 69488)
+        # p_x_given_n
+
+        ## INPUTS: p_x_given_n
+        all_t_bins_final_overlayed_out_RGBA, all_t_bins_per_decoder_out_RGBA, extra_all_t_bins_outputs_dict = MultiDecoderColorOverlayedPosteriors.compute_all_time_bins(p_x_given_n=p_x_given_n, produce_debug_outputs=False, drop_below_threshold=1e-1)
+
+
         """
         ## INPUTS: p_x_given_n, drop_below_threshold, additional_cmaps, produce_debug_outputs
 
         if additional_cmaps is None:
-            from pyphoplacecellanalysis.General.Model.Configs.LongShortDisplayConfig import DecoderIdentityColors, long_short_display_config_manager, apply_LR_to_RL_adjustment
-            from pyphocorehelpers.gui.Qt.color_helpers import ColorFormatConverter, debug_print_color, build_adjusted_color
-            from pyphocorehelpers.gui.Qt.color_helpers import ColormapHelpers
-            import numpy as np, matplotlib.pyplot as plt, matplotlib as mpl
-
-
             decoder_names_to_idx_map: Dict[int, types.DecoderName] = {0: 'long_LR', 1: 'long_RL', 2: 'short_LR', 3: 'short_RL'}
             color_dict: Dict[types.DecoderName, pg.QtGui.QColor] = DecoderIdentityColors.build_decoder_color_dict(wants_hex_str=False)
             additional_cmap_names: Dict[types.DecoderName, str] = {k: ColorFormatConverter.qColor_to_hexstring(v) for k, v in color_dict.items()}
             # additional_cmap_names = {'long_LR': '#4169E1', 'long_RL': '#607B00', 'short_LR': '#DC143C', 'short_RL': '#990099'} ## Just hardcoded version of `additional_cmap_names`
             additional_cmaps = {k:ColormapHelpers.create_transparent_colormap(color_literal_name=v, lower_bound_alpha=0.1, should_return_LinearSegmentedColormap=True) for k, v in additional_cmap_names.items()}
 
+        if color_blend_fn is None:
+            # color_blend_fn = cls.composite_multiplied_alpha
+            color_blend_fn = cls.composite_over
 
         n_pos_bins, n_decoders, n_time_bins = np.shape(p_x_given_n)
         assert n_decoders == 4, f"n_decoders: {n_decoders}"
 
         ## INPUTS: probability_values (n_pos_bins, 4)
-        all_t_bins_out_RGBA = np.zeros((n_time_bins, n_pos_bins, 4, 4))
+        all_t_bins_per_decoder_out_RGBA: NDArray[ND.Shape["N_TIME_BINS", "N_POS_BINS, 4, 4"], np.floating] = np.zeros((n_time_bins, n_pos_bins, 4, 4))
+        all_t_bins_final_overlayed_out_RGBA: NDArray[ND.Shape["N_TIME_BINS", "N_POS_BINS, 4"], np.floating] = np.zeros((n_time_bins, n_pos_bins, 4))
+
+        extra_all_t_bins_outputs_dict: Dict = {
+            'all_t_bins_per_decoder_alphas': np.zeros((n_time_bins, 4)),
+            # 'all_t_bins_per_decoder_out_RGBA': np.zeros((n_time_bins, n_pos_bins, 4, 4)),
+            'all_t_bins_per_decoder_alpha_weighted_RGBA': np.zeros((n_time_bins, n_pos_bins, 4, 4)),
+            'all_t_bins_final_RGBA': np.zeros((n_time_bins, n_pos_bins, 4)),
+        }
 
         for a_t_bin_idx in np.arange(n_time_bins):
             if progress_print:
@@ -260,6 +341,8 @@ class MultiDecoderColorOverlayedPosteriors:
             sum_over_all_pos_values: NDArray[ND.Shape["4"], np.floating] = np.nansum(probability_values, axis=0) # sum over pos
             if produce_debug_outputs:
                 print(f'sum_over_all_pos_values: {sum_over_all_pos_values}')
+                
+            decoder_alphas = sum_over_all_pos_values.copy()
             # sum_over_all_values: NDArray[ND.Shape["4, "], np.floating] = np.nansum(probability_values, axis=0)
             probability_values = probability_values / sum_over_all_pos_values ## normalize over decoder
 
@@ -285,9 +368,19 @@ class MultiDecoderColorOverlayedPosteriors:
                 # rgb = rgba[..., :3] 
                 # single_t_bin_out_RGBA[:, i, :] = rgba
                 
-                all_t_bins_out_RGBA[a_t_bin_idx, :, i, :] = rgba
+                all_t_bins_per_decoder_out_RGBA[a_t_bin_idx, :, i, :] = rgba
+            ## END for i, (a_decoder_name, a_cmap) in enum....
+            
+            single_t_bin_out_RGBA = all_t_bins_per_decoder_out_RGBA[a_t_bin_idx, :, :, :]
+            extra_all_t_bins_outputs_dict['all_t_bins_per_decoder_alphas'][a_t_bin_idx, :] = decoder_alphas
+            extra_all_t_bins_outputs_dict['all_t_bins_per_decoder_alpha_weighted_RGBA'][a_t_bin_idx, :, :, :] = (deepcopy(single_t_bin_out_RGBA) * decoder_alphas[None, :, None]) # (n_pos_bins, 4, 4)
+            all_t_bins_final_overlayed_out_RGBA[a_t_bin_idx, :, :] = color_blend_fn(single_t_bin_out_RGBA, decoder_alphas=decoder_alphas) # (n_pos_bins, 4, 4)
+            # extra_all_t_bins_outputs_dict['all_t_bins_final_RGBA'][a_t_bin_idx, :, :] = numpy_rgba_composite(np.transpose(single_t_bin_out_RGBA, (1, 0, 2)))  # (n_decoders, H=n_pos_bins, 4)
+            extra_all_t_bins_outputs_dict['all_t_bins_final_RGBA'][a_t_bin_idx, :, :] = numpy_rgba_composite(np.transpose(extra_all_t_bins_outputs_dict['all_t_bins_per_decoder_alpha_weighted_RGBA'][a_t_bin_idx, :, :, :], (1, 0, 2))) 
 
-        return all_t_bins_out_RGBA
+        ## END FOR for a_t_bin_idx in np.a...
+
+        return all_t_bins_final_overlayed_out_RGBA, all_t_bins_per_decoder_out_RGBA, extra_all_t_bins_outputs_dict
 
 
     @classmethod
@@ -355,7 +448,7 @@ class MultiDecoderColorOverlayedPosteriors:
         return out_rgba
 
 
-    @function_attributes(short_name=None, tags=['HACK', 'matplotlib', 'overlay', 'figure'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-05-04 18:19', related_items=[])
+    @function_attributes(short_name=None, tags=['HACK', 'matplotlib', 'overlay', 'figure'], input_requires=[], output_provides=[], uses=['numpy_rgba_composite'], used_by=[], creation_date='2025-05-04 18:19', related_items=[])
     @classmethod
     def extract_center_rgba_from_figure(cls, fig, axd, n_pos_bins, subplot_name='matplotlib_combined_rgba', debug_print=False):
         """ Used to reverse-engeinerr the overlayed colors from the matplotlib plot figure
@@ -473,7 +566,126 @@ class MultiDecoderColorOverlayedPosteriors:
         
         return center_rgba
 
+    @classmethod
+    def _plot_single_t_bin_images(cls, fig_num=None, **kwargs):
+        """ plots 
+        """
+        # from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import numpy_rgba_composite
 
+        plot_ax_values_dict = kwargs
+
+        subplot_ax_names_list = list(plot_ax_values_dict.keys())
+
+
+        special_single_t_bin_per_decoder_RGBA_var_name: str = 'single_t_bin_per_decoder_alpha_weighted_RGBA'
+        single_t_bin_per_decoder_RGBA = plot_ax_values_dict.get(special_single_t_bin_per_decoder_RGBA_var_name, None)
+        if single_t_bin_per_decoder_RGBA is not None:
+            subplot_ax_names_list.append(f'programmatic_test_{special_single_t_bin_per_decoder_RGBA_var_name}')
+            subplot_ax_names_list.append(f'matplotlib_{special_single_t_bin_per_decoder_RGBA_var_name}')
+            
+
+        fig = plt.figure(num=fig_num, layout="constrained", clear=True)
+        axd = fig.subplot_mosaic(
+            [
+                # ["pre_norm", "all_normed", "normed", "rgba", "_realphaed_single_t_bin_out_RGBA", "final_combined_rgba"],
+                # ["pre_norm", "normed", "rgba", "_realphaed_single_t_bin_out_RGBA", "final_combined_rgba", "matplotlib_combined_rgba"],
+                subplot_ax_names_list,
+                # ["main", "BLANK"],
+            ],
+            sharey=True
+        )
+
+        ## Plot the single time bin figure
+        # _pre_norm_prob_vals = MultiDecoderColorOverlayedPosteriors._prepare_arr_for_conversion_to_RGBA(_pre_norm_prob_vals, drop_below_threshold=drop_below_threshold)
+        # _all_normed_prob_vals = _prepare_arr_for_conversion_to_RGBA(_all_normed_prob_vals, drop_below_threshold=drop_below_threshold)
+
+        # final_overlayed_single_t_bin_out_RGBA = final_overlayed_single_t_bin_out_RGBA[:, None, :]
+        # img = deepcopy(final_overlayed_single_t_bin_out_RGBA)[:, None, :]
+        # final_rgb_on_white = blend_over_white(final_overlayed_single_t_bin_out_RGBA)  # (n_pos_bins, 3)
+        # img = final_rgb_on_white[:, None, :]               # (n_pos_bins, 1, 3)
+
+
+        # axd['pre_norm'].imshow(_pre_norm_prob_vals)
+        # axd['all_normed'].imshow(_all_normed_prob_vals)
+        # axd['normed'].imshow(probability_values)
+        # axd['rgba'].imshow(single_t_bin_out_RGBA)
+        # axd['_realphaed_single_t_bin_out_RGBA'].imshow(_realphaed_single_t_bin_out_RGBA)
+
+
+        for ax_name, vals in plot_ax_values_dict.items():
+            vals_shape = np.shape(vals)
+            if (len(vals_shape) == 2) and (vals_shape[-1] == 4):
+                vals = vals[:, None, :] ## matplotlib assume's its not an RGBA format dict and plots it wrongly
+                
+            axd[ax_name].imshow(vals)
+            axd[ax_name].set_title(ax_name)    
+
+
+        ## plot the computed one (which doesn't work):
+        # axd['final_combined_rgba'].imshow(img)
+
+
+        if single_t_bin_per_decoder_RGBA is not None:
+            
+            ax_name = f'programmatic_test_{special_single_t_bin_per_decoder_RGBA_var_name}'
+            rgba_layers = np.transpose(single_t_bin_per_decoder_RGBA, (1, 0, 2))[:, :, None, :]  # (n_decoders, H=n_pos_bins, W=1, 4)
+            print(f'numpy_rgba_composite(...):')
+            print(f'\trgba_layers.shape: {np.shape(rgba_layers)}')
+            final_rgba = numpy_rgba_composite(rgba_layers)  # (H, W, 4) (59, 1, 4)
+            axd[ax_name].imshow(final_rgba, aspect='auto')
+            axd[ax_name].set_title(ax_name)
+            print(f'\tfinal_rgba.shape: {np.shape(final_rgba)}')
+
+            ## use matplotlib's rendering to get the final output image:
+            ax_name = f'matplotlib_{special_single_t_bin_per_decoder_RGBA_var_name}'
+            for i in np.arange(4):
+                an_img = single_t_bin_per_decoder_RGBA[:, i, :]
+                # an_img = _realphaed_single_t_bin_out_RGBA[:, i, :] # .shape
+                an_img = an_img[:, None, :]
+                axd[ax_name].imshow(an_img, zorder=i)
+                print(f'\t\ti:{i}, an_img.shape: {np.shape(an_img)}')
+            axd[ax_name].set_title(ax_name)
+            
+        return fig, axd
+
+
+    ## INPUTS: extra_all_t_bins_outputs_dict
+
+
+    @function_attributes(short_name=None, tags=['TODO', 'TODO_2025-05-04'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-05-04 20:01', related_items=[])
+    @classmethod
+    def export_portion_as_images(cls, all_t_bins_out_RGBA, file_save_path='output/all_time_bins.pdf'):
+        import matplotlib.pyplot as plt
+        from matplotlib.backends.backend_pdf import PdfPages
+
+        # Save each time bin as a separate image
+        # for t_idx in range(all_t_bins_out_RGBA.shape[0]):
+        #     # Create a figure with subplots for each decoder
+        #     fig, axes = plt.subplots(1, 4, figsize=(20, 5))
+            
+        #     for decoder_idx in range(4):
+        #         # Extract RGBA data for this time bin and decoder
+        #         rgba_data = all_t_bins_out_RGBA[t_idx, :, decoder_idx, :]
+                
+        #         # Display as an image
+        #         axes[decoder_idx].imshow(rgba_data.reshape(1, -1, 4))
+        #         axes[decoder_idx].set_title(f'Decoder {decoder_idx}')
+            
+        #     plt.tight_layout()
+        #     plt.savefig(f'time_bin_{t_idx}.png')
+        #     plt.close()
+
+        # Or save all time bins in a single PDF
+        with PdfPages(file_save_path) as pdf:
+            for t_idx in range(all_t_bins_out_RGBA.shape[0]):
+                fig, axes = plt.subplots(1, 4, figsize=(20, 5))
+                for decoder_idx in range(4):
+                    rgba_data = all_t_bins_out_RGBA[t_idx, :, decoder_idx, :]
+                    axes[decoder_idx].imshow(rgba_data.reshape(1, -1, 4))
+                    axes[decoder_idx].set_title(f'Decoder {decoder_idx}')
+                plt.tight_layout()
+                pdf.savefig(fig)
+                plt.close()
 
 
 
