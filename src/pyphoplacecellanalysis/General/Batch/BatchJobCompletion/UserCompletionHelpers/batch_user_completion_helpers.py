@@ -3188,11 +3188,11 @@ def figures_plot_generalized_decode_epochs_dict_and_export_results_completion_fu
             # 'defaults': dict(extreme_threshold=0.8, opacity_max=0.7, thickness_ramping_multiplier=35),
             'overrides': dict(extreme_threshold=extreme_threshold, opacity_max=opacity_max, thickness_ramping_multiplier=thickness_ramping_multiplier),
             # '50_sec_window_scale': dict(extreme_threshold=0.5, thickness_ramping_multiplier=50),
-            'full_1700_sec_session_scale': dict(extreme_threshold=0.5, thickness_ramping_multiplier=25), ## really interesting, can see the low-magnitude endcap short-like firing
-            'experimental': dict(extreme_threshold=0.8, thickness_ramping_multiplier=55),
+            'full_1700_sec_session_scale': dict(extreme_threshold=0.5, thickness_ramping_multiplier=12), ## really interesting, can see the low-magnitude endcap short-like firing
+            # 'experimental': dict(extreme_threshold=0.8, thickness_ramping_multiplier=55),
         }
         
-        disable_all_grid_bin_bounds_lines: bool = additional_marginal_overlaying_measured_position_kwargs.get('disable_all_grid_bin_bounds_lines', False)
+        # disable_all_grid_bin_bounds_lines: bool = additional_marginal_overlaying_measured_position_kwargs.get('disable_all_grid_bin_bounds_lines', False)
         if 'disable_all_grid_bin_bounds_lines' not in additional_marginal_overlaying_measured_position_kwargs:
             additional_marginal_overlaying_measured_position_kwargs['disable_all_grid_bin_bounds_lines'] = False ## show the lines by default for big figures
 
