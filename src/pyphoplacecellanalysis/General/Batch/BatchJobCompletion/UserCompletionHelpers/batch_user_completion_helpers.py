@@ -3144,8 +3144,10 @@ def generalized_decode_epochs_dict_and_export_results_completion_function(self, 
 
     return across_session_results_extended_dict
 
-@function_attributes(short_name=None, tags=['figure', 'posterior'], input_requires=[], output_provides=[], uses=['_display_generalized_decoded_yellow_blue_marginal_epochs'], used_by=[], creation_date='2025-04-16 15:17', related_items=['generalized_decode_epochs_dict_and_export_results_completion_function'])
-def figures_plot_generalized_decode_epochs_dict_and_export_results_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict) -> dict:
+@function_attributes(short_name=None, tags=['figure', 'posterior'], input_requires=[], output_provides=[], uses=['_display_generalized_decoded_yellow_blue_marginal_epochs', '_display_decoded_context_marginal_overlaying_measured_position'], used_by=[], creation_date='2025-04-16 15:17', related_items=['generalized_decode_epochs_dict_and_export_results_completion_function'])
+def figures_plot_generalized_decode_epochs_dict_and_export_results_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict,
+                                                                                        included_figures_names=['_display_generalized_decoded_yellow_blue_marginal_epochs', '_display_decoded_context_marginal_overlaying_measured_position'],
+                                                                                        extreme_threshold: float=0.8, opacity_max:float=0.7, thickness_ramping_multiplier:float=35.0, **additional_marginal_overlaying_measured_position_kwargs) -> dict:
     """ Simple function that just plots the figure corresponding to by `generalized_decode_epochs_dict_and_export_results_completion_function` so we don't have to wait for the entire batch_figures_plotting on 2025-04-16 15:22.
     
     """
@@ -3172,18 +3174,20 @@ def figures_plot_generalized_decode_epochs_dict_and_export_results_completion_fu
 
     curr_active_pipeline.reload_default_display_functions()
 
-    # _display_generalized_decoded_yellow_blue_marginal_epochs ___________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
-    try:
-        _out = curr_active_pipeline.display('_display_generalized_decoded_yellow_blue_marginal_epochs', curr_active_pipeline.get_session_context(), defer_render=True, save_figure=True, is_dark_mode=False, override_fig_man=custom_fig_man)
-    except Exception as e:
-        print(f'\tfigures_plot_generalized_decode_epochs_dict_and_export_results_completion_function(...): "_display_generalized_decoded_yellow_blue_marginal_epochs" failed with error: {e}\n skipping.')
+    if '_display_generalized_decoded_yellow_blue_marginal_epochs' in included_figures_names:
+        # _display_generalized_decoded_yellow_blue_marginal_epochs ___________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
+        try:
+            _out = curr_active_pipeline.display('_display_generalized_decoded_yellow_blue_marginal_epochs', curr_active_pipeline.get_session_context(), defer_render=True, save_figure=True, is_dark_mode=False, override_fig_man=custom_fig_man)
+        except Exception as e:
+            print(f'\tfigures_plot_generalized_decode_epochs_dict_and_export_results_completion_function(...): "_display_generalized_decoded_yellow_blue_marginal_epochs" failed with error: {e}\n skipping.')
 
 
-    # _display_decoded_context_marginal_overlaying_measured_position ___________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
-    try:
-        _out = curr_active_pipeline.display('_display_decoded_context_marginal_overlaying_measured_position', curr_active_pipeline.get_session_context(), defer_render=True, save_figure=True, override_fig_man=custom_fig_man)
-    except Exception as e:
-        print(f'\tfigures_plot_generalized_decode_epochs_dict_and_export_results_completion_function(...): "_display_decoded_context_marginal_overlaying_measured_position" failed with error: {e}\n skipping.')
+    if '_display_decoded_context_marginal_overlaying_measured_position' in included_figures_names:
+        # _display_decoded_context_marginal_overlaying_measured_position ___________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
+        try:
+            _out = curr_active_pipeline.display('_display_decoded_context_marginal_overlaying_measured_position', curr_active_pipeline.get_session_context(), defer_render=True, save_figure=True, override_fig_man=custom_fig_man, extreme_threshold=extreme_threshold, opacity_max=opacity_max, thickness_ramping_multiplier=thickness_ramping_multiplier, **additional_marginal_overlaying_measured_position_kwargs)
+        except Exception as e:
+            print(f'\tfigures_plot_generalized_decode_epochs_dict_and_export_results_completion_function(...): "_display_decoded_context_marginal_overlaying_measured_position" failed with error: {e}\n skipping.')
 
 
     print(f'>>\t done with {curr_session_context}')
