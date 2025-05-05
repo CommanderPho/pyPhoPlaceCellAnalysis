@@ -182,8 +182,9 @@ class MultiDecoderColorOverlayedPosteriors:
     """
 
     @classmethod
-    def _test_single_t_bin(cls, probability_values: NDArray[ND.Shape["N_POS_BINS, 4"], np.floating], additional_cmaps: Optional[Dict]=None, drop_below_threshold: float = 1e-2, produce_debug_outputs:bool=True, color_blend_fn=None):
+    def _test_single_t_bin(cls, probability_values: NDArray[ND.Shape["N_POS_BINS, 4"], np.floating], active_decoder_cmap_dict: Optional[Dict]=None, drop_below_threshold: float = 1e-2, produce_debug_outputs:bool=True, color_blend_fn=None):
         """ 
+        NOTE: COMPLETELY INDEPENDENT/DECOUPLED from `cls.compute_all_time_bins` (copy/paste synchronized)
         
         Usage:
         
@@ -191,7 +192,7 @@ class MultiDecoderColorOverlayedPosteriors:
             probability_values: NDArray[ND.Shape["N_POS_BINS, 4"], np.floating] = deepcopy(p_x_given_n[:, :, a_t_bin_idx])
             decoder_alphas = np.nansum(p_x_given_n, axis=0) # .shape (4, n_t_bins)
 
-            final_overlayed_single_t_bin_out_RGBA, single_t_bin_out_RGBA, probability_values, _pre_norm_prob_vals, _all_normed_prob_vals = MultiDecoderColorOverlayedPosteriors._test_single_t_bin(probability_values=probability_values, additional_cmaps=additional_cmaps)
+            final_overlayed_single_t_bin_out_RGBA, single_t_bin_out_RGBA, probability_values, _pre_norm_prob_vals, _all_normed_prob_vals = MultiDecoderColorOverlayedPosteriors._test_single_t_bin(probability_values=probability_values, active_decoder_cmap_dict=active_decoder_cmap_dict)
             final_overlayed_single_t_bin_out_RGBA # (n_pos_bins, 4) - 4 for RGBA
 
         """
@@ -200,7 +201,7 @@ class MultiDecoderColorOverlayedPosteriors:
             color_blend_fn = cls.composite_over
 
 
-        if additional_cmaps is None:
+        if active_decoder_cmap_dict is None:
             from pyphoplacecellanalysis.General.Model.Configs.LongShortDisplayConfig import DecoderIdentityColors, long_short_display_config_manager, apply_LR_to_RL_adjustment
             from pyphocorehelpers.gui.Qt.color_helpers import ColorFormatConverter, debug_print_color, build_adjusted_color
             from pyphocorehelpers.gui.Qt.color_helpers import ColormapHelpers
@@ -211,7 +212,7 @@ class MultiDecoderColorOverlayedPosteriors:
             color_dict: Dict[types.DecoderName, pg.QtGui.QColor] = DecoderIdentityColors.build_decoder_color_dict(wants_hex_str=False)
             additional_cmap_names: Dict[types.DecoderName, str] = {k: ColorFormatConverter.qColor_to_hexstring(v) for k, v in color_dict.items()}
             # additional_cmap_names = {'long_LR': '#4169E1', 'long_RL': '#607B00', 'short_LR': '#DC143C', 'short_RL': '#990099'} ## Just hardcoded version of `additional_cmap_names`
-            additional_cmaps = {k:ColormapHelpers.create_transparent_colormap(color_literal_name=v, lower_bound_alpha=0.1, should_return_LinearSegmentedColormap=True) for k, v in additional_cmap_names.items()}
+            active_decoder_cmap_dict = {k:ColormapHelpers.create_transparent_colormap(color_literal_name=v, lower_bound_alpha=0.1, should_return_LinearSegmentedColormap=True) for k, v in additional_cmap_names.items()}
 
 
 
@@ -252,7 +253,7 @@ class MultiDecoderColorOverlayedPosteriors:
         probability_values = cls._prepare_arr_for_conversion_to_RGBA(probability_values, drop_below_threshold=drop_below_threshold)
 
         ## for each decoder:
-        for i, (a_decoder_name, a_cmap) in enumerate(additional_cmaps.items()):
+        for i, (a_decoder_name, a_cmap) in enumerate(active_decoder_cmap_dict.items()):
             if produce_debug_outputs:
                 # print(f'i: {i}, a_decoder_name: {a_decoder_name}')
                 pass
@@ -282,9 +283,12 @@ class MultiDecoderColorOverlayedPosteriors:
 
     @function_attributes(short_name=None, tags=['MAIN', 'all_t'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-05-04 18:00', related_items=[])
     @classmethod
-    def compute_all_time_bins(cls, p_x_given_n: NDArray, additional_cmaps: Optional[Dict]=None, produce_debug_outputs: bool = False, drop_below_threshold: float = 1e-2, progress_print: bool = True, color_blend_fn=None) -> Tuple[NDArray, NDArray]:
-        """ 
-
+    def compute_all_time_bins(cls, p_x_given_n: NDArray, active_decoder_cmap_dict: Optional[Dict]=None, produce_debug_outputs: bool = False, drop_below_threshold: float = 1e-2, progress_print: bool = True, color_blend_fn=None) -> Tuple[NDArray, NDArray]:
+        """ Computes the final RGBA colors for each position x time bin in p_x_given_n by overlaying each of the decoders values
+        
+        
+        NOTE: COMPLETELY INDEPENDENT/DECOUPLED from `cls._test_single_t_bin` (copy/paste synchronized)
+        
         #TODO 2025-05-05 04:07: - [ ] Can improve by not showing all four bins, but instead marginalizing over Long/Short and just plotting those. The off-color is ugly, and with only 2 options the colors can actually be orthogonal and easy to read
         
         
@@ -312,14 +316,14 @@ class MultiDecoderColorOverlayedPosteriors:
 
 
         """
-        ## INPUTS: p_x_given_n, drop_below_threshold, additional_cmaps, produce_debug_outputs
+        ## INPUTS: p_x_given_n, drop_below_threshold, active_decoder_cmap_dict, produce_debug_outputs
 
-        if additional_cmaps is None:
-            decoder_names_to_idx_map: Dict[int, types.DecoderName] = {0: 'long_LR', 1: 'long_RL', 2: 'short_LR', 3: 'short_RL'}
+        if active_decoder_cmap_dict is None:
+            # decoder_names_to_idx_map: Dict[int, types.DecoderName] = {0: 'long_LR', 1: 'long_RL', 2: 'short_LR', 3: 'short_RL'}
             color_dict: Dict[types.DecoderName, pg.QtGui.QColor] = DecoderIdentityColors.build_decoder_color_dict(wants_hex_str=False)
             additional_cmap_names: Dict[types.DecoderName, str] = {k: ColorFormatConverter.qColor_to_hexstring(v) for k, v in color_dict.items()}
             # additional_cmap_names = {'long_LR': '#4169E1', 'long_RL': '#607B00', 'short_LR': '#DC143C', 'short_RL': '#990099'} ## Just hardcoded version of `additional_cmap_names`
-            additional_cmaps = {k:ColormapHelpers.create_transparent_colormap(color_literal_name=v, lower_bound_alpha=0.1, should_return_LinearSegmentedColormap=True) for k, v in additional_cmap_names.items()}
+            active_decoder_cmap_dict = {k:ColormapHelpers.create_transparent_colormap(color_literal_name=v, lower_bound_alpha=0.1, should_return_LinearSegmentedColormap=True) for k, v in additional_cmap_names.items()}
 
         if color_blend_fn is None:
             # color_blend_fn = cls.composite_multiplied_alpha
@@ -328,14 +332,16 @@ class MultiDecoderColorOverlayedPosteriors:
         n_pos_bins, n_decoders, n_time_bins = np.shape(p_x_given_n)
         assert n_decoders == 4, f"n_decoders: {n_decoders}"
 
+
+
         ## INPUTS: probability_values (n_pos_bins, 4)
-        all_t_bins_per_decoder_out_RGBA: NDArray[ND.Shape["N_TIME_BINS", "N_POS_BINS, 4, 4"], np.floating] = np.zeros((n_time_bins, n_pos_bins, 4, 4))
+        all_t_bins_per_decoder_out_RGBA: NDArray[ND.Shape["N_TIME_BINS", "N_POS_BINS, N_DECODERS, 4"], np.floating] = np.zeros((n_time_bins, n_pos_bins, n_decoders, 4))
         all_t_bins_final_overlayed_out_RGBA: NDArray[ND.Shape["N_TIME_BINS", "N_POS_BINS, 4"], np.floating] = np.zeros((n_time_bins, n_pos_bins, 4))
 
         extra_all_t_bins_outputs_dict: Dict = {
-            'all_t_bins_per_decoder_alphas': np.zeros((n_time_bins, 4)),
+            'all_t_bins_per_decoder_alphas': np.zeros((n_time_bins, n_decoders)),
             # 'all_t_bins_per_decoder_out_RGBA': np.zeros((n_time_bins, n_pos_bins, 4, 4)),
-            'all_t_bins_per_decoder_alpha_weighted_RGBA': np.zeros((n_time_bins, n_pos_bins, 4, 4)),
+            'all_t_bins_per_decoder_alpha_weighted_RGBA': np.zeros((n_time_bins, n_pos_bins, n_decoders, 4)),
             'all_t_bins_final_RGBA': np.zeros((n_time_bins, n_pos_bins, 4)),
         }
 
@@ -345,7 +351,7 @@ class MultiDecoderColorOverlayedPosteriors:
                 if is_every_hundreth_t_bin:        
                     print(f'a_t_bin_idx: [{a_t_bin_idx}/{n_time_bins}]')
 
-            probability_values: NDArray[ND.Shape["N_POS_BINS, 4"], np.floating] = deepcopy(p_x_given_n[:, :, a_t_bin_idx])
+            probability_values: NDArray[ND.Shape["N_POS_BINS, N_DECODERS"], np.floating] = deepcopy(p_x_given_n[:, :, a_t_bin_idx])
 
             if produce_debug_outputs:
                 _pre_norm_prob_vals = deepcopy(probability_values)
@@ -355,7 +361,7 @@ class MultiDecoderColorOverlayedPosteriors:
                 ## normalize over (decoder, position)
                 sum_over_all_decoder_pos_values: float = np.nansum(_pre_norm_prob_vals, axis=(0, 1)) # sum over pos
                 print(f'sum_over_all_decoder_pos_values: {sum_over_all_decoder_pos_values}')
-                _all_normed_prob_vals = _pre_norm_prob_vals / sum_over_all_decoder_pos_values ## normalize
+                # _all_normed_prob_vals = _pre_norm_prob_vals / sum_over_all_decoder_pos_values ## normalize
 
             ## normalize over decoder
             sum_over_all_pos_values: NDArray[ND.Shape["4"], np.floating] = np.nansum(probability_values, axis=0) # sum over pos
@@ -374,7 +380,7 @@ class MultiDecoderColorOverlayedPosteriors:
             probability_values = cls._prepare_arr_for_conversion_to_RGBA(probability_values, drop_below_threshold=drop_below_threshold)
 
             ## for each decoder:
-            for i, (a_decoder_name, a_cmap) in enumerate(additional_cmaps.items()):
+            for i, (a_decoder_name, a_cmap) in enumerate(active_decoder_cmap_dict.items()):
                 if produce_debug_outputs:
                     # print(f'i: {i}, a_decoder_name: {a_decoder_name}')
                     pass
@@ -394,8 +400,8 @@ class MultiDecoderColorOverlayedPosteriors:
             # single_t_bin_out_RGBA: (n_pos_bins, 4, 4)
             single_t_bin_out_RGBA = all_t_bins_per_decoder_out_RGBA[a_t_bin_idx, :, :, :]
             extra_all_t_bins_outputs_dict['all_t_bins_per_decoder_alphas'][a_t_bin_idx, :] = decoder_alphas
-            extra_all_t_bins_outputs_dict['all_t_bins_per_decoder_alpha_weighted_RGBA'][a_t_bin_idx, :, :, :] = (deepcopy(single_t_bin_out_RGBA) * decoder_alphas[None, :, None]) # (n_pos_bins, 4, 4)
-            all_t_bins_final_overlayed_out_RGBA[a_t_bin_idx, :, :] = color_blend_fn(single_t_bin_out_RGBA, decoder_alphas=decoder_alphas) # (n_pos_bins, 4, 4)
+            extra_all_t_bins_outputs_dict['all_t_bins_per_decoder_alpha_weighted_RGBA'][a_t_bin_idx, :, :, :] = (deepcopy(single_t_bin_out_RGBA) * decoder_alphas[None, :, None]) # (n_pos_bins, n_decoders, 4)
+            all_t_bins_final_overlayed_out_RGBA[a_t_bin_idx, :, :] = color_blend_fn(single_t_bin_out_RGBA, decoder_alphas=decoder_alphas) # (n_pos_bins, 4, 4)?
             
             ## `numpy_rgba_composite` -- expects input = rgba_layers: (n_layers, H, W, 4) - here (H:
             # extra_all_t_bins_outputs_dict['all_t_bins_final_RGBA'][a_t_bin_idx, :, :] = numpy_rgba_composite(np.transpose(single_t_bin_out_RGBA, (1, 0, 2)))  # (n_decoders, H=n_pos_bins, 4)
@@ -476,7 +482,7 @@ class MultiDecoderColorOverlayedPosteriors:
         return out_rgba
 
 
-    @function_attributes(short_name=None, tags=['HACK', 'matplotlib', 'overlay', 'figure'], input_requires=[], output_provides=[], uses=['numpy_rgba_composite'], used_by=[], creation_date='2025-05-04 18:19', related_items=[])
+    @function_attributes(short_name=None, tags=['UNUSED', 'HACK', 'matplotlib', 'overlay', 'figure'], input_requires=[], output_provides=[], uses=['numpy_rgba_composite'], used_by=[], creation_date='2025-05-04 18:19', related_items=[])
     @classmethod
     def extract_center_rgba_from_figure(cls, fig, axd, n_pos_bins, subplot_name='matplotlib_combined_rgba', debug_print=False):
         """ Used to reverse-engeinerr the overlayed colors from the matplotlib plot figure
@@ -682,7 +688,7 @@ class MultiDecoderColorOverlayedPosteriors:
     ## INPUTS: extra_all_t_bins_outputs_dict
 
 
-    @function_attributes(short_name=None, tags=['TODO', 'TODO_2025-05-04'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-05-04 20:01', related_items=[])
+    @function_attributes(short_name=None, tags=['UNFINISHED', 'TODO', 'TODO_2025-05-04'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-05-04 20:01', related_items=[])
     @classmethod
     def export_portion_as_images(cls, all_t_bins_out_RGBA, file_save_path='output/all_time_bins.pdf'):
         import matplotlib.pyplot as plt
