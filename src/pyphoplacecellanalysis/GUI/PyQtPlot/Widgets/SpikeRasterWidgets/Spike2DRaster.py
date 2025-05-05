@@ -1391,9 +1391,6 @@ class Spike2DRaster(SpecificDockWidgetManipulatingMixin, DynamicDockDisplayAreaO
             ## sync up the widgets
             self.sync_matplotlib_render_plot_widget(identifier=name, sync_mode=sync_mode)
 
-
-
-
         return self.ui.matplotlib_view_widgets[name], fig, ax, dDisplayItem
     
 

@@ -28,6 +28,8 @@ from pyphoplacecellanalysis.Pho2D.PyQtPlots.plot_placefields import pyqtplot_plo
 from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.ContainerBased.PhoContainerTool import GenericPyQtGraphContainer
 
 
+from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.MultiContextComparingDisplayFunctions.MultiContextComparingDisplayFunctions import MultiContextComparingDisplayFunctions
+
 
 class MultiContextComparingDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=DisplayFunctionRegistryHolder):
 	""" MultiContextComparingDisplayFunctions
@@ -36,7 +38,7 @@ class MultiContextComparingDisplayFunctions(AllFunctionEnumeratingMixin, metacla
 	"""
 
 	@function_attributes(short_name='grid_bin_bounds_validation', tags=['grid_bin_bounds','validation','pandas','1D','position', 'LONG_SHORT_SPECIFIC'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-06-14 18:17', related_items=[], is_global=True)
-	def _display_grid_bin_bounds_validation(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, defer_render=False, save_figure=True, is_x_axis: bool = True, **kwargs):
+	def _display_grid_bin_bounds_validation(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, defer_render=False, save_figure=True, is_x_axis: bool = True, ax=None, **kwargs):
 		""" Renders a single figure that shows the 1D linearized position from several different sources to ensure sufficient overlap. Useful for validating that the grid_bin_bounds are chosen reasonably.
 
 		"""
@@ -58,7 +60,6 @@ class MultiContextComparingDisplayFunctions(AllFunctionEnumeratingMixin, metacla
 			# include_includelist = owning_pipeline_reference.active_completed_computation_result_names
 			include_includelist = ['long', 'short', 'global']
 			
-
 		if is_x_axis:
 			## plot x-positions
 			pos_var_names = ['x', 'lin_pos'] # , 'long_lin_pos', 'short_pos_df', 'global_lin_pos'
@@ -80,7 +81,7 @@ class MultiContextComparingDisplayFunctions(AllFunctionEnumeratingMixin, metacla
 			# combined_pos_df_plot_kwargs = dict(x='y', y='t', title='grid_bin_bounds validation across epochs - positions along y-axis')
 			combined_pos_df_plot_kwargs = dict(x='t', y=pos_var_names, title='grid_bin_bounds validation across epochs - positions along y-axis')
 
-
+		
 		title = f'grid_bin_bounds validation across epochs'
 		if is_x_axis:
 			title = f'{title} - X-axis'
@@ -90,12 +91,19 @@ class MultiContextComparingDisplayFunctions(AllFunctionEnumeratingMixin, metacla
 		const_line_text_label_y_offset: float = 0.05
 		const_line_text_label_x_offset: float = 0.1
 			
+		did_create_new_figure: bool = False
 		# Plot all 1D position variables:
-		combined_pos_df.plot(**combined_pos_df_plot_kwargs)
-		fig = plt.gcf()
-		ax = plt.gca()
+		if ax is None:
+			fig, ax = plt.subplots()
+			did_create_new_figure = True
+		else:
+			fig = ax.figure
+			did_create_new_figure = False
+			
+		combined_pos_df.plot(ax=ax, **combined_pos_df_plot_kwargs)
 		ax.set_title(title)
-		fig.canvas.manager.set_window_title(title)
+		if did_create_new_figure:
+			fig.canvas.manager.set_window_title(title)
 		
 		# Accessing the lines after plotting
 		position_lines_2D = ax.get_lines() # plt.Lines2D
@@ -111,7 +119,6 @@ class MultiContextComparingDisplayFunctions(AllFunctionEnumeratingMixin, metacla
 		grid_bin_bounds = curr_config.computation_config.pf_params.grid_bin_bounds # ((37.0773897438341, 250.69004399129707), (137.925447118083, 145.16448776601297))
 		# curr_config.computation_config.pf_params.grid_bin # (3.793023081021702, 1.607897707662558)
 		# loaded_track_limits = curr_config.active_session_config.loaded_track_limits
-
 
 		# curr_config.active_session_config.y_midpoint
 		
@@ -179,7 +186,9 @@ class MultiContextComparingDisplayFunctions(AllFunctionEnumeratingMixin, metacla
 		else:
 			saved_figure_paths = []
 
-		graphics_output_dict = MatplotlibRenderPlots(name='_display_grid_bin_bounds_validation', figures=(fig,), axes=(ax,), plot_data={'position_lines_2D': position_lines_2D, 'midpoint_line_collection': midpoint_line_collection, 'grid_bin_bounds_line_collection': grid_bin_bounds_line_collection, 'long_track_line_collection': long_track_line_collection, 'short_track_line_collection': short_track_line_collection}, context=final_context, saved_figures=[])
+		graphics_output_dict = MatplotlibRenderPlots(name='_display_grid_bin_bounds_validation', figures=(fig,), axes=(ax,),
+											    plot_data={'position_lines_2D': position_lines_2D, 'midpoint_line_collection': midpoint_line_collection, 'grid_bin_bounds_line_collection': grid_bin_bounds_line_collection, 'long_track_line_collection': long_track_line_collection, 'short_track_line_collection': short_track_line_collection},
+												context=final_context, saved_figures=[])
 		return graphics_output_dict
  
 
