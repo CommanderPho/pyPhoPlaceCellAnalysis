@@ -110,22 +110,40 @@ from pyphocorehelpers.gui.Qt.color_helpers import ColormapHelpers, ColorFormatCo
 #     alpha = rgba[:, 3:4]
 #     return rgb * alpha + (1 - alpha) * 1  # white background (RGB = 1)
 
-def numpy_rgba_composite(rgba_layers):
+def numpy_rgba_composite(rgba_layers: NDArray[ND.Shape["N_DECODERS, N_POS_BINS, 4"], np.floating], debug_print=False) -> NDArray:
     """
     rgba_layers: (n_layers, H, W, 4) — ordered bottom to top
     Returns: (H, W, 4) — final composited RGBA image
+    
+    #TODO 2025-05-05 02:23: - [ ] Note when it works `np.shape(rgba_layers) == (4, 59, 1, 4)`
     """
-    out_rgb = np.zeros_like(rgba_layers[0, ..., :3])
-    out_alpha = np.zeros_like(rgba_layers[0, ..., 3])
+    did_add_singular_W_column: bool = False
+    if np.ndim(rgba_layers) < 4:
+        rgba_layers = rgba_layers[:, :, None, :]  # (n_decoders, H=n_pos_bins, W=1, 4)
+        assert np.ndim(rgba_layers) == 4, f"rgba_layers is the wrong shape. after `rgba_layers = rgba_layers[:, :, None, :]`, np.ndim(rgba_layers): {np.ndim(rgba_layers)} and is still not equal 4!"
+        did_add_singular_W_column = True
+        
+    if debug_print:
+        n_layers, height, width, _RGBA_shape = np.shape(rgba_layers)
+        print(f'n_layers: {n_layers}, H: {height}, W: {width}, _RGBA_shape: {_RGBA_shape}')
+        assert _RGBA_shape == 4, f"_RGBA_shape should be 4 (for RGBA) but is _RGBA_shape: {_RGBA_shape}"
+
+    out_rgb: NDArray[ND.Shape["N_POS_BINS, 3"], np.floating] = np.zeros_like(rgba_layers[0, ..., :3])
+    out_alpha: NDArray[ND.Shape["N_POS_BINS"], np.floating] = np.zeros_like(rgba_layers[0, ..., 3])
 
     for rgba in rgba_layers:
-        src_rgb = rgba[..., :3]
-        src_alpha = rgba[..., 3]
+        ## when working for each iteration rgba.shape: (59, 1, 4)
+        src_rgb = rgba[..., :3] ## only the RGB components
+        src_alpha = rgba[..., 3] ## only the last component (3rd idx)
 
         out_rgb = src_rgb * src_alpha[..., None] + out_rgb * (1 - src_alpha)[..., None]
         out_alpha = src_alpha + out_alpha * (1 - src_alpha)
 
-    return np.concatenate([out_rgb, out_alpha[..., None]], axis=-1)
+    if did_add_singular_W_column:
+        return np.concatenate([out_rgb, out_alpha[..., None]], axis=-1)[:, 0, :]
+    else:
+        return np.concatenate([out_rgb, out_alpha[..., None]], axis=-1)
+
 
 
 
@@ -371,12 +389,20 @@ class MultiDecoderColorOverlayedPosteriors:
                 all_t_bins_per_decoder_out_RGBA[a_t_bin_idx, :, i, :] = rgba
             ## END for i, (a_decoder_name, a_cmap) in enum....
             
+            # single_t_bin_out_RGBA: (n_pos_bins, 4, 4)
             single_t_bin_out_RGBA = all_t_bins_per_decoder_out_RGBA[a_t_bin_idx, :, :, :]
             extra_all_t_bins_outputs_dict['all_t_bins_per_decoder_alphas'][a_t_bin_idx, :] = decoder_alphas
             extra_all_t_bins_outputs_dict['all_t_bins_per_decoder_alpha_weighted_RGBA'][a_t_bin_idx, :, :, :] = (deepcopy(single_t_bin_out_RGBA) * decoder_alphas[None, :, None]) # (n_pos_bins, 4, 4)
             all_t_bins_final_overlayed_out_RGBA[a_t_bin_idx, :, :] = color_blend_fn(single_t_bin_out_RGBA, decoder_alphas=decoder_alphas) # (n_pos_bins, 4, 4)
+            
+            ## `numpy_rgba_composite` -- expects input = rgba_layers: (n_layers, H, W, 4) - here (H:
             # extra_all_t_bins_outputs_dict['all_t_bins_final_RGBA'][a_t_bin_idx, :, :] = numpy_rgba_composite(np.transpose(single_t_bin_out_RGBA, (1, 0, 2)))  # (n_decoders, H=n_pos_bins, 4)
-            extra_all_t_bins_outputs_dict['all_t_bins_final_RGBA'][a_t_bin_idx, :, :] = numpy_rgba_composite(np.transpose(extra_all_t_bins_outputs_dict['all_t_bins_per_decoder_alpha_weighted_RGBA'][a_t_bin_idx, :, :, :], (1, 0, 2))) 
+            # extra_all_t_bins_outputs_dict['all_t_bins_final_RGBA'][a_t_bin_idx, :, :] = numpy_rgba_composite(np.transpose(extra_all_t_bins_outputs_dict['all_t_bins_per_decoder_alpha_weighted_RGBA'][a_t_bin_idx, :, :, :], (1, 0, 2))) # transpose -> (n_pos_bins, n_decoders, 4) => (n_decoders, n_pos_bins, 4)
+            extra_all_t_bins_outputs_dict['all_t_bins_final_RGBA'][a_t_bin_idx, :, :] = numpy_rgba_composite(np.transpose(extra_all_t_bins_outputs_dict['all_t_bins_per_decoder_alpha_weighted_RGBA'][a_t_bin_idx, :, :, :], (1, 0, 2))) # transpose -> (n_pos_bins, n_decoders, 4) => (n_decoders, n_pos_bins, 4)
+
+            # numpy_rgba_composite: Returns: (H, W, 4) — final composited RGBA image
+
+
 
         ## END FOR for a_t_bin_idx in np.a...
 
@@ -567,7 +593,7 @@ class MultiDecoderColorOverlayedPosteriors:
         return center_rgba
 
     @classmethod
-    def _plot_single_t_bin_images(cls, fig_num=None, **kwargs):
+    def _plot_single_t_bin_images(cls, fig_num=None, debug_print=True, **kwargs):
         """ plots 
         """
         # from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import numpy_rgba_composite
@@ -631,7 +657,9 @@ class MultiDecoderColorOverlayedPosteriors:
             rgba_layers = np.transpose(single_t_bin_per_decoder_RGBA, (1, 0, 2))[:, :, None, :]  # (n_decoders, H=n_pos_bins, W=1, 4)
             print(f'numpy_rgba_composite(...):')
             print(f'\trgba_layers.shape: {np.shape(rgba_layers)}')
-            final_rgba = numpy_rgba_composite(rgba_layers)  # (H, W, 4) (59, 1, 4)
+            final_rgba = numpy_rgba_composite(rgba_layers, debug_print=debug_print)  # (H, W, 4) (59, 1, 4)
+            if debug_print:
+                print(f'\tfinal_rgba.shape: {np.shape(final_rgba)} (post call to `numpy_rgba_composite(...)`)')
             axd[ax_name].imshow(final_rgba, aspect='auto')
             axd[ax_name].set_title(ax_name)
             print(f'\tfinal_rgba.shape: {np.shape(final_rgba)}')
