@@ -2461,7 +2461,7 @@ class EpochComputationDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Di
                     ## plot the basic lap-positions (measured) over time figure:
                     graphics_output_dict = owning_pipeline_reference.display(display_function='_display_grid_bin_bounds_validation', active_session_configuration_context=None, include_includelist=[], save_figure=False) # _display_grid_bin_bounds_validation
                     fig = graphics_output_dict.figures[0]
-                    out_axes_list =graphics_output_dict.axes
+                    out_axes_list = graphics_output_dict.axes
                     out_plot_data = graphics_output_dict.plot_data
 
                     ## get the lines2D object to turn off the default position lines:
