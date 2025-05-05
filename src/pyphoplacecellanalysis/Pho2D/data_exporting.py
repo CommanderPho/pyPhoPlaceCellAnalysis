@@ -1067,7 +1067,7 @@ class PosteriorExporting:
 
         return out_image_save_tuple_dict, out_image_paths
 
-    @function_attributes(short_name=None, tags=['marginal', 'export'], input_requires=[], output_provides=[], uses=['cls._test_export_marginals_for_figure'], used_by=[], creation_date='2025-01-02 01:13', related_items=[])
+    @function_attributes(short_name=None, tags=['marginal', 'export'], input_requires=[], output_provides=[], uses=['cls._test_export_marginals_for_figure'], used_by=[], creation_date='2024-09-06 00:00', related_items=[])
     @classmethod
     def _perform_export_current_epoch_marginal_and_raster_images(cls, _out_ripple_rasters, directional_merged_decoders_result, filtered_decoder_filter_epochs_decoder_result_dict, active_session_context, root_export_path: Path, epoch_id_identifier_str='lap',
                                                                  desired_width = 2048, desired_height = 720, debug_print=False

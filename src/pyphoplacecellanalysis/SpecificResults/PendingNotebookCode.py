@@ -285,7 +285,9 @@ class MultiDecoderColorOverlayedPosteriors:
     def compute_all_time_bins(cls, p_x_given_n: NDArray, additional_cmaps: Optional[Dict]=None, produce_debug_outputs: bool = False, drop_below_threshold: float = 1e-2, progress_print: bool = True, color_blend_fn=None) -> Tuple[NDArray, NDArray]:
         """ 
 
-
+        #TODO 2025-05-05 04:07: - [ ] Can improve by not showing all four bins, but instead marginalizing over Long/Short and just plotting those. The off-color is ugly, and with only 2 options the colors can actually be orthogonal and easy to read
+        
+        
         import nptyping as ND
         from nptyping import NDArray
         from neuropy.utils.result_context import IdentifyingContext

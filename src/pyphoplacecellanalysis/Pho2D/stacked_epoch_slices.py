@@ -3263,6 +3263,22 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
     @function_attributes(short_name=None, tags=['export', 'image', 'marginal'], input_requires=[], output_provides=[], uses=['PosteriorExporting._perform_export_current_epoch_marginal_and_raster_images'], used_by=[], creation_date='2024-10-09 16:29', related_items=[])
     def export_current_epoch_marginal_and_raster_images(self, directional_merged_decoders_result, root_export_path: Path, active_context: Optional[IdentifyingContext]=None):
         """ Export Marginal Pseudo2D posteriors and rasters for middle-clicked epochs
+        
+
+        Usage:        
+            # DirectionalMergedDecoders: Get the result after computation:
+            directional_merged_decoders_result = curr_active_pipeline.global_computation_results.computed_data['DirectionalMergedDecoders'] # uses `DirectionalMergedDecoders`.
+
+            # root_export_path: Path = Path(r"/media/halechr/MAX/cloud/University of Michigan Dropbox/Pho Hale/Pho Diba Paper 2023/array_as_image").resolve() # Lab
+            root_export_path.mkdir(exist_ok=True)
+            Assert.path_exists(root_export_path)
+
+            complete_session_context, (session_context, additional_session_context) = curr_active_pipeline.get_complete_session_context()
+            epoch_specific_folder, (out_image_save_tuple_dict, _out_rasters_save_paths, merged_img_save_path) = paginated_multi_decoder_decoded_epochs_window.export_current_epoch_marginal_and_raster_images(directional_merged_decoders_result=directional_merged_decoders_result, root_export_path=root_export_path, active_context=complete_session_context)
+
+            file_uri_from_path(epoch_specific_folder)
+            fullwidth_path_widget(a_path=epoch_specific_folder, file_name_label="epoch_specific_folder:")
+        
         """
         from pyphoplacecellanalysis.Pho2D.data_exporting import PosteriorExporting
         # root_export_path = Path(r"E:\Dropbox (Personal)\Active\Kamran Diba Lab\Pho-Kamran-Meetings\2024-05-01 - Pseudo2D Again\array_as_image").resolve() # Apogee
