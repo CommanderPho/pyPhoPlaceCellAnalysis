@@ -1812,6 +1812,11 @@ class DirectionalPseudo2DDecodersResult(ComputedResult):
         if isinstance(filter_epochs_decoder_result, (List, NDArray)):
             ## assume it's already `p_x_given_n_list` format
             p_x_given_n_list = filter_epochs_decoder_result
+        elif (not hasattr(filter_epochs_decoder_result, 'p_x_given_n_list')):
+            ## assume it's a SingleEpochDecodedResult and wrap its only entry
+            assert hasattr(filter_epochs_decoder_result, 'p_x_given_n'), f"type(filter_epochs_decoder_result): {type(filter_epochs_decoder_result)}, filter_epochs_decoder_result: {filter_epochs_decoder_result}"
+            p_x_given_n_list = [filter_epochs_decoder_result.p_x_given_n]
+
         else:
             ## assume it's in the `DecodedFilterEpochsResult` format, access its `.p_x_given_n_list`
             p_x_given_n_list = filter_epochs_decoder_result.p_x_given_n_list
