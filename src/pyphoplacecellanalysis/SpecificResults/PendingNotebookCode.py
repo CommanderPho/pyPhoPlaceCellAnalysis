@@ -432,6 +432,8 @@ class MultiDecoderColorOverlayedPosteriors:
 
 
         """
+        
+        # p_x_given_n: NDArray[ND.Shape["N_TIME_BINS, N_POS_BINS, N_DECODERS"], np.floating]
         ## INPUTS: p_x_given_n, drop_below_threshold, active_decoder_cmap_dict, produce_debug_outputs
 
         if active_decoder_cmap_dict is None:
@@ -715,9 +717,10 @@ class MultiDecoderColorOverlayedPosteriors:
         
         return center_rgba
 
+    @function_attributes(short_name=None, tags=['DEPRICATED'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-05-06 19:34', related_items=[])
     @classmethod
     def _plot_single_t_bin_images(cls, fig_num=None, debug_print=True, **kwargs):
-        """ plots 
+        """ plots debugging plots for this data
         """
         # from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import numpy_rgba_composite
 
@@ -950,13 +953,9 @@ class MultiDecoderColorOverlayedPosteriors:
         enable_set_axis_limits:bool=True
         
         ## Determine the actual start/end times:
-        x_first_extent = _subfn_try_get_approximate_recovered_t_pos(time_bin_centers, xbin, use_original_bounds=use_original_bounds)
+        x_first_extent = _subfn_try_get_approximate_recovered_t_pos(time_bin_centers, xbin, use_original_bounds=use_original_bounds) # x_first_extent = (xmin, xmax, ymin, ymax)
         xmin, xmax, ymin, ymax = x_first_extent
-        # approximated_recovered_delta_t: float = float(np.nanmedian(np.diff(time_window_centers)))
-        # approximated_recovered_half_delta_t = approximated_recovered_delta_t / 2.0
-        # # xmin, xmax, ymin, ymax = (time_window_centers[0], time_window_centers[-1], xbin[0], xbin[-1]) # TODO 2024-03-27 - This is actually incorrect, the extents should be the actual start/stop of the bins, not the time_window_centers
-        # xmin, xmax, ymin, ymax = ((time_window_centers[0]-approximated_recovered_half_delta_t), (time_window_centers[-1]+approximated_recovered_half_delta_t), xbin[0], xbin[-1]) # 2024-03-27 - Corrected extents computed by adding a half-bin width to the first/last time_window_centers to recover the proper edges.
-        # x_first_extent = (xmin, xmax, ymin, ymax)
+
         try:
             im_posterior_x = ax.imshow(img, extent=x_first_extent, **(dict(animated=False) | main_plot_kwargs)) 
             # assert xmin < xmax
@@ -969,25 +968,6 @@ class MultiDecoderColorOverlayedPosteriors:
             # ax.clear() # clear the existing and now invalid image
             im_posterior_x = None
             
-
-
-        # plt.imshow(img)
-        # plt.axis('off')
-        
-        # ax.set_ylim(auto=True)
-        # xmin, xmax = start_t_bin_idx, start_t_bin_idx + (t_bin_size * 5)
-        # ax.set_xlim(xmin, xmax)  # set your desired x-limits
-        # ax.set_autoscaley_on(True)
-        # ax.set_navigate(True)
-
-        # def on_scroll(event):
-        #     if event.button == 'up':
-        #         ax.set_xlim(ax.get_xlim()[0] + 1, ax.get_xlim()[1] + 1)
-        #     elif event.button == 'down':
-        #         ax.set_xlim(ax.get_xlim()[0] - 1, ax.get_xlim()[1] - 1)
-        #     fig.canvas.draw_idle()
-
-        # fig.canvas.mpl_connect('scroll_event', on_scroll)
 
         return fig, ax, im_posterior_x
 
