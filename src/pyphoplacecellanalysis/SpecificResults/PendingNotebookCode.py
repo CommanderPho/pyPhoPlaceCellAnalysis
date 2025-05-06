@@ -894,8 +894,11 @@ class MultiDecoderColorOverlayedPosteriors:
             ax.set_ylim((ymin, ymax))        
 
         return fig, ax, out_im_posterior_x_dict
+    
+
+    @function_attributes(short_name=None, tags=['plot', 'matplotlib'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-05-04 00:00', related_items=[])
     @classmethod
-    def plot_mutli_t_bin_image(cls, all_t_bins_final_RGBA, time_bin_centers=None, xbin=None, start_t_bin_idx: int = 0, desired_n_seconds: Optional[float] = None, t_bin_size = 0.05, ax=None, use_original_bounds=False):
+    def plot_mutli_t_bin_RGBA_image(cls, all_t_bins_final_RGBA, time_bin_centers=None, xbin=None, start_t_bin_idx: int = 0, desired_n_seconds: Optional[float] = None, t_bin_size = 0.05, ax=None, use_original_bounds=False):
         """ plots a portion of the color-merged result onto a matplotlib axes 
         """
         from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError import _subfn_try_get_approximate_recovered_t_pos
@@ -916,7 +919,9 @@ class MultiDecoderColorOverlayedPosteriors:
 
         active_subset_all_t_bins_final_RGBA.shape
 
-        n_pos_bins, n_decoders, _n_rgba_channels = np.shape(active_subset_all_t_bins_final_RGBA)
+
+        # n_pos_bins, n_decoders, _n_rgba_channels = np.shape(active_subset_all_t_bins_final_RGBA)
+        n_time_bins, n_pos_bins, n_decoders, _n_rgba_channels = np.shape(active_subset_all_t_bins_final_RGBA)
 
         
         if xbin is None:
@@ -1037,7 +1042,7 @@ class MultiDecoderColorOverlayedPosteriors:
 
         ## INPUTS: time_bin_centers, all_t_bins_final_RGBA, xbin
         # all_t_bins_final_RGBA.shape # (69488, 59, 4)
-        fig, ax, im_posterior_x = MultiDecoderColorOverlayedPosteriors.plot_mutli_t_bin_image(all_t_bins_final_RGBA=all_t_bins_final_RGBA, xbin=xbin, time_bin_centers=time_bin_centers, t_bin_size=t_bin_size, ax=ax)
+        fig, ax, im_posterior_x = MultiDecoderColorOverlayedPosteriors.plot_mutli_t_bin_RGBA_image(all_t_bins_final_RGBA=all_t_bins_final_RGBA, xbin=xbin, time_bin_centers=time_bin_centers, t_bin_size=t_bin_size, ax=ax)
         
         ## sync up the widgets
         active_2d_plot.sync_matplotlib_render_plot_widget(dock_identifier, sync_mode=SynchronizedPlotMode.TO_WINDOW)
