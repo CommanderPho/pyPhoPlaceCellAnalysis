@@ -802,6 +802,95 @@ class MultiDecoderColorOverlayedPosteriors:
 
     ## INPUTS: extra_all_t_bins_outputs_dict
 
+    @function_attributes(short_name=None, tags=['plot'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-05-06 19:02', related_items=[])
+    @classmethod
+    def plot_mutli_t_bin_p_x_given_n(cls, all_t_bins_per_decoder_out_RGBA: NDArray, time_bin_centers=None, xbin=None, t_bin_size = 0.05, ax=None):
+        """ plots a portion of the color-merged result onto a matplotlib axes 
+        """
+        # all_t_bins_per_decoder_out_RGBA: NDArray[ND.Shape["N_TIME_BINS", "N_POS_BINS", "N_DECODERS", "4"], np.floating]
+        
+        from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError import _subfn_try_get_approximate_recovered_t_pos
+        
+
+        n_time_bins, n_pos_bins, n_decoders, _n_RGBA_channels = np.shape(all_t_bins_per_decoder_out_RGBA)
+        assert _n_RGBA_channels == 4
+
+        if xbin is None:
+            xbin = np.arange(n_pos_bins) + 0.5
+            use_original_bounds = True
+            
+        if time_bin_centers is None:
+            time_bin_centers = (np.arange(n_time_bins) * t_bin_size) + (0.5 * t_bin_size)
+            use_original_bounds = True
+            
+        # rgba.shape (n_pos_bins, 4) # the 4 here is for RGBA, not the decoders
+        # plt.imshow(rgba)
+
+        # img = rgba[:,None,:]            # (59,1,4)
+        if ax is None:
+            plt.style.use('dark_background')
+            # fig = plt.figure(num='NEW_FINAL all_t_bins_final_RGBA', layout="constrained", clear=True)
+            fig, ax = plt.subplots(num='NEW_FINAL plot_mutli_t_bin_p_x_given_n', layout="constrained", clear=True)
+        else:
+            fig = ax.get_figure()           
+
+        # img = np.transpose(active_subset_p_x_given_n, (1, 0, 2))
+        
+        # Compute extents for imshow:
+        main_plot_kwargs = {
+            'origin': 'lower',
+            'vmin': 0,
+            'vmax': 1,
+            # 'cmap': cmap,
+            'interpolation':'nearest',
+            'aspect':'auto',
+        } # merges `posterior_heatmap_imshow_kwargs` into main_plot_kwargs, replacing the existing values if present in both
+        # Posterior distribution heatmaps at each point.
+        enable_set_axis_limits:bool=True
+        
+        ## Determine the actual start/end times:
+        x_first_extent = _subfn_try_get_approximate_recovered_t_pos(time_bin_centers, xbin, use_original_bounds=use_original_bounds) # x_first_extent = (xmin, xmax, ymin, ymax)
+        xmin, xmax, ymin, ymax = x_first_extent
+
+
+        # rgba_layers = np.transpose(all_t_bins_per_decoder_out_RGBA, (1, 0, 2))[:, :, None, :]  # (n_decoders, H=n_pos_bins, W=1, 4)
+        # print(f'numpy_rgba_composite(...):')
+        # print(f'\trgba_layers.shape: {np.shape(rgba_layers)}')
+        # final_rgba = numpy_rgba_composite(rgba_layers, debug_print=debug_print)  # (H, W, 4) (59, 1, 4)
+        # if debug_print:
+        #     print(f'\tfinal_rgba.shape: {np.shape(final_rgba)} (post call to `numpy_rgba_composite(...)`)')
+        # axd[ax_name].imshow(final_rgba, aspect='auto')
+        # axd[ax_name].set_title(ax_name)
+        # print(f'\tfinal_rgba.shape: {np.shape(final_rgba)}')
+
+        out_im_posterior_x_dict = {}
+        
+        ## use matplotlib's rendering to get the final output image:
+        for i in np.arange(n_decoders):
+            an_img = all_t_bins_per_decoder_out_RGBA[:, :, i, :] # .shape (n_time_bins, n_pos_bins, _n_RGBA_channels)
+            # an_img = _realphaed_single_t_bin_out_RGBA[:, i, :] # .shape (n_time_bins, n_pos_bins, _n_RGBA_channels)
+            # an_img = an_img[:, None, :]
+            # ax.imshow(an_img, zorder=i)
+            # print(f'\t\ti:{i}, an_img.shape: {np.shape(an_img)}')
+
+            an_img = np.transpose(an_img, (1, 0, 2))
+            # print(f'\t\ti:{i}, an_img.shape: {np.shape(an_img)}')
+
+            try:
+                im_posterior_x = ax.imshow(an_img, zorder=i, extent=x_first_extent, **(dict(animated=False) | main_plot_kwargs)) 
+
+            except ValueError as err:
+                # ValueError: Axis limits cannot be NaN or Inf
+                print(f'WARN: active_extent (xmin, xmax, ymin, ymax): {x_first_extent} contains NaN or Inf.\n\terr: {err}')
+                # ax.clear() # clear the existing and now invalid image
+                im_posterior_x = None
+            out_im_posterior_x_dict[i] = im_posterior_x
+        # end for i in np.arange(n_decoders)
+        if enable_set_axis_limits:
+            ax.set_xlim((xmin, xmax)) # UserWarning: Attempting to set identical low and high xlims makes transformation singular; automatically expanding.
+            ax.set_ylim((ymin, ymax))        
+
+        return fig, ax, out_im_posterior_x_dict
     @classmethod
     def plot_mutli_t_bin_image(cls, all_t_bins_final_RGBA, time_bin_centers=None, xbin=None, start_t_bin_idx: int = 0, desired_n_seconds: Optional[float] = None, t_bin_size = 0.05, ax=None, use_original_bounds=False):
         """ plots a portion of the color-merged result onto a matplotlib axes 
