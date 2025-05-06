@@ -502,6 +502,169 @@ class SpecificDockWidgetManipulatingMixin(BaseDynamicInstanceConformingMixin):
         return identifier_name, widget, matplotlib_fig, matplotlib_fig_axes, dock_item
 
 
+    @function_attributes(short_name=None, tags=['IMPORTANT', 'track', 'posterior', 'marginal'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-03-21 08:10', related_items=[])
+    def add_docked_hairy_marginal_position_track(self, name: str, time_window_centers: NDArray, a_1D_posterior: NDArray, xbin: Optional[NDArray]=None, a_variable_name: Optional[str]=None, a_dock_config: Optional[CustomDockDisplayConfig]=None, extended_dock_title_info: Optional[str]=None, **kwargs):
+        """ adds a marginal (such as Long v. Short, or Long_LR v. Long_RL v. Short_LR v. Short_RL) 
+        
+        time_bin_size = epochs_decoding_time_bin_size
+        info_string: str = f" - t_bin_size: {time_bin_size}"
+        identifier_name, widget, matplotlib_fig, matplotlib_fig_axes, dock_item = active_2d_plot.add_docked_marginal_track(name='non-PBE_marginal_over_track_ID',
+                                                                                                time_window_centers=time_window_centers, a_1D_posterior=non_PBE_marginal_over_track_ID, extended_dock_title_info=info_string)
+        """
+        from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError import plot_1D_most_likely_position_comparsions
+        from neuropy.utils.matplotlib_helpers import get_heatmap_cmap
+        from pyphoplacecellanalysis.General.Model.Configs.LongShortDisplayConfig import PlottingHelpers
+        
+        if a_variable_name is None:
+            a_variable_name = name
+
+        if a_dock_config is None:
+            override_dock_group_name: str = None ## this feature doesn't work
+            a_dock_config = CustomCyclicColorsDockDisplayConfig(showCloseButton=True, showTimelineSyncModeButton=True, named_color_scheme=NamedColorScheme.grey)
+            a_dock_config.dock_group_names = [override_dock_group_name] # , 'non-PBE Continuous Decoding'
+
+
+        n_xbins, n_t_bins = np.shape(a_1D_posterior)
+
+        if xbin is None:
+            xbin = np.arange(n_xbins)
+
+        ## ✅ Add a new row for each of the four 1D directional decoders:
+        identifier_name: str = name
+        if extended_dock_title_info is not None:
+            identifier_name += extended_dock_title_info ## add extra info like the time_bin_size in ms
+        print(f'identifier_name: {identifier_name}')
+        widget, matplotlib_fig, matplotlib_fig_axes, dock_item = self.add_new_matplotlib_render_plot_widget(name=identifier_name, dockSize=(25, 200), display_config=a_dock_config, **kwargs)
+        an_ax = matplotlib_fig_axes[0]
+
+        variable_name: str = a_variable_name
+        
+        # active_most_likely_positions = active_marginals.most_likely_positions_1D # Raw decoded positions
+        active_most_likely_positions = None
+        active_posterior = deepcopy(a_1D_posterior)
+        
+        posterior_heatmap_imshow_kwargs = dict()
+        
+        # most_likely_positions_mode: 'standard'|'corrected'
+        ## Actual plotting portion:
+        fig, an_ax = plot_1D_most_likely_position_comparsions(measured_position_df=None, time_window_centers=time_window_centers, xbin=deepcopy(xbin),
+                                                                posterior=active_posterior,
+                                                                active_most_likely_positions_1D=active_most_likely_positions,
+                                                                ax=an_ax, variable_name=variable_name, debug_print=True, enable_flat_line_drawing=False,
+                                                                posterior_heatmap_imshow_kwargs=posterior_heatmap_imshow_kwargs)
+
+        ## Update the params
+        widget.params.variable_name = variable_name
+        widget.params.posterior_heatmap_imshow_kwargs = deepcopy(posterior_heatmap_imshow_kwargs)
+        widget.params.enable_flat_line_drawing = False
+        if extended_dock_title_info is not None:
+            widget.params.extended_dock_title_info = deepcopy(extended_dock_title_info)
+            
+        ## Update the plots_data
+        if time_window_centers is not None:
+            widget.plots_data.time_window_centers = deepcopy(time_window_centers)
+        if xbin is not None:
+            widget.plots_data.xbin = deepcopy(xbin)
+        if active_most_likely_positions is not None:
+            widget.plots_data.active_most_likely_positions = deepcopy(active_most_likely_positions)
+        widget.plots_data.variable_name = variable_name
+        if a_1D_posterior is not None:
+            widget.plots_data.matrix = deepcopy(a_1D_posterior)
+
+        widget.draw() # alternative to accessing through full path?
+        sync_mode = kwargs.get('sync_mode', None)
+        if sync_mode is None:
+            self.sync_matplotlib_render_plot_widget(identifier_name) # Sync it with the active window:
+        else:
+            self.sync_matplotlib_render_plot_widget(identifier_name, sync_mode=sync_mode)
+            
+
+        def pyqtgraph_widget_on_toggle_timeline_sync_mode(an_item, is_checked):
+            """ Captures: widget
+            """
+            print(f'pyqtgraph_widget_on_toggle_timeline_sync_mode(an_item: {an_item}, is_checked: {is_checked})')
+            self.on_toggle_timeline_sync_mode(an_item=an_item, is_checked=is_checked)
+            widget.draw()
+            
+        if 'button_action_callbacks' not in dock_item.connections:
+            dock_item.connections['button_action_callbacks'] = {} ## initialize to new
+        _out_connections = dock_item.connections['button_action_callbacks']
+        _prev_conn = _out_connections.pop(identifier_name, None)
+        if _prev_conn is not None:
+            dock_item.sigToggleTimelineSyncModeClicked.disconnect(_prev_conn)
+            _prev_conn = None
+
+        assert identifier_name == dock_item._name
+        # sync_connection = _out_connections.get(identifier_name, None)
+        # _out_connections[identifier_name] = dock_item.sigToggleTimelineSyncModeClicked.connect(self.on_toggle_timeline_sync_mode)
+        _out_connections[identifier_name] = dock_item.sigToggleTimelineSyncModeClicked.connect(pyqtgraph_widget_on_toggle_timeline_sync_mode)
+        # dock_item.connections['button_action_callbacks'].update(_out_connections)
+        dock_item.connections['button_action_callbacks'] = _out_connections
+
+
+        # ==================================================================================================================================================================================================================================================================================== #
+        # BEGIN PLOTTING                                                                                                                                                                                                                                                                       #
+        # ==================================================================================================================================================================================================================================================================================== #
+        ax.set_facecolor('white')
+
+        ## OUT: all_directional_continuously_decoded_dict
+        ## Draw the position meas/decoded on the plot widget
+        ## INPUT: fig, ax_list, all_directional_continuously_decoded_dict, track_templates
+
+
+        ## INPUTS: a_decoded_marginal_posterior_df
+
+        should_plot_grid_bin_bounds_lines = False
+
+        # plot the basic lap-positions (measured) over time figure:
+        _out = dict()
+        _out['_display_grid_bin_bounds_validation'] = curr_active_pipeline.display(display_function='_display_grid_bin_bounds_validation', active_session_configuration_context=None, include_includelist=[], save_figure=False, ax=ax) # _display_grid_bin_bounds_validation
+        fig = _out['_display_grid_bin_bounds_validation'].figures[0]
+        out_axes_list =_out['_display_grid_bin_bounds_validation'].axes
+        out_plot_data =_out['_display_grid_bin_bounds_validation'].plot_data
+
+        ax = out_axes_list[0]
+
+        ## get the lines2D object to turn off the default position lines:
+        position_lines_2D = out_plot_data['position_lines_2D']
+        ## hide all inactive lines:
+        for a_line in position_lines_2D:
+            a_line.set_visible(False)
+
+
+        interesting_hair_parameter_kwarg_dict = {
+            'defaults': dict(extreme_threshold=0.8, opacity_max=0.7, thickness_ramping_multiplier=35),
+            '50_sec_window_scale': dict(extreme_threshold=0.5, thickness_ramping_multiplier=50),
+            'full_1700_sec_session_scale': dict(extreme_threshold=0.5, thickness_ramping_multiplier=25), ## really interesting, can see the low-magnitude endcap short-like firing
+            'experimental': dict(extreme_threshold=0.8, thickness_ramping_multiplier=55),
+            'pbe': dict(extreme_threshold=0.0, opacity_max=0.9, thickness_ramping_multiplier=55),
+        }
+
+
+        out_plot_data = _subfn_hide_all_plot_lines(out_plot_data)
+        # an_pos_line_artist, df_viz = _perform_plot_hairy_overlayed_position(df=deepcopy(a_decoded_marginal_posterior_df), ax=ax, extreme_threshold=0.5, thickness_ramping_multiplier=50) # , thickness_ramping_multiplier=5
+
+
+
+        ## Named parameter set:
+        # an_pos_line_artist, df_viz = _perform_plot_hairy_overlayed_position(df=deepcopy(a_decoded_marginal_posterior_df), ax=ax, **interesting_hair_parameter_kwarg_dict['50_sec_window_scale'])
+        # an_pos_line_artist, df_viz = _perform_plot_hairy_overlayed_position(df=deepcopy(a_decoded_marginal_posterior_df), ax=ax, **interesting_hair_parameter_kwarg_dict['full_1700_sec_session_scale'])
+        an_pos_line_artist, df_viz = _perform_plot_hairy_overlayed_position(df=deepcopy(a_decoded_marginal_posterior_df), ax=an_ax, **interesting_hair_parameter_kwarg_dict['pbe'])
+
+
+
+
+        widget.draw()
+
+
+
+
+        return identifier_name, widget, matplotlib_fig, matplotlib_fig_axes, dock_item
+
+
+
+
+
 
     # ==================================================================================================================== #
     # Multiple Tracks at once:                                                                                             #
