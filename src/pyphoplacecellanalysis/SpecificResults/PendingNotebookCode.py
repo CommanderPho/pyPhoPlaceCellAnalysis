@@ -687,6 +687,56 @@ class MultiDecoderColorOverlayedPosteriors:
 
     ## INPUTS: extra_all_t_bins_outputs_dict
 
+    @classmethod
+    def plot_mutli_t_bin_image(cls, all_t_bins_final_RGBA, start_t_bin_idx: int = 1338, desired_n_seconds: float = 550.0, t_bin_size = 0.05, ax=None):
+        """ plots a portion of the color-merged result onto a matplotlib axes 
+        """
+        n_samples: int = int(np.ceil(desired_n_seconds / t_bin_size))
+        print(f'n_samples: {n_samples}')
+
+        # n_samples = 2
+        subset_t_bins = np.arange(n_samples)
+        if start_t_bin_idx is not None:
+            subset_t_bins += start_t_bin_idx
+
+        active_subset_all_t_bins_final_RGBA = deepcopy(all_t_bins_final_RGBA[subset_t_bins, :, :])
+
+        active_subset_all_t_bins_final_RGBA.shape
+
+        # rgba.shape (n_pos_bins, 4) # the 4 here is for RGBA, not the decoders
+        # plt.imshow(rgba)
+
+        # img = rgba[:,None,:]            # (59,1,4)
+        if ax is None:
+            plt.style.use('dark_background')
+            # fig = plt.figure(num='NEW_FINAL all_t_bins_final_RGBA', layout="constrained", clear=True)
+            fig, ax = plt.subplots(num='NEW_FINAL all_t_bins_final_RGBA', layout="constrained", clear=True)
+            
+        img = np.transpose(active_subset_all_t_bins_final_RGBA, (1, 0, 2))
+        ax.imshow(img)
+        # plt.imshow(img)
+        # plt.axis('off')
+        
+        # ax.set_ylim(auto=True)
+        # xmin, xmax = start_t_bin_idx, start_t_bin_idx + (t_bin_size * 5)
+        # ax.set_xlim(xmin, xmax)  # set your desired x-limits
+        # ax.set_autoscaley_on(True)
+        # ax.set_navigate(True)
+
+        # def on_scroll(event):
+        #     if event.button == 'up':
+        #         ax.set_xlim(ax.get_xlim()[0] + 1, ax.get_xlim()[1] + 1)
+        #     elif event.button == 'down':
+        #         ax.set_xlim(ax.get_xlim()[0] - 1, ax.get_xlim()[1] - 1)
+        #     fig.canvas.draw_idle()
+
+        # fig.canvas.mpl_connect('scroll_event', on_scroll)
+
+        return fig, ax
+
+
+
+
 
     @function_attributes(short_name=None, tags=['UNFINISHED', 'TODO', 'TODO_2025-05-04'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-05-04 20:01', related_items=[])
     @classmethod
