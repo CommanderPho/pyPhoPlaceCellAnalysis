@@ -943,6 +943,42 @@ class MultiDecoderColorOverlayedPosteriors:
 
 
 
+    @function_attributes(short_name=None, tags=['track', 'SpikeRaster2D'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-05-06 16:08', related_items=[])
+    def add_as_track_to_spike_raster_window(active_2d_plot, all_t_bins_final_RGBA, time_bin_centers=None, xbin=None, t_bin_size = 0.05):
+        """ adds to SpikeRaster2D as a multi-color context-weighted decoding as a track
+        
+        
+        Usage:
+        
+            all_t_bins_final_RGBA = extra_all_t_bins_outputs_dict['all_t_bins_final_RGBA']
+
+            ts_widget, fig, ax_list, dDisplayItem = MultiDecoderColorOverlayedPosteriors.add_as_track_to_spike_raster_window(active_2d_plot, all_t_bins_final_RGBA=all_t_bins_final_RGBA, t_bin_size=0.05)
+
+        
+        """
+        from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import MultiDecoderColorOverlayedPosteriors
+        from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.SpikeRasterWidgets.Spike2DRaster import SynchronizedPlotMode
+
+
+        ## Build the new dock track:
+        dock_identifier: str = 'MergedColorPlot'
+        ts_widget, fig, ax_list, dDisplayItem = active_2d_plot.add_new_matplotlib_render_plot_widget(name=dock_identifier)
+        ax = ax_list[0]
+        ax.clear()
+
+        ## INPUTS: time_bin_centers, all_t_bins_final_RGBA, xbin
+        # all_t_bins_final_RGBA.shape # (69488, 59, 4)
+        fig, ax, im_posterior_x = MultiDecoderColorOverlayedPosteriors.plot_mutli_t_bin_image(all_t_bins_final_RGBA=all_t_bins_final_RGBA, xbin=xbin, time_bin_centers=time_bin_centers, t_bin_size=t_bin_size, ax=ax)
+        
+        ## sync up the widgets
+        active_2d_plot.sync_matplotlib_render_plot_widget(dock_identifier, sync_mode=SynchronizedPlotMode.TO_WINDOW)
+        # active_2d_plot.sync_matplotlib_render_plot_widget(dock_identifier, sync_mode=SynchronizedPlotMode.TO_GLOBAL_DATA)
+        fig.canvas.draw()
+
+        ## OUTPUTS: fig, ax, out_plot_data  
+        return ts_widget, fig, ax_list, dDisplayItem
+        
+
 
 
 
