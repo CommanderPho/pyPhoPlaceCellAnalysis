@@ -151,9 +151,11 @@ def numpy_rgba_composite(rgba_layers: NDArray[ND.Shape["N_DECODERS, N_POS_BINS, 
 
 @metadata_attributes(short_name=None, tags=['figure', 'posteriors'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-05-04 18:05', related_items=[])
 class MultiDecoderColorOverlayedPosteriors:
-    """
+    """ This class relates to visualizing posterior decoded positions for all four context on the same axes, indicating which posterior is which by assigning each decoder a chracteristic color and weighting their opacity according to their likelyhood for each time bin
+        
+    
+    Usage:
         from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import MultiDecoderColorOverlayedPosteriors
-
 
         import nptyping as ND
         from nptyping import NDArray
@@ -283,7 +285,7 @@ class MultiDecoderColorOverlayedPosteriors:
 
     @function_attributes(short_name=None, tags=['MAIN', 'all_t'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-05-04 18:00', related_items=[])
     @classmethod
-    def compute_all_time_bins(cls, p_x_given_n: NDArray, active_decoder_cmap_dict: Optional[Dict]=None, produce_debug_outputs: bool = False, drop_below_threshold: float = 1e-2, progress_print: bool = True, color_blend_fn=None) -> Tuple[NDArray, NDArray]:
+    def compute_all_time_bin_RGBA(cls, p_x_given_n: NDArray, active_decoder_cmap_dict: Optional[Dict]=None, produce_debug_outputs: bool = False, drop_below_threshold: float = 1e-2, progress_print: bool = True, color_blend_fn=None) -> Tuple[NDArray, NDArray]:
         """ Computes the final RGBA colors for each position x time bin in p_x_given_n by overlaying each of the decoders values
         
         
@@ -331,7 +333,6 @@ class MultiDecoderColorOverlayedPosteriors:
 
         n_pos_bins, n_decoders, n_time_bins = np.shape(p_x_given_n)
         assert n_decoders == 4, f"n_decoders: {n_decoders}"
-
 
 
         ## INPUTS: probability_values (n_pos_bins, 4)
@@ -688,21 +689,38 @@ class MultiDecoderColorOverlayedPosteriors:
     ## INPUTS: extra_all_t_bins_outputs_dict
 
     @classmethod
-    def plot_mutli_t_bin_image(cls, all_t_bins_final_RGBA, start_t_bin_idx: int = 1338, desired_n_seconds: float = 550.0, t_bin_size = 0.05, ax=None):
+    def plot_mutli_t_bin_image(cls, all_t_bins_final_RGBA, time_bin_centers=None, xbin=None, start_t_bin_idx: int = 0, desired_n_seconds: Optional[float] = None, t_bin_size = 0.05, ax=None, use_original_bounds=False):
         """ plots a portion of the color-merged result onto a matplotlib axes 
         """
-        n_samples: int = int(np.ceil(desired_n_seconds / t_bin_size))
+        from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError import _subfn_try_get_approximate_recovered_t_pos
+        
+        if desired_n_seconds is not None:
+            n_samples: int = int(np.ceil(desired_n_seconds / t_bin_size))
+        else:
+            n_samples: int = np.shape(all_t_bins_final_RGBA)[0]
+
         print(f'n_samples: {n_samples}')
 
         # n_samples = 2
-        subset_t_bins = np.arange(n_samples)
+        subset_t_bin_indicies = np.arange(n_samples)
         if start_t_bin_idx is not None:
-            subset_t_bins += start_t_bin_idx
+            subset_t_bin_indicies += start_t_bin_idx
 
-        active_subset_all_t_bins_final_RGBA = deepcopy(all_t_bins_final_RGBA[subset_t_bins, :, :])
+        active_subset_all_t_bins_final_RGBA = deepcopy(all_t_bins_final_RGBA[subset_t_bin_indicies, :, :])
 
         active_subset_all_t_bins_final_RGBA.shape
 
+        n_pos_bins, n_decoders, _n_rgba_channels = np.shape(active_subset_all_t_bins_final_RGBA)
+
+        
+        if xbin is None:
+            xbin = np.arange(n_pos_bins) + 0.5
+            use_original_bounds = True
+            
+        if time_bin_centers is None:
+            time_bin_centers = (subset_t_bin_indicies * t_bin_size) + (0.5 * t_bin_size)
+            use_original_bounds = True
+            
         # rgba.shape (n_pos_bins, 4) # the 4 here is for RGBA, not the decoders
         # plt.imshow(rgba)
 
@@ -711,9 +729,45 @@ class MultiDecoderColorOverlayedPosteriors:
             plt.style.use('dark_background')
             # fig = plt.figure(num='NEW_FINAL all_t_bins_final_RGBA', layout="constrained", clear=True)
             fig, ax = plt.subplots(num='NEW_FINAL all_t_bins_final_RGBA', layout="constrained", clear=True)
-            
+        else:
+            fig = ax.get_figure()           
+
         img = np.transpose(active_subset_all_t_bins_final_RGBA, (1, 0, 2))
-        ax.imshow(img)
+        
+        # Compute extents for imshow:
+        main_plot_kwargs = {
+            'origin': 'lower',
+            'vmin': 0,
+            'vmax': 1,
+            # 'cmap': cmap,
+            'interpolation':'nearest',
+            'aspect':'auto',
+        } # merges `posterior_heatmap_imshow_kwargs` into main_plot_kwargs, replacing the existing values if present in both
+        # Posterior distribution heatmaps at each point.
+        enable_set_axis_limits:bool=True
+        
+        ## Determine the actual start/end times:
+        x_first_extent = _subfn_try_get_approximate_recovered_t_pos(time_bin_centers, xbin, use_original_bounds=use_original_bounds)
+        xmin, xmax, ymin, ymax = x_first_extent
+        # approximated_recovered_delta_t: float = float(np.nanmedian(np.diff(time_window_centers)))
+        # approximated_recovered_half_delta_t = approximated_recovered_delta_t / 2.0
+        # # xmin, xmax, ymin, ymax = (time_window_centers[0], time_window_centers[-1], xbin[0], xbin[-1]) # TODO 2024-03-27 - This is actually incorrect, the extents should be the actual start/stop of the bins, not the time_window_centers
+        # xmin, xmax, ymin, ymax = ((time_window_centers[0]-approximated_recovered_half_delta_t), (time_window_centers[-1]+approximated_recovered_half_delta_t), xbin[0], xbin[-1]) # 2024-03-27 - Corrected extents computed by adding a half-bin width to the first/last time_window_centers to recover the proper edges.
+        # x_first_extent = (xmin, xmax, ymin, ymax)
+        try:
+            im_posterior_x = ax.imshow(img, extent=x_first_extent, **(dict(animated=False) | main_plot_kwargs)) 
+            # assert xmin < xmax
+            if enable_set_axis_limits:
+                ax.set_xlim((xmin, xmax)) # UserWarning: Attempting to set identical low and high xlims makes transformation singular; automatically expanding.
+                ax.set_ylim((ymin, ymax))
+        except ValueError as err:
+            # ValueError: Axis limits cannot be NaN or Inf
+            print(f'WARN: active_extent (xmin, xmax, ymin, ymax): {x_first_extent} contains NaN or Inf.\n\terr: {err}')
+            # ax.clear() # clear the existing and now invalid image
+            im_posterior_x = None
+            
+
+
         # plt.imshow(img)
         # plt.axis('off')
         
@@ -732,7 +786,7 @@ class MultiDecoderColorOverlayedPosteriors:
 
         # fig.canvas.mpl_connect('scroll_event', on_scroll)
 
-        return fig, ax
+        return fig, ax, im_posterior_x
 
 
 
