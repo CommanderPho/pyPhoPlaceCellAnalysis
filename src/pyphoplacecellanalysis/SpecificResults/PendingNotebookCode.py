@@ -1033,7 +1033,7 @@ class MultiDecoderColorOverlayedPosteriors:
 
 
     @function_attributes(short_name=None, tags=['track', 'SpikeRaster2D'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-05-06 16:08', related_items=[])
-    def add_as_track_to_spike_raster_window(active_2d_plot, all_t_bins_final_RGBA, time_bin_centers=None, xbin=None, t_bin_size = 0.05):
+    def add_as_track_to_spike_raster_window(active_2d_plot, all_t_bins_final_RGBA, time_bin_centers=None, xbin=None, t_bin_size = 0.05, dock_identifier: str = 'MergedColorPlot'):
         """ adds to SpikeRaster2D as a multi-color context-weighted decoding as a track
         
         
@@ -1050,7 +1050,7 @@ class MultiDecoderColorOverlayedPosteriors:
 
 
         ## Build the new dock track:
-        dock_identifier: str = 'MergedColorPlot'
+        
         ts_widget, fig, ax_list, dDisplayItem = active_2d_plot.add_new_matplotlib_render_plot_widget(name=dock_identifier)
         ax = ax_list[0]
         ax.clear()
