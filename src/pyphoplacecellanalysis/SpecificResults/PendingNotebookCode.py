@@ -428,7 +428,7 @@ class MultiDecoderColorOverlayedPosteriors:
         # p_x_given_n
 
         ## INPUTS: p_x_given_n
-        all_t_bins_final_overlayed_out_RGBA, all_t_bins_per_decoder_out_RGBA, extra_all_t_bins_outputs_dict = MultiDecoderColorOverlayedPosteriors.compute_all_time_bins(p_x_given_n=p_x_given_n, produce_debug_outputs=False, drop_below_threshold=1e-1)
+        all_t_bins_final_overlayed_out_RGBA, all_t_bins_per_decoder_out_RGBA, extra_all_t_bins_outputs_dict = MultiDecoderColorOverlayedPosteriors.compute_all_time_bin_RGBA(p_x_given_n=p_x_given_n, produce_debug_outputs=False, drop_below_threshold=1e-1)
 
 
         """
@@ -457,7 +457,7 @@ class MultiDecoderColorOverlayedPosteriors:
 
         extra_all_t_bins_outputs_dict: Dict = {
             'all_t_bins_per_decoder_alphas': np.zeros((n_time_bins, n_decoders)),
-            # 'all_t_bins_per_decoder_out_RGBA': np.zeros((n_time_bins, n_pos_bins, 4, 4)),
+            # 'all_t_bins_per_decoder_out_RGBA: np.zeros((n_time_bins, n_pos_bins, 4, 4)),
             'all_t_bins_per_decoder_alpha_weighted_RGBA': np.zeros((n_time_bins, n_pos_bins, n_decoders, 4)),
             'all_t_bins_final_RGBA': np.zeros((n_time_bins, n_pos_bins, 4)),
         }
