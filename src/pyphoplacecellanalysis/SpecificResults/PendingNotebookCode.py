@@ -105,6 +105,120 @@ from pyphoplacecellanalysis.General.Model.Configs.LongShortDisplayConfig import 
 from pyphocorehelpers.gui.Qt.color_helpers import ColormapHelpers, ColorFormatConverter, debug_print_color, build_adjusted_color
 
 
+
+
+# ==================================================================================================================================================================================================================================================================================== #
+# 2025-05-06 - Hairy Marginal on timeline                                                                                                                                                                                                                                              #
+# ==================================================================================================================================================================================================================================================================================== #
+from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import DirectionalDecodersContinuouslyDecodedResult
+from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.SpikeRasterWidgets.Spike2DRaster import SynchronizedPlotMode
+from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import _helper_add_interpolated_position_columns_to_decoded_result_df
+from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.EpochComputationFunctions import _perform_plot_hairy_overlayed_position
+from neuropy.utils.matplotlib_helpers import draw_epoch_regions
+
+@function_attributes(short_name=None, tags=['track'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-05-06 16:08', related_items=[])
+def add_hairy_plot(active_2d_plot, curr_active_pipeline, a_decoded_marginal_posterior_df):
+    """ adds a hiary plot the SpikeRaster2D's timeline as a track
+    
+    Usage:
+        from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import add_hairy_plot
+        
+        fig, ax, out_plot_data, dDisplayItem = add_hairy_plot(active_2d_plot, curr_active_pipeline=curr_active_pipeline, a_decoded_marginal_posterior_df=a_decoded_marginal_posterior_df)
+
+    
+    """
+    from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.EpochComputationFunctions import _perform_plot_hairy_overlayed_position
+
+
+    def _subfn_hide_all_plot_lines(out_plot_data, should_fully_remove_items:bool=False):
+        ## get the lines2D object to turn off the default position lines:
+        removed_item_names = []
+        for a_lines_name, a_lines_collection in out_plot_data.items():
+            ## hide all inactive lines:
+            print(f'hiding: "{a_lines_name}"')        
+            try:
+                ## try iteratring the object
+                for a_line in a_lines_collection:
+                    a_line.set_visible(False)
+                removed_item_names.append(a_lines_name)
+            except TypeError:
+                a_lines_collection.set_visible(False)
+                removed_item_names.append(a_lines_name)
+            # except AttributeError:
+                # when we try to set_visible on non-type
+            except Exception as e:
+                raise e
+        ## end for a_lines_name, a_lin....
+        
+        ## remove theitems
+        if should_fully_remove_items:
+            for a_rm_item_name in removed_item_names:
+                out_plot_data.pop(a_rm_item_name, None) ## remove the the array
+
+        return out_plot_data           
+
+
+
+    ## Build the new dock track:
+    dock_identifier: str = 'HairPlot'
+    ts_widget, fig, ax_list, dDisplayItem = active_2d_plot.add_new_matplotlib_render_plot_widget(name=dock_identifier)
+    ax = ax_list[0]
+    ax.clear()
+    ax.set_facecolor('white')
+
+    ## OUT: all_directional_continuously_decoded_dict
+    ## Draw the position meas/decoded on the plot widget
+    ## INPUT: fig, ax_list, all_directional_continuously_decoded_dict, track_templates
+
+
+    ## INPUTS: a_decoded_marginal_posterior_df
+
+    should_plot_grid_bin_bounds_lines = False
+
+    # plot the basic lap-positions (measured) over time figure:
+    _out = dict()
+    _out['_display_grid_bin_bounds_validation'] = curr_active_pipeline.display(display_function='_display_grid_bin_bounds_validation', active_session_configuration_context=None, include_includelist=[], save_figure=False, ax=ax) # _display_grid_bin_bounds_validation
+    fig = _out['_display_grid_bin_bounds_validation'].figures[0]
+    out_axes_list =_out['_display_grid_bin_bounds_validation'].axes
+    out_plot_data =_out['_display_grid_bin_bounds_validation'].plot_data
+
+    ax = out_axes_list[0]
+
+    ## get the lines2D object to turn off the default position lines:
+    position_lines_2D = out_plot_data['position_lines_2D']
+    ## hide all inactive lines:
+    for a_line in position_lines_2D:
+        a_line.set_visible(False)
+
+
+    interesting_hair_parameter_kwarg_dict = {
+        'defaults': dict(extreme_threshold=0.8, opacity_max=0.7, thickness_ramping_multiplier=35),
+        '50_sec_window_scale': dict(extreme_threshold=0.5, thickness_ramping_multiplier=50),
+        'full_1700_sec_session_scale': dict(extreme_threshold=0.5, thickness_ramping_multiplier=25), ## really interesting, can see the low-magnitude endcap short-like firing
+        'experimental': dict(extreme_threshold=0.8, thickness_ramping_multiplier=55),
+        'pbe': dict(extreme_threshold=0.0, opacity_max=0.9, thickness_ramping_multiplier=55),
+    }
+
+
+    out_plot_data = _subfn_hide_all_plot_lines(out_plot_data)
+    # an_pos_line_artist, df_viz = _perform_plot_hairy_overlayed_position(df=deepcopy(a_decoded_marginal_posterior_df), ax=ax, extreme_threshold=0.5, thickness_ramping_multiplier=50) # , thickness_ramping_multiplier=5
+
+
+
+    ## Named parameter set:
+    # an_pos_line_artist, df_viz = _perform_plot_hairy_overlayed_position(df=deepcopy(a_decoded_marginal_posterior_df), ax=ax, **interesting_hair_parameter_kwarg_dict['50_sec_window_scale'])
+    # an_pos_line_artist, df_viz = _perform_plot_hairy_overlayed_position(df=deepcopy(a_decoded_marginal_posterior_df), ax=ax, **interesting_hair_parameter_kwarg_dict['full_1700_sec_session_scale'])
+    an_pos_line_artist, df_viz = _perform_plot_hairy_overlayed_position(df=deepcopy(a_decoded_marginal_posterior_df), ax=ax, **interesting_hair_parameter_kwarg_dict['pbe'])
+
+
+
+    ## sync up the widgets
+    active_2d_plot.sync_matplotlib_render_plot_widget(dock_identifier, sync_mode=SynchronizedPlotMode.TO_WINDOW)
+    fig.canvas.draw()
+    return fig, ax, out_plot_data, dDisplayItem
+
+
+
 # def blend_over_white(rgba):
 #     rgb = rgba[:, :3]
 #     alpha = rgba[:, 3:4]
