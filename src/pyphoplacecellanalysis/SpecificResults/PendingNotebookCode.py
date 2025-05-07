@@ -917,11 +917,10 @@ class MultiDecoderColorOverlayedPosteriors:
 
         active_subset_all_t_bins_final_RGBA = deepcopy(all_t_bins_final_RGBA[subset_t_bin_indicies, :, :])
 
-        active_subset_all_t_bins_final_RGBA.shape
+        # active_subset_all_t_bins_final_RGBA.shape
 
-
-        # n_pos_bins, n_decoders, _n_rgba_channels = np.shape(active_subset_all_t_bins_final_RGBA)
-        n_time_bins, n_pos_bins, n_decoders, _n_rgba_channels = np.shape(active_subset_all_t_bins_final_RGBA)
+        n_pos_bins, n_decoders, _n_rgba_channels = np.shape(active_subset_all_t_bins_final_RGBA)
+        # n_time_bins, n_pos_bins, n_decoders, _n_rgba_channels = np.shape(active_subset_all_t_bins_final_RGBA)
 
         
         if xbin is None:
