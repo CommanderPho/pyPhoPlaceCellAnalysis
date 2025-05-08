@@ -1343,7 +1343,7 @@ class TransitionMatrixComputations:
         row_sums = transition_matrix.sum(axis=1, keepdims=True)
         
         # Avoid division by zero for rows that are all zero
-        non_zero_mask = row_sums > epsilon
+        non_zero_mask = (row_sums > epsilon)
         
         # Safe division - only divide non-zero rows
         safe_row_sums = np.where(non_zero_mask, row_sums, 1.0)

@@ -1464,7 +1464,7 @@ def build_transition_matricies(a_result: DecodedFilterEpochsResult, debug_print:
     return (out_time_bin_container_list, out_position_transition_matrix_list, out_context_state_transition_matrix_list, out_combined_transition_matrix_list), (a_mean_context_state_transition_matrix, a_mean_position_transition_matrix)
 
 
-@function_attributes(short_name=None, tags=['transition-matrix'], input_requires=[], output_provides=[], uses=['build_transition_matricies'], used_by=[], creation_date='2025-04-22 14:49', related_items=[])
+@function_attributes(short_name=None, tags=['MAIN', 'transition-matrix'], input_requires=[], output_provides=[], uses=['build_transition_matricies'], used_by=[], creation_date='2025-04-22 14:49', related_items=[])
 def complete_all_transition_matricies(a_new_fully_generic_result: GenericDecoderDictDecodedEpochsDictResult, a_target_context: IdentifyingContext, debug_print: bool = False):
     """ Computes all transition matrix outputs for all found results for the provided target_context
     
@@ -1500,16 +1500,10 @@ def complete_all_transition_matricies(a_new_fully_generic_result: GenericDecoder
     # for a_ctxt, a_posterior_df in decoded_marginal_posterior_df_context_dict.items():
     for a_ctxt, a_result in result_context_dict.items():
         a_best_matching_context, a_result, a_decoder, a_decoded_marginal_posterior_df = a_new_fully_generic_result.get_results_best_matching_context(context_query=a_ctxt)
-        
-        # a_posterior_df: pd.DataFrame = decoded_marginal_posterior_df_context_dict[a_ctxt]
-        # a_result: DecodedFilterEpochsResult = result_context_dict[a_ctxt]
         a_result: DecodedFilterEpochsResult = a_result
-        # a_decoder: BasePositionDecoder = decoder_context_dict[a_ctxt]
         if debug_print:
             print(f'a_ctxt: {a_ctxt}')
         
-
-
         # Drop Epochs that are too short from all results: ___________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
         replay_epochs_df = deepcopy(a_result.filter_epochs)
         if not isinstance(replay_epochs_df, pd.DataFrame):
@@ -1525,17 +1519,11 @@ def complete_all_transition_matricies(a_new_fully_generic_result: GenericDecoder
         ## Drop those less than the time bin duration
         print(f'DropShorterMode:')
         pre_drop_n_epochs = len(replay_epochs_df)
-        if minimum_event_duration is not None:                
-            replay_epochs_df = replay_epochs_df[replay_epochs_df['duration'] > minimum_event_duration]
-            post_drop_n_epochs = len(replay_epochs_df)
-            n_dropped_epochs = post_drop_n_epochs - pre_drop_n_epochs
-            print(f'\tminimum_event_duration present (minimum_event_duration={minimum_event_duration}).\n\tdropping {n_dropped_epochs} that are shorter than our minimum_event_duration of {minimum_event_duration}.', end='\t')
-        else:
-            replay_epochs_df = replay_epochs_df[replay_epochs_df['duration'] > desired_ripple_decoding_time_bin_size]
-            post_drop_n_epochs = len(replay_epochs_df)
-            n_dropped_epochs = post_drop_n_epochs - pre_drop_n_epochs
-            print(f'\tdropping {n_dropped_epochs} that are shorter than our ripple decoding time bin size of {desired_ripple_decoding_time_bin_size}', end='\t') 
-
+        assert minimum_event_duration is not None
+        replay_epochs_df = replay_epochs_df[replay_epochs_df['duration'] > minimum_event_duration]
+        post_drop_n_epochs = len(replay_epochs_df)
+        n_dropped_epochs = post_drop_n_epochs - pre_drop_n_epochs
+        print(f'\tminimum_event_duration present (minimum_event_duration={minimum_event_duration}).\n\tdropping {n_dropped_epochs} that are shorter than our minimum_event_duration of {minimum_event_duration}.', end='\t')
         print(f'{post_drop_n_epochs} remain.')
 
         epoch_data_indicies = a_result.find_data_indicies_from_epoch_times(replay_epochs_df['start'])
