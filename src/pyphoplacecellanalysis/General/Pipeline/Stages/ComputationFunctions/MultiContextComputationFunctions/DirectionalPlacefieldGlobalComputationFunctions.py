@@ -2293,17 +2293,6 @@ class DirectionalPseudo2DDecodersResult(ComputedResult):
 
             # print(f'np.shape(reshaped_p_x_given_n): {np.shape(reshaped_p_x_given_n)}')
 
-            # normalized_reshaped_p_x_given_n = np.squeeze(np.sum(reshaped_p_x_given_n, axis=(1), keepdims=False)) / np.sum(reshaped_p_x_given_n, axis=(0,1), keepdims=False)
-            # print(f'np.shape(normalized_reshaped_p_x_given_n): {np.shape(normalized_reshaped_p_x_given_n)}')
-
-            # restored_shape_p_x_given_n = np.reshape(normalized_reshaped_p_x_given_n, curr_array_shape)
-            # print(f'np.shape(restored_shape_p_x_given_n): {np.shape(restored_shape_p_x_given_n)}')
-
-            # np.sum(reshaped_array, axis=2) # axis=2 means sum over both long and short for LR/RL
-
-            # to sum over both long/short for LR
-            # np.sum(reshaped_p_x_given_n, axis=1).shape # axis=2 means sum over both long and short for LR/RL
-            
             # input_array = a_p_x_given_n
             # input_array = normalized_reshaped_p_x_given_n
             input_array = normalized_out_p_x_given_n
@@ -2387,16 +2376,12 @@ class DirectionalPseudo2DDecodersResult(ComputedResult):
         
         # gives the likelihood of [LR, RL] for each epoch using information from both Long/Short:
         track_identity_all_epoch_bins_marginal = np.stack([np.sum(v.p_x_given_n, axis=-1)/np.sum(v.p_x_given_n, axis=(-2, -1)) for v in track_identity_marginals], axis=0) # sum over all time-bins within the epoch to reach a consensus
-        # # Compute the likelihood of [LR, RL] for each epoch using information from both Long/Short
-        # track_identity_all_epoch_bins_marginal = np.stack([
-        #     np.nansum(v.p_x_given_n, axis=-1) / np.maximum(np.nansum(v.p_x_given_n, axis=(-2, -1)), _prevent_div_by_zero_epsilon)
-        #     for v in track_identity_marginals
-        # ], axis=0)  # sum over all time-bins within the epoch to reach a consensus
 
         # Find the indicies via this method:
         most_likely_track_identity_from_decoder = np.argmax(track_identity_all_epoch_bins_marginal, axis=1) # consistent with 'lap_dir' columns. for LR_dir, values become more positive with time
         is_most_likely_track_identity_Long = np.logical_not(most_likely_track_identity_from_decoder) # consistent with 'is_LR_dir' column. for LR_dir, values become more positive with time
         return track_identity_marginals, track_identity_all_epoch_bins_marginal, most_likely_track_identity_from_decoder, is_most_likely_track_identity_Long
+
 
     @function_attributes(short_name=None, tags=['marginal', 'MAIN'], input_requires=[], output_provides=[], uses=['cls.build_custom_marginal_over_direction'], used_by=['DecodedFilterEpochsResult.perform_compute_marginals'], creation_date='2025-04-01 00:00', related_items=[])
     @classmethod
@@ -2412,10 +2397,6 @@ class DirectionalPseudo2DDecodersResult(ComputedResult):
         non_marginalized_decoder_marginals: List[DynamicContainer] = cls.build_non_marginalized_raw_posteriors(all_directional_laps_filter_epochs_decoder_result, debug_print=debug_print) # each P-x[i].shape: (4, n_epoch_t_bins[i])
         # gives the likelihood of [LR, RL] for each epoch using information from both Long/Short:
         non_marginalized_decoder_all_epoch_bins_marginal = np.stack([np.sum(v.p_x_given_n, axis=-1)/np.sum(v.p_x_given_n, axis=(-2, -1)) for v in non_marginalized_decoder_marginals], axis=0) # sum over all time-bins within the epoch to reach a consensus .shape: (4, )
-        # non_marginalized_decoder_all_epoch_bins_marginal = np.stack([
-        #     np.nansum(v.p_x_given_n, axis=-1) / np.maximum(np.nansum(v.p_x_given_n, axis=(-2, -1)), _prevent_div_by_zero_epsilon)
-        #     for v in non_marginalized_decoder_marginals
-        # ], axis=0) # sum over all time-bins within the epoch to reach a consensus .shape: (4, )
 
         # non_marginalized_decoder_all_epoch_bins_marginal.shape: [n_epochs, 4]
         most_likely_decoder_idxs = np.argmax(non_marginalized_decoder_all_epoch_bins_marginal, axis=1) # consistent with 'lap_dir' columns. for LR_dir, values become more positive with time | most_likely_decoder_idxs will always contain valid indices, not NaN.

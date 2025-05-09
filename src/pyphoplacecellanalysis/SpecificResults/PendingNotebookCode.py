@@ -805,10 +805,13 @@ class MultiDecoderColorOverlayedPosteriors:
 
     ## INPUTS: extra_all_t_bins_outputs_dict
 
-    @function_attributes(short_name=None, tags=['plot'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-05-06 19:02', related_items=[])
+    @function_attributes(short_name=None, tags=['plot', 'alt', 'WORKING'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-05-06 19:02', related_items=[])
     @classmethod
-    def plot_mutli_t_bin_p_x_given_n(cls, all_t_bins_per_decoder_out_RGBA: NDArray, time_bin_centers=None, xbin=None, t_bin_size = 0.05, ax=None):
+    def plot_mutli_t_bin_p_x_given_n(cls, all_t_bins_per_decoder_out_RGBA: NDArray, time_bin_centers=None, xbin=None, t_bin_size = 0.05, ax=None, use_original_bounds=False):
         """ plots a portion of the color-merged result onto a matplotlib axes 
+
+        Working! Uses a single matplotlib ax to draw `n_decoders` images on top of each other by calling `imshow` sequentially.
+        
         """
         # all_t_bins_per_decoder_out_RGBA: NDArray[ND.Shape["N_TIME_BINS", "N_POS_BINS", "N_DECODERS", "4"], np.floating]
         
@@ -855,17 +858,6 @@ class MultiDecoderColorOverlayedPosteriors:
         x_first_extent = _subfn_try_get_approximate_recovered_t_pos(time_bin_centers, xbin, use_original_bounds=use_original_bounds) # x_first_extent = (xmin, xmax, ymin, ymax)
         xmin, xmax, ymin, ymax = x_first_extent
 
-
-        # rgba_layers = np.transpose(all_t_bins_per_decoder_out_RGBA, (1, 0, 2))[:, :, None, :]  # (n_decoders, H=n_pos_bins, W=1, 4)
-        # print(f'numpy_rgba_composite(...):')
-        # print(f'\trgba_layers.shape: {np.shape(rgba_layers)}')
-        # final_rgba = numpy_rgba_composite(rgba_layers, debug_print=debug_print)  # (H, W, 4) (59, 1, 4)
-        # if debug_print:
-        #     print(f'\tfinal_rgba.shape: {np.shape(final_rgba)} (post call to `numpy_rgba_composite(...)`)')
-        # axd[ax_name].imshow(final_rgba, aspect='auto')
-        # axd[ax_name].set_title(ax_name)
-        # print(f'\tfinal_rgba.shape: {np.shape(final_rgba)}')
-
         out_im_posterior_x_dict = {}
         
         ## use matplotlib's rendering to get the final output image:
@@ -900,6 +892,7 @@ class MultiDecoderColorOverlayedPosteriors:
     @classmethod
     def plot_mutli_t_bin_RGBA_image(cls, all_t_bins_final_RGBA, time_bin_centers=None, xbin=None, start_t_bin_idx: int = 0, desired_n_seconds: Optional[float] = None, t_bin_size = 0.05, ax=None, use_original_bounds=False):
         """ plots a portion of the color-merged result onto a matplotlib axes 
+        
         """
         from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError import _subfn_try_get_approximate_recovered_t_pos
         
@@ -918,8 +911,16 @@ class MultiDecoderColorOverlayedPosteriors:
         active_subset_all_t_bins_final_RGBA = deepcopy(all_t_bins_final_RGBA[subset_t_bin_indicies, :, :])
 
         # active_subset_all_t_bins_final_RGBA.shape
+        n_dims: int = np.ndim(active_subset_all_t_bins_final_RGBA)
+        if n_dims == 4:
+            ## separate overlayed matplotlib version
+            n_time_bins, n_pos_bins, n_decoders, _n_rgba_channels = np.shape(active_subset_all_t_bins_final_RGBA)
+        elif n_dims == 3:
+            ## how can this case happen?
+            n_pos_bins, n_decoders, _n_rgba_channels = np.shape(active_subset_all_t_bins_final_RGBA)
+        else:
+            raise NotImplementedError(f'Nope: np.shape(active_subset_all_t_bins_final_RGBA): {np.shape(active_subset_all_t_bins_final_RGBA)}')
 
-        n_pos_bins, n_decoders, _n_rgba_channels = np.shape(active_subset_all_t_bins_final_RGBA)
         # n_time_bins, n_pos_bins, n_decoders, _n_rgba_channels = np.shape(active_subset_all_t_bins_final_RGBA)
 
         
@@ -1015,9 +1016,10 @@ class MultiDecoderColorOverlayedPosteriors:
                 plt.close()
 
 
-
+    
     @function_attributes(short_name=None, tags=['track', 'SpikeRaster2D'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-05-06 16:08', related_items=[])
-    def add_as_track_to_spike_raster_window(active_2d_plot, all_t_bins_final_RGBA, time_bin_centers=None, xbin=None, t_bin_size = 0.05, dock_identifier: str = 'MergedColorPlot'):
+    @classmethod
+    def add_as_track_to_spike_raster_window(cls, active_2d_plot, all_t_bins_final_RGBA, time_bin_centers=None, xbin=None, t_bin_size = 0.05, dock_identifier: str = 'MergedColorPlot'):
         """ adds to SpikeRaster2D as a multi-color context-weighted decoding as a track
         
         
@@ -1051,6 +1053,93 @@ class MultiDecoderColorOverlayedPosteriors:
         ## OUTPUTS: fig, ax, out_plot_data  
         return ts_widget, fig, ax_list, dDisplayItem
         
+
+    # ==================================================================================================================== #
+    # HDF5                                                                                                                 #
+    # ==================================================================================================================== #
+    @classmethod
+    def save_hdf(cls, hdf5_save_file_path: Path, extra_all_t_bins_outputs_dict, **kwargs):
+        """ 
+        """
+        import h5py
+
+        drop_below_threshold = kwargs.pop('drop_below_threshold', None)
+        all_t_bins_final_overlayed_out_RGBA = kwargs.pop('all_t_bins_final_overlayed_out_RGBA', None)
+        all_t_bins_per_decoder_out_RGBA = kwargs.pop('all_t_bins_per_decoder_out_RGBA', None)
+
+        ## INPUTS: all_t_bins_final_overlayed_out_RGBA, all_t_bins_per_decoder_out_RGBA
+        # hdf5_save_file_path: Path = Path(f'output/2025-05-09_all_t_bins_out_RGBA_thresh.h5').resolve()
+        with h5py.File(hdf5_save_file_path, 'w') as f:
+            if drop_below_threshold:
+                f.create_dataset('drop_below_threshold', data=drop_below_threshold)
+            if all_t_bins_final_overlayed_out_RGBA is None:
+                f.create_dataset('final_overlayed_rgba_data', data=all_t_bins_final_overlayed_out_RGBA, compression='gzip', compression_opts=9)
+            if all_t_bins_per_decoder_out_RGBA is not None:
+                f.create_dataset('rgba_data', data=all_t_bins_per_decoder_out_RGBA, compression='gzip', compression_opts=9)
+                
+            for k, v in extra_all_t_bins_outputs_dict.items():
+                print(f'writing key "{k}"...')
+                f.create_dataset(k, data=v, compression='gzip', compression_opts=9)
+
+            print(f'hdf5_save_file_path: "{hdf5_save_file_path}"')
+
+
+
+    @classmethod
+    def load_hdf(cls, hdf5_load_file_path: Path):
+        """ 
+        """
+        import h5py # For loading data from HDF5 file
+
+        # --- Data Preparation ---
+        # Attempt to load data from HDF5 file first.
+        # If loading fails, fall back to placeholder data.
+
+        # hdf5_load_file_path: Path = Path('output/2025-05-06_all_t_bins_out_RGBA_thresh.h5').resolve()
+        data_loaded_from_hdf5 = False
+        all_t_bins_final_RGBA = None # Initialize variable
+
+        print(f"Attempting to load data from: {hdf5_load_file_path}")
+
+        if hdf5_load_file_path.exists():
+            try:
+                with h5py.File(hdf5_load_file_path, 'r') as f:
+                    # The key 'all_t_bins_final_RGBA' is based on the original script's usage:
+                    # all_t_bins_final_RGBA = extra_all_t_bins_outputs_dict['all_t_bins_final_RGBA']
+                    # and the saving loop: f.create_dataset(k, data=v, ...)
+                    dataset_key = 'all_t_bins_final_RGBA'
+                    
+                    if dataset_key in f:
+                        all_t_bins_final_RGBA = f[dataset_key][:] # Load the entire dataset into memory
+                        print(f"Successfully loaded '{dataset_key}' from {hdf5_load_file_path}")
+                        print(f"Loaded data shape: {all_t_bins_final_RGBA.shape}")
+                        
+                        # Basic validation of the loaded data structure
+                        if not (isinstance(all_t_bins_final_RGBA, np.ndarray) and
+                                all_t_bins_final_RGBA.ndim == 3 and
+                                all_t_bins_final_RGBA.shape[2] == 4):
+                            print(f"Warning: Loaded data for '{dataset_key}' does not have the expected "
+                                f"3D shape (time_bins, spatial_bins, 4 channels). "
+                                f"Found shape: {all_t_bins_final_RGBA.shape}. Problems might occur.")
+                            # Decide if this should be a fatal error or allow continuation
+                        
+                        data_loaded_from_hdf5 = True
+                    else:
+                        print(f"Error: Dataset '{dataset_key}' not found in HDF5 file {hdf5_load_file_path}.")
+            except Exception as e:
+                print(f"Error loading data from HDF5 file {hdf5_load_file_path}: {e}")
+        else:
+            print(f"Error: HDF5 file not found at {hdf5_load_file_path}.")
+
+
+        # data_loaded_from_hdf5
+        ## OUTPUTS: all_t_bins_final_RGBA
+        if data_loaded_from_hdf5:
+            return all_t_bins_final_RGBA
+        else:
+            return None
+
+
 
 
 
