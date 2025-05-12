@@ -54,7 +54,7 @@ from pyphoplacecellanalysis.GUI.Qt.SpikeRasterWindows.Spike3DRasterWindowWidget 
         
 
 @function_attributes(short_name=None, tags=['2024-12-18', 'ACTIVE', 'gui', 'debugging', 'continuous'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-12-18 19:29', related_items=[])
-def _setup_spike_raster_window_for_debugging(spike_raster_window, wants_docked_raster_window_track:bool=False, debug_print=False):
+def _setup_spike_raster_window_for_debugging(spike_raster_window, wants_docked_raster_window_track:bool=False, enable_interval_overview_track:bool=False, debug_print=False):
     """ Called to setup a specific `spike_raster_window` instance for 2024-12-18 style debugging.
     
     
@@ -74,6 +74,8 @@ def _setup_spike_raster_window_for_debugging(spike_raster_window, wants_docked_r
     """
     import pyphoplacecellanalysis.External.pyqtgraph as pg
     
+    _all_outputs_dict = {}
+    
     omit_menu_item_names = ['Debug.MenuDebug', 'DockedWidgets.MenuDockedWidgets', ] # maybe , 'CreateNewConnectedWidget.MenuCreateNewConnectedWidget'
     all_global_menus_actionsDict, global_flat_action_dict = spike_raster_window.build_all_menus_actions_dict()
     if debug_print:
@@ -90,17 +92,38 @@ def _setup_spike_raster_window_for_debugging(spike_raster_window, wants_docked_r
     active_window_container_layout = active_2d_plot.ui.active_window_container_layout
     layout = active_2d_plot.ui.layout
 
+    _all_outputs_dict.update(**dict(preview_overview_scatter_plot=preview_overview_scatter_plot, 
+                                    main_graphics_layout_widget=main_graphics_layout_widget, wrapper_layout=wrapper_layout, main_content_splitter=main_content_splitter,
+                                    active_window_container_layout=active_window_container_layout, layout=layout))
+    
+
+    should_replace_hardcoded_main_plots_with_tracks: bool = False
+    if (enable_interval_overview_track and wants_docked_raster_window_track):
+        should_replace_hardcoded_main_plots_with_tracks = True
+        print(f'should_replace_hardcoded_main_plots_with_tracks: {should_replace_hardcoded_main_plots_with_tracks}')
+
+
     has_main_raster_plot: bool = (active_2d_plot.plots.main_plot_widget is not None)
     if has_main_raster_plot:
         main_plot_widget = active_2d_plot.plots.main_plot_widget # PlotItem
-        main_plot_widget.setMinimumHeight(20.0)
+        if not should_replace_hardcoded_main_plots_with_tracks:
+            main_plot_widget.setMinimumHeight(20.0)
+        _all_outputs_dict['main_plot_widget'] = main_plot_widget
     else:
         active_window_container_layout.setVisible(False)
+
 
     background_static_scroll_window_plot = active_2d_plot.plots.background_static_scroll_window_plot # PlotItem
     background_static_scroll_window_plot.setMinimumHeight(50.0)
     # background_static_scroll_window_plot.setMaximumHeight(75.0)
     # # background_static_scroll_window_plot.setFixedHeight(50.0)
+    _all_outputs_dict['background_static_scroll_window_plot'] = background_static_scroll_window_plot
+
+
+    if should_replace_hardcoded_main_plots_with_tracks:
+        active_window_container_layout.setVisible(False) ## hide the container that contains the main_plot_widget
+        background_static_scroll_window_plot.setMaximumHeight(144)
+
 
     # # Set stretch factors to control priority
     # main_graphics_layout_widget.ci.layout.setRowStretchFactor(0, 3)  # Plot1: lowest priority
@@ -108,13 +131,15 @@ def _setup_spike_raster_window_for_debugging(spike_raster_window, wants_docked_r
     # main_graphics_layout_widget.ci.layout.setRowStretchFactor(2, 2)  # Plot3: highest priority
     # main_graphics_layout_widget.ci.layout.setRowStretchFactor(3, 2)  # Plot3: highest priority
 
-    _interval_tracks_out_dict = active_2d_plot.prepare_pyqtgraph_intervalPlot_tracks(enable_interval_overview_track=False, should_link_to_main_plot_widget=has_main_raster_plot)
+    _interval_tracks_out_dict = active_2d_plot.prepare_pyqtgraph_intervalPlot_tracks(enable_interval_overview_track=enable_interval_overview_track, should_link_to_main_plot_widget=has_main_raster_plot)
+    _all_outputs_dict['_interval_tracks_out_dict'] = _interval_tracks_out_dict
+
     # interval_window_dock_config, interval_dock_item, intervals_time_sync_pyqtgraph_widget, intervals_root_graphics_layout_widget, intervals_plot_item = _interval_tracks_out_dict['intervals']
     # dock_config, interval_overview_dock_item, intervals_overview_time_sync_pyqtgraph_widget, intervals_overview_root_graphics_layout_widget, intervals_overview_plot_item = _interval_tracks_out_dict['interval_overview']
 
     if wants_docked_raster_window_track:
         _raster_tracks_out_dict = active_2d_plot.prepare_pyqtgraph_rasterPlot_track(name_modifier_suffix='raster_window', should_link_to_main_plot_widget=has_main_raster_plot)
-
+        _all_outputs_dict['_raster_tracks_out_dict'] = _raster_tracks_out_dict
 
     # Add Renderables ____________________________________________________________________________________________________ #
     # add_renderables_menu = active_2d_plot.ui.menus.custom_context_menus.add_renderables[0].programmatic_actions_dict
@@ -159,9 +184,7 @@ def _setup_spike_raster_window_for_debugging(spike_raster_window, wants_docked_r
     # grouped_dock_items_dict = active_2d_plot.ui.dynamic_docked_widget_container.get_dockGroup_dock_dict()
     # ## OUTPUTS: nested_dock_items, nested_dynamic_docked_widget_container_widgets
 
-
-
-    return all_global_menus_actionsDict, global_flat_action_dict # , (_raster_tracks_out_dict, _raster_tracks_out_dict, _raster_tracks_out_dict)
+    return all_global_menus_actionsDict, global_flat_action_dict, _all_outputs_dict # , (_raster_tracks_out_dict, _raster_tracks_out_dict, _raster_tracks_out_dict)
 
         
 
