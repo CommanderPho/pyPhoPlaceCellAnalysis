@@ -892,6 +892,21 @@ class MultiDecoderColorOverlayedPosteriors:
     @classmethod
     def plot_mutli_t_bin_RGBA_image(cls, all_t_bins_final_RGBA, time_bin_centers=None, xbin=None, start_t_bin_idx: int = 0, desired_n_seconds: Optional[float] = None, t_bin_size = 0.05, ax=None, use_original_bounds=False):
         """ plots a portion of the color-merged result onto a matplotlib axes 
+
+        Usage:        
+            from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import MultiDecoderColorOverlayedPosteriors
+
+            # all_t_bins_final_RGBA = extra_all_t_bins_outputs_dict['all_t_bins_final_RGBA']
+            # all_t_bins_final_RGBA.shape # (69488, 59, 4)
+
+            start_t_bin_idx: int = 1338
+            desired_n_seconds: float = 60.0
+            ax = None
+            fig, ax, im_posterior_x = MultiDecoderColorOverlayedPosteriors.plot_mutli_t_bin_RGBA_image(all_t_bins_final_RGBA=all_t_bins_per_decoder_out_RGBA, start_t_bin_idx=start_t_bin_idx, desired_n_seconds=desired_n_seconds, t_bin_size=0.05, ax=ax)
+            plt.show()
+
+
+        
         
         """
         from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError import _subfn_try_get_approximate_recovered_t_pos
