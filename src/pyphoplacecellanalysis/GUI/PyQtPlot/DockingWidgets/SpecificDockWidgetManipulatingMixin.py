@@ -225,6 +225,7 @@ class SpecificDockWidgetManipulatingMixin(BaseDynamicInstanceConformingMixin):
 
         return identifier_name, widget, matplotlib_fig, matplotlib_fig_axes, dock_item
     
+    @function_attributes(short_name=None, tags=['track'], input_requires=[], output_provides=[], uses=['plot_slices_1D_most_likely_position_comparsions', '', ''], used_by=['add_docked_decoded_posterior_track_from_result'], creation_date='2025-05-12 12:18', related_items=[])
     def add_docked_decoded_posterior_slices_track(self, name: str, slices_time_window_centers: List[NDArray], slices_posteriors: List[NDArray], xbin: Optional[NDArray]=None, measured_position_df: Optional[pd.DataFrame]=None, a_variable_name: Optional[str]=None, a_dock_config: Optional[CustomDockDisplayConfig]=None, extended_dock_title_info: Optional[str]=None, should_defer_render:bool=False, **kwargs):
         """ adds a decoded 1D posterior 
 
@@ -669,6 +670,7 @@ class SpecificDockWidgetManipulatingMixin(BaseDynamicInstanceConformingMixin):
     # ==================================================================================================================== #
     # Multiple Tracks at once:                                                                                             #
     # ==================================================================================================================== #
+    @function_attributes(short_name=None, tags=['multiple', 'tracks', 'track'], input_requires=[], output_provides=[], uses=['add_docked_decoded_posterior_track_from_result'], used_by=[], creation_date='2025-05-12 12:21', related_items=[])
     def add_docked_decoded_results_dict_tracks(self, name: str, a_decoded_result_dict: Dict[str, Union[SingleEpochDecodedResult, DecodedFilterEpochsResult]], dock_configs: Dict[str, CustomDockDisplayConfig], pf1D_Decoder_dict: Dict[str, BasePositionDecoder], measured_position_df: Optional[pd.DataFrame]=None, **kwargs):
         """ Adds multiple timeline tracks from a dict of decoded results
         
@@ -732,7 +734,7 @@ class SpecificDockWidgetManipulatingMixin(BaseDynamicInstanceConformingMixin):
         return output_dict
 
 
-
+    @function_attributes(short_name=None, tags=['multiple', 'tracks', 'track'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-05-12 12:21', related_items=[])
     def compute_if_needed_and_add_continuous_decoded_posterior(self, curr_active_pipeline, desired_time_bin_size: float, debug_print=True):
         """ computes the continuously decoded position posteriors (if needed) using the pipeline, then adds them as a new track to the SpikeRaster2D 
         from `pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions.AddNewDecodedPosteriors_MatplotlibPlotCommand.prepare_and_perform_add_add_pseudo2D_decoder_decoded_epochs`
