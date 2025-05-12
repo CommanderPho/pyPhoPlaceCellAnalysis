@@ -946,6 +946,7 @@ class SpecificDockWidgetManipulatingMixin(BaseDynamicInstanceConformingMixin):
                 interval_overview_window_dock_config, intervals_overview_dock, intervals_overview_time_sync_pyqtgraph_widget, intervals_overview_root_graphics_layout_widget, intervals_overview_plot_item = _interval_tracks_out_dict['interval_overview']
                 intervals_overview_plot_item.setXRange(active_2d_plot.total_data_start_time, active_2d_plot.total_data_end_time, padding=0) ## global frame
                     
+                
         """
         from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.SpikeRasterWidgets.Spike2DRaster import SynchronizedPlotMode
         import pyphoplacecellanalysis.External.pyqtgraph as pg
@@ -956,13 +957,15 @@ class SpecificDockWidgetManipulatingMixin(BaseDynamicInstanceConformingMixin):
             
         _interval_tracks_out_dict = {}
         if enable_interval_overview_track:
-            dock_config = CustomCyclicColorsDockDisplayConfig(named_color_scheme=NamedColorScheme.grey, showCloseButton=False, showTimelineSyncModeButton=False, corner_radius='0px', hideTitleBar=True)
+            intervals_overview_dock_config = CustomCyclicColorsDockDisplayConfig(named_color_scheme=NamedColorScheme.grey, showCloseButton=False, showTimelineSyncModeButton=False, corner_radius='0px', hideTitleBar=True)
             overview_identifier_name = f'interval_overview{name_modifier_suffix}'
-            intervals_overview_time_sync_pyqtgraph_widget, intervals_overview_root_graphics_layout_widget, intervals_overview_plot_item, intervals_overview_dock = self.add_new_embedded_pyqtgraph_render_plot_widget(name=overview_identifier_name, dockSize=(500, 60), display_config=dock_config)
+            intervals_overview_time_sync_pyqtgraph_widget, intervals_overview_root_graphics_layout_widget, intervals_overview_plot_item, intervals_overview_dock = self.add_new_embedded_pyqtgraph_render_plot_widget(name=overview_identifier_name, dockSize=(500, 60), display_config=intervals_overview_dock_config)
             if (interval_dock_max_height is not None) and (interval_dock_max_height > 0):
                 intervals_overview_dock.setMaximumHeight(interval_dock_max_height)
-            _interval_tracks_out_dict[overview_identifier_name] = (dock_config, intervals_overview_dock, intervals_overview_time_sync_pyqtgraph_widget, intervals_overview_root_graphics_layout_widget, intervals_overview_plot_item)
+            _interval_tracks_out_dict[overview_identifier_name] = (intervals_overview_dock_config, intervals_overview_dock, intervals_overview_time_sync_pyqtgraph_widget, intervals_overview_root_graphics_layout_widget, intervals_overview_plot_item)
+            intervals_overview_plot_item.setXRange(self.total_data_start_time, self.total_data_end_time, padding=0) ## global frame
             
+
         ## Enables creating a new pyqtgraph-based track to display the intervals/epochs
         interval_window_dock_config = CustomCyclicColorsDockDisplayConfig(named_color_scheme=NamedColorScheme.grey, showCloseButton=False, corner_radius='0px', hideTitleBar=True)
         identifier_name = f'intervals{name_modifier_suffix}'
@@ -1051,7 +1054,7 @@ class SpecificDockWidgetManipulatingMixin(BaseDynamicInstanceConformingMixin):
 
 
     @function_attributes(short_name=None, tags=['raster', 'tracks', 'pyqtgraph', 'specific', 'dynamic_ui', 'group_matplotlib_render_plot_widget'], input_requires=[], output_provides=[], uses=['self.add_new_embedded_pyqtgraph_render_plot_widget', 'new_plot_raster_plot'], used_by=[], creation_date='2025-01-09 10:50', related_items=[])
-    def prepare_pyqtgraph_rasterPlot_track(self, name_modifier_suffix: str='', should_link_to_main_plot_widget:bool=True, sync_mode:SynchronizedPlotMode=None, debug_print=False):
+    def prepare_pyqtgraph_rasterPlot_track(self, name_modifier_suffix: str='', should_link_to_main_plot_widget:bool=True, sync_mode:SynchronizedPlotMode=None, downsampling_rate: Optional[int]=None, debug_print=False):
         """ adds to separate pyqtgraph-backed tracks to the SpikeRaster2D plotter for rendering a 2D raster `active_2d_plot.params.custom_interval_rendering_plots` so the intervals are rendered on these new tracks in addition to any normal ones
         
         enable_interval_overview_track: bool: if True, renders a track to show all the intervals during the sessions (overview) in addition to the track for the intervals within the current active window
@@ -1086,6 +1089,14 @@ class SpecificDockWidgetManipulatingMixin(BaseDynamicInstanceConformingMixin):
         if sync_mode is None:
             sync_mode = SynchronizedPlotMode.TO_WINDOW
             
+
+        if downsampling_rate is None:
+            downsampling_rate = 1
+            downsampling_rate: int = self.params.setdefault('downsampling_rate', downsampling_rate) ## reduced downsample rate from 100 -> 5 after noticing that it was very desceptive how many spikes it was missing
+        else:
+            downsampling_rate = int(downsampling_rate)
+            self.params.downsampling_rate = downsampling_rate ## set the downsampling rate param
+
 
         _raster_tracks_out_dict = {}
         ## Enables creating a new pyqtgraph-based track to display the intervals/epochs
@@ -1128,6 +1139,7 @@ class SpecificDockWidgetManipulatingMixin(BaseDynamicInstanceConformingMixin):
                                                         win=raster_root_graphics_layout_widget, plots_data=time_sync_pyqtgraph_widget.plots_data, plots=time_sync_pyqtgraph_widget.plots,
                                                         add_debug_header_label=False,
                                                         scatter_plot_kwargs=dict(size=5, hoverable=False, tick_width=0.0, tick_height=1.0),
+                                                        downsampling_rate=downsampling_rate,
                                                         ) # defer_show=True so we can add it manually to the track view
 
         # an_app, a_win, a_plots, a_plots_data = rasters_display_outputs_tuple = rasters_display_outputs_tuple
