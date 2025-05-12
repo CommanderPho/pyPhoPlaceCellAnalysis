@@ -13,15 +13,17 @@ from pyphoplacecellanalysis.External.pyqtgraph import QtCore, QtGui, QtWidgets
 from pyphocorehelpers.DataStructure.general_parameter_containers import VisualizationParameters, RenderPlotsData, RenderPlots # PyqtgraphRenderPlots
 from pyphocorehelpers.gui.PhoUIContainer import PhoUIContainer
 from pyphocorehelpers.DataStructure.RenderPlots.PyqtgraphRenderPlots import PyqtgraphRenderPlots
+from pyphocorehelpers.DataStructure.RenderPlots.MatplotLibRenderPlots import MatplotlibRenderPlots
 
 import pyphoplacecellanalysis.External.pyqtgraph as pg
 
 from pyphocorehelpers.programming_helpers import metadata_attributes
 from pyphocorehelpers.function_helpers import function_attributes
-
 from neuropy.utils.mixins.AttrsClassHelpers import keys_only_repr
+from neuropy.utils.indexing_helpers import wrap_in_container_if_needed, unwrap_single_item, flatten_dict
 
-__all__ = ['PhoBaseContainerTool']
+
+__all__ = ['PhoBaseContainerTool', 'GenericMatplotlibContainer', 'GenericPyQtGraphContainer']
 
 
 @metadata_attributes(short_name=None, tags=['gui'], input_requires=[], output_provides=[], uses=['RenderPlots', 'RenderPlotsData', 'PhoUIContainer'], used_by=[], creation_date='2023-11-17 19:59', related_items=[])
@@ -37,6 +39,72 @@ class PhoBaseContainerTool:
     plots_data: RenderPlotsData = field(default=Factory(RenderPlotsData, 'plotter'), repr=False)
     ui: PhoUIContainer = field(default=Factory(PhoUIContainer, 'plotter'), repr=False)
     params: VisualizationParameters = field(default=Factory(VisualizationParameters, 'plotter'), repr=keys_only_repr)
+
+
+
+@metadata_attributes(short_name=None, tags=['container', 'generic', 'matplotlib'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-05-12 10:03', related_items=[])
+@define(slots=False, eq=False)
+class GenericMatplotlibContainer(PhoBaseContainerTool):
+    """ a tool in a container:
+    
+    from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.ContainerBased.PhoContainerTool import GenericMatplotlibContainer
+    
+    
+    """
+    name: str = field(default='plot')
+    plots: RenderPlots = field(default=Factory(PyqtgraphRenderPlots, 'plotter'), repr=keys_only_repr)
+    plots_data: RenderPlotsData = field(default=Factory(RenderPlotsData, 'plotter'), repr=False)
+    ui: PhoUIContainer = field(default=Factory(PhoUIContainer, 'plotter'), repr=False)
+    params: VisualizationParameters = field(default=Factory(VisualizationParameters, 'plotter'), repr=keys_only_repr)
+
+    # Passthru/derived properties ________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
+    @property
+    def figures(self):
+        """The figures property."""
+        return self.plots.figures
+    @figures.setter
+    def figures(self, value):
+        self.plots.figures = value
+
+    @property
+    def axes(self):
+        """The axes property."""
+        return self.plots.axes
+    @axes.setter
+    def axes(self, value):
+        self.plots.axes = value
+
+    @property
+    def num_figures(self) -> int:
+        """The num_figures property."""
+        return self.plots.num_figures
+
+    @property
+    def num_axes(self) -> int:
+        """The num_axes property."""
+        return self.plots.num_axes
+    
+
+    # Singular Accessors _________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
+    @property
+    def fig(self):
+        """The fig property."""
+        return self.plots.fig
+    @fig.setter
+    def fig(self, value):
+        self.plots.fig = value
+
+    @property
+    def ax(self):
+        """The ax property."""
+        return self.plots.ax
+    @ax.setter
+    def ax(self, value):
+        self.plots.ax = value
+        
+
+
+
 
 
 
