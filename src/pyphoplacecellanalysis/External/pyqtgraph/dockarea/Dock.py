@@ -344,7 +344,7 @@ class Dock(QtWidgets.QWidget, DockDrop):
 
 
     def toggleTitleBarVisibility(self):
-        """ toggles the visibility of the contents (everything except the title bar) for this Dock.
+        """ toggles the visibility of the titlebar for this Dock.
         """
         new_is_hidden: bool = (not self.labelHidden)
         if new_is_hidden:
@@ -386,10 +386,6 @@ class Dock(QtWidgets.QWidget, DockDrop):
         self.restoreTitleButton.show()
         self.restoreTitleButton.raise_()
         
-
-
-
-
     def showTitleBar(self):
         """
         Show the title bar for this Dock.
@@ -402,6 +398,7 @@ class Dock(QtWidgets.QWidget, DockDrop):
         # Hide the restore button if it exists
         if hasattr(self, 'restoreTitleButton'):
             self.restoreTitleButton.hide()
+
 
 
     def toggleContentVisibility(self):
@@ -649,15 +646,9 @@ class Dock(QtWidgets.QWidget, DockDrop):
         
         # Create standard actions
 
-        new_is_TitleBar_hidden: bool = (not self.labelHidden)
-        if new_is_TitleBar_hidden:
-            ## now hidden
-            showTitleAction = menu.addAction("Show title bar")
-            showTitleAction.triggered.connect(self.showTitleBar)
-        else:
-            ## now visible
-            hideTitleAction = menu.addAction("Hide title bar")
-            hideTitleAction.triggered.connect(self.hideTitleBar)
+
+        toggleTitleBarAction = menu.addAction("Toggle title bar")
+        toggleTitleBarAction.triggered.connect(self.toggleTitleBarVisibility)
 
         menu.addSeparator()
 
