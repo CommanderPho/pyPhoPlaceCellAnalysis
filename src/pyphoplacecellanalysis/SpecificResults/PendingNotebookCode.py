@@ -116,6 +116,8 @@ from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiCo
 from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.EpochComputationFunctions import _perform_plot_hairy_overlayed_position
 from neuropy.utils.matplotlib_helpers import draw_epoch_regions
 
+
+
 @function_attributes(short_name=None, tags=['track'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-05-06 16:08', related_items=[])
 def add_hairy_plot(active_2d_plot, curr_active_pipeline, a_decoded_marginal_posterior_df):
     """ adds a hiary plot the SpikeRaster2D's timeline as a track
@@ -431,6 +433,9 @@ class MultiDecoderColorOverlayedPosteriors:
         all_t_bins_final_overlayed_out_RGBA, all_t_bins_per_decoder_out_RGBA, extra_all_t_bins_outputs_dict = MultiDecoderColorOverlayedPosteriors.compute_all_time_bin_RGBA(p_x_given_n=p_x_given_n, produce_debug_outputs=False, drop_below_threshold=1e-1)
 
 
+        
+        ## OUTPUTS: all_t_bins_per_decoder_out_RGBA
+        
         """
         
         # p_x_given_n: NDArray[ND.Shape["N_TIME_BINS, N_POS_BINS, N_DECODERS"], np.floating]
@@ -453,25 +458,29 @@ class MultiDecoderColorOverlayedPosteriors:
 
         ## INPUTS: probability_values (n_pos_bins, 4)
         all_t_bins_per_decoder_out_RGBA: NDArray[ND.Shape["N_TIME_BINS", "N_POS_BINS, N_DECODERS, 4"], np.floating] = np.zeros((n_time_bins, n_pos_bins, n_decoders, 4))
-        all_t_bins_final_overlayed_out_RGBA: NDArray[ND.Shape["N_TIME_BINS", "N_POS_BINS, 4"], np.floating] = np.zeros((n_time_bins, n_pos_bins, 4))
+        all_t_bins_final_overlayed_out_RGBA: NDArray[ND.Shape["N_TIME_BINS", "N_POS_BINS, 4"], np.floating] = np.zeros((n_time_bins, n_pos_bins, 4)) # Pre-compute the overlay so that there's only one color that represents up to all four active decoders
 
         extra_all_t_bins_outputs_dict: Dict = {
             'all_t_bins_per_decoder_alphas': np.zeros((n_time_bins, n_decoders)),
-            # 'all_t_bins_per_decoder_out_RGBA: np.zeros((n_time_bins, n_pos_bins, 4, 4)),
             'all_t_bins_per_decoder_alpha_weighted_RGBA': np.zeros((n_time_bins, n_pos_bins, n_decoders, 4)),
             'all_t_bins_final_RGBA': np.zeros((n_time_bins, n_pos_bins, 4)),
         }
 
         for a_t_bin_idx in np.arange(n_time_bins):
+            ## for each time bin, there are several ways to normalize
+                # 1. normalize over all in each time bin 
+                # 2. normalize to max/min in each time (colormapping), means colors aren't consistent between timebins
+                            
+
             if progress_print:
                 is_every_hundreth_t_bin = (a_t_bin_idx % 1000 == 0)
                 if is_every_hundreth_t_bin:        
                     print(f'a_t_bin_idx: [{a_t_bin_idx}/{n_time_bins}]')
 
-            probability_values: NDArray[ND.Shape["N_POS_BINS, N_DECODERS"], np.floating] = deepcopy(p_x_given_n[:, :, a_t_bin_idx])
+            single_t_bin_P_values: NDArray[ND.Shape["N_POS_BINS, N_DECODERS"], np.floating] = deepcopy(p_x_given_n[:, :, a_t_bin_idx])
 
             if produce_debug_outputs:
-                _pre_norm_prob_vals = deepcopy(probability_values)
+                _pre_norm_prob_vals = deepcopy(single_t_bin_P_values)
 
             # DEBUGONLY __________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
             if produce_debug_outputs:
@@ -481,20 +490,19 @@ class MultiDecoderColorOverlayedPosteriors:
                 # _all_normed_prob_vals = _pre_norm_prob_vals / sum_over_all_decoder_pos_values ## normalize
 
             ## normalize over decoder
-            sum_over_all_pos_values: NDArray[ND.Shape["4"], np.floating] = np.nansum(probability_values, axis=0) # sum over pos
+            sum_over_all_pos_values: NDArray[ND.Shape["N_DECODERS"], np.floating] = np.nansum(single_t_bin_P_values, axis=0) # sum over pos
             if produce_debug_outputs:
                 print(f'sum_over_all_pos_values: {sum_over_all_pos_values}')
                 
-            decoder_alphas = sum_over_all_pos_values.copy()
-            # sum_over_all_values: NDArray[ND.Shape["4, "], np.floating] = np.nansum(probability_values, axis=0)
-            probability_values = probability_values / sum_over_all_pos_values ## normalize over decoder
+            decoder_alphas: NDArray[ND.Shape["N_DECODERS"], np.floating] = sum_over_all_pos_values.copy()
+            single_t_bin_P_values = single_t_bin_P_values / sum_over_all_pos_values ## normalize over (decoder x position)
 
             ## OUT: probability_values
             ## INPUTS: probability_values (n_pos_bins, 4)
             # single_t_bin_out_RGBA = np.zeros((n_pos_bins, 4, 4))
 
             ## pre-plotting only: mask the tiny values:
-            probability_values = cls._prepare_arr_for_conversion_to_RGBA(probability_values, drop_below_threshold=drop_below_threshold)
+            single_t_bin_P_values = cls._prepare_arr_for_conversion_to_RGBA(single_t_bin_P_values, drop_below_threshold=drop_below_threshold)
 
             ## for each decoder:
             for i, (a_decoder_name, a_cmap) in enumerate(active_decoder_cmap_dict.items()):
@@ -502,22 +510,25 @@ class MultiDecoderColorOverlayedPosteriors:
                     # print(f'i: {i}, a_decoder_name: {a_decoder_name}')
                     pass
 
-                data = probability_values[:, i]
+                a_t_bin_a_decoder_P: NDArray[ND.Shape["N_POS_BINS"], np.floating] = single_t_bin_P_values[:, i]
                 # ignore NaNs when finding data range
-                norm = mpl.colors.Normalize(vmin=np.nanmin(data), vmax=np.nanmax(data))
+                a_norm = mpl.colors.Normalize(vmin=np.nanmin(a_t_bin_a_decoder_P), vmax=np.nanmax(a_t_bin_a_decoder_P))
                 # mask the NaNs so the cmap knows to use the “bad” color
-                masked = np.ma.masked_invalid(data)
-                rgba = a_cmap(norm(masked)) # rgba.shape (n_pos_bins, 4) # the '4' here is for RGBA, not the decoders, RGB per bin
-                # rgb = rgba[..., :3] 
-                # single_t_bin_out_RGBA[:, i, :] = rgba
+                a_masked = np.ma.masked_invalid(a_t_bin_a_decoder_P)
+                an_rgba: NDArray[ND.Shape["N_POS_BINS, 4"], np.floating] = a_cmap(a_norm(a_masked)) # rgba.shape (n_pos_bins, 4) # the '4' here is for RGBA, not the decoders, RGB per bin
+                # rgb = an_rgba[..., :3] 
+                # single_t_bin_out_RGBA[:, i, :] = an_rgba
                 
-                all_t_bins_per_decoder_out_RGBA[a_t_bin_idx, :, i, :] = rgba
+                all_t_bins_per_decoder_out_RGBA[a_t_bin_idx, :, i, :] = an_rgba
             ## END for i, (a_decoder_name, a_cmap) in enum....
             
+            # Add dict entries ___________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
             # single_t_bin_out_RGBA: (n_pos_bins, 4, 4)
-            single_t_bin_out_RGBA = all_t_bins_per_decoder_out_RGBA[a_t_bin_idx, :, :, :]
+            single_t_bin_out_RGBA: NDArray[ND.Shape["N_POS_BINS, N_DECODERS, 4"], np.floating] = all_t_bins_per_decoder_out_RGBA[a_t_bin_idx, :, :, :]
+            # single_t_bin_out_alpha_weighted_RGBA: NDArray[ND.Shape["N_POS_BINS, N_DECODERS, 4"], np.floating] = (deepcopy(single_t_bin_out_RGBA) * decoder_alphas[None, :, None]) # (n_pos_bins, n_decoders, 4)
             extra_all_t_bins_outputs_dict['all_t_bins_per_decoder_alphas'][a_t_bin_idx, :] = decoder_alphas
             extra_all_t_bins_outputs_dict['all_t_bins_per_decoder_alpha_weighted_RGBA'][a_t_bin_idx, :, :, :] = (deepcopy(single_t_bin_out_RGBA) * decoder_alphas[None, :, None]) # (n_pos_bins, n_decoders, 4)
+
             all_t_bins_final_overlayed_out_RGBA[a_t_bin_idx, :, :] = color_blend_fn(single_t_bin_out_RGBA, decoder_alphas=decoder_alphas) # (n_pos_bins, 4, 4)?
             
             ## `numpy_rgba_composite` -- expects input = rgba_layers: (n_layers, H, W, 4) - here (H:
@@ -526,42 +537,38 @@ class MultiDecoderColorOverlayedPosteriors:
             extra_all_t_bins_outputs_dict['all_t_bins_final_RGBA'][a_t_bin_idx, :, :] = numpy_rgba_composite(np.transpose(extra_all_t_bins_outputs_dict['all_t_bins_per_decoder_alpha_weighted_RGBA'][a_t_bin_idx, :, :, :], (1, 0, 2))) # transpose -> (n_pos_bins, n_decoders, 4) => (n_decoders, n_pos_bins, 4)
 
             # numpy_rgba_composite: Returns: (H, W, 4) — final composited RGBA image
-
-
-
         ## END FOR for a_t_bin_idx in np.a...
+        extra_all_t_bins_outputs_dict['all_t_bins_final_overlayed_out_RGBA'] = all_t_bins_final_overlayed_out_RGBA
+        extra_all_t_bins_outputs_dict['all_t_bins_per_decoder_out_RGBA'] = all_t_bins_per_decoder_out_RGBA
 
         return all_t_bins_final_overlayed_out_RGBA, all_t_bins_per_decoder_out_RGBA, extra_all_t_bins_outputs_dict
 
 
     @classmethod
     def _prepare_arr_for_conversion_to_RGBA(cls, arr: NDArray, alt_arr_to_use_for_drops: Optional[NDArray]=None, drop_below_threshold: float=0.0000001, skip_scaling:bool=True):
-        """ Universally used to prepare the pfmap to be displayed (across every plot time)
+        """ Pure (does not alter `arr`, returns a copy).
+        If `drop_below_threshold`
         
-        Regardless of `occupancy` and `drop_below_threshold`, the image is rescaled to fill its dynamic range by its maximum (meaning the output will be normalized between zero and one).
-        `occupancy` is not used unless `drop_below_threshold` is non-None
+        IFF (skip_scaling == False): Regardless of `alt_arr_to_use_for_drops` and `drop_below_threshold`, the image is rescaled to fill its dynamic range by its maximum (meaning the output will be normalized between zero and one).
+        `alt_arr_to_use_for_drops` is not used unless `drop_below_threshold` is non-None
         
         Input:
             drop_below_threshold: if None, no indicies are dropped. Otherwise, values of occupancy less than the threshold specified are used to build a mask, which is subtracted from the returned image (the image is NaN'ed out in these places).
 
-        Known Uses:
-                NeuroPy.neuropy.plotting.ratemaps.plot_single_tuning_map_2D(...)
-                pyphoplacecellanalysis.Pho2D.PyQtPlots.plot_placefields.pyqtplot_plot_image_array(...)
-                
-        # image = np.squeeze(images[a_linear_index,:,:])
+            
         """
         # Pre-filter the data:
         with np.errstate(divide='ignore', invalid='ignore'):
             arr = np.array(arr.copy())
             if not skip_scaling:
                 arr = arr / np.nanmax(arr) # note scaling by maximum here!
-            if (drop_below_threshold is not None):          
+            if (drop_below_threshold is not None) and (drop_below_threshold > 0):          
                 if (alt_arr_to_use_for_drops is not None):
                     Assert.same_shape(arr, alt_arr_to_use_for_drops)
                 else:
                     alt_arr_to_use_for_drops = arr
 
-                arr[np.where(alt_arr_to_use_for_drops < drop_below_threshold)] = np.nan # null out the occupancy
+                arr[np.where(alt_arr_to_use_for_drops < drop_below_threshold)] = np.nan # null out the values below the threshold for visualization
                 
             # arr = np.nan_to_num(arr, nan=0.0, posinf=1.0, neginf=0.0) # from prepare_data_for_plotting
             return arr # return the modified and masked image
