@@ -263,7 +263,7 @@ def numpy_rgba_composite(rgba_layers: NDArray[ND.Shape["N_DECODERS, N_POS_BINS, 
 
 
 
-
+from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.ContainerBased.PhoContainerTool import GenericMatplotlibContainer
 
 @metadata_attributes(short_name=None, tags=['figure', 'posteriors'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-05-04 18:05', related_items=[])
 class MultiDecoderColorOverlayedPosteriors:
@@ -814,16 +814,26 @@ class MultiDecoderColorOverlayedPosteriors:
 
     @function_attributes(short_name=None, tags=['plot', 'alt', 'WORKING'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-05-06 19:02', related_items=[])
     @classmethod
-    def plot_mutli_t_bin_p_x_given_n(cls, all_t_bins_per_decoder_out_RGBA: NDArray, time_bin_centers=None, xbin=None, t_bin_size = 0.05, ax=None, use_original_bounds=False):
+    def plot_mutli_t_bin_p_x_given_n(cls, all_t_bins_per_decoder_out_RGBA: NDArray, time_bin_centers=None, xbin=None, t_bin_size = 0.05, ax=None, use_original_bounds=False) -> GenericMatplotlibContainer:
         """ plots a portion of the color-merged result onto a matplotlib axes 
 
         Working! Uses a single matplotlib ax to draw `n_decoders` images on top of each other by calling `imshow` sequentially.
         
+        Usage:
+        
+            from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.ContainerBased.PhoContainerTool import GenericMatplotlibContainer
+            from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import MultiDecoderColorOverlayedPosteriors
+            
+            
+            _out: GenericMatplotlibContainer = MultiDecoderColorOverlayedPosteriors.plot_mutli_t_bin_p_x_given_n(extra_all_t_bins_outputs_dict['all_t_bins_per_decoder_alpha_weighted_RGBA'], xbin=xbin, time_bin_centers=time_bin_centers, t_bin_size=0.025, ax=ax)
+            fig = _out.fig
+            ax = _out.ax
+            im_posterior_x_dict = _out.plots.im_posterior_x_dict
         """
         # all_t_bins_per_decoder_out_RGBA: NDArray[ND.Shape["N_TIME_BINS", "N_POS_BINS", "N_DECODERS", "4"], np.floating]
         
         from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError import _subfn_try_get_approximate_recovered_t_pos
-        
+        from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.ContainerBased.PhoContainerTool import GenericMatplotlibContainer
 
         n_time_bins, n_pos_bins, n_decoders, _n_RGBA_channels = np.shape(all_t_bins_per_decoder_out_RGBA)
         assert _n_RGBA_channels == 4
@@ -861,11 +871,17 @@ class MultiDecoderColorOverlayedPosteriors:
         # Posterior distribution heatmaps at each point.
         enable_set_axis_limits:bool=True
         
+        _out: GenericMatplotlibContainer = GenericMatplotlibContainer(name='plot_mutli_t_bin_p_x_given_n')
+        _out.fig = fig
+        _out.ax = ax 
+
+
+
         ## Determine the actual start/end times:
         x_first_extent = _subfn_try_get_approximate_recovered_t_pos(time_bin_centers, xbin, use_original_bounds=use_original_bounds) # x_first_extent = (xmin, xmax, ymin, ymax)
         xmin, xmax, ymin, ymax = x_first_extent
 
-        out_im_posterior_x_dict = {}
+        _out.plots.im_posterior_x_dict = {}
         
         ## use matplotlib's rendering to get the final output image:
         for i in np.arange(n_decoders):
@@ -886,14 +902,14 @@ class MultiDecoderColorOverlayedPosteriors:
                 print(f'WARN: active_extent (xmin, xmax, ymin, ymax): {x_first_extent} contains NaN or Inf.\n\terr: {err}')
                 # ax.clear() # clear the existing and now invalid image
                 im_posterior_x = None
-            out_im_posterior_x_dict[i] = im_posterior_x
+            _out.plots.im_posterior_x_dict[i] = im_posterior_x
         # end for i in np.arange(n_decoders)
         if enable_set_axis_limits:
             ax.set_xlim((xmin, xmax)) # UserWarning: Attempting to set identical low and high xlims makes transformation singular; automatically expanding.
             ax.set_ylim((ymin, ymax))        
 
-        return fig, ax, out_im_posterior_x_dict
-    
+        # return fig, ax, _out.plots.im_posterior_x_dict
+        return _out
 
     @function_attributes(short_name=None, tags=['plot', 'matplotlib'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-05-04 00:00', related_items=[])
     @classmethod
