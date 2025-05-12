@@ -1092,6 +1092,73 @@ class MultiDecoderColorOverlayedPosteriors:
         return ts_widget, fig, ax_list, dDisplayItem
         
 
+
+    @classmethod
+    def add_decoder_legend_venn(cls, all_decoder_colors_dict: Dict[str, str], ax):
+        """ Creates an inset axes to serve as the legned, and inside this plots a venn-diagram showing the colors for each decoder, allowing the user to see what they look like overlapping
+
+        Usage:
+
+            all_decoder_colors_dict = {'long_LR': '#4169E1', 'long_RL': '#607B00', 'short_LR': '#DC143C', 'short_RL': '#990099'} ## Just hardcoded version of `additional_cmap_names`
+            ax_inset, _out =  MultiDecoderColorOverlayedPosteriors.add_decoder_legend_venn(all_decoder_colors_dict=all_decoder_colors_dict, ax=ax)
+
+        """
+        assert ax is not None
+        fig = ax.get_figure()
+
+        # n_decoders: int = len(all_decoder_colors_dict)
+        # cmap = list(all_decoder_colors_dict.values())
+
+        # Create the inset axes
+        # Define the size and position of the inset axes relative to the parent axes    
+        width = 0.1
+        height = 0.65
+
+        # Define the position of the lower-left corner for top-right alignment
+        x0 = (1 - width)
+        y0 = (1 - height)
+
+        # Create the inset axes, using bbox_to_anchor and bbox_transform for independent positioning
+        ax_inset = ax.inset_axes([x0, y0, width, height])
+        ax_inset, _out =  cls._build_decoder_legend_venn(all_decoder_colors_dict=all_decoder_colors_dict, ax=ax_inset)
+
+        fig.canvas.draw()
+
+        return ax_inset, _out
+
+
+    @classmethod
+    def _build_decoder_legend_venn(cls, all_decoder_colors_dict: Dict[str, str], ax=None):
+        """ builds a simple venn-diagram showing the colors for each decoder, allowing the user to see what they look like overlapping
+
+        Usage:
+
+            all_decoder_colors_dict = {'long_LR': '#4169E1', 'long_RL': '#607B00', 'short_LR': '#DC143C', 'short_RL': '#990099'} ## Just hardcoded version of `additional_cmap_names`
+            ax, _out =  MultiDecoderColorOverlayedPosteriors._build_decoder_legend_venn(all_decoder_colors_dict=all_decoder_colors_dict, ax=None)
+
+        """
+        from matplotlib.pyplot import subplots
+        from venn import draw_venn, generate_colors
+
+        n_sets: int = len(all_decoder_colors_dict)
+        cmap = list(all_decoder_colors_dict.values())
+        if ax is None:
+            ## make new figure if needed
+            fig, ax = subplots(figsize=(18, 8))
+            
+        dataset_dict = {k:{100} for k, v in deepcopy(all_decoder_colors_dict).items()}
+
+        # _out = venn(dataset_dict, fmt="{percentage:.1f}%", cmap=cmap, fontsize=8, legend_loc="upper left", ax=ax)
+        petal_labels = {} ## empty labels
+        _out = draw_venn(
+            petal_labels=petal_labels, dataset_labels=dataset_dict.keys(),
+            hint_hidden=False,
+            colors=generate_colors(cmap=cmap, n_colors=n_sets),
+            # colors=cmap,
+            figsize=(8, 8), fontsize=8, legend_loc="upper left", ax=ax
+        )
+        return ax, _out
+
     # ==================================================================================================================== #
     # HDF5                                                                                                                 #
     # ==================================================================================================================== #
