@@ -86,6 +86,10 @@ class LiveWindowEventIntervalMonitoringMixin:
     @pyqtExceptionPrintingSlot()
     def LiveWindowEventIntervalMonitoringMixin_on_buildUI(self):
         """ perfrom setup/creation of widget/graphical/data objects. Only the core objects are expected to exist on the implementor (root widget, etc) """
+        if not hasattr(self, '_active_window_visible_intervals_dict'):
+            self.LiveWindowEventIntervalMonitoringMixin_on_init()
+            self.LiveWindowEventIntervalMonitoringMixin_on_setup()
+            
         connections = {}
         connections['LiveWindowEventIntervalMonitoringMixin_entered'] = self.sigOnIntervalEnteredWindow.connect(self.on_visible_event_intervals_added)
         connections['LiveWindowEventIntervalMonitoringMixin_exited'] = self.sigOnIntervalExitedindow.connect(self.on_visible_event_intervals_removed)
@@ -264,6 +268,16 @@ class EpochRenderingMixin(LiveWindowEventIntervalMonitoringMixin):
     @pyqtExceptionPrintingSlot()
     def EpochRenderingMixin_on_buildUI(self):
         """ perfrom setup/creation of widget/graphical/data objects. Only the core objects are expected to exist on the implementor (root widget, etc) """
+        interval_datasources = self.plots_data.get('interval_datasources', None)
+        if interval_datasources is None:
+            ## needs init:
+            self.EpochRenderingMixin_on_init()
+            
+        rendered_epochs = getattr(self.plots, 'rendered_epochs', None)
+        if rendered_epochs is None:
+            ## needs setup:
+            self.EpochRenderingMixin_on_setup()
+            
         # Adds the self.ui and self.ui.connections if they don't exist
         if not hasattr(self, 'ui'):
             # if the window has no .ui property, create one:

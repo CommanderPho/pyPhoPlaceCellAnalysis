@@ -198,12 +198,13 @@ class LocalMenus_AddRenderable(QtWidgets.QMainWindow):
             plot_options_context_menu = parent_widget.getContextMenus(None) # This gets the "Plot Options" menu
             # top_level_parent_context_menu = parent_context_menus.parent()
             top_level_parent_context_menu = parent_widget.vb.menu # ViewBoxMenu
-         
-            active_parent_menu = top_level_parent_context_menu
-            active_parent_menu.addSeparator()
-            active_parent_menu.addMenu(additional_menu)
-            if debug_print:
-                print(f'parent_context_menus.actions: {[an_action.text() for an_action in active_parent_menu.actions()]}') # parent_context_menus.actions: ['Transforms', 'Downsample', 'Average', 'Alpha', 'Grid', 'Points']
+            if top_level_parent_context_menu is not None:
+                active_parent_menu = top_level_parent_context_menu
+                active_parent_menu.addSeparator()
+                active_parent_menu.addMenu(additional_menu)
+                if debug_print:
+                    print(f'parent_context_menus.actions: {[an_action.text() for an_action in active_parent_menu.actions()]}') # parent_context_menus.actions: ['Transforms', 'Downsample', 'Average', 'Alpha', 'Grid', 'Points']
+
                 
 
         # BEGIN FUNCTION BODY ________________________________________________________________________________________________ #

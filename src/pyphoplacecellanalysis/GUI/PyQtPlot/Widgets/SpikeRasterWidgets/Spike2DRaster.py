@@ -236,8 +236,9 @@ class Spike2DRaster(SpecificDockWidgetManipulatingMixin, DynamicDockDisplayAreaO
 
 
     def __init__(self, params=None, spikes_window=None, playback_controller=None, neuron_colors=None, neuron_sort_order=None, application_name=None, **kwargs):
-        SpikeRasterBase.__init__(self=self, params=params, spikes_window=spikes_window, playback_controller=playback_controller, neuron_colors=neuron_colors, neuron_sort_order=neuron_sort_order, application_name=application_name, **kwargs)
-        # super(Spike2DRaster, self).__init__(params=params, spikes_window=spikes_window, playback_controller=playback_controller, neuron_colors=neuron_colors, neuron_sort_order=neuron_sort_order, application_name=application_name, **kwargs)
+        # SpikeRasterBase.__init__(self=self, params=params, spikes_window=spikes_window, playback_controller=playback_controller, neuron_colors=neuron_colors, neuron_sort_order=neuron_sort_order, application_name=application_name, **kwargs)
+        super(Spike2DRaster, self).__init__(params=params, spikes_window=spikes_window, playback_controller=playback_controller, neuron_colors=neuron_colors, neuron_sort_order=neuron_sort_order, application_name=application_name, **kwargs)
+        
         self.logger.info(f'Spike2DRaster.__init__(...)\t.applicationName: "{self.applicationName}"\n\t.windowName: "{self.windowName}")\n')
         
         # Init the TimeCurvesViewMixin for 3D Line plots:
@@ -645,12 +646,19 @@ class Spike2DRaster(SpecificDockWidgetManipulatingMixin, DynamicDockDisplayAreaO
             Presents a linear scroll region over the top to allow the user to select the active window.
             
             
+        Common:
+            self.ui.wrapper_widget
+            self.ui.dynamic_docked_widget_container
+            self.ui.wrapper_layout
+            self.ui.dynamic_docked_widget_container
+            
         """
         from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.GraphicsWidgets.CustomGraphicsLayoutWidget import CustomGraphicsLayoutWidget
         from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.SpikeRasterWidgets.Spike2DRaster import SynchronizedPlotMode
         
         self.logger.debug(f'Spike2DRaster._buildGraphics()')
-        use_docked_pyqtgraph_plots: bool = self.params.setdefault('use_docked_pyqtgraph_plots', False)
+        # use_docked_pyqtgraph_plots: bool = self.params.setdefault('use_docked_pyqtgraph_plots', False)
+        use_docked_pyqtgraph_plots: bool = self.params.setdefault('use_docked_pyqtgraph_plots', True)
 
         ## Common
         self.params.custom_interval_rendering_plots = []
@@ -658,7 +666,9 @@ class Spike2DRaster(SpecificDockWidgetManipulatingMixin, DynamicDockDisplayAreaO
         self.ui.main_time_curves_view_widget = None
         self.ui.main_time_curves_view_legend = None
 
+        # From Render2DScrollWindowPlotMixin:
         self.EpochRenderingMixin_on_buildUI()
+        
         self.update_series_identity_y_values()
         self._build_cell_configs()
         # self._update_plot_ranges()
@@ -728,24 +738,17 @@ class Spike2DRaster(SpecificDockWidgetManipulatingMixin, DynamicDockDisplayAreaO
             
 
 
-
-
-                        
-    
         # From Render2DScrollWindowPlotMixin:
-        self.EpochRenderingMixin_on_buildUI()
+        # self.EpochRenderingMixin_on_buildUI()
         
         # self.Render2DScrollWindowPlot_on_window_update # register with the animation time window for updates for the scroller.
         # Connect the signals for the zoom region and the LinearRegionItem        
         self.rate_limited_signal_scrolled_proxy = pg.SignalProxy(self.window_scrolled, rateLimit=30, slot=self.update_zoomed_plot_rate_limited) # Limit updates to 30 Signals/Second
 
-
         # Required for dynamic matplotlib figures (2022-12-23 added, not sure how it relates to above):
         self._setupUI_matplotlib_render_plots()
 
         self.params.custom_interval_rendering_plots = []
-        
-
         
         ## specific
         if not use_docked_pyqtgraph_plots:
