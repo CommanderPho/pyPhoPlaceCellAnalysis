@@ -582,59 +582,12 @@ class Spike2DRaster(SpecificDockWidgetManipulatingMixin, DynamicDockDisplayAreaO
 
             ## New: Build a container layout to contain all elements that will represent the active window 
             self.params.main_graphics_active_window_container_layout_rowspan = 1
-            self.ui.active_window_container_layout = self.ui.main_graphics_layout_widget.addLayout(row=1, col=0, rowspan=self.params.main_graphics_active_window_container_layout_rowspan, colspan=1)
-            self.ui.active_window_container_layout.setObjectName('active_window_container_layout')
+            # self.ui.active_window_container_layout = self.ui.main_graphics_layout_widget.addLayout(row=1, col=0, rowspan=self.params.main_graphics_active_window_container_layout_rowspan, colspan=1)
+            # self.ui.active_window_container_layout.setObjectName('active_window_container_layout')
                             
             # Custom 2D raster plot:
-            self.params.main_graphics_plot_widget_rowspan = 3 # how many rows the main graphics PlotItems should span
-            # self.params.setdefault('main_graphics_plot_widget_rowspan', 1) # how many rows the main graphics PlotItems should span
-            
-            # curr_plot_row = 1
-            if self.Includes2DActiveWindowScatter:
-                ## Add these active window only plots to the active_window_container_layout
-                # (self.plots.main_plot_widget, self.plots.main_plot_widget_viewbox) = CustomGraphicsLayoutWidget.build_PlotWithCustomViewbox()
-                # (self.plots.main_plot_widget, self.plots.main_plot_widget_viewbox) = self.ui.main_graphics_layout_widget.build_PlotWithCustomViewbox()
-                # self.ui.active_window_container_layout.addItem(self.plots.main_plot_widget, row=1, col=0, rowspan=self.params.main_graphics_plot_widget_rowspan, colspan=1)
-                
-                # if not use_docked_pyqtgraph_plots:
-
-                self.plots.main_plot_widget = self.ui.active_window_container_layout.addPlot(row=1, col=0, rowspan=self.params.main_graphics_plot_widget_rowspan, colspan=1)            
-                self.plots.main_plot_widget.setObjectName('main_plot_widget') # this seems necissary, the 'name' parameter in addPlot(...) seems to only change some internal property related to the legend AND drastically slows down the plotting
-                # self.plots.main_plot_widget_viewbox.setObjectName('main_plot_widget_viewbox') # this seems necissary, the 'name' parameter in addPlot(...) seems to only change some internal property related to the legend AND drastically slows down the plotting
-
-                self.plots.main_plot_widget.setMinimumHeight(40.0) # used to be 500.0 and took up too much room
-
-                # curr_plot_row += (1 * self.params.main_graphics_plot_widget_rowspan)
-                # self.ui.plots = [] # create an empty array for each plot, of which there will be one for each unit.
-                # # build the position range for each unit along the y-axis:
-                
-                # Common Tick Label
-                vtick = QtGui.QPainterPath()
-                vtick.moveTo(0, -0.5)
-                vtick.lineTo(0, 0.5)
-
-                self.plots.main_plot_widget.setLabel('left', 'Cell ID', units='')
-                self.plots.main_plot_widget.setLabel('bottom', 'Time', units='s')
-                self.plots.main_plot_widget.setMouseEnabled(x=False, y=False)
-                self.plots.main_plot_widget.enableAutoRange(x=False, y=False)
-                self.plots.main_plot_widget.setAutoVisible(x=False, y=False)
-                self.plots.main_plot_widget.setAutoPan(x=False, y=False)
-                self.plots.main_plot_widget.enableAutoRange('xy', False)  ## stop auto-scaling after the first data set is plotted
-                
-                # self.plots.main_plot_widget.disableAutoRange()
-                self._update_plot_ranges()
-                
-                ## This scatter plot is the dynamic raster that "zooms" on adjustment of the lienar slider region. It is NOT static background raster that's rendered at the bottom of the window!
-                self.plots.scatter_plot = pg.ScatterPlotItem(name='spikeRasterScatterPlotItem', pxMode=True, symbol=vtick, size=10, pen={'color': 'w', 'width': 2})
-                self.plots.scatter_plot.setObjectName('scatter_plot')
-                self.plots.scatter_plot.opts['useCache'] = True
-                self.plots.main_plot_widget.addItem(self.plots.scatter_plot)
-                _v_axis_item = Render2DNeuronIdentityLinesMixin.setup_custom_neuron_identity_axis(self.plots.main_plot_widget, self.n_cells)
-                    
-            else:
-                self.plots.main_plot_widget = None
-                self.plots.scatter_plot = None
-
+            self.plots.main_plot_widget = None
+            self.plots.scatter_plot = None
             
             # From Render2DScrollWindowPlotMixin:
             # if not use_docked_pyqtgraph_plots:
@@ -645,72 +598,6 @@ class Spike2DRaster(SpecificDockWidgetManipulatingMixin, DynamicDockDisplayAreaO
             #     if self.Includes2DActiveWindowScatter:
             #         self.plots.scatter_plot.addPoints(self.plots_data.all_spots)
         
-            self.EpochRenderingMixin_on_buildUI()
-            
-            # self.Render2DScrollWindowPlot_on_window_update # register with the animation time window for updates for the scroller.
-            # Connect the signals for the zoom region and the LinearRegionItem        
-            self.rate_limited_signal_scrolled_proxy = pg.SignalProxy(self.window_scrolled, rateLimit=30, slot=self.update_zoomed_plot_rate_limited) # Limit updates to 30 Signals/Second
-        
-            # For this 2D Implementation of TimeCurvesViewMixin/PyQtGraphSpecificTimeCurvesMixin
-            self.ui.main_time_curves_view_widget = None
-            self.ui.main_time_curves_view_legend = None
-            
-            # Create a QWidget to act as a wrapper
-            self.ui.wrapper_widget = pg.QtWidgets.QWidget()
-            self.ui.wrapper_widget.setObjectName("wrapper_widget")
-            if not use_docked_pyqtgraph_plots:
-                self.ui.wrapper_widget.setSizePolicy(QtGui.QSizePolicy.Expanding, QtGui.QSizePolicy.Preferred)
-            else:
-                self.ui.wrapper_widget.setSizePolicy(QtGui.QSizePolicy.Expanding, QtGui.QSizePolicy.Expanding)
-                
-
-            # Create a layout for the wrapper (you may want a different layout depending on your needs)
-            self.ui.wrapper_layout = pg.QtWidgets.QVBoxLayout(self.ui.wrapper_widget)
-            self.ui.wrapper_layout.setSpacing(0)
-            self.ui.wrapper_layout.setContentsMargins(0, 0, 0, 0)
-            
-            
-            ## Add the container to hold dynamic matplotlib plot widgets:
-            self.ui.dynamic_docked_widget_container = NestedDockAreaWidget()
-            self.ui.dynamic_docked_widget_container.setObjectName("dynamic_docked_widget_container")
-            # self.ui.layout.addWidget(self.ui.dynamic_docked_widget_container, 1, 0) # Add the dynamic container as the second row
-            # add the GLViewWidget to the splitter
-            # self.ui.main_content_splitter.addWidget(self.ui.dynamic_docked_widget_container)
-
-            # Add the container to the wrapper layout
-            self.ui.wrapper_layout.addWidget(self.ui.dynamic_docked_widget_container)
-
-            # Add the wrapper_widget to the splitter
-            self.ui.main_content_splitter.addWidget(self.ui.wrapper_widget)
-            
-
-            # add the splitter into your layout
-            self.ui.layout.addWidget(self.ui.main_content_splitter, 0, 0)  # add the splitter to the main layout at 0, 0
-
-            # Required for dynamic matplotlib figures (2022-12-23 added, not sure how it relates to above):
-            self._setupUI_matplotlib_render_plots()
-
-            self.params.custom_interval_rendering_plots = []
-
-            if not use_docked_pyqtgraph_plots:
-                self.params.custom_interval_rendering_plots.append(self.plots.background_static_scroll_window_plot)
-
-            # custom_interval_rendering_plots = self.params.setdefault('custom_interval_rendering_plots', [self.plots.background_static_scroll_window_plot])
-            if self.Includes2DActiveWindowScatter:
-                if self.plots.main_plot_widget is not None:
-                    self.params.custom_interval_rendering_plots.append(self.plots.main_plot_widget)
-                
-            # if ((not self.Includes2DActiveWindowScatter) and use_docked_pyqtgraph_plots):
-            #     # use_docked_pyqtgraph_plots == True
-            #     name_modifier_suffix='raster_window'
-            #     _raster_tracks_out_dict = self.prepare_pyqtgraph_rasterPlot_track(name_modifier_suffix=name_modifier_suffix, should_link_to_main_plot_widget=False)            
-            #     _out = _raster_tracks_out_dict[f'rasters{name_modifier_suffix}']
-            #     dock_config, time_sync_pyqtgraph_widget, raster_root_graphics_layout_widget, raster_plot_item, rasters_display_outputs_tuple = _out
-            #     app, win, plots, plots_data = rasters_display_outputs_tuple
-
-            #     self.plots.main_plot_widget = raster_plot_item
-            #     self.plots.scatter_plot = plots.scatter_plot
-
 
 
             ## Done, ready to add docks
@@ -726,17 +613,22 @@ class Spike2DRaster(SpecificDockWidgetManipulatingMixin, DynamicDockDisplayAreaO
             _raster_overview_tracks_out_dict = self.prepare_pyqtgraph_rasterPlot_track(name_modifier_suffix='raster_overview', should_link_to_main_plot_widget=False, sync_mode=SynchronizedPlotMode.NO_SYNC, downsampling_rate=5)
             raster_overview_dock_config, raster_overview_time_sync_pyqtgraph_widget, raster_overview_root_graphics_layout_widget, raster_overview_plot_item, raster_overview_display_outputs_tuple = _raster_overview_tracks_out_dict['rasters[raster_overview]']
             self.plots.background_static_scroll_window_plot = raster_overview_plot_item
-            # self.plots.background_static_scroll_window_plot = self.ScrollRasterPreviewWindow_on_BuildUI(self.plots.background_static_scroll_window_plot)
+            self.plots.background_static_scroll_window_plot = self.ScrollRasterPreviewWindow_on_BuildUI(self.plots.background_static_scroll_window_plot)
             # self.sync_matplotlib_render_plot_widget('rasters[raster_overview]', sync_mode=SynchronizedPlotMode.NO_SYNC) # disable continued sync
             raster_overview_plot_item.setXRange(self.total_data_start_time, self.total_data_end_time, padding=0) ## global frame
             self.params.custom_interval_rendering_plots.append(self.plots.background_static_scroll_window_plot)
 
-
-
             if self.Includes2DActiveWindowScatter:
                 _raster_tracks_out_dict = self.prepare_pyqtgraph_rasterPlot_track(name_modifier_suffix='raster_window', should_link_to_main_plot_widget=False, sync_mode=SynchronizedPlotMode.TO_WINDOW, downsampling_rate=1)
+                raster_window_dock_config, raster_window_time_sync_pyqtgraph_widget, raster_window_root_graphics_layout_widget, raster_window_plot_item, raster_window_display_outputs_tuple = _raster_tracks_out_dict['rasters[raster_window]']
+                raster_window_app, raster_window_win, raster_window_plots, raster_window_plots_data = raster_window_display_outputs_tuple                
+                self.plots.main_plot_widget = raster_window_plot_item
+                self.plots.scatter_plot = raster_window_plots.scatter_plot
+                # self.params.custom_interval_rendering_plots.append(self.plots.main_plot_widget)
                 # _all_outputs_dict['_raster_tracks_out_dict'] = _raster_tracks_out_dict
-            
+                if self.plots.scatter_plot is not None:
+                    if self.plots_data.all_spots is not None:
+                        self.plots.scatter_plot.addPoints(self.plots_data.all_spots)
 
             # END if use_docked_pyqtgraph_plots...
 
