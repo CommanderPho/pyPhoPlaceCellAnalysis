@@ -427,6 +427,16 @@ class Spike2DRaster(SpecificDockWidgetManipulatingMixin, DynamicDockDisplayAreaO
             Presents a linear scroll region over the top to allow the user to select the active window.
             
             
+        Requires:
+            self.ui.main_content_splitter
+            self.params.custom_interval_rendering_plots
+            
+        Creates/Updates:
+            self.plots.main_plot_widget
+            self.plots.scatter_plot
+            self.plots.background_static_scroll_window_plot
+            
+            
         """
         from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.GraphicsWidgets.CustomGraphicsLayoutWidget import CustomGraphicsLayoutWidget
         from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.SpikeRasterWidgets.Spike2DRaster import SynchronizedPlotMode
