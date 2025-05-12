@@ -1,3 +1,12 @@
+ 
+from __future__ import annotations # prevents having to specify types for typehinting as strings
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    ## typehinting only imports here
+    # from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.SpikeRasterWidgets.Spike2DRaster import SynchronizedPlotMode ## could cause problems?
+    pass
+
 from copy import deepcopy
 from typing import Dict, List, Tuple, Optional, Callable, Union, Any
 from typing_extensions import TypeAlias
@@ -22,6 +31,9 @@ from pyphoplacecellanalysis.GUI.PyQtPlot.DockingWidgets.DynamicDockDisplayAreaCo
 from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import DirectionalDecodersContinuouslyDecodedResult, DecodedFilterEpochsResult
 from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import SingleEpochDecodedResult
 from pyphoplacecellanalysis.General.Model.Configs.LongShortDisplayConfig import PlottingHelpers
+
+from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.SpikeRasterWidgets.Spike2DRaster import SynchronizedPlotMode ## could cause problems?
+
 
 
 class SpecificDockWidgetManipulatingMixin(BaseDynamicInstanceConformingMixin):
@@ -917,7 +929,7 @@ class SpecificDockWidgetManipulatingMixin(BaseDynamicInstanceConformingMixin):
     # ==================================================================================================================== #
 
     @function_attributes(short_name=None, tags=['intervals', 'tracks', 'pyqtgraph', 'specific', 'dynamic_ui', 'group_matplotlib_render_plot_widget'], input_requires=[], output_provides=[], uses=['self.add_new_embedded_pyqtgraph_render_plot_widget', 'self.add_rendered_intervals'], used_by=[], creation_date='2024-12-31 07:29', related_items=[])
-    def prepare_pyqtgraph_intervalPlot_tracks(self, enable_interval_overview_track: bool = False, should_remove_all_and_re_add: bool=True, name_modifier_suffix: str='', should_link_to_main_plot_widget:bool=True, debug_print=False):
+    def prepare_pyqtgraph_intervalPlot_tracks(self, enable_interval_overview_track: bool = False, should_remove_all_and_re_add: bool=True, name_modifier_suffix: str='', should_link_to_main_plot_widget:bool=True, interval_dock_max_height: int=89, sync_mode:SynchronizedPlotMode=SynchronizedPlotMode.TO_WINDOW, debug_print=False):
         """ adds to separate pyqtgraph-backed tracks to the SpikeRaster2D plotter for rendering intervals, and updates `active_2d_plot.params.custom_interval_rendering_plots` so the intervals are rendered on these new tracks in addition to any normal ones
         
         enable_interval_overview_track: bool: if True, renders a track to show all the intervals during the sessions (overview) in addition to the track for the intervals within the current active window
@@ -943,15 +955,20 @@ class SpecificDockWidgetManipulatingMixin(BaseDynamicInstanceConformingMixin):
 
         _interval_tracks_out_dict = {}
         if enable_interval_overview_track:
-            dock_config = CustomCyclicColorsDockDisplayConfig(named_color_scheme=NamedColorScheme.grey, showCloseButton=False, corner_radius='0px', hideTitleBar=True)
-            name = f'interval_overview{name_modifier_suffix}'
-            intervals_overview_time_sync_pyqtgraph_widget, intervals_overview_root_graphics_layout_widget, intervals_overview_plot_item, intervals_overview_dock = self.add_new_embedded_pyqtgraph_render_plot_widget(name=name, dockSize=(500, 60), display_config=dock_config)
-            _interval_tracks_out_dict[name] = (dock_config, intervals_overview_dock, intervals_overview_time_sync_pyqtgraph_widget, intervals_overview_root_graphics_layout_widget, intervals_overview_plot_item)
+            dock_config = CustomCyclicColorsDockDisplayConfig(named_color_scheme=NamedColorScheme.grey, showCloseButton=False, showTimelineSyncModeButton=False, corner_radius='0px', hideTitleBar=True)
+            overview_identifier_name = f'interval_overview{name_modifier_suffix}'
+            intervals_overview_time_sync_pyqtgraph_widget, intervals_overview_root_graphics_layout_widget, intervals_overview_plot_item, intervals_overview_dock = self.add_new_embedded_pyqtgraph_render_plot_widget(name=overview_identifier_name, dockSize=(500, 60), display_config=dock_config)
+            if (interval_dock_max_height is not None) and (interval_dock_max_height > 0):
+                intervals_overview_dock.setMaximumHeight(interval_dock_max_height)
+            _interval_tracks_out_dict[overview_identifier_name] = (dock_config, intervals_overview_dock, intervals_overview_time_sync_pyqtgraph_widget, intervals_overview_root_graphics_layout_widget, intervals_overview_plot_item)
+            
         ## Enables creating a new pyqtgraph-based track to display the intervals/epochs
         interval_window_dock_config = CustomCyclicColorsDockDisplayConfig(named_color_scheme=NamedColorScheme.grey, showCloseButton=False, corner_radius='0px', hideTitleBar=True)
-        name = f'intervals{name_modifier_suffix}'
-        intervals_time_sync_pyqtgraph_widget, intervals_root_graphics_layout_widget, intervals_plot_item, intervals_dock = self.add_new_embedded_pyqtgraph_render_plot_widget(name=name, dockSize=(10, 4), display_config=interval_window_dock_config)
-        
+        identifier_name = f'intervals{name_modifier_suffix}'
+        intervals_time_sync_pyqtgraph_widget, intervals_root_graphics_layout_widget, intervals_plot_item, intervals_dock = self.add_new_embedded_pyqtgraph_render_plot_widget(name=identifier_name, dockSize=(10, 4), display_config=interval_window_dock_config)
+        if (interval_dock_max_height is not None) and (interval_dock_max_height > 0):
+            intervals_dock.setMaximumHeight(interval_dock_max_height)
+            
         self.params.custom_interval_rendering_plots.append(intervals_plot_item) # = [self.plots.background_static_scroll_window_plot, self.plots.main_plot_widget, intervals_plot_item]
 
         # self.params.custom_interval_rendering_plots = [self.plots.background_static_scroll_window_plot, self.plots.main_plot_widget, intervals_plot_item]
@@ -961,7 +978,7 @@ class SpecificDockWidgetManipulatingMixin(BaseDynamicInstanceConformingMixin):
             
         # active_2d_plot.interval_rendering_plots
 
-        _interval_tracks_out_dict[name] = (interval_window_dock_config, intervals_dock, intervals_time_sync_pyqtgraph_widget, intervals_root_graphics_layout_widget, intervals_plot_item)
+        _interval_tracks_out_dict[identifier_name] = (interval_window_dock_config, intervals_dock, intervals_time_sync_pyqtgraph_widget, intervals_root_graphics_layout_widget, intervals_plot_item)
 
         ## #TODO 2024-12-31 07:20: - [ ] need to clear/re-add the epochs to make this work
         extant_rendered_interval_plots_lists = {k:list(v.keys()) for k, v in self.list_all_rendered_intervals(debug_print=False).items()}
@@ -993,25 +1010,47 @@ class SpecificDockWidgetManipulatingMixin(BaseDynamicInstanceConformingMixin):
             intervals_plot_item.setXLink(main_plot_widget) # works to synchronize the main zoomed plot (current window) with the epoch_rect_separate_plot (rectangles plotter)
         else:
             ## setup the synchronization:
-            # Perform Initial (one-time) update from source -> controlled:
-            # intervals_time_sync_pyqtgraph_widget.on_window_changed(self.spikes_window.active_window_start_time, self.spikes_window.active_window_end_time)
-            intervals_plot_item.setXRange(self.spikes_window.active_window_start_time, self.spikes_window.active_window_end_time, padding=0)
-            # disable active window syncing if it's enabled:
-            sync_connection = self.ui.connections.get(name, None)
-            if sync_connection is not None:
-                # have an existing sync connection, need to disconnect it.
-                print(f'disconnecting window_scrolled for "{name}"')
-                self.window_scrolled.disconnect(sync_connection)
+            # # Perform Initial (one-time) update from source -> controlled:
+            # # intervals_time_sync_pyqtgraph_widget.on_window_changed(self.spikes_window.active_window_start_time, self.spikes_window.active_window_end_time)
+            # intervals_plot_item.setXRange(self.spikes_window.active_window_start_time, self.spikes_window.active_window_end_time, padding=0)
+            # # disable active window syncing if it's enabled:
+            # sync_connection = self.ui.connections.get(name, None)
+            # if sync_connection is not None:
+            #     # have an existing sync connection, need to disconnect it.
+            #     print(f'disconnecting window_scrolled for "{name}"')
+            #     self.window_scrolled.disconnect(sync_connection)
                     
-            # sync_connection = self.window_scrolled.connect(intervals_time_sync_pyqtgraph_widget.on_window_changed)
-            sync_connection = self.window_scrolled.connect(lambda earliest_t, latest_t: intervals_plot_item.setXRange(earliest_t, latest_t, padding=0)) ## explicitly captures `raster_plot_item`
-            self.ui.connections[name] = sync_connection # add the connection to the connections array
+            # # sync_connection = self.window_scrolled.connect(intervals_time_sync_pyqtgraph_widget.on_window_changed)
+            # sync_connection = self.window_scrolled.connect(lambda earliest_t, latest_t: intervals_plot_item.setXRange(earliest_t, latest_t, padding=0)) ## explicitly captures `raster_plot_item`
+            # self.ui.connections[name] = sync_connection # add the connection to the connections array
+
+            if enable_interval_overview_track and (overview_identifier_name is not None):
+                self.sync_matplotlib_render_plot_widget(overview_identifier_name, sync_mode=SynchronizedPlotMode.TO_GLOBAL_DATA) # Sync it with the active window:
+            
+
+            # 2025-05-12 - more modern syncing ___________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
+            self.sync_matplotlib_render_plot_widget(identifier_name, sync_mode=sync_mode) # Sync it with the active window:
+            
+            if 'button_action_callbacks' not in intervals_dock.connections:
+                intervals_dock.connections['button_action_callbacks'] = {} ## initialize to new
+            _out_connections = intervals_dock.connections['button_action_callbacks']
+            _prev_conn = _out_connections.pop(identifier_name, None)
+            if _prev_conn is not None:
+                intervals_dock.sigToggleTimelineSyncModeClicked.disconnect(_prev_conn)
+                _prev_conn = None
+
+            assert identifier_name == intervals_dock._name
+            # sync_connection = _out_connections.get(identifier_name, None)
+            _out_connections[identifier_name] = intervals_dock.sigToggleTimelineSyncModeClicked.connect(self.on_toggle_timeline_sync_mode)
+            # dock_item.connections['button_action_callbacks'].update(_out_connections)
+            intervals_dock.connections['button_action_callbacks'] = _out_connections
+
 
         return _interval_tracks_out_dict
 
 
     @function_attributes(short_name=None, tags=['raster', 'tracks', 'pyqtgraph', 'specific', 'dynamic_ui', 'group_matplotlib_render_plot_widget'], input_requires=[], output_provides=[], uses=['self.add_new_embedded_pyqtgraph_render_plot_widget', 'new_plot_raster_plot'], used_by=[], creation_date='2025-01-09 10:50', related_items=[])
-    def prepare_pyqtgraph_rasterPlot_track(self, name_modifier_suffix: str='', should_link_to_main_plot_widget:bool=True, debug_print=False):
+    def prepare_pyqtgraph_rasterPlot_track(self, name_modifier_suffix: str='', should_link_to_main_plot_widget:bool=True, sync_mode:SynchronizedPlotMode=SynchronizedPlotMode.TO_WINDOW, debug_print=False):
         """ adds to separate pyqtgraph-backed tracks to the SpikeRaster2D plotter for rendering a 2D raster `active_2d_plot.params.custom_interval_rendering_plots` so the intervals are rendered on these new tracks in addition to any normal ones
         
         enable_interval_overview_track: bool: if True, renders a track to show all the intervals during the sessions (overview) in addition to the track for the intervals within the current active window
@@ -1044,9 +1083,9 @@ class SpecificDockWidgetManipulatingMixin(BaseDynamicInstanceConformingMixin):
 
         _raster_tracks_out_dict = {}
         ## Enables creating a new pyqtgraph-based track to display the intervals/epochs
-        dock_config = CustomCyclicColorsDockDisplayConfig(named_color_scheme=NamedColorScheme.grey, showCloseButton=True, showCollapseButton=False, showGroupButton=False, corner_radius="0px", hideTitleBar=True)
-        name = f'rasters[{name_modifier_suffix}]'
-        time_sync_pyqtgraph_widget, raster_root_graphics_layout_widget, raster_plot_item, raster_dock = self.add_new_embedded_pyqtgraph_render_plot_widget(name=name, dockSize=(10, 4), display_config=dock_config)
+        dock_config = CustomCyclicColorsDockDisplayConfig(named_color_scheme=NamedColorScheme.grey, showCloseButton=True, showCollapseButton=False, showGroupButton=False, showTimelineSyncModeButton=True, corner_radius="0px", hideTitleBar=True)
+        identifier_name = f'rasters[{name_modifier_suffix}]'
+        time_sync_pyqtgraph_widget, raster_root_graphics_layout_widget, raster_plot_item, raster_dock = self.add_new_embedded_pyqtgraph_render_plot_widget(name=identifier_name, dockSize=(10, 4), display_config=dock_config)
 
         if raster_plot_item not in self.params.custom_interval_rendering_plots:
             self.params.custom_interval_rendering_plots.append(raster_plot_item) ## this signals that it should recieve updates for its intervals somewhere else
@@ -1079,7 +1118,7 @@ class SpecificDockWidgetManipulatingMixin(BaseDynamicInstanceConformingMixin):
 
         time_sync_pyqtgraph_widget.plots.root_plot = raster_plot_item # name the plotItem "root_plot" so `new_plot_raster_plot` can reuse it
         rasters_display_outputs_tuple = new_plot_raster_plot(a_spikes_df, an_included_unsorted_neuron_ids, unit_sort_order=unit_sort_order, unit_colors_list=deepcopy(unsorted_unit_colors_map),
-                                                        scatter_app_name=name, defer_show=True, active_context=None,
+                                                        scatter_app_name=identifier_name, defer_show=True, active_context=None,
                                                         win=raster_root_graphics_layout_widget, plots_data=time_sync_pyqtgraph_widget.plots_data, plots=time_sync_pyqtgraph_widget.plots,
                                                         add_debug_header_label=False,
                                                         scatter_plot_kwargs=dict(size=5, hoverable=False, tick_width=0.0, tick_height=1.0),
@@ -1088,7 +1127,7 @@ class SpecificDockWidgetManipulatingMixin(BaseDynamicInstanceConformingMixin):
         # an_app, a_win, a_plots, a_plots_data = rasters_display_outputs_tuple = rasters_display_outputs_tuple
         # raster_root_graphics_layout_widget.addWidget(a_win, row=1, col=1)
         
-        _raster_tracks_out_dict[name] = (dock_config, time_sync_pyqtgraph_widget, raster_root_graphics_layout_widget, raster_plot_item, rasters_display_outputs_tuple)
+        _raster_tracks_out_dict[identifier_name] = (dock_config, time_sync_pyqtgraph_widget, raster_root_graphics_layout_widget, raster_plot_item, rasters_display_outputs_tuple)
         # Setup range for plot:
         # earliest_t, latest_t = active_2d_plot.spikes_window.total_df_start_end_times # global
         earliest_t, latest_t = self.spikes_window.active_time_window # current
@@ -1103,17 +1142,35 @@ class SpecificDockWidgetManipulatingMixin(BaseDynamicInstanceConformingMixin):
             ## setup the synchronization:
             # Perform Initial (one-time) update from source -> controlled:
             # time_sync_pyqtgraph_widget.on_window_changed(self.spikes_window.active_window_start_time, self.spikes_window.active_window_end_time)
-            # disable active window syncing if it's enabled:
-            sync_connection = self.ui.connections.get(name, None)
-            if sync_connection is not None:
-                # have an existing sync connection, need to disconnect it.
-                print(f'disconnecting window_scrolled for "{name}"')
-                self.window_scrolled.disconnect(sync_connection)
+            # # disable active window syncing if it's enabled:
+            # sync_connection = self.ui.connections.get(identifier_name, None)
+            # if sync_connection is not None:
+            #     # have an existing sync connection, need to disconnect it.
+            #     print(f'disconnecting window_scrolled for "{identifier_name}"')
+            #     self.window_scrolled.disconnect(sync_connection)
                         
-            # sync_connection = self.window_scrolled.connect(time_sync_pyqtgraph_widget.on_window_changed)
-            sync_connection = self.window_scrolled.connect(lambda earliest_t, latest_t: raster_plot_item.setXRange(earliest_t, latest_t, padding=0)) ## explicitly captures `raster_plot_item`
-            self.ui.connections[name] = sync_connection # add the connection to the connections array
+            # # sync_connection = self.window_scrolled.connect(time_sync_pyqtgraph_widget.on_window_changed)
+            # sync_connection = self.window_scrolled.connect(lambda earliest_t, latest_t: raster_plot_item.setXRange(earliest_t, latest_t, padding=0)) ## explicitly captures `raster_plot_item`
+            # self.ui.connections[identifier_name] = sync_connection # add the connection to the connections array
             
+
+            # 2025-05-12 - more modern syncing ___________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
+            self.sync_matplotlib_render_plot_widget(identifier_name, sync_mode=sync_mode) # Sync it with the active window:
+            
+            if 'button_action_callbacks' not in raster_dock.connections:
+                raster_dock.connections['button_action_callbacks'] = {} ## initialize to new
+            _out_connections = raster_dock.connections['button_action_callbacks']
+            _prev_conn = _out_connections.pop(identifier_name, None)
+            if _prev_conn is not None:
+                raster_dock.sigToggleTimelineSyncModeClicked.disconnect(_prev_conn)
+                _prev_conn = None
+
+            assert identifier_name == raster_dock._name
+            # sync_connection = _out_connections.get(identifier_name, None)
+            _out_connections[identifier_name] = raster_dock.sigToggleTimelineSyncModeClicked.connect(self.on_toggle_timeline_sync_mode)
+            # dock_item.connections['button_action_callbacks'].update(_out_connections)
+            raster_dock.connections['button_action_callbacks'] = _out_connections
+
 
         return _raster_tracks_out_dict
 
