@@ -1098,6 +1098,28 @@ class MultiDecoderColorOverlayedPosteriors:
     @classmethod
     def save_hdf(cls, hdf5_save_file_path: Path, extra_all_t_bins_outputs_dict, **kwargs):
         """ 
+
+        Usage:
+            from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import MultiDecoderColorOverlayedPosteriors
+
+            ## INPUTS: all_t_bins_final_overlayed_out_RGBA, all_t_bins_per_decoder_out_RGBA
+            hdf5_save_file_path = Path(f'output/2025-05-11_all_t_bins_out_RGBA_thresh.h5').resolve()
+            
+            MultiDecoderColorOverlayedPosteriors.save_hdf(hdf5_save_file_path=hdf5_save_file_path, extra_all_t_bins_outputs_dict=extra_all_t_bins_outputs_dict, drop_below_threshold=drop_below_threshold,
+                                                        all_t_bins_final_overlayed_out_RGBA=all_t_bins_final_overlayed_out_RGBA, all_t_bins_per_decoder_out_RGBA=all_t_bins_per_decoder_out_RGBA,
+                                                        
+            )
+
+
+        
+        Load with reciprocal:
+        
+            hdf5_load_file_path = Path('output/2025-05-11_all_t_bins_out_RGBA_thresh.h5').resolve()
+            all_t_bins_final_RGBA = MultiDecoderColorOverlayedPosteriors.load_hdf(hdf5_load_file_path=hdf5_load_file_path) # Initialize variable
+
+            ## OUTPUTS: all_t_bins_final_RGBA
+            all_t_bins_final_RGBA
+
         """
         import h5py
 
