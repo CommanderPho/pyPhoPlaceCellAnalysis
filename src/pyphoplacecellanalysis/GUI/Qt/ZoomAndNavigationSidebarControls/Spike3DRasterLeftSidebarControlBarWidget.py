@@ -236,7 +236,7 @@ class SpikeRasterLeftSidebarControlsMixin:
         left_side_bar_connections.append(left_side_bar_controls.temporal_zoom_factor_changed.connect(self.on_temporal_zoom_factor_valueChanged))
         left_side_bar_connections.append(left_side_bar_controls.render_window_duration_changed.connect(self.on_render_window_duration_valueChanged))
         left_side_bar_connections.append(left_side_bar_controls.crosshair_trace_toggled.connect(self.on_crosshair_trace_toggled)) # #TODO 2025-02-10 16:50: - [ ] Add handler for enable/disable crosshairs trace
-        left_side_bar_connections.append(left_side_bar_controls.debug_mode_button_Toggled.connect(self.on_debug_mode_Toggled))
+        left_side_bar_connections.append(left_side_bar_controls.debug_mode_toggled.connect(self.on_debug_mode_Toggled))
         return left_side_bar_connections
         
             
