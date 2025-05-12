@@ -501,11 +501,6 @@ class Spike2DRaster(SpecificDockWidgetManipulatingMixin, DynamicDockDisplayAreaO
         # curr_plot_row = 1
         if self.Includes2DActiveWindowScatter:
             ## Add these active window only plots to the active_window_container_layout
-            # (self.plots.main_plot_widget, self.plots.main_plot_widget_viewbox) = CustomGraphicsLayoutWidget.build_PlotWithCustomViewbox()
-            # (self.plots.main_plot_widget, self.plots.main_plot_widget_viewbox) = self.ui.main_graphics_layout_widget.build_PlotWithCustomViewbox()
-            # self.ui.active_window_container_layout.addItem(self.plots.main_plot_widget, row=1, col=0, rowspan=self.params.main_graphics_plot_widget_rowspan, colspan=1)
-            
-            # if not use_docked_pyqtgraph_plots:
 
             self.plots.main_plot_widget = self.ui.active_window_container_layout.addPlot(row=1, col=0, rowspan=self.params.main_graphics_plot_widget_rowspan, colspan=1)            
                 # self.plots.main_plot_widget = self.ui.main_graphics_layout_widget.addPlot(col=0, rowspan=self.params.main_graphics_plot_widget_rowspan, colspan=1) # , name='main_plot_widget'
@@ -560,34 +555,6 @@ class Spike2DRaster(SpecificDockWidgetManipulatingMixin, DynamicDockDisplayAreaO
     
         self.EpochRenderingMixin_on_buildUI()
         
-        # self.Render2DScrollWindowPlot_on_window_update # register with the animation time window for updates for the scroller.
-        # Connect the signals for the zoom region and the LinearRegionItem        
-        self.rate_limited_signal_scrolled_proxy = pg.SignalProxy(self.window_scrolled, rateLimit=30, slot=self.update_zoomed_plot_rate_limited) # Limit updates to 30 Signals/Second
-    
-        # For this 2D Implementation of TimeCurvesViewMixin/PyQtGraphSpecificTimeCurvesMixin
-        self.ui.main_time_curves_view_widget = None
-        self.ui.main_time_curves_view_legend = None
-        
-        # Create a QWidget to act as a wrapper
-        self.ui.wrapper_widget = pg.QtWidgets.QWidget()
-        self.ui.wrapper_widget.setObjectName("wrapper_widget")
-        self.ui.wrapper_widget.setSizePolicy(QtGui.QSizePolicy.Expanding, QtGui.QSizePolicy.Preferred)
-            
-        # Create a layout for the wrapper (you may want a different layout depending on your needs)
-        self.ui.wrapper_layout = pg.QtWidgets.QVBoxLayout(self.ui.wrapper_widget)
-        self.ui.wrapper_layout.setSpacing(0)
-        self.ui.wrapper_layout.setContentsMargins(0, 0, 0, 0)
-        
-        
-        ## Add the container to hold dynamic matplotlib plot widgets:
-        self.ui.dynamic_docked_widget_container = NestedDockAreaWidget()
-        self.ui.dynamic_docked_widget_container.setObjectName("dynamic_docked_widget_container")
-        # self.ui.layout.addWidget(self.ui.dynamic_docked_widget_container, 1, 0) # Add the dynamic container as the second row
-        # add the GLViewWidget to the splitter
-        # self.ui.main_content_splitter.addWidget(self.ui.dynamic_docked_widget_container)
-
-        # Add the container to the wrapper layout
-        self.ui.wrapper_layout.addWidget(self.ui.dynamic_docked_widget_container)
 
         # Add the wrapper_widget to the splitter
         self.ui.main_content_splitter.addWidget(self.ui.wrapper_widget)
@@ -596,10 +563,6 @@ class Spike2DRaster(SpecificDockWidgetManipulatingMixin, DynamicDockDisplayAreaO
         # add the splitter into your layout
         self.ui.layout.addWidget(self.ui.main_content_splitter, 0, 0)  # add the splitter to the main layout at 0, 0
 
-        # Required for dynamic matplotlib figures (2022-12-23 added, not sure how it relates to above):
-        self._setupUI_matplotlib_render_plots()
-
-        self.params.custom_interval_rendering_plots = []
 
         self.params.custom_interval_rendering_plots.append(self.plots.background_static_scroll_window_plot)
 
