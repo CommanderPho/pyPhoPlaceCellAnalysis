@@ -236,7 +236,8 @@ class Spike2DRaster(SpecificDockWidgetManipulatingMixin, DynamicDockDisplayAreaO
 
 
     def __init__(self, params=None, spikes_window=None, playback_controller=None, neuron_colors=None, neuron_sort_order=None, application_name=None, **kwargs):
-        super(Spike2DRaster, self).__init__(params=params, spikes_window=spikes_window, playback_controller=playback_controller, neuron_colors=neuron_colors, neuron_sort_order=neuron_sort_order, application_name=application_name, **kwargs)
+        SpikeRasterBase.__init__(self=self, params=params, spikes_window=spikes_window, playback_controller=playback_controller, neuron_colors=neuron_colors, neuron_sort_order=neuron_sort_order, application_name=application_name, **kwargs)
+        # super(Spike2DRaster, self).__init__(params=params, spikes_window=spikes_window, playback_controller=playback_controller, neuron_colors=neuron_colors, neuron_sort_order=neuron_sort_order, application_name=application_name, **kwargs)
         self.logger.info(f'Spike2DRaster.__init__(...)\t.applicationName: "{self.applicationName}"\n\t.windowName: "{self.windowName}")\n')
         
         # Init the TimeCurvesViewMixin for 3D Line plots:
@@ -649,7 +650,7 @@ class Spike2DRaster(SpecificDockWidgetManipulatingMixin, DynamicDockDisplayAreaO
         from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.SpikeRasterWidgets.Spike2DRaster import SynchronizedPlotMode
         
         self.logger.debug(f'Spike2DRaster._buildGraphics()')
-        use_docked_pyqtgraph_plots: bool = self.params.setdefault('use_docked_pyqtgraph_plots', True)
+        use_docked_pyqtgraph_plots: bool = self.params.setdefault('use_docked_pyqtgraph_plots', False)
 
         ## Common
         self.params.custom_interval_rendering_plots = []
@@ -715,6 +716,12 @@ class Spike2DRaster(SpecificDockWidgetManipulatingMixin, DynamicDockDisplayAreaO
             # Add the wrapper_widget to the splitter
             self.ui.main_content_splitter.addWidget(self.ui.wrapper_widget)
             self.ui.layout.addWidget(self.ui.main_content_splitter, 0, 0)  # add the splitter to the main layout at 0, 0
+            
+            # ## New: Build a container layout to contain all elements that will represent the active window 
+            # self.params.main_graphics_active_window_container_layout_rowspan = 1
+            # self.ui.active_window_container_layout = self.ui.main_graphics_layout_widget.addLayout(row=1, col=0, rowspan=self.params.main_graphics_active_window_container_layout_rowspan, colspan=1)
+            # self.ui.active_window_container_layout.setObjectName('active_window_container_layout')
+            
         else:
             ## DockedTracksLayout
             self.ui.layout.addWidget(self.ui.wrapper_widget, 0, 0)  # add the wrapper_widget (which contains the docked tracks to the main layout at 0, 0
@@ -722,10 +729,7 @@ class Spike2DRaster(SpecificDockWidgetManipulatingMixin, DynamicDockDisplayAreaO
 
 
 
-        ## New: Build a container layout to contain all elements that will represent the active window 
-        self.params.main_graphics_active_window_container_layout_rowspan = 1
-        self.ui.active_window_container_layout = self.ui.main_graphics_layout_widget.addLayout(row=1, col=0, rowspan=self.params.main_graphics_active_window_container_layout_rowspan, colspan=1)
-        self.ui.active_window_container_layout.setObjectName('active_window_container_layout')
+
                         
     
         # From Render2DScrollWindowPlotMixin:
