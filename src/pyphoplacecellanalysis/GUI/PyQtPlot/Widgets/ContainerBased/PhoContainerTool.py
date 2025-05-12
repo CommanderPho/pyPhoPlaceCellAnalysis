@@ -25,7 +25,7 @@ __all__ = ['PhoBaseContainerTool']
 
 
 @metadata_attributes(short_name=None, tags=['gui'], input_requires=[], output_provides=[], uses=['RenderPlots', 'RenderPlotsData', 'PhoUIContainer'], used_by=[], creation_date='2023-11-17 19:59', related_items=[])
-@define(slots=False)
+@define(slots=False, eq=False)
 class PhoBaseContainerTool:
     """ a tool in a container:
     
@@ -33,9 +33,11 @@ class PhoBaseContainerTool:
     
     
     """
-    plots: RenderPlots = field(init=False)
-    plots_data: RenderPlotsData = field(init=False, repr=False)
-    ui: PhoUIContainer = field(init=False, repr=False)
+    plots: RenderPlots = field(default=Factory(PyqtgraphRenderPlots, 'plotter'))
+    plots_data: RenderPlotsData = field(default=Factory(RenderPlotsData, 'plotter'), repr=False)
+    ui: PhoUIContainer = field(default=Factory(PhoUIContainer, 'plotter'), repr=False)
+    params: VisualizationParameters = field(default=Factory(VisualizationParameters, 'plotter'), repr=keys_only_repr)
+
 
 
 

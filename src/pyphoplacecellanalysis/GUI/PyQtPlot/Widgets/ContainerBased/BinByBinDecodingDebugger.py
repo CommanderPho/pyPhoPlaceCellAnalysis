@@ -23,7 +23,6 @@ from pyphocorehelpers.gui.PhoUIContainer import PhoUIContainer
 from pyphocorehelpers.DataStructure.RenderPlots.PyqtgraphRenderPlots import PyqtgraphRenderPlots
 from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.ContainerBased.PhoContainerTool import GenericPyQtGraphContainer
 from pyphocorehelpers.DataStructure.general_parameter_containers import VisualizationParameters, RenderPlotsData, RenderPlots # PyqtgraphRenderPlots
-from pyphocorehelpers.DataStructure.RenderPlots.PyqtgraphRenderPlots import PyqtgraphRenderPlots
 from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import SingleEpochDecodedResult
 from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import BasePositionDecoder
 from neuropy.utils.indexing_helpers import PandasHelpers
