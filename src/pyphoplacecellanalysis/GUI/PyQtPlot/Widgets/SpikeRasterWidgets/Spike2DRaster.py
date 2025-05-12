@@ -503,19 +503,9 @@ class Spike2DRaster(SpecificDockWidgetManipulatingMixin, DynamicDockDisplayAreaO
             ## Add these active window only plots to the active_window_container_layout
 
             self.plots.main_plot_widget = self.ui.active_window_container_layout.addPlot(row=1, col=0, rowspan=self.params.main_graphics_plot_widget_rowspan, colspan=1)            
-                # self.plots.main_plot_widget = self.ui.main_graphics_layout_widget.addPlot(col=0, rowspan=self.params.main_graphics_plot_widget_rowspan, colspan=1) # , name='main_plot_widget'
-                
-                # (self.plots.main_plot_widget, self.plots.main_plot_widget_viewbox) = self.ui.main_graphics_layout_widget.addPlotWithCustomViewbox(row=2, col=0, rowspan=1, colspan=1)
-
-
             self.plots.main_plot_widget.setObjectName('main_plot_widget') # this seems necissary, the 'name' parameter in addPlot(...) seems to only change some internal property related to the legend AND drastically slows down the plotting
-            # self.plots.main_plot_widget_viewbox.setObjectName('main_plot_widget_viewbox') # this seems necissary, the 'name' parameter in addPlot(...) seems to only change some internal property related to the legend AND drastically slows down the plotting
-
+            
             self.plots.main_plot_widget.setMinimumHeight(40.0) # used to be 500.0 and took up too much room
-
-            # curr_plot_row += (1 * self.params.main_graphics_plot_widget_rowspan)
-            # self.ui.plots = [] # create an empty array for each plot, of which there will be one for each unit.
-            # # build the position range for each unit along the y-axis:
             
             # Common Tick Label
             vtick = QtGui.QPainterPath()
@@ -553,16 +543,13 @@ class Spike2DRaster(SpecificDockWidgetManipulatingMixin, DynamicDockDisplayAreaO
         if self.Includes2DActiveWindowScatter:
             self.plots.scatter_plot.addPoints(self.plots_data.all_spots)
     
-        self.EpochRenderingMixin_on_buildUI()
+        # self.EpochRenderingMixin_on_buildUI()
         
-
         # Add the wrapper_widget to the splitter
-        self.ui.main_content_splitter.addWidget(self.ui.wrapper_widget)
+        # self.ui.main_content_splitter.addWidget(self.ui.wrapper_widget)
         
-
         # add the splitter into your layout
-        self.ui.layout.addWidget(self.ui.main_content_splitter, 0, 0)  # add the splitter to the main layout at 0, 0
-
+        # self.ui.layout.addWidget(self.ui.main_content_splitter, 0, 0)  # add the splitter to the main layout at 0, 0
 
         self.params.custom_interval_rendering_plots.append(self.plots.background_static_scroll_window_plot)
 
