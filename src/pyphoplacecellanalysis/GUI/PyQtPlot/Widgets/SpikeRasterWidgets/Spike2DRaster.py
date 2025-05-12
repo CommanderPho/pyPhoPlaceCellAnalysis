@@ -442,27 +442,27 @@ class Spike2DRaster(SpecificDockWidgetManipulatingMixin, DynamicDockDisplayAreaO
         from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.SpikeRasterWidgets.Spike2DRaster import SynchronizedPlotMode
         
         self.logger.debug(f'\tSpike2DRaster._buildGraphics_InternalLayout()')
-        # create a splitter
         
-        self.ui.main_content_splitter = pg.QtWidgets.QSplitter(0)
-        self.ui.main_content_splitter.setObjectName('main_content_splitter')
+        # # create a splitter
+        # self.ui.main_content_splitter = pg.QtWidgets.QSplitter(0)
+        # self.ui.main_content_splitter.setObjectName('main_content_splitter')
+        # # self.ui.main_content_splitter.setHandleWidth(10)
         # self.ui.main_content_splitter.setHandleWidth(10)
-        self.ui.main_content_splitter.setHandleWidth(10)
-        self.ui.main_content_splitter.setOrientation(0) # pg.Qt.Vertical
-        # Qt.Horizontal
+        # self.ui.main_content_splitter.setOrientation(0) # pg.Qt.Vertical
+        # # Qt.Horizontal
 
-        #TODO 2024-12-19 09:18: - [ ] This is where the handles become huge and RED!!
-        self.ui.main_content_splitter.setStyleSheet("""
-                QSplitter::handle {
-                    background: rgb(255, 0, 4);
-                }
-                QSplitter::handle:horizontal {
-                    width: 2px;
-                }
-                QSplitter::handle:vertical {
-                    height: 2px;
-                }
-            """)
+        # #TODO 2024-12-19 09:18: - [ ] This is where the handles become huge and RED!!
+        # self.ui.main_content_splitter.setStyleSheet("""
+        #         QSplitter::handle {
+        #             background: rgb(255, 0, 4);
+        #         }
+        #         QSplitter::handle:horizontal {
+        #             width: 2px;
+        #         }
+        #         QSplitter::handle:vertical {
+        #             height: 2px;
+        #         }
+        #     """)
 
         ##### Main Raster Plot Content Top ##########
         
@@ -486,8 +486,8 @@ class Spike2DRaster(SpecificDockWidgetManipulatingMixin, DynamicDockDisplayAreaO
         # self._series_identity_y_values = DataSeriesToSpatial.build_series_identity_axis(self.n_cells, center_mode=self.params.center_mode, bin_position_mode=self.params.bin_position_mode, side_bin_margins = self.params.side_bin_margins)
         # self._series_identity_lower_y_values = DataSeriesToSpatial.build_series_identity_axis(self.n_cells, center_mode=self.params.center_mode, bin_position_mode='left_edges', side_bin_margins = self.params.side_bin_margins) / self.n_cells
         # self._series_identity_upper_y_values = DataSeriesToSpatial.build_series_identity_axis(self.n_cells, center_mode=self.params.center_mode, bin_position_mode='right_edges', side_bin_margins = self.params.side_bin_margins) / self.n_cells
-        self.update_series_identity_y_values()
-        self._build_cell_configs()
+        # self.update_series_identity_y_values()
+        # self._build_cell_configs()
         
         ## New: Build a container layout to contain all elements that will represent the active window 
         self.params.main_graphics_active_window_container_layout_rowspan = 1
@@ -608,19 +608,6 @@ class Spike2DRaster(SpecificDockWidgetManipulatingMixin, DynamicDockDisplayAreaO
             if self.plots.main_plot_widget is not None:
                 self.params.custom_interval_rendering_plots.append(self.plots.main_plot_widget)
             
-        # if ((not self.Includes2DActiveWindowScatter) and use_docked_pyqtgraph_plots):
-        #     # use_docked_pyqtgraph_plots == True
-        #     name_modifier_suffix='raster_window'
-        #     _raster_tracks_out_dict = self.prepare_pyqtgraph_rasterPlot_track(name_modifier_suffix=name_modifier_suffix, should_link_to_main_plot_widget=False)            
-        #     _out = _raster_tracks_out_dict[f'rasters{name_modifier_suffix}']
-        #     dock_config, time_sync_pyqtgraph_widget, raster_root_graphics_layout_widget, raster_plot_item, rasters_display_outputs_tuple = _out
-        #     app, win, plots, plots_data = rasters_display_outputs_tuple
-
-        #     self.plots.main_plot_widget = raster_plot_item
-        #     self.plots.scatter_plot = plots.scatter_plot
-
-        ## Add the epochs separator lines:
-        _out_lines = self.add_raster_spikes_and_epochs_separator_line()
 
 
     @function_attributes(short_name=None, tags=['docked', 'tracks'], input_requires=[], output_provides=[], uses=[], used_by=['._buildGraphics'], creation_date='2025-05-12 17:13', related_items=[])
@@ -633,6 +620,8 @@ class Spike2DRaster(SpecificDockWidgetManipulatingMixin, DynamicDockDisplayAreaO
                 Presents a linear scroll region over the top to allow the user to select the active window.
                 
                 
+
+            
             """
             from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.GraphicsWidgets.CustomGraphicsLayoutWidget import CustomGraphicsLayoutWidget
             from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.SpikeRasterWidgets.Spike2DRaster import SynchronizedPlotMode
