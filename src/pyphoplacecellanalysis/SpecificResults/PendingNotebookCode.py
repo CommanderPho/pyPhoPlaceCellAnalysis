@@ -380,10 +380,9 @@ class MultiDecoderColorOverlayedPosteriors(ComputedResult):
             _out_tuple = self._perform_add_as_track_to_spike_raster_window(active_2d_plot=active_2d_plot, all_t_bins_final_RGBA=self.extra_all_t_bins_outputs_dict_dict[a_result_name]['all_t_bins_per_decoder_alpha_weighted_RGBA'], time_bin_centers=self.time_bin_centers, xbin=self.xbin, t_bin_size=self.t_bin_size, dock_identifier=dock_identifier)
             ts_widget, fig, ax_list, dDisplayItem = _out_tuple
             ## Add overlay plot to hide bins that don't meet the firing criteria:
-            low_firing_bins_image = _plot_low_firing_time_bins_overlay_image(widget=ts_widget, time_bin_edges=time_bin_edges, mask_rgba=low_firing_bins_mask_rgba)
-            ax_inset, _out =  self.add_decoder_legend_venn(all_decoder_colors_dict=active_colors_dict, ax=ax_list[0])
-            ts_widget.plots['decoder_legend_venn'] = dict(ax_inset=ax_inset, data=_out)
-
+            low_firing_bins_image = _plot_low_firing_time_bins_overlay_image(widget=ts_widget, time_bin_edges=time_bin_edges, mask_rgba=low_firing_bins_mask_rgba, zorder=11)
+            ax_inset =  self.add_decoder_legend_venn(all_decoder_colors_dict=active_colors_dict, ax=ax_list[0], zorder=13)
+            ts_widget.plots['decoder_legend_venn'] = dict(ax_inset=ax_inset)
             # _out_display_dict[dock_identifier] = _out_tuple
             _out_display_dict[dock_identifier] = (ts_widget, fig, ax_list, dDisplayItem)
 
@@ -396,9 +395,9 @@ class MultiDecoderColorOverlayedPosteriors(ComputedResult):
             _out_tuple = self._perform_add_as_track_to_spike_raster_window(active_2d_plot=active_2d_plot, all_t_bins_final_RGBA=self.extra_all_t_bins_outputs_dict_dict[a_result_name]['all_t_bins_per_decoder_alpha_weighted_RGBA'], time_bin_centers=self.time_bin_centers, xbin=self.xbin, t_bin_size=self.t_bin_size, dock_identifier=dock_identifier)
             ts_widget, fig, ax_list, dDisplayItem = _out_tuple
             ## Add overlay plot to hide bins that don't meet the firing criteria:
-            low_firing_bins_image = _plot_low_firing_time_bins_overlay_image(widget=ts_widget, time_bin_edges=time_bin_edges, mask_rgba=low_firing_bins_mask_rgba)
-            ax_inset, _out =  self.add_decoder_legend_venn(all_decoder_colors_dict=active_colors_dict, ax=ax_list[0])
-            ts_widget.plots['decoder_legend_venn'] = dict(ax_inset=ax_inset, data=_out)
+            low_firing_bins_image = _plot_low_firing_time_bins_overlay_image(widget=ts_widget, time_bin_edges=time_bin_edges, mask_rgba=low_firing_bins_mask_rgba, zorder=11)
+            ax_inset =  self.add_decoder_legend_venn(all_decoder_colors_dict=active_colors_dict, ax=ax_list[0], zorder=13)
+            ts_widget.plots['decoder_legend_venn'] = dict(ax_inset=ax_inset)
 
             # _out_display_dict[dock_identifier] = _out_tuple
             _out_display_dict[dock_identifier] = (ts_widget, fig, ax_list, dDisplayItem)
@@ -1425,7 +1424,7 @@ class MultiDecoderColorOverlayedPosteriors(ComputedResult):
 
 
     @classmethod
-    def add_decoder_legend_venn(cls, all_decoder_colors_dict: Dict[str, str], ax, defer_render:bool=False):
+    def add_decoder_legend_venn(cls, all_decoder_colors_dict: Dict[str, str], ax, defer_render:bool=False, zorder:float=137.0):
         """ Creates an inset axes to serve as the legned, and inside this plots a venn-diagram showing the colors for each decoder, allowing the user to see what they look like overlapping
 
         Usage:
@@ -1452,6 +1451,8 @@ class MultiDecoderColorOverlayedPosteriors(ComputedResult):
         # Create the inset axes, using bbox_to_anchor and bbox_transform for independent positioning
         ax_inset = ax.inset_axes([x0, y0, width, height])
         ax_inset =  cls._build_decoder_legend_venn(all_decoder_colors_dict=all_decoder_colors_dict, ax=ax_inset)
+        ax_inset.set_zorder(zorder)  # Set zorder after creation
+        
         if not defer_render:
             fig.canvas.draw()
 
@@ -3152,7 +3153,7 @@ def pyqtgraph_pre_post_delta_scatter(data_results_df: pd.DataFrame, data_context
 
 
 @function_attributes(short_name=None, tags=['plot-helper', 'matplotlib', 'unit-activity', 'black-inactive-time-bins', 'time-bin'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-03-04 10:11', related_items=[])
-def _plot_low_firing_time_bins_overlay_image(widget, time_bin_edges, mask_rgba):
+def _plot_low_firing_time_bins_overlay_image(widget, time_bin_edges, mask_rgba, zorder=11.0):
     """ plots the black masks for low-firing time bins on the specified widget track
     
     Usage:
@@ -3190,7 +3191,7 @@ def _plot_low_firing_time_bins_overlay_image(widget, time_bin_edges, mask_rgba):
     )
 
     # Plot the spike counts as a heatmap
-    low_firing_bins_image = an_ax.imshow(mask_rgba, **low_spiking_heatmap_imshow_kwargs, zorder=1001.0)
+    low_firing_bins_image = an_ax.imshow(mask_rgba, **low_spiking_heatmap_imshow_kwargs, zorder=zorder)
     widget.plots.low_firing_bins_image = low_firing_bins_image
     return low_firing_bins_image
 
