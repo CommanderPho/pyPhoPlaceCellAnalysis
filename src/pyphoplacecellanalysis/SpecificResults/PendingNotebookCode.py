@@ -266,6 +266,7 @@ def numpy_rgba_composite(rgba_layers: NDArray[ND.Shape["N_DECODERS, N_POS_BINS, 
 from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.ContainerBased.PhoContainerTool import GenericMatplotlibContainer
 
 @metadata_attributes(short_name=None, tags=['figure', 'posteriors'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-05-04 18:05', related_items=[])
+@define(slots=False, eq=False)
 class MultiDecoderColorOverlayedPosteriors:
     """ This class relates to visualizing posterior decoded positions for all four context on the same axes, indicating which posterior is which by assigning each decoder a chracteristic color and weighting their opacity according to their likelyhood for each time bin
         
@@ -298,6 +299,189 @@ class MultiDecoderColorOverlayedPosteriors:
 
 
     """
+    p_x_given_n: NDArray[ND.Shape["N_POS_BINS, 4, N_TIME_BINS"], np.floating] = field() # .shape # (59, 4, 69488)
+    time_bin_centers: NDArray[ND.Shape["N_TIME_BINS"], np.floating] = field()
+    xbin: NDArray[ND.Shape["N_POS_BINS"], np.floating] = field()
+
+    p_x_given_n_track_identity_marginal: NDArray[ND.Shape["N_POS_BINS, 2, N_TIME_BINS"], np.floating] = field()
+
+    lower_bound_alpha: float = field(default=0.1)
+    drop_below_threshold: float = field(default=1e-3) ## 
+
+
+    def __attrs_post_init__(self):
+        # Add post-init logic here
+        
+
+        ## INPUTS: all_decoder_colors_dict, active_cmap_names
+        active_colors_dict = {k:v for k, v in all_decoder_colors_dict.items() if k in active_cmap_names}
+        # active_colors_dict
+
+        lower_bound_alpha = 0.1
+        # lower_bound_alpha = 0.0
+        active_decoder_cmap_dict = {k:ColormapHelpers.create_transparent_colormap(color_literal_name=v, lower_bound_alpha=lower_bound_alpha, should_return_LinearSegmentedColormap=True) for k, v in all_decoder_colors_dict.items() if k in active_cmap_names} ## I think `active_decoder_cmap_dict` is what matters
+        # additional_legend_entries = list(zip(directional_active_lap_pf_results_dicts.keys(), additional_cmap_names.values() )) # ['red', 'purple', 'green', 'orange']
+
+        ## OUTPUTS: active_cmap_decoder_dict
+        # drop_below_threshold = 1e-3 # too noisy
+        # drop_below_threshold = 1e-1 ## too sparse
+        drop_below_threshold = 1e-3 ## 
+        extra_all_t_bins_outputs_dict = MultiDecoderColorOverlayedPosteriors.compute_all_time_bin_RGBA(p_x_given_n=p_x_given_n, produce_debug_outputs=False, drop_below_threshold=drop_below_threshold, active_decoder_cmap_dict=active_decoder_cmap_dict)
+        all_t_bins_final_overlayed_out_RGBA = extra_all_t_bins_outputs_dict['all_t_bins_final_overlayed_out_RGBA']
+        all_t_bins_per_decoder_out_RGBA = extra_all_t_bins_outputs_dict['all_t_bins_per_decoder_out_RGBA']
+
+        ## OUTPUTS: extra_all_t_bins_outputs_dict, all_t_bins_per_decoder_out_RGBA, all_t_bins_final_overlayed_out_RGBA
+
+
+    
+
+    @classmethod
+    def build_four_decoder_version(cls, p_x_given_n: NDArray[ND.Shape["N_POS_BINS, 4, N_TIME_BINS"], np.floating], time_bin_centers: NDArray[ND.Shape["N_TIME_BINS"], np.floating], xbin: NDArray[ND.Shape["N_POS_BINS"], np.floating], lower_bound_alpha:float=0.1, drop_below_threshold:float=1e-3):
+        """
+
+        Usage:        
+            extra_all_t_bins_outputs_dict, active_colors_dict = MultiDecoderColorOverlayedPosteriors.build_four_decoder_version(p_x_given_n=p_x_given_n, time_bin_centers=time_bin_centers, xbin=xbin, lower_bound_alpha=0.1, drop_below_threshold=1e-3)
+            all_t_bins_final_overlayed_out_RGBA = extra_all_t_bins_outputs_dict['all_t_bins_final_overlayed_out_RGBA']
+            all_t_bins_per_decoder_out_RGBA = extra_all_t_bins_outputs_dict['all_t_bins_per_decoder_out_RGBA']
+
+        """
+        from pyphocorehelpers.gui.Qt.color_helpers import ColormapHelpers
+        from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import MultiDecoderColorOverlayedPosteriors
+        from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.SpikeRasterWidgets.Spike2DRaster import SynchronizedPlotMode
+        from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.ContainerBased.PhoContainerTool import GenericMatplotlibContainer, GenericPyQtGraphContainer, PhoBaseContainerTool
+
+        ## Common:
+        all_decoder_colors_dict = {'long': '#4169E1', 'short': '#DC143C', 'long_LR': '#4169E1', 'long_RL': '#607B00', 'short_LR': '#DC143C', 'short_RL': '#990099'} ## Just hardcoded version of `additional_cmap_names`
+        
+
+        # ==================================================================================================================================================================================================================================================================================== #
+        # N_DECODERS == 4 ['long_LR', 'long_RL', 'short_LR', 'short_RL']                                                                                                                                                                                                                       #
+        # ==================================================================================================================================================================================================================================================================================== #
+        active_cmap_names = ['long_LR', 'long_RL', 'short_LR', 'short_RL']
+        active_p_x_given_n = deepcopy(p_x_given_n)
+
+
+        # OUTPUTS: all_decoder_colors_dict, p_x_given_n
+        ## OUTPUTS: active_cmap_names, active_p_x_given_n, time_bin_centers, xbin
+        
+
+        ## INPUTS: all_decoder_colors_dict, active_cmap_names
+        active_colors_dict = {k:v for k, v in all_decoder_colors_dict.items() if k in active_cmap_names}
+        # active_colors_dict
+
+        
+        # lower_bound_alpha = 0.0
+        # lower_bound_alpha = 0.1
+        active_decoder_cmap_dict = {k:ColormapHelpers.create_transparent_colormap(color_literal_name=v, lower_bound_alpha=lower_bound_alpha, should_return_LinearSegmentedColormap=True) for k, v in all_decoder_colors_dict.items() if k in active_cmap_names}
+        # additional_legend_entries = list(zip(directional_active_lap_pf_results_dicts.keys(), additional_cmap_names.values() )) # ['red', 'purple', 'green', 'orange']
+
+        ## OUTPUTS: active_cmap_decoder_dict
+        # drop_below_threshold = 1e-3 # too noisy
+        # drop_below_threshold = 1e-1 ## too sparse
+        # drop_below_threshold = 1e-3 ## 
+        extra_all_t_bins_outputs_dict = MultiDecoderColorOverlayedPosteriors.compute_all_time_bin_RGBA(p_x_given_n=active_p_x_given_n, produce_debug_outputs=False, drop_below_threshold=drop_below_threshold, active_decoder_cmap_dict=active_decoder_cmap_dict, should_constrain_to_four_decoder=True)
+
+        # # Plot _______________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
+        # ## Build the new dock track:
+        # # dock_identifier: str = 'MergedColorPlot-Matplotlib-Based-Overlay'
+        # dock_identifier: str = 'MergedColorPlot-AlphaWeighted-["all_t_bins_per_decoder_alpha_weighted_RGBA"]'
+        # ts_widget, fig, ax_list, dDisplayItem = active_2d_plot.add_new_matplotlib_render_plot_widget(name=dock_identifier)
+        # ax = ax_list[0]
+        # ax.clear()
+
+        # # all_t_bins_final_overlayed_out_RGBA, all_t_bins_per_decoder_out_RGBA, extra_all_t_bins_outputs_dict
+
+        # ## INPUTS: time_bin_centers, all_t_bins_final_RGBA, xbin
+        # # all_t_bins_final_RGBA.shape # (69488, 59, 4)
+        # # fig, ax, im_posterior_x = MultiDecoderColorOverlayedPosteriors.plot_mutli_t_bin_RGBA_image(all_t_bins_final_RGBA=all_t_bins_final_RGBA, xbin=xbin, time_bin_centers=time_bin_centers, t_bin_size=0.025, ax=ax)
+        # _out: GenericMatplotlibContainer = MultiDecoderColorOverlayedPosteriors.plot_mutli_t_bin_p_x_given_n(extra_all_t_bins_outputs_dict['all_t_bins_per_decoder_alpha_weighted_RGBA'], xbin=xbin, time_bin_centers=time_bin_centers, t_bin_size=0.025, ax=ax)
+        # fig = _out.fig
+        # ax = _out.ax
+        # im_posterior_x_dict = _out.plots.im_posterior_x_dict
+
+        # ## sync up the widgets
+        # active_2d_plot.sync_matplotlib_render_plot_widget(dock_identifier, sync_mode=SynchronizedPlotMode.TO_WINDOW)
+        # # active_2d_plot.sync_matplotlib_render_plot_widget(dock_identifier, sync_mode=SynchronizedPlotMode.TO_GLOBAL_DATA)
+        # fig.canvas.draw()
+        
+        return extra_all_t_bins_outputs_dict, active_colors_dict
+
+
+
+    @classmethod
+    def build_two_decoder_version(cls, p_x_given_n_track_identity_marginal: NDArray[ND.Shape["N_POS_BINS, 2, N_TIME_BINS"], np.floating], time_bin_centers: NDArray[ND.Shape["N_TIME_BINS"], np.floating], xbin: NDArray[ND.Shape["N_POS_BINS"], np.floating], lower_bound_alpha:float=0.1, drop_below_threshold:float=1e-3):
+        """
+
+        Usage:        
+            extra_all_t_bins_outputs_dict, active_colors_dict = MultiDecoderColorOverlayedPosteriors.build_two_decoder_version(p_x_given_n_track_identity_marginal=p_x_given_n_track_identity_marginal, time_bin_centers=time_bin_centers, xbin=xbin, lower_bound_alpha=0.1, drop_below_threshold=1e-3)
+            all_t_bins_final_overlayed_out_RGBA = extra_all_t_bins_outputs_dict['all_t_bins_final_overlayed_out_RGBA']
+            all_t_bins_per_decoder_out_RGBA = extra_all_t_bins_outputs_dict['all_t_bins_per_decoder_out_RGBA']
+
+        """
+        from pyphocorehelpers.gui.Qt.color_helpers import ColormapHelpers
+        from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import MultiDecoderColorOverlayedPosteriors
+        from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.SpikeRasterWidgets.Spike2DRaster import SynchronizedPlotMode
+        from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.ContainerBased.PhoContainerTool import GenericMatplotlibContainer, GenericPyQtGraphContainer, PhoBaseContainerTool
+
+        ## Common:
+        all_decoder_colors_dict = {'long': '#4169E1', 'short': '#DC143C', 'long_LR': '#4169E1', 'long_RL': '#607B00', 'short_LR': '#DC143C', 'short_RL': '#990099'} ## Just hardcoded version of `additional_cmap_names`
+        
+
+        # ==================================================================================================================================================================================================================================================================================== #
+        # N_DECODERS == 2 ['long', 'short']                                                                                                                                                                                                                                                    #
+        # ==================================================================================================================================================================================================================================================================================== #
+        active_cmap_names = ['long', 'short']
+
+        active_p_x_given_n = deepcopy(p_x_given_n_track_identity_marginal)
+
+
+        # OUTPUTS: all_decoder_colors_dict, p_x_given_n
+        ## OUTPUTS: active_cmap_names, active_p_x_given_n, time_bin_centers, xbin
+        
+
+        ## INPUTS: all_decoder_colors_dict, active_cmap_names
+        active_colors_dict = {k:v for k, v in all_decoder_colors_dict.items() if k in active_cmap_names}
+        # active_colors_dict
+
+        
+        # lower_bound_alpha = 0.0
+        # lower_bound_alpha = 0.1
+        active_decoder_cmap_dict = {k:ColormapHelpers.create_transparent_colormap(color_literal_name=v, lower_bound_alpha=lower_bound_alpha, should_return_LinearSegmentedColormap=True) for k, v in all_decoder_colors_dict.items() if k in active_cmap_names}
+        # additional_legend_entries = list(zip(directional_active_lap_pf_results_dicts.keys(), additional_cmap_names.values() )) # ['red', 'purple', 'green', 'orange']
+
+        ## OUTPUTS: active_cmap_decoder_dict
+        # drop_below_threshold = 1e-3 # too noisy
+        # drop_below_threshold = 1e-1 ## too sparse
+        # drop_below_threshold = 1e-3 ## 
+        extra_all_t_bins_outputs_dict = MultiDecoderColorOverlayedPosteriors.compute_all_time_bin_RGBA(p_x_given_n=active_p_x_given_n, produce_debug_outputs=False, drop_below_threshold=drop_below_threshold, active_decoder_cmap_dict=active_decoder_cmap_dict, should_constrain_to_four_decoder=False)
+
+
+        # # Plot _______________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
+        # ## Build the new dock track:
+        # # dock_identifier: str = 'MergedColorPlot-Matplotlib-Based-Overlay'
+        # dock_identifier: str = 'MergedColorPlot-AlphaWeighted-["all_t_bins_per_decoder_alpha_weighted_RGBA"]'
+        # ts_widget, fig, ax_list, dDisplayItem = active_2d_plot.add_new_matplotlib_render_plot_widget(name=dock_identifier)
+        # ax = ax_list[0]
+        # ax.clear()
+
+        # # all_t_bins_final_overlayed_out_RGBA, all_t_bins_per_decoder_out_RGBA, extra_all_t_bins_outputs_dict
+
+        # ## INPUTS: time_bin_centers, all_t_bins_final_RGBA, xbin
+        # # all_t_bins_final_RGBA.shape # (69488, 59, 4)
+        # # fig, ax, im_posterior_x = MultiDecoderColorOverlayedPosteriors.plot_mutli_t_bin_RGBA_image(all_t_bins_final_RGBA=all_t_bins_final_RGBA, xbin=xbin, time_bin_centers=time_bin_centers, t_bin_size=0.025, ax=ax)
+        # _out: GenericMatplotlibContainer = MultiDecoderColorOverlayedPosteriors.plot_mutli_t_bin_p_x_given_n(extra_all_t_bins_outputs_dict['all_t_bins_per_decoder_alpha_weighted_RGBA'], xbin=xbin, time_bin_centers=time_bin_centers, t_bin_size=0.025, ax=ax)
+        # fig = _out.fig
+        # ax = _out.ax
+        # im_posterior_x_dict = _out.plots.im_posterior_x_dict
+
+        # ## sync up the widgets
+        # active_2d_plot.sync_matplotlib_render_plot_widget(dock_identifier, sync_mode=SynchronizedPlotMode.TO_WINDOW)
+        # # active_2d_plot.sync_matplotlib_render_plot_widget(dock_identifier, sync_mode=SynchronizedPlotMode.TO_GLOBAL_DATA)
+        # fig.canvas.draw()
+        
+        return extra_all_t_bins_outputs_dict, active_colors_dict
+    
+
 
     @classmethod
     def _test_single_t_bin(cls, probability_values: NDArray[ND.Shape["N_POS_BINS, 4"], np.floating], active_decoder_cmap_dict: Optional[Dict]=None, drop_below_threshold: float = 1e-2, produce_debug_outputs:bool=True, color_blend_fn=None):
@@ -401,7 +585,7 @@ class MultiDecoderColorOverlayedPosteriors:
 
     @function_attributes(short_name=None, tags=['MAIN', 'all_t'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-05-04 18:00', related_items=[])
     @classmethod
-    def compute_all_time_bin_RGBA(cls, p_x_given_n: NDArray, active_decoder_cmap_dict: Optional[Dict]=None, produce_debug_outputs: bool = False, drop_below_threshold: float = 1e-2, progress_print: bool = True, color_blend_fn=None) -> Tuple[NDArray, NDArray]:
+    def compute_all_time_bin_RGBA(cls, p_x_given_n: NDArray, active_decoder_cmap_dict: Optional[Dict]=None, produce_debug_outputs: bool = False, drop_below_threshold: float = 1e-2, progress_print: bool = True, color_blend_fn=None, should_constrain_to_four_decoder:bool=True) -> Tuple[NDArray, NDArray]:
         """ Computes the final RGBA colors for each position x time bin in p_x_given_n by overlaying each of the decoders values
         
         
@@ -430,11 +614,11 @@ class MultiDecoderColorOverlayedPosteriors:
         # p_x_given_n
 
         ## INPUTS: p_x_given_n
-        all_t_bins_final_overlayed_out_RGBA, all_t_bins_per_decoder_out_RGBA, extra_all_t_bins_outputs_dict = MultiDecoderColorOverlayedPosteriors.compute_all_time_bin_RGBA(p_x_given_n=p_x_given_n, produce_debug_outputs=False, drop_below_threshold=1e-1)
+        extra_all_t_bins_outputs_dict = MultiDecoderColorOverlayedPosteriors.compute_all_time_bin_RGBA(p_x_given_n=p_x_given_n, produce_debug_outputs=False, drop_below_threshold=1e-1)
+        all_t_bins_final_overlayed_out_RGBA = extra_all_t_bins_outputs_dict['all_t_bins_final_overlayed_out_RGBA']
+        all_t_bins_per_decoder_out_RGBA = extra_all_t_bins_outputs_dict['all_t_bins_per_decoder_out_RGBA']
 
-
-        
-        ## OUTPUTS: all_t_bins_per_decoder_out_RGBA
+        ## OUTPUTS: extra_all_t_bins_outputs_dict, all_t_bins_per_decoder_out_RGBA, all_t_bins_final_overlayed_out_RGBA
         
         """
         
@@ -453,7 +637,10 @@ class MultiDecoderColorOverlayedPosteriors:
             color_blend_fn = cls.composite_over
 
         n_pos_bins, n_decoders, n_time_bins = np.shape(p_x_given_n)
-        assert n_decoders == 4, f"n_decoders: {n_decoders}"
+        if should_constrain_to_four_decoder:
+            assert n_decoders == 4, f"n_decoders: {n_decoders}"
+        else:
+            print(f'n_decoders: {n_decoders}')
 
 
         ## INPUTS: probability_values (n_pos_bins, 4)
@@ -541,7 +728,7 @@ class MultiDecoderColorOverlayedPosteriors:
         extra_all_t_bins_outputs_dict['all_t_bins_final_overlayed_out_RGBA'] = all_t_bins_final_overlayed_out_RGBA
         extra_all_t_bins_outputs_dict['all_t_bins_per_decoder_out_RGBA'] = all_t_bins_per_decoder_out_RGBA
 
-        return all_t_bins_final_overlayed_out_RGBA, all_t_bins_per_decoder_out_RGBA, extra_all_t_bins_outputs_dict
+        return extra_all_t_bins_outputs_dict
 
 
     @classmethod
@@ -1126,7 +1313,6 @@ class MultiDecoderColorOverlayedPosteriors:
 
         return ax_inset, _out
 
-
     @classmethod
     def _build_decoder_legend_venn(cls, all_decoder_colors_dict: Dict[str, str], ax=None):
         """ builds a simple venn-diagram showing the colors for each decoder, allowing the user to see what they look like overlapping
@@ -1209,8 +1395,6 @@ class MultiDecoderColorOverlayedPosteriors:
                 f.create_dataset(k, data=v, compression='gzip', compression_opts=9)
 
             print(f'hdf5_save_file_path: "{hdf5_save_file_path}"')
-
-
 
     @classmethod
     def load_hdf(cls, hdf5_load_file_path: Path):
