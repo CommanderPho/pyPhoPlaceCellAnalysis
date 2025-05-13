@@ -303,37 +303,49 @@ class MultiDecoderColorOverlayedPosteriors:
     time_bin_centers: NDArray[ND.Shape["N_TIME_BINS"], np.floating] = field()
     xbin: NDArray[ND.Shape["N_POS_BINS"], np.floating] = field()
 
-    p_x_given_n_track_identity_marginal: NDArray[ND.Shape["N_POS_BINS, 2, N_TIME_BINS"], np.floating] = field()
+    p_x_given_n_track_identity_marginal: NDArray[ND.Shape["N_POS_BINS, 2, N_TIME_BINS"], np.floating] = field(default=None)
 
     lower_bound_alpha: float = field(default=0.1)
     drop_below_threshold: float = field(default=1e-3) ## 
 
+    ## Computed Results:
+    extra_all_t_bins_outputs_dict_dict: Dict[str, Dict] = field(default=Factory(dict))
+    active_colors_dict_dict: Dict[str, Dict] = field(default=Factory(dict))
+    
 
     def __attrs_post_init__(self):
         # Add post-init logic here
         
+        self.p_x_given_n_track_identity_marginal = self.compute_track_ID_marginal(p_x_given_n=self.p_x_given_n)
 
-        ## INPUTS: all_decoder_colors_dict, active_cmap_names
-        active_colors_dict = {k:v for k, v in all_decoder_colors_dict.items() if k in active_cmap_names}
-        # active_colors_dict
+        # ## INPUTS: all_decoder_colors_dict, active_cmap_names
+        # active_colors_dict = {k:v for k, v in all_decoder_colors_dict.items() if k in active_cmap_names}
+        # # active_colors_dict
 
-        lower_bound_alpha = 0.1
-        # lower_bound_alpha = 0.0
-        active_decoder_cmap_dict = {k:ColormapHelpers.create_transparent_colormap(color_literal_name=v, lower_bound_alpha=lower_bound_alpha, should_return_LinearSegmentedColormap=True) for k, v in all_decoder_colors_dict.items() if k in active_cmap_names} ## I think `active_decoder_cmap_dict` is what matters
-        # additional_legend_entries = list(zip(directional_active_lap_pf_results_dicts.keys(), additional_cmap_names.values() )) # ['red', 'purple', 'green', 'orange']
+        # lower_bound_alpha = 0.1
+        # # lower_bound_alpha = 0.0
+        # active_decoder_cmap_dict = {k:ColormapHelpers.create_transparent_colormap(color_literal_name=v, lower_bound_alpha=lower_bound_alpha, should_return_LinearSegmentedColormap=True) for k, v in all_decoder_colors_dict.items() if k in active_cmap_names} ## I think `active_decoder_cmap_dict` is what matters
+        # # additional_legend_entries = list(zip(directional_active_lap_pf_results_dicts.keys(), additional_cmap_names.values() )) # ['red', 'purple', 'green', 'orange']
 
-        ## OUTPUTS: active_cmap_decoder_dict
-        # drop_below_threshold = 1e-3 # too noisy
-        # drop_below_threshold = 1e-1 ## too sparse
-        drop_below_threshold = 1e-3 ## 
-        extra_all_t_bins_outputs_dict = MultiDecoderColorOverlayedPosteriors.compute_all_time_bin_RGBA(p_x_given_n=p_x_given_n, produce_debug_outputs=False, drop_below_threshold=drop_below_threshold, active_decoder_cmap_dict=active_decoder_cmap_dict)
-        all_t_bins_final_overlayed_out_RGBA = extra_all_t_bins_outputs_dict['all_t_bins_final_overlayed_out_RGBA']
-        all_t_bins_per_decoder_out_RGBA = extra_all_t_bins_outputs_dict['all_t_bins_per_decoder_out_RGBA']
+        # ## OUTPUTS: active_cmap_decoder_dict
+        # # drop_below_threshold = 1e-3 # too noisy
+        # # drop_below_threshold = 1e-1 ## too sparse
+        # drop_below_threshold = 1e-3 ## 
+        # extra_all_t_bins_outputs_dict = MultiDecoderColorOverlayedPosteriors.compute_all_time_bin_RGBA(p_x_given_n=p_x_given_n, produce_debug_outputs=False, drop_below_threshold=drop_below_threshold, active_decoder_cmap_dict=active_decoder_cmap_dict)
+        # all_t_bins_final_overlayed_out_RGBA = extra_all_t_bins_outputs_dict['all_t_bins_final_overlayed_out_RGBA']
+        # all_t_bins_per_decoder_out_RGBA = extra_all_t_bins_outputs_dict['all_t_bins_per_decoder_out_RGBA']
 
         ## OUTPUTS: extra_all_t_bins_outputs_dict, all_t_bins_per_decoder_out_RGBA, all_t_bins_final_overlayed_out_RGBA
 
 
-    
+
+    def compute_all(self):
+        """ computes all """
+        self.p_x_given_n_track_identity_marginal = self.compute_track_ID_marginal(p_x_given_n=self.p_x_given_n)
+        self.extra_all_t_bins_outputs_dict_dict['four_decoders'], self.active_colors_dict_dict['four_decoders'] = MultiDecoderColorOverlayedPosteriors.build_four_decoder_version(p_x_given_n=self.p_x_given_n, time_bin_centers=self.time_bin_centers, xbin=self.xbin, lower_bound_alpha=self.lower_bound_alpha, drop_below_threshold=self.drop_below_threshold)
+        self.extra_all_t_bins_outputs_dict_dict['two_decoders'], self.active_colors_dict_dict['two_decoders'] = MultiDecoderColorOverlayedPosteriors.build_two_decoder_version(p_x_given_n=self.p_x_given_n, time_bin_centers=self.time_bin_centers, xbin=self.xbin, lower_bound_alpha=self.lower_bound_alpha, drop_below_threshold=self.drop_below_threshold)
+        print(f'\done.')
+
 
     @classmethod
     def build_four_decoder_version(cls, p_x_given_n: NDArray[ND.Shape["N_POS_BINS, 4, N_TIME_BINS"], np.floating], time_bin_centers: NDArray[ND.Shape["N_TIME_BINS"], np.floating], xbin: NDArray[ND.Shape["N_POS_BINS"], np.floating], lower_bound_alpha:float=0.1, drop_below_threshold:float=1e-3):
@@ -407,15 +419,50 @@ class MultiDecoderColorOverlayedPosteriors:
         return extra_all_t_bins_outputs_dict, active_colors_dict
 
 
+    @classmethod
+    def compute_track_ID_marginal(cls, p_x_given_n: NDArray[ND.Shape["N_POS_BINS, 4, N_TIME_BINS"], np.floating]):
+        """ Computes the two-decoder marginal of trackID
+
+        p_x_given_n_track_identity_marginal: NDArray[ND.Shape["N_POS_BINS, 2, N_TIME_BINS"], np.floating] = long_only_p_x_given_n # .shape (2, n_time_bins)
+
+        """
+        n_pos_bins, n_decoders, n_time_bins = np.shape(p_x_given_n)
+        assert n_decoders == 4, f"n_decoders: {n_decoders}"
+            
+        long_only_p_x_given_n: NDArray[ND.Shape["N_POS_BINS, 2, N_TIME_BINS"], np.floating] = deepcopy(p_x_given_n[:, (0,1), :])
+        sum_over_all_long_p_x_given_n: NDArray[ND.Shape["N_POS_BINS, N_TIME_BINS"], np.floating] = np.nansum(long_only_p_x_given_n, axis=1) ## sum over the two long columns
+        # sum_over_all_decoders_p_x_given_n: NDArray[ND.Shape["N_POS_BINS, N_TIME_BINS"], np.floating] = np.nansum(p_x_given_n, axis=1) ## sum over all decoders to re-normalize
+        long_only_p_x_given_n = long_only_p_x_given_n / sum_over_all_long_p_x_given_n[:, None, :] ## renormalize by dividing by sum over all decoders
+        ## check normalization
+        col_contains_nan = np.any(np.isnan(long_only_p_x_given_n), axis=1)
+        # np.shape(col_contains_nan)
+        _post_norm_check_sum = np.nansum(long_only_p_x_given_n, axis=1)
+        assert np.alltrue(_post_norm_check_sum[np.logical_not(col_contains_nan)]), f"the non-nan containing columns should sum to one after renormalization"
+
+        # np.shape(_post_norm_check_sum)
+        # np.shape(long_only_p_x_given_n)
+
+        # sum_over_all_long_p_x_given_n.shape
+        # sum_over_all_decoders_p_x_given_n.shape
+        return long_only_p_x_given_n
+
+
+        
+        
 
     @classmethod
-    def build_two_decoder_version(cls, p_x_given_n_track_identity_marginal: NDArray[ND.Shape["N_POS_BINS, 2, N_TIME_BINS"], np.floating], time_bin_centers: NDArray[ND.Shape["N_TIME_BINS"], np.floating], xbin: NDArray[ND.Shape["N_POS_BINS"], np.floating], lower_bound_alpha:float=0.1, drop_below_threshold:float=1e-3):
+    def build_two_decoder_version(cls, p_x_given_n: NDArray[ND.Shape["N_POS_BINS, 4, N_TIME_BINS"], np.floating], time_bin_centers: NDArray[ND.Shape["N_TIME_BINS"], np.floating], xbin: NDArray[ND.Shape["N_POS_BINS"], np.floating], lower_bound_alpha:float=0.1, drop_below_threshold:float=1e-3):
         """
 
         Usage:        
-            extra_all_t_bins_outputs_dict, active_colors_dict = MultiDecoderColorOverlayedPosteriors.build_two_decoder_version(p_x_given_n_track_identity_marginal=p_x_given_n_track_identity_marginal, time_bin_centers=time_bin_centers, xbin=xbin, lower_bound_alpha=0.1, drop_below_threshold=1e-3)
+            extra_all_t_bins_outputs_dict_dict['two_decoders'], active_colors_dict_dict['two_decoders'] = MultiDecoderColorOverlayedPosteriors.build_two_decoder_version(p_x_given_n=p_x_given_n, time_bin_centers=time_bin_centers, xbin=xbin, lower_bound_alpha=0.1, drop_below_threshold=1e-3)
             all_t_bins_final_overlayed_out_RGBA = extra_all_t_bins_outputs_dict['all_t_bins_final_overlayed_out_RGBA']
             all_t_bins_per_decoder_out_RGBA = extra_all_t_bins_outputs_dict['all_t_bins_per_decoder_out_RGBA']
+
+            
+        Usage 2:
+            ## INPUTS: p_x_given_n_track_identity_marginal
+            extra_all_t_bins_outputs_dict_dict['two_decoders'], active_colors_dict_dict['two_decoders'] = MultiDecoderColorOverlayedPosteriors.build_two_decoder_version(p_x_given_n_track_identity_marginal=p_x_given_n_track_identity_marginal, time_bin_centers=time_bin_centers, xbin=xbin, lower_bound_alpha=0.1, drop_below_threshold=1e-3)
 
         """
         from pyphocorehelpers.gui.Qt.color_helpers import ColormapHelpers
@@ -432,8 +479,38 @@ class MultiDecoderColorOverlayedPosteriors:
         # ==================================================================================================================================================================================================================================================================================== #
         active_cmap_names = ['long', 'short']
 
+        # p_x_given_n_track_identity_marginal: NDArray[ND.Shape["N_POS_BINS, 2, N_TIME_BINS"], np.floating]
+
+
+        ## INPUTS: p_x_given_n
+
+        n_pos_bins, n_decoders, n_time_bins = np.shape(p_x_given_n)
+        assert n_decoders == 4, f"n_decoders: {n_decoders}"
+            
+
+        long_only_p_x_given_n: NDArray[ND.Shape["N_POS_BINS, 2, N_TIME_BINS"], np.floating] = deepcopy(p_x_given_n[:, (0,1), :])
+        sum_over_all_long_p_x_given_n: NDArray[ND.Shape["N_POS_BINS, N_TIME_BINS"], np.floating] = np.nansum(long_only_p_x_given_n, axis=1) ## sum over the two long columns
+        # sum_over_all_decoders_p_x_given_n: NDArray[ND.Shape["N_POS_BINS, N_TIME_BINS"], np.floating] = np.nansum(p_x_given_n, axis=1) ## sum over all decoders to re-normalize
+
+        long_only_p_x_given_n = long_only_p_x_given_n / sum_over_all_long_p_x_given_n[:, None, :] ## renormalize by dividing by sum over all decoders
+
+
+        ## check normalization
+        col_contains_nan = np.any(np.isnan(long_only_p_x_given_n), axis=1)
+        # np.shape(col_contains_nan)
+        _post_norm_check_sum = np.nansum(long_only_p_x_given_n, axis=1)
+        assert np.alltrue(_post_norm_check_sum[np.logical_not(col_contains_nan)]), f"the non-nan containing columns should sum to one after renormalization"
+
+        # np.shape(_post_norm_check_sum)
+        # np.shape(long_only_p_x_given_n)
+
+        # sum_over_all_long_p_x_given_n.shape
+        # sum_over_all_decoders_p_x_given_n.shape
+
+        p_x_given_n_track_identity_marginal: NDArray[ND.Shape["N_POS_BINS, 2, N_TIME_BINS"], np.floating] = long_only_p_x_given_n # .shape (2, n_time_bins)
         active_p_x_given_n = deepcopy(p_x_given_n_track_identity_marginal)
 
+        # np.shape(active_p_x_given_n)
 
         # OUTPUTS: all_decoder_colors_dict, p_x_given_n
         ## OUTPUTS: active_cmap_names, active_p_x_given_n, time_bin_centers, xbin
