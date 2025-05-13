@@ -84,17 +84,47 @@ def _setup_spike_raster_window_for_debugging(spike_raster_window, wants_docked_r
 
     ## extract the components so the `background_static_scroll_window_plot` scroll bar is the right size:
     active_2d_plot = spike_raster_window.spike_raster_plt_2d
-    preview_overview_scatter_plot: pg.ScatterPlotItem  = active_2d_plot.plots.preview_overview_scatter_plot # ScatterPlotItem
-    # preview_overview_scatter_plot.setDownsampling(auto=True, method='subsample', dsRate=10)
-    main_graphics_layout_widget: pg.GraphicsLayoutWidget = active_2d_plot.ui.main_graphics_layout_widget
     wrapper_layout: pg.QtWidgets.QVBoxLayout = active_2d_plot.ui.wrapper_layout
-    main_content_splitter = active_2d_plot.ui.main_content_splitter # QSplitter
-    active_window_container_layout = active_2d_plot.ui.active_window_container_layout
     layout = active_2d_plot.ui.layout
+    
+    # main_content_splitter = active_2d_plot.ui.main_content_splitter # QSplitter
+    main_content_splitter = active_2d_plot.ui.get('main_content_splitter', None) # QSplitter
+    if main_content_splitter is not None:
+        _all_outputs_dict['main_content_splitter'] = main_content_splitter
 
-    _all_outputs_dict.update(**dict(preview_overview_scatter_plot=preview_overview_scatter_plot, 
-                                    main_graphics_layout_widget=main_graphics_layout_widget, wrapper_layout=wrapper_layout, main_content_splitter=main_content_splitter,
-                                    active_window_container_layout=active_window_container_layout, layout=layout))
+    # main_graphics_layout_widget: pg.GraphicsLayoutWidget = active_2d_plot.ui.main_graphics_layout_widget
+    main_graphics_layout_widget = active_2d_plot.ui.get('main_graphics_layout_widget', None) # GraphicsLayoutWidget
+    if main_graphics_layout_widget is not None:
+        _all_outputs_dict['main_graphics_layout_widget'] = main_graphics_layout_widget
+        
+    # active_window_container_layout = active_2d_plot.ui.active_window_container_layout
+    active_window_container_layout = active_2d_plot.ui.get('active_window_container_layout', None) # QSplitter
+    if active_window_container_layout is not None:
+        _all_outputs_dict['active_window_container_layout'] = active_window_container_layout
+
+    main_plot_widget = active_2d_plot.plots.get('main_plot_widget', None) # PlotItem
+    if main_plot_widget is not None:
+        _all_outputs_dict['main_plot_widget'] = main_plot_widget
+
+    # preview_overview_scatter_plot: pg.ScatterPlotItem  = active_2d_plot.plots.preview_overview_scatter_plot # ScatterPlotItem
+    # preview_overview_scatter_plot.setDownsampling(auto=True, method='subsample', dsRate=10)
+    preview_overview_scatter_plot = active_2d_plot.plots.get('preview_overview_scatter_plot', None) # ScatterPlotItem
+    if preview_overview_scatter_plot is not None:
+        _all_outputs_dict['preview_overview_scatter_plot'] = preview_overview_scatter_plot
+            
+
+    background_static_scroll_plot_widget = active_2d_plot.plots.get('background_static_scroll_plot_widget', None) # PlotItem
+    if background_static_scroll_plot_widget is not None:
+        _all_outputs_dict['background_static_scroll_plot_widget'] = background_static_scroll_plot_widget
+    
+    background_static_scroll_window_plot = active_2d_plot.plots.get('background_static_scroll_window_plot', None) # PlotItem
+    if background_static_scroll_window_plot is not None:
+        _all_outputs_dict['background_static_scroll_window_plot'] = background_static_scroll_window_plot
+
+
+    _all_outputs_dict.update(**dict(#preview_overview_scatter_plot=preview_overview_scatter_plot, 
+                                    #main_graphics_layout_widget=main_graphics_layout_widget, main_content_splitter=main_content_splitter, active_window_container_layout=active_window_container_layout,
+                                    wrapper_layout=wrapper_layout, layout=layout))
     
 
     should_replace_hardcoded_main_plots_with_tracks: bool = False
@@ -113,16 +143,18 @@ def _setup_spike_raster_window_for_debugging(spike_raster_window, wants_docked_r
         active_window_container_layout.setVisible(False)
 
 
-    background_static_scroll_window_plot = active_2d_plot.plots.background_static_scroll_window_plot # PlotItem
-    background_static_scroll_window_plot.setMinimumHeight(50.0)
-    # background_static_scroll_window_plot.setMaximumHeight(75.0)
-    # # background_static_scroll_window_plot.setFixedHeight(50.0)
-    _all_outputs_dict['background_static_scroll_window_plot'] = background_static_scroll_window_plot
-
+    # background_static_scroll_window_plot = active_2d_plot.plots.background_static_scroll_window_plot # PlotItem
+    if background_static_scroll_window_plot:
+        background_static_scroll_window_plot.setMinimumHeight(50.0)
+        # background_static_scroll_window_plot.setMaximumHeight(75.0)
+        # # background_static_scroll_window_plot.setFixedHeight(50.0)
+    # _all_outputs_dict['background_static_scroll_window_plot'] = background_static_scroll_window_plot
 
     if should_replace_hardcoded_main_plots_with_tracks:
-        active_window_container_layout.setVisible(False) ## hide the container that contains the main_plot_widget
-        background_static_scroll_window_plot.setMaximumHeight(144)
+        if active_window_container_layout:
+            active_window_container_layout.setVisible(False) ## hide the container that contains the main_plot_widget
+        if background_static_scroll_window_plot:
+            background_static_scroll_window_plot.setMaximumHeight(144)
 
 
     # # Set stretch factors to control priority
