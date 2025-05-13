@@ -381,8 +381,8 @@ class MultiDecoderColorOverlayedPosteriors(ComputedResult):
             ts_widget, fig, ax_list, dDisplayItem = _out_tuple
             ## Add overlay plot to hide bins that don't meet the firing criteria:
             low_firing_bins_image = _plot_low_firing_time_bins_overlay_image(widget=ts_widget, time_bin_edges=time_bin_edges, mask_rgba=low_firing_bins_mask_rgba, zorder=11)
-            ax_inset =  self.add_decoder_legend_venn(all_decoder_colors_dict=active_colors_dict, ax=ax_list[0], zorder=13)
-            ts_widget.plots['decoder_legend_venn'] = dict(ax_inset=ax_inset)
+            ax_inset, rounded_rect_inset =  self.add_decoder_legend_venn(all_decoder_colors_dict=active_colors_dict, ax=ax_list[0], zorder=13)
+            ts_widget.plots['decoder_legend_venn'] = dict(ax_inset=ax_inset, background_rounded_rect_inset=rounded_rect_inset)
             # _out_display_dict[dock_identifier] = _out_tuple
             _out_display_dict[dock_identifier] = (ts_widget, fig, ax_list, dDisplayItem)
 
@@ -396,8 +396,8 @@ class MultiDecoderColorOverlayedPosteriors(ComputedResult):
             ts_widget, fig, ax_list, dDisplayItem = _out_tuple
             ## Add overlay plot to hide bins that don't meet the firing criteria:
             low_firing_bins_image = _plot_low_firing_time_bins_overlay_image(widget=ts_widget, time_bin_edges=time_bin_edges, mask_rgba=low_firing_bins_mask_rgba, zorder=11)
-            ax_inset =  self.add_decoder_legend_venn(all_decoder_colors_dict=active_colors_dict, ax=ax_list[0], zorder=13)
-            ts_widget.plots['decoder_legend_venn'] = dict(ax_inset=ax_inset)
+            ax_inset, rounded_rect_inset =  self.add_decoder_legend_venn(all_decoder_colors_dict=active_colors_dict, ax=ax_list[0], zorder=13)
+            ts_widget.plots['decoder_legend_venn'] = dict(ax_inset=ax_inset, background_rounded_rect_inset=rounded_rect_inset)
 
             # _out_display_dict[dock_identifier] = _out_tuple
             _out_display_dict[dock_identifier] = (ts_widget, fig, ax_list, dDisplayItem)
@@ -1433,6 +1433,8 @@ class MultiDecoderColorOverlayedPosteriors(ComputedResult):
             ax_inset =  MultiDecoderColorOverlayedPosteriors.add_decoder_legend_venn(all_decoder_colors_dict=all_decoder_colors_dict, ax=ax)
 
         """
+        import matplotlib.patches as patches
+
         assert ax is not None
         fig = ax.get_figure()
 
@@ -1453,10 +1455,32 @@ class MultiDecoderColorOverlayedPosteriors(ComputedResult):
         ax_inset =  cls._build_decoder_legend_venn(all_decoder_colors_dict=all_decoder_colors_dict, ax=ax_inset)
         ax_inset.set_zorder(zorder)  # Set zorder after creation
         
+        # Now, add the rounded rectangle patch to the inset axes (ax_inset)
+        # We define the rectangle in the coordinate system of ax_inset
+        # (0, 0) is the bottom-left corner of ax_inset
+        # 1 is the width covering 100% of ax_inset's width
+        # 1 is the height covering 100% of ax_inset's height
+        rounded_rect_inset = patches.FancyBboxPatch((0, 0), 1, 1,
+                                                    boxstyle="round,pad=0.5",
+                                                    facecolor='#f5e9e9fa',  # Face color set to white
+                                                    edgecolor='#585252fa',
+                                                    alpha=0.7, # Alpha set to 0.7
+                                                    # mutation_scale=30, # Adjust for desired rounding
+                                                    transform=ax_inset.transAxes, # Crucially, use the inset axes' transform
+                                                    zorder=(zorder-5)) # Set a low zorder to be in the background
+
+        # Add the patch to the inset axes
+        ax_inset.add_patch(rounded_rect_inset)
+
+        # # Optional: Set limits for the inset axes if needed
+        ax_inset.set_xlim(0, 1)
+        ax_inset.set_ylim(0, 1)
+        # # fig.canvas.draw()
+
         if not defer_render:
             fig.canvas.draw()
 
-        return ax_inset
+        return ax_inset, rounded_rect_inset
 
     @classmethod
     def _build_decoder_legend_venn(cls, all_decoder_colors_dict: Dict[str, str], ax=None):
@@ -1488,6 +1512,29 @@ class MultiDecoderColorOverlayedPosteriors(ComputedResult):
             # colors=cmap,
             figsize=(8, 8), fontsize=8, legend_loc="upper left", ax=ax
         )
+
+        # # Now, add the rounded rectangle patch to the inset axes (ax_inset)
+        # # We define the rectangle in the coordinate system of ax_inset
+        # # (0, 0) is the bottom-left corner of ax_inset
+        # # 1 is the width covering 100% of ax_inset's width
+        # # 1 is the height covering 100% of ax_inset's height
+        # rounded_rect_inset = patches.FancyBboxPatch((0, 0), 1, 1,
+        #                                             boxstyle="round,pad=0.5",
+        #                                             facecolor='#f5e9e9fa',  # Face color set to white
+        #                                             edgecolor='#585252fa',
+        #                                             alpha=0.7, # Alpha set to 0.7
+        #                                             # mutation_scale=30, # Adjust for desired rounding
+        #                                             transform=ax.transAxes, # Crucially, use the inset axes' transform
+        #                                             zorder=-5) # Set a low zorder to be in the background
+
+        # # Add the patch to the inset axes
+        # ax.add_patch(rounded_rect_inset)
+
+        # # # # Optional: Set limits for the inset axes if needed
+        # # ax.set_xlim(0, 1)
+        # # ax.set_ylim(0, 1)
+        # # # fig.canvas.draw()
+            
         return ax
 
     # ==================================================================================================================== #
