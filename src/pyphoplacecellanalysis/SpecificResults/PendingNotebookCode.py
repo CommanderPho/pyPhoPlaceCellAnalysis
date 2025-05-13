@@ -307,7 +307,7 @@ class MultiDecoderColorOverlayedPosteriors(ComputedResult):
     """
     _VersionedResultMixin_version: str = "2025.05.12_0" # to be updated in your IMPLEMENTOR to indicate its version
     
-
+    spikes_df: pd.DataFrame = serialized_field(repr=shape_only_repr, is_computable=False)
     p_x_given_n: NDArray[ND.Shape["N_POS_BINS, 4, N_TIME_BINS"], np.floating] = serialized_field(repr=shape_only_repr, is_computable=False, metadata={'shape':('N_POS_BINS','4','N_TIME_BINS')}) # .shape # (59, 4, 69488)
     time_bin_centers: NDArray[ND.Shape["N_TIME_BINS"], np.floating] = serialized_field(repr=shape_only_repr, is_computable=False, metadata={'shape':('N_TIME_BINS',)})
     xbin: NDArray[ND.Shape["N_POS_BINS"], np.floating] = serialized_field(repr=shape_only_repr, is_computable=False, metadata={'shape':('N_POS_BINS',)})
@@ -360,23 +360,48 @@ class MultiDecoderColorOverlayedPosteriors(ComputedResult):
 
         
         """
+        from neuropy.utils.mixins.binning_helpers import get_bin_edges
+        from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import _plot_low_firing_time_bins_overlay_image
+        
+
+        time_bin_edges: NDArray = get_bin_edges(deepcopy(self.time_bin_centers))
+        spikes_df: pd.DataFrame = deepcopy(self.spikes_df)
+        # unique_units = np.unique(spikes_df['aclu']) # sorted
+        unit_specific_time_binned_spike_counts, unique_units, (is_time_bin_active, inactive_mask, low_firing_bins_mask_rgba) = spikes_df.spikes.compute_unit_time_binned_spike_counts_and_mask(time_bin_edges=time_bin_edges)
+
 
         _out_display_dict = {}
         
         if 'four_decoders' in self.extra_all_t_bins_outputs_dict_dict:
             a_result_name: str = 'four_decoders'
             dock_identifier: str = f'{dock_identifier_prefix}-AlphaWeighted-{a_result_name}'
+            active_colors_dict = self.active_colors_dict_dict[a_result_name]
+            
             _out_tuple = self._perform_add_as_track_to_spike_raster_window(active_2d_plot=active_2d_plot, all_t_bins_final_RGBA=self.extra_all_t_bins_outputs_dict_dict[a_result_name]['all_t_bins_per_decoder_alpha_weighted_RGBA'], time_bin_centers=self.time_bin_centers, xbin=self.xbin, t_bin_size=self.t_bin_size, dock_identifier=dock_identifier)
-            # ts_widget, fig, ax_list, dDisplayItem = _out_tuple
-            _out_display_dict[dock_identifier] = _out_tuple
+            ts_widget, fig, ax_list, dDisplayItem = _out_tuple
+            ## Add overlay plot to hide bins that don't meet the firing criteria:
+            low_firing_bins_image = _plot_low_firing_time_bins_overlay_image(widget=ts_widget, time_bin_edges=time_bin_edges, mask_rgba=low_firing_bins_mask_rgba)
+            ax_inset, _out =  self.add_decoder_legend_venn(all_decoder_colors_dict=active_colors_dict, ax=ax_list[0])
+            ts_widget.plots['decoder_legend_venn'] = dict(ax_inset=ax_inset, data=_out)
+
+            # _out_display_dict[dock_identifier] = _out_tuple
+            _out_display_dict[dock_identifier] = (ts_widget, fig, ax_list, dDisplayItem)
 
 
         if 'two_decoders' in self.extra_all_t_bins_outputs_dict_dict:
             a_result_name: str = 'two_decoders'
             dock_identifier: str = f'{dock_identifier_prefix}-AlphaWeighted-{a_result_name}'
+            active_colors_dict = self.active_colors_dict_dict[a_result_name]
+            
             _out_tuple = self._perform_add_as_track_to_spike_raster_window(active_2d_plot=active_2d_plot, all_t_bins_final_RGBA=self.extra_all_t_bins_outputs_dict_dict[a_result_name]['all_t_bins_per_decoder_alpha_weighted_RGBA'], time_bin_centers=self.time_bin_centers, xbin=self.xbin, t_bin_size=self.t_bin_size, dock_identifier=dock_identifier)
-            # ts_widget, fig, ax_list, dDisplayItem = _out_tuple
-            _out_display_dict[dock_identifier] = _out_tuple
+            ts_widget, fig, ax_list, dDisplayItem = _out_tuple
+            ## Add overlay plot to hide bins that don't meet the firing criteria:
+            low_firing_bins_image = _plot_low_firing_time_bins_overlay_image(widget=ts_widget, time_bin_edges=time_bin_edges, mask_rgba=low_firing_bins_mask_rgba)
+            ax_inset, _out =  self.add_decoder_legend_venn(all_decoder_colors_dict=active_colors_dict, ax=ax_list[0])
+            ts_widget.plots['decoder_legend_venn'] = dict(ax_inset=ax_inset, data=_out)
+
+            # _out_display_dict[dock_identifier] = _out_tuple
+            _out_display_dict[dock_identifier] = (ts_widget, fig, ax_list, dDisplayItem)
 
         return _out_display_dict
 
@@ -458,16 +483,28 @@ class MultiDecoderColorOverlayedPosteriors(ComputedResult):
     def compute_track_ID_marginal(cls, p_x_given_n: NDArray[ND.Shape["N_POS_BINS, 4, N_TIME_BINS"], np.floating]):
         """ Computes the two-decoder marginal of trackID
 
-        p_x_given_n_track_identity_marginal: NDArray[ND.Shape["N_POS_BINS, 2, N_TIME_BINS"], np.floating] = long_only_p_x_given_n # .shape (2, n_time_bins)
+        Usage:        
+            p_x_given_n_track_identity_marginal: NDArray[ND.Shape["N_POS_BINS, 2, N_TIME_BINS"], np.floating] = multi_decoder_color_overlay.compute_track_ID_marginal(p_x_given_n=p_x_given_n) # .shape (2, n_time_bins)
+            np.shape(p_x_given_n_track_identity_marginal)
+            p_x_given_n_track_identity_marginal
 
         """
-        def _subfn_perform_normalization_check(a_marginal_p_x_given_n):
+        # def _subfn_perform_normalization_check(a_marginal_p_x_given_n):
+        #     ## check normalization
+        #     col_contains_nan = np.any(np.isnan(a_marginal_p_x_given_n), axis=1)
+        #     # np.shape(col_contains_nan)
+        #     _post_norm_check_sum = np.nansum(a_marginal_p_x_given_n, axis=1)
+        #     assert np.alltrue(_post_norm_check_sum[np.logical_not(col_contains_nan)]), f"the non-nan containing columns should sum to one after renormalization"
+            
+        def _subfn_perform_area_under_curve_normalization_check(a_marginal_p_x_given_n, axis=(0,1)):
             ## check normalization
-            col_contains_nan = np.any(np.isnan(a_marginal_p_x_given_n), axis=1)
+            col_contains_nan = np.any(np.isnan(a_marginal_p_x_given_n), axis=axis)
             # np.shape(col_contains_nan)
-            _post_norm_check_sum = np.nansum(a_marginal_p_x_given_n, axis=1)
+            _post_norm_check_sum = np.nansum(a_marginal_p_x_given_n, axis=axis)
             assert np.alltrue(_post_norm_check_sum[np.logical_not(col_contains_nan)]), f"the non-nan containing columns should sum to one after renormalization"
             
+
+
         n_pos_bins, n_decoders, n_time_bins = np.shape(p_x_given_n)
         assert n_decoders == 4, f"n_decoders: {n_decoders}"
         
@@ -483,16 +520,20 @@ class MultiDecoderColorOverlayedPosteriors(ComputedResult):
         
         ## All
         sum_over_all_decoders_p_x_given_n: NDArray[ND.Shape["N_POS_BINS, N_TIME_BINS"], np.floating] = np.nansum(p_x_given_n, axis=1) ## sum over all decoders to re-normalize
-        
+        sum_over_all_decoders_and_all_positions_p_x_given_n: NDArray[ND.Shape["N_TIME_BINS"], np.floating] = np.nansum(p_x_given_n, axis=(0,1)) ## sum over all decoders to re-normalize
+
         ## build result
         marginal_trackID_p_x_given_n[:, 0, :] = sum_over_all_long_p_x_given_n
         marginal_trackID_p_x_given_n[:, 1, :] = sum_over_all_short_p_x_given_n
 
         ## Normalize result:
-        marginal_trackID_p_x_given_n = marginal_trackID_p_x_given_n / sum_over_all_decoders_p_x_given_n[:, None, :] ## renormalize by dividing by sum over all decoders
-        _subfn_perform_normalization_check(a_marginal_p_x_given_n=marginal_trackID_p_x_given_n)
-                
-
+        # marginal_trackID_p_x_given_n = marginal_trackID_p_x_given_n / sum_over_all_decoders_p_x_given_n[:, None, :] ## renormalize by dividing by sum over all decoders
+        # _subfn_perform_normalization_check(a_marginal_p_x_given_n=marginal_trackID_p_x_given_n)
+        
+        marginal_trackID_p_x_given_n = marginal_trackID_p_x_given_n / sum_over_all_decoders_and_all_positions_p_x_given_n ## renormalize by dividing by sum over all decoders
+        _subfn_perform_area_under_curve_normalization_check(a_marginal_p_x_given_n=marginal_trackID_p_x_given_n)
+        # _post_norm_check_sum: NDArray[ND.Shape["N_TIME_BINS"], np.floating] = np.nansum(marginal_trackID_p_x_given_n, axis=(0,1))
+        
         # long_only_p_x_given_n = long_only_p_x_given_n / sum_over_all_long_p_x_given_n[:, None, :] ## renormalize by dividing by sum over all decoders
         # _subfn_perform_normalization_check(a_marginal_p_x_given_n=long_only_p_x_given_n)
         
@@ -1384,13 +1425,13 @@ class MultiDecoderColorOverlayedPosteriors(ComputedResult):
 
 
     @classmethod
-    def add_decoder_legend_venn(cls, all_decoder_colors_dict: Dict[str, str], ax):
+    def add_decoder_legend_venn(cls, all_decoder_colors_dict: Dict[str, str], ax, defer_render:bool=False):
         """ Creates an inset axes to serve as the legned, and inside this plots a venn-diagram showing the colors for each decoder, allowing the user to see what they look like overlapping
 
         Usage:
 
             all_decoder_colors_dict = {'long_LR': '#4169E1', 'long_RL': '#607B00', 'short_LR': '#DC143C', 'short_RL': '#990099'} ## Just hardcoded version of `additional_cmap_names`
-            ax_inset, _out =  MultiDecoderColorOverlayedPosteriors.add_decoder_legend_venn(all_decoder_colors_dict=all_decoder_colors_dict, ax=ax)
+            ax_inset =  MultiDecoderColorOverlayedPosteriors.add_decoder_legend_venn(all_decoder_colors_dict=all_decoder_colors_dict, ax=ax)
 
         """
         assert ax is not None
@@ -1410,11 +1451,11 @@ class MultiDecoderColorOverlayedPosteriors(ComputedResult):
 
         # Create the inset axes, using bbox_to_anchor and bbox_transform for independent positioning
         ax_inset = ax.inset_axes([x0, y0, width, height])
-        ax_inset, _out =  cls._build_decoder_legend_venn(all_decoder_colors_dict=all_decoder_colors_dict, ax=ax_inset)
+        ax_inset =  cls._build_decoder_legend_venn(all_decoder_colors_dict=all_decoder_colors_dict, ax=ax_inset)
+        if not defer_render:
+            fig.canvas.draw()
 
-        fig.canvas.draw()
-
-        return ax_inset, _out
+        return ax_inset
 
     @classmethod
     def _build_decoder_legend_venn(cls, all_decoder_colors_dict: Dict[str, str], ax=None):
@@ -1423,7 +1464,7 @@ class MultiDecoderColorOverlayedPosteriors(ComputedResult):
         Usage:
 
             all_decoder_colors_dict = {'long_LR': '#4169E1', 'long_RL': '#607B00', 'short_LR': '#DC143C', 'short_RL': '#990099'} ## Just hardcoded version of `additional_cmap_names`
-            ax, _out =  MultiDecoderColorOverlayedPosteriors._build_decoder_legend_venn(all_decoder_colors_dict=all_decoder_colors_dict, ax=None)
+            ax =  MultiDecoderColorOverlayedPosteriors._build_decoder_legend_venn(all_decoder_colors_dict=all_decoder_colors_dict, ax=None)
 
         """
         from matplotlib.pyplot import subplots
@@ -1439,14 +1480,14 @@ class MultiDecoderColorOverlayedPosteriors(ComputedResult):
 
         # _out = venn(dataset_dict, fmt="{percentage:.1f}%", cmap=cmap, fontsize=8, legend_loc="upper left", ax=ax)
         petal_labels = {} ## empty labels
-        _out = draw_venn(
+        ax = draw_venn(
             petal_labels=petal_labels, dataset_labels=dataset_dict.keys(),
             hint_hidden=False,
             colors=generate_colors(cmap=cmap, n_colors=n_sets),
             # colors=cmap,
             figsize=(8, 8), fontsize=8, legend_loc="upper left", ax=ax
         )
-        return ax, _out
+        return ax
 
     # ==================================================================================================================== #
     # HDF5                                                                                                                 #
@@ -3117,6 +3158,13 @@ def _plot_low_firing_time_bins_overlay_image(widget, time_bin_edges, mask_rgba):
     Usage:
         from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import _plot_low_firing_time_bins_overlay_image
 
+        
+        # time_window_centers = deepcopy(results1D.continuous_results['global'].time_bin_containers[0].centers)
+        ## INPUTS: unique_units, time_bin_edges, unit_specific_time_binned_spike_counts
+        time_bin_edges: NDArray = deepcopy(results1D.continuous_results['global'].time_bin_edges[0])
+        spikes_df: pd.DataFrame = deepcopy(get_proper_global_spikes_df(curr_active_pipeline))
+        # unique_units = np.unique(spikes_df['aclu']) # sorted
+        unit_specific_time_binned_spike_counts, unique_units, (is_time_bin_active, inactive_mask, mask_rgba) = spikes_df.spikes.compute_unit_time_binned_spike_counts_and_mask(time_bin_edges=time_bin_edges)
         _plot_low_firing_time_bins_overlay_image(widget=widget, time_bin_edges=time_bin_edges, mask_rgba=mask_rgba)
     """
     ## INPUTS: is_time_bin_active
@@ -3142,8 +3190,9 @@ def _plot_low_firing_time_bins_overlay_image(widget, time_bin_edges, mask_rgba):
     )
 
     # Plot the spike counts as a heatmap
-    low_firing_bins_image = an_ax.imshow(mask_rgba, **low_spiking_heatmap_imshow_kwargs)
+    low_firing_bins_image = an_ax.imshow(mask_rgba, **low_spiking_heatmap_imshow_kwargs, zorder=1001.0)
     widget.plots.low_firing_bins_image = low_firing_bins_image
+    return low_firing_bins_image
 
 
 @function_attributes(short_name=None, tags=['timeline-track', 'firing-rate', 'unit-spiking'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-03-03 15:28', related_items=[])
