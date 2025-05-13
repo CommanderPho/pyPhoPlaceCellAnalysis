@@ -344,7 +344,7 @@ class MultiDecoderColorOverlayedPosteriors(ComputedResult):
         self.p_x_given_n_track_identity_marginal = self.compute_track_ID_marginal(p_x_given_n=self.p_x_given_n)
         self.extra_all_t_bins_outputs_dict_dict['four_decoders'], self.active_colors_dict_dict['four_decoders'] = MultiDecoderColorOverlayedPosteriors.build_four_decoder_version(p_x_given_n=self.p_x_given_n, time_bin_centers=self.time_bin_centers, xbin=self.xbin, lower_bound_alpha=self.lower_bound_alpha, drop_below_threshold=self.drop_below_threshold)
         self.extra_all_t_bins_outputs_dict_dict['two_decoders'], self.active_colors_dict_dict['two_decoders'] = MultiDecoderColorOverlayedPosteriors.build_two_decoder_version(p_x_given_n=self.p_x_given_n, time_bin_centers=self.time_bin_centers, xbin=self.xbin, lower_bound_alpha=self.lower_bound_alpha, drop_below_threshold=self.drop_below_threshold)
-        print(f'\done.')
+        print(f'\tdone.')
 
 
     @function_attributes(short_name=None, tags=['tracks', 'plotting'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-05-13 00:04', related_items=[])
