@@ -381,8 +381,15 @@ class MultiDecoderColorOverlayedPosteriors(ComputedResult):
             ts_widget, fig, ax_list, dDisplayItem = _out_tuple
             ## Add overlay plot to hide bins that don't meet the firing criteria:
             low_firing_bins_image = _plot_low_firing_time_bins_overlay_image(widget=ts_widget, time_bin_edges=time_bin_edges, mask_rgba=low_firing_bins_mask_rgba, zorder=11)
-            ax_inset, rounded_rect_inset =  self.add_decoder_legend_venn(all_decoder_colors_dict=active_colors_dict, ax=ax_list[0], zorder=13)
-            ts_widget.plots['decoder_legend_venn'] = dict(ax_inset=ax_inset, background_rounded_rect_inset=rounded_rect_inset)
+            try:
+                ax_inset, rounded_rect_inset =  self.add_decoder_legend_venn(all_decoder_colors_dict=active_colors_dict, ax=ax_list[0], zorder=13)
+                ts_widget.plots['decoder_legend_venn'] = dict(ax_inset=ax_inset, background_rounded_rect_inset=rounded_rect_inset)
+            except ModuleNotFoundError as e:
+                print(f'WARN: {e}. decoder_legend venn will be missing!')
+                pass
+            except Exception as e:
+                raise e
+
             # _out_display_dict[dock_identifier] = _out_tuple
             _out_display_dict[dock_identifier] = (ts_widget, fig, ax_list, dDisplayItem)
 
@@ -396,8 +403,14 @@ class MultiDecoderColorOverlayedPosteriors(ComputedResult):
             ts_widget, fig, ax_list, dDisplayItem = _out_tuple
             ## Add overlay plot to hide bins that don't meet the firing criteria:
             low_firing_bins_image = _plot_low_firing_time_bins_overlay_image(widget=ts_widget, time_bin_edges=time_bin_edges, mask_rgba=low_firing_bins_mask_rgba, zorder=11)
-            ax_inset, rounded_rect_inset =  self.add_decoder_legend_venn(all_decoder_colors_dict=active_colors_dict, ax=ax_list[0], zorder=13)
-            ts_widget.plots['decoder_legend_venn'] = dict(ax_inset=ax_inset, background_rounded_rect_inset=rounded_rect_inset)
+            try:
+                ax_inset, rounded_rect_inset =  self.add_decoder_legend_venn(all_decoder_colors_dict=active_colors_dict, ax=ax_list[0], zorder=13)
+                ts_widget.plots['decoder_legend_venn'] = dict(ax_inset=ax_inset, background_rounded_rect_inset=rounded_rect_inset)
+            except ModuleNotFoundError as e:
+                print(f'WARN: {e}. decoder_legend venn will be missing!')
+                pass
+            except Exception as e:
+                raise e 
 
             # _out_display_dict[dock_identifier] = _out_tuple
             _out_display_dict[dock_identifier] = (ts_widget, fig, ax_list, dDisplayItem)
