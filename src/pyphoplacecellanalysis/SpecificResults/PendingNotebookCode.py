@@ -324,9 +324,9 @@ class MultiDecoderColorOverlayedPosteriors(ComputedResult):
     
 
     def __attrs_post_init__(self):
-        # Add post-init logic here
-        
+        # Add post-init logic here        
         self.p_x_given_n_track_identity_marginal = self.compute_track_ID_marginal(p_x_given_n=self.p_x_given_n)
+
 
 
     @function_attributes(short_name=None, tags=['MAIN', 'compute'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-05-12 23:50', related_items=[])
@@ -366,7 +366,7 @@ class MultiDecoderColorOverlayedPosteriors(ComputedResult):
         if 'four_decoders' in self.extra_all_t_bins_outputs_dict_dict:
             a_result_name: str = 'four_decoders'
             dock_identifier: str = f'{dock_identifier_prefix}-AlphaWeighted-{a_result_name}'
-            _out_tuple = self._perform_add_as_track_to_spike_raster_window(active_2d_plot=active_2d_plot, all_t_bins_final_RGBA=self.extra_all_t_bins_outputs_dict_dict['four_decoders']['all_t_bins_per_decoder_alpha_weighted_RGBA'], time_bin_centers=self.time_bin_centers, xbin=self.xbin, t_bin_size=self.t_bin_size, dock_identifier=dock_identifier)
+            _out_tuple = self._perform_add_as_track_to_spike_raster_window(active_2d_plot=active_2d_plot, all_t_bins_final_RGBA=self.extra_all_t_bins_outputs_dict_dict[a_result_name]['all_t_bins_per_decoder_alpha_weighted_RGBA'], time_bin_centers=self.time_bin_centers, xbin=self.xbin, t_bin_size=self.t_bin_size, dock_identifier=dock_identifier)
             # ts_widget, fig, ax_list, dDisplayItem = _out_tuple
             _out_display_dict[dock_identifier] = _out_tuple
 
@@ -374,7 +374,7 @@ class MultiDecoderColorOverlayedPosteriors(ComputedResult):
         if 'two_decoders' in self.extra_all_t_bins_outputs_dict_dict:
             a_result_name: str = 'two_decoders'
             dock_identifier: str = f'{dock_identifier_prefix}-AlphaWeighted-{a_result_name}'
-            _out_tuple = self._perform_add_as_track_to_spike_raster_window(active_2d_plot=active_2d_plot, all_t_bins_final_RGBA=self.extra_all_t_bins_outputs_dict_dict['two_decoders']['all_t_bins_per_decoder_alpha_weighted_RGBA'], time_bin_centers=self.time_bin_centers, xbin=self.xbin, t_bin_size=self.t_bin_size, dock_identifier=dock_identifier)
+            _out_tuple = self._perform_add_as_track_to_spike_raster_window(active_2d_plot=active_2d_plot, all_t_bins_final_RGBA=self.extra_all_t_bins_outputs_dict_dict[a_result_name]['all_t_bins_per_decoder_alpha_weighted_RGBA'], time_bin_centers=self.time_bin_centers, xbin=self.xbin, t_bin_size=self.t_bin_size, dock_identifier=dock_identifier)
             # ts_widget, fig, ax_list, dDisplayItem = _out_tuple
             _out_display_dict[dock_identifier] = _out_tuple
 
@@ -461,25 +461,49 @@ class MultiDecoderColorOverlayedPosteriors(ComputedResult):
         p_x_given_n_track_identity_marginal: NDArray[ND.Shape["N_POS_BINS, 2, N_TIME_BINS"], np.floating] = long_only_p_x_given_n # .shape (2, n_time_bins)
 
         """
+        def _subfn_perform_normalization_check(a_marginal_p_x_given_n):
+            ## check normalization
+            col_contains_nan = np.any(np.isnan(a_marginal_p_x_given_n), axis=1)
+            # np.shape(col_contains_nan)
+            _post_norm_check_sum = np.nansum(a_marginal_p_x_given_n, axis=1)
+            assert np.alltrue(_post_norm_check_sum[np.logical_not(col_contains_nan)]), f"the non-nan containing columns should sum to one after renormalization"
+            
         n_pos_bins, n_decoders, n_time_bins = np.shape(p_x_given_n)
         assert n_decoders == 4, f"n_decoders: {n_decoders}"
+        
+        marginal_trackID_p_x_given_n: NDArray[ND.Shape["N_POS_BINS, 2, N_TIME_BINS"], np.floating] = np.zeros(shape=(n_pos_bins, 2, n_time_bins))
             
+        ## Long:
         long_only_p_x_given_n: NDArray[ND.Shape["N_POS_BINS, 2, N_TIME_BINS"], np.floating] = deepcopy(p_x_given_n[:, (0,1), :])
         sum_over_all_long_p_x_given_n: NDArray[ND.Shape["N_POS_BINS, N_TIME_BINS"], np.floating] = np.nansum(long_only_p_x_given_n, axis=1) ## sum over the two long columns
-        # sum_over_all_decoders_p_x_given_n: NDArray[ND.Shape["N_POS_BINS, N_TIME_BINS"], np.floating] = np.nansum(p_x_given_n, axis=1) ## sum over all decoders to re-normalize
-        long_only_p_x_given_n = long_only_p_x_given_n / sum_over_all_long_p_x_given_n[:, None, :] ## renormalize by dividing by sum over all decoders
-        ## check normalization
-        col_contains_nan = np.any(np.isnan(long_only_p_x_given_n), axis=1)
-        # np.shape(col_contains_nan)
-        _post_norm_check_sum = np.nansum(long_only_p_x_given_n, axis=1)
-        assert np.alltrue(_post_norm_check_sum[np.logical_not(col_contains_nan)]), f"the non-nan containing columns should sum to one after renormalization"
+        
+        ## Short:
+        short_only_p_x_given_n: NDArray[ND.Shape["N_POS_BINS, 2, N_TIME_BINS"], np.floating] = deepcopy(p_x_given_n[:, (2,3), :])
+        sum_over_all_short_p_x_given_n: NDArray[ND.Shape["N_POS_BINS, N_TIME_BINS"], np.floating] = np.nansum(short_only_p_x_given_n, axis=1) ## sum over the two long columns
+        
+        ## All
+        sum_over_all_decoders_p_x_given_n: NDArray[ND.Shape["N_POS_BINS, N_TIME_BINS"], np.floating] = np.nansum(p_x_given_n, axis=1) ## sum over all decoders to re-normalize
+        
+        ## build result
+        marginal_trackID_p_x_given_n[:, 0, :] = sum_over_all_long_p_x_given_n
+        marginal_trackID_p_x_given_n[:, 1, :] = sum_over_all_short_p_x_given_n
+
+        ## Normalize result:
+        marginal_trackID_p_x_given_n = marginal_trackID_p_x_given_n / sum_over_all_decoders_p_x_given_n[:, None, :] ## renormalize by dividing by sum over all decoders
+        _subfn_perform_normalization_check(a_marginal_p_x_given_n=marginal_trackID_p_x_given_n)
+                
+
+        # long_only_p_x_given_n = long_only_p_x_given_n / sum_over_all_long_p_x_given_n[:, None, :] ## renormalize by dividing by sum over all decoders
+        # _subfn_perform_normalization_check(a_marginal_p_x_given_n=long_only_p_x_given_n)
+        
 
         # np.shape(_post_norm_check_sum)
         # np.shape(long_only_p_x_given_n)
 
         # sum_over_all_long_p_x_given_n.shape
         # sum_over_all_decoders_p_x_given_n.shape
-        return long_only_p_x_given_n
+        # return long_only_p_x_given_n
+        return marginal_trackID_p_x_given_n
 
         
     @function_attributes(short_name=None, tags=['decoder_result'], input_requires=[], output_provides=[], uses=['.compute_all_time_bin_RGBA', '.compute_track_ID_marginal'], used_by=['.compute_all'], creation_date='2025-05-13 00:03', related_items=[])
@@ -504,7 +528,7 @@ class MultiDecoderColorOverlayedPosteriors(ComputedResult):
         from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.ContainerBased.PhoContainerTool import GenericMatplotlibContainer, GenericPyQtGraphContainer, PhoBaseContainerTool
 
         ## Common:
-        all_decoder_colors_dict = {'long': '#4169E1', 'short': '#DC143C', 'long_LR': '#4169E1', 'long_RL': '#607B00', 'short_LR': '#DC143C', 'short_RL': '#990099'} ## Just hardcoded version of `additional_cmap_names`
+        all_decoder_colors_dict = {'long': '#4169E1', 'short': '#DC143C'} ## Just hardcoded version of `additional_cmap_names`
         
 
         # ==================================================================================================================================================================================================================================================================================== #
@@ -518,76 +542,31 @@ class MultiDecoderColorOverlayedPosteriors(ComputedResult):
         ## INPUTS: p_x_given_n
 
         n_pos_bins, n_decoders, n_time_bins = np.shape(p_x_given_n)
-        assert n_decoders == 4, f"n_decoders: {n_decoders}"
-            
+        # assert n_decoders == 4, f"n_decoders: {n_decoders}"
+        if (n_decoders == 4):
+            # # p_x_given_n_track_identity_marginal: NDArray[ND.Shape["N_POS_BINS, 2, N_TIME_BINS"], np.floating] = long_only_p_x_given_n # .shape (2, n_time_bins)
+            p_x_given_n_track_identity_marginal: NDArray[ND.Shape["N_POS_BINS, 2, N_TIME_BINS"], np.floating] = cls.compute_track_ID_marginal(p_x_given_n=p_x_given_n) # .shape (2, n_time_bins)
 
-        long_only_p_x_given_n: NDArray[ND.Shape["N_POS_BINS, 2, N_TIME_BINS"], np.floating] = deepcopy(p_x_given_n[:, (0,1), :])
-        sum_over_all_long_p_x_given_n: NDArray[ND.Shape["N_POS_BINS, N_TIME_BINS"], np.floating] = np.nansum(long_only_p_x_given_n, axis=1) ## sum over the two long columns
-        # sum_over_all_decoders_p_x_given_n: NDArray[ND.Shape["N_POS_BINS, N_TIME_BINS"], np.floating] = np.nansum(p_x_given_n, axis=1) ## sum over all decoders to re-normalize
+        elif (n_decoders == 2):
+            p_x_given_n_track_identity_marginal: NDArray[ND.Shape["N_POS_BINS, 2, N_TIME_BINS"], np.floating] = deepcopy(p_x_given_n) # .shape (2, n_time_bins)
+        else:
+            raise ValueError(f'n_decoders: {n_decoders} should be 4 or 2')
 
-        long_only_p_x_given_n = long_only_p_x_given_n / sum_over_all_long_p_x_given_n[:, None, :] ## renormalize by dividing by sum over all decoders
 
-
-        ## check normalization
-        col_contains_nan = np.any(np.isnan(long_only_p_x_given_n), axis=1)
-        # np.shape(col_contains_nan)
-        _post_norm_check_sum = np.nansum(long_only_p_x_given_n, axis=1)
-        assert np.alltrue(_post_norm_check_sum[np.logical_not(col_contains_nan)]), f"the non-nan containing columns should sum to one after renormalization"
-
-        # np.shape(_post_norm_check_sum)
-        # np.shape(long_only_p_x_given_n)
-
-        # sum_over_all_long_p_x_given_n.shape
-        # sum_over_all_decoders_p_x_given_n.shape
-
-        p_x_given_n_track_identity_marginal: NDArray[ND.Shape["N_POS_BINS, 2, N_TIME_BINS"], np.floating] = long_only_p_x_given_n # .shape (2, n_time_bins)
         active_p_x_given_n = deepcopy(p_x_given_n_track_identity_marginal)
-
         # np.shape(active_p_x_given_n)
 
         # OUTPUTS: all_decoder_colors_dict, p_x_given_n
         ## OUTPUTS: active_cmap_names, active_p_x_given_n, time_bin_centers, xbin
         
-
         ## INPUTS: all_decoder_colors_dict, active_cmap_names
         active_colors_dict = {k:v for k, v in all_decoder_colors_dict.items() if k in active_cmap_names}
-        # active_colors_dict
-
         
-        # lower_bound_alpha = 0.0
-        # lower_bound_alpha = 0.1
         active_decoder_cmap_dict = {k:ColormapHelpers.create_transparent_colormap(color_literal_name=v, lower_bound_alpha=lower_bound_alpha, should_return_LinearSegmentedColormap=True) for k, v in all_decoder_colors_dict.items() if k in active_cmap_names}
         # additional_legend_entries = list(zip(directional_active_lap_pf_results_dicts.keys(), additional_cmap_names.values() )) # ['red', 'purple', 'green', 'orange']
 
         ## OUTPUTS: active_cmap_decoder_dict
-        # drop_below_threshold = 1e-3 # too noisy
-        # drop_below_threshold = 1e-1 ## too sparse
-        # drop_below_threshold = 1e-3 ## 
         extra_all_t_bins_outputs_dict = cls.compute_all_time_bin_RGBA(p_x_given_n=active_p_x_given_n, produce_debug_outputs=False, drop_below_threshold=drop_below_threshold, active_decoder_cmap_dict=active_decoder_cmap_dict, should_constrain_to_four_decoder=False)
-
-
-        # # Plot _______________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
-        # ## Build the new dock track:
-        # # dock_identifier: str = 'MergedColorPlot-Matplotlib-Based-Overlay'
-        # dock_identifier: str = 'MergedColorPlot-AlphaWeighted-["all_t_bins_per_decoder_alpha_weighted_RGBA"]'
-        # ts_widget, fig, ax_list, dDisplayItem = active_2d_plot.add_new_matplotlib_render_plot_widget(name=dock_identifier)
-        # ax = ax_list[0]
-        # ax.clear()
-
-        # # all_t_bins_final_overlayed_out_RGBA, all_t_bins_per_decoder_out_RGBA, extra_all_t_bins_outputs_dict
-
-        # ## INPUTS: time_bin_centers, all_t_bins_final_RGBA, xbin
-        # # all_t_bins_final_RGBA.shape # (69488, 59, 4)
-        # # fig, ax, im_posterior_x = MultiDecoderColorOverlayedPosteriors.plot_mutli_t_bin_RGBA_image(all_t_bins_final_RGBA=all_t_bins_final_RGBA, xbin=xbin, time_bin_centers=time_bin_centers, t_bin_size=0.025, ax=ax)
-        # _out: GenericMatplotlibContainer = MultiDecoderColorOverlayedPosteriors.plot_mutli_t_bin_p_x_given_n(extra_all_t_bins_outputs_dict['all_t_bins_per_decoder_alpha_weighted_RGBA'], xbin=xbin, time_bin_centers=time_bin_centers, t_bin_size=0.025, ax=ax)
-        # fig = _out.fig
-        # ax = _out.ax
-        # im_posterior_x_dict = _out.plots.im_posterior_x_dict
-
-        # ## sync up the widgets
-        # active_2d_plot.sync_matplotlib_render_plot_widget(dock_identifier, sync_mode=SynchronizedPlotMode.TO_WINDOW)
-        # # active_2d_plot.sync_matplotlib_render_plot_widget(dock_identifier, sync_mode=SynchronizedPlotMode.TO_GLOBAL_DATA)
-        # fig.canvas.draw()
         
         return extra_all_t_bins_outputs_dict, active_colors_dict
     
@@ -754,6 +733,8 @@ class MultiDecoderColorOverlayedPosteriors(ComputedResult):
             print(f'n_decoders: {n_decoders}')
 
 
+        assert (len(active_decoder_cmap_dict) == n_decoders), f"len(active_decoder_cmap_dict): {len(active_decoder_cmap_dict)} != n_decoders: {n_decoders} but it must!"
+            
         ## INPUTS: probability_values (n_pos_bins, 4)
         # all_t_bins_per_decoder_out_RGBA: NDArray[ND.Shape["N_TIME_BINS", "N_POS_BINS, N_DECODERS, 4"], np.floating] = np.zeros((n_time_bins, n_pos_bins, n_decoders, 4))
         # all_t_bins_final_overlayed_out_RGBA: NDArray[ND.Shape["N_TIME_BINS", "N_POS_BINS, 4"], np.floating] = np.zeros((n_time_bins, n_pos_bins, 4)) # Pre-compute the overlay so that there's only one color that represents up to all four active decoders
@@ -840,6 +821,11 @@ class MultiDecoderColorOverlayedPosteriors(ComputedResult):
         ## END FOR for a_t_bin_idx in np.a...
         # extra_all_t_bins_outputs_dict['all_t_bins_final_overlayed_out_RGBA'] = all_t_bins_final_overlayed_out_RGBA
         # extra_all_t_bins_outputs_dict['all_t_bins_per_decoder_out_RGBA'] = all_t_bins_per_decoder_out_RGBA
+
+        if progress_print:
+            print(f'a_t_bin_idx: [{a_t_bin_idx}/{n_time_bins}]')
+            print(f'\tdone.')
+            
 
         return extra_all_t_bins_outputs_dict
 
