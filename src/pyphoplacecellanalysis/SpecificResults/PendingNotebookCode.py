@@ -347,6 +347,7 @@ class MultiDecoderColorOverlayedPosteriors(ComputedResult):
         print(f'\done.')
 
 
+    @function_attributes(short_name=None, tags=['tracks', 'plotting'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-05-13 00:04', related_items=[])
     def add_tracks_to_spike_raster_window(self, active_2d_plot, dock_identifier_prefix: str = 'MergedColorPlot'):
         """ adds two separate tracks to SpikeRaster2D, one for each decoding style (four vs. two) 
                 Each added track is a multi-color context-weighted decoding plot
@@ -380,7 +381,7 @@ class MultiDecoderColorOverlayedPosteriors(ComputedResult):
         return _out_display_dict
 
 
-
+    @function_attributes(short_name=None, tags=['decoder_result'], input_requires=[], output_provides=[], uses=['.compute_all_time_bin_RGBA'], used_by=['.compute_all'], creation_date='2025-05-13 00:03', related_items=[])
     @classmethod
     def build_four_decoder_version(cls, p_x_given_n: NDArray[ND.Shape["N_POS_BINS, 4, N_TIME_BINS"], np.floating], time_bin_centers: NDArray[ND.Shape["N_TIME_BINS"], np.floating], xbin: NDArray[ND.Shape["N_POS_BINS"], np.floating], lower_bound_alpha:float=0.1, drop_below_threshold:float=1e-3):
         """
@@ -452,6 +453,7 @@ class MultiDecoderColorOverlayedPosteriors(ComputedResult):
         return extra_all_t_bins_outputs_dict, active_colors_dict
 
 
+    @function_attributes(short_name=None, tags=['private', 'helper', 'data'], input_requires=[], output_provides=[], uses=[], used_by=['.build_two_decoder_version'], creation_date='2025-05-13 00:05', related_items=[])
     @classmethod
     def compute_track_ID_marginal(cls, p_x_given_n: NDArray[ND.Shape["N_POS_BINS, 4, N_TIME_BINS"], np.floating]):
         """ Computes the two-decoder marginal of trackID
@@ -479,10 +481,8 @@ class MultiDecoderColorOverlayedPosteriors(ComputedResult):
         # sum_over_all_decoders_p_x_given_n.shape
         return long_only_p_x_given_n
 
-
         
-        
-
+    @function_attributes(short_name=None, tags=['decoder_result'], input_requires=[], output_provides=[], uses=['.compute_all_time_bin_RGBA', '.compute_track_ID_marginal'], used_by=['.compute_all'], creation_date='2025-05-13 00:03', related_items=[])
     @classmethod
     def build_two_decoder_version(cls, p_x_given_n: NDArray[ND.Shape["N_POS_BINS, 4, N_TIME_BINS"], np.floating], time_bin_centers: NDArray[ND.Shape["N_TIME_BINS"], np.floating], xbin: NDArray[ND.Shape["N_POS_BINS"], np.floating], lower_bound_alpha:float=0.1, drop_below_threshold:float=1e-3):
         """
@@ -563,7 +563,7 @@ class MultiDecoderColorOverlayedPosteriors(ComputedResult):
         # drop_below_threshold = 1e-3 # too noisy
         # drop_below_threshold = 1e-1 ## too sparse
         # drop_below_threshold = 1e-3 ## 
-        extra_all_t_bins_outputs_dict = MultiDecoderColorOverlayedPosteriors.compute_all_time_bin_RGBA(p_x_given_n=active_p_x_given_n, produce_debug_outputs=False, drop_below_threshold=drop_below_threshold, active_decoder_cmap_dict=active_decoder_cmap_dict, should_constrain_to_four_decoder=False)
+        extra_all_t_bins_outputs_dict = cls.compute_all_time_bin_RGBA(p_x_given_n=active_p_x_given_n, produce_debug_outputs=False, drop_below_threshold=drop_below_threshold, active_decoder_cmap_dict=active_decoder_cmap_dict, should_constrain_to_four_decoder=False)
 
 
         # # Plot _______________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
@@ -734,6 +734,7 @@ class MultiDecoderColorOverlayedPosteriors(ComputedResult):
         
         # p_x_given_n: NDArray[ND.Shape["N_TIME_BINS, N_POS_BINS, N_DECODERS"], np.floating]
         ## INPUTS: p_x_given_n, drop_below_threshold, active_decoder_cmap_dict, produce_debug_outputs
+        p_x_given_n = deepcopy(p_x_given_n) ## copy p_x_given_n so it isn't modified
 
         if active_decoder_cmap_dict is None:
             # decoder_names_to_idx_map: Dict[int, types.DecoderName] = {0: 'long_LR', 1: 'long_RL', 2: 'short_LR', 3: 'short_RL'}
@@ -754,13 +755,14 @@ class MultiDecoderColorOverlayedPosteriors(ComputedResult):
 
 
         ## INPUTS: probability_values (n_pos_bins, 4)
-        all_t_bins_per_decoder_out_RGBA: NDArray[ND.Shape["N_TIME_BINS", "N_POS_BINS, N_DECODERS, 4"], np.floating] = np.zeros((n_time_bins, n_pos_bins, n_decoders, 4))
-        all_t_bins_final_overlayed_out_RGBA: NDArray[ND.Shape["N_TIME_BINS", "N_POS_BINS, 4"], np.floating] = np.zeros((n_time_bins, n_pos_bins, 4)) # Pre-compute the overlay so that there's only one color that represents up to all four active decoders
-
+        # all_t_bins_per_decoder_out_RGBA: NDArray[ND.Shape["N_TIME_BINS", "N_POS_BINS, N_DECODERS, 4"], np.floating] = np.zeros((n_time_bins, n_pos_bins, n_decoders, 4))
+        # all_t_bins_final_overlayed_out_RGBA: NDArray[ND.Shape["N_TIME_BINS", "N_POS_BINS, 4"], np.floating] = np.zeros((n_time_bins, n_pos_bins, 4)) # Pre-compute the overlay so that there's only one color that represents up to all four active decoders
         extra_all_t_bins_outputs_dict: Dict = {
             'all_t_bins_per_decoder_alphas': np.zeros((n_time_bins, n_decoders)),
             'all_t_bins_per_decoder_alpha_weighted_RGBA': np.zeros((n_time_bins, n_pos_bins, n_decoders, 4)),
             'all_t_bins_final_RGBA': np.zeros((n_time_bins, n_pos_bins, 4)),
+            'all_t_bins_per_decoder_out_RGBA': np.zeros((n_time_bins, n_pos_bins, n_decoders, 4)),
+            'all_t_bins_final_overlayed_out_RGBA': np.zeros((n_time_bins, n_pos_bins, 4)),
         }
 
         for a_t_bin_idx in np.arange(n_time_bins):
@@ -768,13 +770,13 @@ class MultiDecoderColorOverlayedPosteriors(ComputedResult):
                 # 1. normalize over all in each time bin 
                 # 2. normalize to max/min in each time (colormapping), means colors aren't consistent between timebins
                             
-
             if progress_print:
                 is_every_hundreth_t_bin = (a_t_bin_idx % 1000 == 0)
                 if is_every_hundreth_t_bin:        
                     print(f'a_t_bin_idx: [{a_t_bin_idx}/{n_time_bins}]')
 
-            single_t_bin_P_values: NDArray[ND.Shape["N_POS_BINS, N_DECODERS"], np.floating] = deepcopy(p_x_given_n[:, :, a_t_bin_idx])
+            # single_t_bin_P_values: NDArray[ND.Shape["N_POS_BINS, N_DECODERS"], np.floating] = deepcopy(p_x_given_n[:, :, a_t_bin_idx])
+            single_t_bin_P_values: NDArray[ND.Shape["N_POS_BINS, N_DECODERS"], np.floating] = p_x_given_n[:, :, a_t_bin_idx]
 
             if produce_debug_outputs:
                 _pre_norm_prob_vals = deepcopy(single_t_bin_P_values)
@@ -816,17 +818,18 @@ class MultiDecoderColorOverlayedPosteriors(ComputedResult):
                 # rgb = an_rgba[..., :3] 
                 # single_t_bin_out_RGBA[:, i, :] = an_rgba
                 
-                all_t_bins_per_decoder_out_RGBA[a_t_bin_idx, :, i, :] = an_rgba
+                extra_all_t_bins_outputs_dict['all_t_bins_per_decoder_out_RGBA'][a_t_bin_idx, :, i, :] = an_rgba
             ## END for i, (a_decoder_name, a_cmap) in enum....
             
             # Add dict entries ___________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
             # single_t_bin_out_RGBA: (n_pos_bins, 4, 4)
-            single_t_bin_out_RGBA: NDArray[ND.Shape["N_POS_BINS, N_DECODERS, 4"], np.floating] = all_t_bins_per_decoder_out_RGBA[a_t_bin_idx, :, :, :]
+            single_t_bin_out_RGBA: NDArray[ND.Shape["N_POS_BINS, N_DECODERS, 4"], np.floating] = extra_all_t_bins_outputs_dict['all_t_bins_per_decoder_out_RGBA'][a_t_bin_idx, :, :, :]
             # single_t_bin_out_alpha_weighted_RGBA: NDArray[ND.Shape["N_POS_BINS, N_DECODERS, 4"], np.floating] = (deepcopy(single_t_bin_out_RGBA) * decoder_alphas[None, :, None]) # (n_pos_bins, n_decoders, 4)
             extra_all_t_bins_outputs_dict['all_t_bins_per_decoder_alphas'][a_t_bin_idx, :] = decoder_alphas
-            extra_all_t_bins_outputs_dict['all_t_bins_per_decoder_alpha_weighted_RGBA'][a_t_bin_idx, :, :, :] = (deepcopy(single_t_bin_out_RGBA) * decoder_alphas[None, :, None]) # (n_pos_bins, n_decoders, 4)
+            # extra_all_t_bins_outputs_dict['all_t_bins_per_decoder_alpha_weighted_RGBA'][a_t_bin_idx, :, :, :] = (deepcopy(single_t_bin_out_RGBA) * decoder_alphas[None, :, None]) # (n_pos_bins, n_decoders, 4)
+            extra_all_t_bins_outputs_dict['all_t_bins_per_decoder_alpha_weighted_RGBA'][a_t_bin_idx, :, :, :] = (single_t_bin_out_RGBA * decoder_alphas[None, :, None]) # (n_pos_bins, n_decoders, 4)
 
-            all_t_bins_final_overlayed_out_RGBA[a_t_bin_idx, :, :] = color_blend_fn(single_t_bin_out_RGBA, decoder_alphas=decoder_alphas) # (n_pos_bins, 4, 4)?
+            extra_all_t_bins_outputs_dict['all_t_bins_final_overlayed_out_RGBA'][a_t_bin_idx, :, :] = color_blend_fn(single_t_bin_out_RGBA, decoder_alphas=decoder_alphas) # (n_pos_bins, 4, 4)?
             
             ## `numpy_rgba_composite` -- expects input = rgba_layers: (n_layers, H, W, 4) - here (H:
             # extra_all_t_bins_outputs_dict['all_t_bins_final_RGBA'][a_t_bin_idx, :, :] = numpy_rgba_composite(np.transpose(single_t_bin_out_RGBA, (1, 0, 2)))  # (n_decoders, H=n_pos_bins, 4)
@@ -835,8 +838,8 @@ class MultiDecoderColorOverlayedPosteriors(ComputedResult):
 
             # numpy_rgba_composite: Returns: (H, W, 4) — final composited RGBA image
         ## END FOR for a_t_bin_idx in np.a...
-        extra_all_t_bins_outputs_dict['all_t_bins_final_overlayed_out_RGBA'] = all_t_bins_final_overlayed_out_RGBA
-        extra_all_t_bins_outputs_dict['all_t_bins_per_decoder_out_RGBA'] = all_t_bins_per_decoder_out_RGBA
+        # extra_all_t_bins_outputs_dict['all_t_bins_final_overlayed_out_RGBA'] = all_t_bins_final_overlayed_out_RGBA
+        # extra_all_t_bins_outputs_dict['all_t_bins_per_decoder_out_RGBA'] = all_t_bins_per_decoder_out_RGBA
 
         return extra_all_t_bins_outputs_dict
 
