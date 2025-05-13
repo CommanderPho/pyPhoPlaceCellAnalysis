@@ -131,6 +131,9 @@ class SpikeRastersDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Displa
         """
         use_separate_windows = kwargs.pop('separate_windows', False)
         type_of_3d_plotter = kwargs.pop('type_of_3d_plotter', 'pyqtgraph')
+        use_docked_pyqtgraph_plots: bool = kwargs.pop('use_docked_pyqtgraph_plots', False)
+
+
         # active_plotting_config = active_config.plotting_config # active_config is unused
         active_config_name = kwargs.pop('active_config_name', 'Unknown')
         active_identifying_context = kwargs.pop('active_context', None)
@@ -153,7 +156,9 @@ class SpikeRastersDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Displa
         active_display_fn_identifying_ctx_string = active_display_fn_identifying_ctx.get_description(separator='|') # Get final discription string:
 
         ## It's passed a specific computation_result which has a .sess attribute that's used to determine which spikes are displayed or not.
-        spike_raster_window: Spike3DRasterWindowWidget = Spike3DRasterWindowWidget(spikes_df, type_of_3d_plotter=type_of_3d_plotter, application_name=f'Spike Raster Window - {active_display_fn_identifying_ctx_string}', neuron_colors=neuron_colors, neuron_sort_order=neuron_sort_order) ## surprisingly only needs spikes_df !!?!
+        spike_raster_window: Spike3DRasterWindowWidget = Spike3DRasterWindowWidget(spikes_df, type_of_3d_plotter=type_of_3d_plotter, application_name=f'Spike Raster Window - {active_display_fn_identifying_ctx_string}', neuron_colors=neuron_colors, neuron_sort_order=neuron_sort_order,
+                                                                                   params_kwargs=dict(use_docked_pyqtgraph_plots=use_docked_pyqtgraph_plots),
+                                                                                   ) ## surprisingly only needs spikes_df !!?!
         # Set Window Title Options:
         a_file_prefix = str(computation_result.sess.filePrefix.resolve())
         spike_raster_window.setWindowFilePath(a_file_prefix)

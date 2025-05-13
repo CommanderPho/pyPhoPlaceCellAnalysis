@@ -210,7 +210,7 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
         # PhoMenuHelper.try_get_menu_window(self).ui.menus._menu_action_history_list = value # window
 
 
-    def __init__(self, curr_spikes_df, core_app_name='UnifiedSpikeRasterApp', window_duration=15.0, window_start_time=30.0, neuron_colors=None, neuron_sort_order=None, application_name=None, type_of_3d_plotter='pyqtgraph', parent=None):
+    def __init__(self, curr_spikes_df, core_app_name='UnifiedSpikeRasterApp', window_duration=15.0, window_start_time=30.0, neuron_colors=None, neuron_sort_order=None, application_name=None, type_of_3d_plotter='pyqtgraph', params_kwargs=None, parent=None):
         """_summary_
 
         Args:
@@ -243,7 +243,10 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
         # self.ui.splitter.setStretchFactor(0, 5) # have the top widget by 3x the height as the bottom widget
         # self.ui.splitter.setStretchFactor(1, 1) # have the top widget by 3x the height as the bottom widget        
         
-        self.params = VisualizationParameters(self.applicationName, _menu_action_history_list=[], type_of_3d_plotter=type_of_3d_plotter, is_crosshair_trace_enabled=False, debug_print=False)
+        if params_kwargs is None:
+            params_kwargs = {}
+
+        self.params = VisualizationParameters(self.applicationName, _menu_action_history_list=[], type_of_3d_plotter=type_of_3d_plotter, is_crosshair_trace_enabled=False, debug_print=False, **params_kwargs)
         self.params.type_of_3d_plotter = type_of_3d_plotter
         self.params._menu_action_history_list = []
         # Helper Mixins: INIT:

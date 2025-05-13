@@ -538,7 +538,6 @@ class Spike2DRaster(SpecificDockWidgetManipulatingMixin, DynamicDockDisplayAreaO
 
             
             """
-            from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.GraphicsWidgets.CustomGraphicsLayoutWidget import CustomGraphicsLayoutWidget
             from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.SpikeRasterWidgets.Spike2DRaster import SynchronizedPlotMode
             
             self.logger.debug(f'\tSpike2DRaster._buildGraphics_DockedTracksLayout()')
@@ -554,17 +553,6 @@ class Spike2DRaster(SpecificDockWidgetManipulatingMixin, DynamicDockDisplayAreaO
             self.plots.main_plot_widget = None
             self.plots.scatter_plot = None
             
-            # From Render2DScrollWindowPlotMixin:
-            # if not use_docked_pyqtgraph_plots:
-            #     self.plots.background_static_scroll_window_plot = self.ui.main_graphics_layout_widget.addPlot(row=2, col=0, rowspan=1, colspan=1) # rowspan=self.params.main_graphics_plot_widget_rowspan
-            #     self.plots.background_static_scroll_window_plot = self.ScrollRasterPreviewWindow_on_BuildUI(self.plots.background_static_scroll_window_plot)
-
-            #     # self.ScrollRasterPreviewWindow_on_BuildUI()
-            #     if self.Includes2DActiveWindowScatter:
-            #         self.plots.scatter_plot.addPoints(self.plots_data.all_spots)
-        
-
-
             ## Done, ready to add docks
             # Intervals __________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
             _interval_tracks_out_dict = self.prepare_pyqtgraph_intervalPlot_tracks(enable_interval_overview_track=True, should_link_to_main_plot_widget=False)
@@ -616,12 +604,12 @@ class Spike2DRaster(SpecificDockWidgetManipulatingMixin, DynamicDockDisplayAreaO
             self.ui.dynamic_docked_widget_container
             
         """
-        from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.GraphicsWidgets.CustomGraphicsLayoutWidget import CustomGraphicsLayoutWidget
+        
         from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.SpikeRasterWidgets.Spike2DRaster import SynchronizedPlotMode
         
         self.logger.debug(f'Spike2DRaster._buildGraphics()')
-        # use_docked_pyqtgraph_plots: bool = self.params.setdefault('use_docked_pyqtgraph_plots', False)
-        use_docked_pyqtgraph_plots: bool = self.params.setdefault('use_docked_pyqtgraph_plots', True)
+        use_docked_pyqtgraph_plots: bool = self.params.setdefault('use_docked_pyqtgraph_plots', False)
+        # use_docked_pyqtgraph_plots: bool = self.params.setdefault('use_docked_pyqtgraph_plots', True)
 
         ## Common
         self.params.custom_interval_rendering_plots = []
