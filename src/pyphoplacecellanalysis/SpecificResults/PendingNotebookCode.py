@@ -44,7 +44,7 @@ import pyphoplacecellanalysis.External.pyqtgraph as pg
 
 from pyphoplacecellanalysis.Analysis.reliability import TrialByTrialActivity
 
-from neuropy.utils.mixins.AttrsClassHelpers import keys_only_repr
+from neuropy.utils.mixins.AttrsClassHelpers import keys_only_repr, shape_only_repr
 from pyphocorehelpers.DataStructure.general_parameter_containers import VisualizationParameters, RenderPlotsData, RenderPlots # PyqtgraphRenderPlots
 from pyphocorehelpers.gui.PhoUIContainer import PhoUIContainer
 
@@ -262,12 +262,17 @@ def numpy_rgba_composite(rgba_layers: NDArray[ND.Shape["N_DECODERS, N_POS_BINS, 
 
 
 
-
+from pyphoplacecellanalysis.General.Model.ComputationResults import ComputedResult
 from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.ContainerBased.PhoContainerTool import GenericMatplotlibContainer
+import attrs
+from attrs import define, field, Factory, astuple, asdict, fields
+from neuropy.utils.mixins.AttrsClassHelpers import AttrsBasedClassHelperMixin, serialized_attribute_field, serialized_field, non_serialized_field, keys_only_repr, shape_only_repr
+from neuropy.utils.mixins.HDF5_representable import HDF_SerializationMixin
+
 
 @metadata_attributes(short_name=None, tags=['figure', 'posteriors'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-05-04 18:05', related_items=[])
 @define(slots=False, eq=False)
-class MultiDecoderColorOverlayedPosteriors:
+class MultiDecoderColorOverlayedPosteriors(ComputedResult):
     """ This class relates to visualizing posterior decoded positions for all four context on the same axes, indicating which posterior is which by assigning each decoder a chracteristic color and weighting their opacity according to their likelyhood for each time bin
         
     
@@ -291,26 +296,31 @@ class MultiDecoderColorOverlayedPosteriors:
 
         global_decoded_result: SingleEpochDecodedResult = a_result.get_result_for_epoch(0)
         p_x_given_n: NDArray[ND.Shape["N_POS_BINS, 4, N_TIME_BINS"], np.floating] = deepcopy(global_decoded_result.p_x_given_n) # .shape # (59, 4, 69488)
-        # p_x_given_n
 
         ## INPUTS: p_x_given_n
-        all_t_bins_final_overlayed_out_RGBA, all_t_bins_out_RGBA = MultiDecoderColorOverlayedPosteriors.compute_all_time_bins(p_x_given_n=p_x_given_n, produce_debug_outputs=False, drop_below_threshold=1e-1)
+        multi_decoder_color_overlay: MultiDecoderColorOverlayedPosteriors = MultiDecoderColorOverlayedPosteriors(p_x_given_n=p_x_given_n, time_bin_centers=time_bin_centers, xbin=xbin, lower_bound_alpha=0.1, drop_below_threshold=1e-3, t_bin_size=0.025)
+        multi_decoder_color_overlay.compute_all()
+        _out_display_dict = multi_decoder_color_overlay.add_tracks_to_spike_raster_window(active_2d_plot=active_2d_plot, dock_identifier_prefix='MergedColorPlot')
 
 
 
     """
-    p_x_given_n: NDArray[ND.Shape["N_POS_BINS, 4, N_TIME_BINS"], np.floating] = field() # .shape # (59, 4, 69488)
-    time_bin_centers: NDArray[ND.Shape["N_TIME_BINS"], np.floating] = field()
-    xbin: NDArray[ND.Shape["N_POS_BINS"], np.floating] = field()
+    _VersionedResultMixin_version: str = "2025.05.12_0" # to be updated in your IMPLEMENTOR to indicate its version
+    
 
-    p_x_given_n_track_identity_marginal: NDArray[ND.Shape["N_POS_BINS, 2, N_TIME_BINS"], np.floating] = field(default=None)
+    p_x_given_n: NDArray[ND.Shape["N_POS_BINS, 4, N_TIME_BINS"], np.floating] = serialized_field(repr=shape_only_repr, is_computable=False, metadata={'shape':('N_POS_BINS','4','N_TIME_BINS')}) # .shape # (59, 4, 69488)
+    time_bin_centers: NDArray[ND.Shape["N_TIME_BINS"], np.floating] = serialized_field(repr=shape_only_repr, is_computable=False, metadata={'shape':('N_TIME_BINS',)})
+    xbin: NDArray[ND.Shape["N_POS_BINS"], np.floating] = serialized_field(repr=shape_only_repr, is_computable=False, metadata={'shape':('N_POS_BINS',)})
 
-    lower_bound_alpha: float = field(default=0.1)
-    drop_below_threshold: float = field(default=1e-3) ## 
+    p_x_given_n_track_identity_marginal: NDArray[ND.Shape["N_POS_BINS, 2, N_TIME_BINS"], np.floating] = serialized_field(init=False, default=None, repr=shape_only_repr, is_computable=True, metadata={'shape':('N_POS_BINS','2','N_TIME_BINS')})
+
+    t_bin_size: float = serialized_attribute_field(default=0.025, is_computable=False, repr=True)
+    lower_bound_alpha: float = serialized_attribute_field(default=0.1, is_computable=False, repr=True)
+    drop_below_threshold: float = serialized_attribute_field(default=1e-3, is_computable=False, repr=True) ## 
 
     ## Computed Results:
-    extra_all_t_bins_outputs_dict_dict: Dict[str, Dict] = field(default=Factory(dict))
-    active_colors_dict_dict: Dict[str, Dict] = field(default=Factory(dict))
+    extra_all_t_bins_outputs_dict_dict: Dict[str, Dict] = field(default=Factory(dict), repr=keys_only_repr)
+    active_colors_dict_dict: Dict[str, Dict] = field(default=Factory(dict), repr=keys_only_repr)
     
 
     def __attrs_post_init__(self):
@@ -318,33 +328,57 @@ class MultiDecoderColorOverlayedPosteriors:
         
         self.p_x_given_n_track_identity_marginal = self.compute_track_ID_marginal(p_x_given_n=self.p_x_given_n)
 
-        # ## INPUTS: all_decoder_colors_dict, active_cmap_names
-        # active_colors_dict = {k:v for k, v in all_decoder_colors_dict.items() if k in active_cmap_names}
-        # # active_colors_dict
 
-        # lower_bound_alpha = 0.1
-        # # lower_bound_alpha = 0.0
-        # active_decoder_cmap_dict = {k:ColormapHelpers.create_transparent_colormap(color_literal_name=v, lower_bound_alpha=lower_bound_alpha, should_return_LinearSegmentedColormap=True) for k, v in all_decoder_colors_dict.items() if k in active_cmap_names} ## I think `active_decoder_cmap_dict` is what matters
-        # # additional_legend_entries = list(zip(directional_active_lap_pf_results_dicts.keys(), additional_cmap_names.values() )) # ['red', 'purple', 'green', 'orange']
-
-        # ## OUTPUTS: active_cmap_decoder_dict
-        # # drop_below_threshold = 1e-3 # too noisy
-        # # drop_below_threshold = 1e-1 ## too sparse
-        # drop_below_threshold = 1e-3 ## 
-        # extra_all_t_bins_outputs_dict = MultiDecoderColorOverlayedPosteriors.compute_all_time_bin_RGBA(p_x_given_n=p_x_given_n, produce_debug_outputs=False, drop_below_threshold=drop_below_threshold, active_decoder_cmap_dict=active_decoder_cmap_dict)
-        # all_t_bins_final_overlayed_out_RGBA = extra_all_t_bins_outputs_dict['all_t_bins_final_overlayed_out_RGBA']
-        # all_t_bins_per_decoder_out_RGBA = extra_all_t_bins_outputs_dict['all_t_bins_per_decoder_out_RGBA']
-
-        ## OUTPUTS: extra_all_t_bins_outputs_dict, all_t_bins_per_decoder_out_RGBA, all_t_bins_final_overlayed_out_RGBA
-
-
-
+    @function_attributes(short_name=None, tags=['MAIN', 'compute'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-05-12 23:50', related_items=[])
     def compute_all(self):
-        """ computes all """
+        """ computes all 
+        
+        Usage:
+            from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import MultiDecoderColorOverlayedPosteriors
+
+            multi_decoder_color_overlay: MultiDecoderColorOverlayedPosteriors = MultiDecoderColorOverlayedPosteriors(p_x_given_n=p_x_given_n, time_bin_centers=time_bin_centers, xbin=xbin, lower_bound_alpha=0.1, drop_below_threshold=1e-3, t_bin_size=0.025)
+            multi_decoder_color_overlay.compute_all()
+
+        
+        """
         self.p_x_given_n_track_identity_marginal = self.compute_track_ID_marginal(p_x_given_n=self.p_x_given_n)
         self.extra_all_t_bins_outputs_dict_dict['four_decoders'], self.active_colors_dict_dict['four_decoders'] = MultiDecoderColorOverlayedPosteriors.build_four_decoder_version(p_x_given_n=self.p_x_given_n, time_bin_centers=self.time_bin_centers, xbin=self.xbin, lower_bound_alpha=self.lower_bound_alpha, drop_below_threshold=self.drop_below_threshold)
         self.extra_all_t_bins_outputs_dict_dict['two_decoders'], self.active_colors_dict_dict['two_decoders'] = MultiDecoderColorOverlayedPosteriors.build_two_decoder_version(p_x_given_n=self.p_x_given_n, time_bin_centers=self.time_bin_centers, xbin=self.xbin, lower_bound_alpha=self.lower_bound_alpha, drop_below_threshold=self.drop_below_threshold)
         print(f'\done.')
+
+
+    def add_tracks_to_spike_raster_window(self, active_2d_plot, dock_identifier_prefix: str = 'MergedColorPlot'):
+        """ adds two separate tracks to SpikeRaster2D, one for each decoding style (four vs. two) 
+                Each added track is a multi-color context-weighted decoding plot
+                
+        Usage:
+                    
+            multi_decoder_color_overlay: MultiDecoderColorOverlayedPosteriors = MultiDecoderColorOverlayedPosteriors(p_x_given_n=p_x_given_n, time_bin_centers=time_bin_centers, xbin=xbin, lower_bound_alpha=0.1, drop_below_threshold=1e-3, t_bin_size=0.025)
+            multi_decoder_color_overlay.compute_all()
+            _out_display_dict = multi_decoder_color_overlay.add_tracks_to_spike_raster_window(active_2d_plot=active_2d_plot, dock_identifier_prefix='MergedColorPlot')
+
+        
+        """
+
+        _out_display_dict = {}
+        
+        if 'four_decoders' in self.extra_all_t_bins_outputs_dict_dict:
+            a_result_name: str = 'four_decoders'
+            dock_identifier: str = f'{dock_identifier_prefix}-AlphaWeighted-{a_result_name}'
+            _out_tuple = self._perform_add_as_track_to_spike_raster_window(active_2d_plot=active_2d_plot, all_t_bins_final_RGBA=self.extra_all_t_bins_outputs_dict_dict['four_decoders']['all_t_bins_per_decoder_alpha_weighted_RGBA'], time_bin_centers=self.time_bin_centers, xbin=self.xbin, t_bin_size=self.t_bin_size, dock_identifier=dock_identifier)
+            # ts_widget, fig, ax_list, dDisplayItem = _out_tuple
+            _out_display_dict[dock_identifier] = _out_tuple
+
+
+        if 'two_decoders' in self.extra_all_t_bins_outputs_dict_dict:
+            a_result_name: str = 'two_decoders'
+            dock_identifier: str = f'{dock_identifier_prefix}-AlphaWeighted-{a_result_name}'
+            _out_tuple = self._perform_add_as_track_to_spike_raster_window(active_2d_plot=active_2d_plot, all_t_bins_final_RGBA=self.extra_all_t_bins_outputs_dict_dict['two_decoders']['all_t_bins_per_decoder_alpha_weighted_RGBA'], time_bin_centers=self.time_bin_centers, xbin=self.xbin, t_bin_size=self.t_bin_size, dock_identifier=dock_identifier)
+            # ts_widget, fig, ax_list, dDisplayItem = _out_tuple
+            _out_display_dict[dock_identifier] = _out_tuple
+
+        return _out_display_dict
+
 
 
     @classmethod
@@ -365,7 +399,6 @@ class MultiDecoderColorOverlayedPosteriors:
         ## Common:
         all_decoder_colors_dict = {'long': '#4169E1', 'short': '#DC143C', 'long_LR': '#4169E1', 'long_RL': '#607B00', 'short_LR': '#DC143C', 'short_RL': '#990099'} ## Just hardcoded version of `additional_cmap_names`
         
-
         # ==================================================================================================================================================================================================================================================================================== #
         # N_DECODERS == 4 ['long_LR', 'long_RL', 'short_LR', 'short_RL']                                                                                                                                                                                                                       #
         # ==================================================================================================================================================================================================================================================================================== #
@@ -1321,7 +1354,7 @@ class MultiDecoderColorOverlayedPosteriors:
     
     @function_attributes(short_name=None, tags=['track', 'SpikeRaster2D'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-05-06 16:08', related_items=[])
     @classmethod
-    def add_as_track_to_spike_raster_window(cls, active_2d_plot, all_t_bins_final_RGBA, time_bin_centers=None, xbin=None, t_bin_size = 0.05, dock_identifier: str = 'MergedColorPlot'):
+    def _perform_add_as_track_to_spike_raster_window(cls, active_2d_plot, all_t_bins_final_RGBA, time_bin_centers=None, xbin=None, t_bin_size = 0.025, dock_identifier: str = 'MergedColorPlot'):
         """ adds to SpikeRaster2D as a multi-color context-weighted decoding as a track
         
         
@@ -1329,11 +1362,11 @@ class MultiDecoderColorOverlayedPosteriors:
         
             all_t_bins_final_RGBA = extra_all_t_bins_outputs_dict['all_t_bins_final_RGBA']
 
-            ts_widget, fig, ax_list, dDisplayItem = MultiDecoderColorOverlayedPosteriors.add_as_track_to_spike_raster_window(active_2d_plot, all_t_bins_final_RGBA=all_t_bins_final_RGBA, t_bin_size=0.05)
+            ts_widget, fig, ax_list, dDisplayItem = MultiDecoderColorOverlayedPosteriors.add_as_track_to_spike_raster_window(active_2d_plot, all_t_bins_final_RGBA=extra_all_t_bins_outputs_dict['all_t_bins_per_decoder_alpha_weighted_RGBA'], t_bin_size=0.05)
 
         
         """
-        from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import MultiDecoderColorOverlayedPosteriors
+        # from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import MultiDecoderColorOverlayedPosteriors
         from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.SpikeRasterWidgets.Spike2DRaster import SynchronizedPlotMode
 
 
@@ -1345,8 +1378,12 @@ class MultiDecoderColorOverlayedPosteriors:
 
         ## INPUTS: time_bin_centers, all_t_bins_final_RGBA, xbin
         # all_t_bins_final_RGBA.shape # (69488, 59, 4)
-        fig, ax, im_posterior_x = MultiDecoderColorOverlayedPosteriors.plot_mutli_t_bin_RGBA_image(all_t_bins_final_RGBA=all_t_bins_final_RGBA, xbin=xbin, time_bin_centers=time_bin_centers, t_bin_size=t_bin_size, ax=ax)
-        
+        # fig, ax, im_posterior_x = cls.plot_mutli_t_bin_RGBA_image(all_t_bins_final_RGBA=all_t_bins_final_RGBA, xbin=xbin, time_bin_centers=time_bin_centers, t_bin_size=t_bin_size, ax=ax)
+        _out: GenericMatplotlibContainer = cls.plot_mutli_t_bin_p_x_given_n(all_t_bins_final_RGBA, xbin=xbin, time_bin_centers=time_bin_centers, t_bin_size=t_bin_size, ax=ax)
+        fig = _out.fig
+        ax = _out.ax
+        im_posterior_x_dict = _out.plots.im_posterior_x_dict
+
         ## sync up the widgets
         active_2d_plot.sync_matplotlib_render_plot_widget(dock_identifier, sync_mode=SynchronizedPlotMode.TO_WINDOW)
         # active_2d_plot.sync_matplotlib_render_plot_widget(dock_identifier, sync_mode=SynchronizedPlotMode.TO_GLOBAL_DATA)
