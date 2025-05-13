@@ -421,7 +421,7 @@ class Spike2DRaster(SpecificDockWidgetManipulatingMixin, DynamicDockDisplayAreaO
 
     @function_attributes(short_name=None, tags=['original', 'layout'], input_requires=[], output_provides=[], uses=[], used_by=['._buildGraphics'], creation_date='2025-05-12 17:13', related_items=[])
     def _buildGraphics_InternalLayout(self):
-        """ Used only when `use_docked_pyqtgraph_plots == False`
+        """ Called only by `self._buildGraphics() and used only when `use_docked_pyqtgraph_plots == False`
         plots.main_plot_widget: 2D display 
             self.plots.scatter_plot: the active 2D display of the current window
         
@@ -445,43 +445,14 @@ class Spike2DRaster(SpecificDockWidgetManipulatingMixin, DynamicDockDisplayAreaO
         
         self.logger.debug(f'\tSpike2DRaster._buildGraphics_InternalLayout()')
         
-        # # create a splitter
-        # self.ui.main_content_splitter = pg.QtWidgets.QSplitter(0)
-        # self.ui.main_content_splitter.setObjectName('main_content_splitter')
-        # # self.ui.main_content_splitter.setHandleWidth(10)
-        # self.ui.main_content_splitter.setHandleWidth(10)
-        # self.ui.main_content_splitter.setOrientation(0) # pg.Qt.Vertical
-        # # Qt.Horizontal
-
-        # #TODO 2024-12-19 09:18: - [ ] This is where the handles become huge and RED!!
-        # self.ui.main_content_splitter.setStyleSheet("""
-        #         QSplitter::handle {
-        #             background: rgb(255, 0, 4);
-        #         }
-        #         QSplitter::handle:horizontal {
-        #             width: 2px;
-        #         }
-        #         QSplitter::handle:vertical {
-        #             height: 2px;
-        #         }
-        #     """)
-
         ##### Main Raster Plot Content Top ##########
-        
         self.ui.main_graphics_layout_widget = CustomGraphicsLayoutWidget()
         self.ui.main_graphics_layout_widget.setObjectName('main_graphics_layout_widget')
         self.ui.main_graphics_layout_widget.useOpenGL(True)
         self.ui.main_graphics_layout_widget.resize(1000,600)
-        # Add the main widget to the layout in the (0, 0) location:
-        # self.ui.layout.addWidget(self.ui.main_graphics_layout_widget, 0, 0) # add the GLViewWidget to the layout at 0, 0
         
         # add the GLViewWidget to the splitter
         self.ui.main_content_splitter.addWidget(self.ui.main_graphics_layout_widget)
-
-        # self.ui.main_gl_widget.clicked.connect(self.play_pause)
-        # self.ui.main_gl_widget.doubleClicked.connect(self.toggle_full_screen)
-        # self.ui.main_gl_widget.wheel.connect(self.wheel_handler)
-        # self.ui.main_gl_widget.keyPressed.connect(self.key_handler)
         
         #### Build Graphics Objects ##### 
         # Add debugging widget:
@@ -545,14 +516,6 @@ class Spike2DRaster(SpecificDockWidgetManipulatingMixin, DynamicDockDisplayAreaO
         if self.Includes2DActiveWindowScatter:
             self.plots.scatter_plot.addPoints(self.plots_data.all_spots)
     
-        # self.EpochRenderingMixin_on_buildUI()
-        
-        # Add the wrapper_widget to the splitter
-        # self.ui.main_content_splitter.addWidget(self.ui.wrapper_widget)
-        
-        # add the splitter into your layout
-        # self.ui.layout.addWidget(self.ui.main_content_splitter, 0, 0)  # add the splitter to the main layout at 0, 0
-
         self.params.custom_interval_rendering_plots.append(self.plots.background_static_scroll_window_plot)
 
         # custom_interval_rendering_plots = self.params.setdefault('custom_interval_rendering_plots', [self.plots.background_static_scroll_window_plot])
@@ -564,7 +527,7 @@ class Spike2DRaster(SpecificDockWidgetManipulatingMixin, DynamicDockDisplayAreaO
 
     @function_attributes(short_name=None, tags=['docked', 'tracks'], input_requires=[], output_provides=[], uses=[], used_by=['._buildGraphics'], creation_date='2025-05-12 17:13', related_items=[])
     def _buildGraphics_DockedTracksLayout(self):
-            """ Used only when `use_docked_pyqtgraph_plots == True`
+            """ Called only by `self._buildGraphics() and used only when `use_docked_pyqtgraph_plots == True`
             plots.main_plot_widget: 2D display 
                 self.plots.scatter_plot: the active 2D display of the current window
             
@@ -1481,7 +1444,7 @@ class Spike2DRaster(SpecificDockWidgetManipulatingMixin, DynamicDockDisplayAreaO
         
 
     @function_attributes(short_name=None, tags=['matplotlib_render_widget', 'dynamic_ui', 'group_matplotlib_render_plot_widget', 'track'], input_requires=[], output_provides=[], uses=['MatplotlibTimeSynchronizedWidget', 'FigureWidgetDockDisplayConfig'], used_by=[], creation_date='2023-10-17 13:26', related_items=['add_new_embedded_pyqtgraph_render_plot_widget'])
-    def add_new_matplotlib_render_plot_widget(self, row=1, col=0, name='matplotlib_view_widget', dockSize=(500,50), dockAddLocationOpts=['bottom'], display_config:CustomDockDisplayConfig=None, sync_mode:Optional[SynchronizedPlotMode]=None) -> Tuple[MatplotlibTimeSynchronizedWidget, Figure, List[Axis]]:
+    def add_new_matplotlib_render_plot_widget(self, row=1, col=0, name='matplotlib_view_widget', dockSize=(500,50), dockAddLocationOpts=['bottom'], display_config:CustomDockDisplayConfig=None, sync_mode:Optional[SynchronizedPlotMode]=None) -> Tuple[MatplotlibTimeSynchronizedWidget, Figure, List[Axis], Dock]:
         """ creates a new dynamic MatplotlibTimeSynchronizedWidget, a container widget that holds a matplotlib figure, and adds it as a row to the main layout
         
         emit an event so the parent can call `self.update_scrolling_event_filters()` to add the new item
@@ -1644,9 +1607,9 @@ class Spike2DRaster(SpecificDockWidgetManipulatingMixin, DynamicDockDisplayAreaO
                 ## pyqtgraph-based:
                 if include_dock:
                     dock_item = self.find_display_dock(identifier=identifier)
-                    return active_matplotlib_view_widget, active_matplotlib_view_widget.getRootGraphicsLayoutWidget(), active_matplotlib_view_widget.getRootPlotItem()
-                else:
                     return active_matplotlib_view_widget, active_matplotlib_view_widget.getRootGraphicsLayoutWidget(), active_matplotlib_view_widget.getRootPlotItem(), dock_item
+                else:
+                    return active_matplotlib_view_widget, active_matplotlib_view_widget.getRootGraphicsLayoutWidget(), active_matplotlib_view_widget.getRootPlotItem()
             else:
                 raise NotImplementedError(f'active_matplotlib_view_widget: {active_matplotlib_view_widget}')
         else:
@@ -1656,6 +1619,31 @@ class Spike2DRaster(SpecificDockWidgetManipulatingMixin, DynamicDockDisplayAreaO
             else:
                 return None, None, None
 
+
+    @function_attributes(short_name=None, tags=['track', 'pyqtgraph_view_widget', 'matplotlib_render_widget', 'dynamic_ui', 'group_matplotlib_render_plot_widget'], input_requires=[], output_provides=[], uses=['self.find_display_dock'], used_by=[], creation_date='2023-10-17 13:23', related_items=[])
+    def find_track(self, identifier) -> Tuple[Optional[Union[MatplotlibTimeSynchronizedWidget, PyqtgraphTimeSynchronizedWidget]], Any, Any, Optional[Dock]]:
+        """ finds the existing dynamically added widget (independent of the plotting backend used). 
+        returns (widget, fig, ax, dock)
+        
+        """
+        active_widget = self.ui.matplotlib_view_widgets.get(identifier, None)
+        if active_widget is not None:
+            if active_widget.is_matplotlib_based():
+                ## matplotlib-based:
+                dock_item = self.find_display_dock(identifier=identifier)
+                return active_widget, active_widget.getFigure(), active_widget.axes, dock_item # return all axes instead of just the first one
+            
+            elif active_widget.is_pyqtgraph_based():
+                ## pyqtgraph-based:
+                dock_item = self.find_display_dock(identifier=identifier)
+                return active_widget, active_widget.getRootGraphicsLayoutWidget(), active_widget.getRootPlotItem(), dock_item
+
+            else:
+                raise NotImplementedError(f'active_matplotlib_view_widget: {active_widget}')
+        else:
+            print(f'WARNING: active_matplotlib_view_widget with identifier "{identifier}" was not found!')
+            return None, None, None, None
+            
 
     @function_attributes(short_name=None, tags=['matplotlib_render_widget', 'dynamic_ui', 'group_matplotlib_render_plot_widget'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-10-17 13:27', related_items=[])
     def remove_matplotlib_render_plot_widget(self, identifier):
