@@ -330,7 +330,7 @@ class MultiDecoderColorOverlayedPosteriors(ComputedResult):
 
 
     @function_attributes(short_name=None, tags=['MAIN', 'compute'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-05-12 23:50', related_items=[])
-    def compute_all(self):
+    def compute_all(self, compute_four_decoder_version: bool=False):
         """ computes all 
         
         Usage:
@@ -342,7 +342,12 @@ class MultiDecoderColorOverlayedPosteriors(ComputedResult):
         
         """
         self.p_x_given_n_track_identity_marginal = self.compute_track_ID_marginal(p_x_given_n=self.p_x_given_n)
-        self.extra_all_t_bins_outputs_dict_dict['four_decoders'], self.active_colors_dict_dict['four_decoders'] = MultiDecoderColorOverlayedPosteriors.build_four_decoder_version(p_x_given_n=self.p_x_given_n, time_bin_centers=self.time_bin_centers, xbin=self.xbin, lower_bound_alpha=self.lower_bound_alpha, drop_below_threshold=self.drop_below_threshold)
+        if compute_four_decoder_version:
+            self.extra_all_t_bins_outputs_dict_dict['four_decoders'], self.active_colors_dict_dict['four_decoders'] = MultiDecoderColorOverlayedPosteriors.build_four_decoder_version(p_x_given_n=self.p_x_given_n, time_bin_centers=self.time_bin_centers, xbin=self.xbin, lower_bound_alpha=self.lower_bound_alpha, drop_below_threshold=self.drop_below_threshold)
+        else:
+            self.extra_all_t_bins_outputs_dict_dict.pop('four_decoders', None)
+            self.active_colors_dict_dict.pop('four_decoders', None)
+            
         self.extra_all_t_bins_outputs_dict_dict['two_decoders'], self.active_colors_dict_dict['two_decoders'] = MultiDecoderColorOverlayedPosteriors.build_two_decoder_version(p_x_given_n=self.p_x_given_n, time_bin_centers=self.time_bin_centers, xbin=self.xbin, lower_bound_alpha=self.lower_bound_alpha, drop_below_threshold=self.drop_below_threshold)
         print(f'\tdone.')
 
@@ -450,43 +455,12 @@ class MultiDecoderColorOverlayedPosteriors(ComputedResult):
 
         ## INPUTS: all_decoder_colors_dict, active_cmap_names
         active_colors_dict = {k:v for k, v in all_decoder_colors_dict.items() if k in active_cmap_names}
-        # active_colors_dict
-
-        
-        # lower_bound_alpha = 0.0
-        # lower_bound_alpha = 0.1
         active_decoder_cmap_dict = {k:ColormapHelpers.create_transparent_colormap(color_literal_name=v, lower_bound_alpha=lower_bound_alpha, should_return_LinearSegmentedColormap=True) for k, v in all_decoder_colors_dict.items() if k in active_cmap_names}
         # additional_legend_entries = list(zip(directional_active_lap_pf_results_dicts.keys(), additional_cmap_names.values() )) # ['red', 'purple', 'green', 'orange']
 
         ## OUTPUTS: active_cmap_decoder_dict
-        # drop_below_threshold = 1e-3 # too noisy
-        # drop_below_threshold = 1e-1 ## too sparse
-        # drop_below_threshold = 1e-3 ## 
         extra_all_t_bins_outputs_dict = MultiDecoderColorOverlayedPosteriors.compute_all_time_bin_RGBA(p_x_given_n=active_p_x_given_n, produce_debug_outputs=False, drop_below_threshold=drop_below_threshold, active_decoder_cmap_dict=active_decoder_cmap_dict, should_constrain_to_four_decoder=True)
 
-        # # Plot _______________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
-        # ## Build the new dock track:
-        # # dock_identifier: str = 'MergedColorPlot-Matplotlib-Based-Overlay'
-        # dock_identifier: str = 'MergedColorPlot-AlphaWeighted-["all_t_bins_per_decoder_alpha_weighted_RGBA"]'
-        # ts_widget, fig, ax_list, dDisplayItem = active_2d_plot.add_new_matplotlib_render_plot_widget(name=dock_identifier)
-        # ax = ax_list[0]
-        # ax.clear()
-
-        # # all_t_bins_final_overlayed_out_RGBA, all_t_bins_per_decoder_out_RGBA, extra_all_t_bins_outputs_dict
-
-        # ## INPUTS: time_bin_centers, all_t_bins_final_RGBA, xbin
-        # # all_t_bins_final_RGBA.shape # (69488, 59, 4)
-        # # fig, ax, im_posterior_x = MultiDecoderColorOverlayedPosteriors.plot_mutli_t_bin_RGBA_image(all_t_bins_final_RGBA=all_t_bins_final_RGBA, xbin=xbin, time_bin_centers=time_bin_centers, t_bin_size=0.025, ax=ax)
-        # _out: GenericMatplotlibContainer = MultiDecoderColorOverlayedPosteriors.plot_mutli_t_bin_p_x_given_n(extra_all_t_bins_outputs_dict['all_t_bins_per_decoder_alpha_weighted_RGBA'], xbin=xbin, time_bin_centers=time_bin_centers, t_bin_size=0.025, ax=ax)
-        # fig = _out.fig
-        # ax = _out.ax
-        # im_posterior_x_dict = _out.plots.im_posterior_x_dict
-
-        # ## sync up the widgets
-        # active_2d_plot.sync_matplotlib_render_plot_widget(dock_identifier, sync_mode=SynchronizedPlotMode.TO_WINDOW)
-        # # active_2d_plot.sync_matplotlib_render_plot_widget(dock_identifier, sync_mode=SynchronizedPlotMode.TO_GLOBAL_DATA)
-        # fig.canvas.draw()
-        
         return extra_all_t_bins_outputs_dict, active_colors_dict
 
 
@@ -623,106 +597,6 @@ class MultiDecoderColorOverlayedPosteriors(ComputedResult):
         
         return extra_all_t_bins_outputs_dict, active_colors_dict
     
-
-
-    @classmethod
-    def _test_single_t_bin(cls, probability_values: NDArray[ND.Shape["N_POS_BINS, 4"], np.floating], active_decoder_cmap_dict: Optional[Dict]=None, drop_below_threshold: float = 1e-2, produce_debug_outputs:bool=True, color_blend_fn=None):
-        """ 
-        NOTE: COMPLETELY INDEPENDENT/DECOUPLED from `cls.compute_all_time_bins` (copy/paste synchronized)
-        
-        Usage:
-        
-        
-            probability_values: NDArray[ND.Shape["N_POS_BINS, 4"], np.floating] = deepcopy(p_x_given_n[:, :, a_t_bin_idx])
-            decoder_alphas = np.nansum(p_x_given_n, axis=0) # .shape (4, n_t_bins)
-
-            final_overlayed_single_t_bin_out_RGBA, single_t_bin_out_RGBA, probability_values, _pre_norm_prob_vals, _all_normed_prob_vals = MultiDecoderColorOverlayedPosteriors._test_single_t_bin(probability_values=probability_values, active_decoder_cmap_dict=active_decoder_cmap_dict)
-            final_overlayed_single_t_bin_out_RGBA # (n_pos_bins, 4) - 4 for RGBA
-
-        """
-        if color_blend_fn is None:
-            # color_blend_fn = cls.composite_multiplied_alpha
-            color_blend_fn = cls.composite_over
-
-
-        if active_decoder_cmap_dict is None:
-            from pyphoplacecellanalysis.General.Model.Configs.LongShortDisplayConfig import DecoderIdentityColors, long_short_display_config_manager, apply_LR_to_RL_adjustment
-            from pyphocorehelpers.gui.Qt.color_helpers import ColorFormatConverter, debug_print_color, build_adjusted_color
-            from pyphocorehelpers.gui.Qt.color_helpers import ColormapHelpers
-            import numpy as np, matplotlib.pyplot as plt, matplotlib as mpl
-
-
-            decoder_names_to_idx_map: Dict[int, types.DecoderName] = {0: 'long_LR', 1: 'long_RL', 2: 'short_LR', 3: 'short_RL'}
-            color_dict: Dict[types.DecoderName, pg.QtGui.QColor] = DecoderIdentityColors.build_decoder_color_dict(wants_hex_str=False)
-            additional_cmap_names: Dict[types.DecoderName, str] = {k: ColorFormatConverter.qColor_to_hexstring(v) for k, v in color_dict.items()}
-            # additional_cmap_names = {'long_LR': '#4169E1', 'long_RL': '#607B00', 'short_LR': '#DC143C', 'short_RL': '#990099'} ## Just hardcoded version of `additional_cmap_names`
-            active_decoder_cmap_dict = {k:ColormapHelpers.create_transparent_colormap(color_literal_name=v, lower_bound_alpha=0.1, should_return_LinearSegmentedColormap=True) for k, v in additional_cmap_names.items()}
-
-
-
-        probability_values: NDArray[ND.Shape["N_POS_BINS, 4"], np.floating] = deepcopy(probability_values)
-        n_pos_bins, n_decoders = np.shape(probability_values)
-        assert n_decoders == 4, f"n_decoders: {n_decoders}"
-
-        _pre_norm_prob_vals = None
-        _all_normed_prob_vals = None
-        _realphaed_single_t_bin_out_RGBA = None
-        
-        if produce_debug_outputs:
-            _pre_norm_prob_vals = deepcopy(probability_values)
-
-        # DEBUGONLY __________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
-        if produce_debug_outputs:
-            ## normalize over (decoder, position)
-            sum_over_all_decoder_pos_values: float = np.nansum(_pre_norm_prob_vals, axis=(0, 1)) # sum over pos
-            print(f'sum_over_all_decoder_pos_values: {sum_over_all_decoder_pos_values}')
-            _all_normed_prob_vals = _pre_norm_prob_vals / sum_over_all_decoder_pos_values ## normalize
-
-        ## normalize over decoder
-        sum_over_all_pos_values: NDArray[ND.Shape["4"], np.floating] = np.nansum(probability_values, axis=0) # sum over pos
-        if produce_debug_outputs:
-            print(f'sum_over_all_pos_values: {sum_over_all_pos_values}')
-            
-        decoder_alphas = sum_over_all_pos_values.copy()
-        print(f'decoder_alphas: {decoder_alphas}')
-        # sum_over_all_values: NDArray[ND.Shape["4, "], np.floating] = np.nansum(probability_values, axis=0)
-        probability_values = probability_values / sum_over_all_pos_values ## normalize over decoder
-
-        ## OUT: probability_values
-        ## INPUTS: probability_values (n_pos_bins, 4)
-        single_t_bin_out_RGBA = np.zeros((n_pos_bins, 4, 4))
-        final_overlayed_single_t_bin_out_RGBA = np.zeros((n_pos_bins, 4)) 
-
-        ## pre-plotting only: mask the tiny values:
-        probability_values = cls._prepare_arr_for_conversion_to_RGBA(probability_values, drop_below_threshold=drop_below_threshold)
-
-        ## for each decoder:
-        for i, (a_decoder_name, a_cmap) in enumerate(active_decoder_cmap_dict.items()):
-            if produce_debug_outputs:
-                # print(f'i: {i}, a_decoder_name: {a_decoder_name}')
-                pass
-
-            data = probability_values[:, i]
-            # ignore NaNs when finding data range
-            norm = mpl.colors.Normalize(vmin=np.nanmin(data), vmax=np.nanmax(data))
-            # mask the NaNs so the cmap knows to use the “bad” color
-            masked = np.ma.masked_invalid(data)
-            rgba = a_cmap(norm(masked)) # rgba.shape (n_pos_bins, 4) # the '4' here is for RGBA, not the decoders, RGB per bin
-            # rgb = rgba[..., :3] 
-            single_t_bin_out_RGBA[:, i, :] = rgba
-            
-            # all_t_bins_out_RGBA[a_t_bin_idx, :, i, :] = rgba
-            
-        ## compute the final merged color
-        if produce_debug_outputs:
-            _realphaed_single_t_bin_out_RGBA = (deepcopy(single_t_bin_out_RGBA) * decoder_alphas[None, :, None]) # (n_pos_bins, 4, 4)
-        # final_overlayed_single_t_bin_out_RGBA = np.nansum(_realphaed_single_t_bin_out_RGBA, axis=1) # (n_pos_bins, 4)
-        final_overlayed_single_t_bin_out_RGBA = color_blend_fn(single_t_bin_out_RGBA, decoder_alphas=decoder_alphas) # (n_pos_bins, 4, 4)
-        # final_overlayed_single_t_bin_out_RGBA = np.nansum((single_t_bin_out_RGBA * decoder_alphas[None, :, None]), axis=1)  # shape (3,)
-        print(f'final_overlayed_single_t_bin_out_RGBA.shape: {final_overlayed_single_t_bin_out_RGBA.shape}')
-        # final_overlayed_single_t_bin_out_RGBA = 
-
-        return final_overlayed_single_t_bin_out_RGBA, single_t_bin_out_RGBA, _realphaed_single_t_bin_out_RGBA, probability_values, _pre_norm_prob_vals, _all_normed_prob_vals
 
 
     @function_attributes(short_name=None, tags=['MAIN', 'all_t'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-05-04 18:00', related_items=[])
@@ -915,14 +789,18 @@ class MultiDecoderColorOverlayedPosteriors(ComputedResult):
 
     @classmethod
     def composite_multiplied_alpha(cls, single_t_bin_out_RGBA, decoder_alphas):
-        """ final_overlayed_single_t_bin_out_RGBA = composite_multiplied_alpha(single_t_bin_out_RGBA=single_t_bin_out_RGBA) """
+        """ Attempts to compute the final overlayed/merged color across decoders (so there's only a single value for all decoders)
+        Usage:
+            final_overlayed_single_t_bin_out_RGBA = composite_multiplied_alpha(single_t_bin_out_RGBA=single_t_bin_out_RGBA)
+        """
         # out_rgb = np.zeros(3)
         return np.nansum((single_t_bin_out_RGBA * decoder_alphas[None, :, None]), axis=1) # (n_pos_bins, 4)
 
 
     @classmethod
     def composite_over(cls, single_t_bin_out_RGBA, decoder_alphas):
-        """
+        """ Attempts to compute the final overlayed/merged color across decoders (so there's only a single value for all decoders)
+        
         single_t_bin_out_RGBA: (n_pos_bins, n_decoders, 4)
         decoder_alphas: (n_decoders,)
         Returns: (n_pos_bins, 4)
@@ -1063,7 +941,7 @@ class MultiDecoderColorOverlayedPosteriors(ComputedResult):
         
         return center_rgba
 
-    @function_attributes(short_name=None, tags=['DEPRICATED'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-05-06 19:34', related_items=[])
+    @function_attributes(short_name=None, tags=['DEPRICATED', 'UNUSED', 'DEBUGGING'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-05-06 19:34', related_items=[])
     @classmethod
     def _plot_single_t_bin_images(cls, fig_num=None, debug_print=True, **kwargs):
         """ plots debugging plots for this data
@@ -1151,10 +1029,11 @@ class MultiDecoderColorOverlayedPosteriors(ComputedResult):
 
     ## INPUTS: extra_all_t_bins_outputs_dict
 
-    @function_attributes(short_name=None, tags=['plot', 'alt', 'WORKING'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-05-06 19:02', related_items=[])
+    @function_attributes(short_name=None, tags=['plot', 'alt', 'WORKING', 'per_decoder'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-05-06 19:02', related_items=[])
     @classmethod
-    def plot_mutli_t_bin_p_x_given_n(cls, all_t_bins_per_decoder_out_RGBA: NDArray, time_bin_centers=None, xbin=None, t_bin_size = 0.05, ax=None, use_original_bounds=False) -> GenericMatplotlibContainer:
-        """ plots a portion of the color-merged result onto a matplotlib axes 
+    def plot_mutli_t_bin_p_x_given_n_per_decoder(cls, all_t_bins_per_decoder_out_RGBA: NDArray, time_bin_centers=None, xbin=None, t_bin_size = 0.05, ax=None, use_original_bounds=False) -> GenericMatplotlibContainer:
+        """ plots the *per_decoder* result onto a single matplotlib axes by iterating over the decoders and using matplotlib's built-in overlay/composition (which works better than the manual attempt used in `plot_mutli_t_bin_RGBA_image`)
+        
 
         Working! Uses a single matplotlib ax to draw `n_decoders` images on top of each other by calling `imshow` sequentially.
         
@@ -1250,10 +1129,12 @@ class MultiDecoderColorOverlayedPosteriors(ComputedResult):
         # return fig, ax, _out.plots.im_posterior_x_dict
         return _out
 
-    @function_attributes(short_name=None, tags=['plot', 'matplotlib'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-05-04 00:00', related_items=[])
+
+
+    @function_attributes(short_name=None, tags=['plot', 'matplotlib', 'RGBA_image'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-05-04 00:00', related_items=[])
     @classmethod
     def plot_mutli_t_bin_RGBA_image(cls, all_t_bins_final_RGBA, time_bin_centers=None, xbin=None, start_t_bin_idx: int = 0, desired_n_seconds: Optional[float] = None, t_bin_size = 0.05, ax=None, use_original_bounds=False):
-        """ plots a portion of the color-merged result onto a matplotlib axes 
+        """ plots a portion of the color-merged *RGBA_image* onto a matplotlib axes 
 
         Usage:        
             from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import MultiDecoderColorOverlayedPosteriors
@@ -1267,9 +1148,6 @@ class MultiDecoderColorOverlayedPosteriors(ComputedResult):
             fig, ax, im_posterior_x = MultiDecoderColorOverlayedPosteriors.plot_mutli_t_bin_RGBA_image(all_t_bins_final_RGBA=all_t_bins_per_decoder_out_RGBA, start_t_bin_idx=start_t_bin_idx, desired_n_seconds=desired_n_seconds, t_bin_size=0.05, ax=ax)
             plt.show()
 
-
-        
-        
         """
         from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError import _subfn_try_get_approximate_recovered_t_pos
         
@@ -1394,7 +1272,7 @@ class MultiDecoderColorOverlayedPosteriors(ComputedResult):
 
 
     
-    @function_attributes(short_name=None, tags=['track', 'SpikeRaster2D'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-05-06 16:08', related_items=[])
+    @function_attributes(short_name=None, tags=['track', 'SpikeRaster2D', 'private'], input_requires=[], output_provides=[], uses=['.plot_mutli_t_bin_p_x_given_n'], used_by=[], creation_date='2025-05-06 16:08', related_items=[])
     @classmethod
     def _perform_add_as_track_to_spike_raster_window(cls, active_2d_plot, all_t_bins_final_RGBA, time_bin_centers=None, xbin=None, t_bin_size = 0.025, dock_identifier: str = 'MergedColorPlot'):
         """ adds to SpikeRaster2D as a multi-color context-weighted decoding as a track
@@ -1421,7 +1299,7 @@ class MultiDecoderColorOverlayedPosteriors(ComputedResult):
         ## INPUTS: time_bin_centers, all_t_bins_final_RGBA, xbin
         # all_t_bins_final_RGBA.shape # (69488, 59, 4)
         # fig, ax, im_posterior_x = cls.plot_mutli_t_bin_RGBA_image(all_t_bins_final_RGBA=all_t_bins_final_RGBA, xbin=xbin, time_bin_centers=time_bin_centers, t_bin_size=t_bin_size, ax=ax)
-        _out: GenericMatplotlibContainer = cls.plot_mutli_t_bin_p_x_given_n(all_t_bins_final_RGBA, xbin=xbin, time_bin_centers=time_bin_centers, t_bin_size=t_bin_size, ax=ax)
+        _out: GenericMatplotlibContainer = cls.plot_mutli_t_bin_p_x_given_n_per_decoder(all_t_bins_final_RGBA, xbin=xbin, time_bin_centers=time_bin_centers, t_bin_size=t_bin_size, ax=ax)
         fig = _out.fig
         ax = _out.ax
         im_posterior_x_dict = _out.plots.im_posterior_x_dict

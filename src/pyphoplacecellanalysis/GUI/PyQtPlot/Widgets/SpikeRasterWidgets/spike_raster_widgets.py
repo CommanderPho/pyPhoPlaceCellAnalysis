@@ -74,6 +74,9 @@ def _setup_spike_raster_window_for_debugging(spike_raster_window, wants_docked_r
     """
     import pyphoplacecellanalysis.External.pyqtgraph as pg
     
+    is_docked_pyqtgraph_plots_mode: bool = spike_raster_window.params.use_docked_pyqtgraph_plots
+
+
     _all_outputs_dict = {}
     
     omit_menu_item_names = ['Debug.MenuDebug', 'DockedWidgets.MenuDockedWidgets', ] # maybe , 'CreateNewConnectedWidget.MenuCreateNewConnectedWidget'
@@ -86,6 +89,14 @@ def _setup_spike_raster_window_for_debugging(spike_raster_window, wants_docked_r
     active_2d_plot = spike_raster_window.spike_raster_plt_2d
     wrapper_layout: pg.QtWidgets.QVBoxLayout = active_2d_plot.ui.wrapper_layout
     layout = active_2d_plot.ui.layout
+    
+    _all_outputs_dict.update(**dict(#preview_overview_scatter_plot=preview_overview_scatter_plot, 
+                                    #main_graphics_layout_widget=main_graphics_layout_widget, main_content_splitter=main_content_splitter, active_window_container_layout=active_window_container_layout,
+                                    wrapper_layout=wrapper_layout, layout=layout))
+    
+
+
+    # Non-common (many of these used only in `is_docked_pyqtgraph_plots_mode == True` mode _______________________________________________________________________________________________________________________________________________________________________________________________ #
     
     # main_content_splitter = active_2d_plot.ui.main_content_splitter # QSplitter
     main_content_splitter = active_2d_plot.ui.get('main_content_splitter', None) # QSplitter
@@ -122,9 +133,6 @@ def _setup_spike_raster_window_for_debugging(spike_raster_window, wants_docked_r
         _all_outputs_dict['background_static_scroll_window_plot'] = background_static_scroll_window_plot
 
 
-    _all_outputs_dict.update(**dict(#preview_overview_scatter_plot=preview_overview_scatter_plot, 
-                                    #main_graphics_layout_widget=main_graphics_layout_widget, main_content_splitter=main_content_splitter, active_window_container_layout=active_window_container_layout,
-                                    wrapper_layout=wrapper_layout, layout=layout))
     
 
     should_replace_hardcoded_main_plots_with_tracks: bool = False
@@ -173,6 +181,9 @@ def _setup_spike_raster_window_for_debugging(spike_raster_window, wants_docked_r
         _raster_tracks_out_dict = active_2d_plot.prepare_pyqtgraph_rasterPlot_track(name_modifier_suffix='raster_window', should_link_to_main_plot_widget=has_main_raster_plot)
         _all_outputs_dict['_raster_tracks_out_dict'] = _raster_tracks_out_dict
 
+
+
+
     # Add Renderables ____________________________________________________________________________________________________ #
     # add_renderables_menu = active_2d_plot.ui.menus.custom_context_menus.add_renderables[0].programmatic_actions_dict
     menu_commands = ['AddTimeIntervals.Replays', 'AddTimeIntervals.Laps', 'AddTimeIntervals.SessionEpochs'] # , 'AddTimeIntervals.SessionEpochs', 'AddTimeIntervals.PBEs', 'AddTimeIntervals.Ripples',
@@ -190,7 +201,7 @@ def _setup_spike_raster_window_for_debugging(spike_raster_window, wants_docked_r
 
 
     menu_commands = [
-        # 'AddTimeCurves.Position', ## 2025-03-11 02:32 Running this too soon after launching the window causes weird black bars on the top and bottom of the window
+        'AddTimeCurves.Position', ## 2025-03-11 02:32 Running this too soon after launching the window causes weird black bars on the top and bottom of the window
         # 'DockedWidgets.LongShortDecodedEpochsDockedMatplotlibView',
         # 'DockedWidgets.DirectionalDecodedEpochsDockedMatplotlibView',
         # 'DockedWidgets.TrackTemplatesDecodedEpochsDockedMatplotlibView',

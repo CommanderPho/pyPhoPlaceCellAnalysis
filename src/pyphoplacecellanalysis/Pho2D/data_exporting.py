@@ -331,7 +331,7 @@ class PosteriorExporting:
         return marginal_dir_tuple, marginal_track_identity_tuple, marginal_dir_point_tuple, marginal_track_identity_point_tuple, _out_save_tuples
         
 
-    @function_attributes(short_name=None, tags=['export','marginal', 'pseudo2D', 'IMPORTANT'], input_requires=[], output_provides=[], uses=['save_posterior'], used_by=[], creation_date='2024-09-10 00:06', related_items=[])
+    @function_attributes(short_name=None, tags=['export','marginal', 'pseudo2D', 'IMPORTANT'], input_requires=[], output_provides=[], uses=['.save_posterior'], used_by=['_test_export_marginals_for_figure'], creation_date='2024-09-10 00:06', related_items=[])
     @classmethod
     def save_marginals_arrays_as_image(cls, directional_merged_decoders_result: DirectionalPseudo2DDecodersResult, parent_array_as_image_output_folder: Path, epoch_id_identifier_str: str = 'ripple', epoch_ids=None, export_all_raw_marginals_separately: bool=True, include_value_labels:bool=False, allow_override_aspect_ratio:bool=True, debug_print=False):
         """ Exports all the raw_merged pseudo2D posteriors and their marginals out to image files.
@@ -503,7 +503,7 @@ class PosteriorExporting:
                 
         
     @classmethod
-    @function_attributes(short_name=None, tags=['MAIN', 'export', 'images', 'ESSENTIAL'], input_requires=[], output_provides=[], uses=['export_decoded_posteriors_as_images'], used_by=[], creation_date='2024-08-28 08:36', related_items=[])
+    @function_attributes(short_name=None, tags=['MAIN', 'export', 'images', 'ESSENTIAL'], input_requires=[], output_provides=[], uses=['.export_decoded_posteriors_as_images'], used_by=['_display_directional_merged_pf_decoded_stacked_epoch_slices'], creation_date='2024-08-28 08:36', related_items=[])
     def perform_export_all_decoded_posteriors_as_images(cls, decoder_laps_filter_epochs_decoder_result_dict: Dict[types.DecoderName, DecodedFilterEpochsResult], decoder_ripple_filter_epochs_decoder_result_dict: Dict[types.DecoderName, DecodedFilterEpochsResult],
                                                          _save_context: IdentifyingContext, parent_output_folder: Path, custom_export_formats: Optional[Dict[str, HeatmapExportConfig]]=None, desired_height=None, combined_img_padding=4, combined_img_separator_color=None):
         """ Exports the decoded epoch position posteriors as raw images, also includes functionality to export merged/combined images.
@@ -954,7 +954,7 @@ class PosteriorExporting:
     # Other/Testing                                                                                                        #
     # ==================================================================================================================== #
 
-
+    @function_attributes(short_name=None, tags=['export', 'images', 'marginals', 'testing'], input_requires=[], output_provides=[], uses=['.save_marginals_arrays_as_image'], used_by=['_perform_export_current_epoch_marginal_and_raster_images'], creation_date='2025-05-13 19:45', related_items=[])
     @classmethod
     def _test_export_marginals_for_figure(cls, directional_merged_decoders_result: DirectionalPseudo2DDecodersResult, filtered_decoder_filter_epochs_decoder_result_dict: Dict[str, DecodedFilterEpochsResult], clicked_epoch: NDArray, context_specific_root_export_path: Path, epoch_specific_folder: Path,
                                            epoch_id_identifier_str='ripple', debug_print=True, allow_override_aspect_ratio:bool=True, **kwargs):
