@@ -478,9 +478,9 @@ class SingleEpochDecodedResult(HDF_SerializationMixin, AttrsBasedClassHelperMixi
 
 
 
-    @function_attributes(short_name=None, tags=['image', 'multi-color-decoder-overlay', 'MultiDecoderColorOverlayedPosteriors'], input_requires=[], output_provides=[], uses=['MultiDecoderColorOverlayedPosteriors'], used_by=[], creation_date='2025-05-14 02:21', related_items=[])    
-    def build_multi_decoder_color_overlay_image(self, spikes_df: pd.DataFrame, xbin: NDArray[ND.Shape["N_POS_BINS"], np.floating], lower_bound_alpha=0.0, drop_below_threshold=1e-3, t_bin_size=0.025, desired_height=None, desired_width=None, **kwargs):
-        """ Builds the RGBA output image for the multi-color decoder overlay.
+    @function_attributes(short_name=None, tags=['image', 'multi-color-decoder-overlay', 'MultiDecoderColorOverlayedPosteriors'], input_requires=[], output_provides=[], uses=['MultiDecoderColorOverlayedPosteriors'], used_by=['.build_multi_decoder_color_overlay_image', '.save_posterior_as_image'], creation_date='2025-05-14 02:21', related_items=[])    
+    def _perform_build_multi_decoder_color_overlay_image_data(self, spikes_df: pd.DataFrame, xbin: NDArray[ND.Shape["N_POS_BINS"], np.floating], lower_bound_alpha=0.0, drop_below_threshold=1e-3, t_bin_size=0.025, **kwargs):
+        """ Builds the RGBA output NDArray img_data for the multi-color decoder overlay (that will be built into a PIL.Image object later).
         
         
         global_decoded_result: SingleEpochDecodedResult = a_result.get_result_for_epoch(0)
@@ -491,8 +491,8 @@ class SingleEpochDecodedResult(HDF_SerializationMixin, AttrsBasedClassHelperMixi
         
         """
         from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import MultiDecoderColorOverlayedPosteriors
-        from pyphocorehelpers.plotting.media_output_helpers import save_array_as_image, get_array_as_image, get_array_as_image_stack
-        from pyphoplacecellanalysis.Pho2D.data_exporting import HeatmapExportKind
+        # from pyphocorehelpers.plotting.media_output_helpers import save_array_as_image, get_array_as_image, get_array_as_image_stack
+        # from pyphoplacecellanalysis.Pho2D.data_exporting import HeatmapExportKind
 
         
         ## INPUTS: global_decoded_result, xbin
@@ -507,11 +507,46 @@ class SingleEpochDecodedResult(HDF_SerializationMixin, AttrsBasedClassHelperMixi
         img_data: NDArray[ND.Shape["N_TIME_BINS, N_POS_BINS, 4"], np.floating] = multi_decoder_color_overlay.extra_all_t_bins_outputs_dict_dict['two_decoders']['all_t_bins_final_overlayed_out_RGBA'].astype(float) # (69488, 59, 4)
         
         img_data = np.transpose(img_data, axes=(1, 0, 2)) # Convert to (H, W, 4)
+        return img_data.astype(float), multi_decoder_color_overlay
+
+
+
+    @function_attributes(short_name=None, tags=['image', 'multi-color-decoder-overlay', 'MultiDecoderColorOverlayedPosteriors'], input_requires=[], output_provides=[], uses=['._perform_build_multi_decoder_color_overlay_image_data'], used_by=[], creation_date='2025-05-14 02:21', related_items=[])    
+    def build_multi_decoder_color_overlay_image(self, spikes_df: pd.DataFrame, xbin: NDArray[ND.Shape["N_POS_BINS"], np.floating], lower_bound_alpha=0.0, drop_below_threshold=1e-3, t_bin_size=0.025, desired_height=None, desired_width=None, **kwargs):
+        """ Builds the final PIL.Image RGBA output image for the multi-color decoder overlay.
+        
+        
+        global_decoded_result: SingleEpochDecodedResult = a_result.get_result_for_epoch(0)
+        # xbin: NDArray[ND.Shape["N_POS_BINS"], np.floating] = deepcopy(a_decoder.xbin)
+        
+        _out_img, multi_decoder_color_overlay = global_decoded_result.build_multi_decoder_color_overlay_image(spikes_df=deepcopy(get_proper_global_spikes_df(curr_active_pipeline)), xbin=deepcopy(a_decoder.xbin))
+        
+        
+        """
+        from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import MultiDecoderColorOverlayedPosteriors
+        from pyphocorehelpers.plotting.media_output_helpers import save_array_as_image, get_array_as_image, get_array_as_image_stack
+        from pyphoplacecellanalysis.Pho2D.data_exporting import HeatmapExportKind
+
+        
+        # ## INPUTS: global_decoded_result, xbin
+        # p_x_given_n: NDArray[ND.Shape["N_POS_BINS, 4, N_TIME_BINS"], np.floating] = deepcopy(self.p_x_given_n) # .shape # (59, 4, 69488)
+        # time_bin_centers: NDArray[ND.Shape["N_TIME_BINS"], np.floating] = deepcopy(self.time_bin_container.centers)
+
+        # # with VizTracer(output_file=f"viztracer_{get_now_time_str()}-MultiDecoderColorOverlayedPosteriors.json", min_duration=200, tracer_entries=3000000, ignore_frozen=True) as tracer:
+        # multi_decoder_color_overlay: MultiDecoderColorOverlayedPosteriors = MultiDecoderColorOverlayedPosteriors(spikes_df=spikes_df, p_x_given_n=p_x_given_n, time_bin_centers=time_bin_centers, xbin=xbin, lower_bound_alpha=lower_bound_alpha, drop_below_threshold=drop_below_threshold, t_bin_size=t_bin_size)
+        # multi_decoder_color_overlay.compute_all() ## single compute
+        
+        # img_data: NDArray[ND.Shape["N_TIME_BINS, N_POS_BINS, 4"], np.floating] = multi_decoder_color_overlay.extra_all_t_bins_outputs_dict_dict['two_decoders']['all_t_bins_final_overlayed_out_RGBA'].astype(float) # (69488, 59, 4)
+        
+        # img_data = np.transpose(img_data, axes=(1, 0, 2)) # Convert to (H, W, 4)
+        
+        img_data, multi_decoder_color_overlay = self._perform_build_multi_decoder_color_overlay_image_data(spikes_df=spikes_df, xbin=xbin, lower_bound_alpha=lower_bound_alpha, drop_below_threshold=drop_below_threshold, t_bin_size=t_bin_size)
+        
         kwargs = {}
         desired_height = 400
         desired_width = None
         skip_img_normalization = True
-        _out_img: NDArray[ND.Shape["IM_HEIGHT, IM_WIDTH, 4"], np.floating] = get_array_as_image(img_data, desired_height=desired_height, desired_width=desired_width, skip_img_normalization=skip_img_normalization, export_kind=HeatmapExportKind.RAW_RGBA, **kwargs)
+        _out_img = get_array_as_image(img_data, desired_height=desired_height, desired_width=desired_width, skip_img_normalization=skip_img_normalization, export_kind=HeatmapExportKind.RAW_RGBA, **kwargs) # Image.Image - NDArray[ND.Shape["IM_HEIGHT, IM_WIDTH, 4"], np.floating]
         
         return _out_img, multi_decoder_color_overlay
 
@@ -575,7 +610,8 @@ class SingleEpochDecodedResult(HDF_SerializationMixin, AttrsBasedClassHelperMixi
 
         """
         from pyphocorehelpers.plotting.media_output_helpers import save_array_as_image
-
+        from pyphoplacecellanalysis.Pho2D.data_exporting import HeatmapExportKind
+        
         if isinstance(parent_array_as_image_output_folder, str):
             parent_array_as_image_output_folder = Path(parent_array_as_image_output_folder).resolve()
             
@@ -610,10 +646,8 @@ class SingleEpochDecodedResult(HDF_SerializationMixin, AttrsBasedClassHelperMixi
             # t_bin_size = kwargs.pop('t_bin_size', 0.025)
 
             # _out_img, multi_decoder_color_overlay = self.build_multi_decoder_color_overlay_image(spikes_df=deepcopy(get_proper_global_spikes_df(curr_active_pipeline)), xbin=deepcopy(a_decoder.xbin), lower_bound_alpha=lower_bound_alpha, drop_below_threshold=drop_below_threshold, t_bin_size=t_bin_size)
-            _out_img, multi_decoder_color_overlay = self.build_multi_decoder_color_overlay_image(**raw_RGBA_only_parameters)
-
-            # build_multi_decoder_color_overlay_image
-            img_data = _out_img.astype(float)  # .shape: (4, n_curr_epoch_time_bins) - (63, 4, 120)
+            # _out_img, multi_decoder_color_overlay = self.build_multi_decoder_color_overlay_image(**raw_RGBA_only_parameters)
+            img_data, multi_decoder_color_overlay = self._perform_build_multi_decoder_color_overlay_image_data(**raw_RGBA_only_parameters) # .shape: (4, n_curr_epoch_time_bins) - (400, 454, 4)
         
         else:
             img_data = self.p_x_given_n.astype(float)  # .shape: (4, n_curr_epoch_time_bins) - (63, 4, 120)
