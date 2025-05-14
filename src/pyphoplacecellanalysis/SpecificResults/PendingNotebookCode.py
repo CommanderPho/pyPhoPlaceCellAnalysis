@@ -118,7 +118,7 @@ from neuropy.utils.matplotlib_helpers import draw_epoch_regions
 
 
 
-@function_attributes(short_name=None, tags=['track'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-05-06 16:08', related_items=[])
+@function_attributes(short_name=None, tags=['track', 'hairy', 'plot', 'figure', 'matplotlib'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-05-06 16:08', related_items=[])
 def add_hairy_plot(active_2d_plot, curr_active_pipeline, a_decoded_marginal_posterior_df):
     """ adds a hiary plot the SpikeRaster2D's timeline as a track
     
@@ -1579,7 +1579,7 @@ def _subfn_helper_process_epochs_result_dict(epochs_result_dict: Dict[types.Know
     return epoch_name_by_pre_post_delta_category_output_dict_dict
 
 
-@function_attributes(short_name=None, tags=['position'], input_requires=[], output_provides=[], uses=['_subfn_helper_process_epochs_result_dict'], used_by=[], creation_date='2025-05-02 12:54', related_items=[])
+@function_attributes(short_name=None, tags=['position', 'debug', 'plot'], input_requires=[], output_provides=[], uses=['_subfn_helper_process_epochs_result_dict'], used_by=[], creation_date='2025-05-02 12:54', related_items=[])
 def build_decoder_prob_as_a_function_of_position(epochs_result_dict: Dict[types.KnownNamedDecodingEpochsType, DecodedFilterEpochsResult], xbin_centers, t_delta: float, grid_bin_bounds=None, is_split_by_all_decoders:bool = True, debug_print=False,
                                                  enable_per_decoder_renormalization: bool=True, enable_per_position_bin_renormalization: bool=False, enable_LS_renormalization: bool=False):
     """ Plots the Decoder Context Probability as a function of position (split by pre/post-delta, decoded epochs) to check for bias of certain positions to decode to certain decoder-context (like the right-long endcap region might have a strong bias towards 'long_LR' pre-delta.)
@@ -3220,6 +3220,7 @@ def filtered_by_frate_and_qclu(curr_active_pipeline, desired_qclu_subset=[1, 2],
 # Pre 2025-02-27                                                                                                       #
 # ==================================================================================================================== #
 
+@function_attributes(short_name=None, tags=['USEFUL', 'unused', 'debug', 'visualizztion'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-05-14 14:01', related_items=[])
 def plot_attached_BinByBinDecodingDebugger(spike_raster_window, curr_active_pipeline, a_decoder: BasePositionDecoder, a_decoded_result: Union[DecodedFilterEpochsResult, SingleEpochDecodedResult]):
     """ 
     

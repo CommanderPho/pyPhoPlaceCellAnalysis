@@ -7958,7 +7958,9 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
     def _display_directional_merged_pf_decoded_epochs(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, save_figure=True, included_any_context_neuron_ids=None,
                                                     single_plot_fixed_height=50.0, max_num_lap_epochs: int = 25, max_num_ripple_epochs: int = 45, size=(15,7), dpi=72, constrained_layout=True, scrollable_figure=True,
                                                     skip_plotting_measured_positions=True, skip_plotting_most_likely_positions=True, **kwargs):
-            """ Renders two windows, one with the decoded laps and another with the decoded ripple posteriors, computed using the merged pseudo-2D decoder.
+            """ Renders the marignal posteriors as a yellow-blue plot for trackID
+
+            Renders two windows, one with the decoded laps and another with the decoded ripple posteriors, computed using the merged pseudo-2D decoder.
 
             """
             from neuropy.utils.mixins.time_slicing import TimeColumnAliasesProtocol
