@@ -542,7 +542,22 @@ class SingleEpochDecodedResult(HDF_SerializationMixin, AttrsBasedClassHelperMixi
         else:
             epoch_id_str = f"{epoch_id_identifier_str}"
 
-        img_data = self.p_x_given_n.astype(float)  # .shape: (4, n_curr_epoch_time_bins) - (63, 4, 120)
+        
+        # `raw_RGBA_only_parameters` dict with keys: ['spikes_df', 'xbin', 'lower_bound_alpha', 'drop_below_threshold', 't_bin_size']
+        raw_RGBA_only_parameters = kwargs.pop('raw_RGBA_only_parameters', {})
+
+        if export_kind.value == HeatmapExportKind.RAW_RGBA.value:
+            ## check values in `raw_RGBA_only_parameters`:
+            required_keys = ['spikes_df', 'xbin', 'lower_bound_alpha', 'drop_below_threshold', 't_bin_size']
+            assert np.all([k in raw_RGBA_only_parameters.keys() for k in required_keys]), f"missing required keys:\n\tequired_keys: {required_keys}\n\tlist(raw_RGBA_only_parameters.keys()): {list(raw_RGBA_only_parameters.keys())}\n"
+            # build_multi_decoder_color_overlay_image
+            _out_img, multi_decoder_color_overlay = self.build_multi_decoder_color_overlay_image(**raw_RGBA_only_parameters)
+            img_data = _out_img.astype(float)  # .shape: (4, n_curr_epoch_time_bins) - (63, 4, 120)
+        
+        else:
+            img_data = self.p_x_given_n.astype(float)  # .shape: (4, n_curr_epoch_time_bins) - (63, 4, 120)
+            
+
         return get_array_as_image(img_data, desired_height=desired_height, desired_width=desired_width, skip_img_normalization=skip_img_normalization, export_grayscale=export_grayscale, **kwargs)
 
 
@@ -582,14 +597,21 @@ class SingleEpochDecodedResult(HDF_SerializationMixin, AttrsBasedClassHelperMixi
             desired_height = 100
             
 
-        ## need to remove these RAW_RGBA-specific kwarg parameters for the other two cases anyway:
-        lower_bound_alpha = kwargs.pop('lower_bound_alpha', 0.1)
-        drop_below_threshold = kwargs.pop('drop_below_threshold', 1e-2)
-        t_bin_size = kwargs.pop('t_bin_size', 0.025)
-        
+        # `raw_RGBA_only_parameters` dict with keys: ['spikes_df', 'xbin', 'lower_bound_alpha', 'drop_below_threshold', 't_bin_size']
+        raw_RGBA_only_parameters = kwargs.pop('raw_RGBA_only_parameters', {})
 
         if export_kind.value == HeatmapExportKind.RAW_RGBA.value:
-            _out_img, multi_decoder_color_overlay = self.build_multi_decoder_color_overlay_image(spikes_df=deepcopy(get_proper_global_spikes_df(curr_active_pipeline)), xbin=deepcopy(a_decoder.xbin), lower_bound_alpha=lower_bound_alpha, drop_below_threshold=drop_below_threshold, t_bin_size=t_bin_size)
+            ## check values in `raw_RGBA_only_parameters`:
+            required_keys = ['spikes_df', 'xbin', 'lower_bound_alpha', 'drop_below_threshold', 't_bin_size']
+            assert np.all([k in raw_RGBA_only_parameters.keys() for k in required_keys]), f"missing required keys:\n\tequired_keys: {required_keys}\n\tlist(raw_RGBA_only_parameters.keys()): {list(raw_RGBA_only_parameters.keys())}\n"
+            # ## need to remove these RAW_RGBA-specific kwarg parameters for the other two cases anyway:
+            # lower_bound_alpha = kwargs.pop('lower_bound_alpha', 0.1)
+            # drop_below_threshold = kwargs.pop('drop_below_threshold', 1e-2)
+            # t_bin_size = kwargs.pop('t_bin_size', 0.025)
+
+            # _out_img, multi_decoder_color_overlay = self.build_multi_decoder_color_overlay_image(spikes_df=deepcopy(get_proper_global_spikes_df(curr_active_pipeline)), xbin=deepcopy(a_decoder.xbin), lower_bound_alpha=lower_bound_alpha, drop_below_threshold=drop_below_threshold, t_bin_size=t_bin_size)
+            _out_img, multi_decoder_color_overlay = self.build_multi_decoder_color_overlay_image(**raw_RGBA_only_parameters)
+
             # build_multi_decoder_color_overlay_image
             img_data = _out_img.astype(float)  # .shape: (4, n_curr_epoch_time_bins) - (63, 4, 120)
         
