@@ -92,26 +92,58 @@ class HeatmapExportConfig:
     skip_img_normalization:bool = field(default=False)
     allow_override_aspect_ratio:bool = field(default=False)
 
+
+    # lower_bound_alpha: float= field(default=0.1, metadata={'desc':'the lower bound for the alpha value for the color map. 0 means fully transparent, 1 means fully opaque.'})
+    # drop_below_threshold: float = field(default=1e-3, metadata={'desc':'the threshold for the alpha value for the color map. 0 means fully transparent, 1 means fully opaque.'})
+    raw_RGBA_only_parameters: Dict[str, Any] = field(default=Factory(dict))
+
+
     ## OUTPUTS:
     posterior_saved_image: Optional[Image.Image] = field(default=None, init=False)
     posterior_saved_path: Optional[Path] = field(default=None, init=False)
 
-    def __attrs_post_init__(self):
-        self.export_grayscale = (self.colormap is None)
+    def __attrs_post_init__(self):        
+        self.export_grayscale = (self.export_kind.value == HeatmapExportKind.GREYSCALE.value) or ((self.export_kind.value != HeatmapExportKind.COLORMAPPED.value) and (self.colormap is None))
+        
+        # (not (self.export_kind.value == HeatmapExportKind.RAW_RGBA.value)) 
+        if (self.colormap is None):
+            assert (self.export_kind.value != HeatmapExportKind.COLORMAPPED.value), f"colormap should not be specified when export_grayscale=True"
+            
 
     @classmethod
     def init_for_export_kind(cls, export_kind: HeatmapExportKind, **kwargs):
-        desired_colormap = kwargs.pop('colormap', None)
-        assert desired_colormap is None
-        _obj = cls(colormap=None, export_kind=HeatmapExportKind.GREYSCALE, **kwargs) # is_greyscale=True, 
-        return _obj
-    
+        """ initializes for a specific export kind """
+        
+        colormap = kwargs.pop('colormap', None)
 
+        if export_kind.value == HeatmapExportKind.GREYSCALE.value:
+            # if export_grayscale:
+            return cls.init_greyscale(**kwargs)
+            
+        elif (export_kind.value == HeatmapExportKind.COLORMAPPED.value):
+            ## Color export mode!
+            assert (colormap is not None)
+            return cls(colormap, export_grayscale=False, skip_img_normalization=kwargs.pop('skip_img_normalization', False), export_kind=HeatmapExportKind.COLORMAPPED, **kwargs)
+
+
+        elif export_kind.value == HeatmapExportKind.RAW_RGBA.value:
+            ## Raw ready to use RGBA image is passed in:
+            # `raw_RGBA_only_parameters` dict with keys: ['spikes_df', 'xbin', 'lower_bound_alpha', 'drop_below_threshold', 't_bin_size']
+            raw_RGBA_only_parameters = kwargs.pop('raw_RGBA_only_parameters', {})
+            required_keys = ['spikes_df', 'xbin', 'lower_bound_alpha', 'drop_below_threshold', 't_bin_size']
+            assert np.all([k in raw_RGBA_only_parameters.keys() for k in required_keys]), f"missing required keys:\n\tequired_keys: {required_keys}\n\tlist(raw_RGBA_only_parameters.keys()): {list(raw_RGBA_only_parameters.keys())}\n"
+            
+            return cls(colormap=None, export_grayscale=False, skip_img_normalization=True, export_kind=HeatmapExportKind.RAW_RGBA, raw_RGBA_only_parameters=raw_RGBA_only_parameters, **kwargs)
+            
+        else:
+            raise NotImplementedError(f"export_kind: {export_kind}")    
+        
+    
     @classmethod
     def init_greyscale(cls, **kwargs):
         desired_colormap = kwargs.pop('colormap', None)
         assert desired_colormap is None
-        _obj = cls(colormap=None, export_kind=HeatmapExportKind.GREYSCALE, **kwargs) # is_greyscale=True, 
+        _obj = cls(colormap=None, export_grayscale=True, skip_img_normalization=kwargs.pop('skip_img_normalization', False), export_kind=HeatmapExportKind.GREYSCALE, **kwargs) # is_greyscale=True, 
         return _obj
     
     
@@ -224,10 +256,10 @@ class PosteriorExporting:
         # reveal_in_system_file_manager(video_out_path)
         return video_out_path
 
-    @function_attributes(short_name=None, tags=['figure', 'save', 'IMPORTANT', 'marginal'], input_requires=[], output_provides=[], uses=[], used_by=['save_marginals_arrays_as_image'], creation_date='2024-01-23 00:00', related_items=[])
+    @function_attributes(short_name=None, tags=['figure', 'save', 'IMPORTANT', 'marginal', 'single-export-format'], input_requires=[], output_provides=[], uses=[], used_by=['save_marginals_arrays_as_image'], creation_date='2024-01-23 00:00', related_items=[])
     @classmethod
     def save_posterior(cls, raw_posterior_epochs_marginals, epochs_directional_marginals, epochs_track_identity_marginals, collapsed_per_epoch_epoch_marginal_dir_point, collapsed_per_epoch_marginal_track_identity_point,
-        parent_array_as_image_output_folder: Path, epoch_id_identifier_str: str = 'lap', epoch_id: int = 9, export_all_raw_marginals_separately:bool = False, base_image_height: float=100, include_value_labels: bool = True, allow_override_aspect_ratio:bool=True, debug_print:bool=False) -> Tuple[Tuple[Image.Image, Path], Tuple[Image.Image, Path], Tuple[Image.Image, Path], Tuple[Image.Image, Path], List[Tuple[Image.Image, Path]]]:
+        parent_array_as_image_output_folder: Path, epoch_id_identifier_str: str = 'lap', epoch_id: int = 9, export_all_raw_marginals_separately:bool = False, base_image_height: float=100, export_kind: Optional[HeatmapExportKind] = None, include_value_labels: bool = True, allow_override_aspect_ratio:bool=True, debug_print:bool=False) -> Tuple[Tuple[Image.Image, Path], Tuple[Image.Image, Path], Tuple[Image.Image, Path], Tuple[Image.Image, Path], List[Tuple[Image.Image, Path]]]:
         """ 2024-01-23 - Writes the posteriors out to file 
         
         Usage:
@@ -261,8 +293,8 @@ class PosteriorExporting:
         base_image_height: int = int(round(base_image_height))
         desired_half_height: int = int(round(base_image_height/2))
         # get_array_as_img_kwargs = dict(desired_width=None, skip_img_normalization=False, include_value_labels=include_value_labels)
-        get_array_as_img_kwargs = dict(desired_width=None, skip_img_normalization=True, include_value_labels=include_value_labels) # do not manually normalize the image before output. 
-        save_array_as_image_kwargs = dict(include_value_labels=include_value_labels, allow_override_aspect_ratio=allow_override_aspect_ratio)
+        get_array_as_img_kwargs = dict(desired_width=None, export_kind=export_kind, skip_img_normalization=True, include_value_labels=include_value_labels) # do not manually normalize the image before output. 
+        save_array_as_image_kwargs = dict(export_kind=export_kind, include_value_labels=include_value_labels, allow_override_aspect_ratio=allow_override_aspect_ratio)
 
         if np.ndim(img_data) > 2:
             n_x_bins, n_decoders, n_curr_epoch_time_bins = np.shape(img_data)
@@ -311,7 +343,7 @@ class PosteriorExporting:
                     # _track_marginal_2tuple = np.atleast_2d(np.array([_long_any, _short_any])).T
                     _track_marginal_2tuple = np.atleast_2d(np.array([_short_any, _long_any]))
                     # _track_marginal_2tuple = _track_marginal_2tuple / np.nansum(_track_marginal_2tuple) # normalize
-                    _temp_img: Image.Image = get_array_as_image(_track_marginal_2tuple.T, desired_height=desired_half_height, **get_array_as_img_kwargs)
+                    _temp_img: Image.Image = get_array_as_image(_track_marginal_2tuple.T, desired_height=desired_half_height, **get_array_as_img_kwargs) # #TODO 2025-05-14 08:28: - [ ] Potential normalization error here, as when using raw_RGBA mode with a 2-decoder the passed posteriors must be normalized.
                     _sub_img_path = _sub_img_parent_path.joinpath(f'{epoch_id_str}_track_marginal_two_tuple_{i}.png').resolve()
                     _temp_img.save(_sub_img_path) # Save image to file
                     _out_save_tuples.append((_temp_img, _sub_img_path))
@@ -368,9 +400,9 @@ class PosteriorExporting:
         return marginal_dir_tuple, marginal_track_identity_tuple, marginal_dir_point_tuple, marginal_track_identity_point_tuple, _out_save_tuples
         
 
-    @function_attributes(short_name=None, tags=['export','marginal', 'pseudo2D', 'IMPORTANT'], input_requires=[], output_provides=[], uses=['.save_posterior'], used_by=['_test_export_marginals_for_figure'], creation_date='2024-09-10 00:06', related_items=[])
+    @function_attributes(short_name=None, tags=['export','marginal', 'pseudo2D', 'IMPORTANT', 'single-export-format'], input_requires=[], output_provides=[], uses=['.save_posterior'], used_by=['_test_export_marginals_for_figure'], creation_date='2024-09-10 00:06', related_items=[])
     @classmethod
-    def save_marginals_arrays_as_image(cls, directional_merged_decoders_result: DirectionalPseudo2DDecodersResult, parent_array_as_image_output_folder: Path, epoch_id_identifier_str: str = 'ripple', epoch_ids=None, export_all_raw_marginals_separately: bool=True, include_value_labels:bool=False, allow_override_aspect_ratio:bool=True, debug_print=False):
+    def save_marginals_arrays_as_image(cls, directional_merged_decoders_result: DirectionalPseudo2DDecodersResult, parent_array_as_image_output_folder: Path, epoch_id_identifier_str: str = 'ripple', epoch_ids=None, export_all_raw_marginals_separately: bool=True, export_kind: Optional[HeatmapExportKind] = None, include_value_labels:bool=False, allow_override_aspect_ratio:bool=True, debug_print=False):
         """ Exports all the raw_merged pseudo2D posteriors and their marginals out to image files.
         
         Usage: 
@@ -425,7 +457,7 @@ class PosteriorExporting:
             out_tuple_dict[epoch_id] = cls.save_posterior(raw_posterior_active_marginals, active_directional_marginals,
                                                                                 active_track_identity_marginals, collapsed_per_epoch_marginal_dir_point, collapsed_per_epoch_marginal_track_identity_point,
                                                                                         parent_array_as_image_output_folder=_curr_path, epoch_id_identifier_str=epoch_id_identifier_str, epoch_id=epoch_id,
-                                                                                        export_all_raw_marginals_separately=export_all_raw_marginals_separately, include_value_labels=include_value_labels, allow_override_aspect_ratio=allow_override_aspect_ratio,
+                                                                                        export_all_raw_marginals_separately=export_all_raw_marginals_separately, export_kind=export_kind, include_value_labels=include_value_labels, allow_override_aspect_ratio=allow_override_aspect_ratio,
                                                                                         debug_print=debug_print)
         return out_tuple_dict
         
@@ -440,7 +472,7 @@ class PosteriorExporting:
                                              posterior_out_folder:Path='output/_temp_individual_posteriors',
                                              should_export_separate_color_and_greyscale: bool = True, custom_export_formats: Optional[Dict[str, HeatmapExportConfig]]=None, colormap='Oranges', #'viridis',
                                              desired_height=None, **kwargs): # decoders_dict: Dict[types.DecoderName, BasePositionDecoder], 
-        """Save the decoded posteiors (decoded epochs) into an image file
+        """Save the decoded posteiors (decoded epochs) into one image file for each format specified in `custom_export_formats`
         
         Usage:
             from pyphoplacecellanalysis.Analysis.Decoder.computer_vision import ComputerVisionComputations
@@ -485,7 +517,8 @@ class PosteriorExporting:
             if should_export_separate_color_and_greyscale:
                 custom_export_formats: Dict[str, HeatmapExportConfig] = {
                     'greyscale': HeatmapExportConfig.init_greyscale(desired_height=desired_height, **kwargs),
-                     'color': HeatmapExportConfig(colormap=colormap, export_kind=HeatmapExportKind.COLORMAPPED, desired_height=desired_height, **kwargs),
+                    'color': HeatmapExportConfig(colormap=colormap, export_kind=HeatmapExportKind.COLORMAPPED, desired_height=desired_height, **kwargs),
+                    'raw_rgba': HeatmapExportConfig.init_for_export_kind(export_kind=HeatmapExportKind.RAW_RGBA, lower_bound_alpha=0.1, drop_below_threshold=1e-2, desired_height=desired_height, **kwargs),
                 }
             else:
                 ## just greyscale?
@@ -612,7 +645,7 @@ class PosteriorExporting:
                 # print(f'a_decoder_name: {a_decoder_name}, _specific_save_context: {_specific_save_context}, posterior_out_folder: {posterior_out_folder}')
                 # (an_out_posterior_out_folder, *an_out_path_extra_paths), an_out_flat_save_out_paths = cls.export_decoded_posteriors_as_images(a_decoder_decoded_epochs_result=a_decoder_decoded_epochs_result, out_context=_specific_save_context, posterior_out_folder=posterior_out_folder, desired_height=desired_height, custom_exports_dict=custom_exports_dict)
                 (an_out_posterior_out_folder, a_custom_export_format_results), an_out_flat_save_out_paths = cls.export_decoded_posteriors_as_images(a_decoder_decoded_epochs_result=a_decoder_decoded_epochs_result, posterior_out_folder=posterior_out_folder,
-                                                                                                                                                     desired_height=desired_height, custom_export_formats=custom_export_formats)
+                                                                                                                                                     desired_height=desired_height, custom_export_formats=custom_export_formats) #TODO 2025-05-14 08:55: - [ ] BUG?!? Is it possible to plot the overlaid color image when iterating through the decoders 1-by-1? Don't I need all 4 at once?
                 
                 out_paths[a_decoder_name] = an_out_posterior_out_folder
                 out_custom_export_formats_results_dict[a_decoder_name] = a_custom_export_format_results
@@ -995,7 +1028,7 @@ class PosteriorExporting:
     @function_attributes(short_name=None, tags=['export', 'images', 'marginals', 'testing'], input_requires=[], output_provides=[], uses=['.save_marginals_arrays_as_image'], used_by=['_perform_export_current_epoch_marginal_and_raster_images'], creation_date='2025-05-13 19:45', related_items=[])
     @classmethod
     def _test_export_marginals_for_figure(cls, directional_merged_decoders_result: DirectionalPseudo2DDecodersResult, filtered_decoder_filter_epochs_decoder_result_dict: Dict[str, DecodedFilterEpochsResult], clicked_epoch: NDArray, context_specific_root_export_path: Path, epoch_specific_folder: Path,
-                                           epoch_id_identifier_str='ripple', debug_print=True, allow_override_aspect_ratio:bool=True, **kwargs):
+                                           epoch_id_identifier_str='ripple', debug_print=True, export_kind: Optional[HeatmapExportKind] = None, allow_override_aspect_ratio:bool=True, **kwargs):
         """
         
                 epoch_id_identifier_str='ripple'
@@ -1071,7 +1104,7 @@ class PosteriorExporting:
 
         # active_filter_epochs_decoder_result.all_directional_ripple_filter_epochs_decoder_result
         out_image_save_tuple_dict = cls.save_marginals_arrays_as_image(directional_merged_decoders_result=directional_merged_decoders_result, parent_array_as_image_output_folder=context_specific_root_export_path,
-                                                          epoch_id_identifier_str=epoch_id_identifier_str, epoch_ids=epoch_ids, debug_print=True, include_value_labels=False, allow_override_aspect_ratio=allow_override_aspect_ratio,# **kwargs,
+                                                          epoch_id_identifier_str=epoch_id_identifier_str, epoch_ids=epoch_ids, debug_print=True, export_kind=export_kind, include_value_labels=False, allow_override_aspect_ratio=allow_override_aspect_ratio,# **kwargs,
                                                         )
 
         # ==================================================================================================================== #
@@ -1100,10 +1133,12 @@ class PosteriorExporting:
             a_result: SingleEpochDecodedResult = v.get_result_for_epoch_at_time(epoch_start_time=clicked_epoch[0])
             print(f"{k}: filtered_decoder_filter_epochs_decoder_result_dict[{k}].decoding_time_bin_size: {v.decoding_time_bin_size}") # 0.016!! 
             _img_path = epoch_specific_folder.joinpath(f'{epoch_id_str}_posterior_{k}.png').resolve()
-            a_result.save_posterior_as_image(_img_path, colormap='Oranges', allow_override_aspect_ratio=allow_override_aspect_ratio, flip_vertical_axis=True, **kwargs)
+            a_result.save_posterior_as_image(_img_path, export_kind=HeatmapExportKind.COLORMAPPED, colormap='Oranges', allow_override_aspect_ratio=allow_override_aspect_ratio, flip_vertical_axis=True, **kwargs) # #TODO 2025-05-14 08:30: - [ ] forced orange
             out_image_paths[k] = _img_path
 
         return out_image_save_tuple_dict, out_image_paths
+
+
 
     @function_attributes(short_name=None, tags=['marginal', 'export'], input_requires=[], output_provides=[], uses=['cls._test_export_marginals_for_figure'], used_by=[], creation_date='2024-09-06 00:00', related_items=[])
     @classmethod

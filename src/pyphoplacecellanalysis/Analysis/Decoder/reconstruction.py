@@ -480,12 +480,13 @@ class SingleEpochDecodedResult(HDF_SerializationMixin, AttrsBasedClassHelperMixi
 
     @function_attributes(short_name=None, tags=['image', 'multi-color-decoder-overlay', 'MultiDecoderColorOverlayedPosteriors'], input_requires=[], output_provides=[], uses=['MultiDecoderColorOverlayedPosteriors'], used_by=[], creation_date='2025-05-14 02:21', related_items=[])    
     def build_multi_decoder_color_overlay_image(self, spikes_df: pd.DataFrame, xbin: NDArray[ND.Shape["N_POS_BINS"], np.floating], lower_bound_alpha=0.0, drop_below_threshold=1e-3, t_bin_size=0.025, desired_height=None, desired_width=None, **kwargs):
-        """ 
+        """ Builds the RGBA output image for the multi-color decoder overlay.
+        
         
         global_decoded_result: SingleEpochDecodedResult = a_result.get_result_for_epoch(0)
         # xbin: NDArray[ND.Shape["N_POS_BINS"], np.floating] = deepcopy(a_decoder.xbin)
         
-        global_decoded_result.build_multi_decoder_color_overlay_image(spikes_df=deepcopy(get_proper_global_spikes_df(curr_active_pipeline)), xbin=deepcopy(a_decoder.xbin))
+        _out_img, multi_decoder_color_overlay = global_decoded_result.build_multi_decoder_color_overlay_image(spikes_df=deepcopy(get_proper_global_spikes_df(curr_active_pipeline)), xbin=deepcopy(a_decoder.xbin))
         
         
         """
@@ -518,7 +519,7 @@ class SingleEpochDecodedResult(HDF_SerializationMixin, AttrsBasedClassHelperMixi
     # Images _____________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
 
     @function_attributes(short_name=None, tags=['image', 'posterior'], input_requires=[], output_provides=[], uses=['get_array_as_image'], used_by=[], creation_date='2024-05-09 05:49', related_items=[])
-    def get_posterior_as_image(self, epoch_id_identifier_str: str = 'p_x_given_n', desired_height=None, desired_width=None, skip_img_normalization=True, export_grayscale:bool=False, export_kind:HeatmapExportKind=None, **kwargs):
+    def get_posterior_as_image(self, epoch_id_identifier_str: str = 'p_x_given_n', desired_height=None, desired_width=None, export_kind: Optional[HeatmapExportKind] = None, skip_img_normalization=True, export_grayscale:bool=False, **kwargs):
         """ gets the posterior as a colormapped image 
         
         Usage:
@@ -545,9 +546,11 @@ class SingleEpochDecodedResult(HDF_SerializationMixin, AttrsBasedClassHelperMixi
         return get_array_as_image(img_data, desired_height=desired_height, desired_width=desired_width, skip_img_normalization=skip_img_normalization, export_grayscale=export_grayscale, **kwargs)
 
 
-    @function_attributes(short_name=None, tags=['export', 'image', 'posterior'], input_requires=[], output_provides=[], uses=['pyphocorehelpers.plotting.media_output_helpers.save_array_as_image'], used_by=['PosteriorExporting.export_decoded_posteriors_as_images'], creation_date='2024-05-09 05:49', related_items=[])
-    def save_posterior_as_image(self, parent_array_as_image_output_folder: Union[Path, str]='', epoch_id_identifier_str: str = 'p_x_given_n', desired_height=None, desired_width=None, colormap:str='viridis', skip_img_normalization=True, export_grayscale:bool=False, allow_override_aspect_ratio:bool=False, **kwargs):
+    @function_attributes(short_name=None, tags=['export', 'image', 'posterior'], input_requires=[], output_provides=[], uses=['pyphocorehelpers.plotting.media_output_helpers.save_array_as_image', '.build_multi_decoder_color_overlay_image'], used_by=['PosteriorExporting.export_decoded_posteriors_as_images'], creation_date='2024-05-09 05:49', related_items=[])
+    def save_posterior_as_image(self, parent_array_as_image_output_folder: Union[Path, str]='', epoch_id_identifier_str: str = 'p_x_given_n', desired_height=None, desired_width=None, export_kind: Optional[HeatmapExportKind] = None, colormap:str='viridis', skip_img_normalization=True, export_grayscale:bool=False, allow_override_aspect_ratio:bool=False, **kwargs):
         """ saves the posterior to disk
+        
+        this is where `self.build_multi_decoder_color_overlay_image(...)` should be called for export_kind == 
         
         Usage:
 
@@ -578,8 +581,22 @@ class SingleEpochDecodedResult(HDF_SerializationMixin, AttrsBasedClassHelperMixi
             # only if the user hasn't provided a desired width OR height should we suggest a height of 100
             desired_height = 100
             
-        img_data = self.p_x_given_n.astype(float)  # .shape: (4, n_curr_epoch_time_bins) - (63, 4, 120)
-        raw_tuple = save_array_as_image(img_data, desired_height=desired_height, desired_width=desired_width, colormap=colormap, skip_img_normalization=skip_img_normalization, out_path=_img_path, export_grayscale=export_grayscale, allow_override_aspect_ratio=allow_override_aspect_ratio, **kwargs)
+
+        ## need to remove these RAW_RGBA-specific kwarg parameters for the other two cases anyway:
+        lower_bound_alpha = kwargs.pop('lower_bound_alpha', 0.1)
+        drop_below_threshold = kwargs.pop('drop_below_threshold', 1e-2)
+        t_bin_size = kwargs.pop('t_bin_size', 0.025)
+        
+
+        if export_kind.value == HeatmapExportKind.RAW_RGBA.value:
+            _out_img, multi_decoder_color_overlay = self.build_multi_decoder_color_overlay_image(spikes_df=deepcopy(get_proper_global_spikes_df(curr_active_pipeline)), xbin=deepcopy(a_decoder.xbin), lower_bound_alpha=lower_bound_alpha, drop_below_threshold=drop_below_threshold, t_bin_size=t_bin_size)
+            # build_multi_decoder_color_overlay_image
+            img_data = _out_img.astype(float)  # .shape: (4, n_curr_epoch_time_bins) - (63, 4, 120)
+        
+        else:
+            img_data = self.p_x_given_n.astype(float)  # .shape: (4, n_curr_epoch_time_bins) - (63, 4, 120)
+        
+        raw_tuple = save_array_as_image(img_data, desired_height=desired_height, desired_width=desired_width, export_kind=export_kind, colormap=colormap, skip_img_normalization=skip_img_normalization, out_path=_img_path, export_grayscale=export_grayscale, allow_override_aspect_ratio=allow_override_aspect_ratio, **kwargs)
         image_raw, path_raw = raw_tuple
         return image_raw, path_raw
 
