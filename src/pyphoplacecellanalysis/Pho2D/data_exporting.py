@@ -571,10 +571,91 @@ class PosteriorExporting:
         #     return (posterior_out_folder, custom_export_formats, ), _save_out_paths
         # else:
         #     return (posterior_out_folder, custom_export_formats, ), _save_out_paths
-                
+
+
+    @function_attributes(short_name=None, tags=['private', 'helper'], input_requires=[], output_provides=[], uses=[], used_by=['._subfn_perform_export_single_epochs'], creation_date='2025-05-14 11:00', related_items=[])
+    @classmethod
+    def _subfn_build_combined_output_images(cls, single_known_epoch_type_dict: Dict[DecoderName, Dict[str, List[HeatmapExportConfig]]], specific_epochs_posterior_out_folder: Path, known_epoch_type_name: str = 'laps', custom_export_format_series_name: str = 'color', joined_export_folder_name: str = 'combined', combined_img_padding=4, combined_img_separator_color=None):
+        """ exports combined images stiched across the seperate decoder's images
+        
+        """
+        from pyphocorehelpers.plotting.media_output_helpers import vertical_image_stack, horizontal_image_stack, image_grid # used in `_subfn_build_combined_output_images`
+        
+        ## INPUTS: out_custom_formats_dict, known_epoch_type_name, custom_export_format_series_name
+
+        # _output_combined_dir = _out['parent_specific_session_output_folder'].joinpath(known_epoch_type_name, joined_export_folder_name, custom_export_format_series_name).resolve()
+        _output_combined_dir = specific_epochs_posterior_out_folder.joinpath(joined_export_folder_name, custom_export_format_series_name).resolve()
+        _output_combined_dir.mkdir(parents=True, exist_ok=True)
+
+        # Stich acrossed decoders
+        out_all_decoders_epochs_list = []
+        # _single_epoch_single_series_single_export_type_row = []
+        for decoder_name, a_single_export_format_export_result_dict in single_known_epoch_type_dict.items():
+            # one for each epoch
+            an_epochs_export_result_list: List[HeatmapExportConfig] = a_single_export_format_export_result_dict[custom_export_format_series_name]
+            out_all_decoders_epochs_list.append([v.posterior_saved_image for v in an_epochs_export_result_list])
+            
+        num_exported_epochs: int = len(out_all_decoders_epochs_list[0])
+        print(f'num_exported_epochs: {num_exported_epochs}')
+        # INPUT: out_all_decoders_epochs_list
+
+        assert len(out_all_decoders_epochs_list) == 4, f"expected the out_all_decoders_epochs_list to be of length 4, with one entry per each decoder_name, but len(out_all_decoders_epochs_list): {len(out_all_decoders_epochs_list)}. out_all_decoders_epochs_list: {out_all_decoders_epochs_list}"
+        _single_epoch_single_series_single_export_type_rows_list = []
+        _output_combined_image_save_dirs = []
+        for i in np.arange(num_exported_epochs):
+            ## for a single epoch:
+            _single_epoch_row = [out_all_decoders_epochs_list[0][i], out_all_decoders_epochs_list[1][i], out_all_decoders_epochs_list[2][i], out_all_decoders_epochs_list[3][i]]
+            _single_epoch_combined_img = horizontal_image_stack(_single_epoch_row, padding=combined_img_padding, separator_color=combined_img_separator_color)
+            _single_epoch_single_series_single_export_type_rows_list.append(_single_epoch_combined_img)
+            
+            ## Save the image:
+            _img_path = _output_combined_dir.joinpath(f'merged_{known_epoch_type_name}[{i}].png').resolve()
+            _single_epoch_combined_img.save(_img_path)
+            _output_combined_image_save_dirs.append(_img_path)
+
+        ## OUTPUTS: _output_combined_dir, out_all_decoders_epochs_list, _single_epoch_single_series_single_export_type_rows_list, _output_combined_image_save_dirs
+        return _output_combined_dir, _output_combined_image_save_dirs
+
+
+    @function_attributes(short_name=None, tags=['private' 'helper'], input_requires=[], output_provides=[], uses=['.export_decoded_posteriors_as_images', '._subfn_build_combined_output_images'], used_by=['.perform_export_all_decoded_posteriors_as_images'], creation_date='2025-05-14 11:03', related_items=[])
+    @classmethod
+    def _subfn_perform_export_single_epochs(cls, _active_filter_epochs_decoder_result_dict: Dict[types.DecoderName, DecodedFilterEpochsResult], epochs_name: str, a_parent_output_folder: Path, custom_export_formats: Optional[Dict[str, HeatmapExportConfig]]=None, desired_height=None, combined_img_padding=4, combined_img_separator_color=None, **kwargs) -> IdentifyingContext:
+        """ saves a single set of named epochs, like 'laps' or 'ripple' 
+        """
+        out_paths = {}
+        out_custom_export_formats_results_dict = {}
+
+        specific_epochs_posterior_out_folder = a_parent_output_folder.joinpath(epochs_name).resolve() # 'K:/scratch/collected_outputs/figures/_temp_individual_posteriors/2024-09-30/gor01_one_2006-6-09_1-22-43/ripple/'
+        specific_epochs_posterior_out_folder.mkdir(parents=True, exist_ok=True)
+
+        for a_decoder_name, a_decoder_decoded_epochs_result in _active_filter_epochs_decoder_result_dict.items():
+            # _save_context: IdentifyingContext = curr_active_pipeline.build_display_context_for_session('save_decoded_posteriors_to_HDF5', decoder_name=a_decoder_name, epochs_name=epochs_name)
+            # _specific_save_context = deepcopy(a_save_context).overwriting_context(decoder_name=a_decoder_name, epochs_name=epochs_name)
+            posterior_out_folder = specific_epochs_posterior_out_folder.joinpath(a_decoder_name).resolve() # 'K:/scratch/collected_outputs/figures/_temp_individual_posteriors/2024-09-30/gor01_one_2006-6-09_1-22-43/ripple/long_RL'
+            posterior_out_folder.mkdir(parents=True, exist_ok=True)
+            # print(f'a_decoder_name: {a_decoder_name}, _specific_save_context: {_specific_save_context}, posterior_out_folder: {posterior_out_folder}')
+            # (an_out_posterior_out_folder, *an_out_path_extra_paths), an_out_flat_save_out_paths = cls.export_decoded_posteriors_as_images(a_decoder_decoded_epochs_result=a_decoder_decoded_epochs_result, out_context=_specific_save_context, posterior_out_folder=posterior_out_folder, desired_height=desired_height, custom_exports_dict=custom_exports_dict)
+            (an_out_posterior_out_folder, a_custom_export_format_results), an_out_flat_save_out_paths = cls.export_decoded_posteriors_as_images(a_decoder_decoded_epochs_result=a_decoder_decoded_epochs_result, posterior_out_folder=posterior_out_folder,
+                                                                                                                                                    desired_height=desired_height, custom_export_formats=custom_export_formats) #TODO 2025-05-14 08:55: - [ ] BUG?!? Is it possible to plot the overlaid color image when iterating through the decoders 1-by-1? Don't I need all 4 at once?
+            
+            out_paths[a_decoder_name] = an_out_posterior_out_folder
+            out_custom_export_formats_results_dict[a_decoder_name] = a_custom_export_format_results
+            
+        ## try to export the combined figures right away
+        # custom_export_format_series_name: str = list(out_custom_export_formats_results_dict.keys())[0]
+        # custom_export_format_series_name: str = list(out_custom_export_formats_results_dict[list(out_custom_export_formats_results_dict.keys())[0]].keys())[0] # the inner key is the decoder_name (like 'long_LR') but the outer key is the custom_export name like 'color'
+        for custom_export_format_series_name in list(out_custom_export_formats_results_dict[list(out_custom_export_formats_results_dict.keys())[0]].keys()):
+            _output_combined_dir, _output_combined_image_save_dirs = cls._subfn_build_combined_output_images(single_known_epoch_type_dict=out_custom_export_formats_results_dict, specific_epochs_posterior_out_folder=specific_epochs_posterior_out_folder,
+                                                                                                        known_epoch_type_name=epochs_name, custom_export_format_series_name=custom_export_format_series_name,
+                                                                                                        combined_img_padding=combined_img_padding, combined_img_separator_color=combined_img_separator_color)
+            
+        return out_paths, out_custom_export_formats_results_dict
+
+
+
         
     @classmethod
-    @function_attributes(short_name=None, tags=['MAIN', 'export', 'images', 'ESSENTIAL'], input_requires=[], output_provides=[], uses=['.export_decoded_posteriors_as_images'], used_by=['_display_directional_merged_pf_decoded_stacked_epoch_slices'], creation_date='2024-08-28 08:36', related_items=[])
+    @function_attributes(short_name=None, tags=['MAIN', 'export', 'images', 'ESSENTIAL'], input_requires=[], output_provides=[], uses=['._subfn_perform_export_single_epochs'], used_by=['_display_directional_merged_pf_decoded_stacked_epoch_slices'], creation_date='2024-08-28 08:36', related_items=[])
     def perform_export_all_decoded_posteriors_as_images(cls, decoder_laps_filter_epochs_decoder_result_dict: Dict[types.DecoderName, DecodedFilterEpochsResult], decoder_ripple_filter_epochs_decoder_result_dict: Dict[types.DecoderName, DecodedFilterEpochsResult],
                                                          _save_context: IdentifyingContext, parent_output_folder: Path, custom_export_formats: Optional[Dict[str, HeatmapExportConfig]]=None, desired_height=None, combined_img_padding=4, combined_img_separator_color=None):
         """ Exports the decoded epoch position posteriors as raw images, also includes functionality to export merged/combined images.
@@ -585,90 +666,92 @@ class PosteriorExporting:
         History:
             Refactored from `ComputerVisionComputations` on 2024-09-30
         """
-        from pyphocorehelpers.plotting.media_output_helpers import vertical_image_stack, horizontal_image_stack, image_grid # used in `_subfn_build_combined_output_images`
         
-        def _subfn_build_combined_output_images(single_known_epoch_type_dict: Dict[DecoderName, Dict[str, List[HeatmapExportConfig]]], specific_epochs_posterior_out_folder: Path, known_epoch_type_name: str = 'laps', custom_export_format_series_name: str = 'color', joined_export_folder_name: str = 'combined'):
-            """ exports combined images stiched across the seperate decoder's images
+        
+        # def _subfn_build_combined_output_images(single_known_epoch_type_dict: Dict[DecoderName, Dict[str, List[HeatmapExportConfig]]], specific_epochs_posterior_out_folder: Path, known_epoch_type_name: str = 'laps', custom_export_format_series_name: str = 'color', joined_export_folder_name: str = 'combined'):
+        #     """ exports combined images stiched across the seperate decoder's images
             
-            """
-            ## INPUTS: out_custom_formats_dict, known_epoch_type_name, custom_export_format_series_name
+        #     """
+        #     ## INPUTS: out_custom_formats_dict, known_epoch_type_name, custom_export_format_series_name
 
-            # _output_combined_dir = _out['parent_specific_session_output_folder'].joinpath(known_epoch_type_name, joined_export_folder_name, custom_export_format_series_name).resolve()
-            _output_combined_dir = specific_epochs_posterior_out_folder.joinpath(joined_export_folder_name, custom_export_format_series_name).resolve()
-            _output_combined_dir.mkdir(parents=True, exist_ok=True)
+        #     # _output_combined_dir = _out['parent_specific_session_output_folder'].joinpath(known_epoch_type_name, joined_export_folder_name, custom_export_format_series_name).resolve()
+        #     _output_combined_dir = specific_epochs_posterior_out_folder.joinpath(joined_export_folder_name, custom_export_format_series_name).resolve()
+        #     _output_combined_dir.mkdir(parents=True, exist_ok=True)
 
-            # Stich acrossed decoders
-            out_all_decoders_epochs_list = []
-            # _single_epoch_single_series_single_export_type_row = []
-            for decoder_name, a_single_export_format_export_result_dict in single_known_epoch_type_dict.items():
-                # one for each epoch
-                an_epochs_export_result_list: List[HeatmapExportConfig] = a_single_export_format_export_result_dict[custom_export_format_series_name]
-                out_all_decoders_epochs_list.append([v.posterior_saved_image for v in an_epochs_export_result_list])
+        #     # Stich acrossed decoders
+        #     out_all_decoders_epochs_list = []
+        #     # _single_epoch_single_series_single_export_type_row = []
+        #     for decoder_name, a_single_export_format_export_result_dict in single_known_epoch_type_dict.items():
+        #         # one for each epoch
+        #         an_epochs_export_result_list: List[HeatmapExportConfig] = a_single_export_format_export_result_dict[custom_export_format_series_name]
+        #         out_all_decoders_epochs_list.append([v.posterior_saved_image for v in an_epochs_export_result_list])
                 
-            num_exported_epochs: int = len(out_all_decoders_epochs_list[0])
-            print(f'num_exported_epochs: {num_exported_epochs}')
-            # INPUT: out_all_decoders_epochs_list
+        #     num_exported_epochs: int = len(out_all_decoders_epochs_list[0])
+        #     print(f'num_exported_epochs: {num_exported_epochs}')
+        #     # INPUT: out_all_decoders_epochs_list
 
-            assert len(out_all_decoders_epochs_list) == 4, f"expected the out_all_decoders_epochs_list to be of length 4, with one entry per each decoder_name, but len(out_all_decoders_epochs_list): {len(out_all_decoders_epochs_list)}. out_all_decoders_epochs_list: {out_all_decoders_epochs_list}"
-            _single_epoch_single_series_single_export_type_rows_list = []
-            _output_combined_image_save_dirs = []
-            for i in np.arange(num_exported_epochs):
-                ## for a single epoch:
-                _single_epoch_row = [out_all_decoders_epochs_list[0][i], out_all_decoders_epochs_list[1][i], out_all_decoders_epochs_list[2][i], out_all_decoders_epochs_list[3][i]]
-                _single_epoch_combined_img = horizontal_image_stack(_single_epoch_row, padding=combined_img_padding, separator_color=combined_img_separator_color)
-                _single_epoch_single_series_single_export_type_rows_list.append(_single_epoch_combined_img)
+        #     assert len(out_all_decoders_epochs_list) == 4, f"expected the out_all_decoders_epochs_list to be of length 4, with one entry per each decoder_name, but len(out_all_decoders_epochs_list): {len(out_all_decoders_epochs_list)}. out_all_decoders_epochs_list: {out_all_decoders_epochs_list}"
+        #     _single_epoch_single_series_single_export_type_rows_list = []
+        #     _output_combined_image_save_dirs = []
+        #     for i in np.arange(num_exported_epochs):
+        #         ## for a single epoch:
+        #         _single_epoch_row = [out_all_decoders_epochs_list[0][i], out_all_decoders_epochs_list[1][i], out_all_decoders_epochs_list[2][i], out_all_decoders_epochs_list[3][i]]
+        #         _single_epoch_combined_img = horizontal_image_stack(_single_epoch_row, padding=combined_img_padding, separator_color=combined_img_separator_color)
+        #         _single_epoch_single_series_single_export_type_rows_list.append(_single_epoch_combined_img)
                 
-                ## Save the image:
-                _img_path = _output_combined_dir.joinpath(f'merged_{known_epoch_type_name}[{i}].png').resolve()
-                _single_epoch_combined_img.save(_img_path)
-                _output_combined_image_save_dirs.append(_img_path)
+        #         ## Save the image:
+        #         _img_path = _output_combined_dir.joinpath(f'merged_{known_epoch_type_name}[{i}].png').resolve()
+        #         _single_epoch_combined_img.save(_img_path)
+        #         _output_combined_image_save_dirs.append(_img_path)
 
-            ## OUTPUTS: _output_combined_dir, out_all_decoders_epochs_list, _single_epoch_single_series_single_export_type_rows_list, _output_combined_image_save_dirs
-            return _output_combined_dir, _output_combined_image_save_dirs
+        #     ## OUTPUTS: _output_combined_dir, out_all_decoders_epochs_list, _single_epoch_single_series_single_export_type_rows_list, _output_combined_image_save_dirs
+        #     return _output_combined_dir, _output_combined_image_save_dirs
 
 
-        def _subfn_perform_export_single_epochs(_active_filter_epochs_decoder_result_dict, epochs_name: str, a_parent_output_folder: Path, custom_export_formats: Optional[Dict[str, HeatmapExportConfig]]=None) -> IdentifyingContext:
-            """ saves a single set of named epochs, like 'laps' or 'ripple' 
-            captures: desired_height, should_export_separate_color_and_greyscale, 
-            """
-            out_paths = {}
-            out_custom_export_formats_results_dict = {}
+        # def _subfn_perform_export_single_epochs(_active_filter_epochs_decoder_result_dict, epochs_name: str, a_parent_output_folder: Path, custom_export_formats: Optional[Dict[str, HeatmapExportConfig]]=None) -> IdentifyingContext:
+        #     """ saves a single set of named epochs, like 'laps' or 'ripple' 
+        #     captures: desired_height, should_export_separate_color_and_greyscale, 
+        #     """
+        #     out_paths = {}
+        #     out_custom_export_formats_results_dict = {}
 
-            specific_epochs_posterior_out_folder = a_parent_output_folder.joinpath(epochs_name).resolve() # 'K:/scratch/collected_outputs/figures/_temp_individual_posteriors/2024-09-30/gor01_one_2006-6-09_1-22-43/ripple/'
-            specific_epochs_posterior_out_folder.mkdir(parents=True, exist_ok=True)
+        #     specific_epochs_posterior_out_folder = a_parent_output_folder.joinpath(epochs_name).resolve() # 'K:/scratch/collected_outputs/figures/_temp_individual_posteriors/2024-09-30/gor01_one_2006-6-09_1-22-43/ripple/'
+        #     specific_epochs_posterior_out_folder.mkdir(parents=True, exist_ok=True)
 
-            for a_decoder_name, a_decoder_decoded_epochs_result in _active_filter_epochs_decoder_result_dict.items():
-                # _save_context: IdentifyingContext = curr_active_pipeline.build_display_context_for_session('save_decoded_posteriors_to_HDF5', decoder_name=a_decoder_name, epochs_name=epochs_name)
-                # _specific_save_context = deepcopy(a_save_context).overwriting_context(decoder_name=a_decoder_name, epochs_name=epochs_name)
-                posterior_out_folder = specific_epochs_posterior_out_folder.joinpath(a_decoder_name).resolve() # 'K:/scratch/collected_outputs/figures/_temp_individual_posteriors/2024-09-30/gor01_one_2006-6-09_1-22-43/ripple/long_RL'
-                posterior_out_folder.mkdir(parents=True, exist_ok=True)
-                # print(f'a_decoder_name: {a_decoder_name}, _specific_save_context: {_specific_save_context}, posterior_out_folder: {posterior_out_folder}')
-                # (an_out_posterior_out_folder, *an_out_path_extra_paths), an_out_flat_save_out_paths = cls.export_decoded_posteriors_as_images(a_decoder_decoded_epochs_result=a_decoder_decoded_epochs_result, out_context=_specific_save_context, posterior_out_folder=posterior_out_folder, desired_height=desired_height, custom_exports_dict=custom_exports_dict)
-                (an_out_posterior_out_folder, a_custom_export_format_results), an_out_flat_save_out_paths = cls.export_decoded_posteriors_as_images(a_decoder_decoded_epochs_result=a_decoder_decoded_epochs_result, posterior_out_folder=posterior_out_folder,
-                                                                                                                                                     desired_height=desired_height, custom_export_formats=custom_export_formats) #TODO 2025-05-14 08:55: - [ ] BUG?!? Is it possible to plot the overlaid color image when iterating through the decoders 1-by-1? Don't I need all 4 at once?
+        #     for a_decoder_name, a_decoder_decoded_epochs_result in _active_filter_epochs_decoder_result_dict.items():
+        #         # _save_context: IdentifyingContext = curr_active_pipeline.build_display_context_for_session('save_decoded_posteriors_to_HDF5', decoder_name=a_decoder_name, epochs_name=epochs_name)
+        #         # _specific_save_context = deepcopy(a_save_context).overwriting_context(decoder_name=a_decoder_name, epochs_name=epochs_name)
+        #         posterior_out_folder = specific_epochs_posterior_out_folder.joinpath(a_decoder_name).resolve() # 'K:/scratch/collected_outputs/figures/_temp_individual_posteriors/2024-09-30/gor01_one_2006-6-09_1-22-43/ripple/long_RL'
+        #         posterior_out_folder.mkdir(parents=True, exist_ok=True)
+        #         # print(f'a_decoder_name: {a_decoder_name}, _specific_save_context: {_specific_save_context}, posterior_out_folder: {posterior_out_folder}')
+        #         # (an_out_posterior_out_folder, *an_out_path_extra_paths), an_out_flat_save_out_paths = cls.export_decoded_posteriors_as_images(a_decoder_decoded_epochs_result=a_decoder_decoded_epochs_result, out_context=_specific_save_context, posterior_out_folder=posterior_out_folder, desired_height=desired_height, custom_exports_dict=custom_exports_dict)
+        #         (an_out_posterior_out_folder, a_custom_export_format_results), an_out_flat_save_out_paths = cls.export_decoded_posteriors_as_images(a_decoder_decoded_epochs_result=a_decoder_decoded_epochs_result, posterior_out_folder=posterior_out_folder,
+        #                                                                                                                                              desired_height=desired_height, custom_export_formats=custom_export_formats) #TODO 2025-05-14 08:55: - [ ] BUG?!? Is it possible to plot the overlaid color image when iterating through the decoders 1-by-1? Don't I need all 4 at once?
                 
-                out_paths[a_decoder_name] = an_out_posterior_out_folder
-                out_custom_export_formats_results_dict[a_decoder_name] = a_custom_export_format_results
+        #         out_paths[a_decoder_name] = an_out_posterior_out_folder
+        #         out_custom_export_formats_results_dict[a_decoder_name] = a_custom_export_format_results
                 
-            ## try to export the combined figures right away
-            # custom_export_format_series_name: str = list(out_custom_export_formats_results_dict.keys())[0]
-            # custom_export_format_series_name: str = list(out_custom_export_formats_results_dict[list(out_custom_export_formats_results_dict.keys())[0]].keys())[0] # the inner key is the decoder_name (like 'long_LR') but the outer key is the custom_export name like 'color'
-            for custom_export_format_series_name in list(out_custom_export_formats_results_dict[list(out_custom_export_formats_results_dict.keys())[0]].keys()):
-                _output_combined_dir, _output_combined_image_save_dirs = _subfn_build_combined_output_images(single_known_epoch_type_dict=out_custom_export_formats_results_dict, specific_epochs_posterior_out_folder=specific_epochs_posterior_out_folder,
-                                                                                                            known_epoch_type_name=epochs_name, custom_export_format_series_name=custom_export_format_series_name)
+        #     ## try to export the combined figures right away
+        #     # custom_export_format_series_name: str = list(out_custom_export_formats_results_dict.keys())[0]
+        #     # custom_export_format_series_name: str = list(out_custom_export_formats_results_dict[list(out_custom_export_formats_results_dict.keys())[0]].keys())[0] # the inner key is the decoder_name (like 'long_LR') but the outer key is the custom_export name like 'color'
+        #     for custom_export_format_series_name in list(out_custom_export_formats_results_dict[list(out_custom_export_formats_results_dict.keys())[0]].keys()):
+        #         _output_combined_dir, _output_combined_image_save_dirs = _subfn_build_combined_output_images(single_known_epoch_type_dict=out_custom_export_formats_results_dict, specific_epochs_posterior_out_folder=specific_epochs_posterior_out_folder,
+        #                                                                                                     known_epoch_type_name=epochs_name, custom_export_format_series_name=custom_export_format_series_name)
                 
-            return out_paths, out_custom_export_formats_results_dict
+        #     return out_paths, out_custom_export_formats_results_dict
 
 
         # BEGIN FUNCTION BODY ________________________________________________________________________________________________ #
         assert parent_output_folder.exists(), f"parent_output_folder: {parent_output_folder} does not exist"
         
+        _common_kwargs = dict(desired_height=desired_height, combined_img_padding=combined_img_padding, combined_img_separator_color=combined_img_separator_color)
+
         out_paths_dict = {'laps': None, 'ripple': None}
         out_custom_formats_results_dict = {'laps': None, 'ripple': None}
         if decoder_laps_filter_epochs_decoder_result_dict is not None:
-            out_paths_dict['laps'], out_custom_formats_results_dict['laps'] = _subfn_perform_export_single_epochs(_active_filter_epochs_decoder_result_dict=decoder_laps_filter_epochs_decoder_result_dict, epochs_name='laps', a_parent_output_folder=parent_output_folder, custom_export_formats=custom_export_formats)
+            out_paths_dict['laps'], out_custom_formats_results_dict['laps'] = cls._subfn_perform_export_single_epochs(_active_filter_epochs_decoder_result_dict=decoder_laps_filter_epochs_decoder_result_dict, epochs_name='laps', a_parent_output_folder=parent_output_folder, custom_export_formats=custom_export_formats, **_common_kwargs)
         if decoder_ripple_filter_epochs_decoder_result_dict is not None:
-            out_paths_dict['ripple'], out_custom_formats_results_dict['ripple'] = _subfn_perform_export_single_epochs(_active_filter_epochs_decoder_result_dict=decoder_ripple_filter_epochs_decoder_result_dict,epochs_name='ripple', a_parent_output_folder=parent_output_folder, custom_export_formats=custom_export_formats)
+            out_paths_dict['ripple'], out_custom_formats_results_dict['ripple'] = cls._subfn_perform_export_single_epochs(_active_filter_epochs_decoder_result_dict=decoder_ripple_filter_epochs_decoder_result_dict,epochs_name='ripple', a_parent_output_folder=parent_output_folder, custom_export_formats=custom_export_formats, **_common_kwargs)
         return out_paths_dict, out_custom_formats_results_dict
 
 
