@@ -1238,6 +1238,12 @@ class MultiDecoderColorOverlayedPosteriors(ComputedResult):
     @function_attributes(short_name=None, tags=['UNFINISHED', 'TODO', 'TODO_2025-05-04'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-05-04 20:01', related_items=[])
     @classmethod
     def export_portion_as_images(cls, all_t_bins_out_RGBA, file_save_path='output/all_time_bins.pdf'):
+        """ 
+        
+        MultiDecoderColorOverlayedPosteriors.export_portion_as_images(all_t_bins_out_RGBA=all_t_bins_out_RGBA, file_save_path='output/all_time_bins.pdf')
+        
+        
+        """
         import matplotlib.pyplot as plt
         from matplotlib.backends.backend_pdf import PdfPages
 
@@ -1259,7 +1265,7 @@ class MultiDecoderColorOverlayedPosteriors(ComputedResult):
         #     plt.close()
 
         # Or save all time bins in a single PDF
-        with PdfPages(file_save_path) as pdf:
+        with PdfPages(file_save_path, keep_empty=False) as pdf:
             for t_idx in range(all_t_bins_out_RGBA.shape[0]):
                 fig, axes = plt.subplots(1, 4, figsize=(20, 5))
                 for decoder_idx in range(4):

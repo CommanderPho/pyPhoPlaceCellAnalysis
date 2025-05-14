@@ -1,3 +1,12 @@
+ 
+from __future__ import annotations # prevents having to specify types for typehinting as strings
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    ## typehinting only imports here
+    from pyphoplacecellanalysis.Pho2D.data_exporting import HeatmapExportKind
+
+
 from copy import deepcopy
 from pathlib import Path
 from typing import Any, Dict, List, Tuple, Union, Optional
@@ -468,7 +477,7 @@ class SingleEpochDecodedResult(HDF_SerializationMixin, AttrsBasedClassHelperMixi
         return f"{type(self).__name__}({content}\n)"
     
     @function_attributes(short_name=None, tags=['image', 'posterior'], input_requires=[], output_provides=[], uses=['get_array_as_image'], used_by=[], creation_date='2024-05-09 05:49', related_items=[])
-    def get_posterior_as_image(self, epoch_id_identifier_str: str = 'p_x_given_n', desired_height=None, desired_width=None, skip_img_normalization=True, export_grayscale:bool=False, **kwargs):
+    def get_posterior_as_image(self, epoch_id_identifier_str: str = 'p_x_given_n', desired_height=None, desired_width=None, skip_img_normalization=True, export_grayscale:bool=False, export_kind:HeatmapExportKind=None, **kwargs):
         """ gets the posterior as a colormapped image 
         
         Usage:
@@ -479,6 +488,12 @@ class SingleEpochDecodedResult(HDF_SerializationMixin, AttrsBasedClassHelperMixi
 
         """
         from pyphocorehelpers.plotting.media_output_helpers import get_array_as_image
+        from pyphoplacecellanalysis.Pho2D.data_exporting import HeatmapExportKind
+
+
+        if export_kind is None:
+            export_kind = HeatmapExportKind.COLORMAPPED
+
 
         if self.epoch_data_index is not None:
             epoch_id_str = f"{epoch_id_identifier_str}[{self.epoch_data_index}]"

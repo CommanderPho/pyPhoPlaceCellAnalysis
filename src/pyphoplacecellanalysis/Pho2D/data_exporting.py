@@ -53,10 +53,38 @@ from pyphocorehelpers.assertion_helpers import Assert
 from attrs import define, field, Factory
 
 
+from enum import Enum, auto
+
+class HeatmapExportKind(Enum):
+    """Description of the enum class and its purpose.
+    
+    from pyphoplacecellanalysis.Pho2D.data_exporting import HeatmapExportKind
+    
+    
+    """
+    GREYSCALE = auto()
+    COLORMAPPED = auto()
+    RAW_RGBA = auto()
+
+    def __str__(self):
+        return self.name
+
+    @classmethod
+    def list_values(cls):
+        """Returns a list of all enum values"""
+        return list(cls)
+
+    @classmethod
+    def list_names(cls):
+        """Returns a list of all enum names"""
+        return [e.name for e in cls]
+
+
 @define(slots=False, eq=False)
 class HeatmapExportConfig:
     """ specifies a single configuration for exporitng a heatmap, such as a posterior"""
     colormap: Optional[str] = field()
+    export_kind: HeatmapExportKind = field(default=HeatmapExportKind.COLORMAPPED)
     export_folder: Optional[Path] = field(default=None)
     export_grayscale: bool = field(default=False)
     desired_height: Optional[int] = field(default=None) 
@@ -72,11 +100,20 @@ class HeatmapExportConfig:
         self.export_grayscale = (self.colormap is None)
 
     @classmethod
+    def init_for_export_kind(cls, export_kind: HeatmapExportKind, **kwargs):
+        desired_colormap = kwargs.pop('colormap', None)
+        assert desired_colormap is None
+        _obj = cls(colormap=None, export_kind=HeatmapExportKind.GREYSCALE, **kwargs) # is_greyscale=True, 
+        return _obj
+    
+
+    @classmethod
     def init_greyscale(cls, **kwargs):
         desired_colormap = kwargs.pop('colormap', None)
         assert desired_colormap is None
-        _obj = cls(colormap=None, **kwargs) # is_greyscale=True, 
+        _obj = cls(colormap=None, export_kind=HeatmapExportKind.GREYSCALE, **kwargs) # is_greyscale=True, 
         return _obj
+    
     
 
     def to_dict(self) -> Dict:
@@ -429,6 +466,7 @@ class PosteriorExporting:
         """
 
         from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import DecodedFilterEpochsResult, SingleEpochDecodedResult
+        from pyphoplacecellanalysis.Pho2D.data_exporting import HeatmapExportKind
 
         if not isinstance(posterior_out_folder, Path):
             posterior_out_folder = Path(posterior_out_folder).resolve()
@@ -447,7 +485,7 @@ class PosteriorExporting:
             if should_export_separate_color_and_greyscale:
                 custom_export_formats: Dict[str, HeatmapExportConfig] = {
                     'greyscale': HeatmapExportConfig.init_greyscale(desired_height=desired_height, **kwargs),
-                     'color': HeatmapExportConfig(colormap=colormap, desired_height=desired_height, **kwargs),
+                     'color': HeatmapExportConfig(colormap=colormap, export_kind=HeatmapExportKind.COLORMAPPED, desired_height=desired_height, **kwargs),
                 }
             else:
                 ## just greyscale?
