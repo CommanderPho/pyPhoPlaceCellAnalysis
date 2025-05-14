@@ -680,17 +680,19 @@ QTreeWidget:item:!enabled {
                </property>
                <property name="styleSheet">
                 <string notr="true">QWidget:link {
-    color: rgb(0, 255, 247);
+    color: rgb(227, 225, 255);
 }
 QWidget:visited {
-    color: rgb(255, 170, 255);
+    color: rgb(170, 0, 255);
 }
 QTextBrowser:link {
-	color: rgb(0, 255, 247);
+	color:  rgb(227, 225, 255);
 }
 QTextBrowser:visited {
-	color: rgb(255, 170, 255);
-}</string>
+	color: rgb(170, 0, 255);
+}
+
+</string>
                </property>
                <property name="documentTitle">
                 <string notr="true">Display Function</string>
