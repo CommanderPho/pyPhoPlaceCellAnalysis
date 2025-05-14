@@ -353,76 +353,6 @@ class MultiDecoderColorOverlayedPosteriors(ComputedResult):
             print(f'\tdone.')
 
 
-    @function_attributes(short_name=None, tags=['tracks', 'plotting'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-05-13 00:04', related_items=[])
-    def add_tracks_to_spike_raster_window(self, active_2d_plot, dock_identifier_prefix: str = 'MergedColorPlot'):
-        """ adds two separate tracks to SpikeRaster2D, one for each decoding style (four vs. two) 
-                Each added track is a multi-color context-weighted decoding plot
-                
-        Usage:
-                    
-            multi_decoder_color_overlay: MultiDecoderColorOverlayedPosteriors = MultiDecoderColorOverlayedPosteriors(p_x_given_n=p_x_given_n, time_bin_centers=time_bin_centers, xbin=xbin, lower_bound_alpha=0.1, drop_below_threshold=1e-3, t_bin_size=0.025)
-            multi_decoder_color_overlay.compute_all()
-            _out_display_dict = multi_decoder_color_overlay.add_tracks_to_spike_raster_window(active_2d_plot=active_2d_plot, dock_identifier_prefix='MergedColorPlot')
-
-        
-        """
-        from neuropy.utils.mixins.binning_helpers import get_bin_edges
-        from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import _plot_low_firing_time_bins_overlay_image
-        
-
-        time_bin_edges: NDArray = get_bin_edges(deepcopy(self.time_bin_centers))
-        spikes_df: pd.DataFrame = deepcopy(self.spikes_df)
-        # unique_units = np.unique(spikes_df['aclu']) # sorted
-        unit_specific_time_binned_spike_counts, unique_units, (is_time_bin_active, inactive_mask, low_firing_bins_mask_rgba) = spikes_df.spikes.compute_unit_time_binned_spike_counts_and_mask(time_bin_edges=time_bin_edges)
-
-
-        _out_display_dict = {}
-        
-        if 'four_decoders' in self.extra_all_t_bins_outputs_dict_dict:
-            a_result_name: str = 'four_decoders'
-            dock_identifier: str = f'{dock_identifier_prefix}-AlphaWeighted-{a_result_name}'
-            active_colors_dict = self.active_colors_dict_dict[a_result_name]
-            
-            _out_tuple = self._perform_add_as_track_to_spike_raster_window(active_2d_plot=active_2d_plot, all_t_bins_final_RGBA=self.extra_all_t_bins_outputs_dict_dict[a_result_name]['all_t_bins_per_decoder_alpha_weighted_RGBA'], time_bin_centers=self.time_bin_centers, xbin=self.xbin, t_bin_size=self.t_bin_size, dock_identifier=dock_identifier)
-            ts_widget, fig, ax_list, dDisplayItem = _out_tuple
-            ## Add overlay plot to hide bins that don't meet the firing criteria:
-            low_firing_bins_image = _plot_low_firing_time_bins_overlay_image(widget=ts_widget, time_bin_edges=time_bin_edges, mask_rgba=low_firing_bins_mask_rgba, zorder=11)
-            try:
-                ax_inset, rounded_rect_inset =  self.add_decoder_legend_venn(all_decoder_colors_dict=active_colors_dict, ax=ax_list[0], zorder=13)
-                ts_widget.plots['decoder_legend_venn'] = dict(ax_inset=ax_inset, background_rounded_rect_inset=rounded_rect_inset)
-            except ModuleNotFoundError as e:
-                print(f'WARN: {e}. decoder_legend venn will be missing!')
-                pass
-            except Exception as e:
-                raise e
-
-            # _out_display_dict[dock_identifier] = _out_tuple
-            _out_display_dict[dock_identifier] = (ts_widget, fig, ax_list, dDisplayItem)
-
-
-        if 'two_decoders' in self.extra_all_t_bins_outputs_dict_dict:
-            a_result_name: str = 'two_decoders'
-            dock_identifier: str = f'{dock_identifier_prefix}-AlphaWeighted-{a_result_name}'
-            active_colors_dict = self.active_colors_dict_dict[a_result_name]
-            
-            _out_tuple = self._perform_add_as_track_to_spike_raster_window(active_2d_plot=active_2d_plot, all_t_bins_final_RGBA=self.extra_all_t_bins_outputs_dict_dict[a_result_name]['all_t_bins_per_decoder_alpha_weighted_RGBA'], time_bin_centers=self.time_bin_centers, xbin=self.xbin, t_bin_size=self.t_bin_size, dock_identifier=dock_identifier)
-            ts_widget, fig, ax_list, dDisplayItem = _out_tuple
-            ## Add overlay plot to hide bins that don't meet the firing criteria:
-            low_firing_bins_image = _plot_low_firing_time_bins_overlay_image(widget=ts_widget, time_bin_edges=time_bin_edges, mask_rgba=low_firing_bins_mask_rgba, zorder=11)
-            try:
-                ax_inset, rounded_rect_inset =  self.add_decoder_legend_venn(all_decoder_colors_dict=active_colors_dict, ax=ax_list[0], zorder=13)
-                ts_widget.plots['decoder_legend_venn'] = dict(ax_inset=ax_inset, background_rounded_rect_inset=rounded_rect_inset)
-            except ModuleNotFoundError as e:
-                print(f'WARN: {e}. decoder_legend venn will be missing!')
-                pass
-            except Exception as e:
-                raise e 
-
-            # _out_display_dict[dock_identifier] = _out_tuple
-            _out_display_dict[dock_identifier] = (ts_widget, fig, ax_list, dDisplayItem)
-
-        return _out_display_dict
-
 
     @function_attributes(short_name=None, tags=['decoder_result'], input_requires=[], output_provides=[], uses=['.compute_all_time_bin_RGBA'], used_by=['.compute_all'], creation_date='2025-05-13 00:03', related_items=[])
     @classmethod
@@ -603,7 +533,7 @@ class MultiDecoderColorOverlayedPosteriors(ComputedResult):
 
     @function_attributes(short_name=None, tags=['MAIN', 'all_t'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-05-04 18:00', related_items=[])
     @classmethod
-    def compute_all_time_bin_RGBA(cls, p_x_given_n: NDArray, active_decoder_cmap_dict: Optional[Dict]=None, produce_debug_outputs: bool = False, drop_below_threshold: float = 1e-2, progress_print: bool = True, color_blend_fn=None, should_constrain_to_four_decoder:bool=True) -> Tuple[NDArray, NDArray]:
+    def compute_all_time_bin_RGBA(cls, p_x_given_n: NDArray, active_decoder_cmap_dict: Optional[Dict]=None, produce_debug_outputs: bool = False, drop_below_threshold: float = 1e-2, progress_print: bool = True, color_blend_fn=None, should_constrain_to_four_decoder:bool=True, debug_print=False) -> Tuple[NDArray, NDArray]:
         """ Computes the final RGBA colors for each position x time bin in p_x_given_n by overlaying each of the decoders values
         
         
@@ -659,7 +589,8 @@ class MultiDecoderColorOverlayedPosteriors(ComputedResult):
         if should_constrain_to_four_decoder:
             assert n_decoders == 4, f"n_decoders: {n_decoders}"
         else:
-            print(f'n_decoders: {n_decoders}')
+            if debug_print:
+                print(f'n_decoders: {n_decoders}')
 
 
         assert (len(active_decoder_cmap_dict) == n_decoders), f"len(active_decoder_cmap_dict): {len(active_decoder_cmap_dict)} != n_decoders: {n_decoders} but it must!"
@@ -1279,6 +1210,10 @@ class MultiDecoderColorOverlayedPosteriors(ComputedResult):
                 plt.close()
 
 
+    # ==================================================================================================================================================================================================================================================================================== #
+    # SpikeRaster2D Decoder Tracks                                                                                                                                                                                                                                                         #
+    # ==================================================================================================================================================================================================================================================================================== #
+
     
     @function_attributes(short_name=None, tags=['track', 'SpikeRaster2D', 'private'], input_requires=[], output_provides=[], uses=['.plot_mutli_t_bin_p_x_given_n'], used_by=[], creation_date='2025-05-06 16:08', related_items=[])
     @classmethod
@@ -1321,6 +1256,81 @@ class MultiDecoderColorOverlayedPosteriors(ComputedResult):
         return ts_widget, fig, ax_list, dDisplayItem
         
 
+
+    @function_attributes(short_name=None, tags=['tracks', 'plotting'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-05-13 00:04', related_items=[])
+    def add_tracks_to_spike_raster_window(self, active_2d_plot, dock_identifier_prefix: str = 'MergedColorPlot'):
+        """ adds two separate tracks to SpikeRaster2D, one for each decoding style (four vs. two) 
+                Each added track is a multi-color context-weighted decoding plot
+                
+        Usage:
+                    
+            multi_decoder_color_overlay: MultiDecoderColorOverlayedPosteriors = MultiDecoderColorOverlayedPosteriors(p_x_given_n=p_x_given_n, time_bin_centers=time_bin_centers, xbin=xbin, lower_bound_alpha=0.1, drop_below_threshold=1e-3, t_bin_size=0.025)
+            multi_decoder_color_overlay.compute_all()
+            _out_display_dict = multi_decoder_color_overlay.add_tracks_to_spike_raster_window(active_2d_plot=active_2d_plot, dock_identifier_prefix='MergedColorPlot')
+
+        
+        """
+        from neuropy.utils.mixins.binning_helpers import get_bin_edges
+        from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import _plot_low_firing_time_bins_overlay_image
+        
+
+        time_bin_edges: NDArray = get_bin_edges(deepcopy(self.time_bin_centers))
+        spikes_df: pd.DataFrame = deepcopy(self.spikes_df)
+        # unique_units = np.unique(spikes_df['aclu']) # sorted
+        unit_specific_time_binned_spike_counts, unique_units, (is_time_bin_active, inactive_mask, low_firing_bins_mask_rgba) = spikes_df.spikes.compute_unit_time_binned_spike_counts_and_mask(time_bin_edges=time_bin_edges)
+
+
+        _out_display_dict = {}
+        
+        if 'four_decoders' in self.extra_all_t_bins_outputs_dict_dict:
+            a_result_name: str = 'four_decoders'
+            dock_identifier: str = f'{dock_identifier_prefix}-AlphaWeighted-{a_result_name}'
+            active_colors_dict = self.active_colors_dict_dict[a_result_name]
+            
+            _out_tuple = self._perform_add_as_track_to_spike_raster_window(active_2d_plot=active_2d_plot, all_t_bins_final_RGBA=self.extra_all_t_bins_outputs_dict_dict[a_result_name]['all_t_bins_per_decoder_alpha_weighted_RGBA'], time_bin_centers=self.time_bin_centers, xbin=self.xbin, t_bin_size=self.t_bin_size, dock_identifier=dock_identifier)
+            ts_widget, fig, ax_list, dDisplayItem = _out_tuple
+            ## Add overlay plot to hide bins that don't meet the firing criteria:
+            low_firing_bins_image = _plot_low_firing_time_bins_overlay_image(widget=ts_widget, time_bin_edges=time_bin_edges, mask_rgba=low_firing_bins_mask_rgba, zorder=11)
+            try:
+                ax_inset, rounded_rect_inset =  self.add_decoder_legend_venn(all_decoder_colors_dict=active_colors_dict, ax=ax_list[0], zorder=13)
+                ts_widget.plots['decoder_legend_venn'] = dict(ax_inset=ax_inset, background_rounded_rect_inset=rounded_rect_inset)
+            except ModuleNotFoundError as e:
+                print(f'WARN: {e}. decoder_legend venn will be missing!')
+                pass
+            except Exception as e:
+                raise e
+
+            # _out_display_dict[dock_identifier] = _out_tuple
+            _out_display_dict[dock_identifier] = (ts_widget, fig, ax_list, dDisplayItem)
+
+
+        if 'two_decoders' in self.extra_all_t_bins_outputs_dict_dict:
+            a_result_name: str = 'two_decoders'
+            dock_identifier: str = f'{dock_identifier_prefix}-AlphaWeighted-{a_result_name}'
+            active_colors_dict = self.active_colors_dict_dict[a_result_name]
+            
+            _out_tuple = self._perform_add_as_track_to_spike_raster_window(active_2d_plot=active_2d_plot, all_t_bins_final_RGBA=self.extra_all_t_bins_outputs_dict_dict[a_result_name]['all_t_bins_per_decoder_alpha_weighted_RGBA'], time_bin_centers=self.time_bin_centers, xbin=self.xbin, t_bin_size=self.t_bin_size, dock_identifier=dock_identifier)
+            ts_widget, fig, ax_list, dDisplayItem = _out_tuple
+            ## Add overlay plot to hide bins that don't meet the firing criteria:
+            low_firing_bins_image = _plot_low_firing_time_bins_overlay_image(widget=ts_widget, time_bin_edges=time_bin_edges, mask_rgba=low_firing_bins_mask_rgba, zorder=11)
+            try:
+                ax_inset, rounded_rect_inset =  self.add_decoder_legend_venn(all_decoder_colors_dict=active_colors_dict, ax=ax_list[0], zorder=13)
+                ts_widget.plots['decoder_legend_venn'] = dict(ax_inset=ax_inset, background_rounded_rect_inset=rounded_rect_inset)
+            except ModuleNotFoundError as e:
+                print(f'WARN: {e}. decoder_legend venn will be missing!')
+                pass
+            except Exception as e:
+                raise e 
+
+            # _out_display_dict[dock_identifier] = _out_tuple
+            _out_display_dict[dock_identifier] = (ts_widget, fig, ax_list, dDisplayItem)
+
+        return _out_display_dict
+
+
+    # ==================================================================================================================================================================================================================================================================================== #
+    # Decoder Legend Venn Diagram:                                                                                                                                                                                                                                                         #
+    # ==================================================================================================================================================================================================================================================================================== #
 
     @classmethod
     def add_decoder_legend_venn(cls, all_decoder_colors_dict: Dict[str, str], ax, defer_render:bool=False, zorder:float=137.0):
