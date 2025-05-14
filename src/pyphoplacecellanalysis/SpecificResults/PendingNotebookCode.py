@@ -7692,53 +7692,6 @@ class ProgrammaticDisplayFunctionTestingFolderImageLoading:
 
 
 
-
-# ==================================================================================================================== #
-# 2024-08-16 - Image Processing Techniques                                                                             #
-# ==================================================================================================================== #
-def plot_grad_quiver(sobel_x, sobel_y, downsample_step=1):
-    """
-
-    # Compute the magnitude of the gradient
-    gradient_magnitude = np.hypot(sobel_x, sobel_y)
-    gradient_direction = np.arctan2(sobel_y, sobel_x)
-
-    """
-    # Compute the magnitude of the gradient
-    gradient_magnitude = np.hypot(sobel_x, sobel_y)
-    gradient_direction = np.arctan2(sobel_y, sobel_x)
-
-    # Create a grid of coordinates for plotting arrows
-    Y, X = np.meshgrid(np.arange(gradient_magnitude.shape[0]), np.arange(gradient_magnitude.shape[1]), indexing='ij')
-
-    # Downsample the arrow plot for better visualization (optional)
-
-    X_downsampled = X[::downsample_step, ::downsample_step]
-    Y_downsampled = Y[::downsample_step, ::downsample_step]
-    sobel_x_downsampled = sobel_x[::downsample_step, ::downsample_step]
-    sobel_y_downsampled = sobel_y[::downsample_step, ::downsample_step]
-
-    # Plotting the gradient magnitude and arrows representing the direction
-    fig = plt.figure(figsize=(10, 10))
-    plt.imshow(gradient_magnitude, cmap='gray', origin='lower')
-    plt.quiver(X_downsampled, Y_downsampled, sobel_x_downsampled, sobel_y_downsampled,
-            color='red', angles='xy', scale_units='xy') # , scale=5, width=0.01
-    plt.title('Gradient Magnitude with Direction Arrows')
-    plt.axis('off')
-    plt.show()
-
-    return fig
-
-
-
-# ==================================================================================================================== #
-# 2024-07-15 - Factored out of Across Session Notebook                                                                 #
-# ==================================================================================================================== #
-
-
-
-
-
 # ==================================================================================================================== #
 # 2024-06-26 - Shuffled WCorr Output with working histogram                                                            #
 # ==================================================================================================================== #
