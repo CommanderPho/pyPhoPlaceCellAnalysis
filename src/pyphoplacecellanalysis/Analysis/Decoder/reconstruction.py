@@ -502,7 +502,7 @@ class SingleEpochDecodedResult(HDF_SerializationMixin, AttrsBasedClassHelperMixi
 
         # with VizTracer(output_file=f"viztracer_{get_now_time_str()}-MultiDecoderColorOverlayedPosteriors.json", min_duration=200, tracer_entries=3000000, ignore_frozen=True) as tracer:
         multi_decoder_color_overlay: MultiDecoderColorOverlayedPosteriors = MultiDecoderColorOverlayedPosteriors(spikes_df=spikes_df, p_x_given_n=p_x_given_n, time_bin_centers=time_bin_centers, xbin=xbin, lower_bound_alpha=lower_bound_alpha, drop_below_threshold=drop_below_threshold, t_bin_size=t_bin_size)
-        multi_decoder_color_overlay.compute_all() ## single compute
+        multi_decoder_color_overlay.compute_all(progress_print=False) ## single compute
         
         img_data: NDArray[ND.Shape["N_TIME_BINS, N_POS_BINS, 4"], np.floating] = multi_decoder_color_overlay.extra_all_t_bins_outputs_dict_dict['two_decoders']['all_t_bins_final_overlayed_out_RGBA'].astype(float) # (69488, 59, 4)
         

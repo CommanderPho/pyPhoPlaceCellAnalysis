@@ -622,6 +622,8 @@ class PosteriorExporting:
     def _subfn_perform_export_single_epochs(cls, _active_filter_epochs_decoder_result_dict: Dict[types.DecoderName, DecodedFilterEpochsResult], epochs_name: str, a_parent_output_folder: Path, custom_export_formats: Optional[Dict[str, HeatmapExportConfig]]=None, desired_height=None, combined_img_padding=4, combined_img_separator_color=None, **kwargs) -> IdentifyingContext:
         """ saves a single set of named epochs, like 'laps' or 'ripple' 
         """
+        n_decoders: int = len(_active_filter_epochs_decoder_result_dict)
+        
         out_paths = {}
         out_custom_export_formats_results_dict = {}
 
@@ -642,12 +644,13 @@ class PosteriorExporting:
             out_custom_export_formats_results_dict[a_decoder_name] = a_custom_export_format_results
             
         ## try to export the combined figures right away
-        # custom_export_format_series_name: str = list(out_custom_export_formats_results_dict.keys())[0]
-        # custom_export_format_series_name: str = list(out_custom_export_formats_results_dict[list(out_custom_export_formats_results_dict.keys())[0]].keys())[0] # the inner key is the decoder_name (like 'long_LR') but the outer key is the custom_export name like 'color'
-        for custom_export_format_series_name in list(out_custom_export_formats_results_dict[list(out_custom_export_formats_results_dict.keys())[0]].keys()):
-            _output_combined_dir, _output_combined_image_save_dirs = cls._subfn_build_combined_output_images(single_known_epoch_type_dict=out_custom_export_formats_results_dict, specific_epochs_posterior_out_folder=specific_epochs_posterior_out_folder,
-                                                                                                        known_epoch_type_name=epochs_name, custom_export_format_series_name=custom_export_format_series_name,
-                                                                                                        combined_img_padding=combined_img_padding, combined_img_separator_color=combined_img_separator_color)
+        if n_decoders > 1:
+            # custom_export_format_series_name: str = list(out_custom_export_formats_results_dict.keys())[0]
+            # custom_export_format_series_name: str = list(out_custom_export_formats_results_dict[list(out_custom_export_formats_results_dict.keys())[0]].keys())[0] # the inner key is the decoder_name (like 'long_LR') but the outer key is the custom_export name like 'color'
+            for custom_export_format_series_name in list(out_custom_export_formats_results_dict[list(out_custom_export_formats_results_dict.keys())[0]].keys()):
+                _output_combined_dir, _output_combined_image_save_dirs = cls._subfn_build_combined_output_images(single_known_epoch_type_dict=out_custom_export_formats_results_dict, specific_epochs_posterior_out_folder=specific_epochs_posterior_out_folder,
+                                                                                                            known_epoch_type_name=epochs_name, custom_export_format_series_name=custom_export_format_series_name,
+                                                                                                            combined_img_padding=combined_img_padding, combined_img_separator_color=combined_img_separator_color)
             
         return out_paths, out_custom_export_formats_results_dict
 

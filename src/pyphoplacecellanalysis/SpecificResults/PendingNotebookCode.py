@@ -330,7 +330,7 @@ class MultiDecoderColorOverlayedPosteriors(ComputedResult):
 
 
     @function_attributes(short_name=None, tags=['MAIN', 'compute'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-05-12 23:50', related_items=[])
-    def compute_all(self, compute_four_decoder_version: bool=False):
+    def compute_all(self, compute_four_decoder_version: bool=False, progress_print: bool=True):
         """ computes all 
         
         Usage:
@@ -343,13 +343,14 @@ class MultiDecoderColorOverlayedPosteriors(ComputedResult):
         """
         self.p_x_given_n_track_identity_marginal = self.compute_track_ID_marginal(p_x_given_n=self.p_x_given_n)
         if compute_four_decoder_version:
-            self.extra_all_t_bins_outputs_dict_dict['four_decoders'], self.active_colors_dict_dict['four_decoders'] = MultiDecoderColorOverlayedPosteriors.build_four_decoder_version(p_x_given_n=self.p_x_given_n, time_bin_centers=self.time_bin_centers, xbin=self.xbin, lower_bound_alpha=self.lower_bound_alpha, drop_below_threshold=self.drop_below_threshold)
+            self.extra_all_t_bins_outputs_dict_dict['four_decoders'], self.active_colors_dict_dict['four_decoders'] = MultiDecoderColorOverlayedPosteriors.build_four_decoder_version(p_x_given_n=self.p_x_given_n, lower_bound_alpha=self.lower_bound_alpha, drop_below_threshold=self.drop_below_threshold, progress_print=progress_print)
         else:
             self.extra_all_t_bins_outputs_dict_dict.pop('four_decoders', None)
             self.active_colors_dict_dict.pop('four_decoders', None)
             
-        self.extra_all_t_bins_outputs_dict_dict['two_decoders'], self.active_colors_dict_dict['two_decoders'] = MultiDecoderColorOverlayedPosteriors.build_two_decoder_version(p_x_given_n=self.p_x_given_n, time_bin_centers=self.time_bin_centers, xbin=self.xbin, lower_bound_alpha=self.lower_bound_alpha, drop_below_threshold=self.drop_below_threshold)
-        print(f'\tdone.')
+        self.extra_all_t_bins_outputs_dict_dict['two_decoders'], self.active_colors_dict_dict['two_decoders'] = MultiDecoderColorOverlayedPosteriors.build_two_decoder_version(p_x_given_n=self.p_x_given_n, lower_bound_alpha=self.lower_bound_alpha, drop_below_threshold=self.drop_below_threshold, progress_print=progress_print)
+        if progress_print:
+            print(f'\tdone.')
 
 
     @function_attributes(short_name=None, tags=['tracks', 'plotting'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-05-13 00:04', related_items=[])
@@ -425,11 +426,13 @@ class MultiDecoderColorOverlayedPosteriors(ComputedResult):
 
     @function_attributes(short_name=None, tags=['decoder_result'], input_requires=[], output_provides=[], uses=['.compute_all_time_bin_RGBA'], used_by=['.compute_all'], creation_date='2025-05-13 00:03', related_items=[])
     @classmethod
-    def build_four_decoder_version(cls, p_x_given_n: NDArray[ND.Shape["N_POS_BINS, 4, N_TIME_BINS"], np.floating], time_bin_centers: NDArray[ND.Shape["N_TIME_BINS"], np.floating], xbin: NDArray[ND.Shape["N_POS_BINS"], np.floating], lower_bound_alpha:float=0.1, drop_below_threshold:float=1e-3):
+    def build_four_decoder_version(cls, p_x_given_n: NDArray[ND.Shape["N_POS_BINS, 4, N_TIME_BINS"], np.floating], lower_bound_alpha:float=0.1, drop_below_threshold:float=1e-3, **kwargs):
         """
-
+        # , time_bin_centers: NDArray[ND.Shape["N_TIME_BINS"], np.floating], xbin: NDArray[ND.Shape["N_POS_BINS"], np.floating]
+        
+        
         Usage:        
-            extra_all_t_bins_outputs_dict, active_colors_dict = MultiDecoderColorOverlayedPosteriors.build_four_decoder_version(p_x_given_n=p_x_given_n, time_bin_centers=time_bin_centers, xbin=xbin, lower_bound_alpha=0.1, drop_below_threshold=1e-3)
+            extra_all_t_bins_outputs_dict, active_colors_dict = MultiDecoderColorOverlayedPosteriors.build_four_decoder_version(p_x_given_n=p_x_given_n, lower_bound_alpha=0.1, drop_below_threshold=1e-3)
             all_t_bins_final_overlayed_out_RGBA = extra_all_t_bins_outputs_dict['all_t_bins_final_overlayed_out_RGBA']
             all_t_bins_per_decoder_out_RGBA = extra_all_t_bins_outputs_dict['all_t_bins_per_decoder_out_RGBA']
 
@@ -448,18 +451,16 @@ class MultiDecoderColorOverlayedPosteriors(ComputedResult):
         active_cmap_names = ['long_LR', 'long_RL', 'short_LR', 'short_RL']
         active_p_x_given_n = deepcopy(p_x_given_n)
 
-
         # OUTPUTS: all_decoder_colors_dict, p_x_given_n
         ## OUTPUTS: active_cmap_names, active_p_x_given_n, time_bin_centers, xbin
         
-
         ## INPUTS: all_decoder_colors_dict, active_cmap_names
         active_colors_dict = {k:v for k, v in all_decoder_colors_dict.items() if k in active_cmap_names}
         active_decoder_cmap_dict = {k:ColormapHelpers.create_transparent_colormap(color_literal_name=v, lower_bound_alpha=lower_bound_alpha, should_return_LinearSegmentedColormap=True) for k, v in all_decoder_colors_dict.items() if k in active_cmap_names}
         # additional_legend_entries = list(zip(directional_active_lap_pf_results_dicts.keys(), additional_cmap_names.values() )) # ['red', 'purple', 'green', 'orange']
 
         ## OUTPUTS: active_cmap_decoder_dict
-        extra_all_t_bins_outputs_dict = MultiDecoderColorOverlayedPosteriors.compute_all_time_bin_RGBA(p_x_given_n=active_p_x_given_n, produce_debug_outputs=False, drop_below_threshold=drop_below_threshold, active_decoder_cmap_dict=active_decoder_cmap_dict, should_constrain_to_four_decoder=True)
+        extra_all_t_bins_outputs_dict = MultiDecoderColorOverlayedPosteriors.compute_all_time_bin_RGBA(p_x_given_n=active_p_x_given_n, produce_debug_outputs=False, drop_below_threshold=drop_below_threshold, active_decoder_cmap_dict=active_decoder_cmap_dict, should_constrain_to_four_decoder=True, **kwargs)
 
         return extra_all_t_bins_outputs_dict, active_colors_dict
 
@@ -535,18 +536,19 @@ class MultiDecoderColorOverlayedPosteriors(ComputedResult):
         
     @function_attributes(short_name=None, tags=['decoder_result'], input_requires=[], output_provides=[], uses=['.compute_all_time_bin_RGBA', '.compute_track_ID_marginal'], used_by=['.compute_all'], creation_date='2025-05-13 00:03', related_items=[])
     @classmethod
-    def build_two_decoder_version(cls, p_x_given_n: NDArray[ND.Shape["N_POS_BINS, 4, N_TIME_BINS"], np.floating], time_bin_centers: NDArray[ND.Shape["N_TIME_BINS"], np.floating], xbin: NDArray[ND.Shape["N_POS_BINS"], np.floating], lower_bound_alpha:float=0.1, drop_below_threshold:float=1e-3):
+    def build_two_decoder_version(cls, p_x_given_n: NDArray[ND.Shape["N_POS_BINS, 4, N_TIME_BINS"], np.floating], lower_bound_alpha:float=0.1, drop_below_threshold:float=1e-3, **kwargs):
         """
-
+        # , time_bin_centers: NDArray[ND.Shape["N_TIME_BINS"], np.floating], xbin: NDArray[ND.Shape["N_POS_BINS"], np.floating]
+        
         Usage:        
-            extra_all_t_bins_outputs_dict_dict['two_decoders'], active_colors_dict_dict['two_decoders'] = MultiDecoderColorOverlayedPosteriors.build_two_decoder_version(p_x_given_n=p_x_given_n, time_bin_centers=time_bin_centers, xbin=xbin, lower_bound_alpha=0.1, drop_below_threshold=1e-3)
+            extra_all_t_bins_outputs_dict_dict['two_decoders'], active_colors_dict_dict['two_decoders'] = MultiDecoderColorOverlayedPosteriors.build_two_decoder_version(p_x_given_n=p_x_given_n, lower_bound_alpha=0.1, drop_below_threshold=1e-3)
             all_t_bins_final_overlayed_out_RGBA = extra_all_t_bins_outputs_dict['all_t_bins_final_overlayed_out_RGBA']
             all_t_bins_per_decoder_out_RGBA = extra_all_t_bins_outputs_dict['all_t_bins_per_decoder_out_RGBA']
 
             
         Usage 2:
             ## INPUTS: p_x_given_n_track_identity_marginal
-            extra_all_t_bins_outputs_dict_dict['two_decoders'], active_colors_dict_dict['two_decoders'] = MultiDecoderColorOverlayedPosteriors.build_two_decoder_version(p_x_given_n_track_identity_marginal=p_x_given_n_track_identity_marginal, time_bin_centers=time_bin_centers, xbin=xbin, lower_bound_alpha=0.1, drop_below_threshold=1e-3)
+            extra_all_t_bins_outputs_dict_dict['two_decoders'], active_colors_dict_dict['two_decoders'] = MultiDecoderColorOverlayedPosteriors.build_two_decoder_version(p_x_given_n_track_identity_marginal=p_x_given_n_track_identity_marginal, lower_bound_alpha=0.1, drop_below_threshold=1e-3)
 
         """
         from pyphocorehelpers.gui.Qt.color_helpers import ColormapHelpers
@@ -593,7 +595,7 @@ class MultiDecoderColorOverlayedPosteriors(ComputedResult):
         # additional_legend_entries = list(zip(directional_active_lap_pf_results_dicts.keys(), additional_cmap_names.values() )) # ['red', 'purple', 'green', 'orange']
 
         ## OUTPUTS: active_cmap_decoder_dict
-        extra_all_t_bins_outputs_dict = cls.compute_all_time_bin_RGBA(p_x_given_n=active_p_x_given_n, produce_debug_outputs=False, drop_below_threshold=drop_below_threshold, active_decoder_cmap_dict=active_decoder_cmap_dict, should_constrain_to_four_decoder=False)
+        extra_all_t_bins_outputs_dict = cls.compute_all_time_bin_RGBA(p_x_given_n=active_p_x_given_n, produce_debug_outputs=False, drop_below_threshold=drop_below_threshold, active_decoder_cmap_dict=active_decoder_cmap_dict, should_constrain_to_four_decoder=False, **kwargs)
         
         return extra_all_t_bins_outputs_dict, active_colors_dict
     
