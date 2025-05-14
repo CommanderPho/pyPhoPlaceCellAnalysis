@@ -40,21 +40,14 @@ KnownEpochsName = Literal['laps', 'ripple', 'other']
 import matplotlib.pyplot as plt
 import pyphoplacecellanalysis.External.pyqtgraph as pg
 
-from pyphoplacecellanalysis.Analysis.reliability import TrialByTrialActivity
-
-from neuropy.utils.mixins.AttrsClassHelpers import keys_only_repr
-from pyphocorehelpers.DataStructure.general_parameter_containers import VisualizationParameters, RenderPlotsData, RenderPlots # PyqtgraphRenderPlots
-from pyphocorehelpers.gui.PhoUIContainer import PhoUIContainer
-
-from pyphocorehelpers.plotting.media_output_helpers import vertical_image_stack, horizontal_image_stack
 from PIL import Image, ImageOps, ImageFilter # for export_array_as_image
-from neuropy.utils.result_context import DisplaySpecifyingIdentifyingContext
+# from neuropy.utils.result_context import DisplaySpecifyingIdentifyingContext
 from pyphocorehelpers.assertion_helpers import Assert
 from attrs import define, field, Factory
 
-
 from enum import Enum, auto
 
+@metadata_attributes(short_name=None, tags=['enum', 'export_mode'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-05-14 14:14', related_items=[])
 class HeatmapExportKind(Enum):
     """Description of the enum class and its purpose.
     
@@ -1258,6 +1251,7 @@ class PosteriorExporting:
             fullwidth_path_widget(a_path=epoch_specific_folder, file_name_label="epoch_specific_folder:")
 
         """
+        from pyphocorehelpers.plotting.media_output_helpers import vertical_image_stack, horizontal_image_stack
 
         # Get the clicked epoch from the _out_ripple_rasters GUI _____________________________________________________________ #
         active_epoch_tuple = deepcopy(_out_ripple_rasters.active_epoch_tuple)
