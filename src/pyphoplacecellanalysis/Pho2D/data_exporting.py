@@ -532,11 +532,18 @@ class PosteriorExporting:
         
 
 
-        from pyphocorehelpers.plotting.media_output_helpers import add_bottom_label
+        from pyphocorehelpers.plotting.media_output_helpers import add_bottom_label, add_half_width_rectangle
 
         def create_label_function(label_text):
             """Create a function that adds a specific label to an image."""
-            return lambda an_img: add_bottom_label(an_img, label_text, font_size=48)
+            return lambda an_img: add_bottom_label(an_img, label_text, font_size=244, text_color=(1, 0, 0))
+
+
+        def create_half_width_rectangle_function(side, color):
+            """Create a function that adds a specific label to an image."""
+            return lambda an_img: add_half_width_rectangle(an_img, side=side, color=color, vertical_position = 'bottom', height_fraction = 0.1)
+
+
 
 
         # # Create an image with a label
@@ -555,16 +562,30 @@ class PosteriorExporting:
 
             # Create an image with a label
             # labeled_image = add_bottom_label(original_image, "Time (seconds)", font_size=14)
-            curr_x_axis_label_str: str = f'{earliest_t}'
+            # curr_x_axis_label_str: str = f'{earliest_t}'
+            # if not is_post_delta:
+            #      curr_x_axis_label_str = f'{curr_x_axis_label_str} (pre-delta)'
+            # else:
+            #     curr_x_axis_label_str = f'{curr_x_axis_label_str} (post-delta)'
+            
+
+            curr_x_axis_label_str: str = f''
             if not is_post_delta:
-                 curr_x_axis_label_str = f'{curr_x_axis_label_str} (pre-delta)'
+                 curr_x_axis_label_str = f'PRE'
+                 side = 'left'
+                 epoch_rect_color = '#4169E1'
+                                            
             else:
-                curr_x_axis_label_str = f'{curr_x_axis_label_str} (post-delta)'
+                curr_x_axis_label_str = f'POST'
+                side = 'right'
+                epoch_rect_color = '#DC143C'
+                
 
             # curr_post_render_image_functions_dict = {'add_bottom_label': (lambda an_img: add_bottom_label(an_img, curr_x_axis_label_str, font_size=8))}
-            curr_post_render_image_functions_dict = {'add_bottom_label': create_label_function(curr_x_axis_label_str),
-                                                     }
-
+            curr_post_render_image_functions_dict = {
+                # 'add_bottom_label': create_label_function(curr_x_axis_label_str),
+                'create_half_width_rectangle_function': create_half_width_rectangle_function(side, epoch_rect_color),
+            }
                                       
             if desired_height is None:
                 ## set to 1x
