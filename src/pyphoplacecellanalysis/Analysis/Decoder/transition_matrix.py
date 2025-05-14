@@ -6,6 +6,8 @@ from typing import TYPE_CHECKING
 from copy import deepcopy
 from pathlib import Path
 from enum import Enum
+from neuropy.analyses.decoders import BinningContainer
+from neuropy.utils.result_context import IdentifyingContext
 import numpy as np
 import pandas as pd
 from scipy.sparse import coo_matrix, csr_matrix
@@ -27,9 +29,10 @@ if TYPE_CHECKING:
     ## typehinting only imports here
     from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import BasePositionDecoder #typehinting only
     from pyphoplacecellanalysis.GUI.PyQtPlot.BinnedImageRenderingWindow import BasicBinnedImageRenderingWindow
+    from pyphoplacecellanalysis.Analysis.Decoder.context_dependent import GenericDecoderDictDecodedEpochsDictResult
+
 
 from neuropy.utils.mixins.indexing_helpers import UnpackableMixin
-
 from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import DecodedFilterEpochsResult
 
 
@@ -1651,7 +1654,7 @@ def build_transition_matricies(a_result: DecodedFilterEpochsResult, debug_print:
 
 
 @function_attributes(short_name=None, tags=['MAIN', 'transition-matrix', 'TO_REFACTOR'], input_requires=[], output_provides=[], uses=['build_transition_matricies'], used_by=[], creation_date='2025-04-22 14:49', related_items=[])
-def complete_all_transition_matricies(a_new_fully_generic_result: GenericDecoderDictDecodedEpochsDictResult, a_target_context: IdentifyingContext, debug_print: bool = False):
+def complete_all_transition_matricies(a_new_fully_generic_result: "GenericDecoderDictDecodedEpochsDictResult", a_target_context: IdentifyingContext, debug_print: bool = False):
     """ Computes all transition matrix outputs for all found results for the provided target_context
     
     
