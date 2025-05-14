@@ -125,7 +125,44 @@ def pyqtplot_plot_image(xbin_edges, ybin_edges, image, enable_LUT_Histogram=Fals
 
     return app, parent_root_widget, root_render_widget
  
- 
+
+@function_attributes(short_name=None, tags=['images', 'pyqtgraph', 'widget'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-08-21 00:00', related_items=['transition_matrix'])
+def visualize_multiple_image_items(images: list, threshold=1e-3) -> None:
+    """ Sample multiple pg.ImageItems overlayed on one another
+
+    # Example usage:
+    image1 = np.random.rand(100, 100) * 100  # Example image 1
+    image2 = np.random.rand(100, 100) * 100  # Example image 2
+    image3 = np.random.rand(100, 100) * 100  # Example image 3
+
+    image1
+    # Define the threshold
+
+    _out = visualize_multiple_image_items([image1, image2, image3], threshold=50)
+
+    
+    History:
+        Plotting Generated Transition Matrix Sequences  
+    """
+    app = pg.mkQApp('visualize_multiple_image_items')  # Initialize the Qt application
+    win = pg.GraphicsLayoutWidget(show=True)
+    view = win.addViewBox()
+    view.setAspectLocked(True)
+
+    for img in images:
+        if threshold is not None:
+            # Create a masked array, masking values below the threshold
+            img = np.ma.masked_less(img, threshold)
+
+        image_item = pg.ImageItem(img)
+        view.addItem(image_item)
+
+    # QtGui.QApplication.instance().exec_()
+    return app, win, view
+
+
+
+
 # ==================================================================================================================== #
 # UI Building Helpers                                                                                                  #
 # ==================================================================================================================== #
