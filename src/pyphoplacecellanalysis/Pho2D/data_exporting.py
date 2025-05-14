@@ -536,7 +536,7 @@ class PosteriorExporting:
 
         def create_label_function(label_text):
             """Create a function that adds a specific label to an image."""
-            return lambda an_img: add_bottom_label(an_img, label_text, font_size=8)
+            return lambda an_img: add_bottom_label(an_img, label_text, font_size=48)
 
 
         # # Create an image with a label
