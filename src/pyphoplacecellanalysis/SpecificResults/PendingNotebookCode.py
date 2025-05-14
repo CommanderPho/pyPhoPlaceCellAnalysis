@@ -5232,9 +5232,6 @@ from neuropy.utils.indexing_helpers import PandasHelpers
 from pyphoplacecellanalysis.Pho2D.track_shape_drawing import LinearTrackInstance
 # from pyphoplacecellanalysis.Analysis.Decoder.heuristic_replay_scoring import SubsequenceDetectionSamples, GroundTruthData
 
-
-
-
 import matplotlib.pyplot as plt
 import numpy as np
 
@@ -5680,6 +5677,7 @@ import neuropy.utils.type_aliases as types
 
 # DecoderName = NewType('DecoderName', str)
 
+@function_attributes(short_name=None, tags=['matplotlib', 'helper'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-05-14 14:09', related_items=[])
 def add_time_indicator_lines(active_figures_dict, later_lap_appearing_aclus_times_dict: Dict[types.aclu_index, Dict[str, float]], time_point_formatting_kwargs_dict=None, defer_draw: bool=False):
     """
         from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import add_time_indicator_lines
@@ -7693,90 +7691,6 @@ class ProgrammaticDisplayFunctionTestingFolderImageLoading:
 
 
 
-
-
-# ==================================================================================================================== #
-# 2024-08-21 Plotting Generated Transition Matrix Sequences                                                            #
-# ==================================================================================================================== #
-from matplotlib.colors import Normalize
-
-@function_attributes(short_name=None, tags=['colormap', 'grayscale', 'image'], input_requires=[], output_provides=[], uses=[], used_by=['blend_images'], creation_date='2024-08-21 00:00', related_items=[])
-def apply_colormap(image: np.ndarray, color: tuple) -> np.ndarray:
-    colored_image = np.zeros((*image.shape, 3), dtype=np.float32)
-    for i in range(3):
-        colored_image[..., i] = image * color[i]
-    return colored_image
-
-@function_attributes(short_name=None, tags=['image'], input_requires=[], output_provides=[], uses=['apply_colormap'], used_by=[], creation_date='2024-08-21 00:00', related_items=[])
-def blend_images(images: list, cmap=None) -> np.ndarray:
-    """ Tries to pre-combine images to produce an output image of the same size
-
-    # 'coolwarm'
-    images = [a_seq_mat.todense().T for i, a_seq_mat in enumerate(sequence_frames_sparse)]
-    blended_image = blend_images(images)
-    # blended_image = blend_images(images, cmap='coolwarm')
-    blended_image
-
-    # blended_image = Image.fromarray(blended_image, mode="RGB")
-    # # blended_image = get_array_as_image(blended_image, desired_height=100, desired_width=None, skip_img_normalization=True)
-    # blended_image
-
-
-    """
-    if cmap is None:
-        # Non-colormap mode:
-        # Ensure images are in the same shape
-        combined_image = np.zeros_like(images[0], dtype=np.float32)
-
-        for img in images:
-            combined_image += img.astype(np.float32)
-
-    else:
-        # colormap mode
-        # Define a colormap (blue to red)
-        cmap = plt.get_cmap(cmap)
-        norm = Normalize(vmin=0, vmax=(len(images) - 1))
-
-        combined_image = np.zeros((*images[0].shape, 3), dtype=np.float32)
-
-        for i, img in enumerate(images):
-            color = cmap(norm(i))[:3]  # Get RGB color from colormap
-            colored_image = apply_colormap(img, color)
-            combined_image += colored_image
-
-    combined_image = np.clip(combined_image, 0, 255)  # Ensure pixel values are within valid range
-    return combined_image.astype(np.uint8)
-
-
-def visualize_multiple_image_items(images: list, threshold=1e-3) -> None:
-    """ Sample multiple pg.ImageItems overlayed on one another
-
-    # Example usage:
-    image1 = np.random.rand(100, 100) * 100  # Example image 1
-    image2 = np.random.rand(100, 100) * 100  # Example image 2
-    image3 = np.random.rand(100, 100) * 100  # Example image 3
-
-    image1
-    # Define the threshold
-
-    _out = visualize_multiple_image_items([image1, image2, image3], threshold=50)
-
-    """
-    app = pg.mkQApp('visualize_multiple_image_items')  # Initialize the Qt application
-    win = pg.GraphicsLayoutWidget(show=True)
-    view = win.addViewBox()
-    view.setAspectLocked(True)
-
-    for img in images:
-        if threshold is not None:
-            # Create a masked array, masking values below the threshold
-            img = np.ma.masked_less(img, threshold)
-
-        image_item = pg.ImageItem(img)
-        view.addItem(image_item)
-
-    # QtGui.QApplication.instance().exec_()
-    return app, win, view
 
 
 # ==================================================================================================================== #
