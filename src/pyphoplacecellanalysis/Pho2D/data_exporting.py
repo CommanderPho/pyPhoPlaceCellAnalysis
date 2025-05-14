@@ -541,7 +541,7 @@ class PosteriorExporting:
 
         def create_half_width_rectangle_function(side, color):
             """Create a function that adds a specific label to an image."""
-            return lambda an_img: add_half_width_rectangle(an_img, side=side, color=color, vertical_position = 'bottom', height_fraction = 0.1)
+            return lambda an_img: add_half_width_rectangle(an_img, side=side, color=color, height_fraction = 0.1)
 
 
 
