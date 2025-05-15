@@ -106,6 +106,57 @@ from pyphoplacecellanalysis.General.Model.Configs.LongShortDisplayConfig import 
 from pyphocorehelpers.gui.Qt.color_helpers import ColormapHelpers, ColorFormatConverter, debug_print_color, build_adjusted_color
 
 
+
+import numpy as np
+import itertools
+from typing import List, Tuple, Dict
+
+
+@function_attributes(short_name=None, tags=['run-lengths', 'sequence-analysis'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-05-15 15:28', related_items=[])
+def analyze_epoch_dynamics(p_long: NDArray, epochs: List[Tuple[int, int]]) -> List[Dict]:
+    """ 
+
+    Usage:
+        from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import analyze_epoch_dynamics
+
+    """
+    def classify(p: float) -> str:
+        if p > 0.6:
+            return 'pure.Long'
+        elif p < 0.4:
+            return 'pure.Short'
+        else:
+            return 'mixed'
+    
+    def rle(seq: List[str]) -> Tuple[NDArray, NDArray, List[str]]:
+        if len(seq) == 0:
+            return np.array([], dtype=int), np.array([], dtype=int), []
+        changes = [0] + [i for i in range(1, len(seq)) if seq[i] != seq[i-1]] + [len(seq)]
+        lengths = np.diff(changes)
+        starts = changes[:-1]
+        values = [seq[i] for i in starts]
+        return np.array(lengths), np.array(starts), values
+
+    state_seq = np.array([classify(p) for p in p_long])
+    results = []
+
+    for epoch_start_t, epoch_end_t in epochs:
+        epoch_states = state_seq[epoch_start_t:epoch_end_t]
+        transitions = np.sum(epoch_states[1:] != epoch_states[:-1])
+        lengths, starts, values = rle(epoch_states)
+        subsequences = {'pure.Long': [], 'pure.Short': [], 'mixed': []}
+        for val, length in zip(values, lengths):
+            subsequences[val].append(length)
+        results.append({
+            'transitions': int(transitions),
+            'subsequences': subsequences,
+            'lengths': lengths.tolist(),
+            'states': values
+        })
+
+    return results
+
+
 # ==================================================================================================================================================================================================================================================================================== #
 # 2025-05-15 - Meas vs. Decoded Occupancy                                                                                                                                                                                                                                              #
 # ==================================================================================================================================================================================================================================================================================== #
