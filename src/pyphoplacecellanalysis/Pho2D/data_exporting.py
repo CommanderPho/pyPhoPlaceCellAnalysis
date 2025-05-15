@@ -531,7 +531,7 @@ class PosteriorExporting:
         is_epoch_pre_post_delta = a_decoder_decoded_epochs_result.active_filter_epochs['maze_id']
         
 
-
+        # Build post-image-generation callback functions _____________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
         from pyphocorehelpers.plotting.media_output_helpers import add_bottom_label, add_half_width_rectangle
 
         def create_label_function(label_text):
@@ -584,7 +584,7 @@ class PosteriorExporting:
             # curr_post_render_image_functions_dict = {'add_bottom_label': (lambda an_img: add_bottom_label(an_img, curr_x_axis_label_str, font_size=8))}
             curr_post_render_image_functions_dict = {
                 # 'add_bottom_label': create_label_function(curr_x_axis_label_str),
-                'create_half_width_rectangle_function': create_half_width_rectangle_function(side, epoch_rect_color),
+                'create_half_width_rectangle_function': create_half_width_rectangle_function(side, epoch_rect_color), ## create rect to indicate pre/post delta
             }
                                       
             if desired_height is None:

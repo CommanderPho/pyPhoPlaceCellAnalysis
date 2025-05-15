@@ -479,7 +479,7 @@ class SingleEpochDecodedResult(HDF_SerializationMixin, AttrsBasedClassHelperMixi
 
 
     @function_attributes(short_name=None, tags=['image', 'multi-color-decoder-overlay', 'MultiDecoderColorOverlayedPosteriors'], input_requires=[], output_provides=[], uses=['MultiDecoderColorOverlayedPosteriors'], used_by=['.build_multi_decoder_color_overlay_image', '.save_posterior_as_image'], creation_date='2025-05-14 02:21', related_items=[])    
-    def _perform_build_multi_decoder_color_overlay_image_data(self, spikes_df: pd.DataFrame, xbin: NDArray[ND.Shape["N_POS_BINS"], np.floating], lower_bound_alpha=0.0, drop_below_threshold=1e-3, t_bin_size=0.025, **kwargs):
+    def _perform_build_multi_decoder_color_overlay_image_data(self, spikes_df: pd.DataFrame, xbin: NDArray[ND.Shape["N_POS_BINS"], np.floating], lower_bound_alpha=0.0, drop_below_threshold=1e-3, t_bin_size=0.025, use_four_decoders_version: bool = False, **kwargs):
         """ Builds the RGBA output NDArray img_data for the multi-color decoder overlay (that will be built into a PIL.Image object later).
         
         
@@ -491,10 +491,14 @@ class SingleEpochDecodedResult(HDF_SerializationMixin, AttrsBasedClassHelperMixi
         
         """
         from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import MultiDecoderColorOverlayedPosteriors
-        # from pyphocorehelpers.plotting.media_output_helpers import save_array_as_image, get_array_as_image, get_array_as_image_stack
-        # from pyphoplacecellanalysis.Pho2D.data_exporting import HeatmapExportKind
 
-        
+        if not use_four_decoders_version:
+            decoders_version_name: str = 'two_decoders'
+
+        else:
+            decoders_version_name: str = 'four_decoders'
+                            
+
         ## INPUTS: global_decoded_result, xbin
         p_x_given_n: NDArray[ND.Shape["N_POS_BINS, 4, N_TIME_BINS"], np.floating] = deepcopy(self.p_x_given_n) # .shape # (59, 4, 69488)
         time_bin_centers: NDArray[ND.Shape["N_TIME_BINS"], np.floating] = deepcopy(self.time_bin_container.centers)
@@ -502,13 +506,10 @@ class SingleEpochDecodedResult(HDF_SerializationMixin, AttrsBasedClassHelperMixi
 
         # with VizTracer(output_file=f"viztracer_{get_now_time_str()}-MultiDecoderColorOverlayedPosteriors.json", min_duration=200, tracer_entries=3000000, ignore_frozen=True) as tracer:
         multi_decoder_color_overlay: MultiDecoderColorOverlayedPosteriors = MultiDecoderColorOverlayedPosteriors(spikes_df=spikes_df, p_x_given_n=p_x_given_n, time_bin_centers=time_bin_centers, xbin=xbin, lower_bound_alpha=lower_bound_alpha, drop_below_threshold=drop_below_threshold, t_bin_size=t_bin_size)
-        multi_decoder_color_overlay.compute_all(progress_print=False) ## single compute
-        
-        img_data: NDArray[ND.Shape["N_TIME_BINS, N_POS_BINS, 4"], np.floating] = multi_decoder_color_overlay.extra_all_t_bins_outputs_dict_dict['two_decoders']['all_t_bins_final_overlayed_out_RGBA'].astype(float) # (69488, 59, 4)
-        
+        multi_decoder_color_overlay.compute_all(compute_four_decoder_version=use_four_decoders_version, progress_print=False) ## single compute
+        img_data: NDArray[ND.Shape["N_TIME_BINS, N_POS_BINS, 4"], np.floating] = multi_decoder_color_overlay.extra_all_t_bins_outputs_dict_dict[decoders_version_name]['all_t_bins_final_overlayed_out_RGBA'].astype(float) # (69488, 59, 4)
         img_data = np.transpose(img_data, axes=(1, 0, 2)) # Convert to (H, W, 4)
         return img_data.astype(float), multi_decoder_color_overlay
-
 
 
     @function_attributes(short_name=None, tags=['image', 'multi-color-decoder-overlay', 'MultiDecoderColorOverlayedPosteriors'], input_requires=[], output_provides=[], uses=['._perform_build_multi_decoder_color_overlay_image_data'], used_by=[], creation_date='2025-05-14 02:21', related_items=[])    
