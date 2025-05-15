@@ -532,18 +532,22 @@ class PosteriorExporting:
         
 
         # Build post-image-generation callback functions _____________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
-        from pyphocorehelpers.plotting.media_output_helpers import add_bottom_label, add_half_width_rectangle
+        from pyphocorehelpers.plotting.media_output_helpers import ImageOperationsAndEffects
+
 
         def create_label_function(label_text):
             """Create a function that adds a specific label to an image."""
-            return lambda an_img: add_bottom_label(an_img, label_text, font_size=244, text_color=(1, 0, 0))
+            return lambda an_img: ImageOperationsAndEffects.add_bottom_label(an_img, label_text, font_size=244, text_color=(1, 0, 0))
 
 
-        def create_half_width_rectangle_function(side, color):
-            """Create a function that adds a specific label to an image."""
-            return lambda an_img: add_half_width_rectangle(an_img, side=side, color=color, height_fraction = 0.1)
+        # def create_half_width_rectangle_function(side, color):
+        #     """Create a function that adds a specific label to an image."""
+        #     return lambda an_img: ImageOperationsAndEffects.add_half_width_rectangle(an_img, side=side, color=color, height_fraction = 0.1)
 
 
+        create_half_width_rectangle_function = ImageOperationsAndEffects.create_fn_builder(ImageOperationsAndEffects.add_half_width_rectangle, height_fraction = 0.1)
+        
+        create_solid_border_function = ImageOperationsAndEffects.create_fn_builder(ImageOperationsAndEffects.add_solid_border) # border_color = (0, 0, 0, 255)
 
 
         # # Create an image with a label
@@ -584,7 +588,9 @@ class PosteriorExporting:
             # curr_post_render_image_functions_dict = {'add_bottom_label': (lambda an_img: add_bottom_label(an_img, curr_x_axis_label_str, font_size=8))}
             curr_post_render_image_functions_dict = {
                 # 'add_bottom_label': create_label_function(curr_x_axis_label_str),
-                'create_half_width_rectangle_function': create_half_width_rectangle_function(side, epoch_rect_color), ## create rect to indicate pre/post delta
+                # 'create_half_width_rectangle_function': create_half_width_rectangle_function(side, epoch_rect_color), ## create rect to indicate pre/post delta
+                # 'create_half_width_rectangle_function': create_half_width_rectangle_function(side, epoch_rect_color),
+                'create_solid_border_function': create_solid_border_function(border_width = 10, border_color = epoch_rect_color),
             }
                                       
             if desired_height is None:
