@@ -169,7 +169,7 @@ class MeasuredVsDecodedOccupancy:
     from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import MeasuredVsDecodedOccupancy
     """
     @classmethod
-    def analyze_and_plot_meas_vs_decoded_occupancy(cls, best_matching_context, a_result, a_decoder, a_decoded_marginal_posterior_df, track_templates, figure_title='Laps', **kwargs):
+    def analyze_and_plot_meas_vs_decoded_occupancy(cls, best_matching_context, a_result, a_decoder, a_decoded_marginal_posterior_df, track_templates, figure_title='Laps', plot_in_same_figure:bool=True, **kwargs):
         """ analyze and plot
 
         
@@ -224,13 +224,7 @@ class MeasuredVsDecodedOccupancy:
         pre_post_delta_timebins_p_x_given_n_dict: Dict[str, NDArray] = {'pre-delta': timebins_p_x_given_n[:, :, np.logical_not(is_post_delta)],
                                                                         'post-delta': timebins_p_x_given_n[:, :, is_post_delta],
         }
-        pre_post_delta_timebins_p_x_given_n_dict
-        # pre_post_delta_result_dict: Dict[str, DecodedFilterEpochsResult] = {k:a_result.filtered_by_epoch_times(v['start']) for k, v in pre_post_delta_result_splits_dict.items()}
-
-        # pre_post_delta_result_dict: Dict[str, DecodedFilterEpochsResult] = {k:a_result.filtered_by_epoch_times(v['start']) for k, v in pre_post_delta_result_splits_dict.items()}
-        # pre_post_delta_result_dict
-        # pre_delta_result = a_result.filtered_by_epoch_times(pre_post_delta_result_splits_dict['pre-delta']['start'])
-
+        # pre_post_delta_timebins_p_x_given_n_dict
 
         # ==================================================================================================================================================================================================================================================================================== #
         # Plotting                                                                                                                                                                                                                                                                             #
@@ -248,7 +242,7 @@ class MeasuredVsDecodedOccupancy:
             plt.suptitle(f'{figure_title} - {k}')
 
     @classmethod
-    def plot_meas_vs_decoded_occupancy(cls, timebins_p_x_given_n: NDArray, track_templates, num='plot_meas_vs_decoded_occupancy', should_max_normalize: bool=False, **kwargs):
+    def plot_meas_vs_decoded_occupancy(cls, timebins_p_x_given_n: NDArray, track_templates, num='plot_meas_vs_decoded_occupancy', fig=None, ax=None, should_max_normalize: bool=False, **kwargs):
         """ from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import plot_meas_vs_decoded_occupancy
         a_result: DecodedFilterEpochsResult
         
@@ -269,27 +263,25 @@ class MeasuredVsDecodedOccupancy:
 
         n_pos_bins, n_decoders = np.shape(timebins_p_x_given_n_occupancy)
 
-        fig = plt.figure(layout="constrained", figsize=[9, 9], dpi=220, clear=True, num=num, **kwargs) # figsize=[Width, height] in inches.
-        ax_dict = fig.subplot_mosaic(
-            [
-                # ["ax_long_LR", "ax_long_RL", "ax_short_LR", "ax_short_RL"],
-                # ["ax_long_LR"], ["ax_long_RL"], ["ax_short_LR"], ["ax_short_RL"],
-                ["long_LR"], ["long_RL"], ["short_LR"], ["short_RL"],
-                
-            ],
-            # set the height ratios between the rows
-            # set the width ratios between the columns
-            # width_ratios=[long_width_ratio, long_width_ratio],
-            # sharey=True,
-            # gridspec_kw=dict(wspace=0, hspace=0.0) # `wspace=0`` is responsible for sticking the pf and the activity axes together with no spacing
-            # width_ratios=[1, 1, 1, 1],
-            # sharey=True,
-            # gridspec_kw=dict(wspace=0, hspace=0.15)
-            
-            height_ratios=[1, 1, 1, 1],
-            sharex=True, sharey=True,
-            gridspec_kw=dict(wspace=0, hspace=0)
-        )
+        if (fig is None) or (ax is None):
+            # Create a new figure and axes if they are not provided
+            fig = plt.figure(layout="constrained", figsize=[9, 9], dpi=220, clear=True, num=num, **kwargs) # figsize=[Width, height] in inches.
+            ax_dict = fig.subplot_mosaic(
+                [
+                    # ["ax_long_LR", "ax_long_RL", "ax_short_LR", "ax_short_RL"],
+                    # ["ax_long_LR"], ["ax_long_RL"], ["ax_short_LR"], ["ax_short_RL"],
+                    ["long_LR"], ["long_RL"], ["short_LR"], ["short_RL"],
+                    
+                ],            
+                height_ratios=[1, 1, 1, 1],
+                sharex=True, sharey=True,
+                gridspec_kw=dict(wspace=0, hspace=0)
+            )
+        else:
+            # Use the provided figure and axes
+            ax_dict = {}
+            for i, ax_name in enumerate(["long_LR", "long_RL", "short_LR", "short_RL"]):
+                ax_dict[ax_name] = ax
 
 
         for i, (ax_name, ax) in enumerate(ax_dict.items()):
@@ -303,8 +295,7 @@ class MeasuredVsDecodedOccupancy:
 
         plt.legend(['decoded', 'measured'])
         # occupancy_fig.show()
-        return occupancy_fig, ax_dict
-
+        return fig, ax_dict
 
 
 
