@@ -9,6 +9,7 @@ from matplotlib import cm, pyplot as plt
 from matplotlib.gridspec import GridSpec
 from neuropy.core import Laps, Position
 from neuropy.core.user_annotations import UserAnnotationsManager
+from neuropy.plotting.placemaps import perform_plot_occupancy
 from neuropy.utils.dynamic_container import DynamicContainer
 from neuropy.utils.indexing_helpers import union_of_arrays
 from neuropy.utils.result_context import IdentifyingContext
@@ -103,6 +104,155 @@ from neuropy.utils.mixins.time_slicing import TimeColumnAliasesProtocol
 
 from pyphoplacecellanalysis.General.Model.Configs.LongShortDisplayConfig import DecoderIdentityColors, long_short_display_config_manager, apply_LR_to_RL_adjustment
 from pyphocorehelpers.gui.Qt.color_helpers import ColormapHelpers, ColorFormatConverter, debug_print_color, build_adjusted_color
+
+
+# ==================================================================================================================================================================================================================================================================================== #
+# 2025-05-15 - Meas vs. Decoded Occupancy                                                                                                                                                                                                                                              #
+# ==================================================================================================================================================================================================================================================================================== #
+
+@metadata_attributes(short_name=None, tags=['VALIDATION', 'occupancy', 'working'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-05-15 14:22', related_items=[])
+class MeasuredVsDecodedOccupancy:
+    """ 2025-05-15 - A validation that Kamran had me to do that showed the expected result
+    
+    
+    from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import MeasuredVsDecodedOccupancy
+    """
+    @classmethod
+    def analyze_and_plot_meas_vs_decoded_occupancy(cls, best_matching_context, a_result, a_decoder, a_decoded_marginal_posterior_df, track_templates, figure_title='Laps', **kwargs):
+        """ analyze and plot
+
+        
+        Usage:
+            from neuropy.plotting.placemaps import plot_placefield_occupancy, perform_plot_occupancy
+            from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import MeasuredVsDecodedOccupancy
+
+            
+            valid_EpochComputations_result: EpochComputationsComputationsContainer = curr_active_pipeline.global_computation_results.computed_data['EpochComputations']
+            a_new_fully_generic_result: GenericDecoderDictDecodedEpochsDictResult = valid_EpochComputations_result.a_generic_decoder_dict_decoded_epochs_dict_result
+
+
+            # common_constraint_dict = dict(trained_compute_epochs='laps', pfND_ndim=1, time_bin_size=0.025, masked_time_bin_fill_type='ignore')
+            common_constraint_dict = dict(trained_compute_epochs='laps', time_bin_size=0.025, masked_time_bin_fill_type='nan_filled') # , pfND_ndim=1
+
+            ## Laps context:
+            a_target_context: IdentifyingContext = IdentifyingContext(known_named_decoding_epochs_type='laps', data_grain='per_time_bin', **common_constraint_dict) ## Laps , data_grain='per_epoch'
+            best_matching_context, a_result, a_decoder, a_decoded_marginal_posterior_df = a_new_fully_generic_result.get_results_best_matching_context(context_query=a_target_context)
+            MeasuredVsDecodedOccupancy.analyze_and_plot_meas_vs_decoded_occupancy(best_matching_context, a_result, a_decoder, a_decoded_marginal_posterior_df, track_templates, figure_title='Laps')
+
+            ## Global context:
+            a_target_context: IdentifyingContext = IdentifyingContext(known_named_decoding_epochs_type='global', data_grain='per_time_bin', **common_constraint_dict) ## Laps , data_grain='per_epoch'
+            best_matching_context, a_result, a_decoder, a_decoded_marginal_posterior_df = a_new_fully_generic_result.get_results_best_matching_context(context_query=a_target_context)
+            MeasuredVsDecodedOccupancy.analyze_and_plot_meas_vs_decoded_occupancy(best_matching_context, a_result, a_decoder, a_decoded_marginal_posterior_df, track_templates, figure_title='Global (all-time)')
+
+            ## PBEs context:
+            a_target_context: IdentifyingContext = IdentifyingContext(known_named_decoding_epochs_type='pbe', data_grain='per_time_bin', **common_constraint_dict) ## Laps , data_grain='per_epoch'
+            best_matching_context, a_result, a_decoder, a_decoded_marginal_posterior_df = a_new_fully_generic_result.get_results_best_matching_context(context_query=a_target_context)
+            MeasuredVsDecodedOccupancy.analyze_and_plot_meas_vs_decoded_occupancy(best_matching_context, a_result, a_decoder, a_decoded_marginal_posterior_df, track_templates, figure_title='PBEs')
+
+
+        """
+        
+        
+
+
+        ## INPUTS: best_matching_context, a_result, a_decoder, a_decoded_marginal_posterior_df
+
+        is_post_delta = (a_decoded_marginal_posterior_df['delta_aligned_start_t'] > 0.0)
+        # a_decoded_marginal_posterior_df['is_post_delta'] = is_post_delta
+
+        a_decoded_marginal_posterior_df['pre_post_delta_id'] = 'pre-delta'
+        a_decoded_marginal_posterior_df.loc[is_post_delta, 'pre_post_delta_id'] = 'post-delta'
+        # a_decoded_marginal_posterior_df['is_post_delta'] = a_decoded_marginal_posterior_df['is_post_delta'].astype(int)
+        a_decoded_marginal_posterior_df
+
+        # pre_post_delta_result_splits_dict = a_decoded_marginal_posterior_df.pho.partition_df_dict('pre_post_delta_id')
+
+        n_timebins, flat_time_bin_containers, timebins_p_x_given_n = a_result.flatten() # (59, 4, 69488)
+        # timebins_p_x_given_n.shape
+
+        pre_post_delta_timebins_p_x_given_n_dict: Dict[str, NDArray] = {'pre-delta': timebins_p_x_given_n[:, :, np.logical_not(is_post_delta)],
+                                                                        'post-delta': timebins_p_x_given_n[:, :, is_post_delta],
+        }
+        pre_post_delta_timebins_p_x_given_n_dict
+        # pre_post_delta_result_dict: Dict[str, DecodedFilterEpochsResult] = {k:a_result.filtered_by_epoch_times(v['start']) for k, v in pre_post_delta_result_splits_dict.items()}
+
+        # pre_post_delta_result_dict: Dict[str, DecodedFilterEpochsResult] = {k:a_result.filtered_by_epoch_times(v['start']) for k, v in pre_post_delta_result_splits_dict.items()}
+        # pre_post_delta_result_dict
+        # pre_delta_result = a_result.filtered_by_epoch_times(pre_post_delta_result_splits_dict['pre-delta']['start'])
+
+
+        # ==================================================================================================================================================================================================================================================================================== #
+        # Plotting                                                                                                                                                                                                                                                                             #
+        # ==================================================================================================================================================================================================================================================================================== #
+
+        # for k, a_result in pre_post_delta_result_dict.items():
+        for k, a_timebins_p_x_given_n in pre_post_delta_timebins_p_x_given_n_dict.items():
+            print(f'k: {k}')
+            ## Decoded:
+            # a_result: DecodedFilterEpochsResult = deepcopy(a_result)
+            # n_timebins, flat_time_bin_containers, timebins_p_x_given_n = a_result.flatten()
+            np.shape(a_timebins_p_x_given_n)
+            
+            cls.plot_meas_vs_decoded_occupancy(timebins_p_x_given_n=a_timebins_p_x_given_n, track_templates=track_templates, num=f'{figure_title} - {k} - plot_meas_vs_decoded_occupancy', **kwargs)
+            plt.suptitle(f'{figure_title} - {k}')
+
+    @classmethod
+    def plot_meas_vs_decoded_occupancy(cls, timebins_p_x_given_n: NDArray, track_templates, num='plot_meas_vs_decoded_occupancy', should_max_normalize: bool=False, **kwargs):
+        """ from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import plot_meas_vs_decoded_occupancy
+        a_result: DecodedFilterEpochsResult
+        
+        """
+        from neuropy.plotting.placemaps import plot_placefield_occupancy, perform_plot_occupancy
+        
+        ## Measured
+        decoders_dict: Dict[types.DecoderName, BasePositionDecoder] = track_templates.get_decoders_dict()
+        # ## Decoded:
+        # a_result: DecodedFilterEpochsResult = deepcopy(a_result)
+
+        # n_timebins, flat_time_bin_containers, timebins_p_x_given_n = a_result.flatten()
+        timebins_p_x_given_n.shape
+
+        timebins_p_x_given_n = np.nan_to_num(timebins_p_x_given_n)
+        timebins_p_x_given_n_occupancy = np.nansum(timebins_p_x_given_n, axis=2) # (n_pos, n_decoders)
+        timebins_p_x_given_n_occupancy.shape
+
+        n_pos_bins, n_decoders = np.shape(timebins_p_x_given_n_occupancy)
+
+        fig = plt.figure(layout="constrained", figsize=[9, 9], dpi=220, clear=True, num=num, **kwargs) # figsize=[Width, height] in inches.
+        ax_dict = fig.subplot_mosaic(
+            [
+                # ["ax_long_LR", "ax_long_RL", "ax_short_LR", "ax_short_RL"],
+                # ["ax_long_LR"], ["ax_long_RL"], ["ax_short_LR"], ["ax_short_RL"],
+                ["long_LR"], ["long_RL"], ["short_LR"], ["short_RL"],
+                
+            ],
+            # set the height ratios between the rows
+            # set the width ratios between the columns
+            # width_ratios=[long_width_ratio, long_width_ratio],
+            # sharey=True,
+            # gridspec_kw=dict(wspace=0, hspace=0.0) # `wspace=0`` is responsible for sticking the pf and the activity axes together with no spacing
+            # width_ratios=[1, 1, 1, 1],
+            # sharey=True,
+            # gridspec_kw=dict(wspace=0, hspace=0.15)
+            
+            height_ratios=[1, 1, 1, 1],
+            sharex=True, sharey=True,
+            gridspec_kw=dict(wspace=0, hspace=0)
+        )
+
+
+        for i, (ax_name, ax) in enumerate(ax_dict.items()):
+        # for i in np.arange(n_decoders):
+            occupancy = timebins_p_x_given_n_occupancy[:,i]
+            a_decoder: BasePositionDecoder = decoders_dict[ax_name]
+            measured_occupancy = deepcopy(a_decoder.pf.occupancy)
+            occupancy_fig, occupancy_ax = perform_plot_occupancy(occupancy, xbin_centers=None, ybin_centers=None, fig=fig, ax=ax, plot_pos_bin_axes=False, label='decoded', should_max_normalize=should_max_normalize)
+            occupancy_fig, occupancy_ax = perform_plot_occupancy(measured_occupancy, xbin_centers=None, ybin_centers=None, fig=fig, ax=ax, plot_pos_bin_axes=False, label='measured', should_max_normalize=should_max_normalize)
+            ax.set_title(f"Decoded Occupancy[{ax_name}]")
+
+        plt.legend(['decoded', 'measured'])
+        # occupancy_fig.show()
+        return occupancy_fig, ax_dict
 
 
 

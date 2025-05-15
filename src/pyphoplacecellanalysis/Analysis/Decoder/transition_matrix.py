@@ -1581,7 +1581,7 @@ class TransitionMatrixComputations:
 def split_transition_matricies_results_pre_post_delta_category(an_out_decoded_marginal_posterior_df: pd.DataFrame, a_context_state_transition_matrix_list: List[NDArray]) -> Dict[str, NDArray]:
     """ 
     Usage:
-        from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import split_transition_matricies_results_pre_post_delta_category
+        from pyphoplacecellanalysis.Analysis.Decoder.transition_matrix import split_transition_matricies_results_pre_post_delta_category
         ## INPUTS: laps_context_state_transition_matrix_context_dict
         out_context_state_transition_matrix_context_dict = deepcopy(laps_context_state_transition_matrix_context_dict)
         out_matched_result_tuple_context_dict = deepcopy(laps_matched_result_tuple_context_dict)
@@ -1661,7 +1661,7 @@ def complete_all_transition_matricies(a_new_fully_generic_result: "GenericDecode
     complete_all_transition_matricies(a_new_fully_generic_result=a_new_fully_generic_result, a_target_context=a_target_context)
     
     Usage:
-        from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import complete_all_transition_matricies, build_transition_matricies
+        from pyphoplacecellanalysis.Analysis.Decoder.transition_matrix import complete_all_transition_matricies, build_transition_matricies
         ## Laps context:
         a_laps_target_context: IdentifyingContext = IdentifyingContext(trained_compute_epochs='laps', pfND_ndim=1, time_bin_size=0.025, known_named_decoding_epochs_type='laps', masked_time_bin_fill_type='ignore', data_grain='per_epoch') ## Laps
         laps_target_context_results = complete_all_transition_matricies(a_new_fully_generic_result=a_new_fully_generic_result, a_target_context=a_laps_target_context)
@@ -1803,7 +1803,8 @@ def plot_blocked_transition_matrix(A_big: NDArray, n_position_bins: int, n_decod
         import matplotlib.pyplot as plt
         import seaborn as sns
         import matplotlib.gridspec as gridspec
-
+        from pyphoplacecellanalysis.Analysis.Decoder.transition_matrix import plot_blocked_transition_matrix
+        
         # plt.figure(figsize=(8,6)); sns.heatmap(A_big, cmap='viridis'); plt.title("Transition Matrix A_big"); plt.show()
         plt.figure(figsize=(8,6)); sns.heatmap(A_position, cmap='viridis'); perform_update_title_subtitle(title_string=f"Transition Matrix A_position - t_bin: {a_time_bin_size}"); plt.show(); 
         plt.figure(figsize=(8,6)); sns.heatmap(A_model, cmap='viridis'); perform_update_title_subtitle(title_string=f"Transition Matrix A_model - t_bin: {a_time_bin_size}"); plt.show()
