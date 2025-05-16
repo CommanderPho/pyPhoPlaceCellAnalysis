@@ -1216,7 +1216,7 @@ class PosteriorExporting:
     @function_attributes(short_name=None, tags=['marginal', 'export'], input_requires=[], output_provides=[], uses=['cls._test_export_marginals_for_figure'], used_by=[], creation_date='2024-09-06 00:00', related_items=[])
     @classmethod
     def _perform_export_current_epoch_marginal_and_raster_images(cls, _out_ripple_rasters, directional_merged_decoders_result, filtered_decoder_filter_epochs_decoder_result_dict, active_session_context, root_export_path: Path, epoch_id_identifier_str='lap',
-                                                                 desired_width = 2048, desired_height = 720, debug_print=False
+                                                                 desired_width = 2048, desired_height = 720, debug_print=False, **kwargs,
                                                                  ):
         """ Exports all rasters, marginals, and posteriors as images
 
@@ -1287,6 +1287,7 @@ class PosteriorExporting:
         _out_rasters_save_paths = _out_ripple_rasters.save_figure(export_path=ripple_specific_folder,
                                                                 width=desired_width,
                                                                 #    height=desired_height,
+                                                                **kwargs,
                                                                 )
         # _out_rasters_save_paths
 
