@@ -2626,7 +2626,7 @@ class EpochComputationDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Di
 
 
                 _out = dict()
-                _out['trackID_marginal_hairy_position'] = curr_active_pipeline.display(display_function='trackID_marginal_hairy_position', active_session_configuration_context=None) # _display_directional_track_template_pf1Ds
+                _out['trackID_weighted_position_posterior'] = curr_active_pipeline.display(display_function='trackID_weighted_position_posterior', active_session_configuration_context=None) # _display_directional_track_template_pf1Ds
 
 
             """
@@ -2691,13 +2691,13 @@ class EpochComputationDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Di
             active_context = kwargs.pop('active_context', None)
             if active_context is not None:
                 # Update the existing context:
-                display_context = active_context.adding_context('display_fn', display_fn_name='trackID_marginal_hairy_position')
+                display_context = active_context.adding_context('display_fn', display_fn_name='trackID_weighted_position_posterior')
             else:
                 # active_context = owning_pipeline_reference.sess.get_context()
                 active_context = deepcopy(complete_session_context) # owning_pipeline_reference.sess.get_context()
                 
                 # Build the active context directly:
-                display_context = owning_pipeline_reference.build_display_context_for_session('trackID_marginal_hairy_position')
+                display_context = owning_pipeline_reference.build_display_context_for_session('trackID_weighted_position_posterior')
 
             fignum = kwargs.pop('fignum', None)
             if fignum is not None:

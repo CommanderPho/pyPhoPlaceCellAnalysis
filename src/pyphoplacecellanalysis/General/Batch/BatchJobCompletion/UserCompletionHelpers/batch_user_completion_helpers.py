@@ -3156,6 +3156,24 @@ def figures_plot_generalized_decode_epochs_dict_and_export_results_completion_fu
     
     This is the global across-session marginal over trackID
     
+    
+
+    ## Getting outputs    
+        _flattened_paths_dict = {} ## Outputs:
+
+        _out_dict = _across_session_results_extended_dict.get('figures_plot_generalized_decode_epochs_dict_and_export_results_completion_function', {}).get('_display_decoded_trackID_weighted_position_posterior_withMultiColorOverlay', {}) # FigureCollector 
+        save_paths_dict = _out_dict.get('out_paths', {})
+        for epoch_name, a_variant_paths_dict in save_paths_dict.items():
+            ## loop over all variants:
+            for a_variant_name, a_path in a_variant_paths_dict.items():
+                if a_path is not None:
+                    _curr_key = f"{epoch_name}.{a_variant_name}"
+                    _flattened_paths_dict[_curr_key] = a_path
+
+
+        _flattened_paths_dict
+
+
     """
     from pyphoplacecellanalysis.General.Mixins.ExportHelpers import FileOutputManager, FigureOutputLocation, ContextToPathMode	
     from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.EpochComputationFunctions import EpochComputationDisplayFunctions
