@@ -2707,29 +2707,9 @@ class EpochComputationDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Di
             ## OUTPUTS: active_context, display_context
             # active_display_context = display_context.overwriting_context(extreme_threshold=extreme_threshold, opacity_max=opacity_max, thickness_ramping_multiplier=thickness_ramping_multiplier) ## include any that are just the slightest big different
             # active_display_context = deepcopy(display_context)
-
-            # defer_render = kwargs.pop('defer_render', False)
-            # debug_print: bool = kwargs.pop('debug_print', False)
-            # active_config_name: bool = kwargs.pop('active_config_name', None)
-
-            # perform_write_to_file_callback = kwargs.pop('perform_write_to_file_callback', (lambda final_context, fig: owning_pipeline_reference.output_figure(final_context, fig)))
-
-
-            # debug_print = kwargs.get('debug_print', False)
-            # session_name: str = owning_pipeline_reference.session_name
-            # t_start, t_delta, t_end = owning_pipeline_reference.find_LongShortDelta_times()
             
             # INPUTS _____________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
 
-
-            # all_decoder_colors_dict = {'long': '#4169E1', 'short': '#DC143C', 'long_LR': '#4169E1', 'long_RL': '#607B00', 'short_LR': '#DC143C', 'short_RL': '#990099'} ## Just hardcoded version of `additional_cmap_names`
-
-
-            # laps_trained_decoder_search_context = IdentifyingContext(trained_compute_epochs='laps', pfND_ndim=1, decoder_identifier='pseudo2D', known_named_decoding_epochs_type='laps', masked_time_bin_fill_type='ignore', data_grain='per_time_bin') # , data_grain= 'per_time_bin -- not really relevant: ['masked_time_bin_fill_type', 'known_named_decoding_epochs_type', 'data_grain']
-            # # laps_trained_decoder_search_context = IdentifyingContext(trained_compute_epochs='laps', pfND_ndim=1, decoder_identifier='pseudo2D', known_named_decoding_epochs_type='laps', masked_time_bin_fill_type='dropped', data_grain='per_time_bin')
-            # flat_context_list, flat_result_context_dict, flat_decoder_context_dict, flat_decoded_marginal_posterior_df_context_dict = a_new_fully_generic_result.get_results_matching_contexts(context_query=laps_trained_decoder_search_context, return_multiple_matches=True, debug_print=True)
-
-            # flat_context_list
 
             # ==================================================================================================================================================================================================================================================================================== #
             # Separate export for each masked_time_bin_fill_type  - LAPS                                                                                                                                                                                                                           #
