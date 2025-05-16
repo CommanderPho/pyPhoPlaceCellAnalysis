@@ -3269,7 +3269,7 @@ def figures_plot_generalized_decode_epochs_dict_and_export_results_completion_fu
             a_params_kwargs = {}
             display_context = curr_active_pipeline.build_display_context_for_session(display_fn_name='trackID_weighted_position_posterior')
             _out = curr_active_pipeline.display('_display_decoded_trackID_weighted_position_posterior_withMultiColorOverlay', display_context, defer_render=True, save_figure=True,
-                                                override_fig_man=custom_fig_man, 
+                                                # override_fig_man=custom_fig_man, 
                                                 parent_output_folder=custom_figure_output_path,
                                             )
             
