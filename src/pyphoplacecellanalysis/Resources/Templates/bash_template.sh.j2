@@ -21,7 +21,7 @@ cd '{{ curr_batch_script_rundir }}'
 export PYTHON_KEYRING_BACKEND=keyring.backends.null.Keyring
 
 # Activate the virtual environment
-sh '/home/halechr/repos/Spike3D/.venv/bin/activate'
+sh '/home/halechr/repos/Spike3D/.UV_venv/bin/activate'
 
 # Run the Python script
 python '{{ python_script_path }}' || exit $?
