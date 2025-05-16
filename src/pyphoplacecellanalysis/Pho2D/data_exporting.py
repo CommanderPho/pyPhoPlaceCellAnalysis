@@ -499,6 +499,8 @@ class PosteriorExporting:
         # posterior_out_folder = parent_output_folder.joinpath(DAY_DATE_TO_USE, epochs_name).resolve()
         posterior_out_folder.mkdir(parents=True, exist_ok=True)
 
+
+
         # if should_export_separate_color_and_greyscale:
         #     posterior_out_folder_greyscale = posterior_out_folder.joinpath('greyscale').resolve()
         #     posterior_out_folder_color = posterior_out_folder.joinpath('color').resolve()
@@ -672,7 +674,7 @@ class PosteriorExporting:
 
     @function_attributes(short_name=None, tags=['private' 'helper'], input_requires=[], output_provides=[], uses=['.export_decoded_posteriors_as_images', '._subfn_build_combined_output_images'], used_by=['.perform_export_all_decoded_posteriors_as_images'], creation_date='2025-05-14 11:03', related_items=[])
     @classmethod
-    def _subfn_perform_export_single_epochs(cls, _active_filter_epochs_decoder_result_dict: Dict[types.DecoderName, DecodedFilterEpochsResult], epochs_name: str, a_parent_output_folder: Path, custom_export_formats: Optional[Dict[str, HeatmapExportConfig]]=None, desired_height=None, combined_img_padding=4, combined_img_separator_color=None, **kwargs) -> IdentifyingContext:
+    def _subfn_perform_export_single_epochs_result_set(cls, _active_filter_epochs_decoder_result_dict: Dict[types.DecoderName, DecodedFilterEpochsResult], epochs_name: str, a_parent_output_folder: Path, custom_export_formats: Optional[Dict[str, HeatmapExportConfig]]=None, desired_height=None, combined_img_padding=4, combined_img_separator_color=None, **kwargs) -> IdentifyingContext:
         """ saves a single set of named epochs, like 'laps' or 'ripple' 
         """
         n_decoders: int = len(_active_filter_epochs_decoder_result_dict)
@@ -691,7 +693,7 @@ class PosteriorExporting:
             # print(f'a_decoder_name: {a_decoder_name}, _specific_save_context: {_specific_save_context}, posterior_out_folder: {posterior_out_folder}')
             # (an_out_posterior_out_folder, *an_out_path_extra_paths), an_out_flat_save_out_paths = cls.export_decoded_posteriors_as_images(a_decoder_decoded_epochs_result=a_decoder_decoded_epochs_result, out_context=_specific_save_context, posterior_out_folder=posterior_out_folder, desired_height=desired_height, custom_exports_dict=custom_exports_dict)
             (an_out_posterior_out_folder, a_custom_export_format_results), an_out_flat_save_out_paths = cls.export_decoded_posteriors_as_images(a_decoder_decoded_epochs_result=a_decoder_decoded_epochs_result, posterior_out_folder=posterior_out_folder,
-                                                                                                                                                    desired_height=desired_height, custom_export_formats=custom_export_formats) #TODO 2025-05-14 08:55: - [ ] BUG?!? Is it possible to plot the overlaid color image when iterating through the decoders 1-by-1? Don't I need all 4 at once?
+                                                                                                                                                    desired_height=desired_height, custom_export_formats=custom_export_formats, **kwargs) #TODO 2025-05-14 08:55: - [ ] BUG?!? Is it possible to plot the overlaid color image when iterating through the decoders 1-by-1? Don't I need all 4 at once?
             
             out_paths[a_decoder_name] = an_out_posterior_out_folder
             out_custom_export_formats_results_dict[a_decoder_name] = a_custom_export_format_results
@@ -739,9 +741,9 @@ class PosteriorExporting:
         out_paths_dict = {'laps': None, 'ripple': None}
         out_custom_formats_results_dict = {'laps': None, 'ripple': None}
         if decoder_laps_filter_epochs_decoder_result_dict is not None:
-            out_paths_dict['laps'], out_custom_formats_results_dict['laps'] = cls._subfn_perform_export_single_epochs(_active_filter_epochs_decoder_result_dict=decoder_laps_filter_epochs_decoder_result_dict, epochs_name='laps', a_parent_output_folder=parent_output_folder, custom_export_formats=custom_export_formats, **_common_kwargs)
+            out_paths_dict['laps'], out_custom_formats_results_dict['laps'] = cls._subfn_perform_export_single_epochs_result_set(_active_filter_epochs_decoder_result_dict=decoder_laps_filter_epochs_decoder_result_dict, epochs_name='laps', a_parent_output_folder=parent_output_folder, custom_export_formats=custom_export_formats, **_common_kwargs)
         if decoder_ripple_filter_epochs_decoder_result_dict is not None:
-            out_paths_dict['ripple'], out_custom_formats_results_dict['ripple'] = cls._subfn_perform_export_single_epochs(_active_filter_epochs_decoder_result_dict=decoder_ripple_filter_epochs_decoder_result_dict,epochs_name='ripple', a_parent_output_folder=parent_output_folder, custom_export_formats=custom_export_formats, **_common_kwargs)
+            out_paths_dict['ripple'], out_custom_formats_results_dict['ripple'] = cls._subfn_perform_export_single_epochs_result_set(_active_filter_epochs_decoder_result_dict=decoder_ripple_filter_epochs_decoder_result_dict,epochs_name='ripple', a_parent_output_folder=parent_output_folder, custom_export_formats=custom_export_formats, **_common_kwargs)
         return out_paths_dict, out_custom_formats_results_dict
 
 

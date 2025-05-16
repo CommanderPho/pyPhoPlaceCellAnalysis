@@ -3278,7 +3278,7 @@ def figures_plot_generalized_decode_epochs_dict_and_export_results_completion_fu
             })
             
         except Exception as e:
-            print(f'\tfigures_plot_generalized_decode_epochs_dict_and_export_results_completion_function(...): "_display_decoded_trackID_marginal_hairy_position" failed with error: {e}\n skipping.')
+            print(f'\tfigures_plot_generalized_decode_epochs_dict_and_export_results_completion_function(...): "_display_decoded_trackID_weighted_position_posterior_withMultiColorOverlay" failed with error: {e}\n skipping.')
             raise
 
 
