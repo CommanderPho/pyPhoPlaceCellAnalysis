@@ -3335,6 +3335,13 @@ def pyqtgraph_pre_post_delta_scatter(data_results_df: pd.DataFrame, data_context
 def _plot_low_firing_time_bins_overlay_image(widget, time_bin_edges, mask_rgba, zorder=11.0):
     """ plots the black masks for low-firing time bins on the specified widget track
     
+    ## Visually dimming low-firing bins
+
+        ## find the time bins with insufficient spikes in them.
+
+        ## Darken them by overlaying something
+
+
     Usage:
         from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import _plot_low_firing_time_bins_overlay_image
 
