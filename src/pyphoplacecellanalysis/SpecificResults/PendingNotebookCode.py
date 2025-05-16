@@ -170,7 +170,7 @@ class MeasuredVsDecodedOccupancy:
     """
     @function_attributes(short_name=None, tags=['MAIN'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-05-15 19:57', related_items=[])
     @classmethod
-    def analyze_and_plot_meas_vs_decoded_occupancy(cls, best_matching_context, a_result, a_decoder, a_decoded_marginal_posterior_df, track_templates, figure_title='Laps', plot_in_same_figure:bool=True, **kwargs):
+    def analyze_and_plot_meas_vs_decoded_occupancy(cls, best_matching_context, a_result, a_decoder, a_decoded_marginal_posterior_df, track_templates, figure_title='Laps', plot_in_same_figure:bool=True, debug_print=False, **kwargs):
         """ analyze and plot
 
         
@@ -251,7 +251,8 @@ class MeasuredVsDecodedOccupancy:
             )
 
             for a_pre_post_delta_name, a_timebins_p_x_given_n in pre_post_delta_timebins_p_x_given_n_dict.items():
-                print(f'a_pre_post_delta_name: {a_pre_post_delta_name}')
+                if debug_print:
+                    print(f'a_pre_post_delta_name: {a_pre_post_delta_name}')
                 # final_ax_key: str = f"{a_pre_post_delta_name}_{}"
                 # np.shape(a_timebins_p_x_given_n)
                 # ax = ax_dict[a_pre_post_delta_name]  # Get the appropriate subplot axis
@@ -265,8 +266,9 @@ class MeasuredVsDecodedOccupancy:
             # Create separate figures for each condition
             all_figs = []
             for a_pre_post_delta_name, a_timebins_p_x_given_n in pre_post_delta_timebins_p_x_given_n_dict.items():
-                print(f'k: {a_pre_post_delta_name}')
-                np.shape(a_timebins_p_x_given_n)
+                if debug_print:
+                    print(f'k: {a_pre_post_delta_name}')
+                # np.shape(a_timebins_p_x_given_n)
                 fig, ax_dict = cls.plot_meas_vs_decoded_occupancy(timebins_p_x_given_n=a_timebins_p_x_given_n, track_templates=track_templates, num=f'{figure_title} - {a_pre_post_delta_name} - plot_meas_vs_decoded_occupancy', a_pre_post_delta_name=a_pre_post_delta_name, should_max_normalize=True, **kwargs)
                 plt.suptitle(f'{figure_title} - {a_pre_post_delta_name}')
                 all_figs.append((fig, ax_dict))
@@ -275,7 +277,7 @@ class MeasuredVsDecodedOccupancy:
 
 
     @classmethod
-    def plot_meas_vs_decoded_occupancy(cls, timebins_p_x_given_n: NDArray, track_templates, num='plot_meas_vs_decoded_occupancy', fig=None, ax_dict=None, should_max_normalize: bool=False, a_pre_post_delta_name=None, **kwargs):
+    def plot_meas_vs_decoded_occupancy(cls, timebins_p_x_given_n: NDArray, track_templates, num='plot_meas_vs_decoded_occupancy', fig=None, ax_dict=None, should_max_normalize: bool=False, a_pre_post_delta_name=None, debug_print=False, **kwargs):
         """ from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import plot_meas_vs_decoded_occupancy
         a_result: DecodedFilterEpochsResult
         
@@ -312,12 +314,8 @@ class MeasuredVsDecodedOccupancy:
             )
         else:
             # Use the provided figure and axes
-            # ax_dict = {}
-            # for i, ax_name in enumerate(["long_LR", "long_RL", "short_LR", "short_RL"]):
-            #     ax_dict[ax_name] = ax
-            # assert a_pre_post_delta_name is not None
-            print(f'ax_dict: {list(ax_dict.keys())}')
             if a_pre_post_delta_name is not None:
+                print(f'ax_dict: {list(ax_dict.keys())}')
                 print(f'\ta_pre_post_delta_name: {a_pre_post_delta_name}')
 
         for i, (ax_name, ax) in enumerate(ax_dict.items()):
@@ -341,8 +339,6 @@ class MeasuredVsDecodedOccupancy:
         plt.legend(['decoded', 'measured'])
         # occupancy_fig.show()
         return fig, ax_dict
-
-
 
 
     @function_attributes(short_name='meas_v_decoded_occupancy', tags=['context-decoder-comparison', 'hairly-plot', 'decoded_position', 'directional'], conforms_to=['output_registering', 'figure_saving'], input_requires=[], output_provides=[], requires_global_keys=["global_computation_results.computed_data['EpochComputations']"], uses=['_perform_plot_hairy_overlayed_position', '_helper_add_interpolated_position_columns_to_decoded_result_df', '_display_grid_bin_bounds_validation', 'FigureCollector'], used_by=[], creation_date='2025-05-03 00:00', related_items=[], is_global=True)
@@ -560,6 +556,9 @@ class MeasuredVsDecodedOccupancy:
 
             return graphics_output_dict
     
+
+
+
 
 # ==================================================================================================================================================================================================================================================================================== #
 # 2025-05-06 - Hairy Marginal on timeline                                                                                                                                                                                                                                              #
