@@ -234,7 +234,7 @@ class MeasuredVsDecodedOccupancy:
         # for k, a_result in pre_post_delta_result_dict.items():
         if plot_in_same_figure:
             # Create a single figure with subplots
-            fig = plt.figure(layout="constrained", figsize=[7, 4], dpi=220, clear=True, num=f'{figure_title} - plot_meas_vs_decoded_occupancy', **kwargs)
+            fig = plt.figure(layout="constrained", figsize=[18, 8], dpi=220, clear=True, num=f'{figure_title} - plot_meas_vs_decoded_occupancy', **kwargs)
             
             ax_dict = fig.subplot_mosaic(
                 [
@@ -300,7 +300,7 @@ class MeasuredVsDecodedOccupancy:
 
         if (fig is None) or (ax_dict is None):
             # Create a new figure and axes if they are not provided
-            fig = plt.figure(layout="constrained", figsize=kwargs.pop('figsize', [7, 4]), dpi=220, clear=True, num=num, **kwargs) # figsize=[Width, height] in inches.
+            fig = plt.figure(layout="constrained", figsize=kwargs.pop('figsize', [18, 8]), dpi=220, clear=True, num=num, **kwargs) # figsize=[Width, height] in inches.
             ax_dict = fig.subplot_mosaic(
                 [
                     ["long_LR"], ["long_RL"], ["short_LR"], ["short_RL"],                    
