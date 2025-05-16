@@ -110,51 +110,216 @@ from pyphocorehelpers.gui.Qt.color_helpers import ColormapHelpers, ColorFormatCo
 import numpy as np
 import itertools
 from typing import List, Tuple, Dict
+# from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import analyze_epoch_dynamics
+# from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import MeasuredVsDecodedOccupancy
+from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.EpochComputationFunctions import EpochComputationFunctions, EpochComputationsComputationsContainer
+from neuropy.utils.indexing_helpers import PandasHelpers
+        
 
+from enum import Enum, auto
 
-@function_attributes(short_name=None, tags=['run-lengths', 'sequence-analysis'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-05-15 15:28', related_items=[])
-def analyze_epoch_dynamics(p_long: NDArray, epochs: List[Tuple[int, int]]) -> List[Dict]:
-    """ 
-
-    Usage:
-        from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import analyze_epoch_dynamics
-
-    """
-    def classify(p: float) -> str:
-        if p > 0.6:
-            return 'pure.Long'
-        elif p < 0.4:
-            return 'pure.Short'
-        else:
-            return 'mixed'
+@metadata_attributes(short_name=None, tags=['run-lengths', 'sequence-analysis', 'temporal'], input_requires=[], output_provides=[], uses=[], used_by=['WithinEpochTimeBinDynamics'], creation_date='2025-05-16 04:30', related_items=[])
+class TimeBinCategorization(Enum):
+    """classifies a single time bin based on its prob 
     
-    def rle(seq: List[str]) -> Tuple[NDArray, NDArray, List[str]]:
-        if len(seq) == 0:
-            return np.array([], dtype=int), np.array([], dtype=int), []
+    
+        if (self.value == self.pLONG.value):
+            pass
+        elif (self.value == self.pSHORT.value):
+            pass
+        elif (self.value == self.MIXED.value):
+            pass
+        else:
+            raise NotImplementedError(f'{self} is not VALID')
+
+            
+    """
+    pLONG = 'pure.Long'
+    pSHORT = 'pure.Short'
+    MIXED = 'mixed'
+
+    def __str__(self):
+        return self.name
+    
+    @classmethod
+    def list_members(cls) -> List["TimeBinCategorization"]:
+        return [cls.pLONG, cls.pSHORT, cls.MIXED]
+
+    @classmethod
+    def list_values(cls):
+        """Returns a list of all enum values"""
+        return list(cls)
+
+    @classmethod
+    def list_names(cls):
+        """Returns a list of all enum names"""
+        return [e.name for e in cls]
+
+    def lower_name(self) -> str:
+        """Returns a list of all enum names"""
+        return self.name[1:].lower() # 'long', 'short', 'mixed'
+        if (self.value == self.pLONG.value):
+            pass
+        elif (self.value == self.pSHORT.value):
+            pass
+        elif (self.value == self.MIXED.value):
+            pass
+        else:
+            raise NotImplementedError(f'{self} is not VALID')
+
+    
+@metadata_attributes(short_name=None, tags=['run-lengths', 'sequence-analysis', 'temporal'], input_requires=[], output_provides=[], uses=['TimeBinCategorization'], used_by=[], creation_date='2025-05-16 04:28', related_items=[])
+class WithinEpochTimeBinDynamics:
+    """ 
+    from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import WithinEpochTimeBinDynamics, TimeBinCategorization
+    
+    
+    """
+    @classmethod
+    def classify(cls, p: float) -> TimeBinCategorization:
+        if p > 0.6:
+            return TimeBinCategorization.pLONG # 'pure.Long'
+        elif p < 0.4:
+            return TimeBinCategorization.pSHORT # 'pure.Short'
+        else:
+            return TimeBinCategorization.MIXED # 'mixed'
+
+    @function_attributes(short_name=None, tags=['private', 'run-length'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-05-16 01:29', related_items=[])
+    @classmethod
+    def run_length_encoding(cls, seq: List[str]) -> Tuple[NDArray, NDArray, List[str]]:
+        """ For a given sequence of categorized events (one categorization for each time-bin), returns stats about the sequence
+        """
+        n_t_bins: int = len(seq)
+        
+        if n_t_bins == 0:
+            return np.array([], dtype=int), np.array([], dtype=int), [], {}
         changes = [0] + [i for i in range(1, len(seq)) if seq[i] != seq[i-1]] + [len(seq)]
-        lengths = np.diff(changes)
-        starts = changes[:-1]
-        values = [seq[i] for i in starts]
-        return np.array(lengths), np.array(starts), values
+        subseq_lengths = np.diff(changes)
+        subseq_start_idxs = changes[:-1]
+        run_subseq_type_id = [seq[i] for i in subseq_start_idxs]
 
-    state_seq = np.array([classify(p) for p in p_long])
-    results = []
+        type_string_seq = [f'{val}[{length}]' for val, length in zip(run_subseq_type_id, subseq_lengths)]
 
-    for epoch_start_t, epoch_end_t in epochs:
-        epoch_states = state_seq[epoch_start_t:epoch_end_t]
-        transitions = np.sum(epoch_states[1:] != epoch_states[:-1])
-        lengths, starts, values = rle(epoch_states)
-        subsequences = {'pure.Long': [], 'pure.Short': [], 'mixed': []}
-        for val, length in zip(values, lengths):
-            subsequences[val].append(length)
-        results.append({
-            'transitions': int(transitions),
-            'subsequences': subsequences,
-            'lengths': lengths.tolist(),
-            'states': values
-        })
+        type_subsequence_lengths_dict = {k:list() for k in TimeBinCategorization.list_members()}
+        
+        for type_name, length in zip(run_subseq_type_id, subseq_lengths):
+            # type_subsequences_dict[type_name].append()
+            type_subsequence_lengths_dict[type_name].append(length)
 
-    return results
+            
+
+        # type_avg_subseq_lengths_dict = {f"{a_type_name}":np.mean(v) for a_type_name, v in type_subsequence_lengths_dict.items()}
+        type_avg_subseq_lengths_dict = {f"mean_len.{a_type_name}":np.mean(v) for a_type_name, v in type_subsequence_lengths_dict.items()}
+        type_subseq_lengths_variance_dict = {f"var_len.{a_type_name}":np.nanstd(v) for a_type_name, v in type_subsequence_lengths_dict.items()}
+        type_n_bin_counts_dict = {f"n_bins.{a_type_name}":np.nansum(v) for a_type_name, v in type_subsequence_lengths_dict.items()}    
+        type_n_bins_ratios_dict = {f"bins_ratio.{a_type_name}":np.nansum(v)/float(n_t_bins) for a_type_name, v in type_subsequence_lengths_dict.items()}
+
+        _out_dict = {
+            'type_subseq_lengths_dict': type_subsequence_lengths_dict,
+            **type_avg_subseq_lengths_dict,
+            **type_subseq_lengths_variance_dict,
+            #  'type_subseq_lengths_variance_dict': {a_type_name:np.var(v) for a_type_name, v in type_subsequence_lengths_dict.items()},
+            'type_string_seq': type_string_seq,
+            **type_n_bin_counts_dict,
+            **type_n_bins_ratios_dict, # 'mixed_bins_ratio': 
+        }
+        # _out_dict.update(**type_subseq_lengths_variance_dict)
+        return np.array(subseq_lengths), np.array(subseq_start_idxs), run_subseq_type_id, _out_dict
+
+
+    @function_attributes(short_name=None, tags=['MAIN'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-05-16 04:27', related_items=[])
+    @classmethod
+    def analyze_subsequence_temporal_dynamics(cls, curr_active_pipeline, should_show_complex_intermediate_columns: bool = False):
+        """ 
+        
+        complex_column_names: List[str] = ['type_subseq_lengths_dict', 'state_seq', 'type_string_seq']
+
+        
+        """        
+        from pyphocorehelpers.assertion_helpers import Assert
+                
+        complex_column_names: List[str] = ['type_subseq_lengths_dict', 'state_seq', 'type_string_seq']
+        transferred_column_names: List[str] = ['pre_post_delta_category',  'pre_post_delta_id', 'delta_aligned_start_t']
+
+        valid_EpochComputations_result: EpochComputationsComputationsContainer = curr_active_pipeline.global_computation_results.computed_data['EpochComputations']
+        a_new_fully_generic_result: GenericDecoderDictDecodedEpochsDictResult = valid_EpochComputations_result.a_generic_decoder_dict_decoded_epochs_dict_result
+
+
+        # common_constraint_dict = dict(trained_compute_epochs='laps', pfND_ndim=1, time_bin_size=0.025, masked_time_bin_fill_type='ignore')
+        common_constraint_dict = dict(trained_compute_epochs='laps', time_bin_size=0.025, masked_time_bin_fill_type='nan_filled') # , pfND_ndim=1
+
+
+        ## PBEs context:
+        a_target_context: IdentifyingContext = IdentifyingContext(known_named_decoding_epochs_type='pbe', data_grain='per_time_bin', **common_constraint_dict) ## Laps , data_grain='per_epoch'
+        best_matching_context, a_result, a_decoder, a_decoded_marginal_posterior_df = a_new_fully_generic_result.get_results_best_matching_context(context_query=a_target_context)
+
+        ## INPUTS: a_decoded_marginal_posterior_df
+        epoch_df = deepcopy(a_decoded_marginal_posterior_df)
+        epoch_df['state_seq'] = epoch_df['P_Long'].map(cls.classify)
+        # epoch_df
+
+        #  ['P_LR', 'P_RL', 'P_Long', 'P_Short', 'long_LR', 'long_RL', 'short_LR', 'short_RL', 'result_t_bin_idx', 'epoch_df_idx', 'parent_epoch_label', 'parent_epoch_duration', 'label', 'start', 't_bin_center', 'stop', 'delta_aligned_start_t',
+        #  'session_name', 'time_bin_size', 'pre_post_delta_category', 'trained_compute_epochs', 'pfND_ndim', 'decoder_identifier', 'known_named_decoding_epochs_type', 'masked_time_bin_fill_type', 'data_grain', 'format_name', 'animal', 'exper_name', 'epochs_source', 'included_qclu_values', 'minimum_inclusion_fr_Hz', 'is_t_bin_center_fake', 'pre_post_delta_id', 'state_seq']
+        print(f'epoch_df.columns: {list(epoch_df.columns)}') 
+
+        epoch_split_df_dict = epoch_df.pho.partition_df_dict('parent_epoch_label')
+        ## INPUTS: epoch_split_df_dict
+
+        results = []
+
+        ## iterate through split epochs to compute stats
+        for i, (epoch_label, an_epoch_df) in enumerate(epoch_split_df_dict.items()):
+            # print(f'i: {i}, epoch_label: {epoch_label}')
+            epoch_start_t = an_epoch_df['start'].to_numpy()[0]
+            epoch_end_t =  an_epoch_df['stop'].to_numpy()[-1]
+
+            a_result_dict = {
+                'epoch_start_t': epoch_start_t,
+                'epoch_end_t': epoch_end_t,
+                'epoch_label': epoch_label,
+            }
+            for a_col_name in transferred_column_names:
+                if a_col_name in an_epoch_df:
+                    curr_values = an_epoch_df[a_col_name].to_numpy()
+                    if len(curr_values) > 2:
+                        Assert.all_equal(curr_values)
+                    a_value = curr_values[0] ## get the first, they better all match
+                    a_result_dict[a_col_name] = a_value
+                else:
+                    print(f'WARN: column "{a_col_name}" is missing from epoch_df!')
+                    
+            # epoch_states = state_seq[epoch_start_t:epoch_end_t]
+            epoch_states = an_epoch_df['state_seq'].to_numpy()
+            n_t_bins: int = len(epoch_states)
+            n_transitions: int = np.sum(epoch_states[1:] != epoch_states[:-1])
+            subseq_lengths, subseq_start_idxs, run_subseq_type_id, an_epoch_out_dict = cls.run_length_encoding(epoch_states)
+            
+            a_result_dict.update({
+                'n_t_bins': n_t_bins,
+                'n_transitions': int(n_transitions),
+                # 'type_subseq_lengths_dict': subsequences,
+                'lengths': subseq_lengths.tolist(),
+                'state_seq': run_subseq_type_id,
+                **an_epoch_out_dict,
+            })
+            
+            results.append(a_result_dict)
+
+        ## END for i, (epoch_label, an_epoch_df) in enumera..
+
+
+
+        sequence_dwell_epochs_df = pd.DataFrame(results)
+        sequence_dwell_epochs_df = sequence_dwell_epochs_df.sort_values('epoch_start_t', ascending=True, inplace=False).reset_index(drop=True)
+        
+        if not should_show_complex_intermediate_columns:
+            sequence_dwell_epochs_df.drop(columns=complex_column_names, inplace=True)
+
+        sequence_dwell_epochs_df = sequence_dwell_epochs_df.convert_dtypes() ## correctly converts columns to integers, etc, but replaces np.nan with <NA>
+        ## Move the "height" columns to the end
+        sequence_dwell_epochs_df = PandasHelpers.reordering_columns_relative(sequence_dwell_epochs_df, column_names=['lengths'], relative_mode='end') # list(filter(lambda column: column.endswith('_peak_heights'), existing_columns))
+        return sequence_dwell_epochs_df
+
 
 
 # ==================================================================================================================================================================================================================================================================================== #
