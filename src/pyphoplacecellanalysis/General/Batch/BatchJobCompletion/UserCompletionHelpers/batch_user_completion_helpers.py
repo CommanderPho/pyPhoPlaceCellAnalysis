@@ -3149,7 +3149,7 @@ def figures_plot_generalized_decode_epochs_dict_and_export_results_completion_fu
                                                                                         included_figures_names=['_display_generalized_decoded_yellow_blue_marginal_epochs', '_display_decoded_trackID_marginal_hairy_position'],
                                                                                         extreme_threshold: float=0.8, opacity_max:float=0.7, thickness_ramping_multiplier:float=35.0, **additional_marginal_overlaying_measured_position_kwargs) -> dict:
     """ Simple function that just plots the figure corresponding to by `generalized_decode_epochs_dict_and_export_results_completion_function` so we don't have to wait for the entire batch_figures_plotting on 2025-04-16 15:22.
-
+    
     
     This is the global across-session marginal over trackID
     
@@ -3226,6 +3226,88 @@ def figures_plot_generalized_decode_epochs_dict_and_export_results_completion_fu
 
 
 
+@function_attributes(short_name='generalized_export_figures_customizazble_completion_function', tags=['customizable', 'reuse', 'figure', 'posterior', 'hairly-plot'], input_requires=[], output_provides=[], uses=['_display_generalized_decoded_yellow_blue_marginal_epochs', '_display_decoded_trackID_marginal_hairy_position'], used_by=[], creation_date='2025-05-16 10:59', related_items=[])
+def generalized_export_figures_customizazble_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict,
+                                                                                        included_figures_names=['_display_generalized_decoded_yellow_blue_marginal_epochs', '_display_decoded_trackID_marginal_hairy_position'],
+                                                                                        extreme_threshold: float=0.8, opacity_max:float=0.7, thickness_ramping_multiplier:float=35.0, **additional_marginal_overlaying_measured_position_kwargs) -> dict:
+    """ Simple function that just does batch plotting/exporting so the user doesn't have to introduce a bunch of new user_completion_helper functions each time they weant to export a figure
+    
+    
+    """
+    from pyphoplacecellanalysis.General.Mixins.ExportHelpers import FileOutputManager, FigureOutputLocation, ContextToPathMode	
+    from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.EpochComputationFunctions import EpochComputationDisplayFunctions
+    
+
+    assert self.collected_outputs_path.exists()
+    curr_session_name: str = curr_active_pipeline.session_name # '2006-6-08_14-26-15'
+    CURR_BATCH_OUTPUT_PREFIX: str = f"{self.BATCH_DATE_TO_USE}-{curr_session_name}"
+    print(f'CURR_BATCH_OUTPUT_PREFIX: {CURR_BATCH_OUTPUT_PREFIX}')
+    
+    print(f'<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<')
+    print(f'generalized_export_figures_customizazble_completion_function(curr_session_context: {curr_session_context}, curr_session_basedir: {str(curr_session_basedir)}, ...)')
+    custom_figure_output_path = self.collected_outputs_path
+    assert custom_figure_output_path.exists(), f"custom_figure_output_path: '{custom_figure_output_path}' does not exist!"
+    
+    custom_fig_man: FileOutputManager = FileOutputManager(figure_output_location=FigureOutputLocation.CUSTOM, context_to_path_mode=ContextToPathMode.GLOBAL_UNIQUE, override_output_parent_path=custom_figure_output_path)
+    
+    # print(f'custom_figure_output_path: "{custom_figure_output_path}"')
+    # test_context = IdentifyingContext(format_name='kdiba',animal='gor01',exper_name='one',session_name='2006-6-08_14-26-15',display_fn_name='display_long_short_laps')
+    test_display_output_path = custom_fig_man.get_figure_save_file_path(curr_active_pipeline.get_session_context(), make_folder_if_needed=False)
+    print(f'test_display_output_path: "{test_display_output_path}"')
+
+    curr_active_pipeline.reload_default_display_functions()
+
+    if '_display_generalized_decoded_yellow_blue_marginal_epochs' in included_figures_names:
+        # _display_generalized_decoded_yellow_blue_marginal_epochs ___________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
+        try:
+            _out = curr_active_pipeline.display('_display_generalized_decoded_yellow_blue_marginal_epochs', curr_active_pipeline.get_session_context(), defer_render=True, save_figure=True, is_dark_mode=False, override_fig_man=custom_fig_man)
+        except Exception as e:
+            print(f'\tgeneralized_export_figures_customizazble_completion_function(...): "_display_generalized_decoded_yellow_blue_marginal_epochs" failed with error: {e}\n skipping.')
+
+
+    if '_display_decoded_trackID_marginal_hairy_position' in included_figures_names:
+
+        interesting_hair_parameter_kwarg_dict = {
+            # 'defaults': dict(extreme_threshold=0.8, opacity_max=0.7, thickness_ramping_multiplier=35),
+            'overrides': dict(extreme_threshold=extreme_threshold, opacity_max=opacity_max, thickness_ramping_multiplier=thickness_ramping_multiplier),
+            # '50_sec_window_scale': dict(extreme_threshold=0.5, thickness_ramping_multiplier=50),
+            'full_1700_sec_session_scale': dict(extreme_threshold=0.5, thickness_ramping_multiplier=12), ## really interesting, can see the low-magnitude endcap short-like firing
+            # 'experimental': dict(extreme_threshold=0.8, thickness_ramping_multiplier=55),
+        }
+        
+        # disable_all_grid_bin_bounds_lines: bool = additional_marginal_overlaying_measured_position_kwargs.get('disable_all_grid_bin_bounds_lines', False)
+        if 'disable_all_grid_bin_bounds_lines' not in additional_marginal_overlaying_measured_position_kwargs:
+            additional_marginal_overlaying_measured_position_kwargs['disable_all_grid_bin_bounds_lines'] = False ## show the lines by default for big figures
+
+
+        ## loop through the configs:
+        for a_plot_name, a_params_kwargs in interesting_hair_parameter_kwarg_dict.items():
+        
+            # _display_decoded_trackID_marginal_hairy_position ___________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
+            display_context = curr_active_pipeline.build_display_context_for_session(display_fn_name='trackID_marginal_hairy_position')
+
+            try:
+                sub_context = display_context.adding_context('subplot', subplot_name=a_plot_name)
+                _out = curr_active_pipeline.display('_display_decoded_trackID_marginal_hairy_position', sub_context, defer_render=True, save_figure=True, override_fig_man=custom_fig_man, 
+                                                    # extreme_threshold=extreme_threshold, opacity_max=opacity_max, thickness_ramping_multiplier=thickness_ramping_multiplier, **additional_marginal_overlaying_measured_position_kwargs,
+                                                    **(a_params_kwargs | additional_marginal_overlaying_measured_position_kwargs), ## expand passed params 
+                                                    )
+                
+            except Exception as e:
+                print(f'\tgeneralized_export_figures_customizazble_completion_function(...): "_display_decoded_trackID_marginal_hairy_position" failed with error: {e}\n skipping.')
+
+
+    print(f'>>\t done with {curr_session_context}')
+    print(f'>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>')
+    print(f'>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>')
+
+    # return True
+    return across_session_results_extended_dict
+
+
+
+
+
 # ==================================================================================================================== #
 # END COMPLETION FUNCTIONS                                                                                             #
 # ==================================================================================================================== #
@@ -3290,6 +3372,7 @@ def MAIN_get_template_string(BATCH_DATE_TO_USE: str, collected_outputs_path:Path
                                     'figures_plot_cell_first_spikes_characteristics_completion_function': figures_plot_cell_first_spikes_characteristics_completion_function,
                                     'generalized_decode_epochs_dict_and_export_results_completion_function': generalized_decode_epochs_dict_and_export_results_completion_function,
                                     'figures_plot_generalized_decode_epochs_dict_and_export_results_completion_function': figures_plot_generalized_decode_epochs_dict_and_export_results_completion_function,
+                                    'generalized_export_figures_customizazble_completion_function': generalized_export_figures_customizazble_completion_function,
                                     }
     else:
         # use the user one:
