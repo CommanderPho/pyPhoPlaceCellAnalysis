@@ -371,9 +371,8 @@ class MultiContextComparingDisplayFunctions(AllFunctionEnumeratingMixin, metacla
             directional_laps_results: DirectionalLapsResult = owning_pipeline_reference.global_computation_results.computed_data['DirectionalLaps']
             track_templates: TrackTemplates = directional_laps_results.get_templates(minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz, included_qclu_values=included_qclu_values) # non-shared-only -- !! Is minimum_inclusion_fr_Hz=None the issue/difference?
             
-
             # common_constraint_dict = dict(trained_compute_epochs='laps', pfND_ndim=1, time_bin_size=0.025, masked_time_bin_fill_type='ignore')
-            common_constraint_dict = dict(trained_compute_epochs='laps', time_bin_size=0.025, masked_time_bin_fill_type='nan_filled') # , pfND_ndim=1
+            common_constraint_dict = dict(trained_compute_epochs='laps', time_bin_size=epochs_decoding_time_bin_size, masked_time_bin_fill_type='nan_filled') # , pfND_ndim=1
 
             ## OUTPUTS: a_decoded_marginal_posterior_df
 
@@ -400,8 +399,12 @@ class MultiContextComparingDisplayFunctions(AllFunctionEnumeratingMixin, metacla
             # ==================================================================================================================================================================================================================================================================================== #
             # Add display function critical parameters                                                                                                                                                                                                                                             #
             # ==================================================================================================================================================================================================================================================================================== #
-            active_display_context = deepcopy(display_context) #.overwriting_context(extreme_threshold=extreme_threshold, opacity_max=opacity_max, thickness_ramping_multiplier=thickness_ramping_multiplier) ## include any that are just the slightest big different
+            # active_display_context = deepcopy(display_context) #.overwriting_context(extreme_threshold=extreme_threshold, opacity_max=opacity_max, thickness_ramping_multiplier=thickness_ramping_multiplier) ## include any that are just the slightest big different
             
+            active_display_context = display_context.overwriting_context(t_bin=epochs_decoding_time_bin_size) ## include any that are just the slightest big different
+            active_display_context = active_display_context.overwriting_context(minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz, included_qclu_values=included_qclu_values) ## include any that are just the slightest big different
+
+
             # perform_write_to_file_callback = kwargs.pop('perform_write_to_file_callback', (lambda final_context, fig: owning_pipeline_reference.output_figure(final_context, fig)))
 
             global_measured_position_df: pd.DataFrame = deepcopy(owning_pipeline_reference.sess.position.to_dataframe())
@@ -460,7 +463,12 @@ class MultiContextComparingDisplayFunctions(AllFunctionEnumeratingMixin, metacla
 
                 # subtitle_string = '\n'.join([f'{active_config.str_for_display(is_2D)}'])
                 # header_text_obj = flexitext(text_formatter.left_margin, 0.9, f'<size:22><weight:bold>{title_string}</></>\n<size:10>{subtitle_string}</>', va="bottom", xycoords="figure fraction") # , wrap=False
-                header_text_obj = flexitext(0.01, 0.85, f'<size:20><weight:bold>{title_string}</></>\n<size:9>{subtitle_string}</>', va="bottom", xycoords="figure fraction") # , wrap=False
+                formatted_title_str: str = f'<size:20><weight:bold>{title_string}</></>'
+                if subtitle_string is not None:
+                    formatted_title_str = formatted_title_str + f'\n<size:9>{subtitle_string}</>'
+                                    
+
+                header_text_obj = flexitext(0.01, 0.85, formatted_title_str, va="bottom", xycoords="figure fraction") # , wrap=False
                 footer_text_obj = text_formatter.add_flexitext_context_footer(active_context=active_context) # flexitext((text_formatter.left_margin*0.1), (text_formatter.bottom_margin*0.25), text_formatter._build_footer_string(active_context=active_context), va="top", xycoords="figure fraction")
                 
                 complete_title_string: str = f"{title_string} - {session_footer_string}"
