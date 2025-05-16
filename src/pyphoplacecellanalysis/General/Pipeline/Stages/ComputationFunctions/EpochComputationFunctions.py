@@ -2609,6 +2609,227 @@ class EpochComputationDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Di
             return graphics_output_dict
 
 
+    @function_attributes(short_name='trackID_weighted_position_posterior', tags=['context-decoder-comparison', 'decoded_position', 'directional'], conforms_to=['output_registering', 'figure_saving'], input_requires=[], output_provides=[], requires_global_keys=["global_computation_results.computed_data['EpochComputations']"], uses=['FigureCollector'], used_by=[], creation_date='2025-05-03 00:00', related_items=[], is_global=True)
+    def _display_decoded_trackID_weighted_position_posterior_withMultiColorOverlay(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, save_figure=True, override_fig_man: Optional[FileOutputManager]=None, ax=None, custom_export_formats: Optional[Dict[str, Any]]=None, parent_output_folder: Path = Path('output/array_to_images'), **kwargs):
+            """ Displays one figure containing the track_ID marginal, decoded continuously over the entire recording session along with the animal's position.
+            
+            "HeatmapExportConfig"
+            
+            #TODO 2025-05-05 15:02: - [ ] Increasing `extreme_threshold` should not have an effect on the thicknesses, only the masked/unmasked regions extreme_threshold=0.9, thickness_ramping_multiplier=50
+
+                        
+            Based off of ``
+            
+            Usage:
+                # getting `_display_generalized_decoded_yellow_blue_marginal_epochs` into shape
+                curr_active_pipeline.reload_default_display_functions()
+
+
+                _out = dict()
+                _out['trackID_marginal_hairy_position'] = curr_active_pipeline.display(display_function='trackID_marginal_hairy_position', active_session_configuration_context=None) # _display_directional_track_template_pf1Ds
+
+
+            """
+            from neuropy.utils.result_context import IdentifyingContext
+            from neuropy.utils.mixins.time_slicing import TimeColumnAliasesProtocol
+            from pyphoplacecellanalysis.General.Model.Configs.LongShortDisplayConfig import PlottingHelpers
+            from pyphoplacecellanalysis.General.Mixins.ExportHelpers import FileOutputManager, FigureOutputLocation, ContextToPathMode	
+            
+            import matplotlib as mpl
+            import matplotlib.pyplot as plt
+            from flexitext import flexitext ## flexitext for formatted matplotlib text
+
+            from pyphocorehelpers.DataStructure.RenderPlots.MatplotLibRenderPlots import FigureCollector
+            from neuropy.utils.matplotlib_helpers import FormattedFigureText
+
+            from pyphoplacecellanalysis.Pho2D.data_exporting import HeatmapExportConfig, PosteriorExporting, HeatmapExportKind
+            from pyphoplacecellanalysis.SpecificResults.AcrossSessionResults import Assert
+
+
+            from datetime import datetime, date, timedelta
+            from pyphocorehelpers.print_helpers import get_now_day_str, get_now_rounded_time_str
+
+            DAY_DATE_STR: str = date.today().strftime("%Y-%m-%d")
+            DAY_DATE_TO_USE = f'{DAY_DATE_STR}' # used for filenames throught the notebook
+            print(f'DAY_DATE_STR: {DAY_DATE_STR}, DAY_DATE_TO_USE: {DAY_DATE_TO_USE}')
+
+            NOW_DATETIME: str = get_now_rounded_time_str()
+            NOW_DATETIME_TO_USE = f'{NOW_DATETIME}' # used for filenames throught the notebook
+            print(f'NOW_DATETIME: {NOW_DATETIME}, NOW_DATETIME_TO_USE: {NOW_DATETIME_TO_USE}')
+
+            # export_dpi_multiplier: float = kwargs.pop('export_dpi_multiplier', 2.0)
+            # dpi = kwargs.pop('dpi', 100)
+            # export_dpi: int = int(np.ceil(dpi * export_dpi_multiplier))
+            
+
+            graphics_output_dict = {'parent_output_folder': parent_output_folder}
+
+
+            # ==================================================================================================================================================================================================================================================================================== #
+            # BEGIN FUNCTION BODY                                                                                                                                                                                                                                                                  #
+            # ==================================================================================================================================================================================================================================================================================== #
+
+            ## Unpack from pipeline:
+            valid_EpochComputations_result: EpochComputationsComputationsContainer = owning_pipeline_reference.global_computation_results.computed_data['EpochComputations'] # owning_pipeline_reference.global_computation_results.computed_data['EpochComputations']
+            assert valid_EpochComputations_result is not None
+            epochs_decoding_time_bin_size: float = valid_EpochComputations_result.epochs_decoding_time_bin_size ## just get the standard size. Currently assuming all things are the same size!
+            print(f'\tepochs_decoding_time_bin_size: {epochs_decoding_time_bin_size}')
+            assert epochs_decoding_time_bin_size == valid_EpochComputations_result.epochs_decoding_time_bin_size, f"\tERROR: nonPBE_results.epochs_decoding_time_bin_size: {valid_EpochComputations_result.epochs_decoding_time_bin_size} != epochs_decoding_time_bin_size: {epochs_decoding_time_bin_size}"
+            a_new_fully_generic_result: GenericDecoderDictDecodedEpochsDictResult = valid_EpochComputations_result.a_generic_decoder_dict_decoded_epochs_dict_result ## get existing
+
+            ## INPUTS: a_new_fully_generic_result
+            # a_target_context: IdentifyingContext = IdentifyingContext(trained_compute_epochs='laps', pfND_ndim=1, decoder_identifier='pseudo2D', known_named_decoding_epochs_type='global', masked_time_bin_fill_type='nan_filled', data_grain='per_time_bin')
+            a_target_context: IdentifyingContext = IdentifyingContext(trained_compute_epochs='laps', pfND_ndim=1, decoder_identifier='pseudo2D', known_named_decoding_epochs_type='global', masked_time_bin_fill_type='ignore', data_grain='per_time_bin')
+            best_matching_context, a_result, a_decoder, a_decoded_marginal_posterior_df = a_new_fully_generic_result.get_results_best_matching_context(context_query=a_target_context, debug_print=False)
+            epochs_decoding_time_bin_size = best_matching_context.get('time_bin_size', None)
+            assert epochs_decoding_time_bin_size is not None
+
+            ## OUTPUTS: a_decoded_marginal_posterior_df
+
+            complete_session_context, (session_context, additional_session_context) = owning_pipeline_reference.get_complete_session_context()
+
+            active_context = kwargs.pop('active_context', None)
+            if active_context is not None:
+                # Update the existing context:
+                display_context = active_context.adding_context('display_fn', display_fn_name='trackID_marginal_hairy_position')
+            else:
+                # active_context = owning_pipeline_reference.sess.get_context()
+                active_context = deepcopy(complete_session_context) # owning_pipeline_reference.sess.get_context()
+                
+                # Build the active context directly:
+                display_context = owning_pipeline_reference.build_display_context_for_session('trackID_marginal_hairy_position')
+
+            fignum = kwargs.pop('fignum', None)
+            if fignum is not None:
+                print(f'WARNING: fignum will be ignored but it was specified as fignum="{fignum}"!')
+
+
+            ## OUTPUTS: active_context, display_context
+            # active_display_context = display_context.overwriting_context(extreme_threshold=extreme_threshold, opacity_max=opacity_max, thickness_ramping_multiplier=thickness_ramping_multiplier) ## include any that are just the slightest big different
+            # active_display_context = deepcopy(display_context)
+
+            # defer_render = kwargs.pop('defer_render', False)
+            # debug_print: bool = kwargs.pop('debug_print', False)
+            # active_config_name: bool = kwargs.pop('active_config_name', None)
+
+            # perform_write_to_file_callback = kwargs.pop('perform_write_to_file_callback', (lambda final_context, fig: owning_pipeline_reference.output_figure(final_context, fig)))
+
+
+            # debug_print = kwargs.get('debug_print', False)
+            # session_name: str = owning_pipeline_reference.session_name
+            # t_start, t_delta, t_end = owning_pipeline_reference.find_LongShortDelta_times()
+            
+            # INPUTS _____________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
+
+
+            # all_decoder_colors_dict = {'long': '#4169E1', 'short': '#DC143C', 'long_LR': '#4169E1', 'long_RL': '#607B00', 'short_LR': '#DC143C', 'short_RL': '#990099'} ## Just hardcoded version of `additional_cmap_names`
+
+
+            # laps_trained_decoder_search_context = IdentifyingContext(trained_compute_epochs='laps', pfND_ndim=1, decoder_identifier='pseudo2D', known_named_decoding_epochs_type='laps', masked_time_bin_fill_type='ignore', data_grain='per_time_bin') # , data_grain= 'per_time_bin -- not really relevant: ['masked_time_bin_fill_type', 'known_named_decoding_epochs_type', 'data_grain']
+            # # laps_trained_decoder_search_context = IdentifyingContext(trained_compute_epochs='laps', pfND_ndim=1, decoder_identifier='pseudo2D', known_named_decoding_epochs_type='laps', masked_time_bin_fill_type='dropped', data_grain='per_time_bin')
+            # flat_context_list, flat_result_context_dict, flat_decoder_context_dict, flat_decoded_marginal_posterior_df_context_dict = a_new_fully_generic_result.get_results_matching_contexts(context_query=laps_trained_decoder_search_context, return_multiple_matches=True, debug_print=True)
+
+            # flat_context_list
+
+            # ==================================================================================================================================================================================================================================================================================== #
+            # Separate export for each masked_time_bin_fill_type  - LAPS                                                                                                                                                                                                                           #
+            # ==================================================================================================================================================================================================================================================================================== #
+
+            laps_trained_decoder_search_context = IdentifyingContext(trained_compute_epochs='laps', pfND_ndim=1, decoder_identifier='pseudo2D', known_named_decoding_epochs_type='laps', masked_time_bin_fill_type=('ignore', 'nan_filled', 'dropped'), data_grain='per_time_bin') # , data_grain= 'per_time_bin -- not really relevant: ['masked_time_bin_fill_type', 'known_named_decoding_epochs_type', 'data_grain']
+            # laps_trained_decoder_search_context = IdentifyingContext(trained_compute_epochs='laps', pfND_ndim=1, decoder_identifier='pseudo2D', known_named_decoding_epochs_type='laps', masked_time_bin_fill_type='dropped', data_grain='per_time_bin')
+            flat_context_list, flat_result_context_dict, flat_decoder_context_dict, flat_decoded_marginal_posterior_df_context_dict = a_new_fully_generic_result.get_results_matching_contexts(context_query=laps_trained_decoder_search_context, return_multiple_matches=True, debug_print=True)
+
+            active_ctxts = [
+                            # IdentifyingContext(trained_compute_epochs= 'laps', pfND_ndim= 1, decoder_identifier= 'pseudo2D', time_bin_size= 0.025, known_named_decoding_epochs_type= 'laps', masked_time_bin_fill_type= 'ignore'), 
+                            IdentifyingContext(trained_compute_epochs= 'laps', pfND_ndim= 1, decoder_identifier= 'pseudo2D', time_bin_size= 0.025, known_named_decoding_epochs_type= 'laps', masked_time_bin_fill_type= 'nan_filled', data_grain= 'per_time_bin'),
+                            # IdentifyingContext(trained_compute_epochs= 'laps', pfND_ndim= 1, decoder_identifier= 'pseudo2D', time_bin_size= 0.025, known_named_decoding_epochs_type= 'laps', masked_time_bin_fill_type= 'dropped', data_grain= 'per_time_bin'),
+            ]
+
+
+            flat_result_context_dict = {k:v for k, v in flat_result_context_dict.items() if k in active_ctxts}
+
+            # decoder_laps_filter_epochs_decoder_result_dict = deepcopy(flat_result_context_dict)
+            decoder_laps_filter_epochs_decoder_result_dict = {f"psuedo2D_{k.get('masked_time_bin_fill_type')}":deepcopy(v) for k, v in flat_result_context_dict.items()}
+            decoder_laps_filter_epochs_decoder_result_dict
+
+
+            # ==================================================================================================================================================================================================================================================================================== #
+            # Separate export for each masked_time_bin_fill_type  - PBE                                                                                                                                                                                                                            #
+            # ==================================================================================================================================================================================================================================================================================== #
+
+            pbe_trained_decoder_search_context = IdentifyingContext(trained_compute_epochs='laps', pfND_ndim=1, decoder_identifier='pseudo2D', known_named_decoding_epochs_type='pbe', masked_time_bin_fill_type=('ignore', 'nan_filled', 'dropped'), data_grain='per_time_bin') # , data_grain= 'per_time_bin -- not really relevant: ['masked_time_bin_fill_type', 'known_named_decoding_epochs_type', 'data_grain']
+            # laps_trained_decoder_search_context = IdentifyingContext(trained_compute_epochs='laps', pfND_ndim=1, decoder_identifier='pseudo2D', known_named_decoding_epochs_type='laps', masked_time_bin_fill_type='dropped', data_grain='per_time_bin')
+            flat_context_list, flat_result_context_dict, flat_decoder_context_dict, flat_decoded_marginal_posterior_df_context_dict = a_new_fully_generic_result.get_results_matching_contexts(context_query=pbe_trained_decoder_search_context, return_multiple_matches=True, debug_print=True)
+
+            active_ctxts = [
+                            # IdentifyingContext(trained_compute_epochs= 'laps', pfND_ndim= 1, decoder_identifier= 'pseudo2D', time_bin_size= 0.025, known_named_decoding_epochs_type= 'pbe', masked_time_bin_fill_type= 'ignore'), 
+                            IdentifyingContext(trained_compute_epochs= 'laps', pfND_ndim= 1, decoder_identifier= 'pseudo2D', time_bin_size= 0.025, known_named_decoding_epochs_type= 'pbe', masked_time_bin_fill_type= 'nan_filled', data_grain= 'per_time_bin'),
+                            # IdentifyingContext(trained_compute_epochs= 'laps', pfND_ndim= 1, decoder_identifier= 'pseudo2D', time_bin_size= 0.025, known_named_decoding_epochs_type= 'pbe', masked_time_bin_fill_type= 'dropped', data_grain= 'per_time_bin'),
+            ]
+
+            flat_result_context_dict = {k:v for k, v in flat_result_context_dict.items() if k in active_ctxts}
+            # flat_result_context_dict
+
+            # decoder_ripple_filter_epochs_decoder_result_dict = deepcopy(flat_result_context_dict)
+            decoder_ripple_filter_epochs_decoder_result_dict = {f"psuedo2D_{k.get('masked_time_bin_fill_type')}":deepcopy(v) for k, v in flat_result_context_dict.items()}
+            decoder_ripple_filter_epochs_decoder_result_dict
+
+            ## OUTPUTS: decoder_laps_filter_epochs_decoder_result_dict, decoder_ripple_filter_epochs_decoder_result_dict
+
+            # ==================================================================================================================================================================================================================================================================================== #
+            # Figure Export Copmonent                                                                                                                                                                                                                                                              #
+            # ==================================================================================================================================================================================================================================================================================== #
+            # using: perform_export_all_decoded_posteriors_as_images
+
+
+            ## INPUTS:: filtered_decoder_filter_epochs_decoder_result_dict, long_like_during_post_delta_only_filter_epochs
+            # active_epochs_decoder_result_dict = deepcopy(filtered_decoder_filter_epochs_decoder_result_dict)
+
+
+            ## Build a makeshift dict with just the pseudo2D in it:
+            ## INPUTS:
+            a_decoder = deepcopy(flat_decoder_context_dict[active_ctxts[0]])
+            # a_decoder = deepcopy(a_laps_trained_decoder)
+
+            ## INPUTS: active_epochs_decoder_result_dict
+
+            parent_output_folder.mkdir(exist_ok=True)
+            Assert.path_exists(parent_output_folder)
+            posterior_out_folder = parent_output_folder.joinpath(DAY_DATE_TO_USE).resolve()
+            posterior_out_folder.mkdir(parents=True, exist_ok=True)
+            save_path = posterior_out_folder.resolve()
+            _parent_save_context: IdentifyingContext = owning_pipeline_reference.build_display_context_for_session('perform_export_all_decoded_posteriors_as_images')
+            _specific_session_output_folder = save_path.joinpath(active_context.get_description(subset_excludelist=['format_name'])).resolve()
+            _specific_session_output_folder.mkdir(parents=True, exist_ok=True)
+            print(f'\tspecific_session_output_folder: "{_specific_session_output_folder}"')
+
+
+            if custom_export_formats is None:
+                custom_export_formats: Dict[str, HeatmapExportConfig] = {
+                    # 'raw_rgba': HeatmapExportConfig.init_for_export_kind(export_kind=HeatmapExportKind.RAW_RGBA, lower_bound_alpha=0.1, drop_below_threshold=1e-2, desired_height=1200),
+                    'raw_rgba': HeatmapExportConfig.init_for_export_kind(export_kind=HeatmapExportKind.RAW_RGBA, 
+                                                                        raw_RGBA_only_parameters = dict(spikes_df=deepcopy(get_proper_global_spikes_df(owning_pipeline_reference)), xbin=deepcopy(a_decoder.xbin), lower_bound_alpha=0.1, drop_below_threshold=1e-2, t_bin_size=0.025,  use_four_decoders_version=False),
+                                                                        desired_height=1200),
+                                                                        
+                    # 'raw_rgba_four_decoders': HeatmapExportConfig.init_for_export_kind(export_kind=HeatmapExportKind.RAW_RGBA, 
+                    #                                                     raw_RGBA_only_parameters = dict(spikes_df=deepcopy(get_proper_global_spikes_df(curr_active_pipeline)), xbin=deepcopy(a_decoder.xbin), lower_bound_alpha=0.1, drop_below_threshold=1e-2, t_bin_size=0.025,  use_four_decoders_version=True),
+                    #                                                     desired_height=1200),
+
+                }
+                # custom_export_formats = None
+
+            out_paths, out_custom_formats_dict = PosteriorExporting.perform_export_all_decoded_posteriors_as_images(decoder_laps_filter_epochs_decoder_result_dict=decoder_laps_filter_epochs_decoder_result_dict, decoder_ripple_filter_epochs_decoder_result_dict=decoder_ripple_filter_epochs_decoder_result_dict,
+            # out_paths, out_custom_formats_dict = PosteriorExporting.perform_export_all_decoded_posteriors_as_images(decoder_laps_filter_epochs_decoder_result_dict=deepcopy(decoder_laps_filter_epochs_decoder_result_dict), decoder_ripple_filter_epochs_decoder_result_dict=None,
+                                                                                                                        _save_context=_parent_save_context, parent_output_folder=_specific_session_output_folder,
+                                                                                                                        desired_height=1200, custom_export_formats=custom_export_formats, combined_img_padding=6, combined_img_separator_color=(0, 0, 0, 255))
+
+            graphics_output_dict['out_paths'] = out_paths # 'out_paths': out_paths
+            
+            return graphics_output_dict
+
+
+
+
 
 # ==================================================================================================================== #
 # Private Methods                                                                                                      #
