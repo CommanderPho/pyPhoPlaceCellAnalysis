@@ -3220,43 +3220,43 @@ def figures_plot_generalized_decode_epochs_dict_and_export_results_completion_fu
     ## END if '_display_generalized_decoded_yellow...
 
 
-    # # ==================================================================================================================================================================================================================================================================================== #
-    # # '_display_decoded_trackID_marginal_hairy_position'                                                                                                                                                                                                                                   #
-    # # ==================================================================================================================================================================================================================================================================================== #
-    # if '_display_decoded_trackID_marginal_hairy_position' in included_figures_names:
+    # ==================================================================================================================================================================================================================================================================================== #
+    # '_display_decoded_trackID_marginal_hairy_position'                                                                                                                                                                                                                                   #
+    # ==================================================================================================================================================================================================================================================================================== #
+    if '_display_decoded_trackID_marginal_hairy_position' in included_figures_names:
 
-    #     interesting_hair_parameter_kwarg_dict = {
-    #         # 'defaults': dict(extreme_threshold=0.8, opacity_max=0.7, thickness_ramping_multiplier=35),
-    #         'overrides': dict(extreme_threshold=extreme_threshold, opacity_max=opacity_max, thickness_ramping_multiplier=thickness_ramping_multiplier),
-    #         # '50_sec_window_scale': dict(extreme_threshold=0.5, thickness_ramping_multiplier=50),
-    #         'full_1700_sec_session_scale': dict(extreme_threshold=0.5, thickness_ramping_multiplier=12), ## really interesting, can see the low-magnitude endcap short-like firing
-    #         # 'experimental': dict(extreme_threshold=0.8, thickness_ramping_multiplier=55),
-    #     }
+        interesting_hair_parameter_kwarg_dict = {
+            # 'defaults': dict(extreme_threshold=0.8, opacity_max=0.7, thickness_ramping_multiplier=35),
+            'overrides': dict(extreme_threshold=extreme_threshold, opacity_max=opacity_max, thickness_ramping_multiplier=thickness_ramping_multiplier),
+            # '50_sec_window_scale': dict(extreme_threshold=0.5, thickness_ramping_multiplier=50),
+            'full_1700_sec_session_scale': dict(extreme_threshold=0.5, thickness_ramping_multiplier=12), ## really interesting, can see the low-magnitude endcap short-like firing
+            # 'experimental': dict(extreme_threshold=0.8, thickness_ramping_multiplier=55),
+        }
         
-    #     # disable_all_grid_bin_bounds_lines: bool = additional_marginal_overlaying_measured_position_kwargs.get('disable_all_grid_bin_bounds_lines', False)
-    #     if 'disable_all_grid_bin_bounds_lines' not in additional_marginal_overlaying_measured_position_kwargs:
-    #         additional_marginal_overlaying_measured_position_kwargs['disable_all_grid_bin_bounds_lines'] = False ## show the lines by default for big figures
+        # disable_all_grid_bin_bounds_lines: bool = additional_marginal_overlaying_measured_position_kwargs.get('disable_all_grid_bin_bounds_lines', False)
+        if 'disable_all_grid_bin_bounds_lines' not in additional_marginal_overlaying_measured_position_kwargs:
+            additional_marginal_overlaying_measured_position_kwargs['disable_all_grid_bin_bounds_lines'] = False ## show the lines by default for big figures
 
 
-    #     ## loop through the configs:
-    #     for a_plot_name, a_params_kwargs in interesting_hair_parameter_kwarg_dict.items():
+        ## loop through the configs:
+        for a_plot_name, a_params_kwargs in interesting_hair_parameter_kwarg_dict.items():
         
-    #         # _display_decoded_trackID_marginal_hairy_position ___________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
-    #         display_context = curr_active_pipeline.build_display_context_for_session(display_fn_name='trackID_marginal_hairy_position')
+            # _display_decoded_trackID_marginal_hairy_position ___________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
+            display_context = curr_active_pipeline.build_display_context_for_session(display_fn_name='trackID_marginal_hairy_position')
 
-    #         try:
-    #             sub_context = display_context.adding_context('subplot', subplot_name=a_plot_name)
-    #             _out = curr_active_pipeline.display('_display_decoded_trackID_marginal_hairy_position', sub_context, defer_render=True, save_figure=True, override_fig_man=custom_fig_man, 
-    #                                                 # extreme_threshold=extreme_threshold, opacity_max=opacity_max, thickness_ramping_multiplier=thickness_ramping_multiplier, **additional_marginal_overlaying_measured_position_kwargs,
-    #                                                 **(a_params_kwargs | additional_marginal_overlaying_measured_position_kwargs), ## expand passed params 
-    #                                                 )
-    #             # across_session_results_extended_dict['figures_plot_generalized_decode_epochs_dict_and_export_results_completion_function'].update({
-    #             #     '_display_decoded_trackID_marginal_hairy_position': _out,
-    #             # })
+            try:
+                sub_context = display_context.adding_context('subplot', subplot_name=a_plot_name)
+                _out = curr_active_pipeline.display('_display_decoded_trackID_marginal_hairy_position', sub_context, defer_render=True, save_figure=True, override_fig_man=custom_fig_man, 
+                                                    # extreme_threshold=extreme_threshold, opacity_max=opacity_max, thickness_ramping_multiplier=thickness_ramping_multiplier, **additional_marginal_overlaying_measured_position_kwargs,
+                                                    **(a_params_kwargs | additional_marginal_overlaying_measured_position_kwargs), ## expand passed params 
+                                                    )
+                # across_session_results_extended_dict['figures_plot_generalized_decode_epochs_dict_and_export_results_completion_function'].update({
+                #     '_display_decoded_trackID_marginal_hairy_position': _out,
+                # })
                                 
-    #         except Exception as e:
-    #             print(f'\tgeneralized_export_figures_customizazble_completion_function(...): "_display_decoded_trackID_marginal_hairy_position" failed with error: {e}\n skipping.')
-    # ## END if '_display_decoded_trackID_marginal...
+            except Exception as e:
+                print(f'\tgeneralized_export_figures_customizazble_completion_function(...): "_display_decoded_trackID_marginal_hairy_position" failed with error: {e}\n skipping.')
+    ## END if '_display_decoded_trackID_marginal_hairy_position...
 
 
     # ==================================================================================================================================================================================================================================================================================== #
@@ -3268,9 +3268,10 @@ def figures_plot_generalized_decode_epochs_dict_and_export_results_completion_fu
         try:
             a_params_kwargs = {}
             display_context = curr_active_pipeline.build_display_context_for_session(display_fn_name='trackID_weighted_position_posterior')
-            _out = curr_active_pipeline.display('_display_decoded_trackID_weighted_position_posterior_withMultiColorOverlay', display_context, defer_render=True, save_figure=True, override_fig_man=custom_fig_man, 
-                                                **(a_params_kwargs | additional_marginal_overlaying_measured_position_kwargs), ## expand passed params 
-                                                )
+            _out = curr_active_pipeline.display('_display_decoded_trackID_weighted_position_posterior_withMultiColorOverlay', display_context, defer_render=True, save_figure=True,
+                                                override_fig_man=custom_fig_man, 
+                                                parent_output_folder=custom_figure_output_path,
+                                            )
             
             # _out = EpochComputationDisplayFunctions._display_decoded_trackID_weighted_position_posterior_withMultiColorOverlay(curr_active_pipeline, None, None, None, include_includelist=None, save_figure=True)
             across_session_results_extended_dict['figures_plot_generalized_decode_epochs_dict_and_export_results_completion_function'].update({
