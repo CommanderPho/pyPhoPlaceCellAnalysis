@@ -191,8 +191,8 @@ class ProcessingScriptPhases(Enum):
                 'export_session_h5_file_completion_function': export_session_h5_file_completion_function, # ran 2024-09-26 3pm
                 'save_custom_session_files_completion_function': save_custom_session_files_completion_function,
                 'generalized_decode_epochs_dict_and_export_results_completion_function': generalized_decode_epochs_dict_and_export_results_completion_function, # Not yet implemented 2025-03-10 19:56 
-                # 'figures_plot_generalized_decode_epochs_dict_and_export_results_completion_function': figures_plot_generalized_decode_epochs_dict_and_export_results_completion_function,
-                'generalized_export_figures_customizazble_completion_function': generalized_export_figures_customizazble_completion_function
+                'figures_plot_generalized_decode_epochs_dict_and_export_results_completion_function': figures_plot_generalized_decode_epochs_dict_and_export_results_completion_function,
+                # 'generalized_export_figures_customizazble_completion_function': generalized_export_figures_customizazble_completion_function
             }
 
             if self.value == ProcessingScriptPhases.clean_run.value:
