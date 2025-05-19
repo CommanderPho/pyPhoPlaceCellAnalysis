@@ -2281,7 +2281,7 @@ class PostHocPipelineFixup:
                     will_change: bool = (_old_val != new_val) # Python's != operator returns True when comparing None with any non-None value
                     ## warn for direct comparison
                     if will_change:
-                        print(f'DEBUGWARN - direct comparison used for variables \n\tnew_val: {new_val} and \n\t{_old_val: _old_val}. and found (will_change == True)')
+                        print(f'DEBUGWARN - direct comparison used for variables \n\tnew_val: {new_val} and \n\t_old_val: {_old_val}. and found (will_change == True)')
                     return will_change
         
 
