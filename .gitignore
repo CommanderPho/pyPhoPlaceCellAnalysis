@@ -71,3 +71,4 @@ src/pyphoplacecellanalysis/External/test.hdf5
 **/__pycache__
 **/.venv*
 
+typings
