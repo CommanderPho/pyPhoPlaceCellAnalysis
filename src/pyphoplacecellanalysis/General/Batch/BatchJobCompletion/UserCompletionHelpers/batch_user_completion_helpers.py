@@ -2555,10 +2555,11 @@ class PostHocPipelineFixup:
         return did_any_change
 
 
-    @metadata_attributes(short_name=None, tags=['MAIN'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-02-19 07:24', related_items=[])
+    @metadata_attributes(short_name=None, tags=['MAIN'], input_requires=[], output_provides=[], uses=[], used_by=['kdiba_session_post_fixup_completion_function'], creation_date='2025-02-19 07:24', related_items=[])
     @staticmethod
     def run_as_batch_user_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict, force_recompute: bool=False, is_dry_run: bool=False) -> dict:
-        """ meant to be executed as a _batch_user_completion_function"""
+        """ meant to be executed as a _batch_user_completion_function, called by `kdiba_session_post_fixup_completion_function` 
+        """
         # from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import DirectionalLapsHelpers, DirectionalLapsResult
 
         print(f'\t !!!||||||||||||||||||> RUNNING `PostHocPipelineFixup.run_as_batch_user_completion_function(...)`:')
@@ -2583,8 +2584,16 @@ class PostHocPipelineFixup:
         print(f'\t\tcallback will be assigned to `across_session_results_extended_dict[{PostHocPipelineFixup.across_session_results_extended_dict_data_name}]`:')
         print(f'\t\t\tcallback_outputs: {callback_outputs}')
         across_session_results_extended_dict[PostHocPipelineFixup.across_session_results_extended_dict_data_name] = callback_outputs
+        print(f'_____________________________________________________________________________________________________\n')
+        if did_any_change:
+            print(f'================= CHANGES WERE MADE BY FIXUP! VALUES WILL NEED RECOMPUTE!\n')
+        else:
+            print(f'================= NO changes needed!\n')            
+
+        print(f'_____________________________________________________________________________________________________\n')        
         print('\tdone.')
         return across_session_results_extended_dict
+    
 
 @function_attributes(short_name=None, tags=['IMPORTANT', 'PostHocPipelineFixup', 'non_PBE'], input_requires=[], output_provides=[], uses=['PostHocPipelineFixup'], used_by=[], creation_date='2025-02-19 00:00', related_items=['PostHocPipelineFixup'])
 def kdiba_session_post_fixup_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict, force_recompute:bool=True, is_dry_run: bool=False) -> dict:

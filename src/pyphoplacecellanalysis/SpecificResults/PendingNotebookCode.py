@@ -229,7 +229,7 @@ class WithinEpochTimeBinDynamics:
 
     @function_attributes(short_name=None, tags=['MAIN'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-05-16 04:27', related_items=[])
     @classmethod
-    def analyze_subsequence_temporal_dynamics(cls, curr_active_pipeline, should_show_complex_intermediate_columns: bool = False):
+    def analyze_subsequence_temporal_dynamics(cls, curr_active_pipeline, time_bin_size=0.025, should_show_complex_intermediate_columns: bool = False):
         """ 
         
         complex_column_names: List[str] = ['type_subseq_lengths_dict', 'state_seq', 'type_string_seq']
@@ -244,14 +244,16 @@ class WithinEpochTimeBinDynamics:
         valid_EpochComputations_result: EpochComputationsComputationsContainer = curr_active_pipeline.global_computation_results.computed_data['EpochComputations']
         a_new_fully_generic_result: GenericDecoderDictDecodedEpochsDictResult = valid_EpochComputations_result.a_generic_decoder_dict_decoded_epochs_dict_result
 
+        Assert.all_are_not_None(a_new_fully_generic_result)
 
         # common_constraint_dict = dict(trained_compute_epochs='laps', pfND_ndim=1, time_bin_size=0.025, masked_time_bin_fill_type='ignore')
-        common_constraint_dict = dict(trained_compute_epochs='laps', time_bin_size=0.025, masked_time_bin_fill_type='nan_filled') # , pfND_ndim=1
+        common_constraint_dict = dict(trained_compute_epochs='laps', time_bin_size=time_bin_size, masked_time_bin_fill_type='nan_filled') # , pfND_ndim=1
 
 
         ## PBEs context:
         a_target_context: IdentifyingContext = IdentifyingContext(known_named_decoding_epochs_type='pbe', data_grain='per_time_bin', **common_constraint_dict) ## Laps , data_grain='per_epoch'
         best_matching_context, a_result, a_decoder, a_decoded_marginal_posterior_df = a_new_fully_generic_result.get_results_best_matching_context(context_query=a_target_context)
+        Assert.all_are_not_None(a_decoded_marginal_posterior_df)
 
         ## INPUTS: a_decoded_marginal_posterior_df
         epoch_df = deepcopy(a_decoded_marginal_posterior_df)
@@ -368,12 +370,9 @@ class MeasuredVsDecodedOccupancy:
 
 
         """
-        
-        
-
-
         ## INPUTS: best_matching_context, a_result, a_decoder, a_decoded_marginal_posterior_df
 
+        
         is_post_delta = (a_decoded_marginal_posterior_df['delta_aligned_start_t'] > 0.0)
         # a_decoded_marginal_posterior_df['is_post_delta'] = is_post_delta
 
