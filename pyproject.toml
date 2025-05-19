@@ -38,6 +38,7 @@ dependencies = [
     "scikit-learn~=1.5",
     "opencv-contrib-python>=4.10.0.84,<5",
     "qtawesome>=1.4.0",
+    "importlib-resources>=6.5.2",
 ]
 
 [dependency-groups]
