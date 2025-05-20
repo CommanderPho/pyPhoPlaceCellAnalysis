@@ -2610,7 +2610,8 @@ class EpochComputationDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Di
 
 
     @function_attributes(short_name='trackID_weighted_position_posterior', tags=['context-decoder-comparison', 'decoded_position', 'directional'], conforms_to=['output_registering', 'figure_saving'], input_requires=[], output_provides=[], requires_global_keys=["global_computation_results.computed_data['EpochComputations']"], uses=['FigureCollector'], used_by=[], creation_date='2025-05-03 00:00', related_items=[], is_global=True)
-    def _display_decoded_trackID_weighted_position_posterior_withMultiColorOverlay(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, save_figure=True, override_fig_man: Optional[FileOutputManager]=None, ax=None, custom_export_formats: Optional[Dict[str, Any]]=None, parent_output_folder: Path = Path('output/array_to_images'), **kwargs):
+    def _display_decoded_trackID_weighted_position_posterior_withMultiColorOverlay(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, save_figure=True, override_fig_man: Optional[FileOutputManager]=None, ax=None,
+                                                                                    custom_export_formats: Optional[Dict[str, Any]]=None, parent_output_folder: Path = Path('output/array_to_images'), time_bin_size: float=0.025, **kwargs):
             """ Displays one figure containing the track_ID marginal, decoded continuously over the entire recording session along with the animal's position.
             
             "HeatmapExportConfig"
@@ -2628,26 +2629,31 @@ class EpochComputationDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Di
                 _out = dict()
                 _out['trackID_weighted_position_posterior'] = curr_active_pipeline.display(display_function='trackID_weighted_position_posterior', active_session_configuration_context=None) # _display_directional_track_template_pf1Ds
 
+                ## Show output paths:
+                _out_curr = _out['trackID_weighted_position_posterior']
+
+                out_paths = deepcopy(_out_curr['out_paths'])
+                for k, v_dict in out_paths.items():
+                    for a_decoder_name, a_path in v_dict.items():
+                        file_uri_from_path(a_path)
+                        fullwidth_path_widget(a_path=a_path, file_name_label=f"{k}[{a_decoder_name}]:")
+
+                        
+                
 
             """
             from neuropy.utils.result_context import IdentifyingContext
-            from neuropy.utils.mixins.time_slicing import TimeColumnAliasesProtocol
-            from pyphoplacecellanalysis.General.Model.Configs.LongShortDisplayConfig import PlottingHelpers
-            from pyphoplacecellanalysis.General.Mixins.ExportHelpers import FileOutputManager, FigureOutputLocation, ContextToPathMode	
-            
-            import matplotlib as mpl
-            import matplotlib.pyplot as plt
-            from flexitext import flexitext ## flexitext for formatted matplotlib text
-
-            from pyphocorehelpers.DataStructure.RenderPlots.MatplotLibRenderPlots import FigureCollector
-            from neuropy.utils.matplotlib_helpers import FormattedFigureText
-
             from pyphoplacecellanalysis.Pho2D.data_exporting import HeatmapExportConfig, PosteriorExporting, HeatmapExportKind
             from pyphoplacecellanalysis.SpecificResults.AcrossSessionResults import Assert
 
-
             from datetime import datetime, date, timedelta
-            from pyphocorehelpers.print_helpers import get_now_day_str, get_now_rounded_time_str
+            from pyphocorehelpers.print_helpers import get_now_rounded_time_str
+
+
+            owning_pipeline_reference.perform_specific_computation(computation_functions_name_includelist=['directional_decoders_decode_continuous'],
+                                                  computation_kwargs_list=[{'time_bin_size': time_bin_size, 'should_disable_cache':False}], 
+                                                  enabled_filter_names=None, fail_on_exception=True, debug_print=False)
+
 
             DAY_DATE_STR: str = date.today().strftime("%Y-%m-%d")
             DAY_DATE_TO_USE = f'{DAY_DATE_STR}' # used for filenames throught the notebook
@@ -2660,10 +2666,14 @@ class EpochComputationDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Di
             # export_dpi_multiplier: float = kwargs.pop('export_dpi_multiplier', 2.0)
             # dpi = kwargs.pop('dpi', 100)
             # export_dpi: int = int(np.ceil(dpi * export_dpi_multiplier))
-            
 
-            graphics_output_dict = {'parent_output_folder': parent_output_folder}
 
+            # ==================================================================================================================================================================================================================================================================================== #
+            # Build outputs:                                                                                                                                                                                                                                                              #
+            # ==================================================================================================================================================================================================================================================================================== #
+            graphics_output_dict = {'parent_output_folder': parent_output_folder, 'time_bin_size': time_bin_size}
+
+            Assert.path_exists(parent_output_folder)
 
             # ==================================================================================================================================================================================================================================================================================== #
             # BEGIN FUNCTION BODY                                                                                                                                                                                                                                                                  #
@@ -2715,22 +2725,28 @@ class EpochComputationDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Di
             # Separate export for each masked_time_bin_fill_type  - LAPS                                                                                                                                                                                                                           #
             # ==================================================================================================================================================================================================================================================================================== #
 
-            laps_trained_decoder_search_context = IdentifyingContext(trained_compute_epochs='laps', pfND_ndim=1, decoder_identifier='pseudo2D', known_named_decoding_epochs_type='laps', masked_time_bin_fill_type=('ignore', 'nan_filled', 'dropped'), data_grain='per_time_bin') # , data_grain= 'per_time_bin -- not really relevant: ['masked_time_bin_fill_type', 'known_named_decoding_epochs_type', 'data_grain']
-            # laps_trained_decoder_search_context = IdentifyingContext(trained_compute_epochs='laps', pfND_ndim=1, decoder_identifier='pseudo2D', known_named_decoding_epochs_type='laps', masked_time_bin_fill_type='dropped', data_grain='per_time_bin')
-            flat_context_list, flat_result_context_dict, flat_decoder_context_dict, flat_decoded_marginal_posterior_df_context_dict = a_new_fully_generic_result.get_results_matching_contexts(context_query=laps_trained_decoder_search_context, return_multiple_matches=True, debug_print=True)
 
-            active_ctxts = [
-                            # IdentifyingContext(trained_compute_epochs= 'laps', pfND_ndim= 1, decoder_identifier= 'pseudo2D', time_bin_size= epochs_decoding_time_bin_size, known_named_decoding_epochs_type= 'laps', masked_time_bin_fill_type= 'ignore'), 
-                            IdentifyingContext(trained_compute_epochs= 'laps', pfND_ndim= 1, decoder_identifier= 'pseudo2D', time_bin_size= epochs_decoding_time_bin_size, known_named_decoding_epochs_type= 'laps', masked_time_bin_fill_type= 'nan_filled', data_grain= 'per_time_bin'),
-                            # IdentifyingContext(trained_compute_epochs= 'laps', pfND_ndim= 1, decoder_identifier= 'pseudo2D', time_bin_size= epochs_decoding_time_bin_size, known_named_decoding_epochs_type= 'laps', masked_time_bin_fill_type= 'dropped', data_grain= 'per_time_bin'),
-            ]
+            try:
+                laps_trained_decoder_search_context = IdentifyingContext(trained_compute_epochs='laps', pfND_ndim=1, decoder_identifier='pseudo2D', known_named_decoding_epochs_type='laps', masked_time_bin_fill_type=('ignore', 'nan_filled', 'dropped'), data_grain='per_time_bin') # , data_grain= 'per_time_bin -- not really relevant: ['masked_time_bin_fill_type', 'known_named_decoding_epochs_type', 'data_grain']
+                # laps_trained_decoder_search_context = IdentifyingContext(trained_compute_epochs='laps', pfND_ndim=1, decoder_identifier='pseudo2D', known_named_decoding_epochs_type='laps', masked_time_bin_fill_type='dropped', data_grain='per_time_bin')
+                flat_context_list, flat_result_context_dict, flat_decoder_context_dict, flat_decoded_marginal_posterior_df_context_dict = a_new_fully_generic_result.get_results_matching_contexts(context_query=laps_trained_decoder_search_context, return_multiple_matches=True, debug_print=True)
+
+                active_ctxts = [
+                                # IdentifyingContext(trained_compute_epochs= 'laps', pfND_ndim= 1, decoder_identifier= 'pseudo2D', time_bin_size= epochs_decoding_time_bin_size, known_named_decoding_epochs_type= 'laps', masked_time_bin_fill_type= 'ignore'), 
+                                IdentifyingContext(trained_compute_epochs= 'laps', pfND_ndim= 1, decoder_identifier= 'pseudo2D', time_bin_size= epochs_decoding_time_bin_size, known_named_decoding_epochs_type= 'laps', masked_time_bin_fill_type= 'nan_filled', data_grain= 'per_time_bin'),
+                                # IdentifyingContext(trained_compute_epochs= 'laps', pfND_ndim= 1, decoder_identifier= 'pseudo2D', time_bin_size= epochs_decoding_time_bin_size, known_named_decoding_epochs_type= 'laps', masked_time_bin_fill_type= 'dropped', data_grain= 'per_time_bin'),
+                ]
 
 
-            flat_result_context_dict = {k:v for k, v in flat_result_context_dict.items() if k in active_ctxts}
+                flat_result_context_dict = {k:v for k, v in flat_result_context_dict.items() if k in active_ctxts}
 
-            # decoder_laps_filter_epochs_decoder_result_dict = deepcopy(flat_result_context_dict)
-            decoder_laps_filter_epochs_decoder_result_dict = {f"psuedo2D_{k.get('masked_time_bin_fill_type')}":deepcopy(v) for k, v in flat_result_context_dict.items()}
-            decoder_laps_filter_epochs_decoder_result_dict
+                # decoder_laps_filter_epochs_decoder_result_dict = deepcopy(flat_result_context_dict)
+                decoder_laps_filter_epochs_decoder_result_dict = {f"psuedo2D_{k.get('masked_time_bin_fill_type')}":deepcopy(v) for k, v in flat_result_context_dict.items()}
+                decoder_laps_filter_epochs_decoder_result_dict
+                
+            except Exception as e:
+                raise e
+
 
 
             # ==================================================================================================================================================================================================================================================================================== #
@@ -2754,6 +2770,45 @@ class EpochComputationDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Di
             decoder_ripple_filter_epochs_decoder_result_dict = {f"psuedo2D_{k.get('masked_time_bin_fill_type')}":deepcopy(v) for k, v in flat_result_context_dict.items()}
             decoder_ripple_filter_epochs_decoder_result_dict
 
+            filter_epochs_ripple_df: Optional[pd.DataFrame] = kwargs.pop('filter_epochs_ripple_df', None)
+            if filter_epochs_ripple_df is not None:
+                ## use `filter_epochs_ripple` to filter the above `decoder_ripple_filter_epochs_decoder_result_dict`                
+                ## INPUTS: high_heuristic_only_filtered_decoder_filter_epochs_decoder_result_dict, filtered_decoder_filter_epochs_decoder_result_dict
+                # INPUTS: included_heuristic_ripple_start_times, high_heuristic_only_filtered_decoder_filter_epochs_decoder_result_dict, excluded_heuristic_ripple_start_times, low_heuristic_only_filtered_decoder_filter_epochs_decoder_result_dict
+                included_decoder_ripple_filter_epochs_decoder_result_dict = {} # deepcopy(decoder_ripple_filter_epochs_decoder_result_dict)
+                
+                for k, all_epoch_result in decoder_ripple_filter_epochs_decoder_result_dict.items():
+                    # all_filter_epochs_df: pd.DataFrame = deepcopy(all_epoch_result.filter_epochs)
+                    
+                    ## Result to filter
+                    included_filter_epoch_result: DecodedFilterEpochsResult = deepcopy(all_epoch_result)
+                    # included_filter_epochs_df: pd.DataFrame = deepcopy(included_filter_epoch_result.filter_epochs)
+                    # included_filter_epochs_df
+
+                    # included_filter_epoch_times = filter_epochs_ripple_df[['start', 'stop']].to_numpy() # Both 'start', 'stop' column matching
+                    included_filter_epoch_times = filter_epochs_ripple_df['start'].to_numpy() # Both 'start', 'stop' column matching
+
+                    # included_filter_epoch_times_to_all_epoch_index_map = included_filter_epoch_result.find_epoch_times_to_data_indicies_map(epoch_times=included_filter_epoch_times)
+                    # included_filter_epoch_times_to_all_epoch_index_arr: NDArray = included_filter_epoch_result.find_data_indicies_from_epoch_times(epoch_times=included_filter_epoch_times)
+                    # len(included_filter_epoch_times_to_all_epoch_index_arr)
+                    # included_filter_epoch_result.
+                    included_decoder_ripple_filter_epochs_decoder_result_dict[k] = included_filter_epoch_result.filtered_by_epoch_times(included_epoch_start_times=included_filter_epoch_times) ## returns a modified result
+
+
+                # decoder_ripple_filter_epochs_decoder_result_dict = {k:v for k, v in decoder_ripple_filter_epochs_decoder_result_dict.items()}
+                
+                print(f'filtering down to {len(included_filter_epoch_times)} filter epochs.')
+                # decoder_ripple_filter_epochs_decoder_result_dict = {k:included_decoder_ripple_filter_epochs_decoder_result_dict[k] for k, v in included_decoder_ripple_filter_epochs_decoder_result_dict.items()} ## replace with the filtered version
+                decoder_ripple_filter_epochs_decoder_result_dict = included_decoder_ripple_filter_epochs_decoder_result_dict
+                
+                print(f'\tdone.')
+
+                ## OUTPUTS: all_filter_epochs_df, all_filter_epochs_df
+                ## OUTPUTS: included_filter_epoch_times_to_all_epoch_index_arr
+            else:
+                print(f'no filter epochs provided.')
+
+
             ## OUTPUTS: decoder_laps_filter_epochs_decoder_result_dict, decoder_ripple_filter_epochs_decoder_result_dict
 
             # ==================================================================================================================================================================================================================================================================================== #
@@ -2768,7 +2823,7 @@ class EpochComputationDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Di
 
             ## Build a makeshift dict with just the pseudo2D in it:
             ## INPUTS:
-            a_decoder = deepcopy(flat_decoder_context_dict[active_ctxts[0]])
+            a_decoder = deepcopy(flat_decoder_context_dict[active_ctxts[0]]) ## same decoder works for any of them:
             # a_decoder = deepcopy(a_laps_trained_decoder)
 
             ## INPUTS: active_epochs_decoder_result_dict
@@ -2804,7 +2859,9 @@ class EpochComputationDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Di
                                                                                                                         desired_height=1200, custom_export_formats=custom_export_formats, combined_img_padding=6, combined_img_separator_color=(0, 0, 0, 255))
 
             graphics_output_dict['out_paths'] = out_paths # 'out_paths': out_paths
+            graphics_output_dict['out_custom_formats_dict'] = out_custom_formats_dict
             
+
             return graphics_output_dict
 
 
