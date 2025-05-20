@@ -2635,11 +2635,13 @@ class EpochComputationDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Di
                 _out['trackID_weighted_position_posterior'] = curr_active_pipeline.display(display_function='trackID_weighted_position_posterior', active_session_configuration_context=None) # _display_directional_track_template_pf1Ds
 
                 ## Show output paths:
-                _out_curr = _out['trackID_weighted_position_posterior']
+                graphics_output_dict = _out['trackID_weighted_position_posterior']
 
-                out_paths: Dict[types.KnownNamedDecoderTrainedComputeEpochsType, Dict[types.DecoderName, Path]] = _out['out_paths']
-                out_custom_formats_dict: Dict[types.KnownNamedDecodingEpochsType, Dict[types.DecoderName, Dict[str, List[HeatmapExportConfig]]]] = _out['out_custom_formats_dict']
-
+                out_paths: Dict[types.KnownNamedDecoderTrainedComputeEpochsType, Dict[types.DecoderName, Path]] = graphics_output_dict['out_paths']
+                out_custom_formats_dict: Dict[types.KnownNamedDecodingEpochsType, Dict[types.DecoderName, Dict[str, List[HeatmapExportConfig]]]] = graphics_output_dict['out_custom_formats_dict']
+                flat_merged_images = graphics_output_dict['flat_merged_images']
+                flat_imgs_dict = graphics_output_dict['flat_imgs_dict']
+            
 
                 ## Handle just the paths:
                 out_paths = deepcopy(_out_curr['out_paths'])
@@ -2848,11 +2850,6 @@ class EpochComputationDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Di
 
                     # included_filter_epoch_times = filter_epochs_ripple_df[['start', 'stop']].to_numpy() # Both 'start', 'stop' column matching
                     included_filter_epoch_times = filter_epochs_ripple_df['start'].to_numpy() # Both 'start', 'stop' column matching
-
-                    # included_filter_epoch_times_to_all_epoch_index_map = included_filter_epoch_result.find_epoch_times_to_data_indicies_map(epoch_times=included_filter_epoch_times)
-                    # included_filter_epoch_times_to_all_epoch_index_arr: NDArray = included_filter_epoch_result.find_data_indicies_from_epoch_times(epoch_times=included_filter_epoch_times)
-                    # len(included_filter_epoch_times_to_all_epoch_index_arr)
-                    # included_filter_epoch_result.
                     included_decoder_ripple_filter_epochs_decoder_result_dict[k] = included_filter_epoch_result.filtered_by_epoch_times(included_epoch_start_times=included_filter_epoch_times) ## returns a modified result
 
 
@@ -2937,10 +2934,10 @@ class EpochComputationDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Di
 
             flat_imgs_dict: Dict[IdentifyingContext, List] = {}
             flat_merged_images = {}
+            flat_merged_image_paths = {}
 
-
-            for a_series_name, v_dict in out_custom_formats_dict.items():
-                # a_series_name: ['laps', 'ripple']
+            for a_known_epoch_type_name, v_dict in out_custom_formats_dict.items():
+                # a_known_epoch_type_name: ['laps', 'ripple']
                 for a_decoder_name, a_rendered_configs_dict in v_dict.items():
                     
                     for a_config_name, a_rendered_config_list in a_rendered_configs_dict.items():
@@ -2948,25 +2945,41 @@ class EpochComputationDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Di
                         # print(a_rendered_config_list)
                         # len(a_rendered_config_list)
                         
-                        a_ctxt = IdentifyingContext(series=a_series_name, decoder=a_decoder_name, config=a_config_name)
+                        a_ctxt = IdentifyingContext(known_epoch_type_name=a_known_epoch_type_name, decoder=a_decoder_name, config=a_config_name)
                         flat_imgs = []
                         
-                        for i, a_config in enumerate(a_rendered_config_list):      
-                            # posterior_save_path = a_config.posterior_saved_path
+                        parent_save_path = None
+                        for i, a_config in enumerate(a_rendered_config_list):                                  
+                            if parent_save_path is None:
+                                posterior_save_path = a_config.posterior_saved_path
+                                parent_save_path = posterior_save_path.parent.resolve()
                             _posterior_image = a_config.posterior_saved_image
                             flat_imgs.append(_posterior_image)                            
                             # print(F'a_rendered_config: {type(a_rendered_config)}')
                         ## END  for i, a_config in enum...
                         ## OUTPUTS: flat_imgs
                         _merged_img = horizontal_image_stack(flat_imgs, padding=10, separator_color='white')
-                        flat_merged_images[a_series_name] = _merged_img
+                        flat_merged_images[a_known_epoch_type_name] = _merged_img
                         flat_imgs_dict[a_ctxt] = flat_imgs
                         
-
+                        ## Save the image to disk if we want
+                        # _merged_img.save
+                        if (_merged_img is not None) and (parent_save_path is not None):
+                            ## Save the image:
+                            _img_path = parent_save_path.joinpath(f'merged_{a_known_epoch_type_name}[{i}].png').resolve()
+                            try:
+                                _merged_img.save(_img_path)
+                                flat_merged_image_paths[a_ctxt] = _img_path
+                            except Exception as e:
+                                raise e
+                        
+                        
+                        
             # flat_img_out_paths
             # flat_merged_images
 
             graphics_output_dict['flat_merged_images'] = flat_merged_images
+            graphics_output_dict['flat_merged_image_paths'] = flat_merged_image_paths
             graphics_output_dict['flat_imgs_dict'] = flat_imgs_dict
 
             return graphics_output_dict
