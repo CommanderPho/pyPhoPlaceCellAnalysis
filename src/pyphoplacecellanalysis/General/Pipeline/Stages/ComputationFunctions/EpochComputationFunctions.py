@@ -2695,6 +2695,8 @@ class EpochComputationDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Di
 
             from datetime import datetime, date, timedelta
             from pyphocorehelpers.print_helpers import get_now_rounded_time_str
+            from pyphocorehelpers.plotting.media_output_helpers import vertical_image_stack, horizontal_image_stack, image_grid # used in `_subfn_build_combined_output_images`
+
 
 
             owning_pipeline_reference.perform_specific_computation(computation_functions_name_includelist=['directional_decoders_decode_continuous'],
@@ -2902,11 +2904,11 @@ class EpochComputationDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Di
                 custom_export_formats: Dict[str, HeatmapExportConfig] = {
                     # 'raw_rgba': HeatmapExportConfig.init_for_export_kind(export_kind=HeatmapExportKind.RAW_RGBA, lower_bound_alpha=0.1, drop_below_threshold=1e-2, desired_height=1200),
                     'raw_rgba': HeatmapExportConfig.init_for_export_kind(export_kind=HeatmapExportKind.RAW_RGBA, 
-                                                                        raw_RGBA_only_parameters = dict(spikes_df=deepcopy(get_proper_global_spikes_df(owning_pipeline_reference)), xbin=deepcopy(a_decoder.xbin), lower_bound_alpha=0.1, drop_below_threshold=1e-2, t_bin_size=0.025,  use_four_decoders_version=False),
+                                                                        raw_RGBA_only_parameters = dict(spikes_df=deepcopy(get_proper_global_spikes_df(owning_pipeline_reference)), xbin=deepcopy(a_decoder.xbin), lower_bound_alpha=0.1, drop_below_threshold=1e-2, t_bin_size=time_bin_size,  use_four_decoders_version=False),
                                                                         desired_height=1200),
                                                                         
                     # 'raw_rgba_four_decoders': HeatmapExportConfig.init_for_export_kind(export_kind=HeatmapExportKind.RAW_RGBA, 
-                    #                                                     raw_RGBA_only_parameters = dict(spikes_df=deepcopy(get_proper_global_spikes_df(curr_active_pipeline)), xbin=deepcopy(a_decoder.xbin), lower_bound_alpha=0.1, drop_below_threshold=1e-2, t_bin_size=0.025,  use_four_decoders_version=True),
+                    #                                                     raw_RGBA_only_parameters = dict(spikes_df=deepcopy(get_proper_global_spikes_df(curr_active_pipeline)), xbin=deepcopy(a_decoder.xbin), lower_bound_alpha=0.1, drop_below_threshold=1e-2, t_bin_size=time_bin_size,  use_four_decoders_version=True),
                     #                                                     desired_height=1200),
 
                 }
@@ -2921,6 +2923,51 @@ class EpochComputationDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Di
             graphics_output_dict['out_custom_formats_dict'] = out_custom_formats_dict
             print(f'\tout_paths: {out_paths}')
             print(f'done.')
+
+
+
+            # Build Merged across time images and flattened dict of images _______________________________________________________ #
+
+            # from pyphoplacecellanalysis.Pho2D.data_exporting import HeatmapExportConfig, HeatmapExportKind
+
+            # out_paths: Dict[types.KnownNamedDecoderTrainedComputeEpochsType, Dict[types.DecoderName, Path]] = graphics_output_dict['out_paths']
+            # out_custom_formats_dict: Dict[types.KnownNamedDecodingEpochsType, Dict[types.DecoderName, Dict[str, List[HeatmapExportConfig]]]] = graphics_output_dict['out_custom_formats_dict']
+
+            # flat_imgs = []
+
+            flat_imgs_dict: Dict[IdentifyingContext, List] = {}
+            flat_merged_images = {}
+
+
+            for a_series_name, v_dict in out_custom_formats_dict.items():
+                # a_series_name: ['laps', 'ripple']
+                for a_decoder_name, a_rendered_configs_dict in v_dict.items():
+                    
+                    for a_config_name, a_rendered_config_list in a_rendered_configs_dict.items():
+                        # 'raw_rgba'
+                        # print(a_rendered_config_list)
+                        # len(a_rendered_config_list)
+                        
+                        a_ctxt = IdentifyingContext(series=a_series_name, decoder=a_decoder_name, config=a_config_name)
+                        flat_imgs = []
+                        
+                        for i, a_config in enumerate(a_rendered_config_list):      
+                            # posterior_save_path = a_config.posterior_saved_path
+                            _posterior_image = a_config.posterior_saved_image
+                            flat_imgs.append(_posterior_image)                            
+                            # print(F'a_rendered_config: {type(a_rendered_config)}')
+                        ## END  for i, a_config in enum...
+                        ## OUTPUTS: flat_imgs
+                        _merged_img = horizontal_image_stack(flat_imgs, padding=10, separator_color='white')
+                        flat_merged_images[a_series_name] = _merged_img
+                        flat_imgs_dict[a_ctxt] = flat_imgs
+                        
+
+            # flat_img_out_paths
+            # flat_merged_images
+
+            graphics_output_dict['flat_merged_images'] = flat_merged_images
+            graphics_output_dict['flat_imgs_dict'] = flat_imgs_dict
 
             return graphics_output_dict
 
