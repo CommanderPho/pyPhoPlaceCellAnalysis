@@ -53,7 +53,8 @@ KnownEpochsName = Literal['laps', 'ripple', 'other']
 @define(slots=False, eq=False)
 @metadata_attributes(short_name=None, tags=['transition_matrix'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-11-14 00:00', related_items=[])
 class ComputerVisionComputations:
-    """ 
+    """ ComputerVision and ImageProcessing helpers, intended to be used for replay analyses
+    
     from pyphoplacecellanalysis.Analysis.Decoder.computer_vision import ComputerVisionComputations
     
     # Visualization ______________________________________________________________________________________________________ #
