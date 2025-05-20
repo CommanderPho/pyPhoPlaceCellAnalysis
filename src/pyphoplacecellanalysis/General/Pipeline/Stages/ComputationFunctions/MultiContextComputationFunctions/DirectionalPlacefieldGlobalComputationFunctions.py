@@ -6807,6 +6807,11 @@ class DirectionalPlacefieldGlobalComputationFunctions(AllFunctionEnumeratingMixi
                 ['DirectionalDecodersEpochsEvaluations']['directional_lap_specific_configs']
                 ['DirectionalDecodersEpochsEvaluations']['continuously_decoded_result_cache_dict']
                 
+                
+                from pyphoplacecellanalysis.Analysis.Decoder.heuristic_replay_scoring import HeuristicReplayScoring, HeuristicsResult
+
+                a_heuristics_result: HeuristicsResult = curr_active_pipeline.global_computation_results.computed_data['Heuristics']
+                
         Should call:
         
         _perform_compute_custom_epoch_decoding
