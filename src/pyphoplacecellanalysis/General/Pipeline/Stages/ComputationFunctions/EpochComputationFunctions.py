@@ -645,7 +645,8 @@ class Compute_NonPBE_Epochs(ComputedResult):
         # Build new Decoders and Placefields _________________________________________________________________________________ #
         if skip_training_test_split:
             # Non-training, use originals
-            new_decoder_dict: Dict[types.DecoderName, BasePositionDecoder] = {a_name:BasePositionDecoder(pf=a_pfs).replacing_computation_epochs(epochs=deepcopy(curr_active_pipeline.filtered_sessions[non_directional_names_to_default_epoch_names_map[a_name]].non_pbe)) for a_name, a_pfs in original_pfs_dict.items()} ## build new simple decoders
+            # new_decoder_dict: Dict[types.DecoderName, BasePositionDecoder] = {a_name:BasePositionDecoder(pf=a_pfs).replacing_computation_epochs(epochs=deepcopy(curr_active_pipeline.filtered_sessions[non_directional_names_to_default_epoch_names_map[a_name]].non_pbe)) for a_name, a_pfs in original_pfs_dict.items()} ## build new simple decoders
+            new_decoder_dict: Dict[types.DecoderName, BasePositionDecoder] = {a_name:BasePositionDecoder(pf=a_pfs).replacing_computation_epochs(epochs=deepcopy(curr_active_pipeline.filtered_sessions[non_directional_names_to_default_epoch_names_map[a_name]].laps)) for a_name, a_pfs in original_pfs_dict.items()} ## build new simple decoders
             
         else:
             ## extract values:
@@ -1859,14 +1860,16 @@ class EpochComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Computati
             ## from dict of filter_epochs to decode:
             global_replays_df: pd.DataFrame = TimeColumnAliasesProtocol.renaming_synonym_columns_if_needed(deepcopy(global_session.replay))
             global_any_laps_epochs_obj = owning_pipeline_reference.computation_results[global_epoch_name].computation_config.pf_params.computation_epochs # global_session.get
+            # filter_epochs_to_decode_dict: Dict[KnownNamedDecodingEpochsType, Epoch] = {'laps': ensure_Epoch(deepcopy(global_any_laps_epochs_obj)),
+            #                                                                         'pbe': ensure_Epoch(deepcopy(global_session.pbe.get_non_overlapping())),
+            #                                 #  'ripple': ensure_Epoch(deepcopy(global_session.ripple)),
+            #                                 #   'replay': ensure_Epoch(deepcopy(global_replays_df)),
+            #                                 'non_pbe': ensure_Epoch(deepcopy(global_session.non_pbe)),
+            #                                 }            
             filter_epochs_to_decode_dict: Dict[KnownNamedDecodingEpochsType, Epoch] = {'laps': ensure_Epoch(deepcopy(global_any_laps_epochs_obj)),
-                                                                                    'pbe': ensure_Epoch(deepcopy(global_session.pbe.get_non_overlapping())),
-                                            #  'ripple': ensure_Epoch(deepcopy(global_session.ripple)),
-                                            #   'replay': ensure_Epoch(deepcopy(global_replays_df)),
-                                            'non_pbe': ensure_Epoch(deepcopy(global_session.non_pbe)),
+                                                                                    **{k:ensure_Epoch(deepcopy(v.get_non_overlapping())) for k, v in global_session.to_dict().items() if k in ('pbe', 'non_pbe')},
                                             }
-            # filter_epochs_to_decode_dict
-
+            
             ## constrain all epochs to be at least two decoding time bins long, or drop them entirely:
             filter_epochs_to_decode_dict = {k:_compute_proper_filter_epochs(epochs_df=v, desired_decoding_time_bin_size=epochs_decoding_time_bin_size, minimum_event_duration=(2.0 * epochs_decoding_time_bin_size), mode=EpochFilteringMode.DropShorter)[0] for k, v in filter_epochs_to_decode_dict.items()} # `[0]` gets just the dataframe, as in DropShorter mode the time_bin_size is unchanged
 
@@ -1968,7 +1971,6 @@ class EpochComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Computati
             print(f'WARN 2025-04-14 - Not yet finished -- perform update here.')
             global_computation_results.computed_data['EpochComputations'].a_generic_decoder_dict_decoded_epochs_dict_result = a_new_fully_generic_result
             
-
 
         # ==================================================================================================================== #
         # Compute `TimeBinAggregation` results                                                                                 #
@@ -2732,6 +2734,17 @@ class EpochComputationDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Di
             print(f'\tepochs_decoding_time_bin_size: {epochs_decoding_time_bin_size}')
             assert epochs_decoding_time_bin_size == valid_EpochComputations_result.epochs_decoding_time_bin_size, f"\tERROR: nonPBE_results.epochs_decoding_time_bin_size: {valid_EpochComputations_result.epochs_decoding_time_bin_size} != epochs_decoding_time_bin_size: {epochs_decoding_time_bin_size}"
             a_new_fully_generic_result: GenericDecoderDictDecodedEpochsDictResult = valid_EpochComputations_result.a_generic_decoder_dict_decoded_epochs_dict_result ## get existing
+            
+            if a_new_fully_generic_result is None:
+                ## need to recompute 'generalized_specific_epochs_decoding'
+                owning_pipeline_reference.perform_specific_computation(computation_functions_name_includelist=['generalized_specific_epochs_decoding'],
+                                        computation_kwargs_list=[{'epochs_decoding_time_bin_size': time_bin_size, 'drop_previous_result_and_compute_fresh':False, 'force_recompute': False}], 
+                                        enabled_filter_names=None, fail_on_exception=True, debug_print=False)
+
+                a_new_fully_generic_result: GenericDecoderDictDecodedEpochsDictResult = valid_EpochComputations_result.a_generic_decoder_dict_decoded_epochs_dict_result ## get existing
+
+            
+            assert a_new_fully_generic_result is not None, f"Missing valid_EpochComputations_result.a_generic_decoder_dict_decoded_epochs_dict_result (valid_EpochComputations_result.a_generic_decoder_dict_decoded_epochs_dict_result == None)"
 
             ## INPUTS: a_new_fully_generic_result
             # a_target_context: IdentifyingContext = IdentifyingContext(trained_compute_epochs='laps', pfND_ndim=1, decoder_identifier='pseudo2D', known_named_decoding_epochs_type='global', masked_time_bin_fill_type='nan_filled', data_grain='per_time_bin')
