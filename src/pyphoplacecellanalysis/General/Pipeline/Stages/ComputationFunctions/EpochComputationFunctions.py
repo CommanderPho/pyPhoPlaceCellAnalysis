@@ -2622,6 +2622,9 @@ class EpochComputationDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Di
             Based off of ``
             
             Usage:
+                from pyphoplacecellanalysis.Pho2D.data_exporting import HeatmapExportConfig, HeatmapExportKind
+
+                            
                 # getting `_display_generalized_decoded_yellow_blue_marginal_epochs` into shape
                 curr_active_pipeline.reload_default_display_functions()
 
@@ -2632,6 +2635,11 @@ class EpochComputationDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Di
                 ## Show output paths:
                 _out_curr = _out['trackID_weighted_position_posterior']
 
+                out_paths: Dict[types.KnownNamedDecoderTrainedComputeEpochsType, Dict[types.DecoderName, Path]] = _out['out_paths']
+                out_custom_formats_dict: Dict[types.KnownNamedDecodingEpochsType, Dict[types.DecoderName, Dict[str, List[HeatmapExportConfig]]]] = _out['out_custom_formats_dict']
+
+
+                ## Handle just the paths:
                 out_paths = deepcopy(_out_curr['out_paths'])
                 for k, v_dict in out_paths.items():
                     for a_decoder_name, a_path in v_dict.items():
@@ -2639,6 +2647,43 @@ class EpochComputationDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Di
                         fullwidth_path_widget(a_path=a_path, file_name_label=f"{k}[{a_decoder_name}]:")
 
                         
+
+                ## Handle Output configs/images:
+                out_custom_formats_dict: Dict = _out['out_custom_formats_dict']
+                # flat_imgs = []
+                flat_merged_images = {}
+
+                for a_series_name, v_dict in out_custom_formats_dict.items():
+                    # a_series_name: ['laps', 'ripple']
+                    for a_decoder_name, a_rendered_configs_dict in v_dict.items():
+                        
+                        for a_config_name, a_rendered_config_list in a_rendered_configs_dict.items():
+                            # 'raw_rgba'
+                            # print(a_rendered_config_list)
+                            # len(a_rendered_config_list)
+                            flat_imgs = []
+                            
+                            for i, a_config in enumerate(a_rendered_config_list):      
+                                # posterior_save_path = a_config.posterior_saved_path
+                                _posterior_image = a_config.posterior_saved_image
+                                flat_imgs.append(_posterior_image)
+                                
+                                # print(F'a_rendered_config: {type(a_rendered_config)}')
+                                # type(a_rendered_config_list[0])
+                                # print(F'a_rendered_config: {list(a_rendered_config.keys())}')
+                                # file_uri_from_path(a_path)
+                                # fullwidth_path_widget(a_path=a_path, file_name_label=f"{a_series_name}[{a_decoder_name}]:")
+                                # flat_img_out_paths.append(a_path)
+                        
+                            ## OUTPUTS: flat_imgs
+                            _merged_img = horizontal_image_stack(flat_imgs, padding=10, separator_color='white')
+                            flat_merged_images[a_series_name] = _merged_img
+                            
+
+                # flat_img_out_paths
+                flat_merged_images
+
+
                 
 
             """
@@ -2679,6 +2724,7 @@ class EpochComputationDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Di
             # BEGIN FUNCTION BODY                                                                                                                                                                                                                                                                  #
             # ==================================================================================================================================================================================================================================================================================== #
 
+            
             ## Unpack from pipeline:
             valid_EpochComputations_result: EpochComputationsComputationsContainer = owning_pipeline_reference.global_computation_results.computed_data['EpochComputations'] # owning_pipeline_reference.global_computation_results.computed_data['EpochComputations']
             assert valid_EpochComputations_result is not None
@@ -2732,7 +2778,7 @@ class EpochComputationDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Di
                 flat_context_list, flat_result_context_dict, flat_decoder_context_dict, flat_decoded_marginal_posterior_df_context_dict = a_new_fully_generic_result.get_results_matching_contexts(context_query=laps_trained_decoder_search_context, return_multiple_matches=True, debug_print=True)
 
                 active_ctxts = [
-                                # IdentifyingContext(trained_compute_epochs= 'laps', pfND_ndim= 1, decoder_identifier= 'pseudo2D', time_bin_size= epochs_decoding_time_bin_size, known_named_decoding_epochs_type= 'laps', masked_time_bin_fill_type= 'ignore'), 
+                                IdentifyingContext(trained_compute_epochs= 'laps', pfND_ndim= 1, decoder_identifier= 'pseudo2D', time_bin_size= epochs_decoding_time_bin_size, known_named_decoding_epochs_type= 'laps', masked_time_bin_fill_type= 'ignore'), 
                                 IdentifyingContext(trained_compute_epochs= 'laps', pfND_ndim= 1, decoder_identifier= 'pseudo2D', time_bin_size= epochs_decoding_time_bin_size, known_named_decoding_epochs_type= 'laps', masked_time_bin_fill_type= 'nan_filled', data_grain= 'per_time_bin'),
                                 # IdentifyingContext(trained_compute_epochs= 'laps', pfND_ndim= 1, decoder_identifier= 'pseudo2D', time_bin_size= epochs_decoding_time_bin_size, known_named_decoding_epochs_type= 'laps', masked_time_bin_fill_type= 'dropped', data_grain= 'per_time_bin'),
                 ]
@@ -2758,7 +2804,7 @@ class EpochComputationDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Di
             flat_context_list, flat_result_context_dict, flat_decoder_context_dict, flat_decoded_marginal_posterior_df_context_dict = a_new_fully_generic_result.get_results_matching_contexts(context_query=pbe_trained_decoder_search_context, return_multiple_matches=True, debug_print=True)
 
             active_ctxts = [
-                            # IdentifyingContext(trained_compute_epochs= 'laps', pfND_ndim= 1, decoder_identifier= 'pseudo2D', time_bin_size=epochs_decoding_time_bin_size, known_named_decoding_epochs_type= 'pbe', masked_time_bin_fill_type= 'ignore'), 
+                            IdentifyingContext(trained_compute_epochs= 'laps', pfND_ndim= 1, decoder_identifier= 'pseudo2D', time_bin_size=epochs_decoding_time_bin_size, known_named_decoding_epochs_type= 'pbe', masked_time_bin_fill_type= 'ignore'), 
                             IdentifyingContext(trained_compute_epochs= 'laps', pfND_ndim= 1, decoder_identifier= 'pseudo2D', time_bin_size= epochs_decoding_time_bin_size, known_named_decoding_epochs_type= 'pbe', masked_time_bin_fill_type= 'nan_filled', data_grain= 'per_time_bin'),
                             # IdentifyingContext(trained_compute_epochs= 'laps', pfND_ndim= 1, decoder_identifier= 'pseudo2D', time_bin_size= epochs_decoding_time_bin_size, known_named_decoding_epochs_type= 'pbe', masked_time_bin_fill_type= 'dropped', data_grain= 'per_time_bin'),
             ]
@@ -2860,7 +2906,8 @@ class EpochComputationDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Di
 
             graphics_output_dict['out_paths'] = out_paths # 'out_paths': out_paths
             graphics_output_dict['out_custom_formats_dict'] = out_custom_formats_dict
-            
+            print(f'\tout_paths: {out_paths}')
+            print(f'done.')
 
             return graphics_output_dict
 
