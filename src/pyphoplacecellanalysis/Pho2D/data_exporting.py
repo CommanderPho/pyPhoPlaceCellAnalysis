@@ -459,7 +459,7 @@ class PosteriorExporting:
     # Save/Load                                                                                                            #
     # ==================================================================================================================== #
     @classmethod
-    @function_attributes(short_name=None, tags=['IMPORTANT', 'save', 'export', 'ESSENTIAL', 'posterior', 'export'], input_requires=[], output_provides=[], uses=['SingleEpochDecodedResult.save_posterior_as_image'], used_by=['cls.perform_export_all_decoded_posteriors_as_images'], creation_date='2024-08-05 10:47', related_items=[])
+    @function_attributes(short_name=None, tags=['IMPORTANT', 'save', 'export', 'ESSENTIAL', 'posterior', 'export'], input_requires=[], output_provides=[], uses=['SingleEpochDecodedResult.save_posterior_as_image', 'ImageOperationsAndEffects'], used_by=['cls.perform_export_all_decoded_posteriors_as_images'], creation_date='2024-08-05 10:47', related_items=[])
     def export_decoded_posteriors_as_images(cls, a_decoder_decoded_epochs_result: DecodedFilterEpochsResult, # decoder_ripple_filter_epochs_decoder_result_dict: DecoderResultDict,
                                              posterior_out_folder:Path='output/_temp_individual_posteriors',
                                              should_export_separate_color_and_greyscale: bool = True, custom_export_formats: Optional[Dict[str, HeatmapExportConfig]]=None, colormap='Oranges', #'viridis',
@@ -489,23 +489,13 @@ class PosteriorExporting:
             Refactored from `ComputerVisionComputations` on 2024-09-30
         """
 
-        from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import DecodedFilterEpochsResult, SingleEpochDecodedResult
+        from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import SingleEpochDecodedResult
         from pyphoplacecellanalysis.Pho2D.data_exporting import HeatmapExportKind
 
         if not isinstance(posterior_out_folder, Path):
             posterior_out_folder = Path(posterior_out_folder).resolve()
 
-        # parent_output_folder = Path(r'output/_temp_individual_posteriors').resolve()
-        # posterior_out_folder = parent_output_folder.joinpath(DAY_DATE_TO_USE, epochs_name).resolve()
         posterior_out_folder.mkdir(parents=True, exist_ok=True)
-
-
-
-        # if should_export_separate_color_and_greyscale:
-        #     posterior_out_folder_greyscale = posterior_out_folder.joinpath('greyscale').resolve()
-        #     posterior_out_folder_color = posterior_out_folder.joinpath('color').resolve()
-        #     posterior_out_folder_greyscale.mkdir(parents=True, exist_ok=True)
-        #     posterior_out_folder_color.mkdir(parents=True, exist_ok=True)
 
         if custom_export_formats is None:
             if should_export_separate_color_and_greyscale:
@@ -530,36 +520,29 @@ class PosteriorExporting:
                     
         num_filter_epochs: int = a_decoder_decoded_epochs_result.num_filter_epochs
         
-        is_epoch_pre_post_delta = a_decoder_decoded_epochs_result.active_filter_epochs['maze_id']
+        is_epoch_pre_post_delta = a_decoder_decoded_epochs_result.active_filter_epochs['maze_id'].to_numpy()
         
 
         # Build post-image-generation callback functions _____________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
         from pyphocorehelpers.plotting.media_output_helpers import ImageOperationsAndEffects
 
-
-        def create_label_function(label_text):
-            """Create a function that adds a specific label to an image."""
-            return lambda an_img: ImageOperationsAndEffects.add_bottom_label(an_img, label_text, font_size=244, text_color=(1, 0, 0))
-
-
-        # def create_half_width_rectangle_function(side, color):
-        #     """Create a function that adds a specific label to an image."""
-        #     return lambda an_img: ImageOperationsAndEffects.add_half_width_rectangle(an_img, side=side, color=color, height_fraction = 0.1)
-
-
+        create_label_function = ImageOperationsAndEffects.create_fn_builder(ImageOperationsAndEffects.add_bottom_label, font_size=244, text_color=(1, 0, 0))
+        
         create_half_width_rectangle_function = ImageOperationsAndEffects.create_fn_builder(ImageOperationsAndEffects.add_half_width_rectangle, height_fraction = 0.1)
         
         create_solid_border_function = ImageOperationsAndEffects.create_fn_builder(ImageOperationsAndEffects.add_solid_border) # border_color = (0, 0, 0, 255)
 
-
-        # # Create an image with a label
-        # # labeled_image = add_bottom_label(original_image, "Time (seconds)", font_size=14)
+        # Create an image with a label
+        # labeled_image = add_bottom_label(original_image, "Time (seconds)", font_size=14)
         # post_render_image_functions = {'add_bottom_label': (lambda an_img: add_bottom_label(an_img, "Time (seconds)", font_size=14)),
                                         # }
+                                        
+
         _save_out_paths = []
         _save_out_format_results: Dict[str, List] = {}
         for i in np.arange(num_filter_epochs):
             active_captured_single_epoch_result: SingleEpochDecodedResult = a_decoder_decoded_epochs_result.get_result_for_epoch(active_epoch_idx=i)
+
 
             is_post_delta = (is_epoch_pre_post_delta[i] > 0)
             
@@ -589,7 +572,7 @@ class PosteriorExporting:
 
             # curr_post_render_image_functions_dict = {'add_bottom_label': (lambda an_img: add_bottom_label(an_img, curr_x_axis_label_str, font_size=8))}
             curr_post_render_image_functions_dict = {
-                # 'add_bottom_label': create_label_function(curr_x_axis_label_str),
+                'add_bottom_label': create_label_function(curr_x_axis_label_str),
                 # 'create_half_width_rectangle_function': create_half_width_rectangle_function(side, epoch_rect_color), ## create rect to indicate pre/post delta
                 # 'create_half_width_rectangle_function': create_half_width_rectangle_function(side, epoch_rect_color),
                 'create_solid_border_function': create_solid_border_function(border_width = 10, border_color = epoch_rect_color),
@@ -1328,7 +1311,7 @@ class PosteriorExporting:
 @metadata_attributes(short_name=None, tags=['export', 'posterior'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-12-16 22:28', related_items=[])
 @define(slots=False)
 class LoadedPosteriorContainer:
-    """ 
+    """ Loads Posteriors exported as .h5 files
 
     Usage:    
         from pyphoplacecellanalysis.SpecificResults.AcrossSessionResults import H5FileAggregator
