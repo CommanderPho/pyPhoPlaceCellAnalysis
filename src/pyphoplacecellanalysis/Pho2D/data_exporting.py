@@ -527,8 +527,8 @@ class PosteriorExporting:
         from pyphocorehelpers.plotting.media_output_helpers import ImageOperationsAndEffects
 
 
-        font_size = 144
-
+        # font_size = 144
+        font_size = 96
         create_label_function = ImageOperationsAndEffects.create_fn_builder(ImageOperationsAndEffects.add_bottom_label, font_size=font_size, text_color=(1, 0, 0))
         
         # create_half_width_rectangle_function = ImageOperationsAndEffects.create_fn_builder(ImageOperationsAndEffects.add_half_width_rectangle, height_fraction = 0.1)
