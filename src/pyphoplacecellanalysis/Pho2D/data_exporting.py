@@ -581,10 +581,10 @@ class PosteriorExporting:
 
             # curr_post_render_image_functions_dict = {'add_bottom_label': (lambda an_img: add_bottom_label(an_img, curr_x_axis_label_str, font_size=8))}
             curr_post_render_image_functions_dict = {
+                'create_solid_border_function': create_solid_border_function(border_width = 10, border_color = epoch_rect_color),
                 'add_bottom_label': create_label_function(curr_x_axis_label_str),
                 # 'create_half_width_rectangle_function': create_half_width_rectangle_function(side, epoch_rect_color), ## create rect to indicate pre/post delta
                 # 'create_half_width_rectangle_function': create_half_width_rectangle_function(side, epoch_rect_color),
-                'create_solid_border_function': create_solid_border_function(border_width = 10, border_color = epoch_rect_color),
             }
                                       
             if desired_height is None:
