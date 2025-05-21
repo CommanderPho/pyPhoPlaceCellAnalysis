@@ -2698,8 +2698,7 @@ class EpochComputationDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Di
             from datetime import datetime, date, timedelta
             from pyphocorehelpers.print_helpers import get_now_rounded_time_str
             from pyphocorehelpers.plotting.media_output_helpers import vertical_image_stack, horizontal_image_stack, image_grid # used in `_subfn_build_combined_output_images`
-
-
+            from pyphocorehelpers.image_helpers import ImageHelpers
 
             owning_pipeline_reference.perform_specific_computation(computation_functions_name_includelist=['directional_decoders_decode_continuous'],
                                                   computation_kwargs_list=[{'time_bin_size': time_bin_size, 'should_disable_cache':False}], 
@@ -2981,7 +2980,13 @@ class EpochComputationDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Di
             graphics_output_dict['flat_merged_images'] = flat_merged_images
             graphics_output_dict['flat_merged_image_paths'] = flat_merged_image_paths
             graphics_output_dict['flat_imgs_dict'] = flat_imgs_dict
+            
 
+            ## one last cleanup step
+            
+            
+            ImageHelpers.clear_cached_fonts()
+            
             return graphics_output_dict
 
 
@@ -3205,23 +3210,23 @@ class KnownFilterEpochs(ExtendedEnum):
 
 
 
-		# ## non_PBE Epochs:
-		# active_file_suffix = '.non_pbe.npy'
-		# found_datafile = Epoch.from_file(fp.with_suffix(active_file_suffix))
-		# if (not force_recompute) and (found_datafile is not None):
-		# 	print('Loading success: {}.'.format(active_file_suffix))
-		# 	session.non_pbe = found_datafile
-		# else:
-		# 	# Otherwise load failed, perform the fallback computation
-		# 	if not force_recompute:
-		# 		print('Failure loading {}. Must recompute.\n'.format(active_file_suffix))
-		# 	else:
-		# 		print(f'force_recompute is True, recomputing...')
-		# 	try:
-		# 		# active_pbe_parameters = kwargs.pop('pbe_epoch_detection_params', session.config.preprocessing_parameters.epoch_estimation_parameters.PBEs)
-		# 		active_non_pbe_parameters = {} # session.config.preprocessing_parameters.epoch_estimation_parameters.PBEs
-		# 		session.non_pbe = DataSession.compute_non_PBE_epochs(session, active_parameters=active_non_pbe_parameters, save_on_compute=True)
-		# 	except (ValueError, AttributeError) as e:
-		# 		print(f'Computation failed with error {e}. Skipping .non_pbe')
-		# 		session.non_pbe = None
+        # ## non_PBE Epochs:
+        # active_file_suffix = '.non_pbe.npy'
+        # found_datafile = Epoch.from_file(fp.with_suffix(active_file_suffix))
+        # if (not force_recompute) and (found_datafile is not None):
+        # 	print('Loading success: {}.'.format(active_file_suffix))
+        # 	session.non_pbe = found_datafile
+        # else:
+        # 	# Otherwise load failed, perform the fallback computation
+        # 	if not force_recompute:
+        # 		print('Failure loading {}. Must recompute.\n'.format(active_file_suffix))
+        # 	else:
+        # 		print(f'force_recompute is True, recomputing...')
+        # 	try:
+        # 		# active_pbe_parameters = kwargs.pop('pbe_epoch_detection_params', session.config.preprocessing_parameters.epoch_estimation_parameters.PBEs)
+        # 		active_non_pbe_parameters = {} # session.config.preprocessing_parameters.epoch_estimation_parameters.PBEs
+        # 		session.non_pbe = DataSession.compute_non_PBE_epochs(session, active_parameters=active_non_pbe_parameters, save_on_compute=True)
+        # 	except (ValueError, AttributeError) as e:
+        # 		print(f'Computation failed with error {e}. Skipping .non_pbe')
+        # 		session.non_pbe = None
                 
