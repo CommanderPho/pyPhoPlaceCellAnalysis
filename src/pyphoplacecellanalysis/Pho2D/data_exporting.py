@@ -526,9 +526,12 @@ class PosteriorExporting:
         # Build post-image-generation callback functions _____________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
         from pyphocorehelpers.plotting.media_output_helpers import ImageOperationsAndEffects
 
-        create_label_function = ImageOperationsAndEffects.create_fn_builder(ImageOperationsAndEffects.add_bottom_label, font_size=244, text_color=(1, 0, 0))
+
+        font_size = 144
+
+        create_label_function = ImageOperationsAndEffects.create_fn_builder(ImageOperationsAndEffects.add_bottom_label, font_size=font_size, text_color=(1, 0, 0))
         
-        create_half_width_rectangle_function = ImageOperationsAndEffects.create_fn_builder(ImageOperationsAndEffects.add_half_width_rectangle, height_fraction = 0.1)
+        # create_half_width_rectangle_function = ImageOperationsAndEffects.create_fn_builder(ImageOperationsAndEffects.add_half_width_rectangle, height_fraction = 0.1)
         
         create_solid_border_function = ImageOperationsAndEffects.create_fn_builder(ImageOperationsAndEffects.add_solid_border) # border_color = (0, 0, 0, 255)
 
@@ -543,11 +546,15 @@ class PosteriorExporting:
         for i in np.arange(num_filter_epochs):
             active_captured_single_epoch_result: SingleEpochDecodedResult = a_decoder_decoded_epochs_result.get_result_for_epoch(active_epoch_idx=i)
 
+            # Prepare a multi-line, sideways label _______________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
 
             is_post_delta = (is_epoch_pre_post_delta[i] > 0)
             
             ## get pre/post delta label:
             earliest_t = active_captured_single_epoch_result.time_bin_edges[0]
+            # earliest_t_ms = earliest_t * 1e-3
+            
+            earliest_t_str: str = f"{earliest_t:.4f}"
 
             # Create an image with a label
             # labeled_image = add_bottom_label(original_image, "Time (seconds)", font_size=14)
@@ -560,15 +567,17 @@ class PosteriorExporting:
 
             curr_x_axis_label_str: str = f''
             if not is_post_delta:
-                 curr_x_axis_label_str = f'PRE'
+                #  curr_x_axis_label_str = f'PRE'
                  side = 'left'
                  epoch_rect_color = '#4169E1'
                                             
             else:
-                curr_x_axis_label_str = f'POST'
+                # curr_x_axis_label_str = f'POST'
                 side = 'right'
                 epoch_rect_color = '#DC143C'
                 
+            # curr_x_axis_label_str = f"{curr_x_axis_label_str}[{i}]"
+            curr_x_axis_label_str = f"{curr_x_axis_label_str}\n{earliest_t_str}"
 
             # curr_post_render_image_functions_dict = {'add_bottom_label': (lambda an_img: add_bottom_label(an_img, curr_x_axis_label_str, font_size=8))}
             curr_post_render_image_functions_dict = {
