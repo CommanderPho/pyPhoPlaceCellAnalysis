@@ -532,8 +532,10 @@ class PosteriorExporting:
 
 
         # font_size = 144
-        font_size = 96
-        create_label_function = ImageOperationsAndEffects.create_fn_builder(ImageOperationsAndEffects.add_bottom_label, font_size=font_size, text_color=(255, 255, 255), background_color=(66, 66, 66, 255), fixed_label_region_height=fixed_label_region_height)
+        # font_size = 96
+        font_size = 72
+        
+        create_label_function = ImageOperationsAndEffects.create_fn_builder(ImageOperationsAndEffects.add_bottom_label, font_size=font_size, text_color=(255, 255, 255), background_color=(66, 66, 66), fixed_label_region_height=fixed_label_region_height)
         
         # create_half_width_rectangle_function = ImageOperationsAndEffects.create_fn_builder(ImageOperationsAndEffects.add_half_width_rectangle, height_fraction = 0.1)
         
@@ -567,7 +569,7 @@ class PosteriorExporting:
             #      curr_x_axis_label_str = f'{curr_x_axis_label_str} (pre-delta)'
             # else:
             #     curr_x_axis_label_str = f'{curr_x_axis_label_str} (post-delta)'
-
+            
             curr_x_axis_label_str: str = f''
             if not is_post_delta:
                 #  curr_x_axis_label_str = f'PRE'
