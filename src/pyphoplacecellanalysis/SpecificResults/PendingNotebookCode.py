@@ -841,15 +841,16 @@ class MultiDecoderColorOverlayedPosteriors(ComputedResult):
         marginal_trackID_p_x_given_n[:, 1, :] = sum_over_all_short_p_x_given_n
 
         ## Normalize result:
-        # marginal_trackID_p_x_given_n = marginal_trackID_p_x_given_n / sum_over_all_decoders_p_x_given_n[:, None, :] ## renormalize by dividing by sum over all decoders
-        # _subfn_perform_normalization_check(a_marginal_p_x_given_n=marginal_trackID_p_x_given_n)
-        
-        marginal_trackID_p_x_given_n = marginal_trackID_p_x_given_n / sum_over_all_decoders_and_all_positions_p_x_given_n ## renormalize by dividing by sum over all decoders
-        _subfn_perform_area_under_curve_normalization_check(a_marginal_p_x_given_n=marginal_trackID_p_x_given_n)
-        # _post_norm_check_sum: NDArray[ND.Shape["N_TIME_BINS"], np.floating] = np.nansum(marginal_trackID_p_x_given_n, axis=(0,1))
-        
-        # long_only_p_x_given_n = long_only_p_x_given_n / sum_over_all_long_p_x_given_n[:, None, :] ## renormalize by dividing by sum over all decoders
-        # _subfn_perform_normalization_check(a_marginal_p_x_given_n=long_only_p_x_given_n)
+        with np.errstate(divide='ignore', invalid='ignore'): # 
+            # marginal_trackID_p_x_given_n = marginal_trackID_p_x_given_n / sum_over_all_decoders_p_x_given_n[:, None, :] ## renormalize by dividing by sum over all decoders
+            # _subfn_perform_normalization_check(a_marginal_p_x_given_n=marginal_trackID_p_x_given_n)
+            
+            marginal_trackID_p_x_given_n = marginal_trackID_p_x_given_n / sum_over_all_decoders_and_all_positions_p_x_given_n ## renormalize by dividing by sum over all decoders
+            _subfn_perform_area_under_curve_normalization_check(a_marginal_p_x_given_n=marginal_trackID_p_x_given_n)
+            # _post_norm_check_sum: NDArray[ND.Shape["N_TIME_BINS"], np.floating] = np.nansum(marginal_trackID_p_x_given_n, axis=(0,1))
+            
+            # long_only_p_x_given_n = long_only_p_x_given_n / sum_over_all_long_p_x_given_n[:, None, :] ## renormalize by dividing by sum over all decoders
+            # _subfn_perform_normalization_check(a_marginal_p_x_given_n=long_only_p_x_given_n)
         
 
         # np.shape(_post_norm_check_sum)
@@ -1003,81 +1004,89 @@ class MultiDecoderColorOverlayedPosteriors(ComputedResult):
             'all_t_bins_final_overlayed_out_RGBA': np.zeros((n_time_bins, n_pos_bins, 4)),
         }
 
-        for a_t_bin_idx in np.arange(n_time_bins):
-            ## for each time bin, there are several ways to normalize
-                # 1. normalize over all in each time bin 
-                # 2. normalize to max/min in each time (colormapping), means colors aren't consistent between timebins
-                            
-            if progress_print:
-                is_every_hundreth_t_bin = (a_t_bin_idx % 1000 == 0)
-                if is_every_hundreth_t_bin:        
-                    print(f'a_t_bin_idx: [{a_t_bin_idx}/{n_time_bins}]')
+        with np.errstate(divide='ignore', invalid='ignore'):
+            ## print log spamming division errors
+            for a_t_bin_idx in np.arange(n_time_bins):
+                ## for each time bin, there are several ways to normalize
+                    # 1. normalize over all in each time bin 
+                    # 2. normalize to max/min in each time (colormapping), means colors aren't consistent between timebins
+                                
+                if progress_print:
+                    is_every_hundreth_t_bin = (a_t_bin_idx % 1000 == 0)
+                    if is_every_hundreth_t_bin:        
+                        print(f'a_t_bin_idx: [{a_t_bin_idx}/{n_time_bins}]')
 
-            # single_t_bin_P_values: NDArray[ND.Shape["N_POS_BINS, N_DECODERS"], np.floating] = deepcopy(p_x_given_n[:, :, a_t_bin_idx])
-            single_t_bin_P_values: NDArray[ND.Shape["N_POS_BINS, N_DECODERS"], np.floating] = p_x_given_n[:, :, a_t_bin_idx]
+                # single_t_bin_P_values: NDArray[ND.Shape["N_POS_BINS, N_DECODERS"], np.floating] = deepcopy(p_x_given_n[:, :, a_t_bin_idx])
+                single_t_bin_P_values: NDArray[ND.Shape["N_POS_BINS, N_DECODERS"], np.floating] = p_x_given_n[:, :, a_t_bin_idx]
 
-            if produce_debug_outputs:
-                _pre_norm_prob_vals = deepcopy(single_t_bin_P_values)
-
-            # DEBUGONLY __________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
-            if produce_debug_outputs:
-                ## normalize over (decoder, position)
-                sum_over_all_decoder_pos_values: float = np.nansum(_pre_norm_prob_vals, axis=(0, 1)) # sum over pos
-                print(f'sum_over_all_decoder_pos_values: {sum_over_all_decoder_pos_values}')
-                # _all_normed_prob_vals = _pre_norm_prob_vals / sum_over_all_decoder_pos_values ## normalize
-
-            ## normalize over decoder
-            sum_over_all_pos_values: NDArray[ND.Shape["N_DECODERS"], np.floating] = np.nansum(single_t_bin_P_values, axis=0) # sum over pos
-            if produce_debug_outputs:
-                print(f'sum_over_all_pos_values: {sum_over_all_pos_values}')
-                
-            decoder_alphas: NDArray[ND.Shape["N_DECODERS"], np.floating] = sum_over_all_pos_values.copy()
-            single_t_bin_P_values = single_t_bin_P_values / sum_over_all_pos_values ## normalize over (decoder x position)
-
-            ## OUT: probability_values
-            ## INPUTS: probability_values (n_pos_bins, 4)
-            # single_t_bin_out_RGBA = np.zeros((n_pos_bins, 4, 4))
-
-            ## pre-plotting only: mask the tiny values:
-            single_t_bin_P_values = cls._prepare_arr_for_conversion_to_RGBA(single_t_bin_P_values, drop_below_threshold=drop_below_threshold)
-
-            ## for each decoder:
-            for i, (a_decoder_name, a_cmap) in enumerate(active_decoder_cmap_dict.items()):
                 if produce_debug_outputs:
-                    # print(f'i: {i}, a_decoder_name: {a_decoder_name}')
-                    pass
+                    _pre_norm_prob_vals = deepcopy(single_t_bin_P_values)
 
-                a_t_bin_a_decoder_P: NDArray[ND.Shape["N_POS_BINS"], np.floating] = single_t_bin_P_values[:, i]
-                # ignore NaNs when finding data range
-                a_norm = mpl.colors.Normalize(vmin=np.nanmin(a_t_bin_a_decoder_P), vmax=np.nanmax(a_t_bin_a_decoder_P))
-                # mask the NaNs so the cmap knows to use the “bad” color
-                a_masked = np.ma.masked_invalid(a_t_bin_a_decoder_P)
-                an_rgba: NDArray[ND.Shape["N_POS_BINS, 4"], np.floating] = a_cmap(a_norm(a_masked)) # rgba.shape (n_pos_bins, 4) # the '4' here is for RGBA, not the decoders, RGB per bin
-                # rgb = an_rgba[..., :3] 
-                # single_t_bin_out_RGBA[:, i, :] = an_rgba
+                # DEBUGONLY __________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
+                if produce_debug_outputs:
+                    ## normalize over (decoder, position)
+                    sum_over_all_decoder_pos_values: float = np.nansum(_pre_norm_prob_vals, axis=(0, 1)) # sum over pos
+                    print(f'sum_over_all_decoder_pos_values: {sum_over_all_decoder_pos_values}')
+                    # _all_normed_prob_vals = _pre_norm_prob_vals / sum_over_all_decoder_pos_values ## normalize
+
+                ## normalize over decoder
+                sum_over_all_pos_values: NDArray[ND.Shape["N_DECODERS"], np.floating] = np.nansum(single_t_bin_P_values, axis=0) # sum over pos
+                if produce_debug_outputs:
+                    print(f'sum_over_all_pos_values: {sum_over_all_pos_values}')
+                    
+                decoder_alphas: NDArray[ND.Shape["N_DECODERS"], np.floating] = sum_over_all_pos_values.copy()
+                single_t_bin_P_values = single_t_bin_P_values / sum_over_all_pos_values ## normalize over (decoder x position)
+
+                ## OUT: probability_values
+                ## INPUTS: probability_values (n_pos_bins, 4)
+                # single_t_bin_out_RGBA = np.zeros((n_pos_bins, 4, 4))
+
+                ## pre-plotting only: mask the tiny values:
+                single_t_bin_P_values = cls._prepare_arr_for_conversion_to_RGBA(single_t_bin_P_values, drop_below_threshold=drop_below_threshold)
+
+                ## for each decoder:
+                for i, (a_decoder_name, a_cmap) in enumerate(active_decoder_cmap_dict.items()):
+                    if produce_debug_outputs:
+                        # print(f'i: {i}, a_decoder_name: {a_decoder_name}')
+                        pass
+
+                    a_t_bin_a_decoder_P: NDArray[ND.Shape["N_POS_BINS"], np.floating] = single_t_bin_P_values[:, i]
+                    # ignore NaNs when finding data range
+                    try:
+                        a_norm = mpl.colors.Normalize(vmin=np.nanmin(a_t_bin_a_decoder_P), vmax=np.nanmax(a_t_bin_a_decoder_P))
+                    except ValueError as e:
+                        # RuntimeWarning: All-NaN slice encountered
+                        pass
+
+
+                    # mask the NaNs so the cmap knows to use the “bad” color
+                    a_masked = np.ma.masked_invalid(a_t_bin_a_decoder_P)
+                    an_rgba: NDArray[ND.Shape["N_POS_BINS, 4"], np.floating] = a_cmap(a_norm(a_masked)) # rgba.shape (n_pos_bins, 4) # the '4' here is for RGBA, not the decoders, RGB per bin
+                    # rgb = an_rgba[..., :3] 
+                    # single_t_bin_out_RGBA[:, i, :] = an_rgba
+                    
+                    extra_all_t_bins_outputs_dict['all_t_bins_per_decoder_out_RGBA'][a_t_bin_idx, :, i, :] = an_rgba
+                ## END for i, (a_decoder_name, a_cmap) in enum....
                 
-                extra_all_t_bins_outputs_dict['all_t_bins_per_decoder_out_RGBA'][a_t_bin_idx, :, i, :] = an_rgba
-            ## END for i, (a_decoder_name, a_cmap) in enum....
-            
-            # Add dict entries ___________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
-            # single_t_bin_out_RGBA: (n_pos_bins, 4, 4)
-            single_t_bin_out_RGBA: NDArray[ND.Shape["N_POS_BINS, N_DECODERS, 4"], np.floating] = extra_all_t_bins_outputs_dict['all_t_bins_per_decoder_out_RGBA'][a_t_bin_idx, :, :, :]
-            # single_t_bin_out_alpha_weighted_RGBA: NDArray[ND.Shape["N_POS_BINS, N_DECODERS, 4"], np.floating] = (deepcopy(single_t_bin_out_RGBA) * decoder_alphas[None, :, None]) # (n_pos_bins, n_decoders, 4)
-            extra_all_t_bins_outputs_dict['all_t_bins_per_decoder_alphas'][a_t_bin_idx, :] = decoder_alphas
-            # extra_all_t_bins_outputs_dict['all_t_bins_per_decoder_alpha_weighted_RGBA'][a_t_bin_idx, :, :, :] = (deepcopy(single_t_bin_out_RGBA) * decoder_alphas[None, :, None]) # (n_pos_bins, n_decoders, 4)
-            extra_all_t_bins_outputs_dict['all_t_bins_per_decoder_alpha_weighted_RGBA'][a_t_bin_idx, :, :, :] = (single_t_bin_out_RGBA * decoder_alphas[None, :, None]) # (n_pos_bins, n_decoders, 4)
+                # Add dict entries ___________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
+                # single_t_bin_out_RGBA: (n_pos_bins, 4, 4)
+                single_t_bin_out_RGBA: NDArray[ND.Shape["N_POS_BINS, N_DECODERS, 4"], np.floating] = extra_all_t_bins_outputs_dict['all_t_bins_per_decoder_out_RGBA'][a_t_bin_idx, :, :, :]
+                # single_t_bin_out_alpha_weighted_RGBA: NDArray[ND.Shape["N_POS_BINS, N_DECODERS, 4"], np.floating] = (deepcopy(single_t_bin_out_RGBA) * decoder_alphas[None, :, None]) # (n_pos_bins, n_decoders, 4)
+                extra_all_t_bins_outputs_dict['all_t_bins_per_decoder_alphas'][a_t_bin_idx, :] = decoder_alphas
+                # extra_all_t_bins_outputs_dict['all_t_bins_per_decoder_alpha_weighted_RGBA'][a_t_bin_idx, :, :, :] = (deepcopy(single_t_bin_out_RGBA) * decoder_alphas[None, :, None]) # (n_pos_bins, n_decoders, 4)
+                extra_all_t_bins_outputs_dict['all_t_bins_per_decoder_alpha_weighted_RGBA'][a_t_bin_idx, :, :, :] = (single_t_bin_out_RGBA * decoder_alphas[None, :, None]) # (n_pos_bins, n_decoders, 4)
 
-            extra_all_t_bins_outputs_dict['all_t_bins_final_overlayed_out_RGBA'][a_t_bin_idx, :, :] = color_blend_fn(single_t_bin_out_RGBA, decoder_alphas=decoder_alphas) # (n_pos_bins, 4, 4)?
-            
-            ## `numpy_rgba_composite` -- expects input = rgba_layers: (n_layers, H, W, 4) - here (H:
-            # extra_all_t_bins_outputs_dict['all_t_bins_final_RGBA'][a_t_bin_idx, :, :] = numpy_rgba_composite(np.transpose(single_t_bin_out_RGBA, (1, 0, 2)))  # (n_decoders, H=n_pos_bins, 4)
-            # extra_all_t_bins_outputs_dict['all_t_bins_final_RGBA'][a_t_bin_idx, :, :] = numpy_rgba_composite(np.transpose(extra_all_t_bins_outputs_dict['all_t_bins_per_decoder_alpha_weighted_RGBA'][a_t_bin_idx, :, :, :], (1, 0, 2))) # transpose -> (n_pos_bins, n_decoders, 4) => (n_decoders, n_pos_bins, 4)
-            extra_all_t_bins_outputs_dict['all_t_bins_final_RGBA'][a_t_bin_idx, :, :] = numpy_rgba_composite(np.transpose(extra_all_t_bins_outputs_dict['all_t_bins_per_decoder_alpha_weighted_RGBA'][a_t_bin_idx, :, :, :], (1, 0, 2))) # transpose -> (n_pos_bins, n_decoders, 4) => (n_decoders, n_pos_bins, 4)
+                extra_all_t_bins_outputs_dict['all_t_bins_final_overlayed_out_RGBA'][a_t_bin_idx, :, :] = color_blend_fn(single_t_bin_out_RGBA, decoder_alphas=decoder_alphas) # (n_pos_bins, 4, 4)?
+                
+                ## `numpy_rgba_composite` -- expects input = rgba_layers: (n_layers, H, W, 4) - here (H:
+                # extra_all_t_bins_outputs_dict['all_t_bins_final_RGBA'][a_t_bin_idx, :, :] = numpy_rgba_composite(np.transpose(single_t_bin_out_RGBA, (1, 0, 2)))  # (n_decoders, H=n_pos_bins, 4)
+                # extra_all_t_bins_outputs_dict['all_t_bins_final_RGBA'][a_t_bin_idx, :, :] = numpy_rgba_composite(np.transpose(extra_all_t_bins_outputs_dict['all_t_bins_per_decoder_alpha_weighted_RGBA'][a_t_bin_idx, :, :, :], (1, 0, 2))) # transpose -> (n_pos_bins, n_decoders, 4) => (n_decoders, n_pos_bins, 4)
+                extra_all_t_bins_outputs_dict['all_t_bins_final_RGBA'][a_t_bin_idx, :, :] = numpy_rgba_composite(np.transpose(extra_all_t_bins_outputs_dict['all_t_bins_per_decoder_alpha_weighted_RGBA'][a_t_bin_idx, :, :, :], (1, 0, 2))) # transpose -> (n_pos_bins, n_decoders, 4) => (n_decoders, n_pos_bins, 4)
 
-            # numpy_rgba_composite: Returns: (H, W, 4) — final composited RGBA image
-        ## END FOR for a_t_bin_idx in np.a...
-        # extra_all_t_bins_outputs_dict['all_t_bins_final_overlayed_out_RGBA'] = all_t_bins_final_overlayed_out_RGBA
-        # extra_all_t_bins_outputs_dict['all_t_bins_per_decoder_out_RGBA'] = all_t_bins_per_decoder_out_RGBA
+                # numpy_rgba_composite: Returns: (H, W, 4) — final composited RGBA image
+            ## END FOR for a_t_bin_idx in np.a...
+            # extra_all_t_bins_outputs_dict['all_t_bins_final_overlayed_out_RGBA'] = all_t_bins_final_overlayed_out_RGBA
+            # extra_all_t_bins_outputs_dict['all_t_bins_per_decoder_out_RGBA'] = all_t_bins_per_decoder_out_RGBA
 
         if progress_print:
             print(f'a_t_bin_idx: [{a_t_bin_idx}/{n_time_bins}]')
