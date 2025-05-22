@@ -20,6 +20,7 @@ import numpy as np
 import pandas as pd
 from pyphocorehelpers.assertion_helpers import Assert
 from pathlib import Path
+import shutil ## for deleting directories
 
 # NeuroPy (Diba Lab Python Repo) Loading
 from neuropy.utils.mixins.binning_helpers import build_df_discretized_binned_position_columns
@@ -2613,7 +2614,7 @@ class EpochComputationDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Di
 
     @function_attributes(short_name='trackID_weighted_position_posterior', tags=['context-decoder-comparison', 'decoded_position', 'directional'], conforms_to=['output_registering', 'figure_saving'], input_requires=[], output_provides=[], requires_global_keys=["global_computation_results.computed_data['EpochComputations']"], uses=['FigureCollector'], used_by=[], creation_date='2025-05-03 00:00', related_items=[], is_global=True)
     def _display_decoded_trackID_weighted_position_posterior_withMultiColorOverlay(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, save_figure=True, override_fig_man: Optional[FileOutputManager]=None, ax=None,
-                                                                                    custom_export_formats: Optional[Dict[str, Any]]=None, parent_output_folder: Path = Path('output/array_to_images'), time_bin_size: float=0.025, **kwargs):
+                                                                                    custom_export_formats: Optional[Dict[str, Any]]=None, parent_output_folder: Path = Path('output/array_to_images'), time_bin_size: float=0.025, delete_previous_outputs_folder:bool=True, **kwargs):
             """ Displays one figure containing the track_ID marginal, decoded continuously over the entire recording session along with the animal's position.
             
             "HeatmapExportConfig"
@@ -2891,9 +2892,9 @@ class EpochComputationDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Di
             posterior_out_folder.mkdir(parents=True, exist_ok=True)
             save_path = posterior_out_folder.resolve()
             _parent_save_context: IdentifyingContext = owning_pipeline_reference.build_display_context_for_session('perform_export_all_decoded_posteriors_as_images')
-            _specific_session_output_folder = save_path.joinpath(active_context.get_description(subset_excludelist=['format_name'])).resolve()
+            _specific_session_output_folder = save_path.joinpath(active_context.get_description(subset_excludelist=['format_name'])).resolve() # 'C:/Users/pho/repos/Spike3DWorkEnv/Spike3D/output/collected_outputs/2025-05-22/gor01_one_2006-6-09_1-22-43_trackID_weighted_position_posterior'
             _specific_session_output_folder.mkdir(parents=True, exist_ok=True)
-            print(f'\tspecific_session_output_folder: "{_specific_session_output_folder}"')
+            print(f'\tspecific_session_output_folder: "{_specific_session_output_folder.as_posix()}"')
 
 
             if custom_export_formats is None:
@@ -2909,6 +2910,24 @@ class EpochComputationDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Di
 
                 }
                 # custom_export_formats = None
+
+
+            # Delete the existing directory if it exists:
+            if delete_previous_outputs_folder:
+                ## delete the outputs created:
+                for a_format_name in custom_export_formats.values():
+                    _an_export_format_output_folder = _specific_session_output_folder.joinpath(a_format_name)                    
+                    try:
+                        if _an_export_format_output_folder.exists():
+                            print(f'\tdeleting previous outputs folder at "{_an_export_format_output_folder.as_posix()}"...')
+                            shutil.rmtree(_an_export_format_output_folder)
+                            print(f'\t\tsuccessfully deleted extant folder.')
+                            _an_export_format_output_folder.mkdir(parents=True, exist_ok=True) # re-make the folder
+                            
+                    except Exception as e:
+                        print(f'\tError deleting folder "{_an_export_format_output_folder.as_posix()}": {e}')
+                        continue
+
 
             out_paths, out_custom_formats_dict = PosteriorExporting.perform_export_all_decoded_posteriors_as_images(decoder_laps_filter_epochs_decoder_result_dict=decoder_laps_filter_epochs_decoder_result_dict, decoder_ripple_filter_epochs_decoder_result_dict=decoder_ripple_filter_epochs_decoder_result_dict,
             # out_paths, out_custom_formats_dict = PosteriorExporting.perform_export_all_decoded_posteriors_as_images(decoder_laps_filter_epochs_decoder_result_dict=deepcopy(decoder_laps_filter_epochs_decoder_result_dict), decoder_ripple_filter_epochs_decoder_result_dict=None,
