@@ -559,8 +559,8 @@ class PosteriorExporting:
             ## get pre/post delta label:
             earliest_t = active_captured_single_epoch_result.time_bin_edges[0]
             # earliest_t_ms = earliest_t * 1e-3
-            earliest_t_str: str = "{:08.4f}".format(earliest_t) # f'{value:.2f}'
-            # earliest_t_str: str = f"{earliest_t:.4f}"
+            # earliest_t_str: str = "{:08.4f}".format(earliest_t)
+            earliest_t_str: str = f"{earliest_t:.4f}"
 
             # Create an image with a label
             # labeled_image = add_bottom_label(original_image, "Time (seconds)", font_size=14)
@@ -587,7 +587,7 @@ class PosteriorExporting:
 
             # curr_post_render_image_functions_dict = {'add_bottom_label': (lambda an_img: add_bottom_label(an_img, curr_x_axis_label_str, font_size=8))}
             curr_post_render_image_functions_dict = {
-                'add_bottom_label': create_label_function(curr_x_axis_label_str, font_size=font_size, text_color=(255, 255, 255), background_color=(66, 66, 66), text_outline_shadow_color=epoch_rect_color, fixed_label_region_height=fixed_label_region_height, debug_print=True),
+                'add_bottom_label': create_label_function(curr_x_axis_label_str, font_size=font_size, text_color=(255, 255, 255), background_color=(66, 66, 66), text_outline_shadow_color=None, fixed_label_region_height=fixed_label_region_height, debug_print=False),
                 'create_solid_border_function': create_solid_border_function(border_width = 10, border_color = epoch_rect_color),
                 # 'create_half_width_rectangle_function': create_half_width_rectangle_function(side, epoch_rect_color), ## create rect to indicate pre/post delta
                 # 'create_half_width_rectangle_function': create_half_width_rectangle_function(side, epoch_rect_color),
