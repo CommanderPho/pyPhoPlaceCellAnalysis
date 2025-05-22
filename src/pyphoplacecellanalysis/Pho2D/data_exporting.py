@@ -526,10 +526,12 @@ class PosteriorExporting:
         # Build post-image-generation callback functions _____________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
         from pyphocorehelpers.plotting.media_output_helpers import ImageOperationsAndEffects
 
+        fixed_label_region_height: Optional[int] = 520
+
 
         # font_size = 144
         font_size = 96
-        create_label_function = ImageOperationsAndEffects.create_fn_builder(ImageOperationsAndEffects.add_bottom_label, font_size=font_size, text_color=(1, 0, 0))
+        create_label_function = ImageOperationsAndEffects.create_fn_builder(ImageOperationsAndEffects.add_bottom_label, font_size=font_size, text_color=(255, 255, 255), background_color=(66, 66, 66, 255), fixed_label_region_height=fixed_label_region_height)
         
         # create_half_width_rectangle_function = ImageOperationsAndEffects.create_fn_builder(ImageOperationsAndEffects.add_half_width_rectangle, height_fraction = 0.1)
         
@@ -581,8 +583,8 @@ class PosteriorExporting:
 
             # curr_post_render_image_functions_dict = {'add_bottom_label': (lambda an_img: add_bottom_label(an_img, curr_x_axis_label_str, font_size=8))}
             curr_post_render_image_functions_dict = {
+                'add_bottom_label': create_label_function(curr_x_axis_label_str, font_size=font_size, text_color=(255, 255, 255), background_color=(66, 66, 66), text_outline_shadow_color=epoch_rect_color, fixed_label_region_height=fixed_label_region_height),
                 'create_solid_border_function': create_solid_border_function(border_width = 10, border_color = epoch_rect_color),
-                'add_bottom_label': create_label_function(curr_x_axis_label_str),
                 # 'create_half_width_rectangle_function': create_half_width_rectangle_function(side, epoch_rect_color), ## create rect to indicate pre/post delta
                 # 'create_half_width_rectangle_function': create_half_width_rectangle_function(side, epoch_rect_color),
             }
@@ -614,10 +616,7 @@ class PosteriorExporting:
         # end for
         
         return (posterior_out_folder, _save_out_format_results, ), _save_out_paths
-        # if should_export_separate_color_and_greyscale:
-        #     return (posterior_out_folder, custom_export_formats, ), _save_out_paths
-        # else:
-        #     return (posterior_out_folder, custom_export_formats, ), _save_out_paths
+
 
 
     @function_attributes(short_name=None, tags=['private', 'helper'], input_requires=[], output_provides=[], uses=[], used_by=['._subfn_perform_export_single_epochs'], creation_date='2025-05-14 11:00', related_items=[])
