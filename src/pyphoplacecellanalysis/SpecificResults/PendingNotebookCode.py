@@ -1052,12 +1052,11 @@ class MultiDecoderColorOverlayedPosteriors(ComputedResult):
 
                     a_t_bin_a_decoder_P: NDArray[ND.Shape["N_POS_BINS"], np.floating] = single_t_bin_P_values[:, i]
                     # ignore NaNs when finding data range
-                    try:
-                        a_norm = mpl.colors.Normalize(vmin=np.nanmin(a_t_bin_a_decoder_P), vmax=np.nanmax(a_t_bin_a_decoder_P))
-                    except ValueError as e:
-                        # RuntimeWarning: All-NaN slice encountered
-                        pass
-
+                    # try:
+                    a_norm = mpl.colors.Normalize(vmin=np.nanmin(a_t_bin_a_decoder_P), vmax=np.nanmax(a_t_bin_a_decoder_P))
+                    # except ValueError as e:
+                    #     # RuntimeWarning: All-NaN slice encountered
+                    #     pass
 
                     # mask the NaNs so the cmap knows to use the “bad” color
                     a_masked = np.ma.masked_invalid(a_t_bin_a_decoder_P)
