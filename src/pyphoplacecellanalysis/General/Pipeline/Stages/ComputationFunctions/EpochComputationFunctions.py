@@ -2915,7 +2915,7 @@ class EpochComputationDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Di
             # Delete the existing directory if it exists:
             if delete_previous_outputs_folder:
                 ## delete the outputs created:
-                for a_format_name in custom_export_formats.values():
+                for a_format_name in custom_export_formats.keys():
                     _an_export_format_output_folder = _specific_session_output_folder.joinpath(a_format_name)                    
                     try:
                         if _an_export_format_output_folder.exists():
