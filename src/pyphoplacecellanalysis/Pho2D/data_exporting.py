@@ -491,6 +491,8 @@ class PosteriorExporting:
 
         from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import SingleEpochDecodedResult
         from pyphoplacecellanalysis.Pho2D.data_exporting import HeatmapExportKind
+        from pyphocorehelpers.plotting.media_output_helpers import ImageOperationsAndEffects
+
 
         if not isinstance(posterior_out_folder, Path):
             posterior_out_folder = Path(posterior_out_folder).resolve()
@@ -524,7 +526,7 @@ class PosteriorExporting:
         
 
         # Build post-image-generation callback functions _____________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
-        from pyphocorehelpers.plotting.media_output_helpers import ImageOperationsAndEffects
+        
 
         fixed_label_region_height: Optional[int] = 520
 
@@ -565,7 +567,6 @@ class PosteriorExporting:
             #      curr_x_axis_label_str = f'{curr_x_axis_label_str} (pre-delta)'
             # else:
             #     curr_x_axis_label_str = f'{curr_x_axis_label_str} (post-delta)'
-            
 
             curr_x_axis_label_str: str = f''
             if not is_post_delta:
@@ -579,7 +580,8 @@ class PosteriorExporting:
                 epoch_rect_color = '#DC143C'
                 
             # curr_x_axis_label_str = f"{curr_x_axis_label_str}[{i}]"
-            curr_x_axis_label_str = f"{curr_x_axis_label_str}\n{earliest_t_str}"
+            # curr_x_axis_label_str = f"{curr_x_axis_label_str}\n{earliest_t_str}"
+            curr_x_axis_label_str = f"{earliest_t_str}"
 
             # curr_post_render_image_functions_dict = {'add_bottom_label': (lambda an_img: add_bottom_label(an_img, curr_x_axis_label_str, font_size=8))}
             curr_post_render_image_functions_dict = {
