@@ -549,7 +549,7 @@ class PosteriorExporting:
 
             # Prepare a multi-line, sideways label _______________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
 
-            is_post_delta = (is_epoch_pre_post_delta[i] > 0)
+            is_post_delta: bool = (is_epoch_pre_post_delta[i] > 0)
             
             ## get pre/post delta label:
             earliest_t = active_captured_single_epoch_result.time_bin_edges[0]
@@ -582,8 +582,9 @@ class PosteriorExporting:
 
             # curr_post_render_image_functions_dict = {'add_bottom_label': (lambda an_img: add_bottom_label(an_img, curr_x_axis_label_str, font_size=8))}
             curr_post_render_image_functions_dict = {
-                'add_bottom_label': create_label_function(curr_x_axis_label_str, font_size=font_size, text_color=(255, 255, 255), background_color=(66, 66, 66), text_outline_shadow_color=None, fixed_label_region_height=fixed_label_region_height, debug_print=False),
-                'create_solid_border_function': create_solid_border_function(border_width = 10, border_color = epoch_rect_color),
+                # 'add_bottom_label': create_label_function(curr_x_axis_label_str, font_size=font_size, text_color=(255, 255, 255), background_color=(66, 66, 66), text_outline_shadow_color=None, fixed_label_region_height=fixed_label_region_height, debug_print=False),
+                'add_bottom_label': create_label_function(curr_x_axis_label_str, font_size=font_size, text_color=epoch_rect_color, background_color=(66, 66, 66), text_outline_shadow_color=None, fixed_label_region_height=fixed_label_region_height, debug_print=False),
+                # 'create_solid_border_function': create_solid_border_function(border_width = 10, border_color = epoch_rect_color),
                 # 'create_half_width_rectangle_function': create_half_width_rectangle_function(side, epoch_rect_color), ## create rect to indicate pre/post delta
                 # 'create_half_width_rectangle_function': create_half_width_rectangle_function(side, epoch_rect_color),
             }
@@ -609,10 +610,9 @@ class PosteriorExporting:
                 _save_out_paths.append(posterior_save_path)
                 # _save_out_format_results[export_format_name].append(export_format_config) # save out the modified v
                 _save_out_format_results[export_format_name].append(_output_export_format_config) # save out the modified v
-                
-
-                    
-        # end for
+            # END for export_format_n...
+                   
+        # END for i in np.arange(num_filter_epochs)
         
         return (posterior_out_folder, _save_out_format_results, ), _save_out_paths
 
