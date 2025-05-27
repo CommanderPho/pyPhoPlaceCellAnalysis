@@ -554,8 +554,8 @@ class PosteriorExporting:
             ## get pre/post delta label:
             earliest_t = active_captured_single_epoch_result.time_bin_edges[0]
             # earliest_t_ms = earliest_t * 1e-3
-            # earliest_t_str: str = "{:08.4f}".format(earliest_t)
-            earliest_t_str: str = f"{earliest_t:.4f}"
+            earliest_t_str: str = "{:08.4f}".format(earliest_t)
+            # earliest_t_str: str = f"{earliest_t:.4f}"
 
             # Create an image with a label
             # labeled_image = add_bottom_label(original_image, "Time (seconds)", font_size=14)
