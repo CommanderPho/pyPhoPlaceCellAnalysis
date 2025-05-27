@@ -2902,7 +2902,7 @@ class EpochComputationDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Di
                 custom_export_formats: Dict[str, HeatmapExportConfig] = {
                     # 'raw_rgba': HeatmapExportConfig.init_for_export_kind(export_kind=HeatmapExportKind.RAW_RGBA, lower_bound_alpha=0.1, drop_below_threshold=1e-2, desired_height=desired_height),
                     'raw_rgba': HeatmapExportConfig.init_for_export_kind(export_kind=HeatmapExportKind.RAW_RGBA, 
-                                                                        raw_RGBA_only_parameters = dict(spikes_df=deepcopy(get_proper_global_spikes_df(owning_pipeline_reference)), xbin=deepcopy(a_decoder.xbin), lower_bound_alpha=0.1, drop_below_threshold=1e-2, t_bin_size=time_bin_size,  use_four_decoders_version=False),
+                                                                        raw_RGBA_only_parameters = dict(spikes_df=deepcopy(get_proper_global_spikes_df(owning_pipeline_reference)), xbin=deepcopy(a_decoder.xbin), lower_bound_alpha=0.1, drop_below_threshold=1e-3, t_bin_size=time_bin_size, use_four_decoders_version=False),
                                                                         desired_height=desired_height),
                                                                         
                     # 'raw_rgba_four_decoders': HeatmapExportConfig.init_for_export_kind(export_kind=HeatmapExportKind.RAW_RGBA, 
