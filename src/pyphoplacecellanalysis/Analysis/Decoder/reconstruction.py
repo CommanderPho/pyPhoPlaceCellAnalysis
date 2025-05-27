@@ -637,7 +637,7 @@ class SingleEpochDecodedResult(HDF_SerializationMixin, AttrsBasedClassHelperMixi
         # `raw_RGBA_only_parameters` dict with keys: ['spikes_df', 'xbin', 'lower_bound_alpha', 'drop_below_threshold', 't_bin_size']
         raw_RGBA_only_parameters = kwargs.pop('raw_RGBA_only_parameters', {})
 
-        if export_kind.value == HeatmapExportKind.RAW_RGBA.value:
+        if (export_kind is not None) and (export_kind.value == HeatmapExportKind.RAW_RGBA.value):
             ## check values in `raw_RGBA_only_parameters`:
             required_keys = ['spikes_df', 'xbin', 'lower_bound_alpha', 'drop_below_threshold', 't_bin_size']
             assert np.all([k in raw_RGBA_only_parameters.keys() for k in required_keys]), f"missing required keys:\n\tequired_keys: {required_keys}\n\tlist(raw_RGBA_only_parameters.keys()): {list(raw_RGBA_only_parameters.keys())}\n"
