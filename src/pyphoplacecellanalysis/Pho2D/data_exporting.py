@@ -462,7 +462,7 @@ class PosteriorExporting:
     @function_attributes(short_name=None, tags=['IMPORTANT', 'save', 'export', 'ESSENTIAL', 'posterior', 'export'], input_requires=[], output_provides=[], uses=['SingleEpochDecodedResult.save_posterior_as_image', 'ImageOperationsAndEffects'], used_by=['cls.perform_export_all_decoded_posteriors_as_images'], creation_date='2024-08-05 10:47', related_items=[])
     def export_decoded_posteriors_as_images(cls, a_decoder_decoded_epochs_result: DecodedFilterEpochsResult, # decoder_ripple_filter_epochs_decoder_result_dict: DecoderResultDict,
                                              posterior_out_folder:Path='output/_temp_individual_posteriors',
-                                             should_export_separate_color_and_greyscale: bool = True, custom_export_formats: Optional[Dict[str, HeatmapExportConfig]]=None, colormap='Oranges', #'viridis',
+                                             custom_export_formats: Optional[Dict[str, HeatmapExportConfig]]=None, colormap='Oranges', #'viridis',
                                              desired_height=None, **kwargs): # decoders_dict: Dict[types.DecoderName, BasePositionDecoder], 
         """Save the decoded posteiors (decoded epochs) into one image file for each format specified in `custom_export_formats`
         
@@ -500,16 +500,11 @@ class PosteriorExporting:
         posterior_out_folder.mkdir(parents=True, exist_ok=True)
 
         if custom_export_formats is None:
-            if should_export_separate_color_and_greyscale:
-                custom_export_formats: Dict[str, HeatmapExportConfig] = {
-                    'greyscale': HeatmapExportConfig.init_greyscale(desired_height=desired_height, **kwargs),
-                    'color': HeatmapExportConfig(colormap=colormap, export_kind=HeatmapExportKind.COLORMAPPED, desired_height=desired_height, **kwargs),
-                    'raw_rgba': HeatmapExportConfig.init_for_export_kind(export_kind=HeatmapExportKind.RAW_RGBA, lower_bound_alpha=0.1, drop_below_threshold=1e-2, desired_height=desired_height, **kwargs),
-                }
-            else:
-                ## just greyscale?
-                custom_export_formats: Dict[str, HeatmapExportConfig] = {'greyscale': HeatmapExportConfig.init_greyscale(desired_height=desired_height, **kwargs)
-                                                                         }
+            custom_export_formats: Dict[str, HeatmapExportConfig] = {
+                'greyscale': HeatmapExportConfig.init_greyscale(desired_height=desired_height, **kwargs),
+                'color': HeatmapExportConfig(colormap=colormap, export_kind=HeatmapExportKind.COLORMAPPED, desired_height=desired_height, **kwargs),
+                'raw_rgba': HeatmapExportConfig.init_for_export_kind(export_kind=HeatmapExportKind.RAW_RGBA, lower_bound_alpha=0.1, drop_below_threshold=1e-2, desired_height=desired_height, **kwargs),
+            }
         else:
             custom_export_formats = deepcopy(custom_export_formats) # make sure they're all independent
 
