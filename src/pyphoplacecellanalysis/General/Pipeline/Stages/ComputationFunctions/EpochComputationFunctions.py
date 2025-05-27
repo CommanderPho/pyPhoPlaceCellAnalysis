@@ -2615,7 +2615,8 @@ class EpochComputationDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Di
     @function_attributes(short_name='trackID_weighted_position_posterior', tags=['context-decoder-comparison', 'decoded_position', 'directional'], conforms_to=['output_registering', 'figure_saving'], input_requires=[], output_provides=[], requires_global_keys=["global_computation_results.computed_data['EpochComputations']"], uses=['FigureCollector'], used_by=[], creation_date='2025-05-03 00:00', related_items=[], is_global=True)
     def _display_decoded_trackID_weighted_position_posterior_withMultiColorOverlay(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, save_figure=True, override_fig_man: Optional[FileOutputManager]=None, ax=None,
                                                                                     custom_export_formats: Optional[Dict[str, Any]]=None, parent_output_folder: Path = Path('output/array_to_images'), time_bin_size: float=0.025, delete_previous_outputs_folder:bool=True, desired_height:int=1200, **kwargs):
-            """ Displays one figure containing the track_ID marginal, decoded continuously over the entire recording session along with the animal's position.
+            """ Exports individual posteriors in an overlayed manner
+            
             
             "HeatmapExportConfig"
             
@@ -2931,9 +2932,8 @@ class EpochComputationDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Di
 
             out_paths, out_custom_formats_dict = PosteriorExporting.perform_export_all_decoded_posteriors_as_images(decoder_laps_filter_epochs_decoder_result_dict=decoder_laps_filter_epochs_decoder_result_dict,
                                                                                                                      decoder_ripple_filter_epochs_decoder_result_dict=decoder_ripple_filter_epochs_decoder_result_dict,
-            # out_paths, out_custom_formats_dict = PosteriorExporting.perform_export_all_decoded_posteriors_as_images(decoder_laps_filter_epochs_decoder_result_dict=deepcopy(decoder_laps_filter_epochs_decoder_result_dict), decoder_ripple_filter_epochs_decoder_result_dict=None,
-                                                                                                                        _save_context=_parent_save_context, parent_output_folder=_specific_session_output_folder,
-                                                                                                                        desired_height=desired_height, custom_export_formats=custom_export_formats, combined_img_padding=6, combined_img_separator_color=(0, 0, 0, 255))
+                                                                                                                    _save_context=_parent_save_context, parent_output_folder=_specific_session_output_folder,
+                                                                                                                    desired_height=desired_height, custom_export_formats=custom_export_formats, combined_img_padding=6, combined_img_separator_color=(0, 0, 0, 255))
 
             graphics_output_dict['out_paths'] = out_paths # 'out_paths': out_paths
             graphics_output_dict['out_custom_formats_dict'] = out_custom_formats_dict
