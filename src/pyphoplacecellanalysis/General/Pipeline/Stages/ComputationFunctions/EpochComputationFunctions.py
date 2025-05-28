@@ -2765,13 +2765,13 @@ class EpochComputationDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Di
             active_context = kwargs.pop('active_context', None)
             if active_context is not None:
                 # Update the existing context:
-                display_context = active_context.adding_context('display_fn', display_fn_name='trackID_weighted_position_posterior')
+                display_context = active_context.adding_context('display_fn', display_fn_name='trackID_weighted_position_posterior', time_bin_size=time_bin_size)
             else:
                 # active_context = owning_pipeline_reference.sess.get_context()
                 active_context = deepcopy(complete_session_context) # owning_pipeline_reference.sess.get_context()
                 
                 # Build the active context directly:
-                display_context = owning_pipeline_reference.build_display_context_for_session('trackID_weighted_position_posterior')
+                display_context = owning_pipeline_reference.build_display_context_for_session('trackID_weighted_position_posterior', time_bin_size=time_bin_size)
 
             fignum = kwargs.pop('fignum', None)
             if fignum is not None:
@@ -2832,7 +2832,7 @@ class EpochComputationDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Di
 
             # decoder_ripple_filter_epochs_decoder_result_dict = deepcopy(flat_result_context_dict)
             decoder_ripple_filter_epochs_decoder_result_dict = {f"psuedo2D_{k.get('masked_time_bin_fill_type')}":deepcopy(v) for k, v in flat_result_context_dict.items()}
-            decoder_ripple_filter_epochs_decoder_result_dict
+            
 
             filter_epochs_ripple_df: Optional[pd.DataFrame] = kwargs.pop('filter_epochs_ripple_df', None)
             if filter_epochs_ripple_df is not None:
