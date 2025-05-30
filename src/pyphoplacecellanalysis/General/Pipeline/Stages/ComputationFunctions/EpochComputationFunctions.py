@@ -2874,6 +2874,20 @@ class EpochComputationDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Di
 
 
             ## OUTPUTS: decoder_laps_filter_epochs_decoder_result_dict, decoder_ripple_filter_epochs_decoder_result_dict
+            
+            ## INPUTS: decoder_laps_filter_epochs_decoder_result_dict, decoder_ripple_filter_epochs_decoder_result_dict
+            ## UPDATES (in-place): decoder_laps_filter_epochs_decoder_result_dict, decoder_ripple_filter_epochs_decoder_result_dict
+
+            # Add the maze_id to the active_filter_epochs so we can see how properties change as a function of which track the replay event occured on:
+            session_name: str = owning_pipeline_reference.session_name
+            t_start, t_delta, t_end = owning_pipeline_reference.find_LongShortDelta_times()
+            _common_add_columns_kwargs = dict(session_name=session_name, t_start=t_start, t_delta=t_delta, t_end=t_end, should_raise_exception_on_fail=True)
+        
+            decoder_laps_filter_epochs_decoder_result_dict = {k:DecodedFilterEpochsResult.perform_add_additional_epochs_columns(a_result=a_result, **_common_add_columns_kwargs) for k, a_result in decoder_laps_filter_epochs_decoder_result_dict.items()}
+            decoder_ripple_filter_epochs_decoder_result_dict = {k:DecodedFilterEpochsResult.perform_add_additional_epochs_columns(a_result=a_result, **_common_add_columns_kwargs) for k, a_result in decoder_ripple_filter_epochs_decoder_result_dict.items()}
+        
+            ## OUTPUTS: decoder_laps_filter_epochs_decoder_result_dict, decoder_ripple_filter_epochs_decoder_result_dict
+
 
             # ==================================================================================================================================================================================================================================================================================== #
             # Figure Export Copmonent                                                                                                                                                                                                                                                              #
