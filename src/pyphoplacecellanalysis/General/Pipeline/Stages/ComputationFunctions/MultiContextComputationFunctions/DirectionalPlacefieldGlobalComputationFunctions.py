@@ -8293,9 +8293,8 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
         session_name: str = owning_pipeline_reference.session_name
         t_start, t_delta, t_end = owning_pipeline_reference.find_LongShortDelta_times()
 
-        decoder_laps_filter_epochs_decoder_result_dict = {k:DecodedFilterEpochsResult.perform_add_additional_epochs_columns(a_result=a_result, session_name=session_name, t_delta=t_delta) for k, a_result in decoder_laps_filter_epochs_decoder_result_dict.items()}
-        decoder_ripple_filter_epochs_decoder_result_dict = {k:DecodedFilterEpochsResult.perform_add_additional_epochs_columns(a_result=a_result, session_name=session_name, t_delta=t_delta) for k, a_result in decoder_ripple_filter_epochs_decoder_result_dict.items()}
-
+        decoder_laps_filter_epochs_decoder_result_dict = {k:DecodedFilterEpochsResult.perform_add_additional_epochs_columns(a_result=a_result, session_name=session_name, t_start=t_start, t_delta=t_delta, t_end=t_end) for k, a_result in decoder_laps_filter_epochs_decoder_result_dict.items()}
+        decoder_ripple_filter_epochs_decoder_result_dict = {k:DecodedFilterEpochsResult.perform_add_additional_epochs_columns(a_result=a_result, session_name=session_name, t_start=t_start, t_delta=t_delta, t_end=t_end) for k, a_result in decoder_ripple_filter_epochs_decoder_result_dict.items()}
 
         parent_output_folder: Path = kwargs.pop('parent_output_folder', None)
         

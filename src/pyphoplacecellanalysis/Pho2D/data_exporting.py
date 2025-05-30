@@ -531,7 +531,6 @@ class PosteriorExporting:
         num_filter_epochs: int = a_decoder_decoded_epochs_result.num_filter_epochs
         active_filter_epochs: pd.DataFrame = ensure_dataframe(a_decoder_decoded_epochs_result.active_filter_epochs)
         
-        is_epoch_pre_post_delta = a_decoder_decoded_epochs_result.active_filter_epochs['maze_id'].to_numpy()
     
         is_epoch_pre_post_delta = active_filter_epochs['maze_id'].to_numpy()
         
