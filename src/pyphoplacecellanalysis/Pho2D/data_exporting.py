@@ -56,6 +56,10 @@ if TYPE_CHECKING:
     from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.ContainerBased.RankOrderRastersDebugger import RankOrderRastersDebugger
 
 
+from pyphocorehelpers.plotting.media_output_helpers import ImagePostRenderFunctionSets
+
+
+
 
 @metadata_attributes(short_name=None, tags=['enum', 'export_mode'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-05-14 14:14', related_items=[])
 class HeatmapExportKind(Enum):
@@ -84,17 +88,6 @@ class HeatmapExportKind(Enum):
 
 
 
-def _build_no_op_image_export_functions_dict(a_decoder_decoded_epochs_result: DecodedFilterEpochsResult) -> List[Dict[str, Callable]]:
-    """ empty/no-op 
-    post_render_image_functions_dict_list: List[Dict[str, Callable]] = _build_image_export_functions_dict(a_decoder_decoded_epochs_result=a_decoder_decoded_epochs_result)
-
-    """
-    num_filter_epochs: int = a_decoder_decoded_epochs_result.num_filter_epochs
-    # Build post-image-generation callback functions _____________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
-    post_render_image_functions_dict_list: List = [dict() for i in np.arange(num_filter_epochs)] ## empty dict
-    return post_render_image_functions_dict_list
-
-
 
 @define(slots=False, eq=False)
 class HeatmapExportConfig:
@@ -107,7 +100,7 @@ class HeatmapExportConfig:
     desired_width: Optional[int] = field(default=None)
     skip_img_normalization:bool = field(default=False)
     allow_override_aspect_ratio:bool = field(default=False)
-    post_render_image_functions_builder_fn: Optional[Callable] = field(default=_build_no_op_image_export_functions_dict) #List[Dict[str, Callable]]
+    post_render_image_functions_builder_fn: Optional[Callable] = field(default=ImagePostRenderFunctionSets._build_no_op_image_export_functions_dict) #List[Dict[str, Callable]]
 
     # lower_bound_alpha: float= field(default=0.1, metadata={'desc':'the lower bound for the alpha value for the color map. 0 means fully transparent, 1 means fully opaque.'})
     # drop_below_threshold: float = field(default=1e-3, metadata={'desc':'the threshold for the alpha value for the color map. 0 means fully transparent, 1 means fully opaque.'})

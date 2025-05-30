@@ -8249,6 +8249,8 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
         from datetime import datetime, date, timedelta
         from pyphocorehelpers.Filesystem.path_helpers import find_first_extant_path
         from pyphoplacecellanalysis.Pho2D.data_exporting import HeatmapExportConfig
+        from pyphocorehelpers.plotting.media_output_helpers import ImagePostRenderFunctionSets, ImageOperationsAndEffects
+
 
         DAY_DATE_STR: str = date.today().strftime("%Y-%m-%d")
         DAY_DATE_TO_USE = f'{DAY_DATE_STR}' # used for filenames throught the notebook
@@ -8334,9 +8336,14 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
 
         if custom_export_formats is None:
             ## use this default instead:
+            common_export_config_kwargs = dict(desired_height = 400,
+                post_render_image_functions_builder_fn=ImagePostRenderFunctionSets._build_no_op_image_export_functions_dict,
+                # post_render_image_functions_builder_fn=ImagePostRenderFunctionSets._build_mergedColorDecoders_image_export_functions_dict,
+            )
+
             custom_export_formats: Dict[str, HeatmapExportConfig] = {
-                'greyscale': HeatmapExportConfig.init_greyscale(),
-                'color': HeatmapExportConfig(colormap='Oranges', desired_height=400), # #TODO 2025-05-30 03:45: - [ ] previous config
+                'greyscale': HeatmapExportConfig.init_greyscale(**common_export_config_kwargs),
+                'color': HeatmapExportConfig(colormap='Oranges', **common_export_config_kwargs), # #TODO 2025-05-30 03:45: - [ ] previous config
                 # 'color': HeatmapExportConfig(colormap=additional_cmaps['long_LR']),
                 # 'color': HeatmapExportConfig(colormap=cmap1, desired_height=200),
             }
