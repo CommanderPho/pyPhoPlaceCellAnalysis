@@ -519,7 +519,7 @@ class PosteriorExporting:
         from pyphoplacecellanalysis.SpecificResults.AcrossSessionResults import AcrossSessionIdentityDataframeAccessor
         
 
-        def _subfn_default_build_image_export_functions_dict(a_decoder_decoded_epochs_result) -> List[Dict[str, Callable]]:
+        def _subfn_default_build_image_export_functions_dict(a_decoder_decoded_epochs_result: DecodedFilterEpochsResult) -> List[Dict[str, Callable]]:
             """ Captures nothing
             
             post_render_image_functions_dict_list: List[Dict[str, Callable]] = _build_image_export_functions_dict(a_decoder_decoded_epochs_result=a_decoder_decoded_epochs_result)
