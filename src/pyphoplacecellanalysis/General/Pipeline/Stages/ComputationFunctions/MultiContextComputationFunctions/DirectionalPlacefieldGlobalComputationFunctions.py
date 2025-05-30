@@ -8230,7 +8230,8 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
 
     @function_attributes(short_name='directional_decoded_stacked_epoch_slices', tags=['export', 'heatmaps', 'posterior', 'directional_merged_decoder_decoded_epochs','directional','marginal','NON-VISUAL','NO-DISPLAY'],
                           input_requires=['RankOrder', 'DirectionalLaps', 'DirectionalMergedDecoders', 'DirectionalDecodersEpochsEvaluations'], output_provides=[], uses=['PosteriorExporting.perform_export_all_decoded_posteriors_as_images'], used_by=[], creation_date='2024-09-27 17:08', related_items=[], is_global=True)
-    def _display_directional_merged_pf_decoded_stacked_epoch_slices(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, save_figure=True, included_any_context_neuron_ids=None, custom_export_formats: Dict[str, "HeatmapExportConfig"]=None, **kwargs):
+    def _display_directional_merged_pf_decoded_stacked_epoch_slices(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, save_figure=True, included_any_context_neuron_ids=None, custom_export_formats: Dict[str, "HeatmapExportConfig"]=None,
+                                                                    parent_output_folder: Optional[Path] = None, **kwargs):
         """ Exports all decoded epoch posteriors separately to a folder. NON-VISUAL, never displays.
          Effectively the entire stack of decoded epochs for both the long and short, including their Radon transformed lines if that information is available.
 
@@ -8298,7 +8299,7 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
         decoder_laps_filter_epochs_decoder_result_dict = {k:DecodedFilterEpochsResult.perform_add_additional_epochs_columns(a_result=a_result, session_name=session_name, t_start=t_start, t_delta=t_delta, t_end=t_end) for k, a_result in decoder_laps_filter_epochs_decoder_result_dict.items()}
         decoder_ripple_filter_epochs_decoder_result_dict = {k:DecodedFilterEpochsResult.perform_add_additional_epochs_columns(a_result=a_result, session_name=session_name, t_start=t_start, t_delta=t_delta, t_end=t_end) for k, a_result in decoder_ripple_filter_epochs_decoder_result_dict.items()}
 
-        parent_output_folder: Path = kwargs.pop('parent_output_folder', None)
+        # parent_output_folder: Path = kwargs.pop('parent_output_folder', None)
         
         needs_discover_default_collected_outputs_dir: bool = True
         if parent_output_folder is not None:
