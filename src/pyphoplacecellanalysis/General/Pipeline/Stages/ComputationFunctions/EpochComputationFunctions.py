@@ -1911,7 +1911,8 @@ class EpochComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Computati
                           uses=['GeneralizedDecodedEpochsComputationsContainer', 'GenericDecoderDictDecodedEpochsDictResult', 'GenericDecoderDictDecodedEpochsDictResult.batch_user_compute_fn(...)'], used_by=[], creation_date='2025-04-14 12:40',
         validate_computation_test=validate_has_generalized_specific_epochs_decoding, is_global=True)
     def perform_generalized_specific_epochs_decoding(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, debug_print=False, epochs_decoding_time_bin_size: float = 0.050, drop_previous_result_and_compute_fresh:bool=False, force_recompute:bool=False):
-        """ 
+        """ Computes the most-general epoch decoding imaginable, creating several dictionaries of IdentifyingContext objects that identify the parameters undewr which decoding was performed.
+
 
         Refactored from `generalized_decode_epochs_dict_and_export_results_completion_function`
 
@@ -2812,6 +2813,8 @@ class EpochComputationDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Di
                 raise e
 
 
+            ## OUTPUTS: decoder_laps_filter_epochs_decoder_result_dict
+            
 
             # ==================================================================================================================================================================================================================================================================================== #
             # Separate export for each masked_time_bin_fill_type  - PBE                                                                                                                                                                                                                            #
@@ -2900,10 +2903,11 @@ class EpochComputationDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Di
 
             if custom_export_formats is None:
                 custom_export_formats: Dict[str, HeatmapExportConfig] = {
+                    # 'greyscale': HeatmapExportConfig.init_greyscale(desired_height=desired_height),
+                    # 'color': HeatmapExportConfig(colormap=colormap, export_kind=HeatmapExportKind.COLORMAPPED, desired_height=desired_height, **kwargs),
                     # 'raw_rgba': HeatmapExportConfig.init_for_export_kind(export_kind=HeatmapExportKind.RAW_RGBA, lower_bound_alpha=0.1, drop_below_threshold=1e-2, desired_height=desired_height),
                     'raw_rgba': HeatmapExportConfig.init_for_export_kind(export_kind=HeatmapExportKind.RAW_RGBA, 
-                                                                        raw_RGBA_only_parameters = dict(spikes_df=deepcopy(get_proper_global_spikes_df(owning_pipeline_reference)), xbin=deepcopy(a_decoder.xbin), lower_bound_alpha=0.1, drop_below_threshold=1e-3, t_bin_size=time_bin_size, use_four_decoders_version=False),
-                                                                        desired_height=desired_height),
+                                                                        raw_RGBA_only_parameters = dict(spikes_df=deepcopy(get_proper_global_spikes_df(owning_pipeline_reference)), xbin=deepcopy(a_decoder.xbin), lower_bound_alpha=0.1, drop_below_threshold=1e-3, t_bin_size=time_bin_size, use_four_decoders_version=False), desired_height=desired_height),
                                                                         
                     # 'raw_rgba_four_decoders': HeatmapExportConfig.init_for_export_kind(export_kind=HeatmapExportKind.RAW_RGBA, 
                     #                                                     raw_RGBA_only_parameters = dict(spikes_df=deepcopy(get_proper_global_spikes_df(curr_active_pipeline)), xbin=deepcopy(a_decoder.xbin), lower_bound_alpha=0.1, drop_below_threshold=1e-2, t_bin_size=time_bin_size,  use_four_decoders_version=True),

@@ -792,6 +792,7 @@ class RankOrderRastersDebugger:
 
 
 
+    @function_attributes(short_name=None, tags=['export', 'raster', 'pyqtgraph'], input_requires=[], output_provides=[], uses=['export_pyqtgraph_plot'], used_by=[], creation_date='2025-05-29 20:18', related_items=[])
     def save_figure(self, export_path: Path, export_topmost_scene_element:bool=False, **kwargs):
         """ Exports all four rasters to a specified file path
         

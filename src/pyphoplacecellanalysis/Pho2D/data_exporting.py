@@ -1095,7 +1095,9 @@ class PosteriorExporting:
     def _test_export_marginals_for_figure(cls, directional_merged_decoders_result: DirectionalPseudo2DDecodersResult, filtered_decoder_filter_epochs_decoder_result_dict: Dict[str, DecodedFilterEpochsResult], clicked_epoch: NDArray, context_specific_root_export_path: Path, epoch_specific_folder: Path,
                                            epoch_id_identifier_str='ripple', debug_print=True, export_kind: Optional[HeatmapExportKind] = None, allow_override_aspect_ratio:bool=True, **kwargs):
         """
-        
+            Takes a `clicked_epoch` start_t 
+            
+            
                 epoch_id_identifier_str='ripple'
 
         """
@@ -1212,6 +1214,8 @@ class PosteriorExporting:
                                                                  ):
         """ Exports all rasters, marginals, and posteriors as images
 
+        Called on `_out_ripple_rasters: RankOrderRastersDebugger`
+        
         Usage:        
             from pyphoplacecellanalysis.Pho2D.data_exporting import PosteriorExporting
 
