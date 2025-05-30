@@ -3157,7 +3157,7 @@ def generalized_decode_epochs_dict_and_export_results_completion_function(self, 
 
 @function_attributes(short_name=None, tags=['figure', 'posterior', 'hairly-plot'], input_requires=[], output_provides=[], uses=['_display_generalized_decoded_yellow_blue_marginal_epochs', '_display_decoded_trackID_marginal_hairy_position', '_display_decoded_trackID_weighted_position_posterior_withMultiColorOverlay'], used_by=[], creation_date='2025-05-16 15:17', related_items=['generalized_decode_epochs_dict_and_export_results_completion_function'])
 def figures_plot_generalized_decode_epochs_dict_and_export_results_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict,
-                                                                                        included_figures_names=['_display_generalized_decoded_yellow_blue_marginal_epochs', '_display_decoded_trackID_marginal_hairy_position', '_display_decoded_trackID_weighted_position_posterior_withMultiColorOverlay'],
+                                                                                        included_figures_names=['_display_directional_merged_pf_decoded_stacked_epoch_slices', '_display_generalized_decoded_yellow_blue_marginal_epochs', '_display_decoded_trackID_marginal_hairy_position', '_display_decoded_trackID_weighted_position_posterior_withMultiColorOverlay'],
                                                                                         extreme_threshold: float=0.8, opacity_max:float=0.7, thickness_ramping_multiplier:float=35.0,
                                                                                         **additional_marginal_overlaying_measured_position_kwargs) -> dict:
     """ Simple function that just plots the figure corresponding to by `generalized_decode_epochs_dict_and_export_results_completion_function` so we don't have to wait for the entire batch_figures_plotting on 2025-04-16 15:22.
@@ -3210,6 +3210,34 @@ def figures_plot_generalized_decode_epochs_dict_and_export_results_completion_fu
     print(f'\ttest_display_output_path: "{test_display_output_path}"')
 
     curr_active_pipeline.reload_default_display_functions()
+
+
+
+    # ==================================================================================================================================================================================================================================================================================== #
+    # '_display_directional_merged_pf_decoded_stacked_epoch_slices'                                                                                                                                                                                                         #
+    # ==================================================================================================================================================================================================================================================================================== #
+
+    if ('_display_directional_merged_pf_decoded_stacked_epoch_slices' in included_figures_names) or ('directional_decoded_stacked_epoch_slices' in included_figures_names):
+
+        try:
+            a_params_kwargs = {}
+            display_context = curr_active_pipeline.build_display_context_for_session(display_fn_name='directional_decoded_stacked_epoch_slices')
+            _out = curr_active_pipeline.display('_display_directional_merged_pf_decoded_stacked_epoch_slices', display_context, defer_render=True, save_figure=True,
+                                                # override_fig_man=custom_fig_man, 
+                                                parent_output_folder=custom_figure_output_path,
+                                            )
+            
+            # _out = EpochComputationDisplayFunctions._display_directional_merged_pf_decoded_stacked_epoch_slices(curr_active_pipeline, None, None, None, include_includelist=None, save_figure=True)
+            across_session_results_extended_dict['figures_plot_generalized_decode_epochs_dict_and_export_results_completion_function'].update({
+                '_display_directional_merged_pf_decoded_stacked_epoch_slices': _out,
+            })
+            
+        except Exception as e:
+            print(f'\tfigures_plot_generalized_decode_epochs_dict_and_export_results_completion_function(...): "_display_directional_merged_pf_decoded_stacked_epoch_slices" failed with error: {e}\n skipping.')
+            raise
+        
+
+
 
 
     # ==================================================================================================================================================================================================================================================================================== #
@@ -3272,7 +3300,7 @@ def figures_plot_generalized_decode_epochs_dict_and_export_results_completion_fu
     # '_display_decoded_trackID_weighted_position_posterior_withMultiColorOverlay'                                                                                                                                                                                                         #
     # ==================================================================================================================================================================================================================================================================================== #
 
-    if '_display_decoded_trackID_weighted_position_posterior_withMultiColorOverlay' in included_figures_names:
+    if ('_display_decoded_trackID_weighted_position_posterior_withMultiColorOverlay' in included_figures_names) or ('trackID_weighted_position_posterior' in included_figures_names):
 
         try:
             a_params_kwargs = {}
