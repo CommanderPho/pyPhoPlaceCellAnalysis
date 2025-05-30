@@ -3220,6 +3220,7 @@ def figures_plot_generalized_decode_epochs_dict_and_export_results_completion_fu
     if ('_display_directional_merged_pf_decoded_stacked_epoch_slices' in included_figures_names) or ('directional_decoded_stacked_epoch_slices' in included_figures_names):
 
         try:
+            print(f'\t trying "_display_directional_merged_pf_decoded_stacked_epoch_slices"')
             a_params_kwargs = {}
             display_context = curr_active_pipeline.build_display_context_for_session(display_fn_name='directional_decoded_stacked_epoch_slices')
             _out = curr_active_pipeline.display('_display_directional_merged_pf_decoded_stacked_epoch_slices', display_context, defer_render=True, save_figure=True,
@@ -3261,7 +3262,7 @@ def figures_plot_generalized_decode_epochs_dict_and_export_results_completion_fu
     # '_display_decoded_trackID_marginal_hairy_position'                                                                                                                                                                                                                                   #
     # ==================================================================================================================================================================================================================================================================================== #
     if '_display_decoded_trackID_marginal_hairy_position' in included_figures_names:
-
+        print(f'\t trying "_display_decoded_trackID_marginal_hairy_position"')
         interesting_hair_parameter_kwarg_dict = {
             # 'defaults': dict(extreme_threshold=0.8, opacity_max=0.7, thickness_ramping_multiplier=35),
             'overrides': dict(extreme_threshold=extreme_threshold, opacity_max=opacity_max, thickness_ramping_multiplier=thickness_ramping_multiplier),
@@ -3301,7 +3302,7 @@ def figures_plot_generalized_decode_epochs_dict_and_export_results_completion_fu
     # ==================================================================================================================================================================================================================================================================================== #
 
     if ('_display_decoded_trackID_weighted_position_posterior_withMultiColorOverlay' in included_figures_names) or ('trackID_weighted_position_posterior' in included_figures_names):
-
+        print(f'\t trying "_display_decoded_trackID_weighted_position_posterior_withMultiColorOverlay"')
         try:
             a_params_kwargs = {}
             display_context = curr_active_pipeline.build_display_context_for_session(display_fn_name='trackID_weighted_position_posterior')
