@@ -3216,7 +3216,7 @@ def figures_plot_generalized_decode_epochs_dict_and_export_results_completion_fu
     # ==================================================================================================================================================================================================================================================================================== #
     # '_display_directional_merged_pf_decoded_stacked_epoch_slices'                                                                                                                                                                                                         #
     # ==================================================================================================================================================================================================================================================================================== #
-
+    ## this is the export of the separate 1D decoder posteriors to images
     if ('_display_directional_merged_pf_decoded_stacked_epoch_slices' in included_figures_names) or ('directional_decoded_stacked_epoch_slices' in included_figures_names):
 
         try:
