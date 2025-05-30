@@ -170,9 +170,18 @@ class TimeBinCategorization(Enum):
     
 @metadata_attributes(short_name=None, tags=['run-lengths', 'sequence-analysis', 'temporal'], input_requires=[], output_provides=[], uses=['TimeBinCategorization'], used_by=[], creation_date='2025-05-16 04:28', related_items=[])
 class WithinEpochTimeBinDynamics:
-    """ 
-    from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import WithinEpochTimeBinDynamics, TimeBinCategorization
-    
+    """ This class aims to quantify the bin-to-bin changes in decoded context within a given Epoch event. Ideally it would say something about whether it was static, random, flickering (transitions with change inertia), transitioning, etc.
+
+
+    Usage:
+        ## ⚓🎯 2025-05-15 - Within-epoch transition and run-length sequence analyis
+        from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import WithinEpochTimeBinDynamics, TimeBinCategorization
+
+        sequence_dwell_epochs_df = WithinEpochTimeBinDynamics.analyze_subsequence_temporal_dynamics(curr_active_pipeline, time_bin_size=0.050)
+        # int_column_names = [k for k in sequence_dwell_epochs_df.columns if k.startswith('n_')]
+
+        # sequence_dwell_epochs_df.infer_objects()
+        sequence_dwell_epochs_df
     
     """
     @classmethod

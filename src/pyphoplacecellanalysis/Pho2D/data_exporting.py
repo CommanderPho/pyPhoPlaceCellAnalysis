@@ -1373,44 +1373,70 @@ class PosteriorExporting:
         _out_final_merged_images = []
         _out_final_merged_image_save_paths: List[Path] = []
 
+        export_format_name_options = ['greyscale_shared_norm', 'greyscale']
 
         for a_decoding_epoch_name in epoch_name_list:
-            num_epochs: int = len(out_custom_formats_dict[f'{a_decoding_epoch_name}.long_LR']['greyscale'])
-            # _out_final_merged_images = []
-            # _out_final_merged_image_save_paths = []
+            try:
+                a_decoder_name = 'long_LR' ## temp
+                _a_partial_dict = out_custom_formats_dict[f'{a_decoding_epoch_name}.{a_decoder_name}']
+                ## find the appropriate `active_found_export_format_name`
+                active_found_export_format_name: str = None
+                for an_export_format_name in export_format_name_options:
+                    if (active_found_export_format_name is None):
+                        if (an_export_format_name in _a_partial_dict):
+                            active_found_export_format_name = an_export_format_name
+                if active_found_export_format_name is None:
+                    raise KeyError('skipping')
 
-            for epoch_IDX in np.arange(num_epochs):
-            # for epoch_IDX in np.arange(3):
-                # vertical stack
-                _tmp_curr_raster_imgs = []
-                for decoder_IDX, a_decoder_name in enumerate(active_1D_decoder_names):
-                    a_config = out_custom_formats_dict[f'{a_decoding_epoch_name}.{a_decoder_name}']['greyscale'][epoch_IDX] # a HeatmapExportConfig
-                    # a_config.posterior_saved_image ## the actual image object
-                    # a_config.posterior_saved_path ## the saved image file
-                    an_active_img = deepcopy(a_config.posterior_saved_image)
-                    an_active_img = an_active_img.reduce(factor=(1, 4)) ## scale image down by 1/4 in height but leave the original width
+                num_epochs: int = len(_a_partial_dict[active_found_export_format_name])
+
+                # num_epochs: int = len(out_custom_formats_dict[f'{a_decoding_epoch_name}.{a_decoder_name}']['greyscale'])
+
+                # num_epochs: int = len(out_custom_formats_dict[f'{a_decoding_epoch_name}.long_LR']['greyscale'])
+                # _out_final_merged_images = []
+                # _out_final_merged_image_save_paths = []
+
+                for epoch_IDX in np.arange(num_epochs):
+                    # vertical stack
+                    _tmp_curr_raster_imgs = []
+                    for decoder_IDX, a_decoder_name in enumerate(active_1D_decoder_names):
+                        a_config = out_custom_formats_dict[f'{a_decoding_epoch_name}.{a_decoder_name}'][active_found_export_format_name][epoch_IDX] # a HeatmapExportConfig
+                        # a_config.posterior_saved_image ## the actual image object
+                        # a_config.posterior_saved_path ## the saved image file
+                        an_active_img = deepcopy(a_config.posterior_saved_image)
+                        an_active_img = an_active_img.reduce(factor=(1, 4)) ## scale image down by 1/4 in height but leave the original width
+                        
+                        _tmp_curr_raster_imgs.append(an_active_img)
+                    ## END for decoder_IDX, a_d...
+
+                    ## get the multicolor iamge:
+                    a_config = out_custom_formats_dict[f'{a_decoding_epoch_name}.{pseudo_2D_decoder_name}']['raw_rgba'][epoch_IDX] # a HeatmapExportConfig
+                    _tmp_curr_raster_imgs.append(a_config.posterior_saved_image)
                     
-                    _tmp_curr_raster_imgs.append(an_active_img)
-                ## END for decoder_IDX, a_d...
+                    # a_config.posterior_saved_image ## the actual image object
+                    a_posterior_saved_path: Path = a_config.posterior_saved_path ## the saved image file
+                    merged_dir = a_posterior_saved_path.parent.parent.parent.joinpath('combined', 'multi')
+                    merged_dir.mkdir(exist_ok=True, parents=True)
+                    a_merged_posterior_export_path: Path = merged_dir.joinpath(a_posterior_saved_path.name) # '_temp_individual_posteriors/2025-05-30/gor01_one_2006-6-12_15-55-31/ripple/combined/multi/p_x_given_n[2].png'
+                    
+                    ## Build merged image:
+                    _out_vstack = vertical_image_stack(_tmp_curr_raster_imgs, padding=5)
+                    _out_final_merged_images.append(_out_vstack)
 
-                ## get the multicolor iamge:
-                a_config = out_custom_formats_dict[f'{a_decoding_epoch_name}.{pseudo_2D_decoder_name}']['raw_rgba'][epoch_IDX] # a HeatmapExportConfig
-                _tmp_curr_raster_imgs.append(a_config.posterior_saved_image)
-                
-                # a_config.posterior_saved_image ## the actual image object
-                a_posterior_saved_path: Path = a_config.posterior_saved_path ## the saved image file
-                merged_dir = a_posterior_saved_path.parent.parent.parent.joinpath('combined', 'multi')
-                merged_dir.mkdir(exist_ok=True, parents=True)
-                a_merged_posterior_export_path: Path = merged_dir.joinpath(a_posterior_saved_path.name) # '_temp_individual_posteriors/2025-05-30/gor01_one_2006-6-12_15-55-31/ripple/combined/multi/p_x_given_n[2].png'
-                
-                ## Build merged image:
-                _out_vstack = vertical_image_stack(_tmp_curr_raster_imgs, padding=5)
-                _out_final_merged_images.append(_out_vstack)
+                    ## save it
+                    ## a_merged_posterior_export_path, _out_vstack
+                    _out_vstack.save(a_merged_posterior_export_path) # Save image to file
+                    _out_final_merged_image_save_paths.append(a_merged_posterior_export_path)
 
-                ## save it
-                ## a_merged_posterior_export_path, _out_vstack
-                _out_vstack.save(a_merged_posterior_export_path) # Save image to file
-                _out_final_merged_image_save_paths.append(a_merged_posterior_export_path)
+                ## END for epoch_IDX in np.arange(num_epochs)...
+            except KeyError as e:
+                # KeyError: "Invalid keys: '['laps', 'long_LR']'"
+                print(f'could not get export data for a_decoding_epoch_name: "{a_decoding_epoch_name}", key error: {e}\n\tskipping.')    
+                continue
+            
+            except Exception as e:
+                raise
+            
         ## END for a_decoding_epoch_name in epoch_name_list
 
         return _out_final_merged_image_save_paths, _out_final_merged_images

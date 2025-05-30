@@ -2700,7 +2700,7 @@ class EpochComputationDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Di
             from neuropy.utils.result_context import IdentifyingContext
             from pyphoplacecellanalysis.Pho2D.data_exporting import HeatmapExportConfig, PosteriorExporting, HeatmapExportKind
             from pyphoplacecellanalysis.SpecificResults.AcrossSessionResults import Assert
-
+            from benedict import benedict
             from datetime import datetime, date, timedelta
             from pyphocorehelpers.print_helpers import get_now_rounded_time_str
             from pyphocorehelpers.Filesystem.path_helpers import find_first_extant_path
@@ -2708,6 +2708,7 @@ class EpochComputationDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Di
             from pyphocorehelpers.plotting.media_output_helpers import vertical_image_stack, horizontal_image_stack, image_grid # used in `_subfn_build_combined_output_images`
             from pyphocorehelpers.image_helpers import ImageHelpers
             from pyphocorehelpers.plotting.media_output_helpers import ImagePostRenderFunctionSets, ImageOperationsAndEffects
+            from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import DecodedFilterEpochsResult, DirectionalPseudo2DDecodersResult
 
 
             owning_pipeline_reference.perform_specific_computation(computation_functions_name_includelist=['directional_decoders_decode_continuous'],
@@ -2906,8 +2907,6 @@ class EpochComputationDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Di
                     
                     ## Result to filter
                     included_filter_epoch_result: DecodedFilterEpochsResult = deepcopy(all_epoch_result)
-                    # included_filter_epochs_df: pd.DataFrame = deepcopy(included_filter_epoch_result.filter_epochs)
-                    # included_filter_epochs_df
 
                     # included_filter_epoch_times = filter_epochs_ripple_df[['start', 'stop']].to_numpy() # Both 'start', 'stop' column matching
                     included_filter_epoch_times = filter_epochs_ripple_df['start'].to_numpy() # Both 'start', 'stop' column matching
@@ -2943,7 +2942,6 @@ class EpochComputationDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Di
         
             ## OUTPUTS: decoder_laps_filter_epochs_decoder_result_dict, decoder_ripple_filter_epochs_decoder_result_dict
 
-
             # ==================================================================================================================================================================================================================================================================================== #
             # Figure Export Copmonent                                                                                                                                                                                                                                                              #
             # ==================================================================================================================================================================================================================================================================================== #
@@ -2963,9 +2961,7 @@ class EpochComputationDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Di
 
             print(f'\tspecific_session_output_folder: "{_specific_session_output_folder.as_posix()}"')
 
-
             if custom_export_formats is None:
-
 
                 custom_export_formats: Dict[str, HeatmapExportConfig] = {
                     # 'greyscale': HeatmapExportConfig.init_greyscale(desired_height=desired_height, post_render_image_functions_builder_fn=_build_no_op_image_export_functions_dict),
@@ -3000,18 +2996,74 @@ class EpochComputationDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Di
                         continue
 
 
+
+            # ==================================================================================================================================================================================================================================================================================== #
+            # Main export function                                                                                                                                                                                                                                                                 #
+            # ==================================================================================================================================================================================================================================================================================== #
+
             out_paths, out_custom_formats_dict = PosteriorExporting.perform_export_all_decoded_posteriors_as_images(decoder_laps_filter_epochs_decoder_result_dict=decoder_laps_filter_epochs_decoder_result_dict,
                                                                                                                      decoder_ripple_filter_epochs_decoder_result_dict=decoder_ripple_filter_epochs_decoder_result_dict,
                                                                                                                     _save_context=_parent_save_context, parent_output_folder=_specific_session_output_folder,
                                                                                                                     desired_height=desired_height, custom_export_formats=custom_export_formats, combined_img_padding=6, combined_img_separator_color=(0, 0, 0, 255))
 
-            graphics_output_dict['out_paths'] = out_paths # 'out_paths': out_paths
-            graphics_output_dict['out_custom_formats_dict'] = out_custom_formats_dict
+            graphics_output_dict['out_paths'] = deepcopy(out_paths) # 'out_paths': out_paths
+            graphics_output_dict['out_custom_formats_dict'] = deepcopy(out_custom_formats_dict)
             print(f'\tout_paths: {out_paths}')
             print(f'done.')
 
 
+            # ==================================================================================================================================================================================================================================================================================== #
+            # TODO 2025-05-30 17:54: - [ ] Export 1D results in the "competition normalized" way that Kamran likes                                                                                                                                                                                 #
+            # ==================================================================================================================================================================================================================================================================================== #
 
+
+            ## INPUTS: decoder_ripple_filter_epochs_decoder_result_dict
+            
+
+            # From `General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions.prepare_and_perform_add_add_pseudo2D_decoder_decoded_epochs`
+            # all_directional_continuously_decoded_dict = most_recent_continuously_decoded_dict or {}
+            a_pseudo2D_decoder_continuously_decoded_result: DecodedFilterEpochsResult = deepcopy(decoder_ripple_filter_epochs_decoder_result_dict['psuedo2D_ignore']) ## only the ignore result
+
+
+            ## INPUTS: laps_pseudo2D_continuous_specific_decoded_result: DecodedFilterEpochsResult
+            # unique_decoder_names = ('long', 'short')
+            # a_non_PBE_marginal_over_track_ID, a_non_PBE_marginal_over_track_ID_posterior_df = DirectionalPseudo2DDecodersResult.build_generalized_non_marginalized_raw_posteriors(a_pseudo2D_decoder_continuously_decoded_result, unique_decoder_names=unique_decoder_names) #AssertionError: only works when curr_array_shape[1]: 4 correspond to the unique_decoder_names: ('long', 'short'). (typically all-directional decoder).
+
+            unique_decoder_names = ('long_LR', 'long_RL', 'short_LR', 'short_RL')
+            a_pseudo2D_split_to_1D_continuous_results_dict: Dict[types.DecoderName, DecodedFilterEpochsResult] = a_pseudo2D_decoder_continuously_decoded_result.split_pseudo2D_result_to_1D_result(pseudo2D_decoder_names_list=unique_decoder_names)
+            # a_masked_pseudo2D_split_to_1D_continuous_results_dict: Dict[types.DecoderName, DecodedFilterEpochsResult] = a_masked_pseudo2D_decoder_continuously_decoded_result.split_pseudo2D_result_to_1D_result(pseudo2D_decoder_names_list=unique_decoder_names)
+            a_pseudo2D_split_to_1D_continuous_results_dict = {k:DecodedFilterEpochsResult.perform_add_additional_epochs_columns(a_result=a_result, **_common_add_columns_kwargs) for k, a_result in a_pseudo2D_split_to_1D_continuous_results_dict.items()} ## add the extra columns if needed
+            # OUTPUTS: a_pseudo2D_split_to_1D_continuous_results_dict, a_masked_pseudo2D_split_to_1D_continuous_results_dict
+
+
+
+            # Run an export function again _______________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
+            pseudo2D_split_to_1D_custom_export_formats: Dict[str, HeatmapExportConfig] = {
+                'greyscale_shared_norm': HeatmapExportConfig.init_greyscale(desired_height=desired_height, post_render_image_functions_builder_fn=ImagePostRenderFunctionSets._build_no_op_image_export_functions_dict),
+                # 'color': HeatmapExportConfig(colormap=colormap, export_kind=HeatmapExportKind.COLORMAPPED, desired_height=desired_height, post_render_image_functions_builder_fn=ImagePostRenderFunctionSets._build_no_op_image_export_functions_dict, **kwargs),
+            }
+            pseudo2D_split_to_1D_out_paths, pseudo2D_split_to_1D_out_custom_formats_dict = PosteriorExporting.perform_export_all_decoded_posteriors_as_images(decoder_laps_filter_epochs_decoder_result_dict=None,
+                                                                                                                        decoder_ripple_filter_epochs_decoder_result_dict=a_pseudo2D_split_to_1D_continuous_results_dict, ## just the ripples
+                                                                                                                    _save_context=_parent_save_context, parent_output_folder=_specific_session_output_folder,
+                                                                                                                    desired_height=desired_height, custom_export_formats=pseudo2D_split_to_1D_custom_export_formats, combined_img_padding=6, combined_img_separator_color=(0, 0, 0, 255))
+            if not isinstance(graphics_output_dict['out_paths'], benedict):
+                graphics_output_dict['out_paths'] = benedict(graphics_output_dict['out_paths']) # 'out_paths': out_paths
+            # graphics_output_dict['out_paths'].merge(pseudo2D_split_to_1D_out_paths)
+            graphics_output_dict['out_paths'].merge({k:v for k, v in pseudo2D_split_to_1D_out_paths.items() if (v is not None)})
+
+            if not isinstance(graphics_output_dict['out_custom_formats_dict'], benedict):
+                graphics_output_dict['out_custom_formats_dict'] = benedict(graphics_output_dict['out_custom_formats_dict']) # 'out_paths': out_paths
+            # graphics_output_dict['out_custom_formats_dict'].merge(pseudo2D_split_to_1D_out_custom_formats_dict)
+            graphics_output_dict['out_custom_formats_dict'].merge({k:v for k, v in pseudo2D_split_to_1D_out_custom_formats_dict.items() if (v is not None)})
+
+            # print(f'\tout_paths: {pseudo2D_split_to_1D_out_paths}')
+            # print(f'done.')
+
+
+
+            # ==================================================================================================================================================================================================================================================================================== #
+            # END/RESUME: Merged Outputs                                                                                                                                                                                                                                                           #
+            # ==================================================================================================================================================================================================================================================================================== #
             # Build Merged across time images and flattened dict of images _______________________________________________________ #
 
             # from pyphoplacecellanalysis.Pho2D.data_exporting import HeatmapExportConfig, HeatmapExportKind
@@ -3065,7 +3117,7 @@ class EpochComputationDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Di
                                 raise e
                         
                         
-                        
+
             # flat_img_out_paths
             # flat_merged_images
 

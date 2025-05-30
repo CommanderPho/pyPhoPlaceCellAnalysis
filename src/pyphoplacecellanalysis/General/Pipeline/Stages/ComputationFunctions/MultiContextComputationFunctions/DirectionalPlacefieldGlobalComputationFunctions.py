@@ -8573,7 +8573,7 @@ class AddNewDirectionalDecodedEpochs_MatplotlibPlotCommand(BaseMenuCommand):
         
 
 
-@metadata_attributes(short_name=None, tags=['track', 'Spike3DRasterWindowWidget', 'MatplotlibPlotCommand', 'epochs', 'decoder'],
+@metadata_attributes(short_name=None, tags=['track', 'KAMRAN_LIKES_NORMALIZATION', 'Spike3DRasterWindowWidget', 'MatplotlibPlotCommand', 'epochs', 'decoder'],
                       input_requires=['DirectionalDecodersDecoded', 'DirectionalDecodersDecoded.most_recent_continuously_decoded_dict["pseudo2D"]'], output_provides=[], uses=['plot_1D_most_likely_position_comparsions'], used_by=[], creation_date='2024-01-22 00:00', related_items=[])
 @define(slots=False)
 class AddNewDecodedPosteriors_MatplotlibPlotCommand(BaseMenuCommand):
@@ -8606,7 +8606,7 @@ class AddNewDecodedPosteriors_MatplotlibPlotCommand(BaseMenuCommand):
 
     @classmethod
     def _perform_overlay_measured_position(cls, identifier_name, widget, matplotlib_fig, matplotlib_fig_axes, measured_position_df: pd.DataFrame, variable_name = 'x'):
-        """ 
+        """ overlays a red measured position line over the heatmap
         
         if a_position_decoder.pf.filtered_pos_df is not None:
             measured_position_df = deepcopy(a_position_decoder.pf.filtered_pos_df)
