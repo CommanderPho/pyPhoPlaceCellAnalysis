@@ -8286,6 +8286,17 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
         print(f'ripple_decoding_time_bin_size: {ripple_decoding_time_bin_size}')
         print(f'laps_decoding_time_bin_size: {laps_decoding_time_bin_size}')
         
+
+        ## Make sure it has all the epoch info
+        
+        # Add the maze_id to the active_filter_epochs so we can see how properties change as a function of which track the replay event occured on:
+        session_name: str = owning_pipeline_reference.session_name
+        t_start, t_delta, t_end = owning_pipeline_reference.find_LongShortDelta_times()
+
+        decoder_laps_filter_epochs_decoder_result_dict = {k:DecodedFilterEpochsResult.perform_add_additional_epochs_columns(a_result=a_result, session_name=session_name, t_delta=t_delta) for k, a_result in decoder_laps_filter_epochs_decoder_result_dict.items()}
+        decoder_ripple_filter_epochs_decoder_result_dict = {k:DecodedFilterEpochsResult.perform_add_additional_epochs_columns(a_result=a_result, session_name=session_name, t_delta=t_delta) for k, a_result in decoder_ripple_filter_epochs_decoder_result_dict.items()}
+
+
         parent_output_folder: Path = kwargs.pop('parent_output_folder', None)
         
         needs_discover_default_collected_outputs_dir: bool = True

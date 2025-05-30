@@ -1747,8 +1747,41 @@ class DecodedFilterEpochsResult(HDF_SerializationMixin, AttrsBasedClassHelperMix
         assert n_ybins == len(pseudo2D_decoder_names_list), f"for pseudo2D_decoder_names_list: {pseudo2D_decoder_names_list}\n\texpected the len(pseudo2D_decoder_names_list): {len(pseudo2D_decoder_names_list)} pseudo-y bins for the decoder in n_ybins. but found n_ybins: {n_ybins}"
     
         return flat_time_window_centers, flat_marginal_y_p_x_given_n
-        
 
+
+    @classmethod
+    def perform_add_additional_epochs_columns(cls, a_result: "DecodedFilterEpochsResult", session_name: str, t_delta: float, **kwargs) -> "DecodedFilterEpochsResult":
+        """ adds the session-related extra columns to the result's .filter_epochs
+
+        session_name: str = curr_active_pipeline.session_name
+        t_start, t_delta, t_end = curr_active_pipeline.find_LongShortDelta_times()
+        a_result = DecodedFilterEpochsResult.perform_add_additional_epochs_columns(a_result=a_result, session_name=session_name, t_delta=t_delta)
+
+        """
+        active_filter_epochs: pd.DataFrame = ensure_dataframe(deepcopy(a_result.filter_epochs))        
+        # Add the maze_id to the active_filter_epochs so we can see how properties change as a function of which track the replay event occured on:
+        active_filter_epochs = active_filter_epochs.across_session_identity.add_session_df_columns(session_name=session_name, curr_session_t_delta=t_delta, **kwargs) # , time_bin_size=None, time_col='ripple_start_t'
+        a_result.filter_epochs = active_filter_epochs ## assign
+        return a_result
+
+
+    def add_additional_epochs_columns(self, session_name: str, t_delta: float, **kwargs) -> pd.DataFrame:
+        """ updates self.filter_epochs
+
+        session_name: str = curr_active_pipeline.session_name
+        t_start, t_delta, t_end = curr_active_pipeline.find_LongShortDelta_times()
+        a_result.add_additional_epochs_columns(session_name=session_name, t_delta=t_delta)
+
+        """
+        self.perform_add_additional_epochs_columns(a_result=self, session_name=session_name, t_delta=t_delta, **kwargs)
+        # active_filter_epochs: pd.DataFrame = ensure_dataframe(deepcopy(self.filter_epochs))        
+        # # Add the maze_id to the active_filter_epochs so we can see how properties change as a function of which track the replay event occured on:
+        # active_filter_epochs = active_filter_epochs.across_session_identity.add_session_df_columns(session_name=session_name, curr_session_t_delta=t_delta, **kwargs) # , time_bin_size=None, time_col='ripple_start_t'
+        # self.filter_epochs = active_filter_epochs ## assign
+        return self.filter_epochs
+
+
+        
 
 # ==================================================================================================================== #
 # Placemap Position Decoders                                                                                           #

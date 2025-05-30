@@ -502,6 +502,9 @@ class PosteriorExporting:
         from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import SingleEpochDecodedResult
         from pyphoplacecellanalysis.Pho2D.data_exporting import HeatmapExportKind
         from pyphocorehelpers.plotting.media_output_helpers import ImageOperationsAndEffects
+        from neuropy.core.epoch import ensure_dataframe
+        from pyphoplacecellanalysis.SpecificResults.AcrossSessionResults import AcrossSessionIdentityDataframeAccessor
+        
 
 
         if not isinstance(posterior_out_folder, Path):
@@ -526,8 +529,11 @@ class PosteriorExporting:
             export_format_config.export_folder.mkdir(parents=True, exist_ok=True)
                     
         num_filter_epochs: int = a_decoder_decoded_epochs_result.num_filter_epochs
+        active_filter_epochs: pd.DataFrame = ensure_dataframe(a_decoder_decoded_epochs_result.active_filter_epochs)
         
         is_epoch_pre_post_delta = a_decoder_decoded_epochs_result.active_filter_epochs['maze_id'].to_numpy()
+    
+        is_epoch_pre_post_delta = active_filter_epochs['maze_id'].to_numpy()
         
 
         # Build post-image-generation callback functions _____________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
