@@ -3208,6 +3208,9 @@ def figures_plot_generalized_decode_epochs_dict_and_export_results_completion_fu
     """
     from pyphoplacecellanalysis.General.Mixins.ExportHelpers import FileOutputManager, FigureOutputLocation, ContextToPathMode	
     from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.EpochComputationFunctions import EpochComputationDisplayFunctions
+    from benedict import benedict
+    from pyphoplacecellanalysis.Pho2D.data_exporting import PosteriorExporting
+
 
     # 'trackID_weighted_position_posterior'
 
@@ -3251,10 +3254,14 @@ def figures_plot_generalized_decode_epochs_dict_and_export_results_completion_fu
                                             )
             
             # _out = EpochComputationDisplayFunctions._display_directional_merged_pf_decoded_stacked_epoch_slices(curr_active_pipeline, None, None, None, include_includelist=None, save_figure=True)
+            keys_to_convert_to_benedict = ['export_paths', 'out_custom_formats_dict']
+            _out = {k:benedict(v) if (k in keys_to_convert_to_benedict) else v for k, v in _out.items()}
+            
             across_session_results_extended_dict['figures_plot_generalized_decode_epochs_dict_and_export_results_completion_function'].update({
                 '_display_directional_merged_pf_decoded_stacked_epoch_slices': _out,
             })
             
+
         except Exception as e:
             print(f'\tfigures_plot_generalized_decode_epochs_dict_and_export_results_completion_function(...): "_display_directional_merged_pf_decoded_stacked_epoch_slices" failed with error: {e}\n skipping.')
             raise
@@ -3334,6 +3341,14 @@ def figures_plot_generalized_decode_epochs_dict_and_export_results_completion_fu
                                             )
             
             # _out = EpochComputationDisplayFunctions._display_decoded_trackID_weighted_position_posterior_withMultiColorOverlay(curr_active_pipeline, None, None, None, include_includelist=None, save_figure=True)
+            keys_to_convert_to_benedict = ['out_paths', 'out_custom_formats_dict']
+            _out = {k:benedict(v) if (k in keys_to_convert_to_benedict) else v for k, v in _out.items()}
+
+            ## merge if we can:
+            _prev_out_dict = across_session_results_extended_dict.get('figures_plot_generalized_decode_epochs_dict_and_export_results_completion_function', {}).get('_display_directional_merged_pf_decoded_stacked_epoch_slices', {}) 
+            _out['out_paths'].merge(_prev_out_dict.get('export_paths', {}))
+            _out['out_custom_formats_dict'].merge(_prev_out_dict.get('out_custom_formats_dict', {}))
+
             across_session_results_extended_dict['figures_plot_generalized_decode_epochs_dict_and_export_results_completion_function'].update({
                 '_display_decoded_trackID_weighted_position_posterior_withMultiColorOverlay': _out,
             })
