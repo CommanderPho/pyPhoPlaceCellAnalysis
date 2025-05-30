@@ -1051,20 +1051,41 @@ class MultiDecoderColorOverlayedPosteriors(ComputedResult):
                         pass
 
                     a_t_bin_a_decoder_P: NDArray[ND.Shape["N_POS_BINS"], np.floating] = single_t_bin_P_values[:, i]
+                    ## INPUTS: a_t_bin_a_decoder_P
                     # ignore NaNs when finding data range
-                    # try:
-                    a_norm = mpl.colors.Normalize(vmin=np.nanmin(a_t_bin_a_decoder_P), vmax=np.nanmax(a_t_bin_a_decoder_P))
-                    # except ValueError as e:
-                    #     # RuntimeWarning: All-NaN slice encountered
-                    #     pass
+                    is_all_nan_slice: bool = np.all(np.isnan(a_t_bin_a_decoder_P)) # to avoid: RuntimeWarning: All-NaN slice encountered
+                    if not is_all_nan_slice:
+                        a_norm = mpl.colors.Normalize(vmin=np.nanmin(a_t_bin_a_decoder_P), vmax=np.nanmax(a_t_bin_a_decoder_P))
+                        
+                        # mask the NaNs so the cmap knows to use the “bad” color
+                        a_masked = np.ma.masked_invalid(a_t_bin_a_decoder_P)
+                        an_rgba: NDArray[ND.Shape["N_POS_BINS, 4"], np.floating] = a_cmap(a_norm(a_masked)) # rgba.shape (n_pos_bins, 4) # the '4' here is for RGBA, not the decoders, RGB per bin
+                        # rgb = an_rgba[..., :3] 
+                        # single_t_bin_out_RGBA[:, i, :] = an_rgba
+                    else:
+                        ## #TODO 2025-05-30 06:51: - [ ] how to avoid the RuntimeWarning: All-NaN slice encountered
+                        # Handle the all-NaN case by filling with a specific color
+                        # # Option 1: Fill with a neutral gray color (visually indicates "no data")
+                        # neutral_color = np.array([0.5, 0.5, 0.5, 1.0])  # RGBA for gray
+                        # single_t_bin_out_RGBA[:, i, :] = np.tile(neutral_color, (a_t_bin_a_decoder_P.shape[0], 1))
+                        
+                        # Option 2: Fill with transparent color (if you want these bins to be invisible)
+                        # transparent_color = np.array([0.0, 0.0, 0.0, 0.0])  # Fully transparent RGBA
+                        # single_t_bin_out_RGBA[:, i, :] = np.tile(transparent_color, (a_t_bin_a_decoder_P.shape[0], 1))
+                        
+                        # # Option 3: Use the colormap's "bad" color (consistent with how NaNs are handled elsewhere)
+                        # bad_color = np.array(a_cmap.get_bad())
+                        # single_t_bin_out_RGBA[:, i, :] = np.tile(bad_color, (a_t_bin_a_decoder_P.shape[0], 1))
 
-                    # mask the NaNs so the cmap knows to use the “bad” color
-                    a_masked = np.ma.masked_invalid(a_t_bin_a_decoder_P)
-                    an_rgba: NDArray[ND.Shape["N_POS_BINS, 4"], np.floating] = a_cmap(a_norm(a_masked)) # rgba.shape (n_pos_bins, 4) # the '4' here is for RGBA, not the decoders, RGB per bin
-                    # rgb = an_rgba[..., :3] 
-                    # single_t_bin_out_RGBA[:, i, :] = an_rgba
-                    
+                        # mask the NaNs so the cmap knows to use the “bad” color
+                        a_masked = np.ma.masked_invalid(a_t_bin_a_decoder_P)
+                        an_rgba: NDArray[ND.Shape["N_POS_BINS, 4"], np.floating] = a_cmap(a_masked) # rgba.shape (n_pos_bins, 4) # the '4' here is for RGBA, not the decoders, RGB per bin
+                        # rgb = an_rgba[..., :3] 
+                        # single_t_bin_out_RGBA[:, i, :] = an_rgba
+                        
+                    ## OUTPUT: an_rgba
                     extra_all_t_bins_outputs_dict['all_t_bins_per_decoder_out_RGBA'][a_t_bin_idx, :, i, :] = an_rgba
+                    
                 ## END for i, (a_decoder_name, a_cmap) in enum....
                 
                 # Add dict entries ___________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
