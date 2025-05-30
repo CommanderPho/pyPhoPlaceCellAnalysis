@@ -1,3 +1,6 @@
+ 
+from __future__ import annotations # prevents having to specify types for typehinting as strings
+from typing import TYPE_CHECKING
 from copy import deepcopy
 from pathlib import Path
 from typing import Dict, List, Tuple, Optional, Callable, Union, Any
@@ -46,6 +49,13 @@ from pyphocorehelpers.assertion_helpers import Assert
 from attrs import define, field, Factory
 
 from enum import Enum, auto
+
+
+if TYPE_CHECKING:
+    ## typehinting only imports here
+    from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.ContainerBased.RankOrderRastersDebugger import RankOrderRastersDebugger
+
+
 
 @metadata_attributes(short_name=None, tags=['enum', 'export_mode'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-05-14 14:14', related_items=[])
 class HeatmapExportKind(Enum):
@@ -1209,7 +1219,7 @@ class PosteriorExporting:
 
     @function_attributes(short_name=None, tags=['marginal', 'export'], input_requires=[], output_provides=[], uses=['cls._test_export_marginals_for_figure'], used_by=[], creation_date='2024-09-06 00:00', related_items=[])
     @classmethod
-    def _perform_export_current_epoch_marginal_and_raster_images(cls, _out_ripple_rasters, directional_merged_decoders_result, filtered_decoder_filter_epochs_decoder_result_dict, active_session_context, root_export_path: Path, epoch_id_identifier_str='lap',
+    def _perform_export_current_epoch_marginal_and_raster_images(cls, _out_ripple_rasters: "RankOrderRastersDebugger", directional_merged_decoders_result, filtered_decoder_filter_epochs_decoder_result_dict, active_session_context, root_export_path: Path, epoch_id_identifier_str='lap',
                                                                  desired_width = 2048, desired_height = 720, debug_print=False, **kwargs,
                                                                  ):
         """ Exports all rasters, marginals, and posteriors as images
