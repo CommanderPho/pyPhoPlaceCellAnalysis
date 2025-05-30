@@ -1750,6 +1750,9 @@ class EpochComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Computati
                 ['RankOrder'].odd_laps
                 ['RankOrder'].even_laps
 
+        dict(epochs_decoding_time_bin_size=epochs_decoding_time_bin_size, drop_previous_result_and_compute_fresh=False, frame_divide_bin_size=10.0)
+
+
 
         """
         from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import EpochFilteringMode, _compute_proper_filter_epochs
