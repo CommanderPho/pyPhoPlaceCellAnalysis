@@ -3062,27 +3062,47 @@ def generalized_decode_epochs_dict_and_export_results_completion_function(self, 
     ## Unpack from pipeline:
     # valid_EpochComputations_result: EpochComputationsComputationsContainer = curr_active_pipeline.global_computation_results.computed_data['EpochComputations']
     fail_on_exception = True
-    
+    EpochComputations_result_needs_full_recompute: bool = False
+
     valid_EpochComputations_result: EpochComputationsComputationsContainer = curr_active_pipeline.global_computation_results.computed_data.get('EpochComputations', None)
     if valid_EpochComputations_result is None:
         print(f'\trecomputation is needed because "EpochComputations" is not in computed_data!')
         ## call computation function 'generalized_specific_epochs_decoding'        
-
-        # a_new_fully_generic_result: GenericDecoderDictDecodedEpochsDictResult = GenericDecoderDictDecodedEpochsDictResult.batch_user_compute_fn(curr_active_pipeline=curr_active_pipeline, force_recompute=force_recompute, time_bin_size=epochs_decoding_time_bin_size, debug_print=debug_print)
+        EpochComputations_result_needs_full_recompute = True
         
+    else:
+        ## already exists:
+        extant_result_decoding_time_bin_size: float = deepcopy(valid_EpochComputations_result.epochs_decoding_time_bin_size) ## just get the standard size. Currently assuming all things are the same size!
+        print(f'\textant_result_decoding_time_bin_size: {extant_result_decoding_time_bin_size}')
+        EpochComputations_result_needs_full_recompute = (epochs_decoding_time_bin_size != extant_result_decoding_time_bin_size)
+        if EpochComputations_result_needs_full_recompute:
+            print(f"\t\tERROR: valid_EpochComputations_result.epochs_decoding_time_bin_size: {extant_result_decoding_time_bin_size} != epochs_decoding_time_bin_size: {epochs_decoding_time_bin_size}.\n\tA FULL RECOMPUTE WILL BE NEEDED!")
+            ## drop existing result
+            dropped_EpochComputations_result: EpochComputationsComputationsContainer = curr_active_pipeline.global_computation_results.computed_data.pop('EpochComputations', None)
+            print(f'\t\t dropped_EpochComputations_result removed!.')
+
+        # assert epochs_decoding_time_bin_size == extant_result_decoding_time_bin_size, f"\tERROR: valid_EpochComputations_result.epochs_decoding_time_bin_size: {extant_result_decoding_time_bin_size} != epochs_decoding_time_bin_size: {epochs_decoding_time_bin_size}"
+
+    if EpochComputations_result_needs_full_recompute:
+        # a_new_fully_generic_result: GenericDecoderDictDecodedEpochsDictResult = GenericDecoderDictDecodedEpochsDictResult.batch_user_compute_fn(curr_active_pipeline=curr_active_pipeline, force_recompute=force_recompute, time_bin_size=epochs_decoding_time_bin_size, debug_print=debug_print)
+
         ## Next wave of computations
-        extended_computations_include_includelist=['non_PBE_epochs_results', 'generalized_specific_epochs_decoding',] # do only specified
+        extended_computations_include_includelist = ['non_PBE_epochs_results', 'generalized_specific_epochs_decoding',] # do only specified
+        computation_kwargs_dict = {'non_PBE_epochs_results': dict(epochs_decoding_time_bin_size=epochs_decoding_time_bin_size, drop_previous_result_and_compute_fresh=False), }
+
         # force_recompute_override_computations_includelist = deepcopy(extended_computations_include_includelist)
         force_recompute_override_computations_includelist = []
         needs_computation_output_dict, valid_computed_results_output_list, remaining_include_function_names = batch_evaluate_required_computations(curr_active_pipeline, include_includelist=extended_computations_include_includelist, include_global_functions=True, fail_on_exception=False, progress_print=True,
                                                             force_recompute=force_recompute, force_recompute_override_computations_includelist=force_recompute_override_computations_includelist, debug_print=False)
-        
+
         if debug_print:
             print(f'\tPost-load global computations: needs_computation_output_dict: {[k for k,v in needs_computation_output_dict.items() if (v is not None)]}')
-        
+
         # Post-hoc verification that the computations worked and that the validators reflect that. The list should be empty now.
         newly_computed_values = batch_extended_computations(curr_active_pipeline, include_includelist=extended_computations_include_includelist, include_global_functions=True, fail_on_exception=False, progress_print=True,
-                                                            force_recompute=force_recompute, force_recompute_override_computations_includelist=force_recompute_override_computations_includelist, debug_print=False)
+                                                            force_recompute=force_recompute, force_recompute_override_computations_includelist=force_recompute_override_computations_includelist, 
+                                                            computation_kwargs_dict=computation_kwargs_dict,
+                                                            debug_print=False)
 
         needs_computation_output_dict, valid_computed_results_output_list, remaining_include_function_names = batch_evaluate_required_computations(curr_active_pipeline, include_includelist=extended_computations_include_includelist, include_global_functions=True, fail_on_exception=False, progress_print=True,
                                                             force_recompute=force_recompute, force_recompute_override_computations_includelist=force_recompute_override_computations_includelist, debug_print=False)
@@ -3091,7 +3111,9 @@ def generalized_decode_epochs_dict_and_export_results_completion_function(self, 
         print(f'\t...recomputation done.')
         valid_EpochComputations_result: EpochComputationsComputationsContainer = curr_active_pipeline.global_computation_results.computed_data.get('EpochComputations', None)
         assert valid_EpochComputations_result is not None, f"valid_EpochComputations_result is still None ever after attempted recomputation!!"
-        
+
+
+
     a_new_fully_generic_result: GenericDecoderDictDecodedEpochsDictResult = valid_EpochComputations_result.a_generic_decoder_dict_decoded_epochs_dict_result
 
     if (a_new_fully_generic_result is None):
