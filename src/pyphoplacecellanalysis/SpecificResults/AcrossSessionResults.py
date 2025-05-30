@@ -3846,7 +3846,7 @@ class AcrossSessionIdentityDataframeAccessor:
 
     @classmethod
     def perform_add_session_df_columns(cls, df: pd.DataFrame, session_name: str, time_bin_size: float=None, custom_replay_source: Optional[str]=None,
-                               t_start: Optional[float]=None, curr_session_t_delta: Optional[float]=None, t_end: Optional[float]=None, time_col: str=None, end_time_col_name: Optional[str]=None) -> pd.DataFrame:
+                               t_start: Optional[float]=None, curr_session_t_delta: Optional[float]=None, t_end: Optional[float]=None, time_col: str=None, end_time_col_name: Optional[str]=None, **kwargs) -> pd.DataFrame:
         """ adds session-specific information to the marginal dataframes 
     
         Added Columns: ['session_name', 'time_bin_size', 'delta_aligned_start_t', 'pre_post_delta_category', 'maze_id']
@@ -3863,6 +3863,9 @@ class AcrossSessionIdentityDataframeAccessor:
         from neuropy.core.epoch import EpochsAccessor
         from neuropy.utils.mixins.time_slicing import TimeColumnAliasesProtocol
 
+        should_raise_exception_on_fail: bool = kwargs.pop('should_raise_exception_on_fail', False)
+        
+
         df['session_name'] = session_name
         
         if custom_replay_source is not None:
@@ -3873,10 +3876,10 @@ class AcrossSessionIdentityDataframeAccessor:
         if curr_session_t_delta is not None:
             if time_col is None:
                 # time_col = 'start' # 'ripple_start_t' for ripples, etc
-                time_col: str = TimeColumnAliasesProtocol.find_first_extant_suitable_columns_name(df, col_connonical_name='start', required_columns_synonym_dict={"start":{'begin','start_t','ripple_start_t'}, "stop":['end','stop_t']}, should_raise_exception_on_fail=False)
+                time_col: str = TimeColumnAliasesProtocol.find_first_extant_suitable_columns_name(df, col_connonical_name='start', required_columns_synonym_dict={"start":{'begin','start_t','ripple_start_t'}, "stop":['end','stop_t']}, should_raise_exception_on_fail=should_raise_exception_on_fail)
                 
             if end_time_col_name is None:
-                end_time_col_name: str = TimeColumnAliasesProtocol.find_first_extant_suitable_columns_name(df, col_connonical_name='stop', required_columns_synonym_dict={"start":{'begin','start_t','ripple_start_t'}, "stop":['end','stop_t']}, should_raise_exception_on_fail=False)
+                end_time_col_name: str = TimeColumnAliasesProtocol.find_first_extant_suitable_columns_name(df, col_connonical_name='stop', required_columns_synonym_dict={"start":{'begin','start_t','ripple_start_t'}, "stop":['end','stop_t']}, should_raise_exception_on_fail=should_raise_exception_on_fail)
 
             if time_col is not None:
                 df['delta_aligned_start_t'] = df[time_col] - curr_session_t_delta
@@ -3888,6 +3891,8 @@ class AcrossSessionIdentityDataframeAccessor:
                         df = EpochsAccessor.add_maze_id_if_needed(epochs_df=df, t_start=t_start, t_delta=curr_session_t_delta, t_end=t_end, start_time_col_name=time_col, end_time_col_name=end_time_col_name) # Adds Columns: ['maze_id']
                     except (AttributeError, KeyError) as e:
                         print(f'could not add the "maze_id" column to the dataframe (err: {e})\n\tlikely because it lacks valid "t_start" or "t_end" columns. df.columns: {list(df.columns)}. Skipping.')
+                        if should_raise_exception_on_fail:
+                            raise
                     except Exception as e:
                         raise e
 
@@ -3897,7 +3902,7 @@ class AcrossSessionIdentityDataframeAccessor:
 
 
     def add_session_df_columns(self, session_name: str, time_bin_size: float=None, custom_replay_source: Optional[str]=None,
-                               t_start: Optional[float]=None, curr_session_t_delta: Optional[float]=None, t_end: Optional[float]=None, time_col: str=None, end_time_col_name: Optional[str]=None) -> pd.DataFrame:
+                               t_start: Optional[float]=None, curr_session_t_delta: Optional[float]=None, t_end: Optional[float]=None, time_col: str=None, end_time_col_name: Optional[str]=None, **kwargs) -> pd.DataFrame:
         """         
         Added Columns: ['session_name', 'time_bin_size', 'delta_aligned_start_t', 'pre_post_delta_category', 'maze_id']
 
@@ -3912,7 +3917,7 @@ class AcrossSessionIdentityDataframeAccessor:
     
         """
         df: pd.DataFrame = deepcopy(self._obj)
-        return self.perform_add_session_df_columns(df=df, session_name=session_name, time_bin_size=time_bin_size, custom_replay_source=custom_replay_source, t_start=t_start, curr_session_t_delta=curr_session_t_delta, t_end=t_end, time_col=time_col, end_time_col_name=end_time_col_name)
+        return self.perform_add_session_df_columns(df=df, session_name=session_name, time_bin_size=time_bin_size, custom_replay_source=custom_replay_source, t_start=t_start, curr_session_t_delta=curr_session_t_delta, t_end=t_end, time_col=time_col, end_time_col_name=end_time_col_name, **kwargs)
 
 
     def split_session_key_col_to_fmt_animal_exper_cols(self, session_key_col: str = 'session_name') -> pd.DataFrame:
