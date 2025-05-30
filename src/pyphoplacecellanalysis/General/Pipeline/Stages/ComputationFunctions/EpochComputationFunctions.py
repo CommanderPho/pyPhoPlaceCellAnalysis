@@ -2615,7 +2615,7 @@ class EpochComputationDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Di
 
     @function_attributes(short_name='trackID_weighted_position_posterior', tags=['context-decoder-comparison', 'decoded_position', 'directional'], conforms_to=['output_registering', 'figure_saving'], input_requires=[], output_provides=[], requires_global_keys=["global_computation_results.computed_data['EpochComputations']"], uses=['FigureCollector'], used_by=[], creation_date='2025-05-03 00:00', related_items=[], is_global=True)
     def _display_decoded_trackID_weighted_position_posterior_withMultiColorOverlay(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, save_figure=True, override_fig_man: Optional[FileOutputManager]=None, ax=None,
-                                                                                    custom_export_formats: Optional[Dict[str, Any]]=None, parent_output_folder: Path = Path('output/array_to_images'), time_bin_size: float=0.025, delete_previous_outputs_folder:bool=True, desired_height:int=1200, **kwargs):
+                                                                                    custom_export_formats: Optional[Dict[str, Any]]=None, parent_output_folder: Optional[Path] = None, time_bin_size: float=0.025, delete_previous_outputs_folder:bool=True, desired_height:int=1200, **kwargs):
             """ Exports individual posteriors in an overlayed manner
             
             
@@ -2700,6 +2700,8 @@ class EpochComputationDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Di
 
             from datetime import datetime, date, timedelta
             from pyphocorehelpers.print_helpers import get_now_rounded_time_str
+            from pyphocorehelpers.Filesystem.path_helpers import find_first_extant_path
+
             from pyphocorehelpers.plotting.media_output_helpers import vertical_image_stack, horizontal_image_stack, image_grid # used in `_subfn_build_combined_output_images`
             from pyphocorehelpers.image_helpers import ImageHelpers
             from pyphocorehelpers.plotting.media_output_helpers import ImagePostRenderFunctionSets, ImageOperationsAndEffects
@@ -2722,10 +2724,13 @@ class EpochComputationDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Di
             # dpi = kwargs.pop('dpi', 100)
             # export_dpi: int = int(np.ceil(dpi * export_dpi_multiplier))
 
-
             # ==================================================================================================================================================================================================================================================================================== #
             # Build outputs:                                                                                                                                                                                                                                                              #
             # ==================================================================================================================================================================================================================================================================================== #
+
+
+
+
             graphics_output_dict = {'parent_output_folder': parent_output_folder, 'time_bin_size': time_bin_size}
 
             Assert.path_exists(parent_output_folder)
@@ -2768,13 +2773,15 @@ class EpochComputationDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Di
             active_context = kwargs.pop('active_context', None)
             if active_context is not None:
                 # Update the existing context:
+                active_context = deepcopy(active_context).overwriting_context(time_bin_size=time_bin_size)
                 display_context = active_context.adding_context('display_fn', display_fn_name='trackID_weighted_position_posterior', time_bin_size=time_bin_size)
             else:
                 # active_context = owning_pipeline_reference.sess.get_context()
-                active_context = deepcopy(complete_session_context) # owning_pipeline_reference.sess.get_context()
+                active_context = deepcopy(complete_session_context).overwriting_context(time_bin_size=time_bin_size) # owning_pipeline_reference.sess.get_context()
                 
                 # Build the active context directly:
-                display_context = owning_pipeline_reference.build_display_context_for_session('trackID_weighted_position_posterior', time_bin_size=time_bin_size)
+                display_context = deepcopy(active_context).overwriting_context(display_fn_name='trackID_weighted_position_posterior', time_bin_size=time_bin_size)
+                # display_context = owning_pipeline_reference.build_display_context_for_session('trackID_weighted_position_posterior', time_bin_size=time_bin_size)
 
             fignum = kwargs.pop('fignum', None)
             if fignum is not None:
@@ -2785,6 +2792,51 @@ class EpochComputationDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Di
             # active_display_context = display_context.overwriting_context(extreme_threshold=extreme_threshold, opacity_max=opacity_max, thickness_ramping_multiplier=thickness_ramping_multiplier) ## include any that are just the slightest big different
             # active_display_context = deepcopy(display_context)
             
+
+            needs_discover_default_collected_outputs_dir: bool = True
+            if parent_output_folder is not None:
+                if isinstance(parent_output_folder, str):
+                    parent_output_folder = Path(parent_output_folder).resolve()
+                    if parent_output_folder.exists():
+                        needs_discover_default_collected_outputs_dir = False # we're good, the provided dir exists
+
+            if needs_discover_default_collected_outputs_dir:
+                    ## if none is provided it tries to find one in collected_outputs
+                    known_collected_outputs_paths = [Path(v).resolve() for v in ['/Users/pho/data/collected_outputs',
+                                                                                '/Volumes/SwapSSD/Data/collected_outputs', r"K:/scratch/collected_outputs", '/Users/pho/Dropbox (University of Michigan)/MED-DibaLabDropbox/Data/Pho/Outputs/output/collected_outputs', r'C:/Users/pho/repos/Spike3DWorkEnv/Spike3D/output/collected_outputs',
+                                                                                '/home/halechr/FastData/collected_outputs/', '/home/halechr/cloud/turbo/Data/Output/collected_outputs']]
+                    collected_outputs_directory = find_first_extant_path(known_collected_outputs_paths)
+                    assert collected_outputs_directory.exists(), f"collected_outputs_directory: {collected_outputs_directory} does not exist! Is the right computer's config commented out above?"
+                    # fullwidth_path_widget(scripts_output_path, file_name_label='Scripts Output Path:')
+                    print(f'collected_outputs_directory: "{collected_outputs_directory}"')
+                    # Create a 'figures' subfolder if it doesn't exist
+                    figures_folder: Path = collected_outputs_directory.joinpath('figures', '_temp_individual_posteriors').resolve()
+                    figures_folder.mkdir(parents=False, exist_ok=True)
+                    assert figures_folder.exists()
+                    print(f'\tfigures_folder: "{figures_folder}"')
+                    ## this is good
+                    parent_output_folder = figures_folder
+
+
+            Assert.path_exists(parent_output_folder)
+            posterior_out_folder = parent_output_folder.joinpath(DAY_DATE_TO_USE).resolve()
+            posterior_out_folder.mkdir(parents=True, exist_ok=True)
+            save_path = posterior_out_folder.resolve()
+            # _parent_save_context: IdentifyingContext = owning_pipeline_reference.build_display_context_for_session('perform_export_all_decoded_posteriors_as_images')
+            # _parent_save_context: IdentifyingContext = owning_pipeline_reference.build_display_context_for_session('trackID_weighted_position_posterior')
+            # _specific_session_output_folder = save_path.joinpath(active_context.get_description(subset_excludelist=['format_name'])).resolve()
+
+            _parent_save_context: IdentifyingContext = owning_pipeline_reference.build_display_context_for_session('trackID_weighted_position_posterior') ## why is this done?
+            _specific_session_output_folder = save_path.joinpath(active_context.get_description(subset_excludelist=['format_name', 'display_fn_name', 'time_bin_size'])).resolve()
+
+            _specific_session_output_folder.mkdir(parents=True, exist_ok=True)
+            print(f'\tspecific_session_output_folder: "{_specific_session_output_folder}"')
+
+            ## OUTPUTS: _parent_save_context, _specific_session_output_folder
+            graphics_output_dict['parent_output_folder'] = parent_output_folder
+            graphics_output_dict['parent_save_context'] = _parent_save_context
+            graphics_output_dict['parent_specific_session_output_folder'] = _specific_session_output_folder
+
             # INPUTS _____________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
 
 
@@ -2906,14 +2958,6 @@ class EpochComputationDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Di
 
             ## INPUTS: active_epochs_decoder_result_dict
 
-            parent_output_folder.mkdir(exist_ok=True)
-            Assert.path_exists(parent_output_folder)
-            posterior_out_folder = parent_output_folder.joinpath(DAY_DATE_TO_USE).resolve()
-            posterior_out_folder.mkdir(parents=True, exist_ok=True)
-            save_path = posterior_out_folder.resolve()
-            _parent_save_context: IdentifyingContext = owning_pipeline_reference.build_display_context_for_session('perform_export_all_decoded_posteriors_as_images')
-            _specific_session_output_folder = save_path.joinpath(active_context.get_description(subset_excludelist=['format_name'])).resolve() # 'C:/Users/pho/repos/Spike3DWorkEnv/Spike3D/output/collected_outputs/2025-05-22/gor01_one_2006-6-09_1-22-43_trackID_weighted_position_posterior'
-            _specific_session_output_folder.mkdir(parents=True, exist_ok=True)
             print(f'\tspecific_session_output_folder: "{_specific_session_output_folder.as_posix()}"')
 
 
@@ -2973,7 +3017,7 @@ class EpochComputationDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Di
             # out_custom_formats_dict: Dict[types.KnownNamedDecodingEpochsType, Dict[types.DecoderName, Dict[str, List[HeatmapExportConfig]]]] = graphics_output_dict['out_custom_formats_dict']
 
             # flat_imgs = []
-
+            graphics_output_dict['flat_parent_save_paths'] = []
             flat_imgs_dict: Dict[IdentifyingContext, List] = {}
             flat_merged_images = {}
             flat_merged_image_paths = {}
@@ -2995,6 +3039,8 @@ class EpochComputationDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Di
                             if parent_save_path is None:
                                 posterior_save_path = a_config.posterior_saved_path
                                 parent_save_path = posterior_save_path.parent.resolve()
+                                graphics_output_dict['flat_parent_save_paths'].append(parent_save_path)
+
                             _posterior_image = a_config.posterior_saved_image
                             flat_imgs.append(_posterior_image)                            
                             # print(F'a_rendered_config: {type(a_rendered_config)}')

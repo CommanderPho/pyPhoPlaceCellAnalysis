@@ -8262,7 +8262,10 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
         
         # #TODO 2024-01-03 05:24: - [ ] Do something to switch the matplotlib backend to 'AGG' if defer_render == True. Currently only adjusts the pyqtgraph-based figures (`plot_rank_order_epoch_inst_fr_result_tuples`)
 
-        active_context = kwargs.pop('active_context', owning_pipeline_reference.sess.get_context())
+
+        # active_context = kwargs.pop('active_context', owning_pipeline_reference.sess.get_context())
+
+
         
         rank_order_results = global_computation_results.computed_data.get('RankOrder', None)
         if rank_order_results is not None:
@@ -8289,6 +8292,23 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
         print(f'ripple_decoding_time_bin_size: {ripple_decoding_time_bin_size}')
         print(f'laps_decoding_time_bin_size: {laps_decoding_time_bin_size}')
         
+
+
+        # Get appropriate context ____________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
+        #TODO 2025-05-30 07:52: - [ ] This assumes `ripple_decoding_time_bin_size == laps_decoding_time_bin_size`
+        complete_session_context, (session_context, additional_session_context) = owning_pipeline_reference.get_complete_session_context()
+
+        assert (ripple_decoding_time_bin_size == laps_decoding_time_bin_size), f"ripple_decoding_time_bin_size: {ripple_decoding_time_bin_size} == laps_decoding_time_bin_size: {laps_decoding_time_bin_size}"
+        active_context = kwargs.pop('active_context', None)
+        if active_context is not None:
+            # Update the existing context:
+            active_context = deepcopy(active_context).overwriting_context(time_bin_size=ripple_decoding_time_bin_size)
+        else:
+            # active_context = owning_pipeline_reference.sess.get_context()
+            active_context = deepcopy(complete_session_context).overwriting_context(time_bin_size=ripple_decoding_time_bin_size) # owning_pipeline_reference.sess.get_context()
+
+
+
 
         ## Make sure it has all the epoch info
         
@@ -8331,7 +8351,10 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
         posterior_out_folder.mkdir(parents=True, exist_ok=True)
         save_path = posterior_out_folder.resolve()
         _parent_save_context: IdentifyingContext = owning_pipeline_reference.build_display_context_for_session('perform_export_all_decoded_posteriors_as_images')
-        _specific_session_output_folder = save_path.joinpath(active_context.get_description(subset_excludelist=['format_name'])).resolve()
+        # _specific_session_output_folder = save_path.joinpath(active_context.get_description(subset_excludelist=['format_name'])).resolve()
+        _specific_session_output_folder = save_path.joinpath(active_context.get_description(subset_excludelist=['format_name', 'display_fn_name', 'time_bin_size'])).resolve()
+
+
         _specific_session_output_folder.mkdir(parents=True, exist_ok=True)
         print(f'\tspecific_session_output_folder: "{_specific_session_output_folder}"')
 
