@@ -8230,8 +8230,8 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
 
     @function_attributes(short_name='directional_decoded_stacked_epoch_slices', tags=['export', 'heatmaps', 'posterior', 'directional_merged_decoder_decoded_epochs','directional','marginal','NON-VISUAL','NO-DISPLAY'],
                           input_requires=['RankOrder', 'DirectionalLaps', 'DirectionalMergedDecoders', 'DirectionalDecodersEpochsEvaluations'], output_provides=[], uses=['PosteriorExporting.perform_export_all_decoded_posteriors_as_images'], used_by=[], creation_date='2024-09-27 17:08', related_items=[], is_global=True)
-    def _display_directional_merged_pf_decoded_stacked_epoch_slices(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, save_figure=True, included_any_context_neuron_ids=None, custom_export_formats: Dict[str, "HeatmapExportConfig"]=None,
-                                                                    parent_output_folder: Optional[Path] = None, **kwargs):
+    def _display_directional_merged_pf_decoded_stacked_epoch_slices(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, save_figure=True, included_any_context_neuron_ids=None,
+                                                                    custom_export_formats: Dict[str, "HeatmapExportConfig"]=None, parent_output_folder: Optional[Path] = None, desired_height:int=1200, **kwargs):
         """ Exports all decoded epoch posteriors separately to a folder. NON-VISUAL, never displays.
          Effectively the entire stack of decoded epochs for both the long and short, including their Radon transformed lines if that information is available.
 
@@ -8360,7 +8360,7 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
 
         if custom_export_formats is None:
             ## use this default instead:
-            common_export_config_kwargs = dict(desired_height = 400,
+            common_export_config_kwargs = dict(desired_height = desired_height,
                 post_render_image_functions_builder_fn=ImagePostRenderFunctionSets._build_no_op_image_export_functions_dict,
                 # post_render_image_functions_builder_fn=ImagePostRenderFunctionSets._build_mergedColorDecoders_image_export_functions_dict,
             )
@@ -8374,7 +8374,7 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
 
         out_paths, out_custom_formats_dict = PosteriorExporting.perform_export_all_decoded_posteriors_as_images(decoder_laps_filter_epochs_decoder_result_dict=decoder_laps_filter_epochs_decoder_result_dict, decoder_ripple_filter_epochs_decoder_result_dict=decoder_ripple_filter_epochs_decoder_result_dict,
                                                                                                                  _save_context=_parent_save_context, parent_output_folder=_specific_session_output_folder,
-                                                                                                                  desired_height=None, custom_export_formats=custom_export_formats)
+                                                                                                                  desired_height=desired_height, custom_export_formats=custom_export_formats)
         # out_paths
         print(_specific_session_output_folder)
 
