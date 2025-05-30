@@ -1659,7 +1659,7 @@ class GenericDecoderDictDecodedEpochsDictResult(ComputedResult):
     # Updating and Adding                                                                                                  #
     # ==================================================================================================================== #
     @function_attributes(short_name=None, tags=['contexts', 'updating', 'adding'], input_requires=[], output_provides=[], uses=['.build_per_time_bin_marginals_df', '.compute_marginals'], used_by=[], creation_date='2025-03-19 15:00', related_items=['self.get_matching_contexts'])
-    def updating_results_for_context(self, new_context: IdentifyingContext, a_result: DecodedFilterEpochsResult, a_decoder:BasePositionDecoder, a_decoded_marginal_posterior_df: pd.DataFrame, an_epoch_to_decode: Optional[Epoch]=None, debug_print:bool=True): 
+    def updating_results_for_context(self, new_context: IdentifyingContext, a_result: DecodedFilterEpochsResult, a_decoder:BasePositionDecoder, a_decoded_marginal_posterior_df: Optional[pd.DataFrame]=None, an_epoch_to_decode: Optional[Epoch]=None, debug_print:bool=True): 
         """ Get a specific contexts
         reciprocal of `self.get_matching_contexts(...)`
         
@@ -1684,10 +1684,10 @@ class GenericDecoderDictDecodedEpochsDictResult(ComputedResult):
         # ==================================================================================================================== #
         _was_update_success: bool = _subfn_update_value_with_context_matching(self.filter_epochs_specific_decoded_result, new_context, updated_value=a_result)
         _was_update_success = _was_update_success and _subfn_update_value_with_context_matching(self.decoders, new_context, updated_value=a_decoder)
-        _was_update_success = _was_update_success and _subfn_update_value_with_context_matching(self.filter_epochs_decoded_track_marginal_posterior_df_dict, new_context, updated_value=a_decoded_marginal_posterior_df)
+        if a_decoded_marginal_posterior_df is not None:
+            _was_update_success = _was_update_success and _subfn_update_value_with_context_matching(self.filter_epochs_decoded_track_marginal_posterior_df_dict, new_context, updated_value=a_decoded_marginal_posterior_df)
         if an_epoch_to_decode is not None:
             _was_update_success = _was_update_success and _subfn_update_value_with_context_matching(self.filter_epochs_to_decode_dict, new_context, updated_value=an_epoch_to_decode)
-
         return _was_update_success
     
     
