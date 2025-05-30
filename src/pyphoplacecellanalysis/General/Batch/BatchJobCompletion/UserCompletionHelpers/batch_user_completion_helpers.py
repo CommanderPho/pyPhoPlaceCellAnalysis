@@ -3353,6 +3353,15 @@ def figures_plot_generalized_decode_epochs_dict_and_export_results_completion_fu
                 '_display_decoded_trackID_weighted_position_posterior_withMultiColorOverlay': _out,
             })
             
+
+            out_custom_formats_dict = _out.get('out_custom_formats_dict', None)
+            if out_custom_formats_dict is not None:
+                _out_final_merged_image_save_paths, _out_final_merged_images = PosteriorExporting.post_export_build_combined_images(out_custom_formats_dict=out_custom_formats_dict)
+                _out['final_merged_image_save_paths'] = deepcopy(_out_final_merged_image_save_paths)
+                # across_session_results_extended_dict['figures_plot_generalized_decode_epochs_dict_and_export_results_completion_function'].update({
+                #     '_display_decoded_trackID_weighted_position_posterior_withMultiColorOverlay': _out,
+                # })
+
         except Exception as e:
             print(f'\tfigures_plot_generalized_decode_epochs_dict_and_export_results_completion_function(...): "_display_decoded_trackID_weighted_position_posterior_withMultiColorOverlay" failed with error: {e}\n skipping.')
             raise
