@@ -83,6 +83,19 @@ class HeatmapExportKind(Enum):
         return [e.name for e in cls]
 
 
+
+def _build_no_op_image_export_functions_dict(a_decoder_decoded_epochs_result: DecodedFilterEpochsResult) -> List[Dict[str, Callable]]:
+    """ empty/no-op 
+    post_render_image_functions_dict_list: List[Dict[str, Callable]] = _build_image_export_functions_dict(a_decoder_decoded_epochs_result=a_decoder_decoded_epochs_result)
+
+    """
+    num_filter_epochs: int = a_decoder_decoded_epochs_result.num_filter_epochs
+    # Build post-image-generation callback functions _____________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
+    post_render_image_functions_dict_list: List = [dict() for i in np.arange(num_filter_epochs)] ## empty dict
+    return post_render_image_functions_dict_list
+
+
+
 @define(slots=False, eq=False)
 class HeatmapExportConfig:
     """ specifies a single configuration for exporitng a heatmap, such as a posterior"""
@@ -94,7 +107,7 @@ class HeatmapExportConfig:
     desired_width: Optional[int] = field(default=None)
     skip_img_normalization:bool = field(default=False)
     allow_override_aspect_ratio:bool = field(default=False)
-
+    post_render_image_functions_builder_fn: Optional[Callable] = field(default=_build_no_op_image_export_functions_dict) #List[Dict[str, Callable]]
 
     # lower_bound_alpha: float= field(default=0.1, metadata={'desc':'the lower bound for the alpha value for the color map. 0 means fully transparent, 1 means fully opaque.'})
     # drop_below_threshold: float = field(default=1e-3, metadata={'desc':'the threshold for the alpha value for the color map. 0 means fully transparent, 1 means fully opaque.'})
@@ -506,6 +519,86 @@ class PosteriorExporting:
         from pyphoplacecellanalysis.SpecificResults.AcrossSessionResults import AcrossSessionIdentityDataframeAccessor
         
 
+        def _subfn_default_build_image_export_functions_dict(a_decoder_decoded_epochs_result) -> List[Dict[str, Callable]]:
+            """ Captures nothing
+            
+            post_render_image_functions_dict_list: List[Dict[str, Callable]] = _build_image_export_functions_dict(a_decoder_decoded_epochs_result=a_decoder_decoded_epochs_result)
+            
+            """
+            num_filter_epochs: int = a_decoder_decoded_epochs_result.num_filter_epochs
+            active_filter_epochs: pd.DataFrame = ensure_dataframe(a_decoder_decoded_epochs_result.active_filter_epochs)
+            
+            assert Assert.require_columns(active_filter_epochs, required_columns=['maze_id'])
+            is_epoch_pre_post_delta = active_filter_epochs['maze_id'].to_numpy()
+            
+            # Build post-image-generation callback functions _____________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
+            
+            fixed_label_region_height: Optional[int] = 520
+
+            # font_size = 144
+            # font_size = 96
+            font_size = 72
+            
+            create_label_function = ImageOperationsAndEffects.create_fn_builder(ImageOperationsAndEffects.add_bottom_label, font_size=font_size, text_color=(255, 255, 255), background_color=(66, 66, 66), fixed_label_region_height=fixed_label_region_height)
+            # create_half_width_rectangle_function = ImageOperationsAndEffects.create_fn_builder(ImageOperationsAndEffects.add_half_width_rectangle, height_fraction = 0.1)    
+            create_solid_border_function = ImageOperationsAndEffects.create_fn_builder(ImageOperationsAndEffects.add_solid_border) # border_color = (0, 0, 0, 255)
+
+            post_render_image_functions_dict_list: List = []
+            
+            for i in np.arange(num_filter_epochs):
+                active_captured_single_epoch_result: SingleEpochDecodedResult = a_decoder_decoded_epochs_result.get_result_for_epoch(active_epoch_idx=i)
+
+                # Prepare a multi-line, sideways label _______________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
+
+                is_post_delta: bool = (is_epoch_pre_post_delta[i] > 0)
+                
+                ## get pre/post delta label:
+                earliest_t = active_captured_single_epoch_result.time_bin_edges[0]
+                # earliest_t_ms = earliest_t * 1e-3
+                earliest_t_str: str = "{:08.4f}".format(earliest_t)
+                # earliest_t_str: str = f"{earliest_t:.4f}"
+
+                # Create an image with a label
+                # labeled_image = add_bottom_label(original_image, "Time (seconds)", font_size=14)
+                # curr_x_axis_label_str: str = f'{earliest_t}'
+                # if not is_post_delta:
+                #      curr_x_axis_label_str = f'{curr_x_axis_label_str} (pre-delta)'
+                # else:
+                #     curr_x_axis_label_str = f'{curr_x_axis_label_str} (post-delta)'
+                
+                curr_x_axis_label_str: str = f''
+                if not is_post_delta:
+                    #  curr_x_axis_label_str = f'PRE'
+                        side = 'left'
+                        epoch_rect_color = '#4169E1'
+                                                
+                else:
+                    # curr_x_axis_label_str = f'POST'
+                    side = 'right'
+                    epoch_rect_color = '#DC143C'
+                    
+                # curr_x_axis_label_str = f"{curr_x_axis_label_str}[{i}]"
+                # curr_x_axis_label_str = f"{curr_x_axis_label_str}\n{earliest_t_str}"
+                curr_x_axis_label_str = f"{earliest_t_str}"
+
+                # curr_post_render_image_functions_dict = {'add_bottom_label': (lambda an_img: add_bottom_label(an_img, curr_x_axis_label_str, font_size=8))}
+                curr_post_render_image_functions_dict = {
+                    # 'add_bottom_label': create_label_function(curr_x_axis_label_str, font_size=font_size, text_color=(255, 255, 255), background_color=(66, 66, 66), text_outline_shadow_color=None, fixed_label_region_height=fixed_label_region_height, debug_print=False),
+                    'add_bottom_label': create_label_function(curr_x_axis_label_str, font_size=font_size, text_color=epoch_rect_color, background_color=(66, 66, 66), text_outline_shadow_color=None, fixed_label_region_height=fixed_label_region_height, debug_print=False),
+                    # 'create_solid_border_function': create_solid_border_function(border_width = 10, border_color = epoch_rect_color),
+                    # 'create_half_width_rectangle_function': create_half_width_rectangle_function(side, epoch_rect_color), ## create rect to indicate pre/post delta
+                    # 'create_half_width_rectangle_function': create_half_width_rectangle_function(side, epoch_rect_color),
+                }
+                post_render_image_functions_dict_list.append(curr_post_render_image_functions_dict)                        
+            # END for i in np.arange(num_filter_epochs)
+            
+
+            return post_render_image_functions_dict_list
+
+
+
+
+
 
         if not isinstance(posterior_out_folder, Path):
             posterior_out_folder = Path(posterior_out_folder).resolve()
@@ -522,41 +615,50 @@ class PosteriorExporting:
             custom_export_formats = deepcopy(custom_export_formats) # make sure they're all independent
 
         assert custom_export_formats is not None
+        
+        export_formats_post_render_image_functions_builder_fn_dict: Dict[str, List[Dict[str, Callable]]] = {}
+        
         for export_format_name, export_format_config in custom_export_formats.items():
             if export_format_config.export_folder is None:
                 export_format_config.export_folder = posterior_out_folder.joinpath(export_format_name).resolve()
             ## create the folder if needed
             export_format_config.export_folder.mkdir(parents=True, exist_ok=True)
                     
+            post_render_image_functions_builder_fn = getattr(export_format_config, 'post_render_image_functions_builder_fn', _subfn_default_build_image_export_functions_dict)
+            assert post_render_image_functions_builder_fn is not None
+            post_render_image_functions_dict_list: List[Dict[str, Callable]] = post_render_image_functions_builder_fn(a_decoder_decoded_epochs_result=a_decoder_decoded_epochs_result)
+            export_formats_post_render_image_functions_builder_fn_dict[export_format_name] = post_render_image_functions_dict_list
+
+        # END for export_format_n...
+            
+
         num_filter_epochs: int = a_decoder_decoded_epochs_result.num_filter_epochs
-        active_filter_epochs: pd.DataFrame = ensure_dataframe(a_decoder_decoded_epochs_result.active_filter_epochs)
+        # active_filter_epochs: pd.DataFrame = ensure_dataframe(a_decoder_decoded_epochs_result.active_filter_epochs)
         
-    
-        is_epoch_pre_post_delta = active_filter_epochs['maze_id'].to_numpy()
+        # assert Assert.require_columns(active_filter_epochs, required_columns=['maze_id'])
+        # is_epoch_pre_post_delta = active_filter_epochs['maze_id'].to_numpy()
         
 
         # Build post-image-generation callback functions _____________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
         
+        # fixed_label_region_height: Optional[int] = 520
 
-        fixed_label_region_height: Optional[int] = 520
-
-
-        # font_size = 144
-        # font_size = 96
-        font_size = 72
+        # # font_size = 144
+        # # font_size = 96
+        # font_size = 72
         
-        create_label_function = ImageOperationsAndEffects.create_fn_builder(ImageOperationsAndEffects.add_bottom_label, font_size=font_size, text_color=(255, 255, 255), background_color=(66, 66, 66), fixed_label_region_height=fixed_label_region_height)
+        # create_label_function = ImageOperationsAndEffects.create_fn_builder(ImageOperationsAndEffects.add_bottom_label, font_size=font_size, text_color=(255, 255, 255), background_color=(66, 66, 66), fixed_label_region_height=fixed_label_region_height)
         
-        # create_half_width_rectangle_function = ImageOperationsAndEffects.create_fn_builder(ImageOperationsAndEffects.add_half_width_rectangle, height_fraction = 0.1)
+        # # create_half_width_rectangle_function = ImageOperationsAndEffects.create_fn_builder(ImageOperationsAndEffects.add_half_width_rectangle, height_fraction = 0.1)
         
-        create_solid_border_function = ImageOperationsAndEffects.create_fn_builder(ImageOperationsAndEffects.add_solid_border) # border_color = (0, 0, 0, 255)
+        # create_solid_border_function = ImageOperationsAndEffects.create_fn_builder(ImageOperationsAndEffects.add_solid_border) # border_color = (0, 0, 0, 255)
 
-        # Create an image with a label
-        # labeled_image = add_bottom_label(original_image, "Time (seconds)", font_size=14)
-        # post_render_image_functions = {'add_bottom_label': (lambda an_img: add_bottom_label(an_img, "Time (seconds)", font_size=14)),
-                                        # }
-                                        
+        # # Create an image with a label
+        # # labeled_image = add_bottom_label(original_image, "Time (seconds)", font_size=14)
+        # # post_render_image_functions = {'add_bottom_label': (lambda an_img: add_bottom_label(an_img, "Time (seconds)", font_size=14)),
+        #                                 # }
 
+        
         _save_out_paths = []
         _save_out_format_results: Dict[str, List] = {}
         for i in np.arange(num_filter_epochs):
@@ -564,45 +666,45 @@ class PosteriorExporting:
 
             # Prepare a multi-line, sideways label _______________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
 
-            is_post_delta: bool = (is_epoch_pre_post_delta[i] > 0)
+            # is_post_delta: bool = (is_epoch_pre_post_delta[i] > 0)
             
-            ## get pre/post delta label:
-            earliest_t = active_captured_single_epoch_result.time_bin_edges[0]
-            # earliest_t_ms = earliest_t * 1e-3
-            earliest_t_str: str = "{:08.4f}".format(earliest_t)
-            # earliest_t_str: str = f"{earliest_t:.4f}"
+            # ## get pre/post delta label:
+            # earliest_t = active_captured_single_epoch_result.time_bin_edges[0]
+            # # earliest_t_ms = earliest_t * 1e-3
+            # earliest_t_str: str = "{:08.4f}".format(earliest_t)
+            # # earliest_t_str: str = f"{earliest_t:.4f}"
 
-            # Create an image with a label
-            # labeled_image = add_bottom_label(original_image, "Time (seconds)", font_size=14)
-            # curr_x_axis_label_str: str = f'{earliest_t}'
+            # # Create an image with a label
+            # # labeled_image = add_bottom_label(original_image, "Time (seconds)", font_size=14)
+            # # curr_x_axis_label_str: str = f'{earliest_t}'
+            # # if not is_post_delta:
+            # #      curr_x_axis_label_str = f'{curr_x_axis_label_str} (pre-delta)'
+            # # else:
+            # #     curr_x_axis_label_str = f'{curr_x_axis_label_str} (post-delta)'
+            
+            # curr_x_axis_label_str: str = f''
             # if not is_post_delta:
-            #      curr_x_axis_label_str = f'{curr_x_axis_label_str} (pre-delta)'
-            # else:
-            #     curr_x_axis_label_str = f'{curr_x_axis_label_str} (post-delta)'
-            
-            curr_x_axis_label_str: str = f''
-            if not is_post_delta:
-                #  curr_x_axis_label_str = f'PRE'
-                 side = 'left'
-                 epoch_rect_color = '#4169E1'
+            #     #  curr_x_axis_label_str = f'PRE'
+            #      side = 'left'
+            #      epoch_rect_color = '#4169E1'
                                             
-            else:
-                # curr_x_axis_label_str = f'POST'
-                side = 'right'
-                epoch_rect_color = '#DC143C'
+            # else:
+            #     # curr_x_axis_label_str = f'POST'
+            #     side = 'right'
+            #     epoch_rect_color = '#DC143C'
                 
-            # curr_x_axis_label_str = f"{curr_x_axis_label_str}[{i}]"
-            # curr_x_axis_label_str = f"{curr_x_axis_label_str}\n{earliest_t_str}"
-            curr_x_axis_label_str = f"{earliest_t_str}"
+            # # curr_x_axis_label_str = f"{curr_x_axis_label_str}[{i}]"
+            # # curr_x_axis_label_str = f"{curr_x_axis_label_str}\n{earliest_t_str}"
+            # curr_x_axis_label_str = f"{earliest_t_str}"
 
-            # curr_post_render_image_functions_dict = {'add_bottom_label': (lambda an_img: add_bottom_label(an_img, curr_x_axis_label_str, font_size=8))}
-            curr_post_render_image_functions_dict = {
-                # 'add_bottom_label': create_label_function(curr_x_axis_label_str, font_size=font_size, text_color=(255, 255, 255), background_color=(66, 66, 66), text_outline_shadow_color=None, fixed_label_region_height=fixed_label_region_height, debug_print=False),
-                'add_bottom_label': create_label_function(curr_x_axis_label_str, font_size=font_size, text_color=epoch_rect_color, background_color=(66, 66, 66), text_outline_shadow_color=None, fixed_label_region_height=fixed_label_region_height, debug_print=False),
-                # 'create_solid_border_function': create_solid_border_function(border_width = 10, border_color = epoch_rect_color),
-                # 'create_half_width_rectangle_function': create_half_width_rectangle_function(side, epoch_rect_color), ## create rect to indicate pre/post delta
-                # 'create_half_width_rectangle_function': create_half_width_rectangle_function(side, epoch_rect_color),
-            }
+            # # curr_post_render_image_functions_dict = {'add_bottom_label': (lambda an_img: add_bottom_label(an_img, curr_x_axis_label_str, font_size=8))}
+            # curr_post_render_image_functions_dict = {
+            #     # 'add_bottom_label': create_label_function(curr_x_axis_label_str, font_size=font_size, text_color=(255, 255, 255), background_color=(66, 66, 66), text_outline_shadow_color=None, fixed_label_region_height=fixed_label_region_height, debug_print=False),
+            #     'add_bottom_label': create_label_function(curr_x_axis_label_str, font_size=font_size, text_color=epoch_rect_color, background_color=(66, 66, 66), text_outline_shadow_color=None, fixed_label_region_height=fixed_label_region_height, debug_print=False),
+            #     # 'create_solid_border_function': create_solid_border_function(border_width = 10, border_color = epoch_rect_color),
+            #     # 'create_half_width_rectangle_function': create_half_width_rectangle_function(side, epoch_rect_color), ## create rect to indicate pre/post delta
+            #     # 'create_half_width_rectangle_function': create_half_width_rectangle_function(side, epoch_rect_color),
+            # }
                                       
             if desired_height is None:
                 ## set to 1x
@@ -616,7 +718,10 @@ class PosteriorExporting:
                     _save_out_format_results[export_format_name] = []
                     
 
-                ## create the folder if needed
+                ## get the post-render functions
+                curr_post_render_image_functions_dict = export_formats_post_render_image_functions_builder_fn_dict[export_format_name][i]
+                
+
                 # _posterior_image, posterior_save_path = active_captured_single_epoch_result.save_posterior_as_image(parent_array_as_image_output_folder=v.export_folder, export_grayscale=v.export_grayscale, colormap=v.colormap, skip_img_normalization=False, desired_height=desired_height, **kwargs)
                 _posterior_image, posterior_save_path = active_captured_single_epoch_result.save_posterior_as_image(parent_array_as_image_output_folder=export_format_config.export_folder, **(kwargs|export_format_config.to_dict()), post_render_image_functions=curr_post_render_image_functions_dict)
                 _output_export_format_config = deepcopy(export_format_config)
