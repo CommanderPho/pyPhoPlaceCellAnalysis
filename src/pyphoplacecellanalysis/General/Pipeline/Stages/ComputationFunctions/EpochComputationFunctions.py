@@ -3007,9 +3007,6 @@ class EpochComputationDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Di
             print(f'done.')
 
 
-
-
-
             # ==================================================================================================================================================================================================================================================================================== #
             # TODO 2025-05-30 17:54: - [ ] Export 1D results in the "competition normalized" way that Kamran likes                                                                                                                                                                                 #
             # ==================================================================================================================================================================================================================================================================================== #
@@ -3038,7 +3035,7 @@ class EpochComputationDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Di
             # Run an export function again _______________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
             pseudo2D_split_to_1D_custom_export_formats: Dict[str, HeatmapExportConfig] = {
                 # 'greyscale_shared_norm': HeatmapExportConfig.init_greyscale(desired_height=desired_height, post_render_image_functions_builder_fn=ImagePostRenderFunctionSets._build_no_op_image_export_functions_dict),
-                'viridis_shared_norm': HeatmapExportConfig(colormap='viridis', export_kind=HeatmapExportKind.COLORMAPPED, desired_height=desired_height, post_render_image_functions_builder_fn=ImagePostRenderFunctionSets._build_no_op_image_export_functions_dict),
+                'viridis_shared_norm': HeatmapExportConfig(colormap='viridis', export_kind=HeatmapExportKind.COLORMAPPED, vmin=0.0, vmax=1.0, desired_height=desired_height, post_render_image_functions_builder_fn=ImagePostRenderFunctionSets._build_no_op_image_export_functions_dict),
             }
             pseudo2D_split_to_1D_out_paths, pseudo2D_split_to_1D_out_custom_formats_dict = PosteriorExporting.perform_export_all_decoded_posteriors_as_images(decoder_laps_filter_epochs_decoder_result_dict=None,
                                                                                                                         decoder_ripple_filter_epochs_decoder_result_dict=a_pseudo2D_split_to_1D_continuous_results_dict, ## just the ripples
