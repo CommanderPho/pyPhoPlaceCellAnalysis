@@ -132,9 +132,6 @@ def _setup_spike_raster_window_for_debugging(spike_raster_window, wants_docked_r
     if background_static_scroll_window_plot is not None:
         _all_outputs_dict['background_static_scroll_window_plot'] = background_static_scroll_window_plot
 
-
-    
-
     should_replace_hardcoded_main_plots_with_tracks: bool = False
     if (enable_interval_overview_track and wants_docked_raster_window_track):
         should_replace_hardcoded_main_plots_with_tracks = True

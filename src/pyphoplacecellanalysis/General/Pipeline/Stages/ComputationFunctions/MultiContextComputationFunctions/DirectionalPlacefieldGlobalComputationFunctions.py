@@ -8400,6 +8400,8 @@ from pyphoplacecellanalysis.GUI.Qt.Menus.BaseMenuProviderMixin import BaseMenuCo
 @define(slots=False)
 class AddNewDirectionalDecodedEpochs_MatplotlibPlotCommand(BaseMenuCommand):
     """ 2024-01-17 
+    ## #TODO 2025-06-02 10:27: - [ ] BROKEN, Not aligned with positions also plotted
+
     Adds four rows to the SpikeRaster2D showing the decoded posteriors for the PBE epochs for each of the four 1D decoders
     These are the ones Kamran wants to be normalized differently.
     
@@ -8503,7 +8505,9 @@ class AddNewDirectionalDecodedEpochs_MatplotlibPlotCommand(BaseMenuCommand):
         """ adds the decoded epochs for the long/short decoder from the global_computation_results as new matplotlib plot rows. """
         from pyphoplacecellanalysis.General.Model.Configs.LongShortDisplayConfig import DisplayColorsEnum
         from pyphoplacecellanalysis.GUI.PyQtPlot.DockingWidgets.DynamicDockDisplayAreaContent import CustomDockDisplayConfig
-        from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.RankOrderComputations import RankOrderAnalyses
+        from pyphoplacecellanalysis.GUI.PyQtPlot.DockingWidgets.SpecificDockWidgetManipulatingMixin import SpecificDockWidgetManipulatingMixin #TODO 2025-06-02 10:28: - [ ] Converting to use `SpecificDockWidgetManipulatingMixin`
+        from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import DecodedFilterEpochsResult, SingleEpochDecodedResult
+
         showCloseButton = True
         dock_configs = dict(zip(('long_LR', 'long_RL', 'short_LR', 'short_RL'), (CustomDockDisplayConfig(custom_get_colors_callback_fn=DisplayColorsEnum.Laps.get_LR_dock_colors, showCloseButton=showCloseButton), CustomDockDisplayConfig(custom_get_colors_callback_fn=DisplayColorsEnum.Laps.get_RL_dock_colors, showCloseButton=showCloseButton),
                         CustomDockDisplayConfig(custom_get_colors_callback_fn=DisplayColorsEnum.Laps.get_LR_dock_colors, showCloseButton=showCloseButton), CustomDockDisplayConfig(custom_get_colors_callback_fn=DisplayColorsEnum.Laps.get_RL_dock_colors, showCloseButton=showCloseButton))))
@@ -8516,8 +8520,8 @@ class AddNewDirectionalDecodedEpochs_MatplotlibPlotCommand(BaseMenuCommand):
         time_bin_size: float = directional_decoders_decode_result.most_recent_decoding_time_bin_size
         if debug_print:
             print(f'time_bin_size: {time_bin_size}')
-        continuously_decoded_dict: Dict[str, DecodedFilterEpochsResult] = directional_decoders_decode_result.most_recent_continuously_decoded_dict
-        all_directional_continuously_decoded_dict = continuously_decoded_dict or {}
+        a_continuously_decoded_dict: Dict[str, DecodedFilterEpochsResult] = directional_decoders_decode_result.most_recent_continuously_decoded_dict
+        all_directional_continuously_decoded_dict = a_continuously_decoded_dict or {}
 
         # Need all_directional_pf1D_Decoder_dict
         output_dict = {}
@@ -8967,7 +8971,7 @@ class AddNewDecodedPosteriors_MatplotlibPlotCommand(BaseMenuCommand):
 class AddNewDecodedEpochMarginal_MatplotlibPlotCommand(AddNewDecodedPosteriors_MatplotlibPlotCommand):
     """ 2024-01-23
     Adds THREE rows ('non_marginalized_raw_result', 'marginal_over_direction', 'marginal_over_track_ID') to the SpikeRaster2D showing the marginalized posteriors for the continuously decoded decoder
-    These are the 4 x n_total_time_bins grid of context likelihoods.
+    These are the 4 x n_total_time_bins grid of context likelihoods. They are normalized okay, maybe how Kamran wants them?
     
     Usage:
     from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import AddNewDecodedPosteriors_MatplotlibPlotCommand
@@ -8983,6 +8987,8 @@ class AddNewDecodedEpochMarginal_MatplotlibPlotCommand(AddNewDecodedPosteriors_M
     enable_marginal_over_track_ID: bool = field(default=True)
     allow_overwrite_enabled_marginals_from_params: bool = field(default=True, metadata={'desc': 'if True, allows overwriting self.enable_* properties with the values in `self._spike_raster_window.spike_raster_plt_2d.params`.'})
 
+
+    @function_attributes(short_name=None, tags=['private'], input_requires=[], output_provides=[], uses=['plot_1D_most_likely_position_comparsions', 'get_heatmap_cmap'], used_by=['cls.prepare_and_perform_add_pseudo2D_decoder_decoded_epoch_marginals'], creation_date='2025-06-02 09:55', related_items=[])
     @classmethod
     def _perform_add_new_decoded_posterior_marginal_row(cls, curr_active_pipeline, active_2d_plot, a_dock_config, a_variable_name: str, time_window_centers, xbin, a_1D_posterior, extended_dock_title_info: Optional[str]=None):
         """ used with `add_pseudo2D_decoder_decoded_epoch_marginals` - adds a single decoded row to the matplotlib dynamic output
@@ -9043,7 +9049,7 @@ class AddNewDecodedEpochMarginal_MatplotlibPlotCommand(AddNewDecodedPosteriors_M
         return identifier_name, widget, matplotlib_fig, matplotlib_fig_axes
     
 
-
+    @function_attributes(short_name=None, tags=['private'], input_requires=[], output_provides=[], uses=['cls._perform_add_new_decoded_posterior_marginal_row', 'DirectionalPseudo2DDecodersResult.build_non_marginalized_raw_posteriors', 'PlottingHelpers.helper_matplotlib_add_pseudo2D_marginal_labels'], used_by=['add_all_computed_time_bin_sizes_pseudo2D_decoder_decoded_epoch_marginals'], creation_date='2025-06-02 09:52', related_items=[])
     @classmethod
     def prepare_and_perform_add_pseudo2D_decoder_decoded_epoch_marginals(cls, curr_active_pipeline, active_2d_plot, continuously_decoded_dict: Dict[str, DecodedFilterEpochsResult], info_string: str, enable_non_marginalized_raw_result: bool=True, 
                                                                          enable_marginal_over_direction: bool=False, enable_marginal_over_track_ID: bool=True, enable_marginal_labels:bool=True, debug_print: bool=False):
@@ -9159,9 +9165,14 @@ class AddNewDecodedEpochMarginal_MatplotlibPlotCommand(AddNewDecodedPosteriors_M
 
 
 
+    @function_attributes(short_name=None, tags=['MAIN'], input_requires=[], output_provides=[], uses=['cls.prepare_and_perform_add_pseudo2D_decoder_decoded_epoch_marginals'], used_by=[], creation_date='2025-06-02 09:50', related_items=[])
     @classmethod
     def add_all_computed_time_bin_sizes_pseudo2D_decoder_decoded_epoch_marginals(cls, curr_active_pipeline, active_2d_plot, debug_print=False, **kwargs):
-        """ adds all computed time_bin_sizes in `curr_active_pipeline.global_computation_results.computed_data['DirectionalDecodersDecoded'].continuously_decoded_result_cache_dict` from the global_computation_results as new matplotlib plot rows. """
+        """ adds all computed time_bin_sizes in `curr_active_pipeline.global_computation_results.computed_data['DirectionalDecodersDecoded'].continuously_decoded_result_cache_dict` from the global_computation_results as new matplotlib plot rows.
+
+        We might not always want to add all time bin sizes, sometimes they're overwhelming. Better to generate a separate menu option for each size.
+
+        """
         
         ## Uses the `global_computation_results.computed_data['DirectionalDecodersDecoded']`
         directional_decoders_decode_result: DirectionalDecodersContinuouslyDecodedResult = curr_active_pipeline.global_computation_results.computed_data['DirectionalDecodersDecoded']
@@ -9198,6 +9209,7 @@ class AddNewDecodedEpochMarginal_MatplotlibPlotCommand(AddNewDecodedPosteriors_M
         return flat_all_time_bin_sizes_output_tuples_dict
 
 
+    @function_attributes(short_name=None, tags=['MAIN'], input_requires=[], output_provides=[], uses=['.add_all_computed_time_bin_sizes_pseudo2D_decoder_decoded_epoch_marginals'], used_by=[], creation_date='2025-06-02 09:51', related_items=[])
     def execute(self, *args, **kwargs) -> None:
         """ 
         
@@ -9226,10 +9238,6 @@ class AddNewDecodedEpochMarginal_MatplotlibPlotCommand(AddNewDecodedPosteriors_M
 
         enable_rows_config_kwargs = dict(enable_non_marginalized_raw_result=self.enable_non_marginalized_raw_result, enable_marginal_over_direction=self.enable_marginal_over_direction, enable_marginal_over_track_ID=self.enable_marginal_over_track_ID)
         
-
-        
-
-        # output_dict = self.add_pseudo2D_decoder_decoded_epoch_marginals(self._active_pipeline, active_2d_plot, **enable_rows_config_kwargs)
         output_dict = self.add_all_computed_time_bin_sizes_pseudo2D_decoder_decoded_epoch_marginals(self._active_pipeline, active_2d_plot, **enable_rows_config_kwargs)
         
         # Update display output dict:
