@@ -2619,7 +2619,7 @@ class EpochComputationDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Di
     @function_attributes(short_name='trackID_weighted_position_posterior', tags=['context-decoder-comparison', 'decoded_position', 'directional'], conforms_to=['output_registering', 'figure_saving'], input_requires=[], output_provides=[], requires_global_keys=["global_computation_results.computed_data['EpochComputations']"], uses=['FigureCollector'], used_by=[], creation_date='2025-05-03 00:00', related_items=[], is_global=True)
     def _display_decoded_trackID_weighted_position_posterior_withMultiColorOverlay(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, save_figure=True, override_fig_man: Optional[FileOutputManager]=None, ax=None,
                                                                                     custom_export_formats: Optional[Dict[str, Any]]=None, parent_output_folder: Optional[Path] = None, time_bin_size: float=0.025, delete_previous_outputs_folder:bool=True, desired_height:int=1200, 
-                                                                                    masked_time_bin_fill_type='ignore', **kwargs):
+                                                                                    masked_time_bin_fill_type='ignore', enable_laps_merged_export: bool = True, **kwargs):
             """ Exports individual posteriors to file in an overlayed manner
             
             
@@ -3012,23 +3012,37 @@ class EpochComputationDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Di
             # ==================================================================================================================================================================================================================================================================================== #
 
             print(f'beginning export of 1D results in the normalizations style Kamran likes...')
-            ## INPUTS: decoder_ripple_filter_epochs_decoder_result_dict
-            
 
-            # From `General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions.prepare_and_perform_add_add_pseudo2D_decoder_decoded_epochs`
-            # all_directional_continuously_decoded_dict = most_recent_continuously_decoded_dict or {}
-            a_pseudo2D_decoder_continuously_decoded_result: DecodedFilterEpochsResult = deepcopy(decoder_ripple_filter_epochs_decoder_result_dict[f'psuedo2D_{masked_time_bin_fill_type}']) ## only the ignore result
+            ## INPUTS: decoder_laps_filter_epochs_decoder_result_dict, decoder_ripple_filter_epochs_decoder_result_dict
+            if enable_laps_merged_export:
+                in_pseudo2D_dict = {'laps': deepcopy(decoder_ripple_filter_epochs_decoder_result_dict[f'psuedo2D_{masked_time_bin_fill_type}']), 
+                                    'ripple': deepcopy(decoder_laps_filter_epochs_decoder_result_dict[f'psuedo2D_{masked_time_bin_fill_type}'])}
+            else:
+                in_pseudo2D_dict = {'laps': None, 
+                                    'ripple': deepcopy(decoder_laps_filter_epochs_decoder_result_dict[f'psuedo2D_{masked_time_bin_fill_type}'])}
+
+            pseudo2D_split_to_1D_continuous_results_dict_dict = {}
 
 
-            ## INPUTS: laps_pseudo2D_continuous_specific_decoded_result: DecodedFilterEpochsResult
-            # unique_decoder_names = ('long', 'short')
-            # a_non_PBE_marginal_over_track_ID, a_non_PBE_marginal_over_track_ID_posterior_df = DirectionalPseudo2DDecodersResult.build_generalized_non_marginalized_raw_posteriors(a_pseudo2D_decoder_continuously_decoded_result, unique_decoder_names=unique_decoder_names) #AssertionError: only works when curr_array_shape[1]: 4 correspond to the unique_decoder_names: ('long', 'short'). (typically all-directional decoder).
+            for a_decoded_epoch_name, a_pseudo2D_decoder_continuously_decoded_result in in_pseudo2D_dict.items():
 
-            unique_decoder_names = ('long_LR', 'long_RL', 'short_LR', 'short_RL')
-            a_pseudo2D_split_to_1D_continuous_results_dict: Dict[types.DecoderName, DecodedFilterEpochsResult] = a_pseudo2D_decoder_continuously_decoded_result.split_pseudo2D_result_to_1D_result(pseudo2D_decoder_names_list=unique_decoder_names)
-            # a_masked_pseudo2D_split_to_1D_continuous_results_dict: Dict[types.DecoderName, DecodedFilterEpochsResult] = a_masked_pseudo2D_decoder_continuously_decoded_result.split_pseudo2D_result_to_1D_result(pseudo2D_decoder_names_list=unique_decoder_names)
-            a_pseudo2D_split_to_1D_continuous_results_dict = {k:DecodedFilterEpochsResult.perform_add_additional_epochs_columns(a_result=a_result, **_common_add_columns_kwargs) for k, a_result in a_pseudo2D_split_to_1D_continuous_results_dict.items()} ## add the extra columns if needed
-            # OUTPUTS: a_pseudo2D_split_to_1D_continuous_results_dict, a_masked_pseudo2D_split_to_1D_continuous_results_dict
+                # From `General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions.prepare_and_perform_add_add_pseudo2D_decoder_decoded_epochs`
+                # all_directional_continuously_decoded_dict = most_recent_continuously_decoded_dict or {}
+                # a_pseudo2D_decoder_continuously_decoded_result: DecodedFilterEpochsResult = deepcopy(decoder_ripple_filter_epochs_decoder_result_dict[f'psuedo2D_{masked_time_bin_fill_type}']) ## only the ignore result
+
+
+                ## INPUTS: laps_pseudo2D_continuous_specific_decoded_result: DecodedFilterEpochsResult
+                # unique_decoder_names = ('long', 'short')
+                # a_non_PBE_marginal_over_track_ID, a_non_PBE_marginal_over_track_ID_posterior_df = DirectionalPseudo2DDecodersResult.build_generalized_non_marginalized_raw_posteriors(a_pseudo2D_decoder_continuously_decoded_result, unique_decoder_names=unique_decoder_names) #AssertionError: only works when curr_array_shape[1]: 4 correspond to the unique_decoder_names: ('long', 'short'). (typically all-directional decoder).
+
+                unique_decoder_names = ('long_LR', 'long_RL', 'short_LR', 'short_RL')
+                a_pseudo2D_split_to_1D_continuous_results_dict: Dict[types.DecoderName, DecodedFilterEpochsResult] = a_pseudo2D_decoder_continuously_decoded_result.split_pseudo2D_result_to_1D_result(pseudo2D_decoder_names_list=unique_decoder_names)
+                # a_masked_pseudo2D_split_to_1D_continuous_results_dict: Dict[types.DecoderName, DecodedFilterEpochsResult] = a_masked_pseudo2D_decoder_continuously_decoded_result.split_pseudo2D_result_to_1D_result(pseudo2D_decoder_names_list=unique_decoder_names)
+                a_pseudo2D_split_to_1D_continuous_results_dict = {k:DecodedFilterEpochsResult.perform_add_additional_epochs_columns(a_result=a_result, **_common_add_columns_kwargs) for k, a_result in a_pseudo2D_split_to_1D_continuous_results_dict.items()} ## add the extra columns if needed
+                # OUTPUTS: a_pseudo2D_split_to_1D_continuous_results_dict, a_masked_pseudo2D_split_to_1D_continuous_results_dict
+                pseudo2D_split_to_1D_continuous_results_dict_dict[a_decoded_epoch_name] = deepcopy(a_pseudo2D_split_to_1D_continuous_results_dict)
+
+
 
 
 
@@ -3037,8 +3051,8 @@ class EpochComputationDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Di
                 # 'greyscale_shared_norm': HeatmapExportConfig.init_greyscale(desired_height=desired_height, post_render_image_functions_builder_fn=ImagePostRenderFunctionSets._build_no_op_image_export_functions_dict),
                 'viridis_shared_norm': HeatmapExportConfig(colormap='viridis', export_kind=HeatmapExportKind.COLORMAPPED, vmin=0.0, vmax=1.0, desired_height=desired_height, post_render_image_functions_builder_fn=ImagePostRenderFunctionSets._build_no_op_image_export_functions_dict),
             }
-            pseudo2D_split_to_1D_out_paths, pseudo2D_split_to_1D_out_custom_formats_dict = PosteriorExporting.perform_export_all_decoded_posteriors_as_images(decoder_laps_filter_epochs_decoder_result_dict=None,
-                                                                                                                        decoder_ripple_filter_epochs_decoder_result_dict=a_pseudo2D_split_to_1D_continuous_results_dict, ## just the ripples
+            pseudo2D_split_to_1D_out_paths, pseudo2D_split_to_1D_out_custom_formats_dict = PosteriorExporting.perform_export_all_decoded_posteriors_as_images(decoder_laps_filter_epochs_decoder_result_dict=pseudo2D_split_to_1D_continuous_results_dict_dict['laps'],
+                                                                                                                        decoder_ripple_filter_epochs_decoder_result_dict=pseudo2D_split_to_1D_continuous_results_dict_dict['ripple'], ## just the ripples
                                                                                                                     _save_context=_parent_save_context, parent_output_folder=_specific_session_output_folder,
                                                                                                                     desired_height=desired_height, custom_export_formats=pseudo2D_split_to_1D_custom_export_formats, combined_img_padding=6, combined_img_separator_color=(0, 0, 0, 0))
             if not isinstance(graphics_output_dict['out_paths'], benedict):
