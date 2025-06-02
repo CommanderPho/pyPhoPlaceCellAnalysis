@@ -1,3 +1,4 @@
+from typing import Optional
 import matplotlib.pyplot as plt
 import numpy as np
 
@@ -90,75 +91,200 @@ def debug_widget_size_policy(a_size_policy):
             f"h_stretch={a_size_policy.horizontalStretch()}, v_stretch={a_size_policy.verticalStretch()})")
     
 
+
+def debug_widget_size_adjust_policy(a_size_adjust_policy):
+    """Format a QSizePolicy with relevant information.
+    
+    Args:
+        obj: QSizePolicy object
+        p: IPython printer
+        
+    Returns:
+        Formatted string representation
+    """
+    from PyQt5.QtWidgets import QAbstractScrollArea
+
+    
+
+    general_policies = {QAbstractScrollArea.SizeAdjustPolicy.AdjustIgnored: "Ignored",
+                        QAbstractScrollArea.SizeAdjustPolicy.AdjustToContents: "ToContents",
+                        QAbstractScrollArea.SizeAdjustPolicy.AdjustToContentsOnFirstShow: "ToContentsOnFirstShow",
+    }   
+    
+    size_adjust_policy_str: str = general_policies.get(a_size_adjust_policy, f"Unknown({a_size_adjust_policy})")
+    print(f"QAbstractScrollArea.SizeAdjustPolicy({size_adjust_policy_str})")
+    
+
     
 
 @function_attributes(short_name=None, tags=['debug_print', 'debug', 'print', 'pyqt5', 'pyqt', 'qwidget'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-04-04 06:45', related_items=[])
-def debug_widget_geometry(a_widget, widget_name="Unknown"):
+def debug_widget_geometry(a_widget, widget_name: Optional[str]=None, single_line_print: bool=False):
     """Print comprehensive debug information about a DockLabel to diagnose layout issues.
     
     from pyphoplacecellanalysis.General.Mixins.DisplayHelpers import debug_widget_geometry
     
     
     """
-    widget_type = type(a_widget)
-    print(f"\n--- {widget_type} Debug: {widget_name} ---")
-    
-    # Basic geometry info
-    print(f"Position: ({a_widget.x()}, {a_widget.y()})")
-    print(f"Size: {a_widget.width()} × {a_widget.height()}")
-    print(f"Geometry: {a_widget.geometry()}")
-    print(f"Content rect: {a_widget.rect()}")
-    print(f"Size hint: {a_widget.sizeHint()}")
-    print(f"Minimum size hint: {a_widget.minimumSizeHint()}")
-    
-    # Size constraints
-    print(f"Minimum size: {a_widget.minimumSize()}")
-    print(f"Maximum size: {a_widget.maximumSize()}")
-    print(f"Minimum width/height: {a_widget.minimumWidth()}, {a_widget.minimumHeight()}")
-    print(f"Maximum width/height: {a_widget.maximumWidth()}, {a_widget.maximumHeight()}")
-    
-    # Layout related
-    print(f"Base size: {a_widget.baseSize()}")
-    print(f"Size increment: {a_widget.sizeIncrement()}")
-    try:
-        print(f"Contents rect: {a_widget.contentsRect()}")
-        margins = a_widget.contentsMargins()
-        print(f"Contents margins: left={margins.left()}, top={margins.top()}, right={margins.right()}, bottom={margins.bottom()}")
-    except AttributeError:
-        print("Contents rect/margins: Not available")
-    
-    print(f"Layout direction: {a_widget.layoutDirection()}")
-    
-    # Frame related
-    try:
-        print(f"Frame geometry: {a_widget.frameGeometry()}")
-        print(f"Frame size: {a_widget.frameSize()}")
-        print(f"Frame width: {a_widget.frameWidth()}")
-    except AttributeError:
-        print("Frame properties: Not available")
-    
-    # Window related
-    try:
-        print(f"Window frame geometry: {a_widget.windowFrameGeometry()}")
-        print(f"Normal geometry: {a_widget.normalGeometry()}")
-    except AttributeError:
-        print("Window frame properties: Not available")
+    def _perform_print(*args, **kwargs):
+        """ captures single_line_print """
+        if not single_line_print:
+            print(*args, **kwargs)
+        else:
+            print(*args, kwargs.pop('end', '\t'), **kwargs)
         
-    # Orientation and layout issues
-    # print(f"Orientation: {a_widget.orientation}")
-    # print(f"Dim state: {a_widget.dim}")
-    print(f"Size policy:", end='\t') # {a_widget.sizePolicy().horizontalPolicy()}, {a_widget.sizePolicy().verticalPolicy()}
-    debug_widget_size_policy(a_size_policy=a_widget.sizePolicy())
-    
-    # Visibility and enablement
-    print(f"Is visible: {a_widget.isVisible()}")
-    print(f"Is enabled: {a_widget.isEnabled()}")
-    print(f"Is shown: {not a_widget.isHidden()}")
-    
-    # Parent and layout context
-    print(f"Parent type: {type(a_widget.parent()).__name__}")
-    
-    print("--- End Debug Info ---\n")
+    widget_type = type(a_widget)
+    widget_object_name: Optional[str] = a_widget.objectName()
+    if not widget_object_name:
+        widget_object_name = None
+        
+    if widget_name is None:
+        ## no name provided
+        undefined_widget_name: str = 'Unnamed'
+        widget_name = (widget_object_name or undefined_widget_name)
+        
+    if single_line_print:
+        _perform_print('(')
+        _perform_print(f"Geometry: {a_widget.geometry()}")
+        _perform_print(f"Content rect: {a_widget.rect()}")
+        _perform_print(f"Size hint: {a_widget.sizeHint()}")
+        _perform_print(f"Minimum size hint: {a_widget.minimumSizeHint()}")
+        
+        # Size constraints
+        _perform_print(f"Minimum size: {a_widget.minimumSize()}")
+        _perform_print(f"Maximum size: {a_widget.maximumSize()}")
+        _perform_print(f"Minimum width/height: {a_widget.minimumWidth()}, {a_widget.minimumHeight()}")
+        _perform_print(f"Maximum width/height: {a_widget.maximumWidth()}, {a_widget.maximumHeight()}")
+        
+        # Layout related
+        _perform_print(f"Base size: {a_widget.baseSize()}")
+        _perform_print(f"Size increment: {a_widget.sizeIncrement()}")
+        try:
+            _perform_print(f"Contents rect: {a_widget.contentsRect()}")
+            margins = a_widget.contentsMargins()
+            _perform_print(f"Contents margins: left={margins.left()}, top={margins.top()}, right={margins.right()}, bottom={margins.bottom()}")
+        except AttributeError:
+            _perform_print("Contents rect/margins: Not available")
+        
+        # _perform_print(f"Layout direction: {a_widget.layoutDirection()}")
+        
+        # # Frame related
+        # try:
+        #     _perform_print(f"Frame geometry: {a_widget.frameGeometry()}")
+        #     _perform_print(f"Frame size: {a_widget.frameSize()}")
+        #     _perform_print(f"Frame width: {a_widget.frameWidth()}")
+        # except AttributeError:
+        #     _perform_print("Frame properties: Not available")
+        
+        # # Window related
+        # try:
+        #     _perform_print(f"Window frame geometry: {a_widget.windowFrameGeometry()}")
+        #     _perform_print(f"Normal geometry: {a_widget.normalGeometry()}")
+        # except AttributeError:
+        #     _perform_print("Window frame properties: Not available")
+            
+        # Orientation and layout issues
+        # _perform_print(f"Orientation: {a_widget.orientation}")
+        # _perform_print(f"Dim state: {a_widget.dim}")
+        _perform_print(f"Size policy:", end='\t') # {a_widget.sizePolicy().horizontalPolicy()}, {a_widget.sizePolicy().verticalPolicy()}
+        debug_widget_size_policy(a_size_policy=a_widget.sizePolicy())
+        
+
+        try:
+            a_size_adjust_policy = a_widget.sizeAdjustPolicy()
+            _perform_print(f"Size Adjust policy:", end='\t')
+            if a_size_adjust_policy is not None:
+                debug_widget_size_adjust_policy(a_size_adjust_policy=a_size_adjust_policy)                
+        except (AttributeError, KeyError) as e:
+            # AttributeError: 'NestedDockAreaWidget' object has no attribute 'sizeAdjustPolicy'
+            pass
+        except Exception as e:
+            raise
+        
+        
+        # Visibility and enablement
+        if not a_widget.isEnabled():
+            _perform_print(f"Is enabled: {a_widget.isEnabled()}")
+        if not a_widget.isVisible():
+            _perform_print(f"Is visible: {a_widget.isVisible()}")
+        
+        _perform_print(')')
+        
+    else:
+        ## multi-line output
+        _widget_desc_str: str = f"\n--- {widget_type} Debug: '{widget_name}' ---"
+        if (widget_object_name is not None) and (widget_object_name != widget_name):
+            _widget_desc_str = f"{_widget_desc_str}\n.objectName(): '{widget_object_name}'"
+            
+        _perform_print(_widget_desc_str)
+        # Basic geometry info
+        _perform_print(f"Position: ({a_widget.x()}, {a_widget.y()})")
+        _perform_print(f"Size: {a_widget.width()} × {a_widget.height()}")
+        _perform_print(f"Geometry: {a_widget.geometry()}")
+        _perform_print(f"Content rect: {a_widget.rect()}")
+        _perform_print(f"Size hint: {a_widget.sizeHint()}")
+        _perform_print(f"Minimum size hint: {a_widget.minimumSizeHint()}")
+        
+        # Size constraints
+        _perform_print(f"Minimum size: {a_widget.minimumSize()}")
+        _perform_print(f"Maximum size: {a_widget.maximumSize()}")
+        _perform_print(f"Minimum width/height: {a_widget.minimumWidth()}, {a_widget.minimumHeight()}")
+        _perform_print(f"Maximum width/height: {a_widget.maximumWidth()}, {a_widget.maximumHeight()}")
+        
+        # Layout related
+        _perform_print(f"Base size: {a_widget.baseSize()}")
+        _perform_print(f"Size increment: {a_widget.sizeIncrement()}")
+        try:
+            _perform_print(f"Contents rect: {a_widget.contentsRect()}")
+            margins = a_widget.contentsMargins()
+            _perform_print(f"Contents margins: left={margins.left()}, top={margins.top()}, right={margins.right()}, bottom={margins.bottom()}")
+        except AttributeError:
+            _perform_print("Contents rect/margins: Not available")
+        
+        _perform_print(f"Layout direction: {a_widget.layoutDirection()}")
+        
+        # Frame related
+        try:
+            _perform_print(f"Frame geometry: {a_widget.frameGeometry()}")
+            _perform_print(f"Frame size: {a_widget.frameSize()}")
+            _perform_print(f"Frame width: {a_widget.frameWidth()}")
+        except AttributeError:
+            _perform_print("Frame properties: Not available")
+        
+        # Window related
+        try:
+            _perform_print(f"Window frame geometry: {a_widget.windowFrameGeometry()}")
+            _perform_print(f"Normal geometry: {a_widget.normalGeometry()}")
+        except AttributeError:
+            _perform_print("Window frame properties: Not available")
+            
+        # Orientation and layout issues
+        # _perform_print(f"Orientation: {a_widget.orientation}")
+        # _perform_print(f"Dim state: {a_widget.dim}")
+        _perform_print(f"Size policy:", end='\t') # {a_widget.sizePolicy().horizontalPolicy()}, {a_widget.sizePolicy().verticalPolicy()}
+        debug_widget_size_policy(a_size_policy=a_widget.sizePolicy())
+
+
+        try:
+            a_size_adjust_policy = a_widget.sizeAdjustPolicy()
+            _perform_print(f"Size Adjust policy:", end='\t')
+            if a_size_adjust_policy is not None:
+                debug_widget_size_adjust_policy(a_size_adjust_policy=a_size_adjust_policy)                
+        except (AttributeError, KeyError) as e:
+            # AttributeError: 'NestedDockAreaWidget' object has no attribute 'sizeAdjustPolicy'
+            pass
+        except Exception as e:
+            raise
+        
+        
+        # Visibility and enablement
+        _perform_print(f"Is visible: {a_widget.isVisible()}")
+        _perform_print(f"Is enabled: {a_widget.isEnabled()}")
+        _perform_print(f"Is shown: {not a_widget.isHidden()}")
+        
+        # Parent and layout context
+        _perform_print(f"Parent type: {type(a_widget.parent()).__name__}")
+        
+        _perform_print("--- End Debug Info ---\n")
     
 
 

@@ -126,7 +126,8 @@ def _setup_spike_raster_window_for_debugging(spike_raster_window, wants_docked_r
     main_graphics_layout_widget = active_2d_plot.ui.get('main_graphics_layout_widget', None) # GraphicsLayoutWidget
     if main_graphics_layout_widget is not None:
         _all_outputs_dict['main_graphics_layout_widget'] = main_graphics_layout_widget
-        
+        main_graphics_layout_widget.setSizeAdjustPolicy(QAbstractScrollArea.SizeAdjustPolicy.AdjustToContentsOnFirstShow)
+
     # active_window_container_layout = active_2d_plot.ui.active_window_container_layout
     active_window_container_layout = active_2d_plot.ui.get('active_window_container_layout', None) # QSplitter
     if active_window_container_layout is not None:
