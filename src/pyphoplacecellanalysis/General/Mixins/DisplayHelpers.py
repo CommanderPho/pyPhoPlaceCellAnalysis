@@ -46,7 +46,26 @@ TODO: EXPLORE: REVIEW: thse debug_print_* functions seem very useful and I didn'
 # ==================================================================================================================== #
 # General                                                                                                              #
 # ==================================================================================================================== #
-@function_attributes(short_name=None, tags=['debug_print','debug','print','QRect'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-05-11 19:55', related_items=[])
+def debug_build_QRect_str(rect, prefix_string='rect: ', indent_string = '\t', include_edge_positions=False) -> str:
+    """ Prints QRectF in a more readible format
+    By default printing QRectF objects results in output like 'PyQt5.QtCore.QRectF(57.847549828567, -0.007193522045074202, 15.76451934295443, 1.0150365839255244)'
+        Which is in the format (x, y, width, height)
+
+    Input:
+        rect: QRectF
+        include_edge_positions: Bool - If True, prints the relative edge positions like .left(), .right(), .top(), .bottom()
+    Output:
+        QRectF(x: 57.847549828567, y: -0.007193522045074202, width: 15.76451934295443, height: 1.0150365839255244)  
+    """
+    out_str: str = f'{indent_string}{prefix_string}QRectF(x: {rect.x()}, y: {rect.y()}, w: {rect.width()}, h: {rect.height()})' # Concise
+    # print(f'{indent_string}{prefix_string}QRectF(x: {rect.x()}, y: {rect.y()}, width: {rect.width()}, height: {rect.height()})') # Concise
+    if include_edge_positions:
+        out_str += f'\n{indent_string}{indent_string}left: {rect.left()}\t right: {rect.right()}'
+        out_str += f'\n{indent_string}{indent_string}top: {rect.top()}\t bottom: {rect.bottom()}'
+        
+    return out_str
+
+@function_attributes(short_name=None, tags=['debug_print','debug','print','QRect'], input_requires=[], output_provides=[], uses=['debug_build_QRect_str'], used_by=[], creation_date='2023-05-11 19:55', related_items=[])
 def debug_print_QRect(rect, prefix_string='rect: ', indent_string = '\t', include_edge_positions=False):
     """ Prints QRectF in a more readible format
     By default printing QRectF objects results in output like 'PyQt5.QtCore.QRectF(57.847549828567, -0.007193522045074202, 15.76451934295443, 1.0150365839255244)'
@@ -58,11 +77,9 @@ def debug_print_QRect(rect, prefix_string='rect: ', indent_string = '\t', includ
     Output:
         QRectF(x: 57.847549828567, y: -0.007193522045074202, width: 15.76451934295443, height: 1.0150365839255244)  
     """
-    print(f'{indent_string}{prefix_string}QRectF(x: {rect.x()}, y: {rect.y()}, width: {rect.width()}, height: {rect.height()})') # Concise
-    if include_edge_positions:
-        print(f'{indent_string}{indent_string}left: {rect.left()}\t right: {rect.right()}')    
-        print(f'{indent_string}{indent_string}top: {rect.top()}\t bottom: {rect.bottom()}')
-    
+    print(debug_build_QRect_str(rect, prefix_string=prefix_string, indent_string=indent_string, include_edge_positions=include_edge_positions)) # Concise
+
+
 
 def debug_widget_size_policy(a_size_policy):
     """Format a QSizePolicy with relevant information.
