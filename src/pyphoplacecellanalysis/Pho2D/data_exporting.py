@@ -1373,7 +1373,7 @@ class PosteriorExporting:
         _out_final_merged_images = []
         _out_final_merged_image_save_paths: List[Path] = []
 
-        export_format_name_options = ['greyscale_shared_norm', 'greyscale']
+        export_format_name_options = ['viridis_shared_norm', 'greyscale_shared_norm', 'greyscale']
 
         for a_decoding_epoch_name in epoch_name_list:
             try:
@@ -1410,9 +1410,16 @@ class PosteriorExporting:
                     ## END for decoder_IDX, a_d...
 
                     ## get the multicolor iamge:
-                    a_config = out_custom_formats_dict[f'{a_decoding_epoch_name}.{pseudo_2D_decoder_name}']['raw_rgba'][epoch_IDX] # a HeatmapExportConfig
-                    _tmp_curr_raster_imgs.append(a_config.posterior_saved_image)
-                    
+                    try:
+                        a_config = out_custom_formats_dict[f'{a_decoding_epoch_name}.{pseudo_2D_decoder_name}']['raw_rgba'][epoch_IDX] # a HeatmapExportConfig
+                        _tmp_curr_raster_imgs.append(a_config.posterior_saved_image)
+                    except KeyError as e:
+                        # KeyError: "Invalid keys: '['laps', 'long_LR']'"
+                        print(f"could not get multicolor image data for out_custom_formats_dict[f'{a_decoding_epoch_name}.{pseudo_2D_decoder_name}']['raw_rgba'][{epoch_IDX}], key error: {e}\n\tskipping.")    
+                        pass
+                    except Exception as e:
+                        raise
+
                     # a_config.posterior_saved_image ## the actual image object
                     a_posterior_saved_path: Path = a_config.posterior_saved_path ## the saved image file
                     merged_dir = a_posterior_saved_path.parent.parent.parent.joinpath('combined', 'multi')
