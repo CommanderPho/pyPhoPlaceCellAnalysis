@@ -1322,7 +1322,7 @@ class PosteriorExporting:
         _out_final_merged_images = []
         _out_final_merged_image_save_paths: List[Path] = []
 
-        export_format_name_options = ['viridis_shared_norm', 'greyscale_shared_norm', 'greyscale']
+        export_format_name_options = ['greyscale_shared_norm', 'viridis_shared_norm', 'greyscale']
 
         for a_decoding_epoch_name in epoch_name_list:
             try:
@@ -1339,20 +1339,13 @@ class PosteriorExporting:
 
                 num_epochs: int = len(_a_partial_dict[active_found_export_format_name])
 
-                # num_epochs: int = len(out_custom_formats_dict[f'{a_decoding_epoch_name}.{a_decoder_name}']['greyscale'])
-
-                # num_epochs: int = len(out_custom_formats_dict[f'{a_decoding_epoch_name}.long_LR']['greyscale'])
-                # _out_final_merged_images = []
-                # _out_final_merged_image_save_paths = []
-
                 for epoch_IDX in np.arange(num_epochs):
                     # vertical stack
                     _tmp_curr_raster_imgs = []
                     for decoder_IDX, a_decoder_name in enumerate(active_1D_decoder_names):
                         a_config = out_custom_formats_dict[f'{a_decoding_epoch_name}.{a_decoder_name}'][active_found_export_format_name][epoch_IDX] # a HeatmapExportConfig
-                        # a_config.posterior_saved_image ## the actual image object
                         # a_config.posterior_saved_path ## the saved image file
-                        an_active_img = deepcopy(a_config.posterior_saved_image)
+                        an_active_img = deepcopy(a_config.posterior_saved_image) ## the actual image object
                         an_active_img = an_active_img.reduce(factor=(1, 4)) ## scale image down by 1/4 in height but leave the original width
                         
                         _tmp_curr_raster_imgs.append(an_active_img)
