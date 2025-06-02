@@ -1,5 +1,7 @@
 # .SpikeRasterWidgets
-
+from copy import deepcopy
+from typing import Optional
+import numpy as np
 from pyphoplacecellanalysis.External.pyqtgraph.Qt import QtCore, QtGui, QtWidgets
 from pyphocorehelpers.gui.Qt.widget_positioning_helpers import WidgetPositioningHelpers
 from pyphocorehelpers.programming_helpers import metadata_attributes
@@ -68,6 +70,34 @@ def _get_required_static_layout_height(active_2d_plot) -> float:
     return required_static_children_bounding_rect_height
 
     
+@function_attributes(short_name=None, tags=['resize'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-06-02 14:29', related_items=[])
+def _post_hoc_layout_resize(active_2d_plot, desired_static_area_height: Optional[float]=None):
+    """ resizes the dynamic tracks to static area heights
+    
+    from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.SpikeRasterWidgets.spike_raster_widgets import _post_hoc_layout_resize
+    
+    _post_hoc_layout_resize(active_2d_plot=active_2d_plot, desired_static_area_height=249)
+    
+    """
+    main_content_splitter = active_2d_plot.ui.main_content_splitter # QSplitter
+    if desired_static_area_height is None:
+        required_static_children_bounding_rect_height: float = _get_required_static_layout_height(active_2d_plot=active_2d_plot)
+        desired_static_area_height = required_static_children_bounding_rect_height
+    else:
+        ## use user provided
+        print(f'desired_static_area_height: {desired_static_area_height}')
+        
+    ## INPUTS: main_content_splitter, required_static_children_bounding_rect_height
+    original_sizes = np.array(main_content_splitter.sizes())
+    extra_v_height = (original_sizes[-1] - required_static_children_bounding_rect_height)
+    desired_sizes = deepcopy(original_sizes)
+    desired_sizes[-1] = required_static_children_bounding_rect_height
+    desired_sizes[0] = desired_sizes[0] + extra_v_height
+
+    assert np.sum(desired_sizes) == np.sum(original_sizes), f"np.sum(desired_sizes): {np.sum(desired_sizes)} != np.sum(original_sizes): {np.sum(original_sizes)}"
+
+    main_content_splitter.setSizes(desired_sizes.tolist())
+
 
 
 @function_attributes(short_name=None, tags=['2024-12-18', 'ACTIVE', 'gui', 'debugging', 'continuous'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-12-18 19:29', related_items=[])
