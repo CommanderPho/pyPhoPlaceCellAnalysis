@@ -8426,55 +8426,78 @@ class AddNewDirectionalDecodedEpochs_MatplotlibPlotCommand(BaseMenuCommand):
         from pyphoplacecellanalysis.GUI.PyQtPlot.DockingWidgets.SpecificDockWidgetManipulatingMixin import SpecificDockWidgetManipulatingMixin #TODO 2025-06-02 10:28: - [ ] Converting to use `SpecificDockWidgetManipulatingMixin`
         from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import DecodedFilterEpochsResult, SingleEpochDecodedResult
 
-        showCloseButton = True
-        dock_configs = dict(zip(('long_LR', 'long_RL', 'short_LR', 'short_RL'), (CustomDockDisplayConfig(custom_get_colors_callback_fn=DisplayColorsEnum.Laps.get_LR_dock_colors, showCloseButton=showCloseButton), CustomDockDisplayConfig(custom_get_colors_callback_fn=DisplayColorsEnum.Laps.get_RL_dock_colors, showCloseButton=showCloseButton),
-                        CustomDockDisplayConfig(custom_get_colors_callback_fn=DisplayColorsEnum.Laps.get_LR_dock_colors, showCloseButton=showCloseButton), CustomDockDisplayConfig(custom_get_colors_callback_fn=DisplayColorsEnum.Laps.get_RL_dock_colors, showCloseButton=showCloseButton))))
 
-
-        ## Uses the `global_computation_results.computed_data['DirectionalDecodersDecoded']`
-        directional_decoders_decode_result: DirectionalDecodersContinuouslyDecodedResult = curr_active_pipeline.global_computation_results.computed_data['DirectionalDecodersDecoded']
-        all_directional_pf1D_Decoder_dict: Dict[str, BasePositionDecoder] = directional_decoders_decode_result.pf1D_Decoder_dict
-        # continuously_decoded_result_cache_dict = directional_decoders_decode_result.continuously_decoded_result_cache_dict
-        time_bin_size: float = directional_decoders_decode_result.most_recent_decoding_time_bin_size
-        if debug_print:
-            print(f'time_bin_size: {time_bin_size}')
-        a_continuously_decoded_dict: Dict[str, DecodedFilterEpochsResult] = directional_decoders_decode_result.most_recent_continuously_decoded_dict
-        all_directional_continuously_decoded_dict = a_continuously_decoded_dict or {}
-
-        # Need all_directional_pf1D_Decoder_dict
         output_dict = {}
 
+        ## get the result data:
+        try:
+            time_bin_size: float = directional_decoders_decode_result.most_recent_decoding_time_bin_size
+            if debug_print:
+                print(f'time_bin_size: {time_bin_size}')
 
-        for a_decoder_name, a_decoder in all_directional_pf1D_Decoder_dict.items():
-            a_dock_config = dock_configs[a_decoder_name]
-            # a_decoder.conform_to_position_bins
-            # active_posterior = a_decoder.marginal
-            ## renormalize all the posteriors
-            
-            a_decoded_result = all_directional_continuously_decoded_dict.get(a_decoder_name, None) # already decoded
-            _out_tuple = cls._perform_add_new_decoded_row(curr_active_pipeline=curr_active_pipeline, active_2d_plot=active_2d_plot, a_dock_config=a_dock_config, a_decoder_name=a_decoder_name, a_decoder=a_decoder, a_decoded_result=a_decoded_result)
-            # identifier_name, widget, matplotlib_fig, matplotlib_fig_axes = _out_tuple
-            output_dict[a_decoder_name] = _out_tuple
+            ## Uses the `global_computation_results.computed_data['DirectionalDecodersDecoded']`
+            directional_decoders_decode_result: DirectionalDecodersContinuouslyDecodedResult = curr_active_pipeline.global_computation_results.computed_data['DirectionalDecodersDecoded']
+            # pseudo2D_decoder: BasePositionDecoder = directional_decoders_decode_result.pseudo2D_decoder
+            all_directional_pf1D_Decoder_dict: Dict[str, BasePositionDecoder] = directional_decoders_decode_result.pf1D_Decoder_dict
+            a_continuously_decoded_dict: Dict[str, DecodedFilterEpochsResult] = directional_decoders_decode_result.continuously_decoded_result_cache_dict.get(time_bin_size, None)
+            all_time_bin_sizes_output_dict: Dict[float, Dict[types.DecoderName, SingleEpochDecodedResult]] = directional_decoders_decode_result.split_pseudo2D_continuous_result_to_1D_continuous_result()
+            a_split_pseudo2D_continuous_result_to_1D_continuous_result_dict: Dict[types.DecoderName, SingleEpochDecodedResult] = all_time_bin_sizes_output_dict.get(time_bin_size, None)
+
+            assert a_continuously_decoded_dict is not None, f"a_continuously_decoded_dict is None even after recomputing!"
+            assert a_split_pseudo2D_continuous_result_to_1D_continuous_result_dict is not None, f"a_split_pseudo2D_continuous_result_to_1D_continuous_result_dict is None even after recomputing!"
+            info_string: str = f" - t_bin_size: {time_bin_size:.3f}"
+
+        except (KeyError, AttributeError) as e:
+            # KeyError: 'DirectionalDecodersDecoded'
+            print(f'add_all_computed_time_bin_sizes_pseudo2D_decoder_decoded_epochs(...) failed to add any tracks, perhaps because the pipeline is missing any computed "DirectionalDecodersDecoded" global results. Error: "{e}". Skipping.')
+            a_continuously_decoded_dict = None
+            pseudo2D_decoder = None        
+            pass
+
+        except Exception as e:
+            raise
+
+
+        # ==================================================================================================================== #
+        # PLOTTING                                                                                                             #
+        # ==================================================================================================================== #
+        dock_group_sep_character: str = '_'
+        showCloseButton = True
+        _common_dock_config_kwargs = {'dock_group_names': [dock_group_sep_character.join([f'ContinuousDecode', info_string])], 'showCloseButton': showCloseButton}
+        dock_configs: Dict[str, CustomDockDisplayConfig] = dict(zip(('long_LR', 'long_RL', 'short_LR', 'short_RL'),
+                                (CustomDockDisplayConfig(custom_get_colors_callback_fn=DisplayColorsEnum.Laps.get_LR_dock_colors, **_common_dock_config_kwargs),
+                                CustomDockDisplayConfig(custom_get_colors_callback_fn=DisplayColorsEnum.Laps.get_RL_dock_colors, **_common_dock_config_kwargs),
+                                CustomDockDisplayConfig(custom_get_colors_callback_fn=DisplayColorsEnum.Laps.get_LR_dock_colors, **_common_dock_config_kwargs),
+                                CustomDockDisplayConfig(custom_get_colors_callback_fn=DisplayColorsEnum.Laps.get_RL_dock_colors, **_common_dock_config_kwargs))))
+
+        output_dict = active_2d_plot.add_docked_decoded_results_dict_tracks(name=f'ContinuousDecode', a_decoded_result_dict=a_split_pseudo2D_continuous_result_to_1D_continuous_result_dict, dock_configs=dock_configs, pf1D_Decoder_dict=all_directional_pf1D_Decoder_dict,
+                                                                                                    measured_position_df=deepcopy(curr_active_pipeline.sess.position.to_dataframe()),
+                                                                                                    extended_dock_title_info=info_string)
+        ## layout the dockGroups:
+        nested_dock_items, nested_dynamic_docked_widget_container_widgets = active_2d_plot.ui.dynamic_docked_widget_container.layout_dockGroups()
+        
 
         return output_dict
     
     def validate_can_display(self) -> bool:
         """ returns True if the item is enabled, otherwise returns false """
-        try:
-            curr_active_pipeline = self._active_pipeline
-            # assert curr_active_pipeline is not None
-            if curr_active_pipeline is None:
-                raise ValueError("Current active pipeline is None!")
-            active_2d_plot = self._spike_raster_window.spike_raster_plt_2d
-            # assert active_2d_plot is not None
-            if active_2d_plot is None:
-                raise ValueError("active_2d_plot is None!")
+        #TODO 2025-06-02 10:42: - [ ] Fixed, but now redundant, so disable perminantly by default
+        return False
+        # try:
+        #     curr_active_pipeline = self._active_pipeline
+        #     # assert curr_active_pipeline is not None
+        #     if curr_active_pipeline is None:
+        #         raise ValueError("Current active pipeline is None!")
+        #     active_2d_plot = self._spike_raster_window.spike_raster_plt_2d
+        #     # assert active_2d_plot is not None
+        #     if active_2d_plot is None:
+        #         raise ValueError("active_2d_plot is None!")
 
-            return DirectionalDecodersContinuouslyDecodedResult.validate_has_directional_decoded_continuous_epochs(curr_active_pipeline=curr_active_pipeline)
+        #     return DirectionalDecodersContinuouslyDecodedResult.validate_has_directional_decoded_continuous_epochs(curr_active_pipeline=curr_active_pipeline)
             
-        except Exception as e:
-            print(f'Exception {e} occured in validate_can_display(), returning False')
-            return False
+        # except Exception as e:
+        #     print(f'Exception {e} occured in validate_can_display(), returning False')
+        #     return False
 
     def execute(self, *args, **kwargs) -> None:
         print(f'menu execute(): {self}')
