@@ -8929,6 +8929,16 @@ class AddNewDecodedEpochMarginal_MatplotlibPlotCommand(AddNewDecodedPosteriors_M
     allow_overwrite_enabled_marginals_from_params: bool = field(default=True, metadata={'desc': 'if True, allows overwriting self.enable_* properties with the values in `self._spike_raster_window.spike_raster_plt_2d.params`.'})
 
 
+    @property
+    def all_computed_time_bin_sizes(self) -> List[float]:
+        """The all_computed_time_bin_sizes property."""
+        assert self._active_pipeline is not None
+        ## Uses the `global_computation_results.computed_data['DirectionalDecodersDecoded']`
+        directional_decoders_decode_result: DirectionalDecodersContinuouslyDecodedResult = self._active_pipeline.global_computation_results.computed_data['DirectionalDecodersDecoded']
+        continuously_decoded_result_cache_dict = directional_decoders_decode_result.continuously_decoded_result_cache_dict
+        return list(continuously_decoded_result_cache_dict.keys())
+
+
     @function_attributes(short_name=None, tags=['private'], input_requires=[], output_provides=[], uses=['plot_1D_most_likely_position_comparsions', 'get_heatmap_cmap'], used_by=['cls.prepare_and_perform_add_pseudo2D_decoder_decoded_epoch_marginals'], creation_date='2025-06-02 09:55', related_items=[])
     @classmethod
     def _perform_add_new_decoded_posterior_marginal_row(cls, curr_active_pipeline, active_2d_plot, a_dock_config, a_variable_name: str, time_window_centers, xbin, a_1D_posterior, extended_dock_title_info: Optional[str]=None):
