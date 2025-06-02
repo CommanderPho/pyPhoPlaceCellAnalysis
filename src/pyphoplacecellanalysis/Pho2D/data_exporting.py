@@ -99,6 +99,8 @@ class HeatmapExportConfig:
     desired_height: Optional[int] = field(default=None) 
     desired_width: Optional[int] = field(default=None)
     skip_img_normalization:bool = field(default=False)
+    vmin: Optional[float] = field(default=None, metadata={'desc': 'used for colormap normalization. The min colormap value.'})
+    vmax: Optional[float] = field(default=None, metadata={'desc': 'used for colormap normalization. The max colormap value.'})
     allow_override_aspect_ratio:bool = field(default=False)
     post_render_image_functions_builder_fn: Optional[Callable] = field(default=ImagePostRenderFunctionSets._build_no_op_image_export_functions_dict, metadata={'desc': 'a function that builds the post-rendering image modification functions list'}) #List[Dict[str, Callable]]
 
@@ -558,65 +560,12 @@ class PosteriorExporting:
         # # font_size = 96
         # font_size = 72
         
-        # create_label_function = ImageOperationsAndEffects.create_fn_builder(ImageOperationsAndEffects.add_bottom_label, font_size=font_size, text_color=(255, 255, 255), background_color=(66, 66, 66), fixed_label_region_height=fixed_label_region_height)
-        
-        # # create_half_width_rectangle_function = ImageOperationsAndEffects.create_fn_builder(ImageOperationsAndEffects.add_half_width_rectangle, height_fraction = 0.1)
-        
-        # create_solid_border_function = ImageOperationsAndEffects.create_fn_builder(ImageOperationsAndEffects.add_solid_border) # border_color = (0, 0, 0, 255)
-
-        # # Create an image with a label
-        # # labeled_image = add_bottom_label(original_image, "Time (seconds)", font_size=14)
-        # # post_render_image_functions = {'add_bottom_label': (lambda an_img: add_bottom_label(an_img, "Time (seconds)", font_size=14)),
-        #                                 # }
-
-        
         _save_out_paths = []
         _save_out_format_results: Dict[str, List] = {}
         for i in np.arange(num_filter_epochs):
             active_captured_single_epoch_result: SingleEpochDecodedResult = a_decoder_decoded_epochs_result.get_result_for_epoch(active_epoch_idx=i)
 
-            # Prepare a multi-line, sideways label _______________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
-
-            # is_post_delta: bool = (is_epoch_pre_post_delta[i] > 0)
-            
-            # ## get pre/post delta label:
-            # earliest_t = active_captured_single_epoch_result.time_bin_edges[0]
-            # # earliest_t_ms = earliest_t * 1e-3
-            # earliest_t_str: str = "{:08.4f}".format(earliest_t)
-            # # earliest_t_str: str = f"{earliest_t:.4f}"
-
-            # # Create an image with a label
-            # # labeled_image = add_bottom_label(original_image, "Time (seconds)", font_size=14)
-            # # curr_x_axis_label_str: str = f'{earliest_t}'
-            # # if not is_post_delta:
-            # #      curr_x_axis_label_str = f'{curr_x_axis_label_str} (pre-delta)'
-            # # else:
-            # #     curr_x_axis_label_str = f'{curr_x_axis_label_str} (post-delta)'
-            
-            # curr_x_axis_label_str: str = f''
-            # if not is_post_delta:
-            #     #  curr_x_axis_label_str = f'PRE'
-            #      side = 'left'
-            #      epoch_rect_color = '#4169E1'
-                                            
-            # else:
-            #     # curr_x_axis_label_str = f'POST'
-            #     side = 'right'
-            #     epoch_rect_color = '#DC143C'
-                
-            # # curr_x_axis_label_str = f"{curr_x_axis_label_str}[{i}]"
-            # # curr_x_axis_label_str = f"{curr_x_axis_label_str}\n{earliest_t_str}"
-            # curr_x_axis_label_str = f"{earliest_t_str}"
-
-            # # curr_post_render_image_functions_dict = {'add_bottom_label': (lambda an_img: add_bottom_label(an_img, curr_x_axis_label_str, font_size=8))}
-            # curr_post_render_image_functions_dict = {
-            #     # 'add_bottom_label': create_label_function(curr_x_axis_label_str, font_size=font_size, text_color=(255, 255, 255), background_color=(66, 66, 66), text_outline_shadow_color=None, fixed_label_region_height=fixed_label_region_height, debug_print=False),
-            #     'add_bottom_label': create_label_function(curr_x_axis_label_str, font_size=font_size, text_color=epoch_rect_color, background_color=(66, 66, 66), text_outline_shadow_color=None, fixed_label_region_height=fixed_label_region_height, debug_print=False),
-            #     # 'create_solid_border_function': create_solid_border_function(border_width = 10, border_color = epoch_rect_color),
-            #     # 'create_half_width_rectangle_function': create_half_width_rectangle_function(side, epoch_rect_color), ## create rect to indicate pre/post delta
-            #     # 'create_half_width_rectangle_function': create_half_width_rectangle_function(side, epoch_rect_color),
-            # }
-                                      
+            # Prepare a multi-line, sideways label _______________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #                                      
             if desired_height is None:
                 ## set to 1x
                 desired_height = active_captured_single_epoch_result.n_xbins # 1 pixel for each xbin
