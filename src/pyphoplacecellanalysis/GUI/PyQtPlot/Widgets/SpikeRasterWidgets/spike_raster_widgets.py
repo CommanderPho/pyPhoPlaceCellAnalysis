@@ -53,6 +53,23 @@ from pyphoplacecellanalysis.GUI.Qt.SpikeRasterWindows.Spike3DRasterWindowWidget 
         
         
 
+def _get_required_static_layout_height(active_2d_plot) -> float:
+    """ 
+        from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.SpikeRasterWidgets.spike_raster_widgets import _get_required_static_layout_height
+    
+        required_static_children_bounding_rect_height: float = _get_required_static_layout_height(active_2d_plot=active_2d_plot)
+        main_graphics_layout_widget.setMaximumHeight(required_static_children_bounding_rect_height)
+        
+    """
+    import pyphoplacecellanalysis.External.pyqtgraph as pg
+    root_layout: pg.GraphicsLayout = active_2d_plot.plots.background_static_scroll_window_plot.parentWidget()
+    static_children_bounding_rect = root_layout.childrenBoundingRect() # QRectF
+    required_static_children_bounding_rect_height: float = static_children_bounding_rect.height()
+    return required_static_children_bounding_rect_height
+
+    
+
+
 @function_attributes(short_name=None, tags=['2024-12-18', 'ACTIVE', 'gui', 'debugging', 'continuous'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-12-18 19:29', related_items=[])
 def _setup_spike_raster_window_for_debugging(spike_raster_window, wants_docked_raster_window_track:bool=False, enable_interval_overview_track:bool=False, debug_print=False):
     """ Called to setup a specific `spike_raster_window` instance for 2024-12-18 style debugging.
@@ -73,7 +90,9 @@ def _setup_spike_raster_window_for_debugging(spike_raster_window, wants_docked_r
 
     """
     import pyphoplacecellanalysis.External.pyqtgraph as pg
-    
+    from PyQt5.QtWidgets import QAbstractScrollArea
+    from PyQt5.QtWidgets import QSizePolicy
+
     is_docked_pyqtgraph_plots_mode: bool = spike_raster_window.params.use_docked_pyqtgraph_plots
 
 
@@ -144,6 +163,13 @@ def _setup_spike_raster_window_for_debugging(spike_raster_window, wants_docked_r
         if not should_replace_hardcoded_main_plots_with_tracks:
             main_plot_widget.setMinimumHeight(20.0)
         _all_outputs_dict['main_plot_widget'] = main_plot_widget
+        
+        if main_graphics_layout_widget is not None:
+            main_graphics_layout_widget.setSizeAdjustPolicy(QAbstractScrollArea.SizeAdjustPolicy.AdjustToContentsOnFirstShow)                    
+            required_static_children_bounding_rect_height: float = _get_required_static_layout_height(active_2d_plot=active_2d_plot)
+            print(f'required_static_children_bounding_rect_height: {required_static_children_bounding_rect_height}')
+            # main_graphics_layout_widget.setMaximumHeight(required_static_children_bounding_rect_height)
+
     else:
         active_window_container_layout.setVisible(False)
 
