@@ -2618,8 +2618,9 @@ class EpochComputationDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Di
 
     @function_attributes(short_name='trackID_weighted_position_posterior', tags=['context-decoder-comparison', 'decoded_position', 'directional'], conforms_to=['output_registering', 'figure_saving'], input_requires=[], output_provides=[], requires_global_keys=["global_computation_results.computed_data['EpochComputations']"], uses=['FigureCollector'], used_by=[], creation_date='2025-05-03 00:00', related_items=[], is_global=True)
     def _display_decoded_trackID_weighted_position_posterior_withMultiColorOverlay(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, save_figure=True, override_fig_man: Optional[FileOutputManager]=None, ax=None,
-                                                                                    custom_export_formats: Optional[Dict[str, Any]]=None, parent_output_folder: Optional[Path] = None, time_bin_size: float=0.025, delete_previous_outputs_folder:bool=True, desired_height:int=1200, **kwargs):
-            """ Exports individual posteriors in an overlayed manner
+                                                                                    custom_export_formats: Optional[Dict[str, Any]]=None, parent_output_folder: Optional[Path] = None, time_bin_size: float=0.025, delete_previous_outputs_folder:bool=True, desired_height:int=1200, 
+                                                                                    masked_time_bin_fill_type='ignore', **kwargs):
+            """ Exports individual posteriors to file in an overlayed manner
             
             
             "HeatmapExportConfig"
@@ -2731,9 +2732,6 @@ class EpochComputationDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Di
             # ==================================================================================================================================================================================================================================================================================== #
             # Build outputs:                                                                                                                                                                                                                                                              #
             # ==================================================================================================================================================================================================================================================================================== #
-
-
-
 
             graphics_output_dict = {'parent_output_folder': parent_output_folder, 'time_bin_size': time_bin_size}
 
@@ -2889,9 +2887,6 @@ class EpochComputationDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Di
             ]
 
             flat_result_context_dict = {k:v for k, v in flat_result_context_dict.items() if k in active_ctxts}
-            # flat_result_context_dict
-
-            # decoder_ripple_filter_epochs_decoder_result_dict = deepcopy(flat_result_context_dict)
             decoder_ripple_filter_epochs_decoder_result_dict = {f"psuedo2D_{k.get('masked_time_bin_fill_type')}":deepcopy(v) for k, v in flat_result_context_dict.items()}
             
 
@@ -3012,17 +3007,20 @@ class EpochComputationDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Di
             print(f'done.')
 
 
+
+
+
             # ==================================================================================================================================================================================================================================================================================== #
             # TODO 2025-05-30 17:54: - [ ] Export 1D results in the "competition normalized" way that Kamran likes                                                                                                                                                                                 #
             # ==================================================================================================================================================================================================================================================================================== #
 
-
+            print(f'beginning export of 1D results in the normalizations style Kamran likes...')
             ## INPUTS: decoder_ripple_filter_epochs_decoder_result_dict
             
 
             # From `General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions.prepare_and_perform_add_add_pseudo2D_decoder_decoded_epochs`
             # all_directional_continuously_decoded_dict = most_recent_continuously_decoded_dict or {}
-            a_pseudo2D_decoder_continuously_decoded_result: DecodedFilterEpochsResult = deepcopy(decoder_ripple_filter_epochs_decoder_result_dict['psuedo2D_ignore']) ## only the ignore result
+            a_pseudo2D_decoder_continuously_decoded_result: DecodedFilterEpochsResult = deepcopy(decoder_ripple_filter_epochs_decoder_result_dict[f'psuedo2D_{masked_time_bin_fill_type}']) ## only the ignore result
 
 
             ## INPUTS: laps_pseudo2D_continuous_specific_decoded_result: DecodedFilterEpochsResult
@@ -3039,13 +3037,13 @@ class EpochComputationDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Di
 
             # Run an export function again _______________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
             pseudo2D_split_to_1D_custom_export_formats: Dict[str, HeatmapExportConfig] = {
-                'greyscale_shared_norm': HeatmapExportConfig.init_greyscale(desired_height=desired_height, post_render_image_functions_builder_fn=ImagePostRenderFunctionSets._build_no_op_image_export_functions_dict),
-                # 'color': HeatmapExportConfig(colormap=colormap, export_kind=HeatmapExportKind.COLORMAPPED, desired_height=desired_height, post_render_image_functions_builder_fn=ImagePostRenderFunctionSets._build_no_op_image_export_functions_dict, **kwargs),
+                # 'greyscale_shared_norm': HeatmapExportConfig.init_greyscale(desired_height=desired_height, post_render_image_functions_builder_fn=ImagePostRenderFunctionSets._build_no_op_image_export_functions_dict),
+                'viridis_shared_norm': HeatmapExportConfig(colormap='viridis', export_kind=HeatmapExportKind.COLORMAPPED, desired_height=desired_height, post_render_image_functions_builder_fn=ImagePostRenderFunctionSets._build_no_op_image_export_functions_dict),
             }
             pseudo2D_split_to_1D_out_paths, pseudo2D_split_to_1D_out_custom_formats_dict = PosteriorExporting.perform_export_all_decoded_posteriors_as_images(decoder_laps_filter_epochs_decoder_result_dict=None,
                                                                                                                         decoder_ripple_filter_epochs_decoder_result_dict=a_pseudo2D_split_to_1D_continuous_results_dict, ## just the ripples
                                                                                                                     _save_context=_parent_save_context, parent_output_folder=_specific_session_output_folder,
-                                                                                                                    desired_height=desired_height, custom_export_formats=pseudo2D_split_to_1D_custom_export_formats, combined_img_padding=6, combined_img_separator_color=(0, 0, 0, 255))
+                                                                                                                    desired_height=desired_height, custom_export_formats=pseudo2D_split_to_1D_custom_export_formats, combined_img_padding=6, combined_img_separator_color=(0, 0, 0, 0))
             if not isinstance(graphics_output_dict['out_paths'], benedict):
                 graphics_output_dict['out_paths'] = benedict(graphics_output_dict['out_paths']) # 'out_paths': out_paths
             # graphics_output_dict['out_paths'].merge(pseudo2D_split_to_1D_out_paths)
@@ -3057,8 +3055,7 @@ class EpochComputationDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Di
             graphics_output_dict['out_custom_formats_dict'].merge({k:v for k, v in pseudo2D_split_to_1D_out_custom_formats_dict.items() if (v is not None)})
 
             # print(f'\tout_paths: {pseudo2D_split_to_1D_out_paths}')
-            # print(f'done.')
-
+            print(f'done.')
 
 
             # ==================================================================================================================================================================================================================================================================================== #
