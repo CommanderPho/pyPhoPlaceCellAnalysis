@@ -87,11 +87,11 @@ def _post_hoc_layout_resize(active_2d_plot, desired_static_area_height: Optional
         ## use user provided
         print(f'desired_static_area_height: {desired_static_area_height}')
         
-    ## INPUTS: main_content_splitter, required_static_children_bounding_rect_height
+    ## INPUTS: main_content_splitter, desired_static_area_height
     original_sizes = np.array(main_content_splitter.sizes())
-    extra_v_height = (original_sizes[-1] - required_static_children_bounding_rect_height)
+    extra_v_height = (original_sizes[-1] - desired_static_area_height)
     desired_sizes = deepcopy(original_sizes)
-    desired_sizes[-1] = required_static_children_bounding_rect_height
+    desired_sizes[-1] = desired_static_area_height
     desired_sizes[0] = desired_sizes[0] + extra_v_height
 
     assert np.sum(desired_sizes) == np.sum(original_sizes), f"np.sum(desired_sizes): {np.sum(desired_sizes)} != np.sum(original_sizes): {np.sum(original_sizes)}"
@@ -210,6 +210,7 @@ def _setup_spike_raster_window_for_debugging(spike_raster_window, wants_docked_r
         background_static_scroll_window_plot.setMinimumHeight(50.0)
         # background_static_scroll_window_plot.setMaximumHeight(75.0)
         # # background_static_scroll_window_plot.setFixedHeight(50.0)
+        # background_static_scroll_window_plot.setMaximumHeight(144)
     # _all_outputs_dict['background_static_scroll_window_plot'] = background_static_scroll_window_plot
 
     if should_replace_hardcoded_main_plots_with_tracks:
@@ -280,6 +281,10 @@ def _setup_spike_raster_window_for_debugging(spike_raster_window, wants_docked_r
     # nested_dock_items, nested_dynamic_docked_widget_container_widgets = active_2d_plot.ui.dynamic_docked_widget_container.layout_dockGroups()
     # grouped_dock_items_dict = active_2d_plot.ui.dynamic_docked_widget_container.get_dockGroup_dock_dict()
     # ## OUTPUTS: nested_dock_items, nested_dynamic_docked_widget_container_widgets
+
+
+    _post_hoc_layout_resize(active_2d_plot=active_2d_plot, desired_static_area_height=144)
+
 
     return all_global_menus_actionsDict, global_flat_action_dict, _all_outputs_dict # , (_raster_tracks_out_dict, _raster_tracks_out_dict, _raster_tracks_out_dict)
 
