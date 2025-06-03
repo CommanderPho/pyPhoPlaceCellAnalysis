@@ -8251,7 +8251,7 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
         from pyphocorehelpers.Filesystem.path_helpers import find_first_extant_path
         from pyphoplacecellanalysis.Pho2D.data_exporting import HeatmapExportConfig
         from pyphocorehelpers.plotting.media_output_helpers import ImagePostRenderFunctionSets, ImageOperationsAndEffects
-
+        from pyphoplacecellanalysis.General.Mixins.ExportHelpers import try_discover_default_collected_outputs_dir
 
         DAY_DATE_STR: str = date.today().strftime("%Y-%m-%d")
         DAY_DATE_TO_USE = f'{DAY_DATE_STR}' # used for filenames throught the notebook
@@ -8265,8 +8265,6 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
 
         # active_context = kwargs.pop('active_context', owning_pipeline_reference.sess.get_context())
 
-
-        
         rank_order_results = global_computation_results.computed_data.get('RankOrder', None)
         if rank_order_results is not None:
             minimum_inclusion_fr_Hz: float = rank_order_results.minimum_inclusion_fr_Hz
@@ -8330,10 +8328,10 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
                     
         if needs_discover_default_collected_outputs_dir:
                 ## if none is provided it tries to find one in collected_outputs
-                known_collected_outputs_paths = [Path(v).resolve() for v in ['/Users/pho/data/collected_outputs',
+                collected_outputs_directory = try_discover_default_collected_outputs_dir(known_collected_outputs_paths=[Path(v).resolve() for v in ['/Users/pho/data/collected_outputs',
                                                                             '/Volumes/SwapSSD/Data/collected_outputs', r"K:/scratch/collected_outputs", '/Users/pho/Dropbox (University of Michigan)/MED-DibaLabDropbox/Data/Pho/Outputs/output/collected_outputs', r'C:/Users/pho/repos/Spike3DWorkEnv/Spike3D/output/collected_outputs',
-                                                                            '/home/halechr/FastData/collected_outputs/', '/home/halechr/cloud/turbo/Data/Output/collected_outputs']]
-                collected_outputs_directory = find_first_extant_path(known_collected_outputs_paths)
+                                                                            '/home/halechr/FastData/collected_outputs/', '/home/halechr/cloud/turbo/Data/Output/collected_outputs']])
+                assert collected_outputs_directory is not None, f"no collected output dir found!"
                 assert collected_outputs_directory.exists(), f"collected_outputs_directory: {collected_outputs_directory} does not exist! Is the right computer's config commented out above?"
                 # fullwidth_path_widget(scripts_output_path, file_name_label='Scripts Output Path:')
                 print(f'collected_outputs_directory: "{collected_outputs_directory}"')

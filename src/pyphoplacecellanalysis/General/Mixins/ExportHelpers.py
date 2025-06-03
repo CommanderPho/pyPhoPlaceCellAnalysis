@@ -12,8 +12,42 @@ from neuropy.utils.result_context import IdentifyingContext
 from pyphocorehelpers.DataStructure.dynamic_parameters import DynamicParameters
 from pyphocorehelpers.function_helpers import function_attributes
 from pyphocorehelpers.Filesystem.path_helpers import file_uri_from_path
+from pyphocorehelpers.Filesystem.path_helpers import find_first_extant_path
 
 from neuropy.utils.mixins.AttrsClassHelpers import AttrsBasedClassHelperMixin, custom_define, serialized_field, serialized_attribute_field, non_serialized_field
+
+
+@function_attributes(short_name=None, tags=['filesystem', 'collected_output', 'platform_independent'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-06-03 08:10', related_items=[])
+def try_discover_default_collected_outputs_dir(known_collected_outputs_paths: Optional[List[Path]]=None) -> Optional[Path]:
+    """ Tries to find the appropriate "collected_outputs" directory on various known computers.
+
+    Usage:
+        from pyphoplacecellanalysis.General.Mixins.ExportHelpers import try_discover_default_collected_outputs_dir
+
+        collected_outputs_directory = try_discover_default_collected_outputs_dir()
+
+        assert collected_outputs_directory.exists(), f"collected_outputs_directory: {collected_outputs_directory} does not exist! Is the right computer's config commented out above?"
+        # fullwidth_path_widget(scripts_output_path, file_name_label='Scripts Output Path:')
+        print(f'collected_outputs_directory: "{collected_outputs_directory}"')
+        # Create a 'figures' subfolder if it doesn't exist
+        figures_folder: Path = collected_outputs_directory.joinpath('figures', '_temp_individual_posteriors').resolve()
+        figures_folder.mkdir(parents=False, exist_ok=True)
+        assert figures_folder.exists()
+        print(f'\tfigures_folder: "{figures_folder}"')
+        ## this is good
+        parent_output_folder = figures_folder
+
+
+    """
+    ## if none is provided it tries to find one in collected_outputs
+    if known_collected_outputs_paths is None:
+        known_collected_outputs_paths = [Path(v).resolve() for v in ['/Users/pho/data/collected_outputs',
+                                                                    '/Volumes/SwapSSD/Data/collected_outputs', r"K:/scratch/collected_outputs", '/Users/pho/Dropbox (University of Michigan)/MED-DibaLabDropbox/Data/Pho/Outputs/output/collected_outputs', r'C:/Users/pho/repos/Spike3DWorkEnv/Spike3D/output/collected_outputs',
+                                                                    '/home/halechr/FastData/collected_outputs/', '/home/halechr/cloud/turbo/Data/Output/collected_outputs']]
+
+    collected_outputs_directory = find_first_extant_path(known_collected_outputs_paths)
+    return collected_outputs_directory
+
 
 ## General Output Helpers
 @custom_define(slots=False)
