@@ -3311,7 +3311,7 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
 
     @function_attributes(short_name=None, tags=['export', 'batch', 'marginals', 'rasters'], input_requires=[], output_provides=[], uses=['export_current_epoch_marginal_and_raster_images'], used_by=[], creation_date='2025-06-03 00:47', related_items=[])
     @classmethod
-    def perform_export_all_epochs_to_images(cls, paginated_multi_decoder_decoded_epochs_window, directional_merged_decoders_result, root_export_path: Path, active_context: Optional[IdentifyingContext]=None, **kwargs):
+    def perform_export_all_epochs_to_images(cls, paginated_multi_decoder_decoded_epochs_window: "PhoPaginatedMultiDecoderDecodedEpochsWindow", directional_merged_decoders_result, root_export_path: Path, active_context: Optional[IdentifyingContext]=None, **kwargs):
         """ programmatically iterates through all epochs and exports them to file, including their posteriors, rasters, and marginals 
 
         Usage:
