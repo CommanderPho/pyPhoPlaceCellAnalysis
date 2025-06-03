@@ -1390,8 +1390,10 @@ class PosteriorExporting:
         _out_final_merged_image_save_paths: List[Path] = []
 
         # export_format_name_options = ['greyscale_shared_norm', 'viridis_shared_norm', 'greyscale']
+        # separator_color=f'#1b0000' ## for greyscale
         export_format_name_options = ['viridis_shared_norm', 'greyscale_shared_norm', 'greyscale']
-
+        separator_color=f'#fae2e2'
+        
         for a_decoding_epoch_name in epoch_name_list:
             try:
                 a_decoder_name = 'long_LR' ## temp
@@ -1438,7 +1440,7 @@ class PosteriorExporting:
                     a_merged_posterior_export_path: Path = merged_dir.joinpath(a_posterior_saved_path.name) # '_temp_individual_posteriors/2025-05-30/gor01_one_2006-6-12_15-55-31/ripple/combined/multi/p_x_given_n[2].png'
                     
                     ## Build merged image:
-                    _out_vstack = vertical_image_stack(_tmp_curr_raster_imgs, padding=5, separator_color=f'#1b0000')
+                    _out_vstack = vertical_image_stack(_tmp_curr_raster_imgs, padding=5, separator_color=separator_color)
                     _out_final_merged_images.append(_out_vstack)
 
                     ## save it
