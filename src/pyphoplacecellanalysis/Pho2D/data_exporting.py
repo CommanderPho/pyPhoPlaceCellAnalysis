@@ -573,6 +573,9 @@ class PosteriorExporting:
         # # font_size = 96
         # font_size = 72
         
+        epoch_id_identifier_str: str = 'p_x_given_n'
+
+        
         _save_out_paths = []
         _save_out_format_results: Dict[str, List] = {}
         for i in np.arange(num_filter_epochs):
@@ -590,13 +593,25 @@ class PosteriorExporting:
                     ## create the empty result:
                     _save_out_format_results[export_format_name] = []
                     
-
                 ## get the post-render functions
                 curr_post_render_image_functions_dict = export_formats_post_render_image_functions_builder_fn_dict[export_format_name][i]
                 
+                ## mode to use
+                # active_epoch_data_IDX: int = self.epoch_data_index
+                curr_epoch_info_dict = active_captured_single_epoch_result.epoch_info_tuple._asdict()
+                active_epoch_id: int = curr_epoch_info_dict.get('label', None)
+                if active_epoch_id is not None:
+                    active_epoch_id = int(active_epoch_id)
+                    complete_epoch_identifier_str = f"{epoch_id_identifier_str}[{active_epoch_id:03d}]" # 2025-06-03 - 'p_x_given_n[067]'
+                else:
+                    complete_epoch_identifier_str = f"{epoch_id_identifier_str}"
 
+                assert complete_epoch_identifier_str is not None
+            
                 # _posterior_image, posterior_save_path = active_captured_single_epoch_result.save_posterior_as_image(parent_array_as_image_output_folder=v.export_folder, export_grayscale=v.export_grayscale, colormap=v.colormap, skip_img_normalization=False, desired_height=desired_height, **kwargs)
-                _posterior_image, posterior_save_path = active_captured_single_epoch_result.save_posterior_as_image(parent_array_as_image_output_folder=export_format_config.export_folder, **(kwargs|export_format_config.to_dict()), post_render_image_functions=curr_post_render_image_functions_dict)
+                # _posterior_image, posterior_save_path = active_captured_single_epoch_result.save_posterior_as_image(parent_array_as_image_output_folder=export_format_config.export_folder, **(kwargs|export_format_config.to_dict()), post_render_image_functions=curr_post_render_image_functions_dict)
+                _posterior_image, posterior_save_path = active_captured_single_epoch_result.save_posterior_as_image(parent_array_as_image_output_folder=export_format_config.export_folder, complete_epoch_identifier_str=complete_epoch_identifier_str, **(kwargs|export_format_config.to_dict()), post_render_image_functions=curr_post_render_image_functions_dict)
+            
                 _output_export_format_config = deepcopy(export_format_config)
                 _output_export_format_config.posterior_saved_path = posterior_save_path
                 _output_export_format_config.posterior_saved_image = _posterior_image

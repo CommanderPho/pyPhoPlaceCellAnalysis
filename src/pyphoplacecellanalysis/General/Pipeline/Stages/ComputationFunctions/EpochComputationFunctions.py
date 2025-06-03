@@ -2824,9 +2824,6 @@ class EpochComputationDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Di
             posterior_out_folder = parent_output_folder.joinpath(DAY_DATE_TO_USE).resolve()
             posterior_out_folder.mkdir(parents=True, exist_ok=True)
             save_path = posterior_out_folder.resolve()
-            # _parent_save_context: IdentifyingContext = owning_pipeline_reference.build_display_context_for_session('perform_export_all_decoded_posteriors_as_images')
-            # _parent_save_context: IdentifyingContext = owning_pipeline_reference.build_display_context_for_session('trackID_weighted_position_posterior')
-            # _specific_session_output_folder = save_path.joinpath(active_context.get_description(subset_excludelist=['format_name'])).resolve()
 
             _parent_save_context: IdentifyingContext = owning_pipeline_reference.build_display_context_for_session('trackID_weighted_position_posterior') ## why is this done?
             _specific_session_output_folder = save_path.joinpath(active_context.get_description(subset_excludelist=['format_name', 'display_fn_name', 'time_bin_size'])).resolve()

@@ -598,7 +598,7 @@ class SingleEpochDecodedResult(HDF_SerializationMixin, AttrsBasedClassHelperMixi
 
 
     @function_attributes(short_name=None, tags=['export', 'image', 'posterior'], input_requires=[], output_provides=[], uses=['pyphocorehelpers.plotting.media_output_helpers.save_array_as_image', '.build_multi_decoder_color_overlay_image', '._perform_build_multi_decoder_color_overlay_image_data'], used_by=['PosteriorExporting.export_decoded_posteriors_as_images'], creation_date='2024-05-09 05:49', related_items=[])
-    def save_posterior_as_image(self, parent_array_as_image_output_folder: Union[Path, str]='', epoch_id_identifier_str: str = 'p_x_given_n', desired_height=None, desired_width=None, export_kind: Optional[HeatmapExportKind] = None, colormap:str='viridis', skip_img_normalization=True, export_grayscale:bool=False, allow_override_aspect_ratio:bool=False, **kwargs):
+    def save_posterior_as_image(self, parent_array_as_image_output_folder: Union[Path, str]='', epoch_id_identifier_str: str = 'p_x_given_n', complete_epoch_identifier_str: Optional[str]=None, desired_height=None, desired_width=None, export_kind: Optional[HeatmapExportKind] = None, colormap:str='viridis', skip_img_normalization=True, export_grayscale:bool=False, allow_override_aspect_ratio:bool=False, **kwargs):
         """ saves the posterior to disk
         
         this is where `self.build_multi_decoder_color_overlay_image(...)` should be called for export_kind == 
@@ -616,18 +616,27 @@ class SingleEpochDecodedResult(HDF_SerializationMixin, AttrsBasedClassHelperMixi
         if isinstance(parent_array_as_image_output_folder, str):
             parent_array_as_image_output_folder = Path(parent_array_as_image_output_folder).resolve()
             
-            
+        if kwargs.get('debug_print', False):
+            print(f'self.epoch_data_index: {self.epoch_data_index}')
+
         if parent_array_as_image_output_folder.is_dir():
             assert parent_array_as_image_output_folder.exists(), f"path '{parent_array_as_image_output_folder}' does not exist!"
-            
-            if self.epoch_data_index is not None:
-                epoch_id_str = f"{epoch_id_identifier_str}[{self.epoch_data_index}]"
-            else:
-                epoch_id_str = f"{epoch_id_identifier_str}"
-            _img_path = parent_array_as_image_output_folder.joinpath(f'{epoch_id_str}.png').resolve()
+            if complete_epoch_identifier_str is None:
+                ## mode to use
+                # active_epoch_data_IDX: int = self.epoch_data_index
+                curr_epoch_info_dict = self.epoch_info_tuple._asdict()
+                active_epoch_id: int = curr_epoch_info_dict.get('label', None)
+                if active_epoch_id is not None:
+                    active_epoch_id = int(active_epoch_id)
+                    complete_epoch_identifier_str = f"{epoch_id_identifier_str}[{active_epoch_id:03d}]" # 2025-06-03 - 'p_x_given_n[067]'
+                else:
+                    complete_epoch_identifier_str = f"{epoch_id_identifier_str}"
+
+            assert complete_epoch_identifier_str is not None
+            _img_path = parent_array_as_image_output_folder.joinpath(f'{complete_epoch_identifier_str}.png').resolve()
         else:
             _img_path = parent_array_as_image_output_folder.resolve() # already a direct path
-            
+            assert complete_epoch_identifier_str is None, f"complete_epoch_identifier_str is provided (not-None), complete_epoch_identifier_str: '{complete_epoch_identifier_str}', but a full path was provided in parent_array_as_image_output_folder: {parent_array_as_image_output_folder.as_posix()}! This will override and ignore complete_epoch_identifier_str. So please only specify one or the other."
 
         if (desired_height is None) and (desired_width is None):
             # only if the user hasn't provided a desired width OR height should we suggest a height of 100
