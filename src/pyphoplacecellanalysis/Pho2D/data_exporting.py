@@ -1389,8 +1389,8 @@ class PosteriorExporting:
         _out_final_merged_images = []
         _out_final_merged_image_save_paths: List[Path] = []
 
-        export_format_name_options = ['greyscale_shared_norm', 'viridis_shared_norm', 'greyscale']
-        # export_format_name_options = ['viridis_shared_norm', 'greyscale_shared_norm', 'greyscale']
+        # export_format_name_options = ['greyscale_shared_norm', 'viridis_shared_norm', 'greyscale']
+        export_format_name_options = ['viridis_shared_norm', 'greyscale_shared_norm', 'greyscale']
 
         for a_decoding_epoch_name in epoch_name_list:
             try:
