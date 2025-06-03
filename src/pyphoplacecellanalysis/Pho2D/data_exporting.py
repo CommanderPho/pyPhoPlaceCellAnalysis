@@ -269,7 +269,7 @@ class PosteriorExporting:
     @function_attributes(short_name=None, tags=['figure', 'save', 'IMPORTANT', 'marginal', 'single-export-format'], input_requires=[], output_provides=[], uses=[], used_by=['save_marginals_arrays_as_image'], creation_date='2024-01-23 00:00', related_items=[])
     @classmethod
     def save_posterior(cls, raw_posterior_epochs_marginals, epochs_directional_marginals, epochs_track_identity_marginals, collapsed_per_epoch_epoch_marginal_dir_point, collapsed_per_epoch_marginal_track_identity_point,
-        parent_array_as_image_output_folder: Path, epoch_id_identifier_str: str = 'lap', epoch_id: int = 9, export_all_raw_marginals_separately:bool = False, base_image_height: float=100, export_kind: Optional[HeatmapExportKind] = None, include_value_labels: bool = True, allow_override_aspect_ratio:bool=True, debug_print:bool=False) -> Tuple[Tuple[Image.Image, Path], Tuple[Image.Image, Path], Tuple[Image.Image, Path], Tuple[Image.Image, Path], List[Tuple[Image.Image, Path]]]:
+        parent_array_as_image_output_folder: Path, epoch_id_identifier_str: str = 'lap', epoch_IDX: int = 9, complete_epoch_identifier_str: Optional[str]=None, export_all_raw_marginals_separately:bool = False, base_image_height: float=100, export_kind: Optional[HeatmapExportKind] = None, include_value_labels: bool = True, allow_override_aspect_ratio:bool=True, debug_print:bool=False) -> Tuple[Tuple[Image.Image, Path], Tuple[Image.Image, Path], Tuple[Image.Image, Path], Tuple[Image.Image, Path], List[Tuple[Image.Image, Path]]]:
         """ 2024-01-23 - Writes the posteriors out to file 
         
         Usage:
@@ -289,16 +289,19 @@ class PosteriorExporting:
         
         _out_save_tuples: List[Tuple[Image.Image, Path]] = []
         
-        epoch_id_str: str = f"{epoch_id_identifier_str}[{epoch_id}]"
-        _img_path = parent_array_as_image_output_folder.joinpath(f'{epoch_id_str}_raw_marginal.png').resolve()
+        if complete_epoch_identifier_str is None:
+            complete_epoch_identifier_str: str = f"{epoch_id_identifier_str}[{epoch_IDX}]"
 
-        img_data = raw_posterior_epochs_marginals[epoch_id]
+
+        _img_path = parent_array_as_image_output_folder.joinpath(f'{complete_epoch_identifier_str}_raw_marginal.png').resolve()
+
+        img_data = raw_posterior_epochs_marginals[epoch_IDX]
         if not isinstance(img_data, NDArray):
             img_data = img_data['p_x_given_n']
         img_data = img_data.astype(float)  # .shape: (4, n_curr_epoch_time_bins) - (63, 4, 120)
         # img_data = raw_posterior_laps_marginals[epoch_id]['p_x_given_n'].astype(float)  # .shape: (4, n_curr_epoch_time_bins) - (63, 4, 120)
         if debug_print:
-            print(f'np.shape(raw_posterior_laps_marginals[{epoch_id}]["p_x_given_n"]): {np.shape(img_data)}')
+            print(f'np.shape(raw_posterior_laps_marginals[{epoch_IDX}]["p_x_given_n"]): {np.shape(img_data)}')
 
         base_image_height: int = int(round(base_image_height))
         desired_half_height: int = int(round(base_image_height/2))
@@ -313,10 +316,10 @@ class PosteriorExporting:
                     
             imgs_array = [get_array_as_image(raw_posterior_array[i].T, desired_height=base_image_height, **get_array_as_img_kwargs) for i in np.arange(n_curr_epoch_time_bins)]            
             if export_all_raw_marginals_separately:
-                _sub_img_parent_path = parent_array_as_image_output_folder.joinpath(f'{epoch_id_str}_raw_marginal').resolve()
+                _sub_img_parent_path = parent_array_as_image_output_folder.joinpath(f'{complete_epoch_identifier_str}_raw_marginal').resolve()
                 _sub_img_parent_path.mkdir(parents=False, exist_ok=True)
                 for i, (a_single_time_bin_raw_posterior, an_img) in enumerate(zip(raw_posterior_array, imgs_array)):
-                    _sub_img_path = _sub_img_parent_path.joinpath(f'{epoch_id_str}_raw_marginal_{i}.png').resolve()
+                    _sub_img_path = _sub_img_parent_path.joinpath(f'{complete_epoch_identifier_str}_raw_marginal_{i}.png').resolve()
                     an_img.save(_sub_img_path) # Save image to file
                     _out_save_tuples.append((an_img, _sub_img_path))
                     
@@ -327,7 +330,7 @@ class PosteriorExporting:
                     if debug_print:
                         print(f'\tnp.shape(_decoder_prob_arr): {np.shape(_decoder_prob_arr)}, _decoder_prob_arr: {_decoder_prob_arr}')
                     _decoder_prob_img: Image.Image = get_array_as_image(np.atleast_2d(_decoder_prob_arr).T, desired_height=base_image_height, **get_array_as_img_kwargs)
-                    _sub_img_path = _sub_img_parent_path.joinpath(f'{epoch_id_str}_marginal_decoder_{i}.png').resolve()
+                    _sub_img_path = _sub_img_parent_path.joinpath(f'{complete_epoch_identifier_str}_marginal_decoder_{i}.png').resolve()
                     _decoder_prob_img.save(_sub_img_path) # Save image to file
                     _out_save_tuples.append((_decoder_prob_img, _sub_img_path))
                     
@@ -354,7 +357,7 @@ class PosteriorExporting:
                     _track_marginal_2tuple = np.atleast_2d(np.array([_short_any, _long_any]))
                     # _track_marginal_2tuple = _track_marginal_2tuple / np.nansum(_track_marginal_2tuple) # normalize
                     _temp_img: Image.Image = get_array_as_image(_track_marginal_2tuple.T, desired_height=desired_half_height, **get_array_as_img_kwargs) # #TODO 2025-05-14 08:28: - [ ] Potential normalization error here, as when using raw_RGBA mode with a 2-decoder the passed posteriors must be normalized.
-                    _sub_img_path = _sub_img_parent_path.joinpath(f'{epoch_id_str}_track_marginal_two_tuple_{i}.png').resolve()
+                    _sub_img_path = _sub_img_parent_path.joinpath(f'{complete_epoch_identifier_str}_track_marginal_two_tuple_{i}.png').resolve()
                     _temp_img.save(_sub_img_path) # Save image to file
                     _out_save_tuples.append((_temp_img, _sub_img_path))
                           
@@ -385,25 +388,25 @@ class PosteriorExporting:
             # image_raw, path_raw = raw_tuple
             
         # [2 x n_epoch_t_bins] matrix
-        _img_path = parent_array_as_image_output_folder.joinpath(f'{epoch_id_str}_marginal_dir.png').resolve()
-        img_data = epochs_directional_marginals[epoch_id]['p_x_given_n'].astype(float)
+        _img_path = parent_array_as_image_output_folder.joinpath(f'{complete_epoch_identifier_str}_marginal_dir.png').resolve()
+        img_data = epochs_directional_marginals[epoch_IDX]['p_x_given_n'].astype(float)
         marginal_dir_tuple = save_array_as_image(img_data, desired_height=desired_half_height, desired_width=None, skip_img_normalization=True, out_path=_img_path, **save_array_as_image_kwargs)
         # image_marginal_dir, path_marginal_dir = marginal_dir_tuple
 
         # [2 x n_epoch_t_bins] matrix
-        _img_path = parent_array_as_image_output_folder.joinpath(f'{epoch_id_str}_marginal_track_identity.png').resolve()
-        img_data = epochs_track_identity_marginals[epoch_id]['p_x_given_n'].astype(float)
+        _img_path = parent_array_as_image_output_folder.joinpath(f'{complete_epoch_identifier_str}_marginal_track_identity.png').resolve()
+        img_data = epochs_track_identity_marginals[epoch_IDX]['p_x_given_n'].astype(float)
         marginal_track_identity_tuple = save_array_as_image(img_data, desired_height=desired_half_height, desired_width=None, skip_img_normalization=True, out_path=_img_path, **save_array_as_image_kwargs)
         # image_marginal_track_identity, path_marginal_track_identity = marginal_track_identity_tuple
 
         # 2-vector
-        _img_path = parent_array_as_image_output_folder.joinpath(f'{epoch_id_str}_marginal_track_identity_point.png').resolve()
-        img_data = np.atleast_2d(collapsed_per_epoch_marginal_track_identity_point[epoch_id,:]).T
+        _img_path = parent_array_as_image_output_folder.joinpath(f'{complete_epoch_identifier_str}_marginal_track_identity_point.png').resolve()
+        img_data = np.atleast_2d(collapsed_per_epoch_marginal_track_identity_point[epoch_IDX,:]).T
         marginal_dir_point_tuple = save_array_as_image(img_data, desired_height=desired_half_height, desired_width=None, skip_img_normalization=True, out_path=_img_path, **save_array_as_image_kwargs)
 
         # 2-vector
-        _img_path = parent_array_as_image_output_folder.joinpath(f'{epoch_id_str}_marginal_dir_point.png').resolve()
-        img_data = np.atleast_2d(collapsed_per_epoch_epoch_marginal_dir_point[epoch_id,:]).T
+        _img_path = parent_array_as_image_output_folder.joinpath(f'{complete_epoch_identifier_str}_marginal_dir_point.png').resolve()
+        img_data = np.atleast_2d(collapsed_per_epoch_epoch_marginal_dir_point[epoch_IDX,:]).T
         marginal_track_identity_point_tuple: Tuple[Image.Image, Path] = save_array_as_image(img_data, desired_height=desired_half_height, desired_width=None, skip_img_normalization=True, out_path=_img_path, **save_array_as_image_kwargs)
 
         
@@ -412,7 +415,9 @@ class PosteriorExporting:
 
     @function_attributes(short_name=None, tags=['export','marginal', 'pseudo2D', 'IMPORTANT', 'single-export-format'], input_requires=[], output_provides=[], uses=['.save_posterior'], used_by=['_test_export_marginals_for_figure'], creation_date='2024-09-10 00:06', related_items=[])
     @classmethod
-    def save_marginals_arrays_as_image(cls, directional_merged_decoders_result: DirectionalPseudo2DDecodersResult, parent_array_as_image_output_folder: Path, epoch_id_identifier_str: str = 'ripple', epoch_ids=None, export_all_raw_marginals_separately: bool=True, export_kind: Optional[HeatmapExportKind] = None, include_value_labels:bool=False, allow_override_aspect_ratio:bool=True, debug_print=False):
+    def save_marginals_arrays_as_image(cls, directional_merged_decoders_result: DirectionalPseudo2DDecodersResult, parent_array_as_image_output_folder: Path, epoch_id_identifier_str: str = 'ripple',
+                                        epoch_IDXs=None, complete_epoch_identifier_strs: Optional[List[str]]=None, 
+                                        export_all_raw_marginals_separately: bool=True, export_kind: Optional[HeatmapExportKind] = None, include_value_labels:bool=False, allow_override_aspect_ratio:bool=True, debug_print=False):
         """ Exports all the raw_merged pseudo2D posteriors and their marginals out to image files.
         
         Usage: 
@@ -455,18 +460,26 @@ class PosteriorExporting:
 
         assert parent_array_as_image_output_folder.exists()
 
-        if epoch_ids is None:
-            epoch_ids = np.arange(active_filter_epochs_decoder_result.num_filter_epochs)
+        if epoch_IDXs is None:
+            epoch_IDXs = np.arange(active_filter_epochs_decoder_result.num_filter_epochs)
+
+        if complete_epoch_identifier_strs is None:
+            complete_epoch_identifier_strs = [f'{epoch_id_identifier_str}_{epoch_IDX:03d}' for epoch_IDX in epoch_IDXs]
+
+        assert len(complete_epoch_identifier_strs) == len(epoch_IDXs), f"complete_epoch_identifier_strs: {complete_epoch_identifier_strs} should be the same length as epoch_IDXs: {epoch_IDXs}"
 
         out_tuple_dict = {}
-        for epoch_id in epoch_ids:
+        for i, epoch_IDX in enumerate(epoch_IDXs):
+            a_complete_epoch_identifier_str: str = complete_epoch_identifier_strs[i]
+            
             # Make epoch folder
-            _curr_path = parent_array_as_image_output_folder.joinpath(f'{epoch_id_identifier_str}_{epoch_id}').resolve()
+            _curr_path = parent_array_as_image_output_folder.joinpath(a_complete_epoch_identifier_str).resolve()
             _curr_path.mkdir(exist_ok=True)
                                                      
-            out_tuple_dict[epoch_id] = cls.save_posterior(raw_posterior_active_marginals, active_directional_marginals,
+            out_tuple_dict[epoch_IDX] = cls.save_posterior(raw_posterior_active_marginals, active_directional_marginals,
                                                                                 active_track_identity_marginals, collapsed_per_epoch_marginal_dir_point, collapsed_per_epoch_marginal_track_identity_point,
-                                                                                        parent_array_as_image_output_folder=_curr_path, epoch_id_identifier_str=epoch_id_identifier_str, epoch_id=epoch_id,
+                                                                                        parent_array_as_image_output_folder=_curr_path,
+                                                                                        epoch_id_identifier_str=epoch_id_identifier_str, epoch_IDX=epoch_IDX, complete_epoch_identifier_str=a_complete_epoch_identifier_str,
                                                                                         export_all_raw_marginals_separately=export_all_raw_marginals_separately, export_kind=export_kind, include_value_labels=include_value_labels, allow_override_aspect_ratio=allow_override_aspect_ratio,
                                                                                         debug_print=debug_print)
         return out_tuple_dict
@@ -1073,7 +1086,7 @@ class PosteriorExporting:
     @function_attributes(short_name=None, tags=['export', 'images', 'marginals', 'testing'], input_requires=[], output_provides=[], uses=['.save_marginals_arrays_as_image'], used_by=['_perform_export_current_epoch_marginal_and_raster_images'], creation_date='2025-05-13 19:45', related_items=[])
     @classmethod
     def _test_export_marginals_for_figure(cls, directional_merged_decoders_result: DirectionalPseudo2DDecodersResult, filtered_decoder_filter_epochs_decoder_result_dict: Dict[str, DecodedFilterEpochsResult], clicked_epoch: NDArray, context_specific_root_export_path: Path, epoch_specific_folder: Path,
-                                           epoch_id_identifier_str='ripple', debug_print=True, export_kind: Optional[HeatmapExportKind] = None, allow_override_aspect_ratio:bool=True, **kwargs):
+                                           epoch_id_identifier_str='ripple', complete_epoch_identifier_str: Optional[str]=None, debug_print=True, export_kind: Optional[HeatmapExportKind] = None, allow_override_aspect_ratio:bool=True, **kwargs):
         """
             Takes a `clicked_epoch` start_t 
             
@@ -1133,14 +1146,40 @@ class PosteriorExporting:
         else:
             raise NotImplementedError(f'epoch_id_identifier_str: {epoch_id_identifier_str}')
         
-        epoch_ids = active_filter_epochs_decoder_result.filter_epochs.epochs.find_data_indicies_from_epoch_times(np.atleast_1d(clicked_epoch[0])) # [262], [296]
+        epoch_data_IDXs = active_filter_epochs_decoder_result.filter_epochs.epochs.find_data_indicies_from_epoch_times(np.atleast_1d(clicked_epoch[0])) # [262], [296]
         if debug_print:
-            print(f'epoch_ids: {epoch_ids}')
+            print(f'epoch_ids: {epoch_data_IDXs}')
 
-        if len(epoch_ids) < 1:
+        if len(epoch_data_IDXs) < 1:
             print(f'WARN: no found epoch_ids from the provided clicked_epoch: {clicked_epoch}!!')
-        assert (len(epoch_ids) > 0), f"no found epoch_ids from the provided clicked_epoch: {clicked_epoch}"
+        assert (len(epoch_data_IDXs) > 0), f"no found epoch_ids from the provided clicked_epoch: {clicked_epoch}"
+        # Determine the index we'll use ______________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
+        # an_active_filter_epochs_decoder_result = list(filtered_decoder_filter_epochs_decoder_result_dict.values())[0] #['long_LR']
+        # epoch_data_IDXs = an_active_filter_epochs_decoder_result.filter_epochs.epochs.find_data_indicies_from_epoch_times(np.atleast_1d(clicked_epoch[0])) # [262], [296]
+        # {k:an_active_filter_epochs_decoder_result.filter_epochs.epochs.find_data_indicies_from_epoch_times(np.atleast_1d(clicked_epoch[0])) for k, an_active_filter_epochs_decoder_result in filtered_decoder_filter_epochs_decoder_result_dict.items()}
+        # active_epoch_id: int = int(epoch_data_IDXs[0])
+        active_epoch_data_IDX: int = int(epoch_data_IDXs[0])
+        active_epoch_id: int = int(active_filter_epochs_decoder_result.filter_epochs['label'][active_epoch_data_IDX])
 
+        # active_epoch_id: int = int(epoch_data_IDXs[0]) # assume a single epoch idx
+        if debug_print:
+            print(f'epoch_idx: {active_epoch_id}')
+        if complete_epoch_identifier_str is None:
+            complete_epoch_identifier_str: str = f"{epoch_id_identifier_str}[{active_epoch_id:03d}]" # format `{active_epoch_dict['Index']}` as a fixed-width integer with leading zeros as needed to make sure the resulting files can be sorted by filename
+        else:
+            ## use the user provided ones
+            pass
+
+        assert complete_epoch_identifier_str is not None
+        if debug_print:
+            print(f'complete_epoch_identifier_str: {complete_epoch_identifier_str}')
+
+
+        # if complete_epoch_identifier_str is not None:
+            # complete_epoch_identifier_strs = [complete_epoch_identifier_str]
+            
+        complete_epoch_identifier_strs = [complete_epoch_identifier_str]
+            
         ## Sanity check:
         if debug_print:
             curr_epoch_result: SingleEpochDecodedResult = active_filter_epochs_decoder_result.get_result_for_epoch_at_time(epoch_start_time=clicked_epoch[0])
@@ -1151,7 +1190,8 @@ class PosteriorExporting:
 
         # active_filter_epochs_decoder_result.all_directional_ripple_filter_epochs_decoder_result
         out_image_save_tuple_dict = cls.save_marginals_arrays_as_image(directional_merged_decoders_result=directional_merged_decoders_result, parent_array_as_image_output_folder=context_specific_root_export_path,
-                                                          epoch_id_identifier_str=epoch_id_identifier_str, epoch_ids=epoch_ids, debug_print=True, export_kind=export_kind, include_value_labels=False, allow_override_aspect_ratio=allow_override_aspect_ratio,# **kwargs,
+                                                          epoch_id_identifier_str=epoch_id_identifier_str, epoch_IDXs=epoch_data_IDXs, complete_epoch_identifier_strs=complete_epoch_identifier_strs,
+                                                          debug_print=True, export_kind=export_kind, include_value_labels=False, allow_override_aspect_ratio=allow_override_aspect_ratio,# **kwargs,
                                                         )
 
         # ==================================================================================================================== #
@@ -1163,12 +1203,7 @@ class PosteriorExporting:
         # assert parent_array_as_image_output_folder.exists()
         assert epoch_specific_folder.exists()
 
-        epoch_id = epoch_ids[0] # assume a single epoch idx
-        if debug_print:
-            print(f'epoch_idx: {epoch_id}')
-        epoch_id_str: str = f"{epoch_id_identifier_str}[{epoch_id}]"
-        if debug_print:
-            print(f'epoch_id_str: {epoch_id_str}')
+
 
         # # Make epoch folder
         # ripple_specific_folder = parent_array_as_image_output_folder.joinpath(f'{epoch_id_identifier_str}_{epoch_id}').resolve()
@@ -1179,7 +1214,7 @@ class PosteriorExporting:
             # v: DecodedFilterEpochsResult
             a_result: SingleEpochDecodedResult = v.get_result_for_epoch_at_time(epoch_start_time=clicked_epoch[0])
             print(f"{k}: filtered_decoder_filter_epochs_decoder_result_dict[{k}].decoding_time_bin_size: {v.decoding_time_bin_size}") # 0.016!! 
-            _img_path = epoch_specific_folder.joinpath(f'{epoch_id_str}_posterior_{k}.png').resolve()
+            _img_path = epoch_specific_folder.joinpath(f'{complete_epoch_identifier_str}_posterior_{k}.png').resolve()
             a_result.save_posterior_as_image(_img_path, export_kind=HeatmapExportKind.COLORMAPPED, colormap='Oranges', allow_override_aspect_ratio=allow_override_aspect_ratio, flip_vertical_axis=True, **kwargs) # #TODO 2025-05-14 08:30: - [ ] forced orange
             out_image_paths[k] = _img_path
 
@@ -1216,11 +1251,11 @@ class PosteriorExporting:
         from pyphocorehelpers.plotting.media_output_helpers import vertical_image_stack, horizontal_image_stack
 
         # Get the clicked epoch from the _out_ripple_rasters GUI _____________________________________________________________ #
-        active_epoch_tuple = deepcopy(_out_ripple_rasters.active_epoch_tuple)
+        active_epoch_tuple = deepcopy(_out_ripple_rasters.active_epoch_tuple) # EpochTuple(Index=21, start=1193.98785331822, stop=1194.1515601143474, label=284, duration=0.1637067961273715, end=1194.1515601143474, wcorr=0.7139066712389361, P_decoder=0.2918033246241751, pearsonr=-0.521100995923076, mseq_len=5, mseq_len_ignoring_intrusions=5, mseq_len_ignoring_intrusions_and_repeats=5, mseq_len_ratio_ignoring_intrusions_and_repeats=0.7142857142857143, mseq_tcov=0.576271186440678, mseq_dtrav=165.8334349469577, avg_jump_cm=34.83895692162977, travel=0.1899320081397262, coverage=0.3050847457627119, total_distance_traveled=0.8474576271186441, track_coverage_score=0.8474576271186441, longest_sequence_length=5, longest_sequence_length_ratio=0.7142857142857143, direction_change_bin_ratio=0.0, congruent_dir_bins_ratio=1.0, total_congruent_direction_change=243.8726984514084, total_variation=243.8726984514084, integral_second_derivative=5281.281702837474, stddev_of_diff=19.441955441371213, is_user_annotated_epoch=True, is_valid_epoch=True, session_name='2006-6-07_16-40-19', delta_aligned_start_t=-42.27839204540942, pre_post_delta_category='pre-delta', maze_id=0, unique_active_aclus=array([39,  7, 52, 63, 40,  6, 27, 55, 11, 53, 24, 17,  8, 60]), n_unique_aclus=14)
         if debug_print:
             print(f'active_epoch_tuple: {active_epoch_tuple}')
         # active_epoch_dict = {k:getattr(active_epoch_tuple, k) for k in ['start', 'stop', 'ripple_idx', 'Index']} # , 'session_name', 'time_bin_size', 'delta_aligned_start_t' {'start': 1161.0011335673044, 'stop': 1161.274357107468, 'session_name': '2006-6-09_1-22-43', 'time_bin_size': 0.025, 'delta_aligned_start_t': 131.68452480540145}
-        active_epoch_dict = {k:getattr(active_epoch_tuple, k) for k in ['start', 'stop', 'Index']} # , 'session_name', 'time_bin_size', 'delta_aligned_start_t' {'start': 1161.0011335673044, 'stop': 1161.274357107468, 'session_name': '2006-6-09_1-22-43', 'time_bin_size': 0.025, 'delta_aligned_start_t': 131.68452480540145}
+        active_epoch_dict = {k:getattr(active_epoch_tuple, k) for k in ['start', 'stop', 'Index', 'label']} # , 'session_name', 'time_bin_size', 'delta_aligned_start_t' {'start': 1161.0011335673044, 'stop': 1161.274357107468, 'session_name': '2006-6-09_1-22-43', 'time_bin_size': 0.025, 'delta_aligned_start_t': 131.68452480540145}
         # EpochTuple(Index=8, lap_idx=8, lap_start_t=499.299262000015, P_Long_LR=0.83978564760147, P_Long_RL=0.06863305250806279, P_Short_LR=0.08466212906826685, P_Short_RL=0.006919170822200387, most_likely_decoder_index=0, start=499.299262000015, stop=504.80590599996503, label='8', duration=5.506643999950029, lap_id=9, lap_dir=1, long_LR_pf_peak_x_pearsonr=-0.775475552508641, long_RL_pf_peak_x_pearsonr=-0.5082034915116096, short_LR_pf_peak_x_pearsonr=-0.7204573376193804, short_RL_pf_peak_x_pearsonr=-0.4648058215927542, best_decoder_index=0, session_name='2006-6-08_14-26-15', time_bin_size=0.25, delta_aligned_start_t=-712.2588180310559)
 
         # clicked_epoch = np.array([169.95631618227344, 170.15983607806265])
@@ -1233,9 +1268,18 @@ class PosteriorExporting:
             print(f'clicked_epoch: {clicked_epoch}')
 
         ## Export Marginal Pseudo2D posteriors and rasters for middle-clicked epochs:
-
-        # epoch_id_identifier_str='ripple'
         
+        # Determine the index we'll use ______________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
+        an_active_filter_epochs_decoder_result = list(filtered_decoder_filter_epochs_decoder_result_dict.values())[0] #['long_LR']
+        epoch_data_IDXs = an_active_filter_epochs_decoder_result.filter_epochs.epochs.find_data_indicies_from_epoch_times(np.atleast_1d(clicked_epoch[0])) # [262], [296]
+        # {k:an_active_filter_epochs_decoder_result.filter_epochs.epochs.find_data_indicies_from_epoch_times(np.atleast_1d(clicked_epoch[0])) for k, an_active_filter_epochs_decoder_result in filtered_decoder_filter_epochs_decoder_result_dict.items()}
+        # active_epoch_id: int = int(epoch_data_IDXs[0])
+        active_epoch_data_IDX: int = int(epoch_data_IDXs[0])
+        active_epoch_id: int = int(an_active_filter_epochs_decoder_result.filter_epochs['label'][active_epoch_data_IDX])
+        
+
+        # active_epoch_id: int = int(active_epoch_dict['Index']) #
+        ## OUTPUTS: active_epoch_id
 
         ## Session-specific folder:
         context_specific_root_export_path = root_export_path.joinpath(active_session_context.get_description(separator='_')).resolve()
@@ -1243,11 +1287,13 @@ class PosteriorExporting:
         assert context_specific_root_export_path.exists()
 
         # Epoch-specific folder:
+        complete_epoch_identifier_str: str = f"{epoch_id_identifier_str}_{active_epoch_id:03d}" # format `{active_epoch_dict['Index']}` as a fixed-width integer with leading zeros as needed to make sure the resulting files can be sorted by filename
         # ripple_specific_folder: Path = context_specific_root_export_path.joinpath(f"ripple_{active_epoch_dict['ripple_idx']}").resolve()
         # ripple_specific_folder: Path = context_specific_root_export_path.joinpath(f"ripple_{active_epoch_dict['Index']}").resolve()
-        ripple_specific_folder: Path = context_specific_root_export_path.joinpath(f"{epoch_id_identifier_str}_{active_epoch_dict['Index']}").resolve()
-        ripple_specific_folder.mkdir(exist_ok=True)
-        assert ripple_specific_folder.exists()
+        a_specific_epoch_type_specific_folder: Path = context_specific_root_export_path.joinpath(complete_epoch_identifier_str).resolve() # like 'ripple' or 'laps'
+        
+        a_specific_epoch_type_specific_folder.mkdir(exist_ok=True)
+        assert a_specific_epoch_type_specific_folder.exists()
         # file_uri_from_path(ripple_specific_folder)
         # fullwidth_path_widget(a_path=ripple_specific_folder, file_name_label="lap_specific_folder:")
 
@@ -1260,7 +1306,7 @@ class PosteriorExporting:
         # ==================================================================================================================== #
 
         # Save out the actual raster-plots ___________________________________________________________________________________ #
-        _out_rasters_save_paths = _out_ripple_rasters.save_figure(export_path=ripple_specific_folder,
+        _out_rasters_save_paths = _out_ripple_rasters.save_figure(export_path=a_specific_epoch_type_specific_folder,
                                                                 width=desired_width,
                                                                 #    height=desired_height,
                                                                 **kwargs,
@@ -1271,8 +1317,9 @@ class PosteriorExporting:
         out_image_save_tuple_dict = cls._test_export_marginals_for_figure(directional_merged_decoders_result=directional_merged_decoders_result,
                                                                                         filtered_decoder_filter_epochs_decoder_result_dict=filtered_decoder_filter_epochs_decoder_result_dict, ## laps
                                                                                         clicked_epoch=clicked_epoch,
-                                                                                        context_specific_root_export_path=context_specific_root_export_path, epoch_specific_folder=ripple_specific_folder,
-                                                                                        epoch_id_identifier_str=epoch_id_identifier_str, debug_print=False, desired_width=desired_width, desired_height=desired_height)
+                                                                                        context_specific_root_export_path=context_specific_root_export_path, epoch_specific_folder=a_specific_epoch_type_specific_folder,
+                                                                                        epoch_id_identifier_str=epoch_id_identifier_str, complete_epoch_identifier_str=complete_epoch_identifier_str,
+                                                                                        debug_print=False, desired_width=desired_width, desired_height=desired_height)
         # out_image_save_tuple_dict
 
         ## INPUTS: _out_rasters_save_paths, out_image_save_tuple_dict[-1]
@@ -1294,7 +1341,7 @@ class PosteriorExporting:
         print(f'saved image to: "{merged_img_save_path.as_posix()}"')
         # _out_save_tuples.append((_out_all_decoders_posteriors_and_rasters_stack_image, _sub_img_path))
 
-        return ripple_specific_folder, (out_image_save_tuple_dict, _out_rasters_save_paths, merged_img_save_path)
+        return a_specific_epoch_type_specific_folder, (out_image_save_tuple_dict, _out_rasters_save_paths, merged_img_save_path)
 
 
     @function_attributes(short_name=None, tags=['TEMP', 'export', 'image', 'files', 'merge', 'combine', 'posterior'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-05-30 14:51', related_items=[])
@@ -1340,6 +1387,7 @@ class PosteriorExporting:
 
                 num_epochs: int = len(_a_partial_dict[active_found_export_format_name])
 
+                ## Iterate through each epoch:
                 for epoch_IDX in np.arange(num_epochs):
                     # vertical stack
                     _tmp_curr_raster_imgs = []
@@ -1370,7 +1418,7 @@ class PosteriorExporting:
                     a_merged_posterior_export_path: Path = merged_dir.joinpath(a_posterior_saved_path.name) # '_temp_individual_posteriors/2025-05-30/gor01_one_2006-6-12_15-55-31/ripple/combined/multi/p_x_given_n[2].png'
                     
                     ## Build merged image:
-                    _out_vstack = vertical_image_stack(_tmp_curr_raster_imgs, padding=5)
+                    _out_vstack = vertical_image_stack(_tmp_curr_raster_imgs, padding=5, separator_color=f'#1b0000')
                     _out_final_merged_images.append(_out_vstack)
 
                     ## save it
