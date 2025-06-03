@@ -430,7 +430,7 @@ class PosteriorExporting:
             save_marginals_arrays_as_image(directional_merged_decoders_result=directional_merged_decoders_result, parent_array_as_image_output_folder=parent_array_as_image_output_folder, epoch_id_identifier_str='ripple', epoch_ids=[31])
 
         """
-        assert epoch_id_identifier_str in ['ripple', 'lap']
+        assert epoch_id_identifier_str in ['ripple', 'laps'], f"epoch_id_identifier_str: '{epoch_id_identifier_str}' should be either 'ripple' or 'laps'"
         active_marginals_df: pd.DataFrame = deepcopy(directional_merged_decoders_result.ripple_all_epoch_bins_marginals_df)
         active_filter_epochs_decoder_result: DecodedFilterEpochsResult = deepcopy(directional_merged_decoders_result.all_directional_ripple_filter_epochs_decoder_result)
 
@@ -1141,7 +1141,7 @@ class PosteriorExporting:
         ## INPUTS: clicked_epoch, 
         if epoch_id_identifier_str == 'ripple':
             active_filter_epochs_decoder_result: DecodedFilterEpochsResult = deepcopy(directional_merged_decoders_result.all_directional_ripple_filter_epochs_decoder_result)
-        elif epoch_id_identifier_str == 'lap':
+        elif epoch_id_identifier_str in ('laps','lap'):
             active_filter_epochs_decoder_result: DecodedFilterEpochsResult = deepcopy(directional_merged_decoders_result.all_directional_laps_filter_epochs_decoder_result)
         else:
             raise NotImplementedError(f'epoch_id_identifier_str: {epoch_id_identifier_str}')
@@ -1248,6 +1248,7 @@ class PosteriorExporting:
             fullwidth_path_widget(a_path=epoch_specific_folder, file_name_label="epoch_specific_folder:")
 
         """
+        from neuropy.core.epoch import ensure_dataframe
         from pyphocorehelpers.plotting.media_output_helpers import vertical_image_stack, horizontal_image_stack
 
         # Get the clicked epoch from the _out_ripple_rasters GUI _____________________________________________________________ #
@@ -1275,7 +1276,7 @@ class PosteriorExporting:
         # {k:an_active_filter_epochs_decoder_result.filter_epochs.epochs.find_data_indicies_from_epoch_times(np.atleast_1d(clicked_epoch[0])) for k, an_active_filter_epochs_decoder_result in filtered_decoder_filter_epochs_decoder_result_dict.items()}
         # active_epoch_id: int = int(epoch_data_IDXs[0])
         active_epoch_data_IDX: int = int(epoch_data_IDXs[0])
-        active_epoch_id: int = int(an_active_filter_epochs_decoder_result.filter_epochs['label'][active_epoch_data_IDX])
+        active_epoch_id: int = int(ensure_dataframe(an_active_filter_epochs_decoder_result.filter_epochs)['label'][active_epoch_data_IDX])
         
 
         # active_epoch_id: int = int(active_epoch_dict['Index']) #

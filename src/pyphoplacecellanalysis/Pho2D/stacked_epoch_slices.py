@@ -3368,7 +3368,7 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
 
             # root_export_path: Path = Path(r"/media/halechr/MAX/cloud/University of Michigan Dropbox/Pho Hale/Pho Diba Paper 2023/array_as_image").resolve() # Lab
             root_export_path: Path = Path(r'K:/scratch/collected_outputs/figures/array_as_image').resolve()
-            # root_export_path: Path = Path(r'C:\Users\pho\repos\Spike3DWorkEnv\Spike3D\EXTERNAL\Screenshots\ProgrammaticDisplayFunctionTesting\array_as_image').resolve()
+            # root_export_path: Path = Path(r'C:/Users/pho/repos/Spike3DWorkEnv/Spike3D/EXTERNAL/Screenshots/ProgrammaticDisplayFunctionTesting/array_as_image').resolve()
             root_export_path.mkdir(exist_ok=True)
             Assert.path_exists(root_export_path)
 
@@ -3406,7 +3406,7 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
         _co_filter_epochs_and_spikes_kwargs_DICT = {'ripple': dict(epoch_id_key_name='ripple_epoch_id'),
             'laps': dict(epoch_id_key_name='lap_id')
         }
-        active_co_filter_epochs_and_spikes_kwargs = _co_filter_epochs_and_spikes_kwargs_DICT[known_epochs_type] # resolve for the specific known_epochs_type ('ripple'/'lap')
+        active_co_filter_epochs_and_spikes_kwargs = _co_filter_epochs_and_spikes_kwargs_DICT[known_epochs_type] # resolve for the specific known_epochs_type ('ripple'/'laps')
         
         active_min_num_unique_aclu_inclusions_requirement: int = track_templates.min_num_unique_aclu_inclusions_requirement(curr_active_pipeline, required_min_percentage_of_active_cells=0.333333333)
         active_filter_epochs_df, active_spikes_df = co_filter_epochs_and_spikes(active_spikes_df=active_spikes_df, active_epochs_df=active_filter_epochs_df, included_aclus=track_templates.any_decoder_neuron_IDs, min_num_unique_aclu_inclusions=active_min_num_unique_aclu_inclusions_requirement, **active_co_filter_epochs_and_spikes_kwargs, no_interval_fill_value=-1, add_unique_aclus_list_column=True, drop_non_epoch_spikes=True)
@@ -3461,7 +3461,7 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
         _build_attached_yellow_blue_track_identity_marginal_window_kwargs_DICT = {'ripple': dict(decoding_time_bin_size=directional_decoders_epochs_decode_result.ripple_decoding_time_bin_size, name='TrackIdentity_Marginal_Ripples', filter_epochs_decoder_result=deepcopy(directional_merged_decoders_result.all_directional_ripple_filter_epochs_decoder_result)),
             'laps': dict(decoding_time_bin_size=directional_decoders_epochs_decode_result.laps_decoding_time_bin_size, name='TrackIdentity_Marginal_Laps', filter_epochs_decoder_result=deepcopy(directional_merged_decoders_result.all_directional_laps_filter_epochs_decoder_result)),
         }
-        active_build_attached_yellow_blue_track_identity_marginal_window_kwargs = _build_attached_yellow_blue_track_identity_marginal_window_kwargs_DICT[known_epochs_type] # resolve for the specific known_epochs_type ('ripple'/'lap')
+        active_build_attached_yellow_blue_track_identity_marginal_window_kwargs = _build_attached_yellow_blue_track_identity_marginal_window_kwargs_DICT[known_epochs_type] # resolve for the specific known_epochs_type ('ripple'/'laps')
         yellow_blue_plot_context = IdentifyingContext(**{'decoded_epochs': known_epochs_type.title(), 'Marginal': 'TrackID', 't_bin': round(active_build_attached_yellow_blue_track_identity_marginal_window_kwargs['decoding_time_bin_size'], ndigits=5)})
         
         # directional_merged_decoders_result.filtered_by_epoch_times()
