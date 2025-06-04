@@ -630,113 +630,311 @@ class SpecificComputationValidator:
 
 class DependencyGraph:
     """
-    # Example usage
+    Builds and analyzes a graph of computation dependencies.
 
-    from pyphoplacecellanalysis.General.Model.SpecificComputationValidation import DependencyGraph, SpecificComputationValidator, SpecificComputationResultsSpecification
-    
-    _comp_specifiers_dict: Dict[str, SpecificComputationValidator] = curr_active_pipeline.get_merged_computation_function_validators()
-    validators = deepcopy(_comp_specifiers_dict) # { ... }  # Your validators here
-    print(validators)
-    graph = DependencyGraph(validators)
+    This class creates a directed graph where:
+    - Nodes are computation functions
+    - Edges represent dependencies (A -> B means B depends on A)
+    - Node attributes store provided/required keys and validator info
+
+    Example usage:
+    from pyphoplacecellanalysis.General.Model.SpecificComputationValidation import DependencyGraph
+
+    _comp_specifiers_dict = curr_active_pipeline.get_merged_computation_function_validators()
+    graph = DependencyGraph(_comp_specifiers_dict)
+    dependents = graph.get_downstream_dependents('DirectionalMergedDecoders')
+    graph.visualize()
     """
     def __init__(self, validators: Dict[str, SpecificComputationValidator]):
+        """
+        Initialize the dependency graph from validators.
+
+        Args:
+            validators: Dictionary mapping function names to SpecificComputationValidator objects
+        """
         self.graph = nx.DiGraph()
         self.validators = validators
         self.build_graph(validators)
-    
-    def build_graph(self, validators):
-        for key, validator in validators.items():
-            self.graph.add_node(key, provides_global_keys=validator.results_specification.provides_global_keys, requires_global_keys=validator.results_specification.requires_global_keys, validator=validator)
-            for required_key in validator.results_specification.requires_global_keys:
-                for provider_key, provider_validator in validators.items():
-                    if required_key in provider_validator.results_specification.provides_global_keys:
-                        self.graph.add_edge(provider_key, key)
 
-    # def __init__(self, validators):
-    #     self.graph = nx.DiGraph()
-    #     self.build_graph(validators)
-    
-    # def build_graph(self, validators):
-    #     for key, validator in validators.items():
-    #         self.graph.add_node(key)
-    #         for required_key in validator.results_specification.requires_global_keys:
-    #             for provider_key, provider_validator in validators.items():
-    #                 if required_key in provider_validator.results_specification.provides_global_keys:
-    #                     self.graph.add_edge(provider_key, key)
-    
-    # def get_downstream_dependents(self, modified_key):
-    #     dependents = set()
-    #     for node in self.graph.nodes:
-    #         if modified_key in validators[node].results_specification.provides_global_keys:
-    #             dependents.update(nx.descendants(self.graph, node))
-    #     return dependents
-    
-    def get_downstream_dependents(self, modified_key: str, debug_print=False):
+        # Build reverse mapping from keys to providers
+        self.key_providers = {}
+        for name, validator in validators.items():
+            for key in validator.provides_global_keys:
+                if key not in self.key_providers:
+                    self.key_providers[key] = []
+                self.key_providers[key].append(name)
+
+    def build_graph(self, validators):
+        """
+        Build the dependency graph.
+
+        Args:
+            validators: Dictionary mapping function names to SpecificComputationValidator objects
+        """
+        # First add all nodes with their attributes
+        for key, validator in validators.items():
+            self.graph.add_node(
+                key, 
+                provides_global_keys=validator.provides_global_keys, 
+                requires_global_keys=validator.requires_global_keys,
+                validator=validator
+            )
+
+        # Then add all edges based on dependencies
+        for consumer_key, consumer in validators.items():
+            for required_key in consumer.requires_global_keys:
+                for provider_key, provider in validators.items():
+                    if required_key in provider.provides_global_keys:
+                        # Provider -> Consumer edge means Consumer depends on Provider
+                        self.graph.add_edge(provider_key, consumer_key, key=required_key)
+
+    def get_downstream_dependents(self, modified_key: str, debug_print=False) -> set:
+        """
+        Get all functions that depend on a specific key.
+
+        Args:
+            modified_key: The global key that was modified
+            debug_print: Whether to print debug information
+
+        Returns:
+            Set of function names that depend on the modified key
+        """
         dependents = set()
+
+        # Find all nodes that provide this key
+        provider_nodes = []
         for node in self.graph.nodes:
-            if debug_print:
-                print(f'node: {node}:')
-                print(f"\tself.graph.nodes[node]['provides_global_keys']: {self.graph.nodes[node]['provides_global_keys']}")
             if modified_key in self.graph.nodes[node]['provides_global_keys']:
+                provider_nodes.append(node)
                 if debug_print:
-                    print(f'modified_key: {modified_key}')
-                dependents.update(nx.descendants(self.graph, node))
+                    print(f"Function '{node}' provides key '{modified_key}'")
+
+        # For each provider, get all downstream nodes that depend on it
+        for provider in provider_nodes:
+            # Get all descendants of this provider
+            descendants = nx.descendants(self.graph, provider)
+            dependents.update(descendants)
+            if debug_print:
+                print(f"  Downstream dependents: {descendants}")
+
         return dependents
 
-    def get_upstream_requirements(self, target_key: str, debug_print=False):
+    def get_upstream_requirements(self, target_key: str, debug_print=False) -> set:
         """
-        upstream_requirements = graph.get_upstream_requirements('perform_wcorr_shuffle_analysis')
-        print(upstream_requirements)
-        """
+        Get all functions that provide a required key.
 
-        requirements = set()
+        Args:
+            target_key: The global key that is required
+            debug_print: Whether to print debug information
+
+        Returns:
+            Set of function names that provide the required key
+        """
+        providers = set()
+
+        # Find all nodes that require this key
+        consumer_nodes = []
         for node in self.graph.nodes:
-            if debug_print:
-                print(f'node: {node}:')
-                print(f"\tself.graph.nodes[node]['requires_global_keys']: {self.graph.nodes[node]['requires_global_keys']}")
             if target_key in self.graph.nodes[node]['requires_global_keys']:
+                consumer_nodes.append(node)
                 if debug_print:
-                    print(f'target_key: {target_key}')
-                requirements.update(nx.descendants(self.graph, node))
-        return requirements
+                    print(f"Function '{node}' requires key '{target_key}'")
 
+        # For each consumer, find ancestors that might provide the key
+        for consumer in consumer_nodes:
+            # Get direct providers of this key
+            for provider_key, provider in self.validators.items():
+                if target_key in provider.provides_global_keys:
+                    providers.add(provider_key)
+                    if debug_print:
+                        print(f"  Direct provider: {provider_key}")
+
+        return providers
+
+    def get_execution_order(self, target_functions=None) -> List[str]:
+        """
+        Get a valid execution order for computations.
+
+        Args:
+            target_functions: Optional list of target functions to include
+                If None, all functions in the graph are included
+
+        Returns:
+            List of function names in a valid execution order
+        """
+        # If we have a cyclic dependency, topological sort will fail
+        try:
+            # Get full topological sort (dependency order)
+            full_order = list(nx.topological_sort(self.graph))
+
+            if target_functions is None:
+                return full_order
+
+            # If specific targets are provided, include them and their dependencies
+            needed_functions = set()
+            for target in target_functions:
+                if target in self.graph:
+                    needed_functions.add(target)
+                    # Include all ancestors (dependencies)
+                    needed_functions.update(nx.ancestors(self.graph, target))
+
+            # Filter and maintain original order
+            filtered_order = [f for f in full_order if f in needed_functions]
+            return filtered_order
+
+        except nx.NetworkXUnfeasible:
+            # There's a cycle in the graph
+            print("Warning: Cyclic dependency detected in computation graph")
+            return list(self.graph.nodes)
     
-    def visualize(self):
-        import matplotlib.pyplot as plt
-        # Filter out nodes with no parents or children
-        nodes_to_draw = [node for node in self.graph.nodes if list(self.graph.predecessors(node)) or list(self.graph.successors(node))]
-        subgraph = self.graph.subgraph(nodes_to_draw)
-        
-        pos = nx.spring_layout(subgraph)
-        nx.draw(subgraph, pos, with_labels=True, node_size=3000, node_color="lightblue", font_size=10, font_weight="bold", edge_color="gray")
-        plt.show()
+
+    @function_attributes(short_name=None, tags=['WORKING', 'dependencies', 'computation', 'AI', 'Cody'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-06-04 07:14', related_items=[])
+    @classmethod
+    def resolve_computation_dependencies(cls, curr_active_pipeline, target_computation_function_names: List[str], debug_print: bool=False, debug_visualization_figure: bool=False) -> List[str]:
+        """
+        Recursively resolves all dependencies for specified computation functions using DependencyGraph.
+
+        Args:
+            curr_active_pipeline: The active pipeline containing computation function validators
+            target_computation_function_names: List of computation function names to resolve dependencies for
+            debug_print: Whether to print debug information
+
+        Returns:
+            ordered_computation_functions: List of computation function names in execution order
+
+
+        Usage:
+
+            from pyphoplacecellanalysis.General.Model.SpecificComputationValidation import DependencyGraph, SpecificComputationValidator, SpecificComputationResultsSpecification
+
+            ordered_computation_functions = DependencyGraph.resolve_computation_dependencies(curr_active_pipeline, ['directional_decoders_decode_continuous'])
+            ordered_computation_functions
+
+
+        """
+        if isinstance(target_computation_function_names, str):
+            target_computation_function_names = [target_computation_function_names]
+
+        # Get all validators from the pipeline
+        all_validators_dict = curr_active_pipeline.get_merged_computation_function_validators()
+
+        # Build dependency graph
+        dep_graph = DependencyGraph(all_validators_dict)
+
+        # Normalize function names to match actual validator keys
+        normalized_targets = []
+        for target in target_computation_function_names:
+            for name, validator in all_validators_dict.items():
+                if validator.does_name_match(target):
+                    normalized_targets.append(name)
+                    if debug_print:
+                        print(f"Matched target '{target}' to validator key '{name}'")
+                    break
+
+        if not normalized_targets:
+            if debug_print:
+                print(f"Warning: No validators found for targets: {target_computation_function_names}")
+            return []
+
+        # Get execution order using the graph
+        execution_order = dep_graph.get_execution_order(normalized_targets)
+
+        if debug_print:
+            print(f"Resolved execution order: {execution_order}")
+
+        if debug_visualization_figure:
+            # Optionally visualize the graph
+            dep_graph.visualize(highlight_nodes=normalized_targets, title="Computation Dependency Graph")
+
+        return execution_order
+
+
+
+    # ==================================================================================================================================================================================================================================================================================== #
+    # Visualizations                                                                                                                                                                                                                                                                       #
+    # ==================================================================================================================================================================================================================================================================================== #
 
     # def visualize(self):
+    #     import matplotlib.pyplot as plt
     #     # Filter out nodes with no parents or children
     #     nodes_to_draw = [node for node in self.graph.nodes if list(self.graph.predecessors(node)) or list(self.graph.successors(node))]
     #     subgraph = self.graph.subgraph(nodes_to_draw)
         
-    #     # Use pygraphviz for better visualization
-    #     pos = nx.nx_agraph.graphviz_layout(subgraph, prog='dot')
-    #     nx.draw(subgraph, pos, with_labels=True, node_size=3000, node_color="lightblue", font_size=10, font_weight="bold", edge_color="gray", arrows=True)
+    #     pos = nx.spring_layout(subgraph)
+    #     nx.draw(subgraph, pos, with_labels=True, node_size=3000, node_color="lightblue", font_size=10, font_weight="bold", edge_color="gray")
     #     plt.show()
 
-    # def visualize(self):
-    #     # Filter out nodes with no parents or children
-    #     nodes_to_draw = [node for node in self.graph.nodes if list(self.graph.predecessors(node)) or list(self.graph.successors(node))]
-    #     subgraph = self.graph.subgraph(nodes_to_draw)
-        
-    #     # Use a spring layout for better spacing
-    #     pos = nx.spring_layout(subgraph, k=0.5, iterations=50)
-        
-    #     plt.figure(figsize=(12, 12))
-    #     nx.draw(subgraph, pos, with_labels=True, node_size=3000, node_color="lightblue", font_size=10, font_weight="bold", edge_color="gray", arrows=True)
-        
-    #     # Draw edge labels if needed
-    #     edge_labels = {(u, v): f'{u} -> {v}' for u, v in subgraph.edges}
-    #     nx.draw_networkx_edge_labels(subgraph, pos, edge_labels=edge_labels, font_color='red')
-        
-    #     plt.show()
+    def visualize(self, highlight_nodes=None, title=None):
+            """
+            Visualize the dependency graph.
+
+            Args:
+                highlight_nodes: Optional list of node names to highlight
+                title: Optional title for the plot
+            """
+            import matplotlib.pyplot as plt
+            from matplotlib.patches import FancyArrowPatch
+
+            # Filter to show only connected nodes
+            connected_nodes = set()
+            for node in self.graph.nodes:
+                if list(self.graph.predecessors(node)) or list(self.graph.successors(node)):
+                    connected_nodes.add(node)
+
+            if not connected_nodes:
+                print("No connected nodes to visualize")
+                return
+
+            subgraph = self.graph.subgraph(connected_nodes)
+
+            # Create the figure
+            plt.figure(figsize=(12, 10))
+            if title:
+                plt.title(title, fontsize=16)
+
+            # Use a more spaced layout
+            pos = nx.spring_layout(subgraph, k=0.5, iterations=50, seed=42)
+
+            # Node colors
+            node_colors = []
+            for node in subgraph.nodes:
+                if highlight_nodes and node in highlight_nodes:
+                    node_colors.append("orange")  # Highlighted nodes
+                else:
+                    node_colors.append("lightblue")  # Regular nodes
+
+            # Draw nodes
+            nx.draw_networkx_nodes(
+                subgraph, pos, 
+                node_size=3000, 
+                node_color=node_colors,
+                alpha=0.8
+            )
+
+            # Draw edges with arrows
+            nx.draw_networkx_edges(
+                subgraph, pos,
+                width=1.5,
+                alpha=0.7,
+                edge_color="gray",
+                connectionstyle="arc3,rad=0.1",
+                arrowstyle="->"
+            )
+
+            # Draw labels
+            nx.draw_networkx_labels(
+                subgraph, pos,
+                font_size=10,
+                font_weight="bold"
+            )
+
+            # Optional: Draw edge labels showing which key creates the dependency
+            # edge_labels = {(u, v): subgraph[u][v].get('key', '') for u, v in subgraph.edges}
+            # nx.draw_networkx_edge_labels(subgraph, pos, edge_labels=edge_labels, font_color='red')
+
+            plt.axis('off')  # Hide axis
+            plt.tight_layout()
+            plt.show()
 
 
 
