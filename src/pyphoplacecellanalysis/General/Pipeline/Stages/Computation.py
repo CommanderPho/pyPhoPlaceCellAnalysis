@@ -908,6 +908,108 @@ class ComputedPipelineStage(FilterablePipelineStage, LoadedPipelineStage):
                 print(f'done.')
 
 
+    @function_attributes(short_name=None, tags=['dependencies', 'validation', 'computation'], input_requires=[], output_provides=[], uses=['DependencyGraph.resolve_computation_dependencies'], used_by=['.resolve_and_execute_full_required_computation_plan'], creation_date='2025-06-04 07:25', related_items=[])
+    def resolve_full_required_computation_plan(self, active_computation_params=None, enabled_filter_names=None, computation_functions_name_includelist=None, computation_kwargs_list=None, debug_print=False, progress_logger_callback=None) -> List[str]:
+        """ determines the full list of specific computations required to perform a desired specific computation (specified in computation_functions_name_includelist)
+
+        """
+        from pyphoplacecellanalysis.General.Model.SpecificComputationValidation import DependencyGraph
+        from pyphoplacecellanalysis.General.Batch.NonInteractiveProcessing import batch_evaluate_required_computations #, batch_extended_computations
+
+        if progress_logger_callback is None:
+            progress_logger_callback = print
+
+        if enabled_filter_names is None:
+            enabled_filter_names = list(self.filtered_sessions.keys()) # all filters if specific enabled names aren't specified
+
+        has_custom_kwargs_list: bool = False # indicates whether user provided a kwargs list
+        if computation_kwargs_list is None:
+            computation_kwargs_list = [{} for _ in computation_functions_name_includelist]
+        else:
+            has_custom_kwargs_list = np.any([len(x)>0 for x in computation_kwargs_list])
+            # has_custom_kwargs_list = True            
+
+        assert isinstance(computation_kwargs_list, List), f"computation_kwargs_list: Optional<list>: is supposed to be a list of kwargs corresponding to each function name in computation_functions_name_includelist but instead is of type:\n\ttype(computation_kwargs_list): {type(computation_kwargs_list)}"
+        assert len(computation_kwargs_list) == len(computation_functions_name_includelist)
+
+        ## Resolve all required pre-req dependencies to execute this function:
+        ordered_required_dependent_computation_fn_names: List[str] = DependencyGraph.resolve_computation_dependencies(self, target_computation_function_names=computation_functions_name_includelist) # computation_functions_name_includelist = ['directional_decoders_decode_continuous']
+        return ordered_required_dependent_computation_fn_names
+
+
+
+    @function_attributes(short_name=None, tags=['dependencies', 'computation', 'specific', 'validation'], input_requires=[], output_provides=[], uses=['self.resolve_full_required_computation_plan', 'batch_evaluate_required_computations', 'self.perform_specific_computation'], used_by=[], creation_date='2025-06-04 07:45', related_items=[])
+    def resolve_and_execute_full_required_computation_plan(self, active_computation_params=None, enabled_filter_names=None, computation_functions_name_includelist=None, computation_kwargs_list=None, debug_print=False, progress_logger_callback=None):
+        """ determines the full list of specific computations required to perform a desired specific computation (specified in computation_functions_name_includelist) AND THEN PERFORMS all the required functions in a minimally destructive manner using the previously recomputed results 
+
+        Updates:
+            curr_active_pipeline.computation_results
+            curr_active_pipeline.global_computation_results
+        """
+        from pyphoplacecellanalysis.General.Model.SpecificComputationValidation import DependencyGraph
+        from pyphoplacecellanalysis.General.Batch.NonInteractiveProcessing import batch_evaluate_required_computations #, batch_extended_computations
+
+        if progress_logger_callback is None:
+            progress_logger_callback = print
+
+        if enabled_filter_names is None:
+            enabled_filter_names = list(self.filtered_sessions.keys()) # all filters if specific enabled names aren't specified
+
+        has_custom_kwargs_list: bool = False # indicates whether user provided a kwargs list
+        if computation_kwargs_list is None:
+            computation_kwargs_list = [{} for _ in computation_functions_name_includelist]
+        else:
+            has_custom_kwargs_list = np.any([len(x)>0 for x in computation_kwargs_list])
+            # has_custom_kwargs_list = True            
+
+        assert isinstance(computation_kwargs_list, List), f"computation_kwargs_list: Optional<list>: is supposed to be a list of kwargs corresponding to each function name in computation_functions_name_includelist but instead is of type:\n\ttype(computation_kwargs_list): {type(computation_kwargs_list)}"
+        assert len(computation_kwargs_list) == len(computation_functions_name_includelist)
+
+        # Determine the whole plan ___________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
+        ## Resolve all required pre-req dependencies to execute this function:
+        ordered_required_dependent_computation_fn_names: List[str] = self.resolve_full_required_computation_plan(active_computation_params=active_computation_params, enabled_filter_names=enabled_filter_names, computation_functions_name_includelist=computation_functions_name_includelist, computation_kwargs_list=computation_kwargs_list, debug_print=debug_print, progress_logger_callback=progress_logger_callback)
+        if debug_print:
+            progress_logger_callback(f'\tordered_required_dependent_computation_fn_names: {ordered_required_dependent_computation_fn_names}')
+
+        if len(ordered_required_dependent_computation_fn_names) > 0:
+            needs_computation_output_dict, valid_computed_results_output_list, remaining_required_dep_comp_fn_names = batch_evaluate_required_computations(self, include_includelist=ordered_required_dependent_computation_fn_names, include_global_functions=True, fail_on_exception=False, progress_print=True,
+                                                                force_recompute=False, force_recompute_override_computations_includelist=[], debug_print=False)
+
+        ## OUTPUTS: needs_computation_output_dict
+        if len(remaining_required_dep_comp_fn_names) > 0:
+            if debug_print:
+                progress_logger_callback(f'\thave {len(remaining_required_dep_comp_fn_names)} functions to compute: {remaining_required_dep_comp_fn_names}. Performing specific computations: ....')
+
+            self.perform_specific_computation(computation_functions_name_includelist=remaining_required_dep_comp_fn_names, computation_kwargs_list=computation_kwargs_list, enabled_filter_names=None, fail_on_exception=True, debug_print=False)
+            if debug_print:
+                progress_logger_callback(f'done.')
+
+            return
+
+        else:
+            if debug_print:
+                progress_logger_callback(f'\tno computations required, have all required keys!')
+            return
+
+
+        # ## OUTPUTS: needs_computation_output_dict
+        # if len(remaining_required_dep_comp_fn_names) > 0:
+        #     if debug_print:
+        #         progress_logger_callback(f'\thave {len(remaining_required_dep_comp_fn_names)} functions to compute: {remaining_required_dep_comp_fn_names}')
+        #     return remaining_required_dep_comp_fn_names
+
+
+        #     # curr_active_pipeline.perform_specific_computation(computation_functions_name_includelist=remaining_include_function_names, computation_kwargs_list=computation_kwargs_list, enabled_filter_names=None, fail_on_exception=True, debug_print=False)
+
+        # else:
+        #     if debug_print:
+        #         progress_logger_callback(f'\tno computations required, have all required keys!')
+        #     return []
+
+
+
+
+
     @function_attributes(short_name=None, tags=['computation', 'specific', 'parallel', 'embarassingly-paralell'], input_requires=[], output_provides=[], uses=['run_specific_computations_single_context', 'cls._build_initial_computationResult'], used_by=[], creation_date='2023-07-21 18:21', related_items=[])
     def perform_specific_computation(self, active_computation_params=None, enabled_filter_names=None, computation_functions_name_includelist=None, computation_kwargs_list=None, fail_on_exception:bool=False, debug_print=False, progress_logger_callback=None, enable_parallel: bool=False):
         """ perform a specific computation (specified in computation_functions_name_includelist) in a minimally destructive manner using the previously recomputed results:
@@ -1489,8 +1591,6 @@ class ComputedPipelineStage(FilterablePipelineStage, LoadedPipelineStage):
                         needs_compute: bool = (not has_valid_computation)
                         if needs_compute:
                             needs_computation_output_dict[_comp_specifier.short_name] = _comp_specifier.computation_precidence
-
-                            
 
                     ## ENDIF is_global
                             
