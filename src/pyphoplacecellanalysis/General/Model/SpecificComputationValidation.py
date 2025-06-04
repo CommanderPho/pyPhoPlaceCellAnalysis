@@ -770,6 +770,219 @@ def find_immediate_dependencies(remaining_comp_specifiers_dict, provided_global_
 
 
 
+# from pyphoplacecellanalysis.General.Model.SpecificComputationValidation import DependencyGraph, SpecificComputationValidator, SpecificComputationResultsSpecification
+
+def resolve_computation_dependencies(curr_active_pipeline, target_computation_function_names, debug_print=False):
+    """
+    Recursively resolves all dependencies for specified computation functions.
+
+    # Pseudocode: ________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
+
+        ## Initially have the name of a single computation function that we want to perform:
+        computation_functions_name_includelist = ['directional_decoders_decode_continuous']
+
+        ## for this function, find the required_global_keys for the function so that we have all the prerequsite info to successfully compute it...
+        requires_global_keys = ['DirectionalLaps', 'DirectionalMergedDecoders']
+
+        ## then resolve each required_global_key into the required computation function that produces them
+        required_additional_computation_function_name_includelist = [] # ...
+
+        ## then for each of these functions, repeat the process of recurrsively resolving their required global keys until we have a flat list of all the required computation_function_names that we need to compute to get our required results. 
+
+
+    # DOCS _______________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
+    Args:
+        curr_active_pipeline: The active pipeline containing computation function validators
+        target_computation_function_names: List of computation function names to resolve dependencies for
+        debug_print: Whether to print debug information
+
+    Returns:
+        ordered_computation_functions: List of computation function names in execution order
+
+    Example:
+        # Get all computation functions needed to run 'directional_decoders_decode_continuous'
+        required_functions = resolve_computation_dependencies(
+            curr_active_pipeline, 
+            ['directional_decoders_decode_continuous']
+        )
+        print(required_functions)
+    """
+    if isinstance(target_computation_function_names, str):
+        target_computation_function_names = [target_computation_function_names]
+
+    # Get all validators from the pipeline
+    all_validators_dict = curr_active_pipeline.get_merged_computation_function_validators()
+
+    # Build dependency graph for better analysis
+    dep_graph = DependencyGraph(all_validators_dict)
+
+    # Track all required functions
+    required_functions = []
+    visited_functions = set()
+
+    def resolve_function_dependencies(function_name):
+        """Recursively resolve dependencies for a function"""
+        if function_name in visited_functions:
+            return
+
+        visited_functions.add(function_name)
+
+        if debug_print:
+            print(f"Resolving dependencies for: {function_name}")
+
+        # Find the validator for this function
+        validator = None
+        for name, val in all_validators_dict.items():
+            if val.does_name_match(function_name):
+                validator = val
+                break
+
+        if validator is None:
+            if debug_print:
+                print(f"Warning: No validator found for {function_name}")
+            return
+
+        # Get required global keys
+        required_global_keys = validator.requires_global_keys
+
+        if debug_print:
+            print(f"  Required global keys: {required_global_keys}")
+
+        # For each required key, find functions that provide it
+        for req_key in required_global_keys:
+            provider_validators = SpecificComputationValidator.find_validators_providing_results(
+                all_validators_dict, 
+                [req_key], 
+                return_flat_list=True
+            )
+
+            for provider in provider_validators:
+                provider_name = provider.computation_fn_name
+                if debug_print:
+                    print(f"  Found provider for {req_key}: {provider_name}")
+
+                # Recursively resolve dependencies for this provider
+                resolve_function_dependencies(provider_name)
+
+        # Add this function to the list after its dependencies
+        required_functions.append(function_name)
+
+    # Start resolution for each target function
+    for function_name in target_computation_function_names:
+        resolve_function_dependencies(function_name)
+
+    # Remove duplicates while preserving order
+    ordered_computation_functions = []
+    for func in required_functions:
+        if func not in ordered_computation_functions:
+            ordered_computation_functions.append(func)
+
+    return ordered_computation_functions
+
+def get_required_keys_for_computation(curr_active_pipeline, computation_function_name):
+    """
+    Get the required global keys for a specific computation function.
+
+    Args:
+        curr_active_pipeline: The active pipeline containing computation function validators
+        computation_function_name: Name of the computation function
+
+    Returns:
+        List of required global keys
+    """
+    all_validators_dict = curr_active_pipeline.get_merged_computation_function_validators()
+
+    for name, validator in all_validators_dict.items():
+        if validator.does_name_match(computation_function_name):
+            return validator.requires_global_keys
+
+    return []
+
+def get_computation_providers_for_keys(curr_active_pipeline, required_keys):
+    """
+    Find computation functions that provide the specified global keys.
+
+    Args:
+        curr_active_pipeline: The active pipeline containing computation function validators
+        required_keys: List of global keys to find providers for
+
+    Returns:
+        List of computation function names that provide the required keys
+    """
+    all_validators_dict = curr_active_pipeline.get_merged_computation_function_validators()
+
+    provider_validators = SpecificComputationValidator.find_validators_providing_results(
+        all_validators_dict,
+        required_keys,
+        return_flat_list=True
+    )
+
+    return [validator.computation_fn_name for validator in provider_validators]
+
+@function_attributes(short_name=None, tags=['MAIN', 'validation'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-06-04 07:03', related_items=[])
+def plan_computation_execution(curr_active_pipeline, target_computation_functions, debug_print=False):
+    """
+    Higher-level function that takes target computation functions and returns
+    an execution plan with all required dependencies.
+
+    Args:
+        curr_active_pipeline: The active pipeline
+        target_computation_functions: List of computation functions to execute
+        debug_print: Whether to print debug information
+
+    Returns:
+        Dictionary with execution plan information
+
+    Example:
+        # Plan execution for 'directional_decoders_decode_continuous'
+        plan = plan_computation_execution(
+            curr_active_pipeline, 
+            ['directional_decoders_decode_continuous']
+        )
+        print(plan['execution_order'])  # Functions in execution order
+        print(plan['dependency_graph'])  # Dependency relationships
+    """
+    if isinstance(target_computation_functions, str):
+        target_computation_functions = [target_computation_functions]
+
+    # Get all required functions in order
+    execution_order = resolve_computation_dependencies(
+        curr_active_pipeline,
+        target_computation_functions,
+        debug_print=debug_print
+    )
+
+    # Get all validators
+    all_validators_dict = curr_active_pipeline.get_merged_computation_function_validators()
+
+    # Build a dependency graph for visualization
+    dependency_graph = {}
+    for func_name in execution_order:
+        for name, validator in all_validators_dict.items():
+            if validator.does_name_match(func_name):
+                dependency_graph[func_name] = {
+                    'requires_global_keys': validator.requires_global_keys,
+                    'provides_global_keys': validator.provides_global_keys,
+                    'dependencies': []
+                }
+
+                # Find direct dependencies
+                for req_key in validator.requires_global_keys:
+                    providers = get_computation_providers_for_keys(curr_active_pipeline, [req_key])
+                    dependency_graph[func_name]['dependencies'].extend(providers)
+
+                # Remove duplicates
+                dependency_graph[func_name]['dependencies'] = list(set(dependency_graph[func_name]['dependencies']))
+                break
+
+    return {
+        'execution_order': execution_order,
+        'dependency_graph': dependency_graph,
+        'target_functions': target_computation_functions
+    }
+
+
+
 
 
 
