@@ -638,7 +638,10 @@ def batch_extended_programmatic_figures(curr_active_pipeline, write_vector_forma
 	
 	try:
 		_out = curr_active_pipeline.display('_display_directional_merged_pf_decoded_stacked_epoch_slices', curr_active_pipeline.get_session_context(), defer_render=True, save_figure=save_figure, is_dark_mode=False)
-		print(f'`directional_decoded_stacked_epoch_slices` completed. \n\t_out_paths: {_out}\n\n')
+		print(f'`directional_decoded_stacked_epoch_slices` completed. \n')
+		if debug_print:
+			print(f'\t_out_paths: {_out}\n\n')
+
 	except Exception as e:
 		print(f'batch_extended_programmatic_figures(...): "_display_directional_merged_pf_decoded_stacked_epoch_slices" failed with error: {e}\n skipping.')
 
@@ -711,6 +714,14 @@ def batch_extended_programmatic_figures(curr_active_pipeline, write_vector_forma
 		_out = curr_active_pipeline.display('_display_trial_to_trial_reliability', curr_active_pipeline.get_session_context(), defer_render=True, save_figure=save_figure, is_dark_mode=False)
 	except Exception as e:
 		print(f'batch_extended_programmatic_figures(...): "_display_trial_to_trial_reliability" failed with error: {e}\n skipping.')
+
+
+
+	try:
+		_out = curr_active_pipeline.display('_display_measured_vs_decoded_occupancy_distributions', curr_active_pipeline.get_session_context(), defer_render=True, save_figure=save_figure, size=[18, 8], dpi=100)
+	except Exception as e:
+		print(f'batch_extended_programmatic_figures(...): "_display_measured_vs_decoded_occupancy_distributions" (short_name="meas_v_decoded_occupancy") failed with error: {e}\n skipping.')
+
 
 
 

@@ -1991,7 +1991,8 @@ def plot_bidirectional_track_remapping_diagram(track_templates, grid_bin_bounds,
                                                 enable_interactivity:bool=True, is_dark_mode:bool=True, aclus_y_offset_mode: AclusYOffsetMode = AclusYOffsetMode.RandomJitter,
                                                 use_separate_plot_for_each_direction:bool=True, use_unique_aclu_colors:bool=False, drop_aclu_if_missing_long_or_short:bool=False,
                                                 **kwargs):   
-    """ 
+    """ Plots a figure that shows how the place cells remap from long to short, with two plots for the seperate run directions
+
     Usage:
     
         from pyphoplacecellanalysis.Pho2D.track_shape_drawing import plot_bidirectional_track_remapping_diagram
