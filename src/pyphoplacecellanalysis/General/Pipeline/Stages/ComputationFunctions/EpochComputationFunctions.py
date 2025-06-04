@@ -2712,7 +2712,15 @@ class EpochComputationDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Di
             from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import DecodedFilterEpochsResult, DirectionalPseudo2DDecodersResult
 
 
-            owning_pipeline_reference.perform_specific_computation(computation_functions_name_includelist=['directional_decoders_decode_continuous'],
+            # global_dropped_keys, local_dropped_keys = curr_active_pipeline.perform_drop_computed_result(computed_data_keys_to_drop = ['DirectionalDecodersDecoded'], debug_print=True)
+
+            ## Does this not perform the required pre-req computations if they're missing? For example this function requires: `requires_global_keys=['DirectionalLaps', 'DirectionalMergedDecoders']`, so does it do those if they're missing, or not because they aren't in the computations list?
+            # owning_pipeline_reference.perform_specific_computation(computation_functions_name_includelist=['directional_decoders_decode_continuous'],
+            #                                       computation_kwargs_list=[{'time_bin_size': time_bin_size, 'should_disable_cache':False}], 
+            #                                       enabled_filter_names=None, fail_on_exception=True, debug_print=False)
+            
+
+            owning_pipeline_reference.resolve_and_execute_full_required_computation_plan(computation_functions_name_includelist=['directional_decoders_decode_continuous'],
                                                   computation_kwargs_list=[{'time_bin_size': time_bin_size, 'should_disable_cache':False}], 
                                                   enabled_filter_names=None, fail_on_exception=True, debug_print=False)
 

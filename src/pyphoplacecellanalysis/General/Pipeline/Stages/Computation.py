@@ -48,6 +48,18 @@ from pyphocorehelpers.function_helpers import function_attributes
 from pyphocorehelpers.assertion_helpers import Assert
 
 
+import functools
+from typing import Callable, TypeVar, Any, get_type_hints
+
+def stage_wrapper_method(func: Callable) -> Callable:
+    """Decorator to create wrapper methods in PipelineWithComputedPipelineStageMixin that delegate to its `self.stage`."""
+    @functools.wraps(func)
+    def wrapper(self, *args, **kwargs):
+        return getattr(self.stage, func.__name__)(*args, **kwargs)
+    return wrapper
+
+
+
 class EvaluationActions(Enum):
     """An enum specifying the available commands that can be performed in the ComputedPipelineStage in regards to computations. Allows generalizing a previously confusing set of functions."""
     EVALUATE_COMPUTATIONS = "evaluate_computations" # replaces .evaluate_computations_for_single_params(...)
@@ -939,7 +951,8 @@ class ComputedPipelineStage(FilterablePipelineStage, LoadedPipelineStage):
 
 
     @function_attributes(short_name=None, tags=['dependencies', 'computation', 'specific', 'validation'], input_requires=[], output_provides=[], uses=['self.resolve_full_required_computation_plan', 'batch_evaluate_required_computations', 'self.perform_specific_computation'], used_by=[], creation_date='2025-06-04 07:45', related_items=[])
-    def resolve_and_execute_full_required_computation_plan(self, active_computation_params=None, enabled_filter_names=None, computation_functions_name_includelist=None, computation_kwargs_list=None, debug_print=False, progress_logger_callback=None):
+    def resolve_and_execute_full_required_computation_plan(self, active_computation_params=None, enabled_filter_names=None, computation_functions_name_includelist=None, computation_kwargs_list=None, fail_on_exception:bool=False, debug_print=False, progress_logger_callback=None):
+
         """ determines the full list of specific computations required to perform a desired specific computation (specified in computation_functions_name_includelist) AND THEN PERFORMS all the required functions in a minimally destructive manner using the previously recomputed results 
 
         Updates:
@@ -972,7 +985,7 @@ class ComputedPipelineStage(FilterablePipelineStage, LoadedPipelineStage):
             progress_logger_callback(f'\tordered_required_dependent_computation_fn_names: {ordered_required_dependent_computation_fn_names}')
 
         if len(ordered_required_dependent_computation_fn_names) > 0:
-            needs_computation_output_dict, valid_computed_results_output_list, remaining_required_dep_comp_fn_names = batch_evaluate_required_computations(self, include_includelist=ordered_required_dependent_computation_fn_names, include_global_functions=True, fail_on_exception=False, progress_print=True,
+            needs_computation_output_dict, valid_computed_results_output_list, remaining_required_dep_comp_fn_names = batch_evaluate_required_computations(self, include_includelist=ordered_required_dependent_computation_fn_names, include_global_functions=True, fail_on_exception=fail_on_exception, progress_print=True,
                                                                 force_recompute=False, force_recompute_override_computations_includelist=[], debug_print=False)
 
         ## OUTPUTS: needs_computation_output_dict
@@ -990,23 +1003,6 @@ class ComputedPipelineStage(FilterablePipelineStage, LoadedPipelineStage):
             if debug_print:
                 progress_logger_callback(f'\tno computations required, have all required keys!')
             return
-
-
-        # ## OUTPUTS: needs_computation_output_dict
-        # if len(remaining_required_dep_comp_fn_names) > 0:
-        #     if debug_print:
-        #         progress_logger_callback(f'\thave {len(remaining_required_dep_comp_fn_names)} functions to compute: {remaining_required_dep_comp_fn_names}')
-        #     return remaining_required_dep_comp_fn_names
-
-
-        #     # curr_active_pipeline.perform_specific_computation(computation_functions_name_includelist=remaining_include_function_names, computation_kwargs_list=computation_kwargs_list, enabled_filter_names=None, fail_on_exception=True, debug_print=False)
-
-        # else:
-        #     if debug_print:
-        #         progress_logger_callback(f'\tno computations required, have all required keys!')
-        #     return []
-
-
 
 
 
@@ -3477,4 +3473,17 @@ class PipelineWithComputedPipelineStageMixin:
                                                             
         """
         return self.stage.batch_extended_computations(include_includelist=include_includelist, included_computation_filter_names=included_computation_filter_names, include_global_functions=include_global_functions, fail_on_exception=fail_on_exception, progress_print=progress_print, debug_print=debug_print, force_recompute=force_recompute, force_recompute_override_computations_includelist=force_recompute_override_computations_includelist, computation_kwargs_dict=computation_kwargs_dict, dry_run=dry_run)
+
+
+
+    # Your new methods with the decorator
+    @stage_wrapper_method
+    def resolve_full_required_computation_plan(self, *args, **kwargs):
+        """This will be replaced by the decorator but preserves docstring and signature"""
+        pass
+
+    @stage_wrapper_method
+    def resolve_and_execute_full_required_computation_plan(self, *args, **kwargs):
+        """This will be replaced by the decorator but preserves docstring and signature"""
+        pass
 
