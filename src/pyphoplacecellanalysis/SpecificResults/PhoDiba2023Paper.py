@@ -1368,8 +1368,38 @@ class LongShortFRRegression:
 def main_complete_figure_generations(curr_active_pipeline, enable_default_neptune_plots:bool=True, save_figures_only:bool=False, save_figure=True):
     """ main run function to generate all figures
     
-        from pyphoplacecellanalysis.SpecificResults.PhoDiba2023Paper import main_complete_figure_generations
-        main_complete_figure_generations(curr_active_pipeline)
+        Usage 1:
+            from pyphoplacecellanalysis.SpecificResults.PhoDiba2023Paper import main_complete_figure_generations
+            main_complete_figure_generations(curr_active_pipeline)
+
+        Usage 2:        
+            from pyphoplacecellanalysis.General.Batch.BatchJobCompletion.BatchCompletionHandler import BatchSessionCompletionHandler
+            from neuropy.utils.matplotlib_helpers import matplotlib_file_only
+            from pyphoplacecellanalysis.SpecificResults.PhoDiba2023Paper import main_complete_figure_generations
+
+            # self.try_complete_figure_generation_to_file(curr_active_pipeline, enable_default_neptune_plots=self.should_generate_all_plots)
+            fail_on_exception: bool = False
+            enable_default_neptune_plots = False
+            completed_good: bool = False
+
+            try:
+                ## To file only:
+                with matplotlib_file_only():
+                    # Perform non-interactive Matplotlib operations with 'AGG' backend
+                    # neptuner = batch_perform_all_plots(curr_active_pipeline, enable_neptune=True, neptuner=None)
+                    main_complete_figure_generations(curr_active_pipeline, enable_default_neptune_plots=enable_default_neptune_plots, save_figures_only=True, save_figure=True)
+
+                curr_active_pipeline.clear_display_outputs()
+                curr_active_pipeline.clear_registered_output_files()
+                completed_good = True # completed successfully (without raising an error at least).
+
+            except Exception as e:
+                completed_good =  False
+                raise
+
+            ## OUTPUTS: completed_good
+            print(f'completed_good: {completed_good}')
+
         
     
     """

@@ -668,7 +668,7 @@ class AcrossSessionsResults:
         across_session_inst_fr_computation.active_identifying_session_ctx = global_multi_session_context
 
         all_contexts_list: List[IdentifyingContext] = list(across_sessions_instantaneous_fr_dict.keys())
-        assert len(all_contexts_list) > 0 # must have at least one element
+        assert len(all_contexts_list) > 0, f"len(all_contexts_list) should be > 0 -- must have at least one element"
         first_context = all_contexts_list[0]
         context_column_names = list(first_context.keys()) # ['format_name', 'animal', 'exper_name', 'session_name']
         expanded_context_df = pd.DataFrame.from_records([a_ctx.as_tuple() for a_ctx in all_contexts_list], columns=context_column_names)
@@ -3162,7 +3162,7 @@ class OldFileArchiver:
 # Visualizations                                                                                                       #
 # ==================================================================================================================== #
 
-@metadata_attributes(short_name=None, tags=['across-session', 'visualizations', 'figure', 'output'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-07-21 00:00', related_items=[])
+@metadata_attributes(short_name=None, tags=['across-session', 'visualizations', 'figure', 'output'], input_requires=[], output_provides=[], uses=['PaperFigureTwo'], used_by=[], creation_date='2023-07-21 00:00', related_items=[])
 class AcrossSessionsVisualizations:
     # 2023-07-21 - Across Sessions Aggregate Figure: __________________________________________________________________________________ #
 
