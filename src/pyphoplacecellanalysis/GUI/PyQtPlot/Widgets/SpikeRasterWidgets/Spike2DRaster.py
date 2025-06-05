@@ -608,8 +608,8 @@ class Spike2DRaster(SpecificDockWidgetManipulatingMixin, DynamicDockDisplayAreaO
         from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.SpikeRasterWidgets.Spike2DRaster import SynchronizedPlotMode
         
         self.logger.debug(f'Spike2DRaster._buildGraphics()')
-        use_docked_pyqtgraph_plots: bool = self.params.setdefault('use_docked_pyqtgraph_plots', False)
-        # use_docked_pyqtgraph_plots: bool = self.params.setdefault('use_docked_pyqtgraph_plots', True)
+        # use_docked_pyqtgraph_plots: bool = self.params.setdefault('use_docked_pyqtgraph_plots', False)
+        use_docked_pyqtgraph_plots: bool = self.params.setdefault('use_docked_pyqtgraph_plots', True)
 
         ## Common
         self.params.custom_interval_rendering_plots = []
@@ -1500,7 +1500,7 @@ class Spike2DRaster(SpecificDockWidgetManipulatingMixin, DynamicDockDisplayAreaO
         
         Usage:
         
-            a_time_sync_pyqtgraph_widget, root_graphics_layout_widget, plot_item = self.add_new_embedded_pyqtgraph_render_plot_widget(name='test_pyqtgraph_view_widget', dockSize=(500,50))
+            a_time_sync_pyqtgraph_widget, root_graphics_layout_widget, plot_item, dDisplayItem = self.add_new_embedded_pyqtgraph_render_plot_widget(name='test_pyqtgraph_view_widget', dockSize=(500,50))
             
         """
         dDisplayItem = self.ui.dynamic_docked_widget_container.find_display_dock(identifier=name) # Dock
