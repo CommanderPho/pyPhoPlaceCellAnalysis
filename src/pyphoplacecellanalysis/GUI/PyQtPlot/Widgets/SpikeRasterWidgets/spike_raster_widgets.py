@@ -265,11 +265,15 @@ def _setup_spike_raster_window_for_debugging(spike_raster_window, wants_docked_r
 
     ]
     # menu_commands = ['actionPseudo2DDecodedEpochsDockedMatplotlibView', 'actionContinuousPseudo2DDecodedMarginalsDockedMatplotlibView'] # , 'AddTimeIntervals.SessionEpochs'
-    for a_command in menu_commands:
-        # all_global_menus_actionsDict[a_command].trigger()
-        global_flat_action_dict[a_command].trigger()
-
-
+    
+    # Run after a 0.5 second delay
+    from PyQt5.QtCore import QTimer
+    def trigger_commands():
+        for a_command in menu_commands:
+            # all_global_menus_actionsDict[a_command].trigger()
+            global_flat_action_dict[a_command].trigger()
+    
+    QTimer.singleShot(500, trigger_commands)
     # ## add the right sidebar
     # visible_intervals_info_widget_container, visible_intervals_ctrl_layout_widget =  spike_raster_window._perform_build_attached_visible_interval_info_widget() # builds the tables
     

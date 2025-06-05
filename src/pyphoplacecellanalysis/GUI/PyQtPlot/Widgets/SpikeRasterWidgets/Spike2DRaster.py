@@ -1500,7 +1500,7 @@ class Spike2DRaster(SpecificDockWidgetManipulatingMixin, DynamicDockDisplayAreaO
         
         Usage:
         
-            a_time_sync_pyqtgraph_widget, root_graphics_layout_widget, plot_item, dDisplayItem = self.add_new_embedded_pyqtgraph_render_plot_widget(name='test_pyqtgraph_view_widget', dockSize=(500,50))
+            a_time_sync_pyqtgraph_widget, root_graphics_layout_widget, plot_item, dDisplayItem = self.add_new_embedded_pyqtgraph_render_plot_widget(name='test_pyqtgraph_view_widget', dockSize=(500,50), sync_mode='')
             
         """
         dDisplayItem = self.ui.dynamic_docked_widget_container.find_display_dock(identifier=name) # Dock

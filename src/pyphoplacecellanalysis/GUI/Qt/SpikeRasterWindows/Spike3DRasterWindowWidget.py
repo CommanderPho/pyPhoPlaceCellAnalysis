@@ -1147,6 +1147,7 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
 
         found_spike_raster_windows = TopLevelWindowHelper.all_widgets(pg.mkQApp(), searchType=cls)
         _out_args = []
+        # _out_args = {}
         
         if len(found_spike_raster_windows) < 1:
             # no existing spike_raster_windows. Make a new one
@@ -1185,16 +1186,15 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
         #     _out_args.append(active_3d_plot)
             
         main_graphics_layout_widget = active_2d_plot.ui.get('main_graphics_layout_widget', None) # GraphicsLayoutWidget
-        if main_graphics_layout_widget is not None:
-            _out_args.append(main_graphics_layout_widget)        
+        # if main_graphics_layout_widget is not None:
+        _out_args.append(main_graphics_layout_widget)
         main_plot_widget = active_2d_plot.plots.get('main_plot_widget', None) # PlotItem
-        if main_plot_widget is not None:
-            _out_args.append(main_plot_widget)
+        # if main_plot_widget is not None:
+        _out_args.append(main_plot_widget)
         background_static_scroll_plot_widget = active_2d_plot.plots.get('background_static_scroll_window_plot', None) # PlotItem
-        if background_static_scroll_plot_widget is not None:
-            _out_args.append(background_static_scroll_plot_widget)
+        # if background_static_scroll_plot_widget is not None:
+        _out_args.append(background_static_scroll_plot_widget)
 
-     
         # main_graphics_layout_widget = active_2d_plot.ui.main_graphics_layout_widget # GraphicsLayoutWidget
         # main_plot_widget = active_2d_plot.plots.main_plot_widget # PlotItem
         # background_static_scroll_plot_widget = active_2d_plot.plots.background_static_scroll_window_plot # PlotItem
@@ -1208,6 +1208,8 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
         spike_raster_window.setWindowTitle(spike_raster_window.params.window_title)
         # return spike_raster_window, (active_2d_plot, active_3d_plot, main_graphics_layout_widget, main_plot_widget, background_static_scroll_plot_widget)
         return spike_raster_window, (active_2d_plot, active_3d_plot, *_out_args)
+    
+        # return spike_raster_window, (active_2d_plot, active_3d_plot, *_out_args)
 
 
     # ==================================================================================================================== #
