@@ -192,6 +192,11 @@ def plotly_helper_save_figures(figures_folder: Optional[Path]=None, figure_save_
 
 @define(slots=False, eq=False)
 class PlotlyFigureContainer:
+    """ holds a reference to a plotly figure
+
+    from pyphoplacecellanalysis.Pho2D.plotly.Extensions.plotly_helpers import PlotlyFigureContainer
+
+    """
     fig = field()
     
     @classmethod
@@ -383,7 +388,7 @@ def plotly_pre_post_delta_scatter(data_results_df: pd.DataFrame, data_context: O
                                    common_plot_kwargs=None, px_scatter_kwargs=None,
                                    histogram_variable_name='P_Long', hist_kwargs=None,
                                    forced_range_y=[0.0, 1.0], time_delta_tuple=None, is_dark_mode: bool = True,
-                                   figure_sup_huge_title_text: str=None, is_top_supertitle: bool = False, figure_footer_text: Optional[str]=None,
+                                   figure_sup_huge_title_text: str=None, is_top_supertitle: bool = False, main_title: Optional[str]=None, figure_footer_text: Optional[str]=None, is_publication_ready_figure: bool=False,
                                    extant_figure=None, # an existing plotly figure
                                     curr_fig_width=1800,
                                     **kwargs):
@@ -467,25 +472,33 @@ def plotly_pre_post_delta_scatter(data_results_df: pd.DataFrame, data_context: O
     if common_plot_kwargs is None:
         common_plot_kwargs = {}
         
-    # f"Across Sessions ({num_unique_sessions} Sessions) - {num_unique_time_bins} Time Bin Sizes"
-    # main_title: str = f"Across Sessions ({num_unique_sessions} Sessions) - {num_unique_time_bins} Time Bin Sizes"
-    if num_unique_sessions == 1:
-        # print(f'single-session mode')
-        main_title: str = f"Session {px_scatter_kwargs.get('title', 'UNKNOWN')}"
-    else:
-        main_title: str = f"Across Sessions {px_scatter_kwargs.get('title', 'UNKNOWN')} ({num_unique_sessions} Sessions)"
+
 
     if num_unique_time_bin_sizes > 1:
-        main_title = main_title + f" - {num_unique_time_bin_sizes} Time Bin Sizes"
         figure_context_dict['n_tbin'] = num_unique_time_bin_sizes
-    elif num_unique_time_bin_sizes == 1:
-        time_bin_size: float = unique_time_bin_sizes[0]
-        main_title = main_title + f" - time bin size: {time_bin_size} sec"
-    else:
-        main_title = main_title + f" - ERR: <No Entries in DataFrame>"
-        
+                
+    # f"Across Sessions ({num_unique_sessions} Sessions) - {num_unique_time_bins} Time Bin Sizes"
+    if (main_title is None) and (not is_publication_ready_figure):
+        # main_title: str = f"Across Sessions ({num_unique_sessions} Sessions) - {num_unique_time_bins} Time Bin Sizes"
+        if num_unique_sessions == 1:
+            # print(f'single-session mode')
+            main_title: str = f"Session {px_scatter_kwargs.get('title', 'UNKNOWN')}"
+        else:
+            main_title: str = f"Across Sessions {px_scatter_kwargs.get('title', 'UNKNOWN')} ({num_unique_sessions} Sessions)"
 
-    figure_context_dict['title'] = main_title
+        if num_unique_time_bin_sizes > 1:
+            main_title = main_title + f" - {num_unique_time_bin_sizes} Time Bin Sizes"
+            # figure_context_dict['n_tbin'] = num_unique_time_bin_sizes
+        elif num_unique_time_bin_sizes == 1:
+            time_bin_size: float = unique_time_bin_sizes[0]
+            main_title = main_title + f" - time bin size: {time_bin_size} sec"
+        else:
+            main_title = main_title + f" - ERR: <No Entries in DataFrame>"
+            
+
+    if main_title:
+        figure_context_dict['title'] = main_title
+
     if debug_print:
         print(f'num_unique_sessions: {num_unique_sessions}, num_unique_time_bins: {num_unique_time_bin_sizes}')
 
@@ -717,6 +730,7 @@ def plotly_pre_post_delta_scatter(data_results_df: pd.DataFrame, data_context: O
                 name='figure_sup_huge_title_text_annotation',
             )
         else:
+            # Horizontal (Left Edge) Supertitle __________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
             suptitle_kwarg_fig_width_dict = {
                 1080: {'annotation_kwargs': dict(x=-0.11,), 'line_x_pos': -0.078},
                 1800: {'annotation_kwargs': dict(x=-0.057,), 'line_x_pos': -0.04},
