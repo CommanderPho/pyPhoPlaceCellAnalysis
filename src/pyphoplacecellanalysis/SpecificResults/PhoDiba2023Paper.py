@@ -1735,6 +1735,7 @@ def _perform_plot_pre_post_delta_scatter(data_context: IdentifyingContext, conca
                             time_delta_tuple=time_delta_tuple, legend_title_text=None, is_dark_mode=is_dark_mode,
                             # figure_sup_huge_title_text=data_context.get_description(subset_excludelist=['title_prefix'], separator=' | '),
                             figure_sup_huge_title_text=figure_sup_huge_title_text, figure_footer_text=figure_footer_text,
+                            is_publication_ready_figure=is_publication_ready_figure,
                             **kwargs,
     )
 
@@ -2857,6 +2858,7 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
             fig_size_kwargs=fig_size_kwargs, additional_fig_layout_kwargs=additional_fig_layout_kwargs,
             is_dark_mode=is_dark_mode,
             save_plotly=save_plotly,
+            figure_sup_huge_title_text=extra_plot_kwargs.pop('figure_sup_huge_title_text', None),
         )
 
         _new_perform_plot_pre_post_delta_scatter_with_embedded_context = partial(

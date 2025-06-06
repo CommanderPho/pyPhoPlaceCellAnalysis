@@ -95,7 +95,7 @@ _template_dict["pho_diba_publication"] = dict(
     layout=dict(
         # Main text elements
         font=dict(family="Arial", color="black", size=text_sizes_px['insets']),  # Base font (note: "Arial" not "Ariel")
-        annotations_font=dict(family="Arial", color="black", size=text_sizes_px['titles']),
+        # annotations_font=dict(family="Arial", color="black", size=text_sizes_px['titles']),
         
         title_font=dict(family="Arial", color="black", size=text_sizes_px['titles']),
 
