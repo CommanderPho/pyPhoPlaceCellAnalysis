@@ -419,7 +419,7 @@ class Spike2DRaster(SpecificDockWidgetManipulatingMixin, DynamicDockDisplayAreaO
         # ## Attempted sorted version -- NOTE -- DOES NOT WORK:
         # self.config_fragile_linear_neuron_IDX_map = dict(zip(self.fragile_linear_neuron_IDXs, np.array(list(self.params.config_items.values()))[self.unit_sort_order])) # sort using the `unit_sort_order`
 
-    @function_attributes(short_name=None, tags=['original', 'layout'], input_requires=[], output_provides=[], uses=[], used_by=['._buildGraphics'], creation_date='2025-05-12 17:13', related_items=[])
+    @function_attributes(short_name=None, tags=['VARIANT', 'original', 'layout'], input_requires=[], output_provides=[], uses=[], used_by=['._buildGraphics'], creation_date='2025-05-12 17:13', related_items=['._buildGraphics_DockedTracksLayout'])
     def _buildGraphics_InternalLayout(self):
         """ Called only by `self._buildGraphics() and used only when `use_docked_pyqtgraph_plots == False`
         plots.main_plot_widget: 2D display 
@@ -525,7 +525,7 @@ class Spike2DRaster(SpecificDockWidgetManipulatingMixin, DynamicDockDisplayAreaO
             
 
 
-    @function_attributes(short_name=None, tags=['docked', 'tracks'], input_requires=[], output_provides=[], uses=[], used_by=['._buildGraphics'], creation_date='2025-05-12 17:13', related_items=[])
+    @function_attributes(short_name=None, tags=['VARIANT', 'docked', 'tracks'], input_requires=[], output_provides=[], uses=[], used_by=['._buildGraphics'], creation_date='2025-05-12 17:13', related_items=['._buildGraphics_InternalLayout'])
     def _buildGraphics_DockedTracksLayout(self):
             """ Called only by `self._buildGraphics() and used only when `use_docked_pyqtgraph_plots == True`
             plots.main_plot_widget: 2D display 
@@ -583,7 +583,7 @@ class Spike2DRaster(SpecificDockWidgetManipulatingMixin, DynamicDockDisplayAreaO
                     if self.plots_data.all_spots is not None:
                         self.plots.scatter_plot.addPoints(self.plots_data.all_spots)
 
-            # END if use_docked_pyqtgraph_plots...
+            # END if self.Includes2DActiveWindowScatter...
 
 
             

@@ -1607,7 +1607,7 @@ def build_session_t_delta(t_delta_csv_path: Path):
     """
     assert t_delta_csv_path.exists(), f"t_split_df CSV at '{t_delta_csv_path}' does not exist!"
     ## The CSV containing the session delta time:
-    t_delta_df = pd.read_csv(t_delta_csv_path, index_col=0) # Assuming that your CSV file has an index column
+    t_delta_df = pd.read_csv(t_delta_csv_path, index_col=0, low_memory=False) # Assuming that your CSV file has an index column
     # adds `delta_aligned_t_start`, `delta_aligned_t_end` columns
     t_delta_df['delta_aligned_t_start'] = t_delta_df['t_start'] - t_delta_df['t_delta']
     t_delta_df['delta_aligned_t_end'] = t_delta_df['t_end'] - t_delta_df['t_delta']
@@ -1636,7 +1636,7 @@ def load_and_apply_session_experience_rank_csv(csv_path="./data/sessions_experim
         csv_path = Path(csv_path).resolve()
         
     assert csv_path.exists(), f"csv_path: '{csv_path}' does not exist!"
-    sessions_df: pd.DataFrame = pd.read_csv(csv_path) # KDibaOldDataSessionFormatRegisteredClass.find_all_existing_sessions(global_data_root_parent_path=global_data_root_parent_path).sort_values(['session_datetime'])
+    sessions_df: pd.DataFrame = pd.read_csv(csv_path, low_memory=False) # KDibaOldDataSessionFormatRegisteredClass.find_all_existing_sessions(global_data_root_parent_path=global_data_root_parent_path).sort_values(['session_datetime'])
             
     session_uid_strs = sessions_df['session_uid'].values
             
@@ -1999,7 +1999,7 @@ def read_and_process_csv_file(file: str, session_name: str, curr_session_t_delta
     """ reads the CSV file and adds the 'session_name' column if it is missing.
 
     """
-    df = pd.read_csv(file, na_values=['', 'nan', 'np.nan', '<NA>'])
+    df = pd.read_csv(file, na_values=['', 'nan', 'np.nan', '<NA>'], low_memory=False)
     df['session_name'] = session_name
     if curr_session_t_delta is not None:
         df['delta_aligned_start_t'] = df[time_col] - curr_session_t_delta
@@ -2727,7 +2727,7 @@ def _concat_custom_dict_to_df(final_sessions_loaded_df_dict):
 def _subfn_new_df_process_and_load_exported_file(file_path, loaded_dict: Dict, session_name: str, curr_session_t_delta: float, time_key: str, debug_print:bool=False, **additional_columns) -> bool:
     try:
         # loaded_dict[session_name] = read_and_process_csv_file(file_path, session_name, curr_session_t_delta, time_key)
-        df = pd.read_csv(file_path, na_values=['', 'nan', 'np.nan', '<NA>'])
+        df = pd.read_csv(file_path, na_values=['', 'nan', 'np.nan', '<NA>'], low_memory=False) # `low_memory=False` tells pandas to use more memory to correctly infer data types.
         df['session_name'] = session_name
         if curr_session_t_delta is not None:
             df['delta_aligned_start_t'] = df[time_key] - curr_session_t_delta

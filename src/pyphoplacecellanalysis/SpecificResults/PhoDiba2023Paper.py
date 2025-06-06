@@ -1631,9 +1631,9 @@ def _perform_dual_hist_plot(grainularity_desc: str, laps_df: pd.DataFrame, rippl
     return _laps_histogram_out, _ripple_histogram_out
 
 
-@function_attributes(short_name=None, tags=['MAIN', 'CRITICAL', 'FINAL', 'plotly'], input_requires=[], output_provides=[], uses=['plotly_pre_post_delta_scatter'], used_by=[], creation_date='2024-10-23 20:04', related_items=[])
+@function_attributes(short_name=None, tags=['MAIN', 'CRITICAL', 'FINAL', 'plotly', 'scatter', 'histogram', 'publication'], input_requires=[], output_provides=[], uses=['plotly_pre_post_delta_scatter'], used_by=[], creation_date='2024-10-23 20:04', related_items=[])
 def _perform_plot_pre_post_delta_scatter(data_context: IdentifyingContext, concatenated_ripple_df: pd.DataFrame, time_delta_tuple: Tuple[float, float, float], fig_size_kwargs: Dict, save_plotly: Callable, is_dark_mode: bool=False, enable_custom_widget_buttons:bool=True,
-                                          extant_figure=None, custom_output_widget=None, legend_groups_to_hide: Optional[List[str]]=None, should_save: bool = True, variable_name = 'P_Short', y_baseline_level: float = 0.5, **kwargs):
+                                          extant_figure=None, custom_output_widget=None, legend_groups_to_hide: Optional[List[str]]=None, should_save: bool = True, variable_name = 'P_Short', y_baseline_level: float = 0.5, additional_fig_layout_kwargs: Dict=None, **kwargs):
     """ plots the stacked histograms for both laps and ripples
 
     Usage:
@@ -1664,7 +1664,9 @@ def _perform_plot_pre_post_delta_scatter(data_context: IdentifyingContext, conca
     if data_context is None:
         data_context = concatenated_ripple_df.attrs.get('data_context', None)
         assert data_context is not None, f"could not get context from dataframe's df.attrs.data_context either."
-        
+
+    if additional_fig_layout_kwargs is None:
+        additional_fig_layout_kwargs = {}        
 
     histogram_bins = 25
     num_sessions = 1
@@ -1727,6 +1729,9 @@ def _perform_plot_pre_post_delta_scatter(data_context: IdentifyingContext, conca
     )
 
     new_fig = new_fig.update_layout(fig_size_kwargs)
+
+    if (additional_fig_layout_kwargs is not None) and len(additional_fig_layout_kwargs) > 0:        
+        new_fig = new_fig.update_layout(fig_size_kwargs)
 
     if legend_groups_to_hide is not None:
         # Collect all unique legend groups you want to hide
@@ -2814,7 +2819,7 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
 
     @function_attributes(short_name=None, tags=['plotting'], input_requires=[], output_provides=[], uses=['_perform_plot_pre_post_delta_scatter'], used_by=[], creation_date='2024-11-20 13:08', related_items=[])
     @classmethod
-    def _build_plot_callback(cls, earliest_delta_aligned_t_start, latest_delta_aligned_t_end, save_plotly, should_save: bool = False, should_prepare_full_hover_click_interactivity: bool = False, resolution_multiplier: float=1, enable_debug_print=False, **extra_plot_kwargs):
+    def _build_plot_callback(cls, earliest_delta_aligned_t_start, latest_delta_aligned_t_end, save_plotly, should_save: bool = False, should_prepare_full_hover_click_interactivity: bool = False, resolution_multiplier: float=1, enable_debug_print=False, additional_fig_layout_kwargs=None, **extra_plot_kwargs):
         """ 
         
         should_prepare_full_hover_click_interactivity: bool:  ## slow when enabled
@@ -2827,7 +2832,10 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
         ## set up figure size
         fig_size_kwargs = {'width': (resolution_multiplier * 1800), 'height': (resolution_multiplier*480)}
         # fig_size_kwargs = {'width': (resolution_multiplier * 1080), 'height': resolution_multiplier*480}
-        is_dark_mode, template = PlotlyHelpers.get_plotly_template(is_dark_mode=False)
+        
+        
+
+        is_dark_mode, template = PlotlyHelpers.get_plotly_template(is_dark_mode=False, is_publication=True)
         pio.templates.default = template
 
         ## INPUTS: earliest_delta_aligned_t_start, latest_delta_aligned_t_end
@@ -2836,7 +2844,7 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
         _new_perform_plot_pre_post_delta_scatter = partial(
             _perform_plot_pre_post_delta_scatter,
             time_delta_tuple=(earliest_delta_aligned_t_start, 0.0, latest_delta_aligned_t_end),
-            fig_size_kwargs=fig_size_kwargs,
+            fig_size_kwargs=fig_size_kwargs, additional_fig_layout_kwargs=additional_fig_layout_kwargs,
             is_dark_mode=is_dark_mode,
             save_plotly=save_plotly,
         )
