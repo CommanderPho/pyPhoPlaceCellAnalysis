@@ -300,6 +300,48 @@ class PlotlyFigureContainer:
 
 
 
+    @classmethod
+    def clear_specific_annotations(cls, fig, should_remove_fn: Callable):
+        """ 
+        should_remove_annotation_fn = lambda annotation: (annotation.name in ('figure_footer_text_annotation', 'figure_sup_huge_title_text_annotation'))
+        fig = PlotlyFigureContainer.clear_specific_annotations(fig, should_remove_fn=(lambda annotation: (annotation.name in ('figure_footer_text_annotation', 'figure_sup_huge_title_text_annotation')))
+
+        """
+        items_to_keep = []
+        for annotation in fig.layout.annotations:
+            should_remove: bool = should_remove_fn(annotation)
+            should_keep = not should_remove
+            if should_keep:
+                items_to_keep.append(annotation)
+            else:
+                continue
+        fig = fig.update_layout(
+            annotations=items_to_keep
+        )        
+        return fig
+    
+
+    @classmethod
+    def clear_specific_shapes(cls, fig, should_remove_fn: Callable):
+        """ 
+        fig = PlotlyFigureContainer.clear_specific_shapes(fig, should_remove_fn=(lambda annotation: (annotation.name in ['figure_sup_huge_title_text_line']))
+
+        """
+        items_to_keep = []
+        for annotation in fig.layout.shapes:
+            should_remove: bool = should_remove_fn(annotation)
+            should_keep = not should_remove
+            if should_keep:
+                items_to_keep.append(annotation)
+            else:
+                continue
+            
+        # fig.layout.shapes = items_to_keep
+        fig = fig.update_layout(
+            shapes=items_to_keep
+        )
+        return fig
+    
 
     @classmethod
     def clear_subplot(cls, fig, row, col):
