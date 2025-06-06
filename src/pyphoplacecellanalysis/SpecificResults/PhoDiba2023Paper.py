@@ -1633,7 +1633,7 @@ def _perform_dual_hist_plot(grainularity_desc: str, laps_df: pd.DataFrame, rippl
 
 @function_attributes(short_name=None, tags=['MAIN', 'CRITICAL', 'FINAL', 'plotly', 'scatter', 'histogram', 'publication'], input_requires=[], output_provides=[], uses=['plotly_pre_post_delta_scatter'], used_by=[], creation_date='2024-10-23 20:04', related_items=[])
 def _perform_plot_pre_post_delta_scatter(data_context: IdentifyingContext, concatenated_ripple_df: pd.DataFrame, time_delta_tuple: Tuple[float, float, float], fig_size_kwargs: Dict, save_plotly: Callable, is_dark_mode: bool=False, enable_custom_widget_buttons:bool=True,
-                                          extant_figure=None, custom_output_widget=None, legend_groups_to_hide: Optional[List[str]]=None, should_save: bool = True, variable_name = 'P_Short', y_baseline_level: float = 0.5, additional_fig_layout_kwargs: Dict=None, **kwargs):
+                                          extant_figure=None, custom_output_widget=None, legend_groups_to_hide: Optional[List[str]]=None, should_save: bool = True, variable_name = 'P_Short', y_baseline_level: float = 0.5, additional_fig_layout_kwargs: Dict=None, is_publication_ready_figure: bool=False, **kwargs):
     """ plots the stacked histograms for both laps and ripples
 
     Usage:
@@ -1710,13 +1710,23 @@ def _perform_plot_pre_post_delta_scatter(data_context: IdentifyingContext, conca
     px_scatter_kwargs = px_scatter_kwargs | kwargs.pop('px_scatter_kwargs', {})
     hist_kwargs = hist_kwargs | kwargs.pop('hist_kwargs', {})
 
-    figure_sup_huge_title_text: str = data_context.get_description(subset_includelist=['epochs_name', 'data_grain', 'dataframe_name', 'n_events'], separator=' | ')
-    if data_context.has_keys(keys_list=['custom_suffix']):
-        custom_suffix_description: str = data_context.get_description(subset_includelist=['custom_suffix'])
-        figure_sup_huge_title_text = figure_sup_huge_title_text + f'\n{custom_suffix_description}'
-    
+    figure_sup_huge_title_text = kwargs.pop('figure_sup_huge_title_text', None)
+    if (figure_sup_huge_title_text is None) and (not is_publication_ready_figure):
+        figure_sup_huge_title_text: str = data_context.get_description(subset_includelist=['epochs_name', 'data_grain', 'dataframe_name', 'n_events'], separator=' | ')
+        if data_context.has_keys(keys_list=['custom_suffix']):
+            custom_suffix_description: str = data_context.get_description(subset_includelist=['custom_suffix'])
+            figure_sup_huge_title_text = figure_sup_huge_title_text + f'\n{custom_suffix_description}'
+    else:
+        print(f'WARN: figure_sup_huge_title_text is provided and not None, figure_sup_huge_title_text: "{figure_sup_huge_title_text}". Overriding.')
+
+
     # filter_context = df_filter.filter_context # IdentifyingContext(time_bin_sizes=df_filter.time_bin_size, custom_suffix=df_filter.replay_name)
-    figure_footer_text = data_context.get_description(separator='|', subset_excludelist=['time_bin_sizes'])
+    
+    figure_footer_text = kwargs.pop('figure_sup_huge_title_text', None)
+    if (figure_footer_text is None) and (not is_publication_ready_figure):
+        figure_footer_text = data_context.get_description(separator='|', subset_excludelist=['time_bin_sizes'])
+    else:
+        print(f'WARN: figure_footer_text is provided and not None, figure_footer_text: "{figure_footer_text}". Overriding.')
 
     new_fig, new_fig_context = plotly_pre_post_delta_scatter(data_results_df=concatenated_ripple_df, data_context=data_context,
                                                               extant_figure=extant_figure,
