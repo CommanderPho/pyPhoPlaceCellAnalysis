@@ -1544,7 +1544,8 @@ def _perform_dual_hist_plot(grainularity_desc: str, laps_df: pd.DataFrame, rippl
     from pyphoplacecellanalysis.Pho2D.statistics_plotting_helpers import plot_histograms_across_sessions, plot_stacked_histograms
 
 
-    if legend_groups_to_hide is None:
+    if (legend_groups_to_solo is None) and (legend_groups_to_hide is None):
+        ## if neither are provided, hide none (show all)
         legend_groups_to_hide = []
 
     variable_name: str = 'P_Short'
@@ -2042,28 +2043,6 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
         df_filter.display()
 
     """
-    # # Original DataFrames passed during initialization
-    # all_sessions_ripple_df: pd.DataFrame = serialized_field()
-    # all_sessions_ripple_time_bin_df: pd.DataFrame = serialized_field()
-    # all_sessions_MultiMeasure_ripple_df: pd.DataFrame = serialized_field()
-    # all_sessions_all_scores_ripple_df: pd.DataFrame = serialized_field()
-
-    # # Original DataFrames for laps
-    # all_sessions_laps_df: pd.DataFrame = serialized_field()
-    # all_sessions_laps_time_bin_df: pd.DataFrame = serialized_field()
-    # all_sessions_MultiMeasure_laps_df: pd.DataFrame = serialized_field()
-
-    # # Filtered DataFrames (initialized to None)
-    # filtered_all_sessions_ripple_df: pd.DataFrame = non_serialized_field(init=False, default=None)
-    # filtered_all_sessions_ripple_time_bin_df: pd.DataFrame = non_serialized_field(init=False, default=None)
-    # filtered_all_sessions_MultiMeasure_ripple_df: pd.DataFrame = non_serialized_field(init=False, default=None)
-    # filtered_all_sessions_all_scores_ripple_df: pd.DataFrame = non_serialized_field(init=False, default=None)
-
-    # # Filtered DataFrames for laps
-    # filtered_all_sessions_laps_df: pd.DataFrame = non_serialized_field(init=False, default=None)
-    # filtered_all_sessions_laps_time_bin_df: pd.DataFrame = non_serialized_field(init=False, default=None)
-    # filtered_all_sessions_MultiMeasure_laps_df: pd.DataFrame = non_serialized_field(init=False, default=None)
-
     ## Original DataFrames passed during initialization
     _original_df_dict: Dict[str, Optional[pd.DataFrame]] = serialized_field()
     # Filtered DataFrames
@@ -2090,19 +2069,21 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
     active_plot_variable_name_widget = non_serialized_field(init=False)
     custom_dynamic_filter_widgets_list: List = non_serialized_field(init=False, metadata={'desc': 'stores references to the widgets with knowledge of which properties to update to filter the dataframe.'})
     
+    is_figure_widget_mode: bool = non_serialized_field(default=True)
+
     output_widget: widgets.Output = non_serialized_field(init=False)
-    figure_widget: go.FigureWidget = non_serialized_field(init=False)
-    table_widget: DataGrid = non_serialized_field(init=False)
+    figure_widget: Optional[go.FigureWidget] = non_serialized_field(init=False, default=None)
+    table_widget: Optional[DataGrid] = non_serialized_field(init=False, default=None)
 
     # Add button widgets as class attributes
-    button_copy: widgets.Button = non_serialized_field(init=False)
-    button_download: widgets.widget = non_serialized_field(init=False)
-    filename_label: widgets.Label = non_serialized_field(init=False)
+    button_copy: Optional[widgets.Button] = non_serialized_field(init=False, default=None)
+    button_download: Optional[widgets.CoreWidget] = non_serialized_field(init=False, default=None)
+    filename_label: Optional[widgets.Label] = non_serialized_field(init=False, default=None)
     # Add Output widget for JavaScript execution
     # js_output: widgets.Output = non_serialized_field(init=False)
-    hover_posterior_preview_figure_widget: go.FigureWidget = non_serialized_field(init=False)
+    hover_posterior_preview_figure_widget: Optional[go.FigureWidget] = non_serialized_field(init=False, default=None)
     # hover_posterior_data: LoadedPosteriorContainer = non_serialized_field()
-    hover_posterior_data: PosteriorPlottingDatasource = non_serialized_field()
+    hover_posterior_data: Optional[PosteriorPlottingDatasource] = non_serialized_field(default=None)
     
     debounce_timer: Optional[threading.Timer] = non_serialized_field(default=None) 
     debounce_delay_ms: int = non_serialized_field(default=300)  # milliseconds
@@ -2216,7 +2197,9 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
 
         # Button Widget Initialize ___________________________________________________________________________________________ #
         # Set up the buttons after figure_widget is created
-        self._setup_widgets_buttons()
+        if self.is_figure_widget_mode:
+            self._setup_widgets_buttons()
+
 
         ## set time_bin_size selections to the first value by default
         initial_selection = self.set_initial_selection(a_widget=self.time_bin_size_widget, initial_selection_mode=InitialSelectionModeEnum.FIRST_SELECTED)
@@ -2393,7 +2376,6 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
         return a_widget
 
 
-
     @function_attributes(short_name=None, tags=['private', 'widget'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-03-27 12:18', related_items=[])
     def _setup_widgets(self):
         import plotly.subplots as sp
@@ -2453,18 +2435,25 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
         
         # self.time_bin_size_widget = self.build_extra_selectMultiple_widget(a_name='time_bin_size', df_col_name='time_bin_size', a_widget_label='Time Bin Size:', initial_selection_mode=InitialSelectionModeEnum.FIRST_SELECTED)
 
-        self.figure_widget, did_create_new_figure = PlotlyFigureContainer._helper_build_pre_post_delta_figure_if_needed(extant_figure=None, use_latex_labels=False, main_title='test', figure_class=go.FigureWidget)
-        self.figure_widget.layout.dragmode = 'select'
-        # self.figure_widget.layout.dragmode = 'lasso'
-        
-        ## initialize the preview widget:
-        self.hover_posterior_preview_figure_widget = go.FigureWidget() # .set_subplots(rows=1, cols=1, column_widths=[0.10, 0.80, 0.10], horizontal_spacing=0.01, shared_yaxes=True, column_titles=[pre_delta_label, main_title, post_delta_label])
-        # self.hover_posterior_preview_figure_widget.layout
-        # Set minimum width and height via CSS
-        self.hover_posterior_preview_figure_widget.layout.width = 600  # Minimum width
-        self.hover_posterior_preview_figure_widget.layout.height = 300  # Minimum height
-        self.hover_posterior_preview_figure_widget.layout.dragmode = 'select'
-        
+
+        if self.is_figure_widget_mode:
+            # If true, the interative plotly figure is rendered in a widget, otherwise only the filter selections are allowed.
+
+            self.figure_widget, did_create_new_figure = PlotlyFigureContainer._helper_build_pre_post_delta_figure_if_needed(extant_figure=None, use_latex_labels=False, main_title='test', figure_class=go.FigureWidget)
+            self.figure_widget.layout.dragmode = 'select'
+            # self.figure_widget.layout.dragmode = 'lasso'
+            
+            ## initialize the preview widget:
+            self.hover_posterior_preview_figure_widget = go.FigureWidget() # .set_subplots(rows=1, cols=1, column_widths=[0.10, 0.80, 0.10], horizontal_spacing=0.01, shared_yaxes=True, column_titles=[pre_delta_label, main_title, post_delta_label])
+            # self.hover_posterior_preview_figure_widget.layout
+            # Set minimum width and height via CSS
+            self.hover_posterior_preview_figure_widget.layout.width = 600  # Minimum width
+            self.hover_posterior_preview_figure_widget.layout.height = 300  # Minimum height
+            self.hover_posterior_preview_figure_widget.layout.dragmode = 'select'
+        else:
+            print(f'self.is_figure_widget_mode is False, so no plotly widget will be displayed')            
+
+
 
         # Set up observers to handle changes in widget values
         self.replay_name_widget.observe(self._on_widget_change, names='value')
@@ -2478,16 +2467,6 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
                                 base_row_size=15, base_column_size=300, horizontal_stripes=True,
                                 #  renderers=renderers,
                                 )
-        # self.table_widget.transform([{"type": "sort", "columnIndex": 2, "desc": True}])
-        # self.table_widget.auto_fit_columns = True
-        
-        # Set layout properties
-        # self.table_widget.layout = widgets.Layout(flex='0 1 auto', width='auto')
-        # self.output_widget.layout = widgets.Layout(flex='1 1 auto', width='auto')
-
-        # Combine in HBox
-        # container = widgets.HBox([shrink_widget, grow_widget], layout=widgets.Layout(width='100%'))
-
 
 
     def _setup_widgets_buttons(self):
@@ -2565,19 +2544,19 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
     def on_widget_update_filename(self):
         """Updates the filename and label based on the figure's title or metadata."""
         fig = self.figure_widget
-        preferred_filename = fig.layout.meta.get('preferred_filename') if fig.layout.meta else None
-        if preferred_filename:
-            self.filename = f"{preferred_filename}.png"
-            self.filename_label.value = preferred_filename
-        else:
-            title = fig.layout.title.text if fig.layout.title and fig.layout.title.text else "figure"
-            self.filename = f"{title.replace(' ', '_')}.png"
-            self.filename_label.value = title
+        if fig is not None:
+            preferred_filename = fig.layout.meta.get('preferred_filename') if fig.layout.meta else None
+            if preferred_filename:
+                self.filename = f"{preferred_filename}.png"
+                self.filename_label.value = preferred_filename
+            else:
+                title = fig.layout.title.text if fig.layout.title and fig.layout.title.text else "figure"
+                self.filename = f"{title.replace(' ', '_')}.png"
+                self.filename_label.value = title
 
-        ## rebuild the download widget with the current figure
-        # self.button_download =  _build_solera_file_download_widget(fig=self.figure_widget, filename=Path(self.filename).with_suffix('.png').as_posix())
+            ## rebuild the download widget with the current figure
+            # self.button_download =  _build_solera_file_download_widget(fig=self.figure_widget, filename=Path(self.filename).with_suffix('.png').as_posix())
         
-
     def on_fig_layout_change(self, layout, *args):
         """Callback for when the figure's layout changes."""
         self.on_widget_update_filename()
@@ -2649,7 +2628,7 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
         #     display(self.hover_posterior_preview_figure_widget)
             
         # Arrange your widgets as needed
-        out = widgets.VBox([
+        out_list = [
             widgets.HBox([
                 self.replay_name_widget, 
                 self.time_bin_size_widget, 
@@ -2663,23 +2642,30 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
                 self.active_plot_df_name_selector_widget, 
                 self.active_plot_variable_name_widget
             ]),
-            self.figure_widget,
-            widgets.HBox([self.button_copy, self.button_download, self.filename_label],
+        ]
+
+        if self.figure_widget is not None:
+            out_list.append(self.figure_widget)
+            out_list.append(widgets.HBox([self.button_copy, self.button_download, self.filename_label],
                         #   layout=widgets.Layout(width='100%'),
-                          ),
+                          ))
+    
+        out_list.extend([
             # self.js_output,  # Include the Output widget to allow the buttons to perform their actions
             widgets.HBox([self.output_widget, ],
                           layout=widgets.Layout(height='300px', width='100%'),
                           ),              
-            widgets.HBox([self.table_widget,
-                          self.hover_posterior_preview_figure_widget,
-                            # plotly_hover_output,  # Use the wrapped Plotly widget here
-                          ],
-                        #   layout=widgets.Layout(height='300px', width='100%'),
+            widgets.HBox(
+                        #   [self.table_widget,
+                        #   self.hover_posterior_preview_figure_widget,
+                        #     # plotly_hover_output,  # Use the wrapped Plotly widget here
+                        #   ],
+                          [v for v in (self.table_widget, self.hover_posterior_preview_figure_widget) if v is not None],
                           layout=widgets.Layout(height='300px', width='100%', display='flex', justify_content='space-between'),
                           ),
         ])
-        
+        out = widgets.VBox(out_list)
+
         self.table_widget.layout = widgets.Layout(flex='0 0 auto')  # Minimal width
         # self.hover_posterior_preview_figure_widget.layout = widgets.Layout(flex='1 1 auto')  # Flexible width
         # plotly_hover_output.layout = widgets.Layout(flex='1 1 auto')  # Flexible width for the container
@@ -2898,97 +2884,100 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
             # active_plot_kwargs = extra_plot_kwargs | {'legend_groups_to_hide': legend_groups_to_hide}
             # active_plot_kwargs = active_plot_kwargs | kwargs
             active_plot_kwargs = (extra_plot_kwargs | {'legend_groups_to_hide': legend_groups_to_hide} | kwargs) 
-            fig, new_fig_context, _extras_output_dict, figure_out_paths = _new_perform_plot_pre_post_delta_scatter_with_embedded_context(concatenated_ripple_df=deepcopy(active_plot_df), is_dark_mode=False, should_save=should_save, extant_figure=df_filter.figure_widget,
-                                                                                                                                    variable_name=plot_variable_name, **active_plot_kwargs) # , enable_custom_widget_buttons=True
-            
+            if df_filter.is_figure_widget_mode:
+                fig, new_fig_context, _extras_output_dict, figure_out_paths = _new_perform_plot_pre_post_delta_scatter_with_embedded_context(concatenated_ripple_df=deepcopy(active_plot_df), is_dark_mode=False, should_save=should_save, extant_figure=df_filter.figure_widget,
+                                                                                                                                        variable_name=plot_variable_name, **active_plot_kwargs) # , enable_custom_widget_buttons=True
+                
 
-            # ==================================================================================================================== #
-            # Hover/Click Interactivity (Slow)                                                                                     #
-            # ==================================================================================================================== #
-            if should_prepare_full_hover_click_interactivity:
-                fig = fig.update_layout(clickmode="event+select", hovermode='closest', dragmode='select')
-                
-                
-                # Customize the hovertemplate
-                fig.update_traces(
-                    # hovertemplate="<b>sess:</b> %{customdata[0]}<br>"
-                    #             # "<b>X:</b> %{x}<br>"
-                    #             "<b>start, duration:</b> %{customdata[3]}, %{customdata[4]}<br>"
-                    #             "<b>Y:</b> %{y}<br>"
-                    #             "<b>custom_replay:</b> %{customdata[1]}",
+                # ==================================================================================================================== #
+                # Hover/Click Interactivity (Slow)                                                                                     #
+                # ==================================================================================================================== #
+                if should_prepare_full_hover_click_interactivity:
+                    fig = fig.update_layout(clickmode="event+select", hovermode='closest', dragmode='select')
                     
-                    hovertemplate="<b>sess:</b> %{customdata[0]} | <b>replay_name:</b> %{customdata[1]} | <b>time_bin_size:</b> %{customdata[2]}<br>"
-                                "<b>start:</b> %{customdata[3]}<br>",
-                    customdata=active_plot_df[["session_name", "custom_replay_name", "time_bin_size", "start", "duration"]].values,
-                    hoverlabel=dict(bgcolor="rgba(255, 255, 255, 0.4)", font=dict(color="black")),
-                )
+                    
+                    # Customize the hovertemplate
+                    fig.update_traces(
+                        # hovertemplate="<b>sess:</b> %{customdata[0]}<br>"
+                        #             # "<b>X:</b> %{x}<br>"
+                        #             "<b>start, duration:</b> %{customdata[3]}, %{customdata[4]}<br>"
+                        #             "<b>Y:</b> %{y}<br>"
+                        #             "<b>custom_replay:</b> %{customdata[1]}",
+                        
+                        hovertemplate="<b>sess:</b> %{customdata[0]} | <b>replay_name:</b> %{customdata[1]} | <b>time_bin_size:</b> %{customdata[2]}<br>"
+                                    "<b>start:</b> %{customdata[3]}<br>",
+                        customdata=active_plot_df[["session_name", "custom_replay_name", "time_bin_size", "start", "duration"]].values,
+                        hoverlabel=dict(bgcolor="rgba(255, 255, 255, 0.4)", font=dict(color="black")),
+                    )
 
-                if df_filter.hover_posterior_data is not None:
-                    if df_filter.hover_posterior_data.plot_heatmap_fn is None:
-                        df_filter.hover_posterior_data.plot_heatmap_fn = (lambda a_df_filter, a_heatmap_img, *args, **kwargs: a_df_filter.hover_posterior_preview_figure_widget.add_heatmap(z=a_heatmap_img, showscale=False, name='selected_posterior', ))
+                    if df_filter.hover_posterior_data is not None:
+                        if df_filter.hover_posterior_data.plot_heatmap_fn is None:
+                            df_filter.hover_posterior_data.plot_heatmap_fn = (lambda a_df_filter, a_heatmap_img, *args, **kwargs: a_df_filter.hover_posterior_preview_figure_widget.add_heatmap(z=a_heatmap_img, showscale=False, name='selected_posterior', ))
+                            
+
+                    allow_single_selection_only: bool = True
+                    # replace_selected_points: bool = True
+
+                
+                    def on_click(trace, points, selector):
+                        if points.point_inds:
+                            df_filter.on_click_scatter_points(trace=trace, points=points, selector=selector) ## pass through call to `df_filter.on_click_scatter_points(...)`                    
+
+                            ## has selection:
+                            if (allow_single_selection_only or (len(points.point_inds) < 2)):
+                                ind = points.point_inds[0]
+                                num_new_selections = 1
+                            else:
+                                ind = points.point_inds # allows multiple selections
+                                num_new_selections = len(ind)
+
+                            session_name = df_filter.active_plot_df['session_name'].iloc[ind]
+                            custom_replay_name = df_filter.active_plot_df['custom_replay_name'].iloc[ind]
+                            time_bin_size = df_filter.active_plot_df['time_bin_size'].iloc[ind]
+                            start_t = df_filter.active_plot_df['start'].iloc[ind]
+                            stop_t = df_filter.active_plot_df['stop'].iloc[ind]
+
+                                
+                            ## update selected points
+
+                            ## try to update the selected heatmap posterior:
+                            try:
+                                ## try to update by start_t, stop_t
+                                _heatmap_data = df_filter.hover_posterior_data.get_posterior_data(session_name=session_name, custom_replay_name=custom_replay_name,
+                                                                                a_decoder_name='long_LR', last_selected_idx=ind)
+                                
+                                # _plot_hoverred_heatmap_preview_posterior(df_filter=df_filter, last_selected_idx=ind) #TODO 2024-11-26 07:32: - [ ] does this work?
+                                _plot_hoverred_heatmap_preview_posterior(df_filter=df_filter, a_heatmap_img=_heatmap_data)
+
+                            except Exception as e:
+                                print(f'encountered exception when trying to call `_plot_hoverred_heatmap_preview_posterior(..., last_selected_idx={ind}, start_t: {start_t}, stop_t: {stop_t}). Error {e}. Skipping.')
+                                                    
+                        else:
+                            ## no selection:
+                            # print(f'NOPE! points: {points}, trace: {trace}')
+                            # df_filter.output_widget.clear_output()
+                            if enable_debug_print:
+                                with df_filter.output_widget:
+                                    print(f'NOPE! points: {points}, trace: {trace}')
+                    ## END def on_click(t...     
+
+                    fig.layout.hovermode = 'closest'
+                    if len(fig.data) > 0:
+                        ## prevent IndexError: tuple index out of range
+                        fig.data[0].on_click(on_click)
+                        fig.data[0].on_selection(df_filter.on_update_selected_scatter_points)
                         
 
-                allow_single_selection_only: bool = True
-                # replace_selected_points: bool = True
-
-              
-                def on_click(trace, points, selector):
-                    if points.point_inds:
-                        df_filter.on_click_scatter_points(trace=trace, points=points, selector=selector) ## pass through call to `df_filter.on_click_scatter_points(...)`                    
-
-                        ## has selection:
-                        if (allow_single_selection_only or (len(points.point_inds) < 2)):
-                            ind = points.point_inds[0]
-                            num_new_selections = 1
-                        else:
-                            ind = points.point_inds # allows multiple selections
-                            num_new_selections = len(ind)
-
-                        session_name = df_filter.active_plot_df['session_name'].iloc[ind]
-                        custom_replay_name = df_filter.active_plot_df['custom_replay_name'].iloc[ind]
-                        time_bin_size = df_filter.active_plot_df['time_bin_size'].iloc[ind]
-                        start_t = df_filter.active_plot_df['start'].iloc[ind]
-                        stop_t = df_filter.active_plot_df['stop'].iloc[ind]
-
-                            
-                        ## update selected points
-
-                        ## try to update the selected heatmap posterior:
-                        try:
-                            ## try to update by start_t, stop_t
-                            _heatmap_data = df_filter.hover_posterior_data.get_posterior_data(session_name=session_name, custom_replay_name=custom_replay_name,
-                                                                            a_decoder_name='long_LR', last_selected_idx=ind)
-                            
-                            # _plot_hoverred_heatmap_preview_posterior(df_filter=df_filter, last_selected_idx=ind) #TODO 2024-11-26 07:32: - [ ] does this work?
-                            _plot_hoverred_heatmap_preview_posterior(df_filter=df_filter, a_heatmap_img=_heatmap_data)
-
-                        except Exception as e:
-                            print(f'encountered exception when trying to call `_plot_hoverred_heatmap_preview_posterior(..., last_selected_idx={ind}, start_t: {start_t}, stop_t: {stop_t}). Error {e}. Skipping.')
-                                                
-                    else:
-                        ## no selection:
-                        # print(f'NOPE! points: {points}, trace: {trace}')
-                        # df_filter.output_widget.clear_output()
-                        if enable_debug_print:
-                            with df_filter.output_widget:
-                                print(f'NOPE! points: {points}, trace: {trace}')
-                ## END def on_click(t...     
-
-                fig.layout.hovermode = 'closest'
-                if len(fig.data) > 0:
-                    ## prevent IndexError: tuple index out of range
-                    fig.data[0].on_click(on_click)
-                    fig.data[0].on_selection(df_filter.on_update_selected_scatter_points)
+                    scatter_traces = list(fig.select_traces(selector=None, row=1, col=2))
+                    for trace in scatter_traces:
+                        trace.on_click(on_click)
+                        trace.on_selection(df_filter.on_update_selected_scatter_points)
+                ## END if should_prepare_hover_tooltips...
                     
+                if fig is not None:
+                    df_filter.figure_widget = fig
 
-                scatter_traces = list(fig.select_traces(selector=None, row=1, col=2))
-                for trace in scatter_traces:
-                    trace.on_click(on_click)
-                    trace.on_selection(df_filter.on_update_selected_scatter_points)
-            ## END if should_prepare_hover_tooltips...
-            
-            if fig is not None:
-                df_filter.figure_widget = fig
+            ## END if df_filter.is_figure_widget_mode...
 
         ## end def _build_filter_changed_plotly_plotting_callback_fn(...)
         
