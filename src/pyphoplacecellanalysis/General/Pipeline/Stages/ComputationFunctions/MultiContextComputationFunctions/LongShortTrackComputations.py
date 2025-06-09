@@ -244,30 +244,6 @@ class JonathanFiringRateAnalysisResult(HDFMixin, AttrsBasedClassHelperMixin):
         # Finish for the custom properties
         
         #TODO 2023-08-04 12:09: - [ ] Included outputs_local/global
-                 
-        # df: pd.DataFrame = self.rdf.rdf
-        # aclu_to_idx: Dict = self.rdf.aclu_to_idx
-        # aclu_to_idx_df: pd.DataFrame = pd.DataFrame({'aclu': list(aclu_to_idx.keys()), 'fragile_linear_idx': list(aclu_to_idx.values())})
-        
-        # with tb.open_file(file_path, mode='a') as f:
-        #     # f.get_node(f'{key}/rdf/df')._f_remove(recursive=True)
-
-        #     try:
-        #         rdf_group = f.create_group(key, 'rdf', title='replay data frame', createparents=True)
-        #     except tb.exceptions.NodeError:
-        #         # Node already exists
-        #         pass
-        #     except BaseException as e:
-        #         raise
-        #     # rdf_group[f'{outputs_local_key}/df'] = self.rdf.rdf
-        #     try:
-        #         irdf_group = f.create_group(key, 'irdf', title='intra-replay data frame', createparents=True)
-        #     except tb.exceptions.NodeError:
-        #         # Node already exists
-        #         pass
-        #     except BaseException as e:
-        #         raise
-
 
         # Convert the ['track_membership', 'neuron_type'] columns of self._neuron_replay_stats_df to the categorical type if needed
         
@@ -292,6 +268,31 @@ class JonathanFiringRateAnalysisResult(HDFMixin, AttrsBasedClassHelperMixin):
         aclu_to_idx: Dict = self.irdf.aclu_to_idx
         aclu_to_idx_df: pd.DataFrame = pd.DataFrame({'aclu': list(aclu_to_idx.keys()), 'fragile_linear_idx': list(aclu_to_idx.values())})
         aclu_to_idx_df.to_hdf(file_path, key=f'{key}/irdf/aclu_to_idx_df', format='table', data_columns=True)
+
+
+    def get_df_for_CSV(self, *kwargs) -> pd.DataFrame:
+        """ Saves the object to key in the hdf5 file specified by file_path"""    
+        _neuron_replay_stats_df: pd.DataFrame = deepcopy(self.neuron_replay_stats_df)
+        
+        active_context = kwargs.pop('active_context', None) # TODO: requiring that the caller pass active_context isn't optimal
+        _neuron_replay_stats_df = HDF_Converter.prepare_neuron_indexed_dataframe_for_hdf(_neuron_replay_stats_df, active_context=active_context, aclu_column_name=None)
+
+        # _neuron_replay_stats_df.astype(str).to_hdf(file_path, key=f'{key}/neuron_replay_stats_df', format='table', data_columns=True)
+
+        # self.rdf.rdf.to_hdf(file_path, key=f'{key}/rdf/df') # , format='table', data_columns=True Can't do 'table' format because `TypeError: Cannot serialize the column [firing_rates] because its data contents are not [string] but [mixed] object dtype`
+        aclu_to_idx: Dict = self.rdf.aclu_to_idx
+        aclu_to_idx_df: pd.DataFrame = pd.DataFrame({'aclu': list(aclu_to_idx.keys()), 'fragile_linear_idx': list(aclu_to_idx.values())})
+        # aclu_to_idx_df.to_hdf(file_path, key=f'{key}/rdf/aclu_to_idx_df', format='table', data_columns=True)
+
+        # irdf_group[f'{outputs_local_key}/df'] = self.irdf.irdf
+        # self.irdf.irdf.to_hdf(file_path, key=f'{key}/irdf/df') # , format='table', data_columns=True Can't do 'table' format because `TypeError: Cannot serialize the column [firing_rates] because its data contents are not [string] but [mixed] object dtype`
+        aclu_to_idx: Dict = self.irdf.aclu_to_idx
+        aclu_to_idx_df: pd.DataFrame = pd.DataFrame({'aclu': list(aclu_to_idx.keys()), 'fragile_linear_idx': list(aclu_to_idx.values())})
+        # aclu_to_idx_df.to_hdf(file_path, key=f'{key}/irdf/aclu_to_idx_df', format='table', data_columns=True)
+        return _neuron_replay_stats_df
+
+
+
 
     def refine_exclusivity_by_inst_frs_index(self, custom_SpikeRateTrends_df: pd.DataFrame, frs_index_inclusion_magnitude: float = 0.5, override_existing_frs_index_values:bool=False) -> bool: 
         """ 
