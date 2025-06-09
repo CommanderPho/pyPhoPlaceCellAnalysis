@@ -2879,7 +2879,7 @@ def determine_session_t_delta_completion_function(self, global_data_root_parent_
 
 @function_attributes(short_name=None, tags=['JSON', 'CSV', 'peak', 'pf', 'peak_promenance'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-01-01 00:00', related_items=[])
 def compute_and_export_session_extended_placefield_peak_information_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict,
-                                                                             save_hdf:bool=True, save_across_session_hdf:bool=False) -> dict:
+                                                                             save_csv:bool=True, save_json:bool=False) -> dict:
     """  Extracts peak information for the placefields for each neuron
     from pyphoplacecellanalysis.General.Batch.BatchJobCompletion.UserCompletionHelpers.batch_user_completion_helpers import kdiba_session_post_fixup_completion_function
     
@@ -2895,10 +2895,8 @@ def compute_and_export_session_extended_placefield_peak_information_completion_f
         
     """
     import sys
-    from pyphocorehelpers.print_helpers import get_now_day_str, get_now_rounded_time_str
     from pyphocorehelpers.exception_helpers import ExceptionPrintingContext, CapturedException
-    from pyphoplacecellanalysis.General.Pipeline.Stages.Loading import saveData
-    from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.LongShortTrackComputations import JonathanFiringRateAnalysisResult
+    from pyphoplacecellanalysis.SpecificResults.AcrossSessionResults import AcrossSessionsResults # for .build_neuron_identities_df_for_CSV
 
     # Dict[IdentifyingContext, InstantaneousSpikeRateGroupsComputation]
 
@@ -2920,20 +2918,24 @@ def compute_and_export_session_extended_placefield_peak_information_completion_f
     active_export_parent_output_path = self.collected_outputs_path.resolve()
 
     try:
-        rank_order_results = curr_active_pipeline.global_computation_results.computed_data['RankOrder']
-        minimum_inclusion_fr_Hz: float = rank_order_results.minimum_inclusion_fr_Hz
-        included_qclu_values: List[int] = rank_order_results.included_qclu_values
-        directional_laps_results = curr_active_pipeline.global_computation_results.computed_data['DirectionalLaps']
-        track_templates = directional_laps_results.get_templates(minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz, included_qclu_values=included_qclu_values) # non-shared-only -- !! Is minimum_inclusion_fr_Hz=None the issue/difference?
-        print(f'minimum_inclusion_fr_Hz: {minimum_inclusion_fr_Hz}')
-        print(f'included_qclu_values: {included_qclu_values}')
+
+        # 2025-06-09 18:22 - Added combined output helper:        
+        all_neuron_stats_table: pd.DataFrame = AcrossSessionsResults.build_neuron_identities_df_for_CSV(curr_active_pipeline=curr_active_pipeline)
+        # # Pre-2025-06-09 Export mode
+        # rank_order_results = curr_active_pipeline.global_computation_results.computed_data['RankOrder']
+        # minimum_inclusion_fr_Hz: float = rank_order_results.minimum_inclusion_fr_Hz
+        # included_qclu_values: List[int] = rank_order_results.included_qclu_values
+        # directional_laps_results = curr_active_pipeline.global_computation_results.computed_data['DirectionalLaps']
+        # track_templates = directional_laps_results.get_templates(minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz, included_qclu_values=included_qclu_values) # non-shared-only -- !! Is minimum_inclusion_fr_Hz=None the issue/difference?
+        # print(f'minimum_inclusion_fr_Hz: {minimum_inclusion_fr_Hz}')
+        # print(f'included_qclu_values: {included_qclu_values}')
     
-        print(f'\t doing specific instantaneous firing rate computation for context: {curr_session_context}...')
-        jonathan_firing_rate_analysis_result: JonathanFiringRateAnalysisResult = curr_active_pipeline.global_computation_results.computed_data.jonathan_firing_rate_analysis
-        neuron_replay_stats_df: pd.DataFrame = deepcopy(jonathan_firing_rate_analysis_result.neuron_replay_stats_df)
-        neuron_replay_stats_df, all_pf2D_peaks_modified_columns = jonathan_firing_rate_analysis_result.add_peak_promenance_pf_peaks(curr_active_pipeline=curr_active_pipeline, track_templates=track_templates)
-        neuron_replay_stats_df, all_pf1D_peaks_modified_columns = jonathan_firing_rate_analysis_result.add_directional_pf_maximum_peaks(track_templates=track_templates)
-        # both_included_neuron_stats_df = deepcopy(neuron_replay_stats_df[neuron_replay_stats_df['LS_pf_peak_x_diff'].notnull()]).drop(columns=['track_membership', 'neuron_type'])
+        # print(f'\t doing specific instantaneous firing rate computation for context: {curr_session_context}...')
+        # jonathan_firing_rate_analysis_result: JonathanFiringRateAnalysisResult = curr_active_pipeline.global_computation_results.computed_data.jonathan_firing_rate_analysis
+        # neuron_replay_stats_df: pd.DataFrame = deepcopy(jonathan_firing_rate_analysis_result.neuron_replay_stats_df)
+        # neuron_replay_stats_df, all_pf2D_peaks_modified_columns = jonathan_firing_rate_analysis_result.add_peak_promenance_pf_peaks(curr_active_pipeline=curr_active_pipeline, track_templates=track_templates)
+        # neuron_replay_stats_df, all_pf1D_peaks_modified_columns = jonathan_firing_rate_analysis_result.add_directional_pf_maximum_peaks(track_templates=track_templates)
+        # # both_included_neuron_stats_df = deepcopy(neuron_replay_stats_df[neuron_replay_stats_df['LS_pf_peak_x_diff'].notnull()]).drop(columns=['track_membership', 'neuron_type'])
         
         print(f'\t\t done (success).')
 
@@ -2944,16 +2946,16 @@ def compute_and_export_session_extended_placefield_peak_information_completion_f
         # if self.fail_on_exception:
         #     raise e.exc
         # _out_inst_fr_comps = None
-        neuron_replay_stats_df = None
+        all_neuron_stats_table = None
         pass
+    
 
-    if (neuron_replay_stats_df is not None):
+    if (all_neuron_stats_table is not None) and save_csv:
         print(f'\t try saving to CSV...')
         # Save DataFrame to CSV
         csv_output_path = active_export_parent_output_path.joinpath(f'{CURR_BATCH_OUTPUT_PREFIX}_neuron_replay_stats_df.csv').resolve()
         try:
-            
-            neuron_replay_stats_df.to_csv(csv_output_path)
+            all_neuron_stats_table.to_csv(csv_output_path)
             print(f'\t saving to CSV: "{csv_output_path}" done.')
             callback_outputs['csv_output_path'] = csv_output_path
 
@@ -2969,12 +2971,12 @@ def compute_and_export_session_extended_placefield_peak_information_completion_f
 
 
     ## standalone saving:
-    if (neuron_replay_stats_df is not None):
+    if (all_neuron_stats_table is not None) and save_json:
         print(f'\t try saving to JSON...')
         # Save DataFrame to JSON
         json_output_path = active_export_parent_output_path.joinpath(f'{CURR_BATCH_OUTPUT_PREFIX}_neuron_replay_stats_df.json').resolve()
         try:
-            neuron_replay_stats_df.to_json(json_output_path, orient='records', lines=True) ## This actually looks pretty good!
+            all_neuron_stats_table.to_json(json_output_path, orient='records', lines=True) ## This actually looks pretty good!
             print(f'\t saving to JSON: "{json_output_path}" done.')
             callback_outputs['json_output_path'] = json_output_path
 
