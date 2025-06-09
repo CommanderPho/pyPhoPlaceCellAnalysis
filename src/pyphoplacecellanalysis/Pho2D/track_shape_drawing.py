@@ -1501,6 +1501,7 @@ def _plot_helper_add_track_shapes(grid_bin_bounds: Union[Tuple[Tuple[float, floa
     
     return (long_patch, long_path), (short_patch, short_path)
 
+
 @function_attributes(short_name=None, tags=['matplotlib', 'track', 'remapping', 'good', 'working'], input_requires=[], output_provides=[], uses=['_plot_helper_add_track_shapes'], used_by=['plot_bidirectional_track_remapping_diagram'], creation_date='2024-02-22 11:12', related_items=[])
 def _plot_track_remapping_diagram(a_dir_decoder_aclu_MAX_peak_maps_df: pd.DataFrame, grid_bin_bounds: Union[Tuple[Tuple[float, float], Tuple[float, float]], BoundsRect], long_column_name:str='long_LR', short_column_name:str='short_LR', ax=None, defer_render: bool=False, enable_interactivity:bool=True, draw_point_aclu_labels:bool=False, enable_adjust_overlapping_text: bool=False, is_dark_mode: bool = True, aclus_y_offset_mode:AclusYOffsetMode=AclusYOffsetMode.CountBased, debug_print=False, **kwargs):
     """ Plots a single figure containing the long and short track outlines (flattened, overlayed) with single points on each corresponding to the peak location in 1D
@@ -1518,7 +1519,8 @@ def _plot_track_remapping_diagram(a_dir_decoder_aclu_MAX_peak_maps_df: pd.DataFr
         from pyphoplacecellanalysis.Pho2D.track_shape_drawing import _plot_track_remapping_diagram
         from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import _get_directional_pf_peaks_dfs
 
-        LR_only_decoder_aclu_MAX_peak_maps_df, RL_only_decoder_aclu_MAX_peak_maps_df = _get_directional_pf_peaks_dfs(track_templates, drop_aclu_if_missing_long_or_short=True)
+        (LR_only_decoder_aclu_MAX_peak_maps_df, RL_only_decoder_aclu_MAX_peak_maps_df), AnyDir_decoder_aclu_MAX_peak_maps_df = track_templates.get_directional_pf_maximum_peaks_dfs(drop_aclu_if_missing_long_or_short=True)
+
 
         ## Make a single figure for both LR/RL remapping cells:
         kwargs = {}
@@ -1633,6 +1635,8 @@ def _plot_track_remapping_diagram(a_dir_decoder_aclu_MAX_peak_maps_df: pd.DataFr
     if len(appearing_long_to_short_aclus) > 0:
         print(f'appearing_long_to_short_aclus: {appearing_long_to_short_aclus}')
 
+    ## OUTPUTS: is_aclu_in_both, disappearing_long_to_short_indicies, appearing_long_to_short_indicies
+
 
     ## Create the remapping figure:
     ## Figure Setup:
@@ -1707,7 +1711,6 @@ def _plot_track_remapping_diagram(a_dir_decoder_aclu_MAX_peak_maps_df: pd.DataFr
         a_dir_decoder_aclu_MAX_peak_maps_df['long_MaxRepeat'] = a_dir_decoder_aclu_MAX_peak_maps_df.groupby(long_column_name)['long_repeated_count'].transform('max')
         a_dir_decoder_aclu_MAX_peak_maps_df['short_MaxRepeat'] = a_dir_decoder_aclu_MAX_peak_maps_df.groupby(short_column_name)['short_repeated_count'].transform('max')
 
-
         long_y_offsets = a_dir_decoder_aclu_MAX_peak_maps_df['long_repeated_count'].to_numpy() * offset_scaling_factor
         short_y_offsets = a_dir_decoder_aclu_MAX_peak_maps_df['short_repeated_count'].to_numpy() * offset_scaling_factor
 
@@ -1732,14 +1735,52 @@ def _plot_track_remapping_diagram(a_dir_decoder_aclu_MAX_peak_maps_df: pd.DataFr
         raise NotImplementedError(f"aclus_y_offset_mode: {aclus_y_offset_mode} not implemented.")
     
     
-    # Draw the circle points _____________________________________________________________________________________________ #
-    # circle_points_kwargs = dict(alpha=0.9, picker=enable_interactivity, s=30.0, c=color)
-    # circle_points_kwargs = dict(alpha=0.9, picker=enable_interactivity, s=25.0, edgecolors=color, c='#AAAAAA33', marker='o', plotnonfinite=False)
-    # circle_points_kwargs = dict(alpha=0.9, picker=enable_interactivity, s=np.full_like(active_aclus, fill_value=scatter_point_size), edgecolors=color, facecolors=(['#CCCCCC33'] * len(active_aclus)), marker='o', plotnonfinite=False)
-    circle_points_kwargs = dict(alpha=0.9, picker=enable_interactivity, s=np.full((len(active_aclus),), fill_value=scatter_point_size), edgecolors=([_default_edgecolors] * len(active_aclus)), facecolors=color, marker='o', plotnonfinite=False)
+    ## OUTPUTS: long_y, short_y, long_y, long_y
 
-    _out_long_points = ax.scatter(long_peak_x, y=long_y, label='long_peak_x', **circle_points_kwargs)
-    _out_short_points = ax.scatter(short_peak_x, y=short_y, label='short_peak_x', **circle_points_kwargs)
+
+    # Draw the circle points _____________________________________________________________________________________________ #
+
+    # INPUTS: is_aclu_in_both, disappearing_long_to_short_indicies, appearing_long_to_short_indicies
+
+    common_circle_points_kwargs = dict(alpha=0.9, picker=enable_interactivity, plotnonfinite=False)
+
+    both_long_peak_x = long_peak_x[is_aclu_in_both]
+    both_long_y = long_y[is_aclu_in_both]
+    both_color = color[is_aclu_in_both]
+    both_long_circle_points_kwargs = dict(**common_circle_points_kwargs, marker='o', s=np.full((len(both_long_peak_x),), fill_value=scatter_point_size), edgecolors=([_default_edgecolors] * len(both_long_peak_x)), facecolors=both_color)
+    _out_long_points = ax.scatter(both_long_peak_x, y=both_long_y, label='long_peak_x', **both_long_circle_points_kwargs)
+    
+    if (disappearing_long_to_short_indicies is not None) and (len(disappearing_long_to_short_indicies) > 0):
+        # disappearing_marker: str = 'v' # downward arrow
+        disappearing_marker: str = 'X' # filled X
+        disappearing_long_peak_x = long_peak_x[disappearing_long_to_short_indicies]
+        disappearing_long_y = long_y[disappearing_long_to_short_indicies]
+        disappearing_color = color[disappearing_long_to_short_indicies]
+        disappearing_circle_points_kwargs = dict(**common_circle_points_kwargs, marker=disappearing_marker, s=np.full((len(disappearing_long_peak_x),), fill_value=scatter_point_size), edgecolors=([_default_edgecolors] * len(disappearing_long_peak_x)), facecolors=disappearing_color)
+        _out_long_points = ax.scatter(disappearing_long_peak_x, y=disappearing_long_y, label='long_peak_x', **disappearing_circle_points_kwargs)
+        
+
+    ## Short: short_peak_x, short_y 
+    both_short_peak_x = short_peak_x[is_aclu_in_both]
+    both_short_y = short_y[is_aclu_in_both]
+    both_color = color[is_aclu_in_both]
+    both_short_circle_points_kwargs = dict(**common_circle_points_kwargs, marker='o', s=np.full((len(both_short_peak_x),), fill_value=scatter_point_size), edgecolors=([_default_edgecolors] * len(both_short_peak_x)), facecolors=both_color)
+    
+    _out_short_points = ax.scatter(both_short_peak_x, y=both_short_y, label='short_peak_x_app', **both_short_circle_points_kwargs)
+
+    # _out_short_points = ax.scatter(short_peak_x, y=short_y, label='short_peak_x', **circle_points_kwargs)
+
+    if (appearing_long_to_short_indicies is not None) and (len(appearing_long_to_short_indicies) > 0):
+        # appearing_marker: str = '^' # upward arrow
+        appearing_marker: str = 'P' # filled plus
+        
+        appearing_short_peak_x = short_peak_x[appearing_long_to_short_indicies]
+        appearing_short_y = short_y[appearing_long_to_short_indicies]
+        appearing_color = color[appearing_long_to_short_indicies]
+        appearing_circle_points_kwargs = dict(**common_circle_points_kwargs, marker=appearing_marker, s=np.full((len(appearing_short_peak_x),), fill_value=scatter_point_size), edgecolors=([_default_edgecolors] * len(appearing_short_peak_x)), facecolors=appearing_color)
+        _out_short_points = ax.scatter(appearing_short_peak_x, y=appearing_short_y, label='short_peak_x_dis', **appearing_circle_points_kwargs)
+        
+
 
     ## OUTPUT Variables:
     _output_dict = {'long_scatter': _out_long_points, 'short_scatter': _out_short_points}
@@ -1760,7 +1801,7 @@ def _plot_track_remapping_diagram(a_dir_decoder_aclu_MAX_peak_maps_df: pd.DataFr
         if aclu_val not in _output_by_aclu_dict:
             _output_by_aclu_dict[aclu_val] = {}
 
-        if aclu_val in both_aclus:
+        if (aclu_val in both_aclus):
             # Starting point coordinates
             start_x = long_peak_x[idx]
             # start_y = 0.1 + random_y_jitter[idx]
@@ -1784,11 +1825,12 @@ def _plot_track_remapping_diagram(a_dir_decoder_aclu_MAX_peak_maps_df: pd.DataFr
             
             # Annotate the plot with arrows; adjust the properties according to your needs
             _output_by_aclu_dict[aclu_val]['long_to_short_arrow'] = ax.annotate('', xy=(end_x, end_y), xytext=(start_x, start_y), arrowprops=dict(**arrowprops_kwargs, color=arrow_color), label=str(active_aclus[idx]))
-            # _output_by_aclu_dict[aclu_val]['long_to_short_arrow'].arrowprops: {'arrowstyle': '->', 'color': (0.267004, 0.004874, 0.329415, 1.0), 'alpha': 0.6}
-            # _output_by_aclu_dict[aclu_val]['long_to_short_arrow'].arrow_patch # mpl.patches.FancyArrowPatch
-            # _output_by_aclu_dict[aclu_val]['long_to_short_arrow'].arrow_patch.set_color('')
+
         else:
             _output_by_aclu_dict[aclu_val]['long_to_short_arrow'] = None
+
+
+    ## END FOR for idx, aclu_v...
 
 
     # ACLU Point Text Labels _____________________________________________________________________________________________ #
@@ -1834,10 +1876,7 @@ def _plot_track_remapping_diagram(a_dir_decoder_aclu_MAX_peak_maps_df: pd.DataFr
             #             # max_move=None,
             #             # autoalign=True
             # )
-
-
-        
-
+    ## END if draw_point_aclu_labels...
 
     if enable_interactivity:
         ## Build the interactivity callbacks:
@@ -1971,6 +2010,7 @@ def _plot_track_remapping_diagram(a_dir_decoder_aclu_MAX_peak_maps_df: pd.DataFr
         _output_dict['get_aclu_color_fn'] = get_aclu_color_fn
         _output_dict['scatter_select_function'] = on_scatter_point_pick
         _output_dict['_scatter_select_mpl_pick_event_handle_idx'] = _mpl_pick_event_handle_idx
+    ## END if enable_interactivity...
 
     ## format tha axes:
     ax.set_yticks([])
