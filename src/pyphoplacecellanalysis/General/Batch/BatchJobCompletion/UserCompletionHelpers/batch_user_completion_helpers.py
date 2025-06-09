@@ -2909,8 +2909,9 @@ def compute_and_export_session_extended_placefield_peak_information_completion_f
     print(f'CURR_BATCH_OUTPUT_PREFIX: {CURR_BATCH_OUTPUT_PREFIX}')
 
     callback_outputs = {
-        'json_output_path': None, #'t_end': t_end   
         'csv_output_path': None,
+        'json_output_path': None, #'t_end': t_end   
+        
     }
     err = None
 
