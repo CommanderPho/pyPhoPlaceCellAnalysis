@@ -3320,6 +3320,44 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
             return instance
         
 
+    @function_attributes(short_name=None, tags=['export', 'pdf', 'html', 'figure'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-06-09 10:40', related_items=[])
+    def export_for_publication(self, figures_parent_folder: Path, export_pdf: bool=True, export_html: bool = False):
+        """ exports the figures for publication 
+        
+        Usage:
+            figures_parent_folder: Path = Path(r'E:/Dropbox (Personal)/Active/Kamran Diba Lab/Pho-Kamran-Meetings/2025-06-06 - EXPORTS FOR PUBLICATION').resolve()
+            _out_paths = df_filter.export_for_publication(figures_parent_folder=figures_parent_folder, export_html=False)
+            _out_paths
+        
+        """
+        filename: str = Path(deepcopy(self.filename)).stem        
+        filename = f"ScatterOverTime_{filename}"
+        
+        fig = self.figure_widget
+
+
+        _out_paths = {}
+        if export_pdf:
+            image_save_path = figures_parent_folder.joinpath(f'{filename}.pdf')
+            fig.write_image(image_save_path)
+            _out_paths['pdf'] = image_save_path
+
+    # png_bytes = pio.to_image(fig, format='png')
+    # mime_type="image/png"
+    # data = deepcopy(png_bytes)
+
+        if export_html:
+            html_file_output = figures_parent_folder.joinpath(f'{filename}.html').resolve()
+            pio.write_html(fig, file=html_file_output, auto_open=True)
+            _out_paths['html'] = html_file_output
+        return _out_paths
+
+
+
+
+
+        
+
 from neuropy.utils.mixins.time_slicing import TimeColumnAliasesProtocol
 
 @pd.api.extensions.register_dataframe_accessor("pho_LS_epoch")
