@@ -51,6 +51,7 @@ from neuropy.utils.matplotlib_helpers import matplotlib_configuration_update
 from neuropy.core.neuron_identities import  neuronTypesEnum, NeuronIdentityTable
 from neuropy.utils.mixins.HDF5_representable import HDF_Converter
 from neuropy.utils.indexing_helpers import PandasHelpers
+from neuropy.utils.debug_helpers import parameter_sweeps 
 
 from pyphocorehelpers.Filesystem.metadata_helpers import  get_file_metadata
 from pyphocorehelpers.assertion_helpers import Assert
@@ -63,6 +64,7 @@ from pyphoplacecellanalysis.General.Mixins.ExportHelpers import  build_and_write
 from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import DecoderDecodedEpochsResult
 
 from pyphocorehelpers.DataStructure.RenderPlots.MatplotLibRenderPlots import MatplotlibRenderPlots
+
 
 """
 from pyphoplacecellanalysis.SpecificResults.AcrossSessionResults import AcrossSessionsResults, AcrossSessionsVisualizations
@@ -509,10 +511,58 @@ class AcrossSessionsResults:
 
 
 
+    @function_attributes(short_name=None, tags=['HDF5', 'csv'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-06-09 16:35', related_items=[])
     @classmethod
     def post_compute_all_sessions_processing(cls, global_data_root_parent_path:Path, output_path_suffix: str, plotting_enabled:bool, output_override_path=None, inst_fr_output_filename: str=None):
         """ 2023-11-15 - called after batch computing all of the sessions and building the required output files. Loads them, processes them, and then plots them!
 
+        
+        from pyphoplacecellanalysis.SpecificResults.AcrossSessionResults import AcrossSessionTables, AcrossSessionsResults, AcrossSessionsVisualizations
+        from neuropy.utils.mixins.HDF5_representable import HDF_Converter
+        from pyphoplacecellanalysis.General.Batch.runBatch import BatchResultDataframeAccessor
+
+        # output_path_suffix: str = '2024-09-26'
+        # output_path_suffix: str = '2024-10-22'
+        output_path_suffix: str = '2025-04-17' 
+        # output_path_suffix: str = '2025-06-03'
+        # output_path_suffix: str = '2024-10-04'
+        # inst_fr_output_filename: str = f'across_session_result_long_short_recomputed_inst_firing_rate_{output_path_suffix}.pkl'
+        # inst_fr_output_filename: str = f'across_session_result_long_short_recomputed_inst_firing_rate_{output_path_suffix}_0.0009.pkl' # single time bin size
+        # inst_fr_output_filename: str = f'across_session_result_long_short_recomputed_inst_firing_rate_{output_path_suffix}_0.0015.pkl' # single time bin size
+        # inst_fr_output_filename: str = f'across_session_result_long_short_recomputed_inst_firing_rate_{output_path_suffix}_0.0025.pkl' # single time bin size
+        # inst_fr_output_filename: str = f'across_session_result_long_short_recomputed_inst_firing_rate_{output_path_suffix}_0.025.pkl' # single time bin size
+        inst_fr_output_filename: str = f'across_session_result_long_short_recomputed_inst_firing_rate_{output_path_suffix}_1000.0.pkl' # single time bin size
+
+        ## INPUTS: included_session_contexts, included_h5_paths
+        neuron_identities_table, long_short_fr_indicies_analysis_table, neuron_replay_stats_table = AcrossSessionTables.build_all_known_tables(included_session_contexts, included_h5_paths, should_restore_native_column_types=True)
+
+        ## different than load_all_combined_tables, which seems to work with `long_short_fr_indicies_analysis_table`
+        # graphics_output_dict |= AcrossSessionsVisualizations.across_sessions_firing_rate_index_figure(long_short_fr_indicies_analysis_results=long_short_fr_indicies_analysis_table, num_sessions=num_sessions, save_figure=True)
+
+        ## Load all across-session tables from the pickles:
+        output_path_suffix: str = f'{output_path_suffix}'
+        neuron_identities_table, long_short_fr_indicies_analysis_table, neuron_replay_stats_table = AcrossSessionTables.load_all_combined_tables(override_output_parent_path=collected_outputs_directory, output_path_suffix=output_path_suffix) # output_path_suffix=f'2023-10-04-GL-Recomp'
+        # num_sessions = len(neuron_replay_stats_table.session_uid.unique().to_numpy())
+        # print(f'num_sessions: {num_sessions}')
+        num_sessions: int = len(long_short_fr_indicies_analysis_table['session_uid'].unique())
+        print(f'num_sessions: {num_sessions}')
+
+        inst_fr_output_load_filepath: Path = collected_outputs_directory.joinpath(inst_fr_output_filename).resolve() # single time bin size # non-instantaneous version
+        assert inst_fr_output_load_filepath.exists()
+        # inst_fr_output_filename: str = inst_fr_output_load_filepath.name
+        # across_session_inst_fr_computation, across_sessions_instantaneous_fr_dict, across_sessions_instantaneous_frs_list = AcrossSessionsResults.load_across_sessions_data(global_data_root_parent_path=global_data_root_parent_path, inst_fr_output_filename=inst_fr_output_filename)
+        across_session_inst_fr_computation, across_sessions_instantaneous_fr_dict, across_sessions_instantaneous_frs_list = AcrossSessionsResults.load_across_sessions_data(global_data_root_parent_path=inst_fr_output_load_filepath.parent, inst_fr_output_filename=inst_fr_output_filename)
+
+        graphics_output_dict = AcrossSessionsResults.post_compute_all_sessions_processing(global_data_root_parent_path=collected_outputs_directory, output_path_suffix=output_path_suffix, plotting_enabled=False, output_override_path=Path('../../output'), inst_fr_output_filename=inst_fr_output_filename)
+
+        num_sessions = len(across_sessions_instantaneous_fr_dict)
+        print(f'num_sessions: {num_sessions}')
+
+        # Convert byte strings to regular strings
+        neuron_replay_stats_table = neuron_replay_stats_table.applymap(lambda x: x.decode('utf-8') if isinstance(x, bytes) else x)
+        neuron_replay_stats_table
+
+        
         """
         # 2023-10-04 - Load Saved across-sessions-data and testing Batch-computed inst_firing_rates:
         ## Load the saved across-session results:
@@ -733,6 +783,190 @@ class AcrossSessionsResults:
                                                         np.concatenate([across_sessions_instantaneous_frs_list[i].SxC_ReplayDeltaPlus.cell_agg_inst_fr_list for i in np.arange(num_sessions) if across_sessions_instantaneous_frs_list[i].SxC_ReplayDeltaPlus is not None]))]
 
         return across_session_inst_fr_computation, across_sessions_instantaneous_fr_dict, across_sessions_instantaneous_frs_list
+
+
+    # ==================================================================================================================================================================================================================================================================================== #
+    # 2025-05-09 - Combined CSV output                                                                                                                                                                                                                                                     #
+    # ==================================================================================================================================================================================================================================================================================== #
+
+    @function_attributes(short_name=None, tags=['across-sessions'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-06-09 17:31', related_items=['AcrossSessionTables.build_neuron_replay_stats_table'])
+    @classmethod
+    def build_neuron_identities_df_for_CSV(cls, curr_active_pipeline) -> pd.DataFrame:
+        """ Exports all available neuron information (both identity and computed in computations) for each neuron
+
+        AcrossSessionTables.build_and_save_all_combined_tables, .build_neuron_identities_table, .build_neuron_replay_stats_table, .build_long_short_fr_indicies_analysis_table
+        
+        
+        
+        from pyphoplacecellanalysis.SpecificResults.AcrossSessionResults import AcrossSessionsResults
+        
+        all_neuron_stats_table: pd.DataFrame = AcrossSessionsResults.build_neuron_identities_df_for_CSV(curr_active_pipeline=curr_active_pipeline)
+        
+        
+        """
+        from neuropy.core.neuron_identities import NeuronExtendedIdentityTuple, neuronTypesEnum, NeuronIdentityTable, NeuronIdentityDataframeAccessor
+        from neuropy.utils.mixins.HDF5_representable import HDF_Converter
+        from pyphoplacecellanalysis.SpecificResults.AcrossSessionResults import AcrossSessionsResults # for build_neuron_identity_table_to_hdf
+        from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import get_proper_global_spikes_df
+        from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.LongShortTrackComputations import JonathanFiringRateAnalysisResult        
+        from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.LongShortTrackComputations import InstantaneousSpikeRateGroupsComputation
+        from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.LongShortTrackComputations import ExpectedVsObservedResult
+
+
+        session_context = curr_active_pipeline.get_session_context() 
+        # session_group_key: str = "/" + session_context.get_description(separator="/", include_property_names=False) # 'kdiba/gor01/one/2006-6-08_14-26-15'
+        # session_uid: str = session_context.get_description(separator="|", include_property_names=False)
+        ## Global Computations
+        # a_global_computations_group_key: str = f"{session_group_key}/global_computations"
+        # with tb.open_file(file_path, mode='w') as f:
+        #     a_global_computations_group = f.create_group(session_group_key, 'global_computations', title='the result of computations that operate over many or all of the filters in the session.', createparents=True)
+            
+        # Handle long|short firing rate index:
+        long_short_fr_indicies_analysis_results = curr_active_pipeline.global_computation_results.computed_data['long_short_fr_indicies_analysis']
+        x_frs_index, y_frs_index = long_short_fr_indicies_analysis_results['x_frs_index'], long_short_fr_indicies_analysis_results['y_frs_index'] # use the all_results_dict as the computed data value
+        active_context = long_short_fr_indicies_analysis_results['active_context']
+        # Need to map keys of dict to an absolute dict value:
+        sess_specific_aclus = list(x_frs_index.keys())
+        session_ctxt_key:str = active_context.get_description(separator='|', subset_includelist=IdentifyingContext._get_session_context_keys())
+
+        long_short_fr_indicies_analysis_results_h5_df = pd.DataFrame([(f"{session_ctxt_key}|{aclu}", session_ctxt_key, aclu, x_frs_index[aclu], y_frs_index[aclu]) for aclu in sess_specific_aclus], columns=['neuron_uid', 'session_uid', 'aclu','x_frs_index', 'y_frs_index'])
+        # long_short_fr_indicies_analysis_results_h5_df.to_hdf(file_path, key=f'{a_global_computations_group_key}/long_short_fr_indicies_analysis', format='table', data_columns=True)
+        ## OUTPUTS: long_short_fr_indicies_analysis_results_h5_df
+        
+
+        # long_short_post_decoding result: __________________________________________________________________________________ #
+        curr_long_short_post_decoding = curr_active_pipeline.global_computation_results.computed_data['long_short_post_decoding']
+        expected_v_observed_result, curr_long_short_rr = curr_long_short_post_decoding.expected_v_observed_result, curr_long_short_post_decoding.rate_remapping
+        rate_remapping_df = curr_long_short_rr.rr_df
+        # Flat_epoch_time_bins_mean, Flat_decoder_time_bin_centers, num_neurons, num_timebins_in_epoch, num_total_flat_timebins, is_short_track_epoch, is_long_track_epoch, short_short_diff, long_long_diff = expected_v_observed_result.Flat_epoch_time_bins_mean, expected_v_observed_result.Flat_decoder_time_bin_centers, expected_v_observed_result.num_neurons, expected_v_observed_result.num_timebins_in_epoch, expected_v_observed_result.num_total_flat_timebins, expected_v_observed_result.is_short_track_epoch, expected_v_observed_result.is_long_track_epoch, expected_v_observed_result.short_short_diff, expected_v_observed_result.long_long_diff
+        ## OUTPUTS: rate_remapping_df
+        
+
+        # Rate Remapping _____________________________________________________________________________________________________ #
+        rate_remapping_df: pd.DataFrame = rate_remapping_df[['laps', 'replays', 'skew', 'max_axis_distance_from_center', 'distance_from_center', 'has_considerable_remapping']]
+        # rate_remapping_df.to_hdf(file_path, key=f'{a_global_computations_group_key}/rate_remapping', format='table', data_columns=True)
+        rate_remapping_df = rate_remapping_df.reset_index(drop=False).neuron_identity.make_neuron_indexed_df_global(session_context, add_expanded_session_context_keys=True, add_extended_aclu_identity_columns=True)
+
+
+        # jonathan_firing_rate_analysis_result _______________________________________________________________________________ #
+        jonathan_firing_rate_analysis_result: JonathanFiringRateAnalysisResult = curr_active_pipeline.global_computation_results.computed_data.jonathan_firing_rate_analysis
+
+        ## try to add extra columns if available:
+        directional_laps_results = curr_active_pipeline.global_computation_results.computed_data['DirectionalLaps']
+        rank_order_results = curr_active_pipeline.global_computation_results.computed_data.get('RankOrder', None) # : "RankOrderComputationsContainer"
+        if rank_order_results is not None:
+            minimum_inclusion_fr_Hz: float = rank_order_results.minimum_inclusion_fr_Hz
+            included_qclu_values: List[int] = rank_order_results.included_qclu_values
+        else:        
+            ## get from parameters:
+            minimum_inclusion_fr_Hz: float = curr_active_pipeline.global_computation_results.computation_config.rank_order_shuffle_analysis.minimum_inclusion_fr_Hz
+            included_qclu_values: List[int] = curr_active_pipeline.global_computation_results.computation_config.rank_order_shuffle_analysis.included_qclu_values
+                    
+
+        track_templates = directional_laps_results.get_templates(minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz, included_qclu_values=included_qclu_values) # non-shared-only -- !! Is minimum_inclusion_fr_Hz=None the issue/difference?
+        
+
+
+        try:
+            _neuron_replay_stats_df, _all_pf2D_peaks_modified_columns = jonathan_firing_rate_analysis_result.add_peak_promenance_pf_peaks(curr_active_pipeline=curr_active_pipeline, track_templates=track_templates)
+        except (KeyError, ValueError, AttributeError) as e:
+            print(f'\tfailed to `add_peak_promenance_pf_peaks`, with error e: {e}. skipping.')            
+        except Exception:
+            raise
+
+        try:
+            _neuron_replay_stats_df, _all_pf1D_peaks_modified_columns = jonathan_firing_rate_analysis_result.add_directional_pf_maximum_peaks(track_templates=track_templates)
+        except (KeyError, ValueError, AttributeError) as e:
+            print(f'\tfailed to `add_directional_pf_maximum_peaks`, with error e: {e}. skipping.')            
+        except Exception:
+            raise
+
+
+        _neuron_replay_stats_df = deepcopy(jonathan_firing_rate_analysis_result.neuron_replay_stats_df)
+        _neuron_replay_stats_df = HDF_Converter.prepare_neuron_indexed_dataframe_for_hdf(_neuron_replay_stats_df, active_context=deepcopy(session_context), aclu_column_name=None)        
+        
+        # jonathan_firing_rate_analysis_result.to_hdf(file_path=file_path, key=f'{a_global_computations_group_key}/jonathan_fr_analysis', active_context=session_context)
+        # jonathan_firing_rate_analysis_result
+
+        ## OUTPUTS: _neuron_replay_stats_df
+
+        ## InstantaneousSpikeRateGroupsComputation ____________________________________________________________________________ #
+        # try:
+        #     inst_spike_rate_groups_result: InstantaneousSpikeRateGroupsComputation = curr_active_pipeline.global_computation_results.computed_data.long_short_inst_spike_rate_groups # = InstantaneousSpikeRateGroupsComputation(instantaneous_time_bin_size_seconds=0.01) # 10ms
+        #     # inst_spike_rate_groups_result.compute(curr_active_pipeline=self, active_context=self.sess.get_context())
+        #     # inst_spike_rate_groups_result.to_hdf(file_path, f'{a_global_computations_group_key}/inst_fr_comps') # held up by SpikeRateTrends.inst_fr_df_list  # to HDF, don't need to split it
+        #     # NotImplementedError: a_field_attr: Attribute(name='LxC_aclus', default=None, validator=None, repr=True, eq=True, eq_key=None, order=True, order_key=None, hash=None, init=False, metadata=mappingproxy({'tags': ['dataset'], 'serialization': {'hdf': True}, 'custom_serialization_fn': None, 'hdf_metadata': {'track_eXclusive_cells': 'LxC'}}), type=<class 'numpy.ndarray'>, converter=None, kw_only=False, inherited=False, on_setattr=None, alias='LxC_aclus') could not be serialized and _ALLOW_GLOBAL_NESTED_EXPANSION is not allowed.
+            
+        # except (KeyError, AttributeError) as e:
+        #     print(f'long_short_inst_spike_rate_groups is missing and will be skipped. Error: {e}')
+        # except NotImplementedError as e:
+        #     print(f'long_short_inst_spike_rate_groups failed to save to HDF5 due to NotImplementedError issues and will be skipped. Error {e}')
+        # except TypeError as e:
+        #     # TypeError: Object dtype dtype('O') has no native HDF5 equivalent
+        #     print(f'long_short_inst_spike_rate_groups failed to save to HDF5 due to type issues and will be skipped. This is usually caused by Python None values. Error {e}')
+        # except Exception:
+        #     raise
+
+        # if not isinstance(expected_v_observed_result, ExpectedVsObservedResult):
+        #     expected_v_observed_result = ExpectedVsObservedResult(**expected_v_observed_result.to_dict())
+
+        # # expected_v_observed_result.to_hdf(file_path=file_path, key=f'{a_global_computations_group_key}/expected_v_observed_result', active_context=session_context) # 'output/test_ExpectedVsObservedResult.h5', '/expected_v_observed_result')
+
+
+        ##TODO: remainder of global_computations
+        # self.global_computation_results.to_hdf(file_path, key=f'{a_global_computations_group_key}')
+
+        # AcrossSessionsResults.build_neuron_identity_table_to_hdf(file_path, key=session_group_key, spikes_df=self.sess.spikes_df, session_uid=session_uid)
+
+        # ==================================================================================================================================================================================================================================================================================== #
+        # Begin building fresh df                                                                                                                                                                                                                                                              #
+        # ==================================================================================================================================================================================================================================================================================== #
+        spikes_df: pd.DataFrame = get_proper_global_spikes_df(owning_pipeline_reference=curr_active_pipeline)
+        unique_neuron_identities_df: pd.DataFrame = spikes_df.spikes.extract_unique_neuron_identities()
+        neuron_types_enum_array = np.array([neuronTypesEnum[a_type.hdfcodingClassName] for a_type in unique_neuron_identities_df['neuron_type']]) # convert NeuronTypes to neuronTypesEnum
+        unique_neuron_identities_df['neuron_type']  = neuron_types_enum_array
+        unique_neuron_identities_df = unique_neuron_identities_df.neuron_identity.make_neuron_indexed_df_global(curr_active_pipeline.get_session_context(), add_expanded_session_context_keys=True, add_extended_aclu_identity_columns=True)
+        # unique_neuron_identities_df
+
+        initial_num_rows: int = len(unique_neuron_identities_df)
+        
+        ## OUTPUT: unique_neuron_identities_df
+        ## INPUTS: long_short_fr_indicies_analysis_results_h5_df, rate_remapping_df, _neuron_replay_stats_df
+        
+
+        ## Combine all unique columns from the three loaded dataframes: [neuron_identities_table, long_short_fr_indicies_analysis_table, neuron_replay_stats_table], into a merged df `all_neuron_stats_table`
+        all_neuron_stats_table: pd.DataFrame = deepcopy(unique_neuron_identities_df)
+        ## All dataframes have the same number of rows and are uniquely indexed by their 'neuron_uid' column. Add the additional columns from `long_short_fr_indicies_analysis_table` to `all_neuron_stats_table`
+
+        ## OUTPUTS: _neuron_replay_stats_df
+        ## merge in `_neuron_replay_stats_df`'s columns
+        all_neuron_stats_table = pd.merge(all_neuron_stats_table, _neuron_replay_stats_df[['neuron_uid'] + [col for col in _neuron_replay_stats_df.columns if col not in all_neuron_stats_table.columns and col != 'neuron_uid']], on='neuron_uid')
+        ## merge in `long_short_fr_indicies_analysis_results_h5_df`'s columns
+        all_neuron_stats_table = pd.merge(all_neuron_stats_table, long_short_fr_indicies_analysis_results_h5_df[['neuron_uid'] + [col for col in long_short_fr_indicies_analysis_results_h5_df.columns if col not in all_neuron_stats_table.columns and col != 'neuron_uid']], on='neuron_uid')
+        ## merge in `rate_remapping_df`'s columns
+        all_neuron_stats_table = pd.merge(all_neuron_stats_table, rate_remapping_df[['neuron_uid'] + [col for col in rate_remapping_df.columns if col not in all_neuron_stats_table.columns and col != 'neuron_uid']], on='neuron_uid')
+
+        ## check
+        assert len(all_neuron_stats_table) == initial_num_rows, f"initial_num_rows: {initial_num_rows}, len(all_neuron_stats_table): {len(all_neuron_stats_table)}"
+        return all_neuron_stats_table
+
+
+    @function_attributes(short_name=None, tags=['across-sessions'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-06-09 17:31', related_items=[])
+    @classmethod
+    def build_neuron_identities_CSV(cls, file_path, curr_active_pipeline) -> pd.DataFrame:
+        """ 
+        from pyphoplacecellanalysis.SpecificResults.AcrossSessionResults import AcrossSessionsResults
+        
+        all_neuron_stats_table, file_path = AcrossSessionsResults.build_neuron_identities_CSV(curr_active_pipeline=curr_active_pipeline)
+        
+        
+        """
+        all_neuron_stats_table: pd.DataFrame = AcrossSessionsResults.build_neuron_identities_df_for_CSV(curr_active_pipeline=curr_active_pipeline)
+        file_path = Path(file_path)
+        file_path = file_path.with_suffix('.csv')
+        all_neuron_stats_table.to_csv(file_path)
+        return (all_neuron_stats_table, file_path)
+    
 
 
 class ConciseSessionIdentifiers:
@@ -1546,6 +1780,7 @@ class AcrossSessionTables:
 
 
 
+    @function_attributes(short_name=None, tags=['HDF5'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-06-09 16:37', related_items=[])
     @classmethod
     def build_all_known_tables(cls, included_session_contexts, included_h5_paths, should_restore_native_column_types:bool=True):
         """ Extracts the neuron identities table from across the **.h5** files.
@@ -3282,9 +3517,6 @@ class AcrossSessionsVisualizations:
         # graphics_output_dict['plot_data'] = {'sort_indicies': (long_sort_ind, short_sort_ind), 'colors':(long_neurons_colors_array, short_neurons_colors_array)}
         return graphics_output_dict
 
-
-
-
     @classmethod
     @function_attributes(short_name=None, tags=['across-session', 'figure', 'matplotlib', 'figure-3'], input_requires=[], output_provides=[], uses=['_plot_single_track_firing_rate_compare'], used_by=[], creation_date='2023-08-24 00:00', related_items=[])
     def across_sessions_long_and_short_firing_rate_replays_v_laps_figure(cls, neuron_replay_stats_table, num_sessions:int, save_figure=True, **kwargs):
@@ -3346,9 +3578,6 @@ class AcrossSessionsVisualizations:
         return graphics_output_dict
 
 
-from neuropy.utils.debug_helpers import parameter_sweeps
- 
-import re
 
 class ExportValueNameCleaner:
     """ 
