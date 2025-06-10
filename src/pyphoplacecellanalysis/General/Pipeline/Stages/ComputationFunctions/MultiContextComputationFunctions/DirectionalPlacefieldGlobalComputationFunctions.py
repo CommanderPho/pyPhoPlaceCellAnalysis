@@ -268,7 +268,7 @@ class TrackTemplates(HDFMixin, AttrsBasedClassHelperMixin):
         """
         # drop_aclu_if_missing_long_or_short: bool = True ## default=True; Drop entire row if either long/short is missing a value
         # drop_aclu_if_missing_long_or_short: bool = False
-        from neuropy.utils.indexing_helpers import intersection_of_arrays, union_of_arrays
+        # from neuropy.utils.indexing_helpers import intersection_of_arrays, union_of_arrays
         from neuropy.utils.indexing_helpers import unwrap_single_item
 
 

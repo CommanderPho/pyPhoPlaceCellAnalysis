@@ -1865,17 +1865,6 @@ def _plot_track_remapping_diagram(a_dir_decoder_aclu_MAX_peak_maps_df: pd.DataFr
             adjust_text([v['long_text'] for v in _output_by_aclu_dict.values()], ax=ax)
             adjust_text([v['short_text'] for v in _output_by_aclu_dict.values()], ax=ax)
 
-            # adjust_text([v['long_text'] for v in _output_by_aclu_dict.values()] + [v['short_text'] for v in _output_by_aclu_dict.values()], ax=ax,
-            #             #  expand=(1.2, 2), # expand text bounding boxes by 1.2 fold in x direction and 2 fold in y direction
-            #             arrowprops=dict(arrowstyle='-', color='gray', alpha=.5), # ensure the labeling is clear by adding small arrows indicating which point a text lable belongs to (these are different than the remapping arrows)
-            #             # avoid_self=False,
-            #             # force_text=(0.5, 0),# Since the movements are so contrained, high force speeds up the process a lot
-            #             # expand=(1, 1), # We want them to be quite compact, so reducing expansion makes sense
-            #             # only_move='x-', #Only allow movement to the left
-            #             # only_move='y', #Only allow movement on y
-            #             # max_move=None,
-            #             # autoalign=True
-            # )
     ## END if draw_point_aclu_labels...
 
     if enable_interactivity:
