@@ -49,6 +49,7 @@ from matplotlib.collections import PatchCollection
 
 import pyvista as pv # for 3D support in `LinearTrackDimensions3D`
 
+from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.ContainerBased.PhoContainerTool import GenericMatplotlibContainer
 
 
 @define(slots=False, repr=True)
@@ -1503,7 +1504,8 @@ def _plot_helper_add_track_shapes(grid_bin_bounds: Union[Tuple[Tuple[float, floa
 
 
 @function_attributes(short_name=None, tags=['matplotlib', 'track', 'remapping', 'good', 'working'], input_requires=[], output_provides=[], uses=['_plot_helper_add_track_shapes'], used_by=['plot_bidirectional_track_remapping_diagram'], creation_date='2024-02-22 11:12', related_items=[])
-def _plot_track_remapping_diagram(a_dir_decoder_aclu_MAX_peak_maps_df: pd.DataFrame, grid_bin_bounds: Union[Tuple[Tuple[float, float], Tuple[float, float]], BoundsRect], long_column_name:str='long_LR', short_column_name:str='short_LR', ax=None, defer_render: bool=False, enable_interactivity:bool=True, draw_point_aclu_labels:bool=False, enable_adjust_overlapping_text: bool=False, is_dark_mode: bool = True, aclus_y_offset_mode:AclusYOffsetMode=AclusYOffsetMode.CountBased, debug_print=False, **kwargs):
+def _plot_track_remapping_diagram(a_dir_decoder_aclu_MAX_peak_maps_df: pd.DataFrame, grid_bin_bounds: Union[Tuple[Tuple[float, float], Tuple[float, float]], BoundsRect], long_column_name:str='long_LR', short_column_name:str='short_LR', ax=None, defer_render: bool=False, enable_interactivity:bool=True, draw_point_aclu_labels:bool=False, enable_adjust_overlapping_text: bool=False, is_dark_mode: bool = True, aclus_y_offset_mode:AclusYOffsetMode=AclusYOffsetMode.CountBased, debug_print=False, 
+                                  extant_plot_container: Optional[GenericMatplotlibContainer]=None, **kwargs):
     """ Plots a single figure containing the long and short track outlines (flattened, overlayed) with single points on each corresponding to the peak location in 1D
 
     🔝🖼️🎨
@@ -1535,6 +1537,8 @@ def _plot_track_remapping_diagram(a_dir_decoder_aclu_MAX_peak_maps_df: pd.DataFr
         perform_update_title_subtitle(fig=fig_LR_RL, ax=ax_RL, title_string=None, subtitle_string=f"RL Track Remapping - {len(RL_only_decoder_aclu_MAX_peak_maps_df)} aclus")
 
     """
+    from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.ContainerBased.PhoContainerTool import GenericMatplotlibContainer
+    
     # BUILDS TRACK PROPERTIES ____________________________________________________________________________________________ #
     import matplotlib as mpl
     import matplotlib.colors as mcolors
@@ -1639,6 +1643,10 @@ def _plot_track_remapping_diagram(a_dir_decoder_aclu_MAX_peak_maps_df: pd.DataFr
 
 
     ## Create the remapping figure:
+    did_create_new_figure: bool = False
+    if (ax is None) and (extant_plot_container is not None):
+        ax = extant_plot_container.ax
+            
     ## Figure Setup:
     if ax is None:
         ## Build a new figure:
@@ -1646,23 +1654,52 @@ def _plot_track_remapping_diagram(a_dir_decoder_aclu_MAX_peak_maps_df: pd.DataFr
         fig = build_or_reuse_figure(fignum=kwargs.pop('fignum', None), fig=kwargs.pop('fig', None), fig_idx=kwargs.pop('fig_idx', 0), figsize=kwargs.pop('figsize', (10, 4)), dpi=kwargs.pop('dpi', None), constrained_layout=True) # , clear=True
         gs = GridSpec(1, 1, figure=fig)
         ax = plt.subplot(gs[0])
-
+        did_create_new_figure = True
     else:
         # otherwise get the figure from the passed axis
-        fig = ax.get_figure()
+        fig = None
+        if (extant_plot_container is not None):
+            fig = extant_plot_container.fig
+
+        if fig is None:
+            ## no fig, need to get it from the axes
+            fig = ax.get_figure()
+        
+        did_create_new_figure = False
+
+
+    if extant_plot_container is None:
+        print(f'creating new `extant_plot_container`...')
+        extant_plot_container: GenericMatplotlibContainer = GenericMatplotlibContainer(name='_plot_track_remapping_diagram')
+        extant_plot_container.fig = fig
+        extant_plot_container.ax = ax
+
+    extant_plot_container.params.did_create_new_figure = did_create_new_figure
 
     ##########################
 
     ## TRACK PLOTTING:
-    (long_patch, long_path), (short_patch, short_path) = _plot_helper_add_track_shapes(grid_bin_bounds=grid_bin_bounds, is_dark_mode=is_dark_mode, debug_print=debug_print)
-    # Draw the long/short track shapes: __________________________________________________________________________________ #
-    if ax is not None:
-        ax.add_patch(long_patch)
-        ax.add_patch(short_patch)
-        ax.autoscale()
+    # if did_create_new_figure:
+    extant_long_patch = extant_plot_container.plots.get('long_patch', None)
+    if extant_long_patch is None:
+        (long_patch, long_path), (short_patch, short_path) = _plot_helper_add_track_shapes(grid_bin_bounds=grid_bin_bounds, is_dark_mode=is_dark_mode, debug_print=debug_print)
+        if long_patch is not None:
+            extant_plot_container.plots.long_patch = long_patch
+        if long_path is not None:
+            extant_plot_container.plots.long_path = long_path
+        if short_patch is not None:
+            extant_plot_container.plots.short_patch = short_patch
+        if short_path is not None:
+            extant_plot_container.plots.short_path = short_path
 
+        # Draw the long/short track shapes: __________________________________________________________________________________ #
+        if ax is not None:
+            ax.add_patch(long_patch)
+            ax.add_patch(short_patch)
+            ax.autoscale()
+    else:
+        print(f'\twarn: already had track extant_long_patch. Skipping duplicate plotting.')
         
-
     ## INPUTS: LR_only_decoder_aclu_MAX_peak_maps_df, long_peak_x, short_peak_x, peak_x_diff
 
     # Define a colormap to map your unique integer indices to colors
@@ -1757,8 +1794,9 @@ def _plot_track_remapping_diagram(a_dir_decoder_aclu_MAX_peak_maps_df: pd.DataFr
         disappearing_long_y = long_y[disappearing_long_to_short_indicies]
         disappearing_color = color[disappearing_long_to_short_indicies]
         disappearing_circle_points_kwargs = dict(**common_circle_points_kwargs, marker=disappearing_marker, s=np.full((len(disappearing_long_peak_x),), fill_value=scatter_point_size), edgecolors=([_default_edgecolors] * len(disappearing_long_peak_x)), facecolors=disappearing_color)
-        _out_long_points = ax.scatter(disappearing_long_peak_x, y=disappearing_long_y, label='long_peak_x', **disappearing_circle_points_kwargs)
-        
+        _out_long_disappearing_points = ax.scatter(disappearing_long_peak_x, y=disappearing_long_y, label='long_peak_x', **disappearing_circle_points_kwargs)
+    else:
+        _out_long_disappearing_points = None
 
     ## Short: short_peak_x, short_y 
     both_short_peak_x = short_peak_x[is_aclu_in_both]
@@ -1778,14 +1816,20 @@ def _plot_track_remapping_diagram(a_dir_decoder_aclu_MAX_peak_maps_df: pd.DataFr
         appearing_short_y = short_y[appearing_long_to_short_indicies]
         appearing_color = color[appearing_long_to_short_indicies]
         appearing_circle_points_kwargs = dict(**common_circle_points_kwargs, marker=appearing_marker, s=np.full((len(appearing_short_peak_x),), fill_value=scatter_point_size), edgecolors=([_default_edgecolors] * len(appearing_short_peak_x)), facecolors=appearing_color)
-        _out_short_points = ax.scatter(appearing_short_peak_x, y=appearing_short_y, label='short_peak_x_dis', **appearing_circle_points_kwargs)
-        
+        _out_short_appearing_points = ax.scatter(appearing_short_peak_x, y=appearing_short_y, label='short_peak_x_dis', **appearing_circle_points_kwargs)
+    else:
+        _out_short_appearing_points = None      
 
 
     ## OUTPUT Variables:
-    _output_dict = {'long_scatter': _out_long_points, 'short_scatter': _out_short_points}
-    _output_by_aclu_dict = {} # keys are integer aclus, values are dictionaries of returned graphics objects:
+    # _output_dict = {'long_scatter': _out_long_points, 'short_scatter': _out_short_points}    
+    extant_plot_container.plots_data.scatter = {'long_scatter': _out_long_points, 'short_scatter': _out_short_points}
+    if _out_long_disappearing_points:
+        extant_plot_container.plots_data.scatter['long_disappearing_scatter'] = _out_long_disappearing_points
+    if _out_short_appearing_points:
+        extant_plot_container.plots_data.scatter['short_appearing_scatter'] = _out_short_appearing_points        
 
+    _output_by_aclu_dict = {} # keys are integer aclus, values are dictionaries of returned graphics objects:
     # Draw arrows from the first set of points to the second set _________________________________________________________ #
     # arrowprops_kwargs = dict(arrowstyle="->", alpha=0.6)
     # arrowprops_kwargs = dict(arrowstyle="simple", alpha=0.7)
@@ -2009,10 +2053,13 @@ def _plot_track_remapping_diagram(a_dir_decoder_aclu_MAX_peak_maps_df: pd.DataFr
     ax.spines['bottom'].set_visible(False)
     ax.spines['left'].set_visible(False)
 
+    extant_plot_container.plots_data._output_by_aclu_dict = _output_by_aclu_dict
+
     # Show the plot
     if not defer_render:
         plt.show()
-    return fig, ax, (_output_dict, _output_by_aclu_dict)
+    # return fig, ax, (_output_dict, _output_by_aclu_dict)
+    return fig, ax, extant_plot_container
 
 
 @function_attributes(short_name='bidir_track_remap', tags=['figure', 'remap', 'track', 'PhoDibaPaper2025_FIGURES'], input_requires=[], output_provides=[], uses=['_get_directional_pf_peaks_dfs', '_plot_track_remapping_diagram', 'build_shared_sorted_neuron_color_maps'], used_by=[], creation_date='2024-04-29 10:23', related_items=[])
