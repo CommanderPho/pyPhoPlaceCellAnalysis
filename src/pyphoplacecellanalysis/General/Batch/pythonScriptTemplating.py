@@ -531,7 +531,16 @@ def generate_batch_single_session_scripts(global_data_root_parent_path, session_
     ## Generate VSCode Workspace for it
     if should_create_vscode_workspace:
         output_compute_python_scripts = [x[0] for x in output_python_scripts]
-        vscode_workspace_path = build_vscode_workspace(output_compute_python_scripts, python_executable=Path('~/Library/VSCode/black/.venv_black/bin/python').resolve())
+        # Check if the current operating system is Windows
+        if os.name == 'nt':
+            # Put your Windows-specific code here
+            python_executable = Path('C:/Users/pho/repos/Spike3DWorkEnv/Spike3D/.venv_UV/Scripts/python').resolve()
+        else:
+            # Put your non-Windows-specific code here
+            python_executable = Path('~/repos/Spike3D/.venv/bin/python').resolve()
+                    
+
+        vscode_workspace_path = build_vscode_workspace(output_compute_python_scripts, python_executable=python_executable)
         print(f'vscode_workspace_path: {vscode_workspace_path}')
     else:
         vscode_workspace_path = None
@@ -739,8 +748,8 @@ def build_vscode_workspace(script_paths, python_executable=None):
 
 @function_attributes(short_name=None, tags=['Windows-only', 'powershell', 'batch', 'script'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-04-15 11:00', related_items=[])
 def build_windows_powershell_run_script(script_paths, max_concurrent_jobs: int = 3,
-                                        activate_path='c:/Users/pho/repos/Spike3DWorkEnv/Spike3D/.venv/Scripts/activate.bat', 
-                                        python_executable='c:/Users/pho/repos/Spike3DWorkEnv/Spike3D/.venv/Scripts/python.exe',
+                                        activate_path='c:/Users/pho/repos/Spike3DWorkEnv/Spike3D/.venv_UV/Scripts/activate.bat', 
+                                        python_executable='c:/Users/pho/repos/Spike3DWorkEnv/Spike3D/.venv_UV/Scripts/python.exe',
                                         script_name: str = 'run_scripts'):
     """
     Builds a Powershell script to run Python scripts in parallel on Windows.
