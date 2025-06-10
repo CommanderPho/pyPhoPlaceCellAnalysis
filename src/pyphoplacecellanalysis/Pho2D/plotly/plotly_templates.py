@@ -65,7 +65,22 @@ pio.templates["pho_poster_light"] = go.layout.Template(
 # titles: 9, axes: 7, insets: 5
 # titles: 23px, axes: 9.2, insets: 6.7
 text_sizes_pts = {'titles': 9, 'axes': 7, 'insets': 5}
+
+def points_to_pixels(pts: float, dpi: float=300.0) -> float:
+    """ 
+    `Pixеls (px) = Points (pt) * (DPI / 72)`
+    """
+    return float(pts) * (float(dpi) / 72.0)
+
 text_sizes_px = {'titles': 23, 'axes': 9.2, 'insets': 6.7}
+# text_sizes_px = {k:points_to_pixels(v) for k, v in text_sizes_pts.items()}
+# text_sizes_px = {'titles': 38, 'axes': 29, 'insets': 20}
+# text_sizes_px = {'titles': 38, 'axes': 29, 'insets': 20}
+
+
+
+
+
 # pio.templates["pho_diba_publication"] = go.layout.Template(
 #     layout= dict(
 #             # font_family="Ariel",
