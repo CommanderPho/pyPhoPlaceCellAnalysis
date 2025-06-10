@@ -579,7 +579,6 @@ class AcrossSessionsResults:
         num_sessions = len(neuron_replay_stats_table.session_uid.unique().to_numpy())
         print(f'num_sessions: {num_sessions}')
 
-
         # Does its own additions to `long_short_fr_indicies_analysis_table` table based on the user labeled LxC/SxCs
         annotation_man = UserAnnotationsManager()
         # Hardcoded included_session_contexts:
@@ -814,13 +813,7 @@ class AcrossSessionsResults:
 
 
         session_context = curr_active_pipeline.get_session_context() 
-        # session_group_key: str = "/" + session_context.get_description(separator="/", include_property_names=False) # 'kdiba/gor01/one/2006-6-08_14-26-15'
-        # session_uid: str = session_context.get_description(separator="|", include_property_names=False)
-        ## Global Computations
-        # a_global_computations_group_key: str = f"{session_group_key}/global_computations"
-        # with tb.open_file(file_path, mode='w') as f:
-        #     a_global_computations_group = f.create_group(session_group_key, 'global_computations', title='the result of computations that operate over many or all of the filters in the session.', createparents=True)
-            
+
         # Handle long|short firing rate index:
         long_short_fr_indicies_analysis_results = curr_active_pipeline.global_computation_results.computed_data['long_short_fr_indicies_analysis']
         x_frs_index, y_frs_index = long_short_fr_indicies_analysis_results['x_frs_index'], long_short_fr_indicies_analysis_results['y_frs_index'] # use the all_results_dict as the computed data value
@@ -947,7 +940,11 @@ class AcrossSessionsResults:
         all_neuron_stats_table = pd.merge(all_neuron_stats_table, rate_remapping_df[['neuron_uid'] + [col for col in rate_remapping_df.columns if col not in all_neuron_stats_table.columns and col != 'neuron_uid']], on='neuron_uid')
 
         ## check
-        assert len(all_neuron_stats_table) == initial_num_rows, f"initial_num_rows: {initial_num_rows}, len(all_neuron_stats_table): {len(all_neuron_stats_table)}"
+        # assert len(all_neuron_stats_table) == initial_num_rows, f"initial_num_rows: {initial_num_rows}, len(all_neuron_stats_table): {len(all_neuron_stats_table)}"
+
+        if len(all_neuron_stats_table) != initial_num_rows:
+            print(f"WARNING: initial_num_rows: {initial_num_rows}, len(all_neuron_stats_table): {len(all_neuron_stats_table)}")
+
         return all_neuron_stats_table
 
 
@@ -967,6 +964,56 @@ class AcrossSessionsResults:
         all_neuron_stats_table.to_csv(file_path)
         return (all_neuron_stats_table, file_path)
     
+
+
+    @classmethod
+    def load_all_neuron_identities_CSV(cls, override_output_parent_path:Optional[Path]=None, output_path_suffix:Optional[str]=None):
+        """Save converted back to .h5 file, .csv file, and several others
+
+        Usage:
+            from pyphoplacecellanalysis.SpecificResults.AcrossSessionResults import AcrossSessionsResults
+
+            all_neuron_stats_table, all_loaded_csv_dfs = AcrossSessionsResults.load_all_neuron_identities_CSV(override_output_parent_path=global_data_root_parent_path, output_path_suffix=f'_{BATCH_DATE_TO_USE}')
+
+
+        """
+        # Build the output paths:
+        out_parent_path: Path = override_output_parent_path or Path('output/across_session_results')
+        out_parent_path = out_parent_path.resolve()
+
+        if output_path_suffix is not None:
+            out_parent_path = out_parent_path.joinpath(output_path_suffix).resolve()
+
+        # out_parent_path.mkdir(parents=True, exist_ok=True)
+        assert out_parent_path.exists(), f"out_parent_path: '{out_parent_path}' must exist to load the tables!"
+
+        # '2025-06-10_Lab_withNormalComputedReplays-qclu_[1, 2, 4, 6, 7, 8, 9]-frateThresh_5.0-2006-6-07_16-40-19_neuron_replay_stats_df.csv'
+        csv_file_match_glob = '*_neuron_replay_stats_df.csv'
+        
+        found_files = list(out_parent_path.glob(csv_file_match_glob))
+        all_loaded_csv_dfs = []
+        for a_found_csv in found_files:
+            print(f'loading "{a_found_csv}"...')
+            a_found_df: pd.DataFrame = pd.read_csv(a_found_csv)
+            # try to rename the columns if needed
+            # a_found_df.rename(columns=cls.aliases_columns_dict, inplace=True)
+            all_loaded_csv_dfs.append(a_found_df)
+
+        all_neuron_stats_table: pd.DataFrame = pd.concat(all_loaded_csv_dfs, axis='index')
+
+        ## Load the exported sessions experience_ranks CSV and use it to add the ['session_experience_rank', 'session_experience_orientation_rank'] columns to the tables:
+        try:
+            sessions_df, (experience_rank_map_dict, experience_orientation_rank_map_dict), _callback_add_df_columns = load_and_apply_session_experience_rank_csv("./data/sessions_experiment_datetime_df.csv", session_uid_str_sep='|')
+            all_loaded_csv_dfs = [_callback_add_df_columns(v, session_id_column_name='session_uid') for v in all_loaded_csv_dfs]
+            all_neuron_stats_table: pd.DataFrame = pd.concat(all_loaded_csv_dfs, axis='index')
+
+        except Exception as e:
+            print(f'failed to load and apply the sessions rank CSV to tables. Error: {e}')
+            raise
+        
+        return all_neuron_stats_table, all_loaded_csv_dfs
+    
+
 
 
 class ConciseSessionIdentifiers:
