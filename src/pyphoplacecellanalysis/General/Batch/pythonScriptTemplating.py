@@ -92,9 +92,11 @@ class BatchScriptsCollection:
 
 from enum import Enum
 
-from pyphoplacecellanalysis.General.Batch.NeptuneAiHelpers import KnownNeptuneProjects
+
 
 def get_batch_neptune_kwargs():
+    from pyphoplacecellanalysis.General.Batch.NeptuneAiHelpers import KnownNeptuneProjects
+
     return KnownNeptuneProjects.get_PhoDibaBatchProcessing_neptune_kwargs()
 
 
