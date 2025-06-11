@@ -2073,7 +2073,7 @@ def compute_and_export_session_instantaneous_spike_rates_completion_function(sel
             # LxC_ThetaDeltaMinus, LxC_ThetaDeltaPlus, SxC_ThetaDeltaMinus, SxC_ThetaDeltaPlus = _out_inst_fr_comps.LxC_ThetaDeltaMinus, _out_inst_fr_comps.LxC_ThetaDeltaPlus, _out_inst_fr_comps.SxC_ThetaDeltaMinus, _out_inst_fr_comps.SxC_ThetaDeltaPlus
             print(f'\t\t done (success).')
 
-        except BaseException as e:
+        except Exception as e:
             exception_info = sys.exc_info()
             err = CapturedException(e, exception_info)
             print(f"WARN: on_complete_success_execution_session: encountered exception {err} while trying to compute the instantaneous firing rates and set self.across_sessions_instantaneous_fr_dict[{curr_session_context}]")
@@ -2096,7 +2096,7 @@ def compute_and_export_session_instantaneous_spike_rates_completion_function(sel
                 was_write_good = True
                 subfn_callback_outputs['recomputed_inst_fr_comps_filepath'] = recomputed_inst_fr_comps_filepath
 
-            except BaseException as e:
+            except Exception as e:
                 exception_info = sys.exc_info()
                 err = CapturedException(e, exception_info)
                 print(f"ERROR: encountered exception {err} while trying to perform _out_recomputed_inst_fr_comps.save_data('{recomputed_inst_fr_comps_filepath}') for {curr_session_context}")
@@ -2120,7 +2120,7 @@ def compute_and_export_session_instantaneous_spike_rates_completion_function(sel
                 was_write_good = True
                 subfn_callback_outputs['recomputed_inst_fr_comps_h5_filepath'] = recomputed_inst_fr_comps_h5_filepath
 
-            except BaseException as e:
+            except Exception as e:
                 exception_info = sys.exc_info()
                 err = CapturedException(e, exception_info)
                 print(f"ERROR: encountered exception {err} while trying to perform _out_recomputed_inst_fr_comps.to_hdf('/recomputed_inst_fr_comps', '{recomputed_inst_fr_comps_h5_filepath}') for {curr_session_context}")
@@ -2133,6 +2133,7 @@ def compute_and_export_session_instantaneous_spike_rates_completion_function(sel
 
         ## common_across_session_h5
         if (_out_recomputed_inst_fr_comps is not None) and save_across_session_hdf:
+            ## #TODO 2025-06-11 06:39: - [ ] NOT THREAD/PARALLEL SAFE because they access the same output file
             common_across_session_h5_filename: str = f'{get_now_day_str()}_across_session_recomputed_inst_fr_comps.h5'
             common_file_path = self.collected_outputs_path.resolve().joinpath(common_across_session_h5_filename).resolve()
             print(f'common_file_path: "{common_file_path}"')
@@ -2141,7 +2142,7 @@ def compute_and_export_session_instantaneous_spike_rates_completion_function(sel
                 InstantaneousFiringRatesDataframeAccessor.add_results_to_inst_fr_results_table(inst_fr_comps=_out_recomputed_inst_fr_comps, curr_active_pipeline=curr_active_pipeline, common_file_path=common_file_path)
                 subfn_callback_outputs['common_across_session_h5'] = common_file_path
 
-            except BaseException as e:
+            except Exception as e:
                 exception_info = sys.exc_info()
                 err = CapturedException(e, exception_info)
                 print(f"ERROR: encountered exception {err} while trying to perform InstantaneousFiringRatesDataframeAccessor.add_results_to_inst_fr_results_table(..., common_file_path='{common_file_path}') for {curr_session_context}")
