@@ -2125,7 +2125,7 @@ def get_only_most_recent_session_files(parsed_paths_df: pd.DataFrame, group_colu
 
 
 @function_attributes(short_name=None, tags=['recent', 'parse'], input_requires=[], output_provides=[], uses=['parse_filename'], used_by=[], creation_date='2024-04-15 09:18', related_items=['convert_to_dataframe'])
-def find_most_recent_files(found_session_export_paths: List[Path], cuttoff_date:Optional[datetime]=None, debug_print: bool = False) -> Tuple[Dict[str, Dict[str, Tuple[Path, str, datetime]]], pd.DataFrame, pd.DataFrame]:
+def find_most_recent_files(found_session_export_paths: List[Path], cuttoff_date:Optional[datetime]=None, debug_print: bool = False, should_fallback_to_filesystem_modification_datetime: bool=False) -> Tuple[Dict[str, Dict[str, Tuple[Path, str, datetime]]], pd.DataFrame, pd.DataFrame]:
     """
     Returns a dictionary representing the most recent files for each session type among a list of provided file paths.
 
@@ -2133,6 +2133,7 @@ def find_most_recent_files(found_session_export_paths: List[Path], cuttoff_date:
     found_session_export_paths (List[Path]): A list of Paths representing files to be checked.
     cuttoff_date (datetime): a date which all files must be newer than to be considered for inclusion. If not provided, the most recent files will be included regardless of their date.
     debug_print (bool): A flag to trigger debugging print statements within the function. Default is False.
+    should_fallback_to_filesystem_modification_datetime (bool): If True, use file modification time when export date can't be parsed from filename. Default is False.
 
     Returns:
     Dict[str, Dict[str, Tuple[Path, datetime]]]: A nested dictionary where the main keys represent
@@ -2142,11 +2143,38 @@ def find_most_recent_files(found_session_export_paths: List[Path], cuttoff_date:
     # now sessions is a dictionary where the key is the session_str and the value is another dictionary.
     # This inner dictionary's key is the file type and the value is the most recent path for this combination of session and file type
     # Thus, laps_csv and ripple_csv can be obtained from the dictionary for each session
-
     """
-    # Function 'parse_filename' should be defined in the global scope
-    parsed_paths: List[Tuple] = [(*parse_filename(p), p) for p in found_session_export_paths if (parse_filename(p)[0] is not None)] # note we append path p to the end of the tuple
-    # '2024-11-22_GL-kdiba_gor01_one_2006-6-09_1-22-43__withNormalComputedReplays-qclu_[1, 2, 4, 6, 7, 9]-frateThresh_5.0-(ripple_all_scores_merged_df)_tbin-0.025.csv' in [v.name for v in found_session_export_paths]
+    # Process each path to extract information or use file modification time as fallback
+    parsed_paths: List[Tuple] = []
+
+    # Original behavior: filter out files where parse_filename returns None for the first element
+    if not should_fallback_to_filesystem_modification_datetime:
+        parsed_paths = [(*parse_filename(p), p) for p in found_session_export_paths if (parse_filename(p)[0] is not None)]
+    else:
+        # Extended behavior with fallback to file modification time
+        for p in found_session_export_paths:
+            parsed_info = parse_filename(p)
+            if parsed_info[0] is not None:
+                # Use parsed datetime from filename
+                parsed_paths.append((*parsed_info, p))
+            else:
+                # Fallback to file modification time
+                try:
+                    # Get file modification time
+                    mtime = datetime.fromtimestamp(p.stat().st_mtime)
+                    # Try to parse other info, use fallback values if needed
+                    session_str = parsed_info[1] if parsed_info[1] is not None else "unknown_session"
+                    custom_replay_name = parsed_info[2] if parsed_info[2] is not None else ""
+                    file_type = parsed_info[3] if parsed_info[3] is not None else p.suffix.lstrip('.')
+                    tbin_size = parsed_info[4] if parsed_info[4] is not None else ""
+                    parsed_paths.append((mtime, session_str, custom_replay_name, file_type, tbin_size, p))
+                    if debug_print:
+                        print(f"Using file modification time for {p.name}: {mtime}")
+                except Exception as e:
+                    if debug_print:
+                        print(f"Skipping file {p.name} due to error: {e}")
+                    continue
+
     # Function that helps sort tuples by handling None values.
     def sort_key(tup):
         # Assign a boolean for each element, True if it's None, to ensure None values are sorted last.
@@ -2159,51 +2187,31 @@ def find_most_recent_files(found_session_export_paths: List[Path], cuttoff_date:
             tup[-1]                         # Finally by path which should handle None by itself
         )
 
-    # '2024-11-22_GL-kdiba_gor01_one_2006-6-09_1-22-43__withNormalComputedReplays-qclu_[1, 2, 4, 6, 7, 9]-frateThresh_5.0-(ripple_all_scores_merged_df)_tbin-0.025.csv' in [v[-1].name for v in parsed_paths] # true
-    
     # Now we sort the data using our custom sort key
     parsed_paths = sorted(parsed_paths, key=sort_key, reverse=True)
-    # parsed_paths.sort(key=lambda x: (x[3] is not None, x), reverse=True)
-    # parsed_paths.sort(reverse=True) # old way
 
-    # '2024-11-22_GL-kdiba_gor01_one_2006-6-09_1-22-43__withNormalComputedReplays-qclu_[1, 2, 4, 6, 7, 9]-frateThresh_5.0-(ripple_all_scores_merged_df)_tbin-0.025.csv' in [v[-1].name for v in parsed_paths] # true
-    #  '2024-11-22_GL-kdiba_gor01_one_2006-6-09_1-22-43__withNormalComputedReplays-qclu_[1, 2, 4, 6, 7, 9]-frateThresh_5.0-(ripple_all_scores_merged_df)_tbin-0.025.csv' in [v.name for v in found_session_export_paths]
-    
     if debug_print:
         print(f'parsed_paths: {parsed_paths}')
 
     tuple_column_names = ['export_datetime', 'session', 'custom_replay_name', 'file_type', 'decoding_time_bin_size_str', 'path']
     all_parsed_paths_df: pd.DataFrame = pd.DataFrame(parsed_paths, columns=tuple_column_names)
-   
+
     # compare_custom_replay_name_col_name: str = 'custom_replay_name'
     compare_custom_replay_name_col_name: str = '_comparable_custom_replay_name'
-    
-    ## replace undscores with hyphens so comparisons are insensitive to whether '_' or '-' are used:
-    # parsed_paths_df['session'] = parsed_paths_df['session'].str.replace('_','-') # replace both with hyphens so they match
-    # parsed_paths_df['custom_replay_name'] = parsed_paths_df['custom_replay_name'].str.replace('_','-') # replace both with hyphens so they match
-    all_parsed_paths_df['_comparable_custom_replay_name'] = all_parsed_paths_df['custom_replay_name'].str.replace('_','-') # replace both with hyphens so they match
-    # parsed_paths_df[['session_name', '_comparable_custom_replay_name']]
-    
-    # _preferred_form_session_names = deepcopy(parsed_paths_df['session_name'].unique()) ## the one with underscores like "kdiba_gor01_one_2006-6-08_14-26-15"
-    # _compare_form_session_names = deepcopy(parsed_paths_df['session_name'].unique())
-    # _compare_to_preferred_session_name_map = dict(zip(_compare_form_session_names, _preferred_form_session_names)) # used to replace desired session names when done
 
+    ## replace undscores with hyphens so comparisons are insensitive to whether '_' or '-' are used:
+    all_parsed_paths_df['_comparable_custom_replay_name'] = all_parsed_paths_df['custom_replay_name'].str.replace('_','-') # replace both with hyphens so they match
 
     # Sort by columns: 'session' (ascending), 'custom_replay_name' (ascending) and 3 other columns
     all_parsed_paths_df = all_parsed_paths_df.sort_values(['session', 'file_type', compare_custom_replay_name_col_name, 'decoding_time_bin_size_str', 'export_datetime']).reset_index(drop=True)
-    ## #TODO 2024-09-27 01:49: - [ ] Confirmed that `parsed_paths_df` still has the `laps_time_bin_marginals` outputs in the list
-    # '2024-11-22_GL-kdiba_gor01_one_2006-6-09_1-22-43__withNormalComputedReplays-qclu_[1, 2, 4, 6, 7, 9]-frateThresh_5.0-(ripple_all_scores_merged_df)_tbin-0.025.csv' in [Path(v).name for v in parsed_paths_df['path'].to_list()]
-    # parsed_paths_df['filename'] = [Path(v).name for v in parsed_paths_df['path'].to_list()]    
-    # _test_df = parsed_paths_df[parsed_paths_df['filename'] == '2024-11-22_GL-kdiba_gor01_one_2006-6-09_1-22-43__withNormalComputedReplays-qclu_[1, 2, 4, 6, 7, 9]-frateThresh_5.0-(ripple_all_scores_merged_df)_tbin-0.025.csv']
 
     # get_only_most_recent_session_files _________________________________________________________________________________ #
     ## This is where we drop all but the most recent:
     filtered_parsed_paths_df = get_only_most_recent_session_files(parsed_paths_df=deepcopy(all_parsed_paths_df), group_column_names=['session', compare_custom_replay_name_col_name, 'file_type', 'decoding_time_bin_size_str']) ## `filtered_parsed_paths_df` still has it
-    
-    # '2024-11-22_GL-kdiba_gor01_one_2006-6-09_1-22-43__withNormalComputedReplays-qclu_[1, 2, 4, 6, 7, 9]-frateThresh_5.0-(ripple_all_scores_merged_df)_tbin-0.025.csv' in [Path(v).name for v in filtered_parsed_paths_df['path'].to_list()]
+
     # Drop rows with export_datetime less than or equal to cutoff_date
     if cuttoff_date is not None:
-        filtered_parsed_paths_df = filtered_parsed_paths_df[filtered_parsed_paths_df['export_datetime'] >= cuttoff_date] ## fails HERE?!?
+        filtered_parsed_paths_df = filtered_parsed_paths_df[filtered_parsed_paths_df['export_datetime'] >= cuttoff_date]
 
     ## filtered_parsed_paths_df is new 2024-07-11 output, NOTE we don't use `filtered_parsed_paths_df` below, instead `parsed_paths`.
 
@@ -2221,23 +2229,8 @@ def find_most_recent_files(found_session_export_paths: List[Path], cuttoff_date:
                 # if there is no cutoff date, add
                 should_add = True
 
-            # #TODO 2024-09-27 01:46: - [ ] Is this indentation right? Is it supposed to be out-dented?
             if should_add:
                 sessions[session_str][file_type] = (path, decoding_time_bin_size_str, export_datetime)
-
-
-    ## Post-process to get session info
-    # split_char: str = '__'
-    # for session_str, outer_dict in sessions.items():
-    #     for file_type, inner_dict in outer_dict.items():
-    #         ## Parse
-    #         _split_columns = session_str.split(split_char)
-    #         if len(_split_columns) > 1:
-    #             _session_names.append(_split_columns[0])
-    #             _accrued_replay_epoch_names.append(_split_columns[-1])
-    #         else:
-    #             _session_names.append(_split_columns[0])
-                # _accrued_replay_epoch_names.append('')
 
     return sessions, filtered_parsed_paths_df, all_parsed_paths_df
 
@@ -3937,8 +3930,9 @@ class AcrossSessionHelpers:
 
     @function_attributes(short_name=None, tags=['filesystem', 'copy', 'file', 'session_folder'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-11-19 06:02', related_items=[])
     @classmethod
-    def _copy_exported_files_from_session_folder_to_collected_outputs(cls, target_dir: Path, BATCH_DATE_TO_USE = '2024-11-19', cuttoff_date = datetime(2024, 11, 16), is_dry_run:bool=True, debug_print:bool=False, custom_file_globs_dict=None):
-        """ 
+    def _copy_exported_files_from_session_folder_to_collected_outputs(cls, target_dir: Path, BATCH_DATE_TO_USE = '2024-11-19', cuttoff_date = datetime(2024, 11, 16), is_dry_run:bool=True, debug_print:bool=False, custom_file_globs_dict=None, find_most_recent_files_kwargs=None):
+        """ Extracts the output files (.pkl, .h5, etc) from the individual session folders to the target folder
+
         
         from pyphoplacecellanalysis.SpecificResults.AcrossSessionResults import AcrossSessionHelpers
 
@@ -3994,6 +3988,9 @@ class AcrossSessionHelpers:
             #    'h5': '*.h5',
             }
 
+        if find_most_recent_files_kwargs is None:
+            find_most_recent_files_kwargs = dict(should_fallback_to_filesystem_modification_datetime=True)
+
         copy_dict = {}
         # moved_dict = {}
 
@@ -4034,7 +4031,7 @@ class AcrossSessionHelpers:
                 
                 for k, a_glob in custom_file_globs_dict.items():
                     all_found_custom_glob_files_dict[k] = list(a_session_output_folder.glob(a_glob))
-                    _, a_most_recent_parsed_files_df, all_parsed_files_df  = find_most_recent_files(found_session_export_paths=all_found_custom_glob_files_dict[k], cuttoff_date=cuttoff_date)
+                    _, a_most_recent_parsed_files_df, all_parsed_files_df  = find_most_recent_files(found_session_export_paths=all_found_custom_glob_files_dict[k], cuttoff_date=cuttoff_date, **find_most_recent_files_kwargs)
                     a_most_recent_parsed_files_df['filename'] = a_most_recent_parsed_files_df['path'].map(lambda x: x.name)
                     a_most_recent_parsed_files_df['desired_filepath'] = a_most_recent_parsed_files_df['path'].map(lambda x: target_dir.joinpath(x.name))
                     all_found_custom_glob_parsed_files_df_dict[k] = a_most_recent_parsed_files_df
