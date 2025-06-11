@@ -2126,7 +2126,7 @@ def get_only_most_recent_session_files(parsed_paths_df: pd.DataFrame, group_colu
 
 
 @function_attributes(short_name=None, tags=['recent', 'parse'], input_requires=[], output_provides=[], uses=['parse_filename'], used_by=[], creation_date='2024-04-15 09:18', related_items=['convert_to_dataframe'])
-def find_most_recent_files(found_session_export_paths: List[Path], cuttoff_date:Optional[datetime]=None, debug_print: bool = False, should_fallback_to_filesystem_modification_datetime: bool=False) -> Tuple[Dict[str, Dict[str, Tuple[Path, str, datetime]]], pd.DataFrame, pd.DataFrame]:
+def find_most_recent_files(found_session_export_paths: List[Path], cuttoff_date:Optional[datetime]=None, debug_print: bool = False, should_print_unparsable_filenames: bool=True, should_fallback_to_filesystem_modification_datetime: bool=False) -> Tuple[Dict[str, Dict[str, Tuple[Path, str, datetime]]], pd.DataFrame, pd.DataFrame]:
     """
     Returns a dictionary representing the most recent files for each session type among a list of provided file paths.
 
@@ -2148,13 +2148,16 @@ def find_most_recent_files(found_session_export_paths: List[Path], cuttoff_date:
     # Process each path to extract information or use file modification time as fallback
     parsed_paths: List[Tuple] = []
 
+
+    parse_filename_kwargs = dict(should_print_unparsable_filenames=should_print_unparsable_filenames, debug_print=debug_print)
+
     # Original behavior: filter out files where parse_filename returns None for the first element
     if not should_fallback_to_filesystem_modification_datetime:
-        parsed_paths = [(*parse_filename(p), p) for p in found_session_export_paths if (parse_filename(p)[0] is not None)]
+        parsed_paths = [(*parse_filename(p, **parse_filename_kwargs), p) for p in found_session_export_paths if (parse_filename(p, should_print_unparsable_filenames=False, debug_print=False)[0] is not None)]
     else:
         # Extended behavior with fallback to file modification time
         for p in found_session_export_paths:
-            parsed_info = parse_filename(p)
+            parsed_info = parse_filename(p, **parse_filename_kwargs)
             if parsed_info[0] is not None:
                 # Use parsed datetime from filename
                 parsed_paths.append((*parsed_info, p))
@@ -2173,7 +2176,7 @@ def find_most_recent_files(found_session_export_paths: List[Path], cuttoff_date:
                         print(f"Using file modification time for {p.name}: {mtime}")
                 except Exception as e:
                     if debug_print:
-                        print(f"Skipping file {p.name} due to error: {e}")
+                        print(f"WARN (SKIP): Skipping file {p.name} due to error: {e}")
                     continue
 
     # Function that helps sort tuples by handling None values.
@@ -3990,7 +3993,7 @@ class AcrossSessionHelpers:
             }
 
         if find_most_recent_files_kwargs is None:
-            find_most_recent_files_kwargs = dict(should_fallback_to_filesystem_modification_datetime=True)
+            find_most_recent_files_kwargs = dict(should_fallback_to_filesystem_modification_datetime=True, should_print_unparsable_filenames=False, debug_print=debug_print)
 
         copy_dict = {}
         # moved_dict = {}
