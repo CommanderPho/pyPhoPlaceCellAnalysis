@@ -1978,7 +1978,7 @@ def find_pkl_files(directory: str, recurrsive: bool=False):
 
 
 @function_attributes(short_name=None, tags=['parse'], input_requires=[], output_provides=[], uses=['try_parse_chain'], used_by=['find_most_recent_files'], creation_date='2024-03-28 10:16', related_items=[])
-def parse_filename(path: Union[Path, str], debug_print:bool=False) -> Tuple[datetime, str, Optional[str], str, str]:
+def parse_filename(path: Union[Path, str], should_print_unparsable_filenames: bool=True, debug_print:bool=False) -> Tuple[datetime, str, Optional[str], str, str]:
     """
     A revised version built on 2024-03-28 that uses `try_parse_chain` instead of nested for loops.
 
@@ -2030,7 +2030,7 @@ def parse_filename(path: Union[Path, str], debug_print:bool=False) -> Tuple[date
         filename: str = path  
     else:
         filename: str = path.stem  # Get filename without extension
-    final_parsed_output_dict = try_parse_chain(basename=filename, debug_print=debug_print) ## previous implementation
+    final_parsed_output_dict = try_parse_chain(basename=filename, should_print_unparsable_filenames=should_print_unparsable_filenames, debug_print=debug_print) ## previous implementation
     # final_parsed_output_dict = try_iterative_parse_chain(basename=filename)
     export_file_type = (final_parsed_output_dict or {}).get('export_file_type', None)
     session_str = (final_parsed_output_dict or {}).get('session_str', None)
@@ -2038,13 +2038,14 @@ def parse_filename(path: Union[Path, str], debug_print:bool=False) -> Tuple[date
         ## do the new 2024-11-15 19:01 parse instead    
         print(f'Using `try_iterative_parse_chain(...)` for file "{filename}" (more modern parse method)...')
         # final_parsed_output_dict = try_parse_chain(basename=filename) ## previous implementation
-        final_parsed_output_dict = try_iterative_parse_chain(basename=filename, debug_print=debug_print)
+        final_parsed_output_dict = try_iterative_parse_chain(basename=filename, should_print_unparsable_filenames=should_print_unparsable_filenames, debug_print=debug_print)
     # if final_parsed_output_dict is None:
     #     ## this version failed, fall-back to the older implementation
     #     final_parsed_output_dict = try_parse_chain(basename=filename) ## previous implementation
     
     if final_parsed_output_dict is None:
-        print(f'ERR: Could not parse filename: "{filename}"') # 2024-01-18_GL_t_split_df
+        if should_print_unparsable_filenames:
+            print(f'ERR: Could not parse filename: "{filename}"') # 2024-01-18_GL_t_split_df
         return None, None, None, None, None # used to return ValueError when it couldn't parse, but we'd rather skip unparsable files
 
 
