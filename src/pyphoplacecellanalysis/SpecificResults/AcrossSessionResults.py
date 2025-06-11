@@ -3934,13 +3934,25 @@ class AcrossSessionHelpers:
 
     @function_attributes(short_name=None, tags=['filesystem', 'copy', 'file', 'session_folder'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-11-19 06:02', related_items=[])
     @classmethod
-    def _copy_exported_files_from_session_folder_to_collected_outputs(cls, target_dir: Path, BATCH_DATE_TO_USE = '2024-11-19', cuttoff_date = datetime(2024, 11, 16), is_dry_run:bool=True, debug_print:bool=False, custom_file_globs_dict=None, find_most_recent_files_kwargs=None):
+    def _copy_exported_files_from_session_folder_to_collected_outputs(cls, target_dir: Path, BATCH_DATE_TO_USE = '2024-11-19', cuttoff_date = datetime(2024, 11, 16), is_dry_run:bool=True, debug_print:bool=False, custom_file_globs_dict=None, find_most_recent_files_kwargs=None, rename_backup_basename_fn: Optional[Callable]=None):
         """ Extracts the output files (.pkl, .h5, etc) from the individual session folders to the target folder
 
         
         from pyphoplacecellanalysis.SpecificResults.AcrossSessionResults import AcrossSessionHelpers
 
-        copy_dict, moved_files_dict_files = AcrossSessionHelpers._copy_exported_files_from_session_folder_to_collected_outputs(BATCH_DATE_TO_USE='2024-11-19', cuttoff_date=datetime(2024, 11, 16), target_dir=collected_outputs_directory, is_dry_run=False)
+        
+        
+        def _across_session_h5_output_basename_fn(session_context: Optional[IdentifyingContext], session_descr: Optional[str], basename: str, *args, separator_char: str = "_"):
+            if session_context is not None:
+                session_descr = session_context.session_name # '2006-6-07_16-40-19'
+            _filename_list = [BATCH_DATE_TO_USE, session_descr, basename]
+            if len(args) > 0:
+                _filename_list.extend([str(a_part) for a_part in args if a_part is not None])
+            return separator_char.join(_filename_list)
+
+
+            
+        copy_dict, moved_files_dict_files = AcrossSessionHelpers._copy_exported_files_from_session_folder_to_collected_outputs(BATCH_DATE_TO_USE='2024-11-19', cuttoff_date=datetime(2024, 11, 16), target_dir=collected_outputs_directory, rename_backup_basename_fn=_across_session_h5_output_basename_fn, is_dry_run=False)
         copy_dict
 
         ## Specify which files to match:    
@@ -3948,8 +3960,20 @@ class AcrossSessionHelpers:
            'pkl': '*.pkl',
            'csv': '*ripple_WCorrShuffle_df*.csv',
            'h5': '*.h5',
-        }, is_dry_run=False)
+        }, rename_backup_basename_fn=_across_session_h5_output_basename_fn, is_dry_run=False)
         copy_dict
+        
+        
+        
+        NOTE: Very similar to 
+        
+        copy_dict = ConcreteSessionFolder.build_backup_copydict(good_session_concrete_folders, target_dir=target_dir, backup_mode=BackupMethods.CommonTargetDirectory, rename_backup_basename_fn=_across_session_h5_output_basename_fn,
+        #  only_include_file_types=['h5'],
+            only_include_file_types=[], # exclude the un-parameterized pipeline_results.h5
+            custom_file_types_dict=custom_file_types_dict) # , rename_backup_suffix=BATCH_DATE_TO_USE
+        copy_dict
+
+        
 
         """
         # from pyphoplacecellanalysis.General.Batch.runBatch import get_file_path_if_file_exists
@@ -3958,7 +3982,20 @@ class AcrossSessionHelpers:
         from neuropy.core.user_annotations import UserAnnotationsManager
         from pyphoplacecellanalysis.General.Batch.runBatch import ConcreteSessionFolder, BackupMethods
         # from pyphoplacecellanalysis.SpecificResults.AcrossSessionResults import find_csv_files, find_HDF5_files, find_pkl_files
-        
+
+
+        def _default_rename_basename_fn(session_context: Optional[IdentifyingContext], session_descr: Optional[str], basename: str, *args, separator_char: str = "_"):
+            _filename_list = []
+            if session_context is not None:
+                session_descr = session_context.session_name # '2006-6-07_16-40-19'
+            if session_descr is not None:
+                _filename_list.append(session_descr)
+            _filename_list.append(basename)
+            if len(args) > 0:
+                _filename_list.extend([str(a_part) for a_part in args if a_part is not None])
+            return separator_char.join(_filename_list)
+
+
         included_session_contexts = UserAnnotationsManager.get_hardcoded_good_sessions()
         
         known_global_data_root_parent_paths = [Path('/Users/pho/data'), Path(r'/nfs/turbo/umms-kdiba/Data'), Path(r'/media/halechr/MAX/Data'), Path(r'W:/Data'), Path(r'/home/halechr/FastData'), Path(r'/Volumes/MoverNew/data')] # Path(r'/home/halechr/cloud/turbo/Data'), , Path(r'/nfs/turbo/umms-kdiba/Data'), Path(r'/home/halechr/turbo/Data'), 
@@ -3967,19 +4004,16 @@ class AcrossSessionHelpers:
         good_session_concrete_folders = ConcreteSessionFolder.build_concrete_session_folders(global_data_root_parent_path, included_session_contexts)
         session_basedirs_dict: Dict[IdentifyingContext, Path] = {a_session_folder.context:a_session_folder.path for a_session_folder in good_session_concrete_folders}
 
-        # excluded_session_keys = ['kdiba_pin01_one_fet11-01_12-58-54', 'kdiba_gor01_one_2006-6-08_14-26-15', 'kdiba_gor01_two_2006-6-07_16-40-19']
-        # excluded_session_contexts = [IdentifyingContext(**dict(zip(IdentifyingContext._get_session_context_keys(), v.split('_', maxsplit=3)))) for v in excluded_session_keys]
+        # """ 
+        # /nfs/turbo/umms-kdiba/Data/KDIBA/gor01/one/2006-6-12_15-55-31/output/2024-11-18_1130PM-kdiba_gor01_one_2006-6-12_15-55-31__withNormalComputedReplays-qclu_[1, 2, 4, 6, 7, 9]-frateThresh_1.0-(ripple_WCorrShuffle_df)_tbin-0.025.csv
+        # /nfs/turbo/umms-kdiba/Data/KDIBA/gor01/one/2006-6-12_15-55-31/output/2024-11-18_1130PM_withNormalComputedReplays-qclu_[1, 2, 4, 6, 7, 9]-frateThresh_1.0_standalone_all_shuffles_wcorr_array.mat
+        # /nfs/turbo/umms-kdiba/Data/KDIBA/gor01/one/2006-6-12_15-55-31/output/2024-11-18_1130PM_withNormalComputedReplays-qclu_[1, 2, 4, 6, 7, 9]-frateThresh_1.0_standalone_wcorr_ripple_shuffle_data_only_1028.pkl
+        # """
 
-        """ 
-        /nfs/turbo/umms-kdiba/Data/KDIBA/gor01/one/2006-6-12_15-55-31/output/2024-11-18_1130PM-kdiba_gor01_one_2006-6-12_15-55-31__withNormalComputedReplays-qclu_[1, 2, 4, 6, 7, 9]-frateThresh_1.0-(ripple_WCorrShuffle_df)_tbin-0.025.csv
-        /nfs/turbo/umms-kdiba/Data/KDIBA/gor01/one/2006-6-12_15-55-31/output/2024-11-18_1130PM_withNormalComputedReplays-qclu_[1, 2, 4, 6, 7, 9]-frateThresh_1.0_standalone_all_shuffles_wcorr_array.mat
-        /nfs/turbo/umms-kdiba/Data/KDIBA/gor01/one/2006-6-12_15-55-31/output/2024-11-18_1130PM_withNormalComputedReplays-qclu_[1, 2, 4, 6, 7, 9]-frateThresh_1.0_standalone_wcorr_ripple_shuffle_data_only_1028.pkl
-        """
-        # included_session_keys = ['kdiba_gor01_one_2006-6-09_1-22-43',]
-        # included_session_contexts = [IdentifyingContext(**dict(zip(IdentifyingContext._get_session_context_keys(), v.split('_', maxsplit=3)))) for v in included_session_keys]
 
-        all_found_parsed_csv_files_df_dict = {}
+        all_found_files_df_dict = {}
 
+        # all_found_parsed_csv_files_df_dict = {}
         # all_found_pkl_files_dict = {}
         # all_found_pipeline_pkl_files_dict = {}
         # all_found_global_pkl_files_dict = {}
@@ -3996,12 +4030,13 @@ class AcrossSessionHelpers:
             find_most_recent_files_kwargs = dict(should_fallback_to_filesystem_modification_datetime=True, should_print_unparsable_filenames=False, debug_print=debug_print)
 
         copy_dict = {}
-        # moved_dict = {}
 
         # scripts_output_path
         for a_good_session_concrete_folder, a_session_basedir in zip(good_session_concrete_folders, session_basedirs_dict):
+            session_descr: str = a_good_session_concrete_folder.context.get_description()
+            
             if debug_print:
-                print(f'a_good_session_concrete_folder: "{a_good_session_concrete_folder}", a_session_basedir: "{a_session_basedir}"')
+                print(f'a_good_session_concrete_folder: "{a_good_session_concrete_folder}", a_session_basedir: "{a_session_basedir}", session_descr: "{session_descr}"')
                 
             should_skip_session: bool = True
                 
@@ -4018,71 +4053,52 @@ class AcrossSessionHelpers:
                 if debug_print:
                     print(f'skipping excluded session: {a_good_session_concrete_folder.context}')
             else:
-                ## 
-                # csv_files = find_csv_files(a_session_output_folder)
-                # csv_sessions, parsed_csv_files_df  = find_most_recent_files(found_session_export_paths=csv_files, cuttoff_date=cuttoff_date) ## this is not working, as it's missing older files with different custom_replay
-                # parsed_csv_files_df['filename'] = parsed_csv_files_df['path'].map(lambda x: x.name)
-                # parsed_csv_files_df['desired_filepath'] = parsed_csv_files_df['path'].map(lambda x: target_dir.joinpath(x.name))
-                # parsed_csv_files_df = parsed_csv_files_df[parsed_csv_files_df['file_type'] == 'ripple_WCorrShuffle_df'] ## only consider 'ripple_WCorrShuffle_df' files
-                # all_found_parsed_csv_files_df_dict[a_session_basedir] = deepcopy(parsed_csv_files_df)
-
-                # _temp_desired_copy_dict = dict(zip(parsed_csv_files_df['path'].to_list(), parsed_csv_files_df['desired_filepath'].to_list()))
-                # # custom_file_types_dict = dict(zip(parsed_csv_files_df['filename'].to_list(), parsed_csv_files_df['path'].to_list()))
-                # copy_dict.update(_temp_desired_copy_dict) 
-                
                 all_found_custom_glob_files_dict = {}
                 all_found_custom_glob_parsed_files_df_dict = {}
                 
                 for k, a_glob in custom_file_globs_dict.items():
+                    
                     all_found_custom_glob_files_dict[k] = list(a_session_output_folder.glob(a_glob))
                     _, a_most_recent_parsed_files_df, all_parsed_files_df  = find_most_recent_files(found_session_export_paths=all_found_custom_glob_files_dict[k], cuttoff_date=cuttoff_date, **find_most_recent_files_kwargs)
                     a_most_recent_parsed_files_df['filename'] = a_most_recent_parsed_files_df['path'].map(lambda x: x.name)
-                    a_most_recent_parsed_files_df['desired_filepath'] = a_most_recent_parsed_files_df['path'].map(lambda x: target_dir.joinpath(x.name))
-                    all_found_custom_glob_parsed_files_df_dict[k] = a_most_recent_parsed_files_df
-
-                    # a_parsed_files_df = a_parsed_files_df[a_parsed_files_df['file_type'] == 'ripple_WCorrShuffle_df'] ## only consider 'ripple_WCorrShuffle_df' files
-                    all_found_parsed_csv_files_df_dict[a_session_basedir] = deepcopy(a_most_recent_parsed_files_df)
-
-                    _temp_desired_copy_dict = dict(zip(a_most_recent_parsed_files_df['path'].to_list(), a_most_recent_parsed_files_df['desired_filepath'].to_list()))
                     
+                    ## Build desired filepaths optionally using the `rename_backup_basename_fn` to rename them
+                    # a_most_recent_parsed_files_df['desired_filepath'] = a_most_recent_parsed_files_df['path'].map(lambda x: target_dir.joinpath(x.name))
+                    a_most_recent_parsed_files_df['desired_filepath'] = []
+                    for src_file in a_most_recent_parsed_files_df['path']:
+                        basename: str = src_file.stem
+                        if rename_backup_basename_fn is not None:
+                            final_dest_basename:str = rename_backup_basename_fn(a_good_session_concrete_folder.context, session_descr, basename)
+                        else:
+                            final_dest_basename:str = basename ## raw basename
+
+                        final_dest_name:str = f'{final_dest_basename}{src_file.suffix}'
+                        if debug_print:
+                            print(f'\tfinal_dest_name: {final_dest_name}')
+                        dest_path: Path = target_dir.joinpath(final_dest_name).resolve()
+                        a_most_recent_parsed_files_df['desired_filepath'].append(dest_path)
+
+
+                    all_found_custom_glob_parsed_files_df_dict[k] = deepcopy(a_most_recent_parsed_files_df)
+                    
+                    # a_parsed_files_df = a_parsed_files_df[a_parsed_files_df['file_type'] == 'ripple_WCorrShuffle_df'] ## only consider 'ripple_WCorrShuffle_df' files
+                    # all_found_parsed_csv_files_df_dict[a_session_basedir] = deepcopy(a_most_recent_parsed_files_df)
+                    all_found_files_df_dict[a_session_basedir] = deepcopy(a_most_recent_parsed_files_df)
+                    _temp_desired_copy_dict = dict(zip(a_most_recent_parsed_files_df['path'].to_list(), a_most_recent_parsed_files_df['desired_filepath'].to_list()))
+
+
+
+
+
                     # custom_file_types_dict = dict(zip(parsed_csv_files_df['filename'].to_list(), parsed_csv_files_df['path'].to_list()))
                     
                     ## this is okay/safe because the keys are absolute paths so each session folder will add unique entries
                     copy_dict.update(_temp_desired_copy_dict) 
-                
-                # # display(parsed_csv_files_df)
-                # all_found_global_pkl_files_dict[a_session_basedir] = list(a_session_output_folder.glob('global_computation_results*.pkl'))
-                
-                # for a_global_file in all_found_global_pkl_files_dict[a_session_basedir]:
-                #     ## iterate through the found global files:
-                #     target_file = a_good_session_concrete_folder.global_computation_result_pickle.with_name(a_global_file.name)
-                #     copy_dict[a_global_file] = target_file
-                #     # if not is_dryrun:
-                #     ## perform the move/copy
-                #     was_success = try_perform_move(src_file=a_global_file, target_file=target_file, is_dryrun=is_dryrun)
-                #     if was_success:
-                #         moved_dict[a_file] = target_file
-                # all_found_pipeline_pkl_files_dict[a_session_basedir] = list(a_session_output_folder.glob('loadedSessPickle*.pkl'))
-                # for a_file in all_found_pipeline_pkl_files_dict[a_session_basedir]:
-                #     ## iterate through the found global files:
-                #     target_file = a_good_session_concrete_folder.session_pickle.with_name(a_file.name)
-                #     copy_dict[a_file] = target_file
-                #     # if not is_dryrun:
-                #     ## perform the move/copy
-                #     was_success = try_perform_move(src_file=a_file, target_file=target_file, is_dryrun=is_dryrun)
-                #     if was_success:
-                #         moved_dict[a_file] = target_file
-                # all_found_pipeline_h5_files_dict[a_session_basedir] = list(a_session_output_folder.glob('loadedSessPickle*.h5'))
-                # for a_file in all_found_pipeline_h5_files_dict[a_session_basedir]:
-                #     ## iterate through the found global files:
-                #     target_file = a_good_session_concrete_folder.pipeline_results_h5.with_name(a_file.name)
-                #     copy_dict[a_file] = target_file
-                #     # if not is_dryrun:
-                #     ## perform the move/copy
-                #     was_success = try_perform_move(src_file=a_file, target_file=target_file, is_dryrun=is_dryrun)
-                #     if was_success:
-                #         moved_dict[a_file] = target_file
-                # all_found_pkl_files_dict[a_session_basedir] = find_pkl_files(a_session_output_folder)
+                ## END for k, a_glob in cus...
+        ## END for a_good_session_concrete_folder, a_session_ba            
+
+
+        ## OUTPUTS: copy_dict
 
         if not is_dry_run:
             copied_files_dict_files = copy_movedict(copy_dict)
@@ -4092,6 +4108,7 @@ class AcrossSessionHelpers:
             print(f'is_dry_run == True, so not actually copying...')
             copied_files_dict_files = None
         return copy_dict, copied_files_dict_files
+
 
     @function_attributes(short_name=None, tags=['filesystem', 'copy', 'file', 'gen_scripts', 'scripts_folder', 'session_folder'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-06-11 07:18', related_items=['try_move_pickle_files_on_GL'])
     @classmethod
