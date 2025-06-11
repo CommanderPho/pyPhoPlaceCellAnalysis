@@ -1171,7 +1171,7 @@ class H5FileAggregator:
                 # for Path inputs:
                 short_name_list = [a_file.name for a_file in file_list]
 
-        assert len(short_name_list) == len(file_list)
+        assert len(short_name_list) == len(file_list), f"short_name_list: {short_name_list} is not equal length to file_list: {file_list}"
         if table_key_list is not None:
             assert len(table_key_list) == len(file_list)
         return cls(file_reference_list=[H5FileReference(short_name=a_short_name, path=a_file) for a_short_name, a_file in zip(short_name_list, file_list)], table_key_list=table_key_list)
@@ -1582,6 +1582,8 @@ class AcrossSessionTables:
         """
         session_short_names: List[str] = [a_ctxt.get_description(separator='_') for a_ctxt in included_session_contexts] # 'kdiba.gor01.one.2006-6-08_14-26-15'
         # session_group_keys: List[str] = [("/" + a_ctxt.get_description(separator="/", include_property_names=False)) for a_ctxt in included_session_contexts] # 'kdiba/gor01/one/2006-6-08_14-26-15'
+        ## currently only handles one type of session run 
+
         a_loader = H5FileAggregator.init_from_file_lists(file_list=included_h5_paths, short_name_list=session_short_names)
         _out_table = a_loader.load_and_consolidate(table_key_list=df_table_keys, fail_on_exception=False)
         if _out_table is not None:
