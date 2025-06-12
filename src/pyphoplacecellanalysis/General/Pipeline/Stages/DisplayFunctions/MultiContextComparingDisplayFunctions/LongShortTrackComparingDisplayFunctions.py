@@ -2940,7 +2940,7 @@ class RateRemappingPaginatedFigureController(PaginatedFigureController):
 # ==================================================================================================================== #
 
 @function_attributes(short_name=None, tags=['private','firing_rate'], input_requires=[], output_provides=[], uses=[], used_by=['_plot_session_long_short_track_firing_rate_figures'], creation_date='2023-05-25 00:01', related_items=[])
-def _plot_single_track_firing_rate_compare(laps_frs_dict, replays_frs_dict, active_context, xlabel_str: str = 'Laps Firing Rate (Hz)',  ylabel_str: str = 'Replay Firing Rate (Hz)', neurons_colors=None, is_centered=False, enable_tiny_point_labels=False, defer_render=False, **scatter_params):
+def _plot_single_track_firing_rate_compare(laps_frs_dict, replays_frs_dict, active_context, xlabel_str: str = 'Laps Firing Rate (Hz)',  ylabel_str: str = 'PBE Firing Rate (Hz)', neurons_colors=None, is_centered=False, enable_tiny_point_labels=False, defer_render=False, prepare_for_publication: bool = False, **scatter_params):
         """ 2023-05-25 - Plot long_replay|long_laps firing rate index 
         Each datapoint is a neuron.
 
@@ -2997,7 +2997,8 @@ def _plot_single_track_firing_rate_compare(laps_frs_dict, replays_frs_dict, acti
         track_name = active_context.get_description(subset_includelist=['filter_name'], separator=' | ') # 'maze1'
         # TODO: do we want to convert this into "long" or "short"?
         flexitext(text_formatter.left_margin, text_formatter.top_margin, f'<size:22><weight:bold>{track_name}</> laps|replay <weight:bold>firing rate</></>', va="bottom", xycoords="figure fraction")
-        footer_text_obj = flexitext((text_formatter.left_margin*0.1), (text_formatter.bottom_margin*0.25), text_formatter._build_footer_string(active_context=active_context), va="top", xycoords="figure fraction")
+        if not prepare_for_publication:
+            footer_text_obj = flexitext((text_formatter.left_margin*0.1), (text_formatter.bottom_margin*0.25), text_formatter._build_footer_string(active_context=active_context), va="top", xycoords="figure fraction")
 
         # add static tiny labels for the neuron_id beside each data point
         if enable_tiny_point_labels:

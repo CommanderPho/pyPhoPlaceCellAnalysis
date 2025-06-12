@@ -3476,7 +3476,7 @@ class AcrossSessionsVisualizations:
     # _registered_output_files = {}
 
     @classmethod
-    def output_figure(cls, final_context: IdentifyingContext, fig, write_vector_format:bool=False, write_png:bool=True, debug_print=True):
+    def output_figure(cls, final_context: IdentifyingContext, fig, write_vector_format:bool=True, write_png:bool=True, debug_print=True):
         """ outputs the figure using the provided context, replacing the pipeline's curr_active_pipeline.output_figure(...) callback which isn't usually accessible for across session figures. """
 
         def register_output_file(output_path, output_metadata=None):
@@ -3591,7 +3591,7 @@ class AcrossSessionsVisualizations:
 
     @classmethod
     @function_attributes(short_name=None, tags=['across-session', 'figure', 'matplotlib', 'figure-3'], input_requires=[], output_provides=[], uses=['_plot_single_track_firing_rate_compare'], used_by=[], creation_date='2023-08-24 00:00', related_items=[])
-    def across_sessions_long_and_short_firing_rate_replays_v_laps_figure(cls, neuron_replay_stats_table, num_sessions:int, save_figure=True, **kwargs):
+    def across_sessions_long_and_short_firing_rate_replays_v_laps_figure(cls, neuron_replay_stats_table, num_sessions:int, save_figure=True, prepare_for_publication: bool = False, **kwargs):
         """ 2023-08-24 - Across Sessions Aggregate Figure - Supposed to be the equivalent for Figure 3.
 
         Based off of `pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.MultiContextComparingDisplayFunctions.LongShortTrackComparingDisplayFunctions._plot_session_long_short_track_firing_rate_figures`
@@ -3611,6 +3611,8 @@ class AcrossSessionsVisualizations:
         from neuropy.utils.matplotlib_helpers import fit_both_axes
         from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.MultiContextComparingDisplayFunctions.LongShortTrackComparingDisplayFunctions import _plot_single_track_firing_rate_compare
 
+        save_figure_kwargs = dict(write_vector_format=kwargs.pop('write_vector_format', False), write_png=kwargs.pop('write_png', True))
+        
 
         global_multi_session_context = IdentifyingContext(format_name='kdiba', num_sessions=num_sessions) # some global context across all of the sessions, not sure what to put here.
         active_context = global_multi_session_context
@@ -3618,26 +3620,27 @@ class AcrossSessionsVisualizations:
 
         # (fig_L, ax_L, active_display_context_L), (fig_S, ax_S, active_display_context_S), _perform_write_to_file_callback = _plot_session_long_short_track_firing_rate_figures(owning_pipeline_reference, jonathan_firing_rate_analysis_result, defer_render=defer_render)
 
-        common_scatter_kwargs = dict(point_colors='#33333333')
+        common_scatter_kwargs = dict(point_colors='#33333333') | kwargs
         
         ## Long Track Replay|Laps FR Figure
         neuron_replay_stats_df = neuron_replay_stats_table.dropna(subset=['long_replay_mean', 'long_non_replay_mean'], inplace=False)
         x_frs = {k:v for k,v in neuron_replay_stats_df['long_non_replay_mean'].items()} 
         y_frs = {k:v for k,v in neuron_replay_stats_df['long_replay_mean'].items()}
-        fig_L, ax_L, active_display_context_L = _plot_single_track_firing_rate_compare(x_frs, y_frs, active_context=final_context.adding_context_if_missing(filter_name='long'), **common_scatter_kwargs)
+        fig_L, ax_L, active_display_context_L = _plot_single_track_firing_rate_compare(x_frs, y_frs, active_context=final_context.adding_context_if_missing(filter_name='long'), prepare_for_publication=prepare_for_publication, **common_scatter_kwargs)
 
         ## Short Track Replay|Laps FR Figure
         neuron_replay_stats_df = neuron_replay_stats_table.dropna(subset=['short_replay_mean', 'short_non_replay_mean'], inplace=False)
         x_frs = {k:v for k,v in neuron_replay_stats_df['short_non_replay_mean'].items()} 
         y_frs = {k:v for k,v in neuron_replay_stats_df['short_replay_mean'].items()}
-        fig_S, ax_S, active_display_context_S = _plot_single_track_firing_rate_compare(x_frs, y_frs, active_context=final_context.adding_context_if_missing(filter_name='short'), **common_scatter_kwargs)
+        fig_S, ax_S, active_display_context_S = _plot_single_track_firing_rate_compare(x_frs, y_frs, active_context=final_context.adding_context_if_missing(filter_name='short'), prepare_for_publication=prepare_for_publication, **common_scatter_kwargs)
 
         ## Fit both the axes:
         fit_both_axes(ax_L, ax_S)
 
         def _perform_write_to_file_callback():
-            active_out_figure_paths_L, *args_L = cls.output_figure(active_display_context_L, fig_L)
-            active_out_figure_paths_S, *args_S = cls.output_figure(active_display_context_S, fig_S)
+            ## Captures: save_figure_kwargs
+            active_out_figure_paths_L, *args_L = cls.output_figure(active_display_context_L, fig_L, **save_figure_kwargs)
+            active_out_figure_paths_S, *args_S = cls.output_figure(active_display_context_S, fig_S, **save_figure_kwargs)
             return (active_out_figure_paths_L + active_out_figure_paths_S)
 
         if save_figure:

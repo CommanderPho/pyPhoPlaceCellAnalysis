@@ -723,8 +723,10 @@ class PaperFigureTwo(SerializedAttributesAllowBlockSpecifyingClass):
 
 
     @classmethod
-    def create_plot(cls, x_labels, y_values, scatter_props, ylabel, title, fig_name, active_context, defer_show, title_modifier=None):
-        """ """
+    def create_plot(cls, x_labels, y_values, scatter_props, ylabel, title, fig_name, active_context, defer_show, title_modifier=None, prepare_for_publication: bool = False, **kwargs):
+        """
+        prepare_for_publication: if True, no context footer is added
+        """
         if title_modifier:
             title = title_modifier(title)
 
@@ -770,15 +772,23 @@ class PaperFigureTwo(SerializedAttributesAllowBlockSpecifyingClass):
             scatter_plots.append(scatter_plot)
             x_values_list.append(x_values)
             
-        ax.set_xlabel('Groups')
+        ax.set_xlabel('Neuron Exclusivity Classification')
         ax.set_ylabel(ylabel)
         # Hide the right and top spines (box components)
         ax.spines[['right', 'top']].set_visible(False)
         
+        
+        
         title_text_obj = flexitext(text_formatter.left_margin, text_formatter.top_margin,
                                 cls._build_formatted_title_string(epochs_name=title), va="bottom", xycoords="figure fraction")
-        footer_text_obj = flexitext(text_formatter.left_margin * 0.1, text_formatter.bottom_margin * 0.25,
-                                    text_formatter._build_footer_string(active_context=active_context), va="top", xycoords="figure fraction")
+        text_objects = {'title': title_text_obj}
+        
+        if not prepare_for_publication:
+            footer_text_obj = flexitext(text_formatter.left_margin * 0.1, text_formatter.bottom_margin * 0.25,
+                                        text_formatter._build_footer_string(active_context=active_context), va="top", xycoords="figure fraction")
+            text_objects['footer'] = footer_text_obj
+            
+
         ax.set_xticks(x)
         ax.set_xticklabels(x_labels)
 
@@ -788,14 +798,13 @@ class PaperFigureTwo(SerializedAttributesAllowBlockSpecifyingClass):
             plt.show()
 
         return MatplotlibRenderPlots(name=fig_name, figures=[fig], axes=[ax], context=active_context,
-                                    plot_objects={'bars': bars, 'scatter_plots': scatter_plots, 'text_objects': {'title': title_text_obj, 'footer': footer_text_obj}},
+                                    plot_objects={'bars': bars, 'scatter_plots': scatter_plots, 'text_objects': text_objects},
                                     plot_data=plot_data)
 
 
     # @providing_context(fig='F2', frs='Laps')
     @classmethod
-    def fig_2_Theta_FR_matplotlib(cls, Fig2_Laps_FR, defer_show=False, **kwargs) -> MatplotlibRenderPlots:
-        active_context = kwargs.get('active_context', None)
+    def fig_2_Theta_FR_matplotlib(cls, Fig2_Laps_FR, defer_show=False, active_context=None, title_modifier=None, prepare_for_publication: bool = False, **kwargs) -> MatplotlibRenderPlots:
         assert active_context is not None
         
         # delta_minus_str: str = '\\Delta -'        
@@ -819,12 +828,11 @@ class PaperFigureTwo(SerializedAttributesAllowBlockSpecifyingClass):
 
         all_scatter_props = [{}, {}, {}, {}] # override, 2023-10-03
 
-        return cls.create_plot(x_labels, all_data_points, all_scatter_props, 'Laps Firing Rates (Hz)', 'Lap ($\\theta$)', 'fig_2_Theta_FR_matplotlib', active_context, defer_show, kwargs.get('title_modifier'))
-
+        return cls.create_plot(x_labels, all_data_points, all_scatter_props, 'Lap-averaged Firing Rates (Hz)', 'Lap ($\\theta$)', 'fig_2_Theta_FR_matplotlib', active_context=active_context, defer_show=defer_show, title_modifier=title_modifier, prepare_for_publication=prepare_for_publication, **kwargs)
 
     # @providing_context(fig='F2', frs='Replay')
     @classmethod
-    def fig_2_Replay_FR_matplotlib(cls, Fig2_Replay_FR, defer_show=False, active_context=None, title_modifier=None, **kwargs) -> MatplotlibRenderPlots:
+    def fig_2_Replay_FR_matplotlib(cls, Fig2_Replay_FR, defer_show=False, active_context=None, title_modifier=None, prepare_for_publication: bool = False, **kwargs) -> MatplotlibRenderPlots:
         assert active_context is not None
         
         # delta_minus_str: str = '\\Delta -'        
@@ -848,15 +856,17 @@ class PaperFigureTwo(SerializedAttributesAllowBlockSpecifyingClass):
             
         all_scatter_props = [{}, {}, {}, {}] # override, 2023-10-03
         # label_list = [LxC_aclus, LxC_aclus, SxC_aclus, SxC_aclus]
-        return cls.create_plot(x_labels, all_data_points, all_scatter_props, 'Replay Firing Rates (Hz)', 'Replay', 'fig_2_Replay_FR_matplotlib', active_context, defer_show, title_modifier)
+        return cls.create_plot(x_labels, all_data_points, all_scatter_props, 'PBE-averaged Firing Rates (Hz)', 'Replay', 'fig_2_Replay_FR_matplotlib', active_context=active_context, defer_show=defer_show, title_modifier=title_modifier, prepare_for_publication=prepare_for_publication, **kwargs)
 
     @providing_context(fig='2', display_fn_name='inst_FR_bar_graphs')
-    def display(self, defer_show=False, save_figure=True, enable_tiny_point_labels=True, enable_hover_labels=False, enabled_point_connection_lines=True, active_context=None, title_modifier_fn=None, top_margin=0.8, left_margin=0.090, bottom_margin=0.150, **kwargs):
+    def display(self, defer_show=False, save_figure=True, enable_tiny_point_labels=True, enable_hover_labels=False, enabled_point_connection_lines=True, active_context=None, title_modifier_fn=None, top_margin=0.8, left_margin=0.090, bottom_margin=0.150, prepare_for_publication: bool = False, **kwargs):
         """ 
         
         title_modifier: lambda original_title: f"{original_title} (all sessions)"
 
         """
+        
+        
         # Get the provided context or use the session context:
         active_context = active_context if active_context is not None else self.active_identifying_session_ctx
         title_modifier = title_modifier_fn if title_modifier_fn is not None else (lambda original_title: original_title)
@@ -864,12 +874,12 @@ class PaperFigureTwo(SerializedAttributesAllowBlockSpecifyingClass):
         _fig_2_theta_out = self.fig_2_Theta_FR_matplotlib(self.computation_result.Fig2_Laps_FR, defer_show=defer_show,
                                                         active_context=active_context, top_margin=top_margin,
                                                         left_margin=left_margin, bottom_margin=bottom_margin,
-                                                        title_modifier=title_modifier)
+                                                        title_modifier=title_modifier, prepare_for_publication=prepare_for_publication, **kwargs)
 
         _fig_2_replay_out = self.fig_2_Replay_FR_matplotlib(self.computation_result.Fig2_Replay_FR, defer_show=defer_show,
                                                             active_context=active_context, top_margin=top_margin,
                                                             left_margin=left_margin, bottom_margin=bottom_margin,
-                                                            title_modifier=title_modifier)
+                                                            title_modifier=title_modifier, prepare_for_publication=prepare_for_publication, **kwargs)
 
 
         if (enable_hover_labels or enable_tiny_point_labels or enabled_point_connection_lines):
