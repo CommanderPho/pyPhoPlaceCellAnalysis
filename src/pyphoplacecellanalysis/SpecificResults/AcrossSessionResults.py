@@ -65,6 +65,13 @@ from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiCo
 
 from pyphocorehelpers.DataStructure.RenderPlots.MatplotLibRenderPlots import MatplotlibRenderPlots
 
+from neuropy.core.user_annotations import UserAnnotationsManager, SessionCellExclusivityRecord
+from neuropy.utils.result_context import IdentifyingContext
+from pyphoplacecellanalysis.SpecificResults.PhoDiba2023Paper import pho_stats_perform_diagonal_line_binomial_test, pho_stats_bar_graph_t_tests
+
+from pyphoplacecellanalysis.General.Mixins.ExportHelpers import FigureOutputLocation, ContextToPathMode, FileOutputManager # used in post_compute_all_sessions_processing
+from pyphoplacecellanalysis.SpecificResults.PhoDiba2023Paper import PaperFigureTwo # used in post_compute_all_sessions_processing
+
 
 """
 from pyphoplacecellanalysis.SpecificResults.AcrossSessionResults import AcrossSessionsResults, AcrossSessionsVisualizations
@@ -258,7 +265,7 @@ class InstantaneousFiringRatesDataframeAccessor():
             print(f'\t\t done (success).')
             return True
 
-        except BaseException as e:
+        except Exception as e:
             exception_info = sys.exc_info()
             e = CapturedException(e, exception_info)
             print(f"ERROR: encountered exception {e} while trying to compute the instantaneous firing rates and set self.across_sessions_instantaneous_fr_dict[{curr_session_context}]")
@@ -267,21 +274,21 @@ class InstantaneousFiringRatesDataframeAccessor():
 
 
     @classmethod
-    def load_and_prepare_for_plot(cls, common_file_path) -> Tuple[InstantaneousSpikeRateGroupsComputation, pd.DataFrame]:
+    def build_shell_object_for_plot(cls, loaded_result_df: pd.DataFrame, column_name_to_colorize:str = 'session_name') -> Tuple[InstantaneousSpikeRateGroupsComputation, pd.DataFrame]:
         """ loads the previously saved out inst_fr_scatter_plot_results_table and prepares it for plotting.
 
         returns a `InstantaneousSpikeRateGroupsComputation` _shell_obj which can be plotted
 
+        Creates a modified 'visualization_df' from 'loaded_result_df' by adding columns: ['color', 'marker', 'scatter_props']
+
         Usage:
-            _shell_obj, loaded_result_df = InstantaneousFiringRatesDataframeAccessor.load_and_prepare_for_plot(common_file_path)
+            ## Read the previously saved-out result:
+            loaded_result_df: pd.DataFrame = InstantaneousFiringRatesDataframeAccessor.read_scatter_plot_results_table(file_path=common_file_path)
+            _shell_obj, visualization_df = InstantaneousFiringRatesDataframeAccessor.build_shell_object_for_plot(loaded_result_df=loaded_result_df)
             # Perform the actual plotting:
             AcrossSessionsVisualizations.across_sessions_bar_graphs(_shell_obj, num_sessions=1, save_figure=False, enable_tiny_point_labels=False, enable_hover_labels=False)
 
         """
-
-        ## Read the previously saved-out result:
-        loaded_result_df = cls.read_scatter_plot_results_table(file_path=common_file_path)
-
         ## Scatter props:
         def build_unique_colors_mapping_for_column(df, column_name:str):
             # Get unique values and map them to colors
@@ -303,21 +310,24 @@ class InstantaneousFiringRatesDataframeAccessor():
             marker_mapping = {value: a_marker for value, a_marker in zip(unique_values, marker_list)}
             return marker_mapping
 
-        scatter_props_column_names = ['color', 'marker']
-        # column_name_to_colorize:str = 'session_name'
-        column_name_to_colorize:str = 'qclu'
-        color_mapping = build_unique_colors_mapping_for_column(loaded_result_df, column_name_to_colorize)
+
+        # Begin Function Body ________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
+        # scatter_props_column_names = ['color', 'marker']
+        # column_name_to_colorize:str = 'qclu'
+
+        visualization_df: pd.DataFrame = deepcopy(loaded_result_df)
+
+        color_mapping = build_unique_colors_mapping_for_column(visualization_df, column_name_to_colorize)
         # Apply the mapping to the 'property' column to create a new 'color' column
-        loaded_result_df['color'] = loaded_result_df[column_name_to_colorize].map(color_mapping)
+        visualization_df['color'] = visualization_df[column_name_to_colorize].map(color_mapping)
 
         column_name_to_markerize:str = 'animal'
-        marker_mapping =  build_unique_markers_mapping_for_column(loaded_result_df, column_name_to_markerize)
-        loaded_result_df['marker'] = loaded_result_df[column_name_to_markerize].map(marker_mapping)
+        marker_mapping =  build_unique_markers_mapping_for_column(visualization_df, column_name_to_markerize)
+        visualization_df['marker'] = visualization_df[column_name_to_markerize].map(marker_mapping)
 
         # build the final 'scatter_props' column
         # loaded_result_df['scatter_props'] = [{'edgecolor': a_color, 'marker': a_marker} for a_color, a_marker in zip(loaded_result_df['color'], loaded_result_df['marker'])]
-        loaded_result_df['scatter_props'] = [{'marker': a_marker} for a_color, a_marker in zip(loaded_result_df['color'], loaded_result_df['marker'])]
-
+        visualization_df['scatter_props'] = [{'marker': a_marker} for a_color, a_marker in zip(visualization_df['color'], visualization_df['marker'])]
 
         # For `loaded_result_df`, to recover the plottable FigureTwo points:
         table_columns = ['neuron_uid', 'aclu', 'lap_delta_minus', 'lap_delta_plus', 'replay_delta_minus', 'replay_delta_plus', 'active_set_membership']
@@ -329,7 +339,7 @@ class InstantaneousFiringRatesDataframeAccessor():
         # 3. Compute the mean and error bars for each of the four columns
         data_columns = ['lap_delta_minus', 'lap_delta_plus', 'replay_delta_minus', 'replay_delta_plus']
 
-        grouped_df = loaded_result_df.groupby(['active_set_membership'])
+        grouped_df = visualization_df.groupby(['active_set_membership'])
         LxC_df, SxC_df = [grouped_df.get_group(aValue) for aValue in ['LxC','SxC']] # Note that in general LxC and SxC might have differing numbers of cells.
 
         #TODO 2023-08-11 02:09: - [ ] These LxC/SxC_aclus need to be globally unique probably.
@@ -367,19 +377,30 @@ class InstantaneousFiringRatesDataframeAccessor():
         # _shell_obj.LxC_scatter_props = LxC_scatter_props
         # _shell_obj.SxC_scatter_props = SxC_scatter_props
 
-        return _shell_obj, loaded_result_df
+        return _shell_obj, visualization_df
+
+
+    @classmethod
+    def load_and_prepare_for_plot(cls, common_file_path) -> Tuple[InstantaneousSpikeRateGroupsComputation, pd.DataFrame]:
+        """ loads the previously saved out inst_fr_scatter_plot_results_table and prepares it for plotting.
+
+        returns a `InstantaneousSpikeRateGroupsComputation` _shell_obj which can be plotted
+
+        Usage:
+            _shell_obj, loaded_result_df = InstantaneousFiringRatesDataframeAccessor.load_and_prepare_for_plot(common_file_path)
+            # Perform the actual plotting:
+            AcrossSessionsVisualizations.across_sessions_bar_graphs(_shell_obj, num_sessions=1, save_figure=False, enable_tiny_point_labels=False, enable_hover_labels=False)
+
+        """
+
+        ## Read the previously saved-out result:
+        loaded_result_df: pd.DataFrame = cls.read_scatter_plot_results_table(file_path=common_file_path)
+        _shell_obj, visualization_df = cls.build_shell_object_for_plot(loaded_result_df=loaded_result_df)
+        return _shell_obj, visualization_df
 
 
 
 
-
-from neuropy.core.user_annotations import UserAnnotationsManager, SessionCellExclusivityRecord
-from neuropy.utils.result_context import IdentifyingContext
-from pyphoplacecellanalysis.SpecificResults.PhoDiba2023Paper import pho_stats_perform_diagonal_line_binomial_test, pho_stats_bar_graph_t_tests
-
-
-from pyphoplacecellanalysis.General.Mixins.ExportHelpers import FigureOutputLocation, ContextToPathMode, FileOutputManager # used in post_compute_all_sessions_processing
-from pyphoplacecellanalysis.SpecificResults.PhoDiba2023Paper import PaperFigureTwo # used in post_compute_all_sessions_processing
 
 
 class AcrossSessionsResults:
@@ -1775,7 +1796,7 @@ class AcrossSessionTables:
 
     @classmethod
     def load_all_combined_tables(cls, override_output_parent_path:Optional[Path]=None, output_path_suffix:Optional[str]=None):
-        """Save converted back to .h5 file, .csv file, and several others
+        """ 
 
         Usage:
             from pyphoplacecellanalysis.SpecificResults.AcrossSessionResults import AcrossSessionTables
@@ -2146,6 +2167,11 @@ def find_most_recent_files(found_session_export_paths: List[Path], cuttoff_date:
     # now sessions is a dictionary where the key is the session_str and the value is another dictionary.
     # This inner dictionary's key is the file type and the value is the most recent path for this combination of session and file type
     # Thus, laps_csv and ripple_csv can be obtained from the dictionary for each session
+    
+    
+    Usage:
+    
+    
     """
     # Process each path to extract information or use file modification time as fallback
     parsed_paths: List[Tuple] = []
