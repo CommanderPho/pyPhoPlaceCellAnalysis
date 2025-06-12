@@ -35,14 +35,14 @@ from scipy.special import rel_entr # alternative for compute_relative_entropy_di
 
 from collections import Counter # Count the Number of Occurrences in a Python list using Counter
 from pyphoplacecellanalysis.General.Mixins.CrossComputationComparisonHelpers import SplitPartitionMembership
-from neuropy.core.neuron_identities import NeuronType
+from neuropy.core.neuron_identities import NeuronIdentityDataframeAccessor, NeuronType
 
 from neuropy.analyses import detect_pbe_epochs # used in `_perform_jonathan_replay_firing_rate_analyses(.)` if replays are missing
 
 from pyphoplacecellanalysis.General.Pipeline.Stages.Loading import saveData # for `pipeline_complete_compute_long_short_fr_indicies`
 from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.EpochComputationFunctions import KnownFilterEpochs # for `pipeline_complete_compute_long_short_fr_indicies`
 from neuropy.core.session.dataSession import DataSession # for `pipeline_complete_compute_long_short_fr_indicies`
-
+from pyphoplacecellanalysis.General.Mixins.PickleSerializableMixin import PickleSerializableMixin
 
 from typing import Dict, List, Any, Optional, Tuple
 from scipy.special import factorial, logsumexp
@@ -2980,6 +2980,103 @@ class SingleBarResult(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
     LxC_scatter_props: Optional[Dict] = non_serialized_field(is_computable=False)
     SxC_scatter_props: Optional[Dict] = non_serialized_field(is_computable=False)
 
+    @classmethod
+    def combine(cls, *results: 'SingleBarResult') -> 'SingleBarResult':
+        """Combines multiple SingleBarResult instances into a new instance.
+
+        Args:
+            *results: One or more SingleBarResult instances to combine
+
+        Returns:
+            A new SingleBarResult with combined data and recomputed statistics
+
+        Raises:
+            ValueError: If no results are provided
+        """
+        if len(results) == 0:
+            raise ValueError("At least one SingleBarResult must be provided")
+
+        if len(results) == 1:
+            # Return a copy of the single result
+            return deepcopy(results[0])
+
+        # Initialize arrays for combining
+        all_values = []
+        all_LxC_aclus = []
+        all_SxC_aclus = []
+
+        # Initialize scatter props dictionaries
+        combined_LxC_scatter_props = {}
+        combined_SxC_scatter_props = {}
+
+        # Collect values from all results
+        for result in results:
+            if result.values is not None and len(result.values) > 0:
+                all_values.append(result.values)
+
+            if result.LxC_aclus is not None and len(result.LxC_aclus) > 0:
+                all_LxC_aclus.append(result.LxC_aclus)
+
+            if result.SxC_aclus is not None and len(result.SxC_aclus) > 0:
+                all_SxC_aclus.append(result.SxC_aclus)
+
+            # Merge scatter properties dictionaries
+            if result.LxC_scatter_props:
+                for key, value in result.LxC_scatter_props.items():
+                    if key in combined_LxC_scatter_props:
+                        # If the key exists and values are arrays, concatenate them
+                        if isinstance(value, np.ndarray) and isinstance(combined_LxC_scatter_props[key], np.ndarray):
+                            combined_LxC_scatter_props[key] = np.concatenate([combined_LxC_scatter_props[key], value])
+                        else:
+                            # For non-array values, keep the most recent
+                            combined_LxC_scatter_props[key] = value
+                    else:
+                        combined_LxC_scatter_props[key] = value
+
+            if result.SxC_scatter_props:
+                for key, value in result.SxC_scatter_props.items():
+                    if key in combined_SxC_scatter_props:
+                        # If the key exists and values are arrays, concatenate them
+                        if isinstance(value, np.ndarray) and isinstance(combined_SxC_scatter_props[key], np.ndarray):
+                            combined_SxC_scatter_props[key] = np.concatenate([combined_SxC_scatter_props[key], value])
+                        else:
+                            # For non-array values, keep the most recent
+                            combined_SxC_scatter_props[key] = value
+                    else:
+                        combined_SxC_scatter_props[key] = value
+
+        # Combine arrays
+        combined_values = np.concatenate(all_values) if all_values else np.array([])
+        combined_LxC_aclus = np.concatenate(all_LxC_aclus) if all_LxC_aclus else np.array([])
+        combined_SxC_aclus = np.concatenate(all_SxC_aclus) if all_SxC_aclus else np.array([])
+
+        # Compute new statistics
+        new_mean = np.mean(combined_values) if len(combined_values) > 0 else 0.0
+        new_std = np.std(combined_values) if len(combined_values) > 0 else 0.0
+
+        # Create and return a new instance
+        return cls(mean=new_mean, std=new_std, values=combined_values, LxC_aclus=combined_LxC_aclus, SxC_aclus=combined_SxC_aclus,
+                   LxC_scatter_props=(combined_LxC_scatter_props if combined_LxC_scatter_props else None), SxC_scatter_props=(combined_SxC_scatter_props if combined_SxC_scatter_props else None))
+
+
+
+
+    @function_attributes(short_name=None, tags=['combine', 'add', 'across-sessions'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-06-12 09:06', related_items=[])
+    def add(self, *others: 'SingleBarResult') -> 'SingleBarResult':
+        """Combines multiple SingleBarResult instances into a new instance.
+
+        Args:
+            *others: One or more SingleBarResult instances to combine with this one
+
+        Returns:
+            A new SingleBarResult with combined data and recomputed statistics
+        """
+        # Create and return a new instance
+        return SingleBarResult.combine(self, *others)
+
+
+
+
 
 def _InstantaneousSpikeRateGroupsComputation_convert_Fig2_ANY_FR_to_hdf_fn(f, key: str, value):
     """ Converts `Fig2_Replay_FR: List[SingleBarResult]` or `Fig2_Laps_FR: List[SingleBarResult]` into something serializable. Unfortunately has to be defined outside the `InstantaneousSpikeRateGroupsComputation` definition so it can be used in the field. value: List[SingleBarResult] """
@@ -2999,8 +3096,9 @@ def _InstantaneousSpikeRateGroupsComputation_convert_Fig2_ANY_FR_to_hdf_fn(f, ke
         raise NotImplementedError
 
 
+
 @custom_define(slots=False)
-class InstantaneousSpikeRateGroupsComputation(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
+class InstantaneousSpikeRateGroupsComputation(PickleSerializableMixin, HDF_SerializationMixin, AttrsBasedClassHelperMixin):
     """ class to handle spike rate computations
 
     Appears to only be for the XxC (LxC, SxC) cells.
@@ -3133,16 +3231,24 @@ class InstantaneousSpikeRateGroupsComputation(HDF_SerializationMixin, AttrsBased
         """
         table_columns = ['aclu', 'lap_delta_minus', 'lap_delta_plus', 'replay_delta_minus', 'replay_delta_plus', 'active_set_membership']
         n_LxC_aclus: int = len(self.LxC_aclus)
-        v_LxC_aclus = [list(self.LxC_aclus)] + [v.cell_agg_inst_fr_list for v in (self.LxC_ThetaDeltaMinus, self.LxC_ThetaDeltaPlus, self.LxC_ReplayDeltaMinus, self.LxC_ReplayDeltaPlus)] + [(['LxC'] * n_LxC_aclus)]
+        self.LxC_ThetaDeltaMinus, self.LxC_ThetaDeltaPlus, self.LxC_ReplayDeltaMinus, self.LxC_ReplayDeltaPlus
+        
+        v_LxC_aclus = [list(self.LxC_aclus)] + [v.cell_agg_inst_fr_list for v in (self.LxC_ThetaDeltaMinus, self.LxC_ThetaDeltaPlus, self.LxC_ReplayDeltaMinus, self.LxC_ReplayDeltaPlus) if v is not None] + [(['LxC'] * n_LxC_aclus)]
         df_LxC_aclus = pd.DataFrame(dict(zip(table_columns, v_LxC_aclus)))
 
         n_SxC_aclus: int = len(self.SxC_aclus)
-        v_SxC_aclus = [list(self.SxC_aclus)] + [v.cell_agg_inst_fr_list for v in (self.SxC_ThetaDeltaMinus, self.SxC_ThetaDeltaPlus, self.SxC_ReplayDeltaMinus, self.SxC_ReplayDeltaPlus)] + [(['SxC'] * n_SxC_aclus)]
+        v_SxC_aclus = [list(self.SxC_aclus)] + [v.cell_agg_inst_fr_list for v in (self.SxC_ThetaDeltaMinus, self.SxC_ThetaDeltaPlus, self.SxC_ReplayDeltaMinus, self.SxC_ReplayDeltaPlus) if v is not None] + [(['SxC'] * n_SxC_aclus)]
         df_SxC_aclus = pd.DataFrame(dict(zip(table_columns, v_SxC_aclus)))
 
         # Concatenate the two dataframes
         df_combined = pd.concat([df_LxC_aclus, df_SxC_aclus], ignore_index=True)
         df_combined['inst_time_bin_seconds'] = float(self.instantaneous_time_bin_size_seconds)
+        
+        ## add session info
+        if self.active_identifying_session_ctx is not None:
+            ## Add the extended neuron identifiers (like the global neuron_uid, session_uid) columns
+            df_combined = df_combined.neuron_identity.make_neuron_indexed_df_global(self.active_identifying_session_ctx, add_expanded_session_context_keys=True, add_extended_aclu_identity_columns=True)
+        
         return df_combined
 
 
@@ -3183,7 +3289,7 @@ def build_merged_neuron_firing_rate_indicies(curr_active_pipeline, enable_displa
     #     df_with_prefix.rename(columns={f'prefix_{col}': col}, inplace=True)
         
     if enable_display_intermediate_results:
-        display(long_short_fr_indicies_df)
+        print(long_short_fr_indicies_df)
 
     jonathan_firing_rate_analysis_result: JonathanFiringRateAnalysisResult = curr_active_pipeline.global_computation_results.computed_data.jonathan_firing_rate_analysis # 'jfra'
     neuron_replay_stats_df = deepcopy(jonathan_firing_rate_analysis_result.neuron_replay_stats_df)
@@ -3198,7 +3304,7 @@ def build_merged_neuron_firing_rate_indicies(curr_active_pipeline, enable_displa
     
 
     if enable_display_intermediate_results: 
-        display(neuron_replay_stats_df)
+        print(neuron_replay_stats_df)
 
     ## Get global 'long_short_post_decoding' results:
     curr_long_short_post_decoding = curr_active_pipeline.global_computation_results.computed_data['long_short_post_decoding'] # 'lspd'
@@ -3208,7 +3314,7 @@ def build_merged_neuron_firing_rate_indicies(curr_active_pipeline, enable_displa
     rate_remapping_df.index.name = 'aclu'
     rate_remapping_df = rate_remapping_df.reset_index() 
     if enable_display_intermediate_results:
-        display(rate_remapping_df)
+        print(rate_remapping_df)
 
 
     # suffixes_list = ({'suffixes':('_lsfria', '_jfra')}, )
