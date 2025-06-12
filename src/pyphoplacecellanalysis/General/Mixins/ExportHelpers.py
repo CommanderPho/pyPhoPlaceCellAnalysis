@@ -407,7 +407,7 @@ def build_pdf_metadata_from_display_context(active_identifying_ctx: IdentifyingC
 
     # PDF metadata:
     active_identifying_ctx.get_subset(subset_includelist=['format_name', 'session_name'])
-    if active_identifying_ctx.check_keys(keys_list=[['format_name', 'session_name']])[0]:
+    if active_identifying_ctx.check_keys(keys_list=['format_name', 'session_name'])[0]:
         session_descriptor_string: str = '_'.join([active_identifying_ctx.format_name, active_identifying_ctx.session_name]) # 'kdiba_2006-6-08_14-26-15'
     else:
         # print(f'no session. in context (err: {err}). Just using context description')
