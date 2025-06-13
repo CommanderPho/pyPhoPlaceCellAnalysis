@@ -2858,7 +2858,7 @@ class DirectionalDecodersContinuouslyDecodedResult(ComputedResult):
             return {k:v.get('pseudo2D', None) for k, v in self.continuously_decoded_result_cache_dict.items()}   
 
 
-    @function_attributes(short_name=None, tags=['pseudo2D', 'timeline-track', '1D', 'split-to-1D'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-02-26 07:23', related_items=[])
+    @function_attributes(short_name=None, tags=['pseudo2D', 'timeline-track', '1D', 'split-to-1D'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-02-26 07:23', related_items=['pyphoplacecellanalysis.Analysis.Decoder.reconstruction.DecodedFilterEpochsResult.split_pseudo2D_result_to_1D_result'])
     def split_pseudo2D_continuous_result_to_1D_continuous_result(self, pseudo2D_decoder_names_list: Optional[str]=None, debug_print=False):
         """ Get 1D representations of the Pseudo2D track (4 decoders) so they can be plotted on seperate tracks and bin-debugged independently.
 
@@ -2931,6 +2931,15 @@ class DirectionalDecodersContinuouslyDecodedResult(ComputedResult):
             assert p_x_given_n.shape[1] == len(pseudo2D_decoder_names_list), f"for pseudo2D_decoder_names_list: {pseudo2D_decoder_names_list}\n\texpected the len(pseudo2D_decoder_names_list): {len(pseudo2D_decoder_names_list)} pseudo-y bins for the decoder in p_x_given_n.shape[1]. but found p_x_given_n.shape: {p_x_given_n.shape}"
             # split_pseudo2D_posteriors_dict = {k:np.squeeze(p_x_given_n[:, i, :]) for i, k in enumerate(pseudo2D_decoder_names_list)}
 
+            xbin_centers: Optional[NDArray] = None
+            ybin_centers: Optional[NDArray] = None
+            if pseudo2D_decoder is not None:
+                assert xbin_centers is None, f"don't provide both xbin_centers and pseudo2D_decoder"
+                assert ybin_centers is None, f"don't provide both ybin_centers and pseudo2D_decoder"
+                original_position_data_shape = deepcopy(pseudo2D_decoder.original_position_data_shape[:-1]) ## all but the pseudo dim
+                xbin_centers = deepcopy(pseudo2D_decoder.xbin_centers)
+                ybin_centers = None
+
             # Need all_directional_pf1D_Decoder_dict
             # output_dict = {}
             output_pseudo2D_split_to_1D_continuous_results_dict: Dict[types.DecoderName, SingleEpochDecodedResult] = {}
@@ -2944,6 +2953,26 @@ class DirectionalDecodersContinuouslyDecodedResult(ComputedResult):
                 # output_pseudo2D_split_to_1D_continuous_results_dict[a_decoder_name].p_x_given_n = a_1D_posterior ## or could squish them here
                 output_pseudo2D_split_to_1D_continuous_results_dict[a_decoder_name].p_x_given_n = np.squeeze(output_pseudo2D_split_to_1D_continuous_results_dict[a_decoder_name].p_x_given_n[:, i, :]) ## or could squish them here
                 
+                ## Copied from `pyphoplacecellanalysis.Analysis.Decoder.reconstruction.DecodedFilterEpochsResult.split_pseudo2D_result_to_1D_result`
+                # #TODO 2025-06-13 14:29: - [X] fix busted-up columns: ['most_likely_position_indicies_list', 'most_likely_positions'
+                output_pseudo2D_split_to_1D_continuous_results_dict[a_decoder_name].most_likely_position_indicies = np.squeeze(np.argmax(output_pseudo2D_split_to_1D_continuous_results_dict[a_decoder_name].p_x_given_n, axis=0))   # average along time dimension
+
+                if (xbin_centers is not None) and (ybin_centers is not None):
+                    ## NOTE: I think 2D position decoding isn't implemented here.
+                    # much more efficient than the other implementation. Result is # (85844, 2)
+                    output_pseudo2D_split_to_1D_continuous_results_dict[a_decoder_name].most_likely_positions = np.vstack((xbin_centers[output_pseudo2D_split_to_1D_continuous_results_dict[a_decoder_name].most_likely_position_indicies[0,:]], self.ybin_centers[output_pseudo2D_split_to_1D_continuous_results_dict[a_decoder_name].most_likely_position_indicies[1,:]])).T
+                elif (xbin_centers is not None):
+                    # 1D Decoder case:
+                    output_pseudo2D_split_to_1D_continuous_results_dict[a_decoder_name].most_likely_positions = np.squeeze(xbin_centers[output_pseudo2D_split_to_1D_continuous_results_dict[a_decoder_name].most_likely_position_indicies])
+                else:
+                    output_pseudo2D_split_to_1D_continuous_results_dict[a_decoder_name].most_likely_positions = []
+                # #TODO 2025-06-13 14:30: - [ ] Finish recomputing marginals
+                # output_pseudo2D_split_to_1D_continuous_results_dict[a_decoder_name].marginal_x = None
+                # output_pseudo2D_split_to_1D_continuous_results_dict[a_decoder_name].marginal_y = None
+                # output_pseudo2D_split_to_1D_continuous_results_dict[a_decoder_name].compute_marginals()
+
+
+
                 # _out_tuple = dict(a_decoder_name=a_decoder_name, a_position_decoder=pseudo2D_decoder, time_window_centers=time_window_centers, a_1D_posterior=a_1D_posterior)
                 # identifier_name, widget, matplotlib_fig, matplotlib_fig_axes = _out_tuple
                 # output_dict[a_decoder_name] = _out_tuple
@@ -6502,7 +6531,7 @@ class DirectionalPlacefieldGlobalComputationFunctions(AllFunctionEnumeratingMixi
             had_existing_DirectionalDecodersDecoded_result = False
             directional_decoders_decode_result = None # set to None
 
-
+        did_update_computations: bool = False
         ## Currently used for both cases to decode:
         t_start, t_delta, t_end = owning_pipeline_reference.find_LongShortDelta_times()
         # Build an Epoch object containing a single epoch, corresponding to the global epoch for the entire session:
@@ -6560,6 +6589,7 @@ class DirectionalPlacefieldGlobalComputationFunctions(AllFunctionEnumeratingMixi
             continuously_decoded_result_cache_dict = {time_bin_size:all_directional_continuously_decoded_dict} # result is a single time_bin_size
             print(f'\t computation done. Creating new DirectionalDecodersContinuouslyDecodedResult....')
             directional_decoders_decode_result = DirectionalDecodersContinuouslyDecodedResult(pseudo2D_decoder=pseudo2D_decoder, pf1D_Decoder_dict=all_directional_pf1D_Decoder_dict, spikes_df=deepcopy(global_spikes_df), continuously_decoded_result_cache_dict=continuously_decoded_result_cache_dict)
+            did_update_computations = True
 
         else:
             # had_existing_DirectionalDecodersDecoded_result == True _____________________________________________________________ #
@@ -6590,6 +6620,7 @@ class DirectionalPlacefieldGlobalComputationFunctions(AllFunctionEnumeratingMixi
                 all_directional_continuously_decoded_dict['pseudo2D'] = pseudo2D_decoder_continuously_decoded_result
                 # directional_decoders_decode_result.__dict__.update(pf1D_Decoder_dict=all_directional_pf1D_Decoder_dict)
                 directional_decoders_decode_result.continuously_decoded_result_cache_dict[time_bin_size] = all_directional_continuously_decoded_dict # update the entry for this time_bin_size
+                did_update_computations = True
                 
             else:
                 print(f'(time_bin_size == {time_bin_size}) already found in cache. Not recomputing.')
@@ -6597,7 +6628,16 @@ class DirectionalPlacefieldGlobalComputationFunctions(AllFunctionEnumeratingMixi
         # Set the global result:
         global_computation_results.computed_data['DirectionalDecodersDecoded'] = directional_decoders_decode_result
         
+        if did_update_computations:
+            ## #TODO 2025-06-13 13:46: - [ ] try to add to generic results
+            # try:
+            #     valid_EpochComputations_result: EpochComputationsComputationsContainer = curr_active_pipeline.global_computation_results.computed_data['EpochComputations']
+            #     a_new_fully_generic_result: GenericDecoderDictDecodedEpochsDictResult = valid_EpochComputations_result.a_generic_decoder_dict_decoded_epochs_dict_result
 
+            # except Exception as e:
+            #     print(f'failed to add continuous computation to the generic results with error e: {e}. Skipping.')
+            pass
+                       
         """ Usage:
         
         from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import DirectionalDecodersContinuouslyDecodedResult
