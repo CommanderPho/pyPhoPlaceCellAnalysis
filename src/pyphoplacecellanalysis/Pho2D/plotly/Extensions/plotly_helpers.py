@@ -609,9 +609,14 @@ def plotly_pre_post_delta_scatter(data_results_df: pd.DataFrame, data_context: O
             # Categorical 'time_bin_size' as color _______________________________________________________________________________ #
             if debug_print:
                 print(f'shared_color_key: "{shared_color_key}"')
-            a_kwargs_update_dict = _subfn_build_categorical_color_kwargs(shared_color_key=shared_color_key)
-            common_plot_kwargs.update(a_kwargs_update_dict)
-        
+
+            # 'color_discrete_sequence'
+            if 'color_discrete_sequence' in common_plot_kwargs:
+                print(f'already have common_plot_kwargs["color_discrete_sequence"]: {common_plot_kwargs["color_discrete_sequence"]}, will not override!')
+            else:
+                a_kwargs_update_dict = _subfn_build_categorical_color_kwargs(shared_color_key=shared_color_key)
+                common_plot_kwargs.update(a_kwargs_update_dict)
+            
             # shared_color_key: 'time_bin_size'
             
 
@@ -653,7 +658,7 @@ def plotly_pre_post_delta_scatter(data_results_df: pd.DataFrame, data_context: O
     # Pre-Delta Histogram
     # trace_name_prefix:str = 'trace_pre_delta_hist'
     trace_name_prefix:str = ''
-    _tmp_pre_delta_fig = px.histogram(pre_delta_df, y=histogram_variable_name, **common_plot_kwargs, **hist_kwargs, title=pre_delta_label)
+    _tmp_pre_delta_fig = px.histogram(pre_delta_df, y=histogram_variable_name, **(common_plot_kwargs | hist_kwargs), title=pre_delta_label)
     for a_trace in _tmp_pre_delta_fig.data:
         a_trace.xbins.start = 0.05
         a_trace.xbins.end = 0.95
@@ -677,7 +682,7 @@ def plotly_pre_post_delta_scatter(data_results_df: pd.DataFrame, data_context: O
             )
     else:
         assert px_scatter_kwargs is not None
-        _tmp_scatter_fig = px.scatter(data_results_df, **common_plot_kwargs, **px_scatter_kwargs)
+        _tmp_scatter_fig = px.scatter(data_results_df, **(common_plot_kwargs | px_scatter_kwargs))
         for i, a_trace in enumerate(_tmp_scatter_fig.data):
             a_trace.marker.line.width = 0 
             a_trace.marker.opacity = 0.5
@@ -688,7 +693,7 @@ def plotly_pre_post_delta_scatter(data_results_df: pd.DataFrame, data_context: O
 
     # Post-Delta Histogram
     trace_name_prefix:str = 'trace_post_delta_hist'
-    _tmp_post_delta_fig = px.histogram(post_delta_df, y=histogram_variable_name, **common_plot_kwargs, **hist_kwargs, title=post_delta_label)
+    _tmp_post_delta_fig = px.histogram(post_delta_df, y=histogram_variable_name, **(common_plot_kwargs | hist_kwargs), title=post_delta_label)
     for a_trace in _tmp_post_delta_fig.data:
         a_trace.xbins.start = 0.05
         a_trace.xbins.end = 0.95

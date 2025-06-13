@@ -1692,12 +1692,20 @@ def _perform_plot_pre_post_delta_scatter(data_context: IdentifyingContext, conca
     # y_baseline_level: float = 0.5 # for P(short), etc
     # y_baseline_level: float = 0.0 # for wcorr, etc
 
+    # px_scatter_kwargs __________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
     # px_scatter_kwargs = {'x': 'delta_aligned_start_t', 'y': variable_name, 'color':"is_user_annotated_epoch", 'title': f"'{variable_name}'"} # , 'color': 'time_bin_size', 'range_y': [-1.0, 1.0], 'labels': {'session_name': 'Session', 'time_bin_size': 'tbin_size', 'is_user_annotated_epoch':'user_sel'}
     px_scatter_kwargs = {'x': 'delta_aligned_start_t', 'y': variable_name, 'title': f"{data_context.get_description(subset_includelist=['dataframe_name', 'title_prefix', 'num_events'], separator=' - ')} - '{variable_name}'"} # , 'color': 'time_bin_size', 'range_y': [-1.0, 1.0], 'labels': {'session_name': 'Session', 'time_bin_size': 'tbin_size', 'is_user_annotated_epoch':'user_sel'}
-    px_scatter_kwargs['color'] = "time_bin_size"
-    # px_scatter_kwargs.pop('color')
-
-
+    if is_publication_ready_figure:
+        print(f'is_publication_ready_figure: omitting "color" from px_scatter_kwargs')
+        # if 'dummy_column_for_color' not in concatenated_ripple_df.columns:
+        #     concatenated_ripple_df['dummy_column_for_color'] = '#000000'            
+        # px_scatter_kwargs['color'] = "dummy_column_for_color"
+        px_scatter_kwargs['color'] = "time_bin_size"
+        px_scatter_kwargs['color_discrete_sequence'] = ['black']
+        # px_scatter_kwargs.pop('color')
+    else:
+        px_scatter_kwargs['color'] = "time_bin_size"
+    
     # Controls scatterplot point size
     if 'dummy_column_for_size' not in concatenated_ripple_df.columns:
         concatenated_ripple_df['dummy_column_for_size'] = 2.0
@@ -1711,7 +1719,19 @@ def _perform_plot_pre_post_delta_scatter(data_context: IdentifyingContext, conca
 
     # px_scatter_kwargs.update(dict(marginal_x="histogram", marginal_y="rug"))
 
-    hist_kwargs = dict(color="time_bin_size")
+    # hist_kwargs ________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
+    hist_kwargs = dict()
+
+    if is_publication_ready_figure:
+        print(f'is_publication_ready_figure: omitting "color" from px_scatter_kwargs')
+        # assert 'dummy_column_for_color' in concatenated_ripple_df.columns, f"it was supposed to be added in the above px_scatter... related block. How did this not happen?"
+        # hist_kwargs['color'] = "dummy_column_for_color"
+        hist_kwargs['color'] = "time_bin_size"
+        hist_kwargs['color_discrete_sequence'] = ['black']
+    else:
+        hist_kwargs['color'] = "time_bin_size"
+        
+    
     # hist_kwargs = dict(color="is_user_annotated_epoch") # , histnorm='probability density'
     # hist_kwargs.pop('color')
     
@@ -3329,7 +3349,7 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
         
 
     @function_attributes(short_name=None, tags=['export', 'pdf', 'html', 'figure'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-06-09 10:40', related_items=[])
-    def export_for_publication(self, figures_parent_folder: Path, export_pdf: bool=True, export_html: bool = False):
+    def export_for_publication(self, figures_parent_folder: Path, export_suffix: str = 'Laps', export_pdf: bool=True, export_html: bool = False):
         """ exports the figures for publication 
         
         Usage:
@@ -3338,26 +3358,22 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
             _out_paths
         
         """
-        filename: str = Path(deepcopy(self.filename)).stem        
-        filename = f"ScatterOverTime_{filename}"
-        
         fig = self.figure_widget
 
-
+        # filename: str = Path(deepcopy(self.filename)).stem        
+        # filename = f"ScatterOverTime_{filename}"
+        basename: str = f'ScatterOverTime_{export_suffix}'
         _out_paths = {}
         if export_pdf:
-            image_save_path = figures_parent_folder.joinpath(f'{filename}.pdf')
+            image_save_path = figures_parent_folder.joinpath(f'{basename}.pdf')
             fig.write_image(image_save_path)
             _out_paths['pdf'] = image_save_path
 
-    # png_bytes = pio.to_image(fig, format='png')
-    # mime_type="image/png"
-    # data = deepcopy(png_bytes)
-
         if export_html:
-            html_file_output = figures_parent_folder.joinpath(f'{filename}.html').resolve()
+            html_file_output = figures_parent_folder.joinpath(f'{basename}.html').resolve()
             pio.write_html(fig, file=html_file_output, auto_open=True)
             _out_paths['html'] = html_file_output
+            
         return _out_paths
 
 
