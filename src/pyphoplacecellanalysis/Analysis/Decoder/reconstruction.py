@@ -1678,10 +1678,14 @@ class DecodedFilterEpochsResult(HDF_SerializationMixin, AttrsBasedClassHelperMix
 
 
     @function_attributes(short_name=None, tags=['pseudo2D', 'timeline-track', '1D', 'split-to-1D'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-02-26 07:23', related_items=[])
-    def split_pseudo2D_result_to_1D_result(self, pseudo2D_decoder_names_list: Optional[str]=None, debug_print=False) -> Dict[types.DecoderName, "DecodedFilterEpochsResult"]:
+    def split_pseudo2D_result_to_1D_result(self, pseudo2D_decoder_names_list: Optional[str]=None, a_pseudo2D_decoder: Optional[Any]=None, xbin_centers: Optional[NDArray]=None, ybin_centers: Optional[NDArray]=None, debug_print=False) -> Dict[types.DecoderName, "DecodedFilterEpochsResult"]:
         """ Get 1D representations of the Pseudo2D track (4 decoders) so they can be plotted on seperate tracks and bin-debugged independently.
 
         This returns the "all-decoders-sum-to-1-across-time' normalization style that Kamran likes
+
+        xbin_centers: the optional position x-bin centers
+        ybin_centers: the optional position x-bin centers, emphatically not the decoder centers
+
 
         Usage:        
             from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import DirectionalDecodersContinuouslyDecodedResult, DecodedFilterEpochsResult
@@ -1702,6 +1706,12 @@ class DecodedFilterEpochsResult(HDF_SerializationMixin, AttrsBasedClassHelperMix
         p_x_given_n_shapes_list = [np.shape(v) for v in self.p_x_given_n_list]  #  [(59, 2, 66), (59, 2, 102), (59, 2, 226), ...]
         p_x_given_n_shapes_list = np.vstack(p_x_given_n_shapes_list) # (84, 3)
         posterior_ndim: int = (np.shape(p_x_given_n_shapes_list)[-1]-1) # 1 or 2
+        if a_pseudo2D_decoder is not None:
+            assert xbin_centers is None, f"don't provide both xbin_centers and a_pseudo2D_decoder"
+            assert ybin_centers is None, f"don't provide both ybin_centers and a_pseudo2D_decoder"
+            original_position_data_shape = deepcopy(a_pseudo2D_decoder.original_position_data_shape[:-1]) ## all but the pseudo dim
+            xbin_centers: Optional[NDArray] = deepcopy(a_pseudo2D_decoder.xbin_centers)
+            ybin_centers: Optional[NDArray] = None
 
         if posterior_ndim == 1:
             print(f'WARN: already 1D')
@@ -1714,7 +1724,10 @@ class DecodedFilterEpochsResult(HDF_SerializationMixin, AttrsBasedClassHelperMix
             if debug_print:
                 print(f'n_xbins: {n_xbins}, n_ybins: {n_ybins}')
             ## we will reduce along the y-dim dimension
-                
+
+            if xbin_centers is None:
+                print(f'WARN: xbin_centers was not provided, so the output 1D `output_pseudo2D_split_to_1D_continuous_results_dict[a_decoder_name].most_likely_positions_list` WILL BE INCORRECT!')
+
             ## Extract the Pseudo2D results as separate 1D tracks
             ## Split across the 2nd axis to make 1D posteriors that can be displayed in separate dock rows:
             assert n_ybins == len(pseudo2D_decoder_names_list), f"for pseudo2D_decoder_names_list: {pseudo2D_decoder_names_list}\n\texpected the len(pseudo2D_decoder_names_list): {len(pseudo2D_decoder_names_list)} pseudo-y bins for the decoder in n_ybins. but found n_ybins: {n_ybins}"
@@ -1724,7 +1737,29 @@ class DecodedFilterEpochsResult(HDF_SerializationMixin, AttrsBasedClassHelperMix
                 ## make separate `DecodedFilterEpochsResult` objects                
                 output_pseudo2D_split_to_1D_continuous_results_dict[a_decoder_name] = deepcopy(self) ## copy the whole pseudo2D result
                 output_pseudo2D_split_to_1D_continuous_results_dict[a_decoder_name].p_x_given_n_list = [np.squeeze(p_x_given_n[:, i, :]) for p_x_given_n in output_pseudo2D_split_to_1D_continuous_results_dict[a_decoder_name].p_x_given_n_list] ## or could squish them here
+
+                # #TODO 2025-06-13 14:29: - [X] fix busted-up columns: ['most_likely_position_indicies_list', 'most_likely_positions'
+                output_pseudo2D_split_to_1D_continuous_results_dict[a_decoder_name].most_likely_position_indicies_list = [np.squeeze(np.argmax(p_x_given_n, axis=0)) for p_x_given_n in output_pseudo2D_split_to_1D_continuous_results_dict[a_decoder_name].p_x_given_n_list]  # average along time dimension
+                # output_pseudo2D_split_to_1D_continuous_results_dict[a_decoder_name].most_likely_positions_list = None
+                if (xbin_centers is not None) and (ybin_centers is not None):
+                    ## NOTE: I think 2D position decoding isn't implemented here.
+                    # much more efficient than the other implementation. Result is # (85844, 2)
+                    output_pseudo2D_split_to_1D_continuous_results_dict[a_decoder_name].most_likely_positions = [np.vstack((xbin_centers[most_likely_position_indicies[0,:]], self.ybin_centers[most_likely_position_indicies[1,:]])).T for most_likely_position_indicies in output_pseudo2D_split_to_1D_continuous_results_dict[a_decoder_name].most_likely_position_indicies_list]
+                elif (xbin_centers is not None):
+                    # 1D Decoder case:
+                    output_pseudo2D_split_to_1D_continuous_results_dict[a_decoder_name].most_likely_positions = [np.squeeze(xbin_centers[most_likely_position_indicies]) for most_likely_position_indicies in output_pseudo2D_split_to_1D_continuous_results_dict[a_decoder_name].most_likely_position_indicies_list]
+                else:
+                    output_pseudo2D_split_to_1D_continuous_results_dict[a_decoder_name].most_likely_positions = [[] for most_likely_position_indicies in output_pseudo2D_split_to_1D_continuous_results_dict[a_decoder_name].most_likely_position_indicies_list]
+
+
+
+
+                # #TODO 2025-06-13 14:30: - [ ] Finish recomputing marginals
+                # output_pseudo2D_split_to_1D_continuous_results_dict[a_decoder_name].marginal_x_list = None
+                # output_pseudo2D_split_to_1D_continuous_results_dict[a_decoder_name].marginal_y_list = None
                 # output_pseudo2D_split_to_1D_continuous_results_dict[a_decoder_name].compute_marginals()
+
+
             ## END for i, a_de...
             return output_pseudo2D_split_to_1D_continuous_results_dict
 
