@@ -105,7 +105,7 @@ def _post_hoc_layout_resize(active_2d_plot, desired_static_area_height: Optional
 
 
 @function_attributes(short_name=None, tags=['2024-12-18', 'ACTIVE', 'gui', 'debugging', 'continuous'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-12-18 19:29', related_items=[])
-def _setup_spike_raster_window_for_debugging(spike_raster_window, wants_docked_raster_window_track:bool=False, enable_interval_overview_track:bool=False, debug_print=False):
+def _setup_spike_raster_window_for_debugging(spike_raster_window, wants_docked_raster_window_track:bool=False, enable_interval_overview_track:bool=False, allow_replace_hardcoded_main_plots_with_tracks: bool = False, debug_print=False):
     """ Called to setup a specific `spike_raster_window` instance for 2024-12-18 style debugging.
     
     
@@ -186,8 +186,9 @@ def _setup_spike_raster_window_for_debugging(spike_raster_window, wants_docked_r
     if background_static_scroll_window_plot is not None:
         _all_outputs_dict['background_static_scroll_window_plot'] = background_static_scroll_window_plot
 
+
     should_replace_hardcoded_main_plots_with_tracks: bool = False
-    if (enable_interval_overview_track and wants_docked_raster_window_track):
+    if (enable_interval_overview_track and wants_docked_raster_window_track and allow_replace_hardcoded_main_plots_with_tracks):
         should_replace_hardcoded_main_plots_with_tracks = True
         print(f'should_replace_hardcoded_main_plots_with_tracks: {should_replace_hardcoded_main_plots_with_tracks}')
 
