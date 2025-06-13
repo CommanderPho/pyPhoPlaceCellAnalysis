@@ -173,6 +173,34 @@ class LocalMenus_AddRenderable(QtWidgets.QMainWindow):
         return widget, renderable_menu, (submenu_addTimeIntervals, submenu_addTimeIntervalCallbacks, submenu_addTimeIntervals_Connections), (submenu_addTimeCurves, submenu_addTimeCurvesCallbacks, submenu_addTimeCurves_Connections), (submenu_addMatplotlibPlot, submenu_addMatplotlibPlotCallbacks, submenu_addMatplotlibPlot_Connections)
 
 
+
+    @classmethod
+    def _helper_append_custom_menu_to_widget_context_menu(cls, parent_widget, additional_menu, debug_print=False):
+        """ Adds the custom menu, such as one loaded from a .ui file, to the end of the *context* menu
+        parent_widget: PlotItem
+        additional_menu: QMenu
+
+        Example:
+            from pyphoplacecellanalysis.Resources import GuiResources, ActionIcons
+            from pyphoplacecellanalysis.GUI.Qt.GlobalApplicationMenus.LocalMenus_AddRenderable import LocalMenus_AddRenderable
+            widget = LocalMenus_AddRenderable()
+            append_custom_menu_to_context_menu(main_plot_widget, widget.ui.menuAdd_Renderable)
+            append_custom_menu_to_context_menu(background_static_scroll_plot_widget, widget.ui.menuAdd_Renderable)
+        """
+
+        plot_options_context_menu = parent_widget.getContextMenus(None) # This gets the "Plot Options" menu
+        # top_level_parent_context_menu = parent_context_menus.parent()
+        top_level_parent_context_menu = parent_widget.vb.menu # ViewBoxMenu
+        if top_level_parent_context_menu is not None:
+            active_parent_menu = top_level_parent_context_menu
+            active_parent_menu.addSeparator()
+            active_parent_menu.addMenu(additional_menu)
+            if debug_print:
+                print(f'parent_context_menus.actions: {[an_action.text() for an_action in active_parent_menu.actions()]}') # parent_context_menus.actions: ['Transforms', 'Downsample', 'Average', 'Alpha', 'Grid', 'Points']
+
+
+
+
     @classmethod
     def add_renderable_context_menu(cls, active_2d_plot, curr_active_pipeline, active_config_name, debug_print=False) -> QtWidgets.QMenu:
         """ Creates the context menus that display when right-clicking a SpikeRaster2D plot showing the actions: add_epochs, add_graph, etc
@@ -182,31 +210,6 @@ class LocalMenus_AddRenderable(QtWidgets.QMainWindow):
             menuAdd_Renderable = LocalMenus_AddRenderable.add_renderable_context_menu(active_2d_plot, sess)
             
         """
-        def _subFn_append_custom_menu_to_context_menu(parent_widget, additional_menu, debug_print=False):
-            """ Adds the custom menu, such as one loaded from a .ui file, to the end of the *context* menu
-            parent_widget: PlotItem
-            additional_menu: QMenu
-            
-            Example:
-                from pyphoplacecellanalysis.Resources import GuiResources, ActionIcons
-                from pyphoplacecellanalysis.GUI.Qt.GlobalApplicationMenus.LocalMenus_AddRenderable import LocalMenus_AddRenderable
-                widget = LocalMenus_AddRenderable()
-                append_custom_menu_to_context_menu(main_plot_widget, widget.ui.menuAdd_Renderable)
-                append_custom_menu_to_context_menu(background_static_scroll_plot_widget, widget.ui.menuAdd_Renderable)
-            """
-            
-            plot_options_context_menu = parent_widget.getContextMenus(None) # This gets the "Plot Options" menu
-            # top_level_parent_context_menu = parent_context_menus.parent()
-            top_level_parent_context_menu = parent_widget.vb.menu # ViewBoxMenu
-            if top_level_parent_context_menu is not None:
-                active_parent_menu = top_level_parent_context_menu
-                active_parent_menu.addSeparator()
-                active_parent_menu.addMenu(additional_menu)
-                if debug_print:
-                    print(f'parent_context_menus.actions: {[an_action.text() for an_action in active_parent_menu.actions()]}') # parent_context_menus.actions: ['Transforms', 'Downsample', 'Average', 'Alpha', 'Grid', 'Points']
-
-                
-
         # BEGIN FUNCTION BODY ________________________________________________________________________________________________ #
         
          ## Build `partial` versions of the functions specific to each raster plotter that can be called with no arguments (capturing the destination plotter and the session
@@ -228,10 +231,11 @@ class LocalMenus_AddRenderable(QtWidgets.QMainWindow):
             main_plot_widget = active_2d_plot.plots.main_plot_widget # PlotItem
             background_static_scroll_plot_widget = active_2d_plot.plots.background_static_scroll_window_plot # PlotItem
             if main_plot_widget is not None:
-                _subFn_append_custom_menu_to_context_menu(main_plot_widget, menuAdd_Renderable)
+                cls._helper_append_custom_menu_to_widget_context_menu(parent_widget=main_plot_widget, additional_menu=menuAdd_Renderable, debug_print=debug_print)
             if background_static_scroll_plot_widget is not None:
-                _subFn_append_custom_menu_to_context_menu(background_static_scroll_plot_widget, menuAdd_Renderable)
-        
+                cls._helper_append_custom_menu_to_widget_context_menu(parent_widget=background_static_scroll_plot_widget, additional_menu=menuAdd_Renderable, debug_print=debug_print)
+
+
         # Add the reference to the context menus to owner, so it isn't released:
         ## TODO: currently replaces the dict entry, which we might want to use for other menus
         active_2d_plot.ui.menus = PhoUIContainer.init_from_dict({'custom_context_menus': PhoUIContainer.init_from_dict({'add_renderables': active_2d_plot_renderable_menus})})
