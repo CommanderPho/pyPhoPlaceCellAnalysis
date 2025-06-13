@@ -1130,7 +1130,7 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
 
     @function_attributes(short_name=None, tags=['MAIN', 'general'], input_requires=[], output_provides=[], uses=['_display_spike_rasters_pyqtplot_2D'], used_by=[], creation_date='2025-06-13 08:11', related_items=[])
     @classmethod
-    def find_or_create_if_needed(cls, curr_active_pipeline, force_create_new:bool=False, **kwargs):
+    def find_or_create_if_needed(cls, curr_active_pipeline, force_create_new:bool=False, wants_docked_raster_window_track=True, enable_interval_overview_track=True, allow_replace_hardcoded_main_plots_with_tracks=False, **kwargs):
         """ Gets the existing SpikeRasterWindow or creates a new one if one doesn't already exist:
         Usage:
         
@@ -1144,6 +1144,7 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
         from pyphocorehelpers.gui.Qt.TopLevelWindowHelper import TopLevelWindowHelper
         import pyphoplacecellanalysis.External.pyqtgraph as pg # Used to get the app for TopLevelWindowHelper.top_level_windows
         ## For searching with `TopLevelWindowHelper.all_widgets(...)`:
+        from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.SpikeRasterWidgets.spike_raster_widgets import _setup_spike_raster_window_for_debugging
 
         found_spike_raster_windows = TopLevelWindowHelper.all_widgets(pg.mkQApp(), searchType=cls)
         _out_args = []
@@ -1154,6 +1155,9 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
             print(f'no existing SpikeRasterWindow. Creating a new one.')
             # Create a new `SpikeRaster2D` instance using `_display_spike_raster_pyqtplot_2D` and capture its outputs:
             active_2d_plot, active_3d_plot, spike_raster_window = curr_active_pipeline.plot._display_spike_rasters_pyqtplot_2D(**kwargs).values()
+            all_global_menus_actionsDict, global_flat_action_dict, _all_outputs_dict = _setup_spike_raster_window_for_debugging(spike_raster_window, wants_docked_raster_window_track=wants_docked_raster_window_track, enable_interval_overview_track=enable_interval_overview_track, allow_replace_hardcoded_main_plots_with_tracks=allow_replace_hardcoded_main_plots_with_tracks)
+
+
         else:
             print(f'found {len(found_spike_raster_windows)} existing Spike3DRasterWindowWidget windows using TopLevelWindowHelper.all_widgets(...). Will use the most recent.')
             if force_create_new:
