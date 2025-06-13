@@ -245,7 +245,7 @@ def _setup_spike_raster_window_for_debugging(spike_raster_window, wants_docked_r
 
     # Add Renderables ____________________________________________________________________________________________________ #
     # add_renderables_menu = active_2d_plot.ui.menus.custom_context_menus.add_renderables[0].programmatic_actions_dict
-    menu_commands = ['AddTimeIntervals.Replays', 'AddTimeIntervals.Laps', 'AddTimeIntervals.SessionEpochs'] # , 'AddTimeIntervals.SessionEpochs', 'AddTimeIntervals.PBEs', 'AddTimeIntervals.Ripples',
+    menu_commands = ['AddTimeIntervals.Replays', 'AddTimeIntervals.Laps', 'AddTimeIntervals.SessionEpochs', 'AddTimeIntervals.PBEs'] # , 'AddTimeIntervals.SessionEpochs', 'AddTimeIntervals.PBEs', 'AddTimeIntervals.Ripples',
     for a_command in menu_commands:
         assert a_command in global_flat_action_dict, f"a_command: '{a_command}' is not present in global_flat_action_dict: {list(global_flat_action_dict.keys())}"
         # add_renderables_menu[a_command].trigger()
@@ -277,7 +277,7 @@ def _setup_spike_raster_window_for_debugging(spike_raster_window, wants_docked_r
             # all_global_menus_actionsDict[a_command].trigger()
             global_flat_action_dict[a_command].trigger()
     
-    QTimer.singleShot(500, trigger_commands)
+    QTimer.singleShot(700, trigger_commands)
     # ## add the right sidebar
     # visible_intervals_info_widget_container, visible_intervals_ctrl_layout_widget =  spike_raster_window._perform_build_attached_visible_interval_info_widget() # builds the tables
     
