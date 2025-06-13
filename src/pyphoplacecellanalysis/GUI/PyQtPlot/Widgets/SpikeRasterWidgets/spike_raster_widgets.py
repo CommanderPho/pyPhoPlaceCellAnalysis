@@ -79,26 +79,28 @@ def _post_hoc_layout_resize(active_2d_plot, desired_static_area_height: Optional
     _post_hoc_layout_resize(active_2d_plot=active_2d_plot, desired_static_area_height=249)
     
     """
-    if getattr(active_2d_plot.ui, 'main_content_splitter', None) is not None:
+
+    if active_2d_plot.ui.has_attr('main_content_splitter'):
         ## requires main_content_splitter, which is only used when `self.params.use_docked_pyqtgraph_plots` == False
         main_content_splitter = active_2d_plot.ui.main_content_splitter # QSplitter
-        if desired_static_area_height is None:
-            required_static_children_bounding_rect_height: float = _get_required_static_layout_height(active_2d_plot=active_2d_plot)
-            desired_static_area_height = required_static_children_bounding_rect_height
-        else:
-            ## use user provided
-            print(f'desired_static_area_height: {desired_static_area_height}')
-            
-        ## INPUTS: main_content_splitter, desired_static_area_height
-        original_sizes = np.array(main_content_splitter.sizes())
-        extra_v_height = (original_sizes[-1] - desired_static_area_height)
-        desired_sizes = deepcopy(original_sizes)
-        desired_sizes[-1] = desired_static_area_height
-        desired_sizes[0] = desired_sizes[0] + extra_v_height
+        if active_2d_plot.ui.main_content_splitter is not None:
+            if desired_static_area_height is None:
+                required_static_children_bounding_rect_height: float = _get_required_static_layout_height(active_2d_plot=active_2d_plot)
+                desired_static_area_height = required_static_children_bounding_rect_height
+            else:
+                ## use user provided
+                print(f'desired_static_area_height: {desired_static_area_height}')
+                
+            ## INPUTS: main_content_splitter, desired_static_area_height
+            original_sizes = np.array(main_content_splitter.sizes())
+            extra_v_height = (original_sizes[-1] - desired_static_area_height)
+            desired_sizes = deepcopy(original_sizes)
+            desired_sizes[-1] = desired_static_area_height
+            desired_sizes[0] = desired_sizes[0] + extra_v_height
 
-        assert np.sum(desired_sizes) == np.sum(original_sizes), f"np.sum(desired_sizes): {np.sum(desired_sizes)} != np.sum(original_sizes): {np.sum(original_sizes)}"
+            assert np.sum(desired_sizes) == np.sum(original_sizes), f"np.sum(desired_sizes): {np.sum(desired_sizes)} != np.sum(original_sizes): {np.sum(original_sizes)}"
 
-        main_content_splitter.setSizes(desired_sizes.tolist())
+            main_content_splitter.setSizes(desired_sizes.tolist())
 
 
 
