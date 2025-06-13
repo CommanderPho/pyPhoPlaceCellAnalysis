@@ -59,7 +59,7 @@ class SpikeRastersDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Displa
     
     # external_independent_widget_fcns = ['_display_spike_rasters_pyqtplot_2D', '_display_spike_rasters_pyqtplot_3D', '_display_spike_rasters_vedo_3D', '_display_spike_rasters_pyqtplot_3D_with_2D_controls', '_display_spike_rasters_vedo_3D_with_2D_controls', '_display_spike_rasters_window']
     
-    @function_attributes(short_name='spike_rasters_pyqtplot_2D', tags=['display','interactive', 'raster', '2D', 'pyqtplot'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-04-11 03:05')
+    @function_attributes(short_name='spike_rasters_pyqtplot_2D', tags=['display','interactive', 'raster', '2D', 'pyqtplot'], input_requires=[], output_provides=[], uses=[], used_by=['Spike3DRasterWindowWidget.find_or_create_if_needed'], creation_date='2023-04-11 03:05')
     @staticmethod
     def _display_spike_rasters_pyqtplot_2D(computation_result, active_config, enable_saving_to_disk=False, **kwargs):
         """ Plots a standalone 2D raster plot
@@ -98,7 +98,7 @@ class SpikeRastersDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Displa
         active_config_name = kwargs.get('active_config_name', 'Unknown')
         owning_pipeline_reference = kwargs.get('owning_pipeline', None) # A reference to the pipeline upon which this display function is being called
         assert owning_pipeline_reference is not None
-        _active_2d_plot_renderable_menus = LocalMenus_AddRenderable.add_renderable_context_menu(spike_raster_plt_2d, owning_pipeline_reference, active_config_name)
+        _active_2d_plot_renderable_menus = LocalMenus_AddRenderable.initialize_renderable_context_menu(spike_raster_plt_2d, owning_pipeline_reference, active_config_name)
         # _active_2d_plot_renderable_menus = LocalMenus_AddRenderable.add_renderable_context_menu(spike_raster_plt_2d, computation_result.sess)  # Adds the custom context menus for SpikeRaster2D
         return {'spike_raster_plt_2d':spike_raster_plt_2d, 'spike_raster_plt_3d':spike_raster_plt_3d, 'spike_3d_to_2d_window_connection':spike_3d_to_2d_window_connection, 'spike_raster_window': spike_raster_window}
 
@@ -114,7 +114,7 @@ class SpikeRastersDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Displa
         active_config_name = kwargs.get('active_config_name', 'Unknown')
         owning_pipeline_reference = kwargs.get('owning_pipeline', None) # A reference to the pipeline upon which this display function is being called
         assert owning_pipeline_reference is not None
-        _active_2d_plot_renderable_menus = LocalMenus_AddRenderable.add_renderable_context_menu(spike_raster_plt_2d, owning_pipeline_reference, active_config_name)
+        _active_2d_plot_renderable_menus = LocalMenus_AddRenderable.initialize_renderable_context_menu(spike_raster_plt_2d, owning_pipeline_reference, active_config_name)
         # _active_2d_plot_renderable_menus = LocalMenus_AddRenderable.add_renderable_context_menu(spike_raster_plt_2d, computation_result.sess) # Adds the custom context menus for SpikeRaster2D
         return {'spike_raster_plt_2d':spike_raster_plt_2d, 'spike_raster_plt_3d_vedo':spike_raster_plt_3d_vedo, 'spike_3d_to_2d_window_connection':spike_3d_to_2d_window_connection, 'spike_raster_window': spike_raster_window}
 
@@ -1533,7 +1533,7 @@ def _build_additional_spikeRaster2D_menus(spike_raster_plt_2d, owning_pipeline_r
     ## Adds the custom renderable menu to the top-level menu of the plots in Spike2DRaster
     # _active_2d_plot_renderable_menus = LocalMenus_AddRenderable.add_renderable_context_menu(spike_raster_window.spike_raster_plt_2d, computation_result.sess)  # Adds the custom context menus for SpikeRaster2D
     
-    _active_2d_plot_renderable_menus = LocalMenus_AddRenderable.add_renderable_context_menu(spike_raster_plt_2d, owning_pipeline_reference, active_config_name)  # Adds the custom context menus for SpikeRaster2D
+    _active_2d_plot_renderable_menus = LocalMenus_AddRenderable.initialize_renderable_context_menu(spike_raster_plt_2d, owning_pipeline_reference, active_config_name)  # Adds the custom context menus for SpikeRaster2D
     
     # spike_raster_plt_2d.menu_action_history_list = []
     

@@ -5,6 +5,7 @@ from functools import partial
 from benedict import benedict
 
 from typing import Dict, List, Tuple, Optional, Callable, Union, Any
+from neuropy.core.user_annotations import function_attributes
 from typing_extensions import TypeAlias
 from nptyping import NDArray
 import pyphoplacecellanalysis.External.pyqtgraph as pg
@@ -174,37 +175,126 @@ class LocalMenus_AddRenderable(QtWidgets.QMainWindow):
 
 
 
-    @classmethod
-    def _helper_append_custom_menu_to_widget_context_menu(cls, parent_widget, additional_menu, debug_print=False):
-        """ Adds the custom menu, such as one loaded from a .ui file, to the end of the *context* menu
-        parent_widget: PlotItem
-        additional_menu: QMenu
+    # ==================================================================================================================================================================================================================================================================================== #
+    # Adding right-click Context Menus                                                                                                                                                                                                                                                     #
+    # ==================================================================================================================================================================================================================================================================================== #
 
-        Example:
-            from pyphoplacecellanalysis.Resources import GuiResources, ActionIcons
-            from pyphoplacecellanalysis.GUI.Qt.GlobalApplicationMenus.LocalMenus_AddRenderable import LocalMenus_AddRenderable
-            widget = LocalMenus_AddRenderable()
-            append_custom_menu_to_context_menu(main_plot_widget, widget.ui.menuAdd_Renderable)
-            append_custom_menu_to_context_menu(background_static_scroll_plot_widget, widget.ui.menuAdd_Renderable)
+
+
+
+    @classmethod
+    def _show_qwidget_context_menu(cls, widget, position):
+        """ Helper method to show the context menu for any QWidget """
+        context_menu = getattr(widget, '_pho_custom_context_menu', None)
+        if context_menu is not None:
+            # Convert the position to global coordinates
+            global_pos = widget.mapToGlobal(position)
+
+            # Check if there are any existing actions to add first
+            if hasattr(widget, '_pho_original_context_menu_event'):
+                # If the widget had original context menu functionality, 
+                # we could try to extract those actions, but this is complex
+                # For now, just show our custom menu
+                pass
+
+            # Show the context menu
+            context_menu.exec_(global_pos)
+
+    @function_attributes(short_name=None, tags=['private', 'main'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-06-13 07:39', related_items=[])
+    @classmethod
+    def _helper_append_custom_menu_to_widget_context_menu_universal(cls, parent_widget, additional_menu, debug_print=False):
+        """ Universal helper that works with both pyqtgraph widgets and general QWidgets
+        parent_widget: QWidget or pyqtgraph widget
+        additional_menu: QMenu
         """
 
-        plot_options_context_menu = parent_widget.getContextMenus(None) # This gets the "Plot Options" menu
-        # top_level_parent_context_menu = parent_context_menus.parent()
-        top_level_parent_context_menu = parent_widget.vb.menu # ViewBoxMenu
-        if top_level_parent_context_menu is not None:
-            active_parent_menu = top_level_parent_context_menu
-            active_parent_menu.addSeparator()
-            active_parent_menu.addMenu(additional_menu)
+        def _subfn_append_custom_menu_to_QWidget_context_menu(parent_widget, additional_menu, debug_print=False):
+            """ 
+            """
+
+            # Ensure the widget has custom context menu policy enabled
+            if parent_widget.contextMenuPolicy() == QtCore.Qt.NoContextMenu:
+                parent_widget.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
+            elif parent_widget.contextMenuPolicy() == QtCore.Qt.DefaultContextMenu:
+                # Switch from default to custom to allow our menu additions
+                parent_widget.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
+
+            # Get or create the context menu
+            existing_context_menu = getattr(parent_widget, '_pho_custom_context_menu', None)
+
+            if existing_context_menu is None:
+                # Create a new context menu
+                parent_widget._pho_custom_context_menu = QtWidgets.QMenu(parent_widget)
+                existing_context_menu = parent_widget._pho_custom_context_menu
+
+                # Check if we need to preserve any existing context menu actions
+                if hasattr(parent_widget, 'contextMenuEvent'):
+                    # Store the original contextMenuEvent method if it exists
+                    original_context_menu_event = parent_widget.contextMenuEvent
+                    parent_widget._pho_original_context_menu_event = original_context_menu_event
+
+                # Connect the customContextMenuRequested signal
+                if not hasattr(parent_widget, '_pho_context_menu_connected'):
+                    parent_widget.customContextMenuRequested.connect(lambda pos, widget=parent_widget: cls._show_qwidget_context_menu(widget, pos))
+                    parent_widget._pho_context_menu_connected = True
+
+            # Add separator and the additional menu
+            existing_context_menu.addSeparator()
+            existing_context_menu.addMenu(additional_menu)
+
             if debug_print:
-                print(f'parent_context_menus.actions: {[an_action.text() for an_action in active_parent_menu.actions()]}') # parent_context_menus.actions: ['Transforms', 'Downsample', 'Average', 'Alpha', 'Grid', 'Points']
+                print(f'QWidget context menu actions: {[an_action.text() for an_action in existing_context_menu.actions()]}')
+
+
+        # @function_attributes(short_name=None, tags=['pyqtgraph'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-06-13 07:40', related_items=[])
+        def _subfn_append_custom_menu_to_PyQtGraph_based_widget_context_menu(parent_widget, additional_menu, debug_print=False):
+            """ For PyQtGraph-based widgets with an existing context menu (the default one by PyQtGraph)
+            """
+            # plot_options_context_menu = parent_widget.getContextMenus(None) # This gets the "Plot Options" menu
+            # top_level_parent_context_menu = parent_context_menus.parent()
+            top_level_parent_context_menu = parent_widget.vb.menu # ViewBoxMenu
+            if top_level_parent_context_menu is not None:
+                active_parent_menu = top_level_parent_context_menu
+                active_parent_menu.addSeparator()
+                active_parent_menu.addMenu(additional_menu)
+                if debug_print:
+                    print(f'parent_context_menus.actions: {[an_action.text() for an_action in active_parent_menu.actions()]}') # parent_context_menus.actions: ['Transforms', 'Downsample', 'Average', 'Alpha', 'Grid', 'Points']
+
+
+
+        # BEGIN FUNCTION BODY ________________________________________________________________________________________________ #
+
+        # Try pyqtgraph approach first (for PlotItem, ViewBox, etc.)
+        try:
+            if hasattr(parent_widget, 'vb') and hasattr(parent_widget.vb, 'menu'):
+                # This is likely a pyqtgraph PlotItem
+                _subfn_append_custom_menu_to_PyQtGraph_based_widget_context_menu(parent_widget, additional_menu, debug_print)
+                return
+            elif hasattr(parent_widget, 'menu'):
+                # This might be a pyqtgraph ViewBox or similar
+                active_parent_menu = parent_widget.menu
+                active_parent_menu.addSeparator()
+                active_parent_menu.addMenu(additional_menu)
+                if debug_print:
+                    print(f'pyqtgraph widget menu actions: {[an_action.text() for an_action in active_parent_menu.actions()]}')
+                return
+        except Exception as e:
+            if debug_print:
+                print(f'Pyqtgraph approach failed: {e}, falling back to QWidget approach')
+
+        # Fall back to general QWidget approach
+        _subfn_append_custom_menu_to_QWidget_context_menu(parent_widget, additional_menu, debug_print)
 
 
 
 
+
+    @function_attributes(short_name=None, tags=['context-menu', 'right-click'], input_requires=[], output_provides=['active_2d_plot.ui.menus'], uses=['._helper_append_custom_menu_to_widget_context_menu_universal'], used_by=['_build_additional_spikeRaster2D_menus'], creation_date='2022-01-01 00:00', related_items=[])
     @classmethod
-    def add_renderable_context_menu(cls, active_2d_plot, curr_active_pipeline, active_config_name, debug_print=False) -> QtWidgets.QMenu:
+    def initialize_renderable_context_menu(cls, active_2d_plot, curr_active_pipeline, active_config_name, debug_print=False) -> QtWidgets.QMenu:
         """ Creates the context menus that display when right-clicking a SpikeRaster2D plot showing the actions: add_epochs, add_graph, etc
-        
+        ** ONLY FOR THE two hard-coded pyqtgraph widgets! Must be called before trying to add elsewhere
+
         Usage:
             active_2d_plot = spike_raster_window.spike_raster_plt_2d 
             menuAdd_Renderable = LocalMenus_AddRenderable.add_renderable_context_menu(active_2d_plot, sess)
@@ -231,9 +321,9 @@ class LocalMenus_AddRenderable(QtWidgets.QMainWindow):
             main_plot_widget = active_2d_plot.plots.main_plot_widget # PlotItem
             background_static_scroll_plot_widget = active_2d_plot.plots.background_static_scroll_window_plot # PlotItem
             if main_plot_widget is not None:
-                cls._helper_append_custom_menu_to_widget_context_menu(parent_widget=main_plot_widget, additional_menu=menuAdd_Renderable, debug_print=debug_print)
+                cls._subfn_append_custom_menu_to_PyQtGraph_based_widget_context_menu(parent_widget=main_plot_widget, additional_menu=menuAdd_Renderable, debug_print=debug_print)
             if background_static_scroll_plot_widget is not None:
-                cls._helper_append_custom_menu_to_widget_context_menu(parent_widget=background_static_scroll_plot_widget, additional_menu=menuAdd_Renderable, debug_print=debug_print)
+                cls._subfn_append_custom_menu_to_PyQtGraph_based_widget_context_menu(parent_widget=background_static_scroll_plot_widget, additional_menu=menuAdd_Renderable, debug_print=debug_print)
 
 
         # Add the reference to the context menus to owner, so it isn't released:
