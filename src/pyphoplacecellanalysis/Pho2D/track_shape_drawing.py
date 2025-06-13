@@ -1613,6 +1613,17 @@ def _plot_track_remapping_diagram(a_dir_decoder_aclu_MAX_peak_maps_df: pd.DataFr
 
     selection_text_path_effects = [path_effects.Stroke(linewidth=0.2, foreground='red'), path_effects.Normal()]
 
+
+
+    appearing_edgecolors = (0, 1, 0, 1)  # Green color in RGBA format
+    # appearing_marker: str = '^' # upward arrow
+    appearing_disappearing_marker: str = 'P' # filled plus
+
+    disappearing_edgecolors = (1, 0, 0, 1)  # Red color in RGBA format
+    # disappearing_marker: str = 'v' # downward arrow
+    disappearing_marker: str = 'X' # filled X
+
+
     # BEGIN FUNCTION BODY ________________________________________________________________________________________________ #
 
     ## Extract the quantities needed from the DF passed
@@ -1780,20 +1791,21 @@ def _plot_track_remapping_diagram(a_dir_decoder_aclu_MAX_peak_maps_df: pd.DataFr
     # INPUTS: is_aclu_in_both, disappearing_long_to_short_indicies, appearing_long_to_short_indicies
 
     common_circle_points_kwargs = dict(alpha=0.9, picker=enable_interactivity, plotnonfinite=False)
+    common_BOTH_only_circle_points_kwargs = common_circle_points_kwargs | dict(marker='o', zorder=9, alpha=0.4)
 
     both_long_peak_x = long_peak_x[is_aclu_in_both]
     both_long_y = long_y[is_aclu_in_both]
     both_color = color[is_aclu_in_both]
-    both_long_circle_points_kwargs = dict(**common_circle_points_kwargs, marker='o', s=np.full((len(both_long_peak_x),), fill_value=scatter_point_size), edgecolors=([_default_edgecolors] * len(both_long_peak_x)), facecolors=both_color)
+    both_long_circle_points_kwargs = dict(**common_BOTH_only_circle_points_kwargs, s=np.full((len(both_long_peak_x),), fill_value=scatter_point_size), edgecolors=([_default_edgecolors] * len(both_long_peak_x)), facecolors=both_color)
     _out_long_points = ax.scatter(both_long_peak_x, y=both_long_y, label='long_peak_x', **both_long_circle_points_kwargs)
     
+
+    # Disappearing Points ___________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
     if (disappearing_long_to_short_indicies is not None) and (len(disappearing_long_to_short_indicies) > 0):
-        # disappearing_marker: str = 'v' # downward arrow
-        disappearing_marker: str = 'X' # filled X
         disappearing_long_peak_x = long_peak_x[disappearing_long_to_short_indicies]
         disappearing_long_y = long_y[disappearing_long_to_short_indicies]
-        disappearing_color = color[disappearing_long_to_short_indicies]
-        disappearing_circle_points_kwargs = dict(**common_circle_points_kwargs, marker=disappearing_marker, s=np.full((len(disappearing_long_peak_x),), fill_value=scatter_point_size), edgecolors=([_default_edgecolors] * len(disappearing_long_peak_x)), facecolors=disappearing_color)
+        disappearing_facecolors = color[disappearing_long_to_short_indicies]
+        disappearing_circle_points_kwargs = dict(**common_circle_points_kwargs, marker=disappearing_marker, s=np.full((len(disappearing_long_peak_x),), fill_value=scatter_point_size), edgecolors=([disappearing_edgecolors] * len(disappearing_long_peak_x)), facecolors=disappearing_facecolors, zorder=10)
         _out_long_disappearing_points = ax.scatter(disappearing_long_peak_x, y=disappearing_long_y, label='long_peak_x', **disappearing_circle_points_kwargs)
     else:
         _out_long_disappearing_points = None
@@ -1802,20 +1814,18 @@ def _plot_track_remapping_diagram(a_dir_decoder_aclu_MAX_peak_maps_df: pd.DataFr
     both_short_peak_x = short_peak_x[is_aclu_in_both]
     both_short_y = short_y[is_aclu_in_both]
     both_color = color[is_aclu_in_both]
-    both_short_circle_points_kwargs = dict(**common_circle_points_kwargs, marker='o', s=np.full((len(both_short_peak_x),), fill_value=scatter_point_size), edgecolors=([_default_edgecolors] * len(both_short_peak_x)), facecolors=both_color)
+    both_short_circle_points_kwargs = dict(**common_BOTH_only_circle_points_kwargs, s=np.full((len(both_short_peak_x),), fill_value=scatter_point_size), edgecolors=([_default_edgecolors] * len(both_short_peak_x)), facecolors=both_color)
     
     _out_short_points = ax.scatter(both_short_peak_x, y=both_short_y, label='short_peak_x_app', **both_short_circle_points_kwargs)
 
     # _out_short_points = ax.scatter(short_peak_x, y=short_y, label='short_peak_x', **circle_points_kwargs)
 
-    if (appearing_long_to_short_indicies is not None) and (len(appearing_long_to_short_indicies) > 0):
-        # appearing_marker: str = '^' # upward arrow
-        appearing_marker: str = 'P' # filled plus
-        
+    # Appearing Points ___________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
+    if (appearing_long_to_short_indicies is not None) and (len(appearing_long_to_short_indicies) > 0):        
         appearing_short_peak_x = short_peak_x[appearing_long_to_short_indicies]
         appearing_short_y = short_y[appearing_long_to_short_indicies]
-        appearing_color = color[appearing_long_to_short_indicies]
-        appearing_circle_points_kwargs = dict(**common_circle_points_kwargs, marker=appearing_marker, s=np.full((len(appearing_short_peak_x),), fill_value=scatter_point_size), edgecolors=([_default_edgecolors] * len(appearing_short_peak_x)), facecolors=appearing_color)
+        appearing_facecolors = color[appearing_long_to_short_indicies]
+        appearing_circle_points_kwargs = dict(**common_circle_points_kwargs, marker=appearing_disappearing_marker, s=np.full((len(appearing_short_peak_x),), fill_value=scatter_point_size), edgecolors=([appearing_edgecolors] * len(appearing_short_peak_x)), facecolors=appearing_facecolors, zorder=11)
         _out_short_appearing_points = ax.scatter(appearing_short_peak_x, y=appearing_short_y, label='short_peak_x_dis', **appearing_circle_points_kwargs)
     else:
         _out_short_appearing_points = None      
@@ -1834,6 +1844,7 @@ def _plot_track_remapping_diagram(a_dir_decoder_aclu_MAX_peak_maps_df: pd.DataFr
     # arrowprops_kwargs = dict(arrowstyle="->", alpha=0.6)
     # arrowprops_kwargs = dict(arrowstyle="simple", alpha=0.7)
     arrowprops_kwargs = dict(arrowstyle="fancy, head_length=0.25, head_width=0.25, tail_width=0.05", alpha=0.6)
+    arrowprops_kwargs = arrowprops_kwargs | dict(alpha=0.2, zorder=1)
     # , mutation_scale=10
 
     ## need to take both to str, or both to int
