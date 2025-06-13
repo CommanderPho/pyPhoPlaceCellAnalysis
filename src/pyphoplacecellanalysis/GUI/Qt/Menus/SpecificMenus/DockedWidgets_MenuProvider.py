@@ -18,7 +18,7 @@ from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPred
     
 @metadata_attributes(short_name=None, tags=['dock'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2022-09-29 00:00', related_items=[])
 class DockedWidgets_MenuProvider(BaseMenuProviderMixin):
-    """ 
+    """ This seems to be *ABOUT* menus that add docked widgets, not about adding menus *TO* new docked widgets
     
     SCRATCH !! NOT THE BEST THO: The most up-to-date (as of 2022-09-29) method of building custom menu items. 
     

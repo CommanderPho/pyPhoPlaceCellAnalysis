@@ -1548,6 +1548,20 @@ def _build_additional_window_menus(spike_raster_window: Spike3DRasterWindowWidge
 
     TODO: seems like it should be a Spike3DRasterWindowWidget member property
     
+        DockedWidgets_MenuProvider
+        
+    Usage:
+        from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.SpikeRasters import _build_additional_window_menus
+
+        # Set Window Title Options:
+        a_file_prefix = str(computation_result.sess.filePrefix.resolve())
+        spike_raster_window.setWindowFilePath(a_file_prefix)
+        spike_raster_window.setWindowTitle(f'Spike Raster Window - {active_config_name} - {a_file_prefix}')
+
+        ## Build the additional menus:
+        output_references = _build_additional_window_menus(spike_raster_window, owning_pipeline_reference, computation_result, active_display_fn_identifying_ctx) ## the menus on the other hand take the entire pipeline, because they might need that valuable DATA
+
+        
     """
     assert owning_pipeline_reference is not None
     active_config_name: str = _recover_filter_config_name_from_display_context(owning_pipeline_reference, active_display_fn_identifying_ctx) # recover active_config_name from the context
