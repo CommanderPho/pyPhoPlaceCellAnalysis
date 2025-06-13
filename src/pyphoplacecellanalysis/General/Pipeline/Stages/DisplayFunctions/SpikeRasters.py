@@ -1529,6 +1529,8 @@ def _recover_filter_config_name_from_display_context(owning_pipeline_reference, 
 
 @function_attributes(short_name=None, tags=['menu', 'spike_raster', 'ui'], input_requires=[], output_provides=[], uses=['LocalMenus_AddRenderable'], used_by=['_build_additional_window_menus'], creation_date='2023-11-09 19:32', related_items=[])
 def _build_additional_spikeRaster2D_menus(spike_raster_plt_2d, owning_pipeline_reference, computation_result, active_display_fn_identifying_ctx):
+    from pyphoplacecellanalysis.GUI.Qt.Menus.LocalMenus_AddRenderable.LocalMenus_AddRenderable import LocalMenus_AddRenderable
+
     active_config_name: str = _recover_filter_config_name_from_display_context(owning_pipeline_reference, active_display_fn_identifying_ctx) # recover active_config_name from the context
 
     ## Adds the custom renderable menu to the top-level menu of the plots in Spike2DRaster
