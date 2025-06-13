@@ -233,7 +233,6 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
         # else:
         #     self.applicationName = Spike3DRasterWindowWidget.applicationName
         
-        
         self.enable_debug_print = Spike3DRasterWindowWidget.enable_debug_print
         
         app = pg.mkQApp(self.applicationName) # <PyQt5.QtWidgets.QApplication at 0x1d44a4891f0>
@@ -1129,6 +1128,7 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
     
     ##-----------------------------------------
 
+    @function_attributes(short_name=None, tags=['MAIN', 'general'], input_requires=[], output_provides=[], uses=['_display_spike_rasters_pyqtplot_2D'], used_by=[], creation_date='2025-06-13 08:11', related_items=[])
     @classmethod
     def find_or_create_if_needed(cls, curr_active_pipeline, force_create_new:bool=False, **kwargs):
         """ Gets the existing SpikeRasterWindow or creates a new one if one doesn't already exist:

@@ -315,20 +315,26 @@ class LocalMenus_AddRenderable(QtWidgets.QMainWindow):
             print(f'menuAdd_Renderable: {menuAdd_Renderable}, type(menuAdd_Renderable): {type(menuAdd_Renderable)}')
             # print(f'menuAdd_Renderable: {menuAdd_Renderable}, type(menuAdd_Renderable): {type(menuAdd_Renderable)}')
 
+
+        # Add the reference to the context menus to owner, so it isn't released:
+        ## TODO: currently replaces the dict entry, which we might want to use for other menus
+        active_2d_plot.ui.menus = PhoUIContainer.init_from_dict({'custom_context_menus': PhoUIContainer.init_from_dict({'add_renderables': active_2d_plot_renderable_menus})})
+
+
         ## Specific to SpikeRaster2D:        
         ## Add the custom menu to the context menus of the plots in SpikeRaster2D:        
         if menuAdd_Renderable is not None:
             main_plot_widget = active_2d_plot.plots.main_plot_widget # PlotItem
             background_static_scroll_plot_widget = active_2d_plot.plots.background_static_scroll_window_plot # PlotItem
             if main_plot_widget is not None:
-                cls._subfn_append_custom_menu_to_PyQtGraph_based_widget_context_menu(parent_widget=main_plot_widget, additional_menu=menuAdd_Renderable, debug_print=debug_print)
+                cls._helper_append_custom_menu_to_widget_context_menu_universal(parent_widget=main_plot_widget, additional_menu=menuAdd_Renderable, debug_print=debug_print)
             if background_static_scroll_plot_widget is not None:
-                cls._subfn_append_custom_menu_to_PyQtGraph_based_widget_context_menu(parent_widget=background_static_scroll_plot_widget, additional_menu=menuAdd_Renderable, debug_print=debug_print)
+                cls._helper_append_custom_menu_to_widget_context_menu_universal(parent_widget=background_static_scroll_plot_widget, additional_menu=menuAdd_Renderable, debug_print=debug_print)
 
+            ## Setup for dock-items:
+            for a_track_widget in active_2d_plot.dock_manager_widget.get_flat_widgets_list():
+                LocalMenus_AddRenderable._helper_append_custom_menu_to_widget_context_menu_universal(parent_widget=a_track_widget, additional_menu=menuAdd_Renderable, debug_print=debug_print)
 
-        # Add the reference to the context menus to owner, so it isn't released:
-        ## TODO: currently replaces the dict entry, which we might want to use for other menus
-        active_2d_plot.ui.menus = PhoUIContainer.init_from_dict({'custom_context_menus': PhoUIContainer.init_from_dict({'add_renderables': active_2d_plot_renderable_menus})})
 
         # # Build final programmatic dict from nested PhoUIContainers:
         # out_final = PhoUIContainer.init_from_dict({})

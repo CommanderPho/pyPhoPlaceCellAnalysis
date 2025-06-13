@@ -609,7 +609,7 @@ class Spike2DRaster(SpecificDockWidgetManipulatingMixin, DynamicDockDisplayAreaO
         
         self.logger.debug(f'Spike2DRaster._buildGraphics()')
         # use_docked_pyqtgraph_plots: bool = self.params.setdefault('use_docked_pyqtgraph_plots', False)
-        use_docked_pyqtgraph_plots: bool = self.params.setdefault('use_docked_pyqtgraph_plots', True)
+        use_docked_pyqtgraph_plots: bool = self.params.setdefault('use_docked_pyqtgraph_plots', True) # #TODO 2025-06-13 08:15: - [ ] More modern, uses tracks instead of embedded pyqtgraph plots
 
         ## Common
         self.params.custom_interval_rendering_plots = []
@@ -1337,6 +1337,25 @@ class Spike2DRaster(SpecificDockWidgetManipulatingMixin, DynamicDockDisplayAreaO
         return {identifier:active_matplotlib_view_widget for identifier, active_matplotlib_view_widget in self.ui.matplotlib_view_widgets.items() if active_matplotlib_view_widget.is_pyqtgraph_based()}
 
 
+
+    @property
+    def _menuContextAddRenderable(self) -> Optional[Any]:
+        """ a reference to the right-click context menu to add renderables.
+        Initialized by `_active_2d_plot_renderable_menus = LocalMenus_AddRenderable.initialize_renderable_context_menu(spike_raster_plt_2d, owning_pipeline_reference, active_config_name)  # Adds the custom context menus for SpikeRaster2D`
+        
+        """
+        try:
+            ## Setup the right-click context menu for all dock widgets:
+                active_2d_plot_renderable_menus = self.ui.menus.custom_context_menus.add_renderables ## Otherwise have to do `active_2d_plot_renderable_menus = cls._build_renderable_menu(active_2d_plot, curr_active_pipeline, active_config_name)`
+                widget_2d_menu = active_2d_plot_renderable_menus[0]
+                menuAdd_Renderable = widget_2d_menu.ui.menuAdd_Renderable
+                return menuAdd_Renderable
+        except (KeyError, AttributeError, ValueError) as e:
+            print(f'._menuContextAddRenderable is not yet set-up by LocalMenus_AddRenderable.initialize_renderable_context_menu(...). Menu creation will be deferred.')
+            return None
+        except Exception as e:
+            raise
+                
     @function_attributes(short_name=None, tags=['pyqtgraph', 'render_plot_group'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-12-31 04:59', related_items=[])
     def create_separate_render_plot_item(self, row=None, col=None, rowspan=1, colspan=1, name='new_curves_separate_plot'):
         """ Adds a separate pyqtgraph independent plot for epoch time rects to the 2D plot above the others:
@@ -1348,6 +1367,7 @@ class Spike2DRaster(SpecificDockWidgetManipulatingMixin, DynamicDockDisplayAreaO
          new_curves_separate_plot: a PlotItem
             
         """
+        
         use_docked_pyqtgraph_plots: bool = self.params.use_docked_pyqtgraph_plots
         if use_docked_pyqtgraph_plots:
             a_time_sync_pyqtgraph_widget, root_graphics_layout_widget, plot_item, dDisplayItem = self.add_new_embedded_pyqtgraph_render_plot_widget(name=name, dockSize=(500,50))
@@ -1385,6 +1405,13 @@ class Spike2DRaster(SpecificDockWidgetManipulatingMixin, DynamicDockDisplayAreaO
         main_plot_widget = self.plots.main_plot_widget # PlotItem
         new_curves_separate_plot.setXLink(main_plot_widget) # works to synchronize the main zoomed plot (current window) with the epoch_rect_separate_plot (rectangles plotter)
         
+        if not use_docked_pyqtgraph_plots:
+            if self._menuContextAddRenderable is not None:
+                ## Add custom right-click context menu:
+                from pyphoplacecellanalysis.GUI.Qt.Menus.LocalMenus_AddRenderable.LocalMenus_AddRenderable import LocalMenus_AddRenderable
+                LocalMenus_AddRenderable._helper_append_custom_menu_to_widget_context_menu_universal(parent_widget=new_curves_separate_plot, additional_menu=self._menuContextAddRenderable)
+
+
         return new_curves_separate_plot
         
 
@@ -1431,13 +1458,15 @@ class Spike2DRaster(SpecificDockWidgetManipulatingMixin, DynamicDockDisplayAreaO
         self.ui.connections['tracks'] = {}
         
 
-    @function_attributes(short_name=None, tags=['matplotlib_render_widget', 'dynamic_ui', 'group_matplotlib_render_plot_widget', 'track'], input_requires=[], output_provides=[], uses=['MatplotlibTimeSynchronizedWidget', 'FigureWidgetDockDisplayConfig'], used_by=[], creation_date='2023-10-17 13:26', related_items=['add_new_embedded_pyqtgraph_render_plot_widget'])
+    @function_attributes(short_name=None, tags=['matplotlib_render_widget', 'dynamic_ui', 'group_matplotlib_render_plot_widget', 'track', 'context-menu'], input_requires=[], output_provides=[], uses=['MatplotlibTimeSynchronizedWidget', 'FigureWidgetDockDisplayConfig'], used_by=[], creation_date='2023-10-17 13:26', related_items=['add_new_embedded_pyqtgraph_render_plot_widget'])
     def add_new_matplotlib_render_plot_widget(self, row=1, col=0, name='matplotlib_view_widget', dockSize=(500,50), dockAddLocationOpts=['bottom'], display_config:CustomDockDisplayConfig=None, sync_mode:Optional[SynchronizedPlotMode]=None) -> Tuple[MatplotlibTimeSynchronizedWidget, Figure, List[Axis], Dock]:
         """ creates a new dynamic MatplotlibTimeSynchronizedWidget, a container widget that holds a matplotlib figure, and adds it as a row to the main layout
         
         emit an event so the parent can call `self.update_scrolling_event_filters()` to add the new item
         
         """
+        
+        
         dDisplayItem: Dock = self.ui.dynamic_docked_widget_container.find_display_dock(identifier=name) # Dock
         if dDisplayItem is None:
             # No extant matplotlib_view_widget and display_dock currently, create a new one:
@@ -1464,6 +1493,12 @@ class Spike2DRaster(SpecificDockWidgetManipulatingMixin, DynamicDockDisplayAreaO
             _single_ax = self.ui.matplotlib_view_widgets[name].getFigure().add_subplot(111) # Adds a single axes to the figure
             ax = self.ui.matplotlib_view_widgets[name].axes # return all axes instead of just the first one
         
+            ## Build custom right-click context menu:
+            if self._menuContextAddRenderable is not None:
+                ## Add custom right-click context menu:
+                from pyphoplacecellanalysis.GUI.Qt.Menus.LocalMenus_AddRenderable.LocalMenus_AddRenderable import LocalMenus_AddRenderable
+                LocalMenus_AddRenderable._helper_append_custom_menu_to_widget_context_menu_universal(parent_widget=self.ui.matplotlib_view_widgets[name], additional_menu=self._menuContextAddRenderable)
+
             ## emit the signal
             self.sigEmbeddedMatplotlibDockWidgetAdded.emit(self, dDisplayItem, self.ui.matplotlib_view_widgets[name])
             self.sigDockAdded.emit(self, dDisplayItem) ## sigDockAdded signal to indicate new dock has been added ## already has self.sigEmbeddedMatplotlibDockWidgetAdded: `self.sigEmbeddedMatplotlibDockWidgetAdded.emit(self, dDisplayItem, self.ui.matplotlib_view_widgets[name])`
@@ -1489,7 +1524,7 @@ class Spike2DRaster(SpecificDockWidgetManipulatingMixin, DynamicDockDisplayAreaO
         return self.ui.matplotlib_view_widgets[name], fig, ax, dDisplayItem
     
 
-    @function_attributes(short_name=None, tags=['pyqtgraph_render_widget', 'dynamic_ui', 'group_matplotlib_render_plot_widget', 'pyqtgraph', 'docked_widget'], input_requires=[], output_provides=[], uses=['PyqtgraphTimeSynchronizedWidget'], used_by=[], creation_date='2024-12-31 03:35', related_items=['add_new_matplotlib_render_plot_widget'])
+    @function_attributes(short_name=None, tags=['pyqtgraph_render_widget', 'dynamic_ui', 'group_matplotlib_render_plot_widget', 'pyqtgraph', 'docked_widget', 'context-menu'], input_requires=[], output_provides=[], uses=['PyqtgraphTimeSynchronizedWidget'], used_by=[], creation_date='2024-12-31 03:35', related_items=['add_new_matplotlib_render_plot_widget'])
     def add_new_embedded_pyqtgraph_render_plot_widget(self, name='pyqtgraph_view_widget', dockSize=(500,50), dockAddLocationOpts=['bottom'], display_config:CustomDockDisplayConfig=None, sync_mode:Optional[SynchronizedPlotMode]=None) -> Tuple[PyqtgraphTimeSynchronizedWidget, Any, Any, Dock]:
         """ creates a new dynamic PyqtgraphTimeSynchronizedWidget, a container widget that holds a pyqtgraph-based figure, and adds it as a row to the main layout
         
@@ -1503,6 +1538,8 @@ class Spike2DRaster(SpecificDockWidgetManipulatingMixin, DynamicDockDisplayAreaO
             a_time_sync_pyqtgraph_widget, root_graphics_layout_widget, plot_item, dDisplayItem = self.add_new_embedded_pyqtgraph_render_plot_widget(name='test_pyqtgraph_view_widget', dockSize=(500,50), sync_mode='')
             
         """
+
+        
         dDisplayItem = self.ui.dynamic_docked_widget_container.find_display_dock(identifier=name) # Dock
         if dDisplayItem is None:
             # No extant matplotlib_view_widget and display_dock currently, create a new one:
@@ -1524,6 +1561,11 @@ class Spike2DRaster(SpecificDockWidgetManipulatingMixin, DynamicDockDisplayAreaO
             ## Add the plot:
             root_graphics_layout_widget = self.ui.matplotlib_view_widgets[name].getRootGraphicsLayoutWidget()
             plot_item = self.ui.matplotlib_view_widgets[name].getRootPlotItem()
+
+            ## Build custom right-click context menu:
+            if self._menuContextAddRenderable is not None:
+                from pyphoplacecellanalysis.GUI.Qt.Menus.LocalMenus_AddRenderable.LocalMenus_AddRenderable import LocalMenus_AddRenderable
+                LocalMenus_AddRenderable._helper_append_custom_menu_to_widget_context_menu_universal(parent_widget=plot_item, additional_menu=self._menuContextAddRenderable)
 
             ## emit the signal
             self.sigEmbeddedMatplotlibDockWidgetAdded.emit(self, dDisplayItem, self.ui.matplotlib_view_widgets[name])
