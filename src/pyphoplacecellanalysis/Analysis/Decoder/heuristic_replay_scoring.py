@@ -142,6 +142,8 @@ class SubsequencesPartitioningResult(ComputedResult):
 
 
     Usage:
+        from pyphoplacecellanalysis.Analysis.Decoder.heuristic_replay_scoring import SubsequencesPartitioningResult
+
         diff_index_subsequence_indicies = NumpyHelpers.split(np.arange(n_diff_bins), list_split_indicies)
         no_low_magnitude_diff_index_subsequence_indicies = [v[np.isin(v, low_magnitude_change_indicies, invert=True)] for v in diff_index_subsequence_indicies] # get the list of indicies for each subsequence without the low-magnitude ones
         num_subsequence_bins: List[int] = [len(v) for v in diff_index_subsequence_indicies]
@@ -3017,7 +3019,8 @@ class HeuristicReplayScoring:
             time_window_centers = np.arange(n_time_bins) + 0.5 # time-bin units, plot range would then be from (0.0, (float(n_time_bins) + 0.5))
             a_most_likely_positions_list = a_result.most_likely_position_indicies_list[an_epoch_idx] # pos-bins
             if np.ndim(a_most_likely_positions_list) == 2:
-                a_most_likely_positions_list = a_most_likely_positions_list.flatten()
+                a_most_likely_positions_list = a_most_likely_positions_list.flatten() # WTF is this, shouldn't we only get the x component or is it 2D for a different reason?
+
                 
             
         else:
