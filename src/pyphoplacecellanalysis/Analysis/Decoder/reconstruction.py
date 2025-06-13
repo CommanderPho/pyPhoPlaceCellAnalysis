@@ -1677,7 +1677,7 @@ class DecodedFilterEpochsResult(HDF_SerializationMixin, AttrsBasedClassHelperMix
         return a_decoded_result, (is_time_bin_active_list, inactive_mask_list, all_time_bin_indicies_list, last_valid_indices_list)
 
 
-    @function_attributes(short_name=None, tags=['pseudo2D', 'timeline-track', '1D', 'split-to-1D'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-02-26 07:23', related_items=[])
+    @function_attributes(short_name=None, tags=['pseudo2D', 'timeline-track', '1D', 'split-to-1D'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-02-26 07:23', related_items=['pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions.DirectionalDecodersContinuouslyDecodedResult.split_pseudo2D_continuous_result_to_1D_continuous_result'])
     def split_pseudo2D_result_to_1D_result(self, pseudo2D_decoder_names_list: Optional[str]=None, a_pseudo2D_decoder: Optional[Any]=None, xbin_centers: Optional[NDArray]=None, ybin_centers: Optional[NDArray]=None, debug_print=False) -> Dict[types.DecoderName, "DecodedFilterEpochsResult"]:
         """ Get 1D representations of the Pseudo2D track (4 decoders) so they can be plotted on seperate tracks and bin-debugged independently.
 
@@ -1744,16 +1744,12 @@ class DecodedFilterEpochsResult(HDF_SerializationMixin, AttrsBasedClassHelperMix
                 if (xbin_centers is not None) and (ybin_centers is not None):
                     ## NOTE: I think 2D position decoding isn't implemented here.
                     # much more efficient than the other implementation. Result is # (85844, 2)
-                    output_pseudo2D_split_to_1D_continuous_results_dict[a_decoder_name].most_likely_positions = [np.vstack((xbin_centers[most_likely_position_indicies[0,:]], self.ybin_centers[most_likely_position_indicies[1,:]])).T for most_likely_position_indicies in output_pseudo2D_split_to_1D_continuous_results_dict[a_decoder_name].most_likely_position_indicies_list]
+                    output_pseudo2D_split_to_1D_continuous_results_dict[a_decoder_name].most_likely_positions_list = [np.vstack((xbin_centers[most_likely_position_indicies[0,:]], self.ybin_centers[most_likely_position_indicies[1,:]])).T for most_likely_position_indicies in output_pseudo2D_split_to_1D_continuous_results_dict[a_decoder_name].most_likely_position_indicies_list]
                 elif (xbin_centers is not None):
                     # 1D Decoder case:
-                    output_pseudo2D_split_to_1D_continuous_results_dict[a_decoder_name].most_likely_positions = [np.squeeze(xbin_centers[most_likely_position_indicies]) for most_likely_position_indicies in output_pseudo2D_split_to_1D_continuous_results_dict[a_decoder_name].most_likely_position_indicies_list]
+                    output_pseudo2D_split_to_1D_continuous_results_dict[a_decoder_name].most_likely_positions_list = [np.squeeze(xbin_centers[most_likely_position_indicies]) for most_likely_position_indicies in output_pseudo2D_split_to_1D_continuous_results_dict[a_decoder_name].most_likely_position_indicies_list]
                 else:
-                    output_pseudo2D_split_to_1D_continuous_results_dict[a_decoder_name].most_likely_positions = [[] for most_likely_position_indicies in output_pseudo2D_split_to_1D_continuous_results_dict[a_decoder_name].most_likely_position_indicies_list]
-
-
-
-
+                    output_pseudo2D_split_to_1D_continuous_results_dict[a_decoder_name].most_likely_positions_list = [[] for most_likely_position_indicies in output_pseudo2D_split_to_1D_continuous_results_dict[a_decoder_name].most_likely_position_indicies_list]
                 # #TODO 2025-06-13 14:30: - [ ] Finish recomputing marginals
                 # output_pseudo2D_split_to_1D_continuous_results_dict[a_decoder_name].marginal_x_list = None
                 # output_pseudo2D_split_to_1D_continuous_results_dict[a_decoder_name].marginal_y_list = None
