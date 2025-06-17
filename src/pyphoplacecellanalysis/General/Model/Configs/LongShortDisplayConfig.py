@@ -701,20 +701,32 @@ class FixedCustomColormaps:
         return LinearSegmentedColormap.from_list(f"dropping_low_values_black_colormap", colors)
 
     @classmethod
-    def get_custom_greyscale_with_low_values_dropped_cmap(cls, low_value_cutoff:float=0.05, full_opacity_threshold:float=0.4, grey_value: float = 0.1):
+    def get_custom_greyscale_with_low_values_dropped_cmap(cls, low_value_cutoff:float=0.05, full_opacity_threshold:float=0.4, grey_value: float = 0.1, invert_for_black_bg: bool = False):
         """ Oranges with low values omitted
         """
         from matplotlib.colors import LinearSegmentedColormap, Colormap
         assert low_value_cutoff < 1.0, f"low_value_cutoff: {low_value_cutoff}"
         # Each point is (normalized value, color)
         assert full_opacity_threshold > low_value_cutoff
+        # colors = [
+        #     (0.0, [grey_value, grey_value, grey_value, 0.0]),    # Start: 0.0 mapped to blue
+        #     (low_value_cutoff, [grey_value, grey_value, grey_value, 0.0]),   # Middle: 0.5 mapped to white
+        #     (full_opacity_threshold, [grey_value, grey_value, grey_value, 1.0]),   # Middle: 0.5 mapped to white
+        #     (1.0, [0.0, 0.0, 0.0, 1.0])      # End: 1.0 mapped to red
+        # ]
+        # return LinearSegmentedColormap.from_list(f"dropping_low_values_black_colormap", colors)
+        # Determine final color based on background
+        final_color = [1.0, 1.0, 1.0, 1.0] if invert_for_black_bg else [0.0, 0.0, 0.0, 1.0]
         colors = [
-            (0.0, [grey_value, grey_value, grey_value, 0.0]),    # Start: 0.0 mapped to blue
-            (low_value_cutoff, [grey_value, grey_value, grey_value, 0.0]),   # Middle: 0.5 mapped to white
-            (full_opacity_threshold, [grey_value, grey_value, grey_value, 1.0]),   # Middle: 0.5 mapped to white
-            (1.0, [0.0, 0.0, 0.0, 1.0])      # End: 1.0 mapped to red
+            (0.0, [grey_value, grey_value, grey_value, 0.0]),    # Start: 0.0 mapped to transparent grey
+            (low_value_cutoff, [grey_value, grey_value, grey_value, 0.0]),   # Low cutoff: still transparent grey
+            (full_opacity_threshold, [grey_value, grey_value, grey_value, 1.0]),   # Full opacity threshold: opaque grey
+            (1.0, final_color)      # End: 1.0 mapped to black or white depending on background
         ]
-        return LinearSegmentedColormap.from_list(f"dropping_low_values_black_colormap", colors)
+        colormap_name = f"dropping_low_values_{'white' if invert_for_black_bg else 'black'}_colormap"
+        return LinearSegmentedColormap.from_list(colormap_name, colors)
+
+
 
 
 
