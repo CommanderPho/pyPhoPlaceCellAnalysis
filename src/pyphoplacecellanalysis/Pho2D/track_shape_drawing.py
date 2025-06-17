@@ -757,8 +757,8 @@ class LinearTrackInstance:
 
         """
         loaded_track_limits = deepcopy(a_sess_config.loaded_track_limits) # {'long_xlim': array([59.0774, 228.69]), 'short_xlim': array([94.0156, 193.757]), 'long_ylim': array([138.164, 146.12]), 'short_ylim': array([138.021, 146.263])}
-        x_midpoint: float = a_sess_config.x_midpoint
-        pix2cm: float = a_sess_config.pix2cm
+        # x_midpoint: float = a_sess_config.x_midpoint
+        # pix2cm: float = a_sess_config.pix2cm
 
         long_xlim = loaded_track_limits['long_xlim']
         long_ylim = loaded_track_limits['long_ylim']
@@ -1295,9 +1295,9 @@ def _perform_plot_matplotlib_2D_tracks(long_track_inst: LinearTrackInstance, sho
 
 
 @function_attributes(short_name=None, tags=['matplotlib', 'track_plotting', '2D', 'mosaic', 'layout'], 
-                    input_requires=[], output_provides=[], uses=[], used_by=[], 
+                    input_requires=[], output_provides=[], uses=[], used_by=['create_long_v_short_track_plot_figure_from_loaded_track_limits'], 
                     creation_date='2024-04-16 16:51', related_items=[])
-def create_long_v_short_track_plot_figure(active_config, figsize=(12, 10), title='2D Track Layout: Long Track (X-axis) vs Short Track (Y-axis)', show_plot=True, clear_figure=True, height_ratios=[12, 1], width_ratios=[1, 12],long_track_alpha=1.0, short_track_alpha=1.0, main_grid_alpha=0.3):
+def create_long_v_short_track_plot_figure(long_track_inst: Optional[LinearTrackInstance]=None, short_track_inst: Optional[LinearTrackInstance]=None, active_config=None, figsize=(12, 10), title='2D Track Layout: Long Track (X-axis) vs Short Track (Y-axis)', show_plot=True, clear_figure=True, height_ratios=[12, 1], width_ratios=[1, 12],long_track_alpha=1.0, short_track_alpha=1.0, main_grid_alpha=0.3):    
     """
     Create a mosaic plot with Long Track Shape drawn under the x-axis and Short Track Shape drawn to the left of the y-axis.
 
@@ -1328,7 +1328,7 @@ def create_long_v_short_track_plot_figure(active_config, figsize=(12, 10), title
             - long_out_tuple: Output from long track plotting
             - short_out_tuple: Output from short track plotting
 
-    Usage:
+    Usage 1:
         from pyphoplacecellanalysis.Pho2D.track_shape_drawing import create_long_v_short_track_plot_figure
 
         active_config = global_session.config
@@ -1346,7 +1346,13 @@ def create_long_v_short_track_plot_figure(active_config, figsize=(12, 10), title
     from pyphoplacecellanalysis.General.Model.Configs.LongShortDisplayConfig import LongShortDisplayConfigManager
 
     # Get track instances from session config
-    long_track_inst, short_track_inst = LinearTrackInstance.init_tracks_from_session_config(active_config)
+    if (long_track_inst is None) or (short_track_inst is None):
+        assert active_config is not None, f"if long_track_inst/short_track_inst are not explicitly provided, a valid active_config must be provided!"    
+        long_track_inst, short_track_inst = LinearTrackInstance.init_tracks_from_session_config(active_config)
+
+
+    ## INPUTS: long_track_inst, short_track_inst
+    assert (long_track_inst is not None) and (short_track_inst is not None)
 
     # Configure display styling
     long_short_display_config_manager = LongShortDisplayConfigManager()
@@ -1442,6 +1448,52 @@ def create_long_v_short_track_plot_figure(active_config, figsize=(12, 10), title
         plt.show()
 
     return fig, ax_dict, long_track_inst, short_track_inst, long_out_tuple, short_out_tuple
+
+
+@function_attributes(short_name=None, tags=['figure', 'track'], input_requires=[], output_provides=[], uses=['create_long_v_short_track_plot_figure'], used_by=[], creation_date='2025-06-17 02:28', related_items=[])
+def create_long_v_short_track_plot_figure_from_loaded_track_limits(loaded_track_limits: Optional[Dict]=None, platform_side_length:float=22.0, **kwargs):
+    """ A version that only requires the exported loaded_track_limits, not the session config
+    Usage:
+        from pyphoplacecellanalysis.Pho2D.track_shape_drawing import create_long_v_short_track_plot_figure_from_loaded_track_limits
+
+        fig, ax_dict, long_inst, short_inst, long_out, short_out = create_long_v_short_track_plot_figure_from_loaded_track_limits(loaded_track_limits=loaded_track_limits)
+            
+    """
+    from pyphocorehelpers.geometry_helpers import BoundsRect
+    from pyphoplacecellanalysis.Pho2D.track_shape_drawing import LinearTrackDimensions, LinearTrackInstance
+
+    
+    # a_sess_config = deepcopy(active_config)
+    if loaded_track_limits is None:
+        # loaded_track_limits = deepcopy(a_sess_config.loaded_track_limits) # {'long_xlim': array([59.0774, 228.69]), 'short_xlim': array([94.0156, 193.757]), 'long_ylim': array([138.164, 146.12]), 'short_ylim': array([138.021, 146.263])}
+        loaded_track_limits = {'long_xlim': np.array([59.0774, 228.69]),
+        'long_unit_xlim': np.array([0.205294, 0.794698]),
+        'short_xlim': np.array([94.0156, 193.757]),
+        'short_unit_xlim': np.array([0.326704, 0.673304]),
+        'long_ylim': np.array([138.164, 146.12]),
+        'long_unit_ylim': np.array([0.48012, 0.507766]),
+        'short_ylim': np.array([138.021, 146.263]),
+        'short_unit_ylim': np.array([0.479622, 0.508264])}
+
+    loaded_track_limits
+    # x_midpoint: float = a_sess_config.x_midpoint
+    # pix2cm: float = a_sess_config.pix2cm
+
+    long_xlim = loaded_track_limits['long_xlim']
+    long_ylim = loaded_track_limits['long_ylim']
+
+    ## if we have short, build that one too:
+    short_xlim = loaded_track_limits['short_xlim']
+    short_ylim = loaded_track_limits['short_ylim']
+
+    LONG_from_mat_lims_grid_bin_bounds = BoundsRect(xmin=(long_xlim[0]-platform_side_length), xmax=(long_xlim[1]+platform_side_length), ymin=long_ylim[0], ymax=long_ylim[1])
+    SHORT_from_mat_lims_grid_bin_bounds = BoundsRect(xmin=(short_xlim[0]-platform_side_length), xmax=(short_xlim[1]+platform_side_length), ymin=short_ylim[0], ymax=short_ylim[1])
+
+    long_track_inst = LinearTrackInstance(LinearTrackDimensions.init_from_grid_bin_bounds(LONG_from_mat_lims_grid_bin_bounds), grid_bin_bounds=LONG_from_mat_lims_grid_bin_bounds)
+    short_track_inst = LinearTrackInstance(LinearTrackDimensions.init_from_grid_bin_bounds(SHORT_from_mat_lims_grid_bin_bounds), grid_bin_bounds=SHORT_from_mat_lims_grid_bin_bounds)
+
+    ## OUTPUTS: long_track_inst, short_track_inst
+    return create_long_v_short_track_plot_figure(active_config=None, long_track_inst=long_track_inst, short_track_inst=short_track_inst, **kwargs)
 
 
 # ==================================================================================================================== #
