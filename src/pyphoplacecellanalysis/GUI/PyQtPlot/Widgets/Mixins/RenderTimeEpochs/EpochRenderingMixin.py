@@ -781,46 +781,6 @@ class EpochRenderingMixin(LiveWindowEventIntervalMonitoringMixin):
 
 
 
-
-
-    def extract_interval_bottom_top_area(self, debug_print=False):
-        """ Computes the REQUIRED display rectangles for each of the `self.interval_datasources`. Does NOT take into account the active raster data.
-
-        TODO: Unused, and obsoleted by `self.recover_interval_datasources_positioning_properties(...)
-        Usage:
-            upper_extreme_vertical_offset, lower_extreme_vertical_offsets = active_2d_plot.extract_interval_bottom_top_area()
-            (upper_extreme_vertical_offset, lower_extreme_vertical_offsets) # (-24.16666666666667, -5.0)
-        """
-        all_series_positioning_dfs = {}
-        all_series_vertical_offsets = []
-        all_series_heights = []
-
-        for a_name, a_ds in self.interval_datasources.items():
-            if isinstance(a_ds, IntervalsDatasource):
-                curr_df = a_ds.df[['series_vertical_offset', 'series_height']].copy()
-                # all_series_positioning_dfs.append(curr_df)
-                all_series_positioning_dfs[a_name] = curr_df
-                all_series_vertical_offsets.extend(curr_df.series_vertical_offset.values)
-                all_series_heights.extend(curr_df.series_height.values)
-            else:
-                if debug_print:
-                    print(f'weird a_name, a_ds: {a_name}, {a_ds}, type(a_ds): {type(a_ds)}')
-                pass
-
-        # Convert to a numpy array:
-        all_series_vertical_offsets = np.array(all_series_vertical_offsets)
-        all_series_heights = np.array(all_series_heights)
-
-        # series can render either 'above' or 'below':
-        is_series_below = (all_series_vertical_offsets <= 0.0) # all elements less than or equal to zero indicate that it's below the plot, and its height will be added negatively to find the max-y value
-
-        _temp_active_effective_series_heights = all_series_heights.copy()
-        _temp_active_effective_series_heights[is_series_below] = -1.0 * _temp_active_effective_series_heights[is_series_below] # effective heights are negative for series below the y-axis
-        _temp_active_effective_series_extreme_vertical_offsets = all_series_vertical_offsets + _temp_active_effective_series_heights
-
-        return ( _temp_active_effective_series_extreme_vertical_offsets.min(), _temp_active_effective_series_extreme_vertical_offsets.max()), all_series_positioning_dfs # (-24.16666666666667, -5.0)
-
-
     @function_attributes(short_name=None, tags=['layout', 'epochs'], input_requires=[], output_provides=[], uses=['self.build_stacked_epoch_layout', 'self.get_render_intervals_plot_range', 'self.update_rendered_intervals_visualization_properties'], used_by=[], creation_date='2024-07-03 11:23', related_items=[])
     def apply_stacked_epoch_layout(self, rendered_interval_keys, desired_interval_height_ratios, epoch_render_stack_height=20.0, interval_stack_location='below', debug_print=True):
         """ Builds and applies a stacked layout for the list of specified epochs
@@ -878,7 +838,7 @@ class EpochRenderingMixin(LiveWindowEventIntervalMonitoringMixin):
 
 
     # 2023-10-16 - Interval `EpochDisplayConfig` extraction from datasources: ____________________________________________ #
-    @function_attributes(short_name=None, tags=['panel', 'parameters'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-02-11 02:12', related_items=[])
+    @function_attributes(short_name=None, tags=['panel', 'parameters'], input_requires=[], output_provides=[], uses=[], used_by=['.extract_interval_display_config_df'], creation_date='2025-02-11 02:12', related_items=[])
     def extract_interval_display_config_lists(self) -> Dict: #[str, EpochDisplayConfig]:
         """ Build the EpochDisplayConfig lists for each interval datasource
 
@@ -904,6 +864,46 @@ class EpochRenderingMixin(LiveWindowEventIntervalMonitoringMixin):
             out_configs_dict[a_name] = result
 
         return out_configs_dict
+
+
+    @function_attributes(short_name=None, tags=['intervals'], input_requires=[], output_provides=[], uses=['.extract_interval_display_config_lists'], used_by=[], creation_date='2025-06-16 12:48', related_items=[])
+    def extract_interval_display_config_df(self) -> pd.DataFrame: #[str, EpochDisplayConfig]:
+        """ Build the easy to understand dataframe with a row for each interval datasource
+
+
+        Usage:
+
+            import panel as pn
+            pn.extension()
+
+            out_configs_dict = active_2d_plot.extract_interval_display_config_lists()
+            pn.Row(*[pn.Column(*[pn.Param(a_sub_v) for a_sub_v in v]) for k,v in out_configs_dict.items()])
+
+
+
+
+        """
+        epoch_display_configs = self.extract_interval_display_config_lists()
+        out_configs_df = []
+        for a_name, a_config_list in epoch_display_configs.items():
+            num_configs: int = len(a_config_list)
+            for (i, a_config) in enumerate(a_config_list):
+                if num_configs > 1:
+                    config_name: str = f'{a_name}[{i}]'
+                else:
+                    config_name: str = a_name
+                # a_config
+                out_config_dict = {'name': config_name} | deepcopy(a_config.to_dict())
+                out_configs_df.append(out_config_dict) # [a_name] = result
+
+
+        out_configs_df: pd.DataFrame = pd.DataFrame(out_configs_df)
+        out_configs_df['y0_location'] = out_configs_df['y_location']
+        out_configs_df['y1_location'] = out_configs_df['y0_location'] + out_configs_df['height']
+        return out_configs_df
+
+
+
     
 
     # @function_attributes(short_name=None, tags=['epoch', 'epoch_render_config_widget'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-07-02 03:38', related_items=[])
