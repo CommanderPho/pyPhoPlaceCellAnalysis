@@ -35,11 +35,14 @@ background-color: rgba(71, 65, 60, 180);
 color: rgb(244, 244, 244);
 border-color: rgb(0, 0, 0);
 QToolTip {
-    color: white;
-    background-color: #353535;
-    border: 1px solid white;
+    background-color: #2a2a2a;
+    color: #ffffff;
+    border: 1px solid #3a3a3a;
+    border-radius: 3px;
     padding: 2px;
-}</string>
+    font-size: 10px;
+}
+</string>
   </property>
   <layout class="QVBoxLayout" name="verticalLayout_2">
    <property name="spacing">

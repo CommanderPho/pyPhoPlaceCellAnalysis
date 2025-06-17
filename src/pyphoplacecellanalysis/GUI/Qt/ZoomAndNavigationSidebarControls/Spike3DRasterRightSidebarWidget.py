@@ -121,7 +121,7 @@ class Spike3DRasterRightSidebarWidget(QtWidgets.QWidget):
 
     def toggle_interval_visual_configs_manager(self):
         """ Toggles the visibility of the interval manager """
-        print("toggle_interval_manager()")
+        print("toggle_interval_visual_configs_manager()")
         self.sigToggleIntervalEpochsDisplayManagerPressed.emit()
         
 
