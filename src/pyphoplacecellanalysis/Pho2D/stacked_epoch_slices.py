@@ -1451,12 +1451,12 @@ class DecodedEpochSlicesPaginatedFigureController(PaginatedFigureController):
                 skip_plotting_most_likely_positions: bool = self.params.get('skip_plotting_most_likely_positions', False)
                 
                 ## NOTE: the actual heatmp is plotted using: 
-                _temp_fig, curr_ax = plot_1D_most_likely_position_comparsions(self.plots_data.global_pos_df, ax=curr_ax, time_window_centers=curr_time_bins, variable_name=self.params.variable_name, xbin=self.params.xbin, # is `self.params.xbin` the problem here? Because there are no positions at all?
+                _temp_fig, curr_ax, _return_out_artists_dict = plot_1D_most_likely_position_comparsions(self.plots_data.global_pos_df, ax=curr_ax, time_window_centers=curr_time_bins, variable_name=self.params.variable_name, xbin=self.params.xbin, # is `self.params.xbin` the problem here? Because there are no positions at all?
                                                                 posterior=curr_posterior,
                                                                 active_most_likely_positions_1D=curr_most_likely_positions,
                                                                 enable_flat_line_drawing=self.params.enable_flat_line_drawing, debug_print=self.params.debug_print,
                                                                 skip_plotting_measured_positions=skip_plotting_measured_positions, skip_plotting_most_likely_positions=skip_plotting_most_likely_positions,
-                                                                posterior_heatmap_imshow_kwargs=self.params.get('posterior_heatmap_imshow_kwargs', None),
+                                                                posterior_heatmap_imshow_kwargs=self.params.get('posterior_heatmap_imshow_kwargs', None), return_created_artists=True,
                                                                 )
                 
                 

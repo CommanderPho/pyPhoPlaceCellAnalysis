@@ -2324,11 +2324,11 @@ class EpochComputationDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Di
                         xbin = np.arange(n_xbins)
 
                     ## Actual plotting portion:
-                    fig, an_ax = plot_1D_most_likely_position_comparsions(measured_position_df=None, time_window_centers=a_time_window_centers, xbin=deepcopy(xbin),
+                    fig, an_ax, _return_out_artists_dict = plot_1D_most_likely_position_comparsions(measured_position_df=None, time_window_centers=a_time_window_centers, xbin=deepcopy(xbin),
                                                                             posterior=active_posterior,
                                                                             active_most_likely_positions_1D=active_most_likely_positions,
                                                                             ax=an_ax, variable_name=variable_name, debug_print=True, enable_flat_line_drawing=False,
-                                                                            posterior_heatmap_imshow_kwargs=posterior_heatmap_imshow_kwargs)
+                                                                            posterior_heatmap_imshow_kwargs=posterior_heatmap_imshow_kwargs, return_created_artists=True)
                     
                     label_artists_dict = PlottingHelpers.helper_matplotlib_add_pseudo2D_marginal_labels(an_ax, y_bin_labels=y_bin_labels, enable_draw_decoder_colored_lines=False, should_use_outer_labels=False,
                                                                                                                 # additional_label_kwargs = dict(fontsize=12, fontweight='bold'),

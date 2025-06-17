@@ -164,11 +164,11 @@ class SpecificDockWidgetManipulatingMixin(BaseDynamicInstanceConformingMixin):
 
         # most_likely_positions_mode: 'standard'|'corrected'
         ## Actual plotting portion:
-        fig, an_ax = plot_1D_most_likely_position_comparsions(measured_position_df=None, time_window_centers=time_window_centers, xbin=deepcopy(xbin),
+        fig, an_ax, _return_out_artists_dict = plot_1D_most_likely_position_comparsions(measured_position_df=None, time_window_centers=time_window_centers, xbin=deepcopy(xbin),
                                                                 posterior=active_posterior,
                                                                 active_most_likely_positions_1D=active_most_likely_positions,
                                                                 ax=an_ax, variable_name=variable_name, debug_print=True, enable_flat_line_drawing=False,
-                                                                posterior_heatmap_imshow_kwargs=posterior_heatmap_imshow_kwargs)
+                                                                posterior_heatmap_imshow_kwargs=posterior_heatmap_imshow_kwargs, return_created_artists=True)
 
         if xbin_labels is not None:
             ## add the labels:
@@ -454,11 +454,11 @@ class SpecificDockWidgetManipulatingMixin(BaseDynamicInstanceConformingMixin):
         
         # most_likely_positions_mode: 'standard'|'corrected'
         ## Actual plotting portion:
-        fig, an_ax = plot_1D_most_likely_position_comparsions(measured_position_df=None, time_window_centers=time_window_centers, xbin=deepcopy(xbin),
+        fig, an_ax, _return_out_artists_dict = plot_1D_most_likely_position_comparsions(measured_position_df=None, time_window_centers=time_window_centers, xbin=deepcopy(xbin),
                                                                 posterior=active_posterior,
                                                                 active_most_likely_positions_1D=active_most_likely_positions,
                                                                 ax=an_ax, variable_name=variable_name, debug_print=True, enable_flat_line_drawing=False,
-                                                                posterior_heatmap_imshow_kwargs=posterior_heatmap_imshow_kwargs)
+                                                                posterior_heatmap_imshow_kwargs=posterior_heatmap_imshow_kwargs, return_created_artists=True)
 
         ## Update the params
         widget.params.variable_name = variable_name
@@ -557,11 +557,11 @@ class SpecificDockWidgetManipulatingMixin(BaseDynamicInstanceConformingMixin):
         
         # most_likely_positions_mode: 'standard'|'corrected'
         ## Actual plotting portion:
-        fig, an_ax = plot_1D_most_likely_position_comparsions(measured_position_df=None, time_window_centers=time_window_centers, xbin=deepcopy(xbin),
+        fig, an_ax, _return_out_artists_dict = plot_1D_most_likely_position_comparsions(measured_position_df=None, time_window_centers=time_window_centers, xbin=deepcopy(xbin),
                                                                 posterior=active_posterior,
                                                                 active_most_likely_positions_1D=active_most_likely_positions,
                                                                 ax=an_ax, variable_name=variable_name, debug_print=True, enable_flat_line_drawing=False,
-                                                                posterior_heatmap_imshow_kwargs=posterior_heatmap_imshow_kwargs)
+                                                                posterior_heatmap_imshow_kwargs=posterior_heatmap_imshow_kwargs, return_created_artists=True)
 
         ## Update the params
         widget.params.variable_name = variable_name

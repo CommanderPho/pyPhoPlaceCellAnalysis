@@ -132,10 +132,10 @@ class DefaultDecoderDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Disp
         
                 
         ## Get the previously created matplotlib_view_widget figure/ax:
-        fig, curr_ax = plot_1D_most_likely_position_comparsions(computation_result.sess.position.to_dataframe(), time_window_centers=active_decoder.time_window_centers, xbin=active_bins,
+        fig, curr_ax, _return_out_artists_dict = plot_1D_most_likely_position_comparsions(computation_result.sess.position.to_dataframe(), time_window_centers=active_decoder.time_window_centers, xbin=active_bins,
                                                         posterior=active_posterior,
                                                         active_most_likely_positions_1D=active_most_likely_positions,
-                                                        **overriding_dict_with(lhs_dict={'ax':None, 'variable_name':variable_name, 'enable_flat_line_drawing':False, 'debug_print': False}, **kwargs))
+                                                        **overriding_dict_with(lhs_dict={'ax':None, 'variable_name':variable_name, 'enable_flat_line_drawing':False, 'debug_print': False}, **kwargs), return_created_artists=True)
         
 
         use_flexitext_titles = kwargs.pop('use_flexitext_titles', False)
@@ -436,7 +436,7 @@ def _subfn_try_plot_posterior_image(ax, time_window_centers, posterior, xbin, en
 
 @function_attributes(short_name=None, tags=['IMPORTANT', 'decoder', 'plot', '1D', 'matplotlib'], input_requires=[], output_provides=[], uses=['perform_plot_1D_single_most_likely_position_curve', '_subfn_try_plot_posterior_image'], used_by=['plot_most_likely_position_comparsions', '_helper_update_decoded_single_epoch_slice_plot'], creation_date='2023-05-01 00:00', related_items=['plot_slices_1D_most_likely_position_comparsions'])
 def plot_1D_most_likely_position_comparsions(measured_position_df, time_window_centers, xbin, ax=None, posterior=None, active_most_likely_positions_1D=None, enable_flat_line_drawing=False, variable_name = 'x', debug_print=False, 
-                                             skip_plotting_measured_positions=False, skip_plotting_most_likely_positions=False, posterior_heatmap_imshow_kwargs=None, use_original_bounds=False):
+                                             skip_plotting_measured_positions=False, skip_plotting_most_likely_positions=False, posterior_heatmap_imshow_kwargs=None, use_original_bounds=False, return_created_artists:bool=False):
     """ renders a single 2D subplot in MATPLOTLIB for a 1D position axes: the computed posterior for the position from the Bayesian decoder and overlays the animal's actual position over the top.
     
     Animal's actual position is rendered as a red line with no markers 
@@ -470,7 +470,9 @@ def plot_1D_most_likely_position_comparsions(measured_position_df, time_window_c
             
     """
     from neuropy.utils.matplotlib_helpers import get_heatmap_cmap
-    
+
+    _return_out_artists_dict = {}    
+
     with plt.ion():
         if ax is None:
             fig, ax = plt.subplots(ncols=1, nrows=1, figsize=(15,15), clear=True, sharex=True, sharey=False, constrained_layout=True)
@@ -487,6 +489,7 @@ def plot_1D_most_likely_position_comparsions(measured_position_df, time_window_c
         else:
             line_measured_position = None
 
+        _return_out_artists_dict['line_measured_position'] = line_measured_position
         ax.set_title(variable_name)
        
         # Posterior distribution heatmap:
@@ -515,6 +518,8 @@ def plot_1D_most_likely_position_comparsions(measured_position_df, time_window_c
         else:
             im_posterior_x = None
 
+        _return_out_artists_dict['im_posterior_x'] = im_posterior_x
+
 
         # Most-likely Estimated Position Plots (grey line):
         if ((not skip_plotting_most_likely_positions) and (active_most_likely_positions_1D is not None)):
@@ -523,8 +528,12 @@ def plot_1D_most_likely_position_comparsions(measured_position_df, time_window_c
         else:
             line_most_likely_position = None
 
-        return fig, ax
-    
+        _return_out_artists_dict['line_most_likely_position'] = line_most_likely_position
+
+        if not return_created_artists:
+            return fig, ax
+        else:
+            return fig, ax, _return_out_artists_dict
 
 # A version of `plot_1D_most_likely_position_comparsions` that plots several images on the same axis: ____________________________________________________ #
 @function_attributes(short_name=None, tags=['decoder', 'plot', '1D', 'matplotlib', 'slices'], input_requires=[], output_provides=[], uses=[], used_by=['plot_most_likely_position_comparsions', 'AddNewLongShortDecodedEpochSlices_MatplotlibPlotCommand', 'AddNewTrackTemplatesDecodedEpochSlicesRows_MatplotlibPlotCommand'], creation_date='2023-10-17 12:25', related_items=['plot_1D_most_likely_position_comparsions'])
@@ -817,13 +826,13 @@ def plot_most_likely_position_comparsions(pho_custom_decoder, position_df, axs=N
         _, axs[0] = plot_1D_most_likely_position_comparsions(position_df, variable_name='x', time_window_centers=pho_custom_decoder.active_time_window_centers, xbin=pho_custom_decoder.xbin,
                                                     posterior=marginal_posterior_x,
                                                     active_most_likely_positions_1D=active_most_likely_positions_x, ax=axs[0],
-                                                    enable_flat_line_drawing=enable_flat_line_drawing, debug_print=debug_print, **kwargs)
+                                                    enable_flat_line_drawing=enable_flat_line_drawing, debug_print=debug_print, return_created_artists=False, **kwargs)
         
         # Y:
         _, axs[1] = plot_1D_most_likely_position_comparsions(position_df, variable_name='y', time_window_centers=pho_custom_decoder.active_time_window_centers, xbin=pho_custom_decoder.ybin,
                                                     posterior=marginal_posterior_y,
                                                     active_most_likely_positions_1D=active_most_likely_positions_y, ax=axs[1],
-                                                    enable_flat_line_drawing=enable_flat_line_drawing, debug_print=debug_print, **kwargs)    
+                                                    enable_flat_line_drawing=enable_flat_line_drawing, debug_print=debug_print, return_created_artists=False, **kwargs)    
         if created_new_figure:
             # Only update if we created a new figure:
             title_text: str = f'Decoded Position data component comparison'
@@ -1001,12 +1010,12 @@ def _helper_update_decoded_single_epoch_slice_plot(curr_ax, params, plots_data, 
 
     skip_plotting_most_likely_positions: bool = params.get('skip_plotting_most_likely_positions', False)
 
-    _temp_fig, curr_ax = plot_1D_most_likely_position_comparsions(measured_position_df, ax=curr_ax, time_window_centers=curr_time_bins, variable_name=params.variable_name, xbin=params.xbin,
+    _temp_fig, curr_ax, _return_out_artists_dict = plot_1D_most_likely_position_comparsions(measured_position_df, ax=curr_ax, time_window_centers=curr_time_bins, variable_name=params.variable_name, xbin=params.xbin,
                                                         posterior=curr_posterior,
                                                         active_most_likely_positions_1D=curr_most_likely_positions,
                                                         enable_flat_line_drawing=params.enable_flat_line_drawing, debug_print=debug_print,
                                                         skip_plotting_measured_positions=skip_plotting_measured_positions, skip_plotting_most_likely_positions=skip_plotting_most_likely_positions,
-                                                        posterior_heatmap_imshow_kwargs=params.get('posterior_heatmap_imshow_kwargs', None),
+                                                        posterior_heatmap_imshow_kwargs=params.get('posterior_heatmap_imshow_kwargs', None), return_created_artists=True,
                                                         )
     if _temp_fig is not None:
         plots.fig = _temp_fig

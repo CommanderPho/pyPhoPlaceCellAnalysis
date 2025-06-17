@@ -5005,13 +5005,13 @@ class TrainTestLapsSplitting:
         # active_decoder_evaluation_df = global_measured_position_df
 
         # ## Get the previously created matplotlib_view_widget figure/ax:
-        fig, curr_ax = plot_1D_most_likely_position_comparsions(active_decoder_evaluation_df, time_window_centers=time_window_centers, xbin=xbin,
+        fig, curr_ax, _return_out_artists_dict = plot_1D_most_likely_position_comparsions(active_decoder_evaluation_df, time_window_centers=time_window_centers, xbin=xbin,
                                                             posterior=active_posterior,
                                                             active_most_likely_positions_1D=active_most_likely_positions,
                                                             # variable_name='x',
                                                             variable_name='measured',
                                                             enable_flat_line_drawing=False,
-                                                            ax=None,
+                                                            ax=None, return_created_artists=True,
                                                         )
         plt.title('decoding performance')
 
@@ -8661,11 +8661,11 @@ class AddNewDecodedPosteriors_MatplotlibPlotCommand(BaseMenuCommand):
         measured_position_df = None # Note: for some reason setting `measured_position_df` to anything other than None here messes up the plotting entirely. Set it to None now, and if we want measured positions plot them after
             
         ## Actual plotting portion:
-        fig, an_ax = plot_1D_most_likely_position_comparsions(measured_position_df=measured_position_df, time_window_centers=time_window_centers, xbin=active_bins,
+        fig, an_ax, _return_out_artists_dict = plot_1D_most_likely_position_comparsions(measured_position_df=measured_position_df, time_window_centers=time_window_centers, xbin=active_bins,
                                                                 posterior=active_posterior,
                                                                 active_most_likely_positions_1D=active_most_likely_positions,
                                                                 ax=an_ax, variable_name=variable_name, debug_print=True, enable_flat_line_drawing=False,
-                                                                posterior_heatmap_imshow_kwargs=posterior_heatmap_imshow_kwargs)
+                                                                posterior_heatmap_imshow_kwargs=posterior_heatmap_imshow_kwargs, return_created_artists=True)
 
         ## Update the params
         widget.params.variable_name = variable_name
@@ -8674,6 +8674,9 @@ class AddNewDecodedPosteriors_MatplotlibPlotCommand(BaseMenuCommand):
         if extended_dock_title_info is not None:
             widget.params.extended_dock_title_info = deepcopy(extended_dock_title_info)
             
+
+
+
         ## Update the plots_data - used for crosshairs tracing and other things
         if time_window_centers is not None:
             widget.plots_data.time_window_centers = deepcopy(time_window_centers)
@@ -8687,6 +8690,9 @@ class AddNewDecodedPosteriors_MatplotlibPlotCommand(BaseMenuCommand):
         if a_position_decoder is not None:
             widget.plots_data.a_decoder = deepcopy(a_position_decoder)
         
+        ## Update the .plots
+        widget.plots.update({k:v for k, v in _return_out_artists_dict.items() if v is not None})
+
         ## try to add the measured_positions
         widget.plots_data.measured_position_df = None
         widget.plots.measured_position_artists = None       
@@ -9008,11 +9014,11 @@ class AddNewDecodedEpochMarginal_MatplotlibPlotCommand(AddNewDecodedPosteriors_M
         # most_likely_positions_mode: 'standard'|'corrected'
         # fig, curr_ax = curr_active_pipeline.display('_display_plot_marginal_1D_most_likely_position_comparisons', _active_config_name, variable_name='x', most_likely_positions_mode='corrected', ax=an_ax) # ax=active_2d_plot.ui.matplotlib_view_widget.ax
         ## Actual plotting portion:
-        fig, curr_ax = plot_1D_most_likely_position_comparsions(None, time_window_centers=time_window_centers, xbin=deepcopy(xbin),
+        fig, curr_ax, _return_out_artists_dict = plot_1D_most_likely_position_comparsions(None, time_window_centers=time_window_centers, xbin=deepcopy(xbin),
                                                                 posterior=active_posterior,
                                                                 active_most_likely_positions_1D=active_most_likely_positions,
                                                                 ax=an_ax, variable_name=variable_name, debug_print=True, enable_flat_line_drawing=False,
-                                                                posterior_heatmap_imshow_kwargs=posterior_heatmap_imshow_kwargs)
+                                                                posterior_heatmap_imshow_kwargs=posterior_heatmap_imshow_kwargs, return_created_artists=True)
 
         ## Update the params
         widget.params.variable_name = variable_name

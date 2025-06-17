@@ -2612,11 +2612,11 @@ def _plot_all_time_decoded_marginal_figures_non_interactive(curr_active_pipeline
                 xbin = np.arange(n_xbins)
 
             ## Actual plotting portion:
-            fig, an_ax = plot_1D_most_likely_position_comparsions(measured_position_df=None, time_window_centers=a_time_window_centers, xbin=deepcopy(xbin),
+            fig, an_ax, _return_out_artists_dict = plot_1D_most_likely_position_comparsions(measured_position_df=None, time_window_centers=a_time_window_centers, xbin=deepcopy(xbin),
                                                                     posterior=active_posterior,
                                                                     active_most_likely_positions_1D=active_most_likely_positions,
                                                                     ax=an_ax, variable_name=variable_name, debug_print=True, enable_flat_line_drawing=False,
-                                                                    posterior_heatmap_imshow_kwargs=posterior_heatmap_imshow_kwargs)
+                                                                    posterior_heatmap_imshow_kwargs=posterior_heatmap_imshow_kwargs, return_created_artists=True)
             
             label_artists_dict = PlottingHelpers.helper_matplotlib_add_pseudo2D_marginal_labels(an_ax, y_bin_labels=y_bin_labels, enable_draw_decoder_colored_lines=False)
             _subfn_clean_axes_decorations(an_ax=ax_dict["ax_decodedMarginal_P_Short_v_time"])
@@ -5021,8 +5021,8 @@ def _perform_plot_multi_decoder_meas_pred_position_track(curr_active_pipeline, f
         if is_first_iteration:
             pos_df = pos_df.position.add_binned_time_column(time_window_edges=time_bin_containers.edges, time_window_edges_binning_info=time_bin_containers.edge_info) # 'binned_time' refers to which time bins these are
             # Plot the measured position X:
-            _, ax = plot_1D_most_likely_position_comparsions(pos_df, variable_name='x', time_window_centers=None, xbin=None, posterior=None, active_most_likely_positions_1D=None, ax=ax_list[0],
-                                                            enable_flat_line_drawing=enable_flat_line_drawing, debug_print=debug_print, **kwargs)
+            _, ax, _return_out_artists_dict = plot_1D_most_likely_position_comparsions(pos_df, variable_name='x', time_window_centers=None, xbin=None, posterior=None, active_most_likely_positions_1D=None, ax=ax_list[0],
+                                                            enable_flat_line_drawing=enable_flat_line_drawing, debug_print=debug_print, return_created_artists=True, **kwargs)
         ## END if is_first_iteration...
 
         _out_data[a_decoder_name] = pd.DataFrame({'t': time_window_centers, 'x': active_most_likely_positions_x, 'binned_time': np.arange(len(time_window_centers))})
