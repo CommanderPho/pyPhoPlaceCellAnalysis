@@ -2715,6 +2715,7 @@ class DecodedSequenceAndHeuristicsPlotData:
     line_y_most_likely: NDArray = field()
     is_epoch_included: bool = field()
 
+@metadata_attributes(short_name=None, tags=['heuristics'], input_requires=[], output_provides=[], uses=['DecodedSequenceAndHeuristicsPlotData'], used_by=['add_data_overlays'], creation_date='2025-06-16 22:51', related_items=[])
 class DecodedSequenceAndHeuristicsPlotDataProvider(PaginatedPlotDataProvider):
     """ Adds the most-likely and actual position points/lines to the posterior heatmap.
 
@@ -2731,7 +2732,7 @@ class DecodedSequenceAndHeuristicsPlotDataProvider(PaginatedPlotDataProvider):
 
     Usage:
 
-    from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError import RadonTransformPlotDataProvider
+    from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError import DecodedSequenceAndHeuristicsPlotDataProvider
 
     
     Can extract from owner like:
@@ -2762,7 +2763,7 @@ class DecodedSequenceAndHeuristicsPlotDataProvider(PaginatedPlotDataProvider):
 
     
     @classmethod
-    def decoder_build_single_decoded_sequence_and_heuristics_curves_data(cls, curr_results_obj, decoder_track_length: float, pos_bin_edges: NDArray, same_thresh_fraction_of_track: float = 0.075, max_jump_distance_cm: float=60.0, included_columns=None):
+    def decoder_build_single_decoded_sequence_and_heuristics_curves_data(cls, curr_results_obj, decoder_track_length: float, pos_bin_edges: NDArray, same_thresh_fraction_of_track: float = 0.075, max_jump_distance_cm: float=60.0, max_ignore_bins:int=2, included_columns=None):
         """ builds for a single decoder. 
         same_thresh_fraction_of_track: float = 0.1 ## up to 10% of the track
         same_thresh_fraction_of_track: float = 0.075 ## up to 7.5% of the track
@@ -2792,7 +2793,7 @@ class DecodedSequenceAndHeuristicsPlotDataProvider(PaginatedPlotDataProvider):
             excluded_heuristic_ripple_start_times = active_filter_epochs_df[df_is_excluded_criteria_fn(active_filter_epochs_df)][start_col_name].values
             active_filter_epochs_df['is_included_by_heuristic_criteria'] = False # default to False
             active_filter_epochs_df.loc[active_filter_epochs_df.epochs.find_data_indicies_from_epoch_times(included_heuristic_ripple_start_times), 'is_included_by_heuristic_criteria'] = True ## adds the ['is_included_by_heuristic_criteria'] column
-
+        ## END if ('is_incl...
 
 
         out_position_curves_data = {}
@@ -2820,14 +2821,14 @@ class DecodedSequenceAndHeuristicsPlotDataProvider(PaginatedPlotDataProvider):
 
             # n_pos_bins: int = np.shape(a_p_x_given_n)[0]
             partition_result: SubsequencesPartitioningResult = SubsequencesPartitioningResult.init_from_positions_list(a_most_likely_positions_list, flat_time_window_centers=time_window_centers, pos_bin_edges=pos_bin_edges,
-                                                                                                                        max_ignore_bins=2, same_thresh=same_thresh_cm, max_jump_distance_cm=max_jump_distance_cm, flat_time_window_edges=time_bin_edges) # AssertionError: (len(flat_time_window_edges)-1): 49 and num_flat_positions: 1
+                                                                                                                        max_ignore_bins=max_ignore_bins, same_thresh=same_thresh_cm, max_jump_distance_cm=max_jump_distance_cm, flat_time_window_edges=time_bin_edges) # AssertionError: (len(flat_time_window_edges)-1): 49 and num_flat_positions: 1
 
             # 'is_included_by_heuristic_criteria'
             is_epoch_included_in_filter: bool = a_tuple.is_included_by_heuristic_criteria
             ## Build the result
             # out_position_curves_data[an_epoch_idx] = DecodedSequenceAndHeuristicsPlotData(partition_result=partition_result, time_bin_centers=time_window_centers, line_y_most_likely=a_most_likely_positions_list, line_y_actual=None)
             out_position_curves_data[a_tuple.start] = DecodedSequenceAndHeuristicsPlotData(partition_result=partition_result, time_bin_centers=time_window_centers, time_bin_edges=time_bin_edges, line_y_most_likely=a_most_likely_positions_list, is_epoch_included=is_epoch_included_in_filter)
-
+        ## END for an_epoch_idx, a_tuple in enumerate(acti...
 
         return out_position_curves_data
 
@@ -2873,8 +2874,6 @@ class DecodedSequenceAndHeuristicsPlotDataProvider(PaginatedPlotDataProvider):
 
 
         show_heuristic_criteria_filter_epoch_inclusion_status: bool = params.setdefault('show_heuristic_criteria_filter_epoch_inclusion_status', False)
-
-        
 
         # data_index_value = data_idx # OLD MODE
         data_index_value = epoch_start_t

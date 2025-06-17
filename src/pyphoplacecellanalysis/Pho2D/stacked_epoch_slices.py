@@ -1797,10 +1797,12 @@ class DecodedEpochSlicesPaginatedFigureController(PaginatedFigureController):
 
         pos_bin_edges = deepcopy(self.params.xbin)
         decoder_track_length: float = self.params.get('track_length_cm', None)
+        # heuristic_kwargs = self.params.get('heuristic_kwargs', dict(same_thresh_fraction_of_track = 0.075, max_jump_distance_cm = 60, max_ignore_bins = 2))
+        data_overlay_heuristic_kwargs = self.params.get('data_overlay_heuristic_kwargs', dict(same_thresh_fraction_of_track = 0.075, max_jump_distance_cm = 60, max_ignore_bins = 2))
         # assert decoder_track_length is not None
         if decoder_track_length is not None:
             # Build Decoded Positions Data and add them:    
-            decoded_sequence_and_heuristics_curves_data = DecodedSequenceAndHeuristicsPlotDataProvider.decoder_build_single_decoded_sequence_and_heuristics_curves_data(deepcopy(decoder_decoded_epochs_result), pos_bin_edges=pos_bin_edges, decoder_track_length=decoder_track_length, included_columns=included_columns)
+            decoded_sequence_and_heuristics_curves_data = DecodedSequenceAndHeuristicsPlotDataProvider.decoder_build_single_decoded_sequence_and_heuristics_curves_data(deepcopy(decoder_decoded_epochs_result), pos_bin_edges=pos_bin_edges, decoder_track_length=decoder_track_length, included_columns=included_columns, **data_overlay_heuristic_kwargs)
             if decoded_sequence_and_heuristics_curves_data is not None:
                 DecodedSequenceAndHeuristicsPlotDataProvider.add_data_to_pagination_controller(self, decoded_sequence_and_heuristics_curves_data, update_controller_on_apply=False)
         else:
@@ -3398,8 +3400,6 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
         assert known_epochs_type in ['ripple', 'laps'], f"known_epochs_type: '{known_epochs_type}' should be either 'ripple' or 'laps'"
         _, _, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
         
-        
-
         active_spikes_df = get_proper_global_spikes_df(curr_active_pipeline)
         # active_filter_epochs_df = deepcopy(decoder_laps_filter_epochs_decoder_result_dict['long_LR'].filter_epochs)
         active_filter_epochs_df = deepcopy(active_decoder_decoded_epochs_result_dict['long_LR'].filter_epochs)
