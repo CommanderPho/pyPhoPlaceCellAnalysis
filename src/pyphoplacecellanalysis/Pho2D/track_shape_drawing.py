@@ -1,3 +1,4 @@
+from pathlib import Path
 import sys
 from copy import deepcopy
 from typing import Tuple, Optional, List, Dict, Union
@@ -1087,6 +1088,7 @@ def add_vertical_track_bounds_lines(grid_bin_bounds, ax=None, include_long:bool=
     return long_track_line_collection, short_track_line_collection
 
 
+@function_attributes(short_name=None, tags=['track', 'track_shapes'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-06-16 21:02', related_items=[])
 def add_track_shapes(grid_bin_bounds, ax=None, include_long:bool=True, include_short:bool=True):
     """ Plots the two track shapes on the plot. Kinda inflexible right now. 
     
@@ -1292,6 +1294,154 @@ def _perform_plot_matplotlib_2D_tracks(long_track_inst: LinearTrackInstance, sho
 
 
 
+@function_attributes(short_name=None, tags=['matplotlib', 'track_plotting', '2D', 'mosaic', 'layout'], 
+                    input_requires=[], output_provides=[], uses=[], used_by=[], 
+                    creation_date='2024-04-16 16:51', related_items=[])
+def create_long_v_short_track_plot_figure(active_config, figsize=(12, 10), title='2D Track Layout: Long Track (X-axis) vs Short Track (Y-axis)', show_plot=True, clear_figure=True, height_ratios=[12, 1], width_ratios=[1, 12],long_track_alpha=1.0, short_track_alpha=1.0, main_grid_alpha=0.3):
+    """
+    Create a mosaic plot with Long Track Shape drawn under the x-axis and Short Track Shape drawn to the left of the y-axis.
+
+    Creates a 2x2 subplot mosaic layout with:
+    - Short track vertically oriented on the left (y-axis area)
+    - Long track horizontally oriented on the bottom (x-axis area)  
+    - Main plot area in the top-right
+    - Hidden empty subplot in bottom-left
+
+    Args:
+        active_config: Session configuration containing track data
+        figsize: Figure size as (width, height) tuple
+        title: Figure title string
+        show_plot: Whether to call plt.show() at the end
+        clear_figure: Whether to clear the figure before plotting
+        height_ratios: Height ratios for [main_row, track_row]
+        width_ratios: Width ratios for [track_col, main_col]
+        long_track_alpha: Alpha transparency for long track
+        short_track_alpha: Alpha transparency for short track
+        main_grid_alpha: Alpha transparency for main plot grid
+
+    Returns:
+        tuple: (fig, ax_dict, long_track_inst, short_track_inst, long_out_tuple, short_out_tuple)
+            - fig: matplotlib Figure object
+            - ax_dict: Dictionary of subplot axes
+            - long_track_inst: LinearTrackInstance for long track
+            - short_track_inst: LinearTrackInstance for short track  
+            - long_out_tuple: Output from long track plotting
+            - short_out_tuple: Output from short track plotting
+
+    Usage:
+        from pyphoplacecellanalysis.Pho2D.track_shape_drawing import create_long_v_short_track_plot_figure
+
+        active_config = global_session.config
+        fig, ax_dict, long_inst, short_inst, long_out, short_out = create_long_v_short_track_plot_figure(active_config)
+
+        # Add your data to the main plot
+        ax_dict["ax_main"].scatter(x_data, y_data)
+        plt.show()
+    """
+    import matplotlib.pyplot as plt
+    import numpy as np
+    from copy import deepcopy
+    from neuropy.utils.mixins.dict_representable import overriding_dict_with
+    from pyphoplacecellanalysis.Pho2D.track_shape_drawing import LinearTrackInstance
+    from pyphoplacecellanalysis.General.Model.Configs.LongShortDisplayConfig import LongShortDisplayConfigManager
+
+    # Get track instances from session config
+    long_track_inst, short_track_inst = LinearTrackInstance.init_tracks_from_session_config(active_config)
+
+    # Configure display styling
+    long_short_display_config_manager = LongShortDisplayConfigManager()
+    long_epoch_matplotlib_config = long_short_display_config_manager.long_epoch_config.as_matplotlib_kwargs()
+    long_kwargs = deepcopy(long_epoch_matplotlib_config)
+    long_kwargs = overriding_dict_with(lhs_dict=long_kwargs, 
+                                      **dict(linewidth=2, zorder=-99, alpha=long_track_alpha, 
+                                            facecolor='#0099ff07', edgecolor=long_kwargs['facecolor'], 
+                                            linestyle='dashed'))
+
+    short_epoch_matplotlib_config = long_short_display_config_manager.short_epoch_config.as_matplotlib_kwargs()
+    short_kwargs = deepcopy(short_epoch_matplotlib_config)
+    short_kwargs = overriding_dict_with(lhs_dict=short_kwargs, 
+                                       **dict(linewidth=2, zorder=-98, alpha=short_track_alpha, 
+                                             facecolor='#f5161607', edgecolor=short_kwargs['facecolor'], 
+                                             linestyle='dashed'))
+
+    # ==================================================================================================================================================================================================================================================================================== #
+    # Create the figure and begin plotting                                                                                                                                                                                                                                                 #
+    # ==================================================================================================================================================================================================================================================================================== #
+
+    # Create the mosaic layout
+    fig = plt.figure(layout="constrained", figsize=figsize, clear=clear_figure)
+    ax_dict = fig.subplot_mosaic(
+        [
+            ["ax_SHORT_track_y_axis", "ax_main"],
+            ["ax_empty", "ax_LONG_track_x_axis"],
+        ],
+        # set the height ratios between the rows
+        height_ratios=height_ratios,
+        # set the width ratios between the columns
+        width_ratios=width_ratios,
+        sharex=True,
+        sharey=True,
+        gridspec_kw=dict(wspace=0, hspace=0)  # No spacing between subplots
+    )
+
+    # Plot SHORT track on the left y-axis (rotated vertically)
+    short_out_tuple = short_track_inst.plot_rects(plot_item=ax_dict["ax_SHORT_track_y_axis"], 
+                                                 matplotlib_rect_kwargs_override=short_kwargs, 
+                                                 rotate_to_vertical=True)
+
+    # Configure and hide short track axis decorations
+    ax_dict["ax_SHORT_track_y_axis"].set_xlim(-1, 1)
+    ax_dict["ax_SHORT_track_y_axis"].set_ylim(short_track_inst.grid_bin_bounds.xmin, short_track_inst.grid_bin_bounds.xmax)
+
+    # Hide all decorations for short track axis
+    for spine in ax_dict["ax_SHORT_track_y_axis"].spines.values():
+        spine.set_visible(False)
+    ax_dict["ax_SHORT_track_y_axis"].tick_params(axis='both', which='both',
+                                               bottom=False, top=False, left=False, right=False,
+                                               labelbottom=False, labeltop=False, labelleft=False, labelright=False)
+    ax_dict["ax_SHORT_track_y_axis"].set_xlabel('')
+    ax_dict["ax_SHORT_track_y_axis"].set_ylabel('')
+
+    # Plot LONG track on the bottom x-axis (horizontal)  
+    long_out_tuple = long_track_inst.plot_rects(plot_item=ax_dict["ax_LONG_track_x_axis"], 
+                                               matplotlib_rect_kwargs_override=long_kwargs, 
+                                               rotate_to_vertical=False)
+
+    # Configure and hide long track axis decorations
+    ax_dict["ax_LONG_track_x_axis"].set_xlim(long_track_inst.grid_bin_bounds.xmin, long_track_inst.grid_bin_bounds.xmax)
+    ax_dict["ax_LONG_track_x_axis"].set_ylim(-1, 1)
+
+    # Hide all decorations for long track axis
+    for spine in ax_dict["ax_LONG_track_x_axis"].spines.values():
+        spine.set_visible(False)
+    ax_dict["ax_LONG_track_x_axis"].tick_params(axis='both', which='both',
+                                              bottom=False, top=False, left=False, right=False,
+                                              labelbottom=False, labeltop=False, labelleft=False, labelright=False)
+    ax_dict["ax_LONG_track_x_axis"].set_xlabel('')
+    ax_dict["ax_LONG_track_x_axis"].set_ylabel('')
+
+    # Configure main plot area
+    ax_dict["ax_main"].set_xlim(long_track_inst.grid_bin_bounds.xmin, long_track_inst.grid_bin_bounds.xmax)
+    ax_dict["ax_main"].set_ylim(short_track_inst.grid_bin_bounds.xmin, short_track_inst.grid_bin_bounds.xmax)
+    ax_dict["ax_main"].set_xlabel('Long Track Position')
+    ax_dict["ax_main"].set_ylabel('Short Track Position')
+    ax_dict["ax_main"].grid(True, alpha=main_grid_alpha)
+
+    # Hide the empty subplot
+    ax_dict["ax_empty"].set_visible(False)
+
+    # Add title to the figure
+    if title:
+        fig.suptitle(title, fontsize=14)
+
+    # Force autoscale on track axes after hiding decorations
+    ax_dict["ax_SHORT_track_y_axis"].autoscale()
+    ax_dict["ax_LONG_track_x_axis"].autoscale()
+
+    if show_plot:
+        plt.show()
+
+    return fig, ax_dict, long_track_inst, short_track_inst, long_out_tuple, short_out_tuple
 
 
 # ==================================================================================================================== #
@@ -1573,9 +1723,9 @@ def _plot_track_remapping_diagram(a_dir_decoder_aclu_MAX_peak_maps_df: pd.DataFr
         
     base_1D_height: float = 1.0
     # base_1D_height: float = 0.5
-    base_platform_additive_height: float = 0.1
+    # base_platform_additive_height: float = 0.1
 
-    long_height_multiplier: float = 1.0
+    # long_height_multiplier: float = 1.0
     # long_height_multiplier: float = 0.5 # this renders the long track half-height
 
     # long_y_baseline: float = 0.1
@@ -1609,12 +1759,12 @@ def _plot_track_remapping_diagram(a_dir_decoder_aclu_MAX_peak_maps_df: pd.DataFr
     ## Selection (only for interactivity)
     selection_color = (1, 0, 0, 1)  # Red color in RGBA format
     scatter_point_selected_size: float = scatter_point_size + 2.0
-    scatter_edgecolors_selection_color = (0.35, 0, 0, 1)  # Red color in RGBA format
+    # scatter_edgecolors_selection_color = (0.35, 0, 0, 1)  # Red color in RGBA format
 
     selection_text_path_effects = [path_effects.Stroke(linewidth=0.2, foreground='red'), path_effects.Normal()]
 
 
-
+    # Appearing/Disappearing _____________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
     appearing_edgecolors = (0, 1, 0, 1)  # Green color in RGBA format
     # appearing_marker: str = '^' # upward arrow
     appearing_disappearing_marker: str = 'P' # filled plus
@@ -1786,12 +1936,16 @@ def _plot_track_remapping_diagram(a_dir_decoder_aclu_MAX_peak_maps_df: pd.DataFr
     ## OUTPUTS: long_y, short_y, long_y, long_y
 
 
-    # Draw the circle points _____________________________________________________________________________________________ #
+    # Draw the scatter points _____________________________________________________________________________________________ #
 
     # INPUTS: is_aclu_in_both, disappearing_long_to_short_indicies, appearing_long_to_short_indicies
 
     common_circle_points_kwargs = dict(alpha=0.9, picker=enable_interactivity, plotnonfinite=False)
-    common_BOTH_only_circle_points_kwargs = common_circle_points_kwargs | dict(marker='o', zorder=9, alpha=0.4)
+    common_circle_points_kwargs = common_circle_points_kwargs | kwargs.pop('common_circle_points_kwargs', {}) ## override with user's kwargs
+
+    common_BOTH_only_circle_points_kwargs = common_circle_points_kwargs | dict(marker='o', zorder=9, alpha=0.6)
+    common_BOTH_only_circle_points_kwargs = common_BOTH_only_circle_points_kwargs | kwargs.pop('common_BOTH_only_circle_points_kwargs', {}) ## override with user's kwargs
+
 
     both_long_peak_x = long_peak_x[is_aclu_in_both]
     both_long_y = long_y[is_aclu_in_both]
@@ -1840,11 +1994,15 @@ def _plot_track_remapping_diagram(a_dir_decoder_aclu_MAX_peak_maps_df: pd.DataFr
         extant_plot_container.plots_data.scatter['short_appearing_scatter'] = _out_short_appearing_points        
 
     _output_by_aclu_dict = {} # keys are integer aclus, values are dictionaries of returned graphics objects:
+    
+
     # Draw arrows from the first set of points to the second set _________________________________________________________ #
     # arrowprops_kwargs = dict(arrowstyle="->", alpha=0.6)
     # arrowprops_kwargs = dict(arrowstyle="simple", alpha=0.7)
     arrowprops_kwargs = dict(arrowstyle="fancy, head_length=0.25, head_width=0.25, tail_width=0.05", alpha=0.6)
-    arrowprops_kwargs = arrowprops_kwargs | dict(alpha=0.2, zorder=1)
+    arrowprops_kwargs = arrowprops_kwargs | dict(alpha=0.6, zorder=1)
+    arrowprops_kwargs = arrowprops_kwargs | kwargs.pop('arrowprops_kwargs', {}) ## override with user's kwargs
+    
     # , mutation_scale=10
 
     ## need to take both to str, or both to int
@@ -2180,6 +2338,172 @@ def plot_bidirectional_track_remapping_diagram(track_templates, grid_bin_bounds,
 
 
     return collector
+
+
+
+@function_attributes(short_name=None, tags=['figure', 'publication'], input_requires=[], output_provides=[], uses=['_plot_track_remapping_diagram'], used_by=[], creation_date='2025-06-16 20:44', related_items=[])
+def plot_publication_bidirectional_track_remapping_diagram(all_neuron_stats_table, **kwargs):
+    """ 
+    from pyphoplacecellanalysis.Pho2D.track_shape_drawing import plot_publication_bidirectional_track_remapping_diagram
+    
+    
+    """
+    from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.ContainerBased.PhoContainerTool import GenericMatplotlibContainer
+    from matplotlib.gridspec import GridSpec
+    from neuropy.utils.matplotlib_helpers import build_or_reuse_figure, perform_update_title_subtitle
+    from pyphoplacecellanalysis.Pho2D.track_shape_drawing import _plot_track_remapping_diagram
+    from pyphoplacecellanalysis.Pho2D.track_shape_drawing import AclusYOffsetMode
+    from neuropy.core.user_annotations import UserAnnotationsManager
+
+
+
+
+    ## INPUTS: all_neuron_stats_table
+
+    active_all_neuron_stats_table: pd.DataFrame = deepcopy(all_neuron_stats_table)[all_neuron_stats_table['has_considerable_remapping']] ## Only the considerably remapping cells
+
+    # ['track_membership'] # SHARED, LEFT_ONLY, RIGHT_ONLY
+    # LR_only_column_names = ['long_LR_pf1D_peak', 'short_LR_pf1D_peak']
+    # RL_only_column_names = ['long_RL_pf1D_peak', 'short_RL_pf1D_peak']
+
+    LR_only_column_names = ['long_LR', 'short_LR']
+    RL_only_column_names = ['long_RL', 'short_RL']
+
+    long_short_any_column_names = ['long_pf_peak_x', 'short_pf_peak_x']
+
+    # long_LR_pf2D_peak_x, 
+
+    # any_1D_column_names = ['long_LR_pf1D_peak', 'long_RL_pf1D_peak', 'short_LR_pf1D_peak', 'short_RL_pf1D_peak']
+    # any_1D_column_names = ['long_LR_pf1D_peak', 'long_RL_pf1D_peak', 'short_LR_pf1D_peak', 'short_RL_pf1D_peak']
+
+    decoder_name_suffix: str = 'pf1D_peak'
+    # decoder_name_suffix: str = 'pf2D_peak_x'
+
+    LR_only_column_names = [f"{a_name}_{decoder_name_suffix}" for a_name in LR_only_column_names]
+    RL_only_column_names = [f"{a_name}_{decoder_name_suffix}" for a_name in RL_only_column_names]
+    any_1D_column_names = [f"{a_name}_{decoder_name_suffix}" for a_name in ('long_LR', 'long_RL', 'short_LR', 'short_RL')]
+    global_min_x: float = np.nanmin(active_all_neuron_stats_table[any_1D_column_names].min(axis='columns', skipna=True).values)
+    global_max_x: float = np.nanmax(active_all_neuron_stats_table[any_1D_column_names].max(axis='columns', skipna=True).values)
+    global_min_y: float = np.nanmin(active_all_neuron_stats_table[any_1D_column_names].min(axis='columns', skipna=True).values)
+    global_max_y: float = np.nanmax(active_all_neuron_stats_table[any_1D_column_names].max(axis='columns', skipna=True).values)
+
+    # (global_min_x, global_max_x)
+
+    # global_most_extreme_track_grid_bin_bounds = ((global_min_x, global_max_x), (global_min_y, global_min_y), )
+    # OUTPUTS: global_most_extreme_track_grid_bin_bounds, (global_min_x, global_max_x)
+    # global_most_extreme_track_grid_bin_bounds
+
+    ## Get grid_bin_bounds for drawing of the track outlines
+    _out_user_annotations_add_code_lines, loaded_configs = UserAnnotationsManager.batch_build_user_annotation_grid_bin_bounds_from_exported_position_info_mat_files(search_parent_path=Path(r'W:/Data/Kdiba'), print_user_annotations_lines_to_add=False, debug_print=False)
+    # loaded_configs_dict = {v['session_context']:v for k, v in loaded_configs.items()}
+
+    # per_session_loaded_configs_dict: Dict[IdentifyingContext, Dict] = {v['session_context']:v for k, v in loaded_configs.items()}
+    per_session_uid_loaded_configs_dict: Dict[str, Dict] = {v['session_context'].get_description(separator='|'):v for k, v in loaded_configs.items()} # indexed by session_uid like 'kdiba|gor01|one|2006-6-07_11-26-53'
+    # per_session_uid_loaded_configs_dict
+
+    grid_bin_bounds_key_name: str = 'new_cm_grid_bin_bounds'
+    # grid_bin_bounds_key_name: str = 'real_cm_grid_bin_bounds'
+    # grid_bin_bounds_key_name: str = 'grid_bin_bounds'
+
+    # per_session_uid_loaded_grid_bin_bounds_cm_dict = {session_uid:deepcopy(a_session_config[grid_bin_bounds_key_name]) for session_uid, a_session_config in per_session_uid_loaded_configs_dict.items()}
+    # per_session_uid_loaded_grid_bin_bounds_cm_dict
+    grid_bin_bounds_col_names = ['grid_bin_bounds_' + part_name for part_name in ('x0', 'x1', 'y0', 'y1')] # ['grid_bin_bounds_x0', 'grid_bin_bounds_x1', 'grid_bin_bounds_y0', 'grid_bin_bounds_y1']
+    # print(grid_bin_bounds_col_names)
+    session_loaded_grid_bin_bounds_cm_df: pd.DataFrame = pd.DataFrame([(session_uid, *deepcopy(a_session_config[grid_bin_bounds_key_name])) for session_uid, a_session_config in per_session_uid_loaded_configs_dict.items()], columns=['session_uid', *grid_bin_bounds_col_names])
+    # session_loaded_grid_bin_bounds_cm_df ## all the same for each session unfortunately
+
+    global_most_extreme_track_grid_bin_bounds = ((session_loaded_grid_bin_bounds_cm_df.grid_bin_bounds_x0.min(), session_loaded_grid_bin_bounds_cm_df.grid_bin_bounds_x1.max()), (session_loaded_grid_bin_bounds_cm_df.grid_bin_bounds_y0.min(), session_loaded_grid_bin_bounds_cm_df.grid_bin_bounds_y1.max()), )
+    # global_most_extreme_track_grid_bin_bounds # ((37.0773897438341, 250.69004399129707), (106.80073123839011, 151.15367504603452))
+
+    ## Add in the grid_bin_bounds from the configs to `active_all_neuron_stats_table`
+    ## INPUTS: per_session_uid_loaded_configs_dict, active_all_neuron_stats_table
+
+    ## INPUTS: active_all_neuron_stats_table
+    per_session_all_neuron_stats_table = active_all_neuron_stats_table.pho.partition_df_dict(partitionColumn='session_uid')
+    # per_session_all_neuron_stats_table
+
+    ## Make a single figure for both LR/RL remapping cells:
+    kwargs = dict(is_dark_mode=False, enable_interactivity=False, defer_render=True,
+                # aclus_y_offset_mode=AclusYOffsetMode.RandomJitter,
+                aclus_y_offset_mode=AclusYOffsetMode.CountBased,
+                
+                )
+    fig = build_or_reuse_figure(fignum='Track Remapping', fig=kwargs.pop('fig', None), fig_idx=kwargs.pop('fig_idx', 0), figsize=kwargs.pop('figsize', (10, 4)), dpi=kwargs.pop('dpi', None), constrained_layout=True, clear=True) # , clear=True
+    gs = GridSpec(2, 1, figure=fig)
+    ax_LR = plt.subplot(gs[0])
+    ax_RL = plt.subplot(gs[1])
+
+    _fig_container: GenericMatplotlibContainer = GenericMatplotlibContainer(name='across-session-neuron-remapping-diagram')
+    _fig_container.fig = fig
+    _fig_container.plots.gs = gs
+    _fig_container.axes = [ax_LR, ax_RL]
+    # _fig_container.plots
+
+    _extant_plot_container_LR = None
+    _extant_plot_container_RL = None
+
+    # included_session_uids = None
+    # # included_session_uids = ['kdiba|gor01|two|2006-6-07_16-40-19']
+    # # included_session_uids = ['kdiba|gor01|one|2006-6-09_1-22-43']
+
+    # if included_session_uids is None:
+    #     included_session_uids = list(per_session_all_neuron_stats_table.keys())
+
+    ## All included_session_uids
+    # included_session_uids
+
+    # _fig_container.params.included_session_uids = deepcopy(included_session_uids)
+    _fig_container.plots_data.all_neuron_stats_table = deepcopy(all_neuron_stats_table)
+    _fig_container.plots_data.active_all_neuron_stats_table = deepcopy(active_all_neuron_stats_table)
+    # _fig_container.plots_data.per_session_all_neuron_stats_table = deepcopy(per_session_all_neuron_stats_table)
+    # _fig_container.plots_data.per_session_uid_loaded_configs_dict = deepcopy(per_session_uid_loaded_configs_dict)
+
+
+
+    ## All on the same plot:
+
+    ## INPUTS: global_most_extreme_track_grid_bin_bounds
+
+    # a_df: pd.DataFrame = deepcopy(all_neuron_stats_table)
+    a_df: pd.DataFrame = deepcopy(active_all_neuron_stats_table)
+
+    # a_session_config = per_session_uid_loaded_configs_dict[session_uid]
+    grid_bin_bounds = deepcopy(global_most_extreme_track_grid_bin_bounds)
+
+    ## ['long_LR_pf1D_peak', 'long_RL_pf1D_peak', 'short_LR_pf1D_peak', 'short_RL_pf1D_peak']
+
+    LR_only_column_names = ['long_LR_pf1D_peak', 'short_LR_pf1D_peak']
+    RL_only_column_names = ['long_RL_pf1D_peak', 'short_RL_pf1D_peak']
+
+    # INPUTS: any_1D_column_names
+
+    # neuron_id_col_name: str = 'aclu'
+    # neuron_id_col_name: str = 'neuron_uid'
+    # neuron_IDs_lists = [deepcopy(a_df[[neuron_id_col_name, a_column_name]]).dropna(axis=0, how='any')[neuron_id_col_name].to_numpy() for a_column_name in any_1D_column_names] # [A, B, C, D, ...]
+    # neuron_IDs_lists
+
+    # LR_only_decoder_aclu_MAX_peak_maps_df = deepcopy(a_df[LR_only_column_names]).dropna(axis=0, how='any') # 266
+    # RL_only_decoder_aclu_MAX_peak_maps_df = deepcopy(a_df[RL_only_column_names]).dropna(axis=0, how='any') # 262
+
+    LR_only_decoder_aclu_MAX_peak_maps_df = deepcopy(a_df[LR_only_column_names]).dropna(axis=0, how='all') # 266
+    RL_only_decoder_aclu_MAX_peak_maps_df = deepcopy(a_df[RL_only_column_names]).dropna(axis=0, how='all') # 262
+
+    # LR_only_decoder_aclu_MAX_peak_maps_df = deepcopy(a_df[LR_only_column_names])
+    # RL_only_decoder_aclu_MAX_peak_maps_df = deepcopy(a_df[RL_only_column_names])
+
+
+    ## OUTPUTS: LR_only_decoder_aclu_MAX_peak_maps_df, RL_only_decoder_aclu_MAX_peak_maps_df
+    LR_only_decoder_aclu_MAX_peak_maps_df # 266
+    RL_only_decoder_aclu_MAX_peak_maps_df # 262
+
+    ## Plot the track shapes (if needed, and the significant remapping points/arrows):
+    fig_LR_RL, ax_LR, _extant_plot_container_LR = _plot_track_remapping_diagram(LR_only_decoder_aclu_MAX_peak_maps_df, grid_bin_bounds=grid_bin_bounds, long_column_name=LR_only_column_names[0], short_column_name=LR_only_column_names[1], ax=ax_LR, extant_plot_container=_extant_plot_container_LR, **kwargs)
+    perform_update_title_subtitle(fig=fig_LR_RL, ax=ax_LR, title_string=None, subtitle_string=f"LR Track Remapping - {len(LR_only_decoder_aclu_MAX_peak_maps_df)} aclus")
+    fig_LR_RL, ax_RL, _extant_plot_container_RL = _plot_track_remapping_diagram(RL_only_decoder_aclu_MAX_peak_maps_df, grid_bin_bounds=grid_bin_bounds, long_column_name=RL_only_column_names[0], short_column_name=RL_only_column_names[1], ax=ax_RL, extant_plot_container=_extant_plot_container_RL, **kwargs)
+    perform_update_title_subtitle(fig=fig_LR_RL, ax=ax_RL, title_string=None, subtitle_string=f"RL Track Remapping - {len(RL_only_decoder_aclu_MAX_peak_maps_df)} aclus")
+
+    return _fig_container
+
 
 
 
