@@ -2134,6 +2134,7 @@ def _plot_track_remapping_diagram(a_dir_decoder_aclu_MAX_peak_maps_df: pd.DataFr
 
     if enable_interactivity:
         ## Build the interactivity callbacks:
+        interactivity_output_dict = {}
         previous_selected_indices = []
 
         if not isinstance(active_aclus, NDArray):
@@ -2261,9 +2262,11 @@ def _plot_track_remapping_diagram(a_dir_decoder_aclu_MAX_peak_maps_df: pd.DataFr
         _mpl_pick_event_handle_idx: int = fig.canvas.mpl_connect('pick_event', on_scatter_point_pick)
 
 
-        _output_dict['get_aclu_color_fn'] = get_aclu_color_fn
-        _output_dict['scatter_select_function'] = on_scatter_point_pick
-        _output_dict['_scatter_select_mpl_pick_event_handle_idx'] = _mpl_pick_event_handle_idx
+        interactivity_output_dict['get_aclu_color_fn'] = get_aclu_color_fn
+        interactivity_output_dict['scatter_select_function'] = on_scatter_point_pick
+        interactivity_output_dict['_scatter_select_mpl_pick_event_handle_idx'] = _mpl_pick_event_handle_idx
+        extant_plot_container.plots_data.interactivity_output_dict = interactivity_output_dict
+        
     ## END if enable_interactivity...
 
     ## format tha axes:
