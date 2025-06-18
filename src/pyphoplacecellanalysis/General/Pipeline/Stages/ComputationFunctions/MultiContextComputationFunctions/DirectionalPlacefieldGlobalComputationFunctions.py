@@ -8768,6 +8768,34 @@ class AddNewDecodedPosteriors_MatplotlibPlotCommand(BaseMenuCommand):
         return output_dict
     
 
+
+    @function_attributes(short_name=None, tags=['multi-time-bin'], input_requires=[], output_provides=[], uses=['cls.prepare_and_perform_add_add_pseudo2D_decoder_decoded_epochs'], used_by=[], creation_date='2025-02-26 05:37', related_items=[])
+    @classmethod
+    def get_all_computed_time_bin_sizes(cls, curr_active_pipeline, active_2d_plot, debug_print=False, **kwargs):
+        """ adds all computed time_bin_sizes in `curr_active_pipeline.global_computation_results.computed_data['DirectionalDecodersDecoded'].continuously_decoded_result_cache_dict` from the global_computation_results as new matplotlib plot rows. """
+        time_bin_size_list: List[str] = []
+
+        try:
+            ## Uses the `global_computation_results.computed_data['DirectionalDecodersDecoded']`
+            directional_decoders_decode_result: DirectionalDecodersContinuouslyDecodedResult = curr_active_pipeline.global_computation_results.computed_data['DirectionalDecodersDecoded']
+            pseudo2D_decoder: BasePositionDecoder = directional_decoders_decode_result.pseudo2D_decoder        
+            # all_directional_pf1D_Decoder_dict: Dict[str, BasePositionDecoder] = directional_decoders_decode_result.pf1D_Decoder_dict
+            continuously_decoded_result_cache_dict = directional_decoders_decode_result.continuously_decoded_result_cache_dict
+            time_bin_size_list = [str(a_time_bin_size) for a_time_bin_size in continuously_decoded_result_cache_dict.keys()]
+
+        except (KeyError, AttributeError) as e:
+            # KeyError: 'DirectionalDecodersDecoded'
+            print(f'get_all_computed_time_bin_sizes(...) failed to add any tracks, perhaps because the pipeline is missing any computed "DirectionalDecodersDecoded" global results. Error: "{e}". Skipping.')
+            pass                   
+
+        except Exception as e:
+            raise
+
+        ## OUTPUTS: time_bin_size_list
+        return time_bin_size_list
+
+
+
     @function_attributes(short_name=None, tags=['multi-time-bin'], input_requires=[], output_provides=[], uses=['cls.prepare_and_perform_add_add_pseudo2D_decoder_decoded_epochs'], used_by=[], creation_date='2025-02-26 05:37', related_items=[])
     @classmethod
     def add_all_computed_time_bin_sizes_pseudo2D_decoder_decoded_epochs(cls, curr_active_pipeline, active_2d_plot, debug_print=False, **kwargs):
