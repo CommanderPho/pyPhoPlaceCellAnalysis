@@ -3471,9 +3471,17 @@ class OldFileArchiver:
 
 @metadata_attributes(short_name=None, tags=['across-session', 'visualizations', 'figure', 'output'], input_requires=[], output_provides=[], uses=['PaperFigureTwo'], used_by=[], creation_date='2023-07-21 00:00', related_items=[])
 class AcrossSessionsVisualizations:
+    """ 
+
+    
+    publication_figures_output_parent_folder = Path('E:/Dropbox (Personal)/Active/Kamran Diba Lab/Pho-Kamran-Meetings/2025-06-06 - EXPORTS FOR PUBLICATION') # 'Figure 1 - Overview'
+        
+    """
     # 2023-07-21 - Across Sessions Aggregate Figure: __________________________________________________________________________________ #
 
     # _registered_output_files = {}
+    _override_output_parent_path: Optional[Path] = None
+    _fig_out_man: Optional[FileOutputManager] = None
 
     @classmethod
     def output_figure(cls, final_context: IdentifyingContext, fig, write_vector_format:bool=True, write_png:bool=True, debug_print=True):
@@ -3484,7 +3492,16 @@ class AcrossSessionsVisualizations:
             print(f'register_output_file(output_path: {output_path}, ...)')
             # registered_output_files[output_path] = output_metadata or {}
 
-        fig_out_man = FileOutputManager(figure_output_location=FigureOutputLocation.DAILY_PROGRAMMATIC_OUTPUT_FOLDER, context_to_path_mode=ContextToPathMode.HIERARCHY_UNIQUE)
+
+        if cls._override_output_parent_path is not None:
+            Assert.path_exists(cls._override_output_parent_path)
+            fig_out_man = FileOutputManager(figure_output_location=FigureOutputLocation.CUSTOM, context_to_path_mode=ContextToPathMode.GLOBAL_UNIQUE, override_output_parent_path=deepcopy(cls._override_output_parent_path))
+        else:
+            # no override path, use default
+            fig_out_man = FileOutputManager(figure_output_location=FigureOutputLocation.DAILY_PROGRAMMATIC_OUTPUT_FOLDER, context_to_path_mode=ContextToPathMode.HIERARCHY_UNIQUE)
+    
+        cls._fig_out_man = fig_out_man
+        
         active_out_figure_paths = build_and_write_to_file(fig, final_context, fig_out_man, write_vector_format=write_vector_format, write_png=write_png, register_output_file_fn=register_output_file)
         return active_out_figure_paths, final_context
 
