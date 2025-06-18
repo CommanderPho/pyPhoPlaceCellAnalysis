@@ -42,6 +42,7 @@
      </property>
      <addaction name="actionAddTimeCurves_Position"/>
      <addaction name="actionAddTimeCurves_Velocity"/>
+     <addaction name="actionAddTimeCurves_ThetaPhase"/>
      <addaction name="actionAddTimeCurves_Random"/>
      <addaction name="actionAddTimeCurves_RelativeEntropySurprise"/>
      <addaction name="actionAddTimeCurves_Custom"/>
@@ -392,6 +393,11 @@
   <action name="actionAddTimeIntervals_NonPBEEndcaps">
    <property name="text">
     <string>Non-PBE Endcaps (Only)</string>
+   </property>
+  </action>
+  <action name="actionAddTimeCurves_ThetaPhase">
+   <property name="text">
+    <string>Theta Phase</string>
    </property>
   </action>
  </widget>

@@ -126,9 +126,10 @@ class LocalMenus_AddRenderable(QtWidgets.QMainWindow):
         widget.ui.actionAddTimeIntervals_Bursts.setEnabled(SpikeBurstIntervals_2DRenderTimeEpochs.is_render_time_epochs_enabled(curr_sess=curr_active_pipeline, active_config_name=active_config_name)) # disable by default        
 
         # Time Curves: _______________________________________________________________________________________________________ #
-        submenu_addTimeCurves = [widget.ui.actionAddTimeCurves_Position, widget.ui.actionAddTimeCurves_Velocity, widget.ui.actionAddTimeCurves_Random, widget.ui.actionAddTimeCurves_RelativeEntropySurprise, widget.ui.actionAddTimeCurves_Custom]
+        submenu_addTimeCurves = [widget.ui.actionAddTimeCurves_Position, widget.ui.actionAddTimeCurves_Velocity, widget.ui.actionAddTimeCurves_ThetaPhase, widget.ui.actionAddTimeCurves_Random, widget.ui.actionAddTimeCurves_RelativeEntropySurprise, widget.ui.actionAddTimeCurves_Custom]
         submenu_addTimeCurvesCallbacks = [lambda evt=None: PositionRenderTimeCurves.add_render_time_curves(curr_sess=sess, destination_plot=destination_plot),
                                             lambda evt=None: VelocityRenderTimeCurves.add_render_time_curves(curr_sess=sess, destination_plot=destination_plot),
+                                            lambda evt=None: ConfigurableRenderTimeCurves.add_render_time_curves(curr_sess=sess, destination_plot=destination_plot), ## thetaphase
                                             lambda evt=None: MUA_RenderTimeCurves.add_render_time_curves(curr_sess=sess, destination_plot=destination_plot),
                                             lambda evt=None: RelativeEntropySurpriseRenderTimeCurves.add_render_time_curves(curr_sess=sess, destination_plot=destination_plot),
                                             # lambda evt=None: Laps2DRenderTimeEpochs.add_render_time_epochs(curr_sess=sess.laps, destination_plot=destination_plot),

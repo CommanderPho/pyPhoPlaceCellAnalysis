@@ -1,5 +1,10 @@
 ### Complex Dataseries-based CurveDatasource approach:
+from copy import deepcopy
 from typing import OrderedDict
+from typing import Dict, List, Tuple, Optional, Callable, Union, Any
+from typing_extensions import TypeAlias
+from nptyping import NDArray
+from attrs import define, field, Factory, asdict, astuple
 import numpy as np
 import pandas as pd
 from sklearn.preprocessing import MinMaxScaler
@@ -10,12 +15,11 @@ from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.Mixins.TimeCurves.RenderTimeCur
 
 ##########################################
 ## General Render Time Curves
-class GeneralRenderTimeCurves(object):
+@define(slots=False, eq=False)
+class GeneralRenderTimeCurves:
     """docstring for GeneralRenderTimeCurves.
     Analagous to the class-based General2DRenderTimeEpochs in pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.Mixins.RenderTimeEpochs.Specific2DRenderTimeEpochs
     """
-    def __init__(self):
-        super(GeneralRenderTimeCurves, self).__init__()
     
     @classmethod
     def build_render_time_curves_datasource(cls, plot_df, pre_spatial_to_spatial_mappings, **kwargs):
@@ -219,19 +223,26 @@ class ConfigurableRenderTimeCurves(BasePositionDataframeRenderTimeCurves):
     default_datasource_name = 'ConfigurableMovementTimeCurves'
     # active_variable_names = ['x','y','lin_pos','speed']
     active_variable_names = ['lin_pos','speed']
+    # active_variable_names: List[str] = field(default=['lin_pos','speed'])
 
     @classmethod
     def data_series_pre_spatial_list(cls, *args, **kwargs):
-        """ returns the pre_spatial list for the dataseries. Usually just returns a constant, only a function in case a class wants to do separate setup based on a class property. """
+        """ returns the pre_spatial list for the dataseries. Usually just returns a constant, only a function in case a class wants to do separate setup based on a class property.
+            DEPENDS ON: cls.active_variable_names
+        """
         return [v for v in [{'name':'linear position','t':'t','v_alt':None,'v_main':'lin_pos','color_name':'yellow', 'line_width':1.25, 'z_scaling_factor':1.0},
             {'name':'x position','t':'t','v_alt':None,'v_main':'x', 'color_name':'red', 'line_width':0.5, 'z_scaling_factor':1.0},
             {'name':'y position','t':'t','v_alt':None,'v_main':'y', 'color_name':'green', 'line_width':0.5, 'z_scaling_factor':1.0},
-            {'name':'speed','t':'t','v_alt':None,'v_main':'speed','color_name':'orange', 'line_width':1.25, 'z_scaling_factor':1.0}
+            {'name':'speed','t':'t','v_alt':None,'v_main':'speed','color_name':'orange', 'line_width':1.25, 'z_scaling_factor':1.0},
+            {'name':'theta_phase_radians','t':'t','v_alt':None,'v_main':'theta_phase_radians','color_name':'white', 'line_width':0.75, 'z_scaling_factor':1.0},
         ] if v['v_main'] in cls.active_variable_names]
          
     @classmethod
     def prepare_dataframe(cls, plot_df, *args, **kwargs):
-        """ preforms and pre-processing of the dataframe needed (such as scaling/renaming columns/etc and returns a COPY """
+        """ preforms and pre-processing of the dataframe needed (such as scaling/renaming columns/etc and returns a COPY
+        
+        DEPENDS ON: cls.active_variable_names
+        """
         z_scaler = MinMaxScaler()
         included_columns = ['t', *cls.active_variable_names]
         transformed_df = plot_df[included_columns].copy()
@@ -243,6 +254,9 @@ class ConfigurableRenderTimeCurves(BasePositionDataframeRenderTimeCurves):
             transformed_df[['lin_pos']] = z_scaler.fit_transform(transformed_df[['lin_pos']]) # scale lin_pos position separately
         if 'speed' in included_columns:
             transformed_df[['speed']] = z_scaler.fit_transform(transformed_df[['speed']]) # scale speed position separately
+        if 'theta_phase_radians' in included_columns:
+            transformed_df[['theta_phase_radians']] = z_scaler.fit_transform(transformed_df[['theta_phase_radians']]) # scale theta_phase_radians position separately
+
         return transformed_df
 
 
@@ -260,6 +274,7 @@ class ConfigurableRenderTimeCurves(BasePositionDataframeRenderTimeCurves):
         return [{'name':'name','x':'t','y':'v_alt','z':'v_main','x_map_fn':x_map_fn,'y_map_fn':y_map_fn,'z_map_fn':z_map_fn},
             {'name':'name','x':'t','y':'v_alt','z':'v_main','x_map_fn':x_map_fn,'y_map_fn':y_map_fn,'z_map_fn':z_map_fn},
             {'name':'name','x':'t','y':'v_alt','z':'v_main','x_map_fn':x_map_fn,'y_map_fn':y_map_fn,'z_map_fn':z_map_fn},
+            {'name':'name','x':'t','y':'v_alt','z':'v_main','x_map_fn':x_map_fn,'y_map_fn':y_map_fn,'z_map_fn':z_map_fn},
             {'name':'name','x':'t','y':'v_alt','z':'v_main','x_map_fn':x_map_fn,'y_map_fn':y_map_fn,'z_map_fn':z_map_fn}
         ]
 
@@ -273,7 +288,7 @@ class ConfigurableRenderTimeCurves(BasePositionDataframeRenderTimeCurves):
         return general_curve_interval_datasource
 
     @classmethod
-    def add_render_time_curves(cls, curr_sess, destination_plot, **kwargs):
+    def add_render_time_curves(cls, curr_sess, destination_plot, override_active_variable_names: Optional[List]=None, **kwargs):
         """ CONSTANT: directly-called method 
         destination_plot should implement add_rendered_intervals
         destination_plot.add_3D_time_curves(...)
@@ -283,10 +298,24 @@ class ConfigurableRenderTimeCurves(BasePositionDataframeRenderTimeCurves):
         curr_sess: The session containing the data to be plotted. 
         
         """
+        _original_overriden_default_active_variable_names = None
+        if override_active_variable_names is not None:
+            print(f'override_active_variable_names is not None (override_active_variable_names: {override_active_variable_names}) so overriding the df variables for the curve series...')
+            # backup defaults
+            _original_overriden_default_active_variable_names = deepcopy(cls.active_variable_names)
+            # cls._BAK_defaults_active_variable_names = deepcopy(cls.active_variable_names)
+            ## perform the override:
+            cls.active_variable_names = deepcopy(override_active_variable_names)
+            
         plot_df = curr_sess.position.to_dataframe()
         data_series_pre_spatial_to_spatial_mappings = cls.build_pre_spatial_to_spatial_mappings(destination_plot)
         active_plot_curve_datasource = cls.build_render_time_curves_datasource(plot_df, data_series_pre_spatial_to_spatial_mappings)
         destination_plot.add_3D_time_curves(curve_datasource=active_plot_curve_datasource) # Add the curves from the datasource
+
+        if _original_overriden_default_active_variable_names is not None:
+            ## restore the defaults
+            cls.active_variable_names = deepcopy(_original_overriden_default_active_variable_names)        
+
         return active_plot_curve_datasource
 
 
