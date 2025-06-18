@@ -11,9 +11,7 @@ from neuropy.utils.result_context import IdentifyingContext
 
 from pyphocorehelpers.DataStructure.dynamic_parameters import DynamicParameters
 from pyphocorehelpers.function_helpers import function_attributes
-from pyphocorehelpers.Filesystem.path_helpers import file_uri_from_path
-from pyphocorehelpers.Filesystem.path_helpers import find_first_extant_path
-
+from pyphocorehelpers.Filesystem.path_helpers import file_uri_from_path, find_first_extant_path, sanitize_filename_for_Windows
 from neuropy.utils.mixins.AttrsClassHelpers import AttrsBasedClassHelperMixin, custom_define, serialized_field, serialized_attribute_field, non_serialized_field
 
 
@@ -381,6 +379,7 @@ class FileOutputManager:
         
         """
         parent_save_path, fig_save_basename = self.get_figure_output_parent_and_basename(final_context, make_folder_if_needed=make_folder_if_needed, **kwargs)
+        fig_save_basename = sanitize_filename_for_Windows(fig_save_basename)
         return parent_save_path.joinpath(fig_save_basename).resolve()
 
 
