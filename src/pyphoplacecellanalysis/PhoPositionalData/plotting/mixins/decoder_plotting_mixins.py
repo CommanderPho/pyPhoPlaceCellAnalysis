@@ -1482,6 +1482,7 @@ class DecodedTrajectoryMatplotlibPlotter(DecodedTrajectoryPlotter):
     # ==================================================================================================================== #
     
     # fig, axs, laps_pages = plot_lap_trajectories_2d(curr_active_pipeline.sess, curr_num_subplots=22, active_page_index=0)
+    @function_attributes(short_name=None, tags=['matplotlib', 'helper', 'gradient', 'curve', 'line'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-06-18 06:22', related_items=[])
     @classmethod
     def _helper_add_gradient_line(cls, ax, t, x, y, add_markers=False, time_cmap='viridis', **LineCollection_kwargs):
         """ Adds a gradient line representing a timeseries of (x, y) positions.

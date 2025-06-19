@@ -262,6 +262,7 @@ def _setup_spike_raster_window_for_debugging(spike_raster_window, wants_docked_r
 
     menu_commands = [
         'AddTimeCurves.Position', ## 2025-03-11 02:32 Running this too soon after launching the window causes weird black bars on the top and bottom of the window
+        'AddTimeCurves.ThetaPhase',
         # 'DockedWidgets.LongShortDecodedEpochsDockedMatplotlibView',
         # 'DockedWidgets.DirectionalDecodedEpochsDockedMatplotlibView',
         # 'DockedWidgets.TrackTemplatesDecodedEpochsDockedMatplotlibView',
@@ -278,7 +279,7 @@ def _setup_spike_raster_window_for_debugging(spike_raster_window, wants_docked_r
             # all_global_menus_actionsDict[a_command].trigger()
             global_flat_action_dict[a_command].trigger()
     
-    QTimer.singleShot(700, trigger_commands)
+    QTimer.singleShot(800, trigger_commands)
     # ## add the right sidebar
     # visible_intervals_info_widget_container, visible_intervals_ctrl_layout_widget =  spike_raster_window._perform_build_attached_visible_interval_info_widget() # builds the tables
     

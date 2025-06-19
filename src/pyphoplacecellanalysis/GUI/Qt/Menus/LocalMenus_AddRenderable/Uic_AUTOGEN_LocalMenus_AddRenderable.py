@@ -175,8 +175,11 @@ class Ui_LocalMenus_AddRenderable(object):
         self.actionDecoded_Epoch_Slices_NonPBEs.setObjectName("actionDecoded_Epoch_Slices_NonPBEs")
         self.actionAddTimeIntervals_NonPBEEndcaps = QtWidgets.QAction(LocalMenus_AddRenderable)
         self.actionAddTimeIntervals_NonPBEEndcaps.setObjectName("actionAddTimeIntervals_NonPBEEndcaps")
+        self.actionAddTimeCurves_ThetaPhase = QtWidgets.QAction(LocalMenus_AddRenderable)
+        self.actionAddTimeCurves_ThetaPhase.setObjectName("actionAddTimeCurves_ThetaPhase")
         self.menuAddRenderable_Time_Curves.addAction(self.actionAddTimeCurves_Position)
         self.menuAddRenderable_Time_Curves.addAction(self.actionAddTimeCurves_Velocity)
+        self.menuAddRenderable_Time_Curves.addAction(self.actionAddTimeCurves_ThetaPhase)
         self.menuAddRenderable_Time_Curves.addAction(self.actionAddTimeCurves_Random)
         self.menuAddRenderable_Time_Curves.addAction(self.actionAddTimeCurves_RelativeEntropySurprise)
         self.menuAddRenderable_Time_Curves.addAction(self.actionAddTimeCurves_Custom)
@@ -267,6 +270,9 @@ class Ui_LocalMenus_AddRenderable(object):
         self.actionAddTimeIntervals_NonPBEs.setText(_translate("LocalMenus_AddRenderable", "Non-PBEs"))
         self.actionDecoded_Epoch_Slices_NonPBEs.setText(_translate("LocalMenus_AddRenderable", "Non-PBEs"))
         self.actionAddTimeIntervals_NonPBEEndcaps.setText(_translate("LocalMenus_AddRenderable", "Non-PBE Endcaps (Only)"))
-from pyphoplacecellanalysis.Resources import ActionIcons
-from pyphoplacecellanalysis.Resources import GuiResources
-from pyphoplacecellanalysis.Resources import breeze
+        self.actionAddTimeCurves_ThetaPhase.setText(_translate("LocalMenus_AddRenderable", "Theta Phase"))
+# from pyphoplacecellanalysis.Resources import ActionIcons_rc
+# from pyphoplacecellanalysis.Resources import GuiResources_rc
+# from pyphoplacecellanalysis.Resources import breeze_rc
+
+from pyphoplacecellanalysis.Resources import GuiResources, ActionIcons, breeze
