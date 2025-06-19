@@ -23,6 +23,7 @@ from neuropy.utils.matplotlib_helpers import fit_both_axes
 from neuropy.utils.matplotlib_helpers import draw_epoch_regions # plot_expected_vs_observed
 from neuropy.utils.indexing_helpers import find_desired_sort_indicies # used in `determine_long_short_pf1D_indicies_sort_by_peak`
 from neuropy.core.neuron_identities import NeuronIdentityDataframeAccessor
+from neuropy.utils.mixins.indexing_helpers import pop_dict_subset, get_dict_subset
 
 from pyphocorehelpers.function_helpers import function_attributes
 from pyphocorehelpers.programming_helpers import metadata_attributes
@@ -2011,9 +2012,10 @@ def _plot_long_short_firing_rate_indicies(x_frs_index, y_frs_index, active_conte
     # rc('text',usetex=True)
     # rc('text.latex', preamble=r'\usepackage{color}')
 
+    
         
     diagonal_y_equals_x_line_kwargs = dict(linestyle='--', color='gray', label='y=x')
-    fig_kwargs = dict(figsize=(8.5, 7.25), num=f'long|short fr indicies_{active_context.get_description(separator="/")}', clear=True)
+    fig_kwargs = dict(figsize=(8.5, 7.25), num=f'long|short fr indicies_{active_context.get_description(separator="/")}', clear=True) | pop_dict_subset(scatter_params, ['figsize', 'num', 'clear', 'dpi'])
     
     if enable_hover_labels:
         import mplcursors # for hover tooltips that specify the aclu of the selected point
