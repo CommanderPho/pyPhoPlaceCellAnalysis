@@ -2970,7 +2970,10 @@ def _plot_single_track_firing_rate_compare(laps_frs_dict, replays_frs_dict, acti
             # point_colors = 'black'
         
         point_hover_labels = [f'{i}' for i in list(laps_frs_dict.keys())] # point_hover_labels will be added as tooltip annotations to the datapoints. Don't do anything I don't think. , enable_hover_labels=False
-        fig, ax = plt.subplots(figsize=(8.5, 7.25), num=f'track_replay|track_laps frs_{active_context.get_description(separator="/")}', clear=True)
+        
+        fig_kwargs = dict(figsize=(1.68535, 1.4375), num=f'track_replay|track_laps frs_{active_context.get_description(separator="/")}', clear=True) | pop_dict_subset(scatter_params, ['figsize', 'num', 'clear'])
+        print(f'fig_kwargs: {fig_kwargs}')
+        fig, ax = plt.subplots(**fig_kwargs)
         
         # TODO 2023-05-25 - build the display context:
         active_display_context = active_context.adding_context('display_fn', display_fn_name='plot_single_track_firing_rate_compare')
