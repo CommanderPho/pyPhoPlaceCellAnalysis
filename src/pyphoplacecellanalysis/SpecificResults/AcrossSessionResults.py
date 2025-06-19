@@ -3531,14 +3531,18 @@ class AcrossSessionsVisualizations:
         _out_aggregate_fig_2._pipeline_file_callback_fn = cls.output_figure
 
         # Showing
+        _fig_2_theta_out = None
+        _fig_2_replay_out = None        
+        _output_dict = {}
         matplotlib_configuration_update(is_interactive=True, backend='Qt5Agg')
         # Perform interactive Matplotlib operations with 'Qt5Agg' backend
         _fig_2_theta_out, _fig_2_replay_out = _out_aggregate_fig_2.display(active_context=global_multi_session_context, title_modifier_fn=lambda original_title: f"{original_title} ({num_sessions} sessions)", save_figure=save_figure, **kwargs)
+        _output_dict.update( {'theta': _fig_2_theta_out, 'replay': _fig_2_replay_out})
         if save_figure:
             # _out_aggregate_fig_2.perform_save(_fig_2_theta_out)
             print(f'save_figure()!')
 
-        return global_multi_session_context, _out_aggregate_fig_2
+        return global_multi_session_context, _out_aggregate_fig_2, _output_dict
 
 
     @classmethod
@@ -3559,6 +3563,9 @@ class AcrossSessionsVisualizations:
         # _out2 = curr_active_pipeline.display('_display_long_and_short_firing_rate_replays_v_laps', curr_active_pipeline.get_session_context(), defer_render=defer_render, save_figure=save_figure)
         from neuropy.utils.result_context import DisplaySpecifyingIdentifyingContext
         from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.MultiContextComparingDisplayFunctions.LongShortTrackComparingDisplayFunctions import _plot_long_short_firing_rate_indicies
+
+
+        save_figure_kwargs = dict(write_vector_format=kwargs.pop('write_vector_format', False), write_png=kwargs.pop('write_png', True))
 
         # Plot long|short firing rate index:
         x_frs_index, y_frs_index = long_short_fr_indicies_analysis_results['x_frs_index'], long_short_fr_indicies_analysis_results['y_frs_index'] # use the all_results_dict as the computed data value
@@ -3594,7 +3601,7 @@ class AcrossSessionsVisualizations:
         fig, ax, scatter_plot = _plot_long_short_firing_rate_indicies(x_frs_index, y_frs_index, final_context, debug_print=True, is_centered=False, enable_hover_labels=False, enable_tiny_point_labels=False, facecolor='w', include_axes_lines=include_axes_lines, **scatter_plot_kwargs) #  markeredgewidth=1.5,
         
         def _perform_write_to_file_callback():
-            active_out_figure_path, *args_L = cls.output_figure(final_context, fig)
+            active_out_figure_path, *args_L = cls.output_figure(final_context, fig, **save_figure_kwargs)
             return (active_out_figure_path,)
 
         if save_figure:
@@ -3637,7 +3644,7 @@ class AcrossSessionsVisualizations:
 
         # (fig_L, ax_L, active_display_context_L), (fig_S, ax_S, active_display_context_S), _perform_write_to_file_callback = _plot_session_long_short_track_firing_rate_figures(owning_pipeline_reference, jonathan_firing_rate_analysis_result, defer_render=defer_render)
 
-        common_scatter_kwargs = dict(point_colors='#33333333') | kwargs
+        common_scatter_kwargs = dict(point_colors='#33333333', defer_render=True) | kwargs
         
         ## Long Track Replay|Laps FR Figure
         neuron_replay_stats_df = neuron_replay_stats_table.dropna(subset=['long_replay_mean', 'long_non_replay_mean'], inplace=False)
