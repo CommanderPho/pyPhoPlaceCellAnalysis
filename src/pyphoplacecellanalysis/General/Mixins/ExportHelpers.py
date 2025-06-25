@@ -723,6 +723,9 @@ def write_to_file(a_fig, active_identifying_ctx: IdentifyingContext, final_fig_s
     is_pillow_image: bool = isinstance(a_fig, Image.Image) # PIL.Image
     
 
+    # Extract saving kwargs
+    
+
     # PDF: .pdf versions:
     if write_vector_format:
         try:
@@ -732,7 +735,7 @@ def write_to_file(a_fig, active_identifying_ctx: IdentifyingContext, final_fig_s
                 fig_vector_save_path = final_fig_save_basename_path.with_suffix('.pdf')
                 with backend_pdf.PdfPages(fig_vector_save_path, keep_empty=False, metadata=active_pdf_metadata) as pdf:
                     # Save out PDF page:
-                    pdf.savefig(a_fig)
+                    pdf.savefig(a_fig, **kwargs)
                     
                 additional_output_metadata = {'fig_format':'matplotlib', 'pdf_metadata': active_pdf_metadata}
 

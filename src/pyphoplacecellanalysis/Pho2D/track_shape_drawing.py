@@ -1456,8 +1456,30 @@ def create_long_v_short_track_plot_figure_from_loaded_track_limits(loaded_track_
     Usage:
         from pyphoplacecellanalysis.Pho2D.track_shape_drawing import create_long_v_short_track_plot_figure_from_loaded_track_limits
 
+        loaded_track_limits = {'long_xlim': np.array([59.0774, 228.69]),
+        'long_unit_xlim': np.array([0.205294, 0.794698]),
+        'short_xlim': np.array([94.0156, 193.757]),
+        'short_unit_xlim': np.array([0.326704, 0.673304]),
+        'long_ylim': np.array([138.164, 146.12]),
+        'long_unit_ylim': np.array([0.48012, 0.507766]),
+        'short_ylim': np.array([138.021, 146.263]),
+        'short_unit_ylim': np.array([0.479622, 0.508264])}
+
         fig, ax_dict, long_inst, short_inst, long_out, short_out = create_long_v_short_track_plot_figure_from_loaded_track_limits(loaded_track_limits=loaded_track_limits)
-            
+        # fig.show()
+        ax_dict
+        active_scatter_all_neuron_stats_table: pd.DataFrame = deepcopy(all_neuron_stats_table)
+
+        # active_all_neuron_stats_table: pd.DataFrame = deepcopy(all_neuron_stats_table)[all_neuron_stats_table['has_considerable_remapping']] ## Only the considerably remapping cells
+
+        ## Build two colors to denote "considerable_remapping" aclus vs. others.
+        active_scatter_all_neuron_stats_table['color'] = 'black'
+        active_scatter_all_neuron_stats_table.loc[active_scatter_all_neuron_stats_table['has_considerable_remapping'], 'color'] = 'red'
+
+        # active_scatter_all_neuron_stats_table = active_scatter_all_neuron_stats_table[['long_pf_peak_x', 'short_pf_peak_x']].dropna(axis='index', how='any')
+
+        _scatter_out = active_scatter_all_neuron_stats_table.plot.scatter(x='long_pf_peak_x', y='short_pf_peak_x', c='color', ax=ax_dict['ax_main'])
+
     """
     from pyphocorehelpers.geometry_helpers import BoundsRect
     from pyphoplacecellanalysis.Pho2D.track_shape_drawing import LinearTrackDimensions, LinearTrackInstance
@@ -2396,7 +2418,7 @@ def plot_bidirectional_track_remapping_diagram(track_templates, grid_bin_bounds,
 
 
 
-@function_attributes(short_name=None, tags=['figure', 'publication'], input_requires=[], output_provides=[], uses=['_plot_track_remapping_diagram'], used_by=[], creation_date='2025-06-16 20:44', related_items=[])
+@function_attributes(short_name=None, tags=['figure', 'publication', 'figure1'], input_requires=[], output_provides=[], uses=['_plot_track_remapping_diagram', 'perform_update_title_subtitle', 'build_or_reuse_figure'], used_by=[], creation_date='2025-06-16 20:44', related_items=[])
 def plot_publication_bidirectional_track_remapping_diagram(all_neuron_stats_table, **kwargs):
     """ 
     from pyphoplacecellanalysis.Pho2D.track_shape_drawing import plot_publication_bidirectional_track_remapping_diagram
@@ -2553,9 +2575,9 @@ def plot_publication_bidirectional_track_remapping_diagram(all_neuron_stats_tabl
 
     ## Plot the track shapes (if needed, and the significant remapping points/arrows):
     fig_LR_RL, ax_LR, _extant_plot_container_LR = _plot_track_remapping_diagram(LR_only_decoder_aclu_MAX_peak_maps_df, grid_bin_bounds=grid_bin_bounds, long_column_name=LR_only_column_names[0], short_column_name=LR_only_column_names[1], ax=ax_LR, extant_plot_container=_extant_plot_container_LR, **kwargs)
-    perform_update_title_subtitle(fig=fig_LR_RL, ax=ax_LR, title_string=None, subtitle_string=f"LR Track Remapping - {len(LR_only_decoder_aclu_MAX_peak_maps_df)} aclus")
+    perform_update_title_subtitle(fig=fig_LR_RL, ax=ax_LR, title_string=None, subtitle_string=f"LR Track Remapping - {len(LR_only_decoder_aclu_MAX_peak_maps_df)} Place cells")
     fig_LR_RL, ax_RL, _extant_plot_container_RL = _plot_track_remapping_diagram(RL_only_decoder_aclu_MAX_peak_maps_df, grid_bin_bounds=grid_bin_bounds, long_column_name=RL_only_column_names[0], short_column_name=RL_only_column_names[1], ax=ax_RL, extant_plot_container=_extant_plot_container_RL, **kwargs)
-    perform_update_title_subtitle(fig=fig_LR_RL, ax=ax_RL, title_string=None, subtitle_string=f"RL Track Remapping - {len(RL_only_decoder_aclu_MAX_peak_maps_df)} aclus")
+    perform_update_title_subtitle(fig=fig_LR_RL, ax=ax_RL, title_string=None, subtitle_string=f"RL Track Remapping - {len(RL_only_decoder_aclu_MAX_peak_maps_df)} Place cells")
 
     return _fig_container
 

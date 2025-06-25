@@ -15,6 +15,8 @@ from qtpy import QtCore, QtGui # for Slot
 
 from neuropy.utils.debug_helpers import safely_accepts_kwargs
 
+from pyphocorehelpers.programming_helpers import metadata_attributes
+from pyphocorehelpers.function_helpers import function_attributes
 from pyphocorehelpers.gui.Qt.GlobalConnectionManager import GlobalConnectionManager, GlobalConnectionManagerAccessingMixin
 from pyphocorehelpers.gui.PyVista.PhoCustomVtkWidgets import PhoWidgetHelper
 from pyphocorehelpers.gui.PyVista.PhoCustomVtkWidgets import MultilineTextConsoleWidget
@@ -30,6 +32,8 @@ from pyphoplacecellanalysis.GUI.PyVista.InteractivePlotter.InteractiveSliderWrap
 from pyphoplacecellanalysis.PhoPositionalData.plotting.visualization_window import VisualizationWindow # Used to build "Windows" into the data points such as the window defining the fixed time period preceeding the current time where spikes had recently fired, etc.
 
 
+
+@metadata_attributes(short_name=None, tags=['window'], input_requires=[], output_provides=[], uses=[], used_by=['_display_3d_interactive_spike_and_behavior_browser'], creation_date='2022-01-01 00:00', related_items=[])
 class InteractivePlaceCellDataExplorer(GlobalConnectionManagerAccessingMixin, InteractiveDataExplorerBase):
     """ This 3D PyVista GUI displays a map of the animal's environment alongside animatable behavioral data (animal position on the maze, etc) and neural data (spikes, sleep state, ripple status, etc)
     

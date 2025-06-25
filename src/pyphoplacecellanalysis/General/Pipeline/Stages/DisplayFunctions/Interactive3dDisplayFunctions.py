@@ -27,7 +27,7 @@ from pyphoplacecellanalysis.GUI.Qt.Menus.SpecificMenus.ConnectionControlsMenuMix
 class Interactive3dDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=DisplayFunctionRegistryHolder):
     
     ## Tuning Curves 3D Plot:
-    @function_attributes(short_name='3d_interactive_tuning_curves_plotter', tags=['display', 'placefields', '3D', 'pyqtgraph'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2022-01-01 00:00')
+    @function_attributes(short_name='3d_interactive_tuning_curves_plotter', tags=['display', 'placefields', '3D', 'pyqtgraph'], input_requires=[], output_provides=[], uses=['build_all_placefield_output_panels'], used_by=[], creation_date='2022-01-01 00:00')
     def _display_3d_interactive_tuning_curves_plotter(computation_result, active_config, **kwargs):
         """ Tuning Curves 3D Plot
         Inputs: {'extant_plotter': None} 
@@ -94,7 +94,7 @@ class Interactive3dDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Displ
         
 
     ## Interactive 3D Spike and Behavior Browser: 
-    @function_attributes(short_name='3d_interactive_spike_and_behavior_browser', tags=['display', 'placefields', 'spikes', 'behavior', '3D', 'pyqtgraph'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2022-01-01 00:00')
+    @function_attributes(short_name='3d_interactive_spike_and_behavior_browser', tags=['display', 'placefields', 'spikes', 'behavior', '3D', 'pyqtgraph'], input_requires=[], output_provides=[], uses=['InteractivePlaceCellDataExplorer'], used_by=[], creation_date='2022-01-01 00:00')
     def _display_3d_interactive_spike_and_behavior_browser(computation_result, active_config, **kwargs):
         """ 
         Inputs: {'extant_plotter': None} 

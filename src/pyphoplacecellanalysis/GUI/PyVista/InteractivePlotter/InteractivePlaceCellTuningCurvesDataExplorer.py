@@ -45,6 +45,9 @@ class InteractivePlaceCellTuningCurvesDataExplorer(OccupancyPlottingMixin, Place
         
         TODO: see where self.active_session is used. Hopefully it's only in _setup_variables? But it is set as an instance property, so that isn't good.
         
+        #TODO 2025-06-25 13:53: - [ ] How does this relate to `InteractivePlaceCellDataExplorer`
+        
+        
         Function call order:
             __init__
             _setup()

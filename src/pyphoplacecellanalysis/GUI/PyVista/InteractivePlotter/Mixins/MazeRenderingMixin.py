@@ -8,7 +8,10 @@ from pyphoplacecellanalysis.Pho3D.PyVista.spikeAndPositions import perform_plot_
 
 
 class TrackShapePlottingConfig(BasePlotDataParams):
-    """ NOTE: Upon reviewing many different versions of my plotting implementations, this Param-based one is the most succinct and smooth.
+    """ Handles configuration related to plotting the 3D track shapes in the Vedo visualizations
+    
+    
+    NOTE: Upon reviewing many different versions of my plotting implementations, this Param-based one is the most succinct and smooth.
 
     This class uses the 'param' library to observe changes to its members and perform corresponding updates to the class that holds it when they happen:
     
@@ -60,7 +63,9 @@ class TrackShapePlottingConfig(BasePlotDataParams):
 
 
 class InteractivePyvistaPlotter_MazeRenderingMixin:
-    """ 
+    """ Allows Implementors to render a 3D track shape
+    
+    
     from pyphoplacecellanalysis.GUI.PyVista.InteractivePlotter.Mixins.MazeRenderingMixin import InteractivePyvistaPlotter_MazeRenderingMixin
 
     Renders the 3D track/maze shape on the 3D PyVista plot.
@@ -186,6 +191,8 @@ class InteractivePyvistaPlotter_MazeRenderingMixin:
 
 
     def setup_MazeRenderingMixin(self):
+        """ called to setup all required config 
+        """
         self.track_shape_plotting_config = TrackShapePlottingConfig()
 
         ## keys to add
