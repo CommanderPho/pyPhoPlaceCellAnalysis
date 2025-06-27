@@ -205,22 +205,22 @@ class LongShort3DPlacefieldsHelpers:
         def _subfn_scale_ybin_centers_to_track_width(ybin: NDArray, track_y_center: float = 0.0, track_y_width: float = 22.0) -> NDArray:
             data_y_range: float = np.ptp(ybin)
             data_y_center_offset: float = ybin[0] + (data_y_range / 2.0)
-            
-            ## adjust the center point:
-            # _needed_y_center_offset_adjust: float = (data_y_center_offset - track_y_center)
-            
+
             _adjusted_ybin_centers = deepcopy(ybin)
-            # _adjusted_ybin_centers = _adjusted_ybin_centers - track_y_center
-            # _adjusted_ybin_centers = _adjusted_ybin_centers - _needed_y_center_offset_adjust
-            _adjusted_ybin_centers = _adjusted_ybin_centers - data_y_center_offset ## zero by subtracting current data offset
-            _adjusted_ybin_centers = _adjusted_ybin_centers + track_y_center
-            
+
             if track_y_width is not None:
-                ## scale width to match track width
-                _adjusted_ybin_centers = _adjusted_ybin_centers / data_y_range ## normalize to 0.0-1.0
-                _adjusted_ybin_centers = _adjusted_ybin_centers * float(track_y_width) ## scale to 0.0 - track_y_widget
-                    
+                # First: center the data around 0
+                _adjusted_ybin_centers = _adjusted_ybin_centers - data_y_center_offset
+                # Then: scale to desired width
+                _adjusted_ybin_centers = (_adjusted_ybin_centers / data_y_range) * float(track_y_width)
+                # Finally: offset to desired center
+                _adjusted_ybin_centers = _adjusted_ybin_centers + track_y_center
+            else:
+                # Just center without scaling
+                _adjusted_ybin_centers = _adjusted_ybin_centers - data_y_center_offset + track_y_center
+
             return _adjusted_ybin_centers
+
 
         # ==================================================================================================================================================================================================================================================================================== #
         # Begin Function Body                                                                                                                                                                                                                                                                  #
@@ -236,8 +236,11 @@ class LongShort3DPlacefieldsHelpers:
 
         ipcDataExplorer.params.maze_y_offset = maze_y_offset
         
-        long_y_offset: float = -maze_y_offset
-        short_y_offset: float = maze_y_offset
+        # long_y_offset: float = -maze_y_offset
+        # short_y_offset: float = maze_y_offset
+        
+        long_y_offset: float = 0.0
+        short_y_offset: float = maze_y_offset        
 
         ipcDataExplorer.params.long_y_offset = long_y_offset
         ipcDataExplorer.params.short_y_offset = short_y_offset
@@ -252,10 +255,16 @@ class LongShort3DPlacefieldsHelpers:
         # short_adjusted_ybin_centers = _subfn_scale_ybin_centers_to_track_width(ybin_centers=short_pf2D.ratemap.ybin_centers, track_y_center=maze_y_offset)
         print(f'long_pf2D.ratemap.ybin: {long_pf2D.ratemap.ybin}')
         print(f'short_pf2D.ratemap.ybin: {short_pf2D.ratemap.ybin}')
-        # long_adjusted_ybin = _subfn_scale_ybin_centers_to_track_width(ybin=long_pf2D.ratemap.ybin, track_y_center=ipcDataExplorer.params.long_y_offset)
-        # short_adjusted_ybin = _subfn_scale_ybin_centers_to_track_width(ybin=short_pf2D.ratemap.ybin, track_y_center=ipcDataExplorer.params.short_y_offset)
-        long_adjusted_ybin = _subfn_scale_ybin_centers_to_track_width(ybin=long_pf2D.ratemap.ybin, track_y_center=0.0)
-        short_adjusted_ybin = _subfn_scale_ybin_centers_to_track_width(ybin=short_pf2D.ratemap.ybin, track_y_center=0.0)        
+        # long_adjusted_ybin = _subfn_scale_ybin_centers_to_track_width(ybin=long_pf2D.ratemap.ybin, track_y_center=-ipcDataExplorer.params.long_y_offset)
+        # short_adjusted_ybin = _subfn_scale_ybin_centers_to_track_width(ybin=short_pf2D.ratemap.ybin, track_y_center=-ipcDataExplorer.params.short_y_offset)
+        # long_adjusted_ybin = _subfn_scale_ybin_centers_to_track_width(ybin=long_pf2D.ratemap.ybin, track_y_center=0.0)
+        # short_adjusted_ybin = _subfn_scale_ybin_centers_to_track_width(ybin=short_pf2D.ratemap.ybin, track_y_center=0.0)
+        long_adjusted_ybin = _subfn_scale_ybin_centers_to_track_width(ybin=long_pf2D.ratemap.ybin, track_y_center=-11.0)
+        short_adjusted_ybin = _subfn_scale_ybin_centers_to_track_width(ybin=short_pf2D.ratemap.ybin, track_y_center=-11.0)
+
+        # long_adjusted_ybin = _subfn_scale_ybin_centers_to_track_width(ybin=long_pf2D.ratemap.ybin, track_y_center=long_pf2D.ratemap.ybin[0])
+        # short_adjusted_ybin = _subfn_scale_ybin_centers_to_track_width(ybin=short_pf2D.ratemap.ybin, track_y_center=short_pf2D.ratemap.ybin[0])
+
 
         print(f'long_adjusted_ybin: {long_adjusted_ybin}')
         print(f'short_adjusted_ybin: {short_adjusted_ybin}')
@@ -310,7 +319,7 @@ class LongShort3DPlacefieldsHelpers:
             # print(f'k: {k}, v: {v}')
             for a_subactor_key, a_subactor in a_nested_actors_dict.items():
                 if a_subactor is not None:
-                    a_subactor.SetPosition(0.0, -maze_y_offset, 0.0) ## long offset
+                    a_subactor.SetPosition(0.0, ipcDataExplorer.params.long_y_offset, 0.0) ## long offset
                 else:
                     # print(f'[{k}][{a_subactor_key}] is None!')
                     pass
@@ -324,7 +333,7 @@ class LongShort3DPlacefieldsHelpers:
             # print(f'k: {k}, v: {v}')
             for a_subactor_key, a_subactor in a_nested_actors_dict.items():
                 if a_subactor is not None:
-                    a_subactor.SetPosition(0.0, maze_y_offset, 0.0) ## short offset
+                    a_subactor.SetPosition(0.0, ipcDataExplorer.params.short_y_offset, 0.0) ## short offset
                 else:
                     # print(f'[{k}][{a_subactor_key}] is None!')
                     pass
