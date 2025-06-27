@@ -60,7 +60,20 @@ class SpikeRenderingBaseMixin:
     Requirements:
         Implementors must conform to NeuronIdentityAccessingMixin or at least have a self.get_neuron_id_and_idx(...) function.
         self.spikes_df
-        
+        self.params.neuron_colors
+        self.params.neuron_colors_hex
+        Relies on self.spikes_df['neuron_IDX'] which was just updated prior to the call.
+
+    Provides:        
+        # Adds to self.params:
+            opaque_neuron_colors
+
+            cell_spike_colors_dict
+            cell_spike_opaque_colors_dict
+
+        # Adds columns to self.spikes_df:
+            'rgb_hex','R','G','B'
+
     Used by:
         SpikeRasterBase (and all of its subclasses)
         SpikeRenderingPyVistaMixin -> InteractivePlaceCellTuningCurvesDataExplorer

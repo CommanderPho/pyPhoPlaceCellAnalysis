@@ -9,9 +9,12 @@ Helper functions that draw/render the neuron's computed peak/prominence/size/con
 
 import numpy as np
 import pyvista as pv # for building bounding boxes
+from neuropy.utils.mixins.dict_representable import get_dict_subset
+from typing import Dict, List, Tuple, Optional, Callable, Union, Any
 from pyphoplacecellanalysis.Pho3D.PyVista.graphs import plot_point_labels, _perform_plot_point_labels
 from pyphocorehelpers.gui.PyVista.CascadingDynamicPlotsList import CascadingDynamicPlotsList # used to wrap _render_peak_prominence_2d_results_on_pyvista_plotter's outputs
 from pyphocorehelpers.function_helpers import function_attributes
+
 
 @function_attributes(short_name=None, tags=['peak_prominence'], input_requires=[], output_provides=[], uses=[], used_by=['_render_peak_prominence_2d_results_on_pyvista_plotter'], creation_date='2024-05-09 05:29', related_items=[])
 def _build_pyvista_single_neuron_prominence_result_data(neuron_id, a_result, promenence_plot_threshold = 1.0, included_level_indicies=[1], debug_print=False):
@@ -100,6 +103,9 @@ def _render_peak_prominence_2d_results_on_pyvista_plotter(ipcDataExplorer, activ
     """ Draws the 2D slice of the placefield peak around its curve FOR A SINGLE NEURON
     
     Built Data:
+
+        from pyphoplacecellanalysis.Pho3D.PyVista.peak_prominences import _render_peak_prominence_2d_results_on_pyvista_plotter
+
         peak_locations, prominence_array, peak_labels, peak_levels, flat_peak_levels, peak_level_bboxes
         
         out_pf_contours_data, out_pf_contours_actors, out_pf_box_data, out_pf_box_actors, out_pf_peak_points_data, out_pf_peak_points_actors
@@ -125,27 +131,20 @@ def _render_peak_prominence_2d_results_on_pyvista_plotter(ipcDataExplorer, activ
 
     # active_curve_color = 'white' # always white
     ## try to use the neuron colors:
-    active_curve_color = ipcDataExplorer.params.cell_spike_colors_dict.get(valid_neuron_id, (1, 1, 1))  # Default to white if color not found
+    
+    active_config = ipcDataExplorer.active_neuron_render_configs_map.get(valid_neuron_id, None)
+    # active_config = ipcDataExplorer.params.active_neuron_render_configs_map.get(valid_neuron_id, None)
+    if active_config is not None:
+        active_curve_color = active_config.qcolor.getRgbF() # (1.0, 0.0, 0.0, 0.5019607843137255)
+    else:
+        ## fallback
+        raise NotImplementedError(f'this is not supposed to happen!')
+        active_curve_color = ipcDataExplorer.params.cell_spike_colors_dict.get(valid_neuron_id, (1, 1, 1))  # Default to white if color not found
+        
+
     #plotter.add_mesh(peak, color=neuron_color)  # Apply the color here
 
-    ## Outputs:
-    
-    # Contours/Isos
-    out_pf_contours_data = {}
-    out_pf_contours_actors = {}
-    
-    # Bounding Boxes:
-    fixed_z_half_height = 0.10 # the fixed half-height of the box, centered around the contour level
-    out_pf_box_data = {}
-    out_pf_box_actors = {}
-    
-    # Text Labels:
-    out_pf_text_size_data = {}
-    out_pf_text_size_actors = {}
-    
-    # Peak Points:
-    out_pf_peak_points_data = {}
-    out_pf_peak_points_actors = {}
+
 
     ## Compute the appropriate z-scaling factors from the actual heights of the ipcDataExplorer's tuning_curves data:
     zScalingFactor = ipcDataExplorer.params.zScalingFactor
@@ -165,108 +164,179 @@ def _render_peak_prominence_2d_results_on_pyvista_plotter(ipcDataExplorer, activ
     peak_levels = peak_levels * curr_scale_z
     if debug_print:
         print(f'peak_levels: {peak_levels}')
-    # Need to flatten the peak_levels
-    flat_peak_levels = peak_levels.flatten()
+
             
     ### Add pyvista contours:
     curr_neuron_plot_data = ipcDataExplorer.plots_data.tuningCurvePlotData[valid_neuron_id]
-    curr_pdata = curr_neuron_plot_data['pdata_currActiveNeuronTuningCurve']
-    curr_contours_mesh_name = f'pf[{valid_neuron_id}]_contours'
-    curr_contours = curr_pdata.contour(isosurfaces=ipcDataExplorer.params.zScalingFactor*flat_peak_levels) # I really don't know why we need to multiply by zScalingFactor (~2000.0) again.
-    try:
-        contours_mesh_actor = ipcDataExplorer.p.add_mesh(curr_contours, color=active_curve_color, line_width=3, name=curr_contours_mesh_name, render=render) # should add it to the ipcDataExplorer's extant plotter (overlaying it on the current mesh
-        out_pf_contours_data[curr_contours_mesh_name] = curr_contours
-        out_pf_contours_actors[curr_contours_mesh_name] = contours_mesh_actor
-    except ValueError as e:
-        #  Empty meshes cannot be plotted. Input mesh has zero points.
-        out_pf_contours_data[curr_contours_mesh_name] = curr_contours
-        # out_pf_contours_actors[curr_contours_mesh_name] = None # do NOT include this entry
+    
+
+    def _subfn_plot_for_pdata(curr_pdata, peak_locations, peak_levels, identifier_suffix: Optional[str]=None):
+        """ Plots a single set of contours/points/labels
         
-    except BaseException as e:
-        raise e # unhandled exception
+         captures: ipcDataExplorer, valid_neuron_id, active_curve_color
+        curr_pdata = curr_neuron_plot_data['pdata_currActiveNeuronTuningCurve']
+        """
+        ## INPUTS: 
+        # Need to flatten the peak_levels
+        flat_peak_levels = peak_levels.flatten()
+    
+        if identifier_suffix is None:
+            curr_common_identifier_prefix_name: str = f'pf[{valid_neuron_id}]' # f'{curr_common_identifier_prefix_name}_prominence_peaks_points'
+        else:
+            curr_common_identifier_prefix_name: str = f'pf[{valid_neuron_id}]_{identifier_suffix}'  # f'{curr_common_identifier_prefix_name}_prominence_peaks_points'
+
+
+        ## Outputs:
+
+        # Contours/Isos
+        out_pf_contours_data = {}
+        out_pf_contours_actors = {}
         
-    ### Add simple bounding boxes to the plot:
-    if debug_print:
-        print(f'np.shape(peak_level_bboxes): {np.shape(peak_level_bboxes)}') # (2, 1, 4)
-    n_peaks = np.shape(peak_level_bboxes)[0]
-    n_levels = np.shape(peak_level_bboxes)[1]
-    for peak_idx in np.arange(n_peaks):
-        for level_idx in np.arange(n_levels):
-            curr_box_mesh_name = f'pf[{valid_neuron_id}]_peak[{peak_idx}]_lvl[{level_idx}]_bounds_box'
-            (x0, y0, width, height) = peak_level_bboxes[peak_idx, level_idx, :]
-            a_peak_level = peak_levels[peak_idx][level_idx]
-            ## Can use a rectangle instead of a box:
-            out_pf_box_data[curr_box_mesh_name] = pv.Rectangle([((x0+width), y0, a_peak_level), ((x0+width), (y0+height), a_peak_level), (x0, (y0+height), a_peak_level), (x0, y0, a_peak_level)])
-            out_pf_box_actors[curr_box_mesh_name] = ipcDataExplorer.p.add_mesh(out_pf_box_data[curr_box_mesh_name], color=active_curve_color,  name=curr_box_mesh_name, show_edges=True, edge_color=active_curve_color, line_width=1.5, opacity=0.75, label=curr_box_mesh_name, style='wireframe', render=render)
+        # Bounding Boxes:
+        fixed_z_half_height = 0.10 # the fixed half-height of the box, centered around the contour level
+        out_pf_box_data = {}
+        out_pf_box_actors = {}
+        
+        # Text Labels:
+        out_pf_text_size_data = {}
+        out_pf_text_size_actors = {}
+        
+        # Peak Points:
+        out_pf_peak_points_data = {}
+        out_pf_peak_points_actors = {}
+        
+        curr_contours_mesh_name = f'{curr_common_identifier_prefix_name}_contours'
+        curr_contours = curr_pdata.contour(isosurfaces=ipcDataExplorer.params.zScalingFactor*flat_peak_levels) # I really don't know why we need to multiply by zScalingFactor (~2000.0) again.
+        try:
+            contours_mesh_actor = ipcDataExplorer.p.add_mesh(curr_contours, color=active_curve_color, line_width=3, name=curr_contours_mesh_name, render=render) # should add it to the ipcDataExplorer's extant plotter (overlaying it on the current mesh
+            out_pf_contours_data[curr_contours_mesh_name] = curr_contours
+            out_pf_contours_actors[curr_contours_mesh_name] = contours_mesh_actor
+        except ValueError as e:
+            #  Empty meshes cannot be plotted. Input mesh has zero points.
+            out_pf_contours_data[curr_contours_mesh_name] = curr_contours
+            # out_pf_contours_actors[curr_contours_mesh_name] = None # do NOT include this entry
             
-            ## Box Mode:
-            ## build the corner points of the box:
-            ## box_bounds = (xMin, xMax, yMin, yMax, zMin, zMax)
-            # box_bounds = (x0, (x0+width), y0, (y0+height), (a_peak_level-fixed_z_half_height), (a_peak_level+fixed_z_half_height))
-            # if debug_print:
-            #     print(f'peak_idx: {peak_idx} - level_idx: {level_idx} :: box_bounds (xMin, xMax, yMin, yMax, zMin, zMax): {box_bounds}')
-#             out_pf_box_data[curr_box_mesh_name] = pv.Box(bounds=box_bounds, level=0, quads=True)
-#             out_pf_box_actors[curr_box_mesh_name] = ipcDataExplorer.p.add_mesh(out_pf_box_data[curr_box_mesh_name], color="white",  name=curr_box_mesh_name, show_edges=True, edge_color="white", line_width=0.5, opacity=0.75, label=curr_box_mesh_name)
+        except BaseException as e:
+            raise e # unhandled exception
             
-    
-            ## Text Labels:
-            curr_text_label_mesh_x_name = f'pf[{valid_neuron_id}]_peak[{peak_idx}]_lvl[{level_idx}]_text_label_x'
-            curr_text_label_mesh_y_name = f'pf[{valid_neuron_id}]_peak[{peak_idx}]_lvl[{level_idx}]_text_label_y'
+        ### Add simple bounding boxes to the plot:
+        if debug_print:
+            print(f'np.shape(peak_level_bboxes): {np.shape(peak_level_bboxes)}') # (2, 1, 4)
+        n_peaks = np.shape(peak_level_bboxes)[0]
+        n_levels = np.shape(peak_level_bboxes)[1]
+        for peak_idx in np.arange(n_peaks):
+            for level_idx in np.arange(n_levels):
+                curr_box_mesh_name = f'{curr_common_identifier_prefix_name}_peak[{peak_idx}]_lvl[{level_idx}]_bounds_box'
+                (x0, y0, width, height) = peak_level_bboxes[peak_idx, level_idx, :]
+                a_peak_level = peak_levels[peak_idx][level_idx]
+                ## Can use a rectangle instead of a box:
+                out_pf_box_data[curr_box_mesh_name] = pv.Rectangle([((x0+width), y0, a_peak_level), ((x0+width), (y0+height), a_peak_level), (x0, (y0+height), a_peak_level), (x0, y0, a_peak_level)])
+                out_pf_box_actors[curr_box_mesh_name] = ipcDataExplorer.p.add_mesh(out_pf_box_data[curr_box_mesh_name], color=active_curve_color,  name=curr_box_mesh_name, show_edges=True, edge_color=active_curve_color, line_width=1.5, opacity=0.75, label=curr_box_mesh_name, style='wireframe', render=render)
+                
+                ## Box Mode:
+                ## build the corner points of the box:
+                ## box_bounds = (xMin, xMax, yMin, yMax, zMin, zMax)
+                # box_bounds = (x0, (x0+width), y0, (y0+height), (a_peak_level-fixed_z_half_height), (a_peak_level+fixed_z_half_height))
+                # if debug_print:
+                #     print(f'peak_idx: {peak_idx} - level_idx: {level_idx} :: box_bounds (xMin, xMax, yMin, yMax, zMin, zMax): {box_bounds}')
+    #             out_pf_box_data[curr_box_mesh_name] = pv.Box(bounds=box_bounds, level=0, quads=True)
+    #             out_pf_box_actors[curr_box_mesh_name] = ipcDataExplorer.p.add_mesh(out_pf_box_data[curr_box_mesh_name], color="white",  name=curr_box_mesh_name, show_edges=True, edge_color="white", line_width=0.5, opacity=0.75, label=curr_box_mesh_name)
+                
+        
+                ## Text Labels:
+                curr_text_label_mesh_x_name = f'{curr_common_identifier_prefix_name}_peak[{peak_idx}]_lvl[{level_idx}]_text_label_x'
+                curr_text_label_mesh_y_name = f'{curr_common_identifier_prefix_name}_peak[{peak_idx}]_lvl[{level_idx}]_text_label_y'
+                
+                x_center = (x0 + (x0+width))/2.0
+                y_center = (y0 + (y0+height))/2.0
+                
+                ## TODO: set the text color appropriately
+                x_text_mesh = pv.Text3D(f'{width:.2f}')
+                y_text_mesh = pv.Text3D(f'{height:.2f}')
+                
+                # x_text_mesh = x_text_mesh.rotate_z(30, inplace=True)
+                y_text_mesh = y_text_mesh.rotate_z(90, inplace=True)
+                
+                offset_center_point_x_mesh = x_text_mesh.center
+                offset_center_point_y_mesh = y_text_mesh.center
+                
+                if debug_print:
+                    print(f'offset_center_point_x_mesh: {offset_center_point_x_mesh}')
+                
+                goal_point_x = (x_center, y0, a_peak_level)
+                goal_point_y = (x0, y_center, a_peak_level)
+                
+                final_offset_x = (goal_point_x[0]-offset_center_point_x_mesh[0], goal_point_x[1]-offset_center_point_x_mesh[1], goal_point_x[2]-offset_center_point_x_mesh[2])
+                final_offset_y = (goal_point_y[0]-offset_center_point_y_mesh[0], goal_point_y[1]-offset_center_point_y_mesh[1], goal_point_y[2]-offset_center_point_y_mesh[2])
+                
+                x_text_mesh = x_text_mesh.translate(final_offset_x, inplace=True)
+                y_text_mesh = y_text_mesh.translate(final_offset_y, inplace=True)
+                
+                out_pf_text_size_data[curr_text_label_mesh_x_name] = x_text_mesh
+                out_pf_text_size_data[curr_text_label_mesh_y_name] = y_text_mesh
+                
+                out_pf_text_size_actors[curr_text_label_mesh_x_name] = ipcDataExplorer.p.add_mesh(x_text_mesh, name=curr_text_label_mesh_x_name, render=render)
+                out_pf_text_size_actors[curr_text_label_mesh_y_name] = ipcDataExplorer.p.add_mesh(y_text_mesh, name=curr_text_label_mesh_y_name, render=render)
+            ## END for level_idx in np.arange(n_levels)...
+        ## END for peak_idx in np.arange(n_peaks)...   
+
+        ### Add peak points:
+        curr_peak_points_mesh_name: str = f'{curr_common_identifier_prefix_name}_prominence_peaks_points'
             
-            x_center = (x0 + (x0+width))/2.0
-            y_center = (y0 + (y0+height))/2.0
-            
-            ## TODO: set the text color appropriately
-            x_text_mesh = pv.Text3D(f'{width:.2f}')
-            y_text_mesh = pv.Text3D(f'{height:.2f}')
-            
-            # x_text_mesh = x_text_mesh.rotate_z(30, inplace=True)
-            y_text_mesh = y_text_mesh.rotate_z(90, inplace=True)
-            
-            offset_center_point_x_mesh = x_text_mesh.center
-            offset_center_point_y_mesh = y_text_mesh.center
-            
-            if debug_print:
-                print(f'offset_center_point_x_mesh: {offset_center_point_x_mesh}')
-            
-            goal_point_x = (x_center, y0, a_peak_level)
-            goal_point_y = (x0, y_center, a_peak_level)
-            
-            final_offset_x = (goal_point_x[0]-offset_center_point_x_mesh[0], goal_point_x[1]-offset_center_point_x_mesh[1], goal_point_x[2]-offset_center_point_x_mesh[2])
-            final_offset_y = (goal_point_y[0]-offset_center_point_y_mesh[0], goal_point_y[1]-offset_center_point_y_mesh[1], goal_point_y[2]-offset_center_point_y_mesh[2])
-            
-            x_text_mesh = x_text_mesh.translate(final_offset_x, inplace=True)
-            y_text_mesh = y_text_mesh.translate(final_offset_y, inplace=True)
-            
-            out_pf_text_size_data[curr_text_label_mesh_x_name] = x_text_mesh
-            out_pf_text_size_data[curr_text_label_mesh_y_name] = y_text_mesh
-            
-            out_pf_text_size_actors[curr_text_label_mesh_x_name] = ipcDataExplorer.p.add_mesh(x_text_mesh, name=curr_text_label_mesh_x_name, render=render)
-            out_pf_text_size_actors[curr_text_label_mesh_y_name] = ipcDataExplorer.p.add_mesh(y_text_mesh, name=curr_text_label_mesh_y_name, render=render)
-            
+        point_labels = peak_labels.copy()
+        points = peak_locations.copy()
+        point_mask = None
+        
+        plotActors_labels, data_dict_labels = _perform_plot_point_labels(ipcDataExplorer.p, points, point_labels=point_labels, point_mask=point_mask,
+                                                                                **({'font_size': 10, 'name':curr_peak_points_mesh_name,
+                                                                                    'shape_opacity': 0.1, 'shape_color':'grey', 'shape':'rounded_rect', 'fill_shape':True, 'margin':3,
+                                                                                    'show_points': False, 'point_size': 8, 'point_color':'white', 'render_points_as_spheres': True, 'render': render} | kwargs)
+                                                                            )
+        out_pf_peak_points_actors[curr_peak_points_mesh_name] = plotActors_labels['main']
+        out_pf_peak_points_data[curr_peak_points_mesh_name] = {'name':curr_peak_points_mesh_name, 'active_data':{'peak_locations':peak_locations, 'point_labels':point_labels} | data_dict_labels}
+        
+        # ALT: as an alternative to the labeled points, we could the add_points function to add them
+        # pdata_currActiveNeuronTuningCurve_Points = pdata_currActiveNeuronTuningCurve.extract_points(pdata_currActiveNeuronTuningCurve.points[:, 2] > 0)  # UnstructuredGrid
+        # pdata_currActiveTuningCurvePeaks_Points_plotActor = ipcDataExplorer.p.add_points(pdata_currActiveNeuronTuningCurve_Points, label=f'{curr_active_neuron_pf_identifier}_peak_points', name=f'{curr_active_neuron_pf_identifier}_peak_points', render_points_as_spheres=True, point_size=6.0, color=curr_active_neuron_opaque_color, render=render)    
+
+        ## Build the final output structures:
+        all_peaks_actors = CascadingDynamicPlotsList(contours=CascadingDynamicPlotsList(**out_pf_contours_actors), boxes=CascadingDynamicPlotsList(**out_pf_box_actors), text=CascadingDynamicPlotsList(**out_pf_text_size_actors), peak_points=CascadingDynamicPlotsList(**out_pf_peak_points_actors))
+        all_peaks_data = dict(contours=out_pf_contours_data, boxes=out_pf_box_data, text=out_pf_text_size_data, peak_points=out_pf_peak_points_data)
+        return all_peaks_actors, all_peaks_data
+    ## END def _subfn_plot_for_pdata...
+
+    ## previous mode: curr_neuron_plot_data is flat
+    ## 2025-06-27 modE: curr_neuron_plot_data is a dict with optional {'long': a_result, 'short': a_result}
+    curr_neuron_plot_data_dict = get_dict_subset(curr_neuron_plot_data, included_keys=['long', 'short'], require_all_keys=False)
+    if len(curr_neuron_plot_data_dict) == 0:
+        ## previous mode: curr_neuron_plot_data is flat
+        curr_pdata = curr_neuron_plot_data['pdata_currActiveNeuronTuningCurve']
+        all_peaks_actors, all_peaks_data = _subfn_plot_for_pdata(curr_pdata=curr_pdata, peak_locations=peak_locations, peak_levels=peak_levels, identifier_suffix=None)
+    else:
+        ## 2025-06-27 modE: curr_neuron_plot_data is a dict with optional {'long': a_result, 'short': a_result}
+        all_peaks_actors = None
+        all_peaks_data = None
+        for series_identifier, a_curr_neuron_plot_data in curr_neuron_plot_data_dict.items():
+            curr_pdata = a_curr_neuron_plot_data.get('pdata_currActiveNeuronTuningCurve', None)
+            if curr_pdata is not None:
+                an_all_peaks_actors, an_all_peaks_data = _subfn_plot_for_pdata(curr_pdata=curr_pdata, peak_locations=peak_locations, peak_levels=peak_levels, identifier_suffix=series_identifier)
+                ## actors:
+                if all_peaks_actors is None:
+                    all_peaks_actors = an_all_peaks_actors
+                else:
+                    ## update the original:
+                    for k, v in an_all_peaks_actors.items():
+                        all_peaks_actors[k] |= v
+                ## data:
+                if all_peaks_data is None:
+                    all_peaks_data = an_all_peaks_data
+                else:
+                    ## update the original:
+                    for k, v in an_all_peaks_data.items():
+                        all_peaks_data[k] |= v
+                
 
 
-    ### Add peak points:
-    curr_peak_points_mesh_name = f'pf[{valid_neuron_id}]_prominence_peaks_points'
-    point_labels = peak_labels.copy()
-    points = peak_locations.copy()
-    point_mask = None
-    
-    plotActors_labels, data_dict_labels = _perform_plot_point_labels(ipcDataExplorer.p, points, point_labels=point_labels, point_mask=point_mask,
-                                                                            **({'font_size': 10, 'name':curr_peak_points_mesh_name,
-                                                                                'shape_opacity': 0.1, 'shape_color':'grey', 'shape':'rounded_rect', 'fill_shape':True, 'margin':3,
-                                                                                'show_points': False, 'point_size': 8, 'point_color':'white', 'render_points_as_spheres': True, 'render': render} | kwargs)
-                                                                        )
-    out_pf_peak_points_actors[curr_peak_points_mesh_name] = plotActors_labels['main']
-    out_pf_peak_points_data[curr_peak_points_mesh_name] = {'name':curr_peak_points_mesh_name, 'active_data':{'peak_locations':peak_locations, 'point_labels':point_labels} | data_dict_labels}
-    
-    # ALT: as an alternative to the labeled points, we could the add_points function to add them
-    # pdata_currActiveNeuronTuningCurve_Points = pdata_currActiveNeuronTuningCurve.extract_points(pdata_currActiveNeuronTuningCurve.points[:, 2] > 0)  # UnstructuredGrid
-    # pdata_currActiveTuningCurvePeaks_Points_plotActor = ipcDataExplorer.p.add_points(pdata_currActiveNeuronTuningCurve_Points, label=f'{curr_active_neuron_pf_identifier}_peak_points', name=f'{curr_active_neuron_pf_identifier}_peak_points', render_points_as_spheres=True, point_size=6.0, color=curr_active_neuron_opaque_color, render=render)    
-
-    ## Build the final output structures:
-    all_peaks_actors = CascadingDynamicPlotsList(contours=CascadingDynamicPlotsList(**out_pf_contours_actors), boxes=CascadingDynamicPlotsList(**out_pf_box_actors), text=CascadingDynamicPlotsList(**out_pf_text_size_actors), peak_points=CascadingDynamicPlotsList(**out_pf_peak_points_actors))
-    all_peaks_data = dict(contours=out_pf_contours_data, boxes=out_pf_box_data, text=out_pf_text_size_data, peak_points=out_pf_peak_points_data)
     # return out_pf_contours_data, out_pf_contours_actors, out_pf_box_data, out_pf_box_actors, out_pf_text_size_data, out_pf_text_size_actors, out_pf_peak_points_data, out_pf_peak_points_actors
     return all_peaks_data, all_peaks_actors
     
@@ -323,7 +393,13 @@ def render_all_neuron_peak_prominence_2d_results_on_pyvista_plotter(ipcDataExplo
         # Determine if this aclu is present in the `active_peak_prominence_2d_results`
         if active_neuron_id in active_peak_prominence_2d_results_aclus:
             all_peaks_data, all_peaks_actors = _render_peak_prominence_2d_results_on_pyvista_plotter(ipcDataExplorer, active_peak_prominence_2d_results, valid_neuron_id=active_neuron_id, render=False, debug_print=debug_print, **kwargs)
-            tuning_curve_is_visible = ipcDataExplorer.plots['tuningCurvePlotActors'][active_neuron_id].main.GetVisibility() # either 0 or 1 depending on the visibility of this cell
+            try:
+                tuning_curve_is_visible = ipcDataExplorer.plots['tuningCurvePlotActors'][active_neuron_id].main.GetVisibility() # either 0 or 1 depending on the visibility of this cell
+            except (KeyError, ValueError) as e:
+                ## get from the configs:
+                tuning_curve_is_visible: int = int(ipcDataExplorer.active_neuron_render_configs_map[active_neuron_id].isVisible)            
+            except Exception as e:
+                raise e
             all_peaks_actors.SetVisibility(tuning_curve_is_visible) # Change the visibility to match the current tuning_curve_visibility_state
             ipcDataExplorer.plots['tuningCurvePlotActors'][active_neuron_id].peaks = all_peaks_actors # sets the .peaks property of the CascadingDynamicPlotsList
             ipcDataExplorer.plots_data['tuningCurvePlotData'][active_neuron_id]['peaks'] = all_peaks_data
@@ -332,7 +408,7 @@ def render_all_neuron_peak_prominence_2d_results_on_pyvista_plotter(ipcDataExplo
             print(f'WARN: neuron_id: {active_neuron_id} is present in ipcDataExplorer but missing from `active_peak_prominence_2d_results`!')
             ipcDataExplorer.plots['tuningCurvePlotActors'][active_neuron_id] = None
             ipcDataExplorer.plots_data['tuningCurvePlotData'][active_neuron_id] = None
-
+    # END for active_neuron_id in ipcDataExplorer.neuron_i...
 
     # Once done, render
     ipcDataExplorer.p.render()

@@ -6,6 +6,7 @@
 NOTE: This is a GOOD, general class that offers both 2D (matplot) and 3D (pyvista) functionality
 
 """
+from typing import Dict, Optional
 from indexed import IndexedOrderedDict
 import sys
 import pyvista as pv
@@ -38,7 +39,7 @@ import matplotlib.pyplot as plt
 from sklearn.preprocessing import minmax_scale
 
 from pyphoplacecellanalysis.PhoPositionalData.plotting.saving import save_to_multipage_pdf
-
+from neuropy.analyses.placefields import PfND
 
 # noinspection PyUnresolvedReferences
 import vtkmodules.vtkRenderingOpenGL2
@@ -354,7 +355,7 @@ def plot_single_cell_1D_placecell_validation(active_epoch_placefields1D, placefi
 # 2D Placefields for PyVista Interactive Plotters                                                                      #
 # ==================================================================================================================== #
 # Private _____________________________________________________________________________________________________________ #
-
+@function_attributes(short_name=None, tags=['private', 'helper'], input_requires=[], output_provides=[], uses=[], used_by=['plot_placefields2D','update_plotColorsPlacefield2D'], creation_date='2022-01-01 00:00', related_items=[])
 def _build_custom_placefield_maps_lookup_table(curr_active_neuron_color, num_opacity_tiers, opacity_tier_values):
     """
     Inputs:
@@ -377,6 +378,8 @@ def _build_custom_placefield_maps_lookup_table(curr_active_neuron_color, num_opa
         lut.SetTableValue(i, map_curr_active_neuron_color)
     return lut
 
+
+@function_attributes(short_name=None, tags=['private', 'helper'], input_requires=[], output_provides=[], uses=[], used_by=['plot_placefields2D', 'update_plotColorsPlacefield2D'], creation_date='2022-01-01 00:00', related_items=[])
 def _force_plot_ignore_scalar_as_color(plot_mesh_actor, lookup_table):
         """The following custom lookup table solution is required to successfuly plot the surfaces with opacity dependant on their scalars property and still have a consistent color (instead of using the scalars for the color too). Note that the previous "fix" for the problem of the scalars determining the object's color when I don't want them to:
     Args:
@@ -389,8 +392,10 @@ def _force_plot_ignore_scalar_as_color(plot_mesh_actor, lookup_table):
         plot_mesh_actor.GetMapper().SetLookupTable(lookup_table)
         plot_mesh_actor.GetMapper().SetScalarModeToUsePointData()
 
+
 # Public _____________________________________________________________________________________________________________ #
-def plot_placefields2D(pTuningCurves, active_placefields, pf_colors: np.ndarray, zScalingFactor=10.0, show_legend=False, enable_debug_print=False, **kwargs):
+@function_attributes(short_name=None, tags=['3D', 'PyVista', 'main', 'render', 'placefields'], input_requires=[], output_provides=[], uses=['CascadingDynamicPlotsList', '_build_custom_placefield_maps_lookup_table', '_force_plot_ignore_scalar_as_color'], used_by=['PlacefieldRenderingPyVistaMixin.plot_placefields'], creation_date='2022-01-01 00:00', related_items=['update_plotColorsPlacefield2D'])
+def plot_placefields2D(pTuningCurves, active_placefields: PfND, pf_colors: np.ndarray, zScalingFactor=10.0, show_legend=False, enable_debug_print=False, series_prefix: Optional[str]=None, clip_below_plane: Optional[float]=None, clip_bounds=None, **kwargs):
     """ Plots 2D (as opposed to linearized/1D) Placefields in a 3D PyVista plot
     
     Known Usages:
@@ -434,16 +439,29 @@ def plot_placefields2D(pTuningCurves, active_placefields, pf_colors: np.ndarray,
     
     tuningCurvePlotActors = IndexedOrderedDict({})
     tuningCurvePlotData = IndexedOrderedDict({}) # TODO: try to convert to an ordered dict indexed by neuron_IDs
+    ## loop through each tuning curve, building its representation and then finally calling `pTuningCurves.add_mesh(...)` for it
+    unit_labels = []
+    legend_entries = []
+    
     for i in np.arange(num_curr_tuning_curves):
     #TODO: BUG: CRITICAL: Very clearly makes sense how the indexing gets off here:
         curr_active_neuron_ID = good_placefield_neuronIDs[i] ## TODO: should do a dict lookup for the ACLU instead
         curr_active_neuron_color = pf_colors[:, i]
         curr_active_neuron_opaque_color = opaque_pf_colors[:,i]
-        curr_active_neuron_pf_identifier = 'pf[{}]'.format(curr_active_neuron_ID)
+        curr_active_neuron_pf_identifier: str = 'pf[{}]'.format(curr_active_neuron_ID)
+        curr_active_neuron_unit_label: str = '{}'.format(curr_active_neuron_ID)
+        if series_prefix is not None:
+            ## append series_suffix to the unique pf identifier
+            curr_active_neuron_pf_identifier = f'{series_prefix}_{curr_active_neuron_pf_identifier}'
+            curr_active_neuron_unit_label = f'{series_prefix}_{curr_active_neuron_unit_label}'
+                    
         curr_active_neuron_tuning_Curve = np.squeeze(curr_tuning_curves[i,:,:]).T.copy() # A single tuning curve
-    
+
+        unit_labels.append(curr_active_neuron_unit_label)
+        legend_entries.append(curr_active_neuron_pf_identifier)
+
         if params['should_pdf_normalize_manually']:
-        # Normalize the area under the curve to 1.0 (like a probability density function)
+            # Normalize the area under the curve to 1.0 (like a probability density function)
             curr_active_neuron_tuning_Curve = curr_active_neuron_tuning_Curve / np.nansum(curr_active_neuron_tuning_Curve)
         
         curr_active_neuron_tuning_Curve = curr_active_neuron_tuning_Curve * zScalingFactor
@@ -452,7 +470,20 @@ def plot_placefields2D(pTuningCurves, active_placefields, pf_colors: np.ndarray,
         pdata_currActiveNeuronTuningCurve = pv.StructuredGrid(tuningCurvePlot_x, tuningCurvePlot_y, curr_active_neuron_tuning_Curve)
         pdata_currActiveNeuronTuningCurve["Elevation"] = (curr_active_neuron_tuning_Curve.ravel(order="F") * zScalingFactor)
     
-    # Extracting Points from recently built StructuredGrid pdata:
+        
+        if clip_bounds is not None:
+            x0, x1, y0, y1, z0, z1 = clip_bounds
+            y_min = min(y0, y1)
+            y_max = max(y0, y1)
+            # pdata_currActiveNeuronTuningCurve = pdata_currActiveNeuronTuningCurve.clip(normal='z', origin=(0, 0, clip_below_plane), invert=False)
+            pdata_currActiveNeuronTuningCurve = pdata_currActiveNeuronTuningCurve.clip(normal='y', origin=(0, y_min, 0), invert=True)
+            pdata_currActiveNeuronTuningCurve = pdata_currActiveNeuronTuningCurve.clip(normal='y', origin=(0, y_max, 0), invert=True)
+            
+        if (clip_below_plane is not None):
+            pdata_currActiveNeuronTuningCurve = pdata_currActiveNeuronTuningCurve.clip(normal='z', origin=(0, 0, clip_below_plane), invert=False)
+            
+
+        # Extracting Points from recently built StructuredGrid pdata:
         if params['should_display_placefield_points']:
             pdata_currActiveNeuronTuningCurve_Points = pdata_currActiveNeuronTuningCurve.extract_points(pdata_currActiveNeuronTuningCurve.points[:, 2] > 0)  # UnstructuredGrid
         else:
@@ -486,26 +517,31 @@ def plot_placefields2D(pTuningCurves, active_placefields, pf_colors: np.ndarray,
     
         if params.get('should_override_disable_smooth_shading', False):
             curr_smooth_shading = False # override smooth shading if this option is set
-    
-        pdata_currActiveNeuronTuningCurve_plotActor = pTuningCurves.add_mesh(pdata_currActiveNeuronTuningCurve, label=curr_active_neuron_pf_identifier, name=curr_active_neuron_pf_identifier,
-                                                                        show_edges=True, edge_color=curr_active_neuron_opaque_color, nan_opacity=params['nan_opacity'], scalars='Elevation',
-                                                                        opacity=curr_opacity, use_transparency=True, smooth_shading=curr_smooth_shading, show_scalar_bar=False, pickable=True, render=False)                                                                     
-    
-    # Force custom colors:
-        if params['should_force_placefield_custom_color']:
-        ## The following custom lookup table solution is required to successfuly plot the surfaces with opacity dependant on their scalars property and still have a consistent color (instead of using the scalars for the color too). Note that the previous "fix" for the problem of the scalars determining the object's color when I don't want them to:
-            #   pdata_currActiveNeuronTuningCurve_plotActor.GetMapper().ScalarVisibilityOff() # Scalars not used to color objects
-        # Is NOT Sufficient, as it disables any opacity at all seemingly
-        # lut = build_custom_placefield_maps_lookup_table(curr_active_neuron_color.copy(), 2, [0.2, 0.8])
-        # lut = build_custom_placefield_maps_lookup_table(curr_active_neuron_color.copy(), 1, [1.0]) # DFEFAULT: Full fill opacity
-            lut = _build_custom_placefield_maps_lookup_table(curr_active_neuron_color.copy(), 1, [0.5]) # ALT: reduce fill opacity
-        # lut = build_custom_placefield_maps_lookup_table(curr_active_neuron_color.copy(), 3, [0.2, 0.6, 1.0]) # Looks great
-        # lut = build_custom_placefield_maps_lookup_table(curr_active_neuron_color.copy(), 3, [0.0, 0.6, 1.0])
-        # lut = build_custom_placefield_maps_lookup_table(curr_active_neuron_color.copy(), 5, [0.0, 0.0, 0.3, 0.5, 0.1])
-            curr_active_neuron_plot_data['lut'] = lut
-            _force_plot_ignore_scalar_as_color(pdata_currActiveNeuronTuningCurve_plotActor, lut)
-        
-        
+
+        if (pdata_currActiveNeuronTuningCurve.n_points > 0):
+            pdata_currActiveNeuronTuningCurve_plotActor = pTuningCurves.add_mesh(pdata_currActiveNeuronTuningCurve, label=curr_active_neuron_pf_identifier, name=curr_active_neuron_pf_identifier,
+                                                                            show_edges=True, edge_color=curr_active_neuron_opaque_color, nan_opacity=params['nan_opacity'], scalars='Elevation',
+                                                                            opacity=curr_opacity, use_transparency=True, smooth_shading=curr_smooth_shading, show_scalar_bar=False, pickable=True, render=False)
+            # Force custom colors:
+            if params['should_force_placefield_custom_color']:
+                ## The following custom lookup table solution is required to successfuly plot the surfaces with opacity dependant on their scalars property and still have a consistent color (instead of using the scalars for the color too). Note that the previous "fix" for the problem of the scalars determining the object's color when I don't want them to:
+                    #   pdata_currActiveNeuronTuningCurve_plotActor.GetMapper().ScalarVisibilityOff() # Scalars not used to color objects
+                # Is NOT Sufficient, as it disables any opacity at all seemingly
+                # lut = build_custom_placefield_maps_lookup_table(curr_active_neuron_color.copy(), 2, [0.2, 0.8])
+                # lut = build_custom_placefield_maps_lookup_table(curr_active_neuron_color.copy(), 1, [1.0]) # DFEFAULT: Full fill opacity
+                lut = _build_custom_placefield_maps_lookup_table(curr_active_neuron_color.copy(), 1, [0.5]) # ALT: reduce fill opacity
+                # lut = build_custom_placefield_maps_lookup_table(curr_active_neuron_color.copy(), 3, [0.2, 0.6, 1.0]) # Looks great
+                # lut = build_custom_placefield_maps_lookup_table(curr_active_neuron_color.copy(), 3, [0.0, 0.6, 1.0])
+                # lut = build_custom_placefield_maps_lookup_table(curr_active_neuron_color.copy(), 5, [0.0, 0.0, 0.3, 0.5, 0.1])
+                curr_active_neuron_plot_data['lut'] = lut
+                _force_plot_ignore_scalar_as_color(pdata_currActiveNeuronTuningCurve_plotActor, lut)
+            
+        else:
+            if enable_debug_print:
+                print(f'WARNING: mesh empty for i: {i}, curr_active_neuron_pf_identifier: {curr_active_neuron_pf_identifier}. Skipping.')
+            pdata_currActiveNeuronTuningCurve_plotActor = None
+            
+
     ## Add points:
     
         if params['should_display_placefield_points'] and (pdata_currActiveNeuronTuningCurve_Points.n_points > 0):
@@ -531,8 +567,13 @@ def plot_placefields2D(pTuningCurves, active_placefields, pf_colors: np.ndarray,
     
 # Legend:
     plots_data = {'good_placefield_neuronIDs': good_placefield_neuronIDs,
-            'unit_labels': ['{}'.format(good_placefield_neuronIDs[i]) for i in np.arange(num_curr_tuning_curves)],
-                'legend_entries': [['pf[{}]'.format(good_placefield_neuronIDs[i]), opaque_pf_colors[:,i]] for i in np.arange(num_curr_tuning_curves)]}
+                # 'unit_labels': ['{}'.format(good_placefield_neuronIDs[i]) for i in np.arange(num_curr_tuning_curves)],
+                # 'legend_entries': [['pf[{}]'.format(good_placefield_neuronIDs[i]), opaque_pf_colors[:,i]] for i in np.arange(num_curr_tuning_curves)]
+                'unit_labels': unit_labels,
+                'legend_entries': [[legend_entries[i], opaque_pf_colors[:,i]] for i in np.arange(num_curr_tuning_curves)]
+                
+                }
+
 
 # lost the ability to have colors with alpha components
     # TypeError: SetEntry argument 4: expected a sequence of 3 values, got 4 values
@@ -551,13 +592,31 @@ def plot_placefields2D(pTuningCurves, active_placefields, pf_colors: np.ndarray,
 
     return pTuningCurves, tuningCurvePlotActors, tuningCurvePlotData, legendActor, plots_data
 
-def update_plotColorsPlacefield2D(tuningCurvePlotActors, tuningCurvePlotData, neuron_id_color_update_dict):
+
+@function_attributes(short_name=None, tags=['3D', 'PyVista', 'main', 'render', 'placefields', 'update'], input_requires=[], output_provides=[], uses=['_build_custom_placefield_maps_lookup_table', '_force_plot_ignore_scalar_as_color'], used_by=['PlacefieldRenderingPyVistaMixin.update_rendered_placefields'], creation_date='2022-01-01 00:00', related_items=['plot_placefields2D'])
+def update_plotColorsPlacefield2D(tuningCurvePlotActors: Dict, tuningCurvePlotData: Dict, neuron_id_color_update_dict: Dict):
     """ Updates the colors of the placefields plots from the neuron_id_color_update_dict
-Inputs:
-    tuningCurvePlotData: IndexedOrderedDict of neuron_id, plot data dict
-"""
+    Inputs:
+        tuningCurvePlotData: IndexedOrderedDict of neuron_id, plot data dict
+    """
+    def _subfn_update_actors(a_nested_actors_dict, rgb_color, lookup_table):
+        pdata_currActiveNeuronTuningCurve_plotActor = a_nested_actors_dict.get('main', None) # get the main plot actor from the CascadingDynamicPlotsList
+        if pdata_currActiveNeuronTuningCurve_plotActor is not None:
+            _force_plot_ignore_scalar_as_color(pdata_currActiveNeuronTuningCurve_plotActor, lookup_table=lookup_table)
+            ## Set color of the edges on the placefield surface (edge_color)
+            pdata_currActiveNeuronTuningCurve_plotActor.GetProperty().SetEdgeColor(rgb_color) # note no-opacity in setting the edge colors
+        
+        # set the color of the points on the placefield surface:
+        pdata_currActiveNeuronTuningCurve_Points_plotActor = a_nested_actors_dict.get('points', None)
+        if pdata_currActiveNeuronTuningCurve_Points_plotActor is not None:
+            pdata_currActiveNeuronTuningCurve_Points_plotActor.GetProperty().SetColor(rgb_color) # note no-opacity in setting the points colors
+    
+    # ==================================================================================================================================================================================================================================================================================== #
+    # BEGIN FUNCTION BODY                                                                                                                                                                                                                                                                  #
+    # ==================================================================================================================================================================================================================================================================================== #
+
     for neuron_id, color in neuron_id_color_update_dict.items():
-    ## Convert color to a QColor for generality:    
+        ## Convert color to a QColor for generality:    
         if isinstance(color, QtGui.QColor):
         # already a QColor, just pass
             converted_color = color
@@ -574,18 +633,21 @@ Inputs:
         rgba_color = converted_color.getRgbF()
         rgb_color = rgba_color[:3]
     
-    # Update the surface color itself:
+        # Update the surface color itself:
+        if neuron_id not in tuningCurvePlotData:
+            tuningCurvePlotData[neuron_id] = {}
         tuningCurvePlotData[neuron_id]['lut'] = _build_custom_placefield_maps_lookup_table(rgba_color, 1, [0.5]) # ALT: reduce fill opacity
-        pdata_currActiveNeuronTuningCurve_plotActor = tuningCurvePlotActors[neuron_id]['main'] # get the main plot actor from the CascadingDynamicPlotsList
-        _force_plot_ignore_scalar_as_color(pdata_currActiveNeuronTuningCurve_plotActor, tuningCurvePlotData[neuron_id]['lut'])
-    
-    ## Set color of the edges on the placefield surface (edge_color)
-        pdata_currActiveNeuronTuningCurve_plotActor.GetProperty().SetEdgeColor(rgb_color) # note no-opacity in setting the edge colors
-    
-    # set the color of the points on the placefield surface:
-        pdata_currActiveNeuronTuningCurve_Points_plotActor = tuningCurvePlotActors[neuron_id]['points']
-        pdata_currActiveNeuronTuningCurve_Points_plotActor.GetProperty().SetColor(rgb_color) # note no-opacity in setting the points colors
-    
+        
+        if isinstance(tuningCurvePlotActors[neuron_id], dict):
+            for k, a_nested_actors_dict in tuningCurvePlotActors[neuron_id].items():
+                # for 'long', 'short'
+                _subfn_update_actors(a_nested_actors_dict, rgb_color=rgb_color, lookup_table=tuningCurvePlotData[neuron_id]['lut'])
+        else:
+            _subfn_update_actors(tuningCurvePlotActors[neuron_id], rgb_color=rgb_color, lookup_table=tuningCurvePlotData[neuron_id]['lut'])
+    ## END for neuron_id, color in neuron_id_color_...
+
+
+
 def update_plotVisiblePlacefields2D(tuningCurvePlotActors, isTuningCurveVisible):
 # Updates the visible placefields. Complements plot_placefields2D
     num_active_tuningCurveActors = len(tuningCurvePlotActors)
