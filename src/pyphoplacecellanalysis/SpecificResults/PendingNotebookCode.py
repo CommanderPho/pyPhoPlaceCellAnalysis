@@ -360,8 +360,8 @@ class LongShort3DPlacefieldsHelpers:
             
 
         ## Update spikes:
-        combined_spikes_df: pd.DataFrame = pd.concat([long_pf2D.spikes_df, short_pf2D.spikes_df], axis='index', ignore_index=True).drop_duplicates(subset=['t_rel_seconds'])
         if enable_update_spikes:
+            combined_spikes_df: pd.DataFrame = pd.concat([long_pf2D.spikes_df, short_pf2D.spikes_df], axis='index', ignore_index=True).drop_duplicates(subset=['t_rel_seconds'])
             ipcDataExplorer._spikes_df = combined_spikes_df
         
         ## OUTPUTS: combined_paired_dict, combined_tuningCurvePlotActors, combined_tuningCurvePlotData, combined_temp_plots_data, combined_spikes_df
@@ -527,6 +527,14 @@ class LongShort3DPlacefieldsHelpers:
         for active_neuron_id in ipcDataExplorer.neuron_ids:
             if debug_print:
                 print(f'processing active_neuron_id: {active_neuron_id}...')
+                
+            _temp_neuron_id_actors = ipcDataExplorer.plots['tuningCurvePlotActors'].get(active_neuron_id, None)
+            if (active_neuron_id not in ipcDataExplorer.plots['tuningCurvePlotActors']) or (_temp_neuron_id_actors is None):
+                ipcDataExplorer.plots['tuningCurvePlotActors'][active_neuron_id] = CascadingDynamicPlotsList(peaks={})
+            _temp_neuron_id_plot_data = ipcDataExplorer.plots_data['tuningCurvePlotData'].get(active_neuron_id, None)
+            if (active_neuron_id not in ipcDataExplorer.plots_data['tuningCurvePlotData']) or (_temp_neuron_id_plot_data is None):
+                ipcDataExplorer.plots_data['tuningCurvePlotData'][active_neuron_id] = {}
+
             # Determine if this aclu is present in the `active_peak_prominence_2d_results`
             if active_neuron_id in either_peak_prominence_2d_results_aclus:
                 
@@ -539,14 +547,6 @@ class LongShort3DPlacefieldsHelpers:
                 except Exception as e:
                     raise e
 
-
-                _temp_neuron_id_actors = ipcDataExplorer.plots['tuningCurvePlotActors'].get(active_neuron_id, None)
-                if (active_neuron_id not in ipcDataExplorer.plots['tuningCurvePlotActors']) or (_temp_neuron_id_actors is None):
-                    ipcDataExplorer.plots['tuningCurvePlotActors'][active_neuron_id] = CascadingDynamicPlotsList(peaks={})
-                _temp_neuron_id_plot_data = ipcDataExplorer.plots_data['tuningCurvePlotData'].get(active_neuron_id, None)
-                if (active_neuron_id not in ipcDataExplorer.plots_data['tuningCurvePlotData']) or (_temp_neuron_id_plot_data is None):
-                    ipcDataExplorer.plots_data['tuningCurvePlotData'][active_neuron_id] = {}
-                    
                 ## Initialize:
                 ipcDataExplorer.plots['tuningCurvePlotActors'][active_neuron_id]['peaks'] = {} # sets the .peaks property of the CascadingDynamicPlotsList
                 ipcDataExplorer.plots_data['tuningCurvePlotData'][active_neuron_id]['peaks'] = {}
@@ -571,8 +571,9 @@ class LongShort3DPlacefieldsHelpers:
             else:
                 # neuron_id is missing from results:
                 print(f'WARN: neuron_id: {active_neuron_id} is present in ipcDataExplorer but missing from `active_peak_prominence_2d_results`!')
-                ipcDataExplorer.plots['tuningCurvePlotActors'][active_neuron_id] = None
-                ipcDataExplorer.plots_data['tuningCurvePlotData'][active_neuron_id] = None
+                # ipcDataExplorer.plots['tuningCurvePlotActors'][active_neuron_id]['peaks'] = None
+                # ipcDataExplorer.plots_data['tuningCurvePlotData'][active_neuron_id]['peaks'] = None
+                pass
         # END for active_neuron_id in ipcDataExplorer.neuron_i...
 
         # Once done, render
