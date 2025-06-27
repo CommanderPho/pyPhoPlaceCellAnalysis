@@ -107,6 +107,452 @@ from pyphocorehelpers.gui.Qt.color_helpers import ColormapHelpers, ColorFormatCo
 
 
 
+
+
+# ==================================================================================================================================================================================================================================================================================== #
+# Long/Short 3D Placefields                                                                                                                                                                                                                                                            #
+# ==================================================================================================================================================================================================================================================================================== #
+from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.Interactive3dDisplayFunctions import Interactive3dDisplayFunctions
+from pyphoplacecellanalysis.GUI.PyVista.InteractivePlotter.InteractivePlaceCellDataExplorer import InteractivePlaceCellDataExplorer
+from pyphoplacecellanalysis.General.Pipeline.Stages.Display import get_neuron_identities
+from pyphoplacecellanalysis.General.Mixins.DataSeriesColorHelpers import DataSeriesColorHelpers
+from pyphoplacecellanalysis.General.Model.Configs.NeuronPlottingParamConfig import SingleNeuronPlottingExtended
+from pyphocorehelpers.gui.Qt.color_helpers import ColorFormatConverter
+from pyphoplacecellanalysis.PhoPositionalData.plotting.placefield import plot_placefields2D, update_plotColorsPlacefield2D
+from pyphoplacecellanalysis.General.Model.Configs.NeuronPlottingParamConfig import NeuronConfigOwningMixin
+from pyphocorehelpers.gui.PyVista.CascadingDynamicPlotsList import CascadingDynamicPlotsList
+
+# curr_active_pipeline.reload_default_display_functions()
+# _out = dict()
+
+class LongShort3DPlacefieldsHelpers:
+    """ 
+
+    from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import LongShort3DPlacefieldsHelpers
+
+    """
+    @classmethod
+    def _build_merged_long_short_pf2D_neuron_identities(cls, long_pf2D, short_pf2D, should_preview_colors: bool=False):
+        """ builds the merged colors and neuron identities for plotting both the long and short track placefields
+        Usage:
+            ## INPUTS: long_pf2D, short_pf2D
+            (long_or_short_colors_dict, long_pf_colors, short_pf_colors), neuron_plotting_configs_dict = _build_merged_long_short_pf2D_neuron_identities(long_pf2D=long_pf2D, short_pf2D=short_pf2D)
+            list(neuron_plotting_configs_dict.values())[0].qcolor
+            list(neuron_plotting_configs_dict.values())[0].color
+            neuron_plotting_configs_dict
+        """
+        # INPUTS: global_pf2D, long_pf2D, short_pf2D
+        long_pf_neuron_identities, pf_sort_ind, pf_colors, pf_colormap, pf_listed_colormap = get_neuron_identities(long_pf2D)
+        long_pf_aclus = set([int(v.extended_identity_tuple.aclu) for v in long_pf_neuron_identities])
+
+        short_pf_neuron_identities, pf_sort_ind, pf_colors, pf_colormap, pf_listed_colormap = get_neuron_identities(short_pf2D)
+        short_pf_aclus = set([int(v.extended_identity_tuple.aclu) for v in short_pf_neuron_identities])
+        long_or_short_neuron_identities = long_pf_aclus.union(short_pf_aclus)
+        # long_or_short_aclus = np.unique(np.array([int(v.aclu) for v in long_or_short_neuron_identities]))
+        long_or_short_aclus = np.unique(np.array([int(v) for v in long_or_short_neuron_identities]))
+
+        n_neurons: int = len(long_or_short_aclus)
+        neuron_qcolors_list, neuron_colors_ndarray = DataSeriesColorHelpers.build_cell_colors(n_neurons, colormap_name='PAL-relaxed_bright', colormap_source=None, return_255_array=False)
+
+        ## Preview the new colors
+        if should_preview_colors:
+            from pyphocorehelpers.gui.Jupyter.simple_widgets import render_colors
+            render_colors([ColorFormatConverter.qColor_to_hexstring(a_qcolor, include_alpha=False) for a_qcolor in neuron_qcolors_list])
+
+        # neuron_colors_ndarray.shape
+        long_or_short_colors_dict = dict(zip(long_or_short_aclus, neuron_colors_ndarray.T))
+
+        # ipcDataExplorer.params.pf_colors.shape # (4, 52)
+
+        long_pf_colors = np.vstack([long_or_short_colors_dict[aclu] for aclu in long_pf_aclus]).T
+        short_pf_colors = np.vstack([long_or_short_colors_dict[aclu] for aclu in short_pf_aclus]).T
+        # long_or_short_colors_array = np.vstack(long_or_short_colors_dict.values()).T
+        # long_pf_colors.shape # (50, 4)
+        neuron_plotting_configs_dict: Dict[int, SingleNeuronPlottingExtended] = DataSeriesColorHelpers.build_cell_display_configs(long_or_short_aclus, neuron_qcolors_list=neuron_qcolors_list)
+        
+        ## OUTPUTS: long_pf_colors, short_pf_colors
+        return (long_or_short_colors_dict, long_pf_colors, short_pf_colors), neuron_plotting_configs_dict
+
+
+
+    @function_attributes(short_name=None, tags=['plot', 'long-short'], input_requires=[], output_provides=[], uses=['_build_merged_long_short_pf2D_neuron_identities'], used_by=[], creation_date='2025-06-27 00:50', related_items=[])
+    @classmethod
+    def _plot_long_short_placefields(cls, ipcDataExplorer, long_pf2D, short_pf2D, maze_y_offset: float = 20.0, enable_update_spikes: bool=False):
+        """ 
+        Usage:
+            from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import LongShort3DPlacefieldsHelpers
+            from pyphoplacecellanalysis.GUI.PyVista.InteractivePlotter.InteractivePlaceCellDataExplorer import InteractivePlaceCellDataExplorer
+
+            curr_active_pipeline.reload_default_display_functions()
+            _out = {}
+            global_any_context = curr_active_pipeline.filtered_contexts[global_any_name]
+            _out['_display_3d_interactive_tuning_curves_plotter'] = curr_active_pipeline.display(display_function='_display_3d_interactive_tuning_curves_plotter', active_session_configuration_context=global_any_context,
+                                                                                                separate_window = False,
+                                                                                                params_kwargs={'show_legend': False, 'should_display_placefield_points': False, 'should_nan_non_visited_elements': False, 'zScalingFactor': 500.0},
+                                                                                                #  panel_controls_mode = 'Panel',
+                                                                                                # panel_controls_mode = 'Qt',
+                                                                                                panel_controls_mode = None,
+                                                                                                ) # _display_grid_bin_bounds_validation
+
+            ## Move the long-maze to -`maze_y_offset` units and the short-maze to +`maze_y_offset` units along the y-axis 
+            ipcDataExplorer: InteractivePlaceCellDataExplorer = _out['_display_3d_interactive_tuning_curves_plotter']['ipcDataExplorer']
+            pActiveTuningCurvesPlotter = _out['_display_3d_interactive_tuning_curves_plotter']['plotter']
+            pane = _out['_display_3d_interactive_tuning_curves_plotter']['pane']
+            pane = LongShort3DPlacefieldsHelpers._plot_long_short_placefields(ipcDataExplorer=ipcDataExplorer, long_pf2D=long_pf2D, short_pf2D=short_pf2D)
+
+        """
+        ## Remove old placefields:
+        ipcDataExplorer.remove_all_rendered_placefields()
+        
+        ## Adjust mazes
+        long_maze_bg = ipcDataExplorer.long_maze_bg
+        short_maze_bg = ipcDataExplorer.short_maze_bg
+
+        long_y_offset: float = -maze_y_offset
+        short_y_offset: float = maze_y_offset
+
+        long_maze_bg.SetPosition(0.0, long_y_offset, 0.0)
+        short_maze_bg.SetPosition(0.0, short_y_offset, 0.0)
+
+
+        ## INPUTS: long_pf2D, short_pf2D
+        (long_or_short_colors_dict, long_pf_colors, short_pf_colors), neuron_plotting_configs_dict = cls._build_merged_long_short_pf2D_neuron_identities(long_pf2D=long_pf2D, short_pf2D=short_pf2D)
+
+        ## OUTPUTS: long_pf_colors, short_pf_colors, neuron_plotting_configs_dict
+        ipcDataExplorer.params.zScalingFactor = 500.0
+        ipcDataExplorer.params.show_legend = False
+        ipcDataExplorer.params.should_display_placefield_points = False
+        ipcDataExplorer.params.should_nan_non_visited_elements = False
+        # ipcDataExplorer.params.
+
+        # {'show_legend': False, 'should_display_placefield_points': False, 'should_nan_non_visited_elements': False, 'zScalingFactor': 500.0}
+        # ==================================================================================================================================================================================================================================================================================== #
+        # Begin Plotting Part                                                                                                                                                                                                                                                                  #
+        # ==================================================================================================================================================================================================================================================================================== #
+
+        ## INPUTS: ipcDataExplorer, pActiveTuningCurvesPlotter
+        # INPUTS: global_pf2D, long_pf2D, short_pf2D
+        _temp_input_params = get_dict_subset(ipcDataExplorer.params, ['should_use_normalized_tuning_curves','should_pdf_normalize_manually','should_nan_non_visited_elements','should_force_placefield_custom_color','should_display_placefield_points', 'should_override_disable_smooth_shading', 'nan_opacity',
+                                                'zScalingFactor', 'show_legend'])
+
+        # _temp_input_params['clip_below_plane'] = 1 # 0.5 * ipcDataExplorer.params.zScalingFactor
+
+        _temp_input_params['clip_below_plane'] = 0.6 # 0.2 * ipcDataExplorer.params.zScalingFactor
+        _temp_input_params['clip_below_plane']
+
+        # ipcDataExplorer.p, ipcDataExplorer.plots['tuningCurvePlotActors'], ipcDataExplorer.plots_data['tuningCurvePlotData'], ipcDataExplorer.plots['tuningCurvePlotLegendActor'], temp_plots_data = plot_placefields2D(ipcDataExplorer.p, deepcopy(long_pf2D), pf_colors=ipcDataExplorer.params.pf_colors, zScalingFactor=ipcDataExplorer.params.zScalingFactor, show_legend=ipcDataExplorer.params.show_legend, series_prefix='long' **_temp_input_params) # note that the get_dict_subset(...) thing is just a safe way to get only the relevant members.
+        ## INPUTS: long_pf_colors, short_pf_colors
+        # ipcDataExplorer.p, ipcDataExplorer.plots['tuningCurvePlotActors'], ipcDataExplorer.plots_data['tuningCurvePlotData'], ipcDataExplorer.plots['tuningCurvePlotLegendActor'], temp_plots_data = plot_placefields2D(ipcDataExplorer.p, active_placefields=deepcopy(long_pf2D), pf_colors=long_pf_colors, zScalingFactor=ipcDataExplorer.params.zScalingFactor, show_legend=ipcDataExplorer.params.show_legend, series_prefix='long' **_temp_input_params) # note that the get_dict_subset(...) thing is just a safe way to get only the relevant members.
+
+        ## Long Track pfs:
+        _long_outs = plot_placefields2D(ipcDataExplorer.p, active_placefields=deepcopy(long_pf2D), pf_colors=long_pf_colors, series_prefix='long', clip_bounds=long_maze_bg.GetBounds(), **_temp_input_params)
+        p, long_tuningCurvePlotActors, long_tuningCurvePlotData, long_tuningCurvePlotLegendActor, long_temp_plots_data = _long_outs
+        for k, a_nested_actors_dict in long_tuningCurvePlotActors.items():
+            # print(f'k: {k}, v: {v}')
+            for a_subactor_key, a_subactor in a_nested_actors_dict.items():
+                if a_subactor is not None:
+                    a_subactor.SetPosition(0.0, -maze_y_offset, 0.0) ## long offset
+                else:
+                    # print(f'[{k}][{a_subactor_key}] is None!')
+                    pass
+
+        ## Short Track pfs:
+        _short_outs = plot_placefields2D(ipcDataExplorer.p, active_placefields=deepcopy(short_pf2D), pf_colors=short_pf_colors, series_prefix='short', clip_bounds=short_maze_bg.GetBounds(), **_temp_input_params) 
+        p, short_tuningCurvePlotActors, short_tuningCurvePlotData, short_tuningCurvePlotLegendActor, short_temp_plots_data = _short_outs
+        for k, a_nested_actors_dict in short_tuningCurvePlotActors.items():
+            # print(f'k: {k}, v: {v}')
+            for a_subactor_key, a_subactor in a_nested_actors_dict.items():
+                if a_subactor is not None:
+                    a_subactor.SetPosition(0.0, maze_y_offset, 0.0) ## short offset
+                else:
+                    # print(f'[{k}][{a_subactor_key}] is None!')
+                    pass
+                
+
+        
+        # ==================================================================================================================================================================================================================================================================================== #
+        # Update Combined Variables                                                                                                                                                                                                                                                            #
+        # ==================================================================================================================================================================================================================================================================================== #
+        ## Combine long/short entries:
+        combined_paired_dict = {}
+        combined_tuningCurvePlotActors = {}
+        combined_tuningCurvePlotData = {}
+        combined_temp_plots_data = {}
+
+        is_flat_key_mode: bool = False
+        ## INPUTS: long_tuningCurvePlotActors, long_tuningCurvePlotData, long_temp_plots_data
+        ## INPUTS: short_tuningCurvePlotActors, short_tuningCurvePlotData, short_temp_plots_data
+
+        ## INPUTS: long_temp_plots_data, long_temp_plots_data
+
+        ## Plots Actors:
+        for k, a_nested_actors_dict in long_tuningCurvePlotActors.items():
+            # print(f'k: {k}, v: {a_nested_actors_dict}')
+            combined_key: str = f'long_{k}'
+            combined_paired_dict[k] = {'long': combined_key, 'short': None}
+                
+            if is_flat_key_mode:
+                combined_tuningCurvePlotActors[combined_key] = a_nested_actors_dict
+            else:
+                combined_tuningCurvePlotActors[k] = {'long': a_nested_actors_dict}
+                a_short_nested_actors_dict = short_tuningCurvePlotActors.get(k, None)
+                if a_short_nested_actors_dict is not None:
+                    combined_tuningCurvePlotActors[k]['short'] = a_short_nested_actors_dict
+
+        for k, a_nested_actors_dict in short_tuningCurvePlotActors.items():
+            # print(f'k: {k}, v: {a_nested_actors_dict}')
+            combined_key: str = f'short_{k}'
+            if k not in combined_paired_dict:
+                combined_paired_dict[k] = {'long': None, 'short': combined_key} ## create a new entry
+            else:
+                ## already in there    
+                # combined_paired_dict.setdefault(k, {'long': None, 'short': a_nested_actors_dict})
+                combined_paired_dict[k]['short'] = combined_key
+                
+            if is_flat_key_mode:
+                combined_tuningCurvePlotActors[combined_key] = a_nested_actors_dict
+            else:
+                ## handle keys only in short
+                if (k not in combined_tuningCurvePlotActors) and (a_nested_actors_dict is not None):
+                    combined_tuningCurvePlotActors[k] = {'short': a_nested_actors_dict}
+
+
+        combined_tuningCurvePlotActors = {k:CascadingDynamicPlotsList(**v) for k, v in combined_tuningCurvePlotActors.items()} ## convert each child to a CascadingDynamicPlotsList
+
+        ## Plots Data:
+        ## INPUTS: long_tuningCurvePlotData, short_tuningCurvePlotData
+
+        combined_tuningCurvePlotData = {}
+        for k, a_nested_plots_data in long_tuningCurvePlotData.items():
+            # print(f'k: {k}, v: {a_nested_actors_dict}')
+            combined_key: str = f'long_{k}'
+            if is_flat_key_mode:
+                combined_tuningCurvePlotData[combined_key] = a_nested_plots_data
+            else:
+                combined_tuningCurvePlotData[k] = {'long': a_nested_plots_data}
+                a_short_data = short_tuningCurvePlotData.get(k, None)
+                if a_short_data is not None:
+                    combined_tuningCurvePlotData[k]['short'] = a_short_data
+
+        for k, a_nested_plots_data in short_tuningCurvePlotData.items():
+            # print(f'k: {k}, v: {a_nested_actors_dict}')
+            combined_key: str = f'short_{k}'
+            if is_flat_key_mode:
+                combined_tuningCurvePlotData[combined_key] = a_nested_plots_data
+            else:
+                ## handle keys only in short
+                if (k not in combined_tuningCurvePlotData) and (a_nested_plots_data is not None):
+                    combined_tuningCurvePlotData[k] = {'short': a_nested_plots_data}
+
+
+        ## Other Data:
+        ## INPUTS: long_temp_plots_data, short_temp_plots_data
+        combined_temp_plots_data = {}
+        for k, v in long_temp_plots_data.items():
+            combined_temp_plots_data[k] = list(v)
+
+        for k, v in short_temp_plots_data.items():
+            if k in combined_temp_plots_data:
+                combined_temp_plots_data[k].extend(v)
+            else:
+                print(F'WARN: k: {k} missing from combined_temp_plots_data. combined_temp_plots_data.keys(): {list(combined_temp_plots_data.keys())}')
+                combined_temp_plots_data[k] = v
+            
+
+        ## Update spikes:
+        combined_spikes_df: pd.DataFrame = pd.concat([long_pf2D.spikes_df, short_pf2D.spikes_df], axis='index', ignore_index=True).drop_duplicates(subset=['t_rel_seconds'])
+        if enable_update_spikes:
+            ipcDataExplorer._spikes_df = combined_spikes_df
+        
+        ## OUTPUTS: combined_paired_dict, combined_tuningCurvePlotActors, combined_tuningCurvePlotData, combined_temp_plots_data, combined_spikes_df
+
+        ipcDataExplorer.params.combined_paired_dict = combined_paired_dict
+        ipcDataExplorer.plots['tuningCurvePlotActors'] = combined_tuningCurvePlotActors
+        ipcDataExplorer.plots_data['tuningCurvePlotData'] = combined_tuningCurvePlotData
+        # ipcDataExplorer.plots['tuningCurvePlotLegendActor'] = combined_tuningCurvePlotActors
+
+        # Build the widget labels:
+        ipcDataExplorer.params.unit_labels = combined_temp_plots_data['unit_labels'] # fetch the unit labels from the extra data dict.
+        ipcDataExplorer.params.pf_fragile_linear_neuron_IDXs = combined_temp_plots_data['good_placefield_neuronIDs'] # fetch the unit labels from the extra data dict.
+        ## Legend data:
+        ipcDataExplorer.plots_data['tuningCurvePlotLegendData'] = combined_temp_plots_data['legend_entries']
+
+        ## build combined legend
+        ipcDataExplorer.plots['tuningCurvePlotLegendActor'] = ipcDataExplorer.p.add_legend(ipcDataExplorer.plots_data['tuningCurvePlotLegendData'], name='tuningCurvesLegend', 
+                            bcolor=(0.05, 0.05, 0.05), border=True,
+                            loc='center right', size=[0.05, 0.85]) # vtk.vtkLegendBoxActor
+
+
+        ## Update: `self.params.pf_active_configs`
+        ## INPUTS: neuron_plotting_configs_dict
+        # ipcDataExplorer.params.pf_active_configs ## replace
+        ipcDataExplorer.params.pf_active_configs = list(neuron_plotting_configs_dict.values())
+        # ipcDataExplorer.active_neuron_render_configs = 
+        ipcDataExplorer.active_neuron_render_configs_map = NeuronConfigOwningMixin._build_id_index_configs_dict(ipcDataExplorer.active_neuron_render_configs)
+        # n_cells: int = len(ipcDataExplorer.active_neuron_render_configs_map)
+        n_cells: int = len(ipcDataExplorer.params.pf_active_configs)
+        
+        ## UPDATES: ipcDataExplorer.params.neuron_colors, ipcDataExplorer.params.neuron_colors_hex
+        print(f'n_cells: {n_cells}')
+        
+        # allocate new neuron_colors array:
+        # ipcDataExplorer.params.neuron_colors = np.zeros((4, n_cells))
+        # for i, curr_config in enumerate(ipcDataExplorer.params.pf_active_configs):
+        #     curr_qcolor = curr_config.qcolor
+        #     curr_color = curr_qcolor.getRgbF() # (1.0, 0.0, 0.0, 0.5019607843137255)
+        #     ipcDataExplorer.params.neuron_colors[:, i] = curr_color[:]
+        #     # self.params.neuron_colors[:, i] = curr_color[:]
+        
+        long_or_short_colors_array = np.vstack(long_or_short_colors_dict.values()).T
+        print(f'np.shape(long_or_short_colors_array): {np.shape(long_or_short_colors_array)}')
+        
+        ipcDataExplorer.params.neuron_colors = long_or_short_colors_array
+        ipcDataExplorer.params.neuron_colors_hex = [v.color for v in list(neuron_plotting_configs_dict.values())]
+
+        ## Called to setup spikes
+        if enable_update_spikes:
+            ipcDataExplorer.setup_spike_rendering_mixin()
+            # ipcDataExplorer._build_flat_color_data()
+            # ipcDataExplorer.plot_spikes()
+            
+        
+        # ==================================================================================================================================================================================================================================================================================== #
+        # Post-update rebuilding widgets and such:                                                                                                                                                                                                                                             #
+        # ==================================================================================================================================================================================================================================================================================== #
+        # Update the ipcDataExplorer's colors for spikes and placefields from its configs on init:
+        defer_update: bool = False
+        # defer_update: bool = True # defer_update=True to prevent self.update_spikes(...) from being erroniously called
+        # ipcDataExplorer.on_config_update({neuron_id:a_config.color for neuron_id, a_config in ipcDataExplorer.active_neuron_render_configs_map.items()}, defer_update=False)
+        ipcDataExplorer.on_config_update({neuron_id:a_config.color for neuron_id, a_config in ipcDataExplorer.active_neuron_render_configs_map.items()}, defer_update=defer_update) 
+    
+
+        ipcDataExplorer.params.panel_controls_mode = None ## override
+        # ipcDataExplorer.params.panel_controls_mode = 'Qt' ## override
+        ipcDataExplorer.params.should_use_separate_window = False ## override
+        
+        # build the output panels if desired:
+        if ipcDataExplorer.params.panel_controls_mode == 'Qt':
+            # Qt-based Placefield controls:
+            from pyphoplacecellanalysis.GUI.Qt.PlacefieldVisualSelectionControls.qt_placefield import build_all_placefield_output_panels
+            from pyphocorehelpers.gui.Qt.widget_positioning_helpers import WidgetPositioningHelpers, DesiredWidgetLocation, WidgetGeometryInfo
+            
+            ## try to remove extant controls
+            placefieldControlsContainerWidget = ipcDataExplorer.ui.pop('placefieldControlsContainerWidget', None)
+            if placefieldControlsContainerWidget is not None:
+                print(f'removing extant Qt controls...')
+                placefieldControlsContainerWidget.close()
+                print(f'done.')        
+
+            # pane: (placefieldControlsContainerWidget, pf_widgets)
+            placefieldControlsContainerWidget, pf_widgets = build_all_placefield_output_panels(ipcDataExplorer)
+            placefieldControlsContainerWidget.show()
+            
+            # Adds the placefield controls container widget and each individual pf widget to the ipcDataExplorer.ui in case it needs to reference them later:
+            ipcDataExplorer.ui['placefieldControlsContainerWidget'] = placefieldControlsContainerWidget
+            
+            # Visually align the widgets:
+            WidgetPositioningHelpers.align_window_edges(ipcDataExplorer.p, placefieldControlsContainerWidget, relative_position = 'above', resize_to_main=(1.0, None))
+            
+            # Wrap:
+            if not ipcDataExplorer.params.should_use_separate_window:
+                from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.DockAreaWrapper import DockAreaWrapper
+                
+                active_root_main_widget = ipcDataExplorer.p.window()
+                root_dockAreaWindow, app = DockAreaWrapper.wrap_with_dockAreaWindow(active_root_main_widget, placefieldControlsContainerWidget, title=ipcDataExplorer.data_explorer_name)
+            else:
+                print(f'Skipping separate window because should_use_separate_window == True')
+                root_dockAreaWindow = None
+            pane = (root_dockAreaWindow, placefieldControlsContainerWidget, pf_widgets)
+            
+        elif ipcDataExplorer.params.panel_controls_mode == 'Panel':        
+            ### Build Dynamic Panel Interactive Controls for configuring Placefields:
+            # Panel library based Placefield controls
+            from pyphoplacecellanalysis.GUI.Panel.panel_placefield import build_panel_interactive_placefield_visibility_controls
+            pane = build_panel_interactive_placefield_visibility_controls(ipcDataExplorer)
+        else:
+            # no controls
+            pane = None
+            # pass
+        
+        ipcDataExplorer.p.update()
+        ipcDataExplorer.p.render() 
+
+        return pane
+
+
+    @function_attributes(short_name=None, tags=['long-short', 'display', '3D', 'pf', 'peaks', 'promienence', 'ratemap'], input_requires=[], output_provides=[], uses=['_render_peak_prominence_2d_results_on_pyvista_plotter'], used_by=[], creation_date='2025-06-27 04:10', related_items=['pyphoplacecellanalysis.Pho3D.PyVista.peak_prominences.render_all_neuron_peak_prominence_2d_results_on_pyvista_plotter'])
+    @classmethod
+    def render_all_neuron_peak_prominence_2d_results_on_pyvista_plotter(cls, ipcDataExplorer, long_peak_prominence_2d_results, short_peak_prominence_2d_results, debug_print=False, **kwargs):
+        """
+        Computes the appropriate contour/peaks/rectangle/etc components for each neuron_id using the active_peak_prominence_2d_results and uses them to create new:
+        Inputs:
+            `ipcDataExplorer`: a valid and activate 3D Interactive Tuning Curves Plotter instance, as would be produced by calling `curr_active_pipeline.display('_display_3d_interactive_tuning_curves_plotter', ...)`
+            `active_peak_prominence_2d_results`: the computed results from the 'PeakProminence2D' computation stage.
+            
+        Provides: 
+            Modifies ipcDataExplorer's `.plots['tuningCurvePlotActors']` and `.plots_data['tuningCurvePlotActors']` properties just like endogenous ipcDataExplorer functions do.
+            FOR EACH neuron_id -> active_neuron_id:
+                ipcDataExplorer.plots['tuningCurvePlotActors'][active_neuron_id].peaks: a hierarchy of nested CascadingDynamicPlotsList objects
+                ipcDataExplorer.plots_data['tuningCurvePlotData'][active_neuron_id]['peaks']: a series of nested-dicts with the same key hierarchy as the above peaks
+            
+        Usage:
+        
+            from pyphoplacecellanalysis.Pho3D.PyVista.peak_prominences.render_all_neuron_peak_prominence_2d_results_on_pyvista_plotter
+            
+            display_output = {}
+            active_config_name = long_LR_name
+            print(f'active_config_name: {active_config_name}')
+            active_peak_prominence_2d_results = curr_active_pipeline.computation_results[active_config_name].computed_data.get('RatemapPeaksAnalysis', {}).get('PeakProminence2D', None)
+            pActiveTuningCurvesPlotter = None
+            display_output = display_output | curr_active_pipeline.display('_display_3d_interactive_tuning_curves_plotter', active_config_name, extant_plotter=display_output.get('pActiveTuningCurvesPlotter', None), panel_controls_mode='Qt', should_nan_non_visited_elements=False, zScalingFactor=2000.0) # Works now!
+            ipcDataExplorer = display_output['ipcDataExplorer']
+            display_output['pActiveTuningCurvesPlotter'] = display_output.pop('plotter') # rename the key from the generic "plotter" to "pActiveSpikesBehaviorPlotter" to avoid collisions with others
+            pActiveTuningCurvesPlotter = display_output['pActiveTuningCurvesPlotter']
+            root_dockAreaWindow, placefieldControlsContainerWidget, pf_widgets = display_output['pane'] # for Qt mode
+
+            active_peak_prominence_2d_results = curr_active_pipeline.computation_results[active_config_name].computed_data.get('RatemapPeaksAnalysis', {}).get('PeakProminence2D', None)
+            render_all_neuron_peak_prominence_2d_results_on_pyvista_plotter(ipcDataExplorer, active_peak_prominence_2d_results)
+            
+        """
+        from pyphoplacecellanalysis.Pho3D.PyVista.peak_prominences import render_all_neuron_peak_prominence_2d_results_on_pyvista_plotter, _render_peak_prominence_2d_results_on_pyvista_plotter
+        
+        active_peak_prominence_2d_results_aclus = np.array(list(active_peak_prominence_2d_results.results.keys()))
+
+        for active_neuron_id in ipcDataExplorer.neuron_ids:
+            if debug_print:
+                print(f'processing active_neuron_id: {active_neuron_id}...')
+            # Determine if this aclu is present in the `active_peak_prominence_2d_results`
+            if active_neuron_id in active_peak_prominence_2d_results_aclus:
+                all_peaks_data, all_peaks_actors = _render_peak_prominence_2d_results_on_pyvista_plotter(ipcDataExplorer, active_peak_prominence_2d_results, valid_neuron_id=active_neuron_id, render=False, debug_print=debug_print, **kwargs)
+                try:
+                    tuning_curve_is_visible = ipcDataExplorer.plots['tuningCurvePlotActors'][active_neuron_id].main.GetVisibility() # either 0 or 1 depending on the visibility of this cell
+                except (KeyError, ValueError) as e:
+                    ## get from the configs:
+                    tuning_curve_is_visible: int = int(ipcDataExplorer.active_neuron_render_configs_map[active_neuron_id].isVisible)            
+                except Exception as e:
+                    raise e
+                all_peaks_actors.SetVisibility(tuning_curve_is_visible) # Change the visibility to match the current tuning_curve_visibility_state
+                ipcDataExplorer.plots['tuningCurvePlotActors'][active_neuron_id].peaks = all_peaks_actors # sets the .peaks property of the CascadingDynamicPlotsList
+                ipcDataExplorer.plots_data['tuningCurvePlotData'][active_neuron_id]['peaks'] = all_peaks_data
+            else:
+                # neuron_id is missing from results:
+                print(f'WARN: neuron_id: {active_neuron_id} is present in ipcDataExplorer but missing from `active_peak_prominence_2d_results`!')
+                ipcDataExplorer.plots['tuningCurvePlotActors'][active_neuron_id] = None
+                ipcDataExplorer.plots_data['tuningCurvePlotData'][active_neuron_id] = None
+        # END for active_neuron_id in ipcDataExplorer.neuron_i...
+
+        # Once done, render
+        ipcDataExplorer.p.render()
+        
+        if debug_print:
+            print('done.')
+            
+        return ipcDataExplorer
+
+# ==================================================================================================================================================================================================================================================================================== #
+# Time Bin Categorization                                                                                                                                                                                                                                                              #
+# ==================================================================================================================================================================================================================================================================================== #
+
 import numpy as np
 import itertools
 from typing import List, Tuple, Dict
