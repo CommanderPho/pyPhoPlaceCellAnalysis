@@ -2483,9 +2483,6 @@ class TrackRemappingDiagramFigure:
         from pyphoplacecellanalysis.Pho2D.track_shape_drawing import AclusYOffsetMode
         from neuropy.core.user_annotations import UserAnnotationsManager
 
-
-
-
         ## INPUTS: all_neuron_stats_table
         
         if use_considerable_remapping_cells_only:
@@ -2507,9 +2504,13 @@ class TrackRemappingDiagramFigure:
         # any_1D_column_names = ['long_LR_pf1D_peak', 'long_RL_pf1D_peak', 'short_LR_pf1D_peak', 'short_RL_pf1D_peak']
         # any_1D_column_names = ['long_LR_pf1D_peak', 'long_RL_pf1D_peak', 'short_LR_pf1D_peak', 'short_RL_pf1D_peak']
 
-        # decoder_name_suffix: str = 'pf1D_peak'
+
         # use_pf2D: bool = False
-        decoder_name_suffix: str = 'pf2D_peak_x'
+        if use_pf2D_peaks:
+            decoder_name_suffix: str = 'pf2D_peak_x'
+        else:
+            decoder_name_suffix: str = 'pf1D_peak'
+
         LR_only_column_names = [f"{a_name}_{decoder_name_suffix}" for a_name in LR_only_column_base_names]
         RL_only_column_names = [f"{a_name}_{decoder_name_suffix}" for a_name in RL_only_column_base_names]
         # any_1D_column_names = [f"{a_name}_{decoder_name_suffix}" for a_name in ('long_LR', 'long_RL', 'short_LR', 'short_RL')]
@@ -2565,8 +2566,8 @@ class TrackRemappingDiagramFigure:
 
         ## Make a single figure for both LR/RL remapping cells:
         kwargs = dict(is_dark_mode=False, enable_interactivity=False, defer_render=True,
-                    # aclus_y_offset_mode=AclusYOffsetMode.RandomJitter,
-                    aclus_y_offset_mode=AclusYOffsetMode.CountBased,
+                    aclus_y_offset_mode=AclusYOffsetMode.RandomJitter,
+                    # aclus_y_offset_mode=AclusYOffsetMode.CountBased,
                     
                     )
         
