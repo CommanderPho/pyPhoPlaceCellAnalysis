@@ -2445,10 +2445,37 @@ class TrackRemappingDiagramFigure:
     @function_attributes(short_name=None, tags=['figure', 'publication', 'figure1'], input_requires=[], output_provides=[], uses=['_plot_track_remapping_diagram', 'perform_update_title_subtitle', 'build_or_reuse_figure'], used_by=[], creation_date='2025-06-16 20:44', related_items=[])
     @classmethod
     def plot_publication_bidirectional_track_remapping_diagram(cls, all_neuron_stats_table, use_considerable_remapping_cells_only: bool=False, use_pf2D_peaks: bool = False, **kwargs):
-        """ 
-        from pyphoplacecellanalysis.Pho2D.track_shape_drawing import plot_publication_bidirectional_track_remapping_diagram
-        
-        
+        """ Plots the neuron remapping diagram
+                
+        from pyphoplacecellanalysis.SpecificResults.AcrossSessionResults import AcrossSessionsResults # for .build_neuron_identities_df_for_CSV
+        from pyphoplacecellanalysis.Pho2D.track_shape_drawing import TrackRemappingDiagramFigure
+
+        # 2025-06-09 18:22 - Added combined output helper:        
+        all_neuron_stats_table: pd.DataFrame = AcrossSessionsResults.build_neuron_identities_df_for_CSV(curr_active_pipeline=curr_active_pipeline)
+        active_scatter_all_neuron_stats_table: pd.DataFrame = deepcopy(all_neuron_stats_table).fillna(value=np.nan, inplace=False) ## fill all Pandas.NA values with np.nan so they can be correctly cast to floats
+        active_scatter_all_neuron_stats_table
+
+        use_pf2D_peaks: bool = False
+
+        # ## required to add the '_rel' version of the '_y' columns (only needed for `use_pf2D_peaks=True` mode
+        # use_pf2D_peaks: bool = True
+        # y_baseline: float = long_pf2D.ybin[0] # 86.33093525179856
+        # y_span: float = np.ptp(long_pf2D.ybin) # 115.10791366906471
+        # # OUTPUTS: y_baseline, y_span
+        # pf2D_peak_y_column_names = [k for k in active_scatter_all_neuron_stats_table.columns if k.endswith('_pf2D_peak_y')]
+        # pf2D_rel_peak_y_column_names = [f'{k}_rel' for k in pf2D_peak_y_column_names]
+        # active_scatter_all_neuron_stats_table[pf2D_rel_peak_y_column_names] = (active_scatter_all_neuron_stats_table[pf2D_peak_y_column_names] - y_baseline) / y_span
+        # active_scatter_all_neuron_stats_table
+
+        _fig_container = TrackRemappingDiagramFigure.plot_publication_bidirectional_track_remapping_diagram(all_neuron_stats_table=active_scatter_all_neuron_stats_table,
+            use_pf2D_peaks=use_pf2D_peaks, use_considerable_remapping_cells_only=True,
+            common_circle_points_kwargs = dict(alpha=0.9, picker=False, plotnonfinite=False),
+            common_BOTH_only_circle_points_kwargs = dict(alpha=0.6, picker=False, plotnonfinite=False, marker='o', zorder=9),	
+            arrowprops_kwargs = dict(arrowstyle="fancy, head_length=0.25, head_width=0.25, tail_width=0.05", alpha=0.6, zorder=1),
+        )
+        _fig_container
+
+
         """
         from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.ContainerBased.PhoContainerTool import GenericMatplotlibContainer
         from matplotlib.gridspec import GridSpec
