@@ -155,7 +155,8 @@ class TimeSynchronizedPositionDecoderPlotter(AnimalTrajectoryPlottingMixin, Time
         curr_time_window_index = self.last_window_index
         curr_t = self.last_window_time
         
-        if curr_time_window_index is None or curr_t is None:
+        if (curr_time_window_index is None) or (curr_t is None):
+            print(f'WARN: TimeSynchronizedPositionDecoderPlotter._update_plots: curr_time_window_index: {curr_time_window_index}')
             return # return without updating
         
         # self.posterior_variable_to_render: allowed values: ['p_x_given_n', 'p_x_given_n_and_x_prev', ...]
@@ -184,7 +185,7 @@ class TimeSynchronizedPositionDecoderPlotter(AnimalTrajectoryPlottingMixin, Time
         else:
             self.ui.imv.setImage(image, rect=self.params.image_bounds_extent, axisOrder=self.params.shared_axis_order)
         
-        self.AnimalTrajectoryPlottingMixin_update_plots()
+        # self.AnimalTrajectoryPlottingMixin_update_plots()
         
         # self.setWindowTitle(f'{self.windowName} - {image_title} t = {curr_t}')
         self.setWindowTitle(f'TimeSynchronizedPositionDecoderPlotter - {image_title} t = {curr_t}')
