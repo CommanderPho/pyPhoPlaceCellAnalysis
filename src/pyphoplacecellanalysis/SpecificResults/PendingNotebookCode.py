@@ -209,9 +209,14 @@ class LongShort3DPlacefieldsHelpers:
         long_maze_bg = ipcDataExplorer.long_maze_bg
         short_maze_bg = ipcDataExplorer.short_maze_bg
 
+        ipcDataExplorer.params.maze_y_offset = maze_y_offset
+        
         long_y_offset: float = -maze_y_offset
         short_y_offset: float = maze_y_offset
 
+        ipcDataExplorer.params.long_y_offset = long_y_offset
+        ipcDataExplorer.params.short_y_offset = short_y_offset
+        
         long_maze_bg.SetPosition(0.0, long_y_offset, 0.0)
         short_maze_bg.SetPosition(0.0, short_y_offset, 0.0)
 
@@ -220,10 +225,16 @@ class LongShort3DPlacefieldsHelpers:
         (long_or_short_colors_dict, long_pf_colors, short_pf_colors), neuron_plotting_configs_dict = cls._build_merged_long_short_pf2D_neuron_identities(long_pf2D=long_pf2D, short_pf2D=short_pf2D)
 
         ## OUTPUTS: long_pf_colors, short_pf_colors, neuron_plotting_configs_dict
-        ipcDataExplorer.params.zScalingFactor = 500.0
+        # ipcDataExplorer.params.zScalingFactor = 500.0
+        ipcDataExplorer.params.zScalingFactor = 2000.0
         ipcDataExplorer.params.show_legend = False
         ipcDataExplorer.params.should_display_placefield_points = False
+        # ipcDataExplorer.params.should_display_placefield_points = True
+
         ipcDataExplorer.params.should_nan_non_visited_elements = False
+        # ipcDataExplorer.params.should_nan_non_visited_elements = True
+        
+        
         # ipcDataExplorer.params.
 
         # {'show_legend': False, 'should_display_placefield_points': False, 'should_nan_non_visited_elements': False, 'zScalingFactor': 500.0}
@@ -562,13 +573,30 @@ class LongShort3DPlacefieldsHelpers:
                     ipcDataExplorer.plots['tuningCurvePlotActors'][active_neuron_id]['peaks']['long'] = long_all_peaks_actors
                     ipcDataExplorer.plots_data['tuningCurvePlotData'][active_neuron_id]['peaks']['long'] = long_all_peaks_data
                     long_all_peaks_actors.SetVisibility(tuning_curve_is_visible) # Change the visibility to match the current tuning_curve_visibility_state
-                    
+                    for k, a_nested_actors_dict in long_all_peaks_actors.items():
+                        # print(f'k: {k}, v: {v}')
+                        for a_subactor_key, a_subactor in a_nested_actors_dict.items():
+                            if a_subactor is not None:
+                                a_subactor.SetPosition(0.0, ipcDataExplorer.params.long_y_offset, 0.0) ## long offset
+                            else:
+                                # print(f'[{k}][{a_subactor_key}] is None!')
+                                pass
+
 
                 if active_neuron_id in short_peak_prominence_2d_results_aclus:
                     short_all_peaks_data, short_all_peaks_actors = _render_peak_prominence_2d_results_on_pyvista_plotter(ipcDataExplorer, active_peak_prominence_2d_results=short_peak_prominence_2d_results, valid_neuron_id=active_neuron_id, render=False, debug_print=debug_print, **kwargs)
                     ipcDataExplorer.plots['tuningCurvePlotActors'][active_neuron_id]['peaks']['short'] = short_all_peaks_actors
                     ipcDataExplorer.plots_data['tuningCurvePlotData'][active_neuron_id]['peaks']['short'] = short_all_peaks_data
                     short_all_peaks_actors.SetVisibility(tuning_curve_is_visible) # Change the visibility to match the current tuning_curve_visibility_state
+                    for k, a_nested_actors_dict in short_all_peaks_actors.items():
+                        # print(f'k: {k}, v: {v}')
+                        for a_subactor_key, a_subactor in a_nested_actors_dict.items():
+                            if a_subactor is not None:
+                                a_subactor.SetPosition(0.0, ipcDataExplorer.params.short_y_offset, 0.0) ## short offset
+                            else:
+                                # print(f'[{k}][{a_subactor_key}] is None!')
+                                pass
+                            
 
                 ipcDataExplorer.plots['tuningCurvePlotActors'][active_neuron_id]['peaks'] = CascadingDynamicPlotsList(**ipcDataExplorer.plots['tuningCurvePlotActors'][active_neuron_id]['peaks'])
                 ## visibility and such:                
