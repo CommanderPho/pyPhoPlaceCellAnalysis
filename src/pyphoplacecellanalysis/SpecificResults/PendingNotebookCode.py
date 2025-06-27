@@ -202,6 +202,31 @@ class LongShort3DPlacefieldsHelpers:
             pane = LongShort3DPlacefieldsHelpers._plot_long_short_placefields(ipcDataExplorer=ipcDataExplorer, long_pf2D=long_pf2D, short_pf2D=short_pf2D)
 
         """
+        def _subfn_scale_ybin_centers_to_track_width(ybin: NDArray, track_y_center: float = 0.0, track_y_width: float = 22.0) -> NDArray:
+            data_y_range: float = np.ptp(ybin)
+            data_y_center_offset: float = ybin[0] + (data_y_range / 2.0)
+            
+            ## adjust the center point:
+            # _needed_y_center_offset_adjust: float = (data_y_center_offset - track_y_center)
+            
+            _adjusted_ybin_centers = deepcopy(ybin)
+            # _adjusted_ybin_centers = _adjusted_ybin_centers - track_y_center
+            # _adjusted_ybin_centers = _adjusted_ybin_centers - _needed_y_center_offset_adjust
+            _adjusted_ybin_centers = _adjusted_ybin_centers - data_y_center_offset ## zero by subtracting current data offset
+            _adjusted_ybin_centers = _adjusted_ybin_centers + track_y_center
+            
+            if track_y_width is not None:
+                ## scale width to match track width
+                _adjusted_ybin_centers = _adjusted_ybin_centers / data_y_range ## normalize to 0.0-1.0
+                _adjusted_ybin_centers = _adjusted_ybin_centers * float(track_y_width) ## scale to 0.0 - track_y_widget
+                    
+            return _adjusted_ybin_centers
+
+        # ==================================================================================================================================================================================================================================================================================== #
+        # Begin Function Body                                                                                                                                                                                                                                                                  #
+        # ==================================================================================================================================================================================================================================================================================== #
+
+
         ## Remove old placefields:
         ipcDataExplorer.remove_all_rendered_placefields()
         
@@ -219,8 +244,28 @@ class LongShort3DPlacefieldsHelpers:
         
         long_maze_bg.SetPosition(0.0, long_y_offset, 0.0)
         short_maze_bg.SetPosition(0.0, short_y_offset, 0.0)
+        
+        long_pf2D = deepcopy(long_pf2D)
+        short_pf2D = deepcopy(short_pf2D)
 
+        # long_adjusted_ybin_centers = _subfn_scale_ybin_centers_to_track_width(ybin_centers=long_pf2D.ratemap.ybin_centers, track_y_center=-maze_y_offset)
+        # short_adjusted_ybin_centers = _subfn_scale_ybin_centers_to_track_width(ybin_centers=short_pf2D.ratemap.ybin_centers, track_y_center=maze_y_offset)
+        print(f'long_pf2D.ratemap.ybin: {long_pf2D.ratemap.ybin}')
+        print(f'short_pf2D.ratemap.ybin: {short_pf2D.ratemap.ybin}')
+        # long_adjusted_ybin = _subfn_scale_ybin_centers_to_track_width(ybin=long_pf2D.ratemap.ybin, track_y_center=ipcDataExplorer.params.long_y_offset)
+        # short_adjusted_ybin = _subfn_scale_ybin_centers_to_track_width(ybin=short_pf2D.ratemap.ybin, track_y_center=ipcDataExplorer.params.short_y_offset)
+        long_adjusted_ybin = _subfn_scale_ybin_centers_to_track_width(ybin=long_pf2D.ratemap.ybin, track_y_center=0.0)
+        short_adjusted_ybin = _subfn_scale_ybin_centers_to_track_width(ybin=short_pf2D.ratemap.ybin, track_y_center=0.0)        
 
+        print(f'long_adjusted_ybin: {long_adjusted_ybin}')
+        print(f'short_adjusted_ybin: {short_adjusted_ybin}')
+        
+        long_pf2D.ratemap.ybin = long_adjusted_ybin
+        short_pf2D.ratemap.ybin = short_adjusted_ybin
+        
+        # long_pf2D.ratemap.ybin_centers = get_bin_centers(long_adjusted_ybin)
+        # short_pf2D.ratemap.ybin_centers = get_bin_centers(short_adjusted_ybin)
+        
         ## INPUTS: long_pf2D, short_pf2D
         (long_or_short_colors_dict, long_pf_colors, short_pf_colors), neuron_plotting_configs_dict = cls._build_merged_long_short_pf2D_neuron_identities(long_pf2D=long_pf2D, short_pf2D=short_pf2D)
 
