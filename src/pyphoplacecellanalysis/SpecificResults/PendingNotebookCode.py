@@ -121,6 +121,7 @@ from pyphocorehelpers.gui.Qt.color_helpers import ColorFormatConverter
 from pyphoplacecellanalysis.PhoPositionalData.plotting.placefield import plot_placefields2D, update_plotColorsPlacefield2D
 from pyphoplacecellanalysis.General.Model.Configs.NeuronPlottingParamConfig import NeuronConfigOwningMixin
 from pyphocorehelpers.gui.PyVista.CascadingDynamicPlotsList import CascadingDynamicPlotsList
+from neuropy.utils.mixins.binning_helpers import get_bin_centers
 
 # curr_active_pipeline.reload_default_display_functions()
 # _out = dict()
@@ -245,7 +246,9 @@ class LongShort3DPlacefieldsHelpers:
         # ipcDataExplorer.p, ipcDataExplorer.plots['tuningCurvePlotActors'], ipcDataExplorer.plots_data['tuningCurvePlotData'], ipcDataExplorer.plots['tuningCurvePlotLegendActor'], temp_plots_data = plot_placefields2D(ipcDataExplorer.p, active_placefields=deepcopy(long_pf2D), pf_colors=long_pf_colors, zScalingFactor=ipcDataExplorer.params.zScalingFactor, show_legend=ipcDataExplorer.params.show_legend, series_prefix='long' **_temp_input_params) # note that the get_dict_subset(...) thing is just a safe way to get only the relevant members.
 
         ## Long Track pfs:
-        _long_outs = plot_placefields2D(ipcDataExplorer.p, active_placefields=deepcopy(long_pf2D), pf_colors=long_pf_colors, series_prefix='long', clip_bounds=long_maze_bg.GetBounds(), **_temp_input_params)
+        # clip_bounds = long_maze_bg.GetBounds()
+        clip_bounds = None
+        _long_outs = plot_placefields2D(ipcDataExplorer.p, active_placefields=deepcopy(long_pf2D), pf_colors=long_pf_colors, series_prefix='long', clip_bounds=clip_bounds, **_temp_input_params)
         p, long_tuningCurvePlotActors, long_tuningCurvePlotData, long_tuningCurvePlotLegendActor, long_temp_plots_data = _long_outs
         for k, a_nested_actors_dict in long_tuningCurvePlotActors.items():
             # print(f'k: {k}, v: {v}')
@@ -257,7 +260,9 @@ class LongShort3DPlacefieldsHelpers:
                     pass
 
         ## Short Track pfs:
-        _short_outs = plot_placefields2D(ipcDataExplorer.p, active_placefields=deepcopy(short_pf2D), pf_colors=short_pf_colors, series_prefix='short', clip_bounds=short_maze_bg.GetBounds(), **_temp_input_params) 
+        # clip_bounds = short_maze_bg.GetBounds()
+        clip_bounds = None
+        _short_outs = plot_placefields2D(ipcDataExplorer.p, active_placefields=deepcopy(short_pf2D), pf_colors=short_pf_colors, series_prefix='short', clip_bounds=clip_bounds, **_temp_input_params) 
         p, short_tuningCurvePlotActors, short_tuningCurvePlotData, short_tuningCurvePlotLegendActor, short_temp_plots_data = _short_outs
         for k, a_nested_actors_dict in short_tuningCurvePlotActors.items():
             # print(f'k: {k}, v: {v}')
@@ -378,9 +383,10 @@ class LongShort3DPlacefieldsHelpers:
         ipcDataExplorer.plots_data['tuningCurvePlotLegendData'] = combined_temp_plots_data['legend_entries']
 
         ## build combined legend
-        ipcDataExplorer.plots['tuningCurvePlotLegendActor'] = ipcDataExplorer.p.add_legend(ipcDataExplorer.plots_data['tuningCurvePlotLegendData'], name='tuningCurvesLegend', 
-                            bcolor=(0.05, 0.05, 0.05), border=True,
-                            loc='center right', size=[0.05, 0.85]) # vtk.vtkLegendBoxActor
+        if ipcDataExplorer.params.show_legend:
+            ipcDataExplorer.plots['tuningCurvePlotLegendActor'] = ipcDataExplorer.p.add_legend(ipcDataExplorer.plots_data['tuningCurvePlotLegendData'], name='tuningCurvesLegend', 
+                                bcolor=(0.05, 0.05, 0.05), border=True,
+                                loc='center right', size=[0.05, 0.85]) # vtk.vtkLegendBoxActor
 
 
         ## Update: `self.params.pf_active_configs`
