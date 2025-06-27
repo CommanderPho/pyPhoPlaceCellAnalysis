@@ -7891,7 +7891,7 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
     def _display_directional_track_remapping_diagram(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, save_figure=True, included_any_context_neuron_ids=None, use_incremental_sorting: bool = False, is_dark_mode:bool=False, **kwargs):
             """ For both directions, plots a subplot showing the cell's location on the long track and the short track with connecting arrows showing their transition. Draws both tracks in the background as reference. 
             """
-            from pyphoplacecellanalysis.Pho2D.track_shape_drawing import plot_bidirectional_track_remapping_diagram
+            from pyphoplacecellanalysis.Pho2D.track_shape_drawing import TrackRemappingDiagramFigure
 
             active_context = kwargs.pop('active_context', owning_pipeline_reference.sess.get_context())
 
@@ -7942,7 +7942,7 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
                     pass # do nothing, don't save
                 
 
-            collector = plot_bidirectional_track_remapping_diagram(track_templates, grid_bin_bounds=grid_bin_bounds, active_context=active_context, perform_write_to_file_callback=_perform_write_to_file_callback, enable_interactivity=True, draw_point_aclu_labels=True, is_dark_mode=is_dark_mode)
+            collector = TrackRemappingDiagramFigure.plot_bidirectional_track_remapping_diagram(track_templates, grid_bin_bounds=grid_bin_bounds, active_context=active_context, perform_write_to_file_callback=_perform_write_to_file_callback, enable_interactivity=True, draw_point_aclu_labels=True, is_dark_mode=is_dark_mode)
 
             return collector
 

@@ -145,6 +145,7 @@ def build_connected_time_synchronized_placefields_plotter(active_pf_2D_dt, sync_
         
     return curr_placefields_plotter, placefields_raster_window_sync_connection
 
+
 def build_connected_time_synchronized_decoder_plotter(active_one_step_decoder, active_two_step_decoder, active_pf_2D_dt, sync_driver=None, should_defer_show=False):
     """ 
     sync_driver: spike_raster_window, 2DRaster, etc

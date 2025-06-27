@@ -1594,992 +1594,1037 @@ from enum import Enum
 class AclusYOffsetMode(Enum):
     RandomJitter = "random_jitter"
     CountBased = "count_based"
-
-
-@function_attributes(short_name=None, tags=['matplotlib', 'patches', 'track', 'long-short'], input_requires=[], output_provides=[], uses=['pyphoplacecellanalysis.Pho2D.track_shape_drawing._build_track_1D_verticies'], used_by=['_plot_track_remapping_diagram'], creation_date='2024-06-12 12:57', related_items=[])
-def _plot_helper_add_track_shapes(grid_bin_bounds: Union[Tuple[Tuple[float, float], Tuple[float, float]], BoundsRect], is_dark_mode: bool = True, debug_print=False):
-    """ Prepares the final matplotlib patch objects to represent the 1D long and short tracks, which can be immediately added to an axis
+    Pf2DExactY = "pf2d_exact_y"
     
-    Usage:
 
-    ## TRACK PLOTTING:
-    (long_patch, long_path), (short_patch, short_path) = _plot_helper_add_track_shapes(grid_bin_bounds=grid_bin_bounds, ax=ax, defer_render=defer_render, is_dark_mode=is_dark_mode, debug_print=debug_print)
-    # Draw the long/short track shapes: __________________________________________________________________________________ #
-    if ax is not None:
-        ax.add_patch(long_patch)
-        ax.add_patch(short_patch)
-        ax.autoscale()
-
-    History:
-
-        Factored out of `_plot_track_remapping_diagram` on 2024-06-12
+class TrackRemappingDiagramFigure:
+    """ 
+    from pyphoplacecellanalysis.Pho2D.track_shape_drawing import TrackRemappingDiagramFigure
 
     """
-  # BUILDS TRACK PROPERTIES ____________________________________________________________________________________________ #
-    import matplotlib as mpl
-    import matplotlib.patches as patches
-    import matplotlib.colors as mcolors
-    import matplotlib.cm as cm
-    from matplotlib.transforms import Affine2D
-    import matplotlib.patheffects as path_effects
-
-    from neuropy.utils.matplotlib_helpers import build_or_reuse_figure
-
-    from pyphocorehelpers.geometry_helpers import BoundsRect
-    from pyphoplacecellanalysis.General.Model.Configs.LongShortDisplayConfig import LongShortDisplayConfigManager
-
-    
-    if is_dark_mode:
-        _default_bg_color = 'white'
-        _default_fg_color = 'black'
-        _default_edgecolors = '#CCCCCC33' # light gray
-
-    else:
-        _default_bg_color = 'black'
-        _default_fg_color = 'white'
-        _default_edgecolors = '#5a5a5a33'
+    @function_attributes(short_name=None, tags=['matplotlib', 'patches', 'track', 'long-short'], input_requires=[], output_provides=[], uses=['pyphoplacecellanalysis.Pho2D.track_shape_drawing._build_track_1D_verticies'], used_by=['_plot_track_remapping_diagram'], creation_date='2024-06-12 12:57', related_items=[])
+    @classmethod
+    def _plot_helper_add_track_shapes(cls, grid_bin_bounds: Union[Tuple[Tuple[float, float], Tuple[float, float]], BoundsRect], is_dark_mode: bool = True, debug_print=False):
+        """ Prepares the final matplotlib patch objects to represent the 1D long and short tracks, which can be immediately added to an axis
         
-    base_1D_height: float = 1.0
-    # base_1D_height: float = 0.5
-    base_platform_additive_height: float = 0.1
+        Usage:
 
-    long_height_multiplier: float = 1.0
-    # long_height_multiplier: float = 0.5 # this renders the long track half-height
-
-    # long_y_baseline: float = 0.1
-    # short_y_baseline: float = 0.75
-
-    ## smarter, all are calculated in terms of 1.0 being the height of the total subplot axes:
-    top_bottom_padding: float = 0.025
-    intra_track_y_spacing: float = 0.05 # spacing in between the long/short tracks
-
-    total_track_y_space: float = 1.0 - (intra_track_y_spacing + (2.0 * top_bottom_padding)) # amount of total space for the tracks
-    track_y_height: float = total_track_y_space / 2.0
-
-    long_y_baseline: float = top_bottom_padding
-    short_y_baseline: float = long_y_baseline + track_y_height + intra_track_y_spacing
-
-    # long_y_height: float = (short_y_baseline - intra_track_y_spacing)
-    # short_y_top: float = (1.0-0.1) # 0.9
-    
-    # BEGIN FUNCTION BODY ________________________________________________________________________________________________ #
-    ## Get the track configs for the colors:
-    long_short_display_config_manager = LongShortDisplayConfigManager()
-    long_epoch_config = long_short_display_config_manager.long_epoch_config.as_matplotlib_kwargs()
-    short_epoch_config = long_short_display_config_manager.short_epoch_config.as_matplotlib_kwargs()
-
-    long_track_color = dict(facecolor=long_epoch_config['facecolor'])
-    short_track_color = dict(facecolor=short_epoch_config['facecolor'])
-
-    if isinstance(grid_bin_bounds, (tuple, list)):
-        grid_bin_bounds = BoundsRect.init_from_grid_bin_bounds(grid_bin_bounds)
-    else:
-        assert isinstance(grid_bin_bounds, BoundsRect)
-
-
-    # display(grid_bin_bounds)
-
-    # long_track_dims = LinearTrackDimensions.init_from_grid_bin_bounds(grid_bin_bounds)
-    # short_track_dims = LinearTrackDimensions.init_from_grid_bin_bounds(grid_bin_bounds)
-
-    long_track_dims = LinearTrackDimensions(track_length=170.0)
-    short_track_dims = LinearTrackDimensions(track_length=100.0)
-
-    common_1D_platform_height = 0.25
-    common_1D_track_height = 0.1
-    long_track_dims.minor_axis_platform_side_width = common_1D_platform_height
-    long_track_dims.track_width = common_1D_track_height # (short_track_dims.minor_axis_platform_side_width
-
-    short_track_dims.minor_axis_platform_side_width = common_1D_platform_height
-    short_track_dims.track_width = common_1D_track_height # (short_track_dims.minor_axis_platform_side_width
-
-    # instances:
-    long_track = LinearTrackInstance(long_track_dims, grid_bin_bounds=grid_bin_bounds)
-    short_track = LinearTrackInstance(short_track_dims, grid_bin_bounds=grid_bin_bounds)
-
-    # BEGIN PLOTTING _____________________________________________________________________________________________________ #
-
-    track_1D_height=1.0*base_1D_height
-    platform_1D_height=1.0*base_1D_height + base_platform_additive_height # want same (additive) height offset even when scaling.
-
-    long_path = _build_track_1D_verticies(platform_length=22.0, track_length=long_track_dims.track_length, track_1D_height=(track_1D_height * long_height_multiplier), platform_1D_height=((track_1D_height * long_height_multiplier) + base_platform_additive_height), track_center_midpoint_x=long_track.grid_bin_bounds.center_point[0], track_center_midpoint_y=-1.0, debug_print=debug_print)
-    # long_path = _build_track_1D_verticies(platform_length=22.0, track_length=long_track_dims.track_length, track_1D_height=(track_1D_height * long_height_multiplier), platform_1D_height=(platform_1D_height * long_height_multiplier), track_center_midpoint_x=long_track.grid_bin_bounds.center_point[0], track_center_midpoint_y=-1.0, debug_print=True)
-    short_path = _build_track_1D_verticies(platform_length=22.0, track_length=short_track_dims.track_length, track_1D_height=track_1D_height, platform_1D_height=platform_1D_height, track_center_midpoint_x=short_track.grid_bin_bounds.center_point[0], track_center_midpoint_y=1.0, debug_print=debug_print)
-    
-    # Define the transformation: squish along y-axis by 0.5 and translate up by 0.5 units
-    # long_transformation = Affine2D().scale(1, -0.5).translate(0, long_y_baseline)
-    # short_transformation = Affine2D().scale(1, 0.5).translate(0, short_y_baseline)
-    track_to_baseline_padding: float = 0.05
-    # long_transformation = Affine2D().scale(1, 1.0).translate(0, long_y_baseline-track_to_baseline_padding)
-    # short_transformation = Affine2D().scale(1, 1.0).translate(0, short_y_baseline-track_to_baseline_padding)
-
-    long_transformation = Affine2D().scale(1, track_y_height).translate(0, (long_y_baseline-track_to_baseline_padding))
-    short_transformation = Affine2D().scale(1, track_y_height).translate(0, (short_y_baseline-track_to_baseline_padding))
-
-    # Apply the transformation to the Path
-    long_path = long_path.transformed(long_transformation)
-    short_path = short_path.transformed(short_transformation)
-
-    # Draw the long/short track shapes: __________________________________________________________________________________ #
-    long_patch = patches.PathPatch(long_path, **long_track_color, alpha=0.5, lw=2)
-    short_patch = patches.PathPatch(short_path, **short_track_color, alpha=0.5, lw=2)
-    
-    return (long_patch, long_path), (short_patch, short_path)
-
-
-@function_attributes(short_name=None, tags=['matplotlib', 'track', 'remapping', 'good', 'working'], input_requires=[], output_provides=[], uses=['_plot_helper_add_track_shapes'], used_by=['plot_bidirectional_track_remapping_diagram'], creation_date='2024-02-22 11:12', related_items=[])
-def _plot_track_remapping_diagram(a_dir_decoder_aclu_MAX_peak_maps_df: pd.DataFrame, grid_bin_bounds: Union[Tuple[Tuple[float, float], Tuple[float, float]], BoundsRect], long_column_name:str='long_LR', short_column_name:str='short_LR', ax=None, defer_render: bool=False, enable_interactivity:bool=True, draw_point_aclu_labels:bool=False, enable_adjust_overlapping_text: bool=False, is_dark_mode: bool = True, aclus_y_offset_mode:AclusYOffsetMode=AclusYOffsetMode.CountBased, debug_print=False, 
-                                  extant_plot_container: Optional[GenericMatplotlibContainer]=None, **kwargs):
-    """ Plots a single figure containing the long and short track outlines (flattened, overlayed) with single points on each corresponding to the peak location in 1D
-
-    🔝🖼️🎨
-    from pyphoplacecellanalysis.Pho2D.track_shape_drawing import _plot_track_remapping_diagram
-    # grid_bin_bounds = BoundsRect.init_from_grid_bin_bounds(global_pf2D.config.grid_bin_bounds)
-    fix, ax, _outputs_tuple = _plot_track_remapping_diagram(LR_only_decoder_aclu_MAX_peak_maps_df, long_peak_x, short_peak_x, peak_x_diff, grid_bin_bounds=long_pf2D.config.grid_bin_bounds)
-
-    
-    Usage:
-
-        from matplotlib.gridspec import GridSpec
-        from neuropy.utils.matplotlib_helpers import build_or_reuse_figure, perform_update_title_subtitle
-        from pyphoplacecellanalysis.Pho2D.track_shape_drawing import _plot_track_remapping_diagram
-        from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import _get_directional_pf_peaks_dfs
-
-        (LR_only_decoder_aclu_MAX_peak_maps_df, RL_only_decoder_aclu_MAX_peak_maps_df), AnyDir_decoder_aclu_MAX_peak_maps_df = track_templates.get_directional_pf_maximum_peaks_dfs(drop_aclu_if_missing_long_or_short=True)
-
-
-        ## Make a single figure for both LR/RL remapping cells:
-        kwargs = {}
-        fig = build_or_reuse_figure(fignum='Track Remapping', fig=kwargs.pop('fig', None), fig_idx=kwargs.pop('fig_idx', 0), figsize=kwargs.pop('figsize', (10, 4)), dpi=kwargs.pop('dpi', None), constrained_layout=True, clear=True) # , clear=True
-        gs = GridSpec(2, 1, figure=fig)
-        ax_LR = plt.subplot(gs[0])
-        ax_RL = plt.subplot(gs[1])
-
-        fig_LR_RL, ax_LR, _outputs_tuple_LR = _plot_track_remapping_diagram(LR_only_decoder_aclu_MAX_peak_maps_df, grid_bin_bounds=long_pf2D.config.grid_bin_bounds, long_column_name='long_LR', short_column_name='short_LR', ax=ax_LR)
-        perform_update_title_subtitle(fig=fig_LR_RL, ax=ax_LR, title_string=None, subtitle_string=f"LR Track Remapping - {len(LR_only_decoder_aclu_MAX_peak_maps_df)} aclus")
-        fig_LR_RL, ax_RL, _outputs_tuple_RL = _plot_track_remapping_diagram(RL_only_decoder_aclu_MAX_peak_maps_df, grid_bin_bounds=long_pf2D.config.grid_bin_bounds, long_column_name='long_RL', short_column_name='short_RL', ax=ax_RL)
-        perform_update_title_subtitle(fig=fig_LR_RL, ax=ax_RL, title_string=None, subtitle_string=f"RL Track Remapping - {len(RL_only_decoder_aclu_MAX_peak_maps_df)} aclus")
-
-    """
-    from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.ContainerBased.PhoContainerTool import GenericMatplotlibContainer
-    
-    # BUILDS TRACK PROPERTIES ____________________________________________________________________________________________ #
-    import matplotlib as mpl
-    import matplotlib.colors as mcolors
-    import matplotlib.cm as cm
-    import matplotlib.patheffects as path_effects
-
-    from neuropy.utils.matplotlib_helpers import build_or_reuse_figure
-
-    if is_dark_mode:
-        _default_bg_color = 'white'
-        _default_fg_color = 'black'
-        _default_edgecolors = '#CCCCCC33' # light gray
-
-    else:
-        _default_bg_color = 'black'
-        _default_fg_color = 'white'
-        _default_edgecolors = '#5a5a5a33'
-
-    # aclus_y_offset_mode: AclusYOffsetMode = AclusYOffsetMode.CountBased
-    # aclus_y_offset_mode: AclusYOffsetMode = AclusYOffsetMode.RandomJitter
-    # aclus_y_offset_mode = 'random_jitter'
-    # aclus_y_offset_mode = 'count_based'
-
-    aclus_y_offset_mode_POSSIBLE_OPTIONS = ['random_jitter', 'count_based']
-    assert aclus_y_offset_mode.value in aclus_y_offset_mode_POSSIBLE_OPTIONS, f"aclus_y_offset_mode must be in {aclus_y_offset_mode_POSSIBLE_OPTIONS} but aclus_y_offset_mode: {aclus_y_offset_mode}"
-    unit_id_colors_map = kwargs.pop('unit_id_colors_map', None)
-
-    if aclus_y_offset_mode.value == AclusYOffsetMode.CountBased.value:
-        enable_single_y_point_arrows: bool = True # if True all arrows are started from the top aclu for long and bottom/baseline for short. If False each arrow starts from its correct aclu dot, which can appear more busy.
-    else:
-        enable_single_y_point_arrows: bool = False
-        
-    base_1D_height: float = 1.0
-    # base_1D_height: float = 0.5
-    # base_platform_additive_height: float = 0.1
-
-    # long_height_multiplier: float = 1.0
-    # long_height_multiplier: float = 0.5 # this renders the long track half-height
-
-    # long_y_baseline: float = 0.1
-    # short_y_baseline: float = 0.75
-
-    ## smarter, all are calculated in terms of 1.0 being the height of the total subplot axes:
-    top_bottom_padding: float = 0.025
-    intra_track_y_spacing: float = 0.05 # spacing in between the long/short tracks
-
-    total_track_y_space: float = 1.0 - (intra_track_y_spacing + (2.0 * top_bottom_padding)) # amount of total space for the tracks
-    track_y_height: float = total_track_y_space / 2.0
-
-    long_y_baseline: float = top_bottom_padding
-    short_y_baseline: float = long_y_baseline + track_y_height + intra_track_y_spacing
-
-    # long_y_height: float = (short_y_baseline - intra_track_y_spacing)
-    # short_y_top: float = (1.0-0.1) # 0.9
-    
-    scatter_point_size: float = 15.0
-
-    # Text label options:
-    if is_dark_mode:
-        aclu_labels_text_color='black'
-    else:
-        aclu_labels_text_color='white'
-
-    # aclu_labels_fontsize = 6
-    aclu_labels_fontsize = 3
-    aclu_labels_text_path_effects = [path_effects.Stroke(linewidth=0.1, foreground='darkgrey'), path_effects.Normal()]
-
-    ## Selection (only for interactivity)
-    selection_color = (1, 0, 0, 1)  # Red color in RGBA format
-    scatter_point_selected_size: float = scatter_point_size + 2.0
-    # scatter_edgecolors_selection_color = (0.35, 0, 0, 1)  # Red color in RGBA format
-
-    selection_text_path_effects = [path_effects.Stroke(linewidth=0.2, foreground='red'), path_effects.Normal()]
-
-
-    # Appearing/Disappearing _____________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
-    appearing_edgecolors = (0, 1, 0, 1)  # Green color in RGBA format
-    # appearing_marker: str = '^' # upward arrow
-    appearing_disappearing_marker: str = 'P' # filled plus
-
-    disappearing_edgecolors = (1, 0, 0, 1)  # Red color in RGBA format
-    # disappearing_marker: str = 'v' # downward arrow
-    disappearing_marker: str = 'X' # filled X
-
-
-    # BEGIN FUNCTION BODY ________________________________________________________________________________________________ #
-
-    ## Extract the quantities needed from the DF passed
-    active_aclus = a_dir_decoder_aclu_MAX_peak_maps_df.index.to_numpy()
-    long_peak_x = a_dir_decoder_aclu_MAX_peak_maps_df[long_column_name].to_numpy()
-    short_peak_x = a_dir_decoder_aclu_MAX_peak_maps_df[short_column_name].to_numpy()
-    # peak_x_diff = LR_only_decoder_aclu_MAX_peak_maps_df['peak_diff'].to_numpy()
-
-    assert (len(long_peak_x) == len(short_peak_x)), f"len(long_peak_x): {len(long_peak_x)} != len(short_peak_x): {len(short_peak_x)}"
-    assert (len(long_peak_x) == len(active_aclus)), f"len(long_peak_x): {len(long_peak_x)} != len(active_aclus): {len(active_aclus)}"
-    
-    ## Find the points missing from long or short:
-    disappearing_long_to_short_indicies = np.where(np.isnan(short_peak_x))[0] # missing peak from short
-    appearing_long_to_short_indicies = np.where(np.isnan(long_peak_x))[0] # missing peak from long
-    disappearing_long_to_short_aclus = active_aclus[disappearing_long_to_short_indicies] # missing peak from short
-    appearing_long_to_short_aclus = active_aclus[appearing_long_to_short_indicies] # missing peak from long
-
-    is_aclu_in_both = np.logical_and(np.logical_not(np.isnan(short_peak_x)), np.logical_not(np.isnan(long_peak_x))) # both are non-NaN
-    assert (len(is_aclu_in_both) == len(active_aclus)), f"len(is_aclu_in_both): {len(is_aclu_in_both)} != len(active_aclus): {len(active_aclus)}"
-    both_aclus = active_aclus[is_aclu_in_both]
-
-    if len(disappearing_long_to_short_aclus) > 0:
-        print(f'disappearing_long_to_short_aclus: {disappearing_long_to_short_aclus}')
-    if len(appearing_long_to_short_aclus) > 0:
-        print(f'appearing_long_to_short_aclus: {appearing_long_to_short_aclus}')
-
-    ## OUTPUTS: is_aclu_in_both, disappearing_long_to_short_indicies, appearing_long_to_short_indicies
-
-
-    ## Create the remapping figure:
-    did_create_new_figure: bool = False
-    if (ax is None) and (extant_plot_container is not None):
-        ax = extant_plot_container.ax
-            
-    ## Figure Setup:
-    if ax is None:
-        ## Build a new figure:
-        from matplotlib.gridspec import GridSpec
-        fig = build_or_reuse_figure(fignum=kwargs.pop('fignum', None), fig=kwargs.pop('fig', None), fig_idx=kwargs.pop('fig_idx', 0), figsize=kwargs.pop('figsize', (10, 4)), dpi=kwargs.pop('dpi', None), constrained_layout=True) # , clear=True
-        gs = GridSpec(1, 1, figure=fig)
-        ax = plt.subplot(gs[0])
-        did_create_new_figure = True
-    else:
-        # otherwise get the figure from the passed axis
-        fig = None
-        if (extant_plot_container is not None):
-            fig = extant_plot_container.fig
-
-        if fig is None:
-            ## no fig, need to get it from the axes
-            fig = ax.get_figure()
-        
-        did_create_new_figure = False
-
-
-    if extant_plot_container is None:
-        print(f'creating new `extant_plot_container`...')
-        extant_plot_container: GenericMatplotlibContainer = GenericMatplotlibContainer(name='_plot_track_remapping_diagram')
-        extant_plot_container.fig = fig
-        extant_plot_container.ax = ax
-
-    extant_plot_container.params.did_create_new_figure = did_create_new_figure
-
-    ##########################
-
-    ## TRACK PLOTTING:
-    # if did_create_new_figure:
-    extant_long_patch = extant_plot_container.plots.get('long_patch', None)
-    if extant_long_patch is None:
-        (long_patch, long_path), (short_patch, short_path) = _plot_helper_add_track_shapes(grid_bin_bounds=grid_bin_bounds, is_dark_mode=is_dark_mode, debug_print=debug_print)
-        if long_patch is not None:
-            extant_plot_container.plots.long_patch = long_patch
-        if long_path is not None:
-            extant_plot_container.plots.long_path = long_path
-        if short_patch is not None:
-            extant_plot_container.plots.short_patch = short_patch
-        if short_path is not None:
-            extant_plot_container.plots.short_path = short_path
-
+        ## TRACK PLOTTING:
+        (long_patch, long_path), (short_patch, short_path) = _plot_helper_add_track_shapes(grid_bin_bounds=grid_bin_bounds, ax=ax, defer_render=defer_render, is_dark_mode=is_dark_mode, debug_print=debug_print)
         # Draw the long/short track shapes: __________________________________________________________________________________ #
         if ax is not None:
             ax.add_patch(long_patch)
             ax.add_patch(short_patch)
             ax.autoscale()
-    else:
-        print(f'\twarn: already had track extant_long_patch. Skipping duplicate plotting.')
+
+        History:
+
+            Factored out of `_plot_track_remapping_diagram` on 2024-06-12
+
+        """
+        # BUILDS TRACK PROPERTIES ____________________________________________________________________________________________ #
+        import matplotlib as mpl
+        import matplotlib.patches as patches
+        import matplotlib.colors as mcolors
+        import matplotlib.cm as cm
+        from matplotlib.transforms import Affine2D
+        import matplotlib.patheffects as path_effects
+        from pyphocorehelpers.geometry_helpers import BoundsRect
+        from pyphoplacecellanalysis.General.Model.Configs.LongShortDisplayConfig import LongShortDisplayConfigManager
         
-    ## INPUTS: LR_only_decoder_aclu_MAX_peak_maps_df, long_peak_x, short_peak_x, peak_x_diff
-
-    # Define a colormap to map your unique integer indices to colors
-    # colormap = plt.cm.viridis  # or any other colormap
-
-    if unit_id_colors_map is None:
-        # Create a constant colormap with only white color
         if is_dark_mode:
-            colormap = mcolors.ListedColormap(['white'])
-        else:
-            colormap = mcolors.ListedColormap(['black'])
+            _default_bg_color = 'white'
+            _default_fg_color = 'black'
+            _default_edgecolors = '#CCCCCC33' # light gray
 
-        if isinstance(active_aclus[0], str):
-            # string aclus:
-            unit_id_colors_map = {}
+        else:
+            _default_bg_color = 'black'
+            _default_fg_color = 'white'
+            _default_edgecolors = '#5a5a5a33'
+            
+        base_1D_height: float = 1.0
+        # base_1D_height: float = 0.5
+        base_platform_additive_height: float = 0.1
+
+        long_height_multiplier: float = 1.0
+        # long_height_multiplier: float = 0.5 # this renders the long track half-height
+
+        # long_y_baseline: float = 0.1
+        # short_y_baseline: float = 0.75
+
+        ## smarter, all are calculated in terms of 1.0 being the height of the total subplot axes:
+        top_bottom_padding: float = 0.025
+        intra_track_y_spacing: float = 0.05 # spacing in between the long/short tracks
+
+        total_track_y_space: float = 1.0 - (intra_track_y_spacing + (2.0 * top_bottom_padding)) # amount of total space for the tracks
+        track_y_height: float = total_track_y_space / 2.0
+
+        long_y_baseline: float = top_bottom_padding
+        short_y_baseline: float = long_y_baseline + track_y_height + intra_track_y_spacing
+
+        # long_y_height: float = (short_y_baseline - intra_track_y_spacing)
+        # short_y_top: float = (1.0-0.1) # 0.9
+        
+        # BEGIN FUNCTION BODY ________________________________________________________________________________________________ #
+        ## Get the track configs for the colors:
+        long_short_display_config_manager = LongShortDisplayConfigManager()
+        long_epoch_config = long_short_display_config_manager.long_epoch_config.as_matplotlib_kwargs()
+        short_epoch_config = long_short_display_config_manager.short_epoch_config.as_matplotlib_kwargs()
+
+        long_track_color = dict(facecolor=long_epoch_config['facecolor'])
+        short_track_color = dict(facecolor=short_epoch_config['facecolor'])
+
+        if isinstance(grid_bin_bounds, (tuple, list)):
+            grid_bin_bounds = BoundsRect.init_from_grid_bin_bounds(grid_bin_bounds)
+        else:
+            assert isinstance(grid_bin_bounds, BoundsRect)
+
+
+        # display(grid_bin_bounds)
+
+        # long_track_dims = LinearTrackDimensions.init_from_grid_bin_bounds(grid_bin_bounds)
+        # short_track_dims = LinearTrackDimensions.init_from_grid_bin_bounds(grid_bin_bounds)
+
+        long_track_dims = LinearTrackDimensions(track_length=170.0)
+        short_track_dims = LinearTrackDimensions(track_length=100.0)
+
+        common_1D_platform_height = 0.25
+        common_1D_track_height = 0.1
+        long_track_dims.minor_axis_platform_side_width = common_1D_platform_height
+        long_track_dims.track_width = common_1D_track_height # (short_track_dims.minor_axis_platform_side_width
+
+        short_track_dims.minor_axis_platform_side_width = common_1D_platform_height
+        short_track_dims.track_width = common_1D_track_height # (short_track_dims.minor_axis_platform_side_width
+
+        # instances:
+        long_track = LinearTrackInstance(long_track_dims, grid_bin_bounds=grid_bin_bounds)
+        short_track = LinearTrackInstance(short_track_dims, grid_bin_bounds=grid_bin_bounds)
+
+        # BEGIN PLOTTING _____________________________________________________________________________________________________ #
+
+        track_1D_height=1.0*base_1D_height
+        platform_1D_height=1.0*base_1D_height + base_platform_additive_height # want same (additive) height offset even when scaling.
+
+        long_path = _build_track_1D_verticies(platform_length=22.0, track_length=long_track_dims.track_length, track_1D_height=(track_1D_height * long_height_multiplier), platform_1D_height=((track_1D_height * long_height_multiplier) + base_platform_additive_height), track_center_midpoint_x=long_track.grid_bin_bounds.center_point[0], track_center_midpoint_y=-1.0, debug_print=debug_print)
+        # long_path = _build_track_1D_verticies(platform_length=22.0, track_length=long_track_dims.track_length, track_1D_height=(track_1D_height * long_height_multiplier), platform_1D_height=(platform_1D_height * long_height_multiplier), track_center_midpoint_x=long_track.grid_bin_bounds.center_point[0], track_center_midpoint_y=-1.0, debug_print=True)
+        short_path = _build_track_1D_verticies(platform_length=22.0, track_length=short_track_dims.track_length, track_1D_height=track_1D_height, platform_1D_height=platform_1D_height, track_center_midpoint_x=short_track.grid_bin_bounds.center_point[0], track_center_midpoint_y=1.0, debug_print=debug_print)
+        
+        # Define the transformation: squish along y-axis by 0.5 and translate up by 0.5 units
+        # long_transformation = Affine2D().scale(1, -0.5).translate(0, long_y_baseline)
+        # short_transformation = Affine2D().scale(1, 0.5).translate(0, short_y_baseline)
+        track_to_baseline_padding: float = 0.05
+        # long_transformation = Affine2D().scale(1, 1.0).translate(0, long_y_baseline-track_to_baseline_padding)
+        # short_transformation = Affine2D().scale(1, 1.0).translate(0, short_y_baseline-track_to_baseline_padding)
+
+        long_transformation = Affine2D().scale(1, track_y_height).translate(0, (long_y_baseline-track_to_baseline_padding))
+        short_transformation = Affine2D().scale(1, track_y_height).translate(0, (short_y_baseline-track_to_baseline_padding))
+
+        # Apply the transformation to the Path
+        long_path = long_path.transformed(long_transformation)
+        short_path = short_path.transformed(short_transformation)
+
+        # Draw the long/short track shapes: __________________________________________________________________________________ #
+        long_patch = patches.PathPatch(long_path, **long_track_color, alpha=0.5, lw=2)
+        short_patch = patches.PathPatch(short_path, **short_track_color, alpha=0.5, lw=2)
+        
+        return (long_patch, long_path), (short_patch, short_path)
+
+
+    @function_attributes(short_name=None, tags=['matplotlib', 'track', 'remapping', 'good', 'working'], input_requires=[], output_provides=[], uses=['_plot_helper_add_track_shapes'], used_by=['plot_bidirectional_track_remapping_diagram'], creation_date='2024-02-22 11:12', related_items=[])
+    @classmethod
+    def _plot_track_remapping_diagram(cls, a_dir_decoder_aclu_MAX_peak_maps_df: pd.DataFrame, grid_bin_bounds: Union[Tuple[Tuple[float, float], Tuple[float, float]], BoundsRect], long_column_name:str='long_LR', short_column_name:str='short_LR', long_y_column_name:Optional[str]=None, short_y_column_name:Optional[str]=None, ax=None, defer_render: bool=False, enable_interactivity:bool=True, draw_point_aclu_labels:bool=False, enable_adjust_overlapping_text: bool=False, is_dark_mode: bool = True, aclus_y_offset_mode:AclusYOffsetMode=AclusYOffsetMode.CountBased, debug_print=False, 
+                                    extant_plot_container: Optional[GenericMatplotlibContainer]=None, **kwargs):
+        """ Plots a single figure containing the long and short track outlines (flattened, overlayed) with single points on each corresponding to the peak location in 1D
+
+        🔝🖼️🎨
+        from pyphoplacecellanalysis.Pho2D.track_shape_drawing import _plot_track_remapping_diagram
+        # grid_bin_bounds = BoundsRect.init_from_grid_bin_bounds(global_pf2D.config.grid_bin_bounds)
+        fix, ax, _outputs_tuple = _plot_track_remapping_diagram(LR_only_decoder_aclu_MAX_peak_maps_df, long_peak_x, short_peak_x, peak_x_diff, grid_bin_bounds=long_pf2D.config.grid_bin_bounds)
+
+        
+        Usage:
+
+            from matplotlib.gridspec import GridSpec
+            from neuropy.utils.matplotlib_helpers import build_or_reuse_figure, perform_update_title_subtitle
+            from pyphoplacecellanalysis.Pho2D.track_shape_drawing import _plot_track_remapping_diagram
+            from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import _get_directional_pf_peaks_dfs
+
+            (LR_only_decoder_aclu_MAX_peak_maps_df, RL_only_decoder_aclu_MAX_peak_maps_df), AnyDir_decoder_aclu_MAX_peak_maps_df = track_templates.get_directional_pf_maximum_peaks_dfs(drop_aclu_if_missing_long_or_short=True)
+
+
+            ## Make a single figure for both LR/RL remapping cells:
+            kwargs = {}
+            fig = build_or_reuse_figure(fignum='Track Remapping', fig=kwargs.pop('fig', None), fig_idx=kwargs.pop('fig_idx', 0), figsize=kwargs.pop('figsize', (10, 4)), dpi=kwargs.pop('dpi', None), constrained_layout=True, clear=True) # , clear=True
+            gs = GridSpec(2, 1, figure=fig)
+            ax_LR = plt.subplot(gs[0])
+            ax_RL = plt.subplot(gs[1])
+
+            fig_LR_RL, ax_LR, _outputs_tuple_LR = _plot_track_remapping_diagram(LR_only_decoder_aclu_MAX_peak_maps_df, grid_bin_bounds=long_pf2D.config.grid_bin_bounds, long_column_name='long_LR', short_column_name='short_LR', ax=ax_LR)
+            perform_update_title_subtitle(fig=fig_LR_RL, ax=ax_LR, title_string=None, subtitle_string=f"LR Track Remapping - {len(LR_only_decoder_aclu_MAX_peak_maps_df)} aclus")
+            fig_LR_RL, ax_RL, _outputs_tuple_RL = _plot_track_remapping_diagram(RL_only_decoder_aclu_MAX_peak_maps_df, grid_bin_bounds=long_pf2D.config.grid_bin_bounds, long_column_name='long_RL', short_column_name='short_RL', ax=ax_RL)
+            perform_update_title_subtitle(fig=fig_LR_RL, ax=ax_RL, title_string=None, subtitle_string=f"RL Track Remapping - {len(RL_only_decoder_aclu_MAX_peak_maps_df)} aclus")
+
+        """
+        from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.ContainerBased.PhoContainerTool import GenericMatplotlibContainer
+        
+        # BUILDS TRACK PROPERTIES ____________________________________________________________________________________________ #
+        import matplotlib as mpl
+        import matplotlib.colors as mcolors
+        import matplotlib.cm as cm
+        import matplotlib.patheffects as path_effects
+
+        from neuropy.utils.matplotlib_helpers import build_or_reuse_figure
+
+        if is_dark_mode:
+            _default_bg_color = 'white'
+            _default_fg_color = 'black'
+            _default_edgecolors = '#CCCCCC33' # light gray
+
+        else:
+            _default_bg_color = 'black'
+            _default_fg_color = 'white'
+            _default_edgecolors = '#5a5a5a33'
+
+        # aclus_y_offset_mode: AclusYOffsetMode = AclusYOffsetMode.CountBased
+        # aclus_y_offset_mode: AclusYOffsetMode = AclusYOffsetMode.RandomJitter
+        # aclus_y_offset_mode = 'random_jitter'
+        # aclus_y_offset_mode = 'count_based'
+
+        aclus_y_offset_mode_POSSIBLE_OPTIONS = ['random_jitter', 'count_based', 'pf2d_exact_y']
+        assert aclus_y_offset_mode.value in aclus_y_offset_mode_POSSIBLE_OPTIONS, f"aclus_y_offset_mode must be in {aclus_y_offset_mode_POSSIBLE_OPTIONS} but aclus_y_offset_mode: {aclus_y_offset_mode}"
+        unit_id_colors_map = kwargs.pop('unit_id_colors_map', None)
+
+        if aclus_y_offset_mode.value == AclusYOffsetMode.CountBased.value:
+            enable_single_y_point_arrows: bool = True # if True all arrows are started from the top aclu for long and bottom/baseline for short. If False each arrow starts from its correct aclu dot, which can appear more busy.
+        else:
+            enable_single_y_point_arrows: bool = False
+            
+        base_1D_height: float = 1.0
+        # base_1D_height: float = 0.5
+        # base_platform_additive_height: float = 0.1
+
+        # long_height_multiplier: float = 1.0
+        # long_height_multiplier: float = 0.5 # this renders the long track half-height
+
+        # long_y_baseline: float = 0.1
+        # short_y_baseline: float = 0.75
+
+        ## smarter, all are calculated in terms of 1.0 being the height of the total subplot axes:
+        top_bottom_padding: float = 0.025
+        intra_track_y_spacing: float = 0.05 # spacing in between the long/short tracks
+
+        total_track_y_space: float = 1.0 - (intra_track_y_spacing + (2.0 * top_bottom_padding)) # amount of total space for the tracks
+        track_y_height: float = total_track_y_space / 2.0
+
+        long_y_baseline: float = top_bottom_padding
+        short_y_baseline: float = long_y_baseline + track_y_height + intra_track_y_spacing
+
+        # long_y_height: float = (short_y_baseline - intra_track_y_spacing)
+        # short_y_top: float = (1.0-0.1) # 0.9
+        
+        scatter_point_size: float = 15.0
+
+        # Text label options:
+        if is_dark_mode:
+            aclu_labels_text_color='black'
+        else:
+            aclu_labels_text_color='white'
+
+        # aclu_labels_fontsize = 6
+        aclu_labels_fontsize = 3
+        aclu_labels_text_path_effects = [path_effects.Stroke(linewidth=0.1, foreground='darkgrey'), path_effects.Normal()]
+
+        ## Selection (only for interactivity)
+        selection_color = (1, 0, 0, 1)  # Red color in RGBA format
+        scatter_point_selected_size: float = scatter_point_size + 2.0
+        # scatter_edgecolors_selection_color = (0.35, 0, 0, 1)  # Red color in RGBA format
+
+        selection_text_path_effects = [path_effects.Stroke(linewidth=0.2, foreground='red'), path_effects.Normal()]
+
+
+        # Appearing/Disappearing _____________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
+        appearing_edgecolors = (0, 1, 0, 1)  # Green color in RGBA format
+        # appearing_marker: str = '^' # upward arrow
+        appearing_disappearing_marker: str = 'P' # filled plus
+
+        disappearing_edgecolors = (1, 0, 0, 1)  # Red color in RGBA format
+        # disappearing_marker: str = 'v' # downward arrow
+        disappearing_marker: str = 'X' # filled X
+
+
+        # BEGIN FUNCTION BODY ________________________________________________________________________________________________ #
+
+        ## Extract the quantities needed from the DF passed
+        active_aclus = a_dir_decoder_aclu_MAX_peak_maps_df.index.to_numpy()
+        long_peak_x = a_dir_decoder_aclu_MAX_peak_maps_df[long_column_name].to_numpy()
+        short_peak_x = a_dir_decoder_aclu_MAX_peak_maps_df[short_column_name].to_numpy()
+        # peak_x_diff = LR_only_decoder_aclu_MAX_peak_maps_df['peak_diff'].to_numpy()
+
+        assert (len(long_peak_x) == len(short_peak_x)), f"len(long_peak_x): {len(long_peak_x)} != len(short_peak_x): {len(short_peak_x)}"
+        assert (len(long_peak_x) == len(active_aclus)), f"len(long_peak_x): {len(long_peak_x)} != len(active_aclus): {len(active_aclus)}"
+        
+        ## Find the points missing from long or short:
+        disappearing_long_to_short_indicies = np.where(np.isnan(short_peak_x))[0] # missing peak from short
+        appearing_long_to_short_indicies = np.where(np.isnan(long_peak_x))[0] # missing peak from long
+        disappearing_long_to_short_aclus = active_aclus[disappearing_long_to_short_indicies] # missing peak from short
+        appearing_long_to_short_aclus = active_aclus[appearing_long_to_short_indicies] # missing peak from long
+
+        is_aclu_in_both = np.logical_and(np.logical_not(np.isnan(short_peak_x)), np.logical_not(np.isnan(long_peak_x))) # both are non-NaN
+        assert (len(is_aclu_in_both) == len(active_aclus)), f"len(is_aclu_in_both): {len(is_aclu_in_both)} != len(active_aclus): {len(active_aclus)}"
+        both_aclus = active_aclus[is_aclu_in_both]
+
+        if len(disappearing_long_to_short_aclus) > 0:
+            print(f'disappearing_long_to_short_aclus: {disappearing_long_to_short_aclus}')
+        if len(appearing_long_to_short_aclus) > 0:
+            print(f'appearing_long_to_short_aclus: {appearing_long_to_short_aclus}')
+
+        ## OUTPUTS: is_aclu_in_both, disappearing_long_to_short_indicies, appearing_long_to_short_indicies
+
+
+        ## Create the remapping figure:
+        did_create_new_figure: bool = False
+        if (ax is None) and (extant_plot_container is not None):
+            ax = extant_plot_container.ax
+                
+        ## Figure Setup:
+        if ax is None:
+            ## Build a new figure:
+            from matplotlib.gridspec import GridSpec
+            fig = build_or_reuse_figure(fignum=kwargs.pop('fignum', None), fig=kwargs.pop('fig', None), fig_idx=kwargs.pop('fig_idx', 0), figsize=kwargs.pop('figsize', (10, 4)), dpi=kwargs.pop('dpi', None), constrained_layout=True) # , clear=True
+            gs = GridSpec(1, 1, figure=fig)
+            ax = plt.subplot(gs[0])
+            did_create_new_figure = True
+        else:
+            # otherwise get the figure from the passed axis
+            fig = None
+            if (extant_plot_container is not None):
+                fig = extant_plot_container.fig
+
+            if fig is None:
+                ## no fig, need to get it from the axes
+                fig = ax.get_figure()
+            
+            did_create_new_figure = False
+
+
+        if extant_plot_container is None:
+            print(f'creating new `extant_plot_container`...')
+            extant_plot_container: GenericMatplotlibContainer = GenericMatplotlibContainer(name='_plot_track_remapping_diagram')
+            extant_plot_container.fig = fig
+            extant_plot_container.ax = ax
+
+        extant_plot_container.params.did_create_new_figure = did_create_new_figure
+
+        ##########################
+
+        ## TRACK PLOTTING:
+        # if did_create_new_figure:
+        extant_long_patch = extant_plot_container.plots.get('long_patch', None)
+        if extant_long_patch is None:
+            (long_patch, long_path), (short_patch, short_path) = cls._plot_helper_add_track_shapes(grid_bin_bounds=grid_bin_bounds, is_dark_mode=is_dark_mode, debug_print=debug_print)
+            if long_patch is not None:
+                extant_plot_container.plots.long_patch = long_patch
+            if long_path is not None:
+                extant_plot_container.plots.long_path = long_path
+            if short_patch is not None:
+                extant_plot_container.plots.short_patch = short_patch
+            if short_path is not None:
+                extant_plot_container.plots.short_path = short_path
+
+            # Draw the long/short track shapes: __________________________________________________________________________________ #
+            if ax is not None:
+                ax.add_patch(long_patch)
+                ax.add_patch(short_patch)
+                ax.autoscale()
+        else:
+            print(f'\twarn: already had track extant_long_patch. Skipping duplicate plotting.')
+            
+        ## INPUTS: LR_only_decoder_aclu_MAX_peak_maps_df, long_peak_x, short_peak_x, peak_x_diff
+
+        # Define a colormap to map your unique integer indices to colors
+        # colormap = plt.cm.viridis  # or any other colormap
+
+        if unit_id_colors_map is None:
+            # Create a constant colormap with only white color
+            if is_dark_mode:
+                colormap = mcolors.ListedColormap(['white'])
+            else:
+                colormap = mcolors.ListedColormap(['black'])
+
+            if isinstance(active_aclus[0], str):
+                # string aclus:
+                unit_id_colors_map = {}
+                color = [unit_id_colors_map.get(an_aclu, _default_bg_color) for an_aclu in active_aclus]
+                get_aclu_color_fn = lambda an_aclu: unit_id_colors_map.get(an_aclu, _default_bg_color)
+
+            else:
+                normalize = mcolors.Normalize(vmin=active_aclus.min(), vmax=active_aclus.max())
+                scalar_map = cm.ScalarMappable(norm=normalize, cmap=colormap)
+                color = scalar_map.to_rgba(active_aclus)
+                ## constant:
+                # color = 'white'
+                get_aclu_color_fn = lambda an_aclu: scalar_map.to_rgba(an_aclu)
+            
+        else:
+            ## use the provided `unit_id_colors_map`:
+            # color = [unit_id_colors_map[an_aclu] for an_aclu in active_aclus]
             color = [unit_id_colors_map.get(an_aclu, _default_bg_color) for an_aclu in active_aclus]
             get_aclu_color_fn = lambda an_aclu: unit_id_colors_map.get(an_aclu, _default_bg_color)
 
-        else:
-            normalize = mcolors.Normalize(vmin=active_aclus.min(), vmax=active_aclus.max())
-            scalar_map = cm.ScalarMappable(norm=normalize, cmap=colormap)
-            color = scalar_map.to_rgba(active_aclus)
-            ## constant:
-            # color = 'white'
-            get_aclu_color_fn = lambda an_aclu: scalar_map.to_rgba(an_aclu)
-        
-    else:
-        ## use the provided `unit_id_colors_map`:
-        # color = [unit_id_colors_map[an_aclu] for an_aclu in active_aclus]
-        color = [unit_id_colors_map.get(an_aclu, _default_bg_color) for an_aclu in active_aclus]
-        get_aclu_color_fn = lambda an_aclu: unit_id_colors_map.get(an_aclu, _default_bg_color)
 
+        ## Count-based offsets: If there are three aclus sharing a bin, offset the repeated aclus by a scaled y-factor:
+        if (aclus_y_offset_mode.value == AclusYOffsetMode.CountBased.value):
+            offset_scaling_factor: float = 0.1
 
-    ## Count-based offsets: If there are three aclus sharing a bin, offset the repeated aclus by a scaled y-factor:
-    if (aclus_y_offset_mode.value == AclusYOffsetMode.CountBased.value):
-        offset_scaling_factor: float = 0.1
+            # Add a new column with the count of repeated entries
+            a_dir_decoder_aclu_MAX_peak_maps_df['long_repeated_count'] = a_dir_decoder_aclu_MAX_peak_maps_df.groupby(long_column_name).cumcount()
+            a_dir_decoder_aclu_MAX_peak_maps_df['short_repeated_count'] = a_dir_decoder_aclu_MAX_peak_maps_df.groupby(short_column_name).cumcount()
 
-        # Add a new column with the count of repeated entries
-        a_dir_decoder_aclu_MAX_peak_maps_df['long_repeated_count'] = a_dir_decoder_aclu_MAX_peak_maps_df.groupby(long_column_name).cumcount()
-        a_dir_decoder_aclu_MAX_peak_maps_df['short_repeated_count'] = a_dir_decoder_aclu_MAX_peak_maps_df.groupby(short_column_name).cumcount()
+            # a_dir_decoder_aclu_MAX_peak_maps_df['long_repeated_count'] = a_dir_decoder_aclu_MAX_peak_maps_df.groupby(long_column_name).agg(['cumcount', ''])
+            # a_dir_decoder_aclu_MAX_peak_maps_df['short_repeated_count'] = a_dir_decoder_aclu_MAX_peak_maps_df.groupby(short_column_name).cumcount()
 
-        # a_dir_decoder_aclu_MAX_peak_maps_df['long_repeated_count'] = a_dir_decoder_aclu_MAX_peak_maps_df.groupby(long_column_name).agg(['cumcount', ''])
-        # a_dir_decoder_aclu_MAX_peak_maps_df['short_repeated_count'] = a_dir_decoder_aclu_MAX_peak_maps_df.groupby(short_column_name).cumcount()
+            # Use `transform` to broadcast the maximum count to all rows in the original DataFrame
+            a_dir_decoder_aclu_MAX_peak_maps_df['long_MaxRepeat'] = a_dir_decoder_aclu_MAX_peak_maps_df.groupby(long_column_name)['long_repeated_count'].transform('max')
+            a_dir_decoder_aclu_MAX_peak_maps_df['short_MaxRepeat'] = a_dir_decoder_aclu_MAX_peak_maps_df.groupby(short_column_name)['short_repeated_count'].transform('max')
 
-        # Use `transform` to broadcast the maximum count to all rows in the original DataFrame
-        a_dir_decoder_aclu_MAX_peak_maps_df['long_MaxRepeat'] = a_dir_decoder_aclu_MAX_peak_maps_df.groupby(long_column_name)['long_repeated_count'].transform('max')
-        a_dir_decoder_aclu_MAX_peak_maps_df['short_MaxRepeat'] = a_dir_decoder_aclu_MAX_peak_maps_df.groupby(short_column_name)['short_repeated_count'].transform('max')
+            long_y_offsets = a_dir_decoder_aclu_MAX_peak_maps_df['long_repeated_count'].to_numpy() * offset_scaling_factor
+            short_y_offsets = a_dir_decoder_aclu_MAX_peak_maps_df['short_repeated_count'].to_numpy() * offset_scaling_factor
 
-        long_y_offsets = a_dir_decoder_aclu_MAX_peak_maps_df['long_repeated_count'].to_numpy() * offset_scaling_factor
-        short_y_offsets = a_dir_decoder_aclu_MAX_peak_maps_df['short_repeated_count'].to_numpy() * offset_scaling_factor
+            # long arrows should start at the top of the stack (maximum y)
+            long_y_arrow_offsets = a_dir_decoder_aclu_MAX_peak_maps_df['long_MaxRepeat'].to_numpy() * offset_scaling_factor
+            # long_y_arrow_val = (np.full_like(long_peak_x, long_y_baseline)) * base_1D_height
+            long_y_arrow_val = (np.full_like(long_peak_x, long_y_baseline) + long_y_arrow_offsets) * base_1D_height
+            # short arrows should end at the bottom of the stack (minimum y)
+            short_y_arrow_val = (np.full_like(short_peak_x, short_y_baseline)) * base_1D_height
 
-        # long arrows should start at the top of the stack (maximum y)
-        long_y_arrow_offsets = a_dir_decoder_aclu_MAX_peak_maps_df['long_MaxRepeat'].to_numpy() * offset_scaling_factor
-        # long_y_arrow_val = (np.full_like(long_peak_x, long_y_baseline)) * base_1D_height
-        long_y_arrow_val = (np.full_like(long_peak_x, long_y_baseline) + long_y_arrow_offsets) * base_1D_height
-        # short arrows should end at the bottom of the stack (minimum y)
-        short_y_arrow_val = (np.full_like(short_peak_x, short_y_baseline)) * base_1D_height
+            long_y = (np.full_like(long_peak_x, long_y_baseline) + long_y_offsets) * base_1D_height
+            short_y = (np.full_like(short_peak_x, short_y_baseline) + short_y_offsets) * base_1D_height
 
-        long_y = (np.full_like(long_peak_x, long_y_baseline) + long_y_offsets) * base_1D_height
-        short_y = (np.full_like(short_peak_x, short_y_baseline) + short_y_offsets) * base_1D_height
-
-    elif (aclus_y_offset_mode.value == AclusYOffsetMode.RandomJitter.value):
-        ## Random Jitter-based offsets:
-        random_y_jitter = np.random.ranf((np.shape(active_aclus)[0], )) * 0.05
-        # random_y_jitter = np.random.ranf((np.shape(active_aclus)[0], )) * 0.1
-        # random_y_jitter = np.zeros((np.shape(active_aclus)[0], )) # no jitter
-        long_y = (np.full_like(long_peak_x, long_y_baseline)+random_y_jitter) * base_1D_height
-        short_y = (np.full_like(short_peak_x, short_y_baseline)+random_y_jitter) * base_1D_height
-    else:
-        raise NotImplementedError(f"aclus_y_offset_mode: {aclus_y_offset_mode} not implemented.")
-    
-    
-    ## OUTPUTS: long_y, short_y, long_y, long_y
-
-
-    # Draw the scatter points _____________________________________________________________________________________________ #
-
-    # INPUTS: is_aclu_in_both, disappearing_long_to_short_indicies, appearing_long_to_short_indicies
-
-    common_circle_points_kwargs = dict(alpha=0.9, picker=enable_interactivity, plotnonfinite=False)
-    common_circle_points_kwargs = common_circle_points_kwargs | kwargs.pop('common_circle_points_kwargs', {}) ## override with user's kwargs
-
-    common_BOTH_only_circle_points_kwargs = common_circle_points_kwargs | dict(marker='o', zorder=9, alpha=0.6)
-    common_BOTH_only_circle_points_kwargs = common_BOTH_only_circle_points_kwargs | kwargs.pop('common_BOTH_only_circle_points_kwargs', {}) ## override with user's kwargs
-
-
-    both_long_peak_x = long_peak_x[is_aclu_in_both]
-    both_long_y = long_y[is_aclu_in_both]
-    both_color = color[is_aclu_in_both]
-    both_long_circle_points_kwargs = dict(**common_BOTH_only_circle_points_kwargs, s=np.full((len(both_long_peak_x),), fill_value=scatter_point_size), edgecolors=([_default_edgecolors] * len(both_long_peak_x)), facecolors=both_color)
-    _out_long_points = ax.scatter(both_long_peak_x, y=both_long_y, label='long_peak_x', **both_long_circle_points_kwargs)
-    
-
-    # Disappearing Points ___________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
-    if (disappearing_long_to_short_indicies is not None) and (len(disappearing_long_to_short_indicies) > 0):
-        disappearing_long_peak_x = long_peak_x[disappearing_long_to_short_indicies]
-        disappearing_long_y = long_y[disappearing_long_to_short_indicies]
-        disappearing_facecolors = color[disappearing_long_to_short_indicies]
-        disappearing_circle_points_kwargs = dict(**common_circle_points_kwargs, marker=disappearing_marker, s=np.full((len(disappearing_long_peak_x),), fill_value=scatter_point_size), edgecolors=([disappearing_edgecolors] * len(disappearing_long_peak_x)), facecolors=disappearing_facecolors, zorder=10)
-        _out_long_disappearing_points = ax.scatter(disappearing_long_peak_x, y=disappearing_long_y, label='long_peak_x', **disappearing_circle_points_kwargs)
-    else:
-        _out_long_disappearing_points = None
-
-    ## Short: short_peak_x, short_y 
-    both_short_peak_x = short_peak_x[is_aclu_in_both]
-    both_short_y = short_y[is_aclu_in_both]
-    both_color = color[is_aclu_in_both]
-    both_short_circle_points_kwargs = dict(**common_BOTH_only_circle_points_kwargs, s=np.full((len(both_short_peak_x),), fill_value=scatter_point_size), edgecolors=([_default_edgecolors] * len(both_short_peak_x)), facecolors=both_color)
-    
-    _out_short_points = ax.scatter(both_short_peak_x, y=both_short_y, label='short_peak_x_app', **both_short_circle_points_kwargs)
-
-    # _out_short_points = ax.scatter(short_peak_x, y=short_y, label='short_peak_x', **circle_points_kwargs)
-
-    # Appearing Points ___________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
-    if (appearing_long_to_short_indicies is not None) and (len(appearing_long_to_short_indicies) > 0):        
-        appearing_short_peak_x = short_peak_x[appearing_long_to_short_indicies]
-        appearing_short_y = short_y[appearing_long_to_short_indicies]
-        appearing_facecolors = color[appearing_long_to_short_indicies]
-        appearing_circle_points_kwargs = dict(**common_circle_points_kwargs, marker=appearing_disappearing_marker, s=np.full((len(appearing_short_peak_x),), fill_value=scatter_point_size), edgecolors=([appearing_edgecolors] * len(appearing_short_peak_x)), facecolors=appearing_facecolors, zorder=11)
-        _out_short_appearing_points = ax.scatter(appearing_short_peak_x, y=appearing_short_y, label='short_peak_x_dis', **appearing_circle_points_kwargs)
-    else:
-        _out_short_appearing_points = None      
-
-
-    ## OUTPUT Variables:
-    # _output_dict = {'long_scatter': _out_long_points, 'short_scatter': _out_short_points}    
-    extant_plot_container.plots_data.scatter = {'long_scatter': _out_long_points, 'short_scatter': _out_short_points}
-    if _out_long_disappearing_points:
-        extant_plot_container.plots_data.scatter['long_disappearing_scatter'] = _out_long_disappearing_points
-    if _out_short_appearing_points:
-        extant_plot_container.plots_data.scatter['short_appearing_scatter'] = _out_short_appearing_points        
-
-    _output_by_aclu_dict = {} # keys are integer aclus, values are dictionaries of returned graphics objects:
-    
-
-    # Draw arrows from the first set of points to the second set _________________________________________________________ #
-    # arrowprops_kwargs = dict(arrowstyle="->", alpha=0.6)
-    # arrowprops_kwargs = dict(arrowstyle="simple", alpha=0.7)
-    arrowprops_kwargs = dict(arrowstyle="fancy, head_length=0.25, head_width=0.25, tail_width=0.05", alpha=0.6)
-    arrowprops_kwargs = arrowprops_kwargs | dict(alpha=0.6, zorder=1)
-    arrowprops_kwargs = arrowprops_kwargs | kwargs.pop('arrowprops_kwargs', {}) ## override with user's kwargs
-    
-    # , mutation_scale=10
-
-    ## need to take both to str, or both to int
-    both_aclus = [str(v) for v in both_aclus]
-
-    for idx, aclu_val in enumerate(active_aclus):
-        # aclu_val: int = int(aclu_val)
-        aclu_val: str = str(aclu_val)
-        if aclu_val not in _output_by_aclu_dict:
-            _output_by_aclu_dict[aclu_val] = {}
-
-        if (aclu_val in both_aclus):
-            # Starting point coordinates
-            start_x = long_peak_x[idx]
-            # start_y = 0.1 + random_y_jitter[idx]
-            start_y = long_y[idx]
-            # End point coordinates
-            end_x = short_peak_x[idx]
-            # end_y = 0.75 + random_y_jitter[idx]
-            end_y = short_y[idx]
-
-            ## override the y-positions to ensure that all arrows neatly attach only to the bottom point when using `(aclus_y_offset_mode.value == AclusYOffsetMode.CountBased.value)` mode
-            if ((aclus_y_offset_mode.value == AclusYOffsetMode.CountBased.value) and enable_single_y_point_arrows):
-                start_y = long_y_arrow_val[idx]
-                end_y = short_y_arrow_val[idx]
-
-            # Calculate the change in x and y for the arrow
-            # dx = end_x - start_x
-            # dy = end_y - start_y
-
-            # Get the corresponding color for the current index using the colormap
-            arrow_color = get_aclu_color_fn(active_aclus[idx])
+        elif (aclus_y_offset_mode.value == AclusYOffsetMode.RandomJitter.value):
+            ## Random Jitter-based offsets:
+            random_y_jitter = np.random.ranf((np.shape(active_aclus)[0], )) * 0.05
+            # random_y_jitter = np.random.ranf((np.shape(active_aclus)[0], )) * 0.1
+            # random_y_jitter = np.zeros((np.shape(active_aclus)[0], )) # no jitter
+            long_y = (np.full_like(long_peak_x, long_y_baseline)+random_y_jitter) * base_1D_height
+            short_y = (np.full_like(short_peak_x, short_y_baseline)+random_y_jitter) * base_1D_height
             
-            # Annotate the plot with arrows; adjust the properties according to your needs
-            _output_by_aclu_dict[aclu_val]['long_to_short_arrow'] = ax.annotate('', xy=(end_x, end_y), xytext=(start_x, start_y), arrowprops=dict(**arrowprops_kwargs, color=arrow_color), label=str(active_aclus[idx]))
 
+        elif (aclus_y_offset_mode.value == AclusYOffsetMode.Pf2DExactY.value):
+            ## Exact Pf2D y-positions:
+            assert long_y_column_name is not None
+            assert short_y_column_name is not None
+            long_peak_y = a_dir_decoder_aclu_MAX_peak_maps_df[long_y_column_name].to_numpy()
+            short_peak_y = a_dir_decoder_aclu_MAX_peak_maps_df[short_y_column_name].to_numpy()
+            # peak_x_diff = LR_only_decoder_aclu_MAX_peak_maps_df['peak_diff'].to_numpy()
+            assert (len(long_peak_y) == len(long_peak_x)), f"len(long_peak_y): {len(long_peak_y)} != len(long_peak_x): {len(long_peak_x)}"
+            assert (len(short_peak_y) == len(long_peak_x)), f"len(short_peak_y): {len(short_peak_y)} != len(long_peak_x): {len(long_peak_x)}"
+            
+            # long_y = (np.full_like(long_peak_x, long_y_baseline)+random_y_jitter) * base_1D_height
+            # short_y = (np.full_like(short_peak_x, short_y_baseline)+random_y_jitter) * base_1D_height
+            # long_y = deepcopy(long_peak_y) # (np.full_like(long_peak_x, long_y_baseline)+random_y_jitter) * base_1D_height
+            # short_y = deepcopy(short_peak_y) # (np.full_like(short_peak_x, short_y_baseline)+random_y_jitter) * base_1D_height
+
+            long_y = (deepcopy(long_peak_y) * track_y_height) + long_y_baseline
+            short_y = (deepcopy(short_peak_y) * track_y_height) + short_y_baseline
+            
         else:
-            _output_by_aclu_dict[aclu_val]['long_to_short_arrow'] = None
-
-
-    ## END FOR for idx, aclu_v...
-
-
-    # ACLU Point Text Labels _____________________________________________________________________________________________ #
-    if draw_point_aclu_labels:
+            raise NotImplementedError(f"aclus_y_offset_mode: {aclus_y_offset_mode} not implemented.")
         
-        text_kwargs = dict(color=aclu_labels_text_color, fontsize=aclu_labels_fontsize, ha='center', va='center')
-        # Add text labels to scatter points
-        for i, aclu_val in enumerate(active_aclus):
+        
+        ## OUTPUTS: long_y, short_y, long_y, long_y
+
+
+        # Draw the scatter points _____________________________________________________________________________________________ #
+
+        # INPUTS: is_aclu_in_both, disappearing_long_to_short_indicies, appearing_long_to_short_indicies
+
+        common_circle_points_kwargs = dict(alpha=0.9, picker=enable_interactivity, plotnonfinite=False)
+        common_circle_points_kwargs = common_circle_points_kwargs | kwargs.pop('common_circle_points_kwargs', {}) ## override with user's kwargs
+
+        common_BOTH_only_circle_points_kwargs = common_circle_points_kwargs | dict(marker='o', zorder=9, alpha=0.6)
+        common_BOTH_only_circle_points_kwargs = common_BOTH_only_circle_points_kwargs | kwargs.pop('common_BOTH_only_circle_points_kwargs', {}) ## override with user's kwargs
+
+
+        both_long_peak_x = long_peak_x[is_aclu_in_both]
+        both_long_y = long_y[is_aclu_in_both]
+        both_color = color[is_aclu_in_both]
+        both_long_circle_points_kwargs = dict(**common_BOTH_only_circle_points_kwargs, s=np.full((len(both_long_peak_x),), fill_value=scatter_point_size), edgecolors=([_default_edgecolors] * len(both_long_peak_x)), facecolors=both_color)
+        _out_long_points = ax.scatter(both_long_peak_x, y=both_long_y, label='long_peak_x', **both_long_circle_points_kwargs)
+        
+
+        # Disappearing Points ___________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
+        if (disappearing_long_to_short_indicies is not None) and (len(disappearing_long_to_short_indicies) > 0):
+            disappearing_long_peak_x = long_peak_x[disappearing_long_to_short_indicies]
+            disappearing_long_y = long_y[disappearing_long_to_short_indicies]
+            disappearing_facecolors = color[disappearing_long_to_short_indicies]
+            disappearing_circle_points_kwargs = dict(**common_circle_points_kwargs, marker=disappearing_marker, s=np.full((len(disappearing_long_peak_x),), fill_value=scatter_point_size), edgecolors=([disappearing_edgecolors] * len(disappearing_long_peak_x)), facecolors=disappearing_facecolors, zorder=10)
+            _out_long_disappearing_points = ax.scatter(disappearing_long_peak_x, y=disappearing_long_y, label='long_peak_x', **disappearing_circle_points_kwargs)
+        else:
+            _out_long_disappearing_points = None
+
+        ## Short: short_peak_x, short_y 
+        both_short_peak_x = short_peak_x[is_aclu_in_both]
+        both_short_y = short_y[is_aclu_in_both]
+        both_color = color[is_aclu_in_both]
+        both_short_circle_points_kwargs = dict(**common_BOTH_only_circle_points_kwargs, s=np.full((len(both_short_peak_x),), fill_value=scatter_point_size), edgecolors=([_default_edgecolors] * len(both_short_peak_x)), facecolors=both_color)
+        
+        _out_short_points = ax.scatter(both_short_peak_x, y=both_short_y, label='short_peak_x_app', **both_short_circle_points_kwargs)
+
+        # _out_short_points = ax.scatter(short_peak_x, y=short_y, label='short_peak_x', **circle_points_kwargs)
+
+        # Appearing Points ___________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
+        if (appearing_long_to_short_indicies is not None) and (len(appearing_long_to_short_indicies) > 0):        
+            appearing_short_peak_x = short_peak_x[appearing_long_to_short_indicies]
+            appearing_short_y = short_y[appearing_long_to_short_indicies]
+            appearing_facecolors = color[appearing_long_to_short_indicies]
+            appearing_circle_points_kwargs = dict(**common_circle_points_kwargs, marker=appearing_disappearing_marker, s=np.full((len(appearing_short_peak_x),), fill_value=scatter_point_size), edgecolors=([appearing_edgecolors] * len(appearing_short_peak_x)), facecolors=appearing_facecolors, zorder=11)
+            _out_short_appearing_points = ax.scatter(appearing_short_peak_x, y=appearing_short_y, label='short_peak_x_dis', **appearing_circle_points_kwargs)
+        else:
+            _out_short_appearing_points = None      
+
+
+        ## OUTPUT Variables:
+        # _output_dict = {'long_scatter': _out_long_points, 'short_scatter': _out_short_points}    
+        extant_plot_container.plots_data.scatter = {'long_scatter': _out_long_points, 'short_scatter': _out_short_points}
+        if _out_long_disappearing_points:
+            extant_plot_container.plots_data.scatter['long_disappearing_scatter'] = _out_long_disappearing_points
+        if _out_short_appearing_points:
+            extant_plot_container.plots_data.scatter['short_appearing_scatter'] = _out_short_appearing_points        
+
+        _output_by_aclu_dict = {} # keys are integer aclus, values are dictionaries of returned graphics objects:
+        
+
+        # Draw arrows from the first set of points to the second set _________________________________________________________ #
+        # arrowprops_kwargs = dict(arrowstyle="->", alpha=0.6)
+        # arrowprops_kwargs = dict(arrowstyle="simple", alpha=0.7)
+        arrowprops_kwargs = dict(arrowstyle="fancy, head_length=0.25, head_width=0.25, tail_width=0.05", alpha=0.6)
+        arrowprops_kwargs = arrowprops_kwargs | dict(alpha=0.6, zorder=1)
+        arrowprops_kwargs = arrowprops_kwargs | kwargs.pop('arrowprops_kwargs', {}) ## override with user's kwargs
+        
+        # , mutation_scale=10
+
+        ## need to take both to str, or both to int
+        both_aclus = [str(v) for v in both_aclus]
+
+        for idx, aclu_val in enumerate(active_aclus):
             # aclu_val: int = int(aclu_val)
             aclu_val: str = str(aclu_val)
-
-            if aclu_val not in appearing_long_to_short_aclus:
-                a_long_text = ax.text(long_peak_x[i], long_y[i], str(aclu_val), **text_kwargs)
-                a_long_text.set_path_effects(aclu_labels_text_path_effects)
-            else:
-                a_long_text = None
-
-            if aclu_val not in disappearing_long_to_short_aclus:
-                a_short_text = ax.text(short_peak_x[i], short_y[i], str(aclu_val), **text_kwargs)
-                a_short_text.set_path_effects(aclu_labels_text_path_effects)
-            else:
-                a_short_text = None
-
             if aclu_val not in _output_by_aclu_dict:
                 _output_by_aclu_dict[aclu_val] = {}
-            _output_by_aclu_dict[aclu_val]['long_text'] = a_long_text
-            _output_by_aclu_dict[aclu_val]['short_text'] = a_short_text
 
-        if enable_adjust_overlapping_text:
-            from adjustText import adjust_text
-            # Call adjust_text function to adjust the positions of text labels
-            adjust_text([v['long_text'] for v in _output_by_aclu_dict.values()], ax=ax)
-            adjust_text([v['short_text'] for v in _output_by_aclu_dict.values()], ax=ax)
+            if (aclu_val in both_aclus):
+                # Starting point coordinates
+                start_x = long_peak_x[idx]
+                # start_y = 0.1 + random_y_jitter[idx]
+                start_y = long_y[idx]
+                # End point coordinates
+                end_x = short_peak_x[idx]
+                # end_y = 0.75 + random_y_jitter[idx]
+                end_y = short_y[idx]
 
-    ## END if draw_point_aclu_labels...
+                ## override the y-positions to ensure that all arrows neatly attach only to the bottom point when using `(aclus_y_offset_mode.value == AclusYOffsetMode.CountBased.value)` mode
+                if ((aclus_y_offset_mode.value == AclusYOffsetMode.CountBased.value) and enable_single_y_point_arrows):
+                    start_y = long_y_arrow_val[idx]
+                    end_y = short_y_arrow_val[idx]
 
-    if enable_interactivity:
-        ## Build the interactivity callbacks:
-        interactivity_output_dict = {}
-        previous_selected_indices = []
+                # Calculate the change in x and y for the arrow
+                # dx = end_x - start_x
+                # dy = end_y - start_y
 
-        if not isinstance(active_aclus, NDArray):
-            active_aclus = np.array(active_aclus)
-
-        index_is_selected = np.full_like(active_aclus, fill_value=False, dtype=bool)
-        
-
-        # if did_reclick_same_selection:
-
-        def _perform_update_scatter_point_color(_out_points, an_index: int, new_color):
-            # _out_points._facecolors[an_index] = new_color # scalar_map.to_rgba(active_aclus[index])
-            _out_points._edgecolors[an_index] = new_color
-            
-
-        def _perform_update_aclu_is_selected(an_index: int, an_aclu: int, is_selected: bool):
-            """ Updates the selection state for the specific aclu
-
-            captures: _out_long_points, _out_short_points, _output_by_aclu_dict, 
-                scatter_edgecolors_selection_color, selection_color, aclu_labels_fontsize, scalar_map,
-                aclu_labels_text_path_effects, selection_text_path_effects, get_aclu_color_fn
-            
-            _perform_update_scatter_point_is_selected(an_index=an_index, an_aclu=active_aclus[an_index], is_selected=True)
-            """
-            if is_selected:
-                # selected
-                # original_color = scalar_map.to_rgba(an_aclu)
-                original_color = get_aclu_color_fn(an_aclu)
-                active_color = original_color
-                # active_color = scatter_edgecolors_selection_color
-
-                active_arrow_color = selection_color
-                active_aclu_labels_text_color = selection_color
-                active_aclu_labels_fontsize = (aclu_labels_fontsize+0.1)
-                active_aclu_labels_text_path_effects = selection_text_path_effects
-                active_scatter_point_size = scatter_point_selected_size
+                # Get the corresponding color for the current index using the colormap
+                arrow_color = get_aclu_color_fn(active_aclus[idx])
                 
+                # Annotate the plot with arrows; adjust the properties according to your needs
+                _output_by_aclu_dict[aclu_val]['long_to_short_arrow'] = ax.annotate('', xy=(end_x, end_y), xytext=(start_x, start_y), arrowprops=dict(**arrowprops_kwargs, color=arrow_color), label=str(active_aclus[idx]))
+
             else:
-                # not-selected
-                # original_color = scalar_map.to_rgba(an_aclu)
-                original_color = get_aclu_color_fn(an_aclu)
-                active_color = original_color
-                active_arrow_color = original_color
-                active_aclu_labels_text_color = aclu_labels_text_color
-                active_aclu_labels_fontsize = aclu_labels_fontsize
-                active_aclu_labels_text_path_effects = aclu_labels_text_path_effects
-                active_scatter_point_size = scatter_point_size
+                _output_by_aclu_dict[aclu_val]['long_to_short_arrow'] = None
 
 
-            # _perform_update_scatter_point_color(_out_long_points, an_index=an_index, new_color=active_color)
-            # _perform_update_scatter_point_color(_out_short_points, an_index=an_index, new_color=active_color)
-
-            for _out_points in [_out_long_points, _out_short_points]:
-                _perform_update_scatter_point_color(_out_points, an_index=an_index, new_color=active_color)
-                _out_points._sizes[an_index] = active_scatter_point_size
-
-            # _out_long_points.get_paths()[an_index].set_path_effects(active_aclu_labels_text_path_effects)
-            # _out_short_points.get_paths()[an_index].set_path_effects(active_aclu_labels_text_path_effects)
+        ## END FOR for idx, aclu_v...
 
 
-            # Change the arrow selection:
-            a_paired_arrow_container_Text_obj = _output_by_aclu_dict.get(an_aclu, {}).get('long_to_short_arrow', None)
-            if a_paired_arrow_container_Text_obj is not None:
-                a_paired_arrow: mpl.patches.FancyArrowPatch = a_paired_arrow_container_Text_obj.arrow_patch
-                a_paired_arrow.set_color(active_arrow_color)  # Change arrow color to blue
+        # ACLU Point Text Labels _____________________________________________________________________________________________ #
+        if draw_point_aclu_labels:
+            
+            text_kwargs = dict(color=aclu_labels_text_color, fontsize=aclu_labels_fontsize, ha='center', va='center')
+            # Add text labels to scatter points
+            for i, aclu_val in enumerate(active_aclus):
+                # aclu_val: int = int(aclu_val)
+                aclu_val: str = str(aclu_val)
 
-            if draw_point_aclu_labels:
-                _output_by_aclu_dict[an_aclu]['long_text'].set_color(active_aclu_labels_text_color)
-                _output_by_aclu_dict[an_aclu]['short_text'].set_color(active_aclu_labels_text_color)
+                if aclu_val not in appearing_long_to_short_aclus:
+                    a_long_text = ax.text(long_peak_x[i], long_y[i], str(aclu_val), **text_kwargs)
+                    a_long_text.set_path_effects(aclu_labels_text_path_effects)
+                else:
+                    a_long_text = None
 
-                _output_by_aclu_dict[an_aclu]['long_text'].set_fontsize(active_aclu_labels_fontsize)
-                _output_by_aclu_dict[an_aclu]['short_text'].set_fontsize(active_aclu_labels_fontsize)
-    
-                _output_by_aclu_dict[an_aclu]['long_text'].set_path_effects(active_aclu_labels_text_path_effects)
-                _output_by_aclu_dict[an_aclu]['short_text'].set_path_effects(active_aclu_labels_text_path_effects)
+                if aclu_val not in disappearing_long_to_short_aclus:
+                    a_short_text = ax.text(short_peak_x[i], short_y[i], str(aclu_val), **text_kwargs)
+                    a_short_text.set_path_effects(aclu_labels_text_path_effects)
+                else:
+                    a_short_text = None
 
-                if not is_selected:
-                    _output_by_aclu_dict[an_aclu]['long_text'].set_zorder(10)  # Choose a z-order value higher than other objects
-                    _output_by_aclu_dict[an_aclu]['short_text'].set_zorder(10)
+                if aclu_val not in _output_by_aclu_dict:
+                    _output_by_aclu_dict[aclu_val] = {}
+                _output_by_aclu_dict[aclu_val]['long_text'] = a_long_text
+                _output_by_aclu_dict[aclu_val]['short_text'] = a_short_text
+
+            if enable_adjust_overlapping_text:
+                from adjustText import adjust_text
+                # Call adjust_text function to adjust the positions of text labels
+                adjust_text([v['long_text'] for v in _output_by_aclu_dict.values()], ax=ax)
+                adjust_text([v['short_text'] for v in _output_by_aclu_dict.values()], ax=ax)
+
+        ## END if draw_point_aclu_labels...
+
+        if enable_interactivity:
+            ## Build the interactivity callbacks:
+            interactivity_output_dict = {}
+            previous_selected_indices = []
+
+            if not isinstance(active_aclus, NDArray):
+                active_aclus = np.array(active_aclus)
+
+            index_is_selected = np.full_like(active_aclus, fill_value=False, dtype=bool)
+            
+
+            # if did_reclick_same_selection:
+
+            def _perform_update_scatter_point_color(_out_points, an_index: int, new_color):
+                # _out_points._facecolors[an_index] = new_color # scalar_map.to_rgba(active_aclus[index])
+                _out_points._edgecolors[an_index] = new_color
                 
 
+            def _perform_update_aclu_is_selected(an_index: int, an_aclu: int, is_selected: bool):
+                """ Updates the selection state for the specific aclu
 
-        def on_scatter_point_pick(event):
-            """ 
-            Captures: active_aclus, scalar_map, _out_long_points, _out_short_points, _output_by_aclu_dict, long_peak_x, long_y, selection_color, aclu_labels_fontsize, get_aclu_color_fn
-            """
-            nonlocal previous_selected_indices, index_is_selected
-            newly_selected_ind = event.ind
-            if debug_print:
-                print(f'on_scatter_point_pick(event: {event}):\n\t', newly_selected_ind, long_peak_x[newly_selected_ind], long_y[newly_selected_ind])
-            # Check which subplot the event originated from
-            artist = event.artist
-            if event.artist not in ax.collections:  # Check if the event originated from the scatter plot in ax1
-                # Your code for handling pick events in the first subplot
-                # print(f'\t not intended for this ax. Skipping.')
-                return
-
-            if len(newly_selected_ind)>1:
-                print(f'WARN: multiple indicies selected: {newly_selected_ind} -- selecting only the first item.')
-                newly_selected_ind = np.array([newly_selected_ind[0]]) # only get the first item if multiple are selected.
-
-
-            # did_reclick_same_selection: bool = np.all(newly_selected_ind == previous_selected_indices) # lists are the same
-            index_is_selected[newly_selected_ind] = np.logical_not(index_is_selected[newly_selected_ind]) # negate the selection
-            any_changed_idxs = np.union1d(previous_selected_indices, newly_selected_ind)
-            if debug_print:
-                print(f'\tprevious_selected_indices: {previous_selected_indices}')
-                print(f'\tnewly_selected_ind: {newly_selected_ind}')
-                print(f'\tany_changed_idxs: {any_changed_idxs}')
-
-            for an_index in any_changed_idxs:
-                an_index: int = int(an_index)
-                if debug_print:
-                    print(f'\tan_index: {an_index}, type(an_index): {type(an_index)}, active_aclus: {active_aclus}, type(active_aclus): {type(active_aclus)} ')
-                aclu_changed: int = int(active_aclus[an_index])
-                if debug_print:
-                    print(f'\taclu_changed: {aclu_changed}')
-                _perform_update_aclu_is_selected(an_index=an_index, an_aclu=aclu_changed, is_selected=index_is_selected[an_index])
-
-
-            previous_selected_indices = np.nonzero(index_is_selected==True)
-
-            plt.draw()  # Update the plot
-
-        _mpl_pick_event_handle_idx: int = fig.canvas.mpl_connect('pick_event', on_scatter_point_pick)
-
-
-        interactivity_output_dict['get_aclu_color_fn'] = get_aclu_color_fn
-        interactivity_output_dict['scatter_select_function'] = on_scatter_point_pick
-        interactivity_output_dict['_scatter_select_mpl_pick_event_handle_idx'] = _mpl_pick_event_handle_idx
-        extant_plot_container.plots_data.interactivity_output_dict = interactivity_output_dict
-        
-    ## END if enable_interactivity...
-
-    ## format tha axes:
-    ax.set_yticks([])
-    ax.set_yticklabels([])
-    ax.spines['top'].set_visible(False)
-    ax.spines['right'].set_visible(False)
-    ax.spines['bottom'].set_visible(False)
-    ax.spines['left'].set_visible(False)
-
-    extant_plot_container.plots_data._output_by_aclu_dict = _output_by_aclu_dict
-
-    # Show the plot
-    if not defer_render:
-        plt.show()
-    # return fig, ax, (_output_dict, _output_by_aclu_dict)
-    return fig, ax, extant_plot_container
-
-
-@function_attributes(short_name='bidir_track_remap', tags=['figure', 'remap', 'track', 'PhoDibaPaper2025_FIGURES'], input_requires=[], output_provides=[], uses=['_get_directional_pf_peaks_dfs', '_plot_track_remapping_diagram', 'build_shared_sorted_neuron_color_maps'], used_by=[], creation_date='2024-04-29 10:23', related_items=[])
-def plot_bidirectional_track_remapping_diagram(track_templates, grid_bin_bounds, active_context=None, perform_write_to_file_callback=None, defer_render: bool=False,
-                                                enable_interactivity:bool=True, is_dark_mode:bool=True, aclus_y_offset_mode: AclusYOffsetMode = AclusYOffsetMode.RandomJitter,
-                                                use_separate_plot_for_each_direction:bool=True, use_unique_aclu_colors:bool=False, drop_aclu_if_missing_long_or_short:bool=False,
-                                                **kwargs):   
-    """ Plots a figure that shows how the place cells remap from long to short, with two plots for the seperate run directions
-
-    Usage:
-    
-        from pyphoplacecellanalysis.Pho2D.track_shape_drawing import plot_bidirectional_track_remapping_diagram
-
-        collector = plot_bidirectional_track_remapping_diagram(track_templates, grid_bin_bounds=long_pf2D.config.grid_bin_bounds, active_context=curr_active_pipeline.build_display_context_for_session(display_fn_name='plot_bidirectional_track_remapping_diagram'))
-
-    """
-    import matplotlib as mpl
-    import matplotlib.pyplot as plt
-    from flexitext import flexitext ## flexitext for formatted matplotlib text
-
-    from pyphocorehelpers.DataStructure.RenderPlots.MatplotLibRenderPlots import FigureCollector
-    from pyphoplacecellanalysis.General.Model.Configs.LongShortDisplayConfig import PlottingHelpers
-    from neuropy.utils.matplotlib_helpers import FormattedFigureText
-
-    from matplotlib.gridspec import GridSpec
-    from neuropy.utils.matplotlib_helpers import build_or_reuse_figure, perform_update_title_subtitle
-    from pyphoplacecellanalysis.Pho2D.track_shape_drawing import _plot_track_remapping_diagram
-    from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.SpikeRasters import build_shared_sorted_neuron_color_maps
-    
-    if active_context is not None:
-            display_context = active_context.adding_context('display_fn', display_fn_name='bidir_track_remap')
-        
-    with mpl.rc_context({'figure.figsize': (10, 4), 'figure.dpi': '220', 'savefig.transparent': True, 'ps.fonttype': 42, }):
-        # Create a FigureCollector instance
-        with FigureCollector(name='plot_bidirectional_track_remapping_diagram', base_context=display_context) as collector:
-
-            ## Define common operations to do after making the figure:
-            def setup_common_after_creation(a_collector, fig, axes, sub_context, title=f'<size:22>Track <weight:bold>Remapping</></>'):
-                """ Captures:
-
-                t_split
+                captures: _out_long_points, _out_short_points, _output_by_aclu_dict, 
+                    scatter_edgecolors_selection_color, selection_color, aclu_labels_fontsize, scalar_map,
+                    aclu_labels_text_path_effects, selection_text_path_effects, get_aclu_color_fn
+                
+                _perform_update_scatter_point_is_selected(an_index=an_index, an_aclu=active_aclus[an_index], is_selected=True)
                 """
-                a_collector.contexts.append(sub_context)
-                
-                # `flexitext` version:
-                text_formatter = FormattedFigureText()
-                # ax.set_title('')
-                fig.suptitle('')
-                text_formatter.setup_margins(fig)
-                title_text_obj = flexitext(text_formatter.left_margin, text_formatter.top_margin,
-                                        title,
-                                        va="bottom", xycoords="figure fraction")
-                footer_text_obj = flexitext((text_formatter.left_margin * 0.1), (text_formatter.bottom_margin * 0.25),
-                                            text_formatter._build_footer_string(active_context=sub_context),
-                                            va="top", xycoords="figure fraction")
+                if is_selected:
+                    # selected
+                    # original_color = scalar_map.to_rgba(an_aclu)
+                    original_color = get_aclu_color_fn(an_aclu)
+                    active_color = original_color
+                    # active_color = scatter_edgecolors_selection_color
+
+                    active_arrow_color = selection_color
+                    active_aclu_labels_text_color = selection_color
+                    active_aclu_labels_fontsize = (aclu_labels_fontsize+0.1)
+                    active_aclu_labels_text_path_effects = selection_text_path_effects
+                    active_scatter_point_size = scatter_point_selected_size
+                    
+                else:
+                    # not-selected
+                    # original_color = scalar_map.to_rgba(an_aclu)
+                    original_color = get_aclu_color_fn(an_aclu)
+                    active_color = original_color
+                    active_arrow_color = original_color
+                    active_aclu_labels_text_color = aclu_labels_text_color
+                    active_aclu_labels_fontsize = aclu_labels_fontsize
+                    active_aclu_labels_text_path_effects = aclu_labels_text_path_effects
+                    active_scatter_point_size = scatter_point_size
+
+
+                # _perform_update_scatter_point_color(_out_long_points, an_index=an_index, new_color=active_color)
+                # _perform_update_scatter_point_color(_out_short_points, an_index=an_index, new_color=active_color)
+
+                for _out_points in [_out_long_points, _out_short_points]:
+                    _perform_update_scatter_point_color(_out_points, an_index=an_index, new_color=active_color)
+                    _out_points._sizes[an_index] = active_scatter_point_size
+
+                # _out_long_points.get_paths()[an_index].set_path_effects(active_aclu_labels_text_path_effects)
+                # _out_short_points.get_paths()[an_index].set_path_effects(active_aclu_labels_text_path_effects)
+
+
+                # Change the arrow selection:
+                a_paired_arrow_container_Text_obj = _output_by_aclu_dict.get(an_aclu, {}).get('long_to_short_arrow', None)
+                if a_paired_arrow_container_Text_obj is not None:
+                    a_paired_arrow: mpl.patches.FancyArrowPatch = a_paired_arrow_container_Text_obj.arrow_patch
+                    a_paired_arrow.set_color(active_arrow_color)  # Change arrow color to blue
+
+                if draw_point_aclu_labels:
+                    _output_by_aclu_dict[an_aclu]['long_text'].set_color(active_aclu_labels_text_color)
+                    _output_by_aclu_dict[an_aclu]['short_text'].set_color(active_aclu_labels_text_color)
+
+                    _output_by_aclu_dict[an_aclu]['long_text'].set_fontsize(active_aclu_labels_fontsize)
+                    _output_by_aclu_dict[an_aclu]['short_text'].set_fontsize(active_aclu_labels_fontsize)
+        
+                    _output_by_aclu_dict[an_aclu]['long_text'].set_path_effects(active_aclu_labels_text_path_effects)
+                    _output_by_aclu_dict[an_aclu]['short_text'].set_path_effects(active_aclu_labels_text_path_effects)
+
+                    if not is_selected:
+                        _output_by_aclu_dict[an_aclu]['long_text'].set_zorder(10)  # Choose a z-order value higher than other objects
+                        _output_by_aclu_dict[an_aclu]['short_text'].set_zorder(10)
+                    
+
+
+            def on_scatter_point_pick(event):
+                """ 
+                Captures: active_aclus, scalar_map, _out_long_points, _out_short_points, _output_by_aclu_dict, long_peak_x, long_y, selection_color, aclu_labels_fontsize, get_aclu_color_fn
+                """
+                nonlocal previous_selected_indices, index_is_selected
+                newly_selected_ind = event.ind
+                if debug_print:
+                    print(f'on_scatter_point_pick(event: {event}):\n\t', newly_selected_ind, long_peak_x[newly_selected_ind], long_y[newly_selected_ind])
+                # Check which subplot the event originated from
+                artist = event.artist
+                if event.artist not in ax.collections:  # Check if the event originated from the scatter plot in ax1
+                    # Your code for handling pick events in the first subplot
+                    # print(f'\t not intended for this ax. Skipping.')
+                    return
+
+                if len(newly_selected_ind)>1:
+                    print(f'WARN: multiple indicies selected: {newly_selected_ind} -- selecting only the first item.')
+                    newly_selected_ind = np.array([newly_selected_ind[0]]) # only get the first item if multiple are selected.
+
+
+                # did_reclick_same_selection: bool = np.all(newly_selected_ind == previous_selected_indices) # lists are the same
+                index_is_selected[newly_selected_ind] = np.logical_not(index_is_selected[newly_selected_ind]) # negate the selection
+                any_changed_idxs = np.union1d(previous_selected_indices, newly_selected_ind)
+                if debug_print:
+                    print(f'\tprevious_selected_indices: {previous_selected_indices}')
+                    print(f'\tnewly_selected_ind: {newly_selected_ind}')
+                    print(f'\tany_changed_idxs: {any_changed_idxs}')
+
+                for an_index in any_changed_idxs:
+                    an_index: int = int(an_index)
+                    if debug_print:
+                        print(f'\tan_index: {an_index}, type(an_index): {type(an_index)}, active_aclus: {active_aclus}, type(active_aclus): {type(active_aclus)} ')
+                    aclu_changed: int = int(active_aclus[an_index])
+                    if debug_print:
+                        print(f'\taclu_changed: {aclu_changed}')
+                    _perform_update_aclu_is_selected(an_index=an_index, an_aclu=aclu_changed, is_selected=index_is_selected[an_index])
+
+
+                previous_selected_indices = np.nonzero(index_is_selected==True)
+
+                plt.draw()  # Update the plot
+
+            _mpl_pick_event_handle_idx: int = fig.canvas.mpl_connect('pick_event', on_scatter_point_pick)
+
+
+            interactivity_output_dict['get_aclu_color_fn'] = get_aclu_color_fn
+            interactivity_output_dict['scatter_select_function'] = on_scatter_point_pick
+            interactivity_output_dict['_scatter_select_mpl_pick_event_handle_idx'] = _mpl_pick_event_handle_idx
+            extant_plot_container.plots_data.interactivity_output_dict = interactivity_output_dict
             
-                if ((perform_write_to_file_callback is not None) and (sub_context is not None)):
-                    perform_write_to_file_callback(sub_context, fig)
+        ## END if enable_interactivity...
+
+        ## format tha axes:
+        ax.set_yticks([])
+        ax.set_yticklabels([])
+        ax.spines['top'].set_visible(False)
+        ax.spines['right'].set_visible(False)
+        ax.spines['bottom'].set_visible(False)
+        ax.spines['left'].set_visible(False)
+
+        extant_plot_container.plots_data._output_by_aclu_dict = _output_by_aclu_dict
+
+        # Show the plot
+        if not defer_render:
+            plt.show()
+        # return fig, ax, (_output_dict, _output_by_aclu_dict)
+        return fig, ax, extant_plot_container
 
 
-            # BEGIN FUNCTION BODY
-            (LR_only_decoder_aclu_MAX_peak_maps_df, RL_only_decoder_aclu_MAX_peak_maps_df), AnyDir_decoder_aclu_MAX_peak_maps_df = track_templates.get_directional_pf_maximum_peaks_dfs(drop_aclu_if_missing_long_or_short=drop_aclu_if_missing_long_or_short)
+    @function_attributes(short_name='bidir_track_remap', tags=['figure', 'remap', 'track', 'PhoDibaPaper2025_FIGURES'], input_requires=[], output_provides=[], uses=['_get_directional_pf_peaks_dfs', '_plot_track_remapping_diagram', 'build_shared_sorted_neuron_color_maps'], used_by=[], creation_date='2024-04-29 10:23', related_items=[])
+    @classmethod
+    def plot_bidirectional_track_remapping_diagram(cls, track_templates, grid_bin_bounds, active_context=None, perform_write_to_file_callback=None, defer_render: bool=False,
+                                                    enable_interactivity:bool=True, is_dark_mode:bool=True, aclus_y_offset_mode: AclusYOffsetMode = AclusYOffsetMode.RandomJitter,
+                                                    use_separate_plot_for_each_direction:bool=True, use_unique_aclu_colors:bool=False, drop_aclu_if_missing_long_or_short:bool=False,
+                                                    **kwargs):   
+        """ Plots a figure that shows how the place cells remap from long to short, with two plots for the seperate run directions
 
+        Usage:
+        
+            from pyphoplacecellanalysis.Pho2D.track_shape_drawing import plot_bidirectional_track_remapping_diagram
 
-            # AnyDir_decoder_aclu_MAX_peak_maps_df.aclu.to_numpy()
-            neuron_IDs_lists = [deepcopy(a_decoder.neuron_IDs) for a_decoder in track_templates.get_decoders_dict().values()] # [A, B, C, D, ...]
-            # _unit_qcolors_map, unit_colors_map = build_shared_sorted_neuron_color_maps(neuron_IDs_lists)
+            collector = plot_bidirectional_track_remapping_diagram(track_templates, grid_bin_bounds=long_pf2D.config.grid_bin_bounds, active_context=curr_active_pipeline.build_display_context_for_session(display_fn_name='plot_bidirectional_track_remapping_diagram'))
 
+        """
+        import matplotlib as mpl
+        import matplotlib.pyplot as plt
+        from flexitext import flexitext ## flexitext for formatted matplotlib text
 
-            if use_unique_aclu_colors:
-                unit_colors_map, _unit_colors_ndarray_map = build_shared_sorted_neuron_color_maps(neuron_IDs_lists, return_255_array=False)
-                # _by_LR = LR_only_decoder_aclu_MAX_peak_maps_df.sort_values(by=['long_LR'], inplace=False)
-                _by_ANY: pd.DataFrame = AnyDir_decoder_aclu_MAX_peak_maps_df.sort_values(by=['long_LR', 'long_RL'], inplace=False) ## sort by peak location on Long track
-                long_peak_sorted_unit_colors_ndarray_map = dict(zip(_by_ANY.index.to_numpy(), list(_unit_colors_ndarray_map.values())))
-                unit_id_colors_map = long_peak_sorted_unit_colors_ndarray_map
+        from pyphocorehelpers.DataStructure.RenderPlots.MatplotLibRenderPlots import FigureCollector
+        from pyphoplacecellanalysis.General.Model.Configs.LongShortDisplayConfig import PlottingHelpers
+        from neuropy.utils.matplotlib_helpers import FormattedFigureText
 
-            else:
-                unit_id_colors_map = None
-
+        from matplotlib.gridspec import GridSpec
+        from neuropy.utils.matplotlib_helpers import build_or_reuse_figure, perform_update_title_subtitle
+        from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.SpikeRasters import build_shared_sorted_neuron_color_maps
+        
+        if active_context is not None:
+                display_context = active_context.adding_context('display_fn', display_fn_name='bidir_track_remap')
             
-            # kwargs = dict(draw_point_aclu_labels=True, enable_interactivity=False, enable_adjust_overlapping_text=False, unit_id_colors_map=_unit_colors_ndarray_map)
-            kwargs = dict(draw_point_aclu_labels=True, enable_interactivity=enable_interactivity, enable_adjust_overlapping_text=False, unit_id_colors_map=unit_id_colors_map, is_dark_mode=is_dark_mode, aclus_y_offset_mode=aclus_y_offset_mode)
+        with mpl.rc_context({'figure.figsize': (10, 4), 'figure.dpi': '220', 'savefig.transparent': True, 'ps.fonttype': 42, }):
+            # Create a FigureCollector instance
+            with FigureCollector(name='plot_bidirectional_track_remapping_diagram', base_context=display_context) as collector:
 
-            ## Either way, make a single figure for both LR/RL remapping cells:
-            if use_separate_plot_for_each_direction:
-                ## Make two separate axes for LR/RL remapping cells:
-                fig, axs = collector.subplots(nrows=2, ncols=1, sharex=True, sharey=True, num='Track Remapping', figsize=kwargs.pop('figsize', (10, 4)), dpi=kwargs.pop('dpi', None), constrained_layout=True, clear=True)
-                assert len(axs) == 2, f"{len(axs)}"
-                ax_dict = {'ax_LR': axs[0], 'ax_RL': axs[1]}
+                ## Define common operations to do after making the figure:
+                def setup_common_after_creation(a_collector, fig, axes, sub_context, title=f'<size:22>Track <weight:bold>Remapping</></>'):
+                    """ Captures:
 
-                fig, ax_LR, _outputs_tuple_LR = _plot_track_remapping_diagram(LR_only_decoder_aclu_MAX_peak_maps_df, grid_bin_bounds=grid_bin_bounds, long_column_name='long_LR', short_column_name='short_LR', ax=ax_dict['ax_LR'], defer_render=defer_render, **kwargs)
-                perform_update_title_subtitle(fig=fig, ax=ax_LR, title_string=None, subtitle_string=f"LR Track Remapping - {len(LR_only_decoder_aclu_MAX_peak_maps_df)} neurons")
-                fig, ax_RL, _outputs_tuple_RL = _plot_track_remapping_diagram(RL_only_decoder_aclu_MAX_peak_maps_df, grid_bin_bounds=grid_bin_bounds, long_column_name='long_RL', short_column_name='short_RL', ax=ax_dict['ax_RL'], defer_render=defer_render, **kwargs)
-                perform_update_title_subtitle(fig=fig, ax=ax_RL, title_string=None, subtitle_string=f"RL Track Remapping - {len(RL_only_decoder_aclu_MAX_peak_maps_df)} neurons")
-
-                setup_common_after_creation(collector, fig=fig, axes=[ax_LR, ax_RL], sub_context=display_context.adding_context('subplot', subplot_name='Track Remapping'))
-            else:
-                ## plot both LR/RL cells on a single combined axes:
-                fig, axs = collector.subplots(nrows=1, ncols=1, sharex=True, sharey=True, num='Track Remapping', figsize=kwargs.pop('figsize', (10, 4)), dpi=kwargs.pop('dpi', None), constrained_layout=True, clear=True)
-                # assert len(axs) == 1, f"{len(axs)}"
-                ax = axs
-
-                fig, ax, _outputs_tuple = _plot_track_remapping_diagram(AnyDir_decoder_aclu_MAX_peak_maps_df, grid_bin_bounds=grid_bin_bounds, long_column_name='long_LR', short_column_name='short_LR', ax=ax, defer_render=defer_render, **kwargs)
-                perform_update_title_subtitle(fig=fig, ax=ax, title_string=None, subtitle_string=f"LR+RL Track Remapping - {len(LR_only_decoder_aclu_MAX_peak_maps_df)} neurons")
-
-                setup_common_after_creation(collector, fig=fig, axes=[ax, ], sub_context=display_context.adding_context('subplot', subplot_name='Track Remapping'))
-
-
-    return collector
-
-
-
-@function_attributes(short_name=None, tags=['figure', 'publication', 'figure1'], input_requires=[], output_provides=[], uses=['_plot_track_remapping_diagram', 'perform_update_title_subtitle', 'build_or_reuse_figure'], used_by=[], creation_date='2025-06-16 20:44', related_items=[])
-def plot_publication_bidirectional_track_remapping_diagram(all_neuron_stats_table, **kwargs):
-    """ 
-    from pyphoplacecellanalysis.Pho2D.track_shape_drawing import plot_publication_bidirectional_track_remapping_diagram
-    
-    
-    """
-    from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.ContainerBased.PhoContainerTool import GenericMatplotlibContainer
-    from matplotlib.gridspec import GridSpec
-    from neuropy.utils.matplotlib_helpers import build_or_reuse_figure, perform_update_title_subtitle
-    from pyphoplacecellanalysis.Pho2D.track_shape_drawing import _plot_track_remapping_diagram
-    from pyphoplacecellanalysis.Pho2D.track_shape_drawing import AclusYOffsetMode
-    from neuropy.core.user_annotations import UserAnnotationsManager
-
-
-
-
-    ## INPUTS: all_neuron_stats_table
-
-    active_all_neuron_stats_table: pd.DataFrame = deepcopy(all_neuron_stats_table)[all_neuron_stats_table['has_considerable_remapping']] ## Only the considerably remapping cells
-
-    # ['track_membership'] # SHARED, LEFT_ONLY, RIGHT_ONLY
-    # LR_only_column_names = ['long_LR_pf1D_peak', 'short_LR_pf1D_peak']
-    # RL_only_column_names = ['long_RL_pf1D_peak', 'short_RL_pf1D_peak']
-
-    LR_only_column_names = ['long_LR', 'short_LR']
-    RL_only_column_names = ['long_RL', 'short_RL']
-
-    long_short_any_column_names = ['long_pf_peak_x', 'short_pf_peak_x']
-
-    # long_LR_pf2D_peak_x, 
-
-    # any_1D_column_names = ['long_LR_pf1D_peak', 'long_RL_pf1D_peak', 'short_LR_pf1D_peak', 'short_RL_pf1D_peak']
-    # any_1D_column_names = ['long_LR_pf1D_peak', 'long_RL_pf1D_peak', 'short_LR_pf1D_peak', 'short_RL_pf1D_peak']
-
-    decoder_name_suffix: str = 'pf1D_peak'
-    # decoder_name_suffix: str = 'pf2D_peak_x'
-
-    LR_only_column_names = [f"{a_name}_{decoder_name_suffix}" for a_name in LR_only_column_names]
-    RL_only_column_names = [f"{a_name}_{decoder_name_suffix}" for a_name in RL_only_column_names]
-    any_1D_column_names = [f"{a_name}_{decoder_name_suffix}" for a_name in ('long_LR', 'long_RL', 'short_LR', 'short_RL')]
-    global_min_x: float = np.nanmin(active_all_neuron_stats_table[any_1D_column_names].min(axis='columns', skipna=True).values)
-    global_max_x: float = np.nanmax(active_all_neuron_stats_table[any_1D_column_names].max(axis='columns', skipna=True).values)
-    global_min_y: float = np.nanmin(active_all_neuron_stats_table[any_1D_column_names].min(axis='columns', skipna=True).values)
-    global_max_y: float = np.nanmax(active_all_neuron_stats_table[any_1D_column_names].max(axis='columns', skipna=True).values)
-
-    # (global_min_x, global_max_x)
-
-    # global_most_extreme_track_grid_bin_bounds = ((global_min_x, global_max_x), (global_min_y, global_min_y), )
-    # OUTPUTS: global_most_extreme_track_grid_bin_bounds, (global_min_x, global_max_x)
-    # global_most_extreme_track_grid_bin_bounds
-
-    ## Get grid_bin_bounds for drawing of the track outlines
-    _out_user_annotations_add_code_lines, loaded_configs = UserAnnotationsManager.batch_build_user_annotation_grid_bin_bounds_from_exported_position_info_mat_files(search_parent_path=Path(r'W:/Data/Kdiba'), print_user_annotations_lines_to_add=False, debug_print=False)
-    # loaded_configs_dict = {v['session_context']:v for k, v in loaded_configs.items()}
-
-    # per_session_loaded_configs_dict: Dict[IdentifyingContext, Dict] = {v['session_context']:v for k, v in loaded_configs.items()}
-    per_session_uid_loaded_configs_dict: Dict[str, Dict] = {v['session_context'].get_description(separator='|'):v for k, v in loaded_configs.items()} # indexed by session_uid like 'kdiba|gor01|one|2006-6-07_11-26-53'
-    # per_session_uid_loaded_configs_dict
-
-    grid_bin_bounds_key_name: str = 'new_cm_grid_bin_bounds'
-    # grid_bin_bounds_key_name: str = 'real_cm_grid_bin_bounds'
-    # grid_bin_bounds_key_name: str = 'grid_bin_bounds'
-
-    # per_session_uid_loaded_grid_bin_bounds_cm_dict = {session_uid:deepcopy(a_session_config[grid_bin_bounds_key_name]) for session_uid, a_session_config in per_session_uid_loaded_configs_dict.items()}
-    # per_session_uid_loaded_grid_bin_bounds_cm_dict
-    grid_bin_bounds_col_names = ['grid_bin_bounds_' + part_name for part_name in ('x0', 'x1', 'y0', 'y1')] # ['grid_bin_bounds_x0', 'grid_bin_bounds_x1', 'grid_bin_bounds_y0', 'grid_bin_bounds_y1']
-    # print(grid_bin_bounds_col_names)
-    session_loaded_grid_bin_bounds_cm_df: pd.DataFrame = pd.DataFrame([(session_uid, *deepcopy(a_session_config[grid_bin_bounds_key_name])) for session_uid, a_session_config in per_session_uid_loaded_configs_dict.items()], columns=['session_uid', *grid_bin_bounds_col_names])
-    # session_loaded_grid_bin_bounds_cm_df ## all the same for each session unfortunately
-
-    global_most_extreme_track_grid_bin_bounds = ((session_loaded_grid_bin_bounds_cm_df.grid_bin_bounds_x0.min(), session_loaded_grid_bin_bounds_cm_df.grid_bin_bounds_x1.max()), (session_loaded_grid_bin_bounds_cm_df.grid_bin_bounds_y0.min(), session_loaded_grid_bin_bounds_cm_df.grid_bin_bounds_y1.max()), )
-    # global_most_extreme_track_grid_bin_bounds # ((37.0773897438341, 250.69004399129707), (106.80073123839011, 151.15367504603452))
-
-    ## Add in the grid_bin_bounds from the configs to `active_all_neuron_stats_table`
-    ## INPUTS: per_session_uid_loaded_configs_dict, active_all_neuron_stats_table
-
-    ## INPUTS: active_all_neuron_stats_table
-    per_session_all_neuron_stats_table = active_all_neuron_stats_table.pho.partition_df_dict(partitionColumn='session_uid')
-    # per_session_all_neuron_stats_table
-
-    ## Make a single figure for both LR/RL remapping cells:
-    kwargs = dict(is_dark_mode=False, enable_interactivity=False, defer_render=True,
-                # aclus_y_offset_mode=AclusYOffsetMode.RandomJitter,
-                aclus_y_offset_mode=AclusYOffsetMode.CountBased,
+                    t_split
+                    """
+                    a_collector.contexts.append(sub_context)
+                    
+                    # `flexitext` version:
+                    text_formatter = FormattedFigureText()
+                    # ax.set_title('')
+                    fig.suptitle('')
+                    text_formatter.setup_margins(fig)
+                    title_text_obj = flexitext(text_formatter.left_margin, text_formatter.top_margin,
+                                            title,
+                                            va="bottom", xycoords="figure fraction")
+                    footer_text_obj = flexitext((text_formatter.left_margin * 0.1), (text_formatter.bottom_margin * 0.25),
+                                                text_formatter._build_footer_string(active_context=sub_context),
+                                                va="top", xycoords="figure fraction")
                 
-                )
-    fig = build_or_reuse_figure(fignum='Track Remapping', fig=kwargs.pop('fig', None), fig_idx=kwargs.pop('fig_idx', 0), figsize=kwargs.pop('figsize', (10, 4)), dpi=kwargs.pop('dpi', None), constrained_layout=True, clear=True) # , clear=True
-    gs = GridSpec(2, 1, figure=fig)
-    ax_LR = plt.subplot(gs[0])
-    ax_RL = plt.subplot(gs[1])
-
-    _fig_container: GenericMatplotlibContainer = GenericMatplotlibContainer(name='across-session-neuron-remapping-diagram')
-    _fig_container.fig = fig
-    _fig_container.plots.gs = gs
-    _fig_container.axes = [ax_LR, ax_RL]
-    # _fig_container.plots
-
-    _extant_plot_container_LR = None
-    _extant_plot_container_RL = None
-
-    # included_session_uids = None
-    # # included_session_uids = ['kdiba|gor01|two|2006-6-07_16-40-19']
-    # # included_session_uids = ['kdiba|gor01|one|2006-6-09_1-22-43']
-
-    # if included_session_uids is None:
-    #     included_session_uids = list(per_session_all_neuron_stats_table.keys())
-
-    ## All included_session_uids
-    # included_session_uids
-
-    # _fig_container.params.included_session_uids = deepcopy(included_session_uids)
-    _fig_container.plots_data.all_neuron_stats_table = deepcopy(all_neuron_stats_table)
-    _fig_container.plots_data.active_all_neuron_stats_table = deepcopy(active_all_neuron_stats_table)
-    # _fig_container.plots_data.per_session_all_neuron_stats_table = deepcopy(per_session_all_neuron_stats_table)
-    # _fig_container.plots_data.per_session_uid_loaded_configs_dict = deepcopy(per_session_uid_loaded_configs_dict)
+                    if ((perform_write_to_file_callback is not None) and (sub_context is not None)):
+                        perform_write_to_file_callback(sub_context, fig)
 
 
-
-    ## All on the same plot:
-
-    ## INPUTS: global_most_extreme_track_grid_bin_bounds
-
-    # a_df: pd.DataFrame = deepcopy(all_neuron_stats_table)
-    a_df: pd.DataFrame = deepcopy(active_all_neuron_stats_table)
-
-    # a_session_config = per_session_uid_loaded_configs_dict[session_uid]
-    grid_bin_bounds = deepcopy(global_most_extreme_track_grid_bin_bounds)
-
-    ## ['long_LR_pf1D_peak', 'long_RL_pf1D_peak', 'short_LR_pf1D_peak', 'short_RL_pf1D_peak']
-
-    LR_only_column_names = ['long_LR_pf1D_peak', 'short_LR_pf1D_peak']
-    RL_only_column_names = ['long_RL_pf1D_peak', 'short_RL_pf1D_peak']
-
-    # INPUTS: any_1D_column_names
-
-    # neuron_id_col_name: str = 'aclu'
-    # neuron_id_col_name: str = 'neuron_uid'
-    # neuron_IDs_lists = [deepcopy(a_df[[neuron_id_col_name, a_column_name]]).dropna(axis=0, how='any')[neuron_id_col_name].to_numpy() for a_column_name in any_1D_column_names] # [A, B, C, D, ...]
-    # neuron_IDs_lists
-
-    # LR_only_decoder_aclu_MAX_peak_maps_df = deepcopy(a_df[LR_only_column_names]).dropna(axis=0, how='any') # 266
-    # RL_only_decoder_aclu_MAX_peak_maps_df = deepcopy(a_df[RL_only_column_names]).dropna(axis=0, how='any') # 262
-
-    LR_only_decoder_aclu_MAX_peak_maps_df = deepcopy(a_df[LR_only_column_names]).dropna(axis=0, how='all') # 266
-    RL_only_decoder_aclu_MAX_peak_maps_df = deepcopy(a_df[RL_only_column_names]).dropna(axis=0, how='all') # 262
-
-    # LR_only_decoder_aclu_MAX_peak_maps_df = deepcopy(a_df[LR_only_column_names])
-    # RL_only_decoder_aclu_MAX_peak_maps_df = deepcopy(a_df[RL_only_column_names])
+                # BEGIN FUNCTION BODY
+                (LR_only_decoder_aclu_MAX_peak_maps_df, RL_only_decoder_aclu_MAX_peak_maps_df), AnyDir_decoder_aclu_MAX_peak_maps_df = track_templates.get_directional_pf_maximum_peaks_dfs(drop_aclu_if_missing_long_or_short=drop_aclu_if_missing_long_or_short)
 
 
-    ## OUTPUTS: LR_only_decoder_aclu_MAX_peak_maps_df, RL_only_decoder_aclu_MAX_peak_maps_df
-    LR_only_decoder_aclu_MAX_peak_maps_df # 266
-    RL_only_decoder_aclu_MAX_peak_maps_df # 262
+                # AnyDir_decoder_aclu_MAX_peak_maps_df.aclu.to_numpy()
+                neuron_IDs_lists = [deepcopy(a_decoder.neuron_IDs) for a_decoder in track_templates.get_decoders_dict().values()] # [A, B, C, D, ...]
+                # _unit_qcolors_map, unit_colors_map = build_shared_sorted_neuron_color_maps(neuron_IDs_lists)
 
-    ## Plot the track shapes (if needed, and the significant remapping points/arrows):
-    fig_LR_RL, ax_LR, _extant_plot_container_LR = _plot_track_remapping_diagram(LR_only_decoder_aclu_MAX_peak_maps_df, grid_bin_bounds=grid_bin_bounds, long_column_name=LR_only_column_names[0], short_column_name=LR_only_column_names[1], ax=ax_LR, extant_plot_container=_extant_plot_container_LR, **kwargs)
-    perform_update_title_subtitle(fig=fig_LR_RL, ax=ax_LR, title_string=None, subtitle_string=f"LR Track Remapping - {len(LR_only_decoder_aclu_MAX_peak_maps_df)} Place cells")
-    fig_LR_RL, ax_RL, _extant_plot_container_RL = _plot_track_remapping_diagram(RL_only_decoder_aclu_MAX_peak_maps_df, grid_bin_bounds=grid_bin_bounds, long_column_name=RL_only_column_names[0], short_column_name=RL_only_column_names[1], ax=ax_RL, extant_plot_container=_extant_plot_container_RL, **kwargs)
-    perform_update_title_subtitle(fig=fig_LR_RL, ax=ax_RL, title_string=None, subtitle_string=f"RL Track Remapping - {len(RL_only_decoder_aclu_MAX_peak_maps_df)} Place cells")
 
-    return _fig_container
+                if use_unique_aclu_colors:
+                    unit_colors_map, _unit_colors_ndarray_map = build_shared_sorted_neuron_color_maps(neuron_IDs_lists, return_255_array=False)
+                    # _by_LR = LR_only_decoder_aclu_MAX_peak_maps_df.sort_values(by=['long_LR'], inplace=False)
+                    _by_ANY: pd.DataFrame = AnyDir_decoder_aclu_MAX_peak_maps_df.sort_values(by=['long_LR', 'long_RL'], inplace=False) ## sort by peak location on Long track
+                    long_peak_sorted_unit_colors_ndarray_map = dict(zip(_by_ANY.index.to_numpy(), list(_unit_colors_ndarray_map.values())))
+                    unit_id_colors_map = long_peak_sorted_unit_colors_ndarray_map
+
+                else:
+                    unit_id_colors_map = None
+
+                
+                # kwargs = dict(draw_point_aclu_labels=True, enable_interactivity=False, enable_adjust_overlapping_text=False, unit_id_colors_map=_unit_colors_ndarray_map)
+                kwargs = dict(draw_point_aclu_labels=True, enable_interactivity=enable_interactivity, enable_adjust_overlapping_text=False, unit_id_colors_map=unit_id_colors_map, is_dark_mode=is_dark_mode, aclus_y_offset_mode=aclus_y_offset_mode)
+
+                ## Either way, make a single figure for both LR/RL remapping cells:
+                if use_separate_plot_for_each_direction:
+                    ## Make two separate axes for LR/RL remapping cells:
+                    fig, axs = collector.subplots(nrows=2, ncols=1, sharex=True, sharey=True, num='Track Remapping', figsize=kwargs.pop('figsize', (10, 4)), dpi=kwargs.pop('dpi', None), constrained_layout=True, clear=True)
+                    assert len(axs) == 2, f"{len(axs)}"
+                    ax_dict = {'ax_LR': axs[0], 'ax_RL': axs[1]}
+
+                    fig, ax_LR, _outputs_tuple_LR = cls._plot_track_remapping_diagram(LR_only_decoder_aclu_MAX_peak_maps_df, grid_bin_bounds=grid_bin_bounds, long_column_name='long_LR', short_column_name='short_LR', ax=ax_dict['ax_LR'], defer_render=defer_render, **kwargs)
+                    perform_update_title_subtitle(fig=fig, ax=ax_LR, title_string=None, subtitle_string=f"LR Track Remapping - {len(LR_only_decoder_aclu_MAX_peak_maps_df)} neurons")
+                    fig, ax_RL, _outputs_tuple_RL = cls._plot_track_remapping_diagram(RL_only_decoder_aclu_MAX_peak_maps_df, grid_bin_bounds=grid_bin_bounds, long_column_name='long_RL', short_column_name='short_RL', ax=ax_dict['ax_RL'], defer_render=defer_render, **kwargs)
+                    perform_update_title_subtitle(fig=fig, ax=ax_RL, title_string=None, subtitle_string=f"RL Track Remapping - {len(RL_only_decoder_aclu_MAX_peak_maps_df)} neurons")
+
+                    setup_common_after_creation(collector, fig=fig, axes=[ax_LR, ax_RL], sub_context=display_context.adding_context('subplot', subplot_name='Track Remapping'))
+                else:
+                    ## plot both LR/RL cells on a single combined axes:
+                    fig, axs = collector.subplots(nrows=1, ncols=1, sharex=True, sharey=True, num='Track Remapping', figsize=kwargs.pop('figsize', (10, 4)), dpi=kwargs.pop('dpi', None), constrained_layout=True, clear=True)
+                    # assert len(axs) == 1, f"{len(axs)}"
+                    ax = axs
+
+                    fig, ax, _outputs_tuple = cls._plot_track_remapping_diagram(AnyDir_decoder_aclu_MAX_peak_maps_df, grid_bin_bounds=grid_bin_bounds, long_column_name='long_LR', short_column_name='short_LR', ax=ax, defer_render=defer_render, **kwargs)
+                    perform_update_title_subtitle(fig=fig, ax=ax, title_string=None, subtitle_string=f"LR+RL Track Remapping - {len(LR_only_decoder_aclu_MAX_peak_maps_df)} neurons")
+
+                    setup_common_after_creation(collector, fig=fig, axes=[ax, ], sub_context=display_context.adding_context('subplot', subplot_name='Track Remapping'))
+
+
+        return collector
+
+
+
+    @function_attributes(short_name=None, tags=['figure', 'publication', 'figure1'], input_requires=[], output_provides=[], uses=['_plot_track_remapping_diagram', 'perform_update_title_subtitle', 'build_or_reuse_figure'], used_by=[], creation_date='2025-06-16 20:44', related_items=[])
+    @classmethod
+    def plot_publication_bidirectional_track_remapping_diagram(cls, all_neuron_stats_table, **kwargs):
+        """ 
+        from pyphoplacecellanalysis.Pho2D.track_shape_drawing import plot_publication_bidirectional_track_remapping_diagram
+        
+        
+        """
+        from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.ContainerBased.PhoContainerTool import GenericMatplotlibContainer
+        from matplotlib.gridspec import GridSpec
+        from neuropy.utils.matplotlib_helpers import build_or_reuse_figure, perform_update_title_subtitle
+        from pyphoplacecellanalysis.Pho2D.track_shape_drawing import AclusYOffsetMode
+        from neuropy.core.user_annotations import UserAnnotationsManager
+
+
+
+
+        ## INPUTS: all_neuron_stats_table
+        active_all_neuron_stats_table: pd.DataFrame = deepcopy(all_neuron_stats_table) ## All Cells
+        # active_all_neuron_stats_table: pd.DataFrame = deepcopy(all_neuron_stats_table)[all_neuron_stats_table['has_considerable_remapping']] ## Only the considerably remapping cells
+
+        # ['track_membership'] # SHARED, LEFT_ONLY, RIGHT_ONLY
+        # LR_only_column_names = ['long_LR_pf1D_peak', 'short_LR_pf1D_peak']
+        # RL_only_column_names = ['long_RL_pf1D_peak', 'short_RL_pf1D_peak']
+
+        LR_only_column_base_names = ['long_LR', 'short_LR']
+        RL_only_column_base_names = ['long_RL', 'short_RL']
+
+        # long_short_any_column_names = ['long_pf_peak_x', 'short_pf_peak_x']
+
+        # long_LR_pf2D_peak_x, 
+
+        # any_1D_column_names = ['long_LR_pf1D_peak', 'long_RL_pf1D_peak', 'short_LR_pf1D_peak', 'short_RL_pf1D_peak']
+        # any_1D_column_names = ['long_LR_pf1D_peak', 'long_RL_pf1D_peak', 'short_LR_pf1D_peak', 'short_RL_pf1D_peak']
+
+        # decoder_name_suffix: str = 'pf1D_peak'
+        # use_pf2D: bool = False
+        decoder_name_suffix: str = 'pf2D_peak_x'
+        use_pf2D_peaks: bool = True
+
+        LR_only_column_names = [f"{a_name}_{decoder_name_suffix}" for a_name in LR_only_column_base_names]
+        RL_only_column_names = [f"{a_name}_{decoder_name_suffix}" for a_name in RL_only_column_base_names]
+        # any_1D_column_names = [f"{a_name}_{decoder_name_suffix}" for a_name in ('long_LR', 'long_RL', 'short_LR', 'short_RL')]
+        ## OUTPUTS: LR_only_column_names, RL_only_column_names
+        if use_pf2D_peaks:
+            decoder_name_suffix_y: str = 'pf2D_peak_y'
+            # LR_only_column_names.extend([f"{a_name}_{decoder_name_suffix_y}" for a_name in LR_only_column_base_names])
+            # RL_only_column_names.extend([f"{a_name}_{decoder_name_suffix_y}" for a_name in RL_only_column_base_names])
+            LR_only_column_names.extend([f"{a_name}_{decoder_name_suffix_y}_rel" for a_name in LR_only_column_base_names])
+            RL_only_column_names.extend([f"{a_name}_{decoder_name_suffix_y}_rel" for a_name in RL_only_column_base_names])
+            
+
+        # global_min_x: float = np.nanmin(active_all_neuron_stats_table[any_1D_column_names].min(axis='columns', skipna=True).values)
+        # global_max_x: float = np.nanmax(active_all_neuron_stats_table[any_1D_column_names].max(axis='columns', skipna=True).values)
+        # global_min_y: float = np.nanmin(active_all_neuron_stats_table[any_1D_column_names].min(axis='columns', skipna=True).values)
+        # global_max_y: float = np.nanmax(active_all_neuron_stats_table[any_1D_column_names].max(axis='columns', skipna=True).values)
+
+        # (global_min_x, global_max_x)
+
+        # global_most_extreme_track_grid_bin_bounds = ((global_min_x, global_max_x), (global_min_y, global_min_y), )
+        # OUTPUTS: global_most_extreme_track_grid_bin_bounds, (global_min_x, global_max_x)
+        # global_most_extreme_track_grid_bin_bounds
+
+        ## Get grid_bin_bounds for drawing of the track outlines
+        _out_user_annotations_add_code_lines, loaded_configs = UserAnnotationsManager.batch_build_user_annotation_grid_bin_bounds_from_exported_position_info_mat_files(search_parent_path=Path(r'W:/Data/Kdiba'), print_user_annotations_lines_to_add=False, debug_print=False)
+        # loaded_configs_dict = {v['session_context']:v for k, v in loaded_configs.items()}
+
+        # per_session_loaded_configs_dict: Dict[IdentifyingContext, Dict] = {v['session_context']:v for k, v in loaded_configs.items()}
+        per_session_uid_loaded_configs_dict: Dict[str, Dict] = {v['session_context'].get_description(separator='|'):v for k, v in loaded_configs.items()} # indexed by session_uid like 'kdiba|gor01|one|2006-6-07_11-26-53'
+        # per_session_uid_loaded_configs_dict
+
+        grid_bin_bounds_key_name: str = 'new_cm_grid_bin_bounds'
+        # grid_bin_bounds_key_name: str = 'real_cm_grid_bin_bounds'
+        # grid_bin_bounds_key_name: str = 'grid_bin_bounds'
+
+        # per_session_uid_loaded_grid_bin_bounds_cm_dict = {session_uid:deepcopy(a_session_config[grid_bin_bounds_key_name]) for session_uid, a_session_config in per_session_uid_loaded_configs_dict.items()}
+        # per_session_uid_loaded_grid_bin_bounds_cm_dict
+        grid_bin_bounds_col_names = ['grid_bin_bounds_' + part_name for part_name in ('x0', 'x1', 'y0', 'y1')] # ['grid_bin_bounds_x0', 'grid_bin_bounds_x1', 'grid_bin_bounds_y0', 'grid_bin_bounds_y1']
+        # print(grid_bin_bounds_col_names)
+        session_loaded_grid_bin_bounds_cm_df: pd.DataFrame = pd.DataFrame([(session_uid, *deepcopy(a_session_config[grid_bin_bounds_key_name])) for session_uid, a_session_config in per_session_uid_loaded_configs_dict.items()], columns=['session_uid', *grid_bin_bounds_col_names])
+        # session_loaded_grid_bin_bounds_cm_df ## all the same for each session unfortunately
+
+        global_most_extreme_track_grid_bin_bounds = ((session_loaded_grid_bin_bounds_cm_df.grid_bin_bounds_x0.min(), session_loaded_grid_bin_bounds_cm_df.grid_bin_bounds_x1.max()), (session_loaded_grid_bin_bounds_cm_df.grid_bin_bounds_y0.min(), session_loaded_grid_bin_bounds_cm_df.grid_bin_bounds_y1.max()), )
+        # global_most_extreme_track_grid_bin_bounds # ((37.0773897438341, 250.69004399129707), (106.80073123839011, 151.15367504603452))
+
+        ## Add in the grid_bin_bounds from the configs to `active_all_neuron_stats_table`
+        ## INPUTS: per_session_uid_loaded_configs_dict, active_all_neuron_stats_table
+
+        ## INPUTS: active_all_neuron_stats_table
+        # per_session_all_neuron_stats_table = active_all_neuron_stats_table.pho.partition_df_dict(partitionColumn='session_uid')
+        # per_session_all_neuron_stats_table
+
+        ## Make a single figure for both LR/RL remapping cells:
+        kwargs = dict(is_dark_mode=False, enable_interactivity=False, defer_render=True,
+                    # aclus_y_offset_mode=AclusYOffsetMode.RandomJitter,
+                    aclus_y_offset_mode=AclusYOffsetMode.CountBased,
+                    
+                    )
+        
+        fig = build_or_reuse_figure(fignum='Track Remapping', fig=kwargs.pop('fig', None), fig_idx=kwargs.pop('fig_idx', 0), figsize=kwargs.pop('figsize', (10, 4)), dpi=kwargs.pop('dpi', None), constrained_layout=True, clear=True) # , clear=True
+        gs = GridSpec(2, 1, figure=fig)
+        ax_LR = plt.subplot(gs[0])
+        ax_RL = plt.subplot(gs[1])
+
+        _fig_container: GenericMatplotlibContainer = GenericMatplotlibContainer(name='across-session-neuron-remapping-diagram')
+        _fig_container.fig = fig
+        _fig_container.plots.gs = gs
+        _fig_container.axes = [ax_LR, ax_RL]
+        # _fig_container.plots
+
+        _extant_plot_container_LR = None
+        _extant_plot_container_RL = None
+
+        # included_session_uids = None
+        # # included_session_uids = ['kdiba|gor01|two|2006-6-07_16-40-19']
+        # # included_session_uids = ['kdiba|gor01|one|2006-6-09_1-22-43']
+
+        # if included_session_uids is None:
+        #     included_session_uids = list(per_session_all_neuron_stats_table.keys())
+
+        ## All included_session_uids
+        # included_session_uids
+
+        # _fig_container.params.included_session_uids = deepcopy(included_session_uids)
+        _fig_container.plots_data.all_neuron_stats_table = deepcopy(all_neuron_stats_table)
+        _fig_container.plots_data.active_all_neuron_stats_table = deepcopy(active_all_neuron_stats_table)
+        # _fig_container.plots_data.per_session_all_neuron_stats_table = deepcopy(per_session_all_neuron_stats_table)
+        # _fig_container.plots_data.per_session_uid_loaded_configs_dict = deepcopy(per_session_uid_loaded_configs_dict)
+
+
+
+        ## All on the same plot:
+
+        ## INPUTS: global_most_extreme_track_grid_bin_bounds
+
+        # a_df: pd.DataFrame = deepcopy(all_neuron_stats_table)
+        a_df: pd.DataFrame = deepcopy(active_all_neuron_stats_table)
+
+        # a_session_config = per_session_uid_loaded_configs_dict[session_uid]
+        grid_bin_bounds = deepcopy(global_most_extreme_track_grid_bin_bounds)
+
+        ## ['long_LR_pf1D_peak', 'long_RL_pf1D_peak', 'short_LR_pf1D_peak', 'short_RL_pf1D_peak']
+
+        # #TODO 2025-06-27 12:04: - [ ] Hardcoded override?
+        # LR_only_column_names = ['long_LR_pf1D_peak', 'short_LR_pf1D_peak']
+        # RL_only_column_names = ['long_RL_pf1D_peak', 'short_RL_pf1D_peak']
+
+        # INPUTS: any_1D_column_names
+        # INPUTS: LR_only_column_names, RL_only_column_names
+
+        # neuron_id_col_name: str = 'aclu'
+        # neuron_id_col_name: str = 'neuron_uid'
+        # neuron_IDs_lists = [deepcopy(a_df[[neuron_id_col_name, a_column_name]]).dropna(axis=0, how='any')[neuron_id_col_name].to_numpy() for a_column_name in any_1D_column_names] # [A, B, C, D, ...]
+        # neuron_IDs_lists
+
+        # LR_only_decoder_aclu_MAX_peak_maps_df = deepcopy(a_df[LR_only_column_names]).dropna(axis=0, how='any') # 266
+        # RL_only_decoder_aclu_MAX_peak_maps_df = deepcopy(a_df[RL_only_column_names]).dropna(axis=0, how='any') # 262
+
+        LR_only_decoder_aclu_MAX_peak_maps_df = deepcopy(a_df[LR_only_column_names]).dropna(axis=0, how='all') # 266
+        RL_only_decoder_aclu_MAX_peak_maps_df = deepcopy(a_df[RL_only_column_names]).dropna(axis=0, how='all') # 262
+
+        # LR_only_decoder_aclu_MAX_peak_maps_df = deepcopy(a_df[LR_only_column_names])
+        # RL_only_decoder_aclu_MAX_peak_maps_df = deepcopy(a_df[RL_only_column_names])
+
+
+        ## OUTPUTS: LR_only_decoder_aclu_MAX_peak_maps_df, RL_only_decoder_aclu_MAX_peak_maps_df
+        # LR_only_decoder_aclu_MAX_peak_maps_df # 266
+        # RL_only_decoder_aclu_MAX_peak_maps_df # 262
+        if use_pf2D_peaks:
+            kwargs['aclus_y_offset_mode'] = AclusYOffsetMode.Pf2DExactY
+            _LR_kwargs = dict(long_y_column_name=LR_only_column_names[2], short_y_column_name=LR_only_column_names[3])
+            _RL_kwargs = dict(long_y_column_name=RL_only_column_names[2], short_y_column_name=RL_only_column_names[3])
+        else:
+            _LR_kwargs = dict()
+            _RL_kwargs = dict()
+            
+        ## Plot the track shapes (if needed, and the significant remapping points/arrows):
+        fig_LR_RL, ax_LR, _extant_plot_container_LR = cls._plot_track_remapping_diagram(LR_only_decoder_aclu_MAX_peak_maps_df, grid_bin_bounds=grid_bin_bounds, long_column_name=LR_only_column_names[0], short_column_name=LR_only_column_names[1], **_LR_kwargs, ax=ax_LR, extant_plot_container=_extant_plot_container_LR, **kwargs)
+        perform_update_title_subtitle(fig=fig_LR_RL, ax=ax_LR, title_string=None, subtitle_string=f"LR Track Remapping - {len(LR_only_decoder_aclu_MAX_peak_maps_df)} Place cells")
+        fig_LR_RL, ax_RL, _extant_plot_container_RL = cls._plot_track_remapping_diagram(RL_only_decoder_aclu_MAX_peak_maps_df, grid_bin_bounds=grid_bin_bounds, long_column_name=RL_only_column_names[0], short_column_name=RL_only_column_names[1], **_RL_kwargs, ax=ax_RL, extant_plot_container=_extant_plot_container_RL, **kwargs)
+        perform_update_title_subtitle(fig=fig_LR_RL, ax=ax_RL, title_string=None, subtitle_string=f"RL Track Remapping - {len(RL_only_decoder_aclu_MAX_peak_maps_df)} Place cells")
+
+        return _fig_container
 
 
 
