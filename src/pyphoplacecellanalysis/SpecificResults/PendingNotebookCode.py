@@ -235,12 +235,14 @@ class LongShort3DPlacefieldsHelpers:
         short_maze_bg = ipcDataExplorer.short_maze_bg
 
         ipcDataExplorer.params.maze_y_offset = maze_y_offset
+
+        ## normal (-, +) offsets        
+        long_y_offset: float = -maze_y_offset
+        short_y_offset: float = maze_y_offset
         
-        # long_y_offset: float = -maze_y_offset
-        # short_y_offset: float = maze_y_offset
-        
-        long_y_offset: float = 0.0
-        short_y_offset: float = maze_y_offset        
+        # ## positive-only offsets:
+        # long_y_offset: float = 0.0
+        # short_y_offset: float = maze_y_offset        
 
         ipcDataExplorer.params.long_y_offset = long_y_offset
         ipcDataExplorer.params.short_y_offset = short_y_offset
@@ -257,10 +259,10 @@ class LongShort3DPlacefieldsHelpers:
         print(f'short_pf2D.ratemap.ybin: {short_pf2D.ratemap.ybin}')
         # long_adjusted_ybin = _subfn_scale_ybin_centers_to_track_width(ybin=long_pf2D.ratemap.ybin, track_y_center=-ipcDataExplorer.params.long_y_offset)
         # short_adjusted_ybin = _subfn_scale_ybin_centers_to_track_width(ybin=short_pf2D.ratemap.ybin, track_y_center=-ipcDataExplorer.params.short_y_offset)
-        # long_adjusted_ybin = _subfn_scale_ybin_centers_to_track_width(ybin=long_pf2D.ratemap.ybin, track_y_center=0.0)
-        # short_adjusted_ybin = _subfn_scale_ybin_centers_to_track_width(ybin=short_pf2D.ratemap.ybin, track_y_center=0.0)
-        long_adjusted_ybin = _subfn_scale_ybin_centers_to_track_width(ybin=long_pf2D.ratemap.ybin, track_y_center=-11.0)
-        short_adjusted_ybin = _subfn_scale_ybin_centers_to_track_width(ybin=short_pf2D.ratemap.ybin, track_y_center=-11.0)
+        long_adjusted_ybin = _subfn_scale_ybin_centers_to_track_width(ybin=long_pf2D.ratemap.ybin, track_y_center=0.0)
+        short_adjusted_ybin = _subfn_scale_ybin_centers_to_track_width(ybin=short_pf2D.ratemap.ybin, track_y_center=0.0)
+        # long_adjusted_ybin = _subfn_scale_ybin_centers_to_track_width(ybin=long_pf2D.ratemap.ybin, track_y_center=-11.0)
+        # short_adjusted_ybin = _subfn_scale_ybin_centers_to_track_width(ybin=short_pf2D.ratemap.ybin, track_y_center=-11.0)
 
         # long_adjusted_ybin = _subfn_scale_ybin_centers_to_track_width(ybin=long_pf2D.ratemap.ybin, track_y_center=long_pf2D.ratemap.ybin[0])
         # short_adjusted_ybin = _subfn_scale_ybin_centers_to_track_width(ybin=short_pf2D.ratemap.ybin, track_y_center=short_pf2D.ratemap.ybin[0])
