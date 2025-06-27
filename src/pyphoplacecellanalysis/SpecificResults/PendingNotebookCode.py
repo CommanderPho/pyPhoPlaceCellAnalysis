@@ -247,8 +247,8 @@ class LongShort3DPlacefieldsHelpers:
         ipcDataExplorer.params.long_y_offset = long_y_offset
         ipcDataExplorer.params.short_y_offset = short_y_offset
         
-        long_maze_bg.SetPosition(0.0, long_y_offset, 0.0)
-        short_maze_bg.SetPosition(0.0, short_y_offset, 0.0)
+        long_maze_bg.SetPosition(0.0, ipcDataExplorer.params.long_y_offset, 0.0)
+        short_maze_bg.SetPosition(0.0, ipcDataExplorer.params.short_y_offset, 0.0)
         
         long_pf2D = deepcopy(long_pf2D)
         short_pf2D = deepcopy(short_pf2D)
@@ -341,6 +341,10 @@ class LongShort3DPlacefieldsHelpers:
                     pass
                 
 
+
+        #TODO 2025-06-27 08:13: - [ ] hardcoded track offsets to re-align appropriately
+        long_maze_bg.SetPosition(0.0, -163.0, 0.0)
+        short_maze_bg.SetPosition(0.0, -123.0, 0.0)
         
         # ==================================================================================================================================================================================================================================================================================== #
         # Update Combined Variables                                                                                                                                                                                                                                                            #
