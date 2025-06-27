@@ -343,6 +343,7 @@ class LongShort3DPlacefieldsHelpers:
 
 
         #TODO 2025-06-27 08:13: - [ ] hardcoded track offsets to re-align appropriately
+        assert (maze_y_offset==20.0), f"2025-06-27 08:13: hardcoded track offsets only work to re-allign with `maze_y_offset=20.0`"
         long_maze_bg.SetPosition(0.0, -163.0, 0.0)
         short_maze_bg.SetPosition(0.0, -123.0, 0.0)
         
