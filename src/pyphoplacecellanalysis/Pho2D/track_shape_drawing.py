@@ -2444,7 +2444,7 @@ class TrackRemappingDiagramFigure:
 
     @function_attributes(short_name=None, tags=['figure', 'publication', 'figure1'], input_requires=[], output_provides=[], uses=['_plot_track_remapping_diagram', 'perform_update_title_subtitle', 'build_or_reuse_figure'], used_by=[], creation_date='2025-06-16 20:44', related_items=[])
     @classmethod
-    def plot_publication_bidirectional_track_remapping_diagram(cls, all_neuron_stats_table, **kwargs):
+    def plot_publication_bidirectional_track_remapping_diagram(cls, all_neuron_stats_table, use_considerable_remapping_cells_only: bool=False, use_pf2D_peaks: bool = False, **kwargs):
         """ 
         from pyphoplacecellanalysis.Pho2D.track_shape_drawing import plot_publication_bidirectional_track_remapping_diagram
         
@@ -2460,9 +2460,12 @@ class TrackRemappingDiagramFigure:
 
 
         ## INPUTS: all_neuron_stats_table
-        active_all_neuron_stats_table: pd.DataFrame = deepcopy(all_neuron_stats_table) ## All Cells
-        # active_all_neuron_stats_table: pd.DataFrame = deepcopy(all_neuron_stats_table)[all_neuron_stats_table['has_considerable_remapping']] ## Only the considerably remapping cells
-
+        
+        if use_considerable_remapping_cells_only:
+            active_all_neuron_stats_table: pd.DataFrame = deepcopy(all_neuron_stats_table)[all_neuron_stats_table['has_considerable_remapping']] ## Only the considerably remapping cells
+        else:
+            active_all_neuron_stats_table: pd.DataFrame = deepcopy(all_neuron_stats_table) ## All Cells
+            
         # ['track_membership'] # SHARED, LEFT_ONLY, RIGHT_ONLY
         # LR_only_column_names = ['long_LR_pf1D_peak', 'short_LR_pf1D_peak']
         # RL_only_column_names = ['long_RL_pf1D_peak', 'short_RL_pf1D_peak']
@@ -2480,11 +2483,10 @@ class TrackRemappingDiagramFigure:
         # decoder_name_suffix: str = 'pf1D_peak'
         # use_pf2D: bool = False
         decoder_name_suffix: str = 'pf2D_peak_x'
-        use_pf2D_peaks: bool = True
-
         LR_only_column_names = [f"{a_name}_{decoder_name_suffix}" for a_name in LR_only_column_base_names]
         RL_only_column_names = [f"{a_name}_{decoder_name_suffix}" for a_name in RL_only_column_base_names]
         # any_1D_column_names = [f"{a_name}_{decoder_name_suffix}" for a_name in ('long_LR', 'long_RL', 'short_LR', 'short_RL')]
+
         ## OUTPUTS: LR_only_column_names, RL_only_column_names
         if use_pf2D_peaks:
             decoder_name_suffix_y: str = 'pf2D_peak_y'
