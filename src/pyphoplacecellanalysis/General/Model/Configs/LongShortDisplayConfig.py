@@ -298,6 +298,74 @@ class DisplayColorsEnum:
                                 }
         
         return formatted_title_strings_dict
+    
+
+    @classmethod
+    @function_attributes(short_name=None, tags=['matplotlib', 'title', 'format'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-09-02 15:14', related_items=[])
+    def get_matplotlib_formatted_title_dict(cls, is_dark_bg: bool = True) -> Dict:
+        """ Generates the two-color LR_Long/LR_Short/RL_Long/RL_Short labels with color formatting for pyqtgraph plots
+        
+        formatted_title_strings_dict = DisplayColorsEnum.get_matplotlib_formatted_title_dict()
+
+        """
+        # long_short_display_config_manager = LongShortDisplayConfigManager()
+        # long_epoch_config = long_short_display_config_manager.long_epoch_config #.as_pyqtgraph_kwargs()
+        # short_epoch_config = long_short_display_config_manager.short_epoch_config #.as_pyqtgraph_kwargs()
+
+        # if is_dark_bg:
+        #     Long_color = DisplayColorsEnum.Epochs.long_dark_bg
+        #     Short_color = DisplayColorsEnum.Epochs.short_dark_bg
+        # else:
+        #     Long_color = long_epoch_config.mpl_color
+        #     Short_color = short_epoch_config.mpl_color
+
+
+        # RL_fg_color, RL_bg_color, RL_border_color = DisplayColorsEnum.Laps.get_RL_dock_colors(None, is_dim=False)
+        # LR_fg_color, LR_bg_color, LR_border_color = DisplayColorsEnum.Laps.get_LR_dock_colors(None, is_dim=False)
+
+        # formatted_title_strings_dict = {"LR_Long":(generate_html_string("LR", color=LR_bg_color, bold=True, font_size=14) + '_' + generate_html_string("Long", color=Long_color, bold=True, font_size=14)),
+        #                         "RL_Long":(generate_html_string("RL", color=RL_bg_color, bold=True, font_size=14) + '_' + generate_html_string("Long", color=Long_color, bold=True, font_size=14)),
+        #                         "LR_Short":(generate_html_string("LR", color=LR_bg_color, bold=True, font_size=14) + '_' + generate_html_string("Short", color=Short_color, bold=True, font_size=14)),
+        #                         "RL_Short":(generate_html_string("RL", color=RL_bg_color, bold=True, font_size=14) + '_' + generate_html_string("Short", color=Short_color, bold=True, font_size=14)),
+        #                         }
+        
+        # LR_RL_Strings_Dict = {
+        #     "LR": "◁",
+        #     "RL": "▷",
+        # }
+        
+        # LR_RL_Strings_Dict = {
+        #     "LR": "⤞",
+        #     "RL": "⤝",
+        # }
+        
+        # LR_RL_Strings_Dict = {
+        #     "LR": "◀",
+        #     "RL": "▶",
+        # }
+
+        # formatted_title_strings_dict = {"LR_Long":(generate_html_string(LR_RL_Strings_Dict["LR"], color=LR_bg_color, bold=True, font_size=14) + '_' + generate_html_string("Long", color=Long_color, bold=True, font_size=14)),
+        #                         "RL_Long":(generate_html_string(LR_RL_Strings_Dict["RL"], color=RL_bg_color, bold=True, font_size=14) + '_' + generate_html_string("Long", color=Long_color, bold=True, font_size=14)),
+        #                         "LR_Short":(generate_html_string(LR_RL_Strings_Dict["LR"], color=LR_bg_color, bold=True, font_size=14) + '_' + generate_html_string("Short", color=Short_color, bold=True, font_size=14)),
+        #                         "RL_Short":(generate_html_string(LR_RL_Strings_Dict["RL"], color=RL_bg_color, bold=True, font_size=14) + '_' + generate_html_string("Short", color=Short_color, bold=True, font_size=14)),
+        #                         }
+        
+        # formatted_title_strings_dict = {
+        #     'long_LR': ('◀', '_', 'Long'),
+        #     'long_RL': ('▶', '_', 'Long'),
+        #     'short_LR': ('◀', '_', 'Short'),
+        #     'short_RL': ('▶', '_', 'Short'),
+        # }
+        
+        formatted_title_strings_dict = {
+            'long_LR': 'Long◀',
+            'long_RL': 'Long▶',
+            'short_LR': 'Short◀',
+            'short_RL': 'Short▶',
+        }
+
+        return formatted_title_strings_dict
+    
 
 
 
