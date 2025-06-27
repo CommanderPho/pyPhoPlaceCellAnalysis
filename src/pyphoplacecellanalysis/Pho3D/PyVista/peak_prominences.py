@@ -98,7 +98,7 @@ def _build_pyvista_single_neuron_prominence_result_data(neuron_id, a_result, pro
     # return peak_locations, colors, prominence_array, is_included_array
     
 
-def _plot_pyvista_single_neuron_prominence_result(ipcDataExplorer, valid_neuron_id, active_curve_color, curr_pdata, peak_locations, peak_labels, peak_levels, peak_level_bboxes, identifier_suffix: Optional[str]=None, render:bool=True, debug_print:bool=False, include_text_labels:bool=False, **kwargs):
+def _plot_pyvista_single_neuron_prominence_result(ipcDataExplorer, valid_neuron_id, active_curve_color, curr_pdata, peak_locations, peak_labels, peak_levels, peak_level_bboxes, identifier_suffix: Optional[str]=None, render:bool=True, debug_print:bool=False, include_text_labels:bool=False, include_contour_bounding_box:bool=False, **kwargs):
     """ Plots a single set of contours/points/labels
     
         captures: ipcDataExplorer, valid_neuron_id, active_curve_color
@@ -162,23 +162,23 @@ def _plot_pyvista_single_neuron_prominence_result(ipcDataExplorer, valid_neuron_
     n_levels = np.shape(peak_level_bboxes)[1]
     for peak_idx in np.arange(n_peaks):
         for level_idx in np.arange(n_levels):
-            curr_box_mesh_name = f'{curr_common_identifier_prefix_name}_peak[{peak_idx}]_lvl[{level_idx}]_bounds_box'
-            (x0, y0, width, height) = peak_level_bboxes[peak_idx, level_idx, :]
-            a_peak_level = peak_levels[peak_idx][level_idx]
-            ## Can use a rectangle instead of a box:
-            out_pf_box_data[curr_box_mesh_name] = pv.Rectangle([((x0+width), y0, a_peak_level), ((x0+width), (y0+height), a_peak_level), (x0, (y0+height), a_peak_level), (x0, y0, a_peak_level)])
-            out_pf_box_actors[curr_box_mesh_name] = ipcDataExplorer.p.add_mesh(out_pf_box_data[curr_box_mesh_name], color=active_curve_color,  name=curr_box_mesh_name, show_edges=True, edge_color=active_curve_color, line_width=1.5, opacity=0.75, label=curr_box_mesh_name, style='wireframe', render=render)
+            if include_contour_bounding_box:
+                curr_box_mesh_name = f'{curr_common_identifier_prefix_name}_peak[{peak_idx}]_lvl[{level_idx}]_bounds_box'
+                (x0, y0, width, height) = peak_level_bboxes[peak_idx, level_idx, :]
+                a_peak_level = peak_levels[peak_idx][level_idx]
+                ## Can use a rectangle instead of a box:
+                out_pf_box_data[curr_box_mesh_name] = pv.Rectangle([((x0+width), y0, a_peak_level), ((x0+width), (y0+height), a_peak_level), (x0, (y0+height), a_peak_level), (x0, y0, a_peak_level)])
+                out_pf_box_actors[curr_box_mesh_name] = ipcDataExplorer.p.add_mesh(out_pf_box_data[curr_box_mesh_name], color=active_curve_color,  name=curr_box_mesh_name, show_edges=True, edge_color=active_curve_color, line_width=1.5, opacity=0.75, label=curr_box_mesh_name, style='wireframe', render=render)
             
-            ## Box Mode:
-            ## build the corner points of the box:
-            ## box_bounds = (xMin, xMax, yMin, yMax, zMin, zMax)
-            # box_bounds = (x0, (x0+width), y0, (y0+height), (a_peak_level-fixed_z_half_height), (a_peak_level+fixed_z_half_height))
-            # if debug_print:
-            #     print(f'peak_idx: {peak_idx} - level_idx: {level_idx} :: box_bounds (xMin, xMax, yMin, yMax, zMin, zMax): {box_bounds}')
-#             out_pf_box_data[curr_box_mesh_name] = pv.Box(bounds=box_bounds, level=0, quads=True)
-#             out_pf_box_actors[curr_box_mesh_name] = ipcDataExplorer.p.add_mesh(out_pf_box_data[curr_box_mesh_name], color="white",  name=curr_box_mesh_name, show_edges=True, edge_color="white", line_width=0.5, opacity=0.75, label=curr_box_mesh_name)
-            
-    
+                ## Box Mode:
+                ## build the corner points of the box:
+                ## box_bounds = (xMin, xMax, yMin, yMax, zMin, zMax)
+                # box_bounds = (x0, (x0+width), y0, (y0+height), (a_peak_level-fixed_z_half_height), (a_peak_level+fixed_z_half_height))
+                # if debug_print:
+                #     print(f'peak_idx: {peak_idx} - level_idx: {level_idx} :: box_bounds (xMin, xMax, yMin, yMax, zMin, zMax): {box_bounds}')
+    #             out_pf_box_data[curr_box_mesh_name] = pv.Box(bounds=box_bounds, level=0, quads=True)
+    #             out_pf_box_actors[curr_box_mesh_name] = ipcDataExplorer.p.add_mesh(out_pf_box_data[curr_box_mesh_name], color="white",  name=curr_box_mesh_name, show_edges=True, edge_color="white", line_width=0.5, opacity=0.75, label=curr_box_mesh_name)
+                
             ## Text Labels:
             if include_text_labels:
                 curr_text_label_mesh_x_name = f'{curr_common_identifier_prefix_name}_peak[{peak_idx}]_lvl[{level_idx}]_text_label_x'
@@ -315,9 +315,9 @@ def _render_peak_prominence_2d_results_on_pyvista_plotter(ipcDataExplorer, activ
     if debug_print:
         print(f'peak_levels: {peak_levels}')
 
-    _common_plot_kwargs = dict(valid_neuron_id=valid_neuron_id, active_curve_color=active_curve_color, peak_locations=peak_locations, peak_labels=peak_labels, peak_levels=peak_levels, peak_level_bboxes=peak_level_bboxes, include_text_labels=False, render=render, debug_print=debug_print)
+    _common_plot_kwargs = dict(valid_neuron_id=valid_neuron_id, active_curve_color=active_curve_color, peak_locations=peak_locations, peak_labels=peak_labels, peak_levels=peak_levels, peak_level_bboxes=peak_level_bboxes,
+                               include_contour_bounding_box=False, include_text_labels=False, render=render, debug_print=debug_print)
     
-
     ### Add pyvista contours:
     curr_neuron_plot_data = ipcDataExplorer.plots_data.tuningCurvePlotData[valid_neuron_id]
     all_peaks_actors = None
