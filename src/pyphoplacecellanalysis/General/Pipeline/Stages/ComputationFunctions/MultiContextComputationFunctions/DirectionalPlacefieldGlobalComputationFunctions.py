@@ -3886,7 +3886,7 @@ import neuropy.utils.type_aliases as types
 decoder_name: TypeAlias = str # a string that describes a decoder, such as 'LongLR' or 'ShortRL'
 epoch_split_key: TypeAlias = str # a string that describes a split epoch, such as 'train' or 'test'
 
-from neuropy.utils.mixins.indexing_helpers import UnpackableMixin
+from neuropy.utils.mixins.indexing_helpers import UnpackableMixin, pop_dict_subset
 
 from neuropy.core.epoch import Epoch, ensure_dataframe
 from neuropy.utils.efficient_interval_search import convert_PortionInterval_to_epochs_df
@@ -7711,43 +7711,47 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
             return graphics_output_dict
 
 
-    @function_attributes(short_name='directional_track_template_pf1Ds', tags=['directional','template','debug', 'overview'], conforms_to=['output_registering', 'figure_saving'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-12-22 10:41', related_items=[], is_global=True)
+    @function_attributes(short_name='directional_track_template_pf1Ds', tags=['directional','template','debug', 'overview', 'figure'], conforms_to=['output_registering', 'figure_saving'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-12-22 10:41', related_items=[], is_global=True)
     def _display_directional_track_template_pf1Ds(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, save_figure=True, included_any_context_neuron_ids=None, use_incremental_sorting: bool = False, **kwargs):
             """ Plots each template's pf1Ds side-by-side in four adjacent subplots. 
             Stack of line-curves style, not heatmap-style
             """
-
-            # from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.DockAreaWrapper import DockAreaWrapper, PhoDockAreaContainingWindow
-            # from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.ContainerBased.TemplateDebugger import TemplateDebugger
             from neuropy.plotting.ratemaps import enumTuningMap2DPlotVariables
-            import matplotlib.pyplot as plt
-
             import matplotlib as mpl
             import matplotlib.pyplot as plt
             from flexitext import flexitext ## flexitext for formatted matplotlib text
             from neuropy.utils.matplotlib_helpers import FormattedFigureText, FigureMargins ## flexitext version
-
+            from pyphoplacecellanalysis.General.Model.Configs.LongShortDisplayConfig import DisplayColorsEnum
             from pyphocorehelpers.DataStructure.RenderPlots.MatplotLibRenderPlots import FigureCollector
             # from pyphoplacecellanalysis.General.Model.Configs.LongShortDisplayConfig import PlottingHelpers
 
             from matplotlib.gridspec import GridSpec
             from neuropy.utils.matplotlib_helpers import build_or_reuse_figure, perform_update_title_subtitle
-            from pyphoplacecellanalysis.Pho2D.track_shape_drawing import _plot_track_remapping_diagram
             from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.SpikeRasters import build_shared_sorted_neuron_color_maps
             from pyphocorehelpers.gui.Qt.color_helpers import ColorFormatConverter
             
+            save_figure_kwargs = dict(write_vector_format=kwargs.pop('write_vector_format', False), write_png=kwargs.pop('write_png', True)) | pop_dict_subset(kwargs, ['bbox_inches', 'pad_inches'])
+            prepare_for_publication: bool = kwargs.pop('prepare_for_publication', False)
+
             active_context = kwargs.pop('active_context', owning_pipeline_reference.sess.get_context())
             if active_context is not None:
                     display_context = active_context.adding_context('display_fn', display_fn_name='directional_track_template_pf1Ds')
                 
             def _perform_write_to_file_callback(final_context, fig):
+                """ captures: owning_pipeline_reference, save_figure, """
                 if save_figure:
-                    return owning_pipeline_reference.output_figure(final_context, fig)
+                    return owning_pipeline_reference.output_figure(final_context, fig, **save_figure_kwargs)
                 else:
                     pass # do nothing, don't save
 
 
-            with mpl.rc_context({'savefig.transparent': True, 'ps.fonttype': 42, }): # 'figure.dpi': '220', 'figure.figsize': (10, 4), 
+
+            _rc_context_kwargs = {'savefig.transparent': True, 'ps.fonttype': 42, }
+            if prepare_for_publication:
+                formatted_title_strings_dict = DisplayColorsEnum.get_matplotlib_formatted_title_dict()
+                _rc_context_kwargs.update({'figure.dpi': '100', 'figure.frameon': False, 'figure.figsize': (8.5, 9.0), }) # , 'figure.constrained_layout.use': (constrained_layout or False)
+
+            with mpl.rc_context(_rc_context_kwargs): # 'figure.dpi': '220', 'figure.figsize': (10, 4), 
                 # Create a FigureCollector instance
                 with FigureCollector(name='directional_track_template_pf1Ds', base_context=display_context) as collector:
                     fignum = kwargs.pop('fignum', None)
@@ -7833,7 +7837,12 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
                         
 
                         ## Setup titles:
-                        axd["ax_pf_tuning_curve"].set_title(a_decoder_name)
+                        if not prepare_for_publication:
+                            axd["ax_pf_tuning_curve"].set_title(a_decoder_name)
+                        else:
+                            ## Publication:                        
+                            axd["ax_pf_tuning_curve"].set_title(formatted_title_strings_dict[a_decoder_name]) ## use the formatted string with the unicode arrow instead
+                        
                         axd["ax_pf_occupancy"].set_title('')
                         
                         # Clear the normal text:
@@ -7874,11 +7883,21 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
                         
                     # active_config = deepcopy(self.config)
                     # active_config.float_precision = 1
-                    title_string: str = f"directional_track_template_pf1Ds"
-                    # subtitle_string = '\n'.join([f'{active_config.str_for_display(is_2D)}'])
-                    # header_text_obj = flexitext(text_formatter.left_margin, 0.9, f'<size:22><weight:bold>{title_string}</></>\n<size:10>{subtitle_string}</>', va="bottom", xycoords="figure fraction") # , wrap=False
-                    header_text_obj = flexitext(0.01, 0.85, f'<size:20><weight:bold>{title_string}</></>\n<size:9>{subtitle_string}</>', va="bottom", xycoords="figure fraction") # , wrap=False
-                    footer_text_obj = text_formatter.add_flexitext_context_footer(active_context=active_context) # flexitext((text_formatter.left_margin*0.1), (text_formatter.bottom_margin*0.25), text_formatter._build_footer_string(active_context=active_context), va="top", xycoords="figure fraction")
+
+                    if not prepare_for_publication:
+                        title_string: str = f"directional_track_template_pf1Ds"
+                        # subtitle_string = '\n'.join([f'{active_config.str_for_display(is_2D)}'])
+                        # header_text_obj = flexitext(text_formatter.left_margin, 0.9, f'<size:22><weight:bold>{title_string}</></>\n<size:10>{subtitle_string}</>', va="bottom", xycoords="figure fraction") # , wrap=False
+                        header_text_obj = flexitext(0.01, 0.85, f'<size:20><weight:bold>{title_string}</></>\n<size:9>{subtitle_string}</>', va="bottom", xycoords="figure fraction") # , wrap=False
+                    else:
+                        ## Publication:
+                        title_string: str = f"Directional Track Templates"
+                        # header_text_obj = flexitext(0.01, 0.85, f'<size:20><weight:bold>{title_string}</></>\n<size:9>{subtitle_string}</>', va="bottom", xycoords="figure fraction") # , wrap=False
+                        header_text_obj = flexitext(0.01, 0.85, f'<size:20><weight:bold>{title_string}</></>', va="bottom", xycoords="figure fraction")
+
+                    if not prepare_for_publication:
+                        footer_text_obj = text_formatter.add_flexitext_context_footer(active_context=active_context) # flexitext((text_formatter.left_margin*0.1), (text_formatter.bottom_margin*0.25), text_formatter._build_footer_string(active_context=active_context), va="top", xycoords="figure fraction")
+
                     fig.canvas.manager.set_window_title(title_string) # sets the window's title
                     if ((_perform_write_to_file_callback is not None) and (display_context is not None)):
                         _perform_write_to_file_callback(display_context, fig)
