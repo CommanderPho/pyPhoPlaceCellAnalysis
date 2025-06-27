@@ -8469,12 +8469,13 @@ class AddNewDirectionalDecodedEpochs_MatplotlibPlotCommand(BaseMenuCommand):
 
         ## get the result data:
         try:
+            ## Uses the `global_computation_results.computed_data['DirectionalDecodersDecoded']`
+            directional_decoders_decode_result: DirectionalDecodersContinuouslyDecodedResult = curr_active_pipeline.global_computation_results.computed_data['DirectionalDecodersDecoded']
+            
             time_bin_size: float = directional_decoders_decode_result.most_recent_decoding_time_bin_size
             if debug_print:
                 print(f'time_bin_size: {time_bin_size}')
 
-            ## Uses the `global_computation_results.computed_data['DirectionalDecodersDecoded']`
-            directional_decoders_decode_result: DirectionalDecodersContinuouslyDecodedResult = curr_active_pipeline.global_computation_results.computed_data['DirectionalDecodersDecoded']
             # pseudo2D_decoder: BasePositionDecoder = directional_decoders_decode_result.pseudo2D_decoder
             all_directional_pf1D_Decoder_dict: Dict[str, BasePositionDecoder] = directional_decoders_decode_result.pf1D_Decoder_dict
             a_continuously_decoded_dict: Dict[str, DecodedFilterEpochsResult] = directional_decoders_decode_result.continuously_decoded_result_cache_dict.get(time_bin_size, None)
