@@ -910,7 +910,8 @@ class GenericDecoderDictDecodedEpochsDictResult(ComputedResult):
 
     @function_attributes(short_name=None, tags=['compute', 'continuous', 'epoch', 'global'], input_requires=[], output_provides=[], uses=['.perform_decoding', '.updating_results_for_context'], used_by=[], creation_date='2025-03-21 00:00', related_items=[])
     def computing_for_global_epoch(self, curr_active_pipeline, debug_print=True):
-        """ Uses the context to extract proper values from the pipeline, and performs a fresh computation
+        """ Performs continuous decoding and computations for only the global epoch.
+
         Computes what are often (misleadinging) called "continuous" epoch computations, meaning they are computed uninterrupted across all time instead of start/ending at specific epochs (like laps or PBEs).
         
         Usage:
