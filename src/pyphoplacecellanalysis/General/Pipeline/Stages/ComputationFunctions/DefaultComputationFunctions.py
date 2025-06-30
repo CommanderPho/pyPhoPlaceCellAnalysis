@@ -148,7 +148,7 @@ class DefaultComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Computa
             
             # TODO: Efficiency: This will be inefficient, but do a slow iteration. 
             for time_window_bin_idx in np.arange(prev_one_step_bayesian_decoder.num_time_windows):
-                flat_p_x_given_n = prev_one_step_bayesian_decoder.flat_p_x_given_n[:, time_window_bin_idx] # this gets the specific n_t for this time window                
+                curr_flat_p_x_given_n = prev_one_step_bayesian_decoder.flat_p_x_given_n[:, time_window_bin_idx] # this gets the specific n_t for this time window                
                 # previous positions as determined by the two-step decoder: this uses the two_step previous position instead of the one_step previous position:
                 prev_x_position = two_step_decoder_result['most_likely_positions'][:, time_window_bin_idx-1] # TODO: is this okay for 1D as well?
                 active_k = two_step_decoder_result['all_scaling_factors_k'][time_window_bin_idx] # get the specific k value
@@ -157,7 +157,7 @@ class DefaultComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Computa
                     print(f'np.shape(prev_x_position): {np.shape(prev_x_position)}')
                             
                 # Flat version:
-                two_step_decoder_result['flat_p_x_given_n_and_x_prev'][:,time_window_bin_idx] = Zhang_Two_Step.compute_bayesian_two_step_prob_single_timestep(flat_p_x_given_n, prev_x_position, two_step_decoder_result['flat_all_x'], two_step_decoder_result['flat_sigma_t_all'], two_step_decoder_result['C'], active_k) # output shape (1856, )            
+                two_step_decoder_result['flat_p_x_given_n_and_x_prev'][:,time_window_bin_idx] = Zhang_Two_Step.compute_bayesian_two_step_prob_single_timestep(curr_flat_p_x_given_n, prev_x_position, two_step_decoder_result['flat_all_x'], two_step_decoder_result['flat_sigma_t_all'], two_step_decoder_result['C'], active_k) # output shape (1856, )            
                 
 
                 if (prev_one_step_bayesian_decoder.ndim < 2):
