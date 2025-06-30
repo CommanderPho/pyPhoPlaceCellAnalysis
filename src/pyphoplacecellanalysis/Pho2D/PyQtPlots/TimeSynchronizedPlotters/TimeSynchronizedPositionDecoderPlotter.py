@@ -33,7 +33,7 @@ class TimeSynchronizedPositionDecoderPlotter(AnimalTrajectoryPlottingMixin, Time
     applicationName = 'TimeSynchronizedPositionDecoderPlotterApp'
     windowName = 'TimeSynchronizedPositionDecoderPlotterWindow'
     
-    enable_debug_print = False
+    enable_debug_print = True
     
     
     @property
@@ -68,6 +68,9 @@ class TimeSynchronizedPositionDecoderPlotter(AnimalTrajectoryPlottingMixin, Time
         self.active_two_step_decoder = active_two_step_decoder
         
         self.setup()
+        self.params.debug_print = True # self.enable_debug_print
+        if self.params.debug_print:
+            print(f'TimeSynchronizedPositionDecoderPlotter: params.debug_print is True, so debugging info will be printed!')
         self.params.posterior_variable_to_render = posterior_variable_to_render
         self.params.drop_below_threshold = drop_below_threshold
         
@@ -140,6 +143,23 @@ class TimeSynchronizedPositionDecoderPlotter(AnimalTrajectoryPlottingMixin, Time
         # self.ui.root_view.setRange(QtCore.QRectF(0, 0, 600, 600))
 
     
+    # ==================================================================================================================== #
+    # QT Slots                                                                                                             #
+    # ==================================================================================================================== #
+
+    @QtCore.Slot(float, float)
+    def on_window_changed(self, start_t, end_t):
+        # called when the window is updated
+        if self.params.debug_print:
+            print(f'TimeSynchronizedPositionDecoderPlotter.on_window_changed(start_t: {start_t}, end_t: {end_t})')
+        # if self.enable_debug_print:
+        #     profiler = pg.debug.Profiler(disabled=True, delayed=True)
+        # self.update(end_t, defer_render=False)
+        self.update(start_t, defer_render=False)
+        if self.params.debug_print:
+            print('\tFinished calling _update_plots()')
+
+
     def update(self, t, defer_render=False):
         # Finds the nearest previous decoded position for the time t:
         self.last_window_index = np.searchsorted(self.time_window_centers, t, side='left') # side='left' ensures that no future values (later than 't') are ever returned
@@ -150,7 +170,7 @@ class TimeSynchronizedPositionDecoderPlotter(AnimalTrajectoryPlottingMixin, Time
 
 
     def _update_plots(self):
-        if self.enable_debug_print:
+        if self.params.debug_print:
             print(f'TimeSynchronizedPositionDecoderPlotter._update_plots()')
             
         # Update the existing one:
