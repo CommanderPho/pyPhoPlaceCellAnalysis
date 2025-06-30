@@ -455,10 +455,22 @@ class SingleEpochDecodedResult(HDF_SerializationMixin, AttrsBasedClassHelperMixi
     # band_width: float = field()
 
     @property
-    def n_xbins(self):
+    def n_xbins(self) -> int:
         """The n_xbins property."""
         return np.shape(self.p_x_given_n)[0]
-    
+
+
+    @property
+    def num_time_windows(self) -> int:
+        """The num_time_windows property."""
+        return (self.nbins - 1)
+
+
+    @property
+    def flat_p_x_given_n(self) -> NDArray:
+        """The num_time_windows property."""
+        return deepcopy(self.p_x_given_n).flatten()
+
 
     def __repr__(self):
         """ 2024-01-11 - Renders only the fields and their sizes  """
@@ -2101,7 +2113,7 @@ class BasePositionDecoder(HDFMixin, AttrsBasedClassHelperMixin, ContinuousPeakLo
     # ==================================================================================================================== #
     # Non-Modifying Methods:                                                                                               #
     # ==================================================================================================================== #
-    @function_attributes(short_name='decode', tags=['decode', 'pure'], input_requires=[], output_provides=[], creation_date='2023-03-23 19:10',
+    @function_attributes(short_name='decode', tags=['MAIN', 'decode', 'pure'], input_requires=[], output_provides=[], creation_date='2023-03-23 19:10',
         uses=['BayesianPlacemapPositionDecoder.perform_compute_most_likely_positions', 'ZhangReconstructionImplementation.neuropy_bayesian_prob'],
         used_by=['BayesianPlacemapPositionDecoder.perform_decode_specific_epochs'])
     def decode(self, unit_specific_time_binned_spike_counts, time_bin_size:float, output_flat_versions=False, debug_print=True):
@@ -2919,6 +2931,7 @@ class BayesianPlacemapPositionDecoder(SerializedAttributesAllowBlockSpecifyingCl
         if self.marginal.y is not None:
             self.marginal.y.p_x_given_n_and_x_prev = two_step_decoder_result.marginal.y.p_x_given_n.copy()
             self.marginal.y.two_step_most_likely_positions_1D = two_step_decoder_result.marginal.y.most_likely_positions_1D.copy()
+
 
     @function_attributes(short_name='to_1D_maximum_projection', tags=['updated'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-04-06 22:06')
     def to_1D_maximum_projection(self, defer_compute_all:bool=True):
