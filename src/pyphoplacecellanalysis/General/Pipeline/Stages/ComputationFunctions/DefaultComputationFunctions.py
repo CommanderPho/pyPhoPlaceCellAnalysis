@@ -82,7 +82,7 @@ class DefaultComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Computa
                           input_requires=["computation_result.computed_data['pf1D_Decoder']", "computation_result.computed_data['pf2D_Decoder']"], output_provides=["computation_result.computed_data['pf1D_TwoStepDecoder']", "computation_result.computed_data['pf2D_TwoStepDecoder']"],
                           uses=['_compute_avg_speed_at_each_position_bin'], used_by=[], creation_date='2023-09-12 17:32', related_items=[],
         validate_computation_test=lambda curr_active_pipeline, computation_filter_name='maze': (curr_active_pipeline.computation_results[computation_filter_name].computed_data['pf1D_TwoStepDecoder'], curr_active_pipeline.computation_results[computation_filter_name].computed_data['pf2D_TwoStepDecoder']), is_global=False)
-    def _perform_two_step_position_decoding_computation(computation_result: ComputationResult, debug_print=False, **kwargs):
+    def _perform_two_step_position_decoding_computation(computation_result: ComputationResult, debug_print=False, ndim: int=2, **kwargs):
         """ Builds the Zhang Velocity/Position For 2-step Bayesian Decoder for 2D Placefields
         """
 
@@ -203,13 +203,12 @@ class DefaultComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Computa
             return two_step_decoder_result
 
 
-        ndim = kwargs.get('ndim', 2)
         if ndim is None:
             ndim = 2 # add the 2D version if no alterantive is passed in.
+
         if ndim == 1:
             one_step_decoder_key = 'pf1D_Decoder'
             two_step_decoder_key = 'pf1D_TwoStepDecoder'
-
         elif ndim == 2:
             one_step_decoder_key = 'pf2D_Decoder'
             two_step_decoder_key = 'pf2D_TwoStepDecoder'
