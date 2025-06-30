@@ -2782,13 +2782,16 @@ class BasePositionDecoder(HDFMixin, AttrsBasedClassHelperMixin, ContinuousPeakLo
 
         """
         from pyphocorehelpers.DataStructure.dynamic_parameters import DynamicParameters
-
+        from neuropy.core.position import PositionComputedDataMixin
+        
         # self = active_decoder: "BasePositionDecoder"
         active_xbins = active_decoder.xbin
         active_ybins = active_decoder.ybin
 
         active_xbin_centers = active_decoder.xbin_centers
         active_ybin_centers = active_decoder.ybin_centers
+
+        pos_df = pos_df.position.adding_binned_position_columns(xbin_edges=active_xbins, ybin_edges=active_ybins, active_computation_config=None)
 
         avg_speed_per_pos = active_decoder._compute_avg_speed_at_each_position_bin(pos_df, xbin=active_xbin_centers, ybin=active_ybin_centers, debug_print=debug_print)
 
@@ -2841,43 +2844,69 @@ class BasePositionDecoder(HDFMixin, AttrsBasedClassHelperMixin, ContinuousPeakLo
 
         for an_epoch_idx in np.arange(num_filter_epochs):
             ## single epoch:
-            flat_p_x_given_n: NDArray = np.atleast_1d(active_two_step_result.p_x_given_n_list[an_epoch_idx].flatten())
+            # flat_p_x_given_n: NDArray = np.atleast_1d(active_two_step_result.p_x_given_n_list[an_epoch_idx].flatten())
             
             curr_single_epoch_result: SingleEpochDecodedResult = active_two_step_result.get_result_for_epoch(active_epoch_idx=an_epoch_idx)
+            curr_epoch_p_x_given_n: NDArray = curr_single_epoch_result.p_x_given_n ## flatten all spatial dimensions (all dimension but the last)
+            if debug_print:
+                print("\tOriginal shape:", np.shape(curr_epoch_p_x_given_n))
+
+            # curr_epoch_active_n_time_bins: int = curr_single_epoch_result.num_time_windows ## (one less than needed
+            curr_epoch_active_n_time_bins: int = curr_single_epoch_result.nbins ## (one less than needed
             
-            flat_p_x_given_n_and_x_prev = np.full_like(curr_single_epoch_result.p_x_given_n.flatten(), 0.0) # fill with NaNs. 
-            p_x_given_n_and_x_prev = np.full_like(curr_single_epoch_result.p_x_given_n, 0.0) # fill with NaNs. Pre-allocate output
+            # Flatten all but the last dimension
+            new_shape = (-1, curr_epoch_p_x_given_n.shape[-1])
+            curr_epoch_flat_p_x_given_n: NDArray = curr_epoch_p_x_given_n.reshape(new_shape)
+            # print("Resulting array:\n", flat_p_x_given_n)
+            if debug_print:
+                print("\tShape:", np.shape(curr_epoch_flat_p_x_given_n))
+
+            # flat_p_x_given_n: NDArray = curr_single_epoch_result.p_x_given_n
+            flat_p_x_given_n_and_x_prev = np.full_like(curr_epoch_flat_p_x_given_n, 0.0) # fill with NaNs. 
+            p_x_given_n_and_x_prev = np.full_like(curr_epoch_p_x_given_n, 0.0) # fill with NaNs. Pre-allocate output
             
             ## Add extra fields to the two-step result
-            active_two_step_result.most_likely_positions_list[an_epoch_idx] = np.zeros((2, curr_single_epoch_result.num_time_windows)) # (2, 85841)
+            active_two_step_result.most_likely_positions_list[an_epoch_idx] = np.zeros((2, curr_epoch_active_n_time_bins)) # (2, 85841)
 
             if debug_print:
-                print(f'np.shape(prev_one_step_bayesian_decoder.p_x_given_n): {np.shape(curr_single_epoch_result.p_x_given_n)}')
+                print(f'np.shape(prev_one_step_bayesian_decoder.p_x_given_n): {np.shape(curr_epoch_p_x_given_n)}')
 
-            all_scaling_factors_k = Zhang_Two_Step.compute_scaling_factor_k(flat_p_x_given_n)
+            all_scaling_factors_k = Zhang_Two_Step.compute_scaling_factor_k(curr_epoch_flat_p_x_given_n)
 
             # TODO: Efficiency: This will be inefficient, but do a slow iteration. 
-            for time_window_bin_idx in np.arange(curr_single_epoch_result.num_time_windows):
-                curr_t_step_flat_p_x_given_n = flat_p_x_given_n[:, time_window_bin_idx] # this gets the specific n_t for this time window                
-                # previous positions as determined by the two-step decoder: this uses the two_step previous position instead of the one_step previous position:
-                prev_x_position = active_two_step_result.most_likely_positions_list[an_epoch_idx][:, time_window_bin_idx-1] # TODO: is this okay for 1D as well?
+            for time_window_bin_idx in np.arange(curr_epoch_active_n_time_bins):
+                ## Iterate through all time bins within the epoch:
+                curr_t_step_flat_p_x_given_n = curr_epoch_flat_p_x_given_n[:, time_window_bin_idx] # this gets the specific n_t for this time window           
                 active_k = all_scaling_factors_k[time_window_bin_idx] # get the specific k value
-                # active_k = two_step_decoder_result['k']
-                if debug_print:
-                    print(f'np.shape(prev_x_position): {np.shape(prev_x_position)}')
+                     
+                # previous positions as determined by the two-step decoder: this uses the two_step previous position instead of the one_step previous position:
+                if time_window_bin_idx > 0:
+                    ## have a valid previous timestep to use (t-1)
+                    prev_x_position = active_two_step_result.most_likely_positions_list[an_epoch_idx][:, time_window_bin_idx-1] # TODO: is this okay for 1D as well?
+                    # active_k = two_step_decoder_result['k']
+                    if debug_print:
+                        print(f'np.shape(prev_x_position): {np.shape(prev_x_position)}')
 
-                # Flat version:
-                flat_p_x_given_n_and_x_prev[:,time_window_bin_idx] = Zhang_Two_Step.compute_bayesian_two_step_prob_single_timestep(curr_t_step_flat_p_x_given_n, prev_x_position, _OLD_two_step_decoder_result['flat_all_x'], _OLD_two_step_decoder_result['flat_sigma_t_all'], _OLD_two_step_decoder_result['C'], active_k) # output shape (1856, )            
+                    # Flat version:
+                    flat_p_x_given_n_and_x_prev[:,time_window_bin_idx] = Zhang_Two_Step.compute_bayesian_two_step_prob_single_timestep(curr_t_step_flat_p_x_given_n, prev_x_position, _OLD_two_step_decoder_result['flat_all_x'], _OLD_two_step_decoder_result['flat_sigma_t_all'], _OLD_two_step_decoder_result['C'], active_k) # output shape (1856, )            
 
 
+                else:
+                    # no valid previous timestep because t=0:
+                    prev_x_position = None # active_two_step_result.most_likely_positions_list[an_epoch_idx][:, time_window_bin_idx]
+                    # Flat version:
+                    flat_p_x_given_n_and_x_prev[:,time_window_bin_idx] = deepcopy(curr_t_step_flat_p_x_given_n) ## same as p_x_given_n # output shape (1856, )            
+
+                    
                 if (active_decoder.ndim < 2):
                     # 1D case:
                     p_x_given_n_and_x_prev[:,time_window_bin_idx] = flat_p_x_given_n_and_x_prev[:,time_window_bin_idx] # used to be (original_data_shape[0], original_data_shape[1])
                 else:
                     # 2D:
-                    p_x_given_n_and_x_prev[:,:,time_window_bin_idx] = np.reshape(flat_p_x_given_n_and_x_prev[:,time_window_bin_idx], (original_data_shape[0], original_data_shape[1]))
-            ## END for time_window_bin_idx in np.arange(curr_single_epoch_result.num_time_windows)...
-            active_two_step_result.p_x_given_n_and_x_prev_list.append(p_x_given_n_and_x_prev)
+                    p_x_given_n_and_x_prev[:,:,time_window_bin_idx] = np.reshape(flat_p_x_given_n_and_x_prev[:,time_window_bin_idx], (original_data_shape[0], original_data_shape[1]))        
+            ## END for time_window_bin_idx in np.arange(curr_epoch_active_n_time_bins)...
+            
+            active_two_step_result.p_x_given_n_and_x_prev_list.append(p_x_given_n_and_x_prev) # (59, 8, 400)
             
 
             # POST-hoc most-likely computations: Compute the most-likely positions from the p_x_given_n_and_x_prev:
@@ -2892,7 +2921,8 @@ class BasePositionDecoder(HDFMixin, AttrsBasedClassHelperMixin, ContinuousPeakLo
             # index_array = two_step_decoder_result['most_likely_position_flat_indicies']
             # two_step_decoder_result['most_likely_position_flat_max_likelihood_values'] = np.take_along_axis(x, np.expand_dims(index_array, axis=axis_idx), axis=axis_idx).squeeze(axis=axis_idx)
             most_likely_position_flat_max_likelihood_values = np.take_along_axis(flat_p_x_given_n_and_x_prev, np.expand_dims(most_likely_position_flat_indicies, axis=0), axis=0).squeeze(axis=0) # get the flat maximum values
-            print(f"{most_likely_position_flat_max_likelihood_values.shape = }")
+            if debug_print:
+                print(f"\t{most_likely_position_flat_max_likelihood_values.shape = }")
             # Reshape the maximum values:
             # two_step_decoder_result['most_likely_position_max_likelihood_values'] = np.array(np.unravel_index(two_step_decoder_result['most_likely_position_flat_max_likelihood_values'], prev_one_step_bayesian_decoder.original_position_data_shape)) # convert back to an array
 

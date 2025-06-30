@@ -358,9 +358,10 @@ class ComputeGlobalEpochBase(ComputedResult):
 
 
     @classmethod
-    @function_attributes(short_name=None, tags=['frame_division', 'pure'], input_requires=[], output_provides=[], uses=[], used_by=['cls.compute_all(...)'], creation_date='2025-02-11 00:00', related_items=[])
-    def build_frame_divided_epochs(cls, curr_active_pipeline, frame_divide_bin_size: float = 1.0):
-        """ 
+    @function_attributes(short_name=None, tags=['frame_division', 'pure'], input_requires=[], output_provides=[], uses=['subdivide_epochs'], used_by=['cls.compute_all(...)'], creation_date='2025-02-11 00:00', related_items=[])
+    def build_frame_divided_epochs(cls, curr_active_pipeline, frame_divide_bin_size: Optional[float] = 1.0):
+        """ Splits the epochs into fixed-size "frames"
+        
         frame_divide_bin_size = 1.0 # Specify the size of each sub-epoch in seconds
 
         Usage:
@@ -384,39 +385,60 @@ class ComputeGlobalEpochBase(ComputedResult):
         # single_global_epoch_df['label'] = single_global_epoch_df.index.to_numpy()
         single_global_epoch: Epoch = Epoch(single_global_epoch_df)
 
+        ## Common:
+        global_session = curr_active_pipeline.filtered_sessions[global_epoch_name]
+        global_pos_obj: "Position" = deepcopy(global_session.position)
+        global_pos_df: pd.DataFrame = global_pos_obj.compute_higher_order_derivatives().position.compute_smoothed_position_info(N=15)
+        ## OUTPUTS: global_pos_df, global_pos_df
+        
+
         df: pd.DataFrame = ensure_dataframe(deepcopy(single_global_epoch)) 
         df['maze_name'] = 'global'
         # df['interval_type_id'] = 666
+        
+        if frame_divide_bin_size is not None:
+            frame_divided_df: pd.DataFrame = subdivide_epochs(df, frame_divide_bin_size)
+            frame_divided_df['label'] = deepcopy(frame_divided_df.index.to_numpy())
+            frame_divided_df['stop'] = frame_divided_df['stop'] - 1e-12
+            global_frame_divided_epochs_obj = ensure_Epoch(frame_divided_df)
 
-        frame_divided_df: pd.DataFrame = subdivide_epochs(df, frame_divide_bin_size)
-        frame_divided_df['label'] = deepcopy(frame_divided_df.index.to_numpy())
-        frame_divided_df['stop'] = frame_divided_df['stop'] - 1e-12
-        global_frame_divided_epochs_obj = ensure_Epoch(frame_divided_df)
+            # ## Do Decoding of only the test epochs to validate performance
+            # frame_divided_epochs_specific_decoded_results_dict: Dict[types.DecoderName, DecodedFilterEpochsResult] = {a_name:a_new_decoder.decode_specific_epochs(spikes_df=deepcopy(get_proper_global_spikes_df(curr_active_pipeline)), filter_epochs=deepcopy(global_frame_divided_epochs_obj), decoding_time_bin_size=epochs_decoding_time_bin_size, debug_print=False) for a_name, a_new_decoder in new_decoder_dict.items()}
 
-        # ## Do Decoding of only the test epochs to validate performance
-        # frame_divided_epochs_specific_decoded_results_dict: Dict[types.DecoderName, DecodedFilterEpochsResult] = {a_name:a_new_decoder.decode_specific_epochs(spikes_df=deepcopy(get_proper_global_spikes_df(curr_active_pipeline)), filter_epochs=deepcopy(global_frame_divided_epochs_obj), decoding_time_bin_size=epochs_decoding_time_bin_size, debug_print=False) for a_name, a_new_decoder in new_decoder_dict.items()}
+            ## OUTPUTS: frame_divided_epochs_specific_decoded_results_dict
+            # takes 4min 30 sec to run
 
-        ## OUTPUTS: frame_divided_epochs_specific_decoded_results_dict
-        # takes 4min 30 sec to run
+            ## Adds the 'global_frame_division_idx' column to 'global_pos_df' so it can get the measured positions by plotting
+            # INPUTS: global_frame_divided_epochs_obj, original_pos_dfs_dict
+            # global_frame_divided_epochs_obj
+            
+            global_frame_divided_epochs_df = global_frame_divided_epochs_obj.epochs.to_dataframe() #.rename(columns={'t_rel_seconds':'t'})
+            global_frame_divided_epochs_df['label'] = deepcopy(global_frame_divided_epochs_df.index.to_numpy())
+            # global_pos_df: pd.DataFrame = deepcopy(global_session.position.to_dataframe()) #.rename(columns={'t':'t_rel_seconds'})
 
-        ## Adds the 'global_frame_division_idx' column to 'global_pos_df' so it can get the measured positions by plotting
-        # INPUTS: global_frame_divided_epochs_obj, original_pos_dfs_dict
-        # global_frame_divided_epochs_obj
-        global_session = curr_active_pipeline.filtered_sessions[global_epoch_name]
-        global_frame_divided_epochs_df = global_frame_divided_epochs_obj.epochs.to_dataframe() #.rename(columns={'t_rel_seconds':'t'})
-        global_frame_divided_epochs_df['label'] = deepcopy(global_frame_divided_epochs_df.index.to_numpy())
-        # global_pos_df: pd.DataFrame = deepcopy(global_session.position.to_dataframe()) #.rename(columns={'t':'t_rel_seconds'})
+            ## Extract Measured Position:
+            ## INPUTS: global_pos_df
+            global_pos_df.time_point_event.adding_epochs_identity_column(epochs_df=global_frame_divided_epochs_df, epoch_id_key_name='global_frame_division_idx', epoch_label_column_name='label', drop_non_epoch_events=True, should_replace_existing_column=True) # , override_time_variable_name='t_rel_seconds'
 
-        ## Extract Measured Position:
-        global_pos_obj: "Position" = deepcopy(global_session.position)
-        global_pos_df: pd.DataFrame = global_pos_obj.compute_higher_order_derivatives().position.compute_smoothed_position_info(N=15)
-        global_pos_df.time_point_event.adding_epochs_identity_column(epochs_df=global_frame_divided_epochs_df, epoch_id_key_name='global_frame_division_idx', epoch_label_column_name='label', drop_non_epoch_events=True, should_replace_existing_column=True) # , override_time_variable_name='t_rel_seconds'
+            ## Adds the ['frame_division_epoch_start_t'] columns to `stacked_flat_global_pos_df` so we can figure out the appropriate offsets
+            frame_divided_epochs_properties_df: pd.DataFrame = deepcopy(global_frame_divided_epochs_df)
+            frame_divided_epochs_properties_df['global_frame_division_idx'] = deepcopy(frame_divided_epochs_properties_df.index) ## add explicit 'global_frame_division_idx' column
+            frame_divided_epochs_properties_df = frame_divided_epochs_properties_df.rename(columns={'start': 'frame_division_epoch_start_t'})[['global_frame_division_idx', 'frame_division_epoch_start_t']]
+            global_pos_df = PandasHelpers.add_explicit_dataframe_columns_from_lookup_df(global_pos_df, frame_divided_epochs_properties_df, join_column_name='global_frame_division_idx')
 
-        ## Adds the ['frame_division_epoch_start_t'] columns to `stacked_flat_global_pos_df` so we can figure out the appropriate offsets
-        frame_divided_epochs_properties_df: pd.DataFrame = deepcopy(global_frame_divided_epochs_df)
-        frame_divided_epochs_properties_df['global_frame_division_idx'] = deepcopy(frame_divided_epochs_properties_df.index) ## add explicit 'global_frame_division_idx' column
-        frame_divided_epochs_properties_df = frame_divided_epochs_properties_df.rename(columns={'start': 'frame_division_epoch_start_t'})[['global_frame_division_idx', 'frame_division_epoch_start_t']]
-        global_pos_df = PandasHelpers.add_explicit_dataframe_columns_from_lookup_df(global_pos_df, frame_divided_epochs_properties_df, join_column_name='global_frame_division_idx')
+
+        else:
+            ## no frame division needed
+            raise NotImplementedError(f'#TODO 2025-06-30 14:49: - [ ] Not yet implemented, always subidivdes at least once')
+            frame_divided_df: pd.DataFrame = deepcopy(df)
+            frame_divided_df['label'] = deepcopy(frame_divided_df.index.to_numpy())
+            global_frame_divided_epochs_obj = ensure_Epoch(frame_divided_df)
+            global_frame_divided_epochs_df = global_frame_divided_epochs_obj.epochs.to_dataframe() #.rename(columns={'t_rel_seconds':'t'})
+            global_frame_divided_epochs_df['label'] = deepcopy(global_frame_divided_epochs_df.index.to_numpy())
+            
+        ## END if
+        
+
         global_pos_df.sort_values(by=['t'], inplace=True) # Need to re-sort by timestamps once done
 
         if global_pos_df.attrs is None:
@@ -428,8 +450,6 @@ class ComputeGlobalEpochBase(ComputedResult):
             global_frame_divided_epochs_df.attrs = {}
 
         global_frame_divided_epochs_df.attrs.update({'frame_divide_bin_size': frame_divide_bin_size})
-
-
 
         return (global_frame_divided_epochs_obj, global_frame_divided_epochs_df), global_pos_df
 
@@ -947,7 +967,7 @@ class Compute_NonPBE_Epochs(ComputedResult):
 
         single_global_epoch: Epoch = Epoch(self.single_global_epoch_df)
 
-        return ComputeGlobalEpochBase.compute_all(curr_active_pipeline, single_global_epoch = deepcopy(single_global_epoch), curr_active_pipeline=curr_active_pipeline,
+        return ComputeGlobalEpochBase.compute_all(curr_active_pipeline=curr_active_pipeline, single_global_epoch = deepcopy(single_global_epoch),
                                                                     epochs_decoding_time_bin_size=epochs_decoding_time_bin_size, frame_divide_bin_size=frame_divide_bin_size, compute_1D=compute_1D, compute_2D=compute_2D,
                                                                     a_new_training_df_dict = a_new_training_df_dict, a_new_testing_epoch_obj_dict = a_new_testing_epoch_obj_dict,
                                                  )
@@ -1885,7 +1905,7 @@ class EpochComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Computati
         requires_global_keys=[], provides_global_keys=['EpochComputations'],
         validate_computation_test=validate_has_non_PBE_epoch_results, is_global=True)
     def perform_compute_non_PBE_epochs(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, debug_print=False, training_data_portion: float=(5.0/6.0), epochs_decoding_time_bin_size: float = 0.050, frame_divide_bin_size:float=10.0,
-                                        compute_1D: bool = True, compute_2D: bool = False, drop_previous_result_and_compute_fresh:bool=False, skip_training_test_split: bool = True, debug_print_memory_breakdown: bool=False):
+                                        compute_1D: bool = True, compute_2D: bool = True, drop_previous_result_and_compute_fresh:bool=False, skip_training_test_split: bool = True, debug_print_memory_breakdown: bool=False):
         """ Performs the computation of non-PBE epochs for the session and all filtered epochs. Stacks things up hardcore yeah.
 
         Requires:

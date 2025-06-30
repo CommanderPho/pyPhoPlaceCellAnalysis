@@ -1152,7 +1152,7 @@ class SingleArtistMultiEpochBatchHelpers:
         return track_shape_patch_collection_artists
 
 
-@function_attributes(short_name=None, tags=['multi-ax', 'inefficient'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-02-18 03:22', related_items=['SingleArtistMultiEpochBatchHelpers'])
+@function_attributes(short_name=None, tags=['multi-ax', 'inefficient'], input_requires=[], output_provides=[], uses=['DecodedTrajectoryMatplotlibPlotter'], used_by=[], creation_date='2025-02-18 03:22', related_items=['SingleArtistMultiEpochBatchHelpers'])
 def multi_DecodedTrajectoryMatplotlibPlotter_side_by_side(a_result2D: DecodedFilterEpochsResult, a_new_global_decoder2D: BasePositionDecoder, global_session, n_axes: int = 10, posterior_masking_value: float = 0.020, desired_epoch_start_idx:int=0):
     """ Performs the same plotting as `SingleArtistMultiEpochBatchHelpers`, but in a less performant manner that draws each frame as a seperate artist (but unlike `SingleArtistMultiEpochBatchHelpers` computations are clear and it actually works)
         
@@ -1832,7 +1832,7 @@ class DecodedTrajectoryMatplotlibPlotter(DecodedTrajectoryPlotter):
 
 
 
-
+    @function_attributes(short_name=None, tags=['plot'], input_requires=[], output_provides=[], uses=[], used_by=['multi_DecodedTrajectoryMatplotlibPlotter_side_by_side'], creation_date='2025-06-30 12:58', related_items=[])
     def plot_decoded_trajectories_2d(self, sess, curr_num_subplots=10, active_page_index=0, plot_actual_lap_lines:bool=False, fixed_columns: int = 2, use_theoretical_tracks_instead: bool = True, existing_ax=None, axes_inset_locators_list=None):
         """ Plots a MatplotLib 2D Figure with each lap being shown in one of its subplots
         

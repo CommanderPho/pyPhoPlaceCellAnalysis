@@ -1117,8 +1117,9 @@ class GenericDecoderDictDecodedEpochsDictResult(ComputedResult):
         curr_active_pipeline.perform_specific_computation(computation_functions_name_includelist=['merged_directional_placefields', 'directional_decoders_decode_continuous', 'directional_decoders_evaluate_epochs', 'directional_decoders_epoch_heuristic_scoring', 'non_PBE_epochs_results'],
                                                         computation_kwargs_list=[{'ripple_decoding_time_bin_size': time_bin_size, 'laps_decoding_time_bin_size': time_bin_size}, {'time_bin_size': time_bin_size}, {'should_skip_radon_transform': True},
                                                                                     {'same_thresh_fraction_of_track': 0.05, 'max_ignore_bins': 2, 'use_bin_units_instead_of_realworld': False, 'max_jump_distance_cm': 60.0},
-                                                                                     dict(epochs_decoding_time_bin_size=time_bin_size, frame_divide_bin_size=10.0, compute_1D=True, compute_2D=False, drop_previous_result_and_compute_fresh=force_recompute, skip_training_test_split=True, debug_print_memory_breakdown=False)], ## END KWARGS LIST
-                                                                                     enabled_filter_names=None, fail_on_exception=True, debug_print=False)
+                                                                                     dict(epochs_decoding_time_bin_size=time_bin_size, frame_divide_bin_size=10.0, compute_1D=True, compute_2D=True, drop_previous_result_and_compute_fresh=force_recompute, skip_training_test_split=True, debug_print_memory_breakdown=False),
+                                                                                ], ## END KWARGS LIST
+                                                                                enabled_filter_names=None, fail_on_exception=True, debug_print=False)
         curr_active_pipeline.batch_extended_computations(include_includelist=['non_PBE_epochs_results'], include_global_functions=True, included_computation_filter_names=None, fail_on_exception=True, debug_print=False) ## just checking
 
 
