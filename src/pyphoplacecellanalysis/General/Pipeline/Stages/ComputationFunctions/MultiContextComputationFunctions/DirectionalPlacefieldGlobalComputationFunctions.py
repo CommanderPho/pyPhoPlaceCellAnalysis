@@ -1857,7 +1857,7 @@ class DirectionalPseudo2DDecodersResult(ComputedResult):
             from pyphocorehelpers.indexing_helpers import partition_df_dict, partition_df        
             # from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import _adding_global_non_PBE_epochs
             # from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.EpochComputationFunctions import Compute_NonPBE_Epochs
-            from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.EpochComputationFunctions import EpochComputationFunctions, EpochComputationsComputationsContainer, NonPBEDimensionalDecodingResult, Compute_NonPBE_Epochs, KnownFilterEpochs
+            from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.EpochComputationFunctions import EpochComputationFunctions, EpochComputationsComputationsContainer, DecodingResultND, Compute_NonPBE_Epochs, KnownFilterEpochs
             from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.EpochComputationFunctions import estimate_memory_requirements_bytes
             from neuropy.core.epoch import Epoch, ensure_dataframe, ensure_Epoch
             from neuropy.analyses.placefields import PfND
@@ -1880,8 +1880,8 @@ class DirectionalPseudo2DDecodersResult(ComputedResult):
             ## Unpack from pipeline:
             nonPBE_results: EpochComputationsComputationsContainer = curr_active_pipeline.global_computation_results.computed_data['EpochComputations']
             a_new_NonPBE_Epochs_obj: Compute_NonPBE_Epochs = nonPBE_results.a_new_NonPBE_Epochs_obj
-            results1D: NonPBEDimensionalDecodingResult = nonPBE_results.results1D
-            results2D: NonPBEDimensionalDecodingResult = nonPBE_results.results2D
+            results1D: DecodingResultND = nonPBE_results.results1D
+            results2D: DecodingResultND = nonPBE_results.results2D
 
             epochs_decoding_time_bin_size = nonPBE_results.epochs_decoding_time_bin_size
             frame_divide_bin_size = nonPBE_results.frame_divide_bin_size

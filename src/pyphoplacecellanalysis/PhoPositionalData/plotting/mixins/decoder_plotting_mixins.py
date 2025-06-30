@@ -3,7 +3,7 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     ## typehinting only imports here
-    from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.EpochComputationFunctions import NonPBEDimensionalDecodingResult
+    from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.EpochComputationFunctions import DecodingResultND
 
 from copy import deepcopy
 import param
@@ -133,7 +133,7 @@ class SingleArtistMultiEpochBatchHelpers:
 
 
     """
-    results2D: "NonPBEDimensionalDecodingResult" = field()
+    results2D: "DecodingResultND" = field()
 
     active_ax = field()
     frame_divide_bin_size: float = field()

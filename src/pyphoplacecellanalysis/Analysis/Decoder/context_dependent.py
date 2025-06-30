@@ -109,7 +109,7 @@ from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiCo
 from neuropy.utils.result_context import IdentifyingContext
 from typing import Literal
 # Define a type that can only be one of these specific strings
-from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.EpochComputationFunctions import Compute_NonPBE_Epochs, GeneralDecoderDictDecodedEpochsDictResult, KnownFilterEpochs, NonPBEDimensionalDecodingResult ## #TODO 2025-03-11 08:15: - [ ] Actually look into this class instead of the literal
+from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.EpochComputationFunctions import Compute_NonPBE_Epochs, GeneralDecoderDictDecodedEpochsDictResult, KnownFilterEpochs, DecodingResultND ## #TODO 2025-03-11 08:15: - [ ] Actually look into this class instead of the literal
 
 import pyphoplacecellanalysis.General.type_aliases as types
 
@@ -711,8 +711,8 @@ class GenericDecoderDictDecodedEpochsDictResult(ComputedResult):
     #     # non_PBE_all_directional_pf1D_Decoder, pseudo2D_continuous_specific_decoded_result, continuous_decoded_results_dict, non_PBE_marginal_over_track_ID, (time_bin_containers, time_window_centers, track_marginal_posterior_df) = curr_active_pipeline.global_computation_results.computed_data['EpochComputations']._build_merged_joint_placefields_and_decode(spikes_df=deepcopy(get_proper_global_spikes_df(curr_active_pipeline))) # , filter_epochs=deepcopy(global_any_laps_epochs_obj)
     #     spikes_df: pd.DataFrame = deepcopy(get_proper_global_spikes_df(curr_active_pipeline))
     #     # a_new_NonPBE_Epochs_obj: Compute_NonPBE_Epochs = self.a_new_NonPBE_Epochs_obj
-    #     # results1D: NonPBEDimensionalDecodingResult = self.results1D
-    #     # results2D: NonPBEDimensionalDecodingResult = self.results2D
+    #     # results1D: DecodingResultND = self.results1D
+    #     # results2D: DecodingResultND = self.results2D
 
     #     # ==================================================================================================================== #
     #     # extracted from `perform_compute_non_PBE_epochs(...)` global computation function                                     #
@@ -1093,7 +1093,7 @@ class GenericDecoderDictDecodedEpochsDictResult(ComputedResult):
         """
         from typing import Literal
         from neuropy.core.epoch import EpochsAccessor, Epoch, ensure_dataframe, ensure_Epoch, TimeColumnAliasesProtocol
-        from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.EpochComputationFunctions import EpochComputationFunctions, EpochComputationsComputationsContainer, NonPBEDimensionalDecodingResult, Compute_NonPBE_Epochs, KnownFilterEpochs, GeneralDecoderDictDecodedEpochsDictResult
+        from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.EpochComputationFunctions import EpochComputationFunctions, EpochComputationsComputationsContainer, DecodingResultND, Compute_NonPBE_Epochs, KnownFilterEpochs, GeneralDecoderDictDecodedEpochsDictResult
         from neuropy.analyses.placefields import PfND
         from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import filter_and_update_epochs_and_spikes
         from neuropy.utils.result_context import DisplaySpecifyingIdentifyingContext
@@ -1131,8 +1131,8 @@ class GenericDecoderDictDecodedEpochsDictResult(ComputedResult):
         ## Unpack from pipeline:
         nonPBE_results: EpochComputationsComputationsContainer = curr_active_pipeline.global_computation_results.computed_data['EpochComputations']
         # a_new_NonPBE_Epochs_obj: Compute_NonPBE_Epochs = nonPBE_results.a_new_NonPBE_Epochs_obj
-        results1D: NonPBEDimensionalDecodingResult = nonPBE_results.results1D
-        # results2D: NonPBEDimensionalDecodingResult = nonPBE_results.results2D
+        results1D: DecodingResultND = nonPBE_results.results1D
+        # results2D: DecodingResultND = nonPBE_results.results2D
 
         epochs_decoding_time_bin_size = nonPBE_results.epochs_decoding_time_bin_size
         frame_divide_bin_size = nonPBE_results.frame_divide_bin_size
