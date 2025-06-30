@@ -2691,6 +2691,233 @@ class BasePositionDecoder(HDFMixin, AttrsBasedClassHelperMixin, ContinuousPeakLo
         return _obj
 
 
+    # ==================================================================================================================== #
+    # Average Speed/Acceleration per Position Bin                                                                          #
+    # ==================================================================================================================== #
+    @classmethod
+    def _compute_group_stats_for_var(cls, active_position_df: pd.DataFrame, xbin, ybin, variable_name:str = 'speed', debug_print=False):
+        """Can compute aggregate statistics (such as the mean) for any column of the position dataframe.
+
+        Args:
+            active_position_df (_type_): _description_
+            xbin (_type_): _description_
+            ybin (_type_): _description_
+            variable_name (str, optional): _description_. Defaults to 'speed'.
+            debug_print (bool, optional): _description_. Defaults to False.
+
+        Returns:
+            _type_: _description_
+        """
+        if ybin is None:
+            # Assume 1D:
+            ndim = 1
+            binned_col_names = ['binned_x',]
+
+        else:
+            # otherwise assume 2D:
+            ndim = 2
+            binned_col_names = ['binned_x','binned_y']
+
+
+        # For each unique binned_x and binned_y value, what is the average velocity_x at that point?
+        position_bin_dependent_specific_average_velocities = active_position_df.groupby(binned_col_names)[variable_name].agg([np.nansum, np.nanmean, np.nanmin, np.nanmax]).reset_index() #.apply(lambda g: g.mean(skipna=True)) #.agg((lambda x: x.mean(skipna=False)))
+        if debug_print:
+            print(f'np.shape(position_bin_dependent_specific_average_velocities): {np.shape(position_bin_dependent_specific_average_velocities)}')
+        # position_bin_dependent_specific_average_velocities # 1856 rows
+        if debug_print:
+            print(f'np.shape(output): {np.shape(output)}')
+            print(f"np.shape(position_bin_dependent_specific_average_velocities['binned_x'].to_numpy()): {np.shape(position_bin_dependent_specific_average_velocities['binned_x'])}")
+            max_binned_x_index = np.max(position_bin_dependent_specific_average_velocities['binned_x'].to_numpy()-1) # 63
+            print(f'max_binned_x_index: {max_binned_x_index}')
+        # (len(xbin), len(ybin)): (59, 21)
+
+        if ndim == 1:
+            # 1D Position:
+            output = np.zeros((len(xbin),)) # (65,)
+            output[position_bin_dependent_specific_average_velocities['binned_x'].to_numpy()-1] = position_bin_dependent_specific_average_velocities['nanmean'].to_numpy() # ValueError: shape mismatch: value array of shape (1856,) could not be broadcast to indexing result of shape (1856,2,30)
+
+        else:
+            # 2D+ Position:
+            if debug_print:
+                max_binned_y_index = np.max(position_bin_dependent_specific_average_velocities['binned_y'].to_numpy()-1) # 28
+                print(f'max_binned_y_index: {max_binned_y_index}')
+            output = np.zeros((len(xbin), len(ybin))) # (65, 30)
+            output[position_bin_dependent_specific_average_velocities['binned_x'].to_numpy()-1, position_bin_dependent_specific_average_velocities['binned_y'].to_numpy()-1] = position_bin_dependent_specific_average_velocities['nanmean'].to_numpy() # ValueError: shape mismatch: value array of shape (1856,) could not be broadcast to indexing result of shape (1856,2,30)
+
+        return output
+
+
+    @classmethod
+    def _compute_avg_speed_at_each_position_bin(cls, active_position_df: pd.DataFrame, xbin: NDArray, ybin: NDArray, debug_print=False):
+        """ compute the average speed at each position x. Used only by the two-step decoder above. """
+        outputs = dict()
+        outputs['speed'] = cls._compute_group_stats_for_var(active_position_df=active_position_df, xbin=xbin, ybin=ybin, variable_name='speed')
+        # outputs['velocity_x'] = _compute_group_stats_for_var(active_position_df=active_position_df, xbin=xbin, ybin=ybin, variable_name='velocity_x')
+        # outputs['acceleration_x'] = _compute_group_stats_for_var(active_position_df=active_position_df, xbin=xbin, ybin=ybin, variable_name='acceleration_x')
+        return outputs['speed']
+
+
+
+    @function_attributes(short_name=None, tags=['two-step-decoder', 'compute', 'pure'], input_requires=[], output_provides=[], uses=['cls._compute_avg_speed_at_each_position_bin', 'Zhang_Two_Step.compute_bayesian_two_step_prob_single_timestep', 'self.perform_build_marginals'], used_by=[], creation_date='2025-06-30 09:07', related_items=[])
+    @classmethod    
+    def perform_compute_two_step_decoder(cls, active_decoder: "BasePositionDecoder", active_one_step_result: DecodedFilterEpochsResult, pos_df: pd.DataFrame, debug_print=False):
+        """ computes the "two-step" position posterior decoding from the one-step results and decoder
+
+        Heavy lifting performed by `Zhang_Two_Step.compute_bayesian_two_step_prob_single_timestep`
+
+        active_one_step_decoder.flat_p_x_given_n.shape # (472, 66151)
+        np.shape(active_one_step_decoder.p_x_given_n) # (59, 8, 66151)
+        np.shape(active_one_step_decoder.P_x) # (472, 1)
+        active_one_step_decoder.original_position_data_shape # (59, 8)
+        active_one_step_decoder.flat_position_size # 472
+
+
+        Usage:
+
+            from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import BasePositionDecoder
+
+            pos_df = deepcopy(results2D.pos_df) # computation_result.sess.position.to_dataframe()
+
+            two_step_decoder_result = BasePositionDecoder.perform_compute_two_step_decoder(active_decoder=a_new_global2D_decoder, pos_df=pos_df)
+
+        """
+        from pyphocorehelpers.DataStructure.dynamic_parameters import DynamicParameters
+
+        # self = active_decoder: "BasePositionDecoder"
+        active_xbins = active_decoder.xbin
+        active_ybins = active_decoder.ybin
+
+        active_xbin_centers = active_decoder.xbin_centers
+        active_ybin_centers = active_decoder.ybin_centers
+
+        avg_speed_per_pos = active_decoder._compute_avg_speed_at_each_position_bin(pos_df, xbin=active_xbin_centers, ybin=active_ybin_centers, debug_print=debug_print)
+
+        if debug_print:
+            print(f'np.shape(avg_speed_per_pos): {np.shape(avg_speed_per_pos)}')
+
+        max_speed = np.nanmax(avg_speed_per_pos)
+        # max_speed # 73.80995983236636
+        min_speed = np.nanmin(avg_speed_per_pos)
+        # min_speed # 0.0
+        K_over_V = 60.0 / max_speed # K_over_V = 0.8128984236852197
+
+        # K = 1.0
+        K = K_over_V
+        V = 1.0
+        sigma_t_all = Zhang_Two_Step.sigma_t(avg_speed_per_pos, K, V, d=1.0) # np.shape(sigma_t_all): (64, 29)
+        if debug_print:
+            print(f'np.shape(sigma_t_all): {np.shape(sigma_t_all)}')
+
+        # normalize sigma_t_all:
+        _OLD_two_step_decoder_result = DynamicParameters.init_from_dict({'xbin':active_xbins, 'ybin':active_ybins,
+                                                                'avg_speed_per_pos': avg_speed_per_pos,
+                                                                'K':K, 'V':V,
+                                                                'sigma_t_all':sigma_t_all, 'flat_sigma_t_all': np.squeeze(np.reshape(sigma_t_all, (-1, 1)))
+        })
+
+        _OLD_two_step_decoder_result['C'] = 1.0
+        _OLD_two_step_decoder_result['k'] = 1.0
+
+        if (active_decoder.ndim < 2):
+            assert active_decoder.ndim == 1, f"prev_one_step_bayesian_decoder.ndim must be either 1 or 2, but prev_one_step_bayesian_decoder.ndim: {active_decoder.ndim}"
+            print(f'prev_one_step_bayesian_decoder.ndim == 1, so using [0.0] as active_ybin_centers.')
+            active_ybin_centers = np.array([0.0])
+
+        else:
+            # 2D Case:
+            assert active_decoder.ndim == 2, f"prev_one_step_bayesian_decoder.ndim must be either 1 or 2, but prev_one_step_bayesian_decoder.ndim: {active_decoder.ndim}"
+            active_ybin_centers = active_decoder.ybin_centers
+
+        # pre-allocate outputs:
+        _OLD_two_step_decoder_result['all_x'], _OLD_two_step_decoder_result['flat_all_x'], original_data_shape = Zhang_Two_Step.build_all_positions_matrix(active_decoder.xbin_centers, active_ybin_centers) # all_x: (64, 29, 2), flat_all_x: (1856, 2)
+        _OLD_two_step_decoder_result['original_all_x_shape'] = original_data_shape # add the original data shape to the computed data
+
+        # Pre-allocate output:
+        active_two_step_result: DecodedFilterEpochsResult = deepcopy(active_one_step_result) ## copy the one-step result
+        num_filter_epochs: int = active_one_step_result.num_filter_epochs
+        ## Add extra fields to the two-step `DecodedFilterEpochsResult`
+        active_two_step_result.all_scaling_factors_k = []
+        active_two_step_result.p_x_given_n_and_x_prev_list = []
+
+        for an_epoch_idx in np.arange(num_filter_epochs):
+            ## single epoch:
+            flat_p_x_given_n: NDArray = np.atleast_1d(active_two_step_result.p_x_given_n_list[an_epoch_idx].flatten())
+            
+            curr_single_epoch_result: SingleEpochDecodedResult = active_two_step_result.get_result_for_epoch(active_epoch_idx=an_epoch_idx)
+            
+            flat_p_x_given_n_and_x_prev = np.full_like(curr_single_epoch_result.p_x_given_n.flatten(), 0.0) # fill with NaNs. 
+            p_x_given_n_and_x_prev = np.full_like(curr_single_epoch_result.p_x_given_n, 0.0) # fill with NaNs. Pre-allocate output
+            
+            ## Add extra fields to the two-step result
+            active_two_step_result.most_likely_positions_list[an_epoch_idx] = np.zeros((2, curr_single_epoch_result.num_time_windows)) # (2, 85841)
+
+            if debug_print:
+                print(f'np.shape(prev_one_step_bayesian_decoder.p_x_given_n): {np.shape(curr_single_epoch_result.p_x_given_n)}')
+
+            all_scaling_factors_k = Zhang_Two_Step.compute_scaling_factor_k(flat_p_x_given_n)
+
+            # TODO: Efficiency: This will be inefficient, but do a slow iteration. 
+            for time_window_bin_idx in np.arange(curr_single_epoch_result.num_time_windows):
+                curr_t_step_flat_p_x_given_n = flat_p_x_given_n[:, time_window_bin_idx] # this gets the specific n_t for this time window                
+                # previous positions as determined by the two-step decoder: this uses the two_step previous position instead of the one_step previous position:
+                prev_x_position = active_two_step_result.most_likely_positions_list[an_epoch_idx][:, time_window_bin_idx-1] # TODO: is this okay for 1D as well?
+                active_k = all_scaling_factors_k[time_window_bin_idx] # get the specific k value
+                # active_k = two_step_decoder_result['k']
+                if debug_print:
+                    print(f'np.shape(prev_x_position): {np.shape(prev_x_position)}')
+
+                # Flat version:
+                flat_p_x_given_n_and_x_prev[:,time_window_bin_idx] = Zhang_Two_Step.compute_bayesian_two_step_prob_single_timestep(curr_t_step_flat_p_x_given_n, prev_x_position, _OLD_two_step_decoder_result['flat_all_x'], _OLD_two_step_decoder_result['flat_sigma_t_all'], _OLD_two_step_decoder_result['C'], active_k) # output shape (1856, )            
+
+
+                if (active_decoder.ndim < 2):
+                    # 1D case:
+                    p_x_given_n_and_x_prev[:,time_window_bin_idx] = flat_p_x_given_n_and_x_prev[:,time_window_bin_idx] # used to be (original_data_shape[0], original_data_shape[1])
+                else:
+                    # 2D:
+                    p_x_given_n_and_x_prev[:,:,time_window_bin_idx] = np.reshape(flat_p_x_given_n_and_x_prev[:,time_window_bin_idx], (original_data_shape[0], original_data_shape[1]))
+            ## END for time_window_bin_idx in np.arange(curr_single_epoch_result.num_time_windows)...
+            active_two_step_result.p_x_given_n_and_x_prev_list.append(p_x_given_n_and_x_prev)
+            
+
+            # POST-hoc most-likely computations: Compute the most-likely positions from the p_x_given_n_and_x_prev:
+            # # np.shape(self.most_likely_position_indicies) # (2, 85841)
+            """ Computes the most likely positions at each timestep from flat_p_x_given_n_and_x_prev """
+            most_likely_position_flat_indicies = np.argmax(flat_p_x_given_n_and_x_prev, axis=0)
+
+            # Adds `most_likely_position_flat_max_likelihood_values`:
+            # Same as np.amax(x, axis=axis_idx)
+            # axis_idx = 0
+            # x = two_step_decoder_result['flat_p_x_given_n_and_x_prev']
+            # index_array = two_step_decoder_result['most_likely_position_flat_indicies']
+            # two_step_decoder_result['most_likely_position_flat_max_likelihood_values'] = np.take_along_axis(x, np.expand_dims(index_array, axis=axis_idx), axis=axis_idx).squeeze(axis=axis_idx)
+            most_likely_position_flat_max_likelihood_values = np.take_along_axis(flat_p_x_given_n_and_x_prev, np.expand_dims(most_likely_position_flat_indicies, axis=0), axis=0).squeeze(axis=0) # get the flat maximum values
+            print(f"{most_likely_position_flat_max_likelihood_values.shape = }")
+            # Reshape the maximum values:
+            # two_step_decoder_result['most_likely_position_max_likelihood_values'] = np.array(np.unravel_index(two_step_decoder_result['most_likely_position_flat_max_likelihood_values'], prev_one_step_bayesian_decoder.original_position_data_shape)) # convert back to an array
+
+            # np.shape(self.most_likely_position_flat_indicies) # (85841,)
+            active_two_step_result.most_likely_position_indicies_list[an_epoch_idx] = np.array(np.unravel_index(most_likely_position_flat_indicies, active_decoder.original_position_data_shape)) # convert back to an array
+            # np.shape(self.most_likely_position_indicies) # (2, 85841)
+            active_two_step_result.most_likely_positions_list[an_epoch_idx][0, :] = active_decoder.xbin_centers[active_two_step_result.most_likely_position_indicies_list[an_epoch_idx][0, :]]
+            if active_decoder.ndim > 1:
+                active_two_step_result.most_likely_positions_list[an_epoch_idx][1, :] = active_decoder.ybin_centers[active_two_step_result.most_likely_position_indicies_list[an_epoch_idx][1, :]]
+            # two_step_decoder_result['sigma_t_all'] = sigma_t_all # set sigma_t_all                
+
+            ## For some reason we set up the two-step decoder's most_likely_positions with the tranposed shape compared to the one-step decoder:
+            active_two_step_result.most_likely_positions_list[an_epoch_idx] = active_two_step_result.most_likely_positions_list[an_epoch_idx].T
+
+            ## Once done, compute marginals for the two-step:
+            curr_unit_marginal_x, curr_unit_marginal_y = active_decoder.perform_build_marginals(p_x_given_n_and_x_prev, active_two_step_result.most_likely_positions_list[an_epoch_idx], debug_print=debug_print)
+            _OLD_two_step_decoder_result['marginal'] = DynamicContainer(x=curr_unit_marginal_x, y=curr_unit_marginal_y)
+        ## END for i in np.arange(num_filter_epochs)...
+        
+
+        return active_two_step_result, _OLD_two_step_decoder_result
+
+
+
+
 
 # ==================================================================================================================== #
 # Bayesian Decoder                                                                                                     #
