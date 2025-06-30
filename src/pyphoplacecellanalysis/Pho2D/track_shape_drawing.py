@@ -465,11 +465,13 @@ class LinearTrackDimensions:
         notable_x_positions, notable_y_positions = self.compute_offset_notable_positions(notable_x_positions, notable_y_positions, is_zero_centered=is_zero_centered, offset_point=offset_point)
         return notable_x_positions, notable_y_positions
 
-    def _build_component_rectangles(self, is_zero_centered:bool=False, offset_point=None, include_rendering_properties:bool=True, rotate_to_vertical:bool=False):
+    def _build_component_rectangles(self, is_zero_centered:bool=False, offset_point=None, include_rendering_properties:bool=True, rotate_to_vertical:bool=False, edgecolor:str="#FF0", facecolor:str="#FF0"):
         major_axis_factor, minor_axis_factor = self.axis_scale_factors
         if include_rendering_properties:
-            pen = pg.mkPen({'color': "#FF0", 'width': 2})
-            brush = pg.mkBrush("#FF0")
+            assert edgecolor is not None
+            assert facecolor is not None
+            pen = pg.mkPen({'color': edgecolor, 'width': 2})
+            brush = pg.mkBrush(facecolor)
             rendering_properties_tuple = (pen, brush)
         else:
             # rendering_properties_tuple = tuple() # omit entirely?
@@ -531,7 +533,15 @@ class LinearTrackDimensions:
         
         combined_item, rect_items, rects = item.plot_rect(ax, offset=None)
         """
-        rects = self._build_component_rectangles(is_zero_centered=True, offset_point=offset, include_rendering_properties=True, rotate_to_vertical=rotate_to_vertical)
+        edgecolor: str = "#FF0"
+        facecolor: str = "#FF0"
+        
+        if matplotlib_rect_kwargs_override is not None:
+            edgecolor = matplotlib_rect_kwargs_override.get('edgecolor', "#FF0")
+            facecolor = matplotlib_rect_kwargs_override.get('facecolor', "#FF0")
+        
+        rects = self._build_component_rectangles(is_zero_centered=True, offset_point=offset, include_rendering_properties=True, rotate_to_vertical=rotate_to_vertical,
+                                                 edgecolor=edgecolor, facecolor=facecolor)
 
         rect_items = [] # probably do not need
         for x, y, w, h, pen, brush in rects:
@@ -553,7 +563,8 @@ class LinearTrackDimensions:
                 rect_items.append(rect)
             else:
                 raise ValueError("Unsupported plot item type.")
-
+        ## END for x, y, w, h, pen, brush in rects...
+        
         if isinstance(plot_item, PlotItem):
             plot_item.setAspectLocked()
             plot_item.setClipToView(True)
@@ -775,6 +786,60 @@ class LinearTrackInstance:
 
         return LONG_obj, SHORT_obj
     
+
+    @function_attributes(short_name=None, tags=['figure', 'track'], input_requires=[], output_provides=[], uses=['BoundsRect', 'LinearTrackDimensions.init_from_grid_bin_bounds'], used_by=['create_long_v_short_track_plot_figure'], creation_date='2025-06-17 02:28', related_items=[])
+    @classmethod
+    def init_LS_tracks_from_loaded_track_limits(cls, loaded_track_limits: Optional[Dict]=None, platform_side_length:float=22.0) -> Tuple["LinearTrackInstance", "LinearTrackInstance"]:
+        """ A version that only requires the exported loaded_track_limits, not the session config
+        Usage:
+            from pyphoplacecellanalysis.Pho2D.track_shape_drawing import LinearTrackInstance
+
+            loaded_track_limits = {'long_xlim': np.array([59.0774, 228.69]),
+            'long_unit_xlim': np.array([0.205294, 0.794698]),
+            'short_xlim': np.array([94.0156, 193.757]),
+            'short_unit_xlim': np.array([0.326704, 0.673304]),
+            'long_ylim': np.array([138.164, 146.12]),
+            'long_unit_ylim': np.array([0.48012, 0.507766]),
+            'short_ylim': np.array([138.021, 146.263]),
+            'short_unit_ylim': np.array([0.479622, 0.508264])}
+
+            
+            long_track_inst, short_track_inst = LinearTrackInstance.init_LS_tracks_from_loaded_track_limits(loaded_track_limits=loaded_track_limits)
+            
+        """
+        if loaded_track_limits is None:
+            # loaded_track_limits = deepcopy(a_sess_config.loaded_track_limits) # {'long_xlim': array([59.0774, 228.69]), 'short_xlim': array([94.0156, 193.757]), 'long_ylim': array([138.164, 146.12]), 'short_ylim': array([138.021, 146.263])}
+            loaded_track_limits = {'long_xlim': np.array([59.0774, 228.69]),
+            'long_unit_xlim': np.array([0.205294, 0.794698]),
+            'short_xlim': np.array([94.0156, 193.757]),
+            'short_unit_xlim': np.array([0.326704, 0.673304]),
+            'long_ylim': np.array([138.164, 146.12]),
+            'long_unit_ylim': np.array([0.48012, 0.507766]),
+            'short_ylim': np.array([138.021, 146.263]),
+            'short_unit_ylim': np.array([0.479622, 0.508264])}
+
+        
+        # x_midpoint: float = a_sess_config.x_midpoint
+        # pix2cm: float = a_sess_config.pix2cm
+
+        long_xlim = loaded_track_limits['long_xlim']
+        long_ylim = loaded_track_limits['long_ylim']
+
+        ## if we have short, build that one too:
+        short_xlim = loaded_track_limits['short_xlim']
+        short_ylim = loaded_track_limits['short_ylim']
+
+        LONG_from_mat_lims_grid_bin_bounds = BoundsRect(xmin=(long_xlim[0]-platform_side_length), xmax=(long_xlim[1]+platform_side_length), ymin=long_ylim[0], ymax=long_ylim[1])
+        SHORT_from_mat_lims_grid_bin_bounds = BoundsRect(xmin=(short_xlim[0]-platform_side_length), xmax=(short_xlim[1]+platform_side_length), ymin=short_ylim[0], ymax=short_ylim[1])
+
+        long_track_inst = cls(LinearTrackDimensions.init_from_grid_bin_bounds(LONG_from_mat_lims_grid_bin_bounds), grid_bin_bounds=LONG_from_mat_lims_grid_bin_bounds)
+        short_track_inst = cls(LinearTrackDimensions.init_from_grid_bin_bounds(SHORT_from_mat_lims_grid_bin_bounds), grid_bin_bounds=SHORT_from_mat_lims_grid_bin_bounds)
+
+        ## OUTPUTS: long_track_inst, short_track_inst
+        return (long_track_inst, short_track_inst)
+
+
+
 
 
     def classify_point(self, test_point) -> "TrackPositionClassification":
@@ -1450,7 +1515,7 @@ def create_long_v_short_track_plot_figure(long_track_inst: Optional[LinearTrackI
     return fig, ax_dict, long_track_inst, short_track_inst, long_out_tuple, short_out_tuple
 
 
-@function_attributes(short_name=None, tags=['figure', 'track'], input_requires=[], output_provides=[], uses=['create_long_v_short_track_plot_figure'], used_by=[], creation_date='2025-06-17 02:28', related_items=[])
+@function_attributes(short_name=None, tags=['figure', 'track'], input_requires=[], output_provides=[], uses=['LinearTrackInstance.init_LS_tracks_from_loaded_track_limits', 'create_long_v_short_track_plot_figure'], used_by=[], creation_date='2025-06-17 02:28', related_items=[])
 def create_long_v_short_track_plot_figure_from_loaded_track_limits(loaded_track_limits: Optional[Dict]=None, platform_side_length:float=22.0, **kwargs):
     """ A version that only requires the exported loaded_track_limits, not the session config
     Usage:
@@ -1481,11 +1546,8 @@ def create_long_v_short_track_plot_figure_from_loaded_track_limits(loaded_track_
         _scatter_out = active_scatter_all_neuron_stats_table.plot.scatter(x='long_pf_peak_x', y='short_pf_peak_x', c='color', ax=ax_dict['ax_main'])
 
     """
-    from pyphocorehelpers.geometry_helpers import BoundsRect
-    from pyphoplacecellanalysis.Pho2D.track_shape_drawing import LinearTrackDimensions, LinearTrackInstance
+    from pyphoplacecellanalysis.Pho2D.track_shape_drawing import LinearTrackInstance
 
-    
-    # a_sess_config = deepcopy(active_config)
     if loaded_track_limits is None:
         # loaded_track_limits = deepcopy(a_sess_config.loaded_track_limits) # {'long_xlim': array([59.0774, 228.69]), 'short_xlim': array([94.0156, 193.757]), 'long_ylim': array([138.164, 146.12]), 'short_ylim': array([138.021, 146.263])}
         loaded_track_limits = {'long_xlim': np.array([59.0774, 228.69]),
@@ -1497,23 +1559,7 @@ def create_long_v_short_track_plot_figure_from_loaded_track_limits(loaded_track_
         'short_ylim': np.array([138.021, 146.263]),
         'short_unit_ylim': np.array([0.479622, 0.508264])}
 
-    loaded_track_limits
-    # x_midpoint: float = a_sess_config.x_midpoint
-    # pix2cm: float = a_sess_config.pix2cm
-
-    long_xlim = loaded_track_limits['long_xlim']
-    long_ylim = loaded_track_limits['long_ylim']
-
-    ## if we have short, build that one too:
-    short_xlim = loaded_track_limits['short_xlim']
-    short_ylim = loaded_track_limits['short_ylim']
-
-    LONG_from_mat_lims_grid_bin_bounds = BoundsRect(xmin=(long_xlim[0]-platform_side_length), xmax=(long_xlim[1]+platform_side_length), ymin=long_ylim[0], ymax=long_ylim[1])
-    SHORT_from_mat_lims_grid_bin_bounds = BoundsRect(xmin=(short_xlim[0]-platform_side_length), xmax=(short_xlim[1]+platform_side_length), ymin=short_ylim[0], ymax=short_ylim[1])
-
-    long_track_inst = LinearTrackInstance(LinearTrackDimensions.init_from_grid_bin_bounds(LONG_from_mat_lims_grid_bin_bounds), grid_bin_bounds=LONG_from_mat_lims_grid_bin_bounds)
-    short_track_inst = LinearTrackInstance(LinearTrackDimensions.init_from_grid_bin_bounds(SHORT_from_mat_lims_grid_bin_bounds), grid_bin_bounds=SHORT_from_mat_lims_grid_bin_bounds)
-
+    long_track_inst, short_track_inst = LinearTrackInstance.init_LS_tracks_from_loaded_track_limits(loaded_track_limits=loaded_track_limits, platform_side_length=platform_side_length)
     ## OUTPUTS: long_track_inst, short_track_inst
     return create_long_v_short_track_plot_figure(active_config=None, long_track_inst=long_track_inst, short_track_inst=short_track_inst, **kwargs)
 
