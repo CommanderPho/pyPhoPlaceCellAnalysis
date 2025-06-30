@@ -78,7 +78,7 @@ class TimeSynchronizedOccupancyPlotter(AnimalTrajectoryPlottingMixin, TimeSynchr
         
         ## Build the colormap to be used:
         # self.params.cmap = pg.ColorMap(pos=np.linspace(0.0, 1.0, 6), color=colors)
-        self.params.cmap = pg.colormap.get('jet','matplotlib') # prepare a linear color map
+        self.params.cmap = pg.colormap.get('viridis','matplotlib') # prepare a linear color map
         self.params.image_margins = 0.0
         self.params.image_bounds_extent, self.params.x_range, self.params.y_range = pyqtplot_build_image_bounds_extent(self.active_time_dependent_placefields.xbin, self.active_time_dependent_placefields.ybin, margin=self.params.image_margins, debug_print=self.enable_debug_print)
         
