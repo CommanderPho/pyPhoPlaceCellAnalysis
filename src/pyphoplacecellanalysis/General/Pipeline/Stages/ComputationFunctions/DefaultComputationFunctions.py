@@ -219,7 +219,9 @@ class DefaultComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Computa
         # Get the one-step decoder:
         prev_one_step_bayesian_decoder = computation_result.computed_data[one_step_decoder_key]
         ## New 2022-09-15 direct neuropy.utils.mixins.binning_helpers.build_df_discretized_binned_position_columns version:
-        computation_result.sess.position.df, (xbin, ybin), bin_infos = build_df_discretized_binned_position_columns(computation_result.sess.position.df, bin_values=(prev_one_step_bayesian_decoder.xbin_centers, prev_one_step_bayesian_decoder.ybin_centers), active_computation_config=computation_result.computation_config.pf_params, force_recompute=False, debug_print=debug_print)
+        computation_result.sess.position.df, (xbin, ybin), bin_infos = build_df_discretized_binned_position_columns(computation_result.sess.position.df, 
+            bin_values=(prev_one_step_bayesian_decoder.xbin, prev_one_step_bayesian_decoder.ybin),
+            active_computation_config=computation_result.computation_config.pf_params, force_recompute=False, debug_print=debug_print)
         active_xbins = xbin
         active_ybins = ybin
 
