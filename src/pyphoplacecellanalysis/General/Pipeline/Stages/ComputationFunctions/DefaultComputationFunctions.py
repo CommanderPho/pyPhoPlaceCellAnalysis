@@ -80,7 +80,7 @@ class DefaultComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Computa
 
     @function_attributes(short_name='position_decoding_two_step', tags=['decoding', 'position', 'two-step'],
                           input_requires=["computation_result.computed_data['pf1D_Decoder']", "computation_result.computed_data['pf2D_Decoder']"], output_provides=["computation_result.computed_data['pf1D_TwoStepDecoder']", "computation_result.computed_data['pf2D_TwoStepDecoder']"],
-                          uses=[], used_by=[], creation_date='2023-09-12 17:32', related_items=[],
+                          uses=['_compute_avg_speed_at_each_position_bin'], used_by=[], creation_date='2023-09-12 17:32', related_items=[],
         validate_computation_test=lambda curr_active_pipeline, computation_filter_name='maze': (curr_active_pipeline.computation_results[computation_filter_name].computed_data['pf1D_TwoStepDecoder'], curr_active_pipeline.computation_results[computation_filter_name].computed_data['pf2D_TwoStepDecoder']), is_global=False)
     def _perform_two_step_position_decoding_computation(computation_result: ComputationResult, debug_print=False, **kwargs):
         """ Builds the Zhang Velocity/Position For 2-step Bayesian Decoder for 2D Placefields
@@ -229,6 +229,7 @@ class DefaultComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Computa
         prev_one_step_bayesian_decoder.add_two_step_decoder_results(computation_result.computed_data[two_step_decoder_key])
 
         return computation_result
+
 
     @function_attributes(short_name='recursive_latent_pf_decoding', tags=['decoding', 'recursive', 'latent'],
                           input_requires=["computation_result.computation_config.pf_params", "computation_result.computed_data['pf1D']", "computation_result.computed_data['pf2D']", "computation_result.computed_data['pf1D_Decoder']", "computation_result.computed_data['pf2D_Decoder']"],

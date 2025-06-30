@@ -11,7 +11,8 @@ from pyphocorehelpers.gui.PhoUIContainer import PhoUIContainer
 
 class TimeSynchronizedPlotterBase(QtWidgets.QWidget):
     """ Subclasses generally display time-dependent results produced by a PfND_TimeDependent instance in a manner synchronized with another plotter/renderer.
-    
+    Seems to have its `self.on_window_changed_rate_limited(...)` called to perform updates, which in-turn calls its `self.on_window_changed(...)`, which calls its `self.update(end_t, defer_render=False)`
+
     Usage:
     
         included_epochs = None

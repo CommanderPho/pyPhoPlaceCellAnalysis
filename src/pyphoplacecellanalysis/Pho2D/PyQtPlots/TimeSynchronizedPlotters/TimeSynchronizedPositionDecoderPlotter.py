@@ -3,6 +3,7 @@ import pandas as pd
 from qtpy import QtCore, QtWidgets
 
 # from neuropy.analyses.time_dependent_placefields import PfND_TimeDependent
+from pyphocorehelpers.assertion_helpers import Assert
 
 import pyphoplacecellanalysis.External.pyqtgraph as pg
 # from pyphoplacecellanalysis.External.pyqtgraph.Qt import QtCore, QtGui
@@ -16,7 +17,10 @@ from pyphoplacecellanalysis.Pho2D.PyQtPlots.TimeSynchronizedPlotters.Mixins.Anim
 
 
 class TimeSynchronizedPositionDecoderPlotter(AnimalTrajectoryPlottingMixin, TimeSynchronizedPlotterBase):
-    """ Plots the decoded position at a given moment in time. 
+    """ Plots the decoded position posteriors at a given moment in time. 
+    Uses pyqtgraph to render the decoded posteriors
+    Its inherited `self.on_window_changed_rate_limited(...)` is called to perform updates
+
     TODO: refactor, these plotters are all supposed to be for the PfND_TimeDependent class usage I think. 
     
     
@@ -159,6 +163,7 @@ class TimeSynchronizedPositionDecoderPlotter(AnimalTrajectoryPlottingMixin, Time
             print(f'WARN: TimeSynchronizedPositionDecoderPlotter._update_plots: curr_time_window_index: {curr_time_window_index}')
             return # return without updating
         
+        Assert.is_in(self.posterior_variable_to_render, allowed_variable_list=['p_x_given_n', 'p_x_given_n_and_x_prev'])
         # self.posterior_variable_to_render: allowed values: ['p_x_given_n', 'p_x_given_n_and_x_prev', ...]
         if self.posterior_variable_to_render == 'p_x_given_n':
             image = np.squeeze(self.active_one_step_decoder.p_x_given_n[:, :, curr_time_window_index]).copy()

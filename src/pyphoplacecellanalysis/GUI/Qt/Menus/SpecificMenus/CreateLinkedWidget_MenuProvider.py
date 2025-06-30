@@ -1,3 +1,4 @@
+from neuropy.core.user_annotations import metadata_attributes
 from qtpy import QtCore, QtGui, QtWidgets
 from pyphoplacecellanalysis.Resources import GuiResources, ActionIcons
 
@@ -107,17 +108,6 @@ class CreateLinkedWidget_MenuProvider(BaseMenuProviderMixin):
         
         self.activeMenuReference.top_level_menu.setObjectName("menuCreateLinkedWidget")
         
-        # Manual Setup:
-        # curr_actions_dict['actionTimeSynchronizedOccupancyPlotter'] = widget.ui.actionTimeSynchronizedOccupancyPlotter
-        # curr_actions_dict['actionTimeSynchronizedPlacefieldsPlotter'] = widget.ui.actionTimeSynchronizedPlacefieldsPlotter
-        # curr_actions_dict['actionTimeSynchronizedDecoderPlotter'] = widget.ui.actionTimeSynchronizedDecoderPlotter
-        # curr_actions_dict['actionCombineTimeSynchronizedPlotterWindow'] = widget.ui.actionCombineTimeSynchronizedPlotterWindow
-        
-        # curr_actions_dict['actionTimeSynchronizedOccupancyPlotter'].triggered.connect(CreateNewTimeSynchronizedPlotterCommand(spike_raster_window, active_pf_2D_dt, plotter_type='occupancy', active_context=active_context, display_output=display_output, action_identifier='actionTimeSynchronizedOccupancyPlotter'))
-        # curr_actions_dict['actionTimeSynchronizedPlacefieldsPlotter'].triggered.connect(CreateNewTimeSynchronizedPlotterCommand(spike_raster_window, active_pf_2D_dt, plotter_type='placefields', active_context=active_context, display_output=display_output, action_identifier='actionTimeSynchronizedPlacefieldsPlotter'))
-        # curr_actions_dict['actionTimeSynchronizedDecoderPlotter'].triggered.connect(CreateNewTimeSynchronizedPlotterCommand(spike_raster_window, active_pf_2D_dt, plotter_type='decoder', active_context=active_context, display_output=display_output, action_identifier='actionTimeSynchronizedDecoderPlotter'))
-        # curr_actions_dict['actionCombineTimeSynchronizedPlotterWindow'].triggered.connect(CreateNewTimeSynchronizedCombinedPlotterCommand(spike_raster_window, active_pf_2D_dt, active_context=active_context, display_output=display_output, action_identifier='actionCombineTimeSynchronizedPlotterWindow'))
-        
         action_command_map = {
             'actionTimeSynchronizedOccupancyPlotter': CreateNewTimeSynchronizedPlotterCommand(spike_raster_window, active_pf_2D_dt, plotter_type='occupancy', curr_active_pipeline=None, active_context=active_context, display_output=display_output, action_identifier='actionTimeSynchronizedOccupancyPlotter'),
             'actionTimeSynchronizedPlacefieldsPlotter': CreateNewTimeSynchronizedPlotterCommand(spike_raster_window, active_pf_2D_dt, plotter_type='placefields', curr_active_pipeline=None, active_context=active_context, display_output=display_output, action_identifier='actionTimeSynchronizedPlacefieldsPlotter'),
@@ -133,6 +123,7 @@ class CreateLinkedWidget_MenuProvider(BaseMenuProviderMixin):
         self.activeMenuReference.actions_dict['actionMenuCreateLinkedWidget'] = curr_window.ui.actionMenuCreateLinkedWidget 
         return self.activeMenuReference.top_level_menu, self.activeMenuReference.actions_dict
 
+
     @pyqtExceptionPrintingSlot()
     def CreateLinkedWidget_MenuProvider_on_destroy(self):
         """ perfrom teardown/destruction of anything that needs to be manually removed or released """
@@ -147,6 +138,7 @@ class CreateLinkedWidget_MenuProvider(BaseMenuProviderMixin):
         # curr_window.ui.menus.global_window_menus.debug.actions_dict = {} # Empty the dict of actions
         self.CreateLinkedWidget_MenuProvider_actionsDict = {}
 
+
     @pyqtExceptionPrintingSlot()
     def CreateLinkedWidget_MenuProvider_on_menus_update(self):
         """ called to update menus dynamically. Only needed if the menu items themselves change dynamically.
@@ -159,7 +151,8 @@ class CreateLinkedWidget_MenuProvider(BaseMenuProviderMixin):
     
 ## Actions to be executed to create new plotters:
 
-        
+
+@metadata_attributes(short_name=None, tags=['menu', 'command', 'time-synchronized'], input_requires=[], output_provides=[], uses=['build_connected_time_synchronized_occupancy_plotter', 'build_connected_time_synchronized_placefields_plotter', 'build_connected_time_synchronized_decoder_plotter'], used_by=[], creation_date='2025-06-30 06:23', related_items=[])
 class CreateNewTimeSynchronizedPlotterCommand(BaseMenuCommand):
     """ build_combined_time_synchronized_plotters_window
     A command to create a plotter as needed
@@ -200,7 +193,9 @@ class CreateNewTimeSynchronizedPlotterCommand(BaseMenuCommand):
         print(f'_out_display_key: {_out_display_key}')
         self._display_output[_out_display_key] = _out_sync_tuple
         
-    
+
+
+@metadata_attributes(short_name=None, tags=['menu', 'command', 'time-synchronized'], input_requires=[], output_provides=[], uses=['build_combined_time_synchronized_plotters_window'], used_by=[], creation_date='2025-06-30 06:23', related_items=[])
 class CreateNewTimeSynchronizedCombinedPlotterCommand(BaseMenuCommand):
     """ build_combined_time_synchronized_plotters_window
     A command to create a plotter as needed
