@@ -652,6 +652,9 @@ class Dock(QtWidgets.QWidget, DockDrop):
 
         menu.addSeparator()
 
+        copyIdentifierToClipboardAction = menu.addAction("Copy dock identifier")
+        copyIdentifierToClipboardAction.triggered.connect(lambda: QtWidgets.QApplication.clipboard().setText(self.name()))
+
         renameAction = menu.addAction("Rename dock...")
         renameAction.triggered.connect(lambda: self.label.promptRename())
         
