@@ -711,7 +711,20 @@ class FigureToImageHelpers:
                     )
                     ax.set_xlim(start, end)
                     ax.set_ylim(y_min, y_max)
-                    ax.set_title(f"Segment: {start:.0f}–{end:.0f}")
+                    # ax.set_title(f"Segment: {start:.0f}–{end:.0f}")
+                    # time_label_formatting_kwargs = dict(fontsize=10, color='red', weight='bold', bbox=dict(boxstyle='round,pad=0.3', facecolor='white', alpha=0.8))
+                    time_label_formatting_kwargs = dict(fontsize=10, color='black')
+
+                    # Display start value vertically on left edge (outside axes)
+                    ax.text(-0.02, 0.5, f'{start:.0f}', 
+                            rotation=90, verticalalignment='center', horizontalalignment='center',
+                            transform=ax.transAxes, **time_label_formatting_kwargs)
+
+                    # Display end value vertically on right edge (outside axes)
+                    ax.text(1.02, 0.5, f'{end:.0f}',
+                            rotation=90, verticalalignment='center', horizontalalignment='center', 
+                            transform=ax.transAxes, **time_label_formatting_kwargs)
+
                     ax.set_xticks([])
                     ax.set_yticks([])
 
