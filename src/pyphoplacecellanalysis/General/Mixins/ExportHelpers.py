@@ -3,6 +3,7 @@ from datetime import datetime
 from enum import Enum # for getting the current date to set the ouptut folder name
 from pathlib import Path
 from typing import Any, Callable, List, Optional, Union, Dict
+from neuropy.core.user_annotations import metadata_attributes
 import pandas as pd
 import numpy as np
 from attrs import define, field, Factory, fields
@@ -544,6 +545,180 @@ def programmatic_display_to_PDF(curr_active_pipeline, curr_display_function_name
                 curr_active_pipeline.register_output_file(output_path=active_pdf_save_path, output_metadata={'filtered_context': a_filtered_context, 'context': active_identifying_ctx, 'fig': out_fig_list})
 
 
+@metadata_attributes(short_name=None, tags=['pdf', 'export', 'helper'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-07-01 01:13', related_items=[])
+class FigureToImageHelpers:
+
+    @function_attributes(short_name=None, tags=['pdf', 'export', 'matplotlib', 'track', 'multi-page'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-07-01 01:13', related_items=[])
+    @classmethod
+    def export_axesimage_to_paged_pdf(cls, ax_image, x_extent: tuple, chunk_width: float, output_pdf_path: str, figsize=(8, 11), dpi=150, override_cmap=None, progress_print: bool=True, debug_max_num_pages: int = 25):
+        """
+        Export an AxesImage to a multi-page PDF, splitting along the x-axis.
+
+        Parameters
+        ----------
+        ax_image : matplotlib.image.AxesImage
+            The AxesImage object (e.g., from imshow()) you want to export.
+        x_extent : tuple
+            (x_min, x_max) data coordinates along the x-axis.
+        chunk_width : float
+            Width of each page in data units.
+        output_pdf_path : str
+            Path to the output PDF file.
+        figsize : tuple
+            Figure size in inches (width, height).
+        dpi : int
+            DPI resolution for rendering.
+        cmap : matplotlib colormap, optional
+            If you want to override the colormap.
+
+        Usage:
+            from pyphoplacecellanalysis.General.Mixins.ExportHelpers import FigureToImageHelpers
+
+            ## INPUTS: im_posterior_x
+            relative_data_output_parent_folder = Path('data').resolve()
+            Assert.path_exists(relative_data_output_parent_folder)
+
+            output_pdf_path: Path = relative_data_output_parent_folder.joinpath('timeline_exported.pdf')
+            FigureToImageHelpers.export_axesimage_to_paged_pdf(ax_image=im_posterior_x, x_extent=(active_2d_plot.total_data_start_time, active_2d_plot.total_data_end_time), chunk_width=active_2d_plot.active_window_duration, output_pdf_path=output_pdf_path, figsize=(11, 8), dpi=150, override_cmap=None)
+
+        """
+        
+        x_min, x_max = x_extent
+        y_min, y_max = ax_image.get_extent()[2:4]
+        img_data = ax_image.get_array()
+        orig_cmap = ax_image.get_cmap() if override_cmap is None else override_cmap
+        curr_page_idx: int = 0
+        # Create multipage PDF
+        with backend_pdf.PdfPages(output_pdf_path) as pdf:
+            start = x_min
+            while (start < x_max) and (curr_page_idx < debug_max_num_pages):
+                end = min(start + chunk_width, x_max)
+                if progress_print:
+                    print(f'processing page_idx: {curr_page_idx}')
+
+                # Create figure
+                fig, ax = plt.subplots(figsize=figsize, dpi=dpi)
+
+                # Plot the image in the current x window
+                ax.imshow(
+                    img_data,
+                    extent=ax_image.get_extent(),
+                    origin=ax_image.origin,
+                    aspect='auto',
+                    cmap=orig_cmap
+                )
+
+                # Set window
+                ax.set_xlim(start, end)
+                ax.set_ylim(y_min, y_max)
+
+                ax.set_title(f"Segment: {start:.2f} to {end:.2f}")
+                ax.set_xlabel("t")
+                ax.set_ylabel("pos")
+
+                pdf.savefig(fig)
+                plt.close(fig)
+
+                start += chunk_width
+                curr_page_idx += 1
+            ## end while
+
+        print(f"Export complete: {output_pdf_path}")
+
+
+    @function_attributes(short_name=None, tags=['pdf', 'export', 'wrapped', 'panelled', 'matplotlib', 'track', 'multi-page'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-07-01 02:08', related_items=[])
+    @classmethod
+    def export_wrapped_axesimage_to_paged_pdf(cls, ax_image, x_extent: tuple, chunk_width: float, output_pdf_path: str, rows_per_page: int=5, figsize=(8, 11), dpi=150, debug_max_num_pages: Optional[int] = 5, vertical_spacing=0.02):
+        """
+        Export an AxesImage (such as the entire timeline plot for a MATPLOTLIB-backed track to a wrapped, paged PDF layout (multi-row per page).
+
+        Parameters
+        ----------
+        ax_image : matplotlib.image.AxesImage
+            The source image from imshow().
+        x_extent : tuple
+            (x_min, x_max) of the full timeline.
+        chunk_width : float
+            Width of each timeline chunk (like a line of text).
+        rows_per_page : int
+            Number of horizontal "lines" per page.
+        output_pdf_path : str
+            Output PDF file path.
+        figsize : tuple
+            PDF page size in inches.
+        dpi : int
+            Dots per inch for rendering.
+        vertical_spacing : float
+            Fractional spacing between rows (relative to figure height).
+            
+        Usage:
+        
+            from pyphoplacecellanalysis.General.Mixins.ExportHelpers import FigureToImageHelpers
+
+            ## INPUTS: im_posterior_x
+            relative_data_output_parent_folder = Path('data').resolve()
+            Assert.path_exists(relative_data_output_parent_folder)
+
+            output_pdf_path: Path = relative_data_output_parent_folder.joinpath('timeline_exported.pdf')
+            FigureToImageHelpers.export_wrapped_axesimage_to_paged_pdf(ax_image=im_posterior_x, x_extent=(active_2d_plot.total_data_start_time, active_2d_plot.total_data_end_time), chunk_width=active_2d_plot.active_window_duration, output_pdf_path=output_pdf_path, figsize=(8, 11), dpi=150, rows_per_page=15, debug_max_num_pages=3)
+
+        """
+        x_min, x_max = x_extent
+        y_min, y_max = ax_image.get_extent()[2:4]
+        img_data = ax_image.get_array()
+        cmap = ax_image.get_cmap()
+        origin = ax_image.origin
+
+        chunks = []
+        start = x_min
+        while start < x_max:
+            end = min((start + chunk_width), x_max)
+            chunks.append((start, end))
+            start = end
+
+        n_chunks: int = len(chunks)
+        
+        # Group chunks into pages
+        chunks_per_page = rows_per_page
+        pages = [chunks[i:i+chunks_per_page] for i in range(0, len(chunks), chunks_per_page)]
+        n_pages: int = len(pages)
+        if debug_max_num_pages is None:
+            debug_max_num_pages = n_pages # all required pages
+
+        pages = pages[:debug_max_num_pages]
+
+
+        with backend_pdf.PdfPages(output_pdf_path) as pdf:
+            for page_chunks in pages:
+                fig, axes = plt.subplots(
+                    nrows=len(page_chunks),
+                    figsize=figsize,
+                    dpi=dpi,
+                    constrained_layout=True
+                )
+
+                # Make sure axes is iterable (even if 1 row)
+                if len(page_chunks) == 1:
+                    axes = [axes]
+
+                for ax, (start, end) in zip(axes, page_chunks):
+                    ax.imshow(
+                        img_data,
+                        extent=ax_image.get_extent(),
+                        origin=origin,
+                        aspect='auto',
+                        cmap=cmap
+                    )
+                    ax.set_xlim(start, end)
+                    ax.set_ylim(y_min, y_max)
+                    ax.set_title(f"Segment: {start:.0f}–{end:.0f}")
+                    ax.set_xticks([])
+                    ax.set_yticks([])
+
+                pdf.savefig(fig)
+                plt.close(fig)
+            ## END for page_chunks in pages...
+        print(f"PDF saved to {output_pdf_path}")
 
 
 
