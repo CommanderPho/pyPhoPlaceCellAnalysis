@@ -8595,7 +8595,9 @@ class AddNewDecodedPosteriors_MatplotlibPlotCommand(BaseMenuCommand):
     _active_config_name = field(default=None)
     _context = field(default=None, alias="active_context")
     _display_output = field(default=Factory(dict))
-    
+    active_time_bin_sizes_whitelist: Optional[List[float]] = field(default=None, metadata={'desc':'if not None, only results with this decoding_time_bin_size will be plotted, otherwise all available time_bin_sizes will be shown.'})    
+
+
     @function_attributes(short_name=None, tags=['row', 'posterior'], input_requires=[], output_provides=[], uses=['add_new_matplotlib_render_plot_widget', 'plot_1D_most_likely_position_comparsions'], used_by=[], creation_date='2024-12-18 08:53', related_items=[])
     @classmethod
     def _build_dock_group_id(cls, extended_dock_title_info: Optional[str]=None) -> str:
@@ -8735,7 +8737,7 @@ class AddNewDecodedPosteriors_MatplotlibPlotCommand(BaseMenuCommand):
     # ==================================================================================================================== #
     @function_attributes(short_name=None, tags=['main'], input_requires=[], output_provides=[], uses=['_perform_add_new_decoded_posterior_row', '_build_dock_group_id'], used_by=['add_all_computed_time_bin_sizes_pseudo2D_decoder_decoded_epochs', 'add_pseudo2D_decoder_decoded_epochs'], creation_date='2025-01-29 09:25', related_items=[])
     @classmethod
-    def prepare_and_perform_add_add_pseudo2D_decoder_decoded_epochs(cls, curr_active_pipeline, active_2d_plot, continuously_decoded_dict: Dict[str, DecodedFilterEpochsResult], info_string: str, a_pseudo2D_decoder: BasePositionDecoder, debug_print: bool=False, **kwargs):
+    def prepare_and_perform_add_pseudo2D_decoder_decoded_epochs(cls, curr_active_pipeline, active_2d_plot, continuously_decoded_dict: Dict[str, DecodedFilterEpochsResult], info_string: str, a_pseudo2D_decoder: BasePositionDecoder, debug_print: bool=False, **kwargs):
         """ adds the decoded epochs for the long/short decoder from the global_computation_results as new matplotlib plot rows. """
         from pyphoplacecellanalysis.General.Model.Configs.LongShortDisplayConfig import DisplayColorsEnum
         from pyphoplacecellanalysis.GUI.PyQtPlot.DockingWidgets.DynamicDockDisplayAreaContent import CustomDockDisplayConfig, CustomCyclicColorsDockDisplayConfig, NamedColorScheme
@@ -8818,7 +8820,7 @@ class AddNewDecodedPosteriors_MatplotlibPlotCommand(BaseMenuCommand):
 
     @function_attributes(short_name=None, tags=['multi-time-bin'], input_requires=[], output_provides=[], uses=['cls.prepare_and_perform_add_add_pseudo2D_decoder_decoded_epochs'], used_by=[], creation_date='2025-02-26 05:37', related_items=[])
     @classmethod
-    def add_all_computed_time_bin_sizes_pseudo2D_decoder_decoded_epochs(cls, curr_active_pipeline, active_2d_plot, debug_print=False, **kwargs):
+    def add_active_computed_time_bin_sizes_pseudo2D_decoder_decoded_epochs(cls, curr_active_pipeline, active_2d_plot, debug_print=False, active_time_bin_sizes_whitelist: Optional[List[float]]=None, **kwargs):
         """ adds all computed time_bin_sizes in `curr_active_pipeline.global_computation_results.computed_data['DirectionalDecodersDecoded'].continuously_decoded_result_cache_dict` from the global_computation_results as new matplotlib plot rows. """
         flat_all_time_bin_sizes_output_tuples_dict: Dict[str, Tuple] = {}
         
@@ -8836,20 +8838,27 @@ class AddNewDecodedPosteriors_MatplotlibPlotCommand(BaseMenuCommand):
                 ## Each iteration here adds 4 more tracks -- one for each decoding context
                 
                 # a_continuously_decoded_dict: Dict[str, DecodedFilterEpochsResult]
-                if debug_print:
-                    print(f'time_bin_size: {time_bin_size}')
+                will_skip_time_bin_size: bool = False
+                if active_time_bin_sizes_whitelist is not None:
+                    if time_bin_size not in active_time_bin_sizes_whitelist:
+                        will_skip_time_bin_size = True
+                        if debug_print:
+                            print(f'active_time_bin_sizes_whitelist will be used: {active_time_bin_sizes_whitelist} and current time_bin_size: {time_bin_size} will be excluded.')
 
-                info_string: str = f" - t_bin_size: {time_bin_size}"
-                # output_dict = _cmd.prepare_and_perform_add_pseudo2D_decoder_decoded_epoch_marginals(curr_active_pipeline=_cmd._active_pipeline, active_2d_plot=active_2d_plot, continuously_decoded_dict=deepcopy(a_continuously_decoded_dict), info_string=info_string, **enable_rows_config_kwargs)
-                output_dict = cls.prepare_and_perform_add_add_pseudo2D_decoder_decoded_epochs(curr_active_pipeline=curr_active_pipeline, active_2d_plot=active_2d_plot, continuously_decoded_dict=deepcopy(a_continuously_decoded_dict), info_string=info_string, a_pseudo2D_decoder=pseudo2D_decoder, debug_print=debug_print, **kwargs)
-                for a_key, an_output_tuple in output_dict.items():
-                    identifier_name, widget, matplotlib_fig, matplotlib_fig_axes, dDisplayItem = an_output_tuple
-                    # if a_key not in all_time_bin_sizes_output_dict:
-                    #     all_time_bin_sizes_output_dict[a_key] = [] ## init empty list
-                    # all_time_bin_sizes_output_dict[a_key].append(an_output_tuple)
-                    
-                    assert (identifier_name not in flat_all_time_bin_sizes_output_tuples_dict), f"identifier_name: {identifier_name} already in flat_all_time_bin_sizes_output_tuples_dict: {list(flat_all_time_bin_sizes_output_tuples_dict.keys())}"
-                    flat_all_time_bin_sizes_output_tuples_dict[identifier_name] = an_output_tuple
+                if not will_skip_time_bin_size:
+                    info_string: str = f" - t_bin_size: {time_bin_size}"
+                    # output_dict = _cmd.prepare_and_perform_add_pseudo2D_decoder_decoded_epoch_marginals(curr_active_pipeline=_cmd._active_pipeline, active_2d_plot=active_2d_plot, continuously_decoded_dict=deepcopy(a_continuously_decoded_dict), info_string=info_string, **enable_rows_config_kwargs)
+                    output_dict = cls.prepare_and_perform_add_pseudo2D_decoder_decoded_epochs(curr_active_pipeline=curr_active_pipeline, active_2d_plot=active_2d_plot, continuously_decoded_dict=deepcopy(a_continuously_decoded_dict), info_string=info_string, a_pseudo2D_decoder=pseudo2D_decoder, debug_print=debug_print, **kwargs)
+                    for a_key, an_output_tuple in output_dict.items():
+                        identifier_name, widget, matplotlib_fig, matplotlib_fig_axes, dDisplayItem = an_output_tuple
+                        # if a_key not in all_time_bin_sizes_output_dict:
+                        #     all_time_bin_sizes_output_dict[a_key] = [] ## init empty list
+                        # all_time_bin_sizes_output_dict[a_key].append(an_output_tuple)
+                        
+                        assert (identifier_name not in flat_all_time_bin_sizes_output_tuples_dict), f"identifier_name: {identifier_name} already in flat_all_time_bin_sizes_output_tuples_dict: {list(flat_all_time_bin_sizes_output_tuples_dict.keys())}"
+                        flat_all_time_bin_sizes_output_tuples_dict[identifier_name] = an_output_tuple
+                # END if not will_skip_tim...
+
         except (KeyError, AttributeError) as e:
             # KeyError: 'DirectionalDecodersDecoded'
             print(f'add_all_computed_time_bin_sizes_pseudo2D_decoder_decoded_epochs(...) failed to add any tracks, perhaps because the pipeline is missing any computed "DirectionalDecodersDecoded" global results. Error: "{e}". Skipping.')
@@ -8882,7 +8891,7 @@ class AddNewDecodedPosteriors_MatplotlibPlotCommand(BaseMenuCommand):
         info_string: str = f" - t_bin_size: {time_bin_size}"
         most_recent_continuously_decoded_dict: Dict[str, DecodedFilterEpochsResult] = deepcopy(directional_decoders_decode_result.most_recent_continuously_decoded_dict)
         
-        return cls.prepare_and_perform_add_add_pseudo2D_decoder_decoded_epochs(curr_active_pipeline=curr_active_pipeline, active_2d_plot=active_2d_plot, continuously_decoded_dict=most_recent_continuously_decoded_dict, info_string=info_string, pseudo2D_decoder=pseudo2D_decoder, debug_print=debug_print, **kwargs)
+        return cls.prepare_and_perform_add_pseudo2D_decoder_decoded_epochs(curr_active_pipeline=curr_active_pipeline, active_2d_plot=active_2d_plot, continuously_decoded_dict=most_recent_continuously_decoded_dict, info_string=info_string, pseudo2D_decoder=pseudo2D_decoder, debug_print=debug_print, **kwargs)
 
 
     @function_attributes(short_name=None, tags=['tracks', 'custom_decoder'], input_requires=[], output_provides=[], uses=['cls._perform_add_new_decoded_posterior_row'], used_by=[], creation_date='2025-01-29 12:08', related_items=[])
@@ -8973,7 +8982,7 @@ class AddNewDecodedPosteriors_MatplotlibPlotCommand(BaseMenuCommand):
         active_2d_plot = self._spike_raster_window.spike_raster_plt_2d
 
         # output_dict = self.add_pseudo2D_decoder_decoded_epochs(self._active_pipeline, active_2d_plot)
-        output_dict = self.add_all_computed_time_bin_sizes_pseudo2D_decoder_decoded_epochs(self._active_pipeline, active_2d_plot, **kwargs)
+        output_dict = self.add_active_computed_time_bin_sizes_pseudo2D_decoder_decoded_epochs(self._active_pipeline, active_2d_plot, active_time_bin_sizes_whitelist=self.active_time_bin_sizes_whitelist, **kwargs)
         
         # Update display output dict:
         for a_decoder_name, an_output_tuple in output_dict.items():
@@ -9019,6 +9028,7 @@ class AddNewDecodedEpochMarginal_MatplotlibPlotCommand(AddNewDecodedPosteriors_M
     enable_marginal_over_direction: bool = field(default=False)
     enable_marginal_over_track_ID: bool = field(default=True)
     allow_overwrite_enabled_marginals_from_params: bool = field(default=True, metadata={'desc': 'if True, allows overwriting self.enable_* properties with the values in `self._spike_raster_window.spike_raster_plt_2d.params`.'})
+    active_time_bin_sizes_whitelist: Optional[List[float]] = field(default=None, metadata={'desc':'if not None, only results with this decoding_time_bin_size will be plotted, otherwise all available time_bin_sizes will be shown.'})
 
 
     @property
@@ -9210,10 +9220,11 @@ class AddNewDecodedEpochMarginal_MatplotlibPlotCommand(AddNewDecodedPosteriors_M
 
     @function_attributes(short_name=None, tags=['MAIN'], input_requires=[], output_provides=[], uses=['cls.prepare_and_perform_add_pseudo2D_decoder_decoded_epoch_marginals'], used_by=[], creation_date='2025-06-02 09:50', related_items=[])
     @classmethod
-    def add_all_computed_time_bin_sizes_pseudo2D_decoder_decoded_epoch_marginals(cls, curr_active_pipeline, active_2d_plot, debug_print=False, **kwargs):
+    def add_active_computed_time_bin_sizes_pseudo2D_decoder_decoded_epoch_marginals(cls, curr_active_pipeline, active_2d_plot, debug_print=False, active_time_bin_sizes_whitelist: Optional[List[float]]=None, **kwargs):
         """ adds all computed time_bin_sizes in `curr_active_pipeline.global_computation_results.computed_data['DirectionalDecodersDecoded'].continuously_decoded_result_cache_dict` from the global_computation_results as new matplotlib plot rows.
 
         We might not always want to add all time bin sizes, sometimes they're overwhelming. Better to generate a separate menu option for each size.
+            #TODO 2025-07-01 06:14: - [ ] These can be excluded by specifying active_time_bin_sizes_whitelist.
 
         """
         
@@ -9228,26 +9239,36 @@ class AddNewDecodedEpochMarginal_MatplotlibPlotCommand(AddNewDecodedPosteriors_M
         flat_all_time_bin_sizes_output_tuples_dict: Dict[str, Tuple] = {}
         for time_bin_size, a_continuously_decoded_dict in continuously_decoded_result_cache_dict.items():
             # a_continuously_decoded_dict: Dict[str, DecodedFilterEpochsResult]
-            if debug_print:
-                print(f'time_bin_size: {time_bin_size}')
+            will_skip_time_bin_size: bool = False
+            if active_time_bin_sizes_whitelist is not None:
+                if time_bin_size not in active_time_bin_sizes_whitelist:
+                    will_skip_time_bin_size = True
+                    if debug_print:
+                        print(f'active_time_bin_sizes_whitelist will be used: {active_time_bin_sizes_whitelist} and current time_bin_size: {time_bin_size} will be excluded.')
 
-            info_string: str = f" - t_bin_size: {time_bin_size}"
-            # output_dict = _cmd.prepare_and_perform_add_pseudo2D_decoder_decoded_epoch_marginals(curr_active_pipeline=_cmd._active_pipeline, active_2d_plot=active_2d_plot, continuously_decoded_dict=deepcopy(a_continuously_decoded_dict), info_string=info_string, **enable_rows_config_kwargs)
-            output_dict = cls.prepare_and_perform_add_pseudo2D_decoder_decoded_epoch_marginals(curr_active_pipeline=curr_active_pipeline, active_2d_plot=active_2d_plot, continuously_decoded_dict=deepcopy(a_continuously_decoded_dict), info_string=info_string, debug_print=debug_print, **kwargs)
-            for a_key, an_output_tuple in output_dict.items():
-                identifier_name, *tuple_extras = an_output_tuple
-                
-                if a_key not in all_time_bin_sizes_output_dict:
-                    all_time_bin_sizes_output_dict[a_key] = [] ## init empty list
-                all_time_bin_sizes_output_dict[a_key].append(an_output_tuple)
-                
-                assert (identifier_name not in flat_all_time_bin_sizes_output_tuples_dict), f"identifier_name: {identifier_name} already in flat_all_time_bin_sizes_output_tuples_dict: {list(flat_all_time_bin_sizes_output_tuples_dict.keys())}"
-                flat_all_time_bin_sizes_output_tuples_dict[identifier_name] = an_output_tuple
-                
-            # all_time_bin_sizes_output_dict['non_marginalized_raw_result'].append(output_dict['non_marginalized_raw_result']) #= all_time_bin_sizes_output_dict['non_marginalized_raw_result'] + 
-            # all_time_bin_sizes_output_dict['marginal_over_direction'].append(output_dict['marginal_over_direction'])
-            # all_time_bin_sizes_output_dict['marginal_over_track_ID'].append(output_dict['marginal_over_track_ID'])
-            
+            if not will_skip_time_bin_size:
+                if debug_print:
+                    print(f'time_bin_size: {time_bin_size}')
+
+                info_string: str = f" - t_bin_size: {time_bin_size}"
+                # output_dict = _cmd.prepare_and_perform_add_pseudo2D_decoder_decoded_epoch_marginals(curr_active_pipeline=_cmd._active_pipeline, active_2d_plot=active_2d_plot, continuously_decoded_dict=deepcopy(a_continuously_decoded_dict), info_string=info_string, **enable_rows_config_kwargs)
+                output_dict = cls.prepare_and_perform_add_pseudo2D_decoder_decoded_epoch_marginals(curr_active_pipeline=curr_active_pipeline, active_2d_plot=active_2d_plot, continuously_decoded_dict=deepcopy(a_continuously_decoded_dict), info_string=info_string, debug_print=debug_print, **kwargs)
+                for a_key, an_output_tuple in output_dict.items():
+                    identifier_name, *tuple_extras = an_output_tuple
+                    
+                    if a_key not in all_time_bin_sizes_output_dict:
+                        all_time_bin_sizes_output_dict[a_key] = [] ## init empty list
+                    all_time_bin_sizes_output_dict[a_key].append(an_output_tuple)
+                    
+                    assert (identifier_name not in flat_all_time_bin_sizes_output_tuples_dict), f"identifier_name: {identifier_name} already in flat_all_time_bin_sizes_output_tuples_dict: {list(flat_all_time_bin_sizes_output_tuples_dict.keys())}"
+                    flat_all_time_bin_sizes_output_tuples_dict[identifier_name] = an_output_tuple
+                ## END for a_key, an_output_tuple in output_d...
+
+                # all_time_bin_sizes_output_dict['non_marginalized_raw_result'].append(output_dict['non_marginalized_raw_result']) #= all_time_bin_sizes_output_dict['non_marginalized_raw_result'] + 
+                # all_time_bin_sizes_output_dict['marginal_over_direction'].append(output_dict['marginal_over_direction'])
+                # all_time_bin_sizes_output_dict['marginal_over_track_ID'].append(output_dict['marginal_over_track_ID'])
+            ## END if not will_skip_time_bin_size...
+
         ## OUTPUTS: all_time_bin_sizes_output_dict
         return flat_all_time_bin_sizes_output_tuples_dict
 
@@ -9281,8 +9302,12 @@ class AddNewDecodedEpochMarginal_MatplotlibPlotCommand(AddNewDecodedPosteriors_M
 
         enable_rows_config_kwargs = dict(enable_non_marginalized_raw_result=self.enable_non_marginalized_raw_result, enable_marginal_over_direction=self.enable_marginal_over_direction, enable_marginal_over_track_ID=self.enable_marginal_over_track_ID)
         
-        output_dict = self.add_all_computed_time_bin_sizes_pseudo2D_decoder_decoded_epoch_marginals(self._active_pipeline, active_2d_plot, **enable_rows_config_kwargs)
-        
+        if self.active_time_bin_sizes_whitelist is None:
+            output_dict = self.add_active_computed_time_bin_sizes_pseudo2D_decoder_decoded_epoch_marginals(self._active_pipeline, active_2d_plot, **enable_rows_config_kwargs, active_time_bin_sizes_whitelist=None)
+        else:
+            ## restrict to the provided time_bin_size:
+            output_dict = self.add_active_computed_time_bin_sizes_pseudo2D_decoder_decoded_epoch_marginals(self._active_pipeline, active_2d_plot, **enable_rows_config_kwargs, active_time_bin_sizes_whitelist=self.active_time_bin_sizes_whitelist) ## set a whitelist of the self.active_only_time_bin_size
+
         # Update display output dict:
         for a_decoder_name, an_output_tuple in output_dict.items():
             identifier_name, *tuple_extras = an_output_tuple
