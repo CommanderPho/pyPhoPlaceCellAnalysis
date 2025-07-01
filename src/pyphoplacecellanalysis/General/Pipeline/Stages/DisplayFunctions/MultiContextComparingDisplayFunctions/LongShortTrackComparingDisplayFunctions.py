@@ -2016,6 +2016,14 @@ def _plot_long_short_firing_rate_indicies(x_frs_index, y_frs_index, active_conte
     fig_kwargs = dict(figsize=(8.5, 7.25), num=f'long|short fr indicies_{active_context.get_description(separator="/")}', clear=True) | pop_dict_subset(scatter_params, ['figsize', 'num', 'clear', 'dpi'])
     prepare_for_publication: bool = scatter_params.pop('prepare_for_publication', False)
         
+    if prepare_for_publication:
+        x_y_axes_label_kwargs = dict(fontsize=7)
+        if 's' not in scatter_params:
+            scatter_params['s'] = 18 ## override it
+    else:
+        x_y_axes_label_kwargs = dict(fontsize=18)
+        if 's' not in scatter_params:
+            scatter_params['s'] = 36 ## apprently 36pts (given by `(mpl.rcParams['lines.markersize'] ** 2)` is the default
 
     if enable_hover_labels:
         import mplcursors # for hover tooltips that specify the aclu of the selected point
@@ -2143,15 +2151,23 @@ def _plot_long_short_firing_rate_indicies(x_frs_index, y_frs_index, active_conte
         ylabel_kwargs = dict(loc='bottom')
 
     scatter_plot = ax.scatter(x_frs_index.values, y_frs_index.values, c=point_colors, **scatter_params) # , s=10, alpha=0.5
-    ax.set_xlabel(xlabel_str, fontsize=18, **xlabel_kwargs)
-    ax.set_ylabel(ylabel_str, fontsize=18, **ylabel_kwargs)
+    ax.set_xlabel(xlabel_str, **x_y_axes_label_kwargs, **xlabel_kwargs)
+    ax.set_ylabel(ylabel_str, **x_y_axes_label_kwargs, **ylabel_kwargs)
 
     ## Non-flexitext version:
     # plt.title('long ($L$)|short($S$) firing rate indicies')
     # plt.suptitle(f'{active_context.get_description(separator="/")}')
 
     # `flexitext` version:
-    text_formatter = FormattedFigureText()
+    if prepare_for_publication:
+        ## Default for publication:
+        text_formatter = FormattedFigureText.init_from_margins(top_margin=0.9, left_margin=0.15, right_margin=0.95, bottom_margin=0.150)
+        # text_formatter = FormattedFigureText.init_from_margins(top_margin=0.9, left_margin=0.15, right_margin=0.95, bottom_margin=0.150) ## Note the margins provide the empty room to position the flexitext headers, and without adding them the fancy text would not fit.
+    else:
+        ## Default for non-publication:
+        # text_formatter = FormattedFigureText.init_from_margins(top_margin=0.8, left_margin=0.15, right_margin=0.85, bottom_margin=0.150) ## Note the margins provide the empty room to position the flexitext headers, and without adding them the fancy text would not fit.
+        text_formatter = FormattedFigureText()
+        
     plt.title('')
     plt.suptitle('')
     text_formatter.setup_margins(fig)
@@ -2163,8 +2179,8 @@ def _plot_long_short_firing_rate_indicies(x_frs_index, y_frs_index, active_conte
         footer_text_obj = flexitext((text_formatter.left_margin*0.1), (text_formatter.bottom_margin*0.25), text_formatter._build_footer_string(active_context=active_context), va="top", xycoords="figure fraction")
     else:  
         ## Publication Mode
-        ## Smaller fonts for publication
-        flexitext(text_formatter.left_margin, text_formatter.top_margin, '<size:18><color:royalblue, weight:bold>long ($L$)</>|<color:crimson, weight:bold>short($S$)</> <weight:bold>firing rate indicies</></>', va="bottom", xycoords="figure fraction")
+        ## Smaller fonts for publication -- Originally 18, now 9
+        flexitext(text_formatter.left_margin, text_formatter.top_margin, '<size:9><color:royalblue, weight:bold>long ($L$)</>|<color:crimson, weight:bold>short($S$)</> <weight:bold>firing rate indicies</></>', va="bottom", xycoords="figure fraction")
 
     # fig.set_size_inches([8.5, 7.25]) # size figure so the x and y labels aren't cut off
 
