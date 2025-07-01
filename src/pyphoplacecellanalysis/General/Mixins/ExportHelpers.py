@@ -663,11 +663,56 @@ class FigureToImageHelpers:
             FigureToImageHelpers.export_wrapped_axesimage_to_paged_pdf(ax_image=im_posterior_x, x_extent=(active_2d_plot.total_data_start_time, active_2d_plot.total_data_end_time), chunk_width=active_2d_plot.active_window_duration, output_pdf_path=output_pdf_path, figsize=(8, 11), dpi=150, rows_per_page=15, debug_max_num_pages=3)
 
         """
+        # Handle both single AxesImage and List[AxesImage]
+        if isinstance(ax_image, list):
+            ax_images = ax_image
+        else:
+            ax_images = [ax_image]
+
         x_min, x_max = x_extent
-        y_min, y_max = ax_image.get_extent()[2:4]
-        img_data = ax_image.get_array()
-        cmap = ax_image.get_cmap()
-        origin = ax_image.origin
+
+        # Get image data and properties from all images
+        image_data_list = []
+        current_y_offset = 0
+
+        for img in ax_images:
+            y_min_img, y_max_img = img.get_extent()[2:4]
+            img_data = img.get_array()
+            cmap = img.get_cmap()
+            origin = img.origin
+            img_height = y_max_img - y_min_img
+
+            # Create stacked extent with precomputed offset
+            original_extent = img.get_extent()  # [x_min, x_max, y_min, y_max]
+            stacked_extent = [
+                original_extent[0],  # x_min (unchanged)
+                original_extent[1],  # x_max (unchanged) 
+                current_y_offset,    # new y_min (stacked position)
+                current_y_offset + img_height  # new y_max (stacked position)
+            ]
+
+            image_data_list.append({
+                'data': img_data,
+                'y_extent': (y_min_img, y_max_img),
+                'cmap': cmap,
+                'origin': origin,
+                'full_extent': original_extent,
+                'stacked_extent': stacked_extent  # Precomputed stacked positioning
+            })
+
+            # Update offset for next image
+            current_y_offset += img_height
+        ## END for img in ax_images...
+        
+        # # Calculate total y extent for stacked images
+        # all_y_mins = [y_ext[0] for y_ext in y_extents]
+        # all_y_maxs = [y_ext[1] for y_ext in y_extents]
+        # total_y_min = min(all_y_mins)
+        # total_y_max = max(all_y_maxs)
+
+        # Total stacked height is the final offset
+        total_y_min = 0
+        total_y_max = current_y_offset
 
         chunks = []
         start = x_min
@@ -701,15 +746,19 @@ class FigureToImageHelpers:
                     axes = [axes]
 
                 for ax, (start, end) in zip(axes, page_chunks):
-                    ax.imshow(
-                        img_data,
-                        extent=ax_image.get_extent(),
-                        origin=origin,
-                        aspect='auto',
-                        cmap=cmap
-                    )
+                    # Plot all track images stacked vertically
+                    for img_info in image_data_list:
+                        ax.imshow(
+                            img_info['data'],
+                            extent=img_info['stacked_extent'],  # Use precomputed stacked extent
+                            origin=img_info['origin'],
+                            aspect='auto',
+                            cmap=img_info['cmap']
+                        )
+                    ## END for img_info in image_data_list...
+                    
                     ax.set_xlim(start, end)
-                    ax.set_ylim(y_min, y_max)
+                    ax.set_ylim(total_y_min, total_y_max)
 
                     # ax.set_title(f"Segment: {start:.0f}–{end:.0f}")
                     # time_label_formatting_kwargs = dict(fontsize=10, color='red', weight='bold', bbox=dict(boxstyle='round,pad=0.3', facecolor='white', alpha=0.8))
