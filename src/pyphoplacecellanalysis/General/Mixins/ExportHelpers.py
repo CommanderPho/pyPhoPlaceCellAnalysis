@@ -628,7 +628,7 @@ class FigureToImageHelpers:
 
     @function_attributes(short_name=None, tags=['pdf', 'export', 'wrapped', 'panelled', 'matplotlib', 'track', 'multi-page'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-07-01 02:08', related_items=[])
     @classmethod
-    def export_wrapped_axesimage_to_paged_pdf(cls, ax_image, x_extent: tuple, chunk_width: float, output_pdf_path: str, rows_per_page: int=5, figsize=(8, 11), dpi=150, debug_max_num_pages: Optional[int] = 5, vertical_spacing=0.02):
+    def export_wrapped_axesimage_to_paged_pdf(cls, ax_image, x_extent: tuple, chunk_width: float, output_pdf_path: str, rows_per_page: int=5, figsize=(8, 11), dpi=150, debug_max_num_pages: Optional[int] = 5, track_labels: Optional[List[str]] = None):
         """
         Export an AxesImage (such as the entire timeline plot for a MATPLOTLIB-backed track to a wrapped, paged PDF layout (multi-row per page).
 
@@ -651,7 +651,46 @@ class FigureToImageHelpers:
         vertical_spacing : float
             Fractional spacing between rows (relative to figure height).
             
-        Usage:
+            
+        Usage (Multiple Tracks):
+            from pyphoplacecellanalysis.General.Mixins.ExportHelpers import FigureToImageHelpers
+            from pyphoplacecellanalysis.General.Model.Configs.LongShortDisplayConfig import DisplayColorsEnum
+
+            formatted_title_strings_dict = DisplayColorsEnum.get_matplotlib_formatted_title_dict()
+            decoder_names_list: List[str] = list(formatted_title_strings_dict.keys())
+
+            ## get the whole stack
+            active_dockGroup_dock_dict = active_2d_plot.get_dockGroup_dock_dict()
+            _curr_active_dock_group = active_dockGroup_dock_dict['ContinuousDecode_ - t_bin_size: 0.025'] # {'long_LR': 'Long◀', 'long_RL': 'Long▶', 'short_LR': 'Short◀', 'short_RL': 'Short▶'}
+            _curr_decoders_dock_item_names_list: List[str] = [v.name() for v in _curr_active_dock_group] # ['ContinuousDecode_long_LR - t_bin_size: 0.025', 'ContinuousDecode_long_RL - t_bin_size: 0.025', 'ContinuousDecode_short_LR - t_bin_size: 0.025', 'ContinuousDecode_short_RL - t_bin_size: 0.025']
+            im_posterior_x_stack = [v.widgets[0].plots.im_posterior_x for v in _curr_active_dock_group]
+
+            _curr_decoder_name_to_decoders_dock_item_name_map = {}
+            _remaining_dock_names = set(_curr_decoders_dock_item_names_list)
+
+            # _curr_decoders_dock_item_names_list
+            for a_decoder_name in decoder_names_list:
+                for a_dock_name in _remaining_dock_names: #_curr_decoders_dock_item_names_list:
+                    if (a_decoder_name in a_dock_name):
+                        _curr_decoder_name_to_decoders_dock_item_name_map[a_decoder_name] = a_dock_name
+                        _remaining_dock_names.remove(a_dock_name)
+                        break
+
+            assert len(_curr_decoder_name_to_decoders_dock_item_name_map) == len(decoder_names_list), f"decoder_names_list: {decoder_names_list} != list(_curr_decoder_name_to_decoders_dock_item_name_map.keys()): {_curr_decoder_name_to_decoders_dock_item_name_map}"
+            track_labels: List[str] = [formatted_title_strings_dict[a_decoder_name] for a_decoder_name, a_dock_name in _curr_decoder_name_to_decoders_dock_item_name_map.items()]
+            track_labels
+
+            ## OUTPUTS: im_posterior_x_stack, track_labels        
+            output_pdf_path: Path = relative_data_output_parent_folder.joinpath('timeline_exported_stack.pdf')
+            FigureToImageHelpers.export_wrapped_axesimage_to_paged_pdf(ax_image=im_posterior_x_stack, x_extent=(active_2d_plot.total_data_start_time, active_2d_plot.total_data_end_time), chunk_width=active_2d_plot.active_window_duration, output_pdf_path=output_pdf_path, figsize=(8, 11), dpi=150,
+                                                                    rows_per_page=5, debug_max_num_pages=3,		    
+                                                                    # rows_per_page=15, debug_max_num_pages=3,
+                                                                    track_labels=track_labels,
+                                                                )
+                                                                        
+        
+        
+        Usage (Simple, single matplotlib axes):
         
             from pyphoplacecellanalysis.General.Mixins.ExportHelpers import FigureToImageHelpers
 
@@ -665,14 +704,26 @@ class FigureToImageHelpers:
         """
         # track_separator_line_kwargs = dict(color='black', linewidth=1, linestyle='-', alpha=0.8)
         track_separator_line_kwargs = dict(color='white', linewidth=2, linestyle='-', alpha=0.8)
-        
+        # time_label_formatting_kwargs = dict(fontsize=10, color='red', weight='bold', bbox=dict(boxstyle='round,pad=0.3', facecolor='white', alpha=0.8))
+        time_label_formatting_kwargs = dict(fontsize=10, color='black')
+        multi_track_label_formatting_kwargs = dict(fontsize=9, color='black') # , weight='bold'
+
+
         # Handle both single AxesImage and List[AxesImage]
         if isinstance(ax_image, list):
             ax_images = ax_image
         else:
             ax_images = [ax_image]
 
+        # Validate track_labels if provided        
+        if track_labels is not None:
+            if len(track_labels) != len(ax_images):
+                print(f"Warning: track_labels length ({len(track_labels)}) doesn't match ax_images length ({len(ax_images)}). Labels will be ignored.")
+                track_labels = None
+                
+        has_valid_track_labels: bool = (track_labels is not None)
         x_min, x_max = x_extent
+
 
         # Get image data and properties from all images
         image_data_list = []
@@ -736,7 +787,9 @@ class FigureToImageHelpers:
         pages = pages[:debug_max_num_pages]
 
         with backend_pdf.PdfPages(output_pdf_path) as pdf:
-            for page_chunks in pages:
+            for page_idx, page_chunks in enumerate(pages):
+                ## for each page:
+                
                 fig, axes = plt.subplots(
                     nrows=len(page_chunks),
                     figsize=figsize,
@@ -748,7 +801,11 @@ class FigureToImageHelpers:
                 if len(page_chunks) == 1:
                     axes = [axes]
 
+
+                is_first_chunk_on_page: bool = True
                 for ax, (start, end) in zip(axes, page_chunks):
+                    ## for each chunk within a page:
+                    
                     # Plot all track images stacked vertically
                     for img_info in image_data_list:
                         ax.imshow(
@@ -770,23 +827,49 @@ class FigureToImageHelpers:
                     ax.set_xlim(start, end)
                     ax.set_ylim(total_y_min, total_y_max)
 
-                    # ax.set_title(f"Segment: {start:.0f}–{end:.0f}")
-                    # time_label_formatting_kwargs = dict(fontsize=10, color='red', weight='bold', bbox=dict(boxstyle='round,pad=0.3', facecolor='white', alpha=0.8))
-                    time_label_formatting_kwargs = dict(fontsize=10, color='black')
+                    # Add track identity labels to the left of the first chunk only
+                    is_first_chunk: bool = is_first_chunk_on_page # (start == x_min)
+                    should_plot_track_labels: bool = (is_first_chunk and (track_labels is not None))
+                    
+                    if should_plot_track_labels:
+                        for i, (img_info, label) in enumerate(zip(image_data_list, track_labels)):
+                            # Calculate the vertical center of this track
+                            track_y_center = (img_info['stacked_extent'][2] + img_info['stacked_extent'][3]) / 2
 
-                    # Display start value vertically on left edge (outside axes)
-                    ax.text(-0.02, 0.5, f'{start:.0f}', 
+                            # Convert to axes coordinates for positioning
+                            track_y_center_norm = (track_y_center - total_y_min) / (total_y_max - total_y_min)
+
+                            ax.text(-0.01, track_y_center_norm, label, 
+                                   rotation=90, verticalalignment='center', horizontalalignment='center',
+                                   transform=ax.transAxes, **multi_track_label_formatting_kwargs)
+                    # END if should_plot_track_labels...
+                    
+
+
+                    # ax.set_title(f"Segment: {start:.0f}–{end:.0f}")
+                    if has_valid_track_labels:
+                        ## need extra room to prevent collisions between the labels and the start_t
+                        start_time_x_offset: float = -0.04
+                    else:
+                        # no labels to collide with:
+                        start_time_x_offset: float = -0.02
+                        
+
+                    # Display the chunk start time vertically on left edge (outside axes)
+                    ax.text(start_time_x_offset, 0.5, f'{start:.0f}', 
                             rotation=90, verticalalignment='center', horizontalalignment='center',
                             transform=ax.transAxes, **time_label_formatting_kwargs)
 
-                    # Display end value vertically on right edge (outside axes)
+                    # Display end time vertically on right edge (outside axes)
                     ax.text(1.02, 0.5, f'{end:.0f}',
                             rotation=90, verticalalignment='center', horizontalalignment='center', 
                             transform=ax.transAxes, **time_label_formatting_kwargs)
 
                     ax.set_xticks([])
                     ax.set_yticks([])
-
+                    is_first_chunk_on_page = False # all later chunks are NOT the first one
+                ## END for ax, (start, end) in zip(axes, page_chunks)...
+                
                 pdf.savefig(fig)
                 plt.close(fig)
             ## END for page_chunks in pages...
