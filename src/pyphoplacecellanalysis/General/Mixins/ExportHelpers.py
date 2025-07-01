@@ -734,7 +734,7 @@ class FigureToImageHelpers:
         print(f"PDF saved to {output_pdf_path}")
 
 
-    @function_attributes(short_name=None, tags=['pdf', 'export', 'wrapped', 'panelled', 'pyqtgraph', 'track', 'multi-page'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-01-01 00:00', related_items=[])
+    @function_attributes(short_name=None, tags=['pdf', 'export', 'wrapped', 'panelled', 'pyqtgraph', 'track', 'multi-page'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-07-01 05:27', related_items=[])
     @classmethod
     def export_wrapped_pyqtgraph_to_paged_pdf(cls, plot_item, x_extent: tuple, chunk_width: float, output_pdf_path: str, rows_per_page: int=5, figsize=(8, 11), dpi=150, debug_max_num_pages: Optional[int] = 5):
         """
