@@ -687,7 +687,6 @@ class FigureToImageHelpers:
 
         pages = pages[:debug_max_num_pages]
 
-
         with backend_pdf.PdfPages(output_pdf_path) as pdf:
             for page_chunks in pages:
                 fig, axes = plt.subplots(
@@ -711,6 +710,7 @@ class FigureToImageHelpers:
                     )
                     ax.set_xlim(start, end)
                     ax.set_ylim(y_min, y_max)
+
                     # ax.set_title(f"Segment: {start:.0f}–{end:.0f}")
                     # time_label_formatting_kwargs = dict(fontsize=10, color='red', weight='bold', bbox=dict(boxstyle='round,pad=0.3', facecolor='white', alpha=0.8))
                     time_label_formatting_kwargs = dict(fontsize=10, color='black')
@@ -733,6 +733,152 @@ class FigureToImageHelpers:
             ## END for page_chunks in pages...
         print(f"PDF saved to {output_pdf_path}")
 
+
+    @function_attributes(short_name=None, tags=['pdf', 'export', 'wrapped', 'panelled', 'pyqtgraph', 'track', 'multi-page'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-01-01 00:00', related_items=[])
+    @classmethod
+    def export_wrapped_pyqtgraph_to_paged_pdf(cls, plot_item, x_extent: tuple, chunk_width: float, output_pdf_path: str, rows_per_page: int=5, figsize=(8, 11), dpi=150, debug_max_num_pages: Optional[int] = 5):
+        """
+        Export a PyQtGraph PlotItem (such as the entire timeline plot) to a wrapped, paged PDF layout (multi-row per page).
+
+        Parameters
+        ----------
+        plot_item : pg.PlotItem
+            The source PyQtGraph PlotItem.
+        x_extent : tuple
+            (x_min, x_max) of the full timeline.
+        chunk_width : float
+            Width of each timeline chunk (like a line of text).
+        rows_per_page : int
+            Number of horizontal "lines" per page.
+        output_pdf_path : str
+            Output PDF file path.
+        figsize : tuple
+            PDF page size in inches.
+        dpi : int
+            Dots per inch for rendering.
+
+        Usage:
+
+            from pyphoplacecellanalysis.General.Mixins.ExportHelpers import FigureToImageHelpers
+
+            ## INPUTS: active_2d_plot (PyQtGraph widget)
+            relative_data_output_parent_folder = Path('data').resolve()
+            Assert.path_exists(relative_data_output_parent_folder)
+
+            output_pdf_path: Path = relative_data_output_parent_folder.joinpath('timeline_exported_pyqtgraph.pdf')
+            plot_item = active_2d_plot.plots.main_plot_widget  # or wherever your PlotItem is
+            FigureToImageHelpers.export_wrapped_pyqtgraph_to_paged_pdf(
+                plot_item=plot_item, 
+                x_extent=(active_2d_plot.total_data_start_time, active_2d_plot.total_data_end_time), 
+                chunk_width=active_2d_plot.active_window_duration, 
+                output_pdf_path=output_pdf_path, 
+                figsize=(8, 11), 
+                dpi=150, 
+                rows_per_page=15, 
+                debug_max_num_pages=3
+            )
+
+        """
+        from pyphoplacecellanalysis.External.pyqtgraph.exporters.ImageExporter import ImageExporter
+        
+        x_min, x_max = x_extent
+
+        # Get the current view range for y-axis
+        y_range = plot_item.getViewBox().viewRange()[1]  # [y_min, y_max]
+        y_min, y_max = y_range
+
+        chunks = []
+        start = x_min
+        while start < x_max:
+            end = min((start + chunk_width), x_max)
+            chunks.append((start, end))
+            start = end
+
+        n_chunks: int = len(chunks)
+
+        # Group chunks into pages
+        chunks_per_page = rows_per_page
+        pages = [chunks[i:i+chunks_per_page] for i in range(0, len(chunks), chunks_per_page)]
+        n_pages: int = len(pages)
+        if debug_max_num_pages is None:
+            debug_max_num_pages = n_pages # all required pages
+
+        pages = pages[:debug_max_num_pages]
+
+        with backend_pdf.PdfPages(output_pdf_path) as pdf:
+            for page_chunks in pages:
+                fig, axes = plt.subplots(
+                    nrows=len(page_chunks),
+                    figsize=figsize,
+                    dpi=dpi,
+                    constrained_layout=True
+                )
+
+                # Make sure axes is iterable (even if 1 row)
+                if len(page_chunks) == 1:
+                    axes = [axes]
+
+                for ax, (start, end) in zip(axes, page_chunks):
+                    # Set the view range for this chunk
+                    original_x_range = plot_item.getViewBox().viewRange()[0]
+                    original_y_range = plot_item.getViewBox().viewRange()[1]
+
+                    # Temporarily set the view range to the current chunk
+                    plot_item.setXRange(start, end, padding=0)
+                    plot_item.setYRange(y_min, y_max, padding=0)
+
+                    # Export the current view as an image
+                    # exporter = pg.exporters.ImageExporter(plot_item)
+                    exporter = ImageExporter(plot_item)
+                    exporter.parameters()['width'] = int(figsize[0] * dpi)
+                    exporter.parameters()['height'] = int((figsize[1] / len(page_chunks)) * dpi)
+
+                    # Export to a temporary image
+                    img = exporter.export(toBytes=True)
+
+                    # Convert QImage to numpy array for matplotlib
+                    from PyQt5.QtGui import QImage
+                    if isinstance(img, QImage):
+                        # Convert QImage to numpy array
+                        width = img.width()
+                        height = img.height()
+                        ptr = img.bits()
+                        ptr.setsize(img.byteCount())
+                        arr = np.array(ptr).reshape(height, width, 4)  # RGBA
+                        arr = arr[:, :, :3]  # Remove alpha channel, keep RGB
+                    else:
+                        # If it's already a numpy array or PIL Image
+                        arr = np.array(img)
+
+                    # Display in matplotlib
+                    ax.imshow(arr, extent=[start, end, y_min, y_max], aspect='auto', origin='upper')
+                    ax.set_xlim(start, end)
+                    ax.set_ylim(y_min, y_max)
+
+                    # Time labels outside axes bounds
+                    time_label_formatting_kwargs = dict(fontsize=10, color='black')
+
+                    # Display start value vertically on left edge (outside axes)
+                    ax.text(-0.02, 0.5, f'{start:.0f}', 
+                            rotation=90, verticalalignment='center', horizontalalignment='center',
+                            transform=ax.transAxes, **time_label_formatting_kwargs)
+
+                    # Display end value vertically on right edge (outside axes)
+                    ax.text(1.02, 0.5, f'{end:.0f}',
+                            rotation=90, verticalalignment='center', horizontalalignment='center', 
+                            transform=ax.transAxes, **time_label_formatting_kwargs)
+
+                    ax.set_xticks([])
+                    ax.set_yticks([])
+
+                # Restore original view range
+                plot_item.setXRange(*original_x_range, padding=0)
+                plot_item.setYRange(*original_y_range, padding=0)
+
+                pdf.savefig(fig)
+                plt.close(fig)
+            ## END for page_chunks in pages...
+        print(f"PDF saved to {output_pdf_path}")
 
 
 @function_attributes(short_name=None, tags=['PDF', 'export', 'output', 'matplotlib', 'display', 'file', 'active'], input_requires=[], output_provides=[], uses=['extract_figures_from_display_function_output'], used_by=[], creation_date='2023-06-08 11:55', related_items=[])
