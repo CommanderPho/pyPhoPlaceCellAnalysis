@@ -1,3 +1,4 @@
+from typing import List
 from qtpy import QtCore, QtGui, QtWidgets
 from pyphoplacecellanalysis.Resources import GuiResources, ActionIcons
 
@@ -85,7 +86,7 @@ class DockedWidgets_MenuProvider(BaseMenuProviderMixin):
         """ perfrom setup/creation of widget/graphical/data objects. Only the core objects are expected to exist on the implementor (root widget, etc) """
         pass
     
-    def DockedWidgets_MenuProvider_on_buildUI(self, **kwargs):
+    def DockedWidgets_MenuProvider_on_buildUI(self, use_time_bin_specific_menus: bool = False, **kwargs):
         """ perfrom setup/creation of widget/graphical/data objects. Only the core objects are expected to exist on the implementor (root widget, etc)
         
         build QMenus from UI
@@ -124,24 +125,76 @@ class DockedWidgets_MenuProvider(BaseMenuProviderMixin):
         addSubmenuActionKeys.append(curr_action_key)
         curr_action_key = PhoMenuHelper.add_action_item(self.root_window, "Directional Decoded Epochs in Matplotlib Views", name="actionDirectionalDecodedEpochsDockedMatplotlibView", tooltip="", icon_path=":/Graphics/Icons/graphics/ic_multiline_chart_48px.png", actions_dict=curr_actions_dict) ## BROKEN, Not aligned with positions also plotted
         addSubmenuActionKeys.append(curr_action_key)
-        curr_action_key = PhoMenuHelper.add_action_item(self.root_window, "Pseudo2D Continuous Decoded Positions in Matplotlib Views", name="actionPseudo2DDecodedEpochsDockedMatplotlibView", tooltip="", icon_path=":/Graphics/Icons/graphics/ic_multiline_chart_48px.png", actions_dict=curr_actions_dict)
-        addSubmenuActionKeys.append(curr_action_key)
-        curr_action_key = PhoMenuHelper.add_action_item(self.root_window, "Pseudo2D Continuous Decoded Marginals in Matplotlib Views", name="actionContinuousPseudo2DDecodedMarginalsDockedMatplotlibView", tooltip="", icon_path=":/Graphics/Icons/graphics/ic_multiline_chart_48px.png", actions_dict=curr_actions_dict)
-        addSubmenuActionKeys.append(curr_action_key)
-        curr_action_key = PhoMenuHelper.add_action_item(self.root_window, "Custom...", name="actionNewDockedCustom", tooltip="", actions_dict=curr_actions_dict)
-        addSubmenuActionKeys.append(curr_action_key)
-        
-        # ==================================================================================================================== #
-        # Connect the relevent actions to each action:
+
+
         action_command_map = {
             'actionNewDockedMatplotlibView': AddNewDecodedPosition_MatplotlibPlotCommand(spike_raster_window, curr_active_pipeline, active_config_name, display_output, action_identifier='actionNewDockedMatplotlibView'),
             # 'actionNewDockedContextNested': CreateNewContextNestedDocksCommand(spike_raster_window, curr_active_pipeline, active_config_name=active_config_name, active_context=active_context, display_output=display_output, action_identifier='actionNewDockedContextNested'),
             'actionLongShortDecodedEpochsDockedMatplotlibView': AddNewLongShortDecodedEpochSlices_MatplotlibPlotCommand(spike_raster_window, curr_active_pipeline, active_config_name=active_config_name, active_context=active_context, display_output=display_output, action_identifier='actionLongShortDecodedEpochsDockedMatplotlibView'),
             'actionDirectionalDecodedEpochsDockedMatplotlibView': AddNewDirectionalDecodedEpochs_MatplotlibPlotCommand(spike_raster_window, curr_active_pipeline, active_config_name=active_config_name, active_context=active_context, display_output=display_output, action_identifier='actionDirectionalDecodedEpochsDockedMatplotlibView'), ## BROKEN, Not aligned with positions also plotted
-            'actionPseudo2DDecodedEpochsDockedMatplotlibView': AddNewDecodedPosteriors_MatplotlibPlotCommand(spike_raster_window, curr_active_pipeline, active_config_name=active_config_name, active_context=active_context, display_output=display_output, action_identifier='actionPseudo2DDecodedEpochsDockedMatplotlibView'),
-            'actionContinuousPseudo2DDecodedMarginalsDockedMatplotlibView': AddNewDecodedEpochMarginal_MatplotlibPlotCommand(spike_raster_window, curr_active_pipeline, active_config_name=active_config_name, active_context=active_context, display_output=display_output, action_identifier='actionContinuousPseudo2DDecodedMarginalsDockedMatplotlibView'),
             'actionTrackTemplatesDecodedEpochsDockedMatplotlibView': AddNewTrackTemplatesDecodedEpochSlicesRows_MatplotlibPlotCommand(spike_raster_window, curr_active_pipeline, active_config_name=active_config_name, active_context=active_context, display_output=display_output, action_identifier='actionTrackTemplatesDecodedEpochsDockedMatplotlibView'),
         }
+
+
+        if use_time_bin_specific_menus:
+                # ## values with time-bin size arguments:
+                # curr_action_key = PhoMenuHelper.add_action_item(self.root_window, "Pseudo2D Continuous Decoded Positions in Matplotlib Views", name="actionPseudo2DDecodedEpochsDockedMatplotlibView", tooltip="", icon_path=":/Graphics/Icons/graphics/ic_multiline_chart_48px.png", actions_dict=curr_actions_dict)
+                # addSubmenuActionKeys.append(curr_action_key)
+                # curr_action_key = PhoMenuHelper.add_action_item(self.root_window, "Pseudo2D Continuous Decoded Marginals in Matplotlib Views", name="actionContinuousPseudo2DDecodedMarginalsDockedMatplotlibView", tooltip="", icon_path=":/Graphics/Icons/graphics/ic_multiline_chart_48px.png", actions_dict=curr_actions_dict)
+                # addSubmenuActionKeys.append(curr_action_key)
+                time_bin_size_list: List[str] = AddNewDecodedPosteriors_MatplotlibPlotCommand.get_all_computed_time_bin_sizes()
+                curr_time_bin_specific_submenu_actions_dict = {}
+                # curr_time_bin_specific_addSubmenuActionKeys = []
+                curr_time_bin_specific_addPositionsSubmenuActionKeys = []
+                curr_time_bin_specific_addMarginalsSubmenuActionKeys = []
+
+                for a_time_bin_size in time_bin_size_list:
+                    ## values with time-bin size arguments:
+                    curr_action_name: str = f"actionPseudo2DDecodedEpochsDockedMatplotlibView_tbin_{a_time_bin_size}"
+                    curr_action_key = PhoMenuHelper.add_action_item(self.root_window, f"Pseudo2D Positions {a_time_bin_size}", name=curr_action_name, tooltip="", icon_path=":/Graphics/Icons/graphics/ic_multiline_chart_48px.png", actions_dict=curr_time_bin_specific_submenu_actions_dict)
+                    curr_time_bin_specific_addPositionsSubmenuActionKeys.append(curr_action_key)
+                    action_command_map[curr_action_name] = AddNewDecodedPosteriors_MatplotlibPlotCommand(spike_raster_window, curr_active_pipeline, active_config_name=active_config_name, active_context=active_context, display_output=display_output, active_time_bin_sizes_whitelist=[a_time_bin_size], action_identifier=curr_action_name)
+                    
+
+                    curr_action_name: str = f"actionPseudo2DDecodedMarginalsDockedMatplotlibView_tbin_{a_time_bin_size}"
+                    curr_action_key = PhoMenuHelper.add_action_item(self.root_window, f"Pseudo2D Marginals {a_time_bin_size}", name=curr_action_name, tooltip="", icon_path=":/Graphics/Icons/graphics/ic_multiline_chart_48px.png", actions_dict=curr_time_bin_specific_submenu_actions_dict)
+                    curr_time_bin_specific_addMarginalsSubmenuActionKeys.append(curr_action_key)
+                    action_command_map[curr_action_name] = AddNewDecodedEpochMarginal_MatplotlibPlotCommand(spike_raster_window, curr_active_pipeline, active_config_name=active_config_name, active_context=active_context, display_output=display_output, active_time_bin_sizes_whitelist=[a_time_bin_size], action_identifier=curr_action_name)
+
+                ## END for a_time_bin_size in time_bin_size_list..
+                ## OUTPUTS: curr_time_bin_specific_addSubmenuActionKeys, curr_time_bin_specific_submenu_actions_dict
+                ## OUTPUTS: curr_time_bin_specific_addPositionsSubmenuActionKeys, curr_time_bin_specific_addMarginalsSubmenuActionKeys
+                curr_actions_dict.update(curr_time_bin_specific_submenu_actions_dict) ## add to the default actions dict, not sure if this is needed
+
+
+        else:
+            ## no submenus, add the default ones:
+            curr_action_key = PhoMenuHelper.add_action_item(self.root_window, "Pseudo2D Continuous Decoded Positions in Matplotlib Views", name="actionPseudo2DDecodedEpochsDockedMatplotlibView", tooltip="", icon_path=":/Graphics/Icons/graphics/ic_multiline_chart_48px.png", actions_dict=curr_actions_dict)
+            addSubmenuActionKeys.append(curr_action_key)
+            curr_action_key = PhoMenuHelper.add_action_item(self.root_window, "Pseudo2D Continuous Decoded Marginals in Matplotlib Views", name="actionContinuousPseudo2DDecodedMarginalsDockedMatplotlibView", tooltip="", icon_path=":/Graphics/Icons/graphics/ic_multiline_chart_48px.png", actions_dict=curr_actions_dict)
+            addSubmenuActionKeys.append(curr_action_key)
+
+            action_command_map.update({
+                'actionPseudo2DDecodedEpochsDockedMatplotlibView': AddNewDecodedPosteriors_MatplotlibPlotCommand(spike_raster_window, curr_active_pipeline, active_config_name=active_config_name, active_context=active_context, display_output=display_output, active_time_bin_sizes_whitelist=None, action_identifier='actionPseudo2DDecodedEpochsDockedMatplotlibView'),
+                'actionContinuousPseudo2DDecodedMarginalsDockedMatplotlibView': AddNewDecodedEpochMarginal_MatplotlibPlotCommand(spike_raster_window, curr_active_pipeline, active_config_name=active_config_name, active_context=active_context, display_output=display_output, active_time_bin_sizes_whitelist=None, action_identifier='actionContinuousPseudo2DDecodedMarginalsDockedMatplotlibView'),
+            })
+
+
+
+        curr_action_key = PhoMenuHelper.add_action_item(self.root_window, "Custom...", name="actionNewDockedCustom", tooltip="", actions_dict=curr_actions_dict)
+        addSubmenuActionKeys.append(curr_action_key)
+
+        # ==================================================================================================================== #
+        # Connect the relevent actions to each action:
+        # action_command_map = {
+        #     'actionNewDockedMatplotlibView': AddNewDecodedPosition_MatplotlibPlotCommand(spike_raster_window, curr_active_pipeline, active_config_name, display_output, action_identifier='actionNewDockedMatplotlibView'),
+        #     # 'actionNewDockedContextNested': CreateNewContextNestedDocksCommand(spike_raster_window, curr_active_pipeline, active_config_name=active_config_name, active_context=active_context, display_output=display_output, action_identifier='actionNewDockedContextNested'),
+        #     'actionLongShortDecodedEpochsDockedMatplotlibView': AddNewLongShortDecodedEpochSlices_MatplotlibPlotCommand(spike_raster_window, curr_active_pipeline, active_config_name=active_config_name, active_context=active_context, display_output=display_output, action_identifier='actionLongShortDecodedEpochsDockedMatplotlibView'),
+        #     'actionDirectionalDecodedEpochsDockedMatplotlibView': AddNewDirectionalDecodedEpochs_MatplotlibPlotCommand(spike_raster_window, curr_active_pipeline, active_config_name=active_config_name, active_context=active_context, display_output=display_output, action_identifier='actionDirectionalDecodedEpochsDockedMatplotlibView'), ## BROKEN, Not aligned with positions also plotted
+        #     'actionPseudo2DDecodedEpochsDockedMatplotlibView': AddNewDecodedPosteriors_MatplotlibPlotCommand(spike_raster_window, curr_active_pipeline, active_config_name=active_config_name, active_context=active_context, display_output=display_output, action_identifier='actionPseudo2DDecodedEpochsDockedMatplotlibView'),
+        #     'actionContinuousPseudo2DDecodedMarginalsDockedMatplotlibView': AddNewDecodedEpochMarginal_MatplotlibPlotCommand(spike_raster_window, curr_active_pipeline, active_config_name=active_config_name, active_context=active_context, display_output=display_output, action_identifier='actionContinuousPseudo2DDecodedMarginalsDockedMatplotlibView'),
+        #     'actionTrackTemplatesDecodedEpochsDockedMatplotlibView': AddNewTrackTemplatesDecodedEpochSlicesRows_MatplotlibPlotCommand(spike_raster_window, curr_active_pipeline, active_config_name=active_config_name, active_context=active_context, display_output=display_output, action_identifier='actionTrackTemplatesDecodedEpochsDockedMatplotlibView'),
+        # }
 
         for a_name, a_build_command in action_command_map.items():
             curr_actions_dict[a_name].triggered.connect(a_build_command)
@@ -154,7 +207,6 @@ class DockedWidgets_MenuProvider(BaseMenuProviderMixin):
         # Now Create the Menus for each QAction:
         
         # curr_window.ui.actionMenuDockedWidgets = curr_menubar.addMenu(self.activeMenuReference.top_level_menu)  # add it to the menubar
-        
         an_action_key, self.activeMenuReference.top_level_menu = PhoMenuHelper.add_menu(a_main_window=self.root_window, text="Docked Widgets", name=self.top_level_menu_name, parent_menu=self.root_menu_bar, menu_actions_dict=curr_actions_dict)
         self.activeMenuReference.top_level_menu.setObjectName("menuDockedWidgets")
         an_action_key, self.activeMenuReference.add_docked_widget_menu = PhoMenuHelper.add_menu(a_main_window=self.root_window, text="Add Docked Widget", name='actionAddDockedWidget', parent_menu=self.activeMenuReference.top_level_menu, menu_actions_dict=curr_actions_dict)
@@ -163,6 +215,13 @@ class DockedWidgets_MenuProvider(BaseMenuProviderMixin):
         # self.activeMenuReference.add_docked_widget_menu.addActions(curr_actions_dict.values())
         ## Add the addSubmenuActions to the Add submenu:
         self.activeMenuReference.add_docked_widget_menu.addActions([curr_actions_dict[a_key] for a_key in addSubmenuActionKeys])
+
+        if use_time_bin_specific_menus:
+            ## custom menu (unused):
+            ## INPUTS: curr_time_bin_specific_addPositionsSubmenuActionKeys, curr_time_bin_specific_addMarginalsSubmenuActionKeys
+            an_action_key, self.activeMenuReference.pseudo2D_positions_time_bin_sizes_menu = PhoMenuHelper.add_menu(a_main_window=self.root_window, text="Pseudo2D Positions (t_bin_sizes)", name='actionPseudo2DPositionsTimeBinSizesMenu', parent_menu=self.activeMenuReference.top_level_menu, menu_actions_dict={k:v for k, v in curr_actions_dict.items() if k in curr_time_bin_specific_addPositionsSubmenuActionKeys})
+            an_action_key, self.activeMenuReference.pseudo2D_marginals_time_bin_sizes_menu = PhoMenuHelper.add_menu(a_main_window=self.root_window, text="Pseudo2D Marginals (t_bin_sizes)", name='actionPseudo2DMarginalsTimeBinSizesMenu', parent_menu=self.activeMenuReference.top_level_menu, menu_actions_dict={k:v for k, v in curr_actions_dict.items() if k in curr_time_bin_specific_addMarginalsSubmenuActionKeys})
+
 
         # Save references in the curr_window
         self.activeMenuReference.actions_dict['actionMenuDockedWidgets'] = curr_window.ui.actionMenuDockedWidgets
