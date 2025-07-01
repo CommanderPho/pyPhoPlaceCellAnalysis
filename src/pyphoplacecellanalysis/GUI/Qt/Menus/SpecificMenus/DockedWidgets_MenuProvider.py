@@ -142,7 +142,7 @@ class DockedWidgets_MenuProvider(BaseMenuProviderMixin):
                 # addSubmenuActionKeys.append(curr_action_key)
                 # curr_action_key = PhoMenuHelper.add_action_item(self.root_window, "Pseudo2D Continuous Decoded Marginals in Matplotlib Views", name="actionContinuousPseudo2DDecodedMarginalsDockedMatplotlibView", tooltip="", icon_path=":/Graphics/Icons/graphics/ic_multiline_chart_48px.png", actions_dict=curr_actions_dict)
                 # addSubmenuActionKeys.append(curr_action_key)
-                time_bin_size_list: List[str] = AddNewDecodedPosteriors_MatplotlibPlotCommand.get_all_computed_time_bin_sizes()
+                time_bin_size_list: List[float] = AddNewDecodedPosteriors_MatplotlibPlotCommand.get_all_computed_time_bin_sizes(curr_active_pipeline=curr_active_pipeline)
                 curr_time_bin_specific_submenu_actions_dict = {}
                 # curr_time_bin_specific_addSubmenuActionKeys = []
                 curr_time_bin_specific_addPositionsSubmenuActionKeys = []
