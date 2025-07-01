@@ -663,6 +663,9 @@ class FigureToImageHelpers:
             FigureToImageHelpers.export_wrapped_axesimage_to_paged_pdf(ax_image=im_posterior_x, x_extent=(active_2d_plot.total_data_start_time, active_2d_plot.total_data_end_time), chunk_width=active_2d_plot.active_window_duration, output_pdf_path=output_pdf_path, figsize=(8, 11), dpi=150, rows_per_page=15, debug_max_num_pages=3)
 
         """
+        # track_separator_line_kwargs = dict(color='black', linewidth=1, linestyle='-', alpha=0.8)
+        track_separator_line_kwargs = dict(color='white', linewidth=2, linestyle='-', alpha=0.8)
+        
         # Handle both single AxesImage and List[AxesImage]
         if isinstance(ax_image, list):
             ax_images = ax_image
@@ -757,6 +760,13 @@ class FigureToImageHelpers:
                         )
                     ## END for img_info in image_data_list...
                     
+                    # Add horizontal separator lines between images
+                    if (len(image_data_list) > 1) and (track_separator_line_kwargs is not None):
+                        for i, img_info in enumerate(image_data_list[:-1]):  # Skip the last image (no line after it)
+                            # Get the top edge of the current image (bottom edge of next image)
+                            separator_y = img_info['stacked_extent'][3]  # y_max of current image
+                            ax.axhline(y=separator_y, **track_separator_line_kwargs)
+                                                
                     ax.set_xlim(start, end)
                     ax.set_ylim(total_y_min, total_y_max)
 
