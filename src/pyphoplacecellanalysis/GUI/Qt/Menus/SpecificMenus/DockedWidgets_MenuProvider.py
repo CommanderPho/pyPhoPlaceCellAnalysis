@@ -186,23 +186,11 @@ class DockedWidgets_MenuProvider(BaseMenuProviderMixin):
 
         # ==================================================================================================================== #
         # Connect the relevent actions to each action:
-        # action_command_map = {
-        #     'actionNewDockedMatplotlibView': AddNewDecodedPosition_MatplotlibPlotCommand(spike_raster_window, curr_active_pipeline, active_config_name, display_output, action_identifier='actionNewDockedMatplotlibView'),
-        #     # 'actionNewDockedContextNested': CreateNewContextNestedDocksCommand(spike_raster_window, curr_active_pipeline, active_config_name=active_config_name, active_context=active_context, display_output=display_output, action_identifier='actionNewDockedContextNested'),
-        #     'actionLongShortDecodedEpochsDockedMatplotlibView': AddNewLongShortDecodedEpochSlices_MatplotlibPlotCommand(spike_raster_window, curr_active_pipeline, active_config_name=active_config_name, active_context=active_context, display_output=display_output, action_identifier='actionLongShortDecodedEpochsDockedMatplotlibView'),
-        #     'actionDirectionalDecodedEpochsDockedMatplotlibView': AddNewDirectionalDecodedEpochs_MatplotlibPlotCommand(spike_raster_window, curr_active_pipeline, active_config_name=active_config_name, active_context=active_context, display_output=display_output, action_identifier='actionDirectionalDecodedEpochsDockedMatplotlibView'), ## BROKEN, Not aligned with positions also plotted
-        #     'actionPseudo2DDecodedEpochsDockedMatplotlibView': AddNewDecodedPosteriors_MatplotlibPlotCommand(spike_raster_window, curr_active_pipeline, active_config_name=active_config_name, active_context=active_context, display_output=display_output, action_identifier='actionPseudo2DDecodedEpochsDockedMatplotlibView'),
-        #     'actionContinuousPseudo2DDecodedMarginalsDockedMatplotlibView': AddNewDecodedEpochMarginal_MatplotlibPlotCommand(spike_raster_window, curr_active_pipeline, active_config_name=active_config_name, active_context=active_context, display_output=display_output, action_identifier='actionContinuousPseudo2DDecodedMarginalsDockedMatplotlibView'),
-        #     'actionTrackTemplatesDecodedEpochsDockedMatplotlibView': AddNewTrackTemplatesDecodedEpochSlicesRows_MatplotlibPlotCommand(spike_raster_window, curr_active_pipeline, active_config_name=active_config_name, active_context=active_context, display_output=display_output, action_identifier='actionTrackTemplatesDecodedEpochsDockedMatplotlibView'),
-        # }
-
         for a_name, a_build_command in action_command_map.items():
             curr_actions_dict[a_name].triggered.connect(a_build_command)
             
-
         # curr_actions_dict['actionNewDockedCustom'].triggered.connect(CreateNewTimeSynchronizedPlotterCommand(spike_raster_window, active_pf_2D_dt, plotter_type='decoder', active_context=active_context, display_output=display_output))
                 
-
         # ==================================================================================================================== #
         # Now Create the Menus for each QAction:
         
@@ -219,8 +207,14 @@ class DockedWidgets_MenuProvider(BaseMenuProviderMixin):
         if use_time_bin_specific_menus:
             ## custom menu (unused):
             ## INPUTS: curr_time_bin_specific_addPositionsSubmenuActionKeys, curr_time_bin_specific_addMarginalsSubmenuActionKeys
-            an_action_key, self.activeMenuReference.pseudo2D_positions_time_bin_sizes_menu = PhoMenuHelper.add_menu(a_main_window=self.root_window, text="Pseudo2D Positions (t_bin_sizes)", name='actionPseudo2DPositionsTimeBinSizesMenu', parent_menu=self.activeMenuReference.top_level_menu, menu_actions_dict={k:v for k, v in curr_actions_dict.items() if k in curr_time_bin_specific_addPositionsSubmenuActionKeys})
-            an_action_key, self.activeMenuReference.pseudo2D_marginals_time_bin_sizes_menu = PhoMenuHelper.add_menu(a_main_window=self.root_window, text="Pseudo2D Marginals (t_bin_sizes)", name='actionPseudo2DMarginalsTimeBinSizesMenu', parent_menu=self.activeMenuReference.top_level_menu, menu_actions_dict={k:v for k, v in curr_actions_dict.items() if k in curr_time_bin_specific_addMarginalsSubmenuActionKeys})
+            # an_action_key, self.activeMenuReference.pseudo2D_positions_time_bin_sizes_menu = PhoMenuHelper.add_menu(a_main_window=self.root_window, text="Pseudo2D Positions (t_bin_sizes)", name='actionPseudo2DPositionsTimeBinSizesMenu', parent_menu=self.activeMenuReference.top_level_menu, menu_actions_dict={k:v for k, v in curr_actions_dict.items() if k in curr_time_bin_specific_addPositionsSubmenuActionKeys})
+            # an_action_key, self.activeMenuReference.pseudo2D_marginals_time_bin_sizes_menu = PhoMenuHelper.add_menu(a_main_window=self.root_window, text="Pseudo2D Marginals (t_bin_sizes)", name='actionPseudo2DMarginalsTimeBinSizesMenu', parent_menu=self.activeMenuReference.top_level_menu, menu_actions_dict={k:v for k, v in curr_actions_dict.items() if k in curr_time_bin_specific_addMarginalsSubmenuActionKeys})
+            an_action_key, self.activeMenuReference.pseudo2D_positions_time_bin_sizes_menu = PhoMenuHelper.add_menu(a_main_window=self.root_window, text="Pseudo2D Positions (t_bin_sizes)", name='actionPseudo2DPositionsTimeBinSizesMenu', parent_menu=self.activeMenuReference.top_level_menu, menu_actions_dict=curr_actions_dict)
+            an_action_key, self.activeMenuReference.pseudo2D_marginals_time_bin_sizes_menu = PhoMenuHelper.add_menu(a_main_window=self.root_window, text="Pseudo2D Marginals (t_bin_sizes)", name='actionPseudo2DMarginalsTimeBinSizesMenu', parent_menu=self.activeMenuReference.top_level_menu, menu_actions_dict=curr_actions_dict)
+            
+            # Add the specific actions to each submenu
+            self.activeMenuReference.pseudo2D_positions_time_bin_sizes_menu.addActions([curr_actions_dict[a_key] for a_key in curr_time_bin_specific_addPositionsSubmenuActionKeys])
+            self.activeMenuReference.pseudo2D_marginals_time_bin_sizes_menu.addActions([curr_actions_dict[a_key] for a_key in curr_time_bin_specific_addMarginalsSubmenuActionKeys])
 
 
         # Save references in the curr_window
