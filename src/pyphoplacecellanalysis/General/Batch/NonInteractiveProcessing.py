@@ -815,6 +815,7 @@ class BatchPhoJonathanFiguresHelper:
 		return active_out_figure_container_dict
 
 
+	@function_attributes(short_name=None, tags=['MAIN'], input_requires=[], output_provides=[], uses=['cls.perform_run(...)'], used_by=[], creation_date='2025-06-30 22:27', related_items=[])
 	@classmethod
 	def run(cls, curr_active_pipeline, neuron_replay_stats_df, included_unit_neuron_IDs=None, n_max_page_rows=10, write_vector_format=False, write_png=True, progress_print=True, debug_print=False,
 			 show_only_refined_cells:bool=False, disable_top_row=False, split_by_short_long_shared: bool = True) -> Dict[IdentifyingContext, MatplotlibRenderPlots]:
@@ -948,6 +949,61 @@ class BatchPhoJonathanFiguresHelper:
 				print(f'WARNING: shared_aclus is empty, so not adding kwargs for these.')
 		return _batch_plot_kwargs_list
 
+
+	@function_attributes(short_name=None, tags=['save', 'export', 'single-figure'], input_requires=[], output_provides=[], uses=[], used_by=['cls._perform_save_batch_plotted_figures'], creation_date='2025-06-30 22:45', related_items=[])
+	@classmethod
+	def _perform_save_single_plotted_fig(cls, curr_active_pipeline, curr_active_identifying_ctx: IdentifyingContext, a_fig_container: MatplotlibRenderPlots, subset_includelist=None, subset_excludelist=None, write_vector_format=False, write_png=True, override_fig_man: Optional[FileOutputManager]=None, progress_print=True, debug_print=False):
+		""" Saves a single figure produced by the first half of `_perform_batch_plot` 
+			
+		## perform saving if needed:
+		if (write_png or write_vector_format):
+			cls._perform_save_batch_plotted_figures(curr_active_pipeline, active_out_figure_container_dict=active_out_figure_container_dict, subset_includelist=subset_includelist, subset_excludelist=subset_excludelist, write_vector_format=write_vector_format, write_png=write_png, progress_print=progress_print, debug_print=debug_print)
+	
+		"""
+		output_file_paths = []
+		if override_fig_man is None:
+			fig_man = curr_active_pipeline.get_output_manager()
+		else:
+			# use custom figure manager
+			fig_man = override_fig_man
+			
+
+		# A single figure:
+		## 2023-06-14 - New way using `fig_man.get_figure_save_file_path(...)` - this is correct
+		final_figure_file_path = fig_man.get_figure_save_file_path(curr_active_identifying_ctx, make_folder_if_needed=True) # complete file path without extension: e.g. '/ProgrammaticDisplayFunctionTesting/2023-06-15/kdiba_pin01_one_11-03_12-3-25_BatchPhoJonathanReplayFRC_short_only_[13, 22, 28]'
+		a_fig, subfigs, axs, plot_data = a_fig_container.figures[0], a_fig_container.subfigs, a_fig_container.axes, a_fig_container.plot_data
+		
+		# One plot at a time to PDF:
+		if write_vector_format:
+			active_pdf_metadata, _UNUSED_pdf_save_filename = build_pdf_metadata_from_display_context(curr_active_identifying_ctx, subset_includelist=subset_includelist, subset_excludelist=subset_excludelist)
+			curr_pdf_save_path = final_figure_file_path.with_suffix('.pdf')
+			with backend_pdf.PdfPages(curr_pdf_save_path, keep_empty=False, metadata=active_pdf_metadata) as pdf:
+				# Save out PDF page:
+				pdf.savefig(a_fig)
+				curr_active_pipeline.register_output_file(output_path=curr_pdf_save_path, output_metadata={'context': curr_active_identifying_ctx, 'fig': (a_fig), 'pdf_metadata': active_pdf_metadata})
+				output_file_paths.append(curr_pdf_save_path)
+				a_fig_container.saved_figures.append(curr_pdf_save_path)
+				if progress_print:
+					print(f'\t saved {curr_pdf_save_path}')
+
+		# Also save .png versions:
+		if write_png:
+			# curr_page_str = f'pg{i+1}of{num_pages}'
+			fig_png_out_path = final_figure_file_path.with_suffix('.png')
+			# fig_png_out_path = fig_png_out_path.with_stem(f'{curr_pdf_save_path.stem}_{curr_page_str}') # note this replaces the current .pdf extension with .png, resulting in a good filename for a .png
+			a_fig.savefig(fig_png_out_path, dpi=240)
+			curr_active_pipeline.register_output_file(output_path=fig_png_out_path, output_metadata={'context': curr_active_identifying_ctx, 'fig': (a_fig)})
+			output_file_paths.append(fig_png_out_path)
+			a_fig_container.saved_figures.append(fig_png_out_path)
+			if progress_print:
+				print(f'\t saved {fig_png_out_path}')
+
+		return output_file_paths
+	
+
+
+
+	@function_attributes(short_name=None, tags=['save', 'export', 'multi-figure'], input_requires=[], output_provides=[], uses=['cls._perform_save_single_plotted_fig'], used_by=[], creation_date='2025-06-30 22:45', related_items=[])
 	@classmethod
 	def _perform_save_batch_plotted_figures(cls, curr_active_pipeline, active_out_figure_container_dict: Dict[IdentifyingContext, MatplotlibRenderPlots], subset_includelist=None, subset_excludelist=None, write_vector_format=False, write_png=True, override_fig_man: Optional[FileOutputManager]=None, progress_print=True, debug_print=False):
 		""" Saves all plots produced by the first half of `_perform_batch_plot` 
@@ -963,44 +1019,23 @@ class BatchPhoJonathanFiguresHelper:
 		else:
 			# use custom figure manager
 			fig_man = override_fig_man
-			
 
 		# Each figure:
 		for curr_active_identifying_ctx, a_fig_container in active_out_figure_container_dict.items():
 			## 2023-06-14 - New way using `fig_man.get_figure_save_file_path(...)` - this is correct
-			final_figure_file_path = fig_man.get_figure_save_file_path(curr_active_identifying_ctx, make_folder_if_needed=True) # complete file path without extension: e.g. '/ProgrammaticDisplayFunctionTesting/2023-06-15/kdiba_pin01_one_11-03_12-3-25_BatchPhoJonathanReplayFRC_short_only_[13, 22, 28]'
-			a_fig, subfigs, axs, plot_data = a_fig_container.figures[0], a_fig_container.subfigs, a_fig_container.axes, a_fig_container.plot_data
-			
-			# One plot at a time to PDF:
-			if write_vector_format:
-				active_pdf_metadata, _UNUSED_pdf_save_filename = build_pdf_metadata_from_display_context(curr_active_identifying_ctx, subset_includelist=subset_includelist, subset_excludelist=subset_excludelist)
-				curr_pdf_save_path = final_figure_file_path.with_suffix('.pdf')
-				with backend_pdf.PdfPages(curr_pdf_save_path, keep_empty=False, metadata=active_pdf_metadata) as pdf:
-					# Save out PDF page:
-					pdf.savefig(a_fig)
-					curr_active_pipeline.register_output_file(output_path=curr_pdf_save_path, output_metadata={'context': curr_active_identifying_ctx, 'fig': (a_fig), 'pdf_metadata': active_pdf_metadata})
-					output_file_paths.append(curr_pdf_save_path)
-					a_fig_container.saved_figures.append(curr_pdf_save_path)
-					if progress_print:
-						print(f'\t saved {curr_pdf_save_path}')
+			curr_output_file_paths = cls._perform_save_single_plotted_fig(curr_active_pipeline=curr_active_pipeline, curr_active_identifying_ctx=curr_active_identifying_ctx, a_fig_container=a_fig_container,
+																  subset_includelist=subset_includelist, subset_excludelist=subset_excludelist,
+																  write_vector_format=write_vector_format, write_png=write_png, override_fig_man=fig_man,
+																  progress_print=progress_print, debug_print=debug_print)
+			output_file_paths.extend(curr_output_file_paths)
+		## END for curr_active_identifying_ctx, a_fig_container in active_out_figure_container_dict.items()...
 
-			# Also save .png versions:
-			if write_png:
-				# curr_page_str = f'pg{i+1}of{num_pages}'
-				fig_png_out_path = final_figure_file_path.with_suffix('.png')
-				# fig_png_out_path = fig_png_out_path.with_stem(f'{curr_pdf_save_path.stem}_{curr_page_str}') # note this replaces the current .pdf extension with .png, resulting in a good filename for a .png
-				a_fig.savefig(fig_png_out_path, dpi=240)
-				curr_active_pipeline.register_output_file(output_path=fig_png_out_path, output_metadata={'context': curr_active_identifying_ctx, 'fig': (a_fig)})
-				output_file_paths.append(fig_png_out_path)
-				a_fig_container.saved_figures.append(fig_png_out_path)
-				if progress_print:
-					print(f'\t saved {fig_png_out_path}')
 
 		return output_file_paths
 
 
 	@classmethod
-	def _perform_batch_plot(cls, curr_active_pipeline, active_kwarg_list, subset_includelist=None, subset_excludelist=None, write_vector_format=False, write_png=True, progress_print=True, debug_print=False) -> Dict[IdentifyingContext, MatplotlibRenderPlots]:
+	def _perform_batch_plot(cls, curr_active_pipeline, active_kwarg_list, subset_includelist=None, subset_excludelist=None, write_vector_format=False, write_png=True, progress_print=True, debug_print=False, close_figures_to_save_memory: bool = True) -> Dict[IdentifyingContext, MatplotlibRenderPlots]:
 		""" Plots everything by calling `cls._subfn_batch_plot_automated` using the kwargs provided in `active_kwarg_list`
 
 		Args:
@@ -1014,19 +1049,52 @@ class BatchPhoJonathanFiguresHelper:
 		Returns:
 			_type_: _description_
 		"""
-		active_out_figure_container_dict: Dict[IdentifyingContext, MatplotlibRenderPlots] = {} # empty dict to hold figures
+		needs_output_figures: bool = (write_png or write_vector_format)
+		if needs_output_figures:
+			output_file_paths = []
+			fig_man = curr_active_pipeline.get_output_manager()
 
+			
+		active_out_figure_container_dict: Dict[IdentifyingContext, MatplotlibRenderPlots] = {} # empty dict to hold figures
+		n_out_figures: int = len(active_kwarg_list)
+		if progress_print:
+			print(f'n_out_figures: {n_out_figures}')
 		# Each figure:
 		for i, curr_batch_plot_kwargs in enumerate(active_kwarg_list):
+			if progress_print:
+				print(f'generating figure {i+1}/{n_out_figures}')
 			curr_active_identifying_ctx = curr_batch_plot_kwargs['active_identifying_ctx'] # this context is good
 			# Perform the plotting:
 			a_fig_container: MatplotlibRenderPlots = cls._subfn_batch_plot_automated(curr_active_pipeline, **curr_batch_plot_kwargs)
 			active_out_figure_container_dict[curr_active_identifying_ctx] = a_fig_container
+			## perform saving if needed:
+			if needs_output_figures:
+				if progress_print:
+					print(f'writing images...')
+				output_file_paths = cls._perform_save_single_plotted_fig(curr_active_pipeline, curr_active_identifying_ctx=curr_active_identifying_ctx, a_fig_container=a_fig_container,
+															  subset_includelist=subset_includelist, subset_excludelist=subset_excludelist,
+															  write_vector_format=write_vector_format, write_png=write_png, override_fig_man=fig_man,
+															 progress_print=progress_print, debug_print=debug_print)
+				if progress_print:
+					print(f'\tdone.')
+			if close_figures_to_save_memory:
+				## close the figure
+				for a_fig in a_fig_container.figures:
+					# a_fig.close()
+					plt.close() ## have to use non-OOP version?
+					# plt.close('all')
+			
 
-		## perform saving if needed:
-		if (write_png or write_vector_format):
-			output_file_paths = cls._perform_save_batch_plotted_figures(curr_active_pipeline, active_out_figure_container_dict=active_out_figure_container_dict, subset_includelist=subset_includelist, subset_excludelist=subset_excludelist, write_vector_format=write_vector_format, write_png=write_png, progress_print=progress_print, debug_print=debug_print)
-
+		if progress_print:
+			print(f'finished all {n_out_figures} figures.')
+		# ## perform saving if needed:
+		# if needs_output_figures:
+		# 	if progress_print:
+		# 		print(f'writing images...')
+		# 	output_file_paths = cls._perform_save_batch_plotted_figures(curr_active_pipeline, active_out_figure_container_dict=active_out_figure_container_dict, subset_includelist=subset_includelist, subset_excludelist=subset_excludelist, write_vector_format=write_vector_format, write_png=write_png, progress_print=progress_print, debug_print=debug_print)
+		# 	if progress_print:
+		# 		print(f'\tdone.')
+				
 		return active_out_figure_container_dict
 
 
