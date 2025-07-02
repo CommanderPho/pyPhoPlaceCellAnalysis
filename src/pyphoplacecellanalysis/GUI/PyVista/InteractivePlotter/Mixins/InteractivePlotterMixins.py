@@ -113,13 +113,23 @@ class InteractivePyvistaPlotter_PointAndPathPlottingMixin:
             perform_plot_location_trail(...)
     
     """
-    def perform_plot_location_point(self, plot_name, curr_animal_point, render=True, **kwargs):
+    def perform_plot_location_point(self, plot_name, curr_animal_point, render=True, circle_circumference_scale:float=0.25, **kwargs):
         """ will render a flat indicator of a single point like is used for the animal's current location. 
-        Updates the existing plot if the same plot_name is reused. """
+        Updates the existing plot if the same plot_name is reused. 
+
+        curr_animal_point = [self.x[active_included_all_window_position_indicies[-1]], self.y[active_included_all_window_position_indicies[-1]], self.z_fixed[-1]]
+        self.perform_plot_location_point('animal_current_location_point', curr_animal_point, render=False)
+
+        """
         ## COMPAT: merge operator '|'requires Python 3.9
         pdata_current_point = pv.PolyData(curr_animal_point) # a mesh
-        
-        pc_current_point = pdata_current_point.glyph(scale=False, geom=point_location_circle)
+
+        if circle_circumference_scale is None:
+            scale = False
+        else:
+            scale = float(circle_circumference_scale)        
+
+        pc_current_point = pdata_current_point.glyph(scale=scale, geom=point_location_circle)
         
         self.plots_data[plot_name] = {'pdata_current_point':pdata_current_point, 'pc_current_point':pc_current_point}
         self.plots[plot_name] = self.p.add_mesh(pc_current_point, name=plot_name, render=render, **({'color':'green', 'ambient':0.6, 'opacity':0.5,
