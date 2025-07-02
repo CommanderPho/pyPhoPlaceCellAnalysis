@@ -43,7 +43,7 @@ class CustomViewBox(pg.ViewBox):
 @metadata_attributes(short_name=None, tags=['useful', 'gui', 'utility', 'epochs', 'widget'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-11-17 19:25', related_items=[])
 @define(slots=False)
 class EpochsEditor:
-    """ EpochsEditor to allow user modification of epoch intervals using PyQtGraph and multiple custom linear rect items
+    """ EpochsEditor to allow user modification of epoch intervals using PyQtGraph and multiple custom linear rect items, like for the laps
 
     It was used to display the laps for the entire session and allow the user to tweak their start/end times and then save the changes manually.
     

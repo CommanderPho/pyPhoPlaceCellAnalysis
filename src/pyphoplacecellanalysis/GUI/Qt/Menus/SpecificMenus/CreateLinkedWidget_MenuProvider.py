@@ -154,7 +154,8 @@ class CreateLinkedWidget_MenuProvider(BaseMenuProviderMixin):
 
 @metadata_attributes(short_name=None, tags=['menu', 'command', 'time-synchronized'], input_requires=[], output_provides=[], uses=['build_connected_time_synchronized_occupancy_plotter', 'build_connected_time_synchronized_placefields_plotter', 'build_connected_time_synchronized_decoder_plotter'], used_by=[], creation_date='2025-06-30 06:23', related_items=[])
 class CreateNewTimeSynchronizedPlotterCommand(BaseMenuCommand):
-    """ build_combined_time_synchronized_plotters_window
+    """ build_combined_time_synchronized_plotters_window - used for placefields, occupancy, and decoded posterior position
+
     A command to create a plotter as needed
     """
     def __init__(self, spike_raster_window, active_pf_2D_dt, plotter_type='occupancy', curr_active_pipeline=None, active_context=None, active_config_name=None, display_output={}, action_identifier: str=None) -> None:

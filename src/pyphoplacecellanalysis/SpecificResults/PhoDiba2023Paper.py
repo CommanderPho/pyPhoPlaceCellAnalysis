@@ -1377,7 +1377,7 @@ class LongShortFRRegression:
 # ==================================================================================================================== #
 # MAIN RUN FUNCTION TO GENERATE ALL FIGURES                                                                            #
 # ==================================================================================================================== #
-@function_attributes(short_name=None, tags=['export', 'output', 'images', 'final', 'figure', 'complete'], input_requires=[], output_provides=[], uses=['PAPER_FIGURE_figure_1_full', 'PaperFigureTwo', 'PAPER_FIGURE_figure_3', 'fig_remapping_cells'], used_by=[], creation_date='2024-08-29 18:07', related_items=[])
+@function_attributes(short_name=None, tags=['export', 'output', 'images', 'final', 'figure', 'complete'], input_requires=[], output_provides=[], uses=['PAPER_FIGURE_figure_1_full', 'PaperFigureTwo', 'PAPER_FIGURE_figure_3', 'fig_remapping_cells', 'batch_perform_all_plots'], used_by=[], creation_date='2024-08-29 18:07', related_items=[])
 def main_complete_figure_generations(curr_active_pipeline, enable_default_neptune_plots:bool=True, save_figures_only:bool=False, save_figure=True):
     """ main run function to generate all figures
     

@@ -17,6 +17,7 @@ from pyphoplacecellanalysis.Pho2D.PyQtPlots.TimeSynchronizedPlotters.Mixins.Anim
 
 class TimeSynchronizedOccupancyPlotter(AnimalTrajectoryPlottingMixin, TimeSynchronizedPlotterBase):
     """ Plots the time-dependent occupancy produced by a PfND_TimeDependent instance.
+            Renders the 2D occupancy heatmap in the background, and then overlays a green dot representing the animal's closest measured position, and as the animal moves it leaves a trail of white dots indicating its previous trajectory.
     
     Usage:
         from pyphoplacecellanalysis.Pho2D.PyQtPlots.TimeSynchronizedPlotters.TimeSynchronizedOccupancyPlotter import TimeSynchronizedOccupancyPlotter
@@ -68,6 +69,7 @@ class TimeSynchronizedOccupancyPlotter(AnimalTrajectoryPlottingMixin, TimeSynchr
         self.buildUI()
         self._update_plots()
         
+
     def setup(self):
         # self.setup_spike_rendering_mixin() # NeuronIdentityAccessingMixin
         self.app = pg.mkQApp(self.applicationName)

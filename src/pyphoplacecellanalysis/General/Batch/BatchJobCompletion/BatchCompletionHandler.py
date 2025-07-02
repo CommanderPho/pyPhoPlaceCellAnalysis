@@ -365,6 +365,7 @@ class BatchSessionCompletionHandler:
 
     
     # Plotting/Figures Helpers ___________________________________________________________________________________________ #
+    @function_attributes(short_name=None, tags=['MAIN', 'figures', 'batch'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-07-02 09:29', related_items=[])
     def try_complete_figure_generation_to_file(self, curr_active_pipeline, enable_default_neptune_plots=False):
         try:
             ## To file only:

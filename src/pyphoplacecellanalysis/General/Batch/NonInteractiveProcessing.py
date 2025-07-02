@@ -566,7 +566,7 @@ def batch_programmatic_figures(curr_active_pipeline, debug_print=False):
 
 # import matplotlib as mpl
 # import matplotlib.pyplot as plt
-@function_attributes(short_name='batch_extended_programmatic_figures', tags=['batch', 'automated', 'session', 'display', 'figures', 'extended', 'matplotlib', 'main'], input_requires=[], output_provides=[], uses=['_display_batch_pho_jonathan_replay_firing_rate_comparison'], used_by=[], creation_date='2023-03-28 04:46')
+@function_attributes(short_name='batch_extended_programmatic_figures', tags=['MAIN', 'batch', 'automated', 'session', 'display', 'figures', 'extended', 'matplotlib', 'main'], input_requires=[], output_provides=[], uses=['programmatic_render_to_file', 'programmatic_display_to_PDF', 'export_active_relative_entropy_results_videos', '_display_batch_pho_jonathan_replay_firing_rate_comparison'], used_by=[], creation_date='2023-03-28 04:46')
 def batch_extended_programmatic_figures(curr_active_pipeline, write_vector_format=False, write_png=True, debug_print=False):
 	""" 
 	
