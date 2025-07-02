@@ -568,11 +568,7 @@ def batch_programmatic_figures(curr_active_pipeline, debug_print=False):
 # import matplotlib.pyplot as plt
 @function_attributes(short_name='batch_extended_programmatic_figures', tags=['MAIN', 'batch', 'automated', 'session', 'display', 'figures', 'extended', 'matplotlib', 'main'], input_requires=[], output_provides=[], uses=['programmatic_render_to_file', 'programmatic_display_to_PDF', 'export_active_relative_entropy_results_videos', '_display_batch_pho_jonathan_replay_firing_rate_comparison'], used_by=[], creation_date='2023-03-28 04:46')
 def batch_extended_programmatic_figures(curr_active_pipeline, write_vector_format=False, write_png=True, debug_print=False):
-	""" 
-	
-	Generation and display of figures should produce as many as possible, not stopping after failing on one.
-	
-	"""
+	""" Generation and display of figures should produce as many as possible, not stopping after failing on one. """
 	disable_unsafe_qt_calls: bool = True # variable to attempt to diagnose the failure of plotting on GreatLakes without a framebuffer (which seems to be related to Qt)
 	
 	_bak_rcParams = mpl.rcParams.copy()
@@ -1139,6 +1135,7 @@ def batch_perform_all_plots(curr_active_pipeline, enable_neptune=True, neptuner=
 	except Exception as e:
 		print(f'in `batch_perform_all_plots(...)`: batch_programmatic_figures(...) failed with exception: {e}. Continuing.')
 	
+	# Majority of Programmatic Figures ___________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
 	try:
 		batch_extended_programmatic_figures(curr_active_pipeline=curr_active_pipeline, debug_print=debug_print)
 	except Exception as e:

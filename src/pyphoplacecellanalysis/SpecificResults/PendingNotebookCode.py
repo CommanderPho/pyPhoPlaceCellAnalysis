@@ -126,8 +126,10 @@ from neuropy.utils.mixins.binning_helpers import get_bin_centers
 # curr_active_pipeline.reload_default_display_functions()
 # _out = dict()
 
+@metadata_attributes(short_name=None, tags=['3D', 'tracks', 'LS', 'NOT-FINISHED', 'pyvista'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-06-27 00:00', related_items=[])
 class LongShort3DPlacefieldsHelpers:
-    """ 
+    """ Helps plot the placefields from both the long and short track on the same 3D PyVista plotter.
+    Not finished.
 
     from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import LongShort3DPlacefieldsHelpers
 

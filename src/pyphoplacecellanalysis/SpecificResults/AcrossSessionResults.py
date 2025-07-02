@@ -1500,6 +1500,120 @@ def copy_session_folder_files_to_target_dir(good_session_concrete_folders, targe
     return moved_files_dict_files, (filelist_path, filedict_out_path)
 
 
+@function_attributes(short_name=None, tags=['batch', 'collect', 'figures'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-07-02 15:05', related_items=[])
+def copy_batch_output_figures_to_common_figures_dir(generate_figures_script_paths: List[Path], common_destination: Path = Path(r"K:/scratch/collected_figures").resolve(), curr_gen_scripts_path: Path = Path(r'K:/scratch/gen_scripts'), batch_export_folder_date:str='2025-07-02', append_session_name_as_suffix: bool = True, append_session_name_as_prefix: bool = False) -> List[Path]:
+    """ copies each session's gen_output figures to a common figures folder
+
+    Should be used after running the figures phase of batch output to collect the figures from greatlakes.
+
+    By default the batch-exported figures are just stored in the gen_script's in individual session folders like:
+         'gen_scripts/{session_folder}/EXTERNAL/Screenshots/ProgrammaticDisplayFunctionTesting/{batch_export_day_date}/{session_context_path_parts}'
+             e.g. 'gen_scripts/run_kdiba_gor01_one_2006-6-08_14-26-15/EXTERNAL/Screenshots/ProgrammaticDisplayFunctionTesting/2025-07-02/kdiba/gor01/one/2006-6-08_14-26-15'
+
+    Usage:
+
+        from pyphoplacecellanalysis.SpecificResults.AcrossSessionResults import copy_batch_output_figures_to_common_figures_dir
+
+        ## Move figures
+        generate_figures_script_paths = [Path(v) for v in ['C:/Users/pho/repos/Spike3DWorkEnv/Spike3D/output/gen_scripts/run_kdiba_gor01_one_2006-6-07_11-26-53/figures_kdiba_gor01_one_2006-6-07_11-26-53.py',
+            'C:/Users/pho/repos/Spike3DWorkEnv/Spike3D/output/gen_scripts/run_kdiba_gor01_one_2006-6-08_14-26-15/figures_kdiba_gor01_one_2006-6-08_14-26-15.py',
+            ...
+            'C:/Users/pho/repos/Spike3DWorkEnv/Spike3D/output/gen_scripts/run_kdiba_pin01_one_fet11-01_12-58-54/figures_kdiba_pin01_one_fet11-01_12-58-54.py'],
+        ]
+
+        _copied_outputs = copy_batch_output_figures_to_common_figures_dir(generate_figures_script_paths=generate_figures_script_paths)
+        _copied_outputs
+    """
+
+    def find_deepest_directory_iterative(path: Path) -> Path:
+        """
+        Iteratively find the deepest directory (first directory with no subdirectories).
+        # Usage:
+            deepest_dir = find_deepest_directory_iterative(gen_scripts_fig_path)
+            deepest_dir
+        ## Output:
+        [
+            WindowsPath('K:/scratch/gen_scripts/run_kdiba_gor01_one_2006-6-08_14-26-15/EXTERNAL/Screenshots/ProgrammaticDisplayFunctionTesting/2025-07-02/kdiba/gor01/one/2006-6-08_14-26-15'),
+            WindowsPath('K:/scratch/gen_scripts/run_kdiba_gor01_one_2006-6-09_1-22-43/EXTERNAL/Screenshots/ProgrammaticDisplayFunctionTesting/2025-07-02/kdiba/gor01/one/2006-6-09_1-22-43'),
+            ...
+            WindowsPath('K:/scratch/gen_scripts/run_kdiba_pin01_one_fet11-01_12-58-54/EXTERNAL/Screenshots/ProgrammaticDisplayFunctionTesting/2025-07-02/kdiba/pin01/one/fet11-01_12-58-54'),
+        ]
+
+        """
+        current_path = Path(path)
+
+        while True:
+            # Get all subdirectories
+            subdirs = [p for p in current_path.iterdir() if p.is_dir()]
+
+            # If no subdirectories, we've found the deepest directory
+            if not subdirs:
+                return current_path
+
+            # Move to the first subdirectory (or you could choose based on other criteria)
+            current_path = subdirs[0]  # or sorted(subdirs)[0] for alphabetical order
+
+    # ==================================================================================================================================================================================================================================================================================== #
+    # BEGIN FUNCTION BODY                                                                                                                                                                                                                                                                  #
+    # ==================================================================================================================================================================================================================================================================================== #
+
+    gen_scripts_sess_paths = [curr_gen_scripts_path.joinpath(Path(k).parent.relative_to(Path('C:\\Users\\pho\\repos\\Spike3DWorkEnv\\Spike3D\\output\\gen_scripts'))).resolve() for k in generate_figures_script_paths]
+    gen_scripts_sess_paths = [v for v in gen_scripts_sess_paths if v.exists()]
+    gen_scripts_sess_path_dict = {v.name.removeprefix('run_'):v for v in gen_scripts_sess_paths}
+    gen_scripts_sess_paths
+    gen_scripts_sess_path_dict
+
+    ### gen_scripts_sess_path_dict
+    # {'kdiba_gor01_one_2006-6-07_11-26-53': WindowsPath('K:/scratch/gen_scripts/run_kdiba_gor01_one_2006-6-07_11-26-53'),
+    #  'kdiba_gor01_one_2006-6-08_14-26-15': WindowsPath('K:/scratch/gen_scripts/run_kdiba_gor01_one_2006-6-08_14-26-15'),
+    #   ...
+    #  'kdiba_pin01_one_fet11-01_12-58-54': WindowsPath('K:/scratch/gen_scripts/run_kdiba_pin01_one_fet11-01_12-58-54')}
+
+    ## OUTPUTS: gen_scripts_sess_paths, gen_scripts_sess_path_dict
+
+    # generate_figures_script_paths
+    gen_scripts_fig_paths = [k.joinpath(f'EXTERNAL/Screenshots/ProgrammaticDisplayFunctionTesting/{batch_export_folder_date}').resolve() for k in gen_scripts_sess_paths]
+    gen_scripts_fig_paths = [v for v in gen_scripts_fig_paths if v.exists()]
+    gen_scripts_fig_path_dict = dict(zip(gen_scripts_sess_path_dict.keys(), gen_scripts_fig_paths))
+    ## OUTPUTS: gen_scripts_fig_path_dict, gen_scripts_fig_paths
+
+    # INPUTS: gen_scripts_fig_paths
+    gen_scripts_fig_flat_child_paths = [find_deepest_directory_iterative(gen_scripts_fig_path) for gen_scripts_fig_path in gen_scripts_fig_paths]
+    gen_scripts_fig_flat_child_path_dict = dict(zip(gen_scripts_sess_path_dict.keys(), gen_scripts_fig_flat_child_paths))
+
+
+    common_destination.mkdir(exist_ok=True)
+
+    _active_format_fn = lambda a_sess_name, f_str: f_str ## no-op
+    if append_session_name_as_prefix:
+        _append_as_prefix_fn = lambda a_sess_name, f_str: f'{a_sess_name}_{f_str}'
+        # _active_format_fn = _active_format_fn
+        _active_format_fn = _append_as_prefix_fn
+
+    if append_session_name_as_suffix:
+        _append_as_suffix_fn = lambda a_sess_name, f_str: f'{f_str}_{a_sess_name}'
+        # _active_format_fn = _active_format_fn
+        _active_format_fn = _append_as_suffix_fn
+
+
+    ## perform the copy
+    # _copied_outputs = [shutil.copy2(f, common_destination.joinpath(f.with_stem(f"{k}_{f.stem}").name)) for k, path in gen_scripts_fig_flat_child_path_dict.items() for f in path.iterdir() if f.is_file()] ## append the session name (k) to each file as a prefix
+    _copied_outputs = [shutil.copy2(f, common_destination.joinpath(f.with_stem(_active_format_fn(k, f.stem)).name)) for k, path in gen_scripts_fig_flat_child_path_dict.items() for f in path.iterdir() if f.is_file()] ## append the session name (k) to each file as a prefix
+
+
+
+    # for k, path in gen_scripts_fig_flat_child_path_dict.items():
+    #     print(f'k: {k}, path: {path}')
+    #     for f in path.iterdir():
+    #         if f.is_file():
+    #             new_dest_f = common_destination.joinpath(f.with_stem(f"{k}_{f.stem}").name)
+    #             print(f'new_dest_f: {new_dest_f}')
+    #             shutil.copy2(f, new_dest_f) 
+
+    return _copied_outputs
+
+
+
 
 @function_attributes(short_name=None, tags=['inst_fr', 'across_session'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-09-12 09:48', related_items=[])
 def copy_session_inst_fr_data_to_across_session_pkl(RESULT_DATE_TO_USE, collected_outputs_path, instantaneous_time_bin_size_seconds_list:List[float], debug_print = False):
