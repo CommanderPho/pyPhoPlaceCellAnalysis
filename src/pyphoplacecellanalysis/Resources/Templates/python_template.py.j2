@@ -188,7 +188,7 @@ result_handler = BatchSessionCompletionHandler(force_reload_all=True,
                                                 session_computations_options=BatchComputationProcessOptions(should_load=False, should_compute=True, should_save=SavingOptions.ALWAYS, override_file=local_computations_override_file, override_output_file=local_computations_override_output_file),
                                                 global_computations_options=BatchComputationProcessOptions(should_load=False, should_compute=True, should_save=SavingOptions.ALWAYS, override_file=global_computation_results_override_file, override_output_file=global_computation_results_override_output_file),
                                                 extended_computations_include_includelist=extended_computations_include_includelist,
-                                                force_recompute_override_computations_includelist=force_recompute_override_computations_includelist, force_recompute_override_computation_kwargs_dict=force_recompute_override_computation_kwargs_dict,
+                                                force_recompute_override_computations_includelist=force_recompute_override_computations_includelist, should_generate_all_plots=True, force_recompute_override_computation_kwargs_dict=force_recompute_override_computation_kwargs_dict,
                                                 should_perform_figure_generation_to_file=should_perform_figure_generation_to_file, saving_mode=PipelineSavingScheme.OVERWRITE_IN_PLACE, force_global_recompute=True,
                                                 **batch_session_completion_handler_kwargs, **multiprocessing_kwargs)
 {% else %}
