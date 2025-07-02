@@ -215,7 +215,7 @@ class BatchSessionCompletionHandler:
 
     # Figures:
     should_perform_figure_generation_to_file: bool = field(default=True) # controls whether figures are generated to file
-    should_generate_all_plots: bool = field(default=False) # controls whether all plots are generated (when True) or if only non-Neptune paper figure specific plots are generated. Has no effect if self.should_perform_figure_generation_to_file is False.
+    should_generate_all_plots: bool = field(default=True) # controls whether all plots are generated (when True) or if only non-Neptune paper figure specific plots are generated. Has no effect if self.should_perform_figure_generation_to_file is False.
 
 
     # Cross-session Results:
