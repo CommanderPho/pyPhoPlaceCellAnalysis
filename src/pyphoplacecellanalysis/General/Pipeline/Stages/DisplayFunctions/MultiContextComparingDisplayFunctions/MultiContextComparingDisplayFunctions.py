@@ -37,11 +37,22 @@ class MultiContextComparingDisplayFunctions(AllFunctionEnumeratingMixin, metacla
     """
 
     @function_attributes(short_name='grid_bin_bounds_validation', tags=['grid_bin_bounds','validation','pandas','1D','position', 'LONG_SHORT_SPECIFIC'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-06-14 18:17', related_items=[], is_global=True)
-    def _display_grid_bin_bounds_validation(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, defer_render=False, save_figure=True, is_x_axis: bool = True, ax=None, **kwargs):
+    def _display_grid_bin_bounds_validation(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, defer_render=False, save_figure=True, size=[18, 5], dpi=100, constrained_layout=True, override_fig_man: Optional[FileOutputManager]=None, is_x_axis: bool = True, ax=None, **kwargs):
         """ Renders a single figure that shows the 1D linearized position from several different sources to ensure sufficient overlap. Useful for validating that the grid_bin_bounds are chosen reasonably.
 
         """
+        import matplotlib as mpl
+        import matplotlib.pyplot as plt
+        from flexitext import flexitext ## flexitext for formatted matplotlib text
+        from pyphocorehelpers.DataStructure.RenderPlots.MatplotLibRenderPlots import FigureCollector
+        from neuropy.utils.matplotlib_helpers import FormattedFigureText
+
         from pyphoplacecellanalysis.Pho2D.track_shape_drawing import NotableTrackPositions, perform_add_1D_track_bounds_lines
+
+        display_fn_name: str = 'grid_bin_bounds_validation' # same as "short_name"
+
+        export_dpi_multiplier: float = kwargs.pop('export_dpi_multiplier', 2.0)
+        export_dpi: int = int(np.ceil(dpi * export_dpi_multiplier))
 
         assert owning_pipeline_reference is not None
         long_epoch_name, short_epoch_name, global_epoch_name = owning_pipeline_reference.find_LongShortGlobal_epoch_names()
@@ -80,7 +91,8 @@ class MultiContextComparingDisplayFunctions(AllFunctionEnumeratingMixin, metacla
             # combined_pos_df_plot_kwargs = dict(x='y', y='t', title='grid_bin_bounds validation across epochs - positions along y-axis')
             combined_pos_df_plot_kwargs = dict(x='t', y=pos_var_names, title='grid_bin_bounds validation across epochs - positions along y-axis')
 
-        
+        # combined_pos_df_plot_kwargs.update(alpha=0.9) # set line opacity to 0.6
+
         title = f'grid_bin_bounds validation across epochs'
         if is_x_axis:
             title = f'{title} - X-axis'
@@ -90,104 +102,249 @@ class MultiContextComparingDisplayFunctions(AllFunctionEnumeratingMixin, metacla
         const_line_text_label_y_offset: float = 0.05
         const_line_text_label_x_offset: float = 0.1
             
-        did_create_new_figure: bool = False
-        # Plot all 1D position variables:
-        if ax is None:
-            fig, ax = plt.subplots()
-            did_create_new_figure = True
+
+        # ==================================================================================================================================================================================================================================================================================== #
+        # Build Display Context                                                                                                                                                                                                                                                                #
+        # ==================================================================================================================================================================================================================================================================================== #
+        complete_session_context, (session_context, additional_session_context) = owning_pipeline_reference.get_complete_session_context()
+
+        active_context = kwargs.pop('active_context', None)
+        if active_context is not None:
+            # Update the existing context:
+            display_context = active_context.adding_context('display_fn', display_fn_name=display_fn_name)
         else:
-            fig = ax.figure
-            did_create_new_figure = False
-            
-        combined_pos_df.plot(ax=ax, **combined_pos_df_plot_kwargs)
-        ax.set_title(title)
-        if did_create_new_figure:
-            fig.canvas.manager.set_window_title(title)
-        
-        # Accessing the lines after plotting
-        position_lines_2D = ax.get_lines() # plt.Lines2D
+            # active_context = owning_pipeline_reference.sess.get_context()
+            active_context = deepcopy(complete_session_context) # owning_pipeline_reference.sess.get_context()
 
-        ax.legend(loc='upper left') # Move legend inside the plot, in the top-left corner
-        # ax.legend(loc='upper left', bbox_to_anchor=(1, 1)) # Move legend outside the plot
-        
-        final_context = owning_pipeline_reference.sess.get_context().adding_context('display_fn', display_fn_name='_display_grid_bin_bounds_validation')
-        
-        ## Add grid_bin_bounds, track limits, and midpoint lines:
-        curr_config = owning_pipeline_reference.active_configs['maze_any']
+            # Build the active context directly:
+            display_context = owning_pipeline_reference.build_display_context_for_session(display_fn_name)
 
-        grid_bin_bounds = curr_config.computation_config.pf_params.grid_bin_bounds # ((37.0773897438341, 250.69004399129707), (137.925447118083, 145.16448776601297))
-        # curr_config.computation_config.pf_params.grid_bin # (3.793023081021702, 1.607897707662558)
-        # loaded_track_limits = curr_config.active_session_config.loaded_track_limits
+        fignum = kwargs.pop('fignum', None)
+        if fignum is not None:
+            print(f'WARNING: fignum will be ignored but it was specified as fignum="{fignum}"!')
 
-        # curr_config.active_session_config.y_midpoint
-        
-        (long_notable_x_platform_positions, short_notable_x_platform_positions), (long_notable_y_platform_positions, short_notable_y_platform_positions) = NotableTrackPositions.init_notable_track_points_from_session_config(owning_pipeline_reference.sess.config)
-        
+
+        ## OUTPUTS: active_context, display_context
+
+        # ==================================================================================================================================================================================================================================================================================== #
+        # Add display function critical parameters                                                                                                                                                                                                                                             #
+        # ==================================================================================================================================================================================================================================================================================== #
+        # active_display_context = deepcopy(display_context) #.overwriting_context(extreme_threshold=extreme_threshold, opacity_max=opacity_max, thickness_ramping_multiplier=thickness_ramping_multiplier) ## include any that are just the slightest big different
         if is_x_axis:
-            ## plot x-positions
-            perform_add_1D_track_bounds_lines_kwargs = dict(long_notable_x_platform_positions=tuple(long_notable_x_platform_positions), short_notable_x_platform_positions=tuple(short_notable_x_platform_positions), is_vertical=False)
+            axis_str: str = 'x'
         else:
-            ## plot y-positions
-            perform_add_1D_track_bounds_lines_kwargs = dict(long_notable_x_platform_positions=tuple(long_notable_y_platform_positions), short_notable_x_platform_positions=tuple(short_notable_y_platform_positions), is_vertical=False)
-            
-        long_track_line_collection, short_track_line_collection = perform_add_1D_track_bounds_lines(**perform_add_1D_track_bounds_lines_kwargs, ax=ax)
+            axis_str: str = 'y'
+        active_display_context = display_context.overwriting_context(axis=axis_str) ## include any that are just the slightest big different
+
+        # ==================================================================================================================================================================================================================================================================================== #
+        # Start Building Figure                                                                                                                                                                                                                                                                #
+        # ==================================================================================================================================================================================================================================================================================== #
+
+        graphics_output_dict = {}
+
+        if override_fig_man is not None:
+            print(f'override_fig_man is not None! Custom output path will be used!')
+            test_display_output_path = override_fig_man.get_figure_save_file_path(active_display_context, make_folder_if_needed=False)
+            print(f'\ttest_display_output_path: "{test_display_output_path}"')
 
 
-        # Plot REAL `grid_bin_bounds` ________________________________________________________________________________________ #
-        ((grid_bin_bounds_x0, grid_bin_bounds_x1), (grid_bin_bounds_y0, grid_bin_bounds_y1)) = grid_bin_bounds
-        if is_x_axis:
-            ## horizontal lines:
-            common_ax_bound_kwargs = dict(xmin=ax.get_xbound()[0], xmax=ax.get_xbound()[1])
-        else:
-            # common_ax_bound_kwargs = dict(ymin=ax.get_ybound()[0], ymax=ax.get_ybound()[1]) 
-            common_ax_bound_kwargs = dict(xmin=ax.get_xbound()[0], xmax=ax.get_xbound()[1])  ## y-axis along x (like a 1D plot) Mode
+        def _perform_write_to_file_callback(final_context, fig):
+            """ captures: override_fig_man, export_dpi """
+            if save_figure:
+                return owning_pipeline_reference.output_figure(final_context, fig, override_fig_man=override_fig_man, dpi=export_dpi)
+            else:
+                pass # do nothing, don't save
 
-        if is_x_axis:
-            ## plot x-positions
-            ## horizontal lines:
-            ## midpoint line: dotted blue line centered in the bounds (along y)
-            x_midpoint = curr_config.active_session_config.x_midpoint # 143.88489208633095
-            midpoint_line_collection = ax.hlines(x_midpoint, label='x_midpoint', xmin=ax.get_xbound()[0], xmax=ax.get_xbound()[1], colors='#0000FFAA', linewidths=1.0, linestyles='dashed', zorder=-98) # matplotlib.collections.LineCollection midpoint_line_collection
-            ax.text(ax.get_xbound()[1], (x_midpoint + const_line_text_label_y_offset), 'x_mid', ha='right', va='bottom', fontsize=8, color='#0000FFAA', zorder=-98) # Add right-aligned text label slightly above the hline
-        
-            ## 2 lines corresponding to the x0 and x1 of the grid_bin_bounds:
-            grid_bin_bounds_line_collection = ax.hlines([grid_bin_bounds_x0, grid_bin_bounds_x1], label='grid_bin_bounds - after - dark blue', **common_ax_bound_kwargs, colors='#2e2e20', linewidths=2.0, linestyles='solid', zorder=-98) # grid_bin_bounds_line_collection
-            # _grid_bin_bound_labels_x_pos = (ax.get_xbound()[1] - const_line_text_label_x_offset)
-            _grid_bin_bound_labels_x_pos: float = ax.get_xbound()[0] + ((ax.get_xbound()[1] - ax.get_xbound()[0])/2.0) # center point
-            print(f'_grid_bin_bound_labels_x_pos: {_grid_bin_bound_labels_x_pos}')
-            ax.text(_grid_bin_bound_labels_x_pos, (grid_bin_bounds_x0 - const_line_text_label_y_offset), 'grid_bin_bounds[x0]', ha='center', va='bottom', fontsize=9, color='#2e2d20', zorder=-97) # Add right-aligned text label slightly above the hline
-            ax.text(_grid_bin_bound_labels_x_pos, (grid_bin_bounds_x1 + const_line_text_label_y_offset), 'grid_bin_bounds[x1]', ha='center', va='top', fontsize=9, color='#2e2d20', zorder=-97) # this will be the top (highest y-pos) line.
-            
-        else:
-            ## plot y-positions
-            midpoint_line_collection = None
-            # grid_bin_bounds_line_collection = None
-            grid_bin_bounds_positions_list = [grid_bin_bounds_y0, grid_bin_bounds_y1]
-            grid_bin_bounds_label_names_list = ['grid_bin_bounds[y0]', 'grid_bin_bounds[y1]']
-            ## 2 lines corresponding to the x0 and x1 of the grid_bin_bounds:
-            grid_bin_bounds_line_collection = ax.hlines(grid_bin_bounds_positions_list, label='grid_bin_bounds - after - dark blue', **common_ax_bound_kwargs, colors='#2e2e20', linewidths=2.0, linestyles='solid', zorder=-98) # grid_bin_bounds_line_collection
-            # _grid_bin_bound_labels_x_pos = (ax.get_xbound()[1] - const_line_text_label_x_offset)
-            _grid_bin_bound_labels_x_pos: float = ax.get_xbound()[0] + ((ax.get_xbound()[1] - ax.get_xbound()[0])/2.0) # center point
-            # print(f'_grid_bin_bound_labels_y_pos: {_grid_bin_bound_labels_y_pos}')
-            # ax.text(_grid_bin_bound_labels_y_pos, (grid_bin_bounds_y0 - const_line_text_label_y_offset), 'grid_bin_bounds[x0]', ha='center', va='bottom', fontsize=9, color='#2e2d20', zorder=-97) # Add right-aligned text label slightly above the hline
-            # ax.text(_grid_bin_bound_labels_y_pos, (grid_bin_bounds_x1 + const_line_text_label_y_offset), 'grid_bin_bounds[x1]', ha='center', va='top', fontsize=9, color='#2e2d20', zorder=-97) # this will be the top (highest y-pos) line.	
-            # Iterate through the hlines in the LineCollection and add labels
-            assert len(grid_bin_bounds_label_names_list) == len(grid_bin_bounds_positions_list)
-            for pos, a_txt_label in zip(grid_bin_bounds_positions_list, grid_bin_bounds_label_names_list):
-                # ax.text(ax.get_xbound()[1], (pos + const_line_text_label_y_offset), a_txt_label, color='#2e2d20', fontsize=9, ha='center', va='center', zorder=-97)
-                ax.text(_grid_bin_bound_labels_x_pos, (pos + const_line_text_label_y_offset), a_txt_label, color='#2e2d20', fontsize=9, ha='center', va='center', zorder=-97)
-        
+        # ==================================================================================================================================================================================================================================================================================== #
+        # Titles/Formatting/Marginas and Saving                                                                                                                                                                                                                                                #
+        # ==================================================================================================================================================================================================================================================================================== #
+        def _subfn_apply_formatting_footer_and_etc(fig, figure_title=None, subtitle_string=None, graphics_output_dict=None):
+            """ builds titles, footers, etc
+            """
+            if graphics_output_dict is None:
+                graphics_output_dict = {}
+            # active_config = deepcopy(a_decoder.pf.config)
+
+            # subtitle_string = active_config.str_for_display(is_2D=False) # , normal_to_extras_line_sep=","
+            if subtitle_string is not None:
+                # subtitle_string = f"{subtitle_string} - only extreme context probs (P(Ctx) > {extreme_threshold}) are shown"
+                print(f'subtitle_string: {subtitle_string}')
+
+            # print(f'subtitle_string: {subtitle_string}')
+
+            ## BUild figure titles:
+            # INPUTS: main_fig
+            # fig.suptitle('')
+            # out_axes_list[0].set_title('')
+
+            # text_formatter = FormattedFigureText() # .init_from_margins(left_margin=0.01)
+            # text_formatter.setup_margins(fig, left_margin=0.01) # , left_margin=0.1
+            text_formatter = FormattedFigureText.init_from_margins(left_margin=0.01, right_margin=0.99, top_margin=0.98, bottom_margin=0.125) # , top_margin=0.9
+            # text_formatter.setup_margins(fig, left_margin=0.01, top_margin=0.9)
+            text_formatter.setup_margins(fig)
+
+            # session_footer_string: str =  active_context.get_description(subset_includelist=['format_name', 'animal', 'exper_name', 'session_name'], separator=' | ') 
+            session_footer_string: str =  active_context.get_description(separator=' | ') 
+
+            if figure_title:
+                title_string: str = f"{display_fn_name}: {figure_title}"
+                # subtitle_string = '\n'.join([f'{active_config.str_for_display(is_2D)}'])
+                # header_text_obj = flexitext(text_formatter.left_margin, 0.9, f'<size:22><weight:bold>{title_string}</></>\n<size:10>{subtitle_string}</>', va="bottom", xycoords="figure fraction") # , wrap=False
+                formatted_title_str: str = f'<size:20><weight:bold>{title_string}</></>'
+                if subtitle_string is not None:
+                    formatted_title_str = formatted_title_str + f'\n<size:9>{subtitle_string}</>'
+
+                header_text_obj = flexitext(0.01, 0.85, formatted_title_str, va="bottom", xycoords="figure fraction") # , wrap=False
+                
+                complete_title_string: str = f"{title_string} - {session_footer_string}"
+                # complete_title_string: str = f"{complete_title_string} - {subtitle_string}"
+
+                window_title_string: str = complete_title_string
+
+                fig.canvas.manager.set_window_title(window_title_string) # sets the window's title
+            else:
+                header_text_obj = None
+
+            footer_text_obj = text_formatter.add_flexitext_context_footer(active_context=active_context) # flexitext((text_formatter.left_margin*0.1), (text_formatter.bottom_margin*0.25), text_formatter._build_footer_string(active_context=active_context), va="top", xycoords="figure fraction")
+
+
+            if ((_perform_write_to_file_callback is not None) and (active_display_context is not None)):
+                _perform_write_to_file_callback(active_display_context, fig)
+
+            graphics_output_dict['label_objects'] = {'header': header_text_obj, 'footer': footer_text_obj, 'formatter': text_formatter}
+            return graphics_output_dict
+
+
+        with mpl.rc_context({'figure.dpi': str(dpi), 'savefig.transparent': True, 'ps.fonttype': 42, 'figure.constrained_layout.use': (constrained_layout or False), 'figure.frameon': False, 'figure.figsize': size, }): # 'figure.figsize': (12.4, 4.8), 
+            # Create a FigureCollector instance
+            with FigureCollector(name=display_fn_name, base_context=active_display_context) as collector:
+
+                did_create_new_figure: bool = False
+                # Plot all 1D position variables:
+                if ax is None:
+                    fig, ax = plt.subplots()
+                    did_create_new_figure = True
+                else:
+                    fig = ax.figure
+                    did_create_new_figure = False
+                    
+                # Plot the position lines ____________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
+                combined_pos_df.plot(ax=ax, **combined_pos_df_plot_kwargs)
+                ax.set_title(title)
+                if did_create_new_figure:
+                    fig.canvas.manager.set_window_title(title)
+                
+                # Accessing the lines after plotting
+                position_lines_2D = ax.get_lines() # plt.Lines2D
+
+                ax.legend(loc='upper left', fontsize=8) # Move legend inside the plot, in the top-left corner
+                # ax.legend(loc='upper left', bbox_to_anchor=(1, 1)) # Move legend outside the plot
+                
+
+                ## Add grid_bin_bounds, track limits, and midpoint lines:
+                curr_config = owning_pipeline_reference.active_configs['maze_any']
+
+                grid_bin_bounds = curr_config.computation_config.pf_params.grid_bin_bounds # ((37.0773897438341, 250.69004399129707), (137.925447118083, 145.16448776601297))
+                # curr_config.computation_config.pf_params.grid_bin # (3.793023081021702, 1.607897707662558)
+                # loaded_track_limits = curr_config.active_session_config.loaded_track_limits
+
+                # curr_config.active_session_config.y_midpoint
+                
+                (long_notable_x_platform_positions, short_notable_x_platform_positions), (long_notable_y_platform_positions, short_notable_y_platform_positions) = NotableTrackPositions.init_notable_track_points_from_session_config(owning_pipeline_reference.sess.config)
+                
+                if is_x_axis:
+                    ## plot x-positions
+                    perform_add_1D_track_bounds_lines_kwargs = dict(long_notable_x_platform_positions=tuple(long_notable_x_platform_positions), short_notable_x_platform_positions=tuple(short_notable_x_platform_positions), is_vertical=False)
+                else:
+                    ## plot y-positions
+                    perform_add_1D_track_bounds_lines_kwargs = dict(long_notable_x_platform_positions=tuple(long_notable_y_platform_positions), short_notable_x_platform_positions=tuple(short_notable_y_platform_positions), is_vertical=False)
+                    
+                long_track_line_collection, short_track_line_collection = perform_add_1D_track_bounds_lines(**perform_add_1D_track_bounds_lines_kwargs, ax=ax)
+
+
+                # Plot REAL `grid_bin_bounds` ________________________________________________________________________________________ #
+                ((grid_bin_bounds_x0, grid_bin_bounds_x1), (grid_bin_bounds_y0, grid_bin_bounds_y1)) = grid_bin_bounds
+                if is_x_axis:
+                    ## horizontal lines:
+                    common_ax_bound_kwargs = dict(xmin=ax.get_xbound()[0], xmax=ax.get_xbound()[1])
+                else:
+                    # common_ax_bound_kwargs = dict(ymin=ax.get_ybound()[0], ymax=ax.get_ybound()[1]) 
+                    common_ax_bound_kwargs = dict(xmin=ax.get_xbound()[0], xmax=ax.get_xbound()[1])  ## y-axis along x (like a 1D plot) Mode
+
+                if is_x_axis:
+                    ## plot x-positions
+                    an_active_display_context = active_display_context.overwriting_context(axis='x')
+                    ## horizontal lines:
+                    ## midpoint line: dotted blue line centered in the bounds (along y)
+                    x_midpoint = curr_config.active_session_config.x_midpoint # 143.88489208633095
+                    midpoint_line_collection = ax.hlines(x_midpoint, label='x_midpoint', xmin=ax.get_xbound()[0], xmax=ax.get_xbound()[1], colors='#0000FFAA', linewidths=1.0, linestyles='dashed', zorder=-98) # matplotlib.collections.LineCollection midpoint_line_collection
+                    ax.text(ax.get_xbound()[1], (x_midpoint + const_line_text_label_y_offset), 'x_mid', ha='right', va='bottom', fontsize=8, color='#0000FFAA', zorder=-98) # Add right-aligned text label slightly above the hline
+                
+                    ## 2 lines corresponding to the x0 and x1 of the grid_bin_bounds:
+                    grid_bin_bounds_line_collection = ax.hlines([grid_bin_bounds_x0, grid_bin_bounds_x1], label='grid_bin_bounds - after - dark blue', **common_ax_bound_kwargs, colors='#2e2e20', linewidths=2.0, linestyles='solid', zorder=-98) # grid_bin_bounds_line_collection
+                    # _grid_bin_bound_labels_x_pos = (ax.get_xbound()[1] - const_line_text_label_x_offset)
+                    _grid_bin_bound_labels_x_pos: float = ax.get_xbound()[0] + ((ax.get_xbound()[1] - ax.get_xbound()[0])/2.0) # center point
+                    print(f'_grid_bin_bound_labels_x_pos: {_grid_bin_bound_labels_x_pos}')
+                    ax.text(_grid_bin_bound_labels_x_pos, (grid_bin_bounds_x0 - const_line_text_label_y_offset), 'grid_bin_bounds[x0]', ha='center', va='bottom', fontsize=9, color='#2e2d20', zorder=-97) # Add right-aligned text label slightly above the hline
+                    ax.text(_grid_bin_bound_labels_x_pos, (grid_bin_bounds_x1 + const_line_text_label_y_offset), 'grid_bin_bounds[x1]', ha='center', va='top', fontsize=9, color='#2e2d20', zorder=-97) # this will be the top (highest y-pos) line.
+                    graphics_output_dict = MatplotlibRenderPlots(name='_display_grid_bin_bounds_validation', figures=(fig,), axes=(ax,),
+                                                            plot_data={'position_lines_2D': position_lines_2D, 'midpoint_line_collection': midpoint_line_collection, 'grid_bin_bounds_line_collection': grid_bin_bounds_line_collection, 'long_track_line_collection': long_track_line_collection, 'short_track_line_collection': short_track_line_collection},
+                                                            context=an_active_display_context, saved_figures=[])
+                    graphics_output_dict = _subfn_apply_formatting_footer_and_etc(fig, figure_title=None, subtitle_string=None, graphics_output_dict=graphics_output_dict)
+                    collector.post_hoc_append(figs=[fig,], axes=ax, contexts=[an_active_display_context])
+
+                else:
+                    ## plot y-positions
+                    an_active_display_context = active_display_context.overwriting_context(axis='y')
+                    midpoint_line_collection = None
+                    # grid_bin_bounds_line_collection = None
+                    grid_bin_bounds_positions_list = [grid_bin_bounds_y0, grid_bin_bounds_y1]
+                    grid_bin_bounds_label_names_list = ['grid_bin_bounds[y0]', 'grid_bin_bounds[y1]']
+                    ## 2 lines corresponding to the x0 and x1 of the grid_bin_bounds:
+                    grid_bin_bounds_line_collection = ax.hlines(grid_bin_bounds_positions_list, label='grid_bin_bounds - after - dark blue', **common_ax_bound_kwargs, colors='#2e2e20', linewidths=2.0, linestyles='solid', zorder=-98) # grid_bin_bounds_line_collection
+                    # _grid_bin_bound_labels_x_pos = (ax.get_xbound()[1] - const_line_text_label_x_offset)
+                    _grid_bin_bound_labels_x_pos: float = ax.get_xbound()[0] + ((ax.get_xbound()[1] - ax.get_xbound()[0])/2.0) # center point
+                    # print(f'_grid_bin_bound_labels_y_pos: {_grid_bin_bound_labels_y_pos}')
+                    # ax.text(_grid_bin_bound_labels_y_pos, (grid_bin_bounds_y0 - const_line_text_label_y_offset), 'grid_bin_bounds[x0]', ha='center', va='bottom', fontsize=9, color='#2e2d20', zorder=-97) # Add right-aligned text label slightly above the hline
+                    # ax.text(_grid_bin_bound_labels_y_pos, (grid_bin_bounds_x1 + const_line_text_label_y_offset), 'grid_bin_bounds[x1]', ha='center', va='top', fontsize=9, color='#2e2d20', zorder=-97) # this will be the top (highest y-pos) line.	
+                    # Iterate through the hlines in the LineCollection and add labels
+                    assert len(grid_bin_bounds_label_names_list) == len(grid_bin_bounds_positions_list)
+                    for pos, a_txt_label in zip(grid_bin_bounds_positions_list, grid_bin_bounds_label_names_list):
+                        # ax.text(ax.get_xbound()[1], (pos + const_line_text_label_y_offset), a_txt_label, color='#2e2d20', fontsize=9, ha='center', va='center', zorder=-97)
+                        ax.text(_grid_bin_bound_labels_x_pos, (pos + const_line_text_label_y_offset), a_txt_label, color='#2e2d20', fontsize=9, ha='center', va='center', zorder=-97)
+
+                    graphics_output_dict = MatplotlibRenderPlots(name='_display_grid_bin_bounds_validation', figures=(fig,), axes=(ax,),
+                                                            plot_data={'position_lines_2D': position_lines_2D, 'midpoint_line_collection': midpoint_line_collection, 'grid_bin_bounds_line_collection': grid_bin_bounds_line_collection, 'long_track_line_collection': long_track_line_collection, 'short_track_line_collection': short_track_line_collection},
+                                                            context=an_active_display_context, saved_figures=[])
+                    graphics_output_dict = _subfn_apply_formatting_footer_and_etc(fig, figure_title=None, subtitle_string=None, graphics_output_dict=graphics_output_dict)
+                    collector.post_hoc_append(figs=[fig,], axes=ax, contexts=[an_active_display_context])
+
+        ## END with mpl.rc_context({'figure.dpi': '...
+
+        graphics_output_dict['collector'] = collector
+
+
         # Show legend
         # ax.legend()
 
-        if save_figure:
-            saved_figure_paths = owning_pipeline_reference.output_figure(final_context, fig)
-        else:
-            saved_figure_paths = []
+        # if save_figure:
+        #     saved_figure_paths = owning_pipeline_reference.output_figure(final_context, fig)
+        # else:
+        #     saved_figure_paths = []
 
-        graphics_output_dict = MatplotlibRenderPlots(name='_display_grid_bin_bounds_validation', figures=(fig,), axes=(ax,),
-                                                plot_data={'position_lines_2D': position_lines_2D, 'midpoint_line_collection': midpoint_line_collection, 'grid_bin_bounds_line_collection': grid_bin_bounds_line_collection, 'long_track_line_collection': long_track_line_collection, 'short_track_line_collection': short_track_line_collection},
-                                                context=final_context, saved_figures=[])
+        # # Show legend
+        # # ax.legend()
+
+        # if save_figure:
+        #     saved_figure_paths = owning_pipeline_reference.output_figure(final_context, fig)
+        # else:
+        #     saved_figure_paths = []
+
+        # graphics_output_dict = MatplotlibRenderPlots(name='_display_grid_bin_bounds_validation', figures=(fig,), axes=(ax,),
+        #                                         plot_data={'position_lines_2D': position_lines_2D, 'midpoint_line_collection': midpoint_line_collection, 'grid_bin_bounds_line_collection': grid_bin_bounds_line_collection, 'long_track_line_collection': long_track_line_collection, 'short_track_line_collection': short_track_line_collection},
+        #                                         context=final_context, saved_figures=[])
+
+
         return graphics_output_dict
  
 
@@ -324,7 +481,6 @@ class MultiContextComparingDisplayFunctions(AllFunctionEnumeratingMixin, metacla
             import matplotlib as mpl
             import matplotlib.pyplot as plt
             from flexitext import flexitext ## flexitext for formatted matplotlib text
-
             from pyphocorehelpers.DataStructure.RenderPlots.MatplotLibRenderPlots import FigureCollector
             from neuropy.utils.matplotlib_helpers import FormattedFigureText
 
