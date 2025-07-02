@@ -1501,7 +1501,7 @@ def copy_session_folder_files_to_target_dir(good_session_concrete_folders, targe
 
 
 @function_attributes(short_name=None, tags=['batch', 'collect', 'figures'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-07-02 15:05', related_items=[])
-def copy_batch_output_figures_to_common_figures_dir(generate_figures_script_paths: List[Path], common_destination: Path = Path(r"K:/scratch/collected_figures").resolve(), curr_gen_scripts_path: Path = Path(r'K:/scratch/gen_scripts'), batch_export_folder_date:str='2025-07-02', append_session_name_as_suffix: bool = True, append_session_name_as_prefix: bool = False) -> List[Path]:
+def copy_batch_output_figures_to_common_figures_dir(generate_figures_script_paths: List[Path], common_destination: Path = Path(r"K:/scratch/collected_figures").resolve(), previous_gen_scripts_path: Path = Path('C:\\Users\\pho\\repos\\Spike3DWorkEnv\\Spike3D\\output\\gen_scripts'), curr_gen_scripts_path: Optional[Path] = Path(r'K:/scratch/gen_scripts'), batch_export_folder_date:str='2025-07-02', append_session_name_as_suffix: bool = True, append_session_name_as_prefix: bool = False) -> List[Path]:
     """ copies each session's gen_output figures to a common figures folder
 
     Should be used after running the figures phase of batch output to collect the figures from greatlakes.
@@ -1556,8 +1556,14 @@ def copy_batch_output_figures_to_common_figures_dir(generate_figures_script_path
     # ==================================================================================================================================================================================================================================================================================== #
     # BEGIN FUNCTION BODY                                                                                                                                                                                                                                                                  #
     # ==================================================================================================================================================================================================================================================================================== #
+    if curr_gen_scripts_path is None:
+        curr_gen_scripts_path = previous_gen_scripts_path ## assumed to be the same
+        gen_scripts_sess_paths = [curr_gen_scripts_path.joinpath(Path(k).parent.relative_to(previous_gen_scripts_path)).resolve() for k in generate_figures_script_paths]
+    else:
+        Assert.path_exists(curr_gen_scripts_path)
 
-    gen_scripts_sess_paths = [curr_gen_scripts_path.joinpath(Path(k).parent.relative_to(Path('C:\\Users\\pho\\repos\\Spike3DWorkEnv\\Spike3D\\output\\gen_scripts'))).resolve() for k in generate_figures_script_paths]
+
+        gen_scripts_sess_paths = [curr_gen_scripts_path.joinpath(Path(k).parent.relative_to(previous_gen_scripts_path)).resolve() for k in generate_figures_script_paths]
     gen_scripts_sess_paths = [v for v in gen_scripts_sess_paths if v.exists()]
     gen_scripts_sess_path_dict = {v.name.removeprefix('run_'):v for v in gen_scripts_sess_paths}
     gen_scripts_sess_paths
