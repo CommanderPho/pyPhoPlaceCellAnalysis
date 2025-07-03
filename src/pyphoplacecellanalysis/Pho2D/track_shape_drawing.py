@@ -1937,7 +1937,7 @@ class TrackRemappingDiagramFigure:
             # considerable_remapping_emphasis_color
             assert unit_id_colors_map is None, f"will be overridden!"
             # unit_id_colors_map = dict(zip(a_dir_decoder_aclu_MAX_peak_maps_df.index.to_numpy(), a_dir_decoder_aclu_MAX_peak_maps_df['has_considerable_remapping'].to_numpy()))
-            unit_id_colors_map = dict(zip(a_dir_decoder_aclu_MAX_peak_maps_df.index.to_numpy(), a_dir_decoder_aclu_MAX_peak_maps_df['color'].to_numpy()))            
+            unit_id_colors_map = dict(zip(a_dir_decoder_aclu_MAX_peak_maps_df.index.to_numpy(), [mcolors.to_rgba(v) for v in a_dir_decoder_aclu_MAX_peak_maps_df['color'].to_numpy()]))            
             # OUTPUTS: unit_id_colors_map
             
 
