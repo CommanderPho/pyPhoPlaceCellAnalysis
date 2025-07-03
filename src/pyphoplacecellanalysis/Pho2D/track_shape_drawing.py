@@ -1834,7 +1834,7 @@ class TrackRemappingDiagramFigure:
             if isinstance(color_iterable, np.ndarray) and color_iterable.dtype != np.object_:
                 # If color is a numpy array (not of object type), use boolean indexing
                 return color_iterable[included_indicies]
-            elif isinstance(color_iterable, list) and (all(isinstance(i, (int, np.int_)) for i in included_indicies)):
+            elif isinstance(color_iterable, list) and (all([isinstance(i, (int, np.integer, tuple, list)) for i in included_indicies])):
                 # If color is a list and is_aclu_in_both contains integer indices
                 return [color_iterable[i] for i in included_indicies]
             elif isinstance(color_iterable, list) and all([isinstance(i, (bool, np.bool_)) for i in included_indicies]):
@@ -1937,7 +1937,7 @@ class TrackRemappingDiagramFigure:
             # considerable_remapping_emphasis_color
             assert unit_id_colors_map is None, f"will be overridden!"
             # unit_id_colors_map = dict(zip(a_dir_decoder_aclu_MAX_peak_maps_df.index.to_numpy(), a_dir_decoder_aclu_MAX_peak_maps_df['has_considerable_remapping'].to_numpy()))
-            unit_id_colors_map = dict(zip(a_dir_decoder_aclu_MAX_peak_maps_df.index.to_numpy(), [mcolors.to_rgba(v) for v in a_dir_decoder_aclu_MAX_peak_maps_df['color'].to_numpy()]))            
+            unit_id_colors_map = dict(zip(a_dir_decoder_aclu_MAX_peak_maps_df.index.to_numpy().astype(int), [mcolors.to_rgba(v) for v in a_dir_decoder_aclu_MAX_peak_maps_df['color'].to_numpy()]))            
             # OUTPUTS: unit_id_colors_map
             
 
