@@ -1686,7 +1686,6 @@ def _perform_plot_pre_post_delta_scatter(data_context: IdentifyingContext, conca
     if additional_fig_layout_kwargs is None:
         additional_fig_layout_kwargs = {}        
 
-    histogram_bins = 25
     num_sessions = 1
 
     num_events: int = len(concatenated_ripple_df)
@@ -2983,13 +2982,18 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
                 df_filter.hover_posterior_preview_figure_widget.add_heatmap(z=a_heatmap_img, showscale=False, name='selected_posterior', )
             ## END def _plot_hoverred_heatmap_preview_post....
 
+
             # df_filter.output_widget.clear_output(wait=True)
             active_plot_df_name: str = df_filter.active_plot_df_name
-            active_plot_df: pd.DataFrame = df_filter.active_plot_df
+            active_plot_df_full: pd.DataFrame = df_filter.active_plot_df
+            # Get sampled data for scatter plot
+            max_scatter_points: int = kwargs.get('max_scatter_points', 16) # None for no limit
+            sampling_method: str = kwargs.get('sampling_method', 'random')
+            can_downsample: bool = (max_scatter_points and (sampling_method is not None))
+
             plot_variable_name: str = df_filter.active_plot_variable_name
-            
-            assert plot_variable_name in active_plot_df.columns, f"plot_variable_name: '{plot_variable_name}' is not present in active_plot_df.columns! Cannot plot!"
-            
+            assert plot_variable_name in active_plot_df_full.columns, f"plot_variable_name: '{plot_variable_name}' is not present in active_plot_df.columns! Cannot plot!"
+
             if len(df_filter.time_bin_size) > 2:
                 non_selected_options = df_filter.time_bin_size[1:] # all but the first
                 legend_groups_to_hide = (deepcopy(non_selected_options))
@@ -3001,9 +3005,24 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
             # extra_plot_kwargs = deepcopy(extra_plot_kwargs)
             # active_plot_kwargs = extra_plot_kwargs | {'legend_groups_to_hide': legend_groups_to_hide}
             # active_plot_kwargs = active_plot_kwargs | kwargs
-            active_plot_kwargs = (extra_plot_kwargs | {'legend_groups_to_hide': legend_groups_to_hide} | kwargs) 
+            # active_plot_kwargs = (extra_plot_kwargs | {'legend_groups_to_hide': legend_groups_to_hide} | kwargs) 
+
+            # Pass both full and sampled data to plotting function
+            active_plot_kwargs = (extra_plot_kwargs | {
+                'legend_groups_to_hide': legend_groups_to_hide,
+                'separate_scatter_df': None,  # For scatter plot
+            } | kwargs)
+
+            if can_downsample and (len(active_plot_df_full) > max_scatter_points):
+                print(f'WARN: max_scatter_points: {max_scatter_points} < actual scatter points ({len(active_plot_df_full)}). DOWNSAMPLING TO {max_scatter_points} will be used.')
+                active_plot_df_sampled: pd.DataFrame = df_filter.get_sampled_plot_data(max_points=max_scatter_points, sampling_method=sampling_method)
+                active_plot_kwargs['separate_scatter_df'] = active_plot_df_sampled
+
             if df_filter.is_figure_widget_mode:
-                fig, new_fig_context, _extras_output_dict, figure_out_paths = _new_perform_plot_pre_post_delta_scatter_with_embedded_context(concatenated_ripple_df=deepcopy(active_plot_df), is_dark_mode=False, should_save=should_save, extant_figure=df_filter.figure_widget,
+                fig, new_fig_context, _extras_output_dict, figure_out_paths = _new_perform_plot_pre_post_delta_scatter_with_embedded_context(
+                                                                                                                                        concatenated_ripple_df=deepcopy(active_plot_df_full),  # Keep full data as main input
+                                                                                                                                        # concatenated_ripple_df=deepcopy(active_plot_df),
+                                                                                                                                        is_dark_mode=False, should_save=should_save, extant_figure=df_filter.figure_widget,
                                                                                                                                         variable_name=plot_variable_name, **active_plot_kwargs) # , enable_custom_widget_buttons=True
                 
 
@@ -3024,7 +3043,7 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
                         
                         hovertemplate="<b>sess:</b> %{customdata[0]} | <b>replay_name:</b> %{customdata[1]} | <b>time_bin_size:</b> %{customdata[2]}<br>"
                                     "<b>start:</b> %{customdata[3]}<br>",
-                        customdata=active_plot_df[["session_name", "custom_replay_name", "time_bin_size", "start", "duration"]].values,
+                        customdata=active_plot_df_full[["session_name", "custom_replay_name", "time_bin_size", "start", "duration"]].values,
                         hoverlabel=dict(bgcolor="rgba(255, 255, 255, 0.4)", font=dict(color="black")),
                     )
 

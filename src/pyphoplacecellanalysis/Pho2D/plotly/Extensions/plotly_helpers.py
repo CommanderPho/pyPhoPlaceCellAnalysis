@@ -432,7 +432,7 @@ def plotly_pre_post_delta_scatter(data_results_df: pd.DataFrame, data_context: O
                                    forced_range_y=[0.0, 1.0], time_delta_tuple=None, is_dark_mode: bool = True,
                                    figure_sup_huge_title_text: str=None, is_top_supertitle: bool = False, main_title: Optional[str]=None, figure_footer_text: Optional[str]=None, is_publication_ready_figure: bool=False,
                                    extant_figure=None, # an existing plotly figure
-                                    curr_fig_width=1800,
+                                    curr_fig_width=1800, separate_scatter_df: Optional[pd.DataFrame]=None,
                                     **kwargs):
     """ Plots a scatter plot of a variable pre/post delta, with a histogram on each end corresponding to the pre/post delta distribution
 
@@ -459,7 +459,10 @@ def plotly_pre_post_delta_scatter(data_results_df: pd.DataFrame, data_context: O
     import plotly.subplots as sp
     import plotly.express as px
     import plotly.graph_objs as go
-    import contextlib  # For contextlib.nullcontext()
+
+    # Use separate datasets if provided (for downsampling)
+    if separate_scatter_df is None:
+        separate_scatter_df = data_results_df
 
     data_results_df = data_results_df.copy()
     use_latex_labels: bool = False
@@ -682,7 +685,7 @@ def plotly_pre_post_delta_scatter(data_results_df: pd.DataFrame, data_context: O
             )
     else:
         assert px_scatter_kwargs is not None
-        _tmp_scatter_fig = px.scatter(data_results_df, **(common_plot_kwargs | px_scatter_kwargs))
+        _tmp_scatter_fig = px.scatter(separate_scatter_df, **(common_plot_kwargs | px_scatter_kwargs))
         for i, a_trace in enumerate(_tmp_scatter_fig.data):
             a_trace.marker.line.width = 0 
             a_trace.marker.opacity = 0.5
