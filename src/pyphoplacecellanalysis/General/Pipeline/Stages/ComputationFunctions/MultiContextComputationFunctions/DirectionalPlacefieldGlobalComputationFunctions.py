@@ -7824,6 +7824,18 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
 
                         ## Occupancy:
                         occupancy_ax = a_decoder.pf.plot_occupancy(fig=a_subfigure, ax=axd["ax_pf_occupancy"], active_context=active_display_ctx, use_flexitext_titles=False, skip_update_titles=True, **({} | plot_kwargs))[-1]
+                        occupancy_ax.spines['top'].set_visible(False)
+                        occupancy_ax.spines['right'].set_visible(False)
+                        # You can also set 'left' and 'bottom' to False if desired
+                        # occupancy_ax.set_frame_on(False) # Hides all four spines (top, bottom, left, right)
+
+                        plt.tick_params(
+                            axis='x',          # changes apply to the x-axis
+                            which='both',      # both major and minor ticks are affected
+                            bottom=False,      # ticks along the bottom edge are off
+                            top=False,         # ticks along the top edge are off
+                            labelbottom=False) # labels along the bottom edge are off
+
                         # display_outputs[a_name] =                  
                         # plot_variable_name = ({'plot_variable': None} | kwargs)
                         plot_variable_name = plot_kwargs.get('plot_variable', enumTuningMap2DPlotVariables.OCCUPANCY).name
