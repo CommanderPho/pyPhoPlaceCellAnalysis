@@ -2894,7 +2894,7 @@ def plot_rank_order_histograms(rank_order_results: RankOrderComputationsContaine
     if active_context is not None:
             display_context = active_context.adding_context('display_fn', display_fn_name='plot_rank_order_histograms')
             
-    with mpl.rc_context({'figure.figsize': (8.4, 4.8), 'figure.dpi': '220', 'savefig.transparent': True, 'ps.fonttype': 42, }):
+    with mpl.rc_context({'figure.figsize': (8.4, 4.8), 'figure.dpi': '220', 'savefig.transparent': True, 'ps.fonttype': 42, 'pdf.fonttype': 42, }):
         # Create a FigureCollector instance
         with FigureCollector(name='plot_rank_order_histograms', base_context=display_context) as collector:
 
@@ -3118,7 +3118,7 @@ def plot_quantile_diffs(merged_complete_epoch_stats_df, t_start=None, t_split=10
     if active_context is not None:
         display_context = active_context.adding_context('display_fn', display_fn_name='plot_quantile_diffs')
         
-    with mpl.rc_context({'figure.figsize': (12.4, 4.8), 'figure.dpi': '220', 'savefig.transparent': True, 'ps.fonttype': 42, }):
+    with mpl.rc_context({'figure.figsize': (12.4, 4.8), 'figure.dpi': '220', 'savefig.transparent': True, 'ps.fonttype': 42, 'pdf.fonttype': 42, }):
         # Create a FigureCollector instance
         with FigureCollector(name='plot_quantile_diffs', base_context=display_context) as collector:
 
