@@ -1651,7 +1651,7 @@ def _perform_dual_hist_plot(grainularity_desc: str, laps_df: pd.DataFrame, rippl
 
 @function_attributes(short_name=None, tags=['MAIN', 'CRITICAL', 'FINAL', 'plotly', 'scatter', 'histogram', 'publication'], input_requires=[], output_provides=[], uses=['plotly_pre_post_delta_scatter'], used_by=[], creation_date='2024-10-23 20:04', related_items=[])
 def _perform_plot_pre_post_delta_scatter(data_context: IdentifyingContext, concatenated_ripple_df: pd.DataFrame, time_delta_tuple: Tuple[float, float, float], fig_size_kwargs: Dict, save_plotly: Callable, is_dark_mode: bool=False, enable_custom_widget_buttons:bool=True,
-                                          extant_figure=None, custom_output_widget=None, legend_groups_to_hide: Optional[List[str]]=None, should_save: bool = True, variable_name = 'P_Short', y_baseline_level: float = 0.5, additional_fig_layout_kwargs: Dict=None, is_publication_ready_figure: bool=False, **kwargs):
+                                          extant_figure=None, custom_output_widget=None, legend_groups_to_hide: Optional[List[str]]=None, should_save: bool = True, variable_name = 'P_Short', y_baseline_level: float = 0.5, additional_fig_layout_kwargs: Dict=None, is_publication_ready_figure: bool=False, histogram_bins = 25, **kwargs):
     """ plots the stacked histograms for both laps and ripples
 
     Usage:
