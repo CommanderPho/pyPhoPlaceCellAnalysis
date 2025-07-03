@@ -718,11 +718,18 @@ class PaperFigureTwo(SerializedAttributesAllowBlockSpecifyingClass):
         
     
     @classmethod
-    def _build_formatted_title_string(cls, epochs_name) -> str:
+    def _build_formatted_title_string(cls, epochs_name, prepare_for_publication: bool = False) -> str:
         """ buidls the two line colored string that is passed into `flexitext`.
         """
-        return (f"<size:22><weight:bold>{epochs_name}</> Firing Rates\n"
-                "<size:14>for the "
+        if not prepare_for_publication:
+            title_font_size: int = 22
+            subtitle_font_size: int = 14
+        else:
+            title_font_size: int = 9*2
+            subtitle_font_size: int = 7*2
+
+        return (f"<size:{title_font_size}><weight:bold>{epochs_name}</> Firing Rates\n"
+                f"<size:{subtitle_font_size}>for the "
                 "<color:royalblue, weight:bold>Long</>/<color:crimson, weight:bold>Short</> eXclusive Cells on each track</></>"
                 )
 
@@ -782,15 +789,13 @@ class PaperFigureTwo(SerializedAttributesAllowBlockSpecifyingClass):
         # Hide the right and top spines (box components)
         ax.spines[['right', 'top']].set_visible(False)
         
-        
-        
         title_text_obj = flexitext(text_formatter.left_margin, text_formatter.top_margin,
-                                cls._build_formatted_title_string(epochs_name=title), va="bottom", xycoords="figure fraction")
+                                cls._build_formatted_title_string(epochs_name=title, prepare_for_publication=prepare_for_publication), va="bottom", xycoords="figure fraction")
         text_objects = {'title': title_text_obj}
         
         if not prepare_for_publication:
             footer_text_obj = flexitext(text_formatter.left_margin * 0.1, text_formatter.bottom_margin * 0.25,
-                                        text_formatter._build_footer_string(active_context=active_context), va="top", xycoords="figure fraction")
+                                        text_formatter._build_footer_string(active_context=active_context, prepare_for_publication=prepare_for_publication), va="top", xycoords="figure fraction")
             text_objects['footer'] = footer_text_obj
             
 
@@ -2727,7 +2732,67 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
     # ==================================================================================================================== #
     # Plot Updating Functions                                                                                              #
     # ==================================================================================================================== #
+    @function_attributes(short_name=None, tags=['performance', 'sampling'], input_requires=[], output_provides=[], uses=['_density_based_sampling'], used_by=[], creation_date='2025-01-27 14:00', related_items=[])
+    def get_sampled_plot_data(self, max_points: int = 5000, sampling_method: str = 'random') -> pd.DataFrame:
+        """
+        Returns a downsampled version of the active plot dataframe for scatter plot rendering.
 
+        Args:
+            max_points: Maximum number of points to display in scatter plot
+            sampling_method: 'random', 'systematic', or 'density_based'
+
+        Returns:
+            Sampled dataframe for scatter plot display
+        """
+        df = self.active_plot_df
+
+        if len(df) <= max_points:
+            return df  # No need to downsample
+
+        if sampling_method == 'random':
+            # Random sampling - preserves distribution
+            return df.sample(n=max_points, random_state=42)
+
+        elif sampling_method == 'systematic':
+            # Systematic sampling - every nth point
+            step = len(df) // max_points
+            return df.iloc[::step].head(max_points)
+
+        elif sampling_method == 'density_based':
+            # More sophisticated: sample more points in sparse areas
+            return self._density_based_sampling(df, max_points)
+
+        else:
+            raise ValueError(f"Unknown sampling method: {sampling_method}")
+
+    @function_attributes(short_name=None, tags=['private'], input_requires=[], output_provides=[], uses=[], used_by=['get_sampled_plot_data'], creation_date='2025-07-03 17:31', related_items=[])
+    def _density_based_sampling(self, df: pd.DataFrame, max_points: int) -> pd.DataFrame:
+        """Density-based sampling: more points in sparse areas, fewer in dense areas."""
+        from sklearn.neighbors import NearestNeighbors
+
+        # Use x,y coordinates for density estimation
+        coords = df[['delta_aligned_start_t', self.active_plot_variable_name]].values
+
+        # Find k-nearest neighbors to estimate density
+        k = min(50, len(df) // 10)  # Adaptive k
+        nbrs = NearestNeighbors(n_neighbors=k).fit(coords)
+        distances, _ = nbrs.kneighbors(coords)
+
+        # Inverse density as sampling weight (sparse areas get higher weight)
+        density_weights = 1.0 / (distances.mean(axis=1) + 1e-10)
+
+        # Sample based on inverse density
+        sample_probs = density_weights / density_weights.sum()
+        sampled_indices = np.random.choice(
+            len(df), 
+            size=max_points, 
+            replace=False, 
+            p=sample_probs
+        )
+        return df.iloc[sampled_indices]
+
+
+    @function_attributes(short_name=None, tags=['interactivity'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-07-03 17:31', related_items=[])
     def on_click_scatter_points(self, trace, points, selector):
         allow_single_selection_only: bool = False
         replace_selected_points: bool = True
