@@ -847,7 +847,7 @@ def plotly_pre_post_delta_scatter(data_results_df: pd.DataFrame, data_context: O
 
 
 @function_attributes(short_name=None, tags=['plotly', 'helper', 'epoch', 'track'], input_requires=[], output_provides=[], uses=[], used_by=['_helper_build_figure'], creation_date='2024-03-01 13:58', related_items=[])
-def plotly_helper_add_epoch_shapes(fig, scatter_column_index: int, t_start: float, t_split:float, t_end: float, is_dark_mode: bool = True, total_rows:int=1):
+def plotly_helper_add_epoch_shapes(fig, scatter_column_index: int, t_start: float, t_split:float, t_end: float, is_dark_mode: bool = True, total_rows:int=1, epoch_text_labels_kwargs=None):
     """ adds shapes representing the epochs to the scatter plot at index scatter_column_index
 
         from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import plotly_helper_add_epoch_shapes
@@ -856,6 +856,9 @@ def plotly_helper_add_epoch_shapes(fig, scatter_column_index: int, t_start: floa
 
     """
     from pyphoplacecellanalysis.General.Model.Configs.LongShortDisplayConfig import LongShortDisplayConfigManager
+
+    # epoch_text_labels_kwargs = dict(size=9, family="Arial") | (epoch_text_labels_kwargs or {}) #TODO 2025-07-03 19:05: - [ ] Corresponding to an exported size of 6.75pt
+    epoch_text_labels_kwargs = dict(size=6.666666666666666, family="Arial") | (epoch_text_labels_kwargs or {}) #TODO 2025-07-03 19:05: - [ ] Corresponding to an exported size of 5pt
 
     _extras_output_dict = {}
     ## Get the track configs for the colors:
@@ -886,8 +889,8 @@ def plotly_helper_add_epoch_shapes(fig, scatter_column_index: int, t_start: floa
         
         # fig.add_hrect(y0=0.9, y1=2.6, line_width=0, fillcolor="red", opacity=0.2)
 
-        fig.add_vrect(x0=t_start, x1=t_split, label=dict(text="Long", textposition="top center", font=dict(size=20, family="Times New Roman"), ), layer="below", opacity=0.5, line_width=1, **long_epoch_kwargs, **row_column_kwargs, name=f"long_region_{row}") # , fillcolor="green", opacity=0.25
-        fig.add_vrect(x0=t_split, x1=t_end, label=dict(text="Short", textposition="top center", font=dict(size=20, family="Times New Roman"), ), layer="below", opacity=0.5, line_width=1, **short_epoch_kwargs, **row_column_kwargs, name=f"short_region_{row}")
+        fig.add_vrect(x0=t_start, x1=t_split, label=dict(text="Long", textposition="top center", font=epoch_text_labels_kwargs, ), layer="below", opacity=0.5, line_width=1, **long_epoch_kwargs, **row_column_kwargs, name=f"long_region_{row}") # , fillcolor="green", opacity=0.25
+        fig.add_vrect(x0=t_split, x1=t_end, label=dict(text="Short", textposition="top center", font=epoch_text_labels_kwargs, ), layer="below", opacity=0.5, line_width=1, **short_epoch_kwargs, **row_column_kwargs, name=f"short_region_{row}")
         
         # _extras_output_dict[f"long_region_{row}"] = blue_shape
         # _extras_output_dict[f"short_region_{row}"] = red_shape

@@ -1716,11 +1716,18 @@ def _perform_plot_pre_post_delta_scatter(data_context: IdentifyingContext, conca
         px_scatter_kwargs['color'] = "time_bin_size"
     
     # Controls scatterplot point size
-    if 'dummy_column_for_size' not in concatenated_ripple_df.columns:
-        concatenated_ripple_df['dummy_column_for_size'] = 2.0
+    if not is_publication_ready_figure:
+        if 'dummy_column_for_size' not in concatenated_ripple_df.columns:
+            concatenated_ripple_df['dummy_column_for_size'] = 2.0
+                        
+        px_scatter_kwargs['size'] = "dummy_column_for_size"
+        px_scatter_kwargs.setdefault('size_max', 5) # don't override tho
         
-    px_scatter_kwargs['size'] = "dummy_column_for_size"
-    px_scatter_kwargs.setdefault('size_max', 5) # don't override tho
+    else:
+        concatenated_ripple_df['dummy_column_for_size'] = 0.5
+        px_scatter_kwargs['size'] = "dummy_column_for_size"
+        px_scatter_kwargs.setdefault('size_max', 1) # don't override tho
+        # px_scatter_kwargs
     
     # px_scatter_kwargs['marker'] = dict(line=dict(width=0))
     # Remove the white border around scatter points by setting line width to 0
@@ -2938,13 +2945,21 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
         legend_groups_to_hide=[0.05]
         
         """
+        is_publication_ready_figure: bool = extra_plot_kwargs.get('is_publication_ready_figure', True)
         # fig_size_kwargs = {'width': 1650, 'height': 480}
         # fig_size_kwargs = {'width': resolution_multiplier*1650, 'height': resolution_multiplier*480}
         ## set up figure size
-        fig_size_kwargs = {'width': (resolution_multiplier * 1800), 'height': (resolution_multiplier*480)}
-        # fig_size_kwargs = {'width': (resolution_multiplier * 1080), 'height': resolution_multiplier*480}
-        
-        
+        if not is_publication_ready_figure:
+            fig_size_kwargs = {'width': (resolution_multiplier * 1800), 'height': (resolution_multiplier*480)}
+            # fig_size_kwargs = {'width': (resolution_multiplier * 792), 'height': (resolution_multiplier*(792/1800)*480)}
+            
+        else:        
+            # fig_size_kwargs = {'width': 474, 'height': 126}
+            # fig_size_kwargs = {'width': (resolution_multiplier * 1080), 'height': resolution_multiplier*480}
+            fig_size_kwargs = {'width': (resolution_multiplier * 792), 'height': (resolution_multiplier * 320)}
+            # fig_size_kwargs = {'width': 792}  # 8.25 inches * 96 DPI
+            # fig_size_kwargs = {'width': 2475}  # 8.25 inches * 300 DPI
+
 
         is_dark_mode, template = PlotlyHelpers.get_plotly_template(is_dark_mode=False, is_publication=True)
         pio.templates.default = template

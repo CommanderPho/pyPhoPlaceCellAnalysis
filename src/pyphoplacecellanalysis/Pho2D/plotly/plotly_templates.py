@@ -66,18 +66,20 @@ pio.templates["pho_poster_light"] = go.layout.Template(
 # titles: 23px, axes: 9.2, insets: 6.7
 text_sizes_pts = {'titles': 9, 'axes': 7, 'insets': 5}
 
-def points_to_pixels(pts: float, dpi: float=300.0) -> float:
-    """ 
-    `Pixеls (px) = Points (pt) * (DPI / 72)`
-    """
-    return float(pts) * (float(dpi) / 72.0)
+# def points_to_pixels(pts: float, dpi: float=300.0) -> float:
+#     """ 
+#     `Pixеls (px) = Points (pt) * (DPI / 72)`
+#     """
+#     return float(pts) * (float(dpi) / 72.0)
 
-text_sizes_px = {'titles': 23, 'axes': 9.2, 'insets': 6.7}
+# text_sizes_px = {'titles': 23, 'axes': 9.2, 'insets': 6.7} #2025-07-03 6pm - original sizes
 # text_sizes_px = {k:points_to_pixels(v) for k, v in text_sizes_pts.items()}
 # text_sizes_px = {'titles': 38, 'axes': 29, 'insets': 20}
 # text_sizes_px = {'titles': 38, 'axes': 29, 'insets': 20}
 
 
+#TODO 2025-07-03 19:00: - [ ] NEW
+text_sizes_px = {'titles': 17.25, 'axes': 9.33333333333333, 'insets': 6.7}
 
 
 
