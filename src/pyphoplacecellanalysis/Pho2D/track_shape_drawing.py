@@ -1779,7 +1779,7 @@ class TrackRemappingDiagramFigure:
     @function_attributes(short_name=None, tags=['matplotlib', 'track', 'remapping', 'good', 'working'], input_requires=[], output_provides=[], uses=['_plot_helper_add_track_shapes'], used_by=['plot_bidirectional_track_remapping_diagram'], creation_date='2024-02-22 11:12', related_items=[])
     @classmethod
     def _plot_track_remapping_diagram(cls, a_dir_decoder_aclu_MAX_peak_maps_df: pd.DataFrame, grid_bin_bounds: Union[Tuple[Tuple[float, float], Tuple[float, float]], BoundsRect], long_column_name:str='long_LR', short_column_name:str='short_LR', long_y_column_name:Optional[str]=None, short_y_column_name:Optional[str]=None, ax=None, defer_render: bool=False, enable_interactivity:bool=True, draw_point_aclu_labels:bool=False, enable_adjust_overlapping_text: bool=False, is_dark_mode: bool = True, aclus_y_offset_mode:AclusYOffsetMode=AclusYOffsetMode.CountBased, debug_print=False, 
-                                    extant_plot_container: Optional[GenericMatplotlibContainer]=None, considerable_remapping_emphasis_color='orange', **kwargs):
+                                    extant_plot_container: Optional[GenericMatplotlibContainer]=None, considerable_remapping_emphasis_color=None, **kwargs):
         """ Plots a single figure containing the long and short track outlines (flattened, overlayed) with single points on each corresponding to the peak location in 1D
 
         🔝🖼️🎨
@@ -2532,7 +2532,7 @@ class TrackRemappingDiagramFigure:
 
     @function_attributes(short_name=None, tags=['figure', 'publication', 'figure1'], input_requires=[], output_provides=[], uses=['_plot_track_remapping_diagram', 'perform_update_title_subtitle', 'build_or_reuse_figure'], used_by=[], creation_date='2025-06-16 20:44', related_items=[])
     @classmethod
-    def plot_publication_bidirectional_track_remapping_diagram(cls, all_neuron_stats_table, use_considerable_remapping_cells_only: bool=False, use_pf2D_peaks: bool = False, **kwargs):
+    def plot_publication_bidirectional_track_remapping_diagram(cls, all_neuron_stats_table, use_considerable_remapping_cells_only: bool=False, use_pf2D_peaks: bool = False, considerable_remapping_emphasis_color=None, **kwargs):
         """ Plots the neuron remapping diagram
                 
         from pyphoplacecellanalysis.SpecificResults.AcrossSessionResults import AcrossSessionsResults # for .build_neuron_identities_df_for_CSV
@@ -2656,6 +2656,7 @@ class TrackRemappingDiagramFigure:
         ## Make a single figure for both LR/RL remapping cells:
         kwargs = dict(is_dark_mode=False, enable_interactivity=False, defer_render=True,
                     aclus_y_offset_mode=AclusYOffsetMode.RandomJitter,
+                    considerable_remapping_emphasis_color=considerable_remapping_emphasis_color,
                     # aclus_y_offset_mode=AclusYOffsetMode.CountBased,
                     
                     ) | kwargs
