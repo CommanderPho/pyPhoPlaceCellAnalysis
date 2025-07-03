@@ -1779,7 +1779,7 @@ class TrackRemappingDiagramFigure:
     @function_attributes(short_name=None, tags=['matplotlib', 'track', 'remapping', 'good', 'working'], input_requires=[], output_provides=[], uses=['_plot_helper_add_track_shapes'], used_by=['plot_bidirectional_track_remapping_diagram'], creation_date='2024-02-22 11:12', related_items=[])
     @classmethod
     def _plot_track_remapping_diagram(cls, a_dir_decoder_aclu_MAX_peak_maps_df: pd.DataFrame, grid_bin_bounds: Union[Tuple[Tuple[float, float], Tuple[float, float]], BoundsRect], long_column_name:str='long_LR', short_column_name:str='short_LR', long_y_column_name:Optional[str]=None, short_y_column_name:Optional[str]=None, ax=None, defer_render: bool=False, enable_interactivity:bool=True, draw_point_aclu_labels:bool=False, enable_adjust_overlapping_text: bool=False, is_dark_mode: bool = True, aclus_y_offset_mode:AclusYOffsetMode=AclusYOffsetMode.CountBased, debug_print=False, 
-                                    extant_plot_container: Optional[GenericMatplotlibContainer]=None, **kwargs):
+                                    extant_plot_container: Optional[GenericMatplotlibContainer]=None, considerable_remapping_emphasis_color='orange', **kwargs):
         """ Plots a single figure containing the long and short track outlines (flattened, overlayed) with single points on each corresponding to the peak location in 1D
 
         🔝🖼️🎨
@@ -1820,7 +1820,35 @@ class TrackRemappingDiagramFigure:
         import matplotlib.patheffects as path_effects
 
         from neuropy.utils.matplotlib_helpers import build_or_reuse_figure
+        
 
+        def _subfn_index_color_iterable(color_iterable, included_indicies):
+            """To handle indexing into different types of color inputs
+
+            Prevents: `TypeError: only integer scalar arrays can be converted to a scalar index`
+            
+            Usage:
+                both_color = _subfn_index_color_iterable(color_iterable=color, included_indicies=is_aclu_in_both)
+            
+            """
+            if isinstance(color_iterable, np.ndarray) and color_iterable.dtype != np.object_:
+                # If color is a numpy array (not of object type), use boolean indexing
+                return color_iterable[included_indicies]
+            elif isinstance(color_iterable, list) and (all(isinstance(i, (int, np.int_)) for i in included_indicies)):
+                # If color is a list and is_aclu_in_both contains integer indices
+                return [color_iterable[i] for i in included_indicies]
+            elif isinstance(color_iterable, list) and all([isinstance(i, (bool, np.bool_)) for i in included_indicies]):
+                # If color is a list and is_aclu_in_both is a boolean mask
+                return [c for c, include in zip(color_iterable, included_indicies) if include]
+            else:
+                raise NotImplementedError(f'indexing color array failed. Is color format unexpected?\ncolor: {color_iterable}\nis_aclu_in_both: {included_indicies}\n')
+                # Fallback to a default color if indexing doesn't work
+                # both_color = 'white'  # or any default color
+                
+
+        # ==================================================================================================================================================================================================================================================================================== #
+        # BEGIN FUNCTION BODY                                                                                                                                                                                                                                                                  #
+        # ==================================================================================================================================================================================================================================================================================== #
         if is_dark_mode:
             _default_bg_color = 'white'
             _default_fg_color = 'black'
@@ -1829,7 +1857,7 @@ class TrackRemappingDiagramFigure:
         else:
             _default_bg_color = 'black'
             _default_fg_color = 'white'
-            _default_edgecolors = '#5a5a5a33'
+            _default_edgecolors = "#20202033"
 
         # aclus_y_offset_mode: AclusYOffsetMode = AclusYOffsetMode.CountBased
         # aclus_y_offset_mode: AclusYOffsetMode = AclusYOffsetMode.RandomJitter
@@ -1900,6 +1928,19 @@ class TrackRemappingDiagramFigure:
 
         # BEGIN FUNCTION BODY ________________________________________________________________________________________________ #
 
+        if considerable_remapping_emphasis_color:
+            # To generate special colors to emphasize the considerably remapping aclus, hyjack the `unit_id_colors_map` system by building custom colors from the df columns
+            assert 'has_considerable_remapping' in a_dir_decoder_aclu_MAX_peak_maps_df.columns, f"a_dir_decoder_aclu_MAX_peak_maps_df: {a_dir_decoder_aclu_MAX_peak_maps_df.columns}"
+            # Make a new column to hold each cell's color:
+            a_dir_decoder_aclu_MAX_peak_maps_df['color'] = _default_bg_color
+            a_dir_decoder_aclu_MAX_peak_maps_df.loc[np.where(a_dir_decoder_aclu_MAX_peak_maps_df['has_considerable_remapping'].to_numpy())[0], 'color'] = considerable_remapping_emphasis_color
+            # considerable_remapping_emphasis_color
+            assert unit_id_colors_map is None, f"will be overridden!"
+            # unit_id_colors_map = dict(zip(a_dir_decoder_aclu_MAX_peak_maps_df.index.to_numpy(), a_dir_decoder_aclu_MAX_peak_maps_df['has_considerable_remapping'].to_numpy()))
+            unit_id_colors_map = dict(zip(a_dir_decoder_aclu_MAX_peak_maps_df.index.to_numpy(), a_dir_decoder_aclu_MAX_peak_maps_df['color'].to_numpy()))            
+            # OUTPUTS: unit_id_colors_map
+            
+
         ## Extract the quantities needed from the DF passed
         active_aclus = a_dir_decoder_aclu_MAX_peak_maps_df.index.to_numpy()
         long_peak_x = a_dir_decoder_aclu_MAX_peak_maps_df[long_column_name].to_numpy()
@@ -1925,7 +1966,6 @@ class TrackRemappingDiagramFigure:
             print(f'appearing_long_to_short_aclus: {appearing_long_to_short_aclus}')
 
         ## OUTPUTS: is_aclu_in_both, disappearing_long_to_short_indicies, appearing_long_to_short_indicies
-
 
         ## Create the remapping figure:
         did_create_new_figure: bool = False
@@ -2093,7 +2133,8 @@ class TrackRemappingDiagramFigure:
 
         both_long_peak_x = long_peak_x[is_aclu_in_both]
         both_long_y = long_y[is_aclu_in_both]
-        both_color = color[is_aclu_in_both]
+        # To handle different types of color inputs:
+        both_color = _subfn_index_color_iterable(color_iterable=color, included_indicies=is_aclu_in_both)
         both_long_circle_points_kwargs = dict(**common_BOTH_only_circle_points_kwargs, s=np.full((len(both_long_peak_x),), fill_value=scatter_point_size), edgecolors=([_default_edgecolors] * len(both_long_peak_x)), facecolors=both_color)
         _out_long_points = ax.scatter(both_long_peak_x, y=both_long_y, label='long_peak_x', **both_long_circle_points_kwargs)
         
@@ -2102,7 +2143,7 @@ class TrackRemappingDiagramFigure:
         if (disappearing_long_to_short_indicies is not None) and (len(disappearing_long_to_short_indicies) > 0):
             disappearing_long_peak_x = long_peak_x[disappearing_long_to_short_indicies]
             disappearing_long_y = long_y[disappearing_long_to_short_indicies]
-            disappearing_facecolors = color[disappearing_long_to_short_indicies]
+            disappearing_facecolors = _subfn_index_color_iterable(color_iterable=color, included_indicies=disappearing_long_to_short_indicies)
             disappearing_circle_points_kwargs = dict(**common_circle_points_kwargs, marker=disappearing_marker, s=np.full((len(disappearing_long_peak_x),), fill_value=scatter_point_size), edgecolors=([disappearing_edgecolors] * len(disappearing_long_peak_x)), facecolors=disappearing_facecolors, zorder=10)
             _out_long_disappearing_points = ax.scatter(disappearing_long_peak_x, y=disappearing_long_y, label='long_peak_x', **disappearing_circle_points_kwargs)
         else:
@@ -2111,7 +2152,8 @@ class TrackRemappingDiagramFigure:
         ## Short: short_peak_x, short_y 
         both_short_peak_x = short_peak_x[is_aclu_in_both]
         both_short_y = short_y[is_aclu_in_both]
-        both_color = color[is_aclu_in_both]
+        both_color = _subfn_index_color_iterable(color_iterable=color, included_indicies=is_aclu_in_both)
+        
         both_short_circle_points_kwargs = dict(**common_BOTH_only_circle_points_kwargs, s=np.full((len(both_short_peak_x),), fill_value=scatter_point_size), edgecolors=([_default_edgecolors] * len(both_short_peak_x)), facecolors=both_color)
         
         _out_short_points = ax.scatter(both_short_peak_x, y=both_short_y, label='short_peak_x_app', **both_short_circle_points_kwargs)
@@ -2122,7 +2164,7 @@ class TrackRemappingDiagramFigure:
         if (appearing_long_to_short_indicies is not None) and (len(appearing_long_to_short_indicies) > 0):        
             appearing_short_peak_x = short_peak_x[appearing_long_to_short_indicies]
             appearing_short_y = short_y[appearing_long_to_short_indicies]
-            appearing_facecolors = color[appearing_long_to_short_indicies]
+            appearing_facecolors = _subfn_index_color_iterable(color_iterable=color, included_indicies=appearing_long_to_short_indicies)
             appearing_circle_points_kwargs = dict(**common_circle_points_kwargs, marker=appearing_disappearing_marker, s=np.full((len(appearing_short_peak_x),), fill_value=scatter_point_size), edgecolors=([appearing_edgecolors] * len(appearing_short_peak_x)), facecolors=appearing_facecolors, zorder=11)
             _out_short_appearing_points = ax.scatter(appearing_short_peak_x, y=appearing_short_y, label='short_peak_x_dis', **appearing_circle_points_kwargs)
         else:
@@ -2557,6 +2599,7 @@ class TrackRemappingDiagramFigure:
         else:
             decoder_name_suffix: str = 'pf1D_peak'
 
+        _common_column_names = ['has_considerable_remapping']
         LR_only_column_names = [f"{a_name}_{decoder_name_suffix}" for a_name in LR_only_column_base_names]
         RL_only_column_names = [f"{a_name}_{decoder_name_suffix}" for a_name in RL_only_column_base_names]
         # any_1D_column_names = [f"{a_name}_{decoder_name_suffix}" for a_name in ('long_LR', 'long_RL', 'short_LR', 'short_RL')]
@@ -2615,7 +2658,7 @@ class TrackRemappingDiagramFigure:
                     aclus_y_offset_mode=AclusYOffsetMode.RandomJitter,
                     # aclus_y_offset_mode=AclusYOffsetMode.CountBased,
                     
-                    )
+                    ) | kwargs
         
         fig = build_or_reuse_figure(fignum='Track Remapping', fig=kwargs.pop('fig', None), fig_idx=kwargs.pop('fig_idx', 0), figsize=kwargs.pop('figsize', (10, 4)), dpi=kwargs.pop('dpi', None), constrained_layout=True, clear=True) # , clear=True
         gs = GridSpec(2, 1, figure=fig)
@@ -2676,8 +2719,8 @@ class TrackRemappingDiagramFigure:
         # LR_only_decoder_aclu_MAX_peak_maps_df = deepcopy(a_df[LR_only_column_names]).dropna(axis=0, how='any') # 266
         # RL_only_decoder_aclu_MAX_peak_maps_df = deepcopy(a_df[RL_only_column_names]).dropna(axis=0, how='any') # 262
 
-        LR_only_decoder_aclu_MAX_peak_maps_df = deepcopy(a_df[LR_only_column_names]).dropna(axis=0, how='all') # 266
-        RL_only_decoder_aclu_MAX_peak_maps_df = deepcopy(a_df[RL_only_column_names]).dropna(axis=0, how='all') # 262
+        LR_only_decoder_aclu_MAX_peak_maps_df = deepcopy(a_df[LR_only_column_names + _common_column_names]).dropna(axis=0, how='all') # 266
+        RL_only_decoder_aclu_MAX_peak_maps_df = deepcopy(a_df[RL_only_column_names + _common_column_names]).dropna(axis=0, how='all') # 262
 
         # LR_only_decoder_aclu_MAX_peak_maps_df = deepcopy(a_df[LR_only_column_names])
         # RL_only_decoder_aclu_MAX_peak_maps_df = deepcopy(a_df[RL_only_column_names])
@@ -2694,12 +2737,13 @@ class TrackRemappingDiagramFigure:
             _LR_kwargs = dict()
             _RL_kwargs = dict()
             
+        suptitle_str: str = 'Placecell Peak Remapping (Example Session)'
         ## Plot the track shapes (if needed, and the significant remapping points/arrows):
-        fig_LR_RL, ax_LR, _extant_plot_container_LR = cls._plot_track_remapping_diagram(LR_only_decoder_aclu_MAX_peak_maps_df, grid_bin_bounds=grid_bin_bounds, long_column_name=LR_only_column_names[0], short_column_name=LR_only_column_names[1], **_LR_kwargs, ax=ax_LR, extant_plot_container=_extant_plot_container_LR, **kwargs)
-        perform_update_title_subtitle(fig=fig_LR_RL, ax=ax_LR, title_string=None, subtitle_string=f"LR Track Remapping - {len(LR_only_decoder_aclu_MAX_peak_maps_df)} Place cells")
-        fig_LR_RL, ax_RL, _extant_plot_container_RL = cls._plot_track_remapping_diagram(RL_only_decoder_aclu_MAX_peak_maps_df, grid_bin_bounds=grid_bin_bounds, long_column_name=RL_only_column_names[0], short_column_name=RL_only_column_names[1], **_RL_kwargs, ax=ax_RL, extant_plot_container=_extant_plot_container_RL, **kwargs)
-        perform_update_title_subtitle(fig=fig_LR_RL, ax=ax_RL, title_string=None, subtitle_string=f"RL Track Remapping - {len(RL_only_decoder_aclu_MAX_peak_maps_df)} Place cells")
-
+        fig_LR_RL, ax_LR, _extant_plot_container_LR = cls._plot_track_remapping_diagram(LR_only_decoder_aclu_MAX_peak_maps_df, grid_bin_bounds=grid_bin_bounds, long_column_name=LR_only_column_names[0], short_column_name=LR_only_column_names[1], **_LR_kwargs, ax=ax_LR, extant_plot_container=_extant_plot_container_LR, **deepcopy(kwargs))
+        perform_update_title_subtitle(fig=fig_LR_RL, ax=ax_LR, title_string=suptitle_str, subtitle_string=f"◀ Placefield Peaks - {len(LR_only_decoder_aclu_MAX_peak_maps_df)} Place cells")
+        fig_LR_RL, ax_RL, _extant_plot_container_RL = cls._plot_track_remapping_diagram(RL_only_decoder_aclu_MAX_peak_maps_df, grid_bin_bounds=grid_bin_bounds, long_column_name=RL_only_column_names[0], short_column_name=RL_only_column_names[1], **_RL_kwargs, ax=ax_RL, extant_plot_container=_extant_plot_container_RL, **deepcopy(kwargs))
+        perform_update_title_subtitle(fig=fig_LR_RL, ax=ax_RL, title_string=suptitle_str, subtitle_string=f"▶ Placefield Peaks - {len(RL_only_decoder_aclu_MAX_peak_maps_df)} Place cells")
+        
         return _fig_container
 
 
