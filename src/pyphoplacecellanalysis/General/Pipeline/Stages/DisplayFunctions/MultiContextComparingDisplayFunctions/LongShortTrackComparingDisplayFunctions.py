@@ -2037,59 +2037,16 @@ def _plot_long_short_firing_rate_indicies(x_frs_index, y_frs_index, active_conte
         # convert to pd.Series
         y_frs_index = pd.Series(y_frs_index.values(), index=y_frs_index.keys(), copy=False)
 
-    # \\theta_{\\Delta +}
-
-    # ## Old L/R style strings
-    # laps_fri_label_str: str = 'Laps Firing Rate Index $\\frac{L_{\\theta}-S_{\\theta}}{L_{\\theta} + S_{\\theta}}$'
-    # replays_fri_label_str: str = 'Replay Firing Rate Index $\\frac{L_{R}-S_{R}}{L_{R} + S_{R}}$'
-    
-
-    # ## 2023-10-06 - Consistent "\\Delta +"/"\\Delta -" notation
-    # laps_fri_label_str: str = 'Laps Firing Rate Index $\\frac{\\theta_{\\Delta +}-\\theta_{\\Delta -}}{\\theta_{\\Delta +} + \\theta_{\\Delta -}}$'
-    # replays_fri_label_str: str = 'Replay Firing Rate Index $\\frac{R_{\\Delta +}-R_{\\Delta -}}{R_{\\Delta +} + R_{\\Delta -}}$'
-        
-
-    ## 2024-09-03 - The x_frs_index/y_frs_index series returned from the computation are always LONG-SHORT. Must fix "Delta" notation to fix that. Consistent "\\Delta +"/"\\Delta -" notation
-    # laps_fri_label_str: str = 'Laps Firing Rate Index $\\frac{\\theta_{\\Delta -}-\\theta_{\\Delta +}}{\\theta_{\\Delta +} + \\theta_{\\Delta -}}$'
-    # replays_fri_label_str: str = 'Replay Firing Rate Index $\\frac{R_{\\Delta -}-R_{\\Delta +}}{R_{\\Delta +} + R_{\\Delta -}}$'
-
-    # pgf_with_latex = {
-    #     "text.usetex": True,            # use LaTeX to write all text
-    #     "pgf.rcfonts": False,           # Ignore Matplotlibrc
-    #     "pgf.preamble": r'\usepackage{color}'
-    # }
-    # matplotlib.rcParams.update(pgf_with_latex)
-
-    # pre_delta_str: str = f'🠴'
-    # pre_delta_str: str = f'◅'
-    # post_delta_str: str = f'►'
     
     pre_delta_str: str = f'⬖'
     post_delta_str: str = f'⬗'
-    
-    # pre_delta_str: str = f'⋊'
-    # post_delta_str: str = f'⋉'
-
-    # pre_delta_str: str = '\\textcolor{red}{⬖}'
-    # post_delta_str: str = '\\textcolor{red}{⬗}'
-
-    # laps_fri_label_str: str = 'Laps Firing Rate Index $\\frac{\\theta_{\\multimap}-\\theta_{\\hookrightarrow}}{\\theta_{\\hookrightarrow} + \\theta_{\\multimap}}$'
-    # replays_fri_label_str: str = 'Replay Firing Rate Index $\\frac{R_{\\multimap}-R_{\\hookrightarrow}}{R_{\\hookrightarrow} + R_{\\multimap}}$'
 
     laps_fri_label_str: str = 'Laps Firing Rate Index $\\frac{\\theta_{' + f'{pre_delta_str}' + '}-\\theta_{' + f'{post_delta_str}' + '}}{\\theta_{' + f'{post_delta_str}' + '} + \\theta_{' + f'{pre_delta_str}' + '}}$'
     replays_fri_label_str: str = 'Replay Firing Rate Index $\\frac{R_{' + f'{pre_delta_str}' + '}-R_{' + f'{post_delta_str}' + '}}{R_{' + f'{post_delta_str}' + '} + R_{' + f'{pre_delta_str}' + '}}$'
 
-    # laps_fri_label_str: str = 'Laps Firing Rate Index $\\frac{\\theta_{\\multimap}-\\theta_{\\hookrightarrow}}{\\theta_{\\hookrightarrow} + \\theta_{\\multimap}}$'
-    # replays_fri_label_str: str = 'Replay Firing Rate Index $\\frac{R_{\\multimap}-R_{\\hookrightarrow}}{R_{\\hookrightarrow} + R_{\\multimap}}$'
-
-    # laps_fri_label_str: str = 'Laps Firing Rate Index $\\frac{\\theta_{\\mathrel{\\multimap}} - \\theta_{\\mathrel{\\hookrightarrow}}}{\\theta_{\\mathrel{\\hookrightarrow}} + \\theta_{\\mathrel{\\multimap}}}$'
-    # replays_fri_label_str: str = 'Replay Firing Rate Index $\\frac{R_{\\mathrel{\\multimap}} - R_{\\mathrel{\\hookrightarrow}}}{R_{\\mathrel{\\hookrightarrow}} + R_{\\mathrel{\\multimap}}}$'
-
-    # Replay Firing Rate Index $\frac{R_{\multimap}-R_{\mapsto}}{R_{\mapsto} + R_{\multimap}}$ \\
                                                                                 
     scatter_params = dict(zorder=5) | scatter_params
-
-
+    
     # Optionally swap the x and y axes:
     if swap_xy_axis:
         # Swapped x: Replays, y: Laps
@@ -2941,7 +2898,17 @@ def _plot_single_track_firing_rate_compare(laps_frs_dict, replays_frs_dict, acti
         
         Captures: `defer_show`
         """
-        
+        prepare_for_publication: bool = scatter_params.pop('prepare_for_publication', True)
+            
+        if prepare_for_publication:
+            x_y_axes_label_kwargs = dict(fontsize=7)
+            if 's' not in scatter_params:
+                scatter_params['s'] = 18 ## override it
+        else:
+            x_y_axes_label_kwargs = dict(fontsize=18)
+            if 's' not in scatter_params:
+                scatter_params['s'] = 36 ## apprently 36pts (given by `(mpl.rcParams['lines.markersize'] ** 2)` is the default
+
         # Optionally swap the x and y axes so laps is on the x-axis:
         if neurons_colors is not None:
             if isinstance(neurons_colors, dict):
@@ -2973,15 +2940,23 @@ def _plot_single_track_firing_rate_compare(laps_frs_dict, replays_frs_dict, acti
             ylabel_kwargs = dict(loc='bottom')
 
         scatter_plot = ax.scatter(laps_frs_dict.values(), replays_frs_dict.values(), c=point_colors, **scatter_params) # , s=10, alpha=0.5
-        plt.xlabel(xlabel_str, fontsize=16, **xlabel_kwargs)
-        plt.ylabel(ylabel_str, fontsize=16, **ylabel_kwargs)
-        
+        ax.set_xlabel(xlabel_str, **x_y_axes_label_kwargs, **xlabel_kwargs)
+        ax.set_ylabel(ylabel_str, **x_y_axes_label_kwargs, **ylabel_kwargs)
+
         # Non-flexitext title:
         # plt.title('Computed track_replay|track_laps firing rate')
         # plt.suptitle(f'{active_display_context.get_description(separator="/")}')
 
         # `flexitext` version:
-        text_formatter = FormattedFigureText()
+        # `flexitext` version:
+        if prepare_for_publication:
+            ## Default for publication:
+            text_formatter = FormattedFigureText.init_from_margins(top_margin=0.9, left_margin=0.15, right_margin=0.95, bottom_margin=0.150)
+            # text_formatter = FormattedFigureText.init_from_margins(top_margin=0.9, left_margin=0.15, right_margin=0.95, bottom_margin=0.150) ## Note the margins provide the empty room to position the flexitext headers, and without adding them the fancy text would not fit.
+        else:
+            ## Default for non-publication:
+            text_formatter = FormattedFigureText()
+            
         plt.title('')
         plt.suptitle('')
         text_formatter.setup_margins(fig)
@@ -2989,9 +2964,16 @@ def _plot_single_track_firing_rate_compare(laps_frs_dict, replays_frs_dict, acti
         ## Need to extract the track name ('maze1') for the title in this plot. 
         track_name = active_context.get_description(subset_includelist=['filter_name'], separator=' | ') # 'maze1'
         # TODO: do we want to convert this into "long" or "short"?
-        flexitext(text_formatter.left_margin, text_formatter.top_margin, f'<size:22><weight:bold>{track_name}</> laps|replay <weight:bold>firing rate</></>', va="bottom", xycoords="figure fraction")
+        
+        
         if not prepare_for_publication:
+            flexitext(text_formatter.left_margin, text_formatter.top_margin, f'<size:22><weight:bold>{track_name}</> laps|replay <weight:bold>firing rate</></>', va="bottom", xycoords="figure fraction")
+            ## Only include the footer label when not for publication
             footer_text_obj = flexitext((text_formatter.left_margin*0.1), (text_formatter.bottom_margin*0.25), text_formatter._build_footer_string(active_context=active_context), va="top", xycoords="figure fraction")
+        else:  
+            ## Publication Mode
+            ## Smaller fonts for publication -- Originally 18, now 9
+            flexitext(text_formatter.left_margin, text_formatter.top_margin, f'<size:8><weight:bold>{track_name}</> laps|replay <weight:bold>firing rate</></>', va="bottom", xycoords="figure fraction")
 
         # add static tiny labels for the neuron_id beside each data point
         if enable_tiny_point_labels:
