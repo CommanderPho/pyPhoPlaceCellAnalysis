@@ -325,6 +325,7 @@ class TrackTemplates(HDFMixin, AttrsBasedClassHelperMixin):
         # OUTPUTS: LR_only_decoder_aclu_MAX_peak_maps_df, RL_only_decoder_aclu_MAX_peak_maps_df
         return (LR_only_decoder_aclu_MAX_peak_maps_df, RL_only_decoder_aclu_MAX_peak_maps_df), AnyDir_decoder_aclu_MAX_peak_maps_df
 
+
     ## WARNING 2024-02-07 - The following all use .peak_tuning_curve_center_of_masses: .get_decoder_aclu_peak_maps, get_decoder_aclu_peak_map_dict, get_decoder_aclu_peak_map_dict
     @function_attributes(short_name=None, tags=[''], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-02-06 00:00', related_items=[])
     def get_long_short_decoder_shifts(self):
@@ -7724,11 +7725,6 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
             from pyphoplacecellanalysis.General.Model.Configs.LongShortDisplayConfig import DisplayColorsEnum
             from pyphocorehelpers.DataStructure.RenderPlots.MatplotLibRenderPlots import FigureCollector
             # from pyphoplacecellanalysis.General.Model.Configs.LongShortDisplayConfig import PlottingHelpers
-
-            from matplotlib.gridspec import GridSpec
-            from neuropy.utils.matplotlib_helpers import build_or_reuse_figure, perform_update_title_subtitle
-            from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.SpikeRasters import build_shared_sorted_neuron_color_maps
-            from pyphocorehelpers.gui.Qt.color_helpers import ColorFormatConverter
             
             save_figure_kwargs = dict(write_vector_format=kwargs.pop('write_vector_format', False), write_png=kwargs.pop('write_png', True)) | pop_dict_subset(kwargs, ['bbox_inches', 'pad_inches'])
             prepare_for_publication: bool = kwargs.pop('prepare_for_publication', False)
@@ -7907,7 +7903,9 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
 
 
     @function_attributes(short_name='track_remapping_diagram', tags=['remapping'], conforms_to=['output_registering', 'figure_saving'], input_requires=[], output_provides=[], uses=['plot_bidirectional_track_remapping_diagram'], used_by=[], creation_date='2024-04-29 09:24', related_items=[], is_global=True)
-    def _display_directional_track_remapping_diagram(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, save_figure=True, included_any_context_neuron_ids=None, use_incremental_sorting: bool = False, is_dark_mode:bool=False, **kwargs):
+    def _display_directional_track_remapping_diagram(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, save_figure=True, included_any_context_neuron_ids=None, use_incremental_sorting: bool = False,
+                                                    is_dark_mode:bool=False, enable_interactivity:bool=True, draw_point_aclu_labels: bool=True,
+                                                    use_separate_plot_for_each_direction:bool=True, use_unique_aclu_colors:bool=False, drop_aclu_if_missing_long_or_short:bool=False, **kwargs):
             """ For both directions, plots a subplot showing the cell's location on the long track and the short track with connecting arrows showing their transition. Draws both tracks in the background as reference. 
             """
             from pyphoplacecellanalysis.Pho2D.track_shape_drawing import TrackRemappingDiagramFigure
@@ -7960,8 +7958,8 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
                 else:
                     pass # do nothing, don't save
                 
-
-            collector = TrackRemappingDiagramFigure.plot_bidirectional_track_remapping_diagram(track_templates, grid_bin_bounds=grid_bin_bounds, active_context=active_context, perform_write_to_file_callback=_perform_write_to_file_callback, enable_interactivity=True, draw_point_aclu_labels=True, is_dark_mode=is_dark_mode)
+            collector = TrackRemappingDiagramFigure.plot_bidirectional_track_remapping_diagram(track_templates, grid_bin_bounds=grid_bin_bounds, active_context=active_context, perform_write_to_file_callback=_perform_write_to_file_callback, enable_interactivity=enable_interactivity, use_separate_plot_for_each_direction=use_separate_plot_for_each_direction,
+                    draw_point_aclu_labels=draw_point_aclu_labels, is_dark_mode=is_dark_mode, use_unique_aclu_colors=use_unique_aclu_colors, drop_aclu_if_missing_long_or_short=drop_aclu_if_missing_long_or_short)
 
             return collector
 
