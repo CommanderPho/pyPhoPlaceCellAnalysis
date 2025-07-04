@@ -7891,10 +7891,11 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
                     # active_config.float_precision = 1
 
                     if not prepare_for_publication:
+                        
                         title_string: str = f"directional_track_template_pf1Ds"
                         # subtitle_string = '\n'.join([f'{active_config.str_for_display(is_2D)}'])
                         # header_text_obj = flexitext(text_formatter.left_margin, 0.9, f'<size:22><weight:bold>{title_string}</></>\n<size:10>{subtitle_string}</>', va="bottom", xycoords="figure fraction") # , wrap=False
-                        header_text_obj = flexitext(0.01, 0.85, f'<size:20><weight:bold>{title_string}</></>\n<size:9>{subtitle_string}</>', va="bottom", xycoords="figure fraction") # , wrap=False
+                        header_text_obj = flexitext(0.01, 0.85, f'<size:10, family:{found_matplotlib_font_name}><weight:bold>{title_string}</></>\n<size:9>{subtitle_string}</>', va="bottom", xycoords="figure fraction") # , wrap=False
                     else:
                         ## Publication:
                         title_string: str = f"Directional Track Templates"
