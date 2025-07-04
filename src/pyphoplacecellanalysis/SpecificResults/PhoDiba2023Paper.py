@@ -3029,8 +3029,6 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
                 # ==================================================================================================================== #
                 if should_prepare_full_hover_click_interactivity:
                     fig = fig.update_layout(clickmode="event+select", hovermode='closest', dragmode='select')
-                    
-                    
                     # Customize the hovertemplate
                     fig.update_traces(
                         # hovertemplate="<b>sess:</b> %{customdata[0]}<br>"
@@ -3113,6 +3111,8 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
                     df_filter.figure_widget = fig
 
             ## END if df_filter.is_figure_widget_mode...
+            df_filter.figure_widget.update_xaxes(col=2, range=[earliest_delta_aligned_t_start, latest_delta_aligned_t_end]) ## surprisingly this does fix it!
+
 
         ## end def _build_filter_changed_plotly_plotting_callback_fn(...)
         
