@@ -1989,7 +1989,7 @@ def plot_short_v_long_pf1D_scalar_overlap_comparison(overlap_scalars_df, pf_neur
 
 
 @function_attributes(short_name='long_short_fr_indicies', tags=['private', 'long_short', 'long_short_firing_rate', 'firing_rate', 'display', 'matplotlib'], input_requires=[], output_provides=[], uses=[], used_by=['_display_short_long_firing_rate_index_comparison', 'AcrossSessionsVisualizations.across_sessions_firing_rate_index_figure'], creation_date='2023-03-28 14:20')
-def _plot_long_short_firing_rate_indicies(x_frs_index, y_frs_index, active_context, neurons_colors=None, debug_print=False, is_centered = False, enable_hover_labels=True, enable_tiny_point_labels=True, swap_xy_axis=False, include_axes_lines=True, enable_histograms=True, enable_subplot_mosaic_style:bool=True, enable_diagonal_histogram: bool = True, **scatter_params):
+def _plot_long_short_firing_rate_indicies(x_frs_index, y_frs_index, active_context, neurons_colors=None, debug_print=False, is_centered = False, enable_hover_labels=True, enable_tiny_point_labels=True, swap_xy_axis=False, include_axes_lines=True, enable_histograms=True, enable_subplot_mosaic_style:bool=True, enable_diagonal_histogram: bool = True, include_linear_regression_line:bool=True, **scatter_params):
     """ Plot long|short firing rate index 
     Each datapoint is a neuron.
     Shows two histograms for the marginals along each axis
@@ -2155,6 +2155,15 @@ def _plot_long_short_firing_rate_indicies(x_frs_index, y_frs_index, active_conte
             # https://stackoverflow.com/questions/7908636/possible-to-make-labels-appear-when-hovering-over-a-point-in-matplotlib/21654635#21654635
             # add hover labels using mplcursors
             mplcursors.cursor(scatter_plot, hover=True).connect("add", lambda sel: sel.annotation.set_text(point_hover_labels[sel.index]))
+
+
+    if include_linear_regression_line:
+        from pyphoplacecellanalysis.SpecificResults.PhoDiba2023Paper import pho_stats_linear_regression, LinearRegressionOutput
+        
+        # Fit linear regression using numpy.polyfit
+        _lin_reg = pho_stats_linear_regression(list(x_frs_index.to_numpy()), list(y_frs_index.to_numpy()))
+        _out_regression_line_artist = _lin_reg.plot(ax=ax)
+        
 
     # Set the x and y axes to standard limits for easy visual comparison across sessions
     ax.set_xlim([-1.1, 1.1])
@@ -2336,6 +2345,7 @@ def _plot_long_short_firing_rate_indicies(x_frs_index, y_frs_index, active_conte
     ax.set_xticks([-1, 0, 1])
     ax.set_xticklabels(["-1.0", "0.0", "+1.0"])  # No x-axis tick labels
     ax.set_yticklabels(["-1.0", "0.0", "+1.0"])  # No y-axis tick labels
+
 
     return fig, ax, scatter_plot
 
@@ -2888,7 +2898,7 @@ class RateRemappingPaginatedFigureController(PaginatedFigureController):
 # ==================================================================================================================== #
 
 @function_attributes(short_name=None, tags=['private','firing_rate'], input_requires=[], output_provides=[], uses=[], used_by=['_plot_session_long_short_track_firing_rate_figures'], creation_date='2023-05-25 00:01', related_items=[])
-def _plot_single_track_firing_rate_compare(laps_frs_dict, replays_frs_dict, active_context, xlabel_str: str = 'Laps Firing Rate (Hz)',  ylabel_str: str = 'PBE Firing Rate (Hz)', neurons_colors=None, is_centered=False, enable_tiny_point_labels=False, defer_render=False, prepare_for_publication: bool = False, **scatter_params):
+def _plot_single_track_firing_rate_compare(laps_frs_dict, replays_frs_dict, active_context, xlabel_str: str = 'Laps Firing Rate (Hz)',  ylabel_str: str = 'PBE Firing Rate (Hz)', neurons_colors=None, is_centered=False, enable_tiny_point_labels=False, defer_render=False, prepare_for_publication: bool = False, include_linear_regression_line:bool=True, **scatter_params):
         """ 2023-05-25 - Plot long_replay|long_laps firing rate index 
         Each datapoint is a neuron.
 
@@ -2896,8 +2906,9 @@ def _plot_single_track_firing_rate_compare(laps_frs_dict, replays_frs_dict, acti
 
         Copied from same file as `_display_short_long_firing_rate_index_comparison()`
         
-        Captures: `defer_show`
         """
+        from pyphoplacecellanalysis.SpecificResults.PhoDiba2023Paper import pho_stats_linear_regression, LinearRegressionOutput        
+
         prepare_for_publication: bool = scatter_params.pop('prepare_for_publication', True)
             
         if prepare_for_publication:
@@ -2989,7 +3000,14 @@ def _plot_single_track_firing_rate_compare(laps_frs_dict, replays_frs_dict, acti
         else:
             # Hide the right and top spines (box components)
             ax.spines[['right', 'top']].set_visible(False)
-    
+
+
+        if include_linear_regression_line:
+            # Fit linear regression using numpy.polyfit
+            _lin_reg = pho_stats_linear_regression(list(laps_frs_dict.values()), list(replays_frs_dict.values()))
+            _out_regression_line_artist = _lin_reg.plot(ax=ax)
+
+
         if not defer_render:
             fig.show()
 
@@ -2997,7 +3015,7 @@ def _plot_single_track_firing_rate_compare(laps_frs_dict, replays_frs_dict, acti
 
 
 @function_attributes(short_name=None, tags=['private', 'long_short'], input_requires=[], output_provides=[], uses=['_plot_single_track_firing_rate_compare', 'fit_both_axes'], used_by=[], creation_date='2023-05-25 00:00', related_items=[])
-def _plot_session_long_short_track_firing_rate_figures(curr_active_pipeline, jonathan_firing_rate_analysis_result, defer_render=False):
+def _plot_session_long_short_track_firing_rate_figures(curr_active_pipeline, jonathan_firing_rate_analysis_result, include_linear_regression_line: bool=True, defer_render=False):
     """ 2023-05-25 - Plots a comparison of the lap vs. replay firing rates for a single track.
     
     Inputs:
@@ -3023,14 +3041,14 @@ def _plot_session_long_short_track_firing_rate_figures(curr_active_pipeline, jon
     neuron_replay_stats_df = jonathan_firing_rate_analysis_result.neuron_replay_stats_df.dropna(subset=['long_replay_mean', 'long_non_replay_mean'], inplace=False)
     x_frs = {k:v for k,v in neuron_replay_stats_df['long_non_replay_mean'].items()} 
     y_frs = {k:v for k,v in neuron_replay_stats_df['long_replay_mean'].items()}
-    fig_L, ax_L, active_display_context_L = _plot_single_track_firing_rate_compare(x_frs, y_frs, active_context=long_epoch_context)
+    fig_L, ax_L, active_display_context_L = _plot_single_track_firing_rate_compare(x_frs, y_frs, active_context=long_epoch_context, include_linear_regression_line=include_linear_regression_line)
 
 
     ## Short Track Replay|Laps FR Figure
     neuron_replay_stats_df = jonathan_firing_rate_analysis_result.neuron_replay_stats_df.dropna(subset=['short_replay_mean', 'short_non_replay_mean'], inplace=False)
     x_frs = {k:v for k,v in neuron_replay_stats_df['short_non_replay_mean'].items()} 
     y_frs = {k:v for k,v in neuron_replay_stats_df['short_replay_mean'].items()}
-    fig_S, ax_S, active_display_context_S = _plot_single_track_firing_rate_compare(x_frs, y_frs, active_context=short_epoch_context)
+    fig_S, ax_S, active_display_context_S = _plot_single_track_firing_rate_compare(x_frs, y_frs, active_context=short_epoch_context, include_linear_regression_line=include_linear_regression_line)
 
     ## Fit both the axes:
     fit_both_axes(ax_L, ax_S)

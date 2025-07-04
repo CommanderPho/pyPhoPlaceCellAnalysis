@@ -50,8 +50,9 @@ import matplotlib.pyplot as plt
 
 from pyphoplacecellanalysis.SpecificResults.fourthYearPresentation import fig_surprise_results, fig_remapping_cells
 from pyphocorehelpers.indexing_helpers import list_of_dicts_to_dict_of_lists
+from neuropy.utils.mixins.indexing_helpers import UnpackableMixin
 
-from attrs import define, field, Factory  # Import the attrs library
+from attrs import make_class, asdict, astuple, define, field, Factory  # Import the attrs library
 import ipywidgets as widgets
 from IPython.display import display
 from copy import deepcopy
@@ -1070,6 +1071,30 @@ def pho_stats_perform_diagonal_line_binomial_test(long_short_fr_indicies_analysi
     binom_test_chance_result = stats.binomtest(n_above_diagonal, n=n_total, p=0.5) # p=0.5 random assignment on each trial, n=n_total trials
     return binom_test_chance_result
 
+
+
+# Define a simple attrs class that's better than a namedtuple and unpackable:
+LinearRegressionOutput = make_class("LinearRegressionOutput", {k:field() for k in ("reg_x", "reg_y", "slope", "intercept", "regression_line")}, bases=(UnpackableMixin, object,))
+LinearRegressionOutput.plot = lambda self, ax, **kwargs: ax.plot(self.reg_x, self.regression_line, label=f'Regression Line\ny={self.slope:.2f}x + {self.intercept:.2f}', **(dict(color='red', alpha=0.7, lw=0.5) | kwargs))
+
+@function_attributes(short_name=None, tags=['stats', 'regression'], input_requires=[], output_provides=[], uses=['LinearRegressionOutput'], used_by=[], creation_date='2025-07-04 03:11', related_items=[])
+def pho_stats_linear_regression(reg_x: NDArray, reg_y: NDArray) -> "LinearRegressionOutput":
+    """ 
+    from pyphoplacecellanalysis.SpecificResults.PhoDiba2023Paper import pho_stats_linear_regression, LinearRegressionOutput
+    
+    _lin_reg = pho_stats_linear_regression(reg_x, reg_y)
+    _lin_reg
+    """
+    if not isinstance(reg_x, NDArray):
+        reg_x = np.array(reg_x)
+    if not isinstance(reg_y, NDArray):
+        reg_y = np.array(reg_y)
+        
+    # Fit linear regression using numpy.polyfit
+    reg_slope, reg_intercept = np.polyfit(reg_x, reg_y, 1)
+    # Compute regression line
+    regression_line = reg_slope * reg_x + reg_intercept
+    return LinearRegressionOutput(**{'reg_x': reg_x, 'reg_y': reg_y, 'slope': reg_slope, 'intercept': reg_intercept, 'regression_line': regression_line})
 
 
 def pho_stats_paired_t_test(values1, values2):

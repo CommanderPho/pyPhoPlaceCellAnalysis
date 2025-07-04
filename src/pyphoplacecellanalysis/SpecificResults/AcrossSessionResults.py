@@ -3735,7 +3735,7 @@ class AcrossSessionsVisualizations:
 
     @classmethod
     @function_attributes(short_name=None, tags=['across-session', 'figure', 'matplotlib', 'figure-3'], input_requires=[], output_provides=[], uses=['_plot_single_track_firing_rate_compare'], used_by=[], creation_date='2023-08-24 00:00', related_items=[])
-    def across_sessions_long_and_short_firing_rate_replays_v_laps_figure(cls, neuron_replay_stats_table, num_sessions:int, save_figure=True, prepare_for_publication: bool = False, **kwargs):
+    def across_sessions_long_and_short_firing_rate_replays_v_laps_figure(cls, neuron_replay_stats_table: pd.DataFrame, num_sessions:int, save_figure=True, prepare_for_publication: bool = False, **kwargs):
         """ 2023-08-24 - Across Sessions Aggregate Figure - Supposed to be the equivalent for Figure 3.
 
         Based off of `pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.MultiContextComparingDisplayFunctions.LongShortTrackComparingDisplayFunctions._plot_session_long_short_track_firing_rate_figures`
