@@ -2450,7 +2450,8 @@ class TrackRemappingDiagramFigure:
         if active_context is not None:
                 display_context = active_context.adding_context('display_fn', display_fn_name='bidir_track_remap')
             
-        with mpl.rc_context({'figure.figsize': (10, 4), 'figure.dpi': '220', 'savefig.transparent': True, 'ps.fonttype': 42, 'pdf.fonttype': 42, }):
+        with mpl.rc_context({'figure.figsize': (10, 4), 'figure.dpi': '220', 'savefig.transparent': True, 'ps.fonttype': 42, 'pdf.fonttype': 42, 'font.family': 'Arial', 'xtick.labelsize': 5, 'ytick.labelsize': 5}):
+
             # Create a FigureCollector instance
             with FigureCollector(name='plot_bidirectional_track_remapping_diagram', base_context=display_context) as collector:
 
