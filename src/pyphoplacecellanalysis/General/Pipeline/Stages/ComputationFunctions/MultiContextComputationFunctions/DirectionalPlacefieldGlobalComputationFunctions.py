@@ -7740,8 +7740,6 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
                 else:
                     pass # do nothing, don't save
 
-
-
             _rc_context_kwargs = {'savefig.transparent': True, 'ps.fonttype': 42, 'pdf.fonttype': 42}
             if prepare_for_publication:
                 formatted_title_strings_dict = DisplayColorsEnum.get_matplotlib_formatted_title_dict()
