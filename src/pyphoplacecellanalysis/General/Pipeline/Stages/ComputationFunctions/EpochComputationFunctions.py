@@ -60,7 +60,6 @@ from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiCo
 import pyphoplacecellanalysis.General.type_aliases as types
 
 
-
 # ### For _perform_recursive_latent_placefield_decoding
 # from neuropy.utils import position_util
 # from neuropy.core import Position
@@ -2348,7 +2347,7 @@ class EpochComputationDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Di
 
             from pyphocorehelpers.DataStructure.RenderPlots.MatplotLibRenderPlots import FigureCollector
             from neuropy.utils.matplotlib_helpers import FormattedFigureText
-
+            from pyphoplacecellanalysis.SpecificResults.PhoDiba2023Paper import PhoPublicationFigureHelper
 
             ## Unpack from pipeline:
             valid_EpochComputations_result: EpochComputationsComputationsContainer = owning_pipeline_reference.global_computation_results.computed_data['EpochComputations'] # owning_pipeline_reference.global_computation_results.computed_data['EpochComputations']
@@ -2459,7 +2458,7 @@ class EpochComputationDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Di
                     pass # do nothing, don't save
                 
 
-            with mpl.rc_context({'figure.dpi': str(dpi), 'savefig.transparent': True, 'ps.fonttype': 42, 'pdf.fonttype': 42, 'figure.constrained_layout.use': (constrained_layout or False), 'figure.frameon': False, 'figure.figsize': size, }): # 'figure.figsize': (12.4, 4.8), 
+            with mpl.rc_context(PhoPublicationFigureHelper.rc_context_kwargs({'figure.dpi': str(dpi), 'figure.constrained_layout.use': (constrained_layout or False), 'figure.frameon': False, 'figure.figsize': size, })): # 'figure.figsize': (12.4, 4.8), 
                 # Create a FigureCollector instance
                 with FigureCollector(name='generalized_decoded_yellow_blue_marginal_epochs', base_context=display_context) as collector:
                     fig, ax_dict = collector.subplot_mosaic(
@@ -2598,7 +2597,7 @@ class EpochComputationDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Di
 
             from neuropy.utils.result_context import IdentifyingContext
             from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import _helper_add_interpolated_position_columns_to_decoded_result_df
-
+            from pyphoplacecellanalysis.SpecificResults.PhoDiba2023Paper import PhoPublicationFigureHelper
 
             def _subfn_hide_all_plot_lines(out_plot_data, should_fully_remove_items:bool=False):
                 ## get the lines2D object to turn off the default position lines:
@@ -2705,7 +2704,7 @@ class EpochComputationDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Di
                     pass # do nothing, don't save
                 
 
-            with mpl.rc_context({'figure.dpi': str(dpi), 'savefig.transparent': True, 'ps.fonttype': 42, 'pdf.fonttype': 42, 'figure.constrained_layout.use': (constrained_layout or False), 'figure.frameon': False, 'figure.figsize': size, }): # 'figure.figsize': (12.4, 4.8), 
+            with mpl.rc_context(PhoPublicationFigureHelper.rc_context_kwargs({'figure.dpi': str(dpi), 'figure.constrained_layout.use': (constrained_layout or False), 'figure.frameon': False, 'figure.figsize': size, })): # 'figure.figsize': (12.4, 4.8), 
                 # Create a FigureCollector instance
                 with FigureCollector(name='trackID_marginal_hairy_position', base_context=active_display_context) as collector:
                     # from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import _perform_plot_hairy_overlayed_position

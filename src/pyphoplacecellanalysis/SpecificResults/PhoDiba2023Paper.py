@@ -3586,3 +3586,27 @@ class LongShortTrackDataframeAccessor(TimeColumnAliasesProtocol):
         epochs_df: pd.DataFrame = self._df
         return self.add_pre_post_delta_category_column_if_needed(epochs_df=epochs_df, t_delta=t_delta, replace_existing=replace_existing, start_time_col_name=start_time_col_name, end_time_col_name=end_time_col_name)
     
+
+
+class PhoPublicationFigureHelper:
+    """ 2025-07-04 - Helps get matplotlib figures in the correct format to be published, allowing manipulation in Adobe Illustrator and vector outputs
+    
+    from pyphoplacecellanalysis.SpecificResults.PhoDiba2023Paper import PhoPublicationFigureHelper
+    
+    
+    """
+    @classmethod
+    def rc_context_kwargs(cls, prepare_for_publication: bool=True, **kwargs) -> Dict:
+        """
+        Usage:
+            from pyphoplacecellanalysis.SpecificResults.PhoDiba2023Paper import PhoPublicationFigureHelper
+            
+            with mpl.rc_context(PhoPublicationFigureHelper.rc_context_kwargs() | {'figure.figsize': (10, 4), 'figure.dpi': '220'})
+            
+        """
+        _out_rcparams = {'savefig.transparent': True, 'ps.fonttype': 42, 'pdf.fonttype': 42,  }
+        _out_rcparams =( _out_rcparams | kwargs)
+        if prepare_for_publication:
+            ## OVERRIDE in the case of publications:
+            _out_rcparams.update({'font.family': 'Arial', 'xtick.labelsize': 5, 'ytick.labelsize': 5, "axes.spines.right": False, "axes.spines.top": False})
+        return _out_rcparams # 'figure.dpi': '220', 

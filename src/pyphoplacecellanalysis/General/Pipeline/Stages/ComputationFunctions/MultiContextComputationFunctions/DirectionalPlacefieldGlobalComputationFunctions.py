@@ -7249,6 +7249,7 @@ def plot_all_epoch_bins_marginal_predictions(directional_merged_decoders_result,
     from pyphocorehelpers.DataStructure.RenderPlots.MatplotLibRenderPlots import FigureCollector
     from pyphoplacecellanalysis.General.Model.Configs.LongShortDisplayConfig import PlottingHelpers
     from neuropy.utils.matplotlib_helpers import FormattedFigureText
+    from pyphoplacecellanalysis.SpecificResults.PhoDiba2023Paper import PhoPublicationFigureHelper
     
     laps_all_epoch_bins_marginals_df = deepcopy(directional_merged_decoders_result.laps_all_epoch_bins_marginals_df)
     ripple_all_epoch_bins_marginals_df = deepcopy(directional_merged_decoders_result.ripple_all_epoch_bins_marginals_df)
@@ -7265,9 +7266,9 @@ def plot_all_epoch_bins_marginal_predictions(directional_merged_decoders_result,
     ripple_display_context = display_context.get_subset(subset_excludelist=laps_only_keys) # ripple specific context filtering out the laps keys
 
 
-    with mpl.rc_context({'figure.figsize': (12.4, 4.8), 'figure.dpi': '220', 'savefig.transparent': True, 'ps.fonttype': 42, 'pdf.fonttype': 42,
+    with mpl.rc_context(PhoPublicationFigureHelper.rc_context_kwargs({'figure.figsize': (12.4, 4.8), 'figure.dpi': '220',
                           "axes.spines.left": False, "axes.spines.right": False, "axes.spines.bottom": False, "axes.spines.top": False,
-                          "axes.edgecolor": "none", "xtick.bottom": False, "xtick.top": False, "ytick.left": False, "ytick.right": False}):
+                          "axes.edgecolor": "none", "xtick.bottom": False, "xtick.top": False, "ytick.left": False, "ytick.right": False})):
         # Create a FigureCollector instance
         with FigureCollector(name='plot_all_epoch_bins_marginal_predictions', base_context=display_context) as collector:
 
@@ -7725,6 +7726,7 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
             from pyphoplacecellanalysis.General.Model.Configs.LongShortDisplayConfig import DisplayColorsEnum
             from pyphocorehelpers.DataStructure.RenderPlots.MatplotLibRenderPlots import FigureCollector
             # from pyphoplacecellanalysis.General.Model.Configs.LongShortDisplayConfig import PlottingHelpers
+            from pyphoplacecellanalysis.SpecificResults.PhoDiba2023Paper import PhoPublicationFigureHelper
             
             save_figure_kwargs = dict(write_vector_format=kwargs.pop('write_vector_format', False), write_png=kwargs.pop('write_png', True)) | pop_dict_subset(kwargs, ['bbox_inches', 'pad_inches'])
             prepare_for_publication: bool = kwargs.pop('prepare_for_publication', False)
@@ -7753,7 +7755,7 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
             if prepare_for_publication:
                 formatted_title_strings_dict = DisplayColorsEnum.get_matplotlib_formatted_title_dict()
                 assert found_matplotlib_font_name is not None
-                _rc_context_kwargs.update({'figure.dpi': '100', 'figure.frameon': False, 'figure.figsize': figsize, 'font.family': found_matplotlib_font_name}) # , 'figure.constrained_layout.use': (constrained_layout or False)
+                _rc_context_kwargs.update(PhoPublicationFigureHelper.rc_context_kwargs({'figure.dpi': '100', 'figure.frameon': False, 'figure.figsize': figsize, 'font.family': found_matplotlib_font_name}), prepare_for_publication=prepare_for_publication) # , 'figure.constrained_layout.use': (constrained_layout or False)
 
             with mpl.rc_context(_rc_context_kwargs): # 'figure.dpi': '220', 'figure.figsize': (10, 4), 
                 # Create a FigureCollector instance
@@ -8056,7 +8058,7 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
             from pyphocorehelpers.DataStructure.RenderPlots.MatplotLibRenderPlots import FigureCollector
             from pyphoplacecellanalysis.General.Model.Configs.LongShortDisplayConfig import PlottingHelpers
             from neuropy.utils.matplotlib_helpers import FormattedFigureText
-        
+            from pyphoplacecellanalysis.SpecificResults.PhoDiba2023Paper import PhoPublicationFigureHelper
 
             active_context = kwargs.pop('active_context', None)
             if active_context is not None:
@@ -8115,7 +8117,7 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
 
             # 'figure.constrained_layout.use': False, 'figure.autolayout': False, 'figure.subplot.bottom': 0.11, 'figure.figsize': (6.4, 4.8)
             # 'figure.constrained_layout.use': constrained_layout, 'figure.autolayout': False, 'figure.subplot.bottom': 0.11, 'figure.figsize': (6.4, 4.8)
-            with mpl.rc_context({'figure.dpi': '220', 'savefig.transparent': True, 'ps.fonttype': 42, 'pdf.fonttype': 42, 'figure.constrained_layout.use': (constrained_layout or False), 'figure.frameon': False, }): # 'figure.figsize': (12.4, 4.8), 
+            with mpl.rc_context(PhoPublicationFigureHelper.rc_context_kwargs({'figure.dpi': '220', 'figure.constrained_layout.use': (constrained_layout or False), 'figure.frameon': False, })): # 'figure.figsize': (12.4, 4.8), 
                 # Create a FigureCollector instance
                 with FigureCollector(name='plot_directional_merged_pf_decoded_epochs', base_context=display_context) as collector:
 

@@ -59,6 +59,8 @@ if TYPE_CHECKING:
     # import pyphoplacecellanalysis.External.pyqtgraph as pg
     from pyphocorehelpers.DataStructure.RenderPlots.MatplotLibRenderPlots import MatplotlibRenderPlots # plot_histogram #TODO 2024-01-02 12:41: - [ ] Is this where the Qt5 Import dependency Pickle complains about is coming from?
     
+
+
 # ==================================================================================================================== #
 # 2023-10-20 - Close-to-working Rank Order Strategy:                                                                   #
 # ==================================================================================================================== #
@@ -2863,6 +2865,8 @@ def plot_rank_order_histograms(rank_order_results: RankOrderComputationsContaine
     from pyphocorehelpers.DataStructure.RenderPlots.MatplotLibRenderPlots import FigureCollector
     from pyphoplacecellanalysis.General.Model.Configs.LongShortDisplayConfig import PlottingHelpers
     from neuropy.utils.matplotlib_helpers import FormattedFigureText
+    from pyphoplacecellanalysis.SpecificResults.PhoDiba2023Paper import PhoPublicationFigureHelper
+    
     # fig = build_or_reuse_figure(fignum=f'1D Histograms')
     # ax1 = fig.add_subplot(3, 1, 1)
     # ax2 = fig.add_subplot(3, 1, 2)
@@ -2894,7 +2898,7 @@ def plot_rank_order_histograms(rank_order_results: RankOrderComputationsContaine
     if active_context is not None:
             display_context = active_context.adding_context('display_fn', display_fn_name='plot_rank_order_histograms')
             
-    with mpl.rc_context({'figure.figsize': (8.4, 4.8), 'figure.dpi': '220', 'savefig.transparent': True, 'ps.fonttype': 42, 'pdf.fonttype': 42, }):
+    with mpl.rc_context(PhoPublicationFigureHelper.rc_context_kwargs({'figure.figsize': (8.4, 4.8), 'figure.dpi': '220',})):
         # Create a FigureCollector instance
         with FigureCollector(name='plot_rank_order_histograms', base_context=display_context) as collector:
 
@@ -3107,6 +3111,7 @@ def plot_quantile_diffs(merged_complete_epoch_stats_df, t_start=None, t_split=10
     from pyphocorehelpers.DataStructure.RenderPlots.MatplotLibRenderPlots import FigureCollector
     from pyphoplacecellanalysis.General.Model.Configs.LongShortDisplayConfig import PlottingHelpers
     from neuropy.utils.matplotlib_helpers import FormattedFigureText
+    from pyphoplacecellanalysis.SpecificResults.PhoDiba2023Paper import PhoPublicationFigureHelper
     
     ripple_combined_epoch_stats_df = deepcopy(merged_complete_epoch_stats_df)
 
@@ -3118,7 +3123,7 @@ def plot_quantile_diffs(merged_complete_epoch_stats_df, t_start=None, t_split=10
     if active_context is not None:
         display_context = active_context.adding_context('display_fn', display_fn_name='plot_quantile_diffs')
         
-    with mpl.rc_context({'figure.figsize': (12.4, 4.8), 'figure.dpi': '220', 'savefig.transparent': True, 'ps.fonttype': 42, 'pdf.fonttype': 42, }):
+    with mpl.rc_context(PhoPublicationFigureHelper.rc_context_kwargs({'figure.figsize': (12.4, 4.8), 'figure.dpi': '220', })):
         # Create a FigureCollector instance
         with FigureCollector(name='plot_quantile_diffs', base_context=display_context) as collector:
 
