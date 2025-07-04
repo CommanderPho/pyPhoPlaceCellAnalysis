@@ -2741,9 +2741,9 @@ class TrackRemappingDiagramFigure:
         suptitle_str: str = 'Placecell Peak Remapping (Example Session)'
         ## Plot the track shapes (if needed, and the significant remapping points/arrows):
         fig_LR_RL, ax_LR, _extant_plot_container_LR = cls._plot_track_remapping_diagram(LR_only_decoder_aclu_MAX_peak_maps_df, grid_bin_bounds=grid_bin_bounds, long_column_name=LR_only_column_names[0], short_column_name=LR_only_column_names[1], **_LR_kwargs, ax=ax_LR, extant_plot_container=_extant_plot_container_LR, **deepcopy(kwargs))
-        perform_update_title_subtitle(fig=fig_LR_RL, ax=ax_LR, title_string=suptitle_str, subtitle_string=f"◀ Placefield Peaks - {len(LR_only_decoder_aclu_MAX_peak_maps_df)} Place cells")
+        perform_update_title_subtitle(fig=fig_LR_RL, ax=ax_LR, title_string=suptitle_str, subtitle_string=f"< Placefield Peaks - {len(LR_only_decoder_aclu_MAX_peak_maps_df)} Place cells")
         fig_LR_RL, ax_RL, _extant_plot_container_RL = cls._plot_track_remapping_diagram(RL_only_decoder_aclu_MAX_peak_maps_df, grid_bin_bounds=grid_bin_bounds, long_column_name=RL_only_column_names[0], short_column_name=RL_only_column_names[1], **_RL_kwargs, ax=ax_RL, extant_plot_container=_extant_plot_container_RL, **deepcopy(kwargs))
-        perform_update_title_subtitle(fig=fig_LR_RL, ax=ax_RL, title_string=suptitle_str, subtitle_string=f"▶ Placefield Peaks - {len(RL_only_decoder_aclu_MAX_peak_maps_df)} Place cells")
+        perform_update_title_subtitle(fig=fig_LR_RL, ax=ax_RL, title_string=suptitle_str, subtitle_string=f"> Placefield Peaks - {len(RL_only_decoder_aclu_MAX_peak_maps_df)} Place cells")
         
         return _fig_container
 

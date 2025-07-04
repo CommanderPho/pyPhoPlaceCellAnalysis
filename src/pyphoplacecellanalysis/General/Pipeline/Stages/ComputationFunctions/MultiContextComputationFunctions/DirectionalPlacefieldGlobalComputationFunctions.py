@@ -7713,7 +7713,7 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
 
 
     @function_attributes(short_name='directional_track_template_pf1Ds', tags=['directional','template','debug', 'overview', 'figure'], conforms_to=['output_registering', 'figure_saving'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-12-22 10:41', related_items=[], is_global=True)
-    def _display_directional_track_template_pf1Ds(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, save_figure=True, included_any_context_neuron_ids=None, use_incremental_sorting: bool = False, **kwargs):
+    def _display_directional_track_template_pf1Ds(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, save_figure=True, included_any_context_neuron_ids=None, use_incremental_sorting: bool = False, figsize=(6.26, 5.25), aclu_labels_strokewidth: float = 0.5, **kwargs):
             """ Plots each template's pf1Ds side-by-side in four adjacent subplots. 
             Stack of line-curves style, not heatmap-style
             """
@@ -7739,11 +7739,21 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
                     return owning_pipeline_reference.output_figure(final_context, fig, **save_figure_kwargs)
                 else:
                     pass # do nothing, don't save
+                
 
-            _rc_context_kwargs = {'savefig.transparent': True, 'ps.fonttype': 42, 'pdf.fonttype': 42}
+            if prepare_for_publication:
+                from neuropy.utils.matplotlib_helpers import find_first_available_matplotlib_font_name
+
+                found_matplotlib_font_name: str = find_first_available_matplotlib_font_name(desired_fonts_list=['Arial'])
+                assert found_matplotlib_font_name, f"found_matplotlib_font_name: {found_matplotlib_font_name} Arial was not found!"
+            else:
+                found_matplotlib_font_name = None
+
+            _rc_context_kwargs = {'savefig.transparent': True, 'ps.fonttype': 42, 'pdf.fonttype': 42, }
             if prepare_for_publication:
                 formatted_title_strings_dict = DisplayColorsEnum.get_matplotlib_formatted_title_dict()
-                _rc_context_kwargs.update({'figure.dpi': '100', 'figure.frameon': False, 'figure.figsize': (8.5, 9.0), }) # , 'figure.constrained_layout.use': (constrained_layout or False)
+                assert found_matplotlib_font_name is not None
+                _rc_context_kwargs.update({'figure.dpi': '100', 'figure.frameon': False, 'figure.figsize': figsize, 'font.family': found_matplotlib_font_name}) # , 'figure.constrained_layout.use': (constrained_layout or False)
 
             with mpl.rc_context(_rc_context_kwargs): # 'figure.dpi': '220', 'figure.figsize': (10, 4), 
                 # Create a FigureCollector instance
@@ -7814,7 +7824,7 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
                         active_display_ctx = active_context.adding_context('display_fn', display_fn_name='plot_ratemaps_1D')
                         # active_display_fn_identifying_ctx = curr_active_pipeline.build_display_context_for_filtered_session(filtered_session_name=a_name, display_fn_name='plot_directional_pf1Ds')
                         # active_display_fn_identifying_ctx
-                        ax_pf_1D = a_decoder.pf.plot_ratemaps_1D(ax=axd["ax_pf_tuning_curve"], active_context=active_display_ctx)
+                        ax_pf_1D = a_decoder.pf.plot_ratemaps_1D(ax=axd["ax_pf_tuning_curve"], active_context=active_display_ctx, aclu_labels_strokewidth=aclu_labels_strokewidth)
                         active_display_ctx = active_context.adding_context('display_fn', display_fn_name='plot_occupancy_1D')
                         # active_display_ctx_string = active_display_ctx.get_description(separator='|')
                         all_display_contexts.append(active_display_ctx)
