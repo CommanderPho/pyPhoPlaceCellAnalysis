@@ -2013,7 +2013,7 @@ def _plot_long_short_firing_rate_indicies(x_frs_index, y_frs_index, active_conte
     # rc('text.latex', preamble=r'\usepackage{color}')
 
     diagonal_y_equals_x_line_kwargs = dict(linestyle='--', color='gray', label='y=x')
-    fig_kwargs = dict(figsize=(8.5, 7.25), num=f'long|short fr indicies_{active_context.get_description(separator="/")}', clear=True) | pop_dict_subset(scatter_params, ['figsize', 'num', 'clear', 'dpi'])
+    fig_kwargs = dict(figsize=(8.5, 7.25), num=f'long|short fr indices_{active_context.get_description(separator="/")}', clear=True) | pop_dict_subset(scatter_params, ['figsize', 'num', 'clear', 'dpi'])
     prepare_for_publication: bool = scatter_params.pop('prepare_for_publication', False)
         
     if prepare_for_publication:
@@ -2112,7 +2112,7 @@ def _plot_long_short_firing_rate_indicies(x_frs_index, y_frs_index, active_conte
     ax.set_ylabel(ylabel_str, **x_y_axes_label_kwargs, **ylabel_kwargs)
 
     ## Non-flexitext version:
-    # plt.title('long ($L$)|short($S$) firing rate indicies')
+    # plt.title('long ($L$)|short($S$) firing rate indices')
     # plt.suptitle(f'{active_context.get_description(separator="/")}')
 
     # `flexitext` version:
@@ -2131,13 +2131,13 @@ def _plot_long_short_firing_rate_indicies(x_frs_index, y_frs_index, active_conte
     
 
     if not prepare_for_publication:
-        flexitext(text_formatter.left_margin, text_formatter.top_margin, '<size:22><color:royalblue, weight:bold>long ($L$)</>|<color:crimson, weight:bold>short($S$)</> <weight:bold>firing rate indicies</></>', va="bottom", xycoords="figure fraction")
+        flexitext(text_formatter.left_margin, text_formatter.top_margin, '<size:22><color:royalblue, weight:bold>long ($L$)</>|<color:crimson, weight:bold>short($S$)</> <weight:bold>firing rate indices</></>', va="bottom", xycoords="figure fraction")
         ## Only include the footer label when not for publication
         footer_text_obj = flexitext((text_formatter.left_margin*0.1), (text_formatter.bottom_margin*0.25), text_formatter._build_footer_string(active_context=active_context), va="top", xycoords="figure fraction")
     else:  
         ## Publication Mode
         ## Smaller fonts for publication -- Originally 18, now 9
-        flexitext(text_formatter.left_margin, text_formatter.top_margin, '<size:9><color:royalblue, weight:bold>long ($L$)</>|<color:crimson, weight:bold>short($S$)</> <weight:bold>firing rate indicies</></>', va="bottom", xycoords="figure fraction")
+        flexitext(text_formatter.left_margin, text_formatter.top_margin, '<size:9><color:royalblue, weight:bold>long ($L$)</>|<color:crimson, weight:bold>short($S$)</> <weight:bold>firing rate indices</></>', va="bottom", xycoords="figure fraction")
 
     # fig.set_size_inches([8.5, 7.25]) # size figure so the x and y labels aren't cut off
 
@@ -2967,13 +2967,13 @@ def _plot_single_track_firing_rate_compare(laps_frs_dict, replays_frs_dict, acti
         
         
         if not prepare_for_publication:
-            flexitext(text_formatter.left_margin, text_formatter.top_margin, f'<size:22><weight:bold>{track_name}</> laps|replay <weight:bold>firing rate</></>', va="bottom", xycoords="figure fraction")
+            flexitext(text_formatter.left_margin, text_formatter.top_margin, f'<size:22><weight:bold>{track_name}</> laps|replay <weight:bold>rate</></>', va="bottom", xycoords="figure fraction")
             ## Only include the footer label when not for publication
             footer_text_obj = flexitext((text_formatter.left_margin*0.1), (text_formatter.bottom_margin*0.25), text_formatter._build_footer_string(active_context=active_context), va="top", xycoords="figure fraction")
         else:  
             ## Publication Mode
             ## Smaller fonts for publication -- Originally 18, now 9
-            flexitext(text_formatter.left_margin, text_formatter.top_margin, f'<size:8><weight:bold>{track_name}</> laps|replay <weight:bold>firing rate</></>', va="bottom", xycoords="figure fraction")
+            flexitext(text_formatter.left_margin, text_formatter.top_margin, f'<size:8><weight:bold>{track_name}</> laps|replay <weight:bold>rate</></>', va="bottom", xycoords="figure fraction")
 
         # add static tiny labels for the neuron_id beside each data point
         if enable_tiny_point_labels:
