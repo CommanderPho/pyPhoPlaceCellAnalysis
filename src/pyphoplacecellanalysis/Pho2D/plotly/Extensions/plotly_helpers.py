@@ -694,9 +694,16 @@ def plotly_pre_post_delta_scatter(data_results_df: pd.DataFrame, data_context: O
     # Post-Delta Histogram
     trace_name_prefix:str = 'trace_post_delta_hist'
     _tmp_post_delta_fig = px.histogram(post_delta_df, y=histogram_variable_name, **(common_plot_kwargs | hist_kwargs), title=post_delta_label)
+    
+    # range_y
+
     for a_trace in _tmp_post_delta_fig.data:
-        a_trace.xbins.start = 0.05
-        a_trace.xbins.end = 0.95
+        # a_trace.xbins.start = 0.05
+        # a_trace.xbins.end = 0.95
+        # a_trace.xbins.size = 0.1
+        ## #TODO 2025-07-03 21:42: - [ ] plotly histogram for data strictly between 0.0-1.0 has its outermost bins from -[0.5-0.5], ... [0.95, 1.05]. How can I fix this?   
+        a_trace.xbins.start = 0.0
+        a_trace.xbins.end = 1.0
         a_trace.xbins.size = 0.1
         a_full_trace_name: str = '_'.join([v for v in [trace_name_prefix, a_trace.name] if (len(v)>0)]) ## build new trace name
         PlotlyFigureContainer.add_trace_with_legend_handling(
@@ -707,6 +714,11 @@ def plotly_pre_post_delta_scatter(data_results_df: pd.DataFrame, data_context: O
     if forced_range_y is not None:
         fig.update_layout(yaxis=dict(range=forced_range_y))
     fig.update_layout(yaxis=dict(range=forced_range_y), barmode='overlay')
+
+    # fig = fig.update_yaxes(col=1, range=[-0.05, 1.05])
+    # fig = fig.update_yaxes(col=3, range=[-0.05, 1.05])
+    # # df_filter.figure_widget = df_filter.figure_widget.update_yaxes(col=2, range=[0.0, 1.0])
+    # fig = fig.update_yaxes(col=2, range=[0.0, 5.0])
 
     # Add epoch shapes if provided
     if time_delta_tuple is not None:
@@ -756,6 +768,22 @@ def plotly_pre_post_delta_scatter(data_results_df: pd.DataFrame, data_context: O
         title_text="Probability of Short Track", row=1, col=1, range=[0, 1],
         autorange=False, fixedrange=True
     )
+    
+
+    ## Override y-axis for whole row
+    fig.update_yaxes(row=1, range=[-0.05, 1.05], autorange=False, fixedrange=True)
+    
+    
+    # fig.update_yaxes(
+    #     title_text="Probability of Short Track", row=1, col=0, range=[0, 1],
+    #     autorange=False, fixedrange=True
+    # )
+
+    # fig.update_yaxes(
+    #     title_text="Probability of Short Track", row=1, col=2, range=[0, 1],
+    #     autorange=False, fixedrange=True
+    # )
+
 
     # Add super title if provided
     if figure_sup_huge_title_text is not None:
@@ -803,8 +831,6 @@ def plotly_pre_post_delta_scatter(data_results_df: pd.DataFrame, data_context: O
             )
             line_x_pos: float = suptitle_kwarg_fig_width_dict[curr_fig_width]['line_x_pos']
 
-
-            # if did_create_new_figure:
             fig.add_annotation(
                 text=figure_sup_huge_title_text,
                 **annotation_kwargs,
