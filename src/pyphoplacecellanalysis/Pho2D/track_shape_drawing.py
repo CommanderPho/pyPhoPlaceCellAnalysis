@@ -2,6 +2,7 @@ from pathlib import Path
 import sys
 from copy import deepcopy
 from typing import Tuple, Optional, List, Dict, Union
+from neuropy.utils.result_context import IdentifyingContext
 import nptyping as ND
 from nptyping import NDArray
 from enum import Enum # for TrackPositionClassification
@@ -15,6 +16,7 @@ from pyphocorehelpers.geometry_helpers import point_tuple_mid_point, BoundsRect,
 from pyphocorehelpers.programming_helpers import metadata_attributes
 from pyphocorehelpers.function_helpers import function_attributes
 from pyphocorehelpers.gui.Qt.color_helpers import ColorFormatConverter
+from pyphocorehelpers.assertion_helpers import Assert
 from pyphoplacecellanalysis.General.Model.Configs.LongShortDisplayConfig import LongShortDisplayConfigManager
 
 import pyphoplacecellanalysis.External.pyqtgraph as pg
@@ -984,14 +986,16 @@ def test_LinearTrackDimensions_2D_Matplotlib(long_track_dims=None, short_track_d
     else:
         figsize=(4,8)
 
-    fig, (ax1, ax2) = plt.subplots(nrows=2, ncols=1, figsize=figsize)
-    
+    fig, (ax1, ax2) = plt.subplots(nrows=2, ncols=1, figsize=figsize, sharex=True, sharey=True)
     long_track_dims.plot_rects(ax1, offset=long_offset, rotate_to_vertical=rotate_to_vertical)
     short_track_dims.plot_rects(ax2, offset=short_offset, rotate_to_vertical=rotate_to_vertical)
     # [ax.axis('equal') for ax in (ax1, ax2)]
     # Auto scale views
     ax1.autoscale_view()
     ax2.autoscale_view()
+    
+    ax1.set_aspect('equal')
+    ax2.set_aspect('equal')
 
     ax1.set_title("LongTrack")
     ax2.set_title("ShortTrack")
@@ -2452,7 +2456,7 @@ class TrackRemappingDiagramFigure:
         if active_context is not None:
                 display_context = active_context.adding_context('display_fn', display_fn_name='bidir_track_remap')
             
-        with mpl.rc_context(PhoPublicationFigureHelper.rc_context_kwargs({'figure.figsize': (10, 4), 'figure.dpi': '220',})):
+        with mpl.rc_context(PhoPublicationFigureHelper.rc_context_kwargs({'figure.figsize': (6.5, 4), 'figure.dpi': '220',})):
 
             # Create a FigureCollector instance
             with FigureCollector(name='plot_bidirectional_track_remapping_diagram', base_context=display_context) as collector:
@@ -2507,7 +2511,7 @@ class TrackRemappingDiagramFigure:
                 ## Either way, make a single figure for both LR/RL remapping cells:
                 if use_separate_plot_for_each_direction:
                     ## Make two separate axes for LR/RL remapping cells:
-                    fig, axs = collector.subplots(nrows=2, ncols=1, sharex=True, sharey=True, num='Track Remapping', figsize=kwargs.pop('figsize', (10, 4)), dpi=kwargs.pop('dpi', None), constrained_layout=True, clear=True)
+                    fig, axs = collector.subplots(nrows=2, ncols=1, sharex=True, sharey=True, num='Track Remapping', figsize=kwargs.pop('figsize', (6.5, 4)), dpi=kwargs.pop('dpi', None), constrained_layout=True, clear=True)
                     assert len(axs) == 2, f"{len(axs)}"
                     ax_dict = {'ax_LR': axs[0], 'ax_RL': axs[1]}
 
@@ -2519,7 +2523,7 @@ class TrackRemappingDiagramFigure:
                     setup_common_after_creation(collector, fig=fig, axes=[ax_LR, ax_RL], sub_context=display_context.adding_context('subplot', subplot_name='Track Remapping'))
                 else:
                     ## plot both LR/RL cells on a single combined axes:
-                    fig, axs = collector.subplots(nrows=1, ncols=1, sharex=True, sharey=True, num='Track Remapping', figsize=kwargs.pop('figsize', (10, 4)), dpi=kwargs.pop('dpi', None), constrained_layout=True, clear=True)
+                    fig, axs = collector.subplots(nrows=1, ncols=1, sharex=True, sharey=True, num='Track Remapping', figsize=kwargs.pop('figsize', (6.5, 4)), dpi=kwargs.pop('dpi', None), constrained_layout=True, clear=True)
                     # assert len(axs) == 1, f"{len(axs)}"
                     ax = axs
 
@@ -2535,7 +2539,7 @@ class TrackRemappingDiagramFigure:
 
     @function_attributes(short_name=None, tags=['figure', 'publication', 'figure1'], input_requires=[], output_provides=[], uses=['_plot_track_remapping_diagram', 'perform_update_title_subtitle', 'build_or_reuse_figure'], used_by=[], creation_date='2025-06-16 20:44', related_items=[])
     @classmethod
-    def plot_publication_bidirectional_track_remapping_diagram(cls, all_neuron_stats_table, use_considerable_remapping_cells_only: bool=False, use_pf2D_peaks: bool = False, considerable_remapping_emphasis_color=None, **kwargs):
+    def plot_publication_bidirectional_track_remapping_diagram(cls, all_neuron_stats_table: pd.DataFrame, use_considerable_remapping_cells_only: bool=False, use_pf2D_peaks: bool = False, considerable_remapping_emphasis_color=None, **kwargs):
         """ Plots the neuron remapping diagram
                 
         from pyphoplacecellanalysis.SpecificResults.AcrossSessionResults import AcrossSessionsResults # for .build_neuron_identities_df_for_CSV
@@ -2568,6 +2572,19 @@ class TrackRemappingDiagramFigure:
 
 
         """
+        from pyphoplacecellanalysis.SpecificResults.AcrossSessionResults import AcrossSessionsVisualizations ## for `.output_figure`
+        import matplotlib as mpl
+        import matplotlib.pyplot as plt
+        from flexitext import flexitext ## flexitext for formatted matplotlib text
+
+        from pyphocorehelpers.DataStructure.RenderPlots.MatplotLibRenderPlots import FigureCollector
+        from pyphoplacecellanalysis.General.Model.Configs.LongShortDisplayConfig import PlottingHelpers
+        from neuropy.utils.matplotlib_helpers import FormattedFigureText
+
+        from matplotlib.gridspec import GridSpec
+        from neuropy.utils.matplotlib_helpers import build_or_reuse_figure, perform_update_title_subtitle
+        from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.SpikeRasters import build_shared_sorted_neuron_color_maps
+        from pyphoplacecellanalysis.SpecificResults.PhoDiba2023Paper import PhoPublicationFigureHelper
         from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.ContainerBased.PhoContainerTool import GenericMatplotlibContainer
         from matplotlib.gridspec import GridSpec
         from neuropy.utils.matplotlib_helpers import build_or_reuse_figure, perform_update_title_subtitle
@@ -2575,28 +2592,20 @@ class TrackRemappingDiagramFigure:
         from neuropy.core.user_annotations import UserAnnotationsManager
 
         ## INPUTS: all_neuron_stats_table
-        
+        output_parent_path = Path(R'E:\Dropbox (Personal)\Active\Kamran Diba Lab\Pho-Kamran-Meetings\2025-07-03 - EXPORTS FOR PUBLICATION\Figure 1 - Overview').resolve()
+        Assert.path_exists(output_parent_path)
+                
+        output_path: Path = output_parent_path.joinpath('bidir_cell_remapping').resolve()
+
+
         if use_considerable_remapping_cells_only:
             active_all_neuron_stats_table: pd.DataFrame = deepcopy(all_neuron_stats_table)[all_neuron_stats_table['has_considerable_remapping']] ## Only the considerably remapping cells
         else:
             active_all_neuron_stats_table: pd.DataFrame = deepcopy(all_neuron_stats_table) ## All Cells
             
-        # ['track_membership'] # SHARED, LEFT_ONLY, RIGHT_ONLY
-        # LR_only_column_names = ['long_LR_pf1D_peak', 'short_LR_pf1D_peak']
-        # RL_only_column_names = ['long_RL_pf1D_peak', 'short_RL_pf1D_peak']
-
         LR_only_column_base_names = ['long_LR', 'short_LR']
         RL_only_column_base_names = ['long_RL', 'short_RL']
-
-        # long_short_any_column_names = ['long_pf_peak_x', 'short_pf_peak_x']
-
-        # long_LR_pf2D_peak_x, 
-
-        # any_1D_column_names = ['long_LR_pf1D_peak', 'long_RL_pf1D_peak', 'short_LR_pf1D_peak', 'short_RL_pf1D_peak']
-        # any_1D_column_names = ['long_LR_pf1D_peak', 'long_RL_pf1D_peak', 'short_LR_pf1D_peak', 'short_RL_pf1D_peak']
-
-
-        # use_pf2D: bool = False
+        
         if use_pf2D_peaks:
             decoder_name_suffix: str = 'pf2D_peak_x'
         else:
@@ -2615,17 +2624,6 @@ class TrackRemappingDiagramFigure:
             LR_only_column_names.extend([f"{a_name}_{decoder_name_suffix_y}_rel" for a_name in LR_only_column_base_names])
             RL_only_column_names.extend([f"{a_name}_{decoder_name_suffix_y}_rel" for a_name in RL_only_column_base_names])
             
-
-        # global_min_x: float = np.nanmin(active_all_neuron_stats_table[any_1D_column_names].min(axis='columns', skipna=True).values)
-        # global_max_x: float = np.nanmax(active_all_neuron_stats_table[any_1D_column_names].max(axis='columns', skipna=True).values)
-        # global_min_y: float = np.nanmin(active_all_neuron_stats_table[any_1D_column_names].min(axis='columns', skipna=True).values)
-        # global_max_y: float = np.nanmax(active_all_neuron_stats_table[any_1D_column_names].max(axis='columns', skipna=True).values)
-
-        # (global_min_x, global_max_x)
-
-        # global_most_extreme_track_grid_bin_bounds = ((global_min_x, global_max_x), (global_min_y, global_min_y), )
-        # OUTPUTS: global_most_extreme_track_grid_bin_bounds, (global_min_x, global_max_x)
-        # global_most_extreme_track_grid_bin_bounds
 
         ## Get grid_bin_bounds for drawing of the track outlines
         _out_user_annotations_add_code_lines, loaded_configs = UserAnnotationsManager.batch_build_user_annotation_grid_bin_bounds_from_exported_position_info_mat_files(search_parent_path=Path(r'W:/Data/Kdiba'), print_user_annotations_lines_to_add=False, debug_print=False)
@@ -2661,93 +2659,91 @@ class TrackRemappingDiagramFigure:
                     aclus_y_offset_mode=AclusYOffsetMode.RandomJitter,
                     considerable_remapping_emphasis_color=considerable_remapping_emphasis_color,
                     # aclus_y_offset_mode=AclusYOffsetMode.CountBased,
-                    
                     ) | kwargs
         
-        fig = build_or_reuse_figure(fignum='Track Remapping', fig=kwargs.pop('fig', None), fig_idx=kwargs.pop('fig_idx', 0), figsize=kwargs.pop('figsize', (10, 4)), dpi=kwargs.pop('dpi', None), constrained_layout=True, clear=True) # , clear=True
-        gs = GridSpec(2, 1, figure=fig)
-        ax_LR = plt.subplot(gs[0])
-        ax_RL = plt.subplot(gs[1])
+        active_context = IdentifyingContext()
+        display_context = active_context.adding_context('display_fn', display_fn_name='bidir_track_remap')
 
-        _fig_container: GenericMatplotlibContainer = GenericMatplotlibContainer(name='across-session-neuron-remapping-diagram')
-        _fig_container.fig = fig
-        _fig_container.plots.gs = gs
-        _fig_container.axes = [ax_LR, ax_RL]
-        # _fig_container.plots
-
-        _extant_plot_container_LR = None
-        _extant_plot_container_RL = None
-
-        # included_session_uids = None
-        # # included_session_uids = ['kdiba|gor01|two|2006-6-07_16-40-19']
-        # # included_session_uids = ['kdiba|gor01|one|2006-6-09_1-22-43']
-
-        # if included_session_uids is None:
-        #     included_session_uids = list(per_session_all_neuron_stats_table.keys())
-
-        ## All included_session_uids
-        # included_session_uids
-
-        # _fig_container.params.included_session_uids = deepcopy(included_session_uids)
-        _fig_container.plots_data.all_neuron_stats_table = deepcopy(all_neuron_stats_table)
-        _fig_container.plots_data.active_all_neuron_stats_table = deepcopy(active_all_neuron_stats_table)
-        # _fig_container.plots_data.per_session_all_neuron_stats_table = deepcopy(per_session_all_neuron_stats_table)
-        # _fig_container.plots_data.per_session_uid_loaded_configs_dict = deepcopy(per_session_uid_loaded_configs_dict)
+        def perform_write_to_file_callback(ctxt, fig):
+            """ captures: Nothing
+            """
+            return (ctxt, AcrossSessionsVisualizations.output_figure(final_context=display_context, fig=fig, write_vector_format=True, write_png=False))
 
 
 
-        ## All on the same plot:
+        with mpl.rc_context(PhoPublicationFigureHelper.rc_context_kwargs({'figure.figsize': (6.5, 4), 'figure.dpi': '220',})):
 
-        ## INPUTS: global_most_extreme_track_grid_bin_bounds
+            # Create a FigureCollector instance
+            with FigureCollector(name='plot_bidirectional_track_remapping_diagram', base_context=display_context) as collector:
 
-        # a_df: pd.DataFrame = deepcopy(all_neuron_stats_table)
-        a_df: pd.DataFrame = deepcopy(active_all_neuron_stats_table)
+                ## Define common operations to do after making the figure:
+                def setup_common_after_creation(a_collector, fig, axes, sub_context, title=f'<size:22>Track <weight:bold>Remapping</></>'):
+                    """ Captures:
 
-        # a_session_config = per_session_uid_loaded_configs_dict[session_uid]
-        grid_bin_bounds = deepcopy(global_most_extreme_track_grid_bin_bounds)
-
-        ## ['long_LR_pf1D_peak', 'long_RL_pf1D_peak', 'short_LR_pf1D_peak', 'short_RL_pf1D_peak']
-
-        # #TODO 2025-06-27 12:04: - [ ] Hardcoded override?
-        # LR_only_column_names = ['long_LR_pf1D_peak', 'short_LR_pf1D_peak']
-        # RL_only_column_names = ['long_RL_pf1D_peak', 'short_RL_pf1D_peak']
-
-        # INPUTS: any_1D_column_names
-        # INPUTS: LR_only_column_names, RL_only_column_names
-
-        # neuron_id_col_name: str = 'aclu'
-        # neuron_id_col_name: str = 'neuron_uid'
-        # neuron_IDs_lists = [deepcopy(a_df[[neuron_id_col_name, a_column_name]]).dropna(axis=0, how='any')[neuron_id_col_name].to_numpy() for a_column_name in any_1D_column_names] # [A, B, C, D, ...]
-        # neuron_IDs_lists
-
-        # LR_only_decoder_aclu_MAX_peak_maps_df = deepcopy(a_df[LR_only_column_names]).dropna(axis=0, how='any') # 266
-        # RL_only_decoder_aclu_MAX_peak_maps_df = deepcopy(a_df[RL_only_column_names]).dropna(axis=0, how='any') # 262
-
-        LR_only_decoder_aclu_MAX_peak_maps_df = deepcopy(a_df[LR_only_column_names + _common_column_names]).dropna(axis=0, how='all') # 266
-        RL_only_decoder_aclu_MAX_peak_maps_df = deepcopy(a_df[RL_only_column_names + _common_column_names]).dropna(axis=0, how='all') # 262
-
-        # LR_only_decoder_aclu_MAX_peak_maps_df = deepcopy(a_df[LR_only_column_names])
-        # RL_only_decoder_aclu_MAX_peak_maps_df = deepcopy(a_df[RL_only_column_names])
+                    t_split
+                    """
+                    a_collector.contexts.append(sub_context)
+                    
+                    # `flexitext` version:
+                    text_formatter = FormattedFigureText()
+                    # ax.set_title('')
+                    fig.suptitle('')
+                    text_formatter.setup_margins(fig)
+                    title_text_obj = flexitext(text_formatter.left_margin, text_formatter.top_margin, title, va="bottom", xycoords="figure fraction")
+                
+                    if ((perform_write_to_file_callback is not None) and (sub_context is not None)):
+                        perform_write_to_file_callback(sub_context, fig)
 
 
-        ## OUTPUTS: LR_only_decoder_aclu_MAX_peak_maps_df, RL_only_decoder_aclu_MAX_peak_maps_df
-        # LR_only_decoder_aclu_MAX_peak_maps_df # 266
-        # RL_only_decoder_aclu_MAX_peak_maps_df # 262
-        if use_pf2D_peaks:
-            kwargs['aclus_y_offset_mode'] = AclusYOffsetMode.Pf2DExactY
-            _LR_kwargs = dict(long_y_column_name=LR_only_column_names[2], short_y_column_name=LR_only_column_names[3])
-            _RL_kwargs = dict(long_y_column_name=RL_only_column_names[2], short_y_column_name=RL_only_column_names[3])
-        else:
-            _LR_kwargs = dict()
-            _RL_kwargs = dict()
-            
-        suptitle_str: str = 'Placecell Peak Remapping (Example Session)'
-        ## Plot the track shapes (if needed, and the significant remapping points/arrows):
-        fig_LR_RL, ax_LR, _extant_plot_container_LR = cls._plot_track_remapping_diagram(LR_only_decoder_aclu_MAX_peak_maps_df, grid_bin_bounds=grid_bin_bounds, long_column_name=LR_only_column_names[0], short_column_name=LR_only_column_names[1], **_LR_kwargs, ax=ax_LR, extant_plot_container=_extant_plot_container_LR, **deepcopy(kwargs))
-        perform_update_title_subtitle(fig=fig_LR_RL, ax=ax_LR, title_string=suptitle_str, subtitle_string=f"< Placefield Peaks - {len(LR_only_decoder_aclu_MAX_peak_maps_df)} Place cells")
-        fig_LR_RL, ax_RL, _extant_plot_container_RL = cls._plot_track_remapping_diagram(RL_only_decoder_aclu_MAX_peak_maps_df, grid_bin_bounds=grid_bin_bounds, long_column_name=RL_only_column_names[0], short_column_name=RL_only_column_names[1], **_RL_kwargs, ax=ax_RL, extant_plot_container=_extant_plot_container_RL, **deepcopy(kwargs))
-        perform_update_title_subtitle(fig=fig_LR_RL, ax=ax_RL, title_string=suptitle_str, subtitle_string=f"> Placefield Peaks - {len(RL_only_decoder_aclu_MAX_peak_maps_df)} Place cells")
-        
+                # BEGIN FUNCTION BODY
+                fig = build_or_reuse_figure(fignum='Track Remapping', fig=kwargs.pop('fig', None), fig_idx=kwargs.pop('fig_idx', 0), figsize=kwargs.pop('figsize', (6.5, 4)), dpi=kwargs.pop('dpi', None), constrained_layout=True, clear=True) # , clear=True
+                gs = GridSpec(2, 1, figure=fig)
+                ax_LR = plt.subplot(gs[0])
+                ax_RL = plt.subplot(gs[1])
+
+                _fig_container: GenericMatplotlibContainer = GenericMatplotlibContainer(name='across-session-neuron-remapping-diagram')
+                _fig_container.fig = fig
+                _fig_container.plots.gs = gs
+                _fig_container.axes = [ax_LR, ax_RL]
+                # _fig_container.plots
+
+                _extant_plot_container_LR = None
+                _extant_plot_container_RL = None
+
+                # _fig_container.params.included_session_uids = deepcopy(included_session_uids)
+                _fig_container.plots_data.all_neuron_stats_table = deepcopy(all_neuron_stats_table)
+                _fig_container.plots_data.active_all_neuron_stats_table = deepcopy(active_all_neuron_stats_table)
+                # _fig_container.plots_data.per_session_all_neuron_stats_table = deepcopy(per_session_all_neuron_stats_table)
+                # _fig_container.plots_data.per_session_uid_loaded_configs_dict = deepcopy(per_session_uid_loaded_configs_dict)
+
+                ## All on the same plot:
+
+                ## INPUTS: global_most_extreme_track_grid_bin_bounds
+
+                # a_df: pd.DataFrame = deepcopy(all_neuron_stats_table)
+                a_df: pd.DataFrame = deepcopy(active_all_neuron_stats_table)
+
+                # a_session_config = per_session_uid_loaded_configs_dict[session_uid]
+                grid_bin_bounds = deepcopy(global_most_extreme_track_grid_bin_bounds)
+                LR_only_decoder_aclu_MAX_peak_maps_df = deepcopy(a_df[LR_only_column_names + _common_column_names]).dropna(axis=0, how='all') # 266
+                RL_only_decoder_aclu_MAX_peak_maps_df = deepcopy(a_df[RL_only_column_names + _common_column_names]).dropna(axis=0, how='all') # 262
+
+                if use_pf2D_peaks:
+                    kwargs['aclus_y_offset_mode'] = AclusYOffsetMode.Pf2DExactY
+                    _LR_kwargs = dict(long_y_column_name=LR_only_column_names[2], short_y_column_name=LR_only_column_names[3])
+                    _RL_kwargs = dict(long_y_column_name=RL_only_column_names[2], short_y_column_name=RL_only_column_names[3])
+                else:
+                    _LR_kwargs = dict()
+                    _RL_kwargs = dict()
+                    
+                suptitle_str: str = 'Placecell Peak Remapping (Example Session)'
+                ## Plot the track shapes (if needed, and the significant remapping points/arrows):
+                fig_LR_RL, ax_LR, _extant_plot_container_LR = cls._plot_track_remapping_diagram(LR_only_decoder_aclu_MAX_peak_maps_df, grid_bin_bounds=grid_bin_bounds, long_column_name=LR_only_column_names[0], short_column_name=LR_only_column_names[1], **_LR_kwargs, ax=ax_LR, extant_plot_container=_extant_plot_container_LR, **deepcopy(kwargs))
+                perform_update_title_subtitle(fig=fig_LR_RL, ax=ax_LR, title_string=suptitle_str, subtitle_string=f"< Placefield Peaks - {len(LR_only_decoder_aclu_MAX_peak_maps_df)} Place cells")
+                fig_LR_RL, ax_RL, _extant_plot_container_RL = cls._plot_track_remapping_diagram(RL_only_decoder_aclu_MAX_peak_maps_df, grid_bin_bounds=grid_bin_bounds, long_column_name=RL_only_column_names[0], short_column_name=RL_only_column_names[1], **_RL_kwargs, ax=ax_RL, extant_plot_container=_extant_plot_container_RL, **deepcopy(kwargs))
+                perform_update_title_subtitle(fig=fig_LR_RL, ax=ax_RL, title_string=suptitle_str, subtitle_string=f"> Placefield Peaks - {len(RL_only_decoder_aclu_MAX_peak_maps_df)} Place cells")
+                setup_common_after_creation(collector, fig=fig, axes=[ax_LR, ax_RL], sub_context=display_context.adding_context('subplot', subplot_name='Track Remapping'))
+                
         return _fig_container
 
 
