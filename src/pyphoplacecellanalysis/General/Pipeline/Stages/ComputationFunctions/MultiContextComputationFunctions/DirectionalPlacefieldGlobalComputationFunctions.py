@@ -387,7 +387,7 @@ class TrackTemplates(HDFMixin, AttrsBasedClassHelperMixin):
 
         Columns:
             ['aclu', 'long_LR_n_spikes', 'long_RL_n_spikes', 'short_LR_n_spikes', 'short_RL_n_spikes', 'long_n_spikes', 'short_n_spikes', 'total_n_spikes', 'pct_long_n_spikes', 'pct_short_n_spikes', 'is_n_spikes_LxC', 'is_n_spikes_SxC']
-        
+            ['long_LR_lap_dur', 'long_RL_lap_dur', 'short_LR_lap_dur', 'short_RL_lap_dur', 'long_lap_dur', 'short_lap_dur', 'total_lap_dur', 'long_fr_Hz', 'short_fr_Hz', 'total_fr_Hz', 'pct_long_fr_Hz', 'pct_short_fr_Hz', 'is_fr_Hz_LxC', 'is_fr_Hz_SxC']
         Usage:        
             from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import TrackTemplates
         
