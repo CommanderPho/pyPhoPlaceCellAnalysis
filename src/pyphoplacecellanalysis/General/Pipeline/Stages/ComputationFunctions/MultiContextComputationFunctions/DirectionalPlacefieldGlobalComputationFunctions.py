@@ -398,7 +398,8 @@ class TrackTemplates(HDFMixin, AttrsBasedClassHelperMixin):
         """
         spike_counts_dict = {k:deepcopy(v.pf.filtered_spikes_df['aclu']).value_counts().to_dict() for k, v in track_templates.get_decoders_dict().items()}
         any_decoder_aclus_list = deepcopy(track_templates.any_decoder_neuron_IDs)
-
+        total_duration_dict = {k:deepcopy(v.pf.epochs.duration).sum() for k, v in track_templates.get_decoders_dict().items()}
+        
         value_counts = []
         for aclu in any_decoder_aclus_list:
             value_counts.append({k:v.get(aclu, 0) for k, v in spike_counts_dict.items()})
@@ -413,13 +414,32 @@ class TrackTemplates(HDFMixin, AttrsBasedClassHelperMixin):
         decoders_total_num_spikes_df['pct_short'] = decoders_total_num_spikes_df['short'] / decoders_total_num_spikes_df['total']
 
         decoders_total_num_spikes_df = decoders_total_num_spikes_df.add_suffix('_n_spikes')    
-
         decoders_total_num_spikes_df['is_n_spikes_LxC'] = decoders_total_num_spikes_df['pct_long_n_spikes'] >= cell_LS_eXclusivity_threshold
         decoders_total_num_spikes_df['is_n_spikes_SxC'] = decoders_total_num_spikes_df['pct_short_n_spikes'] >= cell_LS_eXclusivity_threshold
 
+        ## Use n_spikes combined with duration info to compute firing rates:
+        for k, laps_duration in total_duration_dict.items():
+            decoders_total_num_spikes_df[f'{k}_lap_dur'] = laps_duration
+        decoders_total_num_spikes_df['long_lap_dur'] = decoders_total_num_spikes_df[['long_LR_lap_dur', 'long_RL_lap_dur']].sum(axis='columns')
+        decoders_total_num_spikes_df['short_lap_dur'] = decoders_total_num_spikes_df[['short_LR_lap_dur', 'short_RL_lap_dur']].sum(axis='columns')
+        decoders_total_num_spikes_df['total_lap_dur'] = decoders_total_num_spikes_df['long_lap_dur'] + decoders_total_num_spikes_df['short_lap_dur']
+        
+        firing_rate_suffix: str = '_fr_Hz'
+        _spikes_col_names = ['long_LR_n_spikes', 'long_RL_n_spikes', 'short_LR_n_spikes', 'short_RL_n_spikes', 'long_n_spikes', 'short_n_spikes', 'total_n_spikes']
+        _duration_col_names = ['long_LR_n_spikes', 'long_RL_n_spikes', 'short_LR_n_spikes', 'short_RL_n_spikes', 'long_n_spikes', 'short_n_spikes', 'total_n_spikes']
+        decoders_total_num_spikes_df['long_fr_Hz'] = decoders_total_num_spikes_df['long_n_spikes'] / decoders_total_num_spikes_df['long_lap_dur'] # , 'long_RL']].sum(axis='columns')
+        decoders_total_num_spikes_df['short_fr_Hz'] = decoders_total_num_spikes_df['short_n_spikes'] / decoders_total_num_spikes_df['short_lap_dur']
+        decoders_total_num_spikes_df['total_fr_Hz'] = decoders_total_num_spikes_df['total_n_spikes'] / decoders_total_num_spikes_df['total_lap_dur']
+                
+        ## percent long (used for determing exclusivity)
+        decoders_total_num_spikes_df['pct_long_fr_Hz'] = decoders_total_num_spikes_df['long_fr_Hz'] / decoders_total_num_spikes_df['total_fr_Hz']
+        decoders_total_num_spikes_df['pct_short_fr_Hz'] = decoders_total_num_spikes_df['short_fr_Hz'] / decoders_total_num_spikes_df['total_fr_Hz']
+        
+        decoders_total_num_spikes_df['is_fr_Hz_LxC'] = decoders_total_num_spikes_df['pct_long_fr_Hz'] >= cell_LS_eXclusivity_threshold
+        decoders_total_num_spikes_df['is_fr_Hz_SxC'] = decoders_total_num_spikes_df['pct_short_fr_Hz'] >= cell_LS_eXclusivity_threshold
+
         decoders_total_num_spikes_df['aclu'] = decoders_total_num_spikes_df.index
         decoders_total_num_spikes_df = reorder_columns_relative(decoders_total_num_spikes_df, column_names=['aclu'], relative_mode='start')
-
 
         LxC_cells_df: pd.DataFrame = decoders_total_num_spikes_df[decoders_total_num_spikes_df['is_n_spikes_LxC']]
         SxC_cells_df: pd.DataFrame = decoders_total_num_spikes_df[decoders_total_num_spikes_df['is_n_spikes_SxC']]
