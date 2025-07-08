@@ -834,7 +834,7 @@ class AcrossSessionsResults:
         from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.LongShortTrackComputations import JonathanFiringRateAnalysisResult        
         from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.LongShortTrackComputations import InstantaneousSpikeRateGroupsComputation
         from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.LongShortTrackComputations import ExpectedVsObservedResult
-
+        from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import TrackTemplates
 
         session_context = curr_active_pipeline.get_session_context() 
 
@@ -871,6 +871,7 @@ class AcrossSessionsResults:
 
         ## try to add extra columns if available:
         directional_laps_results = curr_active_pipeline.global_computation_results.computed_data['DirectionalLaps']
+        assert directional_laps_results is not None, f"Must have directional_laps_results!"
         rank_order_results = curr_active_pipeline.global_computation_results.computed_data.get('RankOrder', None) # : "RankOrderComputationsContainer"
         if rank_order_results is not None:
             minimum_inclusion_fr_Hz: float = rank_order_results.minimum_inclusion_fr_Hz
@@ -883,8 +884,6 @@ class AcrossSessionsResults:
 
         track_templates = directional_laps_results.get_templates(minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz, included_qclu_values=included_qclu_values) # non-shared-only -- !! Is minimum_inclusion_fr_Hz=None the issue/difference?
         
-
-
         try:
             _neuron_replay_stats_df, _all_pf2D_peaks_modified_columns = jonathan_firing_rate_analysis_result.add_peak_promenance_pf_peaks(curr_active_pipeline=curr_active_pipeline, track_templates=track_templates)
         except (KeyError, ValueError, AttributeError) as e:
@@ -936,6 +935,11 @@ class AcrossSessionsResults:
 
         # AcrossSessionsResults.build_neuron_identity_table_to_hdf(file_path, key=session_group_key, spikes_df=self.sess.spikes_df, session_uid=session_uid)
 
+        decoders_total_num_spikes_df, (_LxC_cells_df, _SxC_cells_df) = TrackTemplates.perform_determine_quant_cell_eXclusivities(track_templates=track_templates)
+        decoders_total_num_spikes_df = decoders_total_num_spikes_df.neuron_identity.make_neuron_indexed_df_global(curr_active_pipeline.get_session_context(), add_expanded_session_context_keys=False, add_extended_aclu_identity_columns=True)
+        
+        ## OUTPUTS: decoders_total_num_spikes_df
+
         # ==================================================================================================================================================================================================================================================================================== #
         # Begin building fresh df                                                                                                                                                                                                                                                              #
         # ==================================================================================================================================================================================================================================================================================== #
@@ -963,6 +967,8 @@ class AcrossSessionsResults:
         all_neuron_stats_table = pd.merge(all_neuron_stats_table, long_short_fr_indicies_analysis_results_h5_df[['neuron_uid'] + [col for col in long_short_fr_indicies_analysis_results_h5_df.columns if col not in all_neuron_stats_table.columns and col != 'neuron_uid']], on='neuron_uid')
         ## merge in `rate_remapping_df`'s columns
         all_neuron_stats_table = pd.merge(all_neuron_stats_table, rate_remapping_df[['neuron_uid'] + [col for col in rate_remapping_df.columns if col not in all_neuron_stats_table.columns and col != 'neuron_uid']], on='neuron_uid')
+        ## merge in `decoders_total_num_spikes_df`'s columns
+        all_neuron_stats_table = pd.merge(all_neuron_stats_table, decoders_total_num_spikes_df[['neuron_uid'] + [col for col in decoders_total_num_spikes_df.columns if col not in all_neuron_stats_table.columns and col != 'neuron_uid']], on='neuron_uid')
 
         ## check
         # assert len(all_neuron_stats_table) == initial_num_rows, f"initial_num_rows: {initial_num_rows}, len(all_neuron_stats_table): {len(all_neuron_stats_table)}"

@@ -27,6 +27,7 @@ from pyphocorehelpers.print_helpers import strip_type_str_to_classname
 from pyphocorehelpers.exception_helpers import ExceptionPrintingContext
 from neuropy.utils.indexing_helpers import NumpyHelpers
 from pyphocorehelpers.assertion_helpers import Assert
+from pyphocorehelpers.indexing_helpers import reorder_columns_relative
 
 from neuropy.core.laps import Laps # used in `DirectionalLapsHelpers`
 from neuropy.utils.result_context import IdentifyingContext
@@ -397,7 +398,7 @@ class TrackTemplates(HDFMixin, AttrsBasedClassHelperMixin):
 
         value_counts = []
         for aclu in any_decoder_aclus_list:
-            value_counts.append({k:v.get(aclu, 0) for k, v in spike_counts_dict.items()})			
+            value_counts.append({k:v.get(aclu, 0) for k, v in spike_counts_dict.items()})
 
         decoders_total_num_spikes_df: pd.DataFrame = pd.DataFrame(value_counts, index=any_decoder_aclus_list)
         decoders_total_num_spikes_df['long'] = decoders_total_num_spikes_df[['long_LR', 'long_RL']].sum(axis='columns')
@@ -410,11 +411,15 @@ class TrackTemplates(HDFMixin, AttrsBasedClassHelperMixin):
 
         decoders_total_num_spikes_df = decoders_total_num_spikes_df.add_suffix('_n_spikes')    
 
-        decoders_total_num_spikes_df['is_LxC'] = decoders_total_num_spikes_df['pct_long_n_spikes'] >= cell_LS_eXclusivity_threshold
-        decoders_total_num_spikes_df['is_SxC'] = decoders_total_num_spikes_df['pct_short_n_spikes'] >= cell_LS_eXclusivity_threshold
+        decoders_total_num_spikes_df['is_n_spikes_LxC'] = decoders_total_num_spikes_df['pct_long_n_spikes'] >= cell_LS_eXclusivity_threshold
+        decoders_total_num_spikes_df['is_n_spikes_SxC'] = decoders_total_num_spikes_df['pct_short_n_spikes'] >= cell_LS_eXclusivity_threshold
 
-        LxC_cells_df: pd.DataFrame = decoders_total_num_spikes_df[decoders_total_num_spikes_df['is_LxC']]
-        SxC_cells_df: pd.DataFrame = decoders_total_num_spikes_df[decoders_total_num_spikes_df['is_SxC']]
+        decoders_total_num_spikes_df['aclu'] = decoders_total_num_spikes_df.index
+        decoders_total_num_spikes_df = reorder_columns_relative(decoders_total_num_spikes_df, column_names=['aclu'], relative_mode='start')
+
+
+        LxC_cells_df: pd.DataFrame = decoders_total_num_spikes_df[decoders_total_num_spikes_df['is_n_spikes_LxC']]
+        SxC_cells_df: pd.DataFrame = decoders_total_num_spikes_df[decoders_total_num_spikes_df['is_n_spikes_SxC']]
 
         ## OUTPUTS: decoders_total_num_spikes_df
         return decoders_total_num_spikes_df, (LxC_cells_df, SxC_cells_df)
