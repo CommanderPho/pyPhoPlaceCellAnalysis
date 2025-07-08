@@ -811,7 +811,8 @@ class AcrossSessionsResults:
     # 2025-05-09 - Combined CSV output                                                                                                                                                                                                                                                     #
     # ==================================================================================================================================================================================================================================================================================== #
 
-    @function_attributes(short_name=None, tags=['across-sessions'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-06-09 17:31', related_items=['AcrossSessionTables.build_neuron_replay_stats_table'])
+    @function_attributes(short_name=None, tags=['across-sessions'], input_requires=[], output_provides=[],
+                         requires_global_keys=['long_short_fr_indicies_analysis', 'long_short_post_decoding', 'DirectionalLaps'], uses=[], used_by=[], creation_date='2025-06-09 17:31', related_items=['AcrossSessionTables.build_neuron_replay_stats_table'])
     @classmethod
     def build_neuron_identities_df_for_CSV(cls, curr_active_pipeline) -> pd.DataFrame:
         """ Exports all available neuron information (both identity and computed in computations) for each neuron
@@ -852,7 +853,8 @@ class AcrossSessionsResults:
 
         # long_short_post_decoding result: __________________________________________________________________________________ #
         curr_long_short_post_decoding = curr_active_pipeline.global_computation_results.computed_data['long_short_post_decoding']
-        expected_v_observed_result, curr_long_short_rr = curr_long_short_post_decoding.expected_v_observed_result, curr_long_short_post_decoding.rate_remapping
+        # expected_v_observed_result = curr_long_short_post_decoding.expected_v_observed_result
+        curr_long_short_rr = curr_long_short_post_decoding.rate_remapping
         rate_remapping_df = curr_long_short_rr.rr_df
         # Flat_epoch_time_bins_mean, Flat_decoder_time_bin_centers, num_neurons, num_timebins_in_epoch, num_total_flat_timebins, is_short_track_epoch, is_long_track_epoch, short_short_diff, long_long_diff = expected_v_observed_result.Flat_epoch_time_bins_mean, expected_v_observed_result.Flat_decoder_time_bin_centers, expected_v_observed_result.num_neurons, expected_v_observed_result.num_timebins_in_epoch, expected_v_observed_result.num_total_flat_timebins, expected_v_observed_result.is_short_track_epoch, expected_v_observed_result.is_long_track_epoch, expected_v_observed_result.short_short_diff, expected_v_observed_result.long_long_diff
         ## OUTPUTS: rate_remapping_df

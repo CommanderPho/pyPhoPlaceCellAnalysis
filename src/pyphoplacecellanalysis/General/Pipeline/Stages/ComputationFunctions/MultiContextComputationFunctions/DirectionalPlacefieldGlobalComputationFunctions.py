@@ -379,6 +379,61 @@ class TrackTemplates(HDFMixin, AttrsBasedClassHelperMixin):
     def get_decoder_aclu_peak_map_dict(self, peak_mode='CoM') -> Dict[decoder_name_str, Dict]:
         return dict(zip(self.get_decoder_names(), self.get_decoder_aclu_peak_maps(peak_mode=peak_mode)))
 
+    @function_attributes(short_name=None, tags=['n_spikes', 'LxC', 'SxC', 'cell_exclusivity', 'XxC'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-07-08 06:03', related_items=[])
+    @classmethod
+    def perform_determine_quant_cell_eXclusivities(cls, track_templates: "TrackTemplates", cell_LS_eXclusivity_threshold: bool = 0.90) -> Tuple[pd.DataFrame, Tuple[pd.DataFrame, pd.DataFrame]]:
+        """ Uses the total number of spikes fired during laps for each decoder to determine quantitative/objective cell exclusivity thresholds
+
+        Usage:        
+            from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import TrackTemplates
+        
+            decoders_total_num_spikes_df, (LxC_cells_df, SxC_cells_df) = TrackTemplates.perform_determine_quant_cell_eXclusivities(track_templates=track_templates)
+            decoders_total_num_spikes_df
+            LxC_cells_df, SxC_cells_df
+
+        """
+        spike_counts_dict = {k:deepcopy(v.pf.filtered_spikes_df['aclu']).value_counts().to_dict() for k, v in track_templates.get_decoders_dict().items()}
+        any_decoder_aclus_list = deepcopy(track_templates.any_decoder_neuron_IDs)
+
+        value_counts = []
+        for aclu in any_decoder_aclus_list:
+            value_counts.append({k:v.get(aclu, 0) for k, v in spike_counts_dict.items()})			
+
+        decoders_total_num_spikes_df: pd.DataFrame = pd.DataFrame(value_counts, index=any_decoder_aclus_list)
+        decoders_total_num_spikes_df['long'] = decoders_total_num_spikes_df[['long_LR', 'long_RL']].sum(axis='columns')
+        decoders_total_num_spikes_df['short'] = decoders_total_num_spikes_df[['short_LR', 'short_RL']].sum(axis='columns')
+        decoders_total_num_spikes_df['total'] = decoders_total_num_spikes_df['long'] + decoders_total_num_spikes_df['short']
+
+        ## percent long (used for determing exclusivity)
+        decoders_total_num_spikes_df['pct_long'] = decoders_total_num_spikes_df['long'] / decoders_total_num_spikes_df['total']
+        decoders_total_num_spikes_df['pct_short'] = decoders_total_num_spikes_df['short'] / decoders_total_num_spikes_df['total']
+
+        decoders_total_num_spikes_df = decoders_total_num_spikes_df.add_suffix('_n_spikes')    
+
+        decoders_total_num_spikes_df['is_LxC'] = decoders_total_num_spikes_df['pct_long_n_spikes'] >= cell_LS_eXclusivity_threshold
+        decoders_total_num_spikes_df['is_SxC'] = decoders_total_num_spikes_df['pct_short_n_spikes'] >= cell_LS_eXclusivity_threshold
+
+        LxC_cells_df: pd.DataFrame = decoders_total_num_spikes_df[decoders_total_num_spikes_df['is_LxC']]
+        SxC_cells_df: pd.DataFrame = decoders_total_num_spikes_df[decoders_total_num_spikes_df['is_SxC']]
+
+        ## OUTPUTS: decoders_total_num_spikes_df
+        return decoders_total_num_spikes_df, (LxC_cells_df, SxC_cells_df)
+
+
+    @function_attributes(short_name=None, tags=['n_spikes', 'LxC', 'SxC', 'cell_exclusivity', 'XxC'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-07-08 06:03', related_items=[])
+    def determine_quant_cell_eXclusivities(self, cell_LS_eXclusivity_threshold: bool = 0.90) -> Tuple[pd.DataFrame, Tuple[pd.DataFrame, pd.DataFrame]]:
+        """ Uses the total number of spikes fired during laps for each decoder to determine quantitative/objective cell exclusivity thresholds
+
+        Usage:        
+            decoders_total_num_spikes_df, (LxC_cells_df, SxC_cells_df) = track_templates.determine_quant_cell_eXclusivities()
+            decoders_total_num_spikes_df
+            LxC_cells_df, SxC_cells_df
+
+        """
+        return self.perform_determine_quant_cell_eXclusivities(track_templates=self, cell_LS_eXclusivity_threshold=cell_LS_eXclusivity_threshold)
+
+
+
 
     def __repr__(self):
         """ 
