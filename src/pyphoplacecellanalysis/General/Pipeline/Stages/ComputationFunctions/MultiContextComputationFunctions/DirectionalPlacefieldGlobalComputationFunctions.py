@@ -396,7 +396,7 @@ class TrackTemplates(HDFMixin, AttrsBasedClassHelperMixin):
             LxC_cells_df, SxC_cells_df
 
         """
-        spike_counts_dict = {k:deepcopy(v.pf.filtered_spikes_df['aclu']).value_counts().to_dict() for k, v in track_templates.get_decoders_dict().items()}
+        spike_counts_dict = {a_decoder_name:deepcopy(a_decoder.pf.filtered_spikes_df['aclu']).value_counts().to_dict() for a_decoder_name, a_decoder in track_templates.get_decoders_dict().items()}
         any_decoder_aclus_list = deepcopy(track_templates.any_decoder_neuron_IDs)
         total_duration_dict = {k:deepcopy(v.pf.epochs.duration).sum() for k, v in track_templates.get_decoders_dict().items()}
         

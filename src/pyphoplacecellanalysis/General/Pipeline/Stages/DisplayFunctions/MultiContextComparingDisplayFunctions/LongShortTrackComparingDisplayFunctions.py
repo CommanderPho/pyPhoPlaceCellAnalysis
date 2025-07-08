@@ -961,10 +961,10 @@ class PhoJonathanPlotHelpers:
         else:
             ## publication figure
             spike_plot_kwargs_dict = {
-                'all': {**common_simple_kwargs_overrides, 'markersize':2.0, 'marker': '.', 'markerfacecolor':(0.1, 0.1, 0.1, (spikes_alpha*0.6*0.5)), 'markeredgecolor': 'none', 'zorder':10},
-                'is_included_long_pf1D': {**common_simple_kwargs_overrides, 'markersize':3.0, 'marker': '.', 'markerfacecolor':(0, 0, 1, (spikes_alpha*0.6)), 'markeredgecolor': 'none', 'zorder':15},
-                'is_included_short_pf1D': {**common_simple_kwargs_overrides, 'markersize':3.0, 'marker': '.', 'markerfacecolor':(1, 0, 0, (spikes_alpha*0.6)), 'markeredgecolor': 'none', 'zorder':15},
-                'is_included_PBE': {**common_simple_kwargs_overrides, 'markersize':3.0, 'marker': '.', 'markerfacecolor':(0.102, 0.831, 0, (spikes_alpha*0.6)), 'markeredgecolor': 'none', 'zorder':15},
+                'all': {**common_simple_kwargs_overrides, 'markersize': 8.0, 'marker': '.', 'markerfacecolor':(0.1, 0.1, 0.1, (spikes_alpha*0.6*0.5)), 'markeredgecolor': 'none', 'zorder':10},
+                'is_included_long_pf1D': {**common_simple_kwargs_overrides, 'markersize': 10.0, 'marker': '.', 'markerfacecolor':(0, 0, 1, (spikes_alpha*0.6)), 'markeredgecolor': 'none', 'zorder':15},
+                'is_included_short_pf1D': {**common_simple_kwargs_overrides, 'markersize': 10.0, 'marker': '.', 'markerfacecolor':(1, 0, 0, (spikes_alpha*0.6)), 'markeredgecolor': 'none', 'zorder':15},
+                'is_included_PBE': {**common_simple_kwargs_overrides, 'markersize': 10.0, 'marker': '.', 'markerfacecolor':(0.102, 0.831, 0, (spikes_alpha*0.6)), 'markeredgecolor': 'none', 'zorder':15},
             }
                     
         # spike_plot_kwargs_dict.update(
@@ -1663,12 +1663,11 @@ class PhoJonathanPlotHelpers:
             # active_spikes_df = cell_spikes_dfs[cellind]
             active_spikes_df = cell_spikes_dfs_dict[aclu]
             n_spikes: int = len(active_spikes_df)
-            # Apply adaptive downsampling
-            target_spike_density = kwargs.get('target_spike_density', 100)
-            active_spikes_df = _adaptive_spike_downsample(active_spikes_df, time_variable_name=time_variable_name, target_density=target_spike_density)
-            if debug_print:
-                print(f'Downsampling from (n_spikes: {n_spikes} -> {len(active_spikes_df)}): target_spike_density: {target_spike_density}')
-
+            # # Apply adaptive downsampling
+            # target_spike_density = kwargs.get('target_spike_density', 100)
+            # active_spikes_df = _adaptive_spike_downsample(active_spikes_df, time_variable_name=time_variable_name, target_density=target_spike_density)
+            # if debug_print:
+            #     print(f'Downsampling from (n_spikes: {n_spikes} -> {len(active_spikes_df)}): target_spike_density: {target_spike_density}')
             curr_ax_lap_spikes = cls._plot_general_all_spikes(curr_ax_lap_spikes, active_spikes_df, time_variable_name=time_variable_name, prepare_for_publication=prepare_for_publication, defer_render=True)
 
         if not disable_top_row:
