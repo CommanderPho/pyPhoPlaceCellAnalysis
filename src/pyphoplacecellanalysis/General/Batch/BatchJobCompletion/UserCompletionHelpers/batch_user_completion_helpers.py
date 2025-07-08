@@ -2878,10 +2878,13 @@ def determine_session_t_delta_completion_function(self, global_data_root_parent_
     return across_session_results_extended_dict
 
 
-@function_attributes(short_name=None, tags=['JSON', 'CSV', 'peak', 'pf', 'peak_promenance'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-01-01 00:00', related_items=[])
+@function_attributes(short_name=None, tags=['all_neuron_stats_table', 'final-publication', 'JSON', 'CSV', 'peak', 'pf', 'peak_promenance'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-01-01 00:00', related_items=[])
 def compute_and_export_session_extended_placefield_peak_information_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict,
                                                                              save_csv:bool=True, save_json:bool=False) -> dict:
-    """  Extracts peak information for the placefields for each neuron
+    """  Extracts peak information for the placefields for each neuron. Responsible for outputting the combined neuron information CSV used in the final paper results by merging the three+ informationt ables into one `all_neuron_stats_table`
+    
+    
+    
     from pyphoplacecellanalysis.General.Batch.BatchJobCompletion.UserCompletionHelpers.batch_user_completion_helpers import kdiba_session_post_fixup_completion_function
     
     Results can be extracted from batch output by 

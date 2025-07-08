@@ -380,11 +380,15 @@ class TrackTemplates(HDFMixin, AttrsBasedClassHelperMixin):
     def get_decoder_aclu_peak_map_dict(self, peak_mode='CoM') -> Dict[decoder_name_str, Dict]:
         return dict(zip(self.get_decoder_names(), self.get_decoder_aclu_peak_maps(peak_mode=peak_mode)))
 
-    @function_attributes(short_name=None, tags=['n_spikes', 'LxC', 'SxC', 'cell_exclusivity', 'XxC'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-07-08 06:03', related_items=[])
+    @function_attributes(short_name=None, tags=['n_spikes', 'LxC', 'SxC', 'cell_exclusivity', 'XxC'], input_requires=[], output_provides=[], uses=[], used_by=['compute_and_export_session_extended_placefield_peak_information_completion_function', 'determine_quant_cell_eXclusivities'], creation_date='2025-07-08 06:03', related_items=[])
     @classmethod
     def perform_determine_quant_cell_eXclusivities(cls, track_templates: "TrackTemplates", cell_LS_eXclusivity_threshold: bool = 0.90) -> Tuple[pd.DataFrame, Tuple[pd.DataFrame, pd.DataFrame]]:
         """ Uses the total number of spikes fired during laps for each decoder to determine quantitative/objective cell exclusivity thresholds
 
+        Columns:
+            ['aclu', 'long_LR_n_spikes', 'long_RL_n_spikes', 'short_LR_n_spikes', 'short_RL_n_spikes', 'long_n_spikes', 'short_n_spikes', 'total_n_spikes', 'pct_long_n_spikes', 'pct_short_n_spikes', 'is_n_spikes_LxC', 'is_n_spikes_SxC']
+
+        
         Usage:        
             from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import TrackTemplates
         
@@ -425,7 +429,7 @@ class TrackTemplates(HDFMixin, AttrsBasedClassHelperMixin):
         return decoders_total_num_spikes_df, (LxC_cells_df, SxC_cells_df)
 
 
-    @function_attributes(short_name=None, tags=['n_spikes', 'LxC', 'SxC', 'cell_exclusivity', 'XxC'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-07-08 06:03', related_items=[])
+    @function_attributes(short_name=None, tags=['n_spikes', 'LxC', 'SxC', 'cell_exclusivity', 'XxC'], input_requires=[], output_provides=[], uses=['cls.perform_determine_quant_cell_eXclusivities'], used_by=[], creation_date='2025-07-08 06:03', related_items=[])
     def determine_quant_cell_eXclusivities(self, cell_LS_eXclusivity_threshold: bool = 0.90) -> Tuple[pd.DataFrame, Tuple[pd.DataFrame, pd.DataFrame]]:
         """ Uses the total number of spikes fired during laps for each decoder to determine quantitative/objective cell exclusivity thresholds
 
