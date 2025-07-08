@@ -382,7 +382,7 @@ class TrackTemplates(HDFMixin, AttrsBasedClassHelperMixin):
 
     @function_attributes(short_name=None, tags=['n_spikes', 'LxC', 'SxC', 'cell_exclusivity', 'XxC'], input_requires=[], output_provides=[], uses=[], used_by=['compute_and_export_session_extended_placefield_peak_information_completion_function', 'determine_quant_cell_eXclusivities'], creation_date='2025-07-08 06:03', related_items=[])
     @classmethod
-    def perform_determine_quant_cell_eXclusivities(cls, track_templates: "TrackTemplates", cell_LS_eXclusivity_threshold: bool = 0.85) -> Tuple[pd.DataFrame, Tuple[pd.DataFrame, pd.DataFrame]]:
+    def perform_determine_quant_cell_eXclusivities(cls, track_templates: "TrackTemplates", cell_LS_eXclusivity_threshold: bool = 0.85, cell_LS_fr_percent_change_eXclusivity_threshold: bool = 8.0) -> Tuple[pd.DataFrame, Tuple[pd.DataFrame, pd.DataFrame]]:
         """ Uses the total number of spikes fired during laps for each decoder to determine quantitative/objective cell exclusivity thresholds
 
         Columns:
@@ -432,11 +432,12 @@ class TrackTemplates(HDFMixin, AttrsBasedClassHelperMixin):
         decoders_total_num_spikes_df['total_fr_Hz'] = decoders_total_num_spikes_df['total_n_spikes'] / decoders_total_num_spikes_df['total_lap_dur']
                 
         ## percent long (used for determing exclusivity)
-        decoders_total_num_spikes_df['pct_long_fr_Hz'] = decoders_total_num_spikes_df['long_fr_Hz'] / decoders_total_num_spikes_df['total_fr_Hz']
-        decoders_total_num_spikes_df['pct_short_fr_Hz'] = decoders_total_num_spikes_df['short_fr_Hz'] / decoders_total_num_spikes_df['total_fr_Hz']
+        decoders_total_num_spikes_df['pct_LS_fr_Hz'] = (decoders_total_num_spikes_df['short_fr_Hz'] - decoders_total_num_spikes_df['long_fr_Hz']) / decoders_total_num_spikes_df['long_fr_Hz']
+        # decoders_total_num_spikes_df['pct_short_fr_Hz'] = decoders_total_num_spikes_df['short_fr_Hz'] / decoders_total_num_spikes_df['total_fr_Hz']
         
-        decoders_total_num_spikes_df['is_fr_Hz_LxC'] = decoders_total_num_spikes_df['pct_long_fr_Hz'] >= cell_LS_eXclusivity_threshold
-        decoders_total_num_spikes_df['is_fr_Hz_SxC'] = decoders_total_num_spikes_df['pct_short_fr_Hz'] >= cell_LS_eXclusivity_threshold
+        ## negative if LONG is bigger:
+        decoders_total_num_spikes_df['is_fr_Hz_LxC'] = decoders_total_num_spikes_df['pct_LS_fr_Hz'] <= -cell_LS_fr_percent_change_eXclusivity_threshold
+        decoders_total_num_spikes_df['is_fr_Hz_SxC'] = decoders_total_num_spikes_df['pct_LS_fr_Hz'] >= cell_LS_fr_percent_change_eXclusivity_threshold
 
         decoders_total_num_spikes_df['aclu'] = decoders_total_num_spikes_df.index
         decoders_total_num_spikes_df = reorder_columns_relative(decoders_total_num_spikes_df, column_names=['aclu'], relative_mode='start')
