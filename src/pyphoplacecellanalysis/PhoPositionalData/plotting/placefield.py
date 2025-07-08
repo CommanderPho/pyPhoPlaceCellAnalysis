@@ -244,7 +244,7 @@ def _subfn_plot_pf1D_placefield(active_epoch_placefields1D, placefield_cell_inde
 @function_attributes(short_name=None, tags=['pf1D', '1D'], input_requires=[], output_provides=[],
                       uses=['plot_placefield_tuning_curve', 'active_epoch_placefields1D.plotRaw_v_time', '_subfn_plot_pf1D_placefield', '_plot_helper_setup_gridlines'],
                       used_by=['plot_1d_placecell_validations'], creation_date='2023-09-06 01:55', related_items=[])
-def plot_single_cell_1D_placecell_validation(active_epoch_placefields1D, placefield_cell_index, extant_fig=None, extant_axes=None, **kwargs):
+def plot_single_cell_1D_placecell_validation(active_epoch_placefields1D, placefield_cell_index: int, extant_fig=None, extant_axes=None, **kwargs):
     """ A single cell method of analyzing 1D placefields and the spikes that create them 
     
     placefield_cell_index: an flat index into active_epoch_placefields1D.cell_ids. Must be between 0 and len(active_epoch_placefields1D.cell_ids). NOT the cell's original ID!
@@ -278,7 +278,6 @@ def plot_single_cell_1D_placecell_validation(active_epoch_placefields1D, placefi
     suptitle_params = dict(fontsize='14')
     title_params = dict(fontsize='10')
     
-
     if extant_fig is not None:
         fig = extant_fig # use the existing passed figure
         # fig.set_size_inches([23, 9.7])

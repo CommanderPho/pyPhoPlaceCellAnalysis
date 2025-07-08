@@ -238,7 +238,7 @@ class LongShortTrackComparingDisplayFunctions(AllFunctionEnumeratingMixin, metac
             # global_results.sess.spikes_df = add_spikes_df_placefield_inclusion_columns(curr_active_pipeline=owning_pipeline_reference, global_spikes_df=global_results.sess.spikes_df, overwrite_columns=True)            
             global_spikes_df: pd.DataFrame = add_spikes_df_placefield_inclusion_columns(curr_active_pipeline=owning_pipeline_reference, global_spikes_df=global_results.sess.spikes_df, overwrite_columns=True) ## in_place
             # global_spikes_df = global_spikes_df.copy()
-            global_spikes_df = global_spikes_df.neuron_identity.make_neuron_indexed_df_global(curr_session_context=active_identifying_session_ctx, add_expanded_session_context_keys=True, add_extended_aclu_identity_columns=True)
+            global_spikes_df = global_spikes_df.neuron_identity.make_neuron_indexed_df_global(curr_session_context=active_identifying_session_ctx, add_expanded_session_context_keys=True, add_extended_aclu_identity_columns=True) ## This is actually very slow, like 8 seconds
             # global_spikes_df
 
             unique_aclu_information_df: pd.DataFrame = owning_pipeline_reference.get_session_unique_aclu_information()
@@ -339,6 +339,8 @@ class LongShortTrackComparingDisplayFunctions(AllFunctionEnumeratingMixin, metac
             graphics_output_dict['saved_figures'] = active_out_figure_paths
             
             return graphics_output_dict
+
+
 
     @function_attributes(short_name='short_long_pf1D_comparison', tags=['long_short','1D','placefield'], conforms_to=['output_registering', 'figure_saving'], input_requires=[], output_provides=[], uses=['plot_short_v_long_pf1D_comparison', 'determine_long_short_pf1D_indicies_sort_by_peak'], used_by=[], creation_date='2023-04-26 06:12', is_global=True)
     def _display_long_short_pf1D_comparison(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, save_figure=True, included_any_context_neuron_ids=None, **kwargs):
@@ -1406,17 +1408,26 @@ class PhoJonathanPlotHelpers:
 
 
         """
+        from neuropy.plotting.spikes import _adaptive_spike_downsample
+        from pyphoplacecellanalysis.PhoPositionalData.plotting.placefield import plot_single_cell_1D_placecell_validation, _subfn_plot_pf1D_placefield
+        
         # short_title_string = f'{aclu:02d}'
+        prepare_for_publication: bool = kwargs.get('prepare_for_publication', True)
+        if prepare_for_publication:
+            disable_extra_info_labels = True ## force True
+            title_cell_label_size: float = 12
+        else:
+            title_cell_label_size: float = 22
+
+
 
         curr_aclu_row_tuple = kwargs.get('optional_aclu_info_row_tuple', None)
-
 
         ## add the long/short placefields in addition to the pf1d_all
         pf1d_long = kwargs.get('pf1d_long', None)
         pf1d_short = kwargs.get('pf1d_short', None)
         
-
-        formatted_cell_label_string = (f"<size:22><weight:bold>{aclu:02d}</></>")
+        formatted_cell_label_string = (f"<size:{title_cell_label_size}><weight:bold>{aclu:02d}</></>")
 
         ## Optional additional information about the cell to be rendered next to its aclu, like it's firing rate indicies, etc:
         optional_cell_info_labels_dict = kwargs.get('optional_cell_info_labels', {})
@@ -1442,7 +1453,7 @@ class PhoJonathanPlotHelpers:
                 # print(f'aclu: {aclu}, cell_neuron_extended_ids: {cell_neuron_extended_ids}')
                 # subtitle_string = f'(shk <size:10><weight:bold>{cell_neuron_extended_ids.shank}</></>, clu <size:10><weight:bold>{cell_neuron_extended_ids.cluster}</></>)'
 
-        if cell_neuron_extended_ids is not None:
+        if (cell_neuron_extended_ids is not None) and (not prepare_for_publication):
             subtitle_string = f'shk <size:10><weight:bold>{cell_neuron_extended_ids.shank}</></>, clu <size:10><weight:bold>{cell_neuron_extended_ids.cluster}</></>'
             try:
                 # _temp_qclu_str = f'\nqclu <size:10><weight:bold>{cell_neuron_extended_ids.quality}</></>'
@@ -1460,7 +1471,7 @@ class PhoJonathanPlotHelpers:
             # print(f'\tsubtitle_string: {subtitle_string}')
             formatted_cell_label_string = f'{formatted_cell_label_string}\n<size:9>{subtitle_string}</>'
 
-        if optional_cell_info_labels is not None:
+        if (optional_cell_info_labels is not None) and (not prepare_for_publication):
             if debug_print:
                 print(f'has optional_cell_info_labels: {optional_cell_info_labels}')
             optional_cell_info_labels_string: str = optional_cell_info_labels # already should be a string
@@ -1474,7 +1485,7 @@ class PhoJonathanPlotHelpers:
         # subtitle_string = ' '.join([f'{pf1D_all.config.str_for_display(False)}'])
         # if debug_print:
         #     print(f'\t{title_string}\n\t{subtitle_string}')
-        from pyphoplacecellanalysis.PhoPositionalData.plotting.placefield import plot_single_cell_1D_placecell_validation, _subfn_plot_pf1D_placefield
+        
     
         # gridspec mode:
         # curr_fig.set_facecolor('0.65') # light grey
@@ -1632,6 +1643,10 @@ class PhoJonathanPlotHelpers:
             assert time_variable_name is not None, f"if cell_spikes_dfs_dict is passed time_variable_name must also be passed"
             # active_spikes_df = cell_spikes_dfs[cellind]
             active_spikes_df = cell_spikes_dfs_dict[aclu]
+            # Apply adaptive downsampling
+            target_spike_density = kwargs.get('target_spike_density', 500)
+            active_spikes_df = _adaptive_spike_downsample(active_spikes_df, time_variable_name=time_variable_name, target_density=target_spike_density)
+
             curr_ax_lap_spikes = cls._plot_general_all_spikes(curr_ax_lap_spikes, active_spikes_df, time_variable_name=time_variable_name, defer_render=True)
 
         if not disable_top_row:
@@ -1644,7 +1659,7 @@ class PhoJonathanPlotHelpers:
 
     @classmethod
     @function_attributes(short_name='_make_pho_jonathan_batch_plots', tags=['private', 'matplotlib', 'active','jonathan', 'pho_jonathan_batch'], input_requires=[], output_provides=[], uses=['_plot_pho_jonathan_batch_plot_single_cell', 'build_replays_custom_scatter_markers', '_build_neuron_type_distribution_color', 'build_or_reuse_figure'], used_by=['_display_batch_pho_jonathan_replay_firing_rate_comparison'], creation_date='2023-04-11 08:06')
-    def _make_pho_jonathan_batch_plots(cls, t_split, time_bins, neuron_replay_stats_df, unit_specific_time_binned_firing_rates, pf1D_all, aclu_to_idx, rdf, irdf, show_inter_replay_frs=False, included_unit_neuron_IDs=None, marker_split_mode=CustomScatterMarkerMode.TriSplit, n_max_plot_rows:int=4, optional_cell_info_labels=None, debug_print=False, defer_render=False, disable_top_row=False, **kwargs) -> MatplotlibRenderPlots:
+    def _make_pho_jonathan_batch_plots(cls, t_split, time_bins, neuron_replay_stats_df, unit_specific_time_binned_firing_rates, pf1D_all, aclu_to_idx, rdf, irdf, show_inter_replay_frs=False, included_unit_neuron_IDs=None, marker_split_mode=CustomScatterMarkerMode.TriSplit, n_max_plot_rows:int=4, optional_cell_info_labels=None, debug_print=False, defer_render=False, disable_top_row=False, prepare_for_publication:bool=True, **kwargs) -> MatplotlibRenderPlots:
         """ Stacked Jonathan-style firing-rate-across-epochs-plot
         Internally calls `_plot_pho_jonathan_batch_plot_single_cell`
             n_max_plot_rows: the maximum number of rows to plot
@@ -1723,7 +1738,7 @@ class PhoJonathanPlotHelpers:
             kwargs['optional_aclu_info_row_tuple'] = curr_aclu_row_tuple
             # curr_aclu_row_tuple = kwargs.get('optional_aclu_info_row_tuple', None)
 
-            curr_single_cell_out_dict = cls._plot_pho_jonathan_batch_plot_single_cell(t_split, time_bins, unit_specific_time_binned_firing_rates, pf1D_all, aclu_to_idx, rdf, irdf, show_inter_replay_frs, _temp_aclu_to_fragile_linear_neuron_IDX, aclu, curr_fig, colors, debug_print=debug_print, disable_top_row=disable_top_row, **kwargs)
+            curr_single_cell_out_dict = cls._plot_pho_jonathan_batch_plot_single_cell(t_split, time_bins, unit_specific_time_binned_firing_rates, pf1D_all, aclu_to_idx, rdf, irdf, show_inter_replay_frs, _temp_aclu_to_fragile_linear_neuron_IDX, aclu, curr_fig, colors, debug_print=debug_print, disable_top_row=disable_top_row, prepare_for_publication=prepare_for_publication, **kwargs)
 
             # output the axes created:
             axs_list.append(curr_single_cell_out_dict)
