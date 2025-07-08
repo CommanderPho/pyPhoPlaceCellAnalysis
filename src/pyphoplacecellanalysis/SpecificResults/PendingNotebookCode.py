@@ -107,6 +107,161 @@ from pyphocorehelpers.gui.Qt.color_helpers import ColormapHelpers, ColorFormatCo
 
 
 
+@metadata_attributes(short_name=None, tags=['remapping', 'model'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-07-08 17:40', related_items=[])
+class CellFieldRemappingModels:
+    """ Various methods to explain how cells remap. """
+    @classmethod
+    def endcap_anchored(cls, L: float, m: float) -> float:
+        """ transformation between long (L) and short (S) for endcap-anchored fields """
+        # Define the piecewise function using np.piecewise
+        return np.piecewise(L, [L < m, L == m, L > m],           # Conditions
+                        [lambda L, m: L - 15,
+                         lambda L, m: m,
+                         lambda L, m: L + 15,
+                         ], m)
+
+
+    @classmethod
+    def midpoint_anchored(cls, L: float, m: float) -> float:
+        """ transformation between long (L) and short (S) for endcap-anchored fields """
+        # Define the piecewise function using np.piecewise
+        return L
+    
+    @classmethod
+    def room_anchored(cls, L: float, m: float) -> float:
+        """ transformation between long (L) and short (S) for endcap-anchored fields """
+        short_track_distance_bound: float = 57
+        return np.piecewise(L, [L >= short_track_distance_bound, ((L >= m) and (L < short_track_distance_bound)), ((L < m) and (L > -short_track_distance_bound)), L <= -short_track_distance_bound],           # Conditions
+                        [lambda L, m: short_track_distance_bound,
+                         lambda L, m: L,
+                         lambda L, m: L,
+                         lambda L, m: -short_track_distance_bound,
+                         ], m)
+
+    @classmethod
+    def linear_scaling(cls, L: float, m: float) -> float:
+        """ transformation between long (L) and short (S) for endcap-anchored fields """
+        # Define the piecewise function using np.piecewise
+        return L * 0.7 
+    
+
+    @classmethod
+    def get_model_test_fns_dict(cls) -> Dict:
+        """ returns a dict containing each of the remapping models
+        """
+        return {'endcap_anchored':cls.endcap_anchored, 'midpoint_anchored':cls.midpoint_anchored, 'room_anchored': cls.room_anchored, 'linear_scaling': cls.linear_scaling}
+
+    # ==================================================================================================================================================================================================================================================================================== #
+    # END MODELS                                                                                                                                                                                                                                                                           #
+    # ==================================================================================================================================================================================================================================================================================== #
+
+    @classmethod
+    def is_non_linear_remapping(cls, L: float, S: float, m: float) -> bool:
+        """ Not a model, takes an L and S field peak and returns True if this remapping requires non-linear shifts. """
+        ## First question is: does it go the opposite way of the remapping?
+        LS_diff: float = S - L
+        is_non_linear: bool = False
+        if L >= m:
+             if (LS_diff > 0.0):
+                  return True
+        else:
+             if (LS_diff < 0.0):
+                  return True
+             
+        ## Second question: does it greatly exceed the contraction distance? (it shouldn't):
+        contraction_amount_cm: float = 15.0
+        wiggle_room_factor: float = 0.2
+        if np.abs(LS_diff) > 40.0: #(contraction_amount_cm + (contraction_amount_cm * wiggle_room_factor)):
+             return True
+        return is_non_linear    
+
+
+    @function_attributes(short_name=None, tags=['main', 'FIXUP', 'has_considerable_remapping'], input_requires=[], output_provides=[], uses=['cls.is_non_linear_remapping'], used_by=[], creation_date='2025-07-08 17:47', related_items=[])
+    @classmethod
+    def fix_has_considerable_remapping_column(cls, all_neuron_stats_table: pd.DataFrame, x_mid: float = 143.8837168675656) -> pd.DataFrame:
+        """ The 'has_considerable_remapping' as currently computed is wrong. This implements an improved computation for this column.
+
+        NOTE: Independent/unrelated to `cls.main_evaluate_remapping_models`
+        , L_peak_col_name: str='long_LR_pf1D_peak', L_peak_col_name: str='short_LR_pf1D_peak'
+        
+        active_scatter_all_neuron_stats_table = CellFieldRemappingModels.fix_has_considerable_remapping_column(all_neuron_stats_table=active_scatter_all_neuron_stats_table)
+        
+        """
+        active_scatter_all_neuron_stats_table: pd.DataFrame = deepcopy(all_neuron_stats_table).fillna(value=np.nan, inplace=False) ## fill all Pandas.NA values with np.nan so they can be correctly cast to floats
+        # active_scatter_all_neuron_stats_table
+
+        if '_BAK_has_considerable_remapping' not in active_scatter_all_neuron_stats_table:
+            active_scatter_all_neuron_stats_table['_BAK_has_considerable_remapping'] = active_scatter_all_neuron_stats_table['has_considerable_remapping']
+        else:
+            print(f'WARN: active_scatter_all_neuron_stats_table already contains the "_BAK_has_considerable_remapping", a backup has already been made and will not be overwritten!')
+
+        active_scatter_all_neuron_stats_table['has_considerable_remapping'] = False ## start with False
+
+        L_peaks = active_scatter_all_neuron_stats_table['long_LR_pf1D_peak'].to_numpy()
+        S_peaks = active_scatter_all_neuron_stats_table['short_LR_pf1D_peak'].to_numpy()
+        active_scatter_all_neuron_stats_table['has_considerable_remapping'] = np.logical_or(active_scatter_all_neuron_stats_table['has_considerable_remapping'], [CellFieldRemappingModels.is_non_linear_remapping(L, S, x_mid) for L, S in zip(L_peaks, S_peaks)])
+
+        L_peaks = active_scatter_all_neuron_stats_table['long_RL_pf1D_peak'].to_numpy()
+        S_peaks = active_scatter_all_neuron_stats_table['short_RL_pf1D_peak'].to_numpy()
+        active_scatter_all_neuron_stats_table['has_considerable_remapping'] = np.logical_or(active_scatter_all_neuron_stats_table['has_considerable_remapping'], [CellFieldRemappingModels.is_non_linear_remapping(L, S, x_mid) for L, S in zip(L_peaks, S_peaks)])
+        return active_scatter_all_neuron_stats_table
+
+
+
+
+    @classmethod
+    def main_evaluate_remapping_models(cls, active_scatter_all_neuron_stats_table: pd.DataFrame, x_mid: float = 143.8837168675656):
+        """ Evaluate each of the models for the remapping cells in `active_scatter_all_neuron_stats_table`
+
+        from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import CellFieldRemappingModels
+
+        model_errors, best_model_name = CellFieldRemappingModels.main_test_models(active_scatter_all_neuron_stats_table=active_scatter_all_neuron_stats_table)
+        
+        """
+        from sklearn.metrics import mean_squared_error
+
+        _model_test_fns_dict = cls.get_model_test_fns_dict() # {'endcap_anchored':CellFieldRemappingModels.endcap_anchored, 'midpoint_anchored':CellFieldRemappingModels.midpoint_anchored, 'room_anchored': CellFieldRemappingModels.room_anchored, 'linear_scaling': CellFieldRemappingModels.linear_scaling}
+
+        L_peaks = active_scatter_all_neuron_stats_table['long_pf_peak_x'].to_numpy()
+        S_peaks_dict = {}
+
+        for k, a_fn in _model_test_fns_dict.items():
+            S_peaks = [a_fn(L, x_mid) for L in L_peaks]
+            S_peaks_dict[k] = np.array(S_peaks)
+
+        S_peaks_dict
+        # --- New code for model evaluation ---
+
+        # 1. Get both the input (L) and the measured output (S) values
+        # Ensure there are no NaN values in the columns you're using
+        valid_data = active_scatter_all_neuron_stats_table[['long_pf_peak_x', 'short_pf_peak_x']].dropna()
+        L_peaks = valid_data['long_pf_peak_x'].to_numpy()
+        S_peaks_measured = valid_data['short_pf_peak_x'].to_numpy()
+
+
+        # 2. Calculate predictions for each model (as in your original code)
+        S_peaks_predicted_dict = {}
+        for k, a_fn in _model_test_fns_dict.items():
+            S_peaks_predicted = np.array([a_fn(L, x_mid) for L in L_peaks])
+            S_peaks_predicted_dict[k] = S_peaks_predicted
+
+
+        # 3. Calculate RMSE for each model
+        model_errors = {}
+        for model_name, S_predicted in S_peaks_predicted_dict.items():
+            # Calculate Mean Squared Error
+            mse = mean_squared_error(S_peaks_measured, S_predicted)
+            # Calculate Root Mean Squared Error
+            rmse = np.sqrt(mse)
+            model_errors[model_name] = rmse
+            print(f"Model: {model_name:<20} | RMSE: {rmse:.4f}")
+
+
+        # 4. Find and announce the best model
+        best_model_name = min(model_errors, key=model_errors.get)
+        print(f"\n🏆 The best model is '{best_model_name}' with an RMSE of {model_errors[best_model_name]:.4f}")
+        return model_errors, best_model_name
+
 
 
 # ==================================================================================================================================================================================================================================================================================== #
