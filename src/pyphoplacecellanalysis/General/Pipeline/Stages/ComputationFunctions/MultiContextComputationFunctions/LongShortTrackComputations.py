@@ -2196,7 +2196,7 @@ def compute_rate_remapping_stats(long_short_fr_indicies_analysis, aclu_to_neuron
 
     ## Find only the cells that exhibit considerable remapping:
     # considerable_remapping_threshold = 0.7 # cells exhibit "considerable remapping" when they exceed 0.7
-    rate_remapping_df['has_considerable_remapping'] = rate_remapping_df['max_axis_distance_from_center'] > considerable_remapping_threshold
+    rate_remapping_df['has_considerable_remapping'] = (rate_remapping_df['max_axis_distance_from_center'] > considerable_remapping_threshold)
     
     # rendering only:
     rate_remapping_df['render_color'] = [a_neuron_type.renderColor for a_neuron_type in rate_remapping_df.neuron_type] # Get color corresponding to each neuron type (`NeuronType`):
