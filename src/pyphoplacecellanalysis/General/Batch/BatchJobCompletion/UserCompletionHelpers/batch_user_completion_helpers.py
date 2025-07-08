@@ -3093,7 +3093,7 @@ def generalized_decode_epochs_dict_and_export_results_completion_function(self, 
         # a_new_fully_generic_result: GenericDecoderDictDecodedEpochsDictResult = GenericDecoderDictDecodedEpochsDictResult.batch_user_compute_fn(curr_active_pipeline=curr_active_pipeline, force_recompute=force_recompute, time_bin_size=epochs_decoding_time_bin_size, debug_print=debug_print)
 
         ## Next wave of computations
-        extended_computations_include_includelist = ['non_PBE_epochs_results', 'generalized_specific_epochs_decoding',] # do only specified
+        extended_computations_include_includelist = ['split_to_directional_laps', 'non_PBE_epochs_results', 'generalized_specific_epochs_decoding',] # do only specified
         computation_kwargs_dict = {'non_PBE_epochs_results': dict(epochs_decoding_time_bin_size=epochs_decoding_time_bin_size, drop_previous_result_and_compute_fresh=False), }
 
         # force_recompute_override_computations_includelist = deepcopy(extended_computations_include_includelist)
