@@ -3601,7 +3601,7 @@ class PhoPublicationFigureHelper:
         Usage:
             from pyphoplacecellanalysis.SpecificResults.PhoDiba2023Paper import PhoPublicationFigureHelper
             
-            with mpl.rc_context(PhoPublicationFigureHelper.rc_context_kwargs() | {'figure.figsize': (10, 4), 'figure.dpi': '220'})
+            with mpl.rc_context(PhoPublicationFigureHelper.rc_context_kwargs(prepare_for_publication=prepare_for_publication) | {'figure.figsize': (10, 4), 'figure.dpi': '220'})
             
         """
         _out_rcparams = {'savefig.transparent': True, 'ps.fonttype': 42, 'pdf.fonttype': 42,  }

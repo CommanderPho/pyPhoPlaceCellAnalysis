@@ -7839,7 +7839,7 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
             if prepare_for_publication:
                 formatted_title_strings_dict = DisplayColorsEnum.get_matplotlib_formatted_title_dict()
                 assert found_matplotlib_font_name is not None
-                _rc_context_kwargs.update(PhoPublicationFigureHelper.rc_context_kwargs({'figure.dpi': '100', 'figure.frameon': False, 'figure.figsize': figsize, 'font.family': found_matplotlib_font_name}), prepare_for_publication=prepare_for_publication) # , 'figure.constrained_layout.use': (constrained_layout or False)
+                _rc_context_kwargs.update(PhoPublicationFigureHelper.rc_context_kwargs(prepare_for_publication=prepare_for_publication, **{'figure.dpi': '100', 'figure.frameon': False, 'figure.figsize': figsize, 'font.family': found_matplotlib_font_name})) # , 'figure.constrained_layout.use': (constrained_layout or False)
 
             with mpl.rc_context(_rc_context_kwargs): # 'figure.dpi': '220', 'figure.figsize': (10, 4), 
                 # Create a FigureCollector instance
