@@ -2590,6 +2590,7 @@ class TrackRemappingDiagramFigure:
         from neuropy.utils.matplotlib_helpers import build_or_reuse_figure, perform_update_title_subtitle
         from pyphoplacecellanalysis.Pho2D.track_shape_drawing import AclusYOffsetMode
         from neuropy.core.user_annotations import UserAnnotationsManager
+        from pyphoplacecellanalysis.SpecificResults.PhoDiba2023Paper import PhoPublicationFigureHelper
 
         ## INPUTS: all_neuron_stats_table
         output_parent_path = Path(R'E:\Dropbox (Personal)\Active\Kamran Diba Lab\Pho-Kamran-Meetings\2025-07-03 - EXPORTS FOR PUBLICATION\Figure 1 - Overview').resolve()
@@ -2670,8 +2671,7 @@ class TrackRemappingDiagramFigure:
             return (ctxt, AcrossSessionsVisualizations.output_figure(final_context=display_context, fig=fig, write_vector_format=True, write_png=False))
 
 
-
-        with mpl.rc_context(PhoPublicationFigureHelper.rc_context_kwargs({'figure.figsize': (6.5, 4), 'figure.dpi': '220',})):
+        with mpl.rc_context(PhoPublicationFigureHelper.rc_context_kwargs(prepare_for_publication=True, **{'figure.figsize': (6.5, 2), 'figure.dpi': '220',})):
 
             # Create a FigureCollector instance
             with FigureCollector(name='plot_bidirectional_track_remapping_diagram', base_context=display_context) as collector:
@@ -2685,12 +2685,14 @@ class TrackRemappingDiagramFigure:
                     a_collector.contexts.append(sub_context)
                     
                     # `flexitext` version:
-                    text_formatter = FormattedFigureText()
+                    # text_formatter = FormattedFigureText()
                     # ax.set_title('')
-                    fig.suptitle('')
-                    text_formatter.setup_margins(fig)
-                    title_text_obj = flexitext(text_formatter.left_margin, text_formatter.top_margin, title, va="bottom", xycoords="figure fraction")
+                    # fig.suptitle('')
+                    # text_formatter.setup_margins(fig,)
+                    # title_text_obj = flexitext(text_formatter.left_margin, text_formatter.top_margin, title, va="bottom", xycoords="figure fraction")
                 
+                    fig.suptitle('Place Cell Remapping (Example Session)')
+                    
                     if ((perform_write_to_file_callback is not None) and (sub_context is not None)):
                         perform_write_to_file_callback(sub_context, fig)
 
