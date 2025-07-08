@@ -949,21 +949,31 @@ class PhoJonathanPlotHelpers:
         }
     
     @classmethod
-    def get_default_spike_scatter_kwargs_dict(cls, spikes_alpha:float=0.9) -> Dict[str, Dict]:
+    def get_default_spike_scatter_kwargs_dict(cls, prepare_for_publication: bool=True, spikes_alpha:float=0.9) -> Dict[str, Dict]:
         common_simple_kwargs_overrides = {'spikes_color_RGB': None, 'spikes_alpha': None}
-        spike_plot_kwargs_dict = {
-            'all': {**common_simple_kwargs_overrides, 'markersize':4.0, 'marker': '.', 'markerfacecolor':(0.1, 0.1, 0.1, (spikes_alpha*0.6*0.5)), 'markeredgecolor':(0.1, 0.1, 0.1, (spikes_alpha*0.5)), 'zorder':10},
-            'is_included_long_pf1D': {**common_simple_kwargs_overrides, 'markersize':5.0, 'marker': '.', 'markerfacecolor':(0, 0, 1, (spikes_alpha*0.6)), 'markeredgecolor':(0, 0, 1, spikes_alpha), 'zorder':15},
-            'is_included_short_pf1D': {**common_simple_kwargs_overrides, 'markersize':5.0, 'marker': '.', 'markerfacecolor':(1, 0, 0, (spikes_alpha*0.6)), 'markeredgecolor':(1, 0, 0, spikes_alpha), 'zorder':15},
-            'is_included_PBE': {**common_simple_kwargs_overrides, 'markersize':5.0, 'marker': '.', 'markerfacecolor':(0.102, 0.831, 0, (spikes_alpha*0.6)), 'markeredgecolor':(0.102, 0.831, 0, spikes_alpha), 'zorder':15},
-        }
+        if not prepare_for_publication:
+            spike_plot_kwargs_dict = {
+                'all': {**common_simple_kwargs_overrides, 'markersize':4.0, 'marker': '.', 'markerfacecolor':(0.1, 0.1, 0.1, (spikes_alpha*0.6*0.5)), 'markeredgecolor':(0.1, 0.1, 0.1, (spikes_alpha*0.5)), 'zorder':10},
+                'is_included_long_pf1D': {**common_simple_kwargs_overrides, 'markersize':5.0, 'marker': '.', 'markerfacecolor':(0, 0, 1, (spikes_alpha*0.6)), 'markeredgecolor':(0, 0, 1, spikes_alpha), 'zorder':15},
+                'is_included_short_pf1D': {**common_simple_kwargs_overrides, 'markersize':5.0, 'marker': '.', 'markerfacecolor':(1, 0, 0, (spikes_alpha*0.6)), 'markeredgecolor':(1, 0, 0, spikes_alpha), 'zorder':15},
+                'is_included_PBE': {**common_simple_kwargs_overrides, 'markersize':5.0, 'marker': '.', 'markerfacecolor':(0.102, 0.831, 0, (spikes_alpha*0.6)), 'markeredgecolor':(0.102, 0.831, 0, spikes_alpha), 'zorder':15},
+            }
+        else:
+            ## publication figure
+            spike_plot_kwargs_dict = {
+                'all': {**common_simple_kwargs_overrides, 'markersize':2.0, 'marker': '.', 'markerfacecolor':(0.1, 0.1, 0.1, (spikes_alpha*0.6*0.5)), 'markeredgecolor': 'none', 'zorder':10},
+                'is_included_long_pf1D': {**common_simple_kwargs_overrides, 'markersize':3.0, 'marker': '.', 'markerfacecolor':(0, 0, 1, (spikes_alpha*0.6)), 'markeredgecolor': 'none', 'zorder':15},
+                'is_included_short_pf1D': {**common_simple_kwargs_overrides, 'markersize':3.0, 'marker': '.', 'markerfacecolor':(1, 0, 0, (spikes_alpha*0.6)), 'markeredgecolor': 'none', 'zorder':15},
+                'is_included_PBE': {**common_simple_kwargs_overrides, 'markersize':3.0, 'marker': '.', 'markerfacecolor':(0.102, 0.831, 0, (spikes_alpha*0.6)), 'markeredgecolor': 'none', 'zorder':15},
+            }
+                    
         # spike_plot_kwargs_dict.update(
         # {k:[*v, spikes_alpha] for k, v in cls.get_default_spike_colors_dict().items()}
         return spike_plot_kwargs_dict
 
     @classmethod
     @function_attributes(short_name=None, tags=['private', 'matplotlib', 'pho_jonathan_batch'], input_requires=[], output_provides=[], uses=['make_fr', 'LongShortDisplayConfigManager'], used_by=[], creation_date='2023-10-03 19:42', related_items=[])
-    def _temp_draw_jonathan_ax(cls, t_split, time_bins, unit_specific_time_binned_firing_rates, aclu_to_idx, rdf, irdf, show_inter_replay_frs=False, colors=None, fig=None, ax=None, active_aclu:int=0, custom_replay_markers=None, include_horizontal_labels=True, include_vertical_labels=True, should_render=False):
+    def _temp_draw_jonathan_ax(cls, t_split, time_bins, unit_specific_time_binned_firing_rates, aclu_to_idx, rdf, irdf, show_inter_replay_frs=False, colors=None, fig=None, ax=None, active_aclu:int=0, custom_replay_markers=None, markersize:int=5, inactive_scatter_markersize: int = 3, include_horizontal_labels=True, include_vertical_labels=True, should_render=False):
         """ Draws the time binned firing rates and the replay firing rates for a single cell
 
             This is the top half of each pho-jonathan-style single cell plot
@@ -1020,12 +1030,12 @@ class PhoJonathanPlotHelpers:
                 if is_aclu_active_in_replay[replay_idx]:
                     for i, out_plot_kwarg in enumerate(curr_out_plot_kwargs):
                         # this should be only iterate through the two separate paths to be plotted
-                        ax.plot(centers[replay_idx], heights[replay_idx], markersize=5, **out_plot_kwarg, zorder=7) # , label=f'replay[{replay_idx}]'
+                        ax.plot(centers[replay_idx], heights[replay_idx], markersize=markersize, **out_plot_kwarg, zorder=7) # , label=f'replay[{replay_idx}]'
                 else:
                     # don't do the fancy custom makers for the inactive (zero firing for this aclu) replay points:
                     plot_replays_kwargs = {
                         'marker':'o',
-                        's': 3,
+                        's': inactive_scatter_markersize,
                         'c': 'black'
                     }
                     ax.scatter(centers, heights, **plot_replays_kwargs, zorder=5) # , label=f'replay[{replay_idx}]'
@@ -1053,7 +1063,7 @@ class PhoJonathanPlotHelpers:
 
                 ### edge indicator mode:
                 plot_replays_kwargs = {'marker':'o',
-                    's': 5,
+                    's': markersize,
                     'c': 'black',
                     'edgecolors': rdf.neuron_type_distribution_color_RGB.values.tolist(),
                     'linewidths': 5,
@@ -1348,7 +1358,7 @@ class PhoJonathanPlotHelpers:
 
     @classmethod
     @function_attributes(short_name=None, tags=['private', 'matplotlib', 'pho_jonathan_batch'], input_requires=[], output_provides=[], uses=['_simple_plot_spikes', 'cls.get_default_spike_colors_dict'], used_by=[], creation_date='2023-10-03 19:42', related_items=[])
-    def _plot_general_all_spikes(cls, ax_activity_v_time, active_spikes_df: pd.DataFrame, time_variable_name='t', spikes_alpha=0.9, defer_render=True):
+    def _plot_general_all_spikes(cls, ax_activity_v_time, active_spikes_df: pd.DataFrame, time_variable_name='t', spikes_alpha=0.9, prepare_for_publication: bool=True, defer_render=True):
         """ Plots all spikes for a given cell from that cell's complete `active_spikes_df`
         There are three different classes of spikes: all (black), long (blue), short (red)
 
@@ -1368,13 +1378,13 @@ class PhoJonathanPlotHelpers:
             ) # , spikes_color=spikes_color, spikes_alpha=spikes_alpha
         """
         # ax_activity_v_time = _simple_plot_spikes(ax_activity_v_time, active_spikes_df[global_results.sess.spikes_df.spikes.time_variable_name].values, active_spikes_df['x'].values, spikes_color_RGB=(0, 0, 0), spikes_alpha=1.0) # all
-        ax_activity_v_time = cls._simple_plot_spikes(ax_activity_v_time, active_spikes_df[time_variable_name].values, active_spikes_df['x'].values, **cls.get_default_spike_scatter_kwargs_dict(spikes_alpha=spikes_alpha)['all']) # all
+        ax_activity_v_time = cls._simple_plot_spikes(ax_activity_v_time, active_spikes_df[time_variable_name].values, active_spikes_df['x'].values, **cls.get_default_spike_scatter_kwargs_dict(spikes_alpha=spikes_alpha, prepare_for_publication=prepare_for_publication)['all']) # all
 
         active_long_spikes_df: pd.DataFrame = active_spikes_df[active_spikes_df.is_included_long_pf1D]
-        ax_activity_v_time = cls._simple_plot_spikes(ax_activity_v_time, active_long_spikes_df[time_variable_name].values, active_long_spikes_df['x'].values, **cls.get_default_spike_scatter_kwargs_dict(spikes_alpha=spikes_alpha)['is_included_long_pf1D'])
+        ax_activity_v_time = cls._simple_plot_spikes(ax_activity_v_time, active_long_spikes_df[time_variable_name].values, active_long_spikes_df['x'].values, **cls.get_default_spike_scatter_kwargs_dict(spikes_alpha=spikes_alpha, prepare_for_publication=prepare_for_publication)['is_included_long_pf1D'])
 
         active_short_spikes_df: pd.DataFrame = active_spikes_df[active_spikes_df.is_included_short_pf1D]
-        ax_activity_v_time = cls._simple_plot_spikes(ax_activity_v_time, active_short_spikes_df[time_variable_name].values, active_short_spikes_df['x'].values, **cls.get_default_spike_scatter_kwargs_dict(spikes_alpha=spikes_alpha)['is_included_short_pf1D'])
+        ax_activity_v_time = cls._simple_plot_spikes(ax_activity_v_time, active_short_spikes_df[time_variable_name].values, active_short_spikes_df['x'].values, **cls.get_default_spike_scatter_kwargs_dict(spikes_alpha=spikes_alpha, prepare_for_publication=prepare_for_publication)['is_included_short_pf1D'])
 
         # active_global_spikes_df = active_spikes_df[active_spikes_df.is_included_PBE]
         # ax_activity_v_time = _simple_plot_spikes(ax_activity_v_time, active_global_spikes_df[time_variable_name].values, active_global_spikes_df['x'].values, spikes_color_RGB=(0, 1, 0), spikes_alpha=1.0, zorder=25, markersize=2.5)
@@ -1382,7 +1392,7 @@ class PhoJonathanPlotHelpers:
         if 'is_included_PBE' in active_spikes_df:
             ## PBE spikes:
             active_PBE_spikes_df: pd.DataFrame = active_spikes_df[active_spikes_df.is_included_PBE]
-            ax_activity_v_time = cls._simple_plot_spikes(ax_activity_v_time, active_PBE_spikes_df[time_variable_name].values, active_PBE_spikes_df['x'].values, **cls.get_default_spike_scatter_kwargs_dict(spikes_alpha=spikes_alpha)['is_included_PBE'])
+            ax_activity_v_time = cls._simple_plot_spikes(ax_activity_v_time, active_PBE_spikes_df[time_variable_name].values, active_PBE_spikes_df['x'].values, **cls.get_default_spike_scatter_kwargs_dict(spikes_alpha=spikes_alpha, prepare_for_publication=prepare_for_publication)['is_included_PBE'])
 
         if not defer_render:
             fig = ax_activity_v_time.get_figure().get_figure() # For SubFigure
@@ -1416,10 +1426,18 @@ class PhoJonathanPlotHelpers:
         if prepare_for_publication:
             disable_extra_info_labels = True ## force True
             title_cell_label_size: float = 12
+            inactive_scatter_markersize = 2
+            markersize = 4
+            disable_top_row = True ## override to True
+            spike_markersize = 3
+            
         else:
             title_cell_label_size: float = 22
+            inactive_scatter_markersize = 3
+            markersize = 5
+            spike_markersize = 4
 
-
+        debug_print: bool = kwargs.get('debug_print', True)
 
         curr_aclu_row_tuple = kwargs.get('optional_aclu_info_row_tuple', None)
 
@@ -1554,7 +1572,7 @@ class PhoJonathanPlotHelpers:
         ## New ax[0,1] draw method:
         if not disable_top_row:
             cls._temp_draw_jonathan_ax(t_split, time_bins, unit_specific_time_binned_firing_rates, rdf_aclu_to_idx, rdf, irdf, show_inter_replay_frs=show_inter_replay_frs, colors=colors, fig=curr_fig, ax=curr_ax_firing_rate, active_aclu=aclu,
-                                include_horizontal_labels=False, include_vertical_labels=False, should_render=False, custom_replay_markers=custom_replay_scatter_markers_plot_kwargs_list)
+                                include_horizontal_labels=False, include_vertical_labels=False, should_render=False, custom_replay_markers=custom_replay_scatter_markers_plot_kwargs_list, markersize=markersize, inactive_scatter_markersize=inactive_scatter_markersize)
             # curr_ax_firing_rate includes only bottom and left spines, and only y-axis ticks and labels
             curr_ax_firing_rate.set_xticklabels([])
             curr_ax_firing_rate.spines['top'].set_visible(False)
@@ -1579,10 +1597,11 @@ class PhoJonathanPlotHelpers:
         
         ## global (_all) placefield
         ## I think that `plot_single_cell_1D_placecell_validation` is used to plot the position v time AND the little placefield on the right
+        ## Plots: the position v time, the black (non Long/Short pf) spike dots
         _ = plot_single_cell_1D_placecell_validation(pf1D_all, cell_linear_fragile_IDX, extant_fig=curr_fig, extant_axes=(curr_ax_lap_spikes, curr_ax_right_placefield),
                 **({'should_include_labels': False, 'should_plot_spike_indicator_points_on_placefield': should_plot_spike_indicator_points_on_placefield,
                     'should_plot_spike_indicator_lines_on_trajectory': False, 'spike_indicator_lines_alpha': 0.2,
-                    'spikes_color':(0.1, 0.1, 0.1), 'spikes_alpha':0.1, 'should_include_spikes': False} | kwargs))
+                    'spikes_color':(0.1, 0.1, 0.1), 'spikes_alpha':0.1, 'should_include_spikes': False, 'spike_markersize': spike_markersize} | kwargs))
 
 
         if pf1d_short is not None:
@@ -1643,11 +1662,14 @@ class PhoJonathanPlotHelpers:
             assert time_variable_name is not None, f"if cell_spikes_dfs_dict is passed time_variable_name must also be passed"
             # active_spikes_df = cell_spikes_dfs[cellind]
             active_spikes_df = cell_spikes_dfs_dict[aclu]
+            n_spikes: int = len(active_spikes_df)
             # Apply adaptive downsampling
-            target_spike_density = kwargs.get('target_spike_density', 500)
+            target_spike_density = kwargs.get('target_spike_density', 100)
             active_spikes_df = _adaptive_spike_downsample(active_spikes_df, time_variable_name=time_variable_name, target_density=target_spike_density)
+            if debug_print:
+                print(f'Downsampling from (n_spikes: {n_spikes} -> {len(active_spikes_df)}): target_spike_density: {target_spike_density}')
 
-            curr_ax_lap_spikes = cls._plot_general_all_spikes(curr_ax_lap_spikes, active_spikes_df, time_variable_name=time_variable_name, defer_render=True)
+            curr_ax_lap_spikes = cls._plot_general_all_spikes(curr_ax_lap_spikes, active_spikes_df, time_variable_name=time_variable_name, prepare_for_publication=prepare_for_publication, defer_render=True)
 
         if not disable_top_row:
             t_start, t_end = curr_ax_lap_spikes.get_xlim()
@@ -1742,7 +1764,8 @@ class PhoJonathanPlotHelpers:
             kwargs['optional_aclu_info_row_tuple'] = curr_aclu_row_tuple
             # curr_aclu_row_tuple = kwargs.get('optional_aclu_info_row_tuple', None)
 
-            curr_single_cell_out_dict = cls._plot_pho_jonathan_batch_plot_single_cell(t_split, time_bins, unit_specific_time_binned_firing_rates, pf1D_all, aclu_to_idx, rdf, irdf, show_inter_replay_frs, _temp_aclu_to_fragile_linear_neuron_IDX, aclu, curr_fig, colors, debug_print=debug_print, disable_top_row=disable_top_row, prepare_for_publication=prepare_for_publication, **kwargs)
+            curr_single_cell_out_dict = cls._plot_pho_jonathan_batch_plot_single_cell(t_split, time_bins, unit_specific_time_binned_firing_rates, pf1D_all, aclu_to_idx, rdf, irdf, show_inter_replay_frs, _temp_aclu_to_fragile_linear_neuron_IDX, aclu, curr_fig, colors,\
+                                                                                       debug_print=debug_print, disable_top_row=disable_top_row, prepare_for_publication=prepare_for_publication, **kwargs)
 
             # output the axes created:
             axs_list.append(curr_single_cell_out_dict)
