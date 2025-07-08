@@ -1689,9 +1689,13 @@ class PhoJonathanPlotHelpers:
         actual_num_subfigures = min(len(included_unit_neuron_IDs), n_max_plot_rows) # only include the possible rows
         active_context = kwargs.get('active_context', None)
 
+        if prepare_for_publication:
+            figsize = kwargs.pop('figsize', (6.5, 3))
+        else:
+            figsize = kwargs.pop('figsize', (10, 4))
 
         ## Figure Setup:
-        fig = build_or_reuse_figure(fignum=kwargs.pop('fignum', None), fig=kwargs.pop('fig', None), fig_idx=kwargs.pop('fig_idx', 0), figsize=kwargs.pop('figsize', (10, 4)), dpi=kwargs.pop('dpi', None), constrained_layout=True) # , clear=True
+        fig = build_or_reuse_figure(fignum=kwargs.pop('fignum', None), fig=kwargs.pop('fig', None), fig_idx=kwargs.pop('fig_idx', 0), figsize=figsize, dpi=kwargs.pop('dpi', None), constrained_layout=True) # , clear=True
         subfigs = fig.subfigures(actual_num_subfigures, 1, wspace=0.07)
         ##########################
 
@@ -1725,9 +1729,9 @@ class PhoJonathanPlotHelpers:
             except TypeError as e:
                 # TypeError: 'SubFigure' object is not subscriptable ->  # single subfigure, not subscriptable
                 curr_fig = subfigs
-            except BaseException as e:
+            except Exception as e:
                 # Unhandled exception
-                raise e
+                raise
             
             _curr_aclu_row_tuple_list = list(neuron_replay_stats_df[neuron_replay_stats_df['aclu'] == aclu].itertuples(index=False, name='AcluInfoRow'))
             if len(_curr_aclu_row_tuple_list) >= 1:
