@@ -421,7 +421,7 @@ def _subfn_compute_decoded_epochs(computation_result, active_config, filter_epoc
     
     default_figure_name = 'stacked_epoch_slices_matplotlib_subplots'
     min_epoch_included_duration = decoding_time_bin_size * float(2) # 0.06666 # all epochs shorter than min_epoch_included_duration will be excluded from analysis
-    active_filter_epochs, default_figure_name, epoch_description_list = KnownFilterEpochs.process_functionList(sess=computation_result, filter_epochs=filter_epochs, min_epoch_included_duration=min_epoch_included_duration, default_figure_name=default_figure_name)
+    active_filter_epochs, default_figure_name, epoch_description_list = KnownFilterEpochs.process_functionList(sess=computation_result.sess, filter_epochs=filter_epochs, min_epoch_included_duration=min_epoch_included_duration, default_figure_name=default_figure_name)
 
     ## BEGIN_FUNCTION_BODY _subfn_compute_decoded_epochs:
     if decoder_ndim is None:

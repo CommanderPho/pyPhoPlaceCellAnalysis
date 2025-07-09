@@ -16,7 +16,7 @@ from matplotlib.patches import FancyArrowPatch, FancyArrow
 from matplotlib import patheffects
 
 # from neuropy.core import Epoch
-from neuropy.core.epoch import Epoch, ensure_dataframe
+from neuropy.core.epoch import Epoch, ensure_dataframe, ensure_Epoch
 from neuropy.utils.mixins.dict_representable import overriding_dict_with, get_dict_subset # required for safely_accepts_kwargs
 from neuropy.utils.efficient_interval_search import get_non_overlapping_epochs # used in _display_plot_decoded_epoch_slices to get only the valid (non-overlapping) epochs
 from neuropy.utils.result_context import IdentifyingContext
@@ -194,7 +194,7 @@ class DefaultDecoderDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Disp
     @function_attributes(short_name='decoded_epoch_slices', tags=['display', 'decoder', 'epoch','slices'],
                          input_requires=["computation_result.computed_data['specific_epochs_decoding']", "computation_result.computed_data['pf2D_Decoder']"],
                          output_provides=[], uses=['plot_decoded_epoch_slices', '_compute_specific_decoded_epochs', 'DefaultComputationFunctions._perform_specific_epochs_decoding'], used_by=[], creation_date='2023-03-23 15:49')
-    def _display_plot_decoded_epoch_slices(computation_result, active_config, active_context=None, filter_epochs='ripple', included_epoch_indicies=None, **kwargs):
+    def _display_plot_decoded_epoch_slices(computation_result, active_config, active_context=None, filter_epochs='pbe', included_epoch_indicies=None, **kwargs):
         """ renders a plot with the 1D Marginals either (x and y position axes): the computed posterior for the position from the Bayesian decoder and overlays the animal's actual position over the top. 
         2024-12-19 11:46 This isn't working and has undefined variables?
         TODO: This display function is currently atypically implemented as it performs computations as needed.
@@ -265,7 +265,9 @@ class DefaultDecoderDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Disp
         #                                                                                                                                                                                 decoding_time_bin_size=ripple_decoding_time_bin_size, use_single_time_bin_per_epoch=use_single_time_bin_per_epoch, debug_print=False)
     
 
-        filter_epochs_decoder_result, active_filter_epochs, default_figure_name = computation_result.computed_data['specific_epochs_decoding'][('Ripples', decoding_time_bin_size)]
+        # filter_epochs_decoder_result, active_filter_epochs, default_figure_name = computation_result.computed_data['specific_epochs_decoding'][('Ripples', decoding_time_bin_size)]
+        filter_epochs_decoder_result, active_filter_epochs, default_figure_name = computation_result.computed_data['specific_epochs_decoding'][('replay', decoding_time_bin_size, decoder_ndim)]
+        active_filter_epochs = ensure_Epoch(active_filter_epochs)
         print(f'n_epochs: {active_filter_epochs.n_epochs}')
 
         ## Actual plotting portion:

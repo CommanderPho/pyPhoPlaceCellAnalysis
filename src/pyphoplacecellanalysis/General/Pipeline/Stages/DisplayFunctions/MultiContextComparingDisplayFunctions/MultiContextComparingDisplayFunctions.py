@@ -465,7 +465,7 @@ class MultiContextComparingDisplayFunctions(AllFunctionEnumeratingMixin, metacla
 
 
     @function_attributes(short_name='meas_v_decoded_occupancy', tags=['context-decoder-comparison', 'hairly-plot', 'decoded_position', 'directional'], conforms_to=['output_registering', 'figure_saving'], input_requires=[], output_provides=[], requires_global_keys=["global_computation_results.computed_data['EpochComputations']"], uses=['MeasuredVsDecodedOccupancy', '_helper_add_interpolated_position_columns_to_decoded_result_df', '_display_grid_bin_bounds_validation', 'FigureCollector'], used_by=[], creation_date='2025-05-16 00:00', related_items=[], is_global=True)
-    def _display_measured_vs_decoded_occupancy_distributions(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, save_figure=True, size=[18, 8], dpi=100, constrained_layout=True, override_fig_man: Optional[FileOutputManager]=None, **kwargs):
+    def _display_measured_vs_decoded_occupancy_distributions(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, save_figure=True, size=[6.5, 2], dpi=100, constrained_layout=True, override_fig_man: Optional[FileOutputManager]=None, **kwargs):
             """ Plots the measured vs. decoded occupancy (position) for each of the four decoders for both Pre-delta and Post-delta.
             
             Usage:
