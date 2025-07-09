@@ -1015,7 +1015,7 @@ class PipelinePickleFileSelectorWidget:
         from pyphoplacecellanalysis.General.Batch.NonInteractiveProcessing import batch_extended_computations, batch_evaluate_required_computations
         from neuropy.core.session.Formats.BaseDataSessionFormats import DataSessionFormatRegistryHolder # for batch_load_session
         from pyphoplacecellanalysis.General.Pipeline.NeuropyPipeline import NeuropyPipeline, PipelineSavingScheme # for batch_load_session
-
+        from pyphoplacecellanalysis.General.Pipeline.NeuropyPipeline import _get_custom_filenames_from_computation_metadata
 
         def _subfn_load():
             """ captures: everything in calling context!
@@ -1074,9 +1074,14 @@ class PipelinePickleFileSelectorWidget:
         def _subfn_compute_new():
             """Performs computations in clean_run mode"""
             get_global_variable_fn = self.on_get_global_variable_callback
+            update_global_variable_fn = self.on_update_global_variable_callback
+            assert update_global_variable_fn is not None
             assert get_global_variable_fn is not None
             override_parameters_flat_keypaths_dict = deepcopy(self.current_parameter_values)
             print(f'_subfn_compute_new():\n\toverride_parameters_flat_keypaths_dict: {override_parameters_flat_keypaths_dict}\n')
+            custom_suffix: str = self.build_custom_suffix_from_modified_widget_parameters()
+            print(f'\tcustom_suffix: "{custom_suffix}"')
+            active_pickle_filename: str = f'loadedSessPickle{custom_suffix}.pkl'
             
             # From `General.Batch.NonInteractiveProcessing.known_data_session_type_properties_dict`
             known_data_session_type_properties_dict = DataSessionFormatRegistryHolder.get_registry_known_data_session_type_dict(override_parameters_flat_keypaths_dict=override_parameters_flat_keypaths_dict)
@@ -1084,18 +1089,24 @@ class PipelinePickleFileSelectorWidget:
 
             active_data_mode_registered_class = active_data_session_types_registered_classes_dict[active_data_mode_name]
             active_data_mode_type_properties = known_data_session_type_properties_dict[active_data_mode_name]
-            # skip_save_on_initial_load: bool = True
-            skip_save_on_initial_load: bool = False
-
+            skip_save_on_initial_load: bool = True
+            # skip_save_on_initial_load: bool = False
+            print(f'\tinitial loading...')
+            
             ## Begin main run of the pipeline (load or execute):
             curr_active_pipeline = NeuropyPipeline.try_init_from_saved_pickle_or_reload_if_needed(active_data_mode_name, active_data_mode_type_properties,
                 override_basepath=Path(basedir), force_reload=force_reload, active_pickle_filename=active_pickle_filename, skip_save_on_initial_load=skip_save_on_initial_load, override_parameters_flat_keypaths_dict=override_parameters_flat_keypaths_dict)
-
+            print(f'\tinitial load done.')
             curr_active_pipeline.update_parameters(override_parameters_flat_keypaths_dict=override_parameters_flat_keypaths_dict) # should already be updated, but try it again anyway.
 
             was_loaded_from_file: bool =  curr_active_pipeline.has_associated_pickle # True if pipeline was loaded from an existing file, False if it was created fresh
-            
-            print(f'\tNot yet implemented.')
+            print(f'\tupdating global variables...')
+            # Update the global variables
+            update_global_variable_fn('curr_active_pipeline', curr_active_pipeline)
+            update_global_variable_fn('custom_suffix', custom_suffix)
+            # update_global_variable_fn('proposed_load_pkl_path', proposed_load_pkl_path)
+
+            print(f'\tdone.')
 
             # curr_active_pipeline = get_global_variable_fn('curr_active_pipeline')
             
