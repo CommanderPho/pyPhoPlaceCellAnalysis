@@ -970,7 +970,7 @@ class BatchPhoJonathanFiguresHelper:
         
         # size_dpi = 100.0,
         # single_subfigure_size_px = np.array([1920.0, 220.0])
-        single_subfigure_size_inches = np.array([19.2,  2.2]) // #TODO 2025-07-09 13:22: - [ ] Changed for publication output
+        single_subfigure_size_inches = np.array([19.2,  2.2]) #TODO 2025-07-09 13:22: - [ ] Changed for publication output
         # single_subfigure_size_inches = np.array([6.5,  1.5])
 
         num_cells = len(included_unit_neuron_IDs or [])
