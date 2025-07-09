@@ -2993,6 +2993,10 @@ class PipelineWithComputedPipelineStageMixin:
         
         Actually updates `self.global_computation_results.computation_config`
         
+        Usage:
+            layout, _master_params_dict = curr_active_pipeline.get_all_parameters(allow_update_global_computation_config=False, get_panel_gui_widget=True)
+            layout
+
         """
         from benedict import benedict
         from neuropy.core.parameters import ParametersContainer
@@ -3013,13 +3017,16 @@ class PipelineWithComputedPipelineStageMixin:
             curr_global_param_typed_parameters: ComputationKWargParameters = self.global_computation_results.computation_config
             
 
+        _master_params_dict = {}
+        _master_params_dict['preprocessing'] = preprocessing_parameters.to_dict()
+        _master_params_dict.update(curr_global_param_typed_parameters.to_dict())
+        _master_params_dict = benedict(_master_params_dict)
+
+
         if not get_panel_gui_widget:
             ## Ensured that we have a valid `curr_global_param_typed_parameters` that was created with the kwarg defaults if it didn't exist.
             #TODO 2024-10-23 06:45: - [ ] What about when a config was created and then later new kwarg values were added to a computation function, or the default values were updated?
-            _master_params_dict = {}
-            _master_params_dict['preprocessing'] = preprocessing_parameters.to_dict()
-            _master_params_dict.update(curr_global_param_typed_parameters.to_dict())
-            
+
             # if self.global_computation_results.computation_config is not None:
             #     curr_global_param_typed_parameters: ComputationKWargParameters = deepcopy(self.global_computation_results.computation_config)
             #     _master_params_dict.update(curr_global_param_typed_parameters.to_dict())
@@ -3044,7 +3051,7 @@ class PipelineWithComputedPipelineStageMixin:
             #  '_perform_specific_epochs_decoding': {'decoder_ndim': 2, 'filter_epochs': 'ripple', 'decoding_time_bin_size': 0.02},
             #  '_DEP_ratemap_peaks': {'peak_score_inclusion_percent_threshold': 0.25},
             #  'ratemap_peaks_prominence2d': {'step': 0.01, 'peak_height_multiplier_probe_levels': (0.5, 0.9), 'minimum_included_peak_height': 0.2, 'uniform_blur_size': 3, 'gaussian_blur_sigma': 3}}
-            return benedict(_master_params_dict)
+            return _master_params_dict
 
         else:
             ## get_panel_gui_widget
@@ -3069,7 +3076,7 @@ class PipelineWithComputedPipelineStageMixin:
             # style = {"transform": "scale(0.5)", "transform-origin": "top left"}
             # styles_kwargs = dict(styles=style, sizing_mode="fixed")
             layout = pn.Column(*[pn.Param(a_sub_v) for a_sub_v in reversed(out_configs_dict.values())], **styles_kwargs)
-            return layout
+            return layout, _master_params_dict
 
 
         # ## OUTPUTS: param_typed_parameters
