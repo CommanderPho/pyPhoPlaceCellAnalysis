@@ -615,7 +615,13 @@ class BatchPlotting:
         active_identifying_session_ctx, active_out_figures_dict = batch_programmatic_figures(curr_active_pipeline)
         
         """
-        
+        if cls._fig_out_man is None:
+            collected_figures_folder, fig_out_man = cls.find_batch_programmatic_figures_output_dir()
+            assert fig_out_man is not None
+
+        out_man: FileOutputManager = deepcopy(cls._fig_out_man) # curr_active_pipeline.get_output_manager(figure_output_location=FigureOutputLocation.CUSTOM, context_to_path_mode=ContextToPathMode.GLOBAL_UNIQUE, override_output_parent_path=collected_outputs_path)
+        _batch_figure_kwargs = dict(override_fig_man=out_man)
+
         ## 🗨️🟢 2022-10-26 - Jonathan Firing Rate Analyses
         # Perform missing global computations                                                                                  #
         # curr_active_pipeline.perform_specific_computation(computation_functions_name_includelist=['_perform_jonathan_replay_firing_rate_analyses', '_perform_long_short_pf_overlap_analyses'], fail_on_exception=True, debug_print=True)
@@ -645,7 +651,7 @@ class BatchPlotting:
         # ==================================================================================================================== #
         # Output Figures to File                                                                                               #
         # ==================================================================================================================== #
-        active_out_figures_dict = BatchPhoJonathanFiguresHelper.run(curr_active_pipeline, neuron_replay_stats_df, n_max_page_rows=10)
+        active_out_figures_dict = BatchPhoJonathanFiguresHelper.run(curr_active_pipeline, neuron_replay_stats_df, n_max_page_rows=10, **_batch_figure_kwargs)
         return active_identifying_session_ctx, active_out_figures_dict
 
 
@@ -773,7 +779,7 @@ class BatchPlotting:
             jonathan_firing_rate_analysis_result = curr_active_pipeline.global_computation_results.computed_data.jonathan_firing_rate_analysis
             neuron_replay_stats_df, short_exclusive, long_exclusive, BOTH_subset, EITHER_subset, XOR_subset, NEITHER_subset = jonathan_firing_rate_analysis_result.get_cell_track_partitions(frs_index_inclusion_magnitude=0.2)
             ## all cells:
-            fig_1c_figures_all_dict = BatchPhoJonathanFiguresHelper.run(curr_active_pipeline, neuron_replay_stats_df, included_unit_neuron_IDs=None, n_max_page_rows=20, write_vector_format=False, write_png=True, show_only_refined_cells=False, disable_top_row=True) ## TODO: add , **_batch_figure_kwargs
+            fig_1c_figures_all_dict = BatchPhoJonathanFiguresHelper.run(curr_active_pipeline, neuron_replay_stats_df, included_unit_neuron_IDs=None, n_max_page_rows=20, write_vector_format=False, write_png=True, show_only_refined_cells=False, disable_top_row=True, **_batch_figure_kwargs)
         
         except Exception as e:
             print(f'batch_extended_programmatic_figures(...): BatchPhoJonathanFiguresHelper.run(...) failed for all cells. failed with error: {e}\n skipping.')
@@ -879,7 +885,7 @@ class BatchPhoJonathanFiguresHelper:
 
 
     @classmethod
-    def perform_run(cls, curr_active_pipeline, shared_aclus=None, long_only_aclus=None, short_only_aclus=None, n_max_page_rows=10, write_vector_format=False, write_png=True, progress_print=True, debug_print=False, disable_top_row=False) -> Dict[IdentifyingContext, MatplotlibRenderPlots]:
+    def perform_run(cls, curr_active_pipeline, shared_aclus=None, long_only_aclus=None, short_only_aclus=None, n_max_page_rows=10, write_vector_format=False, write_png=True, progress_print=True, debug_print=False, disable_top_row=False, **kwargs) -> Dict[IdentifyingContext, MatplotlibRenderPlots]:
         """ The only public function. Performs the batch plotting.
         
         # split_by_short_long_shared, bool: whether to create separate figures for the short/long exclusive cells and the shared. If False all will be treated as "shared"
@@ -900,7 +906,7 @@ class BatchPhoJonathanFiguresHelper:
         active_identifying_session_ctx = curr_active_pipeline.sess.get_context() # 'bapun_RatN_Day4_2019-10-15_11-30-06'
         
         _batch_plot_kwargs_list = cls._build_batch_plot_kwargs(long_only_aclus, short_only_aclus, shared_aclus, active_identifying_session_ctx, n_max_page_rows=n_max_page_rows, _extra_kwargs=dict(disable_top_row=disable_top_row))
-        active_out_figure_container_dict: Dict[IdentifyingContext, MatplotlibRenderPlots] = cls._perform_batch_plot(curr_active_pipeline, _batch_plot_kwargs_list, write_vector_format=write_vector_format, write_png=write_png, progress_print=progress_print, debug_print=debug_print)
+        active_out_figure_container_dict: Dict[IdentifyingContext, MatplotlibRenderPlots] = cls._perform_batch_plot(curr_active_pipeline, _batch_plot_kwargs_list, write_vector_format=write_vector_format, write_png=write_png, progress_print=progress_print, debug_print=debug_print, **kwargs)
         
         return active_out_figure_container_dict
 
@@ -908,7 +914,7 @@ class BatchPhoJonathanFiguresHelper:
     @function_attributes(short_name=None, tags=['MAIN'], input_requires=[], output_provides=[], uses=['cls.perform_run(...)'], used_by=[], creation_date='2025-06-30 22:27', related_items=[])
     @classmethod
     def run(cls, curr_active_pipeline, neuron_replay_stats_df, included_unit_neuron_IDs=None, n_max_page_rows=10, write_vector_format=False, write_png=True, progress_print=True, debug_print=False,
-             show_only_refined_cells:bool=False, disable_top_row=False, split_by_short_long_shared: bool = True) -> Dict[IdentifyingContext, MatplotlibRenderPlots]:
+             show_only_refined_cells:bool=False, disable_top_row=False, split_by_short_long_shared: bool = True, override_fig_man=None) -> Dict[IdentifyingContext, MatplotlibRenderPlots]:
         """ The only public function. Performs the batch plotting.
         
         # split_by_short_long_shared, bool: whether to create separate figures for the short/long exclusive cells and the shared. If False all will be treated as "shared"
@@ -923,9 +929,9 @@ class BatchPhoJonathanFiguresHelper:
             ## 2023-09-28 - Refined Outputs
             if show_only_refined_cells:
                 short_only_df = neuron_replay_stats_df[neuron_replay_stats_df['is_refined_SxC']]
-                short_only_aclus = short_only_df.index.values.tolist()
+                short_only_aclus = np.unique(short_only_df.index.values).tolist()
                 long_only_df = neuron_replay_stats_df[neuron_replay_stats_df['is_refined_LxC']]
-                long_only_aclus = long_only_df.index.values.tolist()
+                long_only_aclus = np.unique(long_only_df.index.values).tolist()
 
                 ## Note that the above ("refined" LxC and SxC) omit long_only and short_only place cells that don't meant the "exclusive" criteria. That means these cells will be omitted entirely (and not even included in the shared)
                 # shared_df = neuron_replay_stats_df[neuron_replay_stats_df.track_membership == SplitPartitionMembership.SHARED]
@@ -936,25 +942,25 @@ class BatchPhoJonathanFiguresHelper:
             else:
                 # original (non-refined) mode
                 short_only_df = neuron_replay_stats_df[neuron_replay_stats_df.track_membership == SplitPartitionMembership.RIGHT_ONLY]
-                short_only_aclus = short_only_df.index.values.tolist()
+                short_only_aclus = np.unique(short_only_df.index.values).tolist()
                 long_only_df = neuron_replay_stats_df[neuron_replay_stats_df.track_membership == SplitPartitionMembership.LEFT_ONLY]
-                long_only_aclus = long_only_df.index.values.tolist()
+                long_only_aclus = np.unique(long_only_df.index.values).tolist()
                 shared_df = neuron_replay_stats_df[neuron_replay_stats_df.track_membership == SplitPartitionMembership.SHARED]
-                shared_aclus = shared_df.index.values.tolist()
+                shared_aclus = np.unique(shared_df.index.values).tolist()
         else:
             # don't split the short/long/shared, treat all as shared.
             short_only_aclus = []
             long_only_aclus = []
             shared_df = neuron_replay_stats_df.copy()
-            shared_aclus = shared_df.index.values.tolist()
+            shared_aclus = np.unique(shared_df.index.values).tolist()
         
         return cls.perform_run(curr_active_pipeline=curr_active_pipeline, shared_aclus=shared_aclus, long_only_aclus=long_only_aclus, short_only_aclus=short_only_aclus, n_max_page_rows=n_max_page_rows, write_vector_format=write_vector_format, write_png=write_png, progress_print=progress_print, debug_print=debug_print,
-            disable_top_row=disable_top_row
+            disable_top_row=disable_top_row, override_fig_man=override_fig_man,
         )
         # return active_out_figure_container_dict
 
     @classmethod
-    def _subfn_batch_plot_automated(cls, curr_active_pipeline, included_unit_neuron_IDs=None, active_identifying_ctx=None, fignum=None, fig_idx=0, n_max_page_rows=10, disable_top_row=False) -> MatplotlibRenderPlots:
+    def _subfn_batch_plot_automated(cls, curr_active_pipeline, included_unit_neuron_IDs=None, active_identifying_ctx=None, fignum=None, fig_idx=0, n_max_page_rows=10, disable_top_row=False, **kwargs) -> MatplotlibRenderPlots:
         """ the a programmatic wrapper for automated output using `_display_batch_pho_jonathan_replay_firing_rate_comparison`. The specific plot function called. 
         Called ONLY by `_perform_batch_plot(...)`
 
@@ -964,14 +970,15 @@ class BatchPhoJonathanFiguresHelper:
         
         # size_dpi = 100.0,
         # single_subfigure_size_px = np.array([1920.0, 220.0])
-        single_subfigure_size_inches = np.array([19.2,  2.2])
+        single_subfigure_size_inches = np.array([19.2,  2.2]) // #TODO 2025-07-09 13:22: - [ ] Changed for publication output
+        # single_subfigure_size_inches = np.array([6.5,  1.5])
 
         num_cells = len(included_unit_neuron_IDs or [])
         desired_figure_size_inches = single_subfigure_size_inches.copy()
         desired_figure_size_inches[1] = desired_figure_size_inches[1] * num_cells
         graphics_output_dict: MatplotlibRenderPlots = curr_active_pipeline.display(cls._display_fn_name, active_identifying_ctx,
                                                             n_max_plot_rows=n_max_page_rows, included_unit_neuron_IDs=included_unit_neuron_IDs,
-                                                            show_inter_replay_frs=True, spikes_color=(0.1, 0.0, 0.1), spikes_alpha=0.5, fignum=fignum, fig_idx=fig_idx, figsize=desired_figure_size_inches, save_figure=False, defer_render=True, disable_top_row=disable_top_row) # save_figure will be false because we're saving afterwards
+                                                            show_inter_replay_frs=True, spikes_color=(0.1, 0.0, 0.1), spikes_alpha=0.5, fignum=fignum, fig_idx=fig_idx, figsize=desired_figure_size_inches, save_figure=False, defer_render=True, disable_top_row=disable_top_row, **kwargs) # save_figure will be false because we're saving afterwards
         
         # fig, subfigs, axs, plot_data = graphics_output_dict['fig'], graphics_output_dict['subfigs'], graphics_output_dict['axs'], graphics_output_dict['plot_data']
         fig, subfigs, axs, plot_data = graphics_output_dict.figures[0], graphics_output_dict.subfigs, graphics_output_dict.axes, graphics_output_dict.plot_data
@@ -988,7 +995,7 @@ class BatchPhoJonathanFiguresHelper:
         _extra_kwargs = _extra_kwargs or {}
         
         # _aclu_indicies_list_str_formatter = lambda a_list: ('[' + ','.join(map(str, a_list)) + ']') # Prints an array of integer aclu indicies without spaces and comma separated, surrounded by hard brackets. e.g. '[5,6,7,8,11,12,15,17,18,19,20,21,24,25,26,27,28,31,34,35,39,40,41,43,44,45,48,49,50,51,52,53,55,56,60,62,63,64,65]'
-        _aclu_indicies_list_str_formatter = lambda a_list: ('(' + ','.join(map(str, a_list)) + ')')
+        _aclu_indicies_list_str_formatter = lambda a_list: ('(' + ','.join(map(str, sorted(a_list))) + ')')
 
         ## {long_only, short_only} plot configs (doesn't include the shared_aclus)
         if len(long_only_aclus) > 0:
@@ -1125,7 +1132,7 @@ class BatchPhoJonathanFiguresHelper:
 
 
     @classmethod
-    def _perform_batch_plot(cls, curr_active_pipeline, active_kwarg_list, subset_includelist=None, subset_excludelist=None, write_vector_format=False, write_png=True, progress_print=True, debug_print=False, close_figures_to_save_memory: bool = True) -> Dict[IdentifyingContext, MatplotlibRenderPlots]:
+    def _perform_batch_plot(cls, curr_active_pipeline, active_kwarg_list, subset_includelist=None, subset_excludelist=None, write_vector_format=False, write_png=True, progress_print=True, debug_print=False, close_figures_to_save_memory: bool = True, override_fig_man: Optional[FileOutputManager]=None, **kwargs) -> Dict[IdentifyingContext, MatplotlibRenderPlots]:
         """ Plots everything by calling `cls._subfn_batch_plot_automated` using the kwargs provided in `active_kwarg_list`
 
         Args:
@@ -1142,8 +1149,10 @@ class BatchPhoJonathanFiguresHelper:
         needs_output_figures: bool = (write_png or write_vector_format)
         if needs_output_figures:
             output_file_paths = []
-            fig_man = curr_active_pipeline.get_output_manager()
-
+            if override_fig_man is None:
+                fig_man = curr_active_pipeline.get_output_manager()
+            else:
+                fig_man = deepcopy(override_fig_man) ## use provided fig_man
             
         active_out_figure_container_dict: Dict[IdentifyingContext, MatplotlibRenderPlots] = {} # empty dict to hold figures
         n_out_figures: int = len(active_kwarg_list)
