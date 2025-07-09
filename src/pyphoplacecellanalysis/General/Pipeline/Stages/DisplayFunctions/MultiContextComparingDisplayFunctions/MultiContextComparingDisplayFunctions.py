@@ -439,7 +439,7 @@ class MultiContextComparingDisplayFunctions(AllFunctionEnumeratingMixin, metacla
         modified_directional_active_lap_pf_results_dicts = {k:v.sliced_by_neuron_id(included_neuron_ids=override_active_neuron_IDs) for k, v in modified_directional_active_lap_pf_results_dicts.items()}
         _a_trial_by_trial_window = TrialByTrialActivityWindow.plot_trial_to_trial_reliability_all_decoders_image_stack(directional_active_lap_pf_results_dicts=modified_directional_active_lap_pf_results_dicts,
                                                                                                                         active_one_step_decoder=deepcopy(active_pf), drop_below_threshold=drop_below_threshold,
-                                                                                                                        override_active_neuron_IDs=override_active_neuron_IDs)
+                                                                                                                        override_active_neuron_IDs=override_active_neuron_IDs, **kwargs)
 
 
         ## split mode:

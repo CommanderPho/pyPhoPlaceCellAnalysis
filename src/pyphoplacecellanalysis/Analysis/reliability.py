@@ -421,7 +421,8 @@ class TrialByTrialActivity:
     ## MAIN CALL:
     @classmethod
     def directional_compute_trial_by_trial_correlation_matrix(cls, active_pf_dt: PfND_TimeDependent, directional_lap_epochs_dict, included_neuron_IDs=None) -> Dict[types.DecoderName, "TrialByTrialActivity"]:
-        """ 
+        """ Computes the trial-by-trial (lap-by-lap) correlation for each cell
+
         
         2024-02-02 - 10pm - Have global version working but want seperate directional versions. Seperately do `(long_LR_name, long_RL_name, short_LR_name, short_RL_name)`:
         

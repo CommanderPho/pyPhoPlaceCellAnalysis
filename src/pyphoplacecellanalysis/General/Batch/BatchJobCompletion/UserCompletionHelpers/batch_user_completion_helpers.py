@@ -1030,6 +1030,12 @@ def compute_and_export_session_trial_by_trial_performance_completion_function(se
         filtered_laps_time_bin_marginals_df: pd.DataFrame = callback_outputs['subset_decode_results_time_bin_marginals_df_dict']['filtered_laps_time_bin_marginals_df']
         active_results: Dict[types.DecoderName, DecodedFilterEpochsResult] = deepcopy({k:v.decoder_result for k, v in _out_separate_decoder_results[0].items()})
 
+        neuron_group_split_stability_dfs_tuple = callback_outputs['neuron_group_split_stability_dfs_tuple']
+        neuron_group_split_stability_aclus_tuple = callback_outputs['neuron_group_split_stability_aclus_tuple']
+
+        appearing_stability_df, disappearing_stability_df, appearing_or_disappearing_stability_df, stable_both_stability_df, stable_neither_stability_df, stable_long_stability_df, stable_short_stability_df = neuron_group_split_stability_dfs_tuple
+        appearing_aclus, disappearing_aclus, appearing_or_disappearing_aclus, stable_both_aclus, stable_neither_aclus, stable_long_aclus, stable_short_aclus = neuron_group_split_stability_aclus_tuple
+        
     """
     import sys
     from pyphocorehelpers.print_helpers import get_now_day_str, get_now_rounded_time_str
@@ -1182,7 +1188,7 @@ def compute_and_export_session_trial_by_trial_performance_completion_function(se
                 except ValueError as err:
                     # empty pfs: ValueError: need at least one array to concatenate
                     has_valid_result = False
-                except BaseException as err:
+                except Exception as err:
                     raise
 
             if (not has_valid_result):
