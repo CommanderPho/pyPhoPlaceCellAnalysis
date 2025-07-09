@@ -1654,11 +1654,19 @@ class TrackRemappingDiagramFigure:
     """
     @function_attributes(short_name=None, tags=['matplotlib', 'patches', 'track', 'long-short'], input_requires=[], output_provides=[], uses=['pyphoplacecellanalysis.Pho2D.track_shape_drawing._build_track_1D_verticies'], used_by=['_plot_track_remapping_diagram'], creation_date='2024-06-12 12:57', related_items=[])
     @classmethod
-    def _plot_helper_add_track_shapes(cls, grid_bin_bounds: Union[Tuple[Tuple[float, float], Tuple[float, float]], BoundsRect], is_dark_mode: bool = True, debug_print=False):
+    def _plot_helper_add_track_shapes(cls, grid_bin_bounds: Union[Tuple[Tuple[float, float], Tuple[float, float]], BoundsRect], is_dark_mode: bool = True,
+                                       base_1D_height: float = 1.0, base_platform_additive_height: float = 0.1, long_height_multiplier: float = 1.0, top_bottom_padding: float = 0.025, intra_track_y_spacing: float = 0.05,
+                                       common_1D_platform_height = 0.25, common_1D_track_height = 0.1, track_to_baseline_padding: float = 0.05, 
+                                       debug_print=False):
         """ Prepares the final matplotlib patch objects to represent the 1D long and short tracks, which can be immediately added to an axis
         
-        Usage:
+        base_1D_height: float = 1.0 -- the height of each track. track_1D_height
+        base_platform_additive_height: float = 0.1 -- the additional height for the 1D end platforms relative to the track body
 
+        
+        Usage:
+        
+        track_shapes_kwargs = dict(base_1D_height = 1.0, base_platform_additive_height = 0.1, long_height_multiplier = 1.0, top_bottom_padding = 0.025, intra_track_y_spacing = 0.05, common_1D_platform_height = 0.25, common_1D_track_height = 0.1, track_to_baseline_padding = 0.05)
         ## TRACK PLOTTING:
         (long_patch, long_path), (short_patch, short_path) = _plot_helper_add_track_shapes(grid_bin_bounds=grid_bin_bounds, ax=ax, defer_render=defer_render, is_dark_mode=is_dark_mode, debug_print=debug_print)
         # Draw the long/short track shapes: __________________________________________________________________________________ #
@@ -1681,30 +1689,12 @@ class TrackRemappingDiagramFigure:
         import matplotlib.patheffects as path_effects
         from pyphocorehelpers.geometry_helpers import BoundsRect
         from pyphoplacecellanalysis.General.Model.Configs.LongShortDisplayConfig import LongShortDisplayConfigManager
-        
-        if is_dark_mode:
-            _default_bg_color = 'white'
-            _default_fg_color = 'black'
-            _default_edgecolors = '#CCCCCC33' # light gray
-
-        else:
-            _default_bg_color = 'black'
-            _default_fg_color = 'white'
-            _default_edgecolors = '#5a5a5a33'
-            
-        base_1D_height: float = 1.0
-        # base_1D_height: float = 0.5
-        base_platform_additive_height: float = 0.1
-
-        long_height_multiplier: float = 1.0
-        # long_height_multiplier: float = 0.5 # this renders the long track half-height
 
         # long_y_baseline: float = 0.1
         # short_y_baseline: float = 0.75
 
         ## smarter, all are calculated in terms of 1.0 being the height of the total subplot axes:
-        top_bottom_padding: float = 0.025
-        intra_track_y_spacing: float = 0.05 # spacing in between the long/short tracks
+         # spacing in between the long/short tracks
 
         total_track_y_space: float = 1.0 - (intra_track_y_spacing + (2.0 * top_bottom_padding)) # amount of total space for the tracks
         track_y_height: float = total_track_y_space / 2.0
@@ -1729,17 +1719,14 @@ class TrackRemappingDiagramFigure:
         else:
             assert isinstance(grid_bin_bounds, BoundsRect)
 
-
         # display(grid_bin_bounds)
-
         # long_track_dims = LinearTrackDimensions.init_from_grid_bin_bounds(grid_bin_bounds)
         # short_track_dims = LinearTrackDimensions.init_from_grid_bin_bounds(grid_bin_bounds)
 
         long_track_dims = LinearTrackDimensions(track_length=170.0)
         short_track_dims = LinearTrackDimensions(track_length=100.0)
 
-        common_1D_platform_height = 0.25
-        common_1D_track_height = 0.1
+        
         long_track_dims.minor_axis_platform_side_width = common_1D_platform_height
         long_track_dims.track_width = common_1D_track_height # (short_track_dims.minor_axis_platform_side_width
 
@@ -1752,8 +1739,8 @@ class TrackRemappingDiagramFigure:
 
         # BEGIN PLOTTING _____________________________________________________________________________________________________ #
 
-        track_1D_height=1.0*base_1D_height
-        platform_1D_height=1.0*base_1D_height + base_platform_additive_height # want same (additive) height offset even when scaling.
+        track_1D_height = 1.0 * base_1D_height
+        platform_1D_height = 1.0 * base_1D_height + base_platform_additive_height # want same (additive) height offset even when scaling.
 
         long_path = _build_track_1D_verticies(platform_length=22.0, track_length=long_track_dims.track_length, track_1D_height=(track_1D_height * long_height_multiplier), platform_1D_height=((track_1D_height * long_height_multiplier) + base_platform_additive_height), track_center_midpoint_x=long_track.grid_bin_bounds.center_point[0], track_center_midpoint_y=-1.0, debug_print=debug_print)
         # long_path = _build_track_1D_verticies(platform_length=22.0, track_length=long_track_dims.track_length, track_1D_height=(track_1D_height * long_height_multiplier), platform_1D_height=(platform_1D_height * long_height_multiplier), track_center_midpoint_x=long_track.grid_bin_bounds.center_point[0], track_center_midpoint_y=-1.0, debug_print=True)
@@ -1762,7 +1749,7 @@ class TrackRemappingDiagramFigure:
         # Define the transformation: squish along y-axis by 0.5 and translate up by 0.5 units
         # long_transformation = Affine2D().scale(1, -0.5).translate(0, long_y_baseline)
         # short_transformation = Affine2D().scale(1, 0.5).translate(0, short_y_baseline)
-        track_to_baseline_padding: float = 0.05
+        
         # long_transformation = Affine2D().scale(1, 1.0).translate(0, long_y_baseline-track_to_baseline_padding)
         # short_transformation = Affine2D().scale(1, 1.0).translate(0, short_y_baseline-track_to_baseline_padding)
 
@@ -1882,6 +1869,12 @@ class TrackRemappingDiagramFigure:
             enable_single_y_point_arrows: bool = False
             
 
+        ## passed to `cls._plot_helper_add_track_shapes(...)`
+        track_shapes_kwargs = dict(base_1D_height=base_1D_height, base_platform_additive_height = kwargs.get('base_platform_additive_height', 0.1) , long_height_multiplier = kwargs.get('long_height_multiplier', 1.0),
+                                  top_bottom_padding=top_bottom_padding, intra_track_y_spacing=intra_track_y_spacing,
+                                common_1D_platform_height = kwargs.get('common_1D_platform_height', 0.25), common_1D_track_height = kwargs.get('common_1D_track_height', 0.1), track_to_baseline_padding = kwargs.get('track_to_baseline_padding', 0.05))
+        
+
         ## smarter, all are calculated in terms of 1.0 being the height of the total subplot axes:
         total_track_y_space: float = 1.0 - (intra_track_y_spacing + (2.0 * top_bottom_padding)) # amount of total space for the tracks
         track_y_height: float = total_track_y_space / 2.0
@@ -1891,7 +1884,6 @@ class TrackRemappingDiagramFigure:
 
         # long_y_height: float = (short_y_baseline - intra_track_y_spacing)
         # short_y_top: float = (1.0-0.1) # 0.9
-        
         
 
         # Text label options:
@@ -1911,13 +1903,14 @@ class TrackRemappingDiagramFigure:
 
         selection_text_path_effects = [path_effects.Stroke(linewidth=0.2, foreground='red'), path_effects.Normal()]
 
-
+        edgecolors = kwargs.get('edgecolors', _default_edgecolors)
+        
         # Appearing/Disappearing _____________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
-        appearing_edgecolors = (0, 1, 0, 1)  # Green color in RGBA format
+        appearing_edgecolors = kwargs.get('appearing_edgecolors', (0, 1, 0, 1)) # Green color in RGBA format
         # appearing_marker: str = '^' # upward arrow
         appearing_disappearing_marker: str = 'P' # filled plus
 
-        disappearing_edgecolors = (1, 0, 0, 1)  # Red color in RGBA format
+        disappearing_edgecolors = kwargs.get('disappearing_edgecolors', (1, 0, 0, 1)) # Red color in RGBA format
         # disappearing_marker: str = 'v' # downward arrow
         disappearing_marker: str = 'X' # filled X
 
@@ -2003,7 +1996,7 @@ class TrackRemappingDiagramFigure:
         # if did_create_new_figure:
         extant_long_patch = extant_plot_container.plots.get('long_patch', None)
         if extant_long_patch is None:
-            (long_patch, long_path), (short_patch, short_path) = cls._plot_helper_add_track_shapes(grid_bin_bounds=grid_bin_bounds, is_dark_mode=is_dark_mode, debug_print=debug_print)
+            (long_patch, long_path), (short_patch, short_path) = cls._plot_helper_add_track_shapes(grid_bin_bounds=grid_bin_bounds, is_dark_mode=is_dark_mode, **track_shapes_kwargs, debug_print=debug_print)
             if long_patch is not None:
                 extant_plot_container.plots.long_patch = long_patch
             if long_path is not None:
@@ -2131,7 +2124,7 @@ class TrackRemappingDiagramFigure:
         both_long_y = long_y[is_aclu_in_both]
         # To handle different types of color inputs:
         both_color = _subfn_index_color_iterable(color_iterable=color, included_indicies=is_aclu_in_both)
-        both_long_circle_points_kwargs = dict(**common_BOTH_only_circle_points_kwargs, s=np.full((len(both_long_peak_x),), fill_value=scatter_point_size), edgecolors=([_default_edgecolors] * len(both_long_peak_x)), facecolors=both_color)
+        both_long_circle_points_kwargs = dict(**common_BOTH_only_circle_points_kwargs, s=np.full((len(both_long_peak_x),), fill_value=scatter_point_size), edgecolors=([edgecolors] * len(both_long_peak_x)), facecolors=both_color)
         _out_long_points = ax.scatter(both_long_peak_x, y=both_long_y, label='long_peak_x', **both_long_circle_points_kwargs)
         
 
@@ -2150,7 +2143,7 @@ class TrackRemappingDiagramFigure:
         both_short_y = short_y[is_aclu_in_both]
         both_color = _subfn_index_color_iterable(color_iterable=color, included_indicies=is_aclu_in_both)
         
-        both_short_circle_points_kwargs = dict(**common_BOTH_only_circle_points_kwargs, s=np.full((len(both_short_peak_x),), fill_value=scatter_point_size), edgecolors=([_default_edgecolors] * len(both_short_peak_x)), facecolors=both_color)
+        both_short_circle_points_kwargs = dict(**common_BOTH_only_circle_points_kwargs, s=np.full((len(both_short_peak_x),), fill_value=scatter_point_size), edgecolors=([edgecolors] * len(both_short_peak_x)), facecolors=both_color)
         
         _out_short_points = ax.scatter(both_short_peak_x, y=both_short_y, label='short_peak_x_app', **both_short_circle_points_kwargs)
 
@@ -2499,7 +2492,8 @@ class TrackRemappingDiagramFigure:
                 
                 # kwargs = dict(draw_point_aclu_labels=True, enable_interactivity=False, enable_adjust_overlapping_text=False, unit_id_colors_map=_unit_colors_ndarray_map)
                 kwargs = dict(draw_point_aclu_labels=True, enable_interactivity=enable_interactivity, enable_adjust_overlapping_text=False, unit_id_colors_map=unit_id_colors_map, is_dark_mode=is_dark_mode, aclus_y_offset_mode=aclus_y_offset_mode)
-
+                track_shapes_kwargs = dict(base_1D_height = 1.0, base_platform_additive_height = 0.1, long_height_multiplier = 1.0, top_bottom_padding = 0.025, intra_track_y_spacing = 0.05, common_1D_platform_height = 0.25, common_1D_track_height = 0.1, track_to_baseline_padding = 0.05)
+        
                 ## Either way, make a single figure for both LR/RL remapping cells:
                 if use_separate_plot_for_each_direction:
                     ## Make two separate axes for LR/RL remapping cells:
@@ -2654,7 +2648,7 @@ class TrackRemappingDiagramFigure:
                     # aclus_y_offset_mode=AclusYOffsetMode.CountBased,
                     
                     # base_1D_height = 1.0, top_bottom_padding = 0.025,  intra_track_y_spacing = 0.05, scatter_point_size = 15.0, # Defaults
-                    base_1D_height = 0.5, top_bottom_padding = 0.0125,  intra_track_y_spacing = 0.025, scatter_point_size = 7.0, # Smaller
+                    base_1D_height = 1.0, top_bottom_padding = 0.0125,  intra_track_y_spacing = 0.05, scatter_point_size = 7.0, # Smaller
 
                     ) | kwargs
         
@@ -2694,15 +2688,30 @@ class TrackRemappingDiagramFigure:
 
 
                 # BEGIN FUNCTION BODY
-                fig = build_or_reuse_figure(fignum='Track Remapping', fig=kwargs.pop('fig', None), fig_idx=kwargs.pop('fig_idx', 0), figsize=kwargs.pop('figsize', (6.5, 2)), dpi=kwargs.pop('dpi', None), constrained_layout=True, clear=True) # , clear=True
-                gs = GridSpec(2, 1, figure=fig)
-                ax_LR = plt.subplot(gs[0])
-                ax_RL = plt.subplot(gs[1])
-
+                
+                fig = collector.build_or_reuse_figure(fignum='Track Remapping', fig=kwargs.pop('fig', None), fig_idx=kwargs.pop('fig_idx', 0), figsize=kwargs.pop('figsize', (6.5, 2)), dpi=kwargs.pop('dpi', None), constrained_layout=True, clear=True) # , clear=True
                 _fig_container: GenericMatplotlibContainer = GenericMatplotlibContainer(name='across-session-neuron-remapping-diagram')
                 _fig_container.fig = fig
-                _fig_container.plots.gs = gs
-                _fig_container.axes = [ax_LR, ax_RL]
+                
+                if not skip_RL_direction_tracks:
+                    # both
+                    # gs = GridSpec(2, 1, figure=fig)
+                    # ax_LR = plt.subplot(gs[0])
+                    # ax_RL = plt.subplot(gs[1])
+                    fig, ax_dict = collector.subplot_mosaic([['ax_LR'], ['ax_RL']], extant_fig=fig, sharex=True)
+                    ax_LR = ax_dict['ax_LR']
+                    ax_RL = ax_dict['ax_RL']
+                    _fig_container.axes = [ax_LR, ax_RL]
+
+                else:
+                    # just LR
+                    fig, ax_dict = collector.subplot_mosaic([['ax_LR'],], extant_fig=fig, sharex=True)
+                    ax_LR = ax_dict['ax_LR']
+                    _fig_container.axes = [ax_LR, ]
+
+
+                # _fig_container.plots.gs = gs
+                # _fig_container.axes = [ax_LR, ax_RL]
                 # _fig_container.plots
 
                 _extant_plot_container_LR = None
