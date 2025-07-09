@@ -1783,9 +1783,13 @@ class TrackRemappingDiagramFigure:
     @function_attributes(short_name=None, tags=['matplotlib', 'track', 'remapping', 'good', 'working'], input_requires=[], output_provides=[], uses=['_plot_helper_add_track_shapes'], used_by=['plot_bidirectional_track_remapping_diagram'], creation_date='2024-02-22 11:12', related_items=[])
     @classmethod
     def _plot_track_remapping_diagram(cls, a_dir_decoder_aclu_MAX_peak_maps_df: pd.DataFrame, grid_bin_bounds: Union[Tuple[Tuple[float, float], Tuple[float, float]], BoundsRect], long_column_name:str='long_LR', short_column_name:str='short_LR', long_y_column_name:Optional[str]=None, short_y_column_name:Optional[str]=None, ax=None, defer_render: bool=False, enable_interactivity:bool=True, draw_point_aclu_labels:bool=False, enable_adjust_overlapping_text: bool=False, is_dark_mode: bool = True, aclus_y_offset_mode:AclusYOffsetMode=AclusYOffsetMode.CountBased, debug_print=False, 
-                                    extant_plot_container: Optional[GenericMatplotlibContainer]=None, considerable_remapping_emphasis_color=None, **kwargs):
+                                    extant_plot_container: Optional[GenericMatplotlibContainer]=None, considerable_remapping_emphasis_color=None, base_1D_height: float = 1.0, top_bottom_padding: float = 0.025,  intra_track_y_spacing: float = 0.05, scatter_point_size: float = 15.0, **kwargs):
         """ Plots a single figure containing the long and short track outlines (flattened, overlayed) with single points on each corresponding to the peak location in 1D
 
+        
+        intra_track_y_spacing: # spacing in between the long/short tracks
+        long_height_multiplier: float = 0.5 # this renders the long track half-height
+        
         🔝🖼️🎨
         from pyphoplacecellanalysis.Pho2D.track_shape_drawing import _plot_track_remapping_diagram
         # grid_bin_bounds = BoundsRect.init_from_grid_bin_bounds(global_pf2D.config.grid_bin_bounds)
@@ -1877,20 +1881,8 @@ class TrackRemappingDiagramFigure:
         else:
             enable_single_y_point_arrows: bool = False
             
-        base_1D_height: float = 1.0
-        # base_1D_height: float = 0.5
-        # base_platform_additive_height: float = 0.1
-
-        # long_height_multiplier: float = 1.0
-        # long_height_multiplier: float = 0.5 # this renders the long track half-height
-
-        # long_y_baseline: float = 0.1
-        # short_y_baseline: float = 0.75
 
         ## smarter, all are calculated in terms of 1.0 being the height of the total subplot axes:
-        top_bottom_padding: float = 0.025
-        intra_track_y_spacing: float = 0.05 # spacing in between the long/short tracks
-
         total_track_y_space: float = 1.0 - (intra_track_y_spacing + (2.0 * top_bottom_padding)) # amount of total space for the tracks
         track_y_height: float = total_track_y_space / 2.0
 
@@ -1900,7 +1892,7 @@ class TrackRemappingDiagramFigure:
         # long_y_height: float = (short_y_baseline - intra_track_y_spacing)
         # short_y_top: float = (1.0-0.1) # 0.9
         
-        scatter_point_size: float = 15.0
+        
 
         # Text label options:
         if is_dark_mode:
@@ -2539,7 +2531,7 @@ class TrackRemappingDiagramFigure:
 
     @function_attributes(short_name=None, tags=['figure', 'publication', 'figure1'], input_requires=[], output_provides=[], uses=['_plot_track_remapping_diagram', 'perform_update_title_subtitle', 'build_or_reuse_figure'], used_by=[], creation_date='2025-06-16 20:44', related_items=[])
     @classmethod
-    def plot_publication_bidirectional_track_remapping_diagram(cls, all_neuron_stats_table: pd.DataFrame, use_considerable_remapping_cells_only: bool=False, use_pf2D_peaks: bool = False, considerable_remapping_emphasis_color=None, **kwargs):
+    def plot_publication_bidirectional_track_remapping_diagram(cls, all_neuron_stats_table: pd.DataFrame, use_considerable_remapping_cells_only: bool=False, use_pf2D_peaks: bool = False, considerable_remapping_emphasis_color=None, skip_RL_direction_tracks: bool=True, **kwargs):
         """ Plots the neuron remapping diagram
                 
         from pyphoplacecellanalysis.SpecificResults.AcrossSessionResults import AcrossSessionsResults # for .build_neuron_identities_df_for_CSV
@@ -2660,6 +2652,10 @@ class TrackRemappingDiagramFigure:
                     aclus_y_offset_mode=AclusYOffsetMode.RandomJitter,
                     considerable_remapping_emphasis_color=considerable_remapping_emphasis_color,
                     # aclus_y_offset_mode=AclusYOffsetMode.CountBased,
+                    
+                    # base_1D_height = 1.0, top_bottom_padding = 0.025,  intra_track_y_spacing = 0.05, scatter_point_size = 15.0, # Defaults
+                    base_1D_height = 0.5, top_bottom_padding = 0.0125,  intra_track_y_spacing = 0.025, scatter_point_size = 7.0, # Smaller
+
                     ) | kwargs
         
         active_context = IdentifyingContext()
@@ -2698,7 +2694,7 @@ class TrackRemappingDiagramFigure:
 
 
                 # BEGIN FUNCTION BODY
-                fig = build_or_reuse_figure(fignum='Track Remapping', fig=kwargs.pop('fig', None), fig_idx=kwargs.pop('fig_idx', 0), figsize=kwargs.pop('figsize', (6.5, 4)), dpi=kwargs.pop('dpi', None), constrained_layout=True, clear=True) # , clear=True
+                fig = build_or_reuse_figure(fignum='Track Remapping', fig=kwargs.pop('fig', None), fig_idx=kwargs.pop('fig_idx', 0), figsize=kwargs.pop('figsize', (6.5, 2)), dpi=kwargs.pop('dpi', None), constrained_layout=True, clear=True) # , clear=True
                 gs = GridSpec(2, 1, figure=fig)
                 ax_LR = plt.subplot(gs[0])
                 ax_RL = plt.subplot(gs[1])
@@ -2742,9 +2738,13 @@ class TrackRemappingDiagramFigure:
                 ## Plot the track shapes (if needed, and the significant remapping points/arrows):
                 fig_LR_RL, ax_LR, _extant_plot_container_LR = cls._plot_track_remapping_diagram(LR_only_decoder_aclu_MAX_peak_maps_df, grid_bin_bounds=grid_bin_bounds, long_column_name=LR_only_column_names[0], short_column_name=LR_only_column_names[1], **_LR_kwargs, ax=ax_LR, extant_plot_container=_extant_plot_container_LR, **deepcopy(kwargs))
                 perform_update_title_subtitle(fig=fig_LR_RL, ax=ax_LR, title_string=suptitle_str, subtitle_string=f"< Placefield Peaks - {len(LR_only_decoder_aclu_MAX_peak_maps_df)} Place cells")
-                fig_LR_RL, ax_RL, _extant_plot_container_RL = cls._plot_track_remapping_diagram(RL_only_decoder_aclu_MAX_peak_maps_df, grid_bin_bounds=grid_bin_bounds, long_column_name=RL_only_column_names[0], short_column_name=RL_only_column_names[1], **_RL_kwargs, ax=ax_RL, extant_plot_container=_extant_plot_container_RL, **deepcopy(kwargs))
-                perform_update_title_subtitle(fig=fig_LR_RL, ax=ax_RL, title_string=suptitle_str, subtitle_string=f"> Placefield Peaks - {len(RL_only_decoder_aclu_MAX_peak_maps_df)} Place cells")
-                setup_common_after_creation(collector, fig=fig, axes=[ax_LR, ax_RL], sub_context=display_context.adding_context('subplot', subplot_name='Track Remapping'))
+                if skip_RL_direction_tracks:
+                    ## LR only
+                    setup_common_after_creation(collector, fig=fig, axes=[ax_LR,], sub_context=display_context.adding_context('subplot', subplot_name='Track Remapping'))
+                else:
+                    fig_LR_RL, ax_RL, _extant_plot_container_RL = cls._plot_track_remapping_diagram(RL_only_decoder_aclu_MAX_peak_maps_df, grid_bin_bounds=grid_bin_bounds, long_column_name=RL_only_column_names[0], short_column_name=RL_only_column_names[1], **_RL_kwargs, ax=ax_RL, extant_plot_container=_extant_plot_container_RL, **deepcopy(kwargs))
+                    perform_update_title_subtitle(fig=fig_LR_RL, ax=ax_RL, title_string=suptitle_str, subtitle_string=f"> Placefield Peaks - {len(RL_only_decoder_aclu_MAX_peak_maps_df)} Place cells")
+                    setup_common_after_creation(collector, fig=fig, axes=[ax_LR, ax_RL], sub_context=display_context.adding_context('subplot', subplot_name='Track Remapping'))
                 
         return _fig_container
 
