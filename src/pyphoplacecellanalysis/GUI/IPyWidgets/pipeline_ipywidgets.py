@@ -32,7 +32,7 @@ from pyphocorehelpers.gui.Jupyter.simple_widgets import fullwidth_path_widget, c
 
 
 from pyphoplacecellanalysis.General.Pipeline.NeuropyPipeline import PipelineSavingScheme # used in perform_pipeline_save
-
+from pyphoplacecellanalysis.General.Pipeline.NeuropyPipeline import _get_custom_filenames_from_computation_metadata
 
 # AbstractDataFileDialog
 
@@ -520,11 +520,15 @@ class PipelinePickleFileSelectorWidget:
     on_load_callback: Optional[Callable] = field(default=None)
     on_save_callback: Optional[Callable] = field(default=None)
     on_compute_callback: Optional[Callable] = field(default=None)
+    on_compute_new_callback: Optional[Callable] = field(default=None)  # New callback for compute new
     on_get_global_variable_callback: Optional[Callable] = field(default=None)
     on_update_global_variable_callback: Optional[Callable] = field(default=None)
     
     local_file_browser_widget = field(init=False)
     global_file_browser_widget = field(init=False)
+    minimum_fr_widget = field(init=False)
+    qclu_text_widget = field(init=False)
+
     layout: pn.Column = field(init=False)
     debug_print: bool = field(default=False)
 
@@ -562,7 +566,10 @@ class PipelinePickleFileSelectorWidget:
         """The is_compute_button_disabled property."""
         return (self.on_compute_callback is None) or (self.on_get_global_variable_callback is None)
 
-
+    @property 
+    def is_compute_new_button_disabled(self) -> bool:
+        """The is_compute_new_button_disabled property."""
+        return (self.on_compute_new_callback is None) or (self.on_get_global_variable_callback is None) or (self.are_current_parameter_values_modified)
 
 
     @property
@@ -593,6 +600,61 @@ class PipelinePickleFileSelectorWidget:
             return self.global_file_browser_widget._data['File Name'].tolist()
         else:
             return []
+
+
+
+    @property
+    def current_parameter_values(self) -> Dict:
+        """Get the current parameter values from the widgets"""
+        import ast
+
+        # Parse the qclu values from text
+        try:
+            qclu_values = ast.literal_eval(self.qclu_text_widget.value)
+            if not isinstance(qclu_values, list):
+                qclu_values = [qclu_values]
+        except:
+            print("Error: Invalid format for QClu Values. Using default.")
+            qclu_values = [1, 2, 4, 6, 7, 8, 9]
+
+        return {
+            'minimum_inclusion_fr_Hz': self.minimum_fr_widget.value,
+            'included_qclu_values': qclu_values
+        }
+
+
+    @property
+    def are_current_parameter_values_modified(self) -> bool:
+        """Get the current parameter values from the widgets"""
+        if self.on_get_global_variable_callback:
+            return False
+        curr_active_pipeline = self.on_get_global_variable_callback('curr_active_pipeline')
+        assert curr_active_pipeline is not None
+        # curr_active_pipeline.
+        # curr_user_values = deepcopy(current_parameter_values)
+        return True
+        
+
+    def build_custom_suffix_from_modified_widget_parameters(self) -> str:
+        """ Uses the user-modified widget values to build a custom suffix
+
+        custom_suffix: str = widget.try_extract_custom_suffix()
+
+        """
+        override_parameters_flat_keypaths_dict = deepcopy(self.current_parameter_values)
+        print(f'_subfn_compute_new():\n\toverride_parameters_flat_keypaths_dict: {override_parameters_flat_keypaths_dict}\n')
+        minimum_inclusion_fr_Hz = self.current_parameter_values['minimum_inclusion_fr_Hz']
+        included_qclu_values = self.current_parameter_values['included_qclu_values']
+        epochs_source: str = self.current_parameter_values.get('epochs_source', 'normal_computed') ## not currently configurable
+
+        custom_save_filepaths, custom_save_filenames, custom_suffix = _get_custom_filenames_from_computation_metadata(epochs_source=epochs_source, included_qclu_values=included_qclu_values, minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz, parts_separator='-')
+        # print(f'custom_save_filenames: {custom_save_filenames}')
+        # print(f'custom_suffix: "{custom_suffix}"')
+        return custom_suffix
+
+
+
+
 
     def try_extract_custom_suffix(self) -> Optional[str]:
         """ uses the local pkl first 
@@ -644,6 +706,11 @@ class PipelinePickleFileSelectorWidget:
         self.local_file_browser_widget = create_file_browser(self.directory, ['*loadedSessPickle*.pkl'], page_size=10, widget_height=400, selectable=1, on_selected_files_changed_fn=self.on_selected_local_sess_pkl_files_changed)
         self.global_file_browser_widget = create_file_browser(self.directory, ['output/*global_computation_results*.pkl'], page_size=10, widget_height=400, selectable=1, on_selected_files_changed_fn=self.on_selected_global_computation_result_pkl_files_changed)
 
+
+        # Create parameter control widgets
+        self.minimum_fr_widget = pn.widgets.IntInput(name='Min FR (Hz)', value=2, start=0, end=100, step=1, width=150)
+        self.qclu_text_widget = pn.widgets.TextInput(name='QClu Values', value='[1, 2, 4, 6, 7, 8, 9]', placeholder='Enter as list: [1, 2, 3, ...]', width=300)
+
         # Create Load/Save buttons
         # self.load_button = widgets.Button(description="Load")
         # self.save_button = widgets.Button(description="Save")
@@ -651,18 +718,29 @@ class PipelinePickleFileSelectorWidget:
         self.load_button = pn.widgets.Button(name='Load', button_type='primary')
         self.save_button = pn.widgets.Button(name='Save', button_type='success')
         self.compute_button = pn.widgets.Button(name='Compute', button_type='warning')  # Add compute button
-        
+        self.compute_new_button = pn.widgets.Button(name='Compute New', button_type='primary')  # New button
+
         self.load_button.disabled = self.is_load_button_disabled
         self.save_button.disabled = self.is_save_button_disabled
         self.compute_button.disabled = self.is_compute_button_disabled  # Add compute button state
-        
+        self.compute_new_button.disabled = self.is_compute_new_button_disabled
+
         self.load_button.on_click(self._handle_load_click)
         self.save_button.on_click(self._handle_save_click)
         self.compute_button.on_click(self._handle_compute_click)  # Add compute handler
-        
+        self.compute_new_button.on_click(self._handle_compute_new_click)  # New handler
+
+        # Create parameter controls section
+        parameter_controls = pn.Column(
+            pn.pane.HTML("<h4>Computation Parameters</h4>"),
+            pn.Row(self.minimum_fr_widget, self.qclu_text_widget),
+            margin=(10, 0)
+        )
+
         # Update layout to include compute button
-        self.layout = pn.Column(self.local_file_browser_widget, self.global_file_browser_widget, 
-                            pn.Row(self.save_button, self.load_button, self.compute_button))
+        self.layout = pn.Column(self.local_file_browser_widget, self.global_file_browser_widget,
+                            parameter_controls,
+                            pn.Row(self.save_button, self.load_button, self.compute_button, self.compute_new_button))
         
 
     def _update_load_save_button_disabled_state(self):
@@ -670,7 +748,7 @@ class PipelinePickleFileSelectorWidget:
         self.load_button.disabled = self.is_load_button_disabled
         self.save_button.disabled = self.is_save_button_disabled
         self.compute_button.disabled = self.is_compute_button_disabled
-
+        self.compute_new_button.disabled = self.is_compute_new_button_disabled
 
     def _handle_load_click(self, event):
         print(f'\t._handle_load_click(event: {event})')
@@ -688,6 +766,13 @@ class PipelinePickleFileSelectorWidget:
         print(f'\t._handle_compute_click(event: {event})')
         if self.on_compute_callback is not None:
             self.on_compute_callback()
+
+
+    def _handle_compute_new_click(self, event):
+        print(f'\t._handle_compute_new_click(event: {event})')
+        print(f'\tCurrent parameter values: {self.current_parameter_values}')
+        if self.on_compute_new_callback is not None:
+            self.on_compute_new_callback()
 
 
     def servable(self, **kwargs):
@@ -928,7 +1013,10 @@ class PipelinePickleFileSelectorWidget:
 
         """
         from pyphoplacecellanalysis.General.Batch.NonInteractiveProcessing import batch_extended_computations, batch_evaluate_required_computations
-        
+        from neuropy.core.session.Formats.BaseDataSessionFormats import DataSessionFormatRegistryHolder # for batch_load_session
+        from pyphoplacecellanalysis.General.Pipeline.NeuropyPipeline import NeuropyPipeline, PipelineSavingScheme # for batch_load_session
+
+
         def _subfn_load():
             """ captures: everything in calling context!
             Modifies in workspace: ['curr_active_pipeline', 'custom_suffix', 'proposed_load_pkl_path']
@@ -958,7 +1046,9 @@ class PipelinePickleFileSelectorWidget:
             
 
         def _subfn_compute():
-            """Performs computations in clean_run mode"""
+            """Performs computations in clean_run mode
+            Captures: active_data_mode_name
+            """
             get_global_variable_fn = self.on_get_global_variable_callback
             assert get_global_variable_fn is not None
             curr_active_pipeline = get_global_variable_fn('curr_active_pipeline')
@@ -979,6 +1069,54 @@ class PipelinePickleFileSelectorWidget:
                 _subfn_save() ## call _subfn_save() to attempt to save out the results
                 # curr_active_pipeline.save_global_computation_results()
                 
+
+
+        def _subfn_compute_new():
+            """Performs computations in clean_run mode"""
+            get_global_variable_fn = self.on_get_global_variable_callback
+            assert get_global_variable_fn is not None
+            override_parameters_flat_keypaths_dict = deepcopy(self.current_parameter_values)
+            print(f'_subfn_compute_new():\n\toverride_parameters_flat_keypaths_dict: {override_parameters_flat_keypaths_dict}\n')
+            
+            # From `General.Batch.NonInteractiveProcessing.known_data_session_type_properties_dict`
+            known_data_session_type_properties_dict = DataSessionFormatRegistryHolder.get_registry_known_data_session_type_dict(override_parameters_flat_keypaths_dict=override_parameters_flat_keypaths_dict)
+            active_data_session_types_registered_classes_dict = DataSessionFormatRegistryHolder.get_registry_data_session_type_class_name_dict()
+
+            active_data_mode_registered_class = active_data_session_types_registered_classes_dict[active_data_mode_name]
+            active_data_mode_type_properties = known_data_session_type_properties_dict[active_data_mode_name]
+            # skip_save_on_initial_load: bool = True
+            skip_save_on_initial_load: bool = False
+
+            ## Begin main run of the pipeline (load or execute):
+            curr_active_pipeline = NeuropyPipeline.try_init_from_saved_pickle_or_reload_if_needed(active_data_mode_name, active_data_mode_type_properties,
+                override_basepath=Path(basedir), force_reload=force_reload, active_pickle_filename=active_pickle_filename, skip_save_on_initial_load=skip_save_on_initial_load, override_parameters_flat_keypaths_dict=override_parameters_flat_keypaths_dict)
+
+            curr_active_pipeline.update_parameters(override_parameters_flat_keypaths_dict=override_parameters_flat_keypaths_dict) # should already be updated, but try it again anyway.
+
+            was_loaded_from_file: bool =  curr_active_pipeline.has_associated_pickle # True if pipeline was loaded from an existing file, False if it was created fresh
+            
+            print(f'\tNot yet implemented.')
+
+            # curr_active_pipeline = get_global_variable_fn('curr_active_pipeline')
+            
+            # # Reload computation functions and perform computations
+            # curr_active_pipeline.reload_default_computation_functions()
+            # newly_computed_values = batch_extended_computations(curr_active_pipeline, 
+            #                                                 include_includelist=extended_computations_include_includelist,
+            #                                                 include_global_functions=True,
+            #                                                 fail_on_exception=False,
+            #                                                 progress_print=True,
+            #                                                 force_recompute=True,
+            #                                                 force_recompute_override_computations_includelist=force_recompute_override_computations_includelist,
+            #                                                 debug_print=False)
+            
+            # if len(newly_computed_values) > 0:
+            #     print(f'newly_computed_values: {newly_computed_values}')
+            #     _subfn_save() ## call _subfn_save() to attempt to save out the results
+            #     # curr_active_pipeline.save_global_computation_results()
+                
+
+                
         # ==================================================================================================================== #
         # BEGIN MAIN FUNCTION BODY                                                                                             #
         # ==================================================================================================================== #
@@ -986,6 +1124,7 @@ class PipelinePickleFileSelectorWidget:
         self.on_load_callback = _subfn_load
         self.on_save_callback = _subfn_save
         self.on_compute_callback = _subfn_compute
+        self.on_compute_new_callback = _subfn_compute_new
     
         ## Update button enable states:        
         self._update_load_save_button_disabled_state()
