@@ -625,7 +625,7 @@ class BatchSessionCompletionHandler:
 
 
         """
-        print(f'on_complete_success_execution_session(curr_session_context: {curr_session_context}, curr_session_basedir: {str(curr_session_basedir)}, ...)')
+        print(f'>>> on_complete_success_execution_session(curr_session_context: {curr_session_context}, curr_session_basedir: {str(curr_session_basedir)}, ...): BEGIN ======')
         # print(f'curr_session_context: {curr_session_context}, curr_session_basedir: {str(curr_session_basedir)}')
         long_epoch_name, short_epoch_name, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
         # Get existing laps from session:
@@ -634,8 +634,8 @@ class BatchSessionCompletionHandler:
         # short_laps.n_epochs: 40, n_long_laps.n_epochs: 40
         # short_replays.n_epochs: 6, long_replays.n_epochs: 8
         if self.debug_print:
-            print(f'short_laps.n_epochs: {short_laps.n_epochs}, n_long_laps.n_epochs: {long_laps.n_epochs}')
-            print(f'short_replays.n_epochs: {short_replays.n_epochs}, long_replays.n_epochs: {long_replays.n_epochs}')
+            print(f'\tshort_laps.n_epochs: {short_laps.n_epochs}, n_long_laps.n_epochs: {long_laps.n_epochs}')
+            print(f'\tshort_replays.n_epochs: {short_replays.n_epochs}, long_replays.n_epochs: {long_replays.n_epochs}')
 
 
         was_updated = False
@@ -646,13 +646,13 @@ class BatchSessionCompletionHandler:
         except Exception as e:
             exception_info = sys.exc_info()
             an_err = CapturedException(e, exception_info)
-            print(f'self.post_compute_validate(...) failed with exception: {an_err}')
+            print(f'\tself.post_compute_validate(...) failed with exception: {an_err}')
             raise
 
         ## Save the pipeline since that's disabled by default now:
         if was_updated and (self.session_computations_options.should_save != SavingOptions.NEVER):
             # override the saving mode:
-            print(f'WARNING: basic pipleine was updated by post_compute_validate and needs to be saved to be correct.Overriding self.save_mode to ensure pipeline is saved!')
+            print(f'\tWARNING: basic pipleine was updated by post_compute_validate and needs to be saved to be correct.Overriding self.save_mode to ensure pipeline is saved!')
             self.saving_mode = PipelineSavingScheme.TEMP_THEN_OVERWRITE
 
         try:
@@ -668,11 +668,11 @@ class BatchSessionCompletionHandler:
 
         ## GLOBAL FUNCTION:
         if self.force_reload_all and (not self.force_global_recompute):
-            print(f'WARNING: self.force_global_recompute was False but self.force_reload_all was true. The global properties must be recomputed when the local functions change, so self.force_global_recompute will be set to True and computation will continue.')
+            print(f'\tWARNING: self.force_global_recompute was False but self.force_reload_all was true. The global properties must be recomputed when the local functions change, so self.force_global_recompute will be set to True and computation will continue.')
             self.force_global_recompute = True
 
         if was_updated and (not self.force_global_recompute):
-            print(f'WARNING: self.force_global_recompute was False but pipeline was_updated. The global properties must be recomputed when the local functions change, so self.force_global_recompute will be set to True and computation will continue.')
+            print(f'\tWARNING: self.force_global_recompute was False but pipeline was_updated. The global properties must be recomputed when the local functions change, so self.force_global_recompute will be set to True and computation will continue.')
             self.force_global_recompute = True
 
         newly_computed_values = self.try_compute_global_computations_if_needed(curr_active_pipeline, curr_session_context=curr_session_context)
@@ -685,7 +685,7 @@ class BatchSessionCompletionHandler:
         if self.should_perform_figure_generation_to_file:
             self.try_complete_figure_generation_to_file(curr_active_pipeline, enable_default_neptune_plots=self.should_generate_all_plots)
         else:
-            print(f'skipping figure generation because should_perform_figure_generation_to_file == False')
+            print(f'\tskipping figure generation because should_perform_figure_generation_to_file == False')
 
 
         ### Aggregate Outputs specific computations:
@@ -725,7 +725,7 @@ class BatchSessionCompletionHandler:
         except Exception as e:
             exception_info = sys.exc_info()
             e = CapturedException(e, exception_info)
-            print(f"WARN: on_complete_success_execution_session: encountered exception {e} while trying to compute the instantaneous firing rates and set self.across_sessions_instantaneous_fr_dict[{curr_session_context}]")
+            print(f"\t\tWARN: on_complete_success_execution_session: encountered exception {e} while trying to compute the instantaneous firing rates and set self.across_sessions_instantaneous_fr_dict[{curr_session_context}]")
             # if self.fail_on_exception:
             #     raise e.exc
             _out_inst_fr_comps = None
@@ -733,13 +733,14 @@ class BatchSessionCompletionHandler:
             pass
 
         
-            
         # On large ram systems, we can return the whole pipeline? No, because the whole pipeline can't be pickled.
         across_session_results_extended_dict = {}
 
         ## get override kwargs
         override_user_completion_function_kwargs_dict = deepcopy(self.override_user_completion_function_kwargs_dict) ## previously used a blank override config, making it useless. {}
         
+        print(f'\t\t ---- on_complete_success_execution_session(...): starting self.completion_functions execution...')
+
         ## run external completion functions:
         for a_fn in self.completion_functions:
             print(f'\t>> calling external computation function: {a_fn.__name__}')
@@ -755,6 +756,7 @@ class BatchSessionCompletionHandler:
 
                 across_session_results_extended_dict = a_fn(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict, **a_found_override_kwargs)
             
+        print(f'<<< on_complete_success_execution_session(curr_session_context: {curr_session_context}, curr_session_basedir: {str(curr_session_basedir)}, ...): COMPLETED ======')
 
         return PipelineCompletionResult(long_epoch_name=long_epoch_name, long_laps=long_laps, long_replays=long_replays,
                                            short_epoch_name=short_epoch_name, short_laps=short_laps, short_replays=short_replays,
