@@ -1140,7 +1140,7 @@ class PipelinePickleFileSelectorWidget:
         ## Update button enable states:        
         self._update_load_save_button_disabled_state()
         
-        return _subfn_load, _subfn_save, _subfn_compute
+        return _subfn_load, _subfn_save, _subfn_compute, _subfn_compute_new
     
 
 
