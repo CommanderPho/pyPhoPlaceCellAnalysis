@@ -145,7 +145,7 @@ class TrialByTrialActivityWindow:
             # cmap = pg.colormap.get('jet','matplotlib') # prepare a linear color map
             # cmap = pg.colormap.get('gray','matplotlib') # prepare a linear color map
             print(f'WARNING: no colormap provided for first decoder. Falling back to "Reds".')
-            cmap = ColormapHelpers.create_transparent_colormap(cmap_name='Reds', lower_bound_alpha=0.01) # prepare a linear color map
+            cmap = ColormapHelpers.create_transparent_colormap(cmap_name='Reds', lower_bound_alpha=0.01, should_return_LinearSegmentedColormap=False) # prepare a linear color map
 
 
         image_bounds_extent, x_range, y_range = pyqtplot_build_image_bounds_extent(xbin_edges=xbin_edges, ybin_edges=ybin_edges, margin=2.0, debug_print=debug_print)
@@ -387,11 +387,12 @@ class TrialByTrialActivityWindow:
 
         # plot_trial_to_trial_reliability_all_decoders_image_stack
 
-        additional_cmaps = {k: ColormapHelpers.create_transparent_colormap(color_literal_name=v, lower_bound_alpha=0.1) for k, v in additional_cmap_names.items()}
+        additional_cmaps = {k: ColormapHelpers.create_transparent_colormap(color_literal_name=v, lower_bound_alpha=0.1, should_return_LinearSegmentedColormap=False) for k, v in additional_cmap_names.items()}
         additional_legend_entries = list(zip(directional_active_lap_pf_results_dicts.keys(), additional_cmap_names.values() )) # ['red', 'purple', 'green', 'orange']
 
         # Plots only the first data-series ('long_LR')
-        app, parent_root_widget, root_render_widget, plot_array, img_item_array, other_components_array, plot_data_array, (lblTitle, lblFooter) = cls._plot_trial_to_trial_reliability_image_array(active_one_step_decoder=active_one_step_decoder, z_scored_tuning_map_matrix=active_z_scored_tuning_map_matrix, active_neuron_IDs=active_neuron_IDs, drop_below_threshold=drop_below_threshold, cmap=additional_cmaps['long_LR'])
+        app, parent_root_widget, root_render_widget, plot_array, img_item_array, other_components_array, plot_data_array, (lblTitle, lblFooter) = cls._plot_trial_to_trial_reliability_image_array(active_one_step_decoder=active_one_step_decoder, z_scored_tuning_map_matrix=active_z_scored_tuning_map_matrix, active_neuron_IDs=active_neuron_IDs,
+                                                                                                                                                     drop_below_threshold=drop_below_threshold, cmap=additional_cmaps['long_LR'])
         
 
         occupancy = deepcopy(active_one_step_decoder.ratemap.occupancy)
