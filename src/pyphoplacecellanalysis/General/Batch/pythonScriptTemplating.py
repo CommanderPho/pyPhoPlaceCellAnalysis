@@ -421,16 +421,23 @@ def generate_batch_single_session_scripts(global_data_root_parent_path, session_
     os.makedirs(output_directory, exist_ok=True)
     
     for curr_session_context in included_session_contexts:
-        curr_session_basedir = session_batch_basedirs[curr_session_context]
+        curr_session_basedir = session_batch_basedirs[curr_session_context]        
+        if (job_suffix is not None) and (len(job_suffix) > 0):
+            curr_item_name: str = f"run_{curr_session_context}_{job_suffix}"
+        else:
+            curr_item_name: str = f"run_{curr_session_context}"
+                    
+        print(F'curr_item_name: "{curr_item_name}"')
+
         if use_separate_run_directories:
-            curr_batch_script_rundir = os.path.join(output_directory, f"run_{curr_session_context}")
+            curr_batch_script_rundir = os.path.join(output_directory, f"run_{curr_session_context}") # "gen_scripts/run_kdiba_gor01_one_2006-6-07_11-26-53/"
             os.makedirs(curr_batch_script_rundir, exist_ok=True)
         else:
             curr_batch_script_rundir = output_directory
 
         # Create two separate scripts:
         # Run Script _________________________________________________________________________________________________________ #
-        python_script_path = os.path.join(curr_batch_script_rundir, f'run_{curr_session_context}.py')
+        python_script_path = os.path.join(curr_batch_script_rundir, f'run_{curr_item_name}.py') # "run_kdiba_gor01_one_2006-6-07_11-26-53__withNormalComputedReplays-qclu_12-frateThresh_5.0_tbin_25ms_Clean.py"
         with open(python_script_path, 'wb') as script_file:
             script_content = python_template.render(global_data_root_parent_path=global_data_root_parent_path,
                                                     curr_session_context=curr_session_context.get_initialization_code_string().strip("'"),
@@ -444,7 +451,7 @@ def generate_batch_single_session_scripts(global_data_root_parent_path, session_
         # output_python_scripts.append(python_script_path)
 
         # Figures Script _____________________________________________________________________________________________________ #
-        python_figures_script_path = os.path.join(curr_batch_script_rundir, f'figures_{curr_session_context}.py')
+        python_figures_script_path = os.path.join(curr_batch_script_rundir, f'figures_{curr_session_context}.py') ## #TODO 2025-07-09 04:50: - [ ] Only need one figures script, not a bunch of them for each configuration
         with open(python_figures_script_path, 'wb') as script_file:
             script_content = python_template.render(global_data_root_parent_path=global_data_root_parent_path,
                                                     curr_session_context=curr_session_context.get_initialization_code_string().strip("'"),
@@ -524,6 +531,8 @@ def generate_batch_single_session_scripts(global_data_root_parent_path, session_
             output_jupyter_notebooks.append(notebook_path)
             
             # convert_script_to_notebook(script_path, notebook_path, custom_delimiter=None)
+    ## end for curr_session_context in include....
+    
 
     # if should_create_powershell_scripts and (platform.system() == 'Windows'):
     #     powershell_script_path = build_windows_powershell_run_script(output_python_scripts, max_concurrent_jobs=max_parallel_executions)
