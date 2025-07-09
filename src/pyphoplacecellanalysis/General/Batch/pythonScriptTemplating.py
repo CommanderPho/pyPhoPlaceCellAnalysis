@@ -416,6 +416,7 @@ def generate_batch_single_session_scripts(global_data_root_parent_path, session_
     output_slurm_scripts = {'run': [], 'figs': []}
     output_non_slurm_bash_scripts = {'run': [], 'figs': []}
 
+    ## INPUTS: job_suffix, 
 
     # Make sure the output directory exists
     os.makedirs(output_directory, exist_ok=True)
@@ -423,11 +424,11 @@ def generate_batch_single_session_scripts(global_data_root_parent_path, session_
     for curr_session_context in included_session_contexts:
         curr_session_basedir = session_batch_basedirs[curr_session_context]        
         if (job_suffix is not None) and (len(job_suffix) > 0):
-            curr_item_name: str = f"{curr_session_context}_{job_suffix}"
+            curr_session_complete_identifier: str = f"{curr_session_context}_{job_suffix}"
         else:
-            curr_item_name: str = f"{curr_session_context}"
+            curr_session_complete_identifier: str = f"{curr_session_context}"
                     
-        print(F'curr_item_name: "{curr_item_name}"')
+        print(F'curr_item_name: "{curr_session_complete_identifier}"')
 
         if use_separate_run_directories:
             curr_batch_script_rundir = os.path.join(output_directory, f"run_{curr_session_context}") # "gen_scripts/run_kdiba_gor01_one_2006-6-07_11-26-53/"
@@ -437,10 +438,12 @@ def generate_batch_single_session_scripts(global_data_root_parent_path, session_
 
         # Create two separate scripts:
         # Run Script _________________________________________________________________________________________________________ #
-        python_script_path = os.path.join(curr_batch_script_rundir, f'run_{curr_item_name}.py') # "run_kdiba_gor01_one_2006-6-07_11-26-53__withNormalComputedReplays-qclu_12-frateThresh_5.0_tbin_25ms_Clean.py"
+        python_script_path = os.path.join(curr_batch_script_rundir, f'run_{curr_session_complete_identifier}.py') # "run_kdiba_gor01_one_2006-6-07_11-26-53__withNormalComputedReplays-qclu_12-frateThresh_5.0_tbin_25ms_Clean.py"
         with open(python_script_path, 'wb') as script_file:
             script_content = python_template.render(global_data_root_parent_path=global_data_root_parent_path,
                                                     curr_session_context=curr_session_context.get_initialization_code_string().strip("'"),
+                                                    curr_session_complete_identifier=curr_session_complete_identifier,
+                                                    job_suffix=job_suffix,
                                                     curr_session_basedir=curr_session_basedir, 
                                                     batch_session_completion_handler_kwargs=(batch_session_completion_handler_kwargs or {}),
                                                     custom_user_completion_function_override_kwargs_dict=(custom_user_completion_function_override_kwargs_dict or {}),
@@ -455,6 +458,8 @@ def generate_batch_single_session_scripts(global_data_root_parent_path, session_
         with open(python_figures_script_path, 'wb') as script_file:
             script_content = python_template.render(global_data_root_parent_path=global_data_root_parent_path,
                                                     curr_session_context=curr_session_context.get_initialization_code_string().strip("'"),
+                                                    curr_session_complete_identifier=curr_session_complete_identifier,
+                                                    job_suffix=job_suffix,
                                                     curr_session_basedir=curr_session_basedir,
                                                     batch_session_completion_handler_kwargs=(batch_session_completion_handler_kwargs or {}),
                                                     custom_user_completion_function_override_kwargs_dict=(custom_user_completion_function_override_kwargs_dict or {}),

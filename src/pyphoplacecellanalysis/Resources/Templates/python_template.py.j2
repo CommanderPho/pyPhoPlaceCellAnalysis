@@ -33,10 +33,12 @@ script_file_parent_path = Path(os.path.dirname(script_file_path)).resolve()
 
 curr_session_context = {{ curr_session_context }}
 curr_session_basedir = Path(r'{{ curr_session_basedir }}').resolve()
+job_suffix: str = "{{job_suffix|default('')}}"
+curr_session_complete_identifier: str = "{{curr_session_complete_identifier|default('')}}"
 script_type: str = Path(script_file_path).resolve().stem.split('_')[0] # 'run_kdiba_gor01_one_2006-6-07_11-26-53', either ['run', 'figures']
 
 session_ctxt_key:str = curr_session_context.get_description(separator='|', subset_includelist=['animal','exper_name','session_name'])
-
+parameter_specifier_str: str = "{{override_custom_pickle_suffix|default('')}}"
 
 {% if should_use_neptune_logging %}
 
@@ -67,11 +69,13 @@ if neptuner.run is None:
     for k, v in curr_session_context.to_dict().items():
         neptuner.run[k] = v # add the properties to the run
 
-    neptuner.run["sys/tags"].add(list(curr_session_context.as_tuple()) + [script_type]) # adds the session tags ('kdiba', 'gor01', 'one', '2006-6-09_1-22-43')
-    neptuner.run["sys/group_tags"].add([session_ctxt_key, script_type])
+    neptuner.run["sys/tags"].add(list(curr_session_context.as_tuple()) + [script_type, job_suffix]) # adds the session tags ('kdiba', 'gor01', 'one', '2006-6-09_1-22-43')
+    neptuner.run["sys/group_tags"].add([session_ctxt_key, script_type, job_suffix])
 
     # session_descriptor_string: a string describing the context of the session like 'sess_kdiba_2006-6-07_11-26-53'
     neptuner.run['session_descriptor_string'] = curr_session_context.get_description() # 'kdiba_vvp01_two_2006-4-09_16-40-54_sess'
+    neptuner.run['session_complete_descriptor_string'] = curr_session_complete_identifier # 'kdiba_vvp01_two_2006-4-09_16-40-54_sess'
+
     neptuner.outputs = neptuner.run['outputs']
     neptuner.figures = neptuner.outputs['figures']
 
@@ -79,7 +83,7 @@ neptuner_run: AutoValueConvertingNeptuneRun = neptuner.run
 neptuner_run.sync()
 {% endif %}
 
-curr_task_logger = build_batch_task_logger(session_context=curr_session_context, file_logging_dir=script_file_parent_path, logging_root_FQDN=None, include_curr_time_str=True)
+curr_task_logger = build_batch_task_logger(session_context=curr_session_context, file_logging_dir=script_file_parent_path, logging_root_FQDN=None, include_curr_time_str=True, additional_suffix=job_suffix)
 final_log_file_path: Path = None
 for a_handler in curr_task_logger.handlers:
     if hasattr(a_handler, 'baseFilename'):
@@ -151,7 +155,7 @@ local_computations_override_output_file = None
 global_computation_results_override_output_file = None #}
 
 ## Override input/output files:
-parameter_specifier_str: str = "{{override_custom_pickle_suffix|default('')}}"
+
 {# override_output_folder: Path = script_file_parent_path #}
 override_output_folder: Path = Path(str(curr_session_basedir))
 assert override_output_folder.exists(), f"override_output_folder: '{override_output_folder}' does not exist!"
@@ -283,6 +287,7 @@ new_print(f'/* script_file_path: {script_file_path} ____________________________
 {% if should_use_file_redirected_output_logging %}
 new_print(f'/* log_file_path: {final_log_file_path} __________________________________________________________________________________ */')
 {% endif %}
+new_print(f'/* job_suffix: {job_suffix} __________________________________________________________________________________ */')
 new_print(f'/* session_basedir: {curr_session_basedir} __________________________________________________________________________________ */')
 new_print(f'/* local_computations_override_file: {local_computations_override_file} __________________________________________________________________________________ */')
 new_print(f'/* global_computation_results_override_file: {global_computation_results_override_file} __________________________________________________________________________________ */')
