@@ -423,9 +423,9 @@ def generate_batch_single_session_scripts(global_data_root_parent_path, session_
     for curr_session_context in included_session_contexts:
         curr_session_basedir = session_batch_basedirs[curr_session_context]        
         if (job_suffix is not None) and (len(job_suffix) > 0):
-            curr_item_name: str = f"run_{curr_session_context}_{job_suffix}"
+            curr_item_name: str = f"{curr_session_context}_{job_suffix}"
         else:
-            curr_item_name: str = f"run_{curr_session_context}"
+            curr_item_name: str = f"{curr_session_context}"
                     
         print(F'curr_item_name: "{curr_item_name}"')
 
