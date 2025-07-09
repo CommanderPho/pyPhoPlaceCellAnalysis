@@ -469,7 +469,7 @@ def extract_figures_from_display_function_output(out_display_var, out_fig_list:L
     
 
 ## 2022-10-04 Modern Programmatic PDF outputs:
-@function_attributes(short_name=None, tags=['Depricating', 'PDF', 'export', 'output', 'matplotlib', 'display', 'file', 'active'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2022-10-04 00:00', related_items=[])
+@function_attributes(short_name=None, tags=['Depricating', 'PDF', 'export', 'output', 'matplotlib', 'display', 'file', 'active'], input_requires=[], output_provides=[], uses=['create_daily_programmatic_display_function_testing_folder_if_needed', 'session_context_to_relative_path', 'build_pdf_metadata_from_display_context'], used_by=[], creation_date='2022-10-04 00:00', related_items=[])
 def programmatic_display_to_PDF(curr_active_pipeline, curr_display_function_name='_display_plot_decoded_epoch_slices', subset_includelist=None, subset_excludelist=None,  debug_print=False, **kwargs):
     """
     2022-10-04 Modern Programmatic PDF outputs
@@ -1031,6 +1031,15 @@ def programmatic_render_to_file(curr_active_pipeline, curr_display_function_name
 
     Looks it this is done for EACH filtered context (in the loop below) whereas the original just did a single specific context
     """
+    from pyphoplacecellanalysis.General.Batch.NonInteractiveProcessing import BatchPlotting
+
+    if BatchPlotting._fig_out_man is None:
+        collected_figures_folder, fig_out_man = BatchPlotting.find_batch_programmatic_figures_output_dir()
+        assert fig_out_man is not None
+
+    out_man: FileOutputManager = deepcopy(BatchPlotting._fig_out_man) # curr_active_pipeline.get_output_manager(figure_output_location=FigureOutputLocation.CUSTOM, context_to_path_mode=ContextToPathMode.GLOBAL_UNIQUE, override_output_parent_path=collected_outputs_path)
+    _batch_figure_kwargs = dict(override_fig_man=out_man)
+
 
     ## Get the output path (active_session_figures_out_path) for this session (and all of its filtered_contexts as well):
     # fig_man = curr_active_pipeline.get_output_manager() # get the output manager
@@ -1046,7 +1055,7 @@ def programmatic_render_to_file(curr_active_pipeline, curr_display_function_name
         ## Disables showing the figure by default from within the context manager.
         # active_display_fn_kwargs = overriding_dict_with(lhs_dict=dict(filter_epochs='ripple', debug_test_max_num_slices=128), **kwargs)
         # active_display_fn_kwargs = overriding_dict_with(lhs_dict=dict(), **kwargs) # this is always an error, if lhs_dict is empty the result will be empty regardless of the value of kwargs.
-        active_display_fn_kwargs = kwargs
+        active_display_fn_kwargs = (_batch_figure_kwargs | kwargs)
         
         # Perform for each filtered context:
         for filter_name, a_filtered_context in curr_active_pipeline.filtered_contexts.items():
@@ -1083,7 +1092,7 @@ def programmatic_render_to_file(curr_active_pipeline, curr_display_function_name
                 print(f'extracted_context: {extracted_context}')
 
             for fig in out_fig_list:
-                active_out_figure_paths = curr_active_pipeline.output_figure(extracted_context, fig, write_vector_format=write_vector_format, write_png=write_png, debug_print=debug_print)                 
+                active_out_figure_paths = curr_active_pipeline.output_figure(extracted_context, fig, write_vector_format=write_vector_format, write_png=write_png, **_batch_figure_kwargs, debug_print=debug_print)                 
                 all_out_fig_paths.extend(active_out_figure_paths)
 
             # ## Build PDF Output Info

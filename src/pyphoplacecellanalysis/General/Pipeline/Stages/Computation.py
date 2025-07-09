@@ -2389,12 +2389,21 @@ class PipelineWithComputedPipelineStageMixin:
         return self.sess.spikes_df.spikes.extract_unique_neuron_identities()
 
 
-
-    # @property
-    def get_output_manager(self, figure_output_location=FigureOutputLocation.DAILY_PROGRAMMATIC_OUTPUT_FOLDER, context_to_path_mode=ContextToPathMode.HIERARCHY_UNIQUE) -> FileOutputManager:
+    def get_output_manager(self, figure_output_location: Optional[FigureOutputLocation]=None, context_to_path_mode=ContextToPathMode.HIERARCHY_UNIQUE, override_output_parent_path: Optional[Path]=None) -> FileOutputManager:
         """ returns the FileOutputManager that specifies where outputs are stored. """
+        if override_output_parent_path is not None:
+            ## custom path
+            if (figure_output_location is not None):
+                assert (figure_output_location.value == FigureOutputLocation.CUSTOM.value), f"if override_output_parent_path is not None (override_output_parent_path: '{override_output_parent_path}', figure_output_location better be CUSTOM but it was specified as figure_output_location: {figure_output_location}."
+            
+            figure_output_location = FigureOutputLocation.CUSTOM ## Override to custom either way
+        else:
+            ## default when no custom path provide
+            figure_output_location = FigureOutputLocation.DAILY_PROGRAMMATIC_OUTPUT_FOLDER
+            
         # return FileOutputManager(figure_output_location=FigureOutputLocation.DAILY_PROGRAMMATIC_OUTPUT_FOLDER, context_to_path_mode=ContextToPathMode.GLOBAL_UNIQUE)
-        return FileOutputManager(figure_output_location=figure_output_location, context_to_path_mode=context_to_path_mode)
+        return FileOutputManager(figure_output_location=figure_output_location, context_to_path_mode=context_to_path_mode, override_output_parent_path=override_output_parent_path)
+
 
     def get_computation_times(self, debug_print=False):
         return self.stage.get_computation_times(debug_print=debug_print)
