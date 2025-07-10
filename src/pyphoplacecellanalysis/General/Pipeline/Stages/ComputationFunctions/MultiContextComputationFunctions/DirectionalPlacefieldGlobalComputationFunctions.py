@@ -8460,7 +8460,7 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
         #TODO 2025-05-30 07:52: - [ ] This assumes `ripple_decoding_time_bin_size == laps_decoding_time_bin_size`
         complete_session_context, (session_context, additional_session_context) = owning_pipeline_reference.get_complete_session_context()
 
-        assert (ripple_decoding_time_bin_size == laps_decoding_time_bin_size), f"ripple_decoding_time_bin_size: {ripple_decoding_time_bin_size} == laps_decoding_time_bin_size: {laps_decoding_time_bin_size}"
+        assert (ripple_decoding_time_bin_size == laps_decoding_time_bin_size), f"ripple_decoding_time_bin_size: {ripple_decoding_time_bin_size} != laps_decoding_time_bin_size: {laps_decoding_time_bin_size}" //#TODO 2025-07-10 15:32: - [ ] Why does it matter that they aren't equal?
         active_context = kwargs.pop('active_context', None)
         if active_context is not None:
             # Update the existing context:
