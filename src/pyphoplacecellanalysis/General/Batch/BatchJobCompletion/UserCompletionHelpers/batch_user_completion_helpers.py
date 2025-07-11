@@ -1103,7 +1103,7 @@ def compute_and_export_session_trial_by_trial_performance_completion_function(se
         if rank_order_results is not None:
             minimum_inclusion_fr_Hz: float = rank_order_results.minimum_inclusion_fr_Hz
             included_qclu_values: List[int] = rank_order_results.included_qclu_values
-        else:        
+        else:
             ## get from parameters:
             minimum_inclusion_fr_Hz: float = curr_active_pipeline.global_computation_results.computation_config.rank_order_shuffle_analysis.minimum_inclusion_fr_Hz
             included_qclu_values: List[int] = curr_active_pipeline.global_computation_results.computation_config.rank_order_shuffle_analysis.included_qclu_values

@@ -509,7 +509,6 @@ def generate_batch_single_session_scripts(global_data_root_parent_path, session_
                                                         **(compute_as_needed_script_generation_kwargs | dict(should_perform_figure_generation_to_file=False)))
                 # script_file.write(script_content)
                 script_file.write(script_content.encode())
-                            
 
 
             # script_dir = script_path.parent.resolve()
@@ -534,8 +533,9 @@ def generate_batch_single_session_scripts(global_data_root_parent_path, session_
                 print(f"An error occurred while deleting the file: {e}")
 
             output_jupyter_notebooks.append(notebook_path)
+             
+        ## END if should_generate_run_notebooks..
             
-            # convert_script_to_notebook(script_path, notebook_path, custom_delimiter=None)
     ## end for curr_session_context in include....
     
 

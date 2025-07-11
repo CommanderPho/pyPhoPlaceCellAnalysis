@@ -23,6 +23,7 @@ from neuropy.utils.dynamic_container import DynamicContainer
 from neuropy.utils.matplotlib_helpers import matplotlib_file_only
 from neuropy.utils.mixins.AttrsClassHelpers import custom_define, AttrsBasedClassHelperMixin, serialized_attribute_field, serialized_field, non_serialized_field
 from neuropy.utils.mixins.HDF5_representable import HDF_SerializationMixin
+from neuropy.utils.result_context import IdentifyingContext
 
 from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import DirectionalLapsHelpers
 
@@ -609,7 +610,7 @@ class BatchSessionCompletionHandler:
 
     ## Main function that's called with the complete pipeline:
     @function_attributes(short_name=None, tags=['MAIN', 'IMPORTANT', 'callback', 'replay'], input_requires=['filtered_sessions[*].replay'], output_provides=[], uses=['.completion_functions', '.post_compute_validate', '.try_compute_global_computations_if_needed', '.try_complete_figure_generation_to_file', '.try_export_pipeline_hdf5_if_needed'], used_by=['run_specific_batch'], creation_date='2024-07-02 11:44', related_items=[])  
-    def on_complete_success_execution_session(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline) -> PipelineCompletionResult:
+    def on_complete_success_execution_session(self, global_data_root_parent_path: Path, curr_session_context: IdentifyingContext, curr_session_basedir: Path, curr_active_pipeline) -> PipelineCompletionResult:
         """ called when the execute_session completes like:
             `post_run_callback_fn_output = post_run_callback_fn(curr_session_context, curr_session_basedir, curr_active_pipeline)`
 
