@@ -538,12 +538,6 @@ def generate_batch_single_session_scripts(global_data_root_parent_path, session_
             
     ## end for curr_session_context in include....
     
-
-    # if should_create_powershell_scripts and (platform.system() == 'Windows'):
-    #     powershell_script_path = build_windows_powershell_run_script(output_python_scripts, max_concurrent_jobs=max_parallel_executions)
-    #     powershell_script_path
-
-
     ## Generate VSCode Workspace for it
     if should_create_vscode_workspace:
         output_compute_python_scripts = [x[0] for x in output_python_scripts]
@@ -553,8 +547,8 @@ def generate_batch_single_session_scripts(global_data_root_parent_path, session_
             python_executable = Path('C:/Users/pho/repos/Spike3DWorkEnv/Spike3D/.venv_UV/Scripts/python').resolve()
         else:
             # Put your non-Windows-specific code here
-            python_executable = Path('~/repos/Spike3D/.venv/bin/python').resolve()
-                    
+            python_executable = Path('~/repos/Spike3D/.venv/bin/python') # .resolve()
+
 
         vscode_workspace_path = build_vscode_workspace(output_compute_python_scripts, python_executable=python_executable)
         print(f'vscode_workspace_path: {vscode_workspace_path}')
