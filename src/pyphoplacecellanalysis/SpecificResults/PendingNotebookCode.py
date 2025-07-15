@@ -5790,7 +5790,7 @@ from neuropy.core.user_annotations import UserAnnotationsManager
 
 
 @function_attributes(short_name=None, tags=['laps', 'update', 'session', 'TODO', 'UNFINISHED'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-01-13 15:45', related_items=[])
-def override_laps(curr_active_pipeline, override_laps_df: pd.DataFrame, debug_print=False):
+def override_laps(curr_active_pipeline, override_laps_df: pd.DataFrame, debug_print=False) -> bool:
     """
     overrides the laps
 
@@ -5808,9 +5808,11 @@ def override_laps(curr_active_pipeline, override_laps_df: pd.DataFrame, debug_pr
 
     """
     from neuropy.core.laps import Laps
+    did_any_change: bool = False
 
     t_start, t_delta, t_end = curr_active_pipeline.find_LongShortDelta_times()
-
+    laps_df_comparison_column_names = ['start', 'stop']
+    
     ## Load the custom laps
     if debug_print:
         print(f'override_laps_df: {override_laps_df}')
@@ -5836,6 +5838,9 @@ def override_laps(curr_active_pipeline, override_laps_df: pd.DataFrame, debug_pr
     override_laps_obj = Laps(laps=override_laps_df, metadata=None).filter_to_valid()
     ## OUTPUTS: override_laps_obj
 
+    _original_laps = deepcopy(curr_active_pipeline.sess.laps.to_dataframe())
+    did_any_change |= np.any(_original_laps[laps_df_comparison_column_names].to_numpy() != override_laps_obj.to_dataframe()[laps_df_comparison_column_names].to_numpy()) ## update did_any_Change
+
     curr_active_pipeline.sess.laps = deepcopy(override_laps_obj)
 
     # curr_active_pipeline.sess.laps_df = override_laps_df
@@ -5854,13 +5859,17 @@ def override_laps(curr_active_pipeline, override_laps_df: pd.DataFrame, debug_pr
         # override_laps_obj.filter_to_valid()
         a_filtered_override_laps_obj: Laps = deepcopy(override_laps_obj).time_slice(t_start=filtered_sess.t_start, t_stop=filtered_sess.t_stop)
         # a_filtered_context.lap_dir
+        
+        _curr_original_laps = deepcopy(filtered_sess.laps.to_dataframe())
+        did_any_change |= np.any(_curr_original_laps[laps_df_comparison_column_names].to_numpy() != a_filtered_override_laps_obj.to_dataframe()[laps_df_comparison_column_names].to_numpy()) ## update did_any_Change
+        
         filtered_sess.laps = deepcopy(a_filtered_override_laps_obj)
         filtered_sess.compute_position_laps()
         if debug_print:
             print(f'\tupdated.')
 
 
-
+    return did_any_change
 
 
 

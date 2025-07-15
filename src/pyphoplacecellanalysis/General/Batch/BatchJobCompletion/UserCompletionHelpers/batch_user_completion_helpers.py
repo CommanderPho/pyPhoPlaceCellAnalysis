@@ -2440,11 +2440,53 @@ class PostHocPipelineFixup:
         # curr_active_pipeline.sess.config.grid_bin = constrained_grid_bin_sizes
         
         return did_any_change, change_dict
-        
+    
+
+    @classmethod
+    def _perform_required_recompute_on_change(cls, curr_active_pipeline):
+            """ called to actually perform a recomputation when changes are detected/required and it's not dry_run
+            """
+            ## if not dry_run, do the recomputations:
+            ## All invalidated ones:
+            computation_functions_name_includelist=['_perform_baseline_placefield_computation', '_perform_time_dependent_placefield_computation', '_perform_extended_statistics_computation',
+                                                '_perform_position_decoding_computation', 
+                                                '_perform_firing_rate_trends_computation',
+                                                '_perform_pf_find_ratemap_peaks_computation',
+                                                '_perform_time_dependent_pf_sequential_surprise_computation'
+                                                '_perform_two_step_position_decoding_computation',
+                                                # '_perform_recursive_latent_placefield_decoding'
+                                            ]  # '_perform_pf_find_ratemap_peaks_peak_prominence2d_computation'
+
+            # ## Only Essentials:
+            # computation_functions_name_includelist=['_perform_baseline_placefield_computation',
+            #                                         '_perform_time_dependent_placefield_computation',
+            #                                         '_perform_extended_statistics_computation',
+            #                                     '_perform_position_decoding_computation', 
+            #                                     '_perform_firing_rate_trends_computation',
+            #                                     # '_perform_pf_find_ratemap_peaks_computation',
+            #                                     # '_perform_time_dependent_pf_sequential_surprise_computation'
+            #                                     '_perform_two_step_position_decoding_computation',
+            #                                     # '_perform_recursive_latent_placefield_decoding'
+            #                                 ]  # '_perform_pf_find_ratemap_peaks_peak_prominence2d_computation'
+
+            # computation_functions_name_includelist=['_perform_baseline_placefield_computation']
+            # curr_active_pipeline.perform_computations(computation_functions_name_includelist=computation_functions_name_includelist, computation_functions_name_excludelist=None, fail_on_exception=True, debug_print=FalTruese, overwrite_extant_results=True) #, overwrite_extant_results=False  ], fail_on_exception=True, debug_print=False)
+            # curr_active_pipeline.perform_computations(computation_functions_name_includelist=computation_functions_name_includelist, computation_functions_name_excludelist=None, enabled_filter_names=[global_epoch_name], fail_on_exception=True, debug_print=True) # , overwrite_extant_results=False #, overwrite_extant_results=False  ], fail_on_exception=True, debug_print=False)
+
+            # long_epoch_name, short_epoch_name, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
+
+            # curr_active_pipeline.perform_specific_computation(computation_functions_name_includelist=['pf_computation', 'pfdt_computation'], enabled_filter_names=[global_epoch_name], fail_on_exception=True, debug_print=False)
+            # curr_active_pipeline.perform_specific_computation(computation_functions_name_includelist=['pf_computation'], enabled_filter_names=[global_epoch_name], fail_on_exception=True, debug_print=True)
+
+
+            # curr_active_pipeline.perform_specific_computation(computation_functions_name_includelist=computation_functions_name_includelist, enabled_filter_names=[global_epoch_name], fail_on_exception=True, debug_print=True)
+            curr_active_pipeline.perform_specific_computation(computation_functions_name_includelist=computation_functions_name_includelist, fail_on_exception=True, debug_print=True)
+            print(f'\trecomputation complete!')
+                        
 
     @function_attributes(short_name=None, tags=['MAIN', 'ESSENTIAL', 'UNUSED', 'grid_bin_bounds', 'grid_bin'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-02-12 19:50', related_items=[])
     @classmethod
-    def FINAL_FIX_GRID_BIN_BOUNDS(cls, curr_active_pipeline, force_recompute:bool=False, is_dry_run: bool=False, debug_skip_computations_only:bool=False):
+    def FINAL_FIX_GRID_BIN_BOUNDS(cls, curr_active_pipeline, force_recompute:bool=False, is_dry_run: bool=False, debug_skip_computations_only:bool=False, defer_required_compute: bool=False):
         """ perform all fixes regarding the grid_bin_bounds and grid_bin """
         print(f'\t !!!||||||||||||||||||> RUNNING `PostHocPipelineFixup.FINAL_FIX_GRID_BIN_BOUNDS(...)`:')
         correct_grid_bin_bounds = cls.get_hardcoded_known_good_grid_bin_bounds(curr_active_pipeline)
@@ -2461,41 +2503,11 @@ class PostHocPipelineFixup:
             else:
                 if (not is_dry_run):
                     ## if not dry_run, do the recomputations:
-                    ## All invalidated ones:
-                    computation_functions_name_includelist=['_perform_baseline_placefield_computation', '_perform_time_dependent_placefield_computation', '_perform_extended_statistics_computation',
-                                                        '_perform_position_decoding_computation', 
-                                                        '_perform_firing_rate_trends_computation',
-                                                        '_perform_pf_find_ratemap_peaks_computation',
-                                                        '_perform_time_dependent_pf_sequential_surprise_computation'
-                                                        '_perform_two_step_position_decoding_computation',
-                                                        # '_perform_recursive_latent_placefield_decoding'
-                                                    ]  # '_perform_pf_find_ratemap_peaks_peak_prominence2d_computation'
-
-                    # ## Only Essentials:
-                    # computation_functions_name_includelist=['_perform_baseline_placefield_computation',
-                    #                                         '_perform_time_dependent_placefield_computation',
-                    #                                         '_perform_extended_statistics_computation',
-                    #                                     '_perform_position_decoding_computation', 
-                    #                                     '_perform_firing_rate_trends_computation',
-                    #                                     # '_perform_pf_find_ratemap_peaks_computation',
-                    #                                     # '_perform_time_dependent_pf_sequential_surprise_computation'
-                    #                                     '_perform_two_step_position_decoding_computation',
-                    #                                     # '_perform_recursive_latent_placefield_decoding'
-                    #                                 ]  # '_perform_pf_find_ratemap_peaks_peak_prominence2d_computation'
-
-                    # computation_functions_name_includelist=['_perform_baseline_placefield_computation']
-                    # curr_active_pipeline.perform_computations(computation_functions_name_includelist=computation_functions_name_includelist, computation_functions_name_excludelist=None, fail_on_exception=True, debug_print=FalTruese, overwrite_extant_results=True) #, overwrite_extant_results=False  ], fail_on_exception=True, debug_print=False)
-                    # curr_active_pipeline.perform_computations(computation_functions_name_includelist=computation_functions_name_includelist, computation_functions_name_excludelist=None, enabled_filter_names=[global_epoch_name], fail_on_exception=True, debug_print=True) # , overwrite_extant_results=False #, overwrite_extant_results=False  ], fail_on_exception=True, debug_print=False)
-
-                    # long_epoch_name, short_epoch_name, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
-
-                    # curr_active_pipeline.perform_specific_computation(computation_functions_name_includelist=['pf_computation', 'pfdt_computation'], enabled_filter_names=[global_epoch_name], fail_on_exception=True, debug_print=False)
-                    # curr_active_pipeline.perform_specific_computation(computation_functions_name_includelist=['pf_computation'], enabled_filter_names=[global_epoch_name], fail_on_exception=True, debug_print=True)
-
-
-                    # curr_active_pipeline.perform_specific_computation(computation_functions_name_includelist=computation_functions_name_includelist, enabled_filter_names=[global_epoch_name], fail_on_exception=True, debug_print=True)
-                    curr_active_pipeline.perform_specific_computation(computation_functions_name_includelist=computation_functions_name_includelist, fail_on_exception=True, debug_print=True)
-                    print(f'\trecomputation complete!')
+                    if not defer_required_compute:
+                        cls._perform_required_recompute_on_change(curr_active_pipeline=curr_active_pipeline)
+                        print(f'\trecomputation complete!')
+                    else:
+                        print(f'\trecomputation required but defer_required_compute == True, so skipping until later phase.')
                 else:
                     print(f'\tWARNING: is_dry_run is true so no recompute will be done.')
                 ## END if debug_skip_computations_only....
@@ -2505,6 +2517,33 @@ class PostHocPipelineFixup:
             print(f'No grid bin bounds were changed. Everything should be up-to-date!')
 
         return (did_any_change, change_dict), correct_grid_bin_bounds
+
+
+    @function_attributes(short_name=None, tags=['laps'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-07-15 12:45', related_items=[])
+    @classmethod
+    def FINAL_FIX_LAPS_FROM_OVERRIDES(cls, curr_active_pipeline, force_recompute:bool=False, is_dry_run: bool=False, debug_skip_computations_only:bool=False) -> bool:
+        """ perform all fixes regarding any needed replacements for laps indicated in UserAnnotations """
+        print(f'\t !!!||||||||||||||||||> RUNNING `PostHocPipelineFixup.FINAL_FIX_LAPS_FROM_OVERRIDES(...)`:')
+        from neuropy.core.user_annotations import UserAnnotationsManager
+        from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import override_laps
+        from neuropy.core.laps import Laps
+
+        override_laps_df: Optional[pd.DataFrame] = UserAnnotationsManager.get_hardcoded_laps_override_dict().get(curr_active_pipeline.get_session_context(), None)
+        if override_laps_df is None:
+            return False ## no changes
+        else:
+            ## non-None, override laps
+            print(f'\toverriding laps....')
+            override_laps_df['lap_id'] = override_laps_df.index + 1
+            override_laps_df['label'] = override_laps_df.index
+            ## OUTPUTS: override_laps_df
+            t_start, t_delta, t_end = curr_active_pipeline.find_LongShortDelta_times()
+            override_laps_obj: Laps = Laps(laps=override_laps_df)
+            override_laps_obj.update_lap_dir_from_smoothed_velocity(pos_input=curr_active_pipeline.sess.position)
+            override_laps_obj.update_maze_id_if_needed(t_start=t_start, t_delta=t_delta, t_end=t_end)
+            override_laps_df = override_laps_obj.to_dataframe()
+
+            return override_laps(curr_active_pipeline, override_laps_df=override_laps_df, debug_print=True)
 
 
     # ==================================================================================================================== #
@@ -2544,11 +2583,14 @@ class PostHocPipelineFixup:
         print(f'starting `PostHocPipelineFixup.FINAL_UPDATE_ALL(...)`...')
 
         did_any_change: bool = False
-        (did_any_grid_bin_change, change_dict), correct_grid_bin_bounds = PostHocPipelineFixup.FINAL_FIX_GRID_BIN_BOUNDS(curr_active_pipeline=curr_active_pipeline, force_recompute=force_recompute, is_dry_run=is_dry_run)
 
         did_fixup_any_missing_basepath = PostHocPipelineFixup.FINAL_UPDATE_FILEPATHS(curr_active_pipeline=curr_active_pipeline)
 
         did_any_non_pbe_epochs_change = PostHocPipelineFixup.FINAL_UPDATE_NON_PBE_EPOCHS(curr_active_pipeline=curr_active_pipeline)
+
+        did_override_any_laps = PostHocPipelineFixup.FINAL_FIX_LAPS_FROM_OVERRIDES(curr_active_pipeline=curr_active_pipeline)
+
+        (did_any_grid_bin_change, change_dict), correct_grid_bin_bounds = PostHocPipelineFixup.FINAL_FIX_GRID_BIN_BOUNDS(curr_active_pipeline=curr_active_pipeline, force_recompute=force_recompute, is_dry_run=is_dry_run, defer_required_compute=False)
 
         # Fix the computation epochs to be constrained to the proper long/short intervals:
         # was_directional_pipeline_modified = DirectionalLapsResult.fix_computation_epochs_if_needed(curr_active_pipeline=curr_active_pipeline)
@@ -2557,7 +2599,7 @@ class PostHocPipelineFixup:
         
         # curr_active_pipeline, directional_lap_specific_configs = DirectionalLapsHelpers.split_to_directional_laps(curr_active_pipeline=curr_active_pipeline, add_created_configs_to_pipeline=True)
 
-        did_any_change = (did_any_grid_bin_change or did_fixup_any_missing_basepath or did_any_non_pbe_epochs_change or was_directional_pipeline_modified)
+        did_any_change = (did_any_grid_bin_change or did_fixup_any_missing_basepath or did_any_non_pbe_epochs_change or was_directional_pipeline_modified or did_override_any_laps)
         print(f'\tPostHocPipelineFixup.FINAL_UPDATE_ALL(...): did_any_change: {did_any_change}')
         return did_any_change
 

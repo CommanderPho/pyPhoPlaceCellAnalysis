@@ -1192,6 +1192,7 @@ class DirectionalLapsHelpers:
         # end for
         return was_updated
 
+
     @function_attributes(short_name=None, tags=['MAIN'], input_requires=[], output_provides=[], uses=['.has_duplicated_memory_references'], used_by=['.fixup_directional_pipeline_if_needed'], creation_date='2025-02-19 13:22', related_items=[])
     @classmethod
     def fix_computation_epochs_if_needed(cls, curr_active_pipeline, debug_print=False):
@@ -1224,19 +1225,19 @@ class DirectionalLapsHelpers:
                 curr_active_pipeline.computation_results[an_epoch_name].computation_config = a_deduplicated_config
             print(f'deduplicated references!')
 
-        original_num_epochs = np.array([curr_active_pipeline.computation_results[an_epoch_name].computation_config.pf_params.computation_epochs.n_epochs for an_epoch_name in (long_LR_name, long_RL_name, short_LR_name, short_RL_name)])
+        original_num_epochs: int = np.array([curr_active_pipeline.computation_results[an_epoch_name].computation_config.pf_params.computation_epochs.n_epochs for an_epoch_name in (long_LR_name, long_RL_name, short_LR_name, short_RL_name)])
         if debug_print:
             print(f'original_num_epochs: {original_num_epochs}')
         assert np.all(original_num_epochs > 0)
         # Fix the computation epochs to be constrained to the proper long/short intervals:
         # relys on: long_epoch_obj, short_epoch_obj
         for an_epoch_name in (long_LR_name, long_RL_name):
-            curr_active_pipeline.computation_results[an_epoch_name].computation_config.pf_params.computation_epochs = deepcopy(curr_active_pipeline.computation_results[an_epoch_name].computation_config.pf_params.computation_epochs.time_slice(long_epoch_obj.t_start, long_epoch_obj.t_stop))
+            curr_active_pipeline.computation_results[an_epoch_name].computation_config.pf_params.computation_epochs = deepcopy(curr_active_pipeline.computation_results[an_epoch_name].computation_config.pf_params.computation_epochs.time_slice(long_epoch_obj.t_start, long_epoch_obj.t_stop)) ## #TODO 2025-07-15 13:07: - [ ] Why not laps for the pf_params?
 
         for an_epoch_name in (short_LR_name, short_RL_name):
-            curr_active_pipeline.computation_results[an_epoch_name].computation_config.pf_params.computation_epochs = deepcopy(curr_active_pipeline.computation_results[an_epoch_name].computation_config.pf_params.computation_epochs.time_slice(short_epoch_obj.t_start, short_epoch_obj.t_stop))
+            curr_active_pipeline.computation_results[an_epoch_name].computation_config.pf_params.computation_epochs = deepcopy(curr_active_pipeline.computation_results[an_epoch_name].computation_config.pf_params.computation_epochs.time_slice(short_epoch_obj.t_start, short_epoch_obj.t_stop)) ## #TODO 2025-07-15 13:07: - [ ] Why not laps for the pf_params?
 
-        modified_num_epochs = np.array([curr_active_pipeline.computation_results[an_epoch_name].computation_config.pf_params.computation_epochs.n_epochs for an_epoch_name in (long_LR_name, long_RL_name, short_LR_name, short_RL_name)])
+        modified_num_epochs: int = np.array([curr_active_pipeline.computation_results[an_epoch_name].computation_config.pf_params.computation_epochs.n_epochs for an_epoch_name in (long_LR_name, long_RL_name, short_LR_name, short_RL_name)])
         if debug_print:
             print(f'modified_num_epochs: {modified_num_epochs}')
         was_modified = was_modified or np.any(original_num_epochs != modified_num_epochs)
@@ -1244,13 +1245,13 @@ class DirectionalLapsHelpers:
 
         return was_modified
 
+
     @function_attributes(short_name=None, tags=['MAIN'], input_requires=[], output_provides=[], uses=['.post_fixup_filtered_contexts', '.fix_computation_epochs_if_needed'], used_by=[], creation_date='2025-02-19 13:22', related_items=[])
     @classmethod
     def fixup_directional_pipeline_if_needed(cls, curr_active_pipeline, debug_print=False) -> bool:
-        """2023-11-29 - Updates the filtered context and decouples the configs and constrains the computation_epochs to the relevant long/short periods as needed. Will need recomputations if was_modified """
+        """2023-11-29 - Updates the filtered context, decouples the configs, and constrains the computation_epochs to the relevant long/short periods as needed. Will need recomputations if was_modified """
         #TODO 2023-11-10 23:32: - [ ] WORKING NOW!
         # 2023-11-10 21:15: - [X] Not yet finished! Does not work due to shared memory issue. Changes to the first two affect the next two
-
         was_modified: bool = False
         was_modified = was_modified or DirectionalLapsHelpers.post_fixup_filtered_contexts(curr_active_pipeline)
         was_modified = was_modified or DirectionalLapsHelpers.fix_computation_epochs_if_needed(curr_active_pipeline)
