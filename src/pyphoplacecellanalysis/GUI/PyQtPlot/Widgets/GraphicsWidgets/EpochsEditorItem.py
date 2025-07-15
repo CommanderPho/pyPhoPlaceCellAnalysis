@@ -27,10 +27,12 @@ class CustomViewBox(pg.ViewBox):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setMouseEnabled(x=True, y=False)
+        self.epochs_editor = None  # Will be set by EpochsEditor
+
 
     def mouseClickEvent(self, event):
         if event.button() == QtCore.Qt.RightButton:
-            print("Right-click detected!")
+            print("CustomViewBox.mouseClickEvent(event): Right-click detected!")
             pos = event.scenePos()
             if self.sceneBoundingRect().contains(pos):
                 mouse_point = self.mapSceneToView(pos)
@@ -85,9 +87,9 @@ class EpochsEditor:
         self.plots.viewboxes[0].scene().sigMouseClicked.connect(self.on_mouse_click)
 
     def on_mouse_click(self, event):
-        print(f"Mouse click detected: {event}")
+        print(f"EpochsEditor.on_mouse_click(...): Mouse click detected: {event}")
         if event.double():
-            print("Double-click detected!")
+            print("EpochsEditor.on_mouse_click(...): Double-click detected!")
             pos = event.scenePos()
             viewbox = self.plots.viewboxes[0]
             if viewbox.sceneBoundingRect().contains(pos):
@@ -106,28 +108,128 @@ class EpochsEditor:
                     'lap_accent_color': '#c4ff26de',
                     'is_included': True
                 }
-                print(f"Adding new epoch: {new_epoch}")
+                print(f"\tAdding new epoch: {new_epoch}")
                 self.curr_laps_df = self.curr_laps_df.append(new_epoch, ignore_index=True)
                 self.add_epoch_region(new_epoch)
 
+
+        elif event.button() == QtCore.Qt.RightButton:
+            ## right-click
+            print(f'EpochsEditor.on_mouse_click(event): right-click')
+
+        elif event.button() == QtCore.Qt.MiddleButton:
+            ## right-click
+            print(f'EpochsEditor.on_mouse_click(event): middle-click')
+
+        else:
+            ## Non-double click
+            # super().mouseClickEvent(event)
+            print(f'EpochsEditor.on_mouse_click(event): unknown event. event: {event}')
+            pass
+
+
     def show_context_menu(self, screen_pos, mouse_point):
+        """ Generate the context menu items for the epoch rectangles
+
+        NOT WORKING
+
+        Adds: 
+            - an option to change the direction for the epoch
+            - an option to remove the epoch
+        """
+        print(f'.show_context_menu(screen_pos: {screen_pos}, mouse_point: {mouse_point})')
         context_menu = QtWidgets.QMenu()
-        remove_action = context_menu.addAction("Remove")
-        action = context_menu.exec_(screen_pos)
-        if action == remove_action:
-            self.remove_epoch_at(mouse_point)
+
+        # Find the epoch region that was right-clicked
+        clicked_epoch_region = None
+        clicked_epoch_label = None
+
+        for label, region in self.plots.lap_epoch_widgets.items():
+            if region.getRegion()[0] <= mouse_point.x() <= region.getRegion()[1]:
+                clicked_epoch_region = region
+                clicked_epoch_label = label
+                break
+
+        if clicked_epoch_region is not None:
+            # Add "Toggle lap direction" action
+            toggle_direction_action = context_menu.addAction("Toggle lap direction")
+            context_menu.addSeparator()
+
+            # Add "Remove" action
+            remove_action = context_menu.addAction("Remove")
+
+            # Execute the context menu
+            action = context_menu.exec_(screen_pos)
+
+            if action == toggle_direction_action:
+                self.toggle_lap_direction(clicked_epoch_region, clicked_epoch_label)
+            elif action == remove_action:
+                self.remove_epoch_at(mouse_point)
+
+
+    def update_epoch_region_appearance(self, epoch_region, new_color, new_accent_color):
+        """Update the visual appearance of an epoch region with new colors."""
+        # Create new pen and brush with the updated colors
+        new_pen = pg.mkPen(f'{new_color}d6', width=1.0)
+        new_brush = pg.mkBrush(f"{new_color}42")
+        new_hover_brush = pg.mkBrush(f"{new_color}a8")
+        new_hover_pen = pg.mkPen(new_accent_color, width=2.5)
+
+        # Update the region's appearance
+        epoch_region.setBrush(new_brush)
+        epoch_region.setPen(new_pen)
+        epoch_region.setHoverBrush(new_hover_brush)
+        epoch_region.setHoverPen(new_hover_pen)
+
+        # Force a redraw
+        epoch_region.update()
+
+
+    def toggle_lap_direction(self, epoch_region, epoch_label):
+        """Toggle the lap direction for the specified epoch and update its visual representation."""
+        # Get the epoch index from the region's custom_bound_data
+        epoch_index = epoch_region.custom_bound_data
+
+        # Toggle the lap direction in the dataframe
+        current_direction = self.curr_laps_df.loc[epoch_index, 'is_LR_dir']
+        new_direction = not current_direction
+        self.curr_laps_df.loc[epoch_index, 'is_LR_dir'] = new_direction
+
+        # Update the lap_dir column as well (if it exists)
+        if 'lap_dir' in self.curr_laps_df.columns:
+            self.curr_laps_df.loc[epoch_index, 'lap_dir'] = 1 if new_direction else -1
+
+        # Update the colors based on the new direction
+        if new_direction:  # LR direction
+            new_color = DisplayColorsEnum.Laps.LR
+            new_accent_color = '#c4ff26de'
+        else:  # RL direction
+            new_color = DisplayColorsEnum.Laps.RL
+            new_accent_color = '#6227ffde'
+
+        # Update the dataframe with new colors
+        self.curr_laps_df.loc[epoch_index, 'lap_color'] = new_color
+        self.curr_laps_df.loc[epoch_index, 'lap_accent_color'] = new_accent_color
+
+        # Update the visual representation of the epoch region
+        self.update_epoch_region_appearance(epoch_region, new_color, new_accent_color)
+
+        print(f"Toggled lap direction for {epoch_label}: {'LR' if new_direction else 'RL'}")
+
 
     def remove_epoch_at(self, mouse_point):
         for label, region in self.plots.lap_epoch_widgets.items():
             if region.getRegion()[0] <= mouse_point.x() <= region.getRegion()[1]:
                 print(f"Removing epoch: {label}")
-                region.setParentItem(None)  # Remove the region from the plot
+                region.setParentItem(None)  # Remove the region from the plot by setting its parent to None
                 del self.plots.lap_epoch_widgets[label]
                 del self.plots.lap_epoch_labels[label]
                 self.curr_laps_df = self.curr_laps_df[self.curr_laps_df['label'] != label]
                 break
 
     def add_epoch_region(self, epoch):
+        """ creates a new epoch region, a CustomLinearRegionItem """
+
         print(f"Creating epoch region for: {epoch}")
         v1 = self.plots.viewboxes[0]
         epoch_linear_region, epoch_region_label = build_pyqtgraph_epoch_indicator_regions(
@@ -136,10 +238,16 @@ class EpochsEditor:
                    hoverBrush=pg.mkBrush(f"{epoch['lap_color']}a8"), hoverPen=pg.mkPen(epoch['lap_accent_color'], width=2.5)),
             custom_bound_data=epoch['lap_id']
         )
-        self.plots.lap_epoch_widgets[epoch['label']] = epoch_linear_region
+        self.plots.lap_epoch_widgets[epoch['label']] = epoch_linear_region # CustomLinearRegionItem
         self.plots.lap_epoch_labels[epoch['label']] = epoch_region_label
         epoch_linear_region.sigRegionChangeFinished.connect(self.on_epoch_region_updated)
         epoch_linear_region.sigClicked.connect(self.on_epoch_region_selection_toggled)
+        epoch_linear_region.epochs_editor = self
+        # epoch_linear_region.getContextMenus = 
+        # Connect context menu signal
+        epoch_linear_region.setContextMenuPolicy(pg.Qt.CustomContextMenu)
+        epoch_linear_region.customContextMenuRequested.connect(self.show_context_menu)    
+
 
     @classmethod
     def add_visualization_columns(cls, curr_laps_df: pd.DataFrame) -> pd.DataFrame:
@@ -182,6 +290,8 @@ class EpochsEditor:
 
         return curr_laps_df
 
+
+    # INIT METHODS _______________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
     @classmethod
     def perform_plot_laps_diagnoser(cls, pos_df: pd.DataFrame, curr_laps_df: pd.DataFrame, include_velocity=True, include_accel=True, on_epoch_region_updated_callback=None, on_epoch_region_selection_toggled_callback=None, loaded_track_limits=None, grid_bin_bounds=None):
         """
@@ -455,10 +565,13 @@ class EpochsEditor:
         """ returns the complete epochs_df with user-labeled changes. returns all epochs, not just the ones modified. """
         ## Extract changes from `epochs_editor`
         user_labeled_laps_df: pd.DataFrame = copy.deepcopy(self.curr_laps_df)
-        user_labeled_laps_df.loc[self.changed_laps_df.index, :] = self.changed_laps_df
+        user_labeled_laps_df.loc[self.changed_laps_df.index, :] = self.changed_laps_df ## (get only the changed laps)?
         user_labeled_laps_df['duration'] = user_labeled_laps_df['stop'] - user_labeled_laps_df['start']
         # Select columns: 'lap_dir', 'start' and 4 other columns
         user_labeled_laps_df = user_labeled_laps_df.loc[:, ['lap_dir', 'start', 'stop', 'lap_id', 'label', 'duration', 'is_LR_dir']]
+        ## sort any newly added epochs
+        user_labeled_laps_df = user_labeled_laps_df.sort_values(by=['start', 'stop'], ascending=True, axis='index', ignore_index=True)
+        
         return user_labeled_laps_df
     
 
