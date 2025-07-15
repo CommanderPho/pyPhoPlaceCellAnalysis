@@ -227,6 +227,21 @@ class EpochsEditor:
                 self.curr_laps_df = self.curr_laps_df[self.curr_laps_df['label'] != label]
                 break
 
+    def _remove_all_epochs(self):
+        """ removes all epoch graphics 
+        """
+        for label, region in self.plots.lap_epoch_widgets.items():
+            print(f"Removing epoch: {label}")
+            region.setParentItem(None)  # Remove the region from the plot by setting its parent to None
+            del self.plots.lap_epoch_widgets[label]
+            del self.plots.lap_epoch_labels[label]
+            # self.curr_laps_df = self.curr_laps_df[self.curr_laps_df['label'] != label] # do not remove the data, just the graphics
+        self.plots.lap_epoch_widgets = {}
+        self.plots.lap_epoch_labels = {}
+        
+
+
+
     def add_epoch_region(self, epoch):
         """ creates a new epoch region, a CustomLinearRegionItem """
 
@@ -247,6 +262,53 @@ class EpochsEditor:
         # Connect context menu signal
         epoch_linear_region.setContextMenuPolicy(pg.Qt.CustomContextMenu)
         epoch_linear_region.customContextMenuRequested.connect(self.show_context_menu)    
+
+
+    def rebuild_epoch_regions(self):
+        """ rebuilds the graphics when the `self.curr_laps_df` changes
+        
+        plots = RenderPlots('lap_debugger_plot', win=win,
+            sub_layouts=sub_layouts, viewboxes=viewboxes, position_plots=position_plots,
+            lap_epoch_widgets=lap_epoch_widgets, lap_epoch_labels=lap_epoch_labels,
+            legend=legend, scatter_points={}, additional_items=additional_items)
+            
+        """
+        self._remove_all_epochs()
+
+        lap_epoch_widgets = {}
+        lap_epoch_labels = {}
+        
+        curr_laps_df = self.curr_laps_df
+        v1 = self.plots.viewboxes[0]
+        
+        for a_lap in curr_laps_df.itertuples():
+            epoch_linear_region = lap_epoch_widgets.get(a_lap.label, None)
+            if epoch_linear_region is None:
+                ## Create a new one:
+                # add alpha
+                epoch_linear_region, epoch_region_label = build_pyqtgraph_epoch_indicator_regions(v1, t_start=a_lap.start, t_stop=a_lap.stop, epoch_label=a_lap.label, movable=True, removable=True,
+                                                                                                   **dict(pen=pg.mkPen(f'{a_lap.lap_color}d6', width=1.0), brush=pg.mkBrush(f"{a_lap.lap_color}42"), hoverBrush=pg.mkBrush(f"{a_lap.lap_color}a8"), hoverPen=pg.mkPen(a_lap.lap_accent_color, width=2.5)), 
+                                                                                                  custom_bound_data=a_lap.Index)                
+                lap_epoch_widgets[a_lap.label] = epoch_linear_region
+                lap_epoch_labels[a_lap.label] = epoch_region_label
+                if self.on_epoch_region_updated is not None:
+                    epoch_linear_region.sigRegionChangeFinished.connect(self.on_epoch_region_updated)
+                
+                if self.on_epoch_region_selection_toggled is not None:
+                    epoch_linear_region.sigClicked.connect(self.on_epoch_region_selection_toggled)
+
+
+                # Provide a callback to remove the ROI (and its children) when
+                # "remove" is selected from the context menu.
+                def remove():
+                    self.plots.v1.removeItem(epoch_linear_region)
+                epoch_linear_region.sigRemoveRequested.connect(remove)
+
+                # epoch_linear_region.getContextMenus(
+        ## END for a_lap in curr_laps_df.it...
+        self.plots.lap_epoch_widgets = lap_epoch_widgets
+        self.plots.lap_epoch_labels = lap_epoch_labels
+        
 
 
     @classmethod
@@ -441,7 +503,9 @@ class EpochsEditor:
         plots = RenderPlots('lap_debugger_plot', win=win,
             sub_layouts=sub_layouts, viewboxes=viewboxes, position_plots=position_plots,
             lap_epoch_widgets=lap_epoch_widgets, lap_epoch_labels=lap_epoch_labels,
-            legend=legend, scatter_points={}, additional_items=additional_items)
+            legend=legend, scatter_points={}, additional_items=additional_items,
+            on_epoch_region_updated_callback=on_epoch_region_updated_callback, on_epoch_region_selection_toggled_callback=on_epoch_region_selection_toggled_callback,
+            )
         return plots
 
 
@@ -573,6 +637,24 @@ class EpochsEditor:
         user_labeled_laps_df = user_labeled_laps_df.sort_values(by=['start', 'stop'], ascending=True, axis='index', ignore_index=True)
         
         return user_labeled_laps_df
+    
+
+
+
+    def set_user_labeled_epochs_df(self, user_labeled_laps_df: pd.DataFrame):
+        """ returns the complete epochs_df with user-labeled changes. returns all epochs, not just the ones modified.
+        """
+        user_labeled_laps_df = self.add_visualization_columns(curr_laps_df=copy.deepcopy(user_labeled_laps_df))
+        user_labeled_laps_df['duration'] = user_labeled_laps_df['stop'] - user_labeled_laps_df['start']
+        # Select columns: 'lap_dir', 'start' and 4 other columns
+        user_labeled_laps_df = user_labeled_laps_df.loc[:, ['lap_dir', 'start', 'stop', 'lap_id', 'label', 'duration', 'is_LR_dir']]
+        ## sort any newly added epochs
+        user_labeled_laps_df = user_labeled_laps_df.sort_values(by=['start', 'stop'], ascending=True, axis='index', ignore_index=True)
+        
+        self.curr_laps_df = user_labeled_laps_df ## Actualy perform the assignment
+        self.changed_laps_df = self.curr_laps_df.iloc[:0,:].copy() # update changed laps
+        self.rebuild_epoch_regions()
+        print(f'laps updated.')
     
 
 
