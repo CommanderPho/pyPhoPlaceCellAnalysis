@@ -324,6 +324,8 @@ class BatchSessionCompletionHandler:
         """ 2023-05-16 - Ensures that the laps are used for the placefield computation epochs, the number of bins are the same between the long and short tracks. 
         
         NOTE: returns `was_updated`, not `is_valid` or something similar.
+
+        Several sessions are failing here. 
         
         """
         from pyphoplacecellanalysis.General.Model.SpecificComputationParameterTypes import ComputationKWargParameters
