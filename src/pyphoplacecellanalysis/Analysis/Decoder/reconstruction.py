@@ -2241,6 +2241,7 @@ class BasePositionDecoder(HDFMixin, AttrsBasedClassHelperMixin, ContinuousPeakLo
         History:
             Used to be named `_setup_concatenated_F` but renamed because it computes more than that.
         """
+        assert self.pf.ratemap.n_neurons > 0, f"self.pf.ratemap.n_neurons == 0! (No Neurons!)"
         self.neuron_IDXs, self.neuron_IDs, f_i, F_i, self.F, self.P_x = ZhangReconstructionImplementation.build_concatenated_F(self.pf, debug_print=self.debug_print) # fails when `self.pf.ratemap.n_neurons == 0` aka `self.pf.ratemap.ndim == 0`
         if not isinstance(self.neuron_IDs, np.ndarray):
             self.neuron_IDs = np.array(self.neuron_IDs)

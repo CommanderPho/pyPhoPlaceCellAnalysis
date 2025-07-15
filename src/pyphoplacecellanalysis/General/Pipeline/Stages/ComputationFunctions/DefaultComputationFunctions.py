@@ -70,7 +70,9 @@ class DefaultComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Computa
         computation_result.computed_data['pf1D_Decoder'].compute_all() # this is what breaks it
 
         if ('pf2D' in computation_result.computed_data) and (computation_result.computed_data.get('pf2D', None) is not None):
-            computation_result.computed_data['pf2D_Decoder'] = BayesianPlacemapPositionDecoder(time_bin_size=placefield_computation_config.time_bin_size, pf=computation_result.computed_data['pf2D'], spikes_df=computation_result.computed_data['pf2D'].filtered_spikes_df.copy(), debug_print=False)
+            pf = computation_result.computed_data['pf2D']
+
+            computation_result.computed_data['pf2D_Decoder'] = BayesianPlacemapPositionDecoder(time_bin_size=placefield_computation_config.time_bin_size, pf=pf, spikes_df=computation_result.computed_data['pf2D'].filtered_spikes_df.copy(), debug_print=False)
             computation_result.computed_data['pf2D_Decoder'].compute_all() # Changing to fIXED grid_bin_bounds ===> MUCH (10x?) slower than before
         else:
             computation_result.computed_data['pf2D_Decoder'] = None

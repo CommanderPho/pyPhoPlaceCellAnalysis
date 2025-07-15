@@ -2590,8 +2590,28 @@ class PostHocPipelineFixup:
 
         did_override_any_laps = PostHocPipelineFixup.FINAL_FIX_LAPS_FROM_OVERRIDES(curr_active_pipeline=curr_active_pipeline)
 
-        (did_any_grid_bin_change, change_dict), correct_grid_bin_bounds = PostHocPipelineFixup.FINAL_FIX_GRID_BIN_BOUNDS(curr_active_pipeline=curr_active_pipeline, force_recompute=force_recompute, is_dry_run=is_dry_run, defer_required_compute=False)
+        (did_any_grid_bin_change, change_dict), correct_grid_bin_bounds = PostHocPipelineFixup.FINAL_FIX_GRID_BIN_BOUNDS(curr_active_pipeline=curr_active_pipeline, force_recompute=force_recompute, is_dry_run=is_dry_run, defer_required_compute=True)
 
+        did_any_change = (did_any_grid_bin_change or did_fixup_any_missing_basepath or did_any_non_pbe_epochs_change or was_directional_pipeline_modified or did_override_any_laps)
+        
+        if (did_any_change or force_recompute):
+            if force_recompute:
+                print(f'(force_recompute==True), (did_any_change: {did_any_change}) recomputing...')
+            else:
+                print(f'at least one grid_bin_bound was changed, recomputing...')
+
+            if (not is_dry_run):
+                ## if not dry_run, do the recomputations:
+                cls._perform_required_recompute_on_change(curr_active_pipeline=curr_active_pipeline)
+                print(f'\trecomputation complete!')
+
+            else:
+                print(f'\tWARNING: is_dry_run is true so no recompute will be done.')
+                
+        else:
+            ## no changes and not force_recompute
+            print(f'No grid bin bounds were changed. Everything should be up-to-date!')
+            
         # Fix the computation epochs to be constrained to the proper long/short intervals:
         # was_directional_pipeline_modified = DirectionalLapsResult.fix_computation_epochs_if_needed(curr_active_pipeline=curr_active_pipeline)
         was_directional_pipeline_modified = DirectionalLapsHelpers.fixup_directional_pipeline_if_needed(curr_active_pipeline)
