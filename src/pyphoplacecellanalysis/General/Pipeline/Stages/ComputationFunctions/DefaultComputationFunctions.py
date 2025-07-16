@@ -39,8 +39,8 @@ class DefaultComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Computa
     def _perform_lap_direction_determination(computation_result: ComputationResult, **kwargs):
         """ Adds the 'is_LR_dir' column to the laps dataframe and updates 'lap_dir' if needed.        
         """
-        computation_result.sess.laps.update_lap_dir_from_smoothed_velocity(pos_input=computation_result.sess.position) # confirmed in-place
-        # computation_result.sess.laps.update_lap_dir_from_smoothed_velocity(pos_input=computation_result.sess.position)
+        computation_result.sess.laps.update_lap_dir_from_net_displacement(pos_input=computation_result.sess.position) # confirmed in-place
+        # computation_result.sess.laps.update_lap_dir_from_net_displacement(pos_input=computation_result.sess.position)
         # curr_sess.laps.update_maze_id_if_needed(t_start=t_start, t_delta=t_delta, t_end=t_end) # this doesn't make sense for the filtered sessions unfortunately.
         return computation_result # no changes except to the internal sessions
     

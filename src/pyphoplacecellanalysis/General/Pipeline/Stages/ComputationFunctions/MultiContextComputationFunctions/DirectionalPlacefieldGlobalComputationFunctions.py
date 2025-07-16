@@ -29,7 +29,7 @@ from neuropy.utils.indexing_helpers import NumpyHelpers
 from pyphocorehelpers.assertion_helpers import Assert
 from pyphocorehelpers.indexing_helpers import reorder_columns_relative
 
-from neuropy.core.laps import Laps # used in `DirectionalLapsHelpers`
+from neuropy.core.laps import Laps, LapsAccessor # used in `DirectionalLapsHelpers`
 from neuropy.utils.result_context import IdentifyingContext
 from neuropy.utils.dynamic_container import DynamicContainer
 from neuropy.utils.mixins.dict_representable import override_dict # used to build config
@@ -1266,13 +1266,13 @@ class DirectionalLapsHelpers:
         origin_lap_df = curr_sess.laps.to_dataframe()
         added_column = ('is_LR_dir' not in origin_lap_df.columns)
         was_modified = was_modified or added_column
-        curr_sess.laps.update_lap_dir_from_smoothed_velocity(pos_input=curr_sess.position)
+        curr_sess.laps.update_lap_dir_from_net_displacement(pos_input=curr_sess.position)
         curr_sess.laps.update_maze_id_if_needed(t_start=t_start, t_delta=t_delta, t_end=t_end)
         
         for an_epoch_name, curr_sess in curr_active_pipeline.filtered_sessions.items():
             origin_lap_df = curr_sess.laps.to_dataframe()
             added_column = ('is_LR_dir' not in origin_lap_df.columns)
-            curr_sess.laps.update_lap_dir_from_smoothed_velocity(pos_input=curr_sess.position)
+            curr_sess.laps.update_lap_dir_from_net_displacement(pos_input=curr_sess.position)
             curr_sess.laps.update_maze_id_if_needed(t_start=t_start, t_delta=t_delta, t_end=t_end)
             was_modified = was_modified or added_column
 
@@ -2500,8 +2500,9 @@ class DirectionalPseudo2DDecodersResult(ComputedResult):
         """
         # BEGIN FUNCTION BODY ________________________________________________________________________________________________ #
 
-        active_global_laps_df = Laps._compute_lap_dir_from_smoothed_velocity(active_global_laps_df, global_session=global_session, replace_existing=False) ## NOTE: global_session does not work, use curr_active_pipeline.sess instead (unfiltered session) otherwise it clips the last two laps
-
+        # active_global_laps_df = Laps._compute_lap_dir_from_smoothed_velocity(active_global_laps_df, global_session=global_session, replace_existing=False) ## NOTE: global_session does not work, use curr_active_pipeline.sess instead (unfiltered session) otherwise it clips the last two laps
+        active_global_laps_df = active_global_laps_df.laps_accessor.compute_lap_dir_from_net_displacement(global_session=global_session, replace_existing=False) ## NOTE: global_session does not work, use curr_active_pipeline.sess instead (unfiltered session) otherwise it clips the last two laps
+        
         # Validate Laps:
         # ground_truth_lap_dirs = active_global_laps_df['lap_dir'].to_numpy()
         ground_truth_lap_is_LR_dir = active_global_laps_df['is_LR_dir'].to_numpy()
@@ -4470,7 +4471,7 @@ def _do_train_test_split_decode_and_evaluate(curr_active_pipeline, active_laps_d
     percent_laps_track_identity_estimated_correctly
 
     """
-    from neuropy.core.session.dataSession import Laps
+    from neuropy.core.session.dataSession import Laps, LapsAccessor
     from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import PfND
     # from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import compute_weighted_correlations
     # from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import _check_result_laps_epochs_df_performance
@@ -4485,7 +4486,9 @@ def _do_train_test_split_decode_and_evaluate(curr_active_pipeline, active_laps_d
         epochs_df = epochs_df.sort_values(['start', 'stop', 'label']).reset_index(drop=True) # Sort by columns: 'start' (ascending), 'stop' (ascending), 'label' (ascending)
         epochs_df = epochs_df.drop_duplicates(subset=['start', 'stop', 'label'])
         epochs_df = epochs_df.epochs.adding_maze_id_if_needed(t_start=t_start, t_delta=t_delta, t_end=t_end)
-        epochs_df = Laps._compute_lap_dir_from_smoothed_velocity(laps_df=epochs_df, global_session=deepcopy(global_session), replace_existing=True)
+        # epochs_df = Laps._compute_lap_dir_from_smoothed_velocity(laps_df=epochs_df, global_session=deepcopy(global_session), replace_existing=True)
+        epochs_df = epochs_df.laps_accessor.compute_lap_dir_from_net_displacement(global_session=deepcopy(global_session), replace_existing=True)
+        
         return epochs_df
         
 
@@ -6377,7 +6380,7 @@ class DirectionalPlacefieldGlobalComputationFunctions(AllFunctionEnumeratingMixi
     def _split_to_directional_laps(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, debug_print=False):
         """ Splits the existing laps into directional versions
     
-        laps_obj.update_lap_dir_from_smoothed_velocity(pos_input=curr_active_pipeline.sess.position)
+        laps_obj.update_lap_dir_from_net_displacement(pos_input=curr_active_pipeline.sess.position)
         laps_obj.update_maze_id_if_needed(t_start=t_start, t_delta=t_delta, t_end=t_end)
     
         Requires:
@@ -6518,7 +6521,7 @@ class DirectionalPlacefieldGlobalComputationFunctions(AllFunctionEnumeratingMixi
             global_any_laps_epochs_obj = deepcopy(owning_pipeline_reference.computation_results[global_any_name].computation_config.pf_params.computation_epochs) # global_any_name='maze_any' (? same as global_epoch_name?)
             global_any_laps_epochs_df = ensure_dataframe(global_any_laps_epochs_obj)    
             global_any_laps_epochs_df = global_any_laps_epochs_df.epochs.adding_maze_id_if_needed(t_start=t_start, t_delta=t_delta, t_end=t_end)
-            global_any_laps_epochs_df = Laps._compute_lap_dir_from_smoothed_velocity(laps_df=global_any_laps_epochs_df, global_session=deepcopy(global_session), replace_existing=True)
+            global_any_laps_epochs_df = global_any_laps_epochs_df.laps_accessor.compute_lap_dir_from_net_displacement(global_session=deepcopy(global_session), replace_existing=True)
             directional_merged_decoders_result.all_directional_laps_filter_epochs_decoder_result = all_directional_pf1D_Decoder.decode_specific_epochs(spikes_df=deepcopy(get_proper_global_spikes_df(owning_pipeline_reference, minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz, included_qclu_values=included_qclu_values)),
                                                                                                                                                filter_epochs=deepcopy(global_any_laps_epochs_df), decoding_time_bin_size=laps_decoding_time_bin_size, debug_print=False)
         else:

@@ -3522,7 +3522,7 @@ class PipelineWithComputedPipelineStageMixin:
 
 
         """
-        from neuropy.core.laps import Laps
+        from neuropy.core.laps import Laps, LapsAccessor
         did_any_change: bool = False
 
         t_start, t_delta, t_end = self.find_LongShortDelta_times()
@@ -3531,24 +3531,11 @@ class PipelineWithComputedPipelineStageMixin:
         ## Load the custom laps
         if debug_print:
             print(f'override_laps_df: {override_laps_df}')
-        if 'lap_id' not in override_laps_df:
-            override_laps_df['lap_id'] = override_laps_df.index.astype('int') ## set lap_id from the index
-        else:
-            override_laps_df[['lap_id']] = override_laps_df[['lap_id']].astype('int')
-
-        # Either way, ensure that the lap_dir is an 'int' column.
-        override_laps_df['lap_dir'] = override_laps_df['lap_dir'].astype('int')
-        # override_laps_df['lap_dir'] = override_laps_df['lap_dir'].astype('int')
-        # override_laps_df['is_LR_dir'] = (override_laps_df['lap_dir'] < 1.0)
-
-        if 'label' not in override_laps_df:
-            override_laps_df['label'] = override_laps_df['lap_id'].astype('str') # add the string "label" column
-        else:
-            override_laps_df['label'] = override_laps_df['label'].astype('str')
-
+            
+        # override_laps_df = override_laps_df.laps_accessor.get_valid_laps_epochs_df(rebuild_lap_id_columns=True)
+        override_laps_df = override_laps_df.laps_accessor.filter_to_valid()
         # curr_laps_df = Laps._compute_lap_dir_from_smoothed_velocity(laps_df=curr_laps_df, global_session=global_session, replace_existing=True)
-
-        override_laps_df = Laps._compute_lap_dir_from_smoothed_velocity(laps_df=override_laps_df, global_session=self.sess, replace_existing=True)
+        override_laps_df = override_laps_df.laps_accessor.compute_lap_dir_from_net_displacement(global_session=self.sess)
         override_laps_df = Laps._update_dataframe_computed_vars(laps_df=override_laps_df, t_start=t_start, t_delta=t_delta, t_end=t_end, global_session=self.sess, replace_existing=False)
         override_laps_obj = Laps(laps=override_laps_df, metadata=None).filter_to_valid()
         ## OUTPUTS: override_laps_obj
