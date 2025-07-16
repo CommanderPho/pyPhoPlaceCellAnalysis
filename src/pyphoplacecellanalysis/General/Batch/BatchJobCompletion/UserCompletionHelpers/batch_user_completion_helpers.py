@@ -2525,7 +2525,7 @@ class PostHocPipelineFixup:
         """ perform all fixes regarding any needed replacements for laps indicated in UserAnnotations """
         print(f'\t !!!||||||||||||||||||> RUNNING `PostHocPipelineFixup.FINAL_FIX_LAPS_FROM_OVERRIDES(...)`:')
         from neuropy.core.user_annotations import UserAnnotationsManager
-        from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import override_laps
+        # from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import override_laps
         from neuropy.core.laps import Laps
 
         override_laps_df: Optional[pd.DataFrame] = UserAnnotationsManager.get_hardcoded_laps_override_dict().get(curr_active_pipeline.get_session_context(), None)
@@ -2543,7 +2543,7 @@ class PostHocPipelineFixup:
             override_laps_obj.update_maze_id_if_needed(t_start=t_start, t_delta=t_delta, t_end=t_end)
             override_laps_df = override_laps_obj.to_dataframe()
 
-            return override_laps(curr_active_pipeline, override_laps_df=override_laps_df, debug_print=True)
+            return curr_active_pipeline.override_laps(override_laps_df=override_laps_df, debug_print=True)
 
 
     # ==================================================================================================================== #

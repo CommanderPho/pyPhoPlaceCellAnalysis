@@ -3503,3 +3503,84 @@ class PipelineWithComputedPipelineStageMixin:
         """This will be replaced by the decorator but preserves docstring and signature"""
         pass
 
+
+    @function_attributes(short_name=None, tags=['laps', 'update', 'session', 'TODO', 'UNFINISHED'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-01-13 15:45', related_items=[])
+    def override_laps(self, override_laps_df: pd.DataFrame, debug_print=False) -> bool:
+        """
+        overrides the laps
+
+        Usage:
+
+            from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import override_laps
+
+            override_laps_df: Optional[pd.DataFrame] = UserAnnotationsManager.get_hardcoded_laps_override_dict().get(curr_active_pipeline.get_session_context(), None)
+            if override_laps_df is not None:
+                print(f'overriding laps....')
+                display(override_laps_df)
+                did_laps_change = curr_active_pipeline.override_laps(override_laps_df=override_laps_df)
+
+
+
+        """
+        from neuropy.core.laps import Laps
+        did_any_change: bool = False
+
+        t_start, t_delta, t_end = self.find_LongShortDelta_times()
+        laps_df_comparison_column_names = ['start', 'stop']
+        
+        ## Load the custom laps
+        if debug_print:
+            print(f'override_laps_df: {override_laps_df}')
+        if 'lap_id' not in override_laps_df:
+            override_laps_df['lap_id'] = override_laps_df.index.astype('int') ## set lap_id from the index
+        else:
+            override_laps_df[['lap_id']] = override_laps_df[['lap_id']].astype('int')
+
+        # Either way, ensure that the lap_dir is an 'int' column.
+        override_laps_df['lap_dir'] = override_laps_df['lap_dir'].astype('int')
+        # override_laps_df['lap_dir'] = override_laps_df['lap_dir'].astype('int')
+        # override_laps_df['is_LR_dir'] = (override_laps_df['lap_dir'] < 1.0)
+
+        if 'label' not in override_laps_df:
+            override_laps_df['label'] = override_laps_df['lap_id'].astype('str') # add the string "label" column
+        else:
+            override_laps_df['label'] = override_laps_df['label'].astype('str')
+
+        # curr_laps_df = Laps._compute_lap_dir_from_smoothed_velocity(laps_df=curr_laps_df, global_session=global_session, replace_existing=True)
+
+        override_laps_df = Laps._compute_lap_dir_from_smoothed_velocity(laps_df=override_laps_df, global_session=self.sess, replace_existing=True)
+        override_laps_df = Laps._update_dataframe_computed_vars(laps_df=override_laps_df, t_start=t_start, t_delta=t_delta, t_end=t_end, global_session=self.sess, replace_existing=False)
+        override_laps_obj = Laps(laps=override_laps_df, metadata=None).filter_to_valid()
+        ## OUTPUTS: override_laps_obj
+
+        _original_laps = deepcopy(self.sess.laps.to_dataframe())
+        did_any_change |= np.any(_original_laps[laps_df_comparison_column_names].to_numpy() != override_laps_obj.to_dataframe()[laps_df_comparison_column_names].to_numpy()) ## update did_any_Change
+
+        self.sess.laps = deepcopy(override_laps_obj)
+
+        # curr_active_pipeline.sess.laps_df = override_laps_df
+        self.sess.compute_position_laps()
+
+        # curr_active_pipeline.sess = curr_active_pipeline.sess
+        # a_pf1D_dt.replacing_computation_epochs(epochs=override_laps_df)
+
+        for a_filtered_context_name, a_filtered_context in self.filtered_contexts.items():
+            ## current session
+            a_filtered_epoch = self.filtered_epochs[a_filtered_context_name]
+            filtered_sess = self.filtered_sessions[a_filtered_context_name]
+            if debug_print:
+                print(f'a_filtered_context_name: {a_filtered_context_name}, a_filtered_context: {a_filtered_context}')
+            # override_laps_obj.filter_to_valid()
+            a_filtered_override_laps_obj: Laps = deepcopy(override_laps_obj).time_slice(t_start=filtered_sess.t_start, t_stop=filtered_sess.t_stop)
+            # a_filtered_context.lap_dir
+            
+            _curr_original_laps = deepcopy(filtered_sess.laps.to_dataframe())
+            did_any_change |= np.any(_curr_original_laps[laps_df_comparison_column_names].to_numpy() != a_filtered_override_laps_obj.to_dataframe()[laps_df_comparison_column_names].to_numpy()) ## update did_any_Change
+            
+            filtered_sess.laps = deepcopy(a_filtered_override_laps_obj)
+            filtered_sess.compute_position_laps()
+            if debug_print:
+                print(f'\tupdated.')
+
+
+        return did_any_change
