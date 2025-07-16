@@ -7,7 +7,8 @@ from typing_extensions import TypeAlias
 from nptyping import NDArray
 import neuropy.utils.type_aliases as types
 from contextlib import redirect_stdout, redirect_stderr
-
+import json
+from datetime import datetime
 import numpy as np
 import pandas as pd
 pd.options.mode.chained_assignment = None  # default='warn'
@@ -303,8 +304,36 @@ new_print(f'/* batch_session_completion_handler_kwargs: {batch_session_completio
 {# new_print(f'/* run_outputs: {run_outputs} __________________________________________________________________________________ */') #}
 {# new_print(f'/* batch_session_completion_handler_kwargs: {batch_session_completion_handler_kwargs} __________________________________________________________________________________ */') #}
 
+# Write a status_file that can be read by the powershell script:
+try:
+    status_file = Path(script_file_parent_path) / "status.json"
+    status_data = {
+        "status": "success" if run_status == 'success' else "error",
+        "session_complete_identifier": curr_session_complete_identifier,
+        "session_context": str(curr_session_context),
+        "job_suffix": str(job_suffix) if job_suffix else None,
+        "errors": str(run_errors) if run_errors else None,
+        "log_file": str(final_log_file_path),
+        "completion_time": str(datetime.now()) if 'datetime' in sys.modules else None,
+        "session_basedir": curr_session_basedir.as_posix() if curr_session_basedir else None,
+    }
+
+    with open(status_file, 'w') as f:
+        json.dump(status_data, f, indent=2)
+
+    new_print(f'/* wrote status_file: "{status_file}" __________________________________________________________________________________ */')
+
+except Exception as e:
+    new_print(f'ERROR: writing status_file: "{status_file}" failed with error: {e}')
+    raise e
+
 new_print(f'\n ALL DONE! \n')
 new_print(f'/* ================================================================================================================== */\n')
+
+
+
+
+
 {% endmacro %}
 
 
