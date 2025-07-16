@@ -308,7 +308,7 @@ new_print(f'/* batch_session_completion_handler_kwargs: {batch_session_completio
 try:
     status_file = Path(script_file_parent_path) / "status.json"
     status_data = {
-        "status": "success" if run_status == 'success' else "error",
+        "status": f"{run_status}",
         "session_complete_identifier": curr_session_complete_identifier,
         "session_context": str(curr_session_context),
         "job_suffix": str(job_suffix) if job_suffix else None,
