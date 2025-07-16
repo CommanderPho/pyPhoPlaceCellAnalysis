@@ -7,7 +7,7 @@ $scriptBlock = {
         $startTime = Get-Date
         Write-Host "Starting script: $scriptPath at time: $($startTime.ToString())"
         
-        # Remove any existing status file
+        # Inline status file removal
         $statusFile = Join-Path $parentDir "status.json"
         if (Test-Path $statusFile) {
             Remove-Item $statusFile -Force
@@ -18,13 +18,13 @@ $scriptBlock = {
         $endTime = Get-Date
         $duration = $endTime - $startTime
         
-        # Read status file if it exists
+        # Inline status file reading
         $pythonStatus = $null
         if (Test-Path $statusFile) {
             try {
                 $pythonStatus = Get-Content $statusFile -Raw | ConvertFrom-Json
             } catch {
-                Write-Warning "Failed to read status file: $statusFile"
+                Write-Warning "Failed to read status file: $statusFile - Error: $_"
             }
         }
         
@@ -37,7 +37,7 @@ $scriptBlock = {
             PythonStatus = $pythonStatus
         }
     } catch {
-        Write-Error "An error occurred for script: $scriptPath"
+        Write-Error "An error occurred for script: $scriptPath - Error: $_"
         return @{
             ScriptPath = $scriptPath
             StartTime = $startTime.ToString()
@@ -76,6 +76,10 @@ function Manage-JobQueue {
                             if ($hashtable.PythonStatus.errors) {
                                 $statusInfo += " (Errors: $($hashtable.PythonStatus.errors))"
                             }
+                            if ($hashtable.PythonStatus.session_complete_identifier) {
+                                $statusInfo += " (session_complete_identifier: $($hashtable.PythonStatus.session_complete_identifier))"
+                            }
+
                         }
                         
                         Write-Host "Job $($job.Id) with script '$($hashtable.ScriptPath)' has completed.$statusInfo"
@@ -141,6 +145,12 @@ function WaitForAllJobs {
                         $statusInfo = " - Python Status: $($hashtable.PythonStatus.status)"
                         if ($hashtable.PythonStatus.session_context) {
                             $statusInfo += " (Session: $($hashtable.PythonStatus.session_context))"
+                        }
+                        if ($hashtable.PythonStatus.session_complete_identifier) {
+                            $statusInfo += " (session_complete_identifier: $($hashtable.PythonStatus.session_complete_identifier))"
+                        }
+                        if ($hashtable.PythonStatus.errors) {
+                            $statusInfo += " (Errors: $($hashtable.PythonStatus.errors))"
                         }
                     }
                     
@@ -225,7 +235,10 @@ foreach ($job in $runHistory) {
     $scriptName = [System.IO.Path]::GetFileNameWithoutExtension($job.ScriptPath)
     $status = if ($job.PythonStatus -and $job.PythonStatus.status) { $job.PythonStatus.status } else { "Unknown" }
     $duration = $job.Duration
-    Write-Host "  $scriptName - Status: $status - Duration: $duration"
+    $errors = if ($job.PythonStatus -and $job.PythonStatus.errors) { $job.PythonStatus.errors } else { "<No Errors>" }
+    $session_complete_identifier = if ($job.PythonStatus -and $job.PythonStatus.session_complete_identifier) { $job.PythonStatus.session_complete_identifier } else { "<No Complete Session Identifier>" }
+
+    Write-Host "  $scriptName - Status: $status - Errors: $errors - Duration: $duration - CompleteSessionID: $session_complete_identifier"
 }
 
 Write-Host "`nAll processing complete!"
