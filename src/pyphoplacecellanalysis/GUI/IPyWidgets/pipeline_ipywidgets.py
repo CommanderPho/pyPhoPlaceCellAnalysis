@@ -1021,13 +1021,16 @@ class PipelinePickleFileSelectorWidget:
             """ captures: everything in calling context!
             Modifies in workspace: ['curr_active_pipeline', 'custom_suffix', 'proposed_load_pkl_path']
             """
-            curr_active_pipeline, custom_suffix, proposed_load_pkl_path = self.on_load_local(global_data_root_parent_path=global_data_root_parent_path, active_data_mode_name=active_data_mode_name, basedir=basedir, saving_mode=saving_mode, force_reload=force_reload)
-            curr_active_pipeline = self.on_load_global(curr_active_pipeline=curr_active_pipeline, basedir=basedir, extended_computations_include_includelist=extended_computations_include_includelist, force_recompute_override_computations_includelist=force_recompute_override_computations_includelist,
-                                        skip_global_load=False, force_reload=False, override_global_computation_results_pickle_path=self.active_global_pkl)
-            
             update_global_variable_fn = self.on_update_global_variable_callback
             assert update_global_variable_fn is not None
-            # Update the global variable
+            curr_active_pipeline, custom_suffix, proposed_load_pkl_path = self.on_load_local(global_data_root_parent_path=global_data_root_parent_path, active_data_mode_name=active_data_mode_name, basedir=basedir, saving_mode=saving_mode, force_reload=force_reload)
+            # Update the global variable before doing the global part:
+            update_global_variable_fn('curr_active_pipeline', curr_active_pipeline)
+            update_global_variable_fn('custom_suffix', custom_suffix)
+            update_global_variable_fn('proposed_load_pkl_path', proposed_load_pkl_path)            
+            curr_active_pipeline = self.on_load_global(curr_active_pipeline=curr_active_pipeline, basedir=basedir, extended_computations_include_includelist=extended_computations_include_includelist, force_recompute_override_computations_includelist=force_recompute_override_computations_includelist,
+                                        skip_global_load=False, force_reload=False, override_global_computation_results_pickle_path=self.active_global_pkl)
+            # Update the global variable after loading global
             update_global_variable_fn('curr_active_pipeline', curr_active_pipeline)
             update_global_variable_fn('custom_suffix', custom_suffix)
             update_global_variable_fn('proposed_load_pkl_path', proposed_load_pkl_path)
