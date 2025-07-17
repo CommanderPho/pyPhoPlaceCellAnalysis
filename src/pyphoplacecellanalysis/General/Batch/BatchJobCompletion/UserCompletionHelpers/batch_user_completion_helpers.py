@@ -2592,7 +2592,7 @@ class PostHocPipelineFixup:
 
         (did_any_grid_bin_change, change_dict), correct_grid_bin_bounds = PostHocPipelineFixup.FINAL_FIX_GRID_BIN_BOUNDS(curr_active_pipeline=curr_active_pipeline, force_recompute=force_recompute, is_dry_run=is_dry_run, defer_required_compute=True)
 
-        did_any_change = (did_any_grid_bin_change or did_fixup_any_missing_basepath or did_any_non_pbe_epochs_change or was_directional_pipeline_modified or did_override_any_laps)
+        did_any_change = (did_any_grid_bin_change or did_fixup_any_missing_basepath or did_any_non_pbe_epochs_change or did_override_any_laps)
         
         if (did_any_change or force_recompute):
             if force_recompute:
