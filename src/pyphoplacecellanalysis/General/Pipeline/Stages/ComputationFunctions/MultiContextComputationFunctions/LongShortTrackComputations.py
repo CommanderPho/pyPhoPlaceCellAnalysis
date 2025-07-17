@@ -3259,9 +3259,10 @@ class InstantaneousSpikeRateGroupsComputation(PickleSerializableMixin, HDF_Seria
 
     @function_attributes(short_name=None, tags=['MAIN', 'to_df', 'FAT', 'FAT_df', 'equiv'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-01-17 15:30', related_items=[])
     def get_comprehensive_dataframe(self) -> pd.DataFrame:
-        """
-        Creates a comprehensive DataFrame with ALL InstantaneousSpikeRateGroupsComputation data.
+        """ Creates a comprehensive DataFrame with ALL InstantaneousSpikeRateGroupsComputation data.
         Each row represents one cell with all conditions as columns.
+
+        INVERSE OF: `cls.from_comprehensive_dataframe`
 
         Returns:
             pd.DataFrame: Comprehensive DataFrame with all computation data
@@ -3425,23 +3426,34 @@ class InstantaneousSpikeRateGroupsComputation(PickleSerializableMixin, HDF_Seria
     # ==================================================================================================================================================================================================================================================================================== #
     @classmethod
     def from_comprehensive_dataframe(cls, df: pd.DataFrame) -> "InstantaneousSpikeRateGroupsComputation":
-        """
-        Reconstruct InstantaneousSpikeRateGroupsComputation from comprehensive DataFrame.
-
+        """ Reconstruct InstantaneousSpikeRateGroupsComputation from comprehensive DataFrame.
+        INVERSE OF: `cls.get_comprehensive_dataframe`
         Args:
             df: DataFrame created by get_comprehensive_dataframe()
 
         Returns:
             Reconstructed InstantaneousSpikeRateGroupsComputation instance
+
+        Usage:
+            from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.LongShortTrackComputations import InstantaneousSpikeRateGroupsComputation
+
+            # 8. Direct reconstruction from DataFrame
+            df = inst_fr_comp.get_comprehensive_dataframe()
+            reconstructed_comp2 = InstantaneousSpikeRateGroupsComputation.from_comprehensive_dataframe(df)
+
+            # 9. Compare original and reconstructed objects
+            print(f"LxC aclus match: {np.array_equal(inst_fr_comp.LxC_aclus, reconstructed_comp2.LxC_aclus)}")
+            print(f"SxC aclus match: {np.array_equal(inst_fr_comp.SxC_aclus, reconstructed_comp2.SxC_aclus)}")
+
+
         """
         from neuropy.utils.mixins.time_slicing import TimeColumnAliasesProtocol
-        
+
         if df.empty:
-            # Return minimal instance for empty DataFrame
             return cls(instantaneous_time_bin_size_seconds=0.01)
-        else:
-            ## rename columns:
-            df = TimeColumnAliasesProtocol.renaming_synonym_columns_if_needed(df, required_columns_synonym_dict={"cell_type":{'neuron_type',}})
+
+        # Handle column name synonyms
+        df = TimeColumnAliasesProtocol.renaming_synonym_columns_if_needed(df, required_columns_synonym_dict={"cell_type":{'neuron_type',}})
 
         # Extract scalar session-level metadata
         instantaneous_time_bin_size_seconds = df['instantaneous_time_bin_size_seconds'].iloc[0]
@@ -3450,66 +3462,31 @@ class InstantaneousSpikeRateGroupsComputation(PickleSerializableMixin, HDF_Seria
         instance = cls(instantaneous_time_bin_size_seconds=instantaneous_time_bin_size_seconds)
 
         # Reconstruct session context
-        instance.active_identifying_session_ctx = cls._reconstruct_session_context(df)
+        session_columns = [col for col in df.columns if col.startswith('session_')]
+        if session_columns:
+            session_data = {}
+            for col in session_columns:
+                key = col.replace('session_', '')
+                session_data[key] = df[col].iloc[0]
+
+            try:
+                instance.active_identifying_session_ctx = IdentifyingContext.from_dict(session_data)
+            except:
+                instance.active_identifying_session_ctx = None
+        else:
+            instance.active_identifying_session_ctx = None
 
         # Reconstruct cell arrays
-        instance.LxC_aclus, instance.SxC_aclus = cls._reconstruct_cell_arrays(df)
-
-        # Reconstruct SpikeRateTrends objects
-        instance = cls._reconstruct_spike_trends(instance, df)
-
-        # Reconstruct Fig2 results
-        instance = cls._reconstruct_fig2_results(instance, df)
-
-        return instance
-
-    @classmethod
-    def _reconstruct_session_context(cls, df: pd.DataFrame) -> Optional[IdentifyingContext]:
-        """Reconstruct session context from DataFrame"""
-        # Look for session context columns
-        session_columns = [col for col in df.columns if col.startswith('session_')]
-
-        if not session_columns:
-            return None
-
-        # Extract session context data from first row
-        session_data = {}
-        for col in session_columns:
-            key = col.replace('session_', '')
-            session_data[key] = df[col].iloc[0]
-
-        # Try to reconstruct IdentifyingContext
-        try:
-            return IdentifyingContext.from_dict(session_data)
-        except:
-            # If reconstruction fails, return None
-            return None
-
-    @classmethod
-    def _reconstruct_cell_arrays(cls, df: pd.DataFrame) -> Tuple[np.ndarray, np.ndarray]:
-        """Reconstruct LxC_aclus and SxC_aclus arrays from DataFrame"""
-        
-        
-        
-        
-        # Extract cell IDs by type
         lxc_mask = df['cell_type'] == 'LxC'
         sxc_mask = df['cell_type'] == 'SxC'
 
-        # Sort by cell_index_in_type to maintain original order
         lxc_df = df[lxc_mask].sort_values('cell_index_in_type') if lxc_mask.any() else pd.DataFrame()
         sxc_df = df[sxc_mask].sort_values('cell_index_in_type') if sxc_mask.any() else pd.DataFrame()
 
-        LxC_aclus = lxc_df['aclu'].values if not lxc_df.empty else np.array([])
-        SxC_aclus = sxc_df['aclu'].values if not sxc_df.empty else np.array([])
+        instance.LxC_aclus = lxc_df['aclu'].values if not lxc_df.empty else np.array([])
+        instance.SxC_aclus = sxc_df['aclu'].values if not sxc_df.empty else np.array([])
 
-        return LxC_aclus, SxC_aclus
-
-    @classmethod
-    def _reconstruct_spike_trends(cls, instance: "InstantaneousSpikeRateGroupsComputation", df: pd.DataFrame) -> "InstantaneousSpikeRateGroupsComputation":
-        """Reconstruct SpikeRateTrends objects from DataFrame"""
-
-        # Define the mapping of conditions to attributes
+        # Reconstruct SpikeRateTrends objects
         trend_mappings = {
             'LxC': {
                 'replay_delta_minus': 'LxC_ReplayDeltaMinus',
@@ -3539,54 +3516,30 @@ class InstantaneousSpikeRateGroupsComputation(PickleSerializableMixin, HDF_Seria
                 firing_rate_col = f'{condition}_firing_rate'
 
                 if firing_rate_col in cell_df.columns:
-                    # Extract firing rates, handling NaN values
                     firing_rates = cell_df[firing_rate_col].values
                     valid_rates = firing_rates[~pd.isna(firing_rates)]
 
                     if len(valid_rates) > 0:
-                        # Create a minimal SpikeRateTrends object
-                        trend_obj = cls._create_minimal_spike_trends(
-                            valid_rates, 
-                            instance.instantaneous_time_bin_size_seconds,
-                            cell_df, 
-                            condition
-                        )
+                        # Create minimal SpikeRateTrends object
+                        trend_obj = SpikeRateTrends.__new__(SpikeRateTrends)
+                        trend_obj.cell_agg_inst_fr_list = valid_rates
+                        trend_obj.instantaneous_time_bin_size_seconds = instance.instantaneous_time_bin_size_seconds
+
+                        # Extract additional metadata if available
+                        metadata_cols = [col for col in cell_df.columns if col.startswith(f'{condition}_')]
+                        for col in metadata_cols:
+                            attr_name_meta = col.replace(f'{condition}_', '')
+                            if attr_name_meta not in ['firing_rate'] and not col.endswith('_firing_rate'):
+                                if hasattr(trend_obj, attr_name_meta):
+                                    value = cell_df[col].iloc[0]
+                                    if not pd.isna(value):
+                                        setattr(trend_obj, attr_name_meta, value)
+
                         setattr(instance, attr_name, trend_obj)
                     else:
                         setattr(instance, attr_name, None)
                 else:
                     setattr(instance, attr_name, None)
-
-        return instance
-
-    @classmethod
-    def _create_minimal_spike_trends(cls, firing_rates: np.ndarray, time_bin_size: float, 
-                                    cell_df: pd.DataFrame, condition: str) -> 'SpikeRateTrends':
-        """Create a minimal SpikeRateTrends object with the essential data"""
-        # Create a basic SpikeRateTrends object
-        # This is a simplified version - you may need to adjust based on SpikeRateTrends constructor
-        trend_obj = SpikeRateTrends.__new__(SpikeRateTrends)
-
-        # Set the essential attributes
-        trend_obj.cell_agg_inst_fr_list = firing_rates
-        trend_obj.instantaneous_time_bin_size_seconds = time_bin_size
-
-        # Extract additional metadata if available
-        metadata_cols = [col for col in cell_df.columns if col.startswith(f'{condition}_')]
-        for col in metadata_cols:
-            attr_name = col.replace(f'{condition}_', '')
-            if attr_name not in ['firing_rate'] and not col.endswith('_firing_rate'):
-                # Try to set the attribute if it exists
-                if hasattr(trend_obj, attr_name):
-                    value = cell_df[col].iloc[0]
-                    if not pd.isna(value):
-                        setattr(trend_obj, attr_name, value)
-
-        return trend_obj
-
-    @classmethod
-    def _reconstruct_fig2_results(cls, instance: "InstantaneousSpikeRateGroupsComputation", df: pd.DataFrame) -> "InstantaneousSpikeRateGroupsComputation":
-        """Reconstruct Fig2_Replay_FR and Fig2_Laps_FR from DataFrame"""
 
         # Reconstruct Fig2_Replay_FR
         replay_conditions = ['LxC_ReplayDeltaMinus', 'LxC_ReplayDeltaPlus', 'SxC_ReplayDeltaMinus', 'SxC_ReplayDeltaPlus']
@@ -3600,7 +3553,7 @@ class InstantaneousSpikeRateGroupsComputation(PickleSerializableMixin, HDF_Seria
                 mean_val = df[mean_col].iloc[0] if not df[mean_col].isna().all() else None
                 std_val = df[std_col].iloc[0] if not df[std_col].isna().all() else None
 
-                # Extract values array (this is more complex - we need to reconstruct from individual cell data)
+                # Extract values array from individual cell data
                 cell_type = 'LxC' if condition.startswith('LxC') else 'SxC'
                 firing_rate_condition = 'replay_delta_minus' if 'DeltaMinus' in condition else 'replay_delta_plus'
 
@@ -3612,23 +3565,11 @@ class InstantaneousSpikeRateGroupsComputation(PickleSerializableMixin, HDF_Seria
                 else:
                     values = np.array([])
 
-                result = SingleBarResult(
-                    mean=mean_val,
-                    std=std_val,
-                    values=values,
-                    LxC_aclus=instance.LxC_aclus,
-                    SxC_aclus=instance.SxC_aclus,
-                    LxC_scatter_props=None,  # Could be reconstructed if needed
-                    SxC_scatter_props=None   # Could be reconstructed if needed
-                )
+                result = SingleBarResult(mean=mean_val, std=std_val, values=values, LxC_aclus=instance.LxC_aclus, SxC_aclus=instance.SxC_aclus, LxC_scatter_props=None, SxC_scatter_props=None)  # Could be reconstructed if needed 
                 instance.Fig2_Replay_FR.append(result)
             else:
                 # Create empty result
-                instance.Fig2_Replay_FR.append(SingleBarResult(
-                    mean=None, std=None, values=np.array([]),
-                    LxC_aclus=instance.LxC_aclus, SxC_aclus=instance.SxC_aclus,
-                    LxC_scatter_props=None, SxC_scatter_props=None
-                ))
+                instance.Fig2_Replay_FR.append(SingleBarResult(mean=None, std=None, values=np.array([]), LxC_aclus=instance.LxC_aclus, SxC_aclus=instance.SxC_aclus, LxC_scatter_props=None, SxC_scatter_props=None))
 
         # Reconstruct Fig2_Laps_FR
         laps_conditions = ['LxC_ThetaDeltaMinus', 'LxC_ThetaDeltaPlus', 'SxC_ThetaDeltaMinus', 'SxC_ThetaDeltaPlus']
@@ -3654,27 +3595,13 @@ class InstantaneousSpikeRateGroupsComputation(PickleSerializableMixin, HDF_Seria
                 else:
                     values = np.array([])
 
-                result = SingleBarResult(
-                    mean=mean_val,
-                    std=std_val,
-                    values=values,
-                    LxC_aclus=instance.LxC_aclus,
-                    SxC_aclus=instance.SxC_aclus,
-                    LxC_scatter_props=None,
-                    SxC_scatter_props=None
-                )
+                result = SingleBarResult(mean=mean_val, std=std_val, values=values, LxC_aclus=instance.LxC_aclus, SxC_aclus=instance.SxC_aclus, LxC_scatter_props=None, SxC_scatter_props=None)
                 instance.Fig2_Laps_FR.append(result)
             else:
                 # Create empty result
-                instance.Fig2_Laps_FR.append(SingleBarResult(
-                    mean=None, std=None, values=np.array([]),
-                    LxC_aclus=instance.LxC_aclus, SxC_aclus=instance.SxC_aclus,
-                    LxC_scatter_props=None, SxC_scatter_props=None
-                ))
+                instance.Fig2_Laps_FR.append(SingleBarResult(mean=None, std=None, values=np.array([]), LxC_aclus=instance.LxC_aclus, SxC_aclus=instance.SxC_aclus, LxC_scatter_props=None, SxC_scatter_props=None))
 
         return instance
-
-
 
 
 
