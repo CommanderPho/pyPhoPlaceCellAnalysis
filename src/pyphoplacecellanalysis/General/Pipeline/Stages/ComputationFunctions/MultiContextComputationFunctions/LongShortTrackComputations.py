@@ -1,6 +1,7 @@
 from copy import deepcopy
 from enum import Enum # required by `FiringRateActivitySource` enum
-from dataclasses import dataclass # required by `SortOrderMetric` class
+from dataclasses import dataclass
+from pathlib import Path # required by `SortOrderMetric` class
 
 import h5py # for to_hdf and read_hdf definitions
 import numpy as np
@@ -44,7 +45,7 @@ from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.EpochCo
 from neuropy.core.session.dataSession import DataSession # for `pipeline_complete_compute_long_short_fr_indicies`
 from pyphoplacecellanalysis.General.Mixins.PickleSerializableMixin import PickleSerializableMixin
 
-from typing import Dict, List, Any, Optional, Tuple
+from typing import Dict, List, Any, Optional, Tuple, Union
 from scipy.special import factorial, logsumexp
 from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import DecodedFilterEpochsResult
 import nptyping as ND
@@ -3253,11 +3254,101 @@ class InstantaneousSpikeRateGroupsComputation(PickleSerializableMixin, HDF_Seria
         return df_combined
 
 
+    @function_attributes(short_name=None, tags=['UNFINISHED', 'export', 'CSV', 'FAT', 'FAT_df'], input_requires=[], output_provides=[], uses=['.get_comprehensive_dataframe'], used_by=[], creation_date='2025-07-17 16:43', related_items=[])
+    def export_as_FAT_df_CSV(self, active_export_parent_output_path: Path, owning_pipeline_reference, decoding_time_bin_size: float):
+        """  export as a single_FAT .csv file
+        active_export_parent_output_path = self.collected_outputs_path.resolve()
+        Assert.path_exists(parent_output_path)
+        csv_save_paths_dict = a_new_fully_generic_result.export_as_FAT_df_CSV(active_export_parent_output_path=active_export_parent_output_path, owning_pipeline_reference=owning_pipeline_reference, decoding_time_bin_size=decoding_time_bin_size)
+        csv_save_paths_dict
+        
+        History:
+            Extracted from `pyphoplacecellanalysis.Analysis.Decoder.context_dependent.GenericDecoderDictDecodedEpochsDictResult`
+                                `._perform_export_dfs_dict_to_csvs`
+                                `.export_csvs`
+                                `.default_export_all_CSVs`
+            
+
+        """ 
+        from pyphocorehelpers.assertion_helpers import Assert
+        from neuropy.core.epoch import EpochsAccessor, Epoch, ensure_dataframe, ensure_Epoch, TimeColumnAliasesProtocol
+        from pyphocorehelpers.print_helpers import get_now_rounded_time_str
+        from pyphoplacecellanalysis.SpecificResults.AcrossSessionResults import SingleFatDataframe
+
+
+        print(f'WARN: NOT YET IMPLEMENTED 2025-07-17 16:56!!!!!!!!!!!!!!')
+        
+        ## Unpack from pipeline:
+        ## Export to CSVs:
+        result_identifier_str: str = f'FAT_inst_frs'
+
+        Assert.path_exists(active_export_parent_output_path)
+
+        ## INPUTS: collected_outputs_path
+        # decoding_time_bin_size: float = epochs_decoding_time_bin_size
+
+        complete_session_context, (session_context, additional_session_context) = owning_pipeline_reference.get_complete_session_context()
+        active_context = complete_session_context
+        session_name: str = owning_pipeline_reference.session_name
+        earliest_delta_aligned_t_start, t_delta, latest_delta_aligned_t_end = owning_pipeline_reference.find_LongShortDelta_times()
+
+        ## Build the function that uses owning_pipeline_reference to build the correct filename and actually output the .csv to the right place
+        def _subfn_custom_export_df_to_csv(export_df: pd.DataFrame, data_identifier_str: str = f'({result_identifier_str})', parent_output_path: Path=None):
+            """ captures `owning_pipeline_reference`
+            """
+            output_date_str: str = get_now_rounded_time_str(rounded_minutes=10)
+            out_path, out_filename, out_basename = owning_pipeline_reference.build_complete_session_identifier_filename_string(output_date_str=output_date_str, data_identifier_str=data_identifier_str, parent_output_path=parent_output_path, out_extension='.csv')
+            export_df.to_csv(out_path)
+            return out_path 
+
+        custom_export_df_to_csv_fn = _subfn_custom_export_df_to_csv
+
+
+        def _subfn_pre_process_and_export_df(export_df: pd.DataFrame, a_df_identifier: Union[str, IdentifyingContext]):
+            """ sets up all the important metadata and then calls `custom_export_df_to_csv_fn(....)` to actually export the CSV
+            
+            captures: decoding_time_bin_size, t_start, t_delta, t_end, tbin_values_dict, time_col_name_dict, user_annotation_selections, valid_epochs_selections, custom_export_df_to_csv_fn
+            """
+            a_tbin_size: float = float(decoding_time_bin_size)
+            ## Add t_bin column method
+            export_df = export_df.across_session_identity.add_session_df_columns(session_name=session_name, time_bin_size=a_tbin_size) ## #TODO 2025-04-05 18:12: - [ ] what about qclu? FrHz?
+            a_tbin_size_str: str = f"{round(a_tbin_size, ndigits=5)}"
+            a_data_identifier_str: str = f'({a_df_identifier})_tbin-{a_tbin_size_str}' ## build the identifier '(laps_weighted_corr_merged_df)_tbin-1.5'
+            
+            return custom_export_df_to_csv_fn(export_df, data_identifier_str=a_data_identifier_str, parent_output_path=active_export_parent_output_path) # this is exporting corr '(ripple_WCorrShuffle_df)_tbin-0.025'
+        
+
+        # ================================================================================================================================================================================ #
+        # BEGIN FUNCTION BODY                                                                                                                                                              #
+        # ================================================================================================================================================================================ #
+        
+        # tbin_values_dict={'laps': decoding_time_bin_size, 'pbe': decoding_time_bin_size, 'non_pbe': decoding_time_bin_size, 'FAT': decoding_time_bin_size}
+
+        # csv_save_paths_dict = GenericDecoderDictDecodedEpochsDictResult._perform_export_dfs_dict_to_csvs(extracted_dfs_dict=a_new_fully_generic_result.filter_epochs_decoded_track_marginal_posterior_df_dict,
+        # csv_save_paths_dict = self.export_csvs(parent_output_path=active_export_parent_output_path.resolve(),
+        #                                             active_context=active_context, session_name=session_name, #curr_active_pipeline=owning_pipeline_reference,
+        #                                             custom_export_df_to_csv_fn=custom_export_df_to_csv_fn,
+        #                                             decoding_time_bin_size=decoding_time_bin_size,
+        #                                             curr_session_t_delta=t_delta
+        #                                             )
+        
+        csv_save_paths_dict = {}
+        df: pd.DataFrame = self.get_comprehensive_dataframe() ## actually convert to a DF
+        single_FAT_df: pd.DataFrame = SingleFatDataframe.build_fat_df(dfs_dict={result_identifier_str:df}, additional_common_context=active_context)
+        csv_save_paths_dict[result_identifier_str] =  _subfn_pre_process_and_export_df(export_df=single_FAT_df, a_df_identifier="FAT")
+    
+
+        # across_session_results_extended_dict['generalized_decode_epochs_dict_and_export_results_completion_function']['csv_save_paths_dict'] = deepcopy(csv_save_paths_dict)
+        print(f'csv_save_paths_dict: {csv_save_paths_dict}\n')
+        return csv_save_paths_dict
+
+
+
     # ==================================================================================================================================================================================================================================================================================== #
     # `get_comprehensive_dataframe(...)` Private Helpers                                                                                                                                                                                                                                   #
     # ==================================================================================================================================================================================================================================================================================== #
 
-    @function_attributes(short_name=None, tags=['MAIN', 'to_df', 'FAT', 'FAT_df', 'equiv'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-01-17 15:30', related_items=[])
+    @function_attributes(short_name=None, tags=['MAIN', 'to_df', 'FAT', 'FAT_df', 'equiv', 'UNVALIDATED'], input_requires=[], output_provides=[], uses=[], used_by=['.export_as_FAT_df_CSV'], creation_date='2025-01-17 15:30', related_items=['cls.from_comprehensive_dataframe'])
     def get_comprehensive_dataframe(self) -> pd.DataFrame:
         """ Creates a comprehensive DataFrame with ALL InstantaneousSpikeRateGroupsComputation data.
         Each row represents one cell with all conditions as columns.
@@ -3424,6 +3515,7 @@ class InstantaneousSpikeRateGroupsComputation(PickleSerializableMixin, HDF_Seria
     # ==================================================================================================================================================================================================================================================================================== #
     # From comprehensive dataframe                                                                                                                                                                                                                                                         #
     # ==================================================================================================================================================================================================================================================================================== #
+    @function_attributes(short_name=None, tags=['FAT_df', 'df', 'UNVALIDATED'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-07-17 16:57', related_items=['cls.get_comprehensive_dataframe'])
     @classmethod
     def from_comprehensive_dataframe(cls, df: pd.DataFrame) -> "InstantaneousSpikeRateGroupsComputation":
         """ Reconstruct InstantaneousSpikeRateGroupsComputation from comprehensive DataFrame.
