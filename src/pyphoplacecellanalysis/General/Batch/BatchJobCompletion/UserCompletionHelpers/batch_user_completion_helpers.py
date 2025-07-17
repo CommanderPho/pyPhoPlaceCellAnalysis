@@ -2026,7 +2026,7 @@ def figures_plot_cell_first_spikes_characteristics_completion_function(self, glo
 def compute_and_export_session_instantaneous_spike_rates_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict,
                                                                             #  instantaneous_time_bin_size_seconds_list:List[float]=[0.0005, 0.0009, 0.0015, 0.0025, 0.025], epoch_handling_mode:str='DropShorterMode',
                                                                             instantaneous_time_bin_size_seconds_list:List[float]=[1000.0], epoch_handling_mode:str='UseAllEpochsMode', # single-bin per epoch
-                                                                            save_hdf:bool=True, save_pickle:bool=True, save_across_session_hdf:bool=False, 
+                                                                            save_hdf:bool=True, save_pickle:bool=True, save_across_session_hdf:bool=False, save_FAT_csv:bool=True, 
                                                                 ) -> dict:
     """  Computes the `InstantaneousSpikeRateGroupsComputation` for the pipleine (completely independent of the internal implementations), and exports it as several output files:
 
@@ -2059,15 +2059,22 @@ def compute_and_export_session_instantaneous_spike_rates_completion_function(sel
         'recomputed_inst_fr_time_bin_dict': None,
     }
     
+    active_export_parent_output_path: Path = self.collected_outputs_path.resolve()
+    Assert.path_exists(active_export_parent_output_path)
+    ## OUTPUTS: active_export_parent_output_path
         
     def _subfn_single_time_bin_size_compute_and_export_session_instantaneous_spike_rates_completion_function(instantaneous_time_bin_size_seconds:float):
+        """ Captures: active_export_parent_output_path, curr_session_context, ...
+        """
         print(f'<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<')
         print(f'compute_and_export_session_instantaneous_spike_rates_completion_function(curr_session_context: {curr_session_context}, curr_session_basedir: {str(curr_session_basedir)}, instantaneous_time_bin_size_seconds: {instantaneous_time_bin_size_seconds}, ...)')
         
         subfn_callback_outputs = {
             'recomputed_inst_fr_comps_filepath': None, #'t_end': t_end   
             'recomputed_inst_fr_comps_h5_filepath': None,
+            'recomputed_inst_fr_comps_FAT_CSV_filepath': None,
             'common_across_session_h5': None,
+            
         }
         err = None
 
@@ -2089,6 +2096,35 @@ def compute_and_export_session_instantaneous_spike_rates_completion_function(sel
             # _out_inst_fr_comps = None
             _out_recomputed_inst_fr_comps = None
             pass
+
+
+        ## 2025-07-17 - FAT_df CSV saving:
+        if (_out_recomputed_inst_fr_comps is not None) and save_FAT_csv:
+            ## FAT_csv Saving:
+            ## Export to CSVs:
+            # FAT_df: pd.DataFrame = _out_recomputed_inst_fr_comps.get_comprehensive_dataframe()
+
+            recomputed_inst_fr_comps_FAT_CSV_filepath = None
+            try:
+                _csv_save_paths_dict = _out_recomputed_inst_fr_comps.export_as_FAT_df_CSV(active_export_parent_output_path=active_export_parent_output_path, owning_pipeline_reference=curr_active_pipeline, decoding_time_bin_size=_out_recomputed_inst_fr_comps.instantaneous_time_bin_size_seconds)
+                recomputed_inst_fr_comps_FAT_CSV_filepath = list(_csv_save_paths_dict.values())[0]
+                print(f'recomputed_inst_fr_comps_FAT_CSV_filepath: "{recomputed_inst_fr_comps_FAT_CSV_filepath}"\n')
+                was_write_good = True
+                subfn_callback_outputs['recomputed_inst_fr_comps_FAT_CSV_filepath'] = deepcopy(recomputed_inst_fr_comps_FAT_CSV_filepath)
+
+            except Exception as e:
+                exception_info = sys.exc_info()
+                err = CapturedException(e, exception_info)
+                print(f"ERROR: encountered exception {err} while trying to perform _out_recomputed_inst_fr_comps.export_as_FAT_df_CSV(...) for {curr_session_context}")
+                recomputed_inst_fr_comps_FAT_CSV_filepath = None # set to None because it failed.
+                if self.fail_on_exception:
+                    raise err.exc
+        else:
+            recomputed_inst_fr_comps_FAT_CSV_filepath = None
+
+        subfn_callback_outputs['recomputed_inst_fr_comps_FAT_CSV_filepath'] = recomputed_inst_fr_comps_FAT_CSV_filepath
+
+
 
 
         ## standalone saving:
@@ -2170,7 +2206,7 @@ def compute_and_export_session_instantaneous_spike_rates_completion_function(sel
 
 
     across_session_results_extended_dict['compute_and_export_session_instantaneous_spike_rates_completion_function'] = callback_outputs
-    
+
     print(f'>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>')
     print(f'>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>')
 
