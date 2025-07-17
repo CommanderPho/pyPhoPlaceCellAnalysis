@@ -2026,7 +2026,7 @@ def figures_plot_cell_first_spikes_characteristics_completion_function(self, glo
 def compute_and_export_session_instantaneous_spike_rates_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict,
                                                                             #  instantaneous_time_bin_size_seconds_list:List[float]=[0.0005, 0.0009, 0.0015, 0.0025, 0.025], epoch_handling_mode:str='DropShorterMode',
                                                                             instantaneous_time_bin_size_seconds_list:List[float]=[1000.0], epoch_handling_mode:str='UseAllEpochsMode', # single-bin per epoch
-                                                                            save_hdf:bool=True, save_pickle:bool=True, save_across_session_hdf:bool=False, save_FAT_csv:bool=True, 
+                                                                            save_hdf:bool=True, save_pickle:bool=True, save_across_session_hdf:bool=False, save_FAT_csv:bool=False, 
                                                                 ) -> dict:
     """  Computes the `InstantaneousSpikeRateGroupsComputation` for the pipleine (completely independent of the internal implementations), and exports it as several output files:
 
