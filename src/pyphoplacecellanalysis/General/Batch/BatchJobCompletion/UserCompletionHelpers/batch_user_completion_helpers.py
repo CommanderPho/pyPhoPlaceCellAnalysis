@@ -2049,6 +2049,7 @@ def compute_and_export_session_instantaneous_spike_rates_completion_function(sel
     import sys
     from pyphocorehelpers.print_helpers import get_now_day_str, get_now_rounded_time_str
     from pyphocorehelpers.exception_helpers import ExceptionPrintingContext, CapturedException
+    from pyphocorehelpers.assertion_helpers import Assert
     from pyphoplacecellanalysis.General.Pipeline.Stages.Loading import saveData
     from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.LongShortTrackComputations import SingleBarResult, InstantaneousSpikeRateGroupsComputation
     from pyphoplacecellanalysis.SpecificResults.AcrossSessionResults import InstantaneousFiringRatesDataframeAccessor
@@ -2072,7 +2073,7 @@ def compute_and_export_session_instantaneous_spike_rates_completion_function(sel
 
         try:
             print(f'\t doing specific instantaneous firing rate computation for context: {curr_session_context}...')
-            _out_recomputed_inst_fr_comps = InstantaneousSpikeRateGroupsComputation(instantaneous_time_bin_size_seconds=instantaneous_time_bin_size_seconds) # 3ms, 10ms
+            _out_recomputed_inst_fr_comps: InstantaneousSpikeRateGroupsComputation = InstantaneousSpikeRateGroupsComputation(instantaneous_time_bin_size_seconds=instantaneous_time_bin_size_seconds) # 3ms, 10ms
             _out_recomputed_inst_fr_comps.compute(curr_active_pipeline=curr_active_pipeline, active_context=curr_active_pipeline.sess.get_context(), epoch_handling_mode=epoch_handling_mode)
 
             # LxC_ReplayDeltaMinus, LxC_ReplayDeltaPlus, SxC_ReplayDeltaMinus, SxC_ReplayDeltaPlus = _out_inst_fr_comps.LxC_ReplayDeltaMinus, _out_inst_fr_comps.LxC_ReplayDeltaPlus, _out_inst_fr_comps.SxC_ReplayDeltaMinus, _out_inst_fr_comps.SxC_ReplayDeltaPlus
@@ -2082,7 +2083,7 @@ def compute_and_export_session_instantaneous_spike_rates_completion_function(sel
         except Exception as e:
             exception_info = sys.exc_info()
             err = CapturedException(e, exception_info)
-            print(f"WARN: on_complete_success_execution_session: encountered exception {err} while trying to compute the instantaneous firing rates and set self.across_sessions_instantaneous_fr_dict[{curr_session_context}]")
+            print(f"WARN: compute_and_export_session_instantaneous_spike_rates_completion_function: encountered exception {err} while trying to compute the instantaneous firing rates and set self.across_sessions_instantaneous_fr_dict[{curr_session_context}]")
             # if self.fail_on_exception:
             #     raise e.exc
             # _out_inst_fr_comps = None
