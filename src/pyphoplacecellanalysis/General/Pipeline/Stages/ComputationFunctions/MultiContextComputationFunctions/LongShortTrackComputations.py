@@ -3257,203 +3257,7 @@ class InstantaneousSpikeRateGroupsComputation(PickleSerializableMixin, HDF_Seria
     # `get_comprehensive_dataframe(...)` Private Helpers                                                                                                                                                                                                                                   #
     # ==================================================================================================================================================================================================================================================================================== #
 
-    def _process_cell_type_data(self, cell_type: str, aclus: np.ndarray, session_metadata: dict) -> List[dict]:
-        """
-        Process data for a specific cell type (LxC or SxC).
-
-        Args:
-            cell_type: 'LxC' or 'SxC'
-            aclus: Array of cell IDs
-            session_metadata: Session-level metadata dict
-
-        Returns:
-            List of record dictionaries for this cell type
-        """
-        records = []
-
-        # Get the relevant SpikeRateTrends objects
-        spike_trends = {
-            'replay_delta_minus': getattr(self, f'{cell_type}_ReplayDeltaMinus', None),
-            'replay_delta_plus': getattr(self, f'{cell_type}_ReplayDeltaPlus', None),
-            'theta_delta_minus': getattr(self, f'{cell_type}_ThetaDeltaMinus', None),
-            'theta_delta_plus': getattr(self, f'{cell_type}_ThetaDeltaPlus', None),
-        }
-
-        # Process each cell
-        for i, aclu in enumerate(aclus):
-            base_record = {
-                'aclu': aclu,
-                'cell_type': cell_type,
-                'cell_index_in_type': i,
-                **session_metadata
-            }
-
-            # Add firing rate data for each condition
-            for condition, spike_trend in spike_trends.items():
-                if spike_trend is not None and hasattr(spike_trend, 'cell_agg_inst_fr_list'):
-                    if i < len(spike_trend.cell_agg_inst_fr_list):
-                        base_record[f'{condition}_firing_rate'] = spike_trend.cell_agg_inst_fr_list[i]
-                    else:
-                        base_record[f'{condition}_firing_rate'] = np.nan
-                else:
-                    base_record[f'{condition}_firing_rate'] = np.nan
-
-            # Add additional SpikeRateTrends metadata
-            base_record.update(self._extract_spike_trends_metadata(spike_trends))
-
-            records.append(base_record)
-
-        return records
-
-    def _extract_spike_trends_metadata(self, spike_trends: dict) -> dict:
-        """
-        Extract metadata from SpikeRateTrends objects.
-
-        Args:
-            spike_trends: Dictionary of condition -> SpikeRateTrends object
-
-        Returns:
-            Dictionary of metadata fields
-        """
-        metadata = {}
-
-        for condition, trend_obj in spike_trends.items():
-            if trend_obj is not None:
-                # Extract common attributes that might exist in SpikeRateTrends
-                for attr in ['n_epochs', 'total_duration', 'mean_epoch_duration', 'n_cells']:
-                    if hasattr(trend_obj, attr):
-                        metadata[f'{condition}_{attr}'] = getattr(trend_obj, attr)
-
-                # Add statistical info
-                if hasattr(trend_obj, 'cell_agg_inst_fr_list'):
-                    fr_list = trend_obj.cell_agg_inst_fr_list
-                    if len(fr_list) > 0:
-                        metadata[f'{condition}_pop_mean'] = np.mean(fr_list)
-                        metadata[f'{condition}_pop_std'] = np.std(fr_list)
-                        metadata[f'{condition}_pop_n_cells'] = len(fr_list)
-                    else:
-                        metadata[f'{condition}_pop_mean'] = np.nan
-                        metadata[f'{condition}_pop_std'] = np.nan
-                        metadata[f'{condition}_pop_n_cells'] = 0
-
-        return metadata
-
-    def _add_fig2_summary_stats(self, df: pd.DataFrame) -> pd.DataFrame:
-        """
-        Add summary statistics from Fig2_Replay_FR and Fig2_Laps_FR.
-
-        Args:
-            df: DataFrame to add statistics to
-
-        Returns:
-            DataFrame with added summary statistics
-        """
-        # Fig2_Replay_FR has 4 SingleBarResult objects for:
-        # [LxC_ReplayDeltaMinus, LxC_ReplayDeltaPlus, SxC_ReplayDeltaMinus, SxC_ReplayDeltaPlus]
-        replay_conditions = ['LxC_ReplayDeltaMinus', 'LxC_ReplayDeltaPlus', 'SxC_ReplayDeltaMinus', 'SxC_ReplayDeltaPlus']
-
-        if hasattr(self, 'Fig2_Replay_FR') and self.Fig2_Replay_FR and len(self.Fig2_Replay_FR) == 4:
-            for condition, result in zip(replay_conditions, self.Fig2_Replay_FR):
-                cell_type = 'LxC' if condition.startswith('LxC') else 'SxC'
-                mask = df['cell_type'] == cell_type
-
-                # Add summary statistics
-                df.loc[mask, f'{condition}_summary_mean'] = result.mean if result.mean is not None else np.nan
-                df.loc[mask, f'{condition}_summary_std'] = result.std if result.std is not None else np.nan
-
-                # Add scatter properties if they exist
-                if result.LxC_scatter_props is not None:
-                    df = self._add_scatter_properties(df, mask, result.LxC_scatter_props, f'{condition}_LxC_scatter')
-                if result.SxC_scatter_props is not None:
-                    df = self._add_scatter_properties(df, mask, result.SxC_scatter_props, f'{condition}_SxC_scatter')
-
-        # Fig2_Laps_FR has 4 SingleBarResult objects for:
-        # [LxC_ThetaDeltaMinus, LxC_ThetaDeltaPlus, SxC_ThetaDeltaMinus, SxC_ThetaDeltaPlus]
-        laps_conditions = ['LxC_ThetaDeltaMinus', 'LxC_ThetaDeltaPlus', 'SxC_ThetaDeltaMinus', 'SxC_ThetaDeltaPlus']
-
-        if hasattr(self, 'Fig2_Laps_FR') and self.Fig2_Laps_FR and len(self.Fig2_Laps_FR) == 4:
-            for condition, result in zip(laps_conditions, self.Fig2_Laps_FR):
-                cell_type = 'LxC' if condition.startswith('LxC') else 'SxC'
-                mask = df['cell_type'] == cell_type
-
-                # Add summary statistics
-                df.loc[mask, f'{condition}_summary_mean'] = result.mean if result.mean is not None else np.nan
-                df.loc[mask, f'{condition}_summary_std'] = result.std if result.std is not None else np.nan
-
-                # Add scatter properties if they exist
-                if result.LxC_scatter_props is not None:
-                    df = self._add_scatter_properties(df, mask, result.LxC_scatter_props, f'{condition}_LxC_scatter')
-                if result.SxC_scatter_props is not None:
-                    df = self._add_scatter_properties(df, mask, result.SxC_scatter_props, f'{condition}_SxC_scatter')
-
-        return df
-
-    def _add_scatter_properties(self, df: pd.DataFrame, mask: pd.Series, scatter_props: dict, prefix: str) -> pd.DataFrame:
-        """
-        Add scatter properties to DataFrame.
-
-        Args:
-            df: DataFrame to add properties to
-            mask: Boolean mask for rows to update
-            scatter_props: Dictionary of scatter properties
-            prefix: Prefix for column names
-
-        Returns:
-            DataFrame with added scatter properties
-        """
-        for key, value in scatter_props.items():
-            column_name = f'{prefix}_{key}'
-
-            if isinstance(value, np.ndarray):
-                # For arrays, we need to handle them carefully
-                if len(value) == mask.sum():
-                    # If array length matches number of cells, assign directly
-                    df.loc[mask, column_name] = value
-                else:
-                    # If lengths don't match, convert to string representation
-                    df.loc[mask, column_name] = str(value)
-            else:
-                # For scalar values, assign to all matching rows
-                df.loc[mask, column_name] = value
-
-        return df
-
-    def _get_expected_columns(self) -> List[str]:
-        """
-        Get expected column names for empty DataFrame.
-
-        Returns:
-            List of expected column names
-        """
-        base_columns = [
-            'aclu', 'cell_type', 'cell_index_in_type', 'instantaneous_time_bin_size_seconds'
-        ]
-
-        # Firing rate columns
-        fr_columns = [
-            'replay_delta_minus_firing_rate', 'replay_delta_plus_firing_rate',
-            'theta_delta_minus_firing_rate', 'theta_delta_plus_firing_rate'
-        ]
-
-        # Population statistics columns
-        pop_stat_columns = []
-        for condition in ['replay_delta_minus', 'replay_delta_plus', 'theta_delta_minus', 'theta_delta_plus']:
-            pop_stat_columns.extend([
-                f'{condition}_pop_mean', f'{condition}_pop_std', f'{condition}_pop_n_cells'
-            ])
-
-        # Summary statistics columns
-        summary_columns = []
-        for condition in ['LxC_ReplayDeltaMinus', 'LxC_ReplayDeltaPlus', 'SxC_ReplayDeltaMinus', 'SxC_ReplayDeltaPlus',
-                            'LxC_ThetaDeltaMinus', 'LxC_ThetaDeltaPlus', 'SxC_ThetaDeltaMinus', 'SxC_ThetaDeltaPlus']:
-            summary_columns.extend([
-                f'{condition}_summary_mean', f'{condition}_summary_std'
-            ])
-
-        return base_columns + fr_columns + pop_stat_columns + summary_columns
-
-
-    @function_attributes(short_name=None, tags=['MAIN', 'to_df', 'FAT', 'FAT_df', 'equiv'], input_requires=[], output_provides=[], uses=['_process_cell_type_data', '_extract_spike_trends_metadata', '_add_fig2_summary_stats', '_add_scatter_properties', '_get_expected_columns'], used_by=[], creation_date='2025-07-17 15:30', related_items=[])
+    @function_attributes(short_name=None, tags=['MAIN', 'to_df', 'FAT', 'FAT_df', 'equiv'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-01-17 15:30', related_items=[])
     def get_comprehensive_dataframe(self) -> pd.DataFrame:
         """
         Creates a comprehensive DataFrame with ALL InstantaneousSpikeRateGroupsComputation data.
@@ -3461,43 +3265,150 @@ class InstantaneousSpikeRateGroupsComputation(PickleSerializableMixin, HDF_Seria
 
         Returns:
             pd.DataFrame: Comprehensive DataFrame with all computation data
-        """
 
-        # ==================================================================================================================================================================================================================================================================================== #
-        # BEGIN FUNCTION BODY                                                                                                                                                                                                                                                                  #
-        # ==================================================================================================================================================================================================================================================================================== #
+        Usage:
+
+            from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.LongShortTrackComputations import InstantaneousSpikeRateGroupsComputation
+
+            # Example usage of the complete round-trip functionality:
+
+            # 1. Create and compute the original object
+            inst_fr_comp = InstantaneousSpikeRateGroupsComputation(instantaneous_time_bin_size_seconds=0.01)
+            inst_fr_comp.compute(curr_active_pipeline=curr_active_pipeline)
+
+            # 2. Get comprehensive DataFrame
+            comprehensive_df: pd.DataFrame = inst_fr_comp.get_comprehensive_dataframe()
+            print(f"DataFrame shape: {comprehensive_df.shape}")
+            print(f"Columns: {comprehensive_df.columns.tolist()}")
+            comprehensive_df
+
+        """
+        # Handle empty case
         if ((self.LxC_aclus is None or len(self.LxC_aclus) == 0) and 
             (self.SxC_aclus is None or len(self.SxC_aclus) == 0)):
-            # Return empty DataFrame with expected columns if no cells
-            return pd.DataFrame(columns=self._get_expected_columns())
+            base_columns = ['aclu', 'cell_type', 'cell_index_in_type', 'instantaneous_time_bin_size_seconds']
+            fr_columns = ['replay_delta_minus_firing_rate', 'replay_delta_plus_firing_rate', 
+                        'theta_delta_minus_firing_rate', 'theta_delta_plus_firing_rate']
+            pop_stat_columns = []
+            for condition in ['replay_delta_minus', 'replay_delta_plus', 'theta_delta_minus', 'theta_delta_plus']:
+                pop_stat_columns.extend([f'{condition}_pop_mean', f'{condition}_pop_std', f'{condition}_pop_n_cells'])
+            summary_columns = []
+            for condition in ['LxC_ReplayDeltaMinus', 'LxC_ReplayDeltaPlus', 'SxC_ReplayDeltaMinus', 'SxC_ReplayDeltaPlus',
+                            'LxC_ThetaDeltaMinus', 'LxC_ThetaDeltaPlus', 'SxC_ThetaDeltaMinus', 'SxC_ThetaDeltaPlus']:
+                summary_columns.extend([f'{condition}_summary_mean', f'{condition}_summary_std'])
+            return pd.DataFrame(columns=base_columns + fr_columns + pop_stat_columns + summary_columns)
 
         records = []
 
         # Session-level metadata (same for all rows)
-        session_metadata = {
-            'instantaneous_time_bin_size_seconds': self.instantaneous_time_bin_size_seconds,
-        }
-
-        # Add session context if available
+        session_metadata = {'instantaneous_time_bin_size_seconds': self.instantaneous_time_bin_size_seconds}
         if self.active_identifying_session_ctx is not None:
             session_ctx_dict = self.active_identifying_session_ctx.to_dict()
             session_metadata.update({f'session_{k}': v for k, v in session_ctx_dict.items()})
 
-        # Process LxC cells
-        if self.LxC_aclus is not None and len(self.LxC_aclus) > 0:
-            lxc_records = self._process_cell_type_data('LxC', self.LxC_aclus, session_metadata)
-            records.extend(lxc_records)
+        # Process each cell type
+        for cell_type, aclus in [('LxC', self.LxC_aclus), ('SxC', self.SxC_aclus)]:
+            if aclus is None or len(aclus) == 0:
+                continue
 
-        # Process SxC cells
-        if self.SxC_aclus is not None and len(self.SxC_aclus) > 0:
-            sxc_records = self._process_cell_type_data('SxC', self.SxC_aclus, session_metadata)
-            records.extend(sxc_records)
+            # Get the relevant SpikeRateTrends objects for this cell type
+            spike_trends = {
+                'replay_delta_minus': getattr(self, f'{cell_type}_ReplayDeltaMinus', None),
+                'replay_delta_plus': getattr(self, f'{cell_type}_ReplayDeltaPlus', None),
+                'theta_delta_minus': getattr(self, f'{cell_type}_ThetaDeltaMinus', None),
+                'theta_delta_plus': getattr(self, f'{cell_type}_ThetaDeltaPlus', None),
+            }
+
+            # Extract population-level metadata once per cell type
+            pop_metadata = {}
+            for condition, trend_obj in spike_trends.items():
+                if trend_obj is not None:
+                    # Extract common attributes
+                    for attr in ['n_epochs', 'total_duration', 'mean_epoch_duration', 'n_cells']:
+                        if hasattr(trend_obj, attr):
+                            pop_metadata[f'{condition}_{attr}'] = getattr(trend_obj, attr)
+
+                    # Add population statistics
+                    if hasattr(trend_obj, 'cell_agg_inst_fr_list'):
+                        fr_list = trend_obj.cell_agg_inst_fr_list
+                        if len(fr_list) > 0:
+                            pop_metadata[f'{condition}_pop_mean'] = np.mean(fr_list)
+                            pop_metadata[f'{condition}_pop_std'] = np.std(fr_list)
+                            pop_metadata[f'{condition}_pop_n_cells'] = len(fr_list)
+                        else:
+                            pop_metadata[f'{condition}_pop_mean'] = np.nan
+                            pop_metadata[f'{condition}_pop_std'] = np.nan
+                            pop_metadata[f'{condition}_pop_n_cells'] = 0
+
+            # Process each cell
+            for i, aclu in enumerate(aclus):
+                record = {
+                    'aclu': aclu,
+                    'cell_type': cell_type,
+                    'cell_index_in_type': i,
+                    **session_metadata,
+                    **pop_metadata  # Add population metadata to each row
+                }
+
+                # Add individual cell firing rates
+                for condition, spike_trend in spike_trends.items():
+                    if spike_trend is not None and hasattr(spike_trend, 'cell_agg_inst_fr_list'):
+                        if i < len(spike_trend.cell_agg_inst_fr_list):
+                            record[f'{condition}_firing_rate'] = spike_trend.cell_agg_inst_fr_list[i]
+                        else:
+                            record[f'{condition}_firing_rate'] = np.nan
+                    else:
+                        record[f'{condition}_firing_rate'] = np.nan
+
+                records.append(record)
 
         # Create DataFrame
         df = pd.DataFrame(records)
 
         # Add Fig2 summary statistics
-        df = self._add_fig2_summary_stats(df)
+        # Fig2_Replay_FR: [LxC_ReplayDeltaMinus, LxC_ReplayDeltaPlus, SxC_ReplayDeltaMinus, SxC_ReplayDeltaPlus]
+        replay_conditions = ['LxC_ReplayDeltaMinus', 'LxC_ReplayDeltaPlus', 'SxC_ReplayDeltaMinus', 'SxC_ReplayDeltaPlus']
+        if hasattr(self, 'Fig2_Replay_FR') and self.Fig2_Replay_FR and len(self.Fig2_Replay_FR) == 4:
+            for condition, result in zip(replay_conditions, self.Fig2_Replay_FR):
+                cell_type = 'LxC' if condition.startswith('LxC') else 'SxC'
+                mask = df['cell_type'] == cell_type
+                df.loc[mask, f'{condition}_summary_mean'] = result.mean if result.mean is not None else np.nan
+                df.loc[mask, f'{condition}_summary_std'] = result.std if result.std is not None else np.nan
+
+                # Add scatter properties if they exist
+                for scatter_type, scatter_props in [('LxC_scatter', result.LxC_scatter_props), ('SxC_scatter', result.SxC_scatter_props)]:
+                    if scatter_props is not None:
+                        for key, value in scatter_props.items():
+                            column_name = f'{condition}_{scatter_type}_{key}'
+                            if isinstance(value, np.ndarray):
+                                if len(value) == mask.sum():
+                                    df.loc[mask, column_name] = value
+                                else:
+                                    df.loc[mask, column_name] = str(value)
+                            else:
+                                df.loc[mask, column_name] = value
+
+        # Fig2_Laps_FR: [LxC_ThetaDeltaMinus, LxC_ThetaDeltaPlus, SxC_ThetaDeltaMinus, SxC_ThetaDeltaPlus]
+        laps_conditions = ['LxC_ThetaDeltaMinus', 'LxC_ThetaDeltaPlus', 'SxC_ThetaDeltaMinus', 'SxC_ThetaDeltaPlus']
+        if hasattr(self, 'Fig2_Laps_FR') and self.Fig2_Laps_FR and len(self.Fig2_Laps_FR) == 4:
+            for condition, result in zip(laps_conditions, self.Fig2_Laps_FR):
+                cell_type = 'LxC' if condition.startswith('LxC') else 'SxC'
+                mask = df['cell_type'] == cell_type
+                df.loc[mask, f'{condition}_summary_mean'] = result.mean if result.mean is not None else np.nan
+                df.loc[mask, f'{condition}_summary_std'] = result.std if result.std is not None else np.nan
+
+                # Add scatter properties if they exist
+                for scatter_type, scatter_props in [('LxC_scatter', result.LxC_scatter_props), ('SxC_scatter', result.SxC_scatter_props)]:
+                    if scatter_props is not None:
+                        for key, value in scatter_props.items():
+                            column_name = f'{condition}_{scatter_type}_{key}'
+                            if isinstance(value, np.ndarray):
+                                if len(value) == mask.sum():
+                                    df.loc[mask, column_name] = value
+                                else:
+                                    df.loc[mask, column_name] = str(value)
+                            else:
+                                df.loc[mask, column_name] = value
 
         # Add extended neuron identity columns if session context exists
         if self.active_identifying_session_ctx is not None:
@@ -3508,7 +3419,6 @@ class InstantaneousSpikeRateGroupsComputation(PickleSerializableMixin, HDF_Seria
             )
 
         return df
-
 
     # ==================================================================================================================================================================================================================================================================================== #
     # From comprehensive dataframe                                                                                                                                                                                                                                                         #
