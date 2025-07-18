@@ -2949,7 +2949,7 @@ def _plot_single_track_firing_rate_compare(laps_frs_dict, replays_frs_dict, acti
         
         """
         from pyphoplacecellanalysis.SpecificResults.PhoDiba2023Paper import pho_stats_linear_regression, LinearRegressionOutput        
-
+    
         prepare_for_publication: bool = scatter_params.pop('prepare_for_publication', True)
             
         if prepare_for_publication:
