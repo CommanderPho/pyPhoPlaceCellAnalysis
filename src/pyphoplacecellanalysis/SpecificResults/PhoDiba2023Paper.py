@@ -1074,7 +1074,7 @@ def pho_stats_perform_diagonal_line_binomial_test(long_short_fr_indicies_analysi
 
 
 # Define a simple attrs class that's better than a namedtuple and unpackable:
-LinearRegressionOutput = make_class("LinearRegressionOutput", {k:field() for k in ("reg_x", "reg_y", "slope", "intercept", "regression_line")}, bases=(UnpackableMixin, object,))
+LinearRegressionOutput = make_class("LinearRegressionOutput", {k:field() for k in ("reg_x", "reg_y", "slope", "intercept", "regression_line", "model")}, bases=(UnpackableMixin, object,))
 LinearRegressionOutput.plot = lambda self, ax, **kwargs: ax.plot(self.reg_x, self.regression_line, label=f'Regression Line\ny={self.slope:.2f}x + {self.intercept:.2f}', **(dict(color='red', alpha=0.7, lw=0.5) | kwargs))
 
 @function_attributes(short_name=None, tags=['stats', 'regression'], input_requires=[], output_provides=[], uses=['LinearRegressionOutput'], used_by=[], creation_date='2025-07-04 03:11', related_items=[])
@@ -1085,6 +1085,8 @@ def pho_stats_linear_regression(reg_x: NDArray, reg_y: NDArray) -> "LinearRegres
     _lin_reg = pho_stats_linear_regression(reg_x, reg_y)
     _lin_reg
     """
+    import statsmodels.api as sm
+    
     if not isinstance(reg_x, NDArray):
         reg_x = np.array(reg_x)
     if not isinstance(reg_y, NDArray):
@@ -1094,7 +1096,22 @@ def pho_stats_linear_regression(reg_x: NDArray, reg_y: NDArray) -> "LinearRegres
     reg_slope, reg_intercept = np.polyfit(reg_x, reg_y, 1)
     # Compute regression line
     regression_line = reg_slope * reg_x + reg_intercept
-    return LinearRegressionOutput(**{'reg_x': reg_x, 'reg_y': reg_y, 'slope': reg_slope, 'intercept': reg_intercept, 'regression_line': regression_line})
+    
+
+    # 2025-07-18 08:18 Added to find p-value: https://www.statology.org/statsmodels-linear-regression-p-value/
+    #add constant to predictor variables
+    x_lin_model = deepcopy(reg_x)
+    y_lin_model = deepcopy(reg_y)
+    x_lin_model = sm.add_constant(x_lin_model)
+    #fit linear regression model
+    model = sm.OLS(y_lin_model, x_lin_model).fit()
+    #view model summary
+    # print(model.summary())
+    # #extract p-values for all predictor variables
+    # for x in np.arange(2):
+    #     print(model.pvalues[x])
+
+    return LinearRegressionOutput(**{'reg_x': reg_x, 'reg_y': reg_y, 'slope': reg_slope, 'intercept': reg_intercept, 'regression_line': regression_line, 'model': model})
 
 
 def pho_stats_paired_t_test(values1, values2):
