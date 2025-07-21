@@ -3675,7 +3675,7 @@ class AcrossSessionsVisualizations:
 
 
     @classmethod
-    @function_attributes(short_name=None, tags=['across-session', 'figure', 'matplotlib', 'figure-3'], input_requires=[], output_provides=[], uses=['_plot_long_short_firing_rate_indicies'], used_by=[], creation_date='2023-08-24 00:00', related_items=[])
+    @function_attributes(short_name=None, tags=['across-session', 'figure', 'matplotlib', 'publication', 'figure-3'], input_requires=[], output_provides=[], uses=['_plot_long_short_firing_rate_indicies'], used_by=[], creation_date='2023-08-24 00:00', related_items=[])
     def across_sessions_firing_rate_index_figure(cls, long_short_fr_indicies_analysis_results: pd.DataFrame, num_sessions:int, save_figure=True, include_axes_lines:bool=True, **kwargs):
         """ 2023-08-24 - Across Sessions Aggregate Figure - Supposed to be the equivalent for Figure 3.
 

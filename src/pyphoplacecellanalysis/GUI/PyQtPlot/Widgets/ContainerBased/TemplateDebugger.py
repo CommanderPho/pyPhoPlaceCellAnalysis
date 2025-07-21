@@ -689,19 +689,6 @@ class TemplateDebugger:
         import pyqtgraph.exporters
         from pyphoplacecellanalysis.General.Mixins.ExportHelpers import export_pyqtgraph_plot
         """
-        ## Get main laps plotter:
-        # print_keys_if_possible('_out', _out, max_depth=4)
-        # plots = _out['plots']
-
-        # ## Already have: epochs_editor, _out_pf1D_heatmaps
-        # epochs_editor = self.ui[0]
-
-        # shared_output_file_prefix = f'output/2023-11-20'
-        # # print(list(plots.keys()))
-        # # pg.GraphicsLayoutWidget
-        # main_graphics_layout_widget = epochs_editor.plots.win
-        # export_file_path = Path(f'{shared_output_file_prefix}_test_main_position_laps_line_plot').with_suffix('.svg').resolve()
-        # export_pyqtgraph_plot(main_graphics_layout_widget, savepath=export_file_path) # works
 
         _out_pf1D_heatmaps = self.plots.pf1D_heatmaps
         # _out_pf1D_heatmaps = graphics_output_dict['plots']
@@ -709,13 +696,6 @@ class TemplateDebugger:
             a_win, a_img = a_decoder_heatmap_tuple
             # a_win.export_image(f'{a_decoder_name}_heatmap.png')
             print(f'a_win: {type(a_win)}')
-
-            # create an exporter instance, as an argument give it the item you wish to export
-            # exporter = pg.exporters.ImageExporter(a_win.plotItem)
-            # exporter = pg.exporters.SVGExporter(a_win.plotItem)
-            # set export parameters if needed
-            # exporter.parameters()['width'] = 300   # (note this also affects height parameter)
-
             # save to file
             export_file_path = Path(f'{shared_output_file_prefix}_test_{a_decoder_name}_heatmap').with_suffix('.png').resolve() # '.svg' # .resolve()
 
