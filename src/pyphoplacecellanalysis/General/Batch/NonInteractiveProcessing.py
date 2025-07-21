@@ -823,10 +823,6 @@ class BatchPlotting:
         except Exception as e:
             print(f'batch_extended_programmatic_figures(...): "_display_measured_vs_decoded_occupancy_distributions" (short_name="meas_v_decoded_occupancy") failed with error: {e}\n skipping.')
 
-
-
-
-
         # _display_directional_merged_pf_decoded_epochs ______________________________________________________________________ #
         # this open the Yellow-Blue plots and various marginals
         try:
@@ -852,7 +848,6 @@ class BatchPlotting:
             
         except Exception as e:
             print(f'batch_extended_programmatic_figures(...): "_display_directional_merged_pf_decoded_epochs" failed with error: {e}\n skipping.')
-
 
 
         # _display_generalized_decoded_yellow_blue_marginal_epochs ___________________________________________________________________________________________________________________________________________________________________________________________________________________________ #

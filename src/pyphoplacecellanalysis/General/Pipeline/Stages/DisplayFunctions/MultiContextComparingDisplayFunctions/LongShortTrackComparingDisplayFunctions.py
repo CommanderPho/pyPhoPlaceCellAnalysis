@@ -312,7 +312,7 @@ class LongShortTrackComparingDisplayFunctions(AllFunctionEnumeratingMixin, metac
                 # build the labels for each cell using `build_extra_cell_info_label_string(...)`:
                 optional_cell_info_labels = {aclu:build_extra_cell_info_label_string(row) for aclu, row in zip(_curr_aclus, long_short_fr_indicies_df.itertuples(name='ExtraCellInfoLabels', index=False))}
 
-            except BaseException:
+            except Exception:
                 # set optional cell info labels to None
                 print(f'WARNING: could not get optional cell info labels from long_short_fr_indicies_df. Skipping.')
                 optional_cell_info_labels = {}
@@ -1378,18 +1378,22 @@ class PhoJonathanPlotHelpers:
             ) # , spikes_color=spikes_color, spikes_alpha=spikes_alpha
         """
         # ax_activity_v_time = _simple_plot_spikes(ax_activity_v_time, active_spikes_df[global_results.sess.spikes_df.spikes.time_variable_name].values, active_spikes_df['x'].values, spikes_color_RGB=(0, 0, 0), spikes_alpha=1.0) # all
-        ax_activity_v_time = cls._simple_plot_spikes(ax_activity_v_time, active_spikes_df[time_variable_name].values, active_spikes_df['x'].values, **cls.get_default_spike_scatter_kwargs_dict(spikes_alpha=spikes_alpha, prepare_for_publication=prepare_for_publication)['all']) # all
+        ax_activity_v_time = cls._simple_plot_spikes(ax_activity_v_time, active_spikes_df[time_variable_name].values, active_spikes_df['x'].values, **cls.get_default_spike_scatter_kwargs_dict(spikes_alpha=spikes_alpha, prepare_for_publication=prepare_for_publication)['all']) # plot all first, as block circles
 
+        ## Long-only:
         active_long_spikes_df: pd.DataFrame = active_spikes_df[active_spikes_df.is_included_long_pf1D]
         ax_activity_v_time = cls._simple_plot_spikes(ax_activity_v_time, active_long_spikes_df[time_variable_name].values, active_long_spikes_df['x'].values, **cls.get_default_spike_scatter_kwargs_dict(spikes_alpha=spikes_alpha, prepare_for_publication=prepare_for_publication)['is_included_long_pf1D'])
 
+        ## Short-only:
         active_short_spikes_df: pd.DataFrame = active_spikes_df[active_spikes_df.is_included_short_pf1D]
         ax_activity_v_time = cls._simple_plot_spikes(ax_activity_v_time, active_short_spikes_df[time_variable_name].values, active_short_spikes_df['x'].values, **cls.get_default_spike_scatter_kwargs_dict(spikes_alpha=spikes_alpha, prepare_for_publication=prepare_for_publication)['is_included_short_pf1D'])
 
         # active_global_spikes_df = active_spikes_df[active_spikes_df.is_included_PBE]
         # ax_activity_v_time = _simple_plot_spikes(ax_activity_v_time, active_global_spikes_df[time_variable_name].values, active_global_spikes_df['x'].values, spikes_color_RGB=(0, 1, 0), spikes_alpha=1.0, zorder=25, markersize=2.5)
 
-        if 'is_included_PBE' in active_spikes_df:
+        ## Green PBE spikes:
+        # if (not prepare_for_publication) and ('is_included_PBE' in active_spikes_df):
+        if ('is_included_PBE' in active_spikes_df):
             ## PBE spikes:
             active_PBE_spikes_df: pd.DataFrame = active_spikes_df[active_spikes_df.is_included_PBE]
             ax_activity_v_time = cls._simple_plot_spikes(ax_activity_v_time, active_PBE_spikes_df[time_variable_name].values, active_PBE_spikes_df['x'].values, **cls.get_default_spike_scatter_kwargs_dict(spikes_alpha=spikes_alpha, prepare_for_publication=prepare_for_publication)['is_included_PBE'])
@@ -1399,6 +1403,7 @@ class PhoJonathanPlotHelpers:
             fig.canvas.draw()
 
         return ax_activity_v_time
+
 
     @classmethod
     @function_attributes(short_name='_plot_pho_jonathan_batch_plot_single_cell', tags=['private', 'matplotlib', 'pho_jonathan_batch'], input_requires=[], output_provides=[],
