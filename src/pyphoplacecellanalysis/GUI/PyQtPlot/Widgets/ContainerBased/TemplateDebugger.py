@@ -711,7 +711,7 @@ class TemplateDebugger:
             print(f'a_win: {type(a_win)}')
 
             # create an exporter instance, as an argument give it the item you wish to export
-            exporter = pg.exporters.ImageExporter(a_win.plotItem)
+            # exporter = pg.exporters.ImageExporter(a_win.plotItem)
             # exporter = pg.exporters.SVGExporter(a_win.plotItem)
             # set export parameters if needed
             # exporter.parameters()['width'] = 300   # (note this also affects height parameter)
@@ -719,7 +719,10 @@ class TemplateDebugger:
             # save to file
             export_file_path = Path(f'{shared_output_file_prefix}_test_{a_decoder_name}_heatmap').with_suffix('.png').resolve() # '.svg' # .resolve()
 
-            exporter.export(str(export_file_path)) # '.png'
+            # exporter.export(str(export_file_path)) # '.png'
+            
+            export_pyqtgraph_plot(a_win.plotItem, savepath=export_file_path) # works
+            
             print(f'exporting to {export_file_path}')
             # .scene()
 
