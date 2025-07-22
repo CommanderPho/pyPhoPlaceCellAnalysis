@@ -1,5 +1,5 @@
 from copy import deepcopy
-from typing import Optional, Dict, List, Tuple, Callable, Union
+from typing import Any, Optional, Dict, List, Tuple, Callable, Union
 from attrs import define, field, Factory
 import nptyping as ND
 from nptyping import NDArray
@@ -793,7 +793,7 @@ class RankOrderRastersDebugger:
 
 
     @function_attributes(short_name=None, tags=['export', 'raster', 'pyqtgraph'], input_requires=[], output_provides=[], uses=['export_pyqtgraph_plot'], used_by=[], creation_date='2025-05-29 20:18', related_items=[])
-    def save_figure(self, export_path: Path, export_topmost_scene_element:bool=False, **kwargs):
+    def save_figure(self, export_path: Path, export_topmost_scene_element:bool=False, include_aclu_labels: bool=False, **kwargs):
         """ Exports all four rasters to a specified file path
         
         _out_rank_order_event_raster_debugger.save_figure(export_path=export_path)
@@ -813,6 +813,10 @@ class RankOrderRastersDebugger:
             if export_topmost_scene_element:
                 a_plot = a_plot.parentItem()
             self.get_epoch_active_aclus()
+            if not include_aclu_labels:
+                # hide the aclu labels on the raster because they're way too small
+                self.set_all_cell_y_labels_visibility(False)
+                
             out_path = export_path.joinpath(f'{a_decoder}_raster.png').resolve()
             export_pyqtgraph_plot(a_plot, savepath=out_path, background=pg.mkColor(0, 0, 0, 0), **kwargs)
             save_paths.append(out_path)
@@ -858,11 +862,25 @@ class RankOrderRastersDebugger:
     # Cell y-axis Labels                                                                                                   #
     # ==================================================================================================================== #
 
+    @property
+    def cell_y_label_controls_by_plot_dict(self) -> Dict[str, Any]:
+        """The small aclu labels"""
+        _out_text_item_by_plot_dict = {}
+        for _active_plot_identifier, new_sorted_raster in self.plots_data.seperate_new_sorted_rasters_dict.items():
+            # aclu_y_values_dict = {int(aclu):new_sorted_raster.neuron_y_pos[aclu] for aclu in new_sorted_raster.neuron_IDs}
+            a_plot_item = self.plots.root_plots.get(_active_plot_identifier, None)
+            if a_plot_item is None:
+                continue # skip this item
+            _out_text_items = self.plots.text_items_dict.get(a_plot_item, None)
+            if _out_text_items is not None:
+                _out_text_item_by_plot_dict[_active_plot_identifier] = _out_text_items
+        return _out_text_item_by_plot_dict
+
+
+    @function_attributes(short_name=None, tags=['cell_y_labels', 'private'], input_requires=[], output_provides=[], uses=[], used_by=['._build_cell_y_labels'], creation_date='2025-07-22 14:50', related_items=[])
     @classmethod
     def _build_neuron_y_labels(cls, a_plot_item, a_decoder_color_map, aclu_y_values_dict: Dict):
         """ 2023-11-29 - builds the y-axis text labels for a single one of the four raster plots.
-
-
         Uses:
             a_decoder_color_map, aclu_y_values_dict
 
@@ -928,6 +946,7 @@ class RankOrderRastersDebugger:
         self.plots.text_items_dict = {}
 
         for _active_plot_identifier, new_sorted_raster in self.plots_data.seperate_new_sorted_rasters_dict.items():
+            ## Loop through each raster
             aclu_y_values_dict = {int(aclu):new_sorted_raster.neuron_y_pos[aclu] for aclu in new_sorted_raster.neuron_IDs}
             a_plot_item = self.plots.root_plots[_active_plot_identifier]
             # f"{int(aclu)}"
@@ -968,6 +987,19 @@ class RankOrderRastersDebugger:
                     text.setColor(inactive_color) # dark grey (inactive)
                     # text.setOpacity(0.5/255.)
                 # text.setVisible(is_aclu_active)
+
+
+    def set_all_cell_y_labels_visibility(self, desired_is_visible: bool=True):
+        """ show/hide all cell y-label texts 
+        """
+        # Adjust based on the whether the aclu is active or not:
+        for _active_plot_identifier, new_sorted_raster in self.plots_data.seperate_new_sorted_rasters_dict.items():
+            a_plot_item = self.plots.root_plots[_active_plot_identifier]
+            # get the labels to update:
+            _out_text_items = self.plots.text_items_dict[a_plot_item]
+            for cell_i, (aclu, text) in enumerate(_out_text_items.items()):
+                text.setVisible(desired_is_visible)
+
 
 
     def scroll_df_table_view(self, row_index: Optional[int]):
