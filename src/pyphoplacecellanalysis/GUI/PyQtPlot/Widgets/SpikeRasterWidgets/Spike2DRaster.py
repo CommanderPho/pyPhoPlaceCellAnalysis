@@ -1983,7 +1983,8 @@ class Spike2DRaster(SpecificDockWidgetManipulatingMixin, DynamicDockDisplayAreaO
                             print(f'\t\tadding crosshairs callback for item: "{an_identifier}"')
                             self.ui.connections['tracks'][an_identifier]['sigCrosshairsUpdated'] = None
                             # self.on_child_crosshair_updated_signal
-                            _crosshairs_updated_conn = a_ts_widget.sigCrosshairsUpdated.connect(lambda a_child_widget, an_identifier, a_trace_value: self.on_child_crosshair_updated_signal(an_identifier, a_trace_value))
+                            _crosshairs_updated_conn = a_ts_widget.sigCrosshairsUpdated.connect(lambda a_child_widget, child_identifier, a_trace_value: self.on_child_crosshair_updated_signal(child_identifier=an_identifier, trace_value=a_trace_value))
+
                             self.ui.connections['tracks'][an_identifier]['sigCrosshairsUpdated'] = _crosshairs_updated_conn ## set just as the raw connection so we can disconnect
                             # self.ui.connections['tracks'][an_identifier]['sigCrosshairsUpdated'] = (_crosshairs_updated_conn, a_ts_widget.sigCrosshairsUpdated) ## set a tuple so we can disconnect
                             print(f'\t\tdone.')
