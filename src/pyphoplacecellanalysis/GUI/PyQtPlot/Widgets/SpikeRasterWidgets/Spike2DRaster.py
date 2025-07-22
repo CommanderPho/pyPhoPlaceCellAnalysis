@@ -1964,8 +1964,8 @@ class Spike2DRaster(SpecificDockWidgetManipulatingMixin, DynamicDockDisplayAreaO
     # ==================================================================================================================== #
     # Crosshairs/Tracing Functions                                                                                         #
     # ==================================================================================================================== #
-
-    def toggle_crosshair_traces_enabled(self, are_crosshairs_enabled):
+    @function_attributes(short_name=None, tags=['crosshairs'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-02-25 00:00', related_items=[])
+    def toggle_crosshair_traces_enabled(self, are_crosshairs_enabled: bool):
         print(f'SpikeRaster2D.on_crosshair_trace_toggled(is_crosshairs_enabled={are_crosshairs_enabled})')
         if are_crosshairs_enabled:
             # for a_ts_widget in self.get_flat_widgets_list():
@@ -2013,7 +2013,7 @@ class Spike2DRaster(SpecificDockWidgetManipulatingMixin, DynamicDockDisplayAreaO
                         # raise e
                                 
             
-
+    @function_attributes(short_name=None, tags=['crosshairs'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-02-25 00:00', related_items=[])
     def on_child_crosshair_updated_signal(self, child_identifier, trace_value):
         """ called when a child (with crosshairs enabled) updates its crosshairs trace. """
         if self.debug_print:

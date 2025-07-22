@@ -87,6 +87,7 @@ class Spike3DRasterLeftSidebarControlBar(QWidget):
 
     def __init__(self, parent=None):
         super().__init__(parent=parent) # Call the inherited classes __init__ method
+        self._enable_debug_print = True 
         # self.ui = uic.loadUi(uiFile, self) # Load the .ui file
         self.ui = load_ui_with_named_spacers(uiFile, self) # Load the .ui file
         
@@ -123,7 +124,31 @@ class Spike3DRasterLeftSidebarControlBar(QWidget):
         self.ui.lblCrosshairTraceValue.setVisible(False)
              
 
+    @property
+    def enable_debug_print(self) -> bool:
+        """The enable_debug_print property."""
+        return self._enable_debug_print
+    @enable_debug_print.setter
+    def enable_debug_print(self, value: bool):
+        self._enable_debug_print = value
         
+    @property
+    def wants_crosshair_trace_visible(self) -> bool:
+        """The foo property."""
+        if getattr(self, 'ui', None) is None:
+            return False
+        if getattr(self.ui, 'btnToggleCrosshairTrace', None) is None:
+            return False
+        return self.ui.btnToggleCrosshairTrace.isChecked()
+
+    @wants_crosshair_trace_visible.setter
+    def wants_crosshair_trace_visible(self, value: bool):
+        if getattr(self, 'ui', None) is None:
+            raise ValueError(f'no self.ui.btnToggleCrosshairTrace yet')
+        if getattr(self.ui, 'btnToggleCrosshairTrace', None) is None:
+            raise ValueError(f'no self.ui.btnToggleCrosshairTrace yet')
+        self.ui.btnToggleCrosshairTrace.setChecked(value)
+
 
     @pyqtExceptionPrintingSlot(object)
     def animation_time_step_valueChanged(self, sb):
