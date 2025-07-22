@@ -339,6 +339,8 @@ class EpochRenderingMixin(LiveWindowEventIntervalMonitoringMixin):
             returned_rect_items: a dictionary of tuples containing the newly created rect items and the plots they were added to.
             
             
+        Uses: 'RectangleRenderTupleHelpers', 'RenderedEpochsItemsContainer', 'IntervalRectsItem', 'self._perform_add_render_item(...)'
+        
         Example:
             active_pbe_interval_rects_item = Render2DEventRectanglesHelper.build_IntervalRectsItem_from_interval_datasource(interval_datasources.PBEs)
             
@@ -400,10 +402,25 @@ class EpochRenderingMixin(LiveWindowEventIntervalMonitoringMixin):
             self.interval_datasources[name].update_visualization_properties(lambda active_df, **kwargs: General2DRenderTimeEpochs._update_df_visualization_columns(active_df, **(vis_kwargs | kwargs))) ## Fully inline
         
         returned_rect_items = {}
-        
+
+
+        def _custom_format_tooltip_for_rect_data(rect_index: int, rect_data_tuple: Tuple) -> str:
+            """ hover info text tooltip for each epoch in the `IntervalRectsItem`
+            Captures: name 
+            rect_data_tuple = self.data[rect_index]
+            start_t, series_vertical_offset, duration_t, series_height, pen, brush = rect_data_tuple
+            """
+            start_t, series_vertical_offset, duration_t, series_height, pen, brush = rect_data_tuple
+            end_t = start_t + duration_t
+            tooltip_text = f"{name}[{rect_index}]\nStart: {start_t:.3f}\nEnd: {end_t:.3f}\nDuration: {duration_t:.3f}" # The tooltip is set generically here to 'PBEs', 'Replays' or whatever the dataseries name is
+            return tooltip_text
+
+
+
         # Build the rendered interval item:
-        new_interval_rects_item = Render2DEventRectanglesHelper.build_IntervalRectsItem_from_interval_datasource(interval_datasource)
-        new_interval_rects_item.setToolTip(name) # The tooltip is set generically here to 'PBEs', 'Replays' or whatever the dataseries name is
+        new_interval_rects_item: IntervalRectsItem = Render2DEventRectanglesHelper.build_IntervalRectsItem_from_interval_datasource(interval_datasource, format_tooltip_fn=deepcopy(_custom_format_tooltip_for_rect_data))
+        new_interval_rects_item._current_hovered_item_tooltip_format_fn = deepcopy(_custom_format_tooltip_for_rect_data)
+        # new_interval_rects_item.setToolTip(name) # The tooltip is set generically here to 'PBEs', 'Replays' or whatever the dataseries name is
         
         ######### PLOTS:
         if child_plots is None:
@@ -429,10 +446,13 @@ class EpochRenderingMixin(LiveWindowEventIntervalMonitoringMixin):
                     # # add the new one:
                     # extant_rects_plot_items_container[a_plot] = new_interval_rects_item.copy()
                     # a_plot.addItem(extant_rects_plot_items_container[a_plot])
-                
+                # if a_plot in extant_rects_plot_items_container...           
+
                 independent_data_copy = RectangleRenderTupleHelpers.copy_data(new_interval_rects_item.data)
-                extant_rects_plot_items_container[a_plot] = IntervalRectsItem(data=independent_data_copy)
-                extant_rects_plot_items_container[a_plot].setToolTip(name)
+                extant_rects_plot_items_container[a_plot] = IntervalRectsItem(data=independent_data_copy, format_tooltip_fn=deepcopy(_custom_format_tooltip_for_rect_data))
+                extant_rects_plot_items_container[a_plot]._current_hovered_item_tooltip_format_fn = deepcopy(_custom_format_tooltip_for_rect_data)
+                
+                # extant_rects_plot_items_container[a_plot].setToolTip(name) # would set a single, static tooltip for the entire graphics item.
                 self._perform_add_render_item(a_plot, extant_rects_plot_items_container[a_plot])
                 returned_rect_items[a_plot.objectName()] = dict(plot=a_plot, rect_item=extant_rects_plot_items_container[a_plot])
                 # Adjust the bounds to fit any children:
@@ -452,7 +472,6 @@ class EpochRenderingMixin(LiveWindowEventIntervalMonitoringMixin):
                     
                     # Adjust the bounds to fit any children:
                     EpochRenderingMixin.compute_bounds_adjustment_for_rect_item(a_plot, a_rect_item)
-
 
         if rendered_intervals_list_did_change:
             self.sigRenderedIntervalsListChanged.emit(self) # Emit the intervals list changed signal when a truely new item is added
@@ -779,7 +798,34 @@ class EpochRenderingMixin(LiveWindowEventIntervalMonitoringMixin):
 
         return all_series_positioning_dfs, all_series_compressed_positioning_dfs, all_series_compressed_positioning_update_dicts
 
+    def recover_interval_flat_positioning_df(self) -> pd.DataFrame:
+        """ returns a single flat dataframe with one entry for each series color 
+        """
+        all_series_positioning_dfs, all_series_compressed_positioning_dfs, all_series_compressed_positioning_update_dicts = self.recover_interval_datasources_positioning_properties()
+        a_flat_df = []
+        for a_series_name, a_df in all_series_compressed_positioning_dfs.items():
+            a_df['series_name'] = a_series_name
+            a_df['series_idx'] = deepcopy(a_df.index)
+            a_flat_df.append(a_df)
+            
+        a_flat_df: pd.DataFrame = pd.concat(a_flat_df, ignore_index=True)
+        a_flat_df['series_y_min'] = deepcopy(a_flat_df['series_vertical_offset'])
+        a_flat_df['series_y_max'] = a_flat_df['series_y_min'] + a_flat_df['series_height']
 
+        return a_flat_df
+
+
+    def get_interval_y_extrema_locations(self) -> Tuple[float, float]:
+        """ returns to top and bottom y-positions for the intervals, as would be needed for positioning a new one
+        
+            bottom_y_min, top_y_max = active_2d_plot.get_interval_y_extrema_locations()
+            bottom_y_min, top_y_max
+        """
+        curr_pos_df: pd.DataFrame = deepcopy(self.recover_interval_flat_positioning_df())
+        bottom_y_min: float = curr_pos_df['series_y_min'].min()
+        top_y_max: float = curr_pos_df['series_y_max'].max() # if it's to be placed above the plot, we need to add the top of the plot to each of the offsets
+        return bottom_y_min, top_y_max
+    
 
     @function_attributes(short_name=None, tags=['layout', 'epochs'], input_requires=[], output_provides=[], uses=['self.build_stacked_epoch_layout', 'self.get_render_intervals_plot_range', 'self.update_rendered_intervals_visualization_properties'], used_by=[], creation_date='2024-07-03 11:23', related_items=[])
     def apply_stacked_epoch_layout(self, rendered_interval_keys, desired_interval_height_ratios, epoch_render_stack_height=20.0, interval_stack_location='below', debug_print=True):
@@ -825,6 +871,81 @@ class EpochRenderingMixin(LiveWindowEventIntervalMonitoringMixin):
 
         return stacked_epoch_layout_dict
 
+
+
+    @function_attributes(short_name=None, tags=['layout', 'epochs'], input_requires=[], output_provides=[], uses=['self.build_stacked_epoch_layout', 'self.get_render_intervals_plot_range', 'self.update_rendered_intervals_visualization_properties'], used_by=[], creation_date='2024-07-03 11:23', related_items=[])
+    def apply_relative_epoch_layout(self, rendered_interval_keys_to_adjust: Union[str, List[str]], desired_interval_heights: Union[float, List[float]]=0.9, desired_intra_interval_padding: float=0.1, interval_stack_location='below', debug_print=True):
+        """ Builds and applies a stacked layout for the list of specified epochs
+
+            rendered_interval_keys = ['_', 'SessionEpochs', 'Laps', '_', 'PBEs', 'Ripples', 'Replays'] # '_' indicates a vertical spacer
+            rendered_interval_heights = [0.2, 1.0, 1.0, 0.1, 1.0, 1.0, 1.0] # ratio of heights to each interval
+            vertical_spacer_height = 0.2
+            epoch_render_stack_height = 40.0 # the height of the entire stack containing all rendered epochs:
+            interval_stack_location = 'below' # 'below' or 'above'
+
+        Usage:
+            from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.Mixins.RenderTimeEpochs.Specific2DRenderTimeEpochs import General2DRenderTimeEpochs
+
+            rendered_interval_keys = ['_', 'SessionEpochs', 'Laps', '_', 'PBEs', 'Ripples', 'Replays'] # '_' indicates a vertical spacer
+            desired_interval_height_ratios = [0.2, 0.5, 1.0, 0.1, 1.0, 1.0, 1.0] # ratio of heights to each interval (and the vertical spacers)
+            stacked_epoch_layout_dict = active_2d_plot.apply_stacked_epoch_layout(rendered_interval_keys, desired_interval_height_ratios, epoch_render_stack_height=20.0, interval_stack_location='below')
+            stacked_epoch_layout_dict
+
+
+            ## Inline Concise: Position Replays, PBEs, and Ripples all below the scatter:
+            for interval_key, y_location, height in zip(rendered_interval_keys, required_vertical_offsets, required_interval_heights):
+                if interval_key in active_2d_plot.interval_datasources:
+                    active_2d_plot.interval_datasources[interval_key].update_visualization_properties(lambda active_df, **kwargs: General2DRenderTimeEpochs._update_df_visualization_columns(active_df, y_location=y_location, height=height, **kwargs)) ## Fully inline
+        """
+        if isinstance(rendered_interval_keys_to_adjust, str):
+            rendered_interval_keys_to_adjust = [rendered_interval_keys_to_adjust] ## List[str] with single element
+            
+        if isinstance(desired_interval_heights, float):
+            desired_interval_heights = [desired_interval_heights] * len(rendered_interval_keys_to_adjust) ## repeat once for each key to adjust
+                
+        assert len(rendered_interval_keys_to_adjust) == len(desired_interval_heights), f"len(rendered_interval_keys): {len(rendered_interval_keys_to_adjust)} != len(desired_interval_heights): {len(desired_interval_heights)}"
+        if not isinstance(desired_interval_heights, NDArray):
+            desired_interval_heights = np.array(desired_interval_heights)
+
+        curr_pos_df: pd.DataFrame = deepcopy(self.recover_interval_flat_positioning_df())
+        # required_vertical_offsets, required_interval_heights = self.build_stacked_epoch_layout(desired_interval_heights, epoch_render_stack_height=epoch_render_stack_height, interval_stack_location=interval_stack_location)
+        
+        if interval_stack_location == 'below':
+            # required_vertical_offsets = required_vertical_offsets * -1.0 # make offsets negative if it's below the plot
+            bottom_y_min: float = curr_pos_df['series_y_min'].min()
+            ## determine the required_vertical_offsets
+            required_vertical_offsets = []
+            _initial_y_offset = (bottom_y_min + desired_intra_interval_padding)
+            for i, a_height in enumerate(desired_interval_heights):
+                required_vertical_offsets.append(_initial_y_offset)
+                _initial_y_offset -= (a_height + desired_intra_interval_padding)        
+
+            # required_vertical_offsets = bottom_y_min - (desired_interval_heights + desired_intra_interval_padding) ## pad each interval with the padding
+            ## OUTPUT: required_vertical_offsets
+
+        elif interval_stack_location == 'above':
+            # if it's to be placed above the plot, we need to add the top of the plot to each of the offsets:
+            top_y_max: float = curr_pos_df['series_y_max'].max()
+            # curr_x_min, curr_x_max, curr_y_min, curr_y_max = self.get_render_intervals_plot_range()
+            # required_vertical_offsets = required_vertical_offsets + curr_y_max # TODO: get top of plot            
+            ## determine the required_vertical_offsets
+            # required_vertical_offsets = top_y_max + desired_interval_heights
+            required_vertical_offsets = []
+            _initial_y_offset = (top_y_max + desired_intra_interval_padding)
+            for i, a_height in enumerate(desired_interval_heights):
+                required_vertical_offsets.append(_initial_y_offset)
+                _initial_y_offset += (a_height + desired_intra_interval_padding)        
+        else:
+            print(f"interval_stack_location: str must be either ('below' or 'above') but was {interval_stack_location}")
+            raise NotImplementedError
+        
+        required_vertical_offsets = np.array(required_vertical_offsets)        
+        # Build update dict:
+        stacked_epoch_layout_dict = {interval_key:dict(y_location=y_location, height=height) for interval_key, y_location, height in zip(rendered_interval_keys_to_adjust, required_vertical_offsets, desired_interval_heights)} # Build a stacked_epoch_layout_dict to update the display
+        self.update_rendered_intervals_visualization_properties(stacked_epoch_layout_dict)
+
+        return stacked_epoch_layout_dict
+    
 
     # Separator Lines ____________________________________________________________________________________________________ #
 
