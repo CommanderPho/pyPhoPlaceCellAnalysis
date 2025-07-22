@@ -115,7 +115,8 @@ def visualize_heatmap_pyqtgraph(data, win=None, show_value_labels=False, title="
         # win = pg.PlotWidget()
         win = CustomPlotWidget()
         win.setWindowTitle(title)
-        win.show()
+        if not defer_show:
+            win.show() # is this needed for something?
         did_create_win = True
     else:
         did_create_win = False
