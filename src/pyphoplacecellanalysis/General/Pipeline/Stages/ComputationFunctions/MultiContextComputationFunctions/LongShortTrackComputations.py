@@ -3470,6 +3470,8 @@ class InstantaneousSpikeRateGroupsComputation(PickleSerializableMixin, HDF_Seria
                             pop_metadata[f'{condition}_pop_mean'] = np.nan
                             pop_metadata[f'{condition}_pop_std'] = np.nan
                             pop_metadata[f'{condition}_pop_n_cells'] = 0
+            ## END for condition, trend_obj in spike_trends.items()
+            
 
             # Process each cell
             for i, aclu in enumerate(aclus):
@@ -3490,13 +3492,16 @@ class InstantaneousSpikeRateGroupsComputation(PickleSerializableMixin, HDF_Seria
                             record[f'{condition}_firing_rate'] = np.nan
                     else:
                         record[f'{condition}_firing_rate'] = np.nan
-
+                ## END for condition, spike_trend in spike_trends.items()...
                 records.append(record)
-
+            ## END for i, aclu in enumerate(aclus)...
+        ## END for cell_type, aclus in [('LxC', self.LxC_aclus), ('SxC', self.SxC_aclus), ('AnyC', self.AnyC_aclus)]...
+          
         # Create DataFrame
         df = pd.DataFrame(records)
 
-        df = df.drop_duplicates(subset=['aclu'], keep='last', ignore_index=True, inplace=False) ## drop any duplicate aclus, keep the last (AnyC version)
+        # df = df.drop_duplicates(subset=['aclu'], keep='last', ignore_index=True, inplace=False) ## drop any duplicate aclus, keep the last (AnyC version)
+        df = df.drop_duplicates(subset=['aclu'], keep='first', ignore_index=True, inplace=False) ## keep the first now, so they are still found in LxC and SxCs
 
         # Add Fig2 summary statistics
         # Fig2_Replay_FR: [LxC_ReplayDeltaMinus, LxC_ReplayDeltaPlus, SxC_ReplayDeltaMinus, SxC_ReplayDeltaPlus]
