@@ -5,6 +5,8 @@ import numpy as np
 import pandas as pd
 from indexed import IndexedOrderedDict
 from typing import Any, Optional, Dict, List, Tuple
+import nptyping as ND
+from nptyping import NDArray
 import itertools
 
 # from neurodsp.burst import detect_bursts_dual_threshold, compute_burst_stats
@@ -50,8 +52,8 @@ class SpikeRateTrends(HDFMixin, AttrsBasedClassHelperMixin):
 
     
     """
-    epoch_agg_inst_fr_list: np.ndarray = serialized_field(is_computable=True, init=False) # .shape (n_epochs, n_cells)
-    cell_agg_inst_fr_list: np.ndarray = serialized_field(is_computable=True, init=False) # .shape (n_cells,)
+    epoch_agg_inst_fr_list: NDArray[ND.Shape["N_EPOCHS, N_CELLS"], Any] = serialized_field(is_computable=True, init=False) # .shape (n_epochs, n_cells)
+    cell_agg_inst_fr_list: NDArray[ND.Shape["N_CELLS"], Any] = serialized_field(is_computable=True, init=False) # .shape (n_cells,)
     all_agg_inst_fr: float = serialized_attribute_field(is_computable=True, init=False) # the scalar value that results from aggregating over ALL (timebins, epochs, cells)
     
     # Add aclu values:
@@ -66,9 +68,9 @@ class SpikeRateTrends(HDFMixin, AttrsBasedClassHelperMixin):
     a `inst_fr_df` is a df with time bins along the rows and aclu values along the columns in the style of `unit_specific_binned_spike_counts`
     """
     #TODO 2023-07-31 08:36: - [ ] both of these properties would ideally be serialized to HDF, but they can't be right now.`
-    inst_fr_df_list: list[pd.DataFrame] = non_serialized_field() # a list containing a inst_fr_df for each epoch. 
-    inst_fr_signals_list: list[AnalogSignal] = non_serialized_field()
-    included_neuron_ids: Optional[np.ndarray] = serialized_field(default=None, is_computable=False) # .shape (n_cells,)
+    inst_fr_df_list: List[pd.DataFrame] = non_serialized_field() # a list containing a inst_fr_df for each epoch. 
+    inst_fr_signals_list: List[AnalogSignal] = non_serialized_field()
+    included_neuron_ids: Optional[NDArray[ND.Shape["N_CELLS"], Any]] = serialized_field(default=None, is_computable=False) # .shape (n_cells,)
     filter_epochs_df: pd.DataFrame = serialized_field(is_computable=False) # .shape (n_epochs, ...)
     
     instantaneous_time_bin_size_seconds: float = serialized_attribute_field(default=0.01, is_computable=False)
@@ -76,7 +78,7 @@ class SpikeRateTrends(HDFMixin, AttrsBasedClassHelperMixin):
 
     
     @classmethod
-    def init_from_spikes_and_epochs(cls, spikes_df: pd.DataFrame, filter_epochs, included_neuron_ids=None, instantaneous_time_bin_size_seconds=0.01, kernel=GaussianKernel(10*ms),
+    def init_from_spikes_and_epochs(cls, spikes_df: pd.DataFrame, filter_epochs, included_neuron_ids=None, instantaneous_time_bin_size_seconds:float=0.01, kernel=GaussianKernel(10*ms),
                                     use_instantaneous_firing_rate=False, epoch_handling_mode:str='DropShorterMode') -> "SpikeRateTrends":
         """ the main called function
         
@@ -167,7 +169,7 @@ class SpikeRateTrends(HDFMixin, AttrsBasedClassHelperMixin):
         return unit_specific_binned_spike_rate_df, unit_specific_binned_spike_counts_df, time_window_edges, time_window_edges_binning_info
 
     @classmethod
-    def compute_instantaneous_time_firing_rates(cls, active_spikes_df, time_bin_size_seconds=0.5, kernel=GaussianKernel(200*ms), t_start=0.0, t_stop=1000.0, included_neuron_ids=None) -> Tuple[pd.DataFrame, Any, List[SpikeTrain]]:
+    def compute_instantaneous_time_firing_rates(cls, active_spikes_df: pd.DataFrame, time_bin_size_seconds:float=0.5, kernel=GaussianKernel(200*ms), t_start:float=0.0, t_stop:float=1000.0, included_neuron_ids=None) -> Tuple[pd.DataFrame, Any, List[SpikeTrain]]:
         """ I think the error is actually occuring when: `time_bin_size_seconds > (t_stop - t_start)` """
         is_smaller_than_single_bin = (time_bin_size_seconds > (t_stop - t_start))
         assert not is_smaller_than_single_bin, f"ERROR: time_bin_size_seconds ({time_bin_size_seconds}) > (t_stop - t_start) ({t_stop - t_start}). Reduce the bin size or exclude this epoch."
@@ -200,7 +202,7 @@ class SpikeRateTrends(HDFMixin, AttrsBasedClassHelperMixin):
         return instantaneous_unit_specific_spike_rate_values, inst_rate, unit_split_spiketrains
 
     @classmethod
-    def compute_epochs_unit_avg_inst_firing_rates(cls, spikes_df: pd.DataFrame, filter_epochs, included_neuron_ids=None, instantaneous_time_bin_size_seconds=0.02, kernel=GaussianKernel(20*ms), use_instantaneous_firing_rate: bool=False, debug_print=False):
+    def compute_epochs_unit_avg_inst_firing_rates(cls, spikes_df: pd.DataFrame, filter_epochs, included_neuron_ids=None, instantaneous_time_bin_size_seconds:float=0.02, kernel=GaussianKernel(20*ms), use_instantaneous_firing_rate: bool=False, debug_print=False):
         """Computes the average firing rate for each neuron (unit) in each epoch. 
             Usage:
             epoch_inst_fr_df_list, epoch_inst_fr_signal_list, epoch_avg_firing_rates_list = SpikeRateTrends.compute_epochs_unit_avg_inst_firing_rates(spikes_df=filter_epoch_spikes_df_L, filter_epochs=epochs_df_L, included_neuron_ids=EITHER_subset.track_exclusive_aclus, debug_print=True)
