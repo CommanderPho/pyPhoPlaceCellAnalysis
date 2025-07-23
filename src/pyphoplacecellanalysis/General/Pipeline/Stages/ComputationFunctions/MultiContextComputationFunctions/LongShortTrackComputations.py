@@ -3113,9 +3113,15 @@ class InstantaneousSpikeRateGroupsComputation(PickleSerializableMixin, HDF_Seria
     
     LxC_aclus: np.ndarray = serialized_field(init=False, hdf_metadata={'track_eXclusive_cells': 'LxC'}) # the list of long-eXclusive cell aclus
     SxC_aclus: np.ndarray = serialized_field(init=False, hdf_metadata={'track_eXclusive_cells': 'SxC'}) # the list of short-eXclusive cell aclus
+    Shared_aclus: NDArray = serialized_field(init=False, hdf_metadata={'track_eXclusive_cells': 'Shared'}, metadata={'field_added': "2025.07.23_0"}) # the list of short-eXclusive cell aclus
 
     Fig2_Replay_FR: List[SingleBarResult] = serialized_field(init=False, is_computable=True, serialization_fn=_InstantaneousSpikeRateGroupsComputation_convert_Fig2_ANY_FR_to_hdf_fn, hdf_metadata={'epochs': 'Replay'}) # a list of the four single-bar results.
     Fig2_Laps_FR: List[SingleBarResult] = serialized_field(init=False, is_computable=True, serialization_fn=_InstantaneousSpikeRateGroupsComputation_convert_Fig2_ANY_FR_to_hdf_fn, hdf_metadata={'epochs': 'Laps'}) # a list of the four single-bar results.
+
+    SharedCells_ReplayDeltaMinus: SpikeRateTrends = serialized_field(init=False, repr=False, default=None, is_computable=True, hdf_metadata={'track_eXclusive_cells': 'Shared', 'epochs': 'Replay', 'track_change_relative_period': 'DeltaMinus'}, metadata={'field_added': "2025.07.23_0"})
+    SharedCells_ReplayDeltaPlus: SpikeRateTrends = serialized_field(init=False, repr=False, default=None, is_computable=True, hdf_metadata={'track_eXclusive_cells': 'Shared', 'epochs': 'Replay', 'track_change_relative_period': 'DeltaPlus'}, metadata={'field_added': "2025.07.23_0"})
+    SharedCells_ThetaDeltaMinus: SpikeRateTrends = serialized_field(init=False, repr=False, default=None, is_computable=True, hdf_metadata={'track_eXclusive_cells': 'Shared', 'epochs': 'Laps', 'track_change_relative_period': 'DeltaMinus'}, metadata={'field_added': "2025.07.23_0"})
+    SharedCells_ThetaDeltaPlus: SpikeRateTrends = serialized_field(init=False, repr=False, default=None, is_computable=True, hdf_metadata={'track_eXclusive_cells': 'Shared', 'epochs': 'Laps', 'track_change_relative_period': 'DeltaPlus'}, metadata={'field_added': "2025.07.23_0"})
 
     LxC_ReplayDeltaMinus: SpikeRateTrends = serialized_field(init=False, repr=False, default=None, is_computable=True, hdf_metadata={'track_eXclusive_cells': 'LxC', 'epochs': 'Replay', 'track_change_relative_period': 'DeltaMinus'})
     LxC_ReplayDeltaPlus: SpikeRateTrends = serialized_field(init=False, repr=False, default=None, is_computable=True, hdf_metadata={'track_eXclusive_cells': 'LxC', 'epochs': 'Replay', 'track_change_relative_period': 'DeltaPlus'})
@@ -3142,6 +3148,9 @@ class InstantaneousSpikeRateGroupsComputation(PickleSerializableMixin, HDF_Seria
             LxC_ThetaDeltaMinus, LxC_ThetaDeltaPlus, SxC_ThetaDeltaMinus, SxC_ThetaDeltaPlus = _out_inst_fr_comps.LxC_ThetaDeltaMinus, _out_inst_fr_comps.LxC_ThetaDeltaPlus, _out_inst_fr_comps.SxC_ThetaDeltaMinus, _out_inst_fr_comps.SxC_ThetaDeltaPlus
 
         """
+        from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import get_proper_global_spikes_df
+
+    
         sess = curr_active_pipeline.sess
         # Get the provided context or use the session context:
         active_context = kwargs.get('active_context', sess.get_context())
@@ -3158,32 +3167,54 @@ class InstantaneousSpikeRateGroupsComputation(PickleSerializableMixin, HDF_Seria
         long_laps, long_replays, short_laps, short_replays, global_laps, global_replays = [long_short_fr_indicies_analysis_results[k] for k in ['long_laps', 'long_replays', 'short_laps', 'short_replays', 'global_laps', 'global_replays']]
 
         ## Manual User-annotation mode:
+        LxC_aclus = kwargs.pop('LxC_aclus', None)
+        SxC_aclus = kwargs.pop('SxC_aclus', None)
+        Shared_aclus = kwargs.pop('Shared_aclus', None)
+                
+
         annotation_man: UserAnnotationsManager = UserAnnotationsManager()
         session_cell_exclusivity: SessionCellExclusivityRecord = annotation_man.annotations[self.active_identifying_session_ctx].get('session_cell_exclusivity', None)
-        if session_cell_exclusivity is not None:
+        if ((LxC_aclus is None) or (SxC_aclus is None)) and (session_cell_exclusivity is not None):
             print(f'setting LxC_aclus/SxC_aclus from user annotation.')
             self.LxC_aclus = session_cell_exclusivity.LxC
             self.SxC_aclus = session_cell_exclusivity.SxC
         else:
             print(f'WARN: no user annotation for session_cell_exclusivity')
 
-
         # Common:
         are_LxC_empty: bool = (self.LxC_aclus is None) or (len(self.LxC_aclus) == 0)
         are_SxC_empty: bool = (self.SxC_aclus is None) or (len(self.SxC_aclus) == 0)
 
+        spikes_df: pd.DataFrame = get_proper_global_spikes_df(curr_active_pipeline)
+        all_spikes_aclus = deepcopy(spikes_df.spikes.neuron_ids)
+        
+        if Shared_aclus is None:
+            ## build from the LxC and SxCs
+            Shared_aclus = np.array([aclu for aclu in all_spikes_aclus if ((aclu not in self.LxC_aclus) and (aclu not in self.SxC_aclus))])
+            self.Shared_aclus = Shared_aclus
+            
+
         # Replays: Uses `global_session.spikes_df`, `long_exclusive.track_exclusive_aclus, `short_exclusive.track_exclusive_aclus`, `long_replays`, `short_replays`
+        self.SharedCells_ReplayDeltaMinus        
+
+        # Shared: `Shared.track_exclusive_aclus`
+        # ReplayDeltaMinus: `long_replays`
+        self.SharedCells_ReplayDeltaMinus: SpikeRateTrends = SpikeRateTrends.init_from_spikes_and_epochs(spikes_df=deepcopy(spikes_df), filter_epochs=long_replays, included_neuron_ids=self.Shared_aclus, instantaneous_time_bin_size_seconds=self.instantaneous_time_bin_size_seconds, epoch_handling_mode=epoch_handling_mode)
+        # ReplayDeltaPlus: `short_replays`
+        self.SharedCells_ReplayDeltaPlus: SpikeRateTrends = SpikeRateTrends.init_from_spikes_and_epochs(spikes_df=deepcopy(spikes_df), filter_epochs=short_replays, included_neuron_ids=self.Shared_aclus, instantaneous_time_bin_size_seconds=self.instantaneous_time_bin_size_seconds, epoch_handling_mode=epoch_handling_mode)
+        
+
         # LxC: `long_exclusive.track_exclusive_aclus`
         # ReplayDeltaMinus: `long_replays`
-        self.LxC_ReplayDeltaMinus: SpikeRateTrends = SpikeRateTrends.init_from_spikes_and_epochs(spikes_df=global_session.spikes_df, filter_epochs=long_replays, included_neuron_ids=self.LxC_aclus, instantaneous_time_bin_size_seconds=self.instantaneous_time_bin_size_seconds, epoch_handling_mode=epoch_handling_mode)
+        self.LxC_ReplayDeltaMinus: SpikeRateTrends = SpikeRateTrends.init_from_spikes_and_epochs(spikes_df=deepcopy(spikes_df), filter_epochs=long_replays, included_neuron_ids=self.LxC_aclus, instantaneous_time_bin_size_seconds=self.instantaneous_time_bin_size_seconds, epoch_handling_mode=epoch_handling_mode)
         # ReplayDeltaPlus: `short_replays`
-        self.LxC_ReplayDeltaPlus: SpikeRateTrends = SpikeRateTrends.init_from_spikes_and_epochs(spikes_df=global_session.spikes_df, filter_epochs=short_replays, included_neuron_ids=self.LxC_aclus, instantaneous_time_bin_size_seconds=self.instantaneous_time_bin_size_seconds, epoch_handling_mode=epoch_handling_mode)
+        self.LxC_ReplayDeltaPlus: SpikeRateTrends = SpikeRateTrends.init_from_spikes_and_epochs(spikes_df=deepcopy(spikes_df), filter_epochs=short_replays, included_neuron_ids=self.LxC_aclus, instantaneous_time_bin_size_seconds=self.instantaneous_time_bin_size_seconds, epoch_handling_mode=epoch_handling_mode)
 
         # SxC: `short_exclusive.track_exclusive_aclus`
         # ReplayDeltaMinus: `long_replays`
-        self.SxC_ReplayDeltaMinus: SpikeRateTrends = SpikeRateTrends.init_from_spikes_and_epochs(spikes_df=global_session.spikes_df, filter_epochs=long_replays, included_neuron_ids=self.SxC_aclus, instantaneous_time_bin_size_seconds=self.instantaneous_time_bin_size_seconds, epoch_handling_mode=epoch_handling_mode)
+        self.SxC_ReplayDeltaMinus: SpikeRateTrends = SpikeRateTrends.init_from_spikes_and_epochs(spikes_df=deepcopy(spikes_df), filter_epochs=long_replays, included_neuron_ids=self.SxC_aclus, instantaneous_time_bin_size_seconds=self.instantaneous_time_bin_size_seconds, epoch_handling_mode=epoch_handling_mode)
         # ReplayDeltaPlus: `short_replays`
-        self.SxC_ReplayDeltaPlus: SpikeRateTrends = SpikeRateTrends.init_from_spikes_and_epochs(spikes_df=global_session.spikes_df, filter_epochs=short_replays, included_neuron_ids=self.SxC_aclus, instantaneous_time_bin_size_seconds=self.instantaneous_time_bin_size_seconds, epoch_handling_mode=epoch_handling_mode)
+        self.SxC_ReplayDeltaPlus: SpikeRateTrends = SpikeRateTrends.init_from_spikes_and_epochs(spikes_df=deepcopy(spikes_df), filter_epochs=short_replays, included_neuron_ids=self.SxC_aclus, instantaneous_time_bin_size_seconds=self.instantaneous_time_bin_size_seconds, epoch_handling_mode=epoch_handling_mode)
 
         # Note that in general LxC and SxC might have differing numbers of cells.
         if (are_LxC_empty or are_SxC_empty):
@@ -3200,17 +3231,23 @@ class InstantaneousSpikeRateGroupsComputation(PickleSerializableMixin, HDF_Seria
         
 
         # Laps/Theta: Uses `global_session.spikes_df`, `long_exclusive.track_exclusive_aclus, `short_exclusive.track_exclusive_aclus`, `long_laps`, `short_laps`
+        # Shared: `Shared.track_exclusive_aclus`
+        # ThetaDeltaMinus: `long_laps`
+        self.SharedCells_ThetaDeltaMinus: SpikeRateTrends = SpikeRateTrends.init_from_spikes_and_epochs(spikes_df=deepcopy(spikes_df), filter_epochs=long_laps, included_neuron_ids=self.Shared_aclus, instantaneous_time_bin_size_seconds=self.instantaneous_time_bin_size_seconds, epoch_handling_mode=epoch_handling_mode)
+        # ThetaDeltaPlus: `short_laps`
+        self.SharedCells_ThetaDeltaPlus: SpikeRateTrends = SpikeRateTrends.init_from_spikes_and_epochs(spikes_df=deepcopy(spikes_df), filter_epochs=short_laps, included_neuron_ids=self.Shared_aclus, instantaneous_time_bin_size_seconds=self.instantaneous_time_bin_size_seconds, epoch_handling_mode=epoch_handling_mode)
+
         # LxC: `long_exclusive.track_exclusive_aclus`
         # ThetaDeltaMinus: `long_laps`
-        self.LxC_ThetaDeltaMinus: SpikeRateTrends = SpikeRateTrends.init_from_spikes_and_epochs(spikes_df=global_session.spikes_df, filter_epochs=long_laps, included_neuron_ids=self.LxC_aclus, instantaneous_time_bin_size_seconds=self.instantaneous_time_bin_size_seconds, epoch_handling_mode=epoch_handling_mode)
+        self.LxC_ThetaDeltaMinus: SpikeRateTrends = SpikeRateTrends.init_from_spikes_and_epochs(spikes_df=deepcopy(spikes_df), filter_epochs=long_laps, included_neuron_ids=self.LxC_aclus, instantaneous_time_bin_size_seconds=self.instantaneous_time_bin_size_seconds, epoch_handling_mode=epoch_handling_mode)
         # ThetaDeltaPlus: `short_laps`
-        self.LxC_ThetaDeltaPlus: SpikeRateTrends = SpikeRateTrends.init_from_spikes_and_epochs(spikes_df=global_session.spikes_df, filter_epochs=short_laps, included_neuron_ids=self.LxC_aclus, instantaneous_time_bin_size_seconds=self.instantaneous_time_bin_size_seconds, epoch_handling_mode=epoch_handling_mode)
+        self.LxC_ThetaDeltaPlus: SpikeRateTrends = SpikeRateTrends.init_from_spikes_and_epochs(spikes_df=deepcopy(spikes_df), filter_epochs=short_laps, included_neuron_ids=self.LxC_aclus, instantaneous_time_bin_size_seconds=self.instantaneous_time_bin_size_seconds, epoch_handling_mode=epoch_handling_mode)
 
         # SxC: `short_exclusive.track_exclusive_aclus`
         # ThetaDeltaMinus: `long_laps`
-        self.SxC_ThetaDeltaMinus: SpikeRateTrends = SpikeRateTrends.init_from_spikes_and_epochs(spikes_df=global_session.spikes_df, filter_epochs=long_laps, included_neuron_ids=self.SxC_aclus, instantaneous_time_bin_size_seconds=self.instantaneous_time_bin_size_seconds, epoch_handling_mode=epoch_handling_mode)
+        self.SxC_ThetaDeltaMinus: SpikeRateTrends = SpikeRateTrends.init_from_spikes_and_epochs(spikes_df=deepcopy(spikes_df), filter_epochs=long_laps, included_neuron_ids=self.SxC_aclus, instantaneous_time_bin_size_seconds=self.instantaneous_time_bin_size_seconds, epoch_handling_mode=epoch_handling_mode)
         # ThetaDeltaPlus: `short_laps`
-        self.SxC_ThetaDeltaPlus: SpikeRateTrends = SpikeRateTrends.init_from_spikes_and_epochs(spikes_df=global_session.spikes_df, filter_epochs=short_laps, included_neuron_ids=self.SxC_aclus, instantaneous_time_bin_size_seconds=self.instantaneous_time_bin_size_seconds, epoch_handling_mode=epoch_handling_mode)
+        self.SxC_ThetaDeltaPlus: SpikeRateTrends = SpikeRateTrends.init_from_spikes_and_epochs(spikes_df=deepcopy(spikes_df), filter_epochs=short_laps, included_neuron_ids=self.SxC_aclus, instantaneous_time_bin_size_seconds=self.instantaneous_time_bin_size_seconds, epoch_handling_mode=epoch_handling_mode)
 
         # Note that in general LxC and SxC might have differing numbers of cells.
         if are_LxC_empty or are_SxC_empty:
@@ -3241,9 +3278,14 @@ class InstantaneousSpikeRateGroupsComputation(PickleSerializableMixin, HDF_Seria
         n_SxC_aclus: int = len(self.SxC_aclus)
         v_SxC_aclus = [list(self.SxC_aclus)] + [v.cell_agg_inst_fr_list for v in (self.SxC_ThetaDeltaMinus, self.SxC_ThetaDeltaPlus, self.SxC_ReplayDeltaMinus, self.SxC_ReplayDeltaPlus) if v is not None] + [(['SxC'] * n_SxC_aclus)]
         df_SxC_aclus = pd.DataFrame(dict(zip(table_columns, v_SxC_aclus)))
+        
+        n_Shared_aclus: int = len(self.Shared_aclus)
+        v_Shared_aclus = [list(self.Shared_aclus)] + [v.cell_agg_inst_fr_list for v in (self.SharedCells_ThetaDeltaMinus, self.SharedCells_ThetaDeltaPlus, self.SharedCells_ReplayDeltaMinus, self.SharedCells_ReplayDeltaPlus) if v is not None] + [(['Shared'] * n_Shared_aclus)]
+        df_Shared_aclus = pd.DataFrame(dict(zip(table_columns, v_Shared_aclus)))
+
 
         # Concatenate the two dataframes
-        df_combined = pd.concat([df_LxC_aclus, df_SxC_aclus], ignore_index=True)
+        df_combined = pd.concat([df_LxC_aclus, df_SxC_aclus, df_Shared_aclus], ignore_index=True)
         df_combined['inst_time_bin_seconds'] = float(self.instantaneous_time_bin_size_seconds)
         
         ## add session info
@@ -3399,7 +3441,7 @@ class InstantaneousSpikeRateGroupsComputation(PickleSerializableMixin, HDF_Seria
             session_metadata.update({f'session_{k}': v for k, v in session_ctx_dict.items()})
 
         # Process each cell type
-        for cell_type, aclus in [('LxC', self.LxC_aclus), ('SxC', self.SxC_aclus)]:
+        for cell_type, aclus in [('LxC', self.LxC_aclus), ('SxC', self.SxC_aclus), ('SharedCells', self.Shared_aclus)]:
             if aclus is None or len(aclus) == 0:
                 continue
 
