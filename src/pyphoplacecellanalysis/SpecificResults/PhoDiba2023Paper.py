@@ -795,9 +795,9 @@ class PaperFigureTwo(SerializedAttributesAllowBlockSpecifyingClass):
                                 cls._build_formatted_title_string(epochs_name=title, prepare_for_publication=prepare_for_publication), va="bottom", xycoords="figure fraction")
         text_objects = {'title': title_text_obj}
         
-        if not prepare_for_publication:
+        if (not prepare_for_publication):
             footer_text_obj = flexitext(text_formatter.left_margin * 0.1, text_formatter.bottom_margin * 0.25,
-                                        text_formatter._build_footer_string(active_context=active_context, prepare_for_publication=prepare_for_publication), va="top", xycoords="figure fraction")
+                                        text_formatter._build_footer_string(active_context=active_context), va="top", xycoords="figure fraction") ## How did that get added? and when?
             text_objects['footer'] = footer_text_obj
             
 

@@ -236,14 +236,14 @@ class LongShortTrackComparingDisplayFunctions(AllFunctionEnumeratingMixin, metac
             # t_split = sess.paradigm[0][0,1] # passed to _make_pho_jonathan_batch_plots(t_split, ...)
             t_split = t_delta
 
-            from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import get_proper_global_spikes_df
+            # from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import get_proper_global_spikes_df
 
-            global_spikes_df: pd.DataFrame = deepcopy(get_proper_global_spikes_df(owning_pipeline_reference))            
+            # global_spikes_df: pd.DataFrame = deepcopy(get_proper_global_spikes_df(owning_pipeline_reference))
 
             ## Add three columns to global_results.sess.spikes_df, indicating whether each spike is included in the filtered_spikes_df for the (long, short, global) pf1Ds
-            # global_results.sess.flattened_spiketrains._spikes_df = add_spikes_df_placefield_inclusion_columns(curr_active_pipeline=owning_pipeline_reference, global_spikes_df=global_results.sess.spikes_df, overwrite_columns=True)
-            # global_results.sess.spikes_df = add_spikes_df_placefield_inclusion_columns(curr_active_pipeline=owning_pipeline_reference, global_spikes_df=global_results.sess.spikes_df, overwrite_columns=True)            
-            global_spikes_df = add_spikes_df_placefield_inclusion_columns(curr_active_pipeline=owning_pipeline_reference, global_spikes_df=global_spikes_df, overwrite_columns=True) ## in_place
+            global_results.sess.flattened_spiketrains._spikes_df = add_spikes_df_placefield_inclusion_columns(curr_active_pipeline=owning_pipeline_reference, global_spikes_df=global_results.sess.spikes_df, overwrite_columns=True)
+            global_spikes_df = add_spikes_df_placefield_inclusion_columns(curr_active_pipeline=owning_pipeline_reference, global_spikes_df=global_results.sess.spikes_df, overwrite_columns=True)            
+            # global_spikes_df = add_spikes_df_placefield_inclusion_columns(curr_active_pipeline=owning_pipeline_reference, global_spikes_df=global_spikes_df, overwrite_columns=True) ## in_place
             # global_spikes_df = global_spikes_df.copy()
             global_spikes_df = global_spikes_df.neuron_identity.make_neuron_indexed_df_global(curr_session_context=active_identifying_session_ctx, add_expanded_session_context_keys=True, add_extended_aclu_identity_columns=True) ## This is actually very slow, like 8 seconds
             # global_spikes_df
