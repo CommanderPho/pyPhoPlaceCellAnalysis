@@ -694,7 +694,8 @@ class PaperFigureTwo(SerializedAttributesAllowBlockSpecifyingClass):
     @classmethod
     def get_bar_colors(cls):
         # return [(1.0, 0, 0, 1), (0.65, 0, 0, 1), (0, 0, 0.65, 1), (0, 0, 1.0, 1)] # corresponding colors
-        return [(0, 0, 1.0, 1), (0, 0, 0.65, 1), (0.65, 0, 0, 1), (1.0, 0, 0, 1)] # long=Blue, short=Red -- dimmer
+        # return [(0, 0, 1.0, 1), (0, 0, 0.65, 1), (0.65, 0, 0, 1), (1.0, 0, 0, 1)] # long=Blue, short=Red -- dimmer -- 4 separate colors (2 shades of red and 2 shades of blue)
+        return [(0, 0, 0.65, 1), (0, 0, 0.65, 1), (0.65, 0, 0, 1), (0.65, 0, 0, 1)] # long=Blue, short=Red -- dimmer -- only 2 colors
 
 
     def compute(self, curr_active_pipeline, **kwargs):
