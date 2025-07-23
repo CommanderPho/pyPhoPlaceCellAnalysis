@@ -318,7 +318,6 @@ def plot_single_cell_1D_placecell_validation(active_epoch_placefields1D, placefi
     t_start = kwargs.get('t_start', active_epoch_placefields1D.t[0])
     t_end = kwargs.get('t_end', active_epoch_placefields1D.t[-1])
 
-
     if placefield_cell_index is not None:
         ## Do all cell_index dependent stuff:
         curr_cell_id = active_epoch_placefields1D.cell_ids[placefield_cell_index]
@@ -334,9 +333,10 @@ def plot_single_cell_1D_placecell_validation(active_epoch_placefields1D, placefi
             _plot_helper_setup_gridlines(ax_activity_v_time, active_epoch_placefields1D.ratemap.xbin, active_epoch_placefields1D.ratemap.xbin_centers)
 
 
-        # Part 2: The Placefield Plot to the Right and the connecting features: ______________________________________________ #
-        _subfn_plot_pf1D_placefield(active_epoch_placefields1D=active_epoch_placefields1D, placefield_cell_index=placefield_cell_index,
-                                ax_activity_v_time=ax_activity_v_time, ax_pf_tuning_curve=ax_pf_tuning_curve, pf_tuning_curve_ax_position='right', **kwargs)
+        if ax_pf_tuning_curve is not None:
+            # Part 2: The Placefield Plot to the Right and the connecting features: ______________________________________________ #
+            _subfn_plot_pf1D_placefield(active_epoch_placefields1D=active_epoch_placefields1D, placefield_cell_index=placefield_cell_index,
+                                    ax_activity_v_time=ax_activity_v_time, ax_pf_tuning_curve=ax_pf_tuning_curve, pf_tuning_curve_ax_position='right', **kwargs)
             
         ax_activity_v_time.set_xlim((t_start, t_end)) # We don't want to clip to only the spiketimes for this cell, we want it for all cells, or even when the recording started/ended
 
@@ -345,8 +345,10 @@ def plot_single_cell_1D_placecell_validation(active_epoch_placefields1D, placefi
         ax_activity_v_time.set_xlim((t_start, t_end)) # We don't want to clip to only the spiketimes for this cell, we want it for all cells, or even when the recording started/ended
         # ax_pf_tuning_curve.clear()
 
-    ax_pf_tuning_curve.axis('off')
-    ax_pf_tuning_curve.set_xlim((0, 1))
+    if ax_pf_tuning_curve is not None:
+        ax_pf_tuning_curve.axis('off')
+        ax_pf_tuning_curve.set_xlim((0, 1))
+
     return fig, [ax_activity_v_time, ax_pf_tuning_curve]
 
 
