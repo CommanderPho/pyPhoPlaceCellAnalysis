@@ -983,10 +983,14 @@ class PhoJonathanPlotHelpers:
         else:
             ## publication figure
             spike_plot_kwargs_dict = {
-                'all': {**common_simple_kwargs_overrides, 'markersize': 8.0, 'marker': '.', 'markerfacecolor':(0.1, 0.1, 0.1, (spikes_alpha*0.6*0.5)), 'markeredgecolor': 'none', 'zorder':10},
-                'is_included_long_pf1D': {**common_simple_kwargs_overrides, 'markersize': 10.0, 'marker': '.', 'markerfacecolor':(0, 0, 1, (spikes_alpha*0.6)), 'markeredgecolor': 'none', 'zorder':15},
-                'is_included_short_pf1D': {**common_simple_kwargs_overrides, 'markersize': 10.0, 'marker': '.', 'markerfacecolor':(1, 0, 0, (spikes_alpha*0.6)), 'markeredgecolor': 'none', 'zorder':15},
-                'is_included_PBE': {**common_simple_kwargs_overrides, 'markersize': 10.0, 'marker': '.', 'markerfacecolor':(0.102, 0.831, 0, (spikes_alpha*0.6)), 'markeredgecolor': 'none', 'zorder':15},
+                # 'all': {**common_simple_kwargs_overrides, 'markersize': 8.0, 'marker': '.', 'markerfacecolor':(0.1, 0.1, 0.1, (spikes_alpha*0.6*0.5)), 'markeredgecolor': 'none', 'zorder':10},
+                # 'is_included_long_pf1D': {**common_simple_kwargs_overrides, 'markersize': 10.0, 'marker': '.', 'markerfacecolor':(0, 0, 1, (spikes_alpha*0.6)), 'markeredgecolor': 'none', 'zorder':15},
+                # 'is_included_short_pf1D': {**common_simple_kwargs_overrides, 'markersize': 10.0, 'marker': '.', 'markerfacecolor':(1, 0, 0, (spikes_alpha*0.6)), 'markeredgecolor': 'none', 'zorder':15},
+                # 'is_included_PBE': {**common_simple_kwargs_overrides, 'markersize': 10.0, 'marker': '.', 'markerfacecolor':(0.102, 0.831, 0, (spikes_alpha*0.6)), 'markeredgecolor': 'none', 'zorder':15},
+                'all': {**common_simple_kwargs_overrides, 'markersize': 1.0, 'marker': '.', 'markerfacecolor':(0.1, 0.1, 0.1, (spikes_alpha*0.6*0.5)), 'markeredgecolor': 'none', 'zorder':10},
+                'is_included_long_pf1D': {**common_simple_kwargs_overrides, 'markersize': 2.0, 'marker': '.', 'markerfacecolor':(0, 0, 1, (spikes_alpha*0.6)), 'markeredgecolor': 'none', 'zorder':15},
+                'is_included_short_pf1D': {**common_simple_kwargs_overrides, 'markersize': 2.0, 'marker': '.', 'markerfacecolor':(1, 0, 0, (spikes_alpha*0.6)), 'markeredgecolor': 'none', 'zorder':15},
+                'is_included_PBE': {**common_simple_kwargs_overrides, 'markersize': 2.0, 'marker': '.', 'markerfacecolor':(0.102, 0.831, 0, (spikes_alpha*0.6)), 'markeredgecolor': 'none', 'zorder':15},
             }
                     
         # spike_plot_kwargs_dict.update(
