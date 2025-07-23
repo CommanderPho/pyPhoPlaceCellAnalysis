@@ -187,22 +187,40 @@ class CellFieldRemappingModels:
     @classmethod
     def is_non_linear_remapping(cls, L: float, S: float, m: float) -> bool:
         """ Not a model, takes an L and S field peak and returns True if this remapping requires non-linear shifts. """
-        ## First question is: does it go the opposite way of the remapping?
-        LS_diff: float = S - L
+        LS_diff: float = S - L # S - updated, L - original
         is_non_linear: bool = False
+
+        expected_S_by_lin_trans: float = cls.nearest_endcap_anchored(L=L, m=m)
+        expected_to_observed_diff_cm: float = expected_S_by_lin_trans - S # difference between expected S and the observed one
+        
+        does_exceed_allowed_deviation: bool = (np.abs(expected_to_observed_diff_cm) > cls.linear_translation_wiggle_room_cm)
+        if does_exceed_allowed_deviation:
+            ## implies (S  exceeds the allowed deviation from the S expected by translation
+            is_non_linear = True
+            return is_non_linear
+        
+        ## First question is: does it go the opposite way of the remapping?
         if L >= m:
+             ## is right of midpoint
              if (LS_diff > 0.0):
-                  return True
+                  ## implies (S > L) -> moved ++ (to right)
+                  is_non_linear = True
+                  return is_non_linear ## Moved OPPOSITE DIRECTION to expected translation
         else:
+             ## is left of midpoint
              if (LS_diff < 0.0):
-                  return True
+                  ## implies (L > S) -> moved -- (to left)
+                  is_non_linear = True
+                  return is_non_linear ## Moved OPPOSITE DIRECTION to expected translation
              
-        ## Second question: does it greatly exceed the contraction distance? (it shouldn't):
-        contraction_amount_cm: float = 15.0
-        wiggle_room_factor: float = 0.2
-        if np.abs(LS_diff) > 40.0: #(contraction_amount_cm + (contraction_amount_cm * wiggle_room_factor)):
-             return True
-        return is_non_linear    
+        # ## Second question: does it greatly exceed the contraction distance? (it shouldn't):
+        # contraction_amount_cm: float = 15.0
+        # wiggle_room_factor: float = 0.2
+        # if np.abs(LS_diff) > 40.0: #(contraction_amount_cm + (contraction_amount_cm * wiggle_room_factor)):
+        #     is_non_linear = True
+        #     return is_non_linear ## point moved much further than the translation would expect
+        
+        return is_non_linear ## likely False
 
 
     @function_attributes(short_name=None, tags=['main', 'FIXUP', 'has_considerable_remapping'], input_requires=[], output_provides=[], uses=['cls.is_non_linear_remapping'], used_by=[], creation_date='2025-07-08 17:47', related_items=[])
