@@ -2044,6 +2044,10 @@ def compute_and_export_session_instantaneous_spike_rates_completion_function(sel
     ## previous `instantaneous_time_bin_size_seconds` values:
     0.0005    
     
+    inst_fr_comps: InstantaneousSpikeRateGroupsComputation = callback_outputs['recomputed_inst_fr_time_bin_dict'][1000.0]['inst_fr_comps']
+    
+    
+    subfn_callback_outputs['inst_fr_comps'] 
     
     """
     import sys
@@ -2070,6 +2074,7 @@ def compute_and_export_session_instantaneous_spike_rates_completion_function(sel
         print(f'compute_and_export_session_instantaneous_spike_rates_completion_function(curr_session_context: {curr_session_context}, curr_session_basedir: {str(curr_session_basedir)}, instantaneous_time_bin_size_seconds: {instantaneous_time_bin_size_seconds}, ...)')
         
         subfn_callback_outputs = {
+            'inst_fr_comps': None, # the actual InstantaneousSpikeRateGroupsComputation
             'recomputed_inst_fr_comps_filepath': None, #'t_end': t_end   
             'recomputed_inst_fr_comps_h5_filepath': None,
             'recomputed_inst_fr_comps_FAT_CSV_filepath': None,
@@ -2085,6 +2090,10 @@ def compute_and_export_session_instantaneous_spike_rates_completion_function(sel
 
             # LxC_ReplayDeltaMinus, LxC_ReplayDeltaPlus, SxC_ReplayDeltaMinus, SxC_ReplayDeltaPlus = _out_inst_fr_comps.LxC_ReplayDeltaMinus, _out_inst_fr_comps.LxC_ReplayDeltaPlus, _out_inst_fr_comps.SxC_ReplayDeltaMinus, _out_inst_fr_comps.SxC_ReplayDeltaPlus
             # LxC_ThetaDeltaMinus, LxC_ThetaDeltaPlus, SxC_ThetaDeltaMinus, SxC_ThetaDeltaPlus = _out_inst_fr_comps.LxC_ThetaDeltaMinus, _out_inst_fr_comps.LxC_ThetaDeltaPlus, _out_inst_fr_comps.SxC_ThetaDeltaMinus, _out_inst_fr_comps.SxC_ThetaDeltaPlus
+
+            if _out_recomputed_inst_fr_comps is not None:
+                subfn_callback_outputs['inst_fr_comps'] = _out_recomputed_inst_fr_comps            
+
             print(f'\t\t done (success).')
 
         except Exception as e:
