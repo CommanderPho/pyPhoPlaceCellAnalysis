@@ -3113,15 +3113,15 @@ class InstantaneousSpikeRateGroupsComputation(PickleSerializableMixin, HDF_Seria
     
     LxC_aclus: np.ndarray = serialized_field(init=False, hdf_metadata={'track_eXclusive_cells': 'LxC'}) # the list of long-eXclusive cell aclus
     SxC_aclus: np.ndarray = serialized_field(init=False, hdf_metadata={'track_eXclusive_cells': 'SxC'}) # the list of short-eXclusive cell aclus
-    Shared_aclus: NDArray = serialized_field(init=False, hdf_metadata={'track_eXclusive_cells': 'Shared'}, metadata={'field_added': "2025.07.23_0"}) # the list of short-eXclusive cell aclus
+    AnyC_aclus: NDArray = serialized_field(init=False, hdf_metadata={'track_eXclusive_cells': 'AnyC'}, metadata={'field_added': "2025.07.23_0"}) # the list of short-eXclusive cell aclus
 
     Fig2_Replay_FR: List[SingleBarResult] = serialized_field(init=False, is_computable=True, serialization_fn=_InstantaneousSpikeRateGroupsComputation_convert_Fig2_ANY_FR_to_hdf_fn, hdf_metadata={'epochs': 'Replay'}) # a list of the four single-bar results.
     Fig2_Laps_FR: List[SingleBarResult] = serialized_field(init=False, is_computable=True, serialization_fn=_InstantaneousSpikeRateGroupsComputation_convert_Fig2_ANY_FR_to_hdf_fn, hdf_metadata={'epochs': 'Laps'}) # a list of the four single-bar results.
 
-    SharedCells_ReplayDeltaMinus: SpikeRateTrends = serialized_field(init=False, repr=False, default=None, is_computable=True, hdf_metadata={'track_eXclusive_cells': 'Shared', 'epochs': 'Replay', 'track_change_relative_period': 'DeltaMinus'}, metadata={'field_added': "2025.07.23_0"})
-    SharedCells_ReplayDeltaPlus: SpikeRateTrends = serialized_field(init=False, repr=False, default=None, is_computable=True, hdf_metadata={'track_eXclusive_cells': 'Shared', 'epochs': 'Replay', 'track_change_relative_period': 'DeltaPlus'}, metadata={'field_added': "2025.07.23_0"})
-    SharedCells_ThetaDeltaMinus: SpikeRateTrends = serialized_field(init=False, repr=False, default=None, is_computable=True, hdf_metadata={'track_eXclusive_cells': 'Shared', 'epochs': 'Laps', 'track_change_relative_period': 'DeltaMinus'}, metadata={'field_added': "2025.07.23_0"})
-    SharedCells_ThetaDeltaPlus: SpikeRateTrends = serialized_field(init=False, repr=False, default=None, is_computable=True, hdf_metadata={'track_eXclusive_cells': 'Shared', 'epochs': 'Laps', 'track_change_relative_period': 'DeltaPlus'}, metadata={'field_added': "2025.07.23_0"})
+    AnyC_ReplayDeltaMinus: SpikeRateTrends = serialized_field(init=False, repr=False, default=None, is_computable=True, hdf_metadata={'track_eXclusive_cells': 'AnyC', 'epochs': 'Replay', 'track_change_relative_period': 'DeltaMinus'}, metadata={'field_added': "2025.07.23_0"})
+    AnyC_ReplayDeltaPlus: SpikeRateTrends = serialized_field(init=False, repr=False, default=None, is_computable=True, hdf_metadata={'track_eXclusive_cells': 'AnyC', 'epochs': 'Replay', 'track_change_relative_period': 'DeltaPlus'}, metadata={'field_added': "2025.07.23_0"})
+    AnyC_ThetaDeltaMinus: SpikeRateTrends = serialized_field(init=False, repr=False, default=None, is_computable=True, hdf_metadata={'track_eXclusive_cells': 'AnyC', 'epochs': 'Laps', 'track_change_relative_period': 'DeltaMinus'}, metadata={'field_added': "2025.07.23_0"})
+    AnyC_ThetaDeltaPlus: SpikeRateTrends = serialized_field(init=False, repr=False, default=None, is_computable=True, hdf_metadata={'track_eXclusive_cells': 'AnyC', 'epochs': 'Laps', 'track_change_relative_period': 'DeltaPlus'}, metadata={'field_added': "2025.07.23_0"})
 
     LxC_ReplayDeltaMinus: SpikeRateTrends = serialized_field(init=False, repr=False, default=None, is_computable=True, hdf_metadata={'track_eXclusive_cells': 'LxC', 'epochs': 'Replay', 'track_change_relative_period': 'DeltaMinus'})
     LxC_ReplayDeltaPlus: SpikeRateTrends = serialized_field(init=False, repr=False, default=None, is_computable=True, hdf_metadata={'track_eXclusive_cells': 'LxC', 'epochs': 'Replay', 'track_change_relative_period': 'DeltaPlus'})
@@ -3169,8 +3169,7 @@ class InstantaneousSpikeRateGroupsComputation(PickleSerializableMixin, HDF_Seria
         ## Manual User-annotation mode:
         LxC_aclus = kwargs.pop('LxC_aclus', None)
         SxC_aclus = kwargs.pop('SxC_aclus', None)
-        Shared_aclus = kwargs.pop('Shared_aclus', None)
-                
+        AnyC_aclus = kwargs.pop('AnyC_aclus', None)
 
         annotation_man: UserAnnotationsManager = UserAnnotationsManager()
         session_cell_exclusivity: SessionCellExclusivityRecord = annotation_man.annotations[self.active_identifying_session_ctx].get('session_cell_exclusivity', None)
@@ -3188,20 +3187,20 @@ class InstantaneousSpikeRateGroupsComputation(PickleSerializableMixin, HDF_Seria
         spikes_df: pd.DataFrame = get_proper_global_spikes_df(curr_active_pipeline)
         all_spikes_aclus = deepcopy(spikes_df.spikes.neuron_ids)
         
-        if Shared_aclus is None:
+        if AnyC_aclus is None:
             ## build from the LxC and SxCs
-            Shared_aclus = np.array([aclu for aclu in all_spikes_aclus if ((aclu not in self.LxC_aclus) and (aclu not in self.SxC_aclus))])
-            self.Shared_aclus = Shared_aclus
+            # AnyC_aclus = np.array([aclu for aclu in all_spikes_aclus if ((aclu not in self.LxC_aclus) and (aclu not in self.SxC_aclus))]) ## shared only
+            AnyC_aclus = np.array([aclu for aclu in all_spikes_aclus]) # All
+            self.AnyC_aclus = AnyC_aclus
             
 
         # Replays: Uses `global_session.spikes_df`, `long_exclusive.track_exclusive_aclus, `short_exclusive.track_exclusive_aclus`, `long_replays`, `short_replays`
-        self.SharedCells_ReplayDeltaMinus        
-
-        # Shared: `Shared.track_exclusive_aclus`
+        
+        # AnyC: `AnyC.track_exclusive_aclus`
         # ReplayDeltaMinus: `long_replays`
-        self.SharedCells_ReplayDeltaMinus: SpikeRateTrends = SpikeRateTrends.init_from_spikes_and_epochs(spikes_df=deepcopy(spikes_df), filter_epochs=long_replays, included_neuron_ids=self.Shared_aclus, instantaneous_time_bin_size_seconds=self.instantaneous_time_bin_size_seconds, epoch_handling_mode=epoch_handling_mode)
+        self.AnyC_ReplayDeltaMinus: SpikeRateTrends = SpikeRateTrends.init_from_spikes_and_epochs(spikes_df=deepcopy(spikes_df), filter_epochs=long_replays, included_neuron_ids=self.AnyC_aclus, instantaneous_time_bin_size_seconds=self.instantaneous_time_bin_size_seconds, epoch_handling_mode=epoch_handling_mode)
         # ReplayDeltaPlus: `short_replays`
-        self.SharedCells_ReplayDeltaPlus: SpikeRateTrends = SpikeRateTrends.init_from_spikes_and_epochs(spikes_df=deepcopy(spikes_df), filter_epochs=short_replays, included_neuron_ids=self.Shared_aclus, instantaneous_time_bin_size_seconds=self.instantaneous_time_bin_size_seconds, epoch_handling_mode=epoch_handling_mode)
+        self.AnyC_ReplayDeltaPlus: SpikeRateTrends = SpikeRateTrends.init_from_spikes_and_epochs(spikes_df=deepcopy(spikes_df), filter_epochs=short_replays, included_neuron_ids=self.AnyC_aclus, instantaneous_time_bin_size_seconds=self.instantaneous_time_bin_size_seconds, epoch_handling_mode=epoch_handling_mode)
         
 
         # LxC: `long_exclusive.track_exclusive_aclus`
@@ -3231,11 +3230,11 @@ class InstantaneousSpikeRateGroupsComputation(PickleSerializableMixin, HDF_Seria
         
 
         # Laps/Theta: Uses `global_session.spikes_df`, `long_exclusive.track_exclusive_aclus, `short_exclusive.track_exclusive_aclus`, `long_laps`, `short_laps`
-        # Shared: `Shared.track_exclusive_aclus`
+        # AnyC: `AnyC.track_exclusive_aclus`
         # ThetaDeltaMinus: `long_laps`
-        self.SharedCells_ThetaDeltaMinus: SpikeRateTrends = SpikeRateTrends.init_from_spikes_and_epochs(spikes_df=deepcopy(spikes_df), filter_epochs=long_laps, included_neuron_ids=self.Shared_aclus, instantaneous_time_bin_size_seconds=self.instantaneous_time_bin_size_seconds, epoch_handling_mode=epoch_handling_mode)
+        self.AnyC_ThetaDeltaMinus: SpikeRateTrends = SpikeRateTrends.init_from_spikes_and_epochs(spikes_df=deepcopy(spikes_df), filter_epochs=long_laps, included_neuron_ids=self.AnyC_aclus, instantaneous_time_bin_size_seconds=self.instantaneous_time_bin_size_seconds, epoch_handling_mode=epoch_handling_mode)
         # ThetaDeltaPlus: `short_laps`
-        self.SharedCells_ThetaDeltaPlus: SpikeRateTrends = SpikeRateTrends.init_from_spikes_and_epochs(spikes_df=deepcopy(spikes_df), filter_epochs=short_laps, included_neuron_ids=self.Shared_aclus, instantaneous_time_bin_size_seconds=self.instantaneous_time_bin_size_seconds, epoch_handling_mode=epoch_handling_mode)
+        self.AnyC_ThetaDeltaPlus: SpikeRateTrends = SpikeRateTrends.init_from_spikes_and_epochs(spikes_df=deepcopy(spikes_df), filter_epochs=short_laps, included_neuron_ids=self.AnyC_aclus, instantaneous_time_bin_size_seconds=self.instantaneous_time_bin_size_seconds, epoch_handling_mode=epoch_handling_mode)
 
         # LxC: `long_exclusive.track_exclusive_aclus`
         # ThetaDeltaMinus: `long_laps`
@@ -3279,13 +3278,12 @@ class InstantaneousSpikeRateGroupsComputation(PickleSerializableMixin, HDF_Seria
         v_SxC_aclus = [list(self.SxC_aclus)] + [v.cell_agg_inst_fr_list for v in (self.SxC_ThetaDeltaMinus, self.SxC_ThetaDeltaPlus, self.SxC_ReplayDeltaMinus, self.SxC_ReplayDeltaPlus) if v is not None] + [(['SxC'] * n_SxC_aclus)]
         df_SxC_aclus = pd.DataFrame(dict(zip(table_columns, v_SxC_aclus)))
         
-        n_Shared_aclus: int = len(self.Shared_aclus)
-        v_Shared_aclus = [list(self.Shared_aclus)] + [v.cell_agg_inst_fr_list for v in (self.SharedCells_ThetaDeltaMinus, self.SharedCells_ThetaDeltaPlus, self.SharedCells_ReplayDeltaMinus, self.SharedCells_ReplayDeltaPlus) if v is not None] + [(['Shared'] * n_Shared_aclus)]
-        df_Shared_aclus = pd.DataFrame(dict(zip(table_columns, v_Shared_aclus)))
-
+        n_AnyC_aclus: int = len(self.AnyC_aclus)
+        v_AnyC_aclus = [list(self.AnyC_aclus)] + [v.cell_agg_inst_fr_list for v in (self.AnyC_ThetaDeltaMinus, self.AnyC_ThetaDeltaPlus, self.AnyC_ReplayDeltaMinus, self.AnyC_ReplayDeltaPlus) if v is not None] + [(['AnyC'] * n_AnyC_aclus)]
+        df_AnyC_aclus = pd.DataFrame(dict(zip(table_columns, v_AnyC_aclus)))
 
         # Concatenate the two dataframes
-        df_combined = pd.concat([df_LxC_aclus, df_SxC_aclus, df_Shared_aclus], ignore_index=True)
+        df_combined = pd.concat([df_LxC_aclus, df_SxC_aclus, df_AnyC_aclus], ignore_index=True)
         df_combined['inst_time_bin_seconds'] = float(self.instantaneous_time_bin_size_seconds)
         
         ## add session info
@@ -3418,8 +3416,7 @@ class InstantaneousSpikeRateGroupsComputation(PickleSerializableMixin, HDF_Seria
 
         """
         # Handle empty case
-        if ((self.LxC_aclus is None or len(self.LxC_aclus) == 0) and 
-            (self.SxC_aclus is None or len(self.SxC_aclus) == 0)):
+        if ((self.LxC_aclus is None or len(self.LxC_aclus) == 0) and (self.SxC_aclus is None or len(self.SxC_aclus) == 0) and (self.AnyC_aclus is None or len(self.AnyC_aclus) == 0)):
             base_columns = ['aclu', 'cell_type', 'cell_index_in_type', 'instantaneous_time_bin_size_seconds']
             fr_columns = ['replay_delta_minus_firing_rate', 'replay_delta_plus_firing_rate', 
                         'theta_delta_minus_firing_rate', 'theta_delta_plus_firing_rate']
@@ -3441,7 +3438,7 @@ class InstantaneousSpikeRateGroupsComputation(PickleSerializableMixin, HDF_Seria
             session_metadata.update({f'session_{k}': v for k, v in session_ctx_dict.items()})
 
         # Process each cell type
-        for cell_type, aclus in [('LxC', self.LxC_aclus), ('SxC', self.SxC_aclus), ('SharedCells', self.Shared_aclus)]:
+        for cell_type, aclus in [('LxC', self.LxC_aclus), ('SxC', self.SxC_aclus), ('AnyC', self.AnyC_aclus)]:
             if aclus is None or len(aclus) == 0:
                 continue
 
@@ -3498,6 +3495,8 @@ class InstantaneousSpikeRateGroupsComputation(PickleSerializableMixin, HDF_Seria
 
         # Create DataFrame
         df = pd.DataFrame(records)
+
+        df = df.drop_duplicates(subset=['aclu'], keep='last', ignore_index=True, inplace=False) ## drop any duplicate aclus, keep the last (AnyC version)
 
         # Add Fig2 summary statistics
         # Fig2_Replay_FR: [LxC_ReplayDeltaMinus, LxC_ReplayDeltaPlus, SxC_ReplayDeltaMinus, SxC_ReplayDeltaPlus]
