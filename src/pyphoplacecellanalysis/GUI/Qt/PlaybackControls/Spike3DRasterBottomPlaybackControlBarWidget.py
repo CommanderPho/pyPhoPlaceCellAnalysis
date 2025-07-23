@@ -663,19 +663,23 @@ class Spike3DRasterBottomPlaybackControlBar(ComboBoxCtrlOwningMixin, QWidget):
         
         """
         self.log_print(f'on_edit_number_field_revert_button_pressed()')
+
+        ## Uncheck
+        self.ui.btnEditNumberField_Toggle.setChecked(False)
+        self.on_edit_number_field_toggle_changed(is_checked=False)
+
+        # # Format the toggle button based on checked state
+        # self._format_boolean_toggle_button(button=self.ui.btnEditNumberField_Toggle)
         
-        # Format the toggle button based on checked state
-        self._format_boolean_toggle_button(button=self.ui.btnEditNumberField_Toggle)
+        # # Update the editability of the spinboxes
+        # self.on_start_end_doubleSpinBox_edit_mode_changed(is_checked)
         
-        # Update the editability of the spinboxes
-        self.on_start_end_doubleSpinBox_edit_mode_changed(is_checked)
+        # # Emit signal to notify other components
+        # self.sigManualEditWindowStartEndToggled.emit(is_checked)
         
-        # Emit signal to notify other components
-        self.sigManualEditWindowStartEndToggled.emit(is_checked)
-        
-        # If editing is enabled, set focus to the start time spinbox
-        if is_checked:
-            self.ui.doubleSpinBox_ActiveWindowStartTime.setFocus()
+        # # If editing is enabled, set focus to the start time spinbox
+        # if is_checked:
+        #     self.ui.doubleSpinBox_ActiveWindowStartTime.setFocus()
             
 
     @pyqtExceptionPrintingSlot(bool)
