@@ -211,7 +211,9 @@ class LongShortTrackComparingDisplayFunctions(AllFunctionEnumeratingMixin, metac
                     graphics_output_dict: MatplotlibRenderPlots = curr_active_pipeline.display('_display_batch_pho_jonathan_replay_firing_rate_comparison', active_identifying_session_ctx)
                     
 
-                #TODO 2025-07-23 15:55: - [ ] Currently exporting each cell programmatically still results in variation in the output width and alignment. Seems to depend on whether the cell has  long_pf/short_pf placefield1Ds or not and affects positions
+                #TODO 2025-07-23 15:55: - [x] Currently exporting each cell programmatically still results in variation in the output width and alignment. Seems to depend on whether the cell has  long_pf/short_pf placefield1Ds or not and affects positions
+                    - 2025-07-23 18:55: - [ ] Hopefully this has been fixed by removing the long/short placefield plots entirely
+                    
             """
             if include_includelist is None:
                 include_includelist = owning_pipeline_reference.active_completed_computation_result_names # ['maze', 'sprinkle']
@@ -1454,11 +1456,14 @@ class PhoJonathanPlotHelpers:
         
         # Add this parameter near the top with the other kwargs
         disable_left_and_right_pf_plots: bool = kwargs.get('disable_left_and_right_pf_plots', False)
+        disable_basic_title_label: bool = kwargs.get('disable_basic_title_label', False)
+
 
         # short_title_string = f'{aclu:02d}'
         prepare_for_publication: bool = kwargs.get('prepare_for_publication', True)
         if prepare_for_publication:
             disable_extra_info_labels = True ## force True
+            disable_basic_title_label = True ## force True
             title_cell_label_size: float = 12
             inactive_scatter_markersize = 2
             markersize = 4
@@ -1591,14 +1596,19 @@ class PhoJonathanPlotHelpers:
                 curr_ax_right_placefield = curr_fig.add_subplot(gs[1, -1], sharey=curr_ax_lap_spikes, label=f'ax_pf1D[{aclu:02d}]') # only the last element of the row
 
 
-        text_formatter = FormattedFigureText()
-        text_formatter.left_margin = 0.5
-        text_formatter.top_margin = 0.5
 
-        title_axes_kwargs = dict(ha="center", va="center", xycoords='axes fraction') # , ma="left"
-        # flexitext version:
-        title_text_obj = flexitext(text_formatter.left_margin, text_formatter.top_margin, formatted_cell_label_string, ax=curr_ax_cell_label, **title_axes_kwargs)
-        # curr_ax_cell_label.set_facecolor('0.95')
+        if (not disable_basic_title_label) or (not disable_extra_info_labels):
+            # If at least one label is required, build the figure layout for text
+            text_formatter = FormattedFigureText()
+            text_formatter.left_margin = 0.5
+            text_formatter.top_margin = 0.5
+
+        if (not disable_basic_title_label):
+            title_axes_kwargs = dict(ha="center", va="center", xycoords='axes fraction') # , ma="left"
+            # flexitext version:
+            title_text_obj = flexitext(text_formatter.left_margin, text_formatter.top_margin, formatted_cell_label_string, ax=curr_ax_cell_label, **title_axes_kwargs)
+            # curr_ax_cell_label.set_facecolor('0.95')
+
         if not disable_extra_info_labels:
             extra_information_text_obj = flexitext(text_formatter.left_margin, text_formatter.top_margin, optional_formatted_cell_label_string, xycoords='axes fraction', ax=curr_ax_extra_information_labels, ha="center", va="center") # no top margin
 
