@@ -2049,12 +2049,20 @@ def _plot_long_short_firing_rate_indicies(x_frs_index, y_frs_index, active_conte
 
     """
     import matplotlib
+    from pyphoplacecellanalysis.SpecificResults.PhoDiba2023Paper import PhoPublicationFigureHelper
     # from matplotlib.backends.backend_pgf import FigureCanvasPgf
     # matplotlib.backend_bases.register_backend('pdf', FigureCanvasPgf)
 
     # matplotlib.use('ps')
     # from matplotlib import rc
+    
 
+    # Laps_fr_label: str = '\\theta'
+    Laps_fr_label: str = '\\text{Laps}'
+
+    # PBE_fr_label: str = 'R'
+    PBE_fr_label: str = '\\text{PBE}'
+    
     # rc('text',usetex=True)
     # rc('text.latex', preamble=r'\usepackage{color}')
 
@@ -2083,14 +2091,16 @@ def _plot_long_short_firing_rate_indicies(x_frs_index, y_frs_index, active_conte
         # convert to pd.Series
         y_frs_index = pd.Series(y_frs_index.values(), index=y_frs_index.keys(), copy=False)
 
+
+    pre_delta_str: str = scatter_params.get('pre_delta_str', PhoPublicationFigureHelper.delta_minus_str) # 't < \\Delta'        
+    post_delta_str: str = scatter_params.get('post_delta_str', PhoPublicationFigureHelper.delta_plus_str) # 't > \\Delta'
+
+    # laps_fri_label_str: str = 'Laps Firing Rate Index $\\frac{\\theta_{' + f'{pre_delta_str}' + '}-\\theta_{' + f'{post_delta_str}' + '}}{\\theta_{' + f'{post_delta_str}' + '} + \\theta_{' + f'{pre_delta_str}' + '}}$'
+    # replays_fri_label_str: str = 'Replay Firing Rate Index $\\frac{R_{' + f'{pre_delta_str}' + '}-R_{' + f'{post_delta_str}' + '}}{R_{' + f'{post_delta_str}' + '} + R_{' + f'{pre_delta_str}' + '}}$'
     
-    pre_delta_str: str = f'⬖'
-    post_delta_str: str = f'⬗'
-
-    laps_fri_label_str: str = 'Laps Firing Rate Index $\\frac{\\theta_{' + f'{pre_delta_str}' + '}-\\theta_{' + f'{post_delta_str}' + '}}{\\theta_{' + f'{post_delta_str}' + '} + \\theta_{' + f'{pre_delta_str}' + '}}$'
-    replays_fri_label_str: str = 'Replay Firing Rate Index $\\frac{R_{' + f'{pre_delta_str}' + '}-R_{' + f'{post_delta_str}' + '}}{R_{' + f'{post_delta_str}' + '} + R_{' + f'{pre_delta_str}' + '}}$'
-
-                                                                                
+    laps_fri_label_str: str = r'$\left({' + Laps_fr_label + '_{' + f'{pre_delta_str}' + '}-' + Laps_fr_label + '_{' + f'{post_delta_str}' + r'}}\right)/\left({' + Laps_fr_label + '_{' + f'{post_delta_str}' + '} + ' + Laps_fr_label + '_{' + f'{pre_delta_str}' + r'}}\right)$'
+    replays_fri_label_str: str = r'$\left({' + PBE_fr_label + '_{' + f'{pre_delta_str}' + '}-' + PBE_fr_label + '_{' + f'{post_delta_str}' + r'}}\right)/\left({' + PBE_fr_label + '_{' + f'{post_delta_str}' + '} + ' + PBE_fr_label + '_{' + f'{pre_delta_str}' + r'}}\right)$'
+                                                
     scatter_params = dict(zorder=5) | scatter_params
     
     # Optionally swap the x and y axes:

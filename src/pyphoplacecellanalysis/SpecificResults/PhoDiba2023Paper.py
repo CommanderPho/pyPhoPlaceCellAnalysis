@@ -816,17 +816,18 @@ class PaperFigureTwo(SerializedAttributesAllowBlockSpecifyingClass):
     # @providing_context(fig='F2', frs='Laps')
     @classmethod
     def fig_2_Theta_FR_matplotlib(cls, Fig2_Laps_FR, defer_show=False, active_context=None, title_modifier=None, prepare_for_publication: bool = False, **kwargs) -> MatplotlibRenderPlots:
+        from pyphoplacecellanalysis.SpecificResults.PhoDiba2023Paper import PhoPublicationFigureHelper
         assert active_context is not None
         
-        # delta_minus_str: str = '\\Delta -'        
-        # delta_plus_str: str = '\\Delta +'
-        delta_minus_str: str = '⬖'        
-        delta_plus_str: str = '⬗'
+        delta_minus_str: str = kwargs.get('delta_minus_str', PhoPublicationFigureHelper.delta_minus_str) # 't < \\Delta'        
+        delta_plus_str: str = kwargs.get('delta_plus_str', PhoPublicationFigureHelper.delta_plus_str) # 't > \\Delta'
 
         var_name:str = 'Laps'
         active_context = active_context.adding_context_if_missing(variable=var_name) # title='Laps'
+        # Laps_fr_label: str = '\\theta'
+        Laps_fr_label: str = '\\text{Laps}'
 
-        x_labels = ['$L_x C$\t$\\theta_{' + delta_minus_str + '}$', '$L_x C$\t$\\theta_{' + delta_plus_str + '}$', '$S_x C$\t$\\theta_{' + delta_minus_str + '}$', '$S_x C$\t$\\theta_{' + delta_plus_str + '}$']
+        x_labels = [f'$L_d C$\t${Laps_fr_label}' + '_{' + delta_minus_str + '}$', f'$L_d C$\t${Laps_fr_label}' + '_{' + delta_plus_str + '}$', f'$S_d C$\t${Laps_fr_label}' + '_{' + delta_minus_str + '}$', f'$S_d C$\t${Laps_fr_label}' + '_{' + delta_plus_str + '}$']
         all_data_points = np.array([v.values for v in Fig2_Laps_FR])
         # all_scatter_props =  Fig2_Laps_FR[0].LxC_scatter_props + Fig2_Laps_FR[1].LxC_scatter_props + Fig2_Laps_FR[2].SxC_scatter_props + Fig2_Laps_FR[3].SxC_scatter_props # the LxC_scatter_props and SxC_scatter_props are actually the same for all entries in this list, but get em like this anyway. 
 
@@ -844,17 +845,20 @@ class PaperFigureTwo(SerializedAttributesAllowBlockSpecifyingClass):
     # @providing_context(fig='F2', frs='Replay')
     @classmethod
     def fig_2_Replay_FR_matplotlib(cls, Fig2_Replay_FR, defer_show=False, active_context=None, title_modifier=None, prepare_for_publication: bool = False, **kwargs) -> MatplotlibRenderPlots:
+        from pyphoplacecellanalysis.SpecificResults.PhoDiba2023Paper import PhoPublicationFigureHelper
+
         assert active_context is not None
         
-        # delta_minus_str: str = '\\Delta -'        
-        # delta_plus_str: str = '\\Delta +'
-        delta_minus_str: str = '⬖'        
-        delta_plus_str: str = '⬗'
+        delta_minus_str: str = kwargs.get('delta_minus_str', PhoPublicationFigureHelper.delta_minus_str) # 't < \\Delta'        
+        delta_plus_str: str = kwargs.get('delta_plus_str', PhoPublicationFigureHelper.delta_plus_str) # 't > \\Delta'
         
         var_name:str = 'Replay'
         active_context = active_context.adding_context_if_missing(variable=var_name) # title='Laps'
-        
-        x_labels = ['$L_x C$\t$R_{' + delta_minus_str + '}$', '$L_x C$\t$R_{' + delta_plus_str + '}$', '$S_x C$\t$R_{' + delta_minus_str + '}$', '$S_x C$\t$R_{' + delta_plus_str + '}$']
+
+        # PBE_fr_label: str = 'R'
+        PBE_fr_label: str = '\\text{PBE}'
+
+        x_labels = [f'$L d C$\t${PBE_fr_label}' + '_{' + delta_minus_str + '}$', f'$L d C$\t${PBE_fr_label}' + '_{' + delta_plus_str + '}$', f'$S d C$\t${PBE_fr_label}' + '_{' + delta_minus_str + '}$', f'$S d C$\t${PBE_fr_label}' + '_{' +  delta_plus_str + '}$']
         assert len(Fig2_Replay_FR) == 4
         all_data_points = np.array([v.values for v in Fig2_Replay_FR])
         # all_scatter_props = Fig2_Replay_FR[0].LxC_scatter_props + Fig2_Replay_FR[1].LxC_scatter_props + Fig2_Replay_FR[2].SxC_scatter_props + Fig2_Replay_FR[3].SxC_scatter_props # the LxC_scatter_props and SxC_scatter_props are actually the same for all entries in this list, but get em like this anyway. 
@@ -3612,6 +3616,13 @@ class PhoPublicationFigureHelper:
     
     
     """
+    # delta_minus_str: str = '\\Delta -'        
+    # delta_plus_str: str = '\\Delta +'
+    # delta_minus_str: str = '⬖'        
+    # delta_plus_str: str = '⬗'
+    delta_minus_str: str = 't < \\Delta'        
+    delta_plus_str: str = 't > \\Delta'
+    
     @classmethod
     def rc_context_kwargs(cls, prepare_for_publication: bool=True, **kwargs) -> Dict:
         """
