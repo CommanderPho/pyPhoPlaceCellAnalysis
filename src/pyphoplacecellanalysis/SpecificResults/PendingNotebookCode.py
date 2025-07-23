@@ -900,6 +900,30 @@ class TimeBinCategorization(Enum):
         else:
             raise NotImplementedError(f'{self} is not VALID')
 
+    def to_numeric(self) -> int:
+        """Returns an integer representation (-1, 0, +1) of the span type"""
+        if (self.value == self.pLONG.value):
+            return 1
+        elif (self.value == self.pSHORT.value):
+            return -1
+        elif (self.value == self.MIXED.value):
+            return 0
+        else:
+            raise NotImplementedError(f'{self} is not VALID')
+
+
+    def to_two_column_vector(self) -> NDArray:
+        """Returns an integer representation (-1, 0, +1) of the span type"""
+        if (self.value == self.pLONG.value):
+            return [1, 0]
+        elif (self.value == self.pSHORT.value):
+            return [0, 1]
+        elif (self.value == self.MIXED.value):
+            return [0.5, 0.5]
+        else:
+            raise NotImplementedError(f'{self} is not VALID')
+        
+
     
 @metadata_attributes(short_name=None, tags=['run-lengths', 'sequence-analysis', 'temporal'], input_requires=[], output_provides=[], uses=['TimeBinCategorization'], used_by=[], creation_date='2025-05-16 04:28', related_items=[])
 class WithinEpochTimeBinDynamics:
@@ -925,6 +949,14 @@ class WithinEpochTimeBinDynamics:
             return TimeBinCategorization.pSHORT # 'pure.Short'
         else:
             return TimeBinCategorization.MIXED # 'mixed'
+
+    @classmethod
+    def classify_binary(cls, p: float) -> TimeBinCategorization:
+        if p >= 0.5:
+            return TimeBinCategorization.pLONG # 'pure.Long'
+        else:
+            return TimeBinCategorization.pSHORT # 'pure.Short'
+
 
     @function_attributes(short_name=None, tags=['private', 'run-length'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-05-16 01:29', related_items=[])
     @classmethod
@@ -969,7 +1001,7 @@ class WithinEpochTimeBinDynamics:
         return np.array(subseq_lengths), np.array(subseq_start_idxs), run_subseq_type_id, _out_dict
 
 
-    @function_attributes(short_name=None, tags=['MAIN'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-05-16 04:27', related_items=[])
+    @function_attributes(short_name=None, tags=['MAIN', 'transition-analysis'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-05-16 04:27', related_items=[])
     @classmethod
     def analyze_subsequence_temporal_dynamics(cls, curr_active_pipeline, time_bin_size=0.025, should_show_complex_intermediate_columns: bool = False):
         """ 
@@ -979,9 +1011,12 @@ class WithinEpochTimeBinDynamics:
         
         """        
         from pyphocorehelpers.assertion_helpers import Assert
-                
+
+        # active_state_col_name: str = 'state_seq'
+        active_state_col_name: str = 'state_seq_binary'
+        
         complex_column_names: List[str] = ['type_subseq_lengths_dict', 'state_seq', 'type_string_seq']
-        transferred_column_names: List[str] = ['pre_post_delta_category',  'pre_post_delta_id', 'delta_aligned_start_t']
+        transferred_column_names: List[str] = ['pre_post_delta_category', 'pre_post_delta_id', 'delta_aligned_start_t']
 
         valid_EpochComputations_result: EpochComputationsComputationsContainer = curr_active_pipeline.global_computation_results.computed_data['EpochComputations']
         a_new_fully_generic_result: GenericDecoderDictDecodedEpochsDictResult = valid_EpochComputations_result.a_generic_decoder_dict_decoded_epochs_dict_result
@@ -1000,8 +1035,8 @@ class WithinEpochTimeBinDynamics:
         ## INPUTS: a_decoded_marginal_posterior_df
         epoch_df = deepcopy(a_decoded_marginal_posterior_df)
         epoch_df['state_seq'] = epoch_df['P_Long'].map(cls.classify)
-        # epoch_df
-
+        epoch_df['state_seq_binary'] = epoch_df['P_Long'].map(cls.classify_binary) # .map(lambda x: cls.classify_binary(x).to_numeric()).astype(int)
+        
         #  ['P_LR', 'P_RL', 'P_Long', 'P_Short', 'long_LR', 'long_RL', 'short_LR', 'short_RL', 'result_t_bin_idx', 'epoch_df_idx', 'parent_epoch_label', 'parent_epoch_duration', 'label', 'start', 't_bin_center', 'stop', 'delta_aligned_start_t',
         #  'session_name', 'time_bin_size', 'pre_post_delta_category', 'trained_compute_epochs', 'pfND_ndim', 'decoder_identifier', 'known_named_decoding_epochs_type', 'masked_time_bin_fill_type', 'data_grain', 'format_name', 'animal', 'exper_name', 'epochs_source', 'included_qclu_values', 'minimum_inclusion_fr_Hz', 'is_t_bin_center_fake', 'pre_post_delta_id', 'state_seq']
         print(f'epoch_df.columns: {list(epoch_df.columns)}') 
@@ -1022,6 +1057,7 @@ class WithinEpochTimeBinDynamics:
                 'epoch_end_t': epoch_end_t,
                 'epoch_label': epoch_label,
             }
+
             for a_col_name in transferred_column_names:
                 if a_col_name in an_epoch_df:
                     curr_values = an_epoch_df[a_col_name].to_numpy()
@@ -1030,14 +1066,29 @@ class WithinEpochTimeBinDynamics:
                     a_value = curr_values[0] ## get the first, they better all match
                     a_result_dict[a_col_name] = a_value
                 else:
-                    print(f'WARN: column "{a_col_name}" is missing from epoch_df!')
+                    # print(f'WARN: column "{a_col_name}" is missing from epoch_df!')
+                    pass
                     
             # epoch_states = state_seq[epoch_start_t:epoch_end_t]
-            epoch_states = an_epoch_df['state_seq'].to_numpy()
+            epoch_states = an_epoch_df[active_state_col_name].to_numpy()
             n_t_bins: int = len(epoch_states)
             n_transitions: int = np.sum(epoch_states[1:] != epoch_states[:-1])
             subseq_lengths, subseq_start_idxs, run_subseq_type_id, an_epoch_out_dict = cls.run_length_encoding(epoch_states)
+
+            ideal_epoch_states_col_vectors: NDArray = np.vstack([c.to_two_column_vector() for c in epoch_states]).T
             
+
+            np.ones((1, subseq_lengths[0]))
+
+            np.tile(np.array([1, 0]).T, (1, subseq_lengths[0]))
+            
+            # dist_from_ideal: float = np.nansum((ideal_epoch_states_col_vectors - np.where((an_epoch_df['state_seq_binary'] == TimeBinCategorization.pLONG), an_epoch_df['P_Long'], an_epoch_df['P_Short'])), axis=1)
+            
+            dist_from_ideal: float = np.nansum((ideal_epoch_states_col_vectors - an_epoch_df[['P_Long', 'P_Short']].to_numpy().T), axis=1)
+
+
+            # dist_from_ideal: float = np.nansum(1.0 - np.where((an_epoch_df['state_seq_binary'] == TimeBinCategorization.pLONG), an_epoch_df['P_Long'], an_epoch_df['P_Short']))
+
             a_result_dict.update({
                 'n_t_bins': n_t_bins,
                 'n_transitions': int(n_transitions),
