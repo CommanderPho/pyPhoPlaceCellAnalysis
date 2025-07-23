@@ -203,13 +203,13 @@ class IntervalRectsItem(pg.GraphicsObject):
                 return i
         return None
     
-    def _default_format_tooltip_for_rect_data(self, rect_index: int, rect_data_tuple: Tuple) -> str:
+    @classmethod
+    def _default_format_tooltip_for_rect_data(cls, rect_index: int, rect_data_tuple: Tuple) -> str:
         """ rect_data_tuple = self.data[rect_index]
         start_t, series_vertical_offset, duration_t, series_height, pen, brush = rect_data_tuple
         """
         start_t, series_vertical_offset, duration_t, series_height, pen, brush = rect_data_tuple
         end_t = start_t + duration_t
-        
         tooltip_text = f"Item[{rect_index}]\nStart: {start_t:.3f}\nEnd: {end_t:.3f}\nDuration: {duration_t:.3f}"
         return tooltip_text
 
