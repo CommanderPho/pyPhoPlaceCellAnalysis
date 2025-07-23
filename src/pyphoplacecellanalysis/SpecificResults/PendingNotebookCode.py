@@ -110,46 +110,75 @@ from pyphocorehelpers.gui.Qt.color_helpers import ColormapHelpers, ColorFormatCo
 @metadata_attributes(short_name=None, tags=['remapping', 'model'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-07-08 17:40', related_items=[])
 class CellFieldRemappingModels:
     """ Various methods to explain how cells remap. """
+    inward_endcap_offset_magnitude: float = 15.0
+    short_track_distance_bound: float = 57.0 # the amplitude of the max endcap endpoint for the short track (furthest valid point away from midpoint)
+    
+    scale_factor_track_body_only: float = 0.7 # (35.0/50.0)
+    scale_factor_entire_track_length: float = (57.0/72.0)
+
+    # linear_translation_wiggle_room_cm: float = 40.0 ## allow point to be anywhere within 40.0cm of expected point by translation
+    linear_translation_wiggle_room_cm: float = 50.0 ## allow point to be anywhere within 40.0cm of expected point by translation
+
     @classmethod
-    def endcap_anchored(cls, L: float, m: float) -> float:
+    def nearest_endcap_anchored(cls, L: float, m: float) -> float:
         """ transformation between long (L) and short (S) for endcap-anchored fields """
         # Define the piecewise function using np.piecewise
-        return np.piecewise(L, [L < m, L == m, L > m],           # Conditions
-                        [lambda L, m: L - 15,
+        return np.piecewise(L, [(L < m), (L == m), (L > m)],           # Conditions
+                        [lambda L, m: L + cls.inward_endcap_offset_magnitude, # anchored to -endcap -> (-endcap_L + 15)
                          lambda L, m: m,
-                         lambda L, m: L + 15,
+                         lambda L, m: L - cls.inward_endcap_offset_magnitude, # anchored to +endcap -> (+endcap_L - 15)
                          ], m)
-
+    
+    @classmethod
+    def left_endcap_anchored(cls, L: float, m: float) -> float:
+        """ transformation between long (L) and short (S) for left endcap-anchored fields """
+        return (L + cls.inward_endcap_offset_magnitude) # anchored to -endcap -> (-endcap_L + 15)
 
     @classmethod
-    def midpoint_anchored(cls, L: float, m: float) -> float:
-        """ transformation between long (L) and short (S) for endcap-anchored fields """
-        # Define the piecewise function using np.piecewise
-        return L
+    def right_endcap_anchored(cls, L: float, m: float) -> float:
+        """ transformation between long (L) and short (S) for right endcap-anchored fields """
+        return (L - cls.inward_endcap_offset_magnitude) # anchored to +endcap -> (+endcap_L - 15) 
+
+
+    # @classmethod
+    # def midpoint_anchored(cls, L: float, m: float) -> float:
+    #     """ transformation between long (L) and short (S) for endcap-anchored fields """
+    #     # Define the piecewise function using np.piecewise
+    #     return L ## L is equal S
     
     @classmethod
     def room_anchored(cls, L: float, m: float) -> float:
         """ transformation between long (L) and short (S) for endcap-anchored fields """
-        short_track_distance_bound: float = 57
-        return np.piecewise(L, [L >= short_track_distance_bound, ((L >= m) and (L < short_track_distance_bound)), ((L < m) and (L > -short_track_distance_bound)), L <= -short_track_distance_bound],           # Conditions
-                        [lambda L, m: short_track_distance_bound,
+        return np.piecewise(L, [(L >= cls.short_track_distance_bound), ((L >= m) and (L < cls.short_track_distance_bound)), ((L < m) and (L > -cls.short_track_distance_bound)), (L <= -cls.short_track_distance_bound)],           # Conditions
+                        [lambda L, m: cls.short_track_distance_bound, ## has to clip to endcap
                          lambda L, m: L,
                          lambda L, m: L,
-                         lambda L, m: -short_track_distance_bound,
+                         lambda L, m: -cls.short_track_distance_bound, ## clips to -endcap
                          ], m)
 
     @classmethod
-    def linear_scaling(cls, L: float, m: float) -> float:
+    def linear_scaling_by_track_body(cls, L: float, m: float) -> float:
         """ transformation between long (L) and short (S) for endcap-anchored fields """
-        # Define the piecewise function using np.piecewise
-        return L * 0.7 
+        return L * cls.scale_factor_track_body_only # 0.7 
+    
+
+    @classmethod
+    def linear_scaling_by_entire_track(cls, L: float, m: float) -> float:
+        """ transformation between long (L) and short (S) for endcap-anchored fields """
+        return L * cls.scale_factor_entire_track_length
+    
+
     
 
     @classmethod
     def get_model_test_fns_dict(cls) -> Dict:
         """ returns a dict containing each of the remapping models
         """
-        return {'endcap_anchored':cls.endcap_anchored, 'midpoint_anchored':cls.midpoint_anchored, 'room_anchored': cls.room_anchored, 'linear_scaling': cls.linear_scaling}
+        raise NotImplementedError(f' #TODO 2025-07-23 15:47: - [ ] THIS DOES NOT FULLY WORK and is UNTESTED')
+        return {'nearest_endcap_anchored':cls.nearest_endcap_anchored, 'left_endcap_anchored':cls.left_endcap_anchored, 'right_endcap_anchored':cls.right_endcap_anchored, 
+                # 'midpoint_anchored':cls.midpoint_anchored,
+                'room_anchored': cls.room_anchored, 
+                'linear_scaling_by_track_body': cls.linear_scaling_by_track_body, 'linear_scaling_by_entire_track': cls.linear_scaling_by_entire_track}
 
     # ==================================================================================================================================================================================================================================================================================== #
     # END MODELS                                                                                                                                                                                                                                                                           #
@@ -190,8 +219,8 @@ class CellFieldRemappingModels:
         active_scatter_all_neuron_stats_table: pd.DataFrame = deepcopy(all_neuron_stats_table).fillna(value=np.nan, inplace=False) ## fill all Pandas.NA values with np.nan so they can be correctly cast to floats
         # active_scatter_all_neuron_stats_table
 
-        if '_BAK_has_considerable_remapping' not in active_scatter_all_neuron_stats_table:
-            active_scatter_all_neuron_stats_table['_BAK_has_considerable_remapping'] = active_scatter_all_neuron_stats_table['has_considerable_remapping']
+        if ('_BAK_has_considerable_remapping' not in active_scatter_all_neuron_stats_table):
+            active_scatter_all_neuron_stats_table['_BAK_has_considerable_remapping'] = deepcopy(active_scatter_all_neuron_stats_table['has_considerable_remapping'])
         else:
             print(f'WARN: active_scatter_all_neuron_stats_table already contains the "_BAK_has_considerable_remapping", a backup has already been made and will not be overwritten!')
 
