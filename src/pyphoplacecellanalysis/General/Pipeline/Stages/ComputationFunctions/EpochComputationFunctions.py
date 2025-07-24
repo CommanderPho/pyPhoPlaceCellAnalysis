@@ -3217,7 +3217,10 @@ class EpochComputationDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Di
             pseudo2D_split_to_1D_out_paths, pseudo2D_split_to_1D_out_custom_formats_dict = PosteriorExporting.perform_export_all_decoded_posteriors_as_images(decoder_laps_filter_epochs_decoder_result_dict=_pseudo2D_split_to_1D_continuous_results_dict_dict['laps'],
                                                                                                                         decoder_ripple_filter_epochs_decoder_result_dict=_pseudo2D_split_to_1D_continuous_results_dict_dict['ripple'], ## just the ripples
                                                                                                                     _save_context=_parent_save_context, parent_output_folder=_specific_session_output_folder,
-                                                                                                                    desired_height=desired_height, custom_export_formats=pseudo2D_split_to_1D_custom_export_formats, combined_img_padding=6, combined_img_separator_color=(255, 255, 255, 255))
+                                                                                                                    desired_height=desired_height, custom_export_formats=pseudo2D_split_to_1D_custom_export_formats, combined_img_padding=6,
+                                                                                                                    #  combined_img_separator_color=(255, 255, 255, 255),
+                                                                                                                    combined_img_separator_color=(200, 46, 33, 10),
+                                                                                                                     )
             if not isinstance(graphics_output_dict['out_paths'], benedict):
                 graphics_output_dict['out_paths'] = benedict(graphics_output_dict['out_paths']) # 'out_paths': out_paths
             # graphics_output_dict['out_paths'].merge(pseudo2D_split_to_1D_out_paths)
