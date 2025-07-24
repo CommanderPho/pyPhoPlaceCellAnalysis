@@ -55,9 +55,7 @@ if TYPE_CHECKING:
     ## typehinting only imports here
     from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.ContainerBased.RankOrderRastersDebugger import RankOrderRastersDebugger
 
-
-from pyphocorehelpers.plotting.media_output_helpers import ImagePostRenderFunctionSets
-
+from pyphocorehelpers.plotting.media_output_helpers import ImagePostRenderFunctionSets, ImageStackOrientation  # used in `_subfn_build_combined_output_images`
 
 
 
@@ -607,9 +605,6 @@ class PosteriorExporting:
                     complete_epoch_identifier_str = f"{epoch_id_identifier_str}"
 
                 assert complete_epoch_identifier_str is not None
-            
-                # _posterior_image, posterior_save_path = active_captured_single_epoch_result.save_posterior_as_image(parent_array_as_image_output_folder=v.export_folder, export_grayscale=v.export_grayscale, colormap=v.colormap, skip_img_normalization=False, desired_height=desired_height, **kwargs)
-                # _posterior_image, posterior_save_path = active_captured_single_epoch_result.save_posterior_as_image(parent_array_as_image_output_folder=export_format_config.export_folder, **(kwargs|export_format_config.to_dict()), post_render_image_functions=curr_post_render_image_functions_dict)
                 _posterior_image, posterior_save_path = active_captured_single_epoch_result.save_posterior_as_image(parent_array_as_image_output_folder=export_format_config.export_folder, complete_epoch_identifier_str=complete_epoch_identifier_str, **(kwargs|export_format_config.to_dict()), post_render_image_functions=curr_post_render_image_functions_dict)
             
                 _output_export_format_config = deepcopy(export_format_config)
@@ -628,12 +623,13 @@ class PosteriorExporting:
 
     @function_attributes(short_name=None, tags=['private', 'helper'], input_requires=[], output_provides=[], uses=[], used_by=['._subfn_perform_export_single_epochs'], creation_date='2025-05-14 11:00', related_items=[])
     @classmethod
-    def _subfn_build_combined_output_images(cls, single_known_epoch_type_dict: Dict[DecoderName, Dict[str, List[HeatmapExportConfig]]], specific_epochs_posterior_out_folder: Path, known_epoch_type_name: str = 'laps', custom_export_format_series_name: str = 'color', joined_export_folder_name: str = 'combined', combined_img_padding=4, combined_img_separator_color=None):
+    def _subfn_build_combined_output_images(cls, single_known_epoch_type_dict: Dict[DecoderName, Dict[str, List[HeatmapExportConfig]]], specific_epochs_posterior_out_folder: Path, known_epoch_type_name: str = 'laps', custom_export_format_series_name: str = 'color', joined_export_folder_name: str = 'combined', combined_img_padding=4, combined_img_separator_color=None,
+                                            stack_orientations: List[ImageStackOrientation] = [ImageStackOrientation.GRID]):
         """ exports combined images stiched across the seperate decoder's images
         
         """
-        from pyphocorehelpers.plotting.media_output_helpers import vertical_image_stack, horizontal_image_stack, image_grid # used in `_subfn_build_combined_output_images`
-        
+        from pyphocorehelpers.plotting.media_output_helpers import ImageStackOrientation  # used in `_subfn_build_combined_output_images`
+                
         ## INPUTS: out_custom_formats_dict, known_epoch_type_name, custom_export_format_series_name
 
         # _output_combined_dir = _out['parent_specific_session_output_folder'].joinpath(known_epoch_type_name, joined_export_folder_name, custom_export_format_series_name).resolve()
@@ -657,14 +653,22 @@ class PosteriorExporting:
         _output_combined_image_save_dirs = []
         for i in np.arange(num_exported_epochs):
             ## for a single epoch:
-            _single_epoch_row = [out_all_decoders_epochs_list[0][i], out_all_decoders_epochs_list[1][i], out_all_decoders_epochs_list[2][i], out_all_decoders_epochs_list[3][i]]
-            _single_epoch_combined_img = horizontal_image_stack(_single_epoch_row, padding=combined_img_padding, separator_color=combined_img_separator_color)
-            _single_epoch_single_series_single_export_type_rows_list.append(_single_epoch_combined_img)
             
-            ## Save the image:
-            _img_path = _output_combined_dir.joinpath(f'merged_{known_epoch_type_name}[{i}].png').resolve()
-            _single_epoch_combined_img.save(_img_path)
-            _output_combined_image_save_dirs.append(_img_path)
+            # _single_epoch_combined_img = horizontal_image_stack(_single_epoch_row, padding=combined_img_padding, separator_color=combined_img_separator_color)
+            # _single_epoch_combined_img = vertical_image_stack(_single_epoch_row, padding=combined_img_padding, separator_color=combined_img_separator_color)
+            
+            for an_orientation in stack_orientations:
+                if an_orientation.is_grid:
+                    _single_epoch_row = [[out_all_decoders_epochs_list[0][i], out_all_decoders_epochs_list[1][i]], [out_all_decoders_epochs_list[2][i], out_all_decoders_epochs_list[3][i]]] # 2 x 2
+                else:
+                    _single_epoch_row = [out_all_decoders_epochs_list[0][i], out_all_decoders_epochs_list[1][i], out_all_decoders_epochs_list[2][i], out_all_decoders_epochs_list[3][i]] # 4 x 1
+                    
+                _single_epoch_combined_img = an_orientation.stack_images(_single_epoch_row, padding=combined_img_padding, separator_color=combined_img_separator_color)    
+                _single_epoch_single_series_single_export_type_rows_list.append(_single_epoch_combined_img)
+                ## Save the image:
+                _img_path = _output_combined_dir.joinpath(f'merged{an_orientation.shortname}_{known_epoch_type_name}[{i}].png').resolve() # 'mergedV_laps[0].png'
+                _single_epoch_combined_img.save(_img_path)
+                _output_combined_image_save_dirs.append(_img_path)
 
         ## OUTPUTS: _output_combined_dir, out_all_decoders_epochs_list, _single_epoch_single_series_single_export_type_rows_list, _output_combined_image_save_dirs
         return _output_combined_dir, _output_combined_image_save_dirs
@@ -689,7 +693,6 @@ class PosteriorExporting:
             posterior_out_folder = specific_epochs_posterior_out_folder.joinpath(a_decoder_name).resolve() # 'K:/scratch/collected_outputs/figures/_temp_individual_posteriors/2024-09-30/gor01_one_2006-6-09_1-22-43/ripple/long_RL'
             posterior_out_folder.mkdir(parents=True, exist_ok=True)
             # print(f'a_decoder_name: {a_decoder_name}, _specific_save_context: {_specific_save_context}, posterior_out_folder: {posterior_out_folder}')
-            # (an_out_posterior_out_folder, *an_out_path_extra_paths), an_out_flat_save_out_paths = cls.export_decoded_posteriors_as_images(a_decoder_decoded_epochs_result=a_decoder_decoded_epochs_result, out_context=_specific_save_context, posterior_out_folder=posterior_out_folder, desired_height=desired_height, custom_exports_dict=custom_exports_dict)
             (an_out_posterior_out_folder, a_custom_export_format_results), an_out_flat_save_out_paths = cls.export_decoded_posteriors_as_images(a_decoder_decoded_epochs_result=a_decoder_decoded_epochs_result, posterior_out_folder=posterior_out_folder,
                                                                                                                                                     desired_height=desired_height, custom_export_formats=custom_export_formats, **kwargs) #TODO 2025-05-14 08:55: - [ ] BUG?!? Is it possible to plot the overlaid color image when iterating through the decoders 1-by-1? Don't I need all 4 at once?
             
