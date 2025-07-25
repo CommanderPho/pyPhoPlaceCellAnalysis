@@ -125,7 +125,7 @@ class SpikeRateTrends(HDFMixin, AttrsBasedClassHelperMixin):
                 print(f'UseAllEpochsMode')
                 pass
             else:
-                raise NotImplementedError(f'epoch_handling_mode: {epoch_handling_mode} is unsupported.')
+                raise NotImplementedError(f'epoch_handling_mode: "{epoch_handling_mode}" is unsupported.')
             
             epoch_inst_fr_df_list, epoch_inst_fr_signal_list, epoch_agg_firing_rates_list, epoch_results_list_dict = cls.compute_epochs_unit_avg_inst_firing_rates(spikes_df=spikes_df, filter_epochs=filter_epochs_df, included_neuron_ids=included_neuron_ids, instantaneous_time_bin_size_seconds=instantaneous_time_bin_size_seconds, kernel=kernel,
                                                                                                                                           use_instantaneous_firing_rate=use_instantaneous_firing_rate, **kwargs)
@@ -166,7 +166,7 @@ class SpikeRateTrends(HDFMixin, AttrsBasedClassHelperMixin):
 
 
     @classmethod
-    def compute_simple_time_binned_firing_rates_df(cls, active_spikes_df, time_bin_size_seconds=0.5, debug_print=False) -> Tuple[pd.DataFrame, pd.DataFrame, NDArray, BinningInfo]:
+    def compute_simple_time_binned_firing_rates_df(cls, active_spikes_df: pd.DataFrame, time_bin_size_seconds: float=0.5, debug_print=False) -> Tuple[pd.DataFrame, pd.DataFrame, NDArray, BinningInfo]:
         """ This simple function computes the firing rates for each time bin. 
         Captures: debug_print
         """
@@ -268,7 +268,14 @@ class SpikeRateTrends(HDFMixin, AttrsBasedClassHelperMixin):
                 epoch_results_list_dict['spike_counts'].append(epoch_units_total_num_spikes_df)
                 
             else:
-                unit_specific_binned_spike_rate_df, unit_specific_binned_spike_counts_df, time_window_edges, time_window_edges_binning_info = SpikeRateTrends.compute_simple_time_binned_firing_rates_df(epoch_spikes_df, time_bin_size_seconds=instantaneous_time_bin_size_seconds, debug_print=debug_print) # returns dfs containing only the relevant entries
+                ## Non-instantaneous rate
+                # 2025-07-25 08:51 IMPORTANT: since this is calculated by dividing the number of spikes in each time bin by the duration of each bin, when the duration exceeds the length of the epoch it will be divided by too large of a bin size
+                if instantaneous_time_bin_size_seconds > epoch_duration:
+                    epoch_instantaneous_time_bin_size_seconds: float = epoch_duration
+                else:
+                    epoch_instantaneous_time_bin_size_seconds: float = instantaneous_time_bin_size_seconds
+                                    
+                unit_specific_binned_spike_rate_df, unit_specific_binned_spike_counts_df, time_window_edges, time_window_edges_binning_info = SpikeRateTrends.compute_simple_time_binned_firing_rates_df(epoch_spikes_df, time_bin_size_seconds=epoch_instantaneous_time_bin_size_seconds, debug_print=debug_print) # returns dfs containing only the relevant entries
                 n_epoch_time_bins: int = np.shape(unit_specific_binned_spike_rate_df)[0]
                 ## Convert the returned df to a "full" representation: containing a column for each aclu in `included_neuron_ids` (which will be all zeros for aclus not active in this epoch)
                 unit_specific_binned_spike_rate_dict = unit_specific_binned_spike_rate_df.to_dict('list')

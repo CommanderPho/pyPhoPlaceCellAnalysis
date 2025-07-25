@@ -126,6 +126,7 @@ class ZhangReconstructionImplementation:
         unit_specific_binned_spike_counts = pd.DataFrame(unit_specific_binned_spike_counts, columns=active_unique_aclu_values, index=time_bin_indicies)
         return unit_specific_binned_spike_counts
     
+
     @staticmethod
     def compute_time_binned_spiking_activity(spikes_df, max_time_bin_size:float=0.02, debug_print=False):
         """Given a spikes dataframe, this function temporally bins the spikes, counting the number that fall into each bin.
@@ -155,7 +156,7 @@ class ZhangReconstructionImplementation:
         """
         time_window_edges, time_window_edges_binning_info, spikes_df = ZhangReconstructionImplementation.compute_time_bins(spikes_df, max_time_bin_size=max_time_bin_size, debug_print=debug_print) # importantly adds 'binned_time' column to spikes_df
         active_indicies = time_window_edges_binning_info.bin_indicies[1:] # pre-2025-01-13 Old way that led to losing a time bin
-        # active_indicies = time_window_edges_binning_info.bin_indicies[:-1] # 2025-01-14 New way that supposedly uses correct indexing
+        # active_indicies = time_window_edges_binning_info.bin_indicies[:-1] # ABORT - 2025-01-14 New way that supposedly uses correct indexing - ACTUALLY Mismatch: The binned_time column contains labels [1, 2, ..., N] but your DataFrame uses index [0, 1, ..., N-1] when using [:-1]
         unit_specific_binned_spike_counts = ZhangReconstructionImplementation.compute_unit_specific_bin_specific_spike_counts(spikes_df, active_indicies, debug_print=debug_print) # 2025-01-13 16:14 replaced [1:] with [:-1]
         return unit_specific_binned_spike_counts, time_window_edges, time_window_edges_binning_info
 
