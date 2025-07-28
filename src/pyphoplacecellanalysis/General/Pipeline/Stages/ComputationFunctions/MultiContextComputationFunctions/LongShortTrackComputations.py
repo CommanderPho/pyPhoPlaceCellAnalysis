@@ -3268,9 +3268,8 @@ class InstantaneousSpikeRateGroupsComputation(PickleSerializableMixin, HDF_Seria
 
         """
         table_columns = ['aclu', 'lap_delta_minus', 'lap_delta_plus', 'replay_delta_minus', 'replay_delta_plus', 'active_set_membership']
-        n_LxC_aclus: int = len(self.LxC_aclus)
-        self.LxC_ThetaDeltaMinus, self.LxC_ThetaDeltaPlus, self.LxC_ReplayDeltaMinus, self.LxC_ReplayDeltaPlus
         
+        n_LxC_aclus: int = len(self.LxC_aclus)        
         v_LxC_aclus = [list(self.LxC_aclus)] + [v.cell_agg_inst_fr_list for v in (self.LxC_ThetaDeltaMinus, self.LxC_ThetaDeltaPlus, self.LxC_ReplayDeltaMinus, self.LxC_ReplayDeltaPlus) if v is not None] + [(['LxC'] * n_LxC_aclus)]
         df_LxC_aclus = pd.DataFrame(dict(zip(table_columns, v_LxC_aclus)))
 
@@ -3284,8 +3283,10 @@ class InstantaneousSpikeRateGroupsComputation(PickleSerializableMixin, HDF_Seria
 
         # Concatenate the two dataframes
         df_combined = pd.concat([df_LxC_aclus, df_SxC_aclus, df_AnyC_aclus], ignore_index=True)
-        df_combined['inst_time_bin_seconds'] = float(self.instantaneous_time_bin_size_seconds)
-        
+        ## Drop duplicates, keeping the first (corresponding to the SxC/LxC over the AnyC, although all the values are the same so only the 'active_set_membership' column would need to be changed): 
+        df_combined = df_combined.drop_duplicates(subset=['aclu'], keep='first', inplace=False)
+        ## Add extra columns:
+        df_combined['inst_time_bin_seconds'] = float(self.instantaneous_time_bin_size_seconds)        
         ## add session info
         if self.active_identifying_session_ctx is not None:
             ## Add the extended neuron identifiers (like the global neuron_uid, session_uid) columns
