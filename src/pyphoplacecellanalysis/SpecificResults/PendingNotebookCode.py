@@ -1168,7 +1168,7 @@ class WithinEpochTimeBinDynamics:
 # 2025-05-15 - Meas vs. Decoded Occupancy                                                                                                                                                                                                                                              #
 # ==================================================================================================================================================================================================================================================================================== #
 
-@metadata_attributes(short_name=None, tags=['VALIDATION', 'occupancy', 'working'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-05-15 14:22', related_items=[])
+@metadata_attributes(short_name=None, tags=['VALIDATION', 'occupancy', 'working', 'figure5'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-05-15 14:22', related_items=[])
 class MeasuredVsDecodedOccupancy:
     """ 2025-05-15 - A validation that Kamran had me to do that showed the expected result
     
