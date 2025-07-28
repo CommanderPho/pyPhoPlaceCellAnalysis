@@ -3195,7 +3195,18 @@ class InstantaneousSpikeRateGroupsComputation(PickleSerializableMixin, HDF_Seria
             
 
         # Replays: Uses `global_session.spikes_df`, `long_exclusive.track_exclusive_aclus, `short_exclusive.track_exclusive_aclus`, `long_replays`, `short_replays`
-        
+        use_instantaneous_firing_rate: bool = kwargs.get('use_instantaneous_firing_rate', False)
+        if (self.instantaneous_time_bin_size_seconds >= 5.0):
+            print(f'self.instantaneous_time_bin_size_seconds: {self.instantaneous_time_bin_size_seconds} >= 5.0 so not using instantaneous firing rate')
+            use_instantaneous_firing_rate = False
+            kwargs['use_instantaneous_firing_rate'] = False            
+
+        else:
+            print(f'self.instantaneous_time_bin_size_seconds: {self.instantaneous_time_bin_size_seconds} < 5.0 so using instantaneous firing rate')
+            use_instantaneous_firing_rate = True ## override True
+            kwargs['use_instantaneous_firing_rate'] = True
+            
+            
         # AnyC: `AnyC.track_exclusive_aclus`
         # ReplayDeltaMinus: `long_replays`
         self.AnyC_ReplayDeltaMinus: SpikeRateTrends = SpikeRateTrends.init_from_spikes_and_epochs(spikes_df=deepcopy(spikes_df), filter_epochs=long_replays, included_neuron_ids=self.AnyC_aclus, instantaneous_time_bin_size_seconds=self.instantaneous_time_bin_size_seconds, epoch_handling_mode=epoch_handling_mode, **kwargs)
