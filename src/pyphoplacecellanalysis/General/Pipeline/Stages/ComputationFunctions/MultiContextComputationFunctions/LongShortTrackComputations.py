@@ -3136,6 +3136,62 @@ class InstantaneousSpikeRateGroupsComputation(PickleSerializableMixin, HDF_Seria
     ## New
     all_incl_endPlatforms_InstSpikeRateTrends_df: Optional[pd.DataFrame] = non_serialized_field(repr=False, default=None, is_computable=False) # converter=attrs.converters.default_if_none("")
 
+
+    @classmethod
+    def _perform_compute_spike_rate_bars(cls, LxC_aclus, SxC_aclus, LxC_ThetaDeltaMinus, LxC_ThetaDeltaPlus, SxC_ThetaDeltaMinus, SxC_ThetaDeltaPlus,
+                                          LxC_ReplayDeltaMinus, LxC_ReplayDeltaPlus, SxC_ReplayDeltaMinus, SxC_ReplayDeltaPlus,
+                                          ):
+        """ Computing 
+        
+
+        (Fig2_Laps_FR, Fig2_Replay_FR) = InstantaneousSpikeRateGroupsComputation._perform_compute_spike_rate_bars(LxC_aclus=LxC_aclus, SxC_aclus=SxC_aclus,
+                                             LxC_ThetaDeltaMinus=LxC_ThetaDeltaMinus, LxC_ThetaDeltaPlus=LxC_ThetaDeltaPlus, SxC_ThetaDeltaMinus=SxC_ThetaDeltaMinus, SxC_ThetaDeltaPlus=SxC_ThetaDeltaPlus,
+                                             LxC_ReplayDeltaMinus=LxC_ReplayDeltaMinus, LxC_ReplayDeltaPlus=LxC_ReplayDeltaPlus, SxC_ReplayDeltaMinus=SxC_ReplayDeltaMinus, SxC_ReplayDeltaPlus=SxC_ReplayDeltaPlus,
+                                          )
+        """
+        # Common:
+        are_LxC_empty: bool = (LxC_aclus is None) or (len(LxC_aclus) == 0)
+        are_SxC_empty: bool = (SxC_aclus is None) or (len(SxC_aclus) == 0)
+        
+        # Note that in general LxC and SxC might have differing numbers of cells.
+        if (are_LxC_empty or are_SxC_empty):
+            # self.Fig2_Replay_FR = None # None mode
+            # initialize with an empty array and None values for the mean and std.
+            Fig2_Replay_FR: List[SingleBarResult] = []
+            for v in (LxC_ReplayDeltaMinus, LxC_ReplayDeltaPlus, SxC_ReplayDeltaMinus, SxC_ReplayDeltaPlus):
+                if v is not None:
+                    Fig2_Replay_FR.append(SingleBarResult(v.cell_agg_inst_fr_list.mean(), v.cell_agg_inst_fr_list.std(), v.cell_agg_inst_fr_list, LxC_aclus, SxC_aclus, None, None))
+                else:
+                    Fig2_Replay_FR.append(SingleBarResult(None, None, np.array([], dtype=float), LxC_aclus, SxC_aclus, None, None))
+        else:
+            Fig2_Replay_FR: list[SingleBarResult] = [SingleBarResult(v.cell_agg_inst_fr_list.mean(), v.cell_agg_inst_fr_list.std(), v.cell_agg_inst_fr_list, LxC_aclus, SxC_aclus, None, None) for v in (LxC_ReplayDeltaMinus, LxC_ReplayDeltaPlus, SxC_ReplayDeltaMinus, SxC_ReplayDeltaPlus)]
+        
+        # Note that in general LxC and SxC might have differing numbers of cells.
+        if are_LxC_empty or are_SxC_empty:
+            # self.Fig2_Laps_FR = None # NONE mode
+            Fig2_Laps_FR: List[SingleBarResult] = []
+            for v in (LxC_ThetaDeltaMinus, LxC_ThetaDeltaPlus, SxC_ThetaDeltaMinus, SxC_ThetaDeltaPlus):
+                if v is not None:
+                    Fig2_Laps_FR.append(SingleBarResult(v.cell_agg_inst_fr_list.mean(), v.cell_agg_inst_fr_list.std(), v.cell_agg_inst_fr_list, LxC_aclus, SxC_aclus, None, None))
+                else:
+                    Fig2_Laps_FR.append(SingleBarResult(None, None, np.array([], dtype=float), LxC_aclus, SxC_aclus, None, None))
+                    
+        else:
+            # Note that in general LxC and SxC might have differing numbers of cells.
+            Fig2_Laps_FR: list[SingleBarResult] = [SingleBarResult(v.cell_agg_inst_fr_list.mean(), v.cell_agg_inst_fr_list.std(), v.cell_agg_inst_fr_list, LxC_aclus, SxC_aclus, None, None) for v in (LxC_ThetaDeltaMinus, LxC_ThetaDeltaPlus, SxC_ThetaDeltaMinus, SxC_ThetaDeltaPlus)]
+            
+        return (Fig2_Laps_FR, Fig2_Replay_FR)
+
+
+
+    def compute_spike_rate_bars(self):
+        """ Computing """
+        (self.Fig2_Laps_FR, self.Fig2_Replay_FR) = InstantaneousSpikeRateGroupsComputation._perform_compute_spike_rate_bars(LxC_aclus=self.LxC_aclus, SxC_aclus=self.SxC_aclus,
+                                             LxC_ThetaDeltaMinus=self.LxC_ThetaDeltaMinus, LxC_ThetaDeltaPlus=self.LxC_ThetaDeltaPlus, SxC_ThetaDeltaMinus=self.SxC_ThetaDeltaMinus, SxC_ThetaDeltaPlus=self.SxC_ThetaDeltaPlus,
+                                             LxC_ReplayDeltaMinus=self.LxC_ReplayDeltaMinus, LxC_ReplayDeltaPlus=self.LxC_ReplayDeltaPlus, SxC_ReplayDeltaMinus=self.SxC_ReplayDeltaMinus, SxC_ReplayDeltaPlus=self.SxC_ReplayDeltaPlus,
+                                          )
+
+
     def compute(self, curr_active_pipeline, **kwargs):
         """ full instantaneous computations for both Long and Short epochs:
 
