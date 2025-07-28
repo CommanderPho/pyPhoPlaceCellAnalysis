@@ -54,6 +54,7 @@ from neuropy.core.neuron_identities import  neuronTypesEnum, NeuronIdentityTable
 from neuropy.utils.mixins.HDF5_representable import HDF_Converter
 from neuropy.utils.indexing_helpers import PandasHelpers
 from neuropy.utils.debug_helpers import parameter_sweeps 
+from neuropy.utils.mixins.dict_representable import override_dict, overriding_dict_with
 
 from pyphocorehelpers.Filesystem.metadata_helpers import  get_file_metadata
 from pyphocorehelpers.assertion_helpers import Assert
@@ -3705,7 +3706,7 @@ class AcrossSessionsVisualizations:
         is_above_diagonal = (y_frs_index > x_frs_index)
         num_above_diagonal = np.sum(is_above_diagonal)
         is_below_count = np.sum(y_frs_index < x_frs_index)
-        total_num_points = np.shape(y_frs_index)[0]
+        total_num_points: int = np.shape(y_frs_index)[0]
         percent_below_diagonal = float(is_below_count) / float(total_num_points)
         percent_above_diagonal = float(num_above_diagonal) / float(total_num_points)
         
@@ -3722,11 +3723,49 @@ class AcrossSessionsVisualizations:
 
         scatter_plot_kwargs = dict(zorder=5)
         scatter_plot_kwargs['point_colors'] = '#33333333'
+        scatter_plot_kwargs['edgecolors'] =  ["#33333300"] * total_num_points
+        
+        ## 2025-07-25 - More advanced point coloring based on place cell and exclusivity/dominance status:
+        long_short_fr_indicies_analysis_results['point_colors'] = "#33333333"
+        long_short_fr_indicies_analysis_results['edgecolors'] = "#33333300"
+        
         if 'has_pf_color' in long_short_fr_indicies_analysis_results:
-            scatter_plot_kwargs['edgecolors'] = long_short_fr_indicies_analysis_results['has_pf_color'].to_numpy() #.to_list() # edgecolors=(r, g, b, 1)
+            long_short_fr_indicies_analysis_results.loc['edgecolors', long_short_fr_indicies_analysis_results['has_pf_color']] = "#7E7E7E" #.to_list() # edgecolors=(r, g, b, 1)
 
 
-        fig, ax, scatter_plot = _plot_long_short_firing_rate_indicies(x_frs_index, y_frs_index, final_context, debug_print=True, is_centered=False, enable_hover_labels=False, enable_tiny_point_labels=False, facecolor='w', include_axes_lines=include_axes_lines, **scatter_plot_kwargs, **kwargs) #  markeredgewidth=1.5,
+        # ## Place field status - affects ['point_colors']
+        # if ('has_long_pf' in long_short_fr_indicies_analysis_results) and ('has_short_pf' in long_short_fr_indicies_analysis_results):
+        #     long_short_fr_indicies_analysis_results['has_both_pf'] = np.logical_and(long_short_fr_indicies_analysis_results['has_long_pf'], long_short_fr_indicies_analysis_results['has_short_pf'])
+        #     long_short_fr_indicies_analysis_results.loc[long_short_fr_indicies_analysis_results['has_long_pf'], 'point_colors'] = "#FF0000A6"
+        #     long_short_fr_indicies_analysis_results.loc[long_short_fr_indicies_analysis_results['has_short_pf'], 'point_colors'] = '#0000FFA6'
+        #     long_short_fr_indicies_analysis_results.loc[long_short_fr_indicies_analysis_results['has_both_pf'], 'point_colors'] = "#FF00DDA6" ## override with purple for cells that have both
+
+
+        ## eXclusivity/dominant cell status - affects ['edgecolors']
+        if 'is_refined_LxC' in long_short_fr_indicies_analysis_results:
+            long_short_fr_indicies_analysis_results.loc[long_short_fr_indicies_analysis_results['is_refined_LxC'], 'edgecolors'] = '#FF0000' #.to_list() # edgecolors=(r, g, b, 1)
+        if 'is_n_spikes_LxC' in long_short_fr_indicies_analysis_results:
+            long_short_fr_indicies_analysis_results.loc[long_short_fr_indicies_analysis_results['is_n_spikes_LxC'], 'edgecolors'] = "#E20000" #.to_list() # edgecolors=(r, g, b, 1)
+        if 'is_fr_Hz_LxC' in long_short_fr_indicies_analysis_results:
+            long_short_fr_indicies_analysis_results.loc[long_short_fr_indicies_analysis_results['is_fr_Hz_LxC'], 'edgecolors'] = "#9C0000" #.to_list() # edgecolors=(r, g, b, 1)
+            
+
+        if 'is_refined_SxC' in long_short_fr_indicies_analysis_results:
+            long_short_fr_indicies_analysis_results.loc[long_short_fr_indicies_analysis_results['is_refined_SxC'], 'edgecolors'] = '#0000FF' #.to_list() # edgecolors=(r, g, b, 1)
+        if 'is_n_spikes_SxC' in long_short_fr_indicies_analysis_results:
+            long_short_fr_indicies_analysis_results.loc[long_short_fr_indicies_analysis_results['is_n_spikes_SxC'], 'edgecolors'] = '#0000E2' #.to_list() # edgecolors=(r, g, b, 1)
+        if 'is_fr_Hz_SxC' in long_short_fr_indicies_analysis_results:
+            long_short_fr_indicies_analysis_results.loc[long_short_fr_indicies_analysis_results['is_fr_Hz_SxC'], 'edgecolors'] = "#0000B3" #.to_list() # edgecolors=(r, g, b, 1)
+
+
+        scatter_plot_kwargs['point_colors'] = long_short_fr_indicies_analysis_results['point_colors'].to_numpy()
+        scatter_plot_kwargs['edgecolors'] = long_short_fr_indicies_analysis_results['edgecolors'].to_numpy()
+
+
+        _plot_long_short_firing_rate_indicies_kwargs =  override_dict(dict(debug_print=True, is_centered=False, enable_hover_labels=False, enable_tiny_point_labels=False, facecolor='w', include_axes_lines=include_axes_lines), kwargs)
+        
+        
+        fig, ax, scatter_plot = _plot_long_short_firing_rate_indicies(x_frs_index, y_frs_index, final_context, **_plot_long_short_firing_rate_indicies_kwargs, **scatter_plot_kwargs) #, **kwargs  markeredgewidth=1.5,
         
         def _perform_write_to_file_callback():
             active_out_figure_path, *args_L = cls.output_figure(final_context, fig, **save_figure_kwargs)

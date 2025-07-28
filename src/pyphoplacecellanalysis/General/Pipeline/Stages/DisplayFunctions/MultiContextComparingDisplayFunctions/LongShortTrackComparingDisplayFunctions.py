@@ -2098,7 +2098,8 @@ def plot_short_v_long_pf1D_scalar_overlap_comparison(overlap_scalars_df, pf_neur
 
 
 @function_attributes(short_name='long_short_fr_indicies', tags=['private', 'long_short', 'long_short_firing_rate', 'firing_rate', 'display', 'matplotlib'], input_requires=[], output_provides=[], uses=[], used_by=['_display_short_long_firing_rate_index_comparison', 'AcrossSessionsVisualizations.across_sessions_firing_rate_index_figure'], creation_date='2023-03-28 14:20')
-def _plot_long_short_firing_rate_indicies(x_frs_index, y_frs_index, active_context, neurons_colors=None, debug_print=False, is_centered = False, enable_hover_labels=True, enable_tiny_point_labels=True, swap_xy_axis=False, include_axes_lines=True, enable_histograms=True, enable_subplot_mosaic_style:bool=True, enable_diagonal_histogram: bool = True, include_linear_regression_line:bool=True, **scatter_params):
+def _plot_long_short_firing_rate_indicies(x_frs_index, y_frs_index, active_context, neurons_colors=None, debug_print=False, is_centered = False, enable_hover_labels=True, enable_tiny_point_labels=True, swap_xy_axis=False, include_axes_lines=True,  enable_axes_colored_guide_lines: bool = False,
+                                          enable_histograms=True, enable_subplot_mosaic_style:bool=True, enable_diagonal_histogram: bool = True, include_linear_regression_line:bool=True, **scatter_params):
     """ Plot long|short firing rate index 
     Each datapoint is a neuron.
     Shows two histograms for the marginals along each axis
@@ -2109,7 +2110,9 @@ def _plot_long_short_firing_rate_indicies(x_frs_index, y_frs_index, active_conte
         is_centered: bool - if True, the spines are centered at (0, 0)
         enable_hover_labels = True # add interactive point hover labels using mplcursors
         enable_tiny_point_labels = True # add static tiny aclu labels beside each point
+        enable_axes_colored_guide_lines - if true, draws colored red/blue lines along the -1 and 1 lines to associate the colors visually
 
+        
     """
     import matplotlib
     from pyphoplacecellanalysis.SpecificResults.PhoDiba2023Paper import PhoPublicationFigureHelper
@@ -2302,18 +2305,20 @@ def _plot_long_short_firing_rate_indicies(x_frs_index, y_frs_index, active_conte
         
         # _boundary_line_kwargs = dict(linestyle='--', )
         _boundary_line_kwargs = dict(linestyle='-', )
-        _line_kwargs = dict(zorder=1)
-        
-        long_color = 'royalblue'
-        short_color = 'crimson'
+        _line_kwargs = dict(zorder=-1000)
 
-        ax.axvline(x=-1.0, color=long_color, **_boundary_line_kwargs, **_line_kwargs)  # Vertical line at x = -1
         ax.axvline(x=0.0, color='grey', linestyle='-', **_line_kwargs)  # Vertical line at x = 0
-        ax.axvline(x=1.0, color=short_color, **_boundary_line_kwargs, **_line_kwargs)  # Vertical line at x = +1
-
-        ax.axhline(y=-1.0, color=long_color, **_boundary_line_kwargs, **_line_kwargs)  # Horizontal line at y = -1
         ax.axhline(y=0.0, color='grey', linestyle='-', **_line_kwargs)  # Horizontal line at y = 0
-        ax.axhline(y=1.0, color=short_color, **_boundary_line_kwargs, **_line_kwargs)  # Horizontal line at y = +1
+
+        if enable_axes_colored_guide_lines:
+            long_color = 'royalblue'
+            short_color = 'crimson'
+
+            ax.axvline(x=-1.0, color=long_color, **_boundary_line_kwargs, **_line_kwargs)  # Vertical line at x = -1
+            ax.axvline(x=1.0, color=short_color, **_boundary_line_kwargs, **_line_kwargs)  # Vertical line at x = +1
+
+            ax.axhline(y=-1.0, color=long_color, **_boundary_line_kwargs, **_line_kwargs)  # Horizontal line at y = -1
+            ax.axhline(y=1.0, color=short_color, **_boundary_line_kwargs, **_line_kwargs)  # Horizontal line at y = +1
 
         # Add y=x diagonal line:
         ax.plot(ax.get_xlim(), ax.get_ylim(), **diagonal_y_equals_x_line_kwargs)
