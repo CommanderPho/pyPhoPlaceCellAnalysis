@@ -147,8 +147,10 @@ class SpikeRateTrends(HDFMixin, AttrsBasedClassHelperMixin):
             epoch_agg_firing_rates_list = np.vstack([np.nanmean(a_df.to_numpy(), axis=0) for a_df in self.inst_fr_df_list])
         else:
             # use instantaneous version
-            epoch_agg_firing_rates_list = np.vstack([a_signal.max(axis=0).magnitude for a_signal in self.inst_fr_signals_list]) # find the peak within each epoch (for all cells) using `.max(...)`
-            epoch_agg_firing_rates_list = epoch_agg_firing_rates_list.mean(axis=0)
+            epoch_agg_firing_rates_list = np.vstack([a_signal.max(axis=0).magnitude for a_signal in self.inst_fr_signals_list]) # find the peak within each epoch (for all cells) using `.max(...)` - # (226, 66) - (n_epochs, n_cells)
+            # epoch_agg_firing_rates_list = epoch_agg_firing_rates_list.mean(axis=0)
+            
+
         assert epoch_agg_firing_rates_list.shape == (n_epochs, n_cells)
         self.epoch_agg_inst_fr_list = epoch_agg_firing_rates_list # .shape (n_epochs, n_cells)
         cell_agg_firing_rates_list = epoch_agg_firing_rates_list.mean(axis=0) # find the peak over all epochs (for all cells) using `.max(...)` --- OOPS, what about the zero epochs? Should those actually effect the rate? Should they be excluded?
@@ -247,17 +249,18 @@ class SpikeRateTrends(HDFMixin, AttrsBasedClassHelperMixin):
                 unit_avg_firing_rates = np.nanmean(unit_specific_inst_spike_rate_signal.magnitude, axis=0)
                 epoch_avg_firing_rates_list.append(unit_avg_firing_rates)
                 
-
                 ## spike counts:
                 epoch_spike_counts_dict = deepcopy(epoch_spikes_df['aclu']).value_counts().to_dict()            
                 epoch_value_counts = []
-                for aclu in included_neuron_ids:
-                    epoch_value_counts.append({k:v.get(aclu, 0) for k, v in epoch_spike_counts_dict.items()})
-                    # epoch_value_counts.append({k:v.get(aclu, np.zeros((n_epoch_time_bins, )) for k, v in epoch_spike_counts_dict.items()})
+                for aclu in included_neuron_ids:          
+                    epoch_value_counts.append(epoch_spike_counts_dict.get(aclu, 0))
+                    # epoch_value_counts.append({k:v.get(aclu, 0) for k, v in epoch_spike_counts_dict.items()})
                     
                 epoch_units_total_num_spikes_df: pd.DataFrame = pd.DataFrame(epoch_value_counts, index=deepcopy(included_neuron_ids))
                 # unit_specific_binned_spike_counts = ZhangReconstructionImplementation.compute_unit_specific_bin_specific_spike_counts(spikes_df=epoch_spikes_df, active_indicies, debug_print=debug_print)
                 epoch_results_list_dict['spike_counts'].append(epoch_units_total_num_spikes_df)
+                
+                unit_specific_binned_spike_counts_df = deepcopy(epoch_units_total_num_spikes_df) ## just to make sure it works
                 
             else:
                 ## Non-instantaneous rate
