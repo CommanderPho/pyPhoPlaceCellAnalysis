@@ -580,15 +580,18 @@ class MultiContextComparingDisplayFunctions(AllFunctionEnumeratingMixin, metacla
             def _perform_write_to_file_callback(final_context, fig):
                 """ captures: override_fig_man, export_dpi """
                 if save_figure:
-                    return owning_pipeline_reference.output_figure(final_context, fig, override_fig_man=override_fig_man, dpi=export_dpi)
+                    return owning_pipeline_reference.output_figure(final_context, fig, override_fig_man=override_fig_man, dpi=export_dpi, write_vector_format=True, write_png=False)
                 else:
                     pass # do nothing, don't save
                 
             # ==================================================================================================================================================================================================================================================================================== #
             # Titles/Formatting/Marginas and Saving                                                                                                                                                                                                                                                #
             # ==================================================================================================================================================================================================================================================================================== #
-            def _subfn_apply_formatting_footer_and_etc(fig, figure_title, subtitle_string=None, graphics_output_dict=None):
+            def _subfn_apply_formatting_footer_and_etc(fig, figure_title: str, subtitle_string: Optional[str]=None, an_active_display_context: IdentifyingContext=None, graphics_output_dict=None):
                 """ builds titles, footers, etc
+
+                Captures: _subfn_apply_formatting_footer_and_etc
+
                 """
                 if graphics_output_dict is None:
                     graphics_output_dict = {}
@@ -630,9 +633,16 @@ class MultiContextComparingDisplayFunctions(AllFunctionEnumeratingMixin, metacla
                 
                 window_title_string: str = complete_title_string
                 
-                fig.canvas.manager.set_window_title(window_title_string) # sets the window's title
-                if ((_perform_write_to_file_callback is not None) and (active_display_context is not None)):
-                    _perform_write_to_file_callback(active_display_context, fig)
+                try:
+                    fig.canvas.manager.set_window_title(window_title_string) # sets the window's title
+                except AttributeError as e:
+                    ## Missing canvas to set widnow title of
+                    print(f'Could not set window title with error: {e}. Continuing...')
+                except Exception as e:
+                    raise e
+
+                if ((_perform_write_to_file_callback is not None) and (an_active_display_context is not None)):
+                    _perform_write_to_file_callback(an_active_display_context, fig)
 
                 graphics_output_dict['label_objects'] = {'header': header_text_obj, 'footer': footer_text_obj, 'formatter': text_formatter}
                 return graphics_output_dict
@@ -653,7 +663,7 @@ class MultiContextComparingDisplayFunctions(AllFunctionEnumeratingMixin, metacla
                     best_matching_context, a_result, a_decoder, a_decoded_marginal_posterior_df = a_new_fully_generic_result.get_results_best_matching_context(context_query=a_target_context)
                     an_active_display_context = active_display_context.overwriting_context(known_named_decoding_epochs_type=known_named_decoding_epochs_type, figure_title=figure_title)
                     fig, ax_dict = MeasuredVsDecodedOccupancy.analyze_and_plot_meas_vs_decoded_occupancy(best_matching_context, a_result, a_decoder, a_decoded_marginal_posterior_df, track_templates, figure_title=figure_title)
-                    _graphics_output_dict = _subfn_apply_formatting_footer_and_etc(fig, figure_title=figure_title, subtitle_string=None)
+                    _graphics_output_dict = _subfn_apply_formatting_footer_and_etc(fig, figure_title=figure_title, subtitle_string=None, an_active_display_context=an_active_display_context)
                     collector.post_hoc_append(figs=[fig,], axes=ax_dict, contexts=[an_active_display_context])
 
 
@@ -664,7 +674,7 @@ class MultiContextComparingDisplayFunctions(AllFunctionEnumeratingMixin, metacla
                     best_matching_context, a_result, a_decoder, a_decoded_marginal_posterior_df = a_new_fully_generic_result.get_results_best_matching_context(context_query=a_target_context)
                     an_active_display_context = active_display_context.overwriting_context(known_named_decoding_epochs_type=known_named_decoding_epochs_type, figure_title=figure_title)
                     fig, ax_dict = MeasuredVsDecodedOccupancy.analyze_and_plot_meas_vs_decoded_occupancy(best_matching_context, a_result, a_decoder, a_decoded_marginal_posterior_df, track_templates, figure_title=figure_title)
-                    _graphics_output_dict = _subfn_apply_formatting_footer_and_etc(fig, figure_title=figure_title, subtitle_string=None)
+                    _graphics_output_dict = _subfn_apply_formatting_footer_and_etc(fig, figure_title=figure_title, subtitle_string=None, an_active_display_context=an_active_display_context)
                     collector.post_hoc_append(figs=[fig,], axes=ax_dict, contexts=[an_active_display_context])
 
                     ## PBEs context:
@@ -674,7 +684,7 @@ class MultiContextComparingDisplayFunctions(AllFunctionEnumeratingMixin, metacla
                     best_matching_context, a_result, a_decoder, a_decoded_marginal_posterior_df = a_new_fully_generic_result.get_results_best_matching_context(context_query=a_target_context)
                     an_active_display_context = active_display_context.overwriting_context(known_named_decoding_epochs_type=known_named_decoding_epochs_type, figure_title=figure_title)
                     fig, ax_dict = MeasuredVsDecodedOccupancy.analyze_and_plot_meas_vs_decoded_occupancy(best_matching_context, a_result, a_decoder, a_decoded_marginal_posterior_df, track_templates, figure_title=figure_title)
-                    _graphics_output_dict = _subfn_apply_formatting_footer_and_etc(fig, figure_title=figure_title, subtitle_string=None)
+                    _graphics_output_dict = _subfn_apply_formatting_footer_and_etc(fig, figure_title=figure_title, subtitle_string=None, an_active_display_context=an_active_display_context)
                     collector.post_hoc_append(figs=[fig,], axes=ax_dict, contexts=[an_active_display_context])
 
 
