@@ -3061,7 +3061,7 @@ def compute_and_export_session_extended_placefield_peak_information_completion_f
     except Exception as e:
         exception_info = sys.exc_info()
         err = CapturedException(e, exception_info)
-        print(f"WARN: on_complete_success_execution_session: encountered exception {err} while trying to compute the instantaneous firing rates and set self.across_sessions_instantaneous_fr_dict[{curr_session_context}]")
+        print(f"WARN: on_complete_success_execution_session: encountered exception {err} while trying to compute the extended placefield peak information and set self.across_sessions_instantaneous_fr_dict[{curr_session_context}]")
         # if self.fail_on_exception:
         #     raise e.exc
         # _out_inst_fr_comps = None
