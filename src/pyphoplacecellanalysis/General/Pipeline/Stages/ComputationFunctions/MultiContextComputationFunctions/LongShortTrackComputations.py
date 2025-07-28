@@ -3219,7 +3219,7 @@ class InstantaneousSpikeRateGroupsComputation(PickleSerializableMixin, HDF_Seria
         if (are_LxC_empty or are_SxC_empty):
             # self.Fig2_Replay_FR = None # None mode
             # initialize with an empty array and None values for the mean and std.
-            self.Fig2_Replay_FR: list[SingleBarResult] = []
+            self.Fig2_Replay_FR: List[SingleBarResult] = []
             for v in (self.LxC_ReplayDeltaMinus, self.LxC_ReplayDeltaPlus, self.SxC_ReplayDeltaMinus, self.SxC_ReplayDeltaPlus):
                 if v is not None:
                     self.Fig2_Replay_FR.append(SingleBarResult(v.cell_agg_inst_fr_list.mean(), v.cell_agg_inst_fr_list.std(), v.cell_agg_inst_fr_list, self.LxC_aclus, self.SxC_aclus, None, None))
@@ -3251,7 +3251,7 @@ class InstantaneousSpikeRateGroupsComputation(PickleSerializableMixin, HDF_Seria
         # Note that in general LxC and SxC might have differing numbers of cells.
         if are_LxC_empty or are_SxC_empty:
             # self.Fig2_Laps_FR = None # NONE mode
-            self.Fig2_Laps_FR: list[SingleBarResult] = []
+            self.Fig2_Laps_FR: List[SingleBarResult] = []
             for v in (self.LxC_ThetaDeltaMinus, self.LxC_ThetaDeltaPlus, self.SxC_ThetaDeltaMinus, self.SxC_ThetaDeltaPlus):
                 if v is not None:
                     self.Fig2_Laps_FR.append(SingleBarResult(v.cell_agg_inst_fr_list.mean(), v.cell_agg_inst_fr_list.std(), v.cell_agg_inst_fr_list, self.LxC_aclus, self.SxC_aclus, None, None))

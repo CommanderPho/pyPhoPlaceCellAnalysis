@@ -28,6 +28,7 @@ from elephant.kernels import GaussianKernel
 from tqdm.notebook import tqdm
 
 from neuropy.utils.misc import safe_pandas_get_group # for _compute_pybursts_burst_interval_detection
+from neuropy.core.epoch import ensure_dataframe
 from neuropy.utils.mixins.binning_helpers import BinningContainer # used in _perform_firing_rate_trends_computation
 from neuropy.utils.mixins.AttrsClassHelpers import AttrsBasedClassHelperMixin, serialized_field, serialized_attribute_field, non_serialized_field, custom_define
 from neuropy.utils.mixins.HDF5_representable import HDF_DeserializationMixin, post_deserialize, HDF_SerializationMixin, HDFMixin
@@ -40,10 +41,6 @@ from pyphoplacecellanalysis.General.Model.ComputationResults import ComputationR
 from pyphocorehelpers.DataStructure.dynamic_parameters import DynamicParameters
 
 from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import ZhangReconstructionImplementation # for _perform_firing_rate_trends_computation
-
-import multiprocessing
-
-
 
 
 @custom_define(slots=False)
@@ -83,8 +80,8 @@ class SpikeRateTrends(HDFMixin, AttrsBasedClassHelperMixin):
     epoch_unit_fr_df_list: Optional[List[pd.DataFrame]] = non_serialized_field(default=None, metadata={})
     
     @classmethod
-    def init_from_spikes_and_epochs(cls, spikes_df: pd.DataFrame, filter_epochs, included_neuron_ids=None, instantaneous_time_bin_size_seconds:float=0.01, kernel=GaussianKernel(10*ms),
-                                    use_instantaneous_firing_rate=False, epoch_handling_mode:str='DropShorterMode', **kwargs) -> "SpikeRateTrends":
+    def init_from_spikes_and_epochs(cls, spikes_df: pd.DataFrame, filter_epochs: pd.DataFrame, included_neuron_ids=None, instantaneous_time_bin_size_seconds:float=0.01, kernel=GaussianKernel(10*ms),
+                                    use_instantaneous_firing_rate:bool=False, epoch_handling_mode:str='DropShorterMode', **kwargs) -> "SpikeRateTrends":
         """ the main called function
         
         epoch_handling_mode='DropShorterMode' - the default mode prior to 2024-09-12, drops any epochs shorter than the time_bin_size so binning works appropriately.
@@ -95,14 +92,9 @@ class SpikeRateTrends(HDFMixin, AttrsBasedClassHelperMixin):
         if included_neuron_ids is None:
             included_neuron_ids = spikes_df.spikes.neuron_ids
         if len(included_neuron_ids)>0:
-            if isinstance(filter_epochs, pd.DataFrame):
-                filter_epochs_df = filter_epochs
-            else:
-                filter_epochs_df = filter_epochs.to_dataframe()
-                
-                
+            filter_epochs_df = ensure_dataframe(filter_epochs) 
             assert epoch_handling_mode in ['DropShorterMode', 'UseAllEpochsMode']
-                
+
             if epoch_handling_mode == 'DropShorterMode':
                 minimum_event_duration: float = instantaneous_time_bin_size_seconds # allow direct use            
                 ## Drop those less than the time bin duration
@@ -205,7 +197,7 @@ class SpikeRateTrends(HDFMixin, AttrsBasedClassHelperMixin):
 
         # elephant.statistics.instantaneous_rate
 
-        inst_rate = instantaneous_rate(unit_split_spiketrains, t_start=epoch_t_start, t_stop=epoch_t_stop, sampling_period=time_bin_size_seconds*s, kernel=kernel) # ValueError: `bins` must be positive, when an integer
+        inst_rate = instantaneous_rate(unit_split_spiketrains, t_start=epoch_t_start*s, t_stop=epoch_t_stop*s, sampling_period=time_bin_size_seconds*s, kernel=kernel) # ValueError: `bins` must be positive, when an integer
             # Raises `TypeError: The input must be a list of SpikeTrain` when the unit_split_spiketrains are empty, which occurs at least when included_neuron_ids is empty
         # AnalogSignal
         # print(type(inst_rate), f"of shape {inst_rate.shape}: {inst_rate.shape[0]} samples, {inst_rate.shape[1]} channel")
@@ -301,7 +293,7 @@ class SpikeRateTrends(HDFMixin, AttrsBasedClassHelperMixin):
                 
 
             ## Sum up the spikes per epoch for each cell, and then divide each by the epoch duration to get the epoch firing rate
-            unit_approximate_entire_epoch_fr_df = deepcopy(unit_specific_binned_spike_counts_df.sum(axis='index', skipna=True, numeric_only=True)).astype(float) / epoch_duration # np.nanmean(unit_specific_binned_spike_counts_df.to_numpy(), axis=0) # (n_neurons, )
+            unit_approximate_entire_epoch_fr_df: pd.DataFrame = deepcopy(unit_specific_binned_spike_counts_df.sum(axis='index', skipna=True, numeric_only=True)).astype(float) / epoch_duration # np.nanmean(unit_specific_binned_spike_counts_df.to_numpy(), axis=0) # (n_neurons, )
             epoch_results_list_dict['epoch_unit_fr'].append(unit_approximate_entire_epoch_fr_df)
                 
         ## END for epoch_id in np.arange(n_epochs)...
