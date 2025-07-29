@@ -3740,6 +3740,11 @@ class AcrossSessionsVisualizations:
         #     long_short_fr_indicies_analysis_results.loc[long_short_fr_indicies_analysis_results['has_short_pf'], 'point_colors'] = '#0000FFA6'
         #     long_short_fr_indicies_analysis_results.loc[long_short_fr_indicies_analysis_results['has_both_pf'], 'point_colors'] = "#FF00DDA6" ## override with purple for cells that have both
 
+        if 'active_set_membership' in long_short_fr_indicies_analysis_results:
+            ## active_set_membership variable:
+            # long_short_fr_indicies_analysis_results.loc[long_short_fr_indicies_analysis_results['active_set_membership'], 'point_colors'] = "#FF00DDA6" ## override with purple for cells that have both
+            long_short_fr_indicies_analysis_results.loc[(long_short_fr_indicies_analysis_results['active_set_membership'] == 'LxC'), 'edgecolors'] = '#FF0000'
+            long_short_fr_indicies_analysis_results.loc[(long_short_fr_indicies_analysis_results['active_set_membership'] == 'SxC'), 'edgecolors'] = '#0000FF'
 
         ## eXclusivity/dominant cell status - affects ['edgecolors']
         if 'is_refined_LxC' in long_short_fr_indicies_analysis_results:
@@ -3762,7 +3767,7 @@ class AcrossSessionsVisualizations:
         scatter_plot_kwargs['edgecolors'] = long_short_fr_indicies_analysis_results['edgecolors'].to_numpy()
 
 
-        _plot_long_short_firing_rate_indicies_kwargs =  override_dict(dict(debug_print=True, is_centered=False, enable_hover_labels=False, enable_tiny_point_labels=False, facecolor='w', include_axes_lines=include_axes_lines), kwargs)
+        _plot_long_short_firing_rate_indicies_kwargs = override_dict(dict(debug_print=True, is_centered=False, enable_hover_labels=False, enable_tiny_point_labels=False, facecolor='w', include_axes_lines=include_axes_lines), kwargs) | kwargs
         
         
         fig, ax, scatter_plot = _plot_long_short_firing_rate_indicies(x_frs_index, y_frs_index, final_context, **_plot_long_short_firing_rate_indicies_kwargs, **scatter_plot_kwargs) #, **kwargs  markeredgewidth=1.5,

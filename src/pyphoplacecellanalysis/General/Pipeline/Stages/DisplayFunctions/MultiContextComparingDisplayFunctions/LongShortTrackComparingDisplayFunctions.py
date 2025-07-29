@@ -2252,7 +2252,7 @@ def _plot_long_short_firing_rate_indicies(x_frs_index, y_frs_index, active_conte
     text_formatter.setup_margins(fig)
     
 
-    if not prepare_for_publication:
+    if (not prepare_for_publication):
         flexitext(text_formatter.left_margin, text_formatter.top_margin, '<size:22><color:royalblue, weight:bold>long ($L$)</>|<color:crimson, weight:bold>short($S$)</> <weight:bold>firing rate indices</></>', va="bottom", xycoords="figure fraction")
         ## Only include the footer label when not for publication
         footer_text_obj = flexitext((text_formatter.left_margin*0.1), (text_formatter.bottom_margin*0.25), text_formatter._build_footer_string(active_context=active_context), va="top", xycoords="figure fraction")
@@ -3102,13 +3102,13 @@ def _plot_single_track_firing_rate_compare(laps_frs_dict, replays_frs_dict, acti
         
         
         if not prepare_for_publication:
-            flexitext(text_formatter.left_margin, text_formatter.top_margin, f'<size:22><weight:bold>{track_name}</> laps|replay <weight:bold>rate</></>', va="bottom", xycoords="figure fraction")
+            flexitext(text_formatter.left_margin, text_formatter.top_margin, f'<size:22><weight:bold>{track_name}</> laps|PBEs <weight:bold>rate</></>', va="bottom", xycoords="figure fraction")
             ## Only include the footer label when not for publication
             footer_text_obj = flexitext((text_formatter.left_margin*0.1), (text_formatter.bottom_margin*0.25), text_formatter._build_footer_string(active_context=active_context), va="top", xycoords="figure fraction")
         else:  
             ## Publication Mode
             ## Smaller fonts for publication -- Originally 18, now 9
-            flexitext(text_formatter.left_margin, text_formatter.top_margin, f'<size:8><weight:bold>{track_name}</> laps|replay <weight:bold>rate</></>', va="bottom", xycoords="figure fraction")
+            flexitext(text_formatter.left_margin, text_formatter.top_margin, f'<size:8><weight:bold>{track_name}</> laps|PBEs <weight:bold>rate</></>', va="bottom", xycoords="figure fraction")
 
         # add static tiny labels for the neuron_id beside each data point
         if enable_tiny_point_labels:
@@ -3130,7 +3130,6 @@ def _plot_single_track_firing_rate_compare(laps_frs_dict, replays_frs_dict, acti
             # Fit linear regression using numpy.polyfit
             _lin_reg = pho_stats_linear_regression(list(laps_frs_dict.values()), list(replays_frs_dict.values()))
             _out_regression_line_artist = _lin_reg.plot(ax=ax)
-
 
         if not defer_render:
             fig.show()

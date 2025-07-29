@@ -1079,8 +1079,11 @@ def pho_stats_perform_diagonal_line_binomial_test(long_short_fr_indicies_analysi
 
 
 # Define a simple attrs class that's better than a namedtuple and unpackable:
-LinearRegressionOutput = make_class("LinearRegressionOutput", {k:field() for k in ("reg_x", "reg_y", "slope", "intercept", "regression_line", "model")}, bases=(UnpackableMixin, object,))
-LinearRegressionOutput.plot = lambda self, ax, **kwargs: ax.plot(self.reg_x, self.regression_line, label=f'Regression Line\ny={self.slope:.2f}x + {self.intercept:.2f}', **(dict(color='red', alpha=0.7, lw=0.5) | kwargs))
+LinearRegressionOutput = make_class("LinearRegressionOutput", {k:field() for k in ("reg_x", "reg_y", "slope", "intercept", "regression_line", "model", "r_value")}, bases=(UnpackableMixin, object,))
+LinearRegressionOutput.plot = lambda self, ax, **kwargs: (
+    ax.plot(self.reg_x, self.regression_line, label=f'Regression Line\ny={self.slope:.2f}x + {self.intercept:.2f}', **(dict(color='red', alpha=0.7, lw=0.5) | kwargs)),
+    ax.text(0.02, 0.98, f'R = {self.r_value:.3f}', transform=ax.transAxes, fontsize=8, verticalalignment='top', color='black', alpha=0.9)
+)[0]
 
 @function_attributes(short_name=None, tags=['stats', 'regression'], input_requires=[], output_provides=[], uses=['LinearRegressionOutput'], used_by=[], creation_date='2025-07-04 03:11', related_items=[])
 def pho_stats_linear_regression(reg_x: NDArray, reg_y: NDArray) -> "LinearRegressionOutput":
@@ -1116,7 +1119,10 @@ def pho_stats_linear_regression(reg_x: NDArray, reg_y: NDArray) -> "LinearRegres
     # for x in np.arange(2):
     #     print(model.pvalues[x])
 
-    return LinearRegressionOutput(**{'reg_x': reg_x, 'reg_y': reg_y, 'slope': reg_slope, 'intercept': reg_intercept, 'regression_line': regression_line, 'model': model})
+    # Calculate R value (correlation coefficient)
+    r_value = np.corrcoef(reg_x, reg_y)[0, 1]
+    
+    return LinearRegressionOutput(**{'reg_x': reg_x, 'reg_y': reg_y, 'slope': reg_slope, 'intercept': reg_intercept, 'regression_line': regression_line, 'model': model, 'r_value': r_value})
 
 
 def pho_stats_paired_t_test(values1, values2):
