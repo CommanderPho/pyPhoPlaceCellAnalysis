@@ -32,6 +32,7 @@ from neuropy.core.epoch import ensure_dataframe
 from neuropy.utils.mixins.binning_helpers import BinningContainer # used in _perform_firing_rate_trends_computation
 from neuropy.utils.mixins.AttrsClassHelpers import AttrsBasedClassHelperMixin, serialized_field, serialized_attribute_field, non_serialized_field, custom_define
 from neuropy.utils.mixins.HDF5_representable import HDF_DeserializationMixin, post_deserialize, HDF_SerializationMixin, HDFMixin
+from neuropy.utils.mixins.unit_slicing import NeuronUnitSlicableObjectProtocol
 
 from pyphocorehelpers.programming_helpers import metadata_attributes
 from pyphocorehelpers.function_helpers import function_attributes
@@ -44,7 +45,7 @@ from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import ZhangReconstr
 
 
 @custom_define(slots=False)
-class SpikeRateTrends(HDFMixin, AttrsBasedClassHelperMixin):
+class SpikeRateTrends(HDFMixin, NeuronUnitSlicableObjectProtocol, AttrsBasedClassHelperMixin):
     """ Computes instantaneous firing rates for each cell
     
     from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.SpikeAnalysis import SpikeRateTrends
@@ -137,10 +138,9 @@ class SpikeRateTrends(HDFMixin, AttrsBasedClassHelperMixin):
         """ called after update to self.inst_fr_df_list or self.inst_fr_signals_list to update all of the aggregate properties. 
 
         """
-        n_epochs = len(self.inst_fr_df_list)
+        n_epochs: int = len(self.inst_fr_df_list)
         assert n_epochs > 0        
-        n_cells = self.inst_fr_df_list[0].shape[1]
-        
+        n_cells: int = self.inst_fr_df_list[0].shape[1]
         
         is_non_instantaneous = np.all([a_signal is None for a_signal in self.inst_fr_signals_list])
         if is_non_instantaneous:
@@ -306,6 +306,24 @@ class SpikeRateTrends(HDFMixin, AttrsBasedClassHelperMixin):
         # epoch_results_list_dict['spike_counts'] = np.vstack(epoch_results_list_dict['spike_counts'])
 
         return epoch_inst_fr_df_list, epoch_inst_fr_signal_list, epoch_avg_firing_rates_list, epoch_results_list_dict
+
+
+    # for NeuronUnitSlicableObjectProtocol:
+    def get_by_id(self, ids: NDArray[ND.Shape["N_CELLS"], Any]) -> 'SpikeRateTrends':
+        """Returns object with neuron_ids equal to ids"""
+        _obj = deepcopy(self)        
+        if _obj.included_neuron_ids is not None:
+            is_neuron_id_included = np.isin(_obj.included_neuron_ids, ids)
+            _obj.included_neuron_ids = np.intersect1d(_obj.included_neuron_ids, ids)
+            
+        _obj.epoch_agg_inst_fr_list = _obj.epoch_agg_inst_fr_list[:, ids]
+        _obj.cell_agg_inst_fr_list = _obj.cell_agg_inst_fr_list[ids]
+        # _obj.epoch_agg_inst_fr_list = _obj.epoch_agg_inst_fr_list[:, ids]
+        _obj.inst_fr_signals_list = _obj.inst_fr_signals_list[ids]
+
+        flattened_spiketrains = deepcopy(self)
+        return _obj
+    
 
 
 
