@@ -2525,7 +2525,7 @@ class TrackRemappingDiagramFigure:
 
     @function_attributes(short_name=None, tags=['figure', 'publication', 'figure1'], input_requires=[], output_provides=[], uses=['_plot_track_remapping_diagram', 'perform_update_title_subtitle', 'build_or_reuse_figure'], used_by=[], creation_date='2025-06-16 20:44', related_items=[])
     @classmethod
-    def plot_publication_bidirectional_track_remapping_diagram(cls, all_neuron_stats_table: pd.DataFrame, use_considerable_remapping_cells_only: bool=False, use_pf2D_peaks: bool = False, considerable_remapping_emphasis_color=None, skip_RL_direction_tracks: bool=True, **kwargs):
+    def plot_publication_bidirectional_track_remapping_diagram(cls, all_neuron_stats_table: pd.DataFrame, use_considerable_remapping_cells_only: bool=False, use_pf2D_peaks: bool = False, considerable_remapping_emphasis_color=None, skip_RL_direction_tracks: bool=True, output_fig_1_folder:Optional[Path]=None, **kwargs):
         """ Plots the neuron remapping diagram
                 
         from pyphoplacecellanalysis.SpecificResults.AcrossSessionResults import AcrossSessionsResults # for .build_neuron_identities_df_for_CSV
@@ -2579,7 +2579,10 @@ class TrackRemappingDiagramFigure:
         from pyphoplacecellanalysis.SpecificResults.PhoDiba2023Paper import PhoPublicationFigureHelper
 
         ## INPUTS: all_neuron_stats_table
-        output_parent_path = Path(R'E:\Dropbox (Personal)\Active\Kamran Diba Lab\Pho-Kamran-Meetings\2025-07-03 - EXPORTS FOR PUBLICATION\Figure 1 - Overview').resolve()
+        if output_fig_1_folder is None:
+            output_fig_1_folder = Path(R'E:\Dropbox (Personal)\Active\Kamran Diba Lab\Pho-Kamran-Meetings\2025-07-03 - EXPORTS FOR PUBLICATION\Figure 1 - Overview').resolve()
+            
+        output_parent_path = deepcopy(output_fig_1_folder)
         Assert.path_exists(output_parent_path)
                 
         output_path: Path = output_parent_path.joinpath('bidir_cell_remapping').resolve()
