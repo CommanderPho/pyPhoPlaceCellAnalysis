@@ -732,7 +732,7 @@ class PaperFigureTwo(SerializedAttributesAllowBlockSpecifyingClass):
 
         return (f"<size:{title_font_size}><weight:bold>{epochs_name}</> Firing Rates\n"
                 f"<size:{subtitle_font_size}>for the "
-                "<color:royalblue, weight:bold>Long</>/<color:crimson, weight:bold>Short</> eXclusive Cells on each track</></>"
+                "<color:royalblue, weight:bold>Long</>/<color:crimson, weight:bold>Short</> dominant Cells on each track</></>"
                 )
 
 
@@ -786,7 +786,7 @@ class PaperFigureTwo(SerializedAttributesAllowBlockSpecifyingClass):
             scatter_plots.append(scatter_plot)
             x_values_list.append(x_values)
             
-        ax.set_xlabel('Neuron Exclusivity Classification')
+        ax.set_xlabel('Neuron Track Dominance Classification')
         ax.set_ylabel(ylabel)
         # Hide the right and top spines (box components)
         ax.spines[['right', 'top']].set_visible(False)
@@ -828,7 +828,7 @@ class PaperFigureTwo(SerializedAttributesAllowBlockSpecifyingClass):
         # Laps_fr_label: str = '\\theta'
         Laps_fr_label: str = '\\text{Laps}'
 
-        x_labels = [f'$L_d C$\t${Laps_fr_label}' + '_{' + delta_minus_str + '}$', f'$L_d C$\t${Laps_fr_label}' + '_{' + delta_plus_str + '}$', f'$S_d C$\t${Laps_fr_label}' + '_{' + delta_minus_str + '}$', f'$S_d C$\t${Laps_fr_label}' + '_{' + delta_plus_str + '}$']
+        x_labels = [f'$L d C$\t${Laps_fr_label}' + '_{' + delta_minus_str + '}$', f'$L d C$\t${Laps_fr_label}' + '_{' + delta_plus_str + '}$', f'$S d C$\t${Laps_fr_label}' + '_{' + delta_minus_str + '}$', f'$S d C$\t${Laps_fr_label}' + '_{' + delta_plus_str + '}$']
         all_data_points = np.array([v.values for v in Fig2_Laps_FR])
         # all_scatter_props =  Fig2_Laps_FR[0].LxC_scatter_props + Fig2_Laps_FR[1].LxC_scatter_props + Fig2_Laps_FR[2].SxC_scatter_props + Fig2_Laps_FR[3].SxC_scatter_props # the LxC_scatter_props and SxC_scatter_props are actually the same for all entries in this list, but get em like this anyway. 
 
@@ -853,7 +853,7 @@ class PaperFigureTwo(SerializedAttributesAllowBlockSpecifyingClass):
         delta_minus_str: str = kwargs.get('delta_minus_str', PhoPublicationFigureHelper.delta_minus_str) # 't < \\Delta'        
         delta_plus_str: str = kwargs.get('delta_plus_str', PhoPublicationFigureHelper.delta_plus_str) # 't > \\Delta'
         
-        var_name:str = 'Replay'
+        var_name:str = 'PBE'
         active_context = active_context.adding_context_if_missing(variable=var_name) # title='Laps'
 
         # PBE_fr_label: str = 'R'
@@ -872,7 +872,7 @@ class PaperFigureTwo(SerializedAttributesAllowBlockSpecifyingClass):
             
         all_scatter_props = [{}, {}, {}, {}] # override, 2023-10-03
         # label_list = [LxC_aclus, LxC_aclus, SxC_aclus, SxC_aclus]
-        return cls.create_plot(x_labels, all_data_points, all_scatter_props, 'PBE-averaged Firing Rates (Hz)', 'Replay', 'fig_2_Replay_FR_matplotlib', active_context=active_context, defer_show=defer_show, title_modifier=title_modifier, prepare_for_publication=prepare_for_publication, **kwargs)
+        return cls.create_plot(x_labels, all_data_points, all_scatter_props, 'PBE-averaged Firing Rates (Hz)', 'PBE', 'fig_2_Replay_FR_matplotlib', active_context=active_context, defer_show=defer_show, title_modifier=title_modifier, prepare_for_publication=prepare_for_publication, **kwargs)
 
     @providing_context(fig='2', display_fn_name='inst_FR_bar_graphs')
     def display(self, defer_show=False, save_figure=True, enable_tiny_point_labels=True, enable_hover_labels=False, enabled_point_connection_lines=True, active_context=None, title_modifier_fn=None, top_margin=0.8, left_margin=0.090, bottom_margin=0.150, prepare_for_publication: bool = False, **kwargs):
