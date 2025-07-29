@@ -1602,24 +1602,60 @@ def main_complete_figure_generations(curr_active_pipeline, enable_default_neptun
 # ==================================================================================================================== #
 # Plotting Helpers 2024-10-29                                                                                          #
 # ==================================================================================================================== #
-@function_attributes(short_name=None, tags=['matplotlib', 'good', 'stacked-hist', 'ACTIVE'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-10-23 18:51', related_items=[])
-def _perform_dual_hist_plot(grainularity_desc: str, laps_df: pd.DataFrame, ripple_df: pd.DataFrame, is_dark_mode: bool=False, legend_groups_to_solo=None, legend_groups_to_hide: Optional[List[str]]=None):
-    """ plots the stacked histograms for both laps and ripples
+@function_attributes(short_name=None, tags=['matplotlib', 'good', 'stacked-hist', 'scatter', 'ACTIVE', 'publication'], input_requires=[], output_provides=[], uses=['plot_pre_scatter_post_matplotlib'], used_by=[], creation_date='2024-07-29 00:00', related_items=['_perform_plot_pre_post_delta_scatter'])
+def _perform_matplotlib_pre_post_scatter(grainularity_desc: str, laps_df: pd.DataFrame, ripple_df: pd.DataFrame, is_dark_mode: bool=False, legend_groups_to_solo=None, legend_groups_to_hide: Optional[List[str]]=None, include_scatterplot: bool=True, time_column: str='t_start', value_column: str='P_Short'):
+    """ plots the stacked histograms for both laps and ripples, with optional scatterplot showing values over time
     
-    from pyphoplacecellanalysis.SpecificResults.PhoDiba2023Paper import _perform_dual_hist_plot
+    Aims to replace the plotly version `_perform_plot_pre_post_delta_scatter` by implementing the same figure in MATPLOTLIB for easier export to publication
+    
+    
+    Parameters:
+    -----------
+    grainularity_desc : str
+        Description of the granularity
+    laps_df : pd.DataFrame
+        DataFrame containing laps data
+    ripple_df : pd.DataFrame  
+        DataFrame containing ripple data
+    is_dark_mode : bool, optional
+        Whether to use dark mode styling
+    legend_groups_to_solo : optional
+        Groups to show exclusively
+    legend_groups_to_hide : List[str], optional
+        Groups to hide from display
+    include_scatterplot : bool, optional
+        Whether to include a scatterplot between histograms showing values over time
+    time_column : str, optional
+        Column name for time values (default: 't_start')
+    value_column : str, optional
+        Column name for values to plot (default: 'P_Short')
+    
+    Returns:
+    --------
+    tuple
+        Returns histogram outputs and optionally scatterplot figure
+    
+    Usage:
+    ------
+    from pyphoplacecellanalysis.SpecificResults.PhoDiba2023Paper import _perform_matplotlib_pre_post_scatter
     
     
     """
     from flexitext import flexitext
     from neuropy.utils.matplotlib_helpers import MatplotlibFigureExtractors, FormattedFigureText ## flexitext version
-    from pyphoplacecellanalysis.Pho2D.statistics_plotting_helpers import plot_histograms_across_sessions, plot_stacked_histograms
-
+    
+    if include_scatterplot:
+        from pyphoplacecellanalysis.Pho2D.statistics_plotting_helpers import plot_pre_scatter_post_matplotlib
+        _active_plot_fn = plot_pre_scatter_post_matplotlib
+    else:
+        from pyphoplacecellanalysis.Pho2D.statistics_plotting_helpers import plot_histograms_across_sessions, plot_stacked_histograms        
+        _active_plot_fn = plot_stacked_histograms
 
     if (legend_groups_to_solo is None) and (legend_groups_to_hide is None):
         ## if neither are provided, hide none (show all)
         legend_groups_to_hide = []
 
-    variable_name: str = 'P_Short'
+    variable_name: str = value_column
     y_baseline_level: float = 0.5 # for P(short), etc
     y_ylims = (0, 1)
 
@@ -1633,12 +1669,15 @@ def _perform_dual_hist_plot(grainularity_desc: str, laps_df: pd.DataFrame, rippl
         
     def _update_stacked_hist_post_plot(histogram_out):
         """ captures: y_baseline_level, y_ylims """
-        for k, ax in histogram_out.axes.items():
+        # for k, ax in histogram_out.axes.items():
+        for k, ax in histogram_out.ax_dict.items():
+            ## this works for scatter as well
             _tmp_line = ax.axhline(y_baseline_level, **baseline_kwargs) # draw baseline line (horizontally)
             ax.set_ylim(*y_ylims)
             
         ## add flexitext text:
-        a_fig = histogram_out.figures[0]
+        # a_fig = histogram_out.figures[0]
+        a_fig = histogram_out.fig
         extracted_fig_titles_dict = MatplotlibFigureExtractors.extract_titles(fig=a_fig)
         suptitle: str = extracted_fig_titles_dict.get('suptitle', None) # 'Laps (by-time-bin)|2 Sessions|5 tbin sizes'
         subtitle_string = None
@@ -1662,6 +1701,8 @@ def _perform_dual_hist_plot(grainularity_desc: str, laps_df: pd.DataFrame, rippl
         header_text_obj = flexitext(text_formatter.left_margin, 0.89, full_title_str, va="bottom", xycoords="figure fraction")
         return {'header_text_obj': header_text_obj}
             
+
+
     common_stacked_hist_kwargs = dict(figsize=(12, 3), column_name=variable_name)
 
     compare_decimal_precision_ndigits: int = 3
@@ -1686,27 +1727,85 @@ def _perform_dual_hist_plot(grainularity_desc: str, laps_df: pd.DataFrame, rippl
         # laps_df = laps_df[np.isclose(laps_df.time_bin_size.astype(float), legend_groups_to_hide)]
         # ripple_df = ripple_df[np.isin(ripple_df.time_bin_size.astype(float), legend_groups_to_hide)]
         
+
+    # Add scatterplot if requested
+    scatter_fig = None
+
     # You can use it like this:
     num_unique_sessions: int = laps_df.session_name.nunique(dropna=True) # number of unique sessions, ignoring the NA entries
     num_unique_time_bins: int = laps_df.time_bin_size.nunique(dropna=True)
-    _laps_histogram_out = plot_stacked_histograms(laps_df, data_type=f'Laps ({grainularity_desc})', session_spec=f'{num_unique_sessions} Sessions', time_bin_duration_str=f"{num_unique_time_bins} tbin sizes", **common_stacked_hist_kwargs)
+    _laps_histogram_out = _active_plot_fn(laps_df, data_type=f'Laps ({grainularity_desc})', session_spec=f'{num_unique_sessions} Sessions', time_bin_duration_str=f"{num_unique_time_bins} tbin sizes", **common_stacked_hist_kwargs)
     _laps_flexitext_dict = _update_stacked_hist_post_plot(_laps_histogram_out)
     # fig_to_clipboard(_laps_histogram_out.figures[0], bbox_inches='tight')
 
     num_unique_sessions: int = ripple_df.session_name.nunique(dropna=True) # number of unique sessions, ignoring the NA entries
     num_unique_time_bins: int = ripple_df.time_bin_size.nunique(dropna=True)
-    _ripple_histogram_out = plot_stacked_histograms(ripple_df, data_type=f'PBEs ({grainularity_desc})', session_spec=f'{num_unique_sessions} Sessions', time_bin_duration_str=f"{num_unique_time_bins} tbin sizes", **common_stacked_hist_kwargs)
+    _ripple_histogram_out = _active_plot_fn(ripple_df, data_type=f'PBEs ({grainularity_desc})', session_spec=f'{num_unique_sessions} Sessions', time_bin_duration_str=f"{num_unique_time_bins} tbin sizes", **common_stacked_hist_kwargs)
     _ripple_flexitext_dict = _update_stacked_hist_post_plot(_ripple_histogram_out)
     # fig_to_clipboard(_ripple_histogram_out.figures[0], bbox_inches='tight')
+
+    # Add scatterplot if requested
+    # scatter_fig = None
+    # if include_scatterplot:
+    #     import matplotlib.pyplot as plt
+        
+    #     # Combine both dataframes for scatterplot
+    #     combined_df = pd.concat([
+    #         laps_df.assign(data_type='Laps'),
+    #         ripple_df.assign(data_type='PBEs')
+    #     ], ignore_index=True)
+        
+    #     if len(combined_df) > 0 and time_column in combined_df.columns and value_column in combined_df.columns:
+    #         # Create figure with 3 subplots: hist1, scatter, hist2
+    #         scatter_fig, (ax1, ax_scatter, ax2) = plt.subplots(1, 3, figsize=(15, 5))
+            
+    #         # Plot scatterplot in middle
+    #         colors = {'Laps': 'blue', 'PBEs': 'red'}
+    #         for data_type in combined_df['data_type'].unique():
+    #             subset = combined_df[combined_df['data_type'] == data_type]
+    #             ax_scatter.scatter(subset[time_column], subset[value_column], 
+    #                              c=colors.get(data_type, 'gray'), 
+    #                              alpha=0.6, label=data_type)
+            
+    #         ax_scatter.axhline(y_baseline_level, **baseline_kwargs)
+    #         ax_scatter.set_ylim(*y_ylims)
+    #         ax_scatter.set_xlabel(f'Time ({time_column})')
+    #         ax_scatter.set_ylabel(value_column)
+    #         ax_scatter.set_title(f'{value_column} vs {time_column}')
+    #         ax_scatter.legend()
+    #         ax_scatter.grid(True, alpha=0.3)
+            
+    #         # Hide the side plots for now (they could contain histograms if needed)
+    #         ax1.set_visible(False)
+    #         ax2.set_visible(False)
+            
+    #         plt.tight_layout()
 
     return _laps_histogram_out, _ripple_histogram_out
 
 
-@function_attributes(short_name=None, tags=['MAIN', 'CRITICAL', 'FINAL', 'plotly', 'scatter', 'histogram', 'publication'], input_requires=[], output_provides=[], uses=['plotly_pre_post_delta_scatter'], used_by=[], creation_date='2024-10-23 20:04', related_items=[])
+# Backward compatibility alias
+def _perform_dual_hist_plot(grainularity_desc: str, laps_df: pd.DataFrame, ripple_df: pd.DataFrame, is_dark_mode: bool=False, legend_groups_to_solo=None, legend_groups_to_hide: Optional[List[str]]=None):
+    """Backward compatibility wrapper for _perform_matplotlib_pre_post_scatter without scatterplot"""
+    laps_out, ripple_out = _perform_matplotlib_pre_post_scatter(
+        grainularity_desc=grainularity_desc, 
+        laps_df=laps_df, 
+        ripple_df=ripple_df, 
+        is_dark_mode=is_dark_mode, 
+        legend_groups_to_solo=legend_groups_to_solo, 
+        legend_groups_to_hide=legend_groups_to_hide, 
+        include_scatterplot=False
+    )
+    return laps_out, ripple_out
+
+
+@function_attributes(short_name=None, tags=['MAIN', 'CRITICAL', 'FINAL', 'plotly', 'scatter', 'histogram', 'publication'], input_requires=[], output_provides=[], uses=['plotly_pre_post_delta_scatter'], used_by=[], creation_date='2024-10-23 20:04', related_items=['_perform_matplotlib_pre_post_scatter'])
 def _perform_plot_pre_post_delta_scatter(data_context: IdentifyingContext, concatenated_ripple_df: pd.DataFrame, time_delta_tuple: Tuple[float, float, float], fig_size_kwargs: Dict, save_plotly: Callable, is_dark_mode: bool=False, enable_custom_widget_buttons:bool=True,
                                           extant_figure=None, custom_output_widget=None, legend_groups_to_hide: Optional[List[str]]=None, should_save: bool = True, variable_name = 'P_Short', y_baseline_level: float = 0.5, additional_fig_layout_kwargs: Dict=None, is_publication_ready_figure: bool=False, histogram_bins: int = 11, **kwargs):
     """ plots the stacked histograms for both laps and ripples
-
+    2025-07-29 - Created ALTERNATIVE <MATPLOTLIB> function: `_perform_matplotlib_pre_post_scatter` for publication to avoid the Plotly exporting headaches
+    
+    
     Usage:
         from functools import partial
         from pyphoplacecellanalysis.Pho2D.plotly.Extensions.plotly_helpers import plotly_pre_post_delta_scatter
