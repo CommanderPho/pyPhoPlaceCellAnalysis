@@ -668,6 +668,40 @@ def PAPER_FIGURE_figure_1_full(curr_active_pipeline, defer_show=False, save_figu
 # ==================================================================================================================== #
 # Shows the LxC/SxC metrics and firing rate indicies
 
+@function_attributes(short_name=None, tags=['significance_bars', 'fig2', 'statistics'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-07-29 18:12', related_items=[])
+def add_significance_bars(ax, p_value, x1, x2, y, significance_level:float=0.05, y_offset: float = 0.5, text_additional_y_offset:float=0.01):
+    """Add significance bars to a boxplot.
+
+
+    Usage:
+
+        # Add significance bars between groups
+        ax = _fig_2_output_dict['theta'].ax
+        _out_ann_AB = add_significance_bars(ax, LxC_Laps_T_result.pvalue, 0, 1, 6)
+        # _out_ann_BC = add_significance_bars(ax, SxC_Laps_T_result.pvalue, 1, 2, 6)
+        _out_ann_CD = add_significance_bars(ax, SxC_Laps_T_result.pvalue, 2, 3, 6)
+
+    """
+      # Offset for the bar above y
+    _out_ann = {}
+    _out_ann['bar'] = ax.plot([x1, x1, x2, x2], [y, (y + y_offset), (y + y_offset), y], color='black')
+    
+    # Annotate with asterisks based on p-value
+    sig_astrisks_str: str = 'N.S.'
+    if p_value < significance_level:
+        sig_astrisks_str: str = '*'
+    if p_value < significance_level / 10:
+        sig_astrisks_str += '*'
+    if p_value < significance_level / 100:
+        sig_astrisks_str += '*'
+    ## OUTPUT:
+    if sig_astrisks_str:
+        _out_ann['label'] = ax.text(((x1 + x2) / 2), (y + y_offset + text_additional_y_offset), sig_astrisks_str, fontsize=16, ha='center')
+
+    return _out_ann
+
+
+
 # Instantaneous versions:
 
 # @overwriting_display_context(
@@ -696,6 +730,8 @@ class PaperFigureTwo(SerializedAttributesAllowBlockSpecifyingClass):
         # return [(1.0, 0, 0, 1), (0.65, 0, 0, 1), (0, 0, 0.65, 1), (0, 0, 1.0, 1)] # corresponding colors
         # return [(0, 0, 1.0, 1), (0, 0, 0.65, 1), (0.65, 0, 0, 1), (1.0, 0, 0, 1)] # long=Blue, short=Red -- dimmer -- 4 separate colors (2 shades of red and 2 shades of blue)
         return [(0, 0, 0.65, 1), (0, 0, 0.65, 1), (0.65, 0, 0, 1), (0.65, 0, 0, 1)] # long=Blue, short=Red -- dimmer -- only 2 colors
+
+
 
 
     def compute(self, curr_active_pipeline, **kwargs):
@@ -738,7 +774,8 @@ class PaperFigureTwo(SerializedAttributesAllowBlockSpecifyingClass):
 
     @classmethod
     def create_plot(cls, x_labels, y_values, scatter_props, ylabel, title, fig_name, active_context, defer_show, title_modifier=None, prepare_for_publication: bool = False, **kwargs):
-        """
+        """ Main plotting function, called by both Laps and PBE subfigures
+        
         prepare_for_publication: if True, no context footer is added
         """
         if title_modifier:
@@ -875,7 +912,7 @@ class PaperFigureTwo(SerializedAttributesAllowBlockSpecifyingClass):
         return cls.create_plot(x_labels, all_data_points, all_scatter_props, 'PBE-averaged Firing Rates (Hz)', 'PBE', 'fig_2_Replay_FR_matplotlib', active_context=active_context, defer_show=defer_show, title_modifier=title_modifier, prepare_for_publication=prepare_for_publication, **kwargs)
 
     @providing_context(fig='2', display_fn_name='inst_FR_bar_graphs')
-    def display(self, defer_show=False, save_figure=True, enable_tiny_point_labels=True, enable_hover_labels=False, enabled_point_connection_lines=True, active_context=None, title_modifier_fn=None, top_margin=0.8, left_margin=0.090, bottom_margin=0.150, prepare_for_publication: bool = False, **kwargs):
+    def display(self, defer_show=False, save_figure=True, enable_tiny_point_labels=True, enable_hover_labels=False, enabled_point_connection_lines=True, enable_stats_overlays:bool=True, active_context=None, title_modifier_fn=None, top_margin=0.8, left_margin=0.090, bottom_margin=0.150, prepare_for_publication: bool = False, **kwargs):
         """ 
         
         title_modifier: lambda original_title: f"{original_title} (all sessions)"
@@ -904,6 +941,49 @@ class PaperFigureTwo(SerializedAttributesAllowBlockSpecifyingClass):
             _fig_2_theta_out = self.add_optional_aclu_labels(_fig_2_theta_out, LxC_aclus, SxC_aclus, enable_tiny_point_labels=enable_tiny_point_labels, enable_hover_labels=enable_hover_labels, enabled_point_connection_lines=enabled_point_connection_lines)
             _fig_2_replay_out = self.add_optional_aclu_labels(_fig_2_replay_out, LxC_aclus, SxC_aclus, enable_tiny_point_labels=enable_tiny_point_labels, enable_hover_labels=enable_hover_labels, enabled_point_connection_lines=enabled_point_connection_lines)
         
+
+
+        if enable_stats_overlays:
+            ## Compute and add the bar graph stats and significance bars
+            ## Add stats from t-tests (check?)
+            ## INPUTS: across_session_inst_fr_computation_shell_obj
+            LxC_Laps_T_result, SxC_Laps_T_result, LxC_Replay_T_result, SxC_Replay_T_result = pho_stats_bar_graph_t_tests(self.computation_result)
+            # 'Fig2_Laps_FR'
+
+            # LxC_Laps_T_result: TtestResult(statistic=6.712433589492588, pvalue=5.2823734983320806e-05, df=10)
+            # SxC_Laps_T_result: TtestResult(statistic=-4.339172228913557, pvalue=0.002481149212058544, df=8)
+            # LxC_Replay_T_result: TtestResult(statistic=-1.1080728076872137, pvalue=0.29376948620786025, df=10)
+            # SxC_Replay_T_result: TtestResult(statistic=-2.952880002807658, pvalue=0.018344744614346115, df=8)
+
+            # LxC_Laps_T_result: TtestResult(statistic=4.91664380764766, pvalue=8.326747683573472e-05, df=20)
+            # SxC_Laps_T_result: TtestResult(statistic=-4.836261942292889, pvalue=0.00011472243045619965, df=19)
+            # LxC_Replay_T_result: TtestResult(statistic=0.6019865878499693, pvalue=0.5539469660448748, df=20)
+            # SxC_Replay_T_result: TtestResult(statistic=-4.580715643685985, pvalue=0.00020418641915182124, df=19)
+
+            # Add significance bars between groups
+            # ax = _fig_2_output_dict['theta'].ax
+            ax = _fig_2_theta_out.ax
+            # ax = _fig_2_theta_out.axes[0] # one shared axis per figure
+            _out_ann_AB = add_significance_bars(ax, LxC_Laps_T_result.pvalue, 0, 1, 6)
+            # _out_ann_BC = add_significance_bars(ax, SxC_Laps_T_result.pvalue, 1, 2, 6)
+            _out_ann_CD = add_significance_bars(ax, SxC_Laps_T_result.pvalue, 2, 3, 6)
+
+            # _out_ann_BD = add_significance_bars(ax, SxC_Laps_T_result.pvalue, 0.5, 2.5, 8)
+
+            # _out_ann_AC = add_significance_bars(ax, 0.005, 0, 2, 15)
+
+
+            # Add significance bars between groups
+            # ax = _fig_2_output_dict['replay'].ax
+            ax = _fig_2_replay_out.ax
+            _out_ann_AB = add_significance_bars(ax, LxC_Replay_T_result.pvalue, 0, 1, 6)
+            # _out_ann_BC = add_significance_bars(ax, SxC_Laps_T_result.pvalue, 1, 2, 6)
+            _out_ann_CD = add_significance_bars(ax, SxC_Replay_T_result.pvalue, 2, 3, 6)
+
+
+
+
+
         def _perform_write_to_file_callback():
             ## 2023-05-31 - Reference Output of matplotlib figure to file, along with building appropriate context.
             return (self.perform_save(_fig_2_theta_out.context, _fig_2_theta_out.figures[0]), 
