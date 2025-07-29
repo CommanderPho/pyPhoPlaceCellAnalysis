@@ -3211,10 +3211,8 @@ class InstantaneousSpikeRateGroupsComputation(PickleSerializableMixin, HDF_Seria
         # Get the provided context or use the session context:
         active_context = kwargs.get('active_context', sess.get_context())
 
-
         epoch_handling_mode:str = kwargs.pop('epoch_handling_mode', 'DropShorterMode')
-        
-        
+            
         self.active_identifying_session_ctx = active_context
         long_epoch_name, short_epoch_name, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
         # long_session, short_session, global_session = [curr_active_pipeline.filtered_sessions[an_epoch_name] for an_epoch_name in [long_epoch_name, short_epoch_name, global_epoch_name]] # only uses global_session
