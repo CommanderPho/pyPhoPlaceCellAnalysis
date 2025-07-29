@@ -106,8 +106,243 @@ from pyphoplacecellanalysis.General.Model.Configs.LongShortDisplayConfig import 
 from pyphocorehelpers.gui.Qt.color_helpers import ColormapHelpers, ColorFormatConverter, debug_print_color, build_adjusted_color
 
 
+@metadata_attributes(short_name=None, tags=['heuristic', 'continuous-heuristic', 'not-yet-working'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-07-29 00:40', related_items=[])
+class ContinuousHeuristicScoring:
+    """ 
+        Most recent functions to attempt to do continuous/non-PBE period sequence detection via a version of my heuristic decoder
 
-@metadata_attributes(short_name=None, tags=['remapping', 'model'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-07-08 17:40', related_items=[])
+    Usage:
+
+
+        import numpy as np
+        from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import ContinuousHeuristicScoring
+
+        # Example usage
+
+        # a_result.most_likely_position_indicies_list[0].shape # (2, 69488)
+        # np.sum(p_x_given_n, axis=1) ## sum over 4 decoders to find most likely
+
+        _decoder_prob_sum_over_all_positions = np.nansum(p_x_given_n, axis=0) ## sum over all positions (4, 69488)
+        most_likely_decoder_idxs: NDArray = np.argmax(_decoder_prob_sum_over_all_positions, axis=0) ## find the max decoder idx for each time bins (4, 69488) - (n_time_bins, )
+        # most_likely_decoder_idxs # .shape
+        # p_x_given_n.shape # p_x_given_n.shape (59, 4, 69488)
+        # p_x_given_n[most_likely_decoder_idxs, :]
+        most_likely_pos_idxs: NDArray = np.argmax(p_x_given_n, axis=0) ## find the max position bins (4, 69488) - (n_decoders, n_time_bins)
+        a_most_likely_pos_idxs = most_likely_pos_idxs[0,:] ## single decoder result .shape (n_time_bins)
+        # a_most_likely_pos_idxs
+
+        # pos_bin_edges: NDArray = deepcopy(xbin)
+        # track_templates: TrackTemplates
+        use_bin_units_instead_of_realworld:bool=False
+        # max_ignore_bins:float = 2 ## for PBEs
+        max_ignore_bins:float = 9 ## for Laps
+        # 5 skip bins
+        # same_thresh_cm: float = 6.0
+        same_thresh_cm: float = 60.0
+        # max_jump_distance_cm: float = 60.0
+        max_jump_distance_cm: float = 200.0
+        debug_print=False
+
+        # pos_bounds = [np.min([track_templates.long_LR_decoder.xbin, track_templates.short_LR_decoder.xbin]), np.max([track_templates.long_LR_decoder.xbin, track_templates.short_LR_decoder.xbin])] # [37.0773897438341, 253.98616538463315]
+        num_pos_bins: int = track_templates.long_LR_decoder.n_xbin_centers
+        xbin_edges: NDArray = deepcopy(track_templates.long_LR_decoder.xbin)
+        decoder_track_length_dict = track_templates.get_track_length_dict()  # {'long_LR': 214.0, 'long_RL': 214.0, 'short_LR': 144.0, 'short_RL': 144.0}
+
+        time_window_centers: NDArray = deepcopy(a_result.time_window_centers[0]) # (n_time_bins)
+
+        if not use_bin_units_instead_of_realworld:
+            a_most_likely_pos_cm = [xbin_edges[v] for v in a_most_likely_pos_idxs]
+            active_most_likely_pos = deepcopy(a_most_likely_pos_cm)
+        else:
+            active_most_likely_pos = deepcopy(a_most_likely_pos_idxs)
+            
+        if isinstance(active_most_likely_pos, list):
+            active_most_likely_pos = np.array(active_most_likely_pos)
+
+        ## INPUTS: active_most_likely_pos -- original data series
+
+        df_runs, (valid, counts), (P_diff, is_excessive_change_index, series_idx) = ContinuousHeuristicScoring.find_longest_run_of_non_excessive_diffs(active_most_likely_pos=active_most_likely_pos, time_window_centers=time_window_centers, max_jump_distance_cm=max_jump_distance_cm, min_suffix_merge_seq_n_bins=20, max_ignore_bins=0, min_prefix_merge_seq_n_bins=20)
+        df_runs
+
+        ## Add to SpikeRaster2D as intervals:
+        cont_heuristics_dfs_datasources_dict, cont_heuristics_dfs_dict = ContinuousHeuristicScoring.add_spikeRaster2D_interval_rects(active_2d_plot, df_runs=df_runs)
+
+    """
+    @classmethod
+    def add_spikeRaster2D_interval_rects(cls, active_2d_plot: Spike2DRaster, df_runs: pd.DataFrame, **kwargs):
+        """ 
+        
+        cont_heuristics_dfs_datasources_dict, cont_heuristics_dfs_dict = ContinuousHeuristicScoring.add_spikeRaster2D_interval_rects(active_2d_plot, df_runs=df_runs)
+        """
+        
+        from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.Mixins.RenderTimeEpochs.Specific2DRenderTimeEpochs import General2DRenderTimeEpochs, inline_mkColor
+        from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.SpikeRasterWidgets.Spike2DRaster import Spike2DRaster
+        from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.Mixins.RenderTimeEpochs.EpochRenderingMixin import EpochRenderingMixin, RenderedEpochsItemsContainer
+        from pyphoplacecellanalysis.General.Model.Datasources.IntervalDatasource import IntervalsDatasource
+        from neuropy.utils.mixins.time_slicing import TimeColumnAliasesProtocol
+
+        if 't_duration' not in df_runs.columns:
+            df_runs['t_duration'] = df_runs['t_end'] - df_runs['t_start']
+
+        ## Use the three dataframes as separate Epoch series:
+        cont_heuristics_dfs_dict = {
+            'ContinuousHeuristic': df_runs,
+        }
+
+        cont_heuristics_epochs_formatting_dict = {
+            'ContinuousHeuristic':dict(y_location=-10.0, height=7.5, pen_color=inline_mkColor('purple', 0.8), brush_color=inline_mkColor('purple', 0.5)),
+        }
+
+        required_vertical_offsets, required_interval_heights = EpochRenderingMixin.build_stacked_epoch_layout([0.2], epoch_render_stack_height=10.0, interval_stack_location='below') # ratio of heights to each interval
+        stacked_epoch_layout_dict = {interval_key:dict(y_location=y_location, height=height) for interval_key, y_location, height in zip(list(cont_heuristics_epochs_formatting_dict.keys()), required_vertical_offsets, required_interval_heights)} # Build a stacked_epoch_layout_dict to update the display
+        # stacked_epoch_layout_dict # {'LapsAll': {'y_location': -3.6363636363636367, 'height': 3.6363636363636367}, 'LapsTrain': {'y_location': -21.818181818181817, 'height': 18.18181818181818}, 'LapsTest': {'y_location': -40.0, 'height': 18.18181818181818}}
+
+        # replaces 'y_location', 'position' for each dict:
+        cont_heuristics_epochs_formatting_dict = {k:(v|stacked_epoch_layout_dict[k]) for k, v in cont_heuristics_epochs_formatting_dict.items()}
+        
+        ## INPUTS: train_test_split_laps_dfs_dict
+        cont_heuristics_dfs_dict = {k:TimeColumnAliasesProtocol.renaming_synonym_columns_if_needed(df=v, required_columns_synonym_dict=IntervalsDatasource._time_column_name_synonyms) for k, v in cont_heuristics_dfs_dict.items()}
+
+        ## Build interval datasources for them:
+        cont_heuristics_dfs_datasources_dict = {k:General2DRenderTimeEpochs.build_render_time_epochs_datasource(v) for k, v in cont_heuristics_dfs_dict.items()}
+        ## INPUTS: active_2d_plot, train_test_split_laps_epochs_formatting_dict, train_test_split_laps_dfs_datasources_dict
+        assert len(cont_heuristics_epochs_formatting_dict) == len(cont_heuristics_dfs_datasources_dict)
+        for k, an_interval_ds in cont_heuristics_dfs_datasources_dict.items():
+            an_interval_ds.update_visualization_properties(lambda active_df, **kwargs: General2DRenderTimeEpochs._update_df_visualization_columns(active_df, **(cont_heuristics_epochs_formatting_dict[k] | kwargs)))
+
+        ## Full output: train_test_split_laps_dfs_datasources_dict
+
+        # actually add the epochs:
+        for k, an_interval_ds in cont_heuristics_dfs_datasources_dict.items():
+            active_2d_plot.add_rendered_intervals(an_interval_ds, name=f'{k}', debug_print=False) # adds the interval
+
+        return cont_heuristics_dfs_datasources_dict, cont_heuristics_dfs_dict
+
+
+    @function_attributes(short_name=None, tags=['continuous-heuristic', 'replay-detection', 'PBEs', 'WORKING', 'AI'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-07-29 08:20', related_items=[])
+    @classmethod
+    def label_false_series_with_bridging(cls, is_excessive: np.ndarray, min_prefix_merge_seq_n_bins: int = 4, max_ignore_bins:int=2, min_suffix_merge_seq_n_bins: int = 2):
+        """ 
+        min_prefix_merge_seq_n_bins: minimum number of bins to consider for bridging
+        
+        
+        # Output might look like:
+        # [ 0 0 0 0  -1  0 0 0  -1 -1  1 1 ]
+        # where the single True intrusion at position 4 was bridged into series 0,
+        # but the double True run at 8–9 was not.
+
+        """
+        # 1) RLE helper
+        def rle(arr):
+            # returns (values, lengths, start_positions)
+            n = arr.size
+            if n == 0:
+                return np.array([], bool), np.array([], int), np.array([], int)
+            # find boundaries where value changes
+            change_idx = np.nonzero(np.concatenate(([True], arr[1:] != arr[:-1], [True])))[0]
+            lengths = np.diff(change_idx)
+            starts = change_idx[:-1]
+            vals = arr[starts]
+            return vals, lengths, starts
+
+        # make a copy we can mutate
+        arr = is_excessive.copy()
+        
+        # Run initial RLE
+        vals, lengths, starts = rle(arr)
+        
+        # 2) Find intrusion runs:
+        #    A run of True (vals==True, lengths<2) whose previous False-run is >=4
+        #    and whose following False-run is >=2.
+        intrusion_mask = np.zeros_like(arr, bool)
+        for i, (v, L, st) in enumerate(zip(vals, lengths, starts)):
+            if not v and L >= min_prefix_merge_seq_n_bins:              # false-run of length >=4
+                # check if next is a short intrusion
+                if i+1 < len(vals) and vals[i+1] and lengths[i+1] < max_ignore_bins:
+                    # check the run after intrusion
+                    if i+2 < len(vals) and not vals[i+2] and lengths[i+2] >= min_suffix_merge_seq_n_bins:
+                        # mark that short True-run for flipping
+                        intrusion_start = starts[i+1]
+                        intrusion_len   = lengths[i+1]
+                        intrusion_mask[intrusion_start:intrusion_start+intrusion_len] = True
+
+        # 3) Flip only the marked “short intrusions” from True to False
+        arr[intrusion_mask] = False
+
+        # 4) Rerun RLE on the corrected Boolean array and label each False-block
+        vals2, lengths2, starts2 = rle(arr)
+        series_index = np.full(arr.shape, -1, dtype=int)
+        series_id = 0
+
+        for v, L, st in zip(vals2, lengths2, starts2):
+            if not v:
+                series_index[st:st+L] = series_id
+                series_id += 1
+            # if v is True, we leave series_index at -1
+
+        return series_index
+
+
+    @classmethod
+    def find_longest_run_of_non_excessive_diffs(cls, active_most_likely_pos: NDArray, time_window_centers: NDArray, max_jump_distance_cm: float, min_prefix_merge_seq_n_bins: int = 4, max_ignore_bins:int=2, min_suffix_merge_seq_n_bins: int = 2):
+        """ 
+        
+        active_most_likely_pos
+        """
+        P_diff = np.diff(active_most_likely_pos)
+        is_excessive_change_index = (np.abs(P_diff) > max_jump_distance_cm)
+        # is_excessive_change_index # array([False, False, False, ...,  True, False, False])
+
+        # 1) label runs with your function
+        series_idx = ContinuousHeuristicScoring.label_false_series_with_bridging(is_excessive_change_index, min_prefix_merge_seq_n_bins=min_prefix_merge_seq_n_bins, max_ignore_bins=max_ignore_bins, min_suffix_merge_seq_n_bins=min_suffix_merge_seq_n_bins)
+
+        # 2) count sizes
+        valid      = series_idx >= 0
+        counts     = np.bincount(series_idx[valid], minlength=series_idx.max()+1)
+        ## OUTPUTS: valid, counts
+
+        # Sorted run IDs from largest to smallest
+        sorted_ids = np.argsort(counts)[::-1]
+
+        records = []
+
+        for rid in sorted_ids:
+            diff_bins = np.where(series_idx == rid)[0]
+            if diff_bins.size == 0:
+                # no diffs in this run (shouldn’t usually happen)  
+                continue
+
+            # span of diffs is diff_bins.min() … diff_bins.max()
+            start_diff = diff_bins.min()
+            end_diff   = diff_bins.max()
+
+            # that covers positions[start_diff] through positions[end_diff+1]
+            pos_start = start_diff
+            pos_end   = end_diff + 1
+
+            # slice out the actual positions
+            seg = active_most_likely_pos[pos_start : pos_end+1]
+
+            records.append({
+                "run_id":       int(rid),
+                "run_length":   int(counts[rid]),    # number of diffs
+                "pos_start":    int(pos_start),
+                "pos_end":      int(pos_end),
+                't_start': float(time_window_centers[pos_start]),
+                't_end': float(time_window_centers[pos_end]),
+                "positions":    list(seg)            # store as list
+            })
+
+        df_runs = pd.DataFrame.from_records(records)
+        return df_runs, (valid, counts), (P_diff, is_excessive_change_index, series_idx)
+
+
+
+# ==================================================================================================================================================================================================================================================================================== #
+# 2025-07-08 - Remapping Models - Not yet working                                                                                                                                                                                                                                      #
+# ==================================================================================================================================================================================================================================================================================== #
+
+@metadata_attributes(short_name=None, tags=['remapping', 'model', 'not-yet-working'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-07-08 17:40', related_items=[])
 class CellFieldRemappingModels:
     """ Various methods to explain how cells remap. """
     inward_endcap_offset_magnitude: float = 15.0
