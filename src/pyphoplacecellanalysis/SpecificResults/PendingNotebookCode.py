@@ -106,6 +106,118 @@ from pyphoplacecellanalysis.General.Model.Configs.LongShortDisplayConfig import 
 from pyphocorehelpers.gui.Qt.color_helpers import ColormapHelpers, ColorFormatConverter, debug_print_color, build_adjusted_color
 
 
+from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.LongShortTrackComputations import SingleBarResult, InstantaneousSpikeRateGroupsComputation, SpikeRateTrends
+import nptyping as ND
+from nptyping import NDArray
+from neuropy.core.user_annotations import SessionCellExclusivityRecord
+
+@function_attributes(short_name=None, tags=['UNFINISHED', 'median', 'dominant'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-07-29 17:41', related_items=[])
+def recompute_dominant_cells_from_median(across_session_inst_fr_computation_dict: Dict[IdentifyingContext, InstantaneousSpikeRateGroupsComputation]) -> Dict[IdentifyingContext, InstantaneousSpikeRateGroupsComputation]:
+    """ Usage:
+    
+    from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import recompute_dominant_cells_from_median
+    _OUT_UPDATED_across_session_inst_fr_computation_dict, df_combined, session_cell_exclusivity_annotations = recompute_dominant_cells_from_median(across_session_inst_fr_computation_dict=across_session_inst_fr_computation_dict)
+    
+    ## Print for UserAnnotations
+    print(',\n'.join([': '.join([k.get_initialization_code_string(), str(v)]) for k, v in session_cell_exclusivity_annotations.items()]))
+
+
+    """
+    from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.LongShortTrackComputations import SingleBarResult, InstantaneousSpikeRateGroupsComputation, SpikeRateTrends
+    import nptyping as ND
+    from nptyping import NDArray
+    from neuropy.core.user_annotations import SessionCellExclusivityRecord
+
+    # an_out: InstantaneousSpikeRateGroupsComputation = across_session_inst_fr_computation_dict[IdentifyingContext(format_name= 'kdiba', animal= 'gor01', exper_name= 'one', session_name= '2006-6-08_14-26-15')]
+
+    _OUT_UPDATED_across_session_inst_fr_computation_dict = deepcopy(across_session_inst_fr_computation_dict)
+    session_cell_exclusivity_annotations: Dict[IdentifyingContext, SessionCellExclusivityRecord] = {}
+    
+    _updated_dfs = []
+    # for a_ctxt, an_out in across_session_inst_fr_computation_dict.items():
+    for a_ctxt, an_out in _OUT_UPDATED_across_session_inst_fr_computation_dict.items():
+        theta_trends_list: List[SpikeRateTrends] = [an_out.AnyC_ThetaDeltaMinus, an_out.AnyC_ThetaDeltaPlus]
+
+        _theta_trends_cell_medians = []
+        for a_named_epochs_period_result in theta_trends_list: 
+            # SpikeRateTrends = an_out.AnyC_ThetaDeltaMinus
+            epoch_agg_inst_fr_list: NDArray[ND.Shape["N_EPOCHS, N_CELLS"], Any] = deepcopy(a_named_epochs_period_result.epoch_agg_inst_fr_list) #.shape (40, 66) - (n_epochs, n_neurons)
+            cell_agg_inst_fr_list: NDArray[ND.Shape["N_CELLS"], Any] = np.median(epoch_agg_inst_fr_list, axis=0) ## Aggregation function applied here -- MEDIAN
+            # a_named_epochs_period_result.epoch_agg_inst_fr_list = deepcopy(epoch_agg_inst_fr_list)
+            a_named_epochs_period_result.cell_agg_inst_fr_list = deepcopy(cell_agg_inst_fr_list) ## OVERRIDE WITH NEW ONE -- UPDATES
+            
+            _theta_trends_cell_medians.append(cell_agg_inst_fr_list)
+
+        _theta_trends_cell_medians = np.vstack(_theta_trends_cell_medians).T # (66, 2) - (n_neurons, 2)
+        _theta_trends_cell_medians_df: pd.DataFrame = pd.DataFrame(_theta_trends_cell_medians, columns=['ThetaDeltaMinus', 'ThetaDeltaPlus'])
+        _theta_trends_cell_medians_df['median_diff'] = _theta_trends_cell_medians_df['ThetaDeltaPlus'] - _theta_trends_cell_medians_df['ThetaDeltaMinus'] 
+        _theta_trends_cell_medians_df['median_diff_idx'] = _theta_trends_cell_medians_df['median_diff'] / (_theta_trends_cell_medians_df['ThetaDeltaMinus'] + _theta_trends_cell_medians_df['ThetaDeltaPlus'])
+
+        ## Add the cell identity columns:
+        _theta_trends_cell_medians_df['aclu'] = deepcopy(an_out.AnyC_aclus)
+
+
+        ## Find LxC-like properties
+
+        dominant_cell_threshold: float = 0.8
+
+        _theta_trends_cell_medians_df['is_LdC'] = _theta_trends_cell_medians_df['median_diff_idx'] <= (-dominant_cell_threshold)
+        _theta_trends_cell_medians_df['is_SdC'] = _theta_trends_cell_medians_df['median_diff_idx'] >= dominant_cell_threshold
+        
+        # ## Find long and short dominant cells:
+        _theta_trends_cell_medians_df[_theta_trends_cell_medians_df['is_LdC']]
+        _theta_trends_cell_medians_df[_theta_trends_cell_medians_df['is_SdC']]
+
+        ## UPDATE:
+        an_out.LxC_aclus = np.array(_theta_trends_cell_medians_df[_theta_trends_cell_medians_df['is_LdC']]['aclu'].tolist())
+        an_out.SxC_aclus = np.array(_theta_trends_cell_medians_df[_theta_trends_cell_medians_df['is_SdC']]['aclu'].tolist())
+
+        session_cell_exclusivity_annotations[a_ctxt] = SessionCellExclusivityRecord(
+            LxC=deepcopy(an_out.LxC_aclus).tolist(),
+            SxC=deepcopy(an_out.SxC_aclus).tolist(),
+            # Others=deepcopy(an_out.AnyC_aclus).tolist(),
+        )
+        
+        # # LxC: `long_exclusive.track_exclusive_aclus`
+        # # ThetaDeltaMinus: `long_laps`
+        # an_out.LxC_ThetaDeltaMinus = an_out.AnyC_ThetaDeltaMinus.get_by_id(an_out.LxC_aclus) # = SpikeRateTrends.init_from_spikes_and_epochs(spikes_df=deepcopy(spikes_df), filter_epochs=long_laps, included_neuron_ids=self.LxC_aclus, instantaneous_time_bin_size_seconds=self.instantaneous_time_bin_size_seconds, epoch_handling_mode=epoch_handling_mode, **kwargs)
+        # # ThetaDeltaPlus: `short_laps`
+        # an_out.LxC_ThetaDeltaPlus = an_out.AnyC_ThetaDeltaPlus.get_by_id(an_out.LxC_aclus) # SpikeRateTrends.init_from_spikes_and_epochs(spikes_df=deepcopy(spikes_df), filter_epochs=short_laps, included_neuron_ids=self.LxC_aclus, instantaneous_time_bin_size_seconds=self.instantaneous_time_bin_size_seconds, epoch_handling_mode=epoch_handling_mode, **kwargs)
+
+        # # SxC: `short_exclusive.track_exclusive_aclus`
+        # # ThetaDeltaMinus: `long_laps`
+        # an_out.SxC_ThetaDeltaMinus = an_out.AnyC_ThetaDeltaMinus.get_by_id(an_out.SxC_aclus) # SpikeRateTrends.init_from_spikes_and_epochs(spikes_df=deepcopy(spikes_df), filter_epochs=long_laps, included_neuron_ids=self.SxC_aclus, instantaneous_time_bin_size_seconds=self.instantaneous_time_bin_size_seconds, epoch_handling_mode=epoch_handling_mode, **kwargs)
+        # # ThetaDeltaPlus: `short_laps`
+        # an_out.SxC_ThetaDeltaPlus = an_out.AnyC_ThetaDeltaPlus.get_by_id(an_out.SxC_aclus) # SpikeRateTrends.init_from_spikes_and_epochs(spikes_df=deepcopy(spikes_df), filter_epochs=short_laps, included_neuron_ids=self.SxC_aclus, instantaneous_time_bin_size_seconds=self.instantaneous_time_bin_size_seconds, epoch_handling_mode=epoch_handling_mode, **kwargs)
+
+        if an_out.active_identifying_session_ctx is not None:
+            ## Add the extended neuron identifiers (like the global neuron_uid, session_uid) columns
+            _theta_trends_cell_medians_df = _theta_trends_cell_medians_df.neuron_identity.make_neuron_indexed_df_global(an_out.active_identifying_session_ctx, add_expanded_session_context_keys=True, add_extended_aclu_identity_columns=True)
+            
+        ## OUTPUTS: _theta_trends_cell_medians_df
+        _updated_dfs.append(_theta_trends_cell_medians_df)
+
+    _updated_dfs
+
+    ## Merge the resultant dfs
+    # Concatenate the two dataframes
+    df_combined = pd.concat(_updated_dfs, ignore_index=True)
+    ## Drop duplicates, keeping the first (corresponding to the SxC/LxC over the AnyC, although all the values are the same so only the 'active_set_membership' column would need to be changed): 
+    df_combined = df_combined.drop_duplicates(subset=['neuron_uid'], keep='first', inplace=False)
+    ## Add extra columns:
+    # df_combined['inst_time_bin_seconds'] = float(self.instantaneous_time_bin_size_seconds)
+    # df_combined
+
+    # ['neuron_uid']
+
+    ## Find long and short dominant cells:
+    df_combined[df_combined['is_LdC']]
+    df_combined[df_combined['is_SdC']]
+    
+    return (_OUT_UPDATED_across_session_inst_fr_computation_dict, df_combined, session_cell_exclusivity_annotations)
+
+
+
 @metadata_attributes(short_name=None, tags=['heuristic', 'continuous-heuristic', 'not-yet-working'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-07-29 00:40', related_items=[])
 class ContinuousHeuristicScoring:
     """ 
