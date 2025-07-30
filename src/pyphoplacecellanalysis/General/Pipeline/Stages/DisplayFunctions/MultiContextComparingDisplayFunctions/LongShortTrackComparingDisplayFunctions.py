@@ -1496,7 +1496,7 @@ class PhoJonathanPlotHelpers:
             disable_top_row = True ## override to True
             spike_markersize = 3
             disable_left_and_right_pf_plots = True
-            position_plot_kwargs = {'color': '#757575c8', 'linewidth': 0.4, 'zorder':5} | kwargs.get('position_plot_kwargs', {})
+            position_plot_kwargs = {'color': '#757575c8', 'linewidth': 0.2, 'zorder':5} | kwargs.get('position_plot_kwargs', {})
             suptitle_params = dict(fontsize='11')
             title_params = dict(fontsize='9')
 
