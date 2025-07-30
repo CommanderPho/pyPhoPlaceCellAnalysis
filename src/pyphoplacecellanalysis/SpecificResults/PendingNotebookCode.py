@@ -1,3 +1,10 @@
+from __future__ import annotations # prevents having to specify types for typehinting as strings
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    ## typehinting only imports here
+    from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.SpikeRasterWidgets.Spike2DRaster import Spike2DRaster
+
 # 2024-01-29 - A version of "PendingNotebookCode" that is inside the pyphoplacecellanalysis library so that it can be imported from notebook that are not in the root of Spike3D
 ## This file serves as overflow from active Jupyter-lab notebooks, to eventually be refactored.
 from copy import deepcopy
@@ -110,6 +117,10 @@ from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiCo
 import nptyping as ND
 from nptyping import NDArray
 from neuropy.core.user_annotations import SessionCellExclusivityRecord
+
+
+
+
 
 @function_attributes(short_name=None, tags=['UNFINISHED', 'median', 'dominant'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-07-29 17:41', related_items=[])
 def recompute_dominant_cells_from_median(across_session_inst_fr_computation_dict: Dict[IdentifyingContext, InstantaneousSpikeRateGroupsComputation]) -> Dict[IdentifyingContext, InstantaneousSpikeRateGroupsComputation]:
@@ -288,7 +299,7 @@ class ContinuousHeuristicScoring:
         """
         
         from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.Mixins.RenderTimeEpochs.Specific2DRenderTimeEpochs import General2DRenderTimeEpochs, inline_mkColor
-        from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.SpikeRasterWidgets.Spike2DRaster import Spike2DRaster
+        
         from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.Mixins.RenderTimeEpochs.EpochRenderingMixin import EpochRenderingMixin, RenderedEpochsItemsContainer
         from pyphoplacecellanalysis.General.Model.Datasources.IntervalDatasource import IntervalsDatasource
         from neuropy.utils.mixins.time_slicing import TimeColumnAliasesProtocol
