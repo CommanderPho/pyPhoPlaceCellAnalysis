@@ -1340,6 +1340,8 @@ class PhoJonathanPlotHelpers:
             # pos_df = global_results.computed_data.pf1D.pos_df
             pos_df = global_results.computed_data.pf1D.position.to_dataframe()
 
+        pos_df: pd.DataFrame = pos_df.position.adding_hairy_curve_normal_dir_columns()
+
         t = pos_df.t.to_numpy()
         x = pos_df.x.to_numpy()
         if (ndim > 1):
@@ -1364,7 +1366,10 @@ class PhoJonathanPlotHelpers:
             #     spk_pos.append([spk_x])
 
             # spk_t.append(cell_spike_times)
-
+            cell_df = cell_df.spikes.interpolate_spike_positions(t, x, y, **{k:pos_df[k].to_numpy() for k in ['normal_dir_unit_t', 'normal_dir_unit_x']})
+            
+        ## END for cell_df in cell_spikes_dfs....
+        
         # spk_pos[0][0].shape # (214,)
         # returns (spk_t, spk_pos) arrays that can be used to plot spikes
         # return cell_spikes_dfs_list, aclu_to_fragile_linear_idx_map #, (spk_t, spk_pos)
@@ -1415,16 +1420,20 @@ class PhoJonathanPlotHelpers:
                 spike_plot_kwargs=spike_plot_kwargs, should_include_labels=False
             ) # , spikes_color=spikes_color, spikes_alpha=spikes_alpha
         """
+        spike_normal_columns_kwargs = {}
+        if ('normal_dir_unit_t' in active_spikes_df.columns) and ('normal_dir_unit_x' in active_spikes_df.columns):
+            spike_normal_columns_kwargs = dict(normal_x=active_spikes_df['normal_dir_unit_t'].values, normal_y=active_spikes_df['normal_dir_unit_x'].values)
+
         # ax_activity_v_time = _simple_plot_spikes(ax_activity_v_time, active_spikes_df[global_results.sess.spikes_df.spikes.time_variable_name].values, active_spikes_df['x'].values, spikes_color_RGB=(0, 0, 0), spikes_alpha=1.0) # all
-        ax_activity_v_time = cls._simple_plot_spikes(ax_activity_v_time, active_spikes_df[time_variable_name].values, active_spikes_df['x'].values, **cls.get_default_spike_scatter_kwargs_dict(spikes_alpha=spikes_alpha, prepare_for_publication=prepare_for_publication)['all']) # plot all first, as block circles
+        ax_activity_v_time = cls._simple_plot_spikes(ax_activity_v_time, active_spikes_df[time_variable_name].values, active_spikes_df['x'].values, **spike_normal_columns_kwargs, **cls.get_default_spike_scatter_kwargs_dict(spikes_alpha=spikes_alpha, prepare_for_publication=prepare_for_publication)['all']) # plot all first, as block circles
 
         ## Long-only:
         active_long_spikes_df: pd.DataFrame = active_spikes_df[active_spikes_df.is_included_long_pf1D]
-        ax_activity_v_time = cls._simple_plot_spikes(ax_activity_v_time, active_long_spikes_df[time_variable_name].values, active_long_spikes_df['x'].values, **cls.get_default_spike_scatter_kwargs_dict(spikes_alpha=spikes_alpha, prepare_for_publication=prepare_for_publication)['is_included_long_pf1D'])
+        ax_activity_v_time = cls._simple_plot_spikes(ax_activity_v_time, active_long_spikes_df[time_variable_name].values, active_long_spikes_df['x'].values, **spike_normal_columns_kwargs, **cls.get_default_spike_scatter_kwargs_dict(spikes_alpha=spikes_alpha, prepare_for_publication=prepare_for_publication)['is_included_long_pf1D'])
 
         ## Short-only:
         active_short_spikes_df: pd.DataFrame = active_spikes_df[active_spikes_df.is_included_short_pf1D]
-        ax_activity_v_time = cls._simple_plot_spikes(ax_activity_v_time, active_short_spikes_df[time_variable_name].values, active_short_spikes_df['x'].values, **cls.get_default_spike_scatter_kwargs_dict(spikes_alpha=spikes_alpha, prepare_for_publication=prepare_for_publication)['is_included_short_pf1D'])
+        ax_activity_v_time = cls._simple_plot_spikes(ax_activity_v_time, active_short_spikes_df[time_variable_name].values, active_short_spikes_df['x'].values, **spike_normal_columns_kwargs, **cls.get_default_spike_scatter_kwargs_dict(spikes_alpha=spikes_alpha, prepare_for_publication=prepare_for_publication)['is_included_short_pf1D'])
 
         # active_global_spikes_df = active_spikes_df[active_spikes_df.is_included_PBE]
         # ax_activity_v_time = _simple_plot_spikes(ax_activity_v_time, active_global_spikes_df[time_variable_name].values, active_global_spikes_df['x'].values, spikes_color_RGB=(0, 1, 0), spikes_alpha=1.0, zorder=25, markersize=2.5)
@@ -1434,7 +1443,7 @@ class PhoJonathanPlotHelpers:
         if ('is_included_PBE' in active_spikes_df):
             ## PBE spikes:
             active_PBE_spikes_df: pd.DataFrame = active_spikes_df[active_spikes_df.is_included_PBE]
-            ax_activity_v_time = cls._simple_plot_spikes(ax_activity_v_time, active_PBE_spikes_df[time_variable_name].values, active_PBE_spikes_df['x'].values, **cls.get_default_spike_scatter_kwargs_dict(spikes_alpha=spikes_alpha, prepare_for_publication=prepare_for_publication)['is_included_PBE'])
+            ax_activity_v_time = cls._simple_plot_spikes(ax_activity_v_time, active_PBE_spikes_df[time_variable_name].values, active_PBE_spikes_df['x'].values, **spike_normal_columns_kwargs, **cls.get_default_spike_scatter_kwargs_dict(spikes_alpha=spikes_alpha, prepare_for_publication=prepare_for_publication)['is_included_PBE'])
 
         if not defer_render:
             fig = ax_activity_v_time.get_figure().get_figure() # For SubFigure
