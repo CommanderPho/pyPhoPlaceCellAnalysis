@@ -1429,10 +1429,14 @@ class PhoJonathanPlotHelpers:
 
         ## Long-only:
         active_long_spikes_df: pd.DataFrame = active_spikes_df[active_spikes_df.is_included_long_pf1D]
+        if ('normal_dir_unit_t' in active_long_spikes_df.columns) and ('normal_dir_unit_x' in active_long_spikes_df.columns):
+            spike_normal_columns_kwargs = dict(normal_x=active_long_spikes_df['normal_dir_unit_t'].values, normal_y=active_long_spikes_df['normal_dir_unit_x'].values)        
         ax_activity_v_time = cls._simple_plot_spikes(ax_activity_v_time, active_long_spikes_df[time_variable_name].values, active_long_spikes_df['x'].values, **spike_normal_columns_kwargs, **cls.get_default_spike_scatter_kwargs_dict(spikes_alpha=spikes_alpha, prepare_for_publication=prepare_for_publication)['is_included_long_pf1D'])
 
         ## Short-only:
         active_short_spikes_df: pd.DataFrame = active_spikes_df[active_spikes_df.is_included_short_pf1D]
+        if ('normal_dir_unit_t' in active_short_spikes_df.columns) and ('normal_dir_unit_x' in active_short_spikes_df.columns):
+            spike_normal_columns_kwargs = dict(normal_x=active_short_spikes_df['normal_dir_unit_t'].values, normal_y=active_short_spikes_df['normal_dir_unit_x'].values)        
         ax_activity_v_time = cls._simple_plot_spikes(ax_activity_v_time, active_short_spikes_df[time_variable_name].values, active_short_spikes_df['x'].values, **spike_normal_columns_kwargs, **cls.get_default_spike_scatter_kwargs_dict(spikes_alpha=spikes_alpha, prepare_for_publication=prepare_for_publication)['is_included_short_pf1D'])
 
         # active_global_spikes_df = active_spikes_df[active_spikes_df.is_included_PBE]
@@ -1443,6 +1447,8 @@ class PhoJonathanPlotHelpers:
         if ('is_included_PBE' in active_spikes_df):
             ## PBE spikes:
             active_PBE_spikes_df: pd.DataFrame = active_spikes_df[active_spikes_df.is_included_PBE]
+            if ('normal_dir_unit_t' in active_PBE_spikes_df.columns) and ('normal_dir_unit_x' in active_PBE_spikes_df.columns):
+                spike_normal_columns_kwargs = dict(normal_x=active_PBE_spikes_df['normal_dir_unit_t'].values, normal_y=active_PBE_spikes_df['normal_dir_unit_x'].values)  
             ax_activity_v_time = cls._simple_plot_spikes(ax_activity_v_time, active_PBE_spikes_df[time_variable_name].values, active_PBE_spikes_df['x'].values, **spike_normal_columns_kwargs, **cls.get_default_spike_scatter_kwargs_dict(spikes_alpha=spikes_alpha, prepare_for_publication=prepare_for_publication)['is_included_PBE'])
 
         if not defer_render:
