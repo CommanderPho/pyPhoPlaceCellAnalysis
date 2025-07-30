@@ -2719,6 +2719,7 @@ class RankOrderGlobalComputationFunctions(AllFunctionEnumeratingMixin, metaclass
                                                                                                    is_global=True)
 
         global_computation_results.computed_data['RankOrder'].included_qclu_values = included_qclu_values
+        global_computation_results.computed_data['RankOrder'].minimum_inclusion_fr_Hz = minimum_inclusion_fr_Hz
 
 
         ## Update the `global_computation_results.computation_config`

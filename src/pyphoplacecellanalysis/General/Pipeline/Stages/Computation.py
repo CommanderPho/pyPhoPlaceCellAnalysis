@@ -2165,6 +2165,11 @@ class PipelineWithComputedPipelineStageMixin:
             ## recompute:
             for k, v in dependent_validators.items():
                 v.try_remove_provided_keys(curr_active_pipeline=self)
+                fcn_kwargs = {}
+                if k == 'perform_rank_order_shuffle_analysis':
+                    fcn_kwargs = dict(included_qclu_values=deepcopy(included_qclu_values), minimum_inclusion_fr_Hz=deepcopy(minimum_inclusion_fr_Hz), num_shuffles=256)
+                    
+                v.computation_fn_kwargs = (v.computation_fn_kwargs | deepcopy(fcn_kwargs))
                 v.try_computation_if_needed(curr_active_pipeline=self, computation_filter_name=None)
                 # remaining_comp_specifiers_dict, dependent_validators, provided_global_keys = SpecificComputationValidator.find_immediate_dependencies(remaining_comp_specifiers_dict=v, provided_global_keys=provided_global_keys)
                 # provided_global_keys
