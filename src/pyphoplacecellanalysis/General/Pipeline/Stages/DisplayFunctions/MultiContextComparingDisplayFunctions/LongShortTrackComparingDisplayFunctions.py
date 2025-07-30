@@ -36,6 +36,7 @@ from pyphocorehelpers.gui.PhoUIContainer import PhoUIContainer # for context_nes
 from pyphocorehelpers.mixins.member_enumerating import AllFunctionEnumeratingMixin
 from pyphocorehelpers.plotting.figure_management import PhoActiveFigureManager2D # for plot_short_v_long_pf1D_comparison (_display_long_short_pf1D_comparison)
 from pyphocorehelpers.DataStructure.RenderPlots.MatplotLibRenderPlots import MatplotlibRenderPlots
+from pyphocorehelpers.plotting.hairy_lines_plot import HairyLinePlot
 
 from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DisplayFunctionRegistryHolder import DisplayFunctionRegistryHolder
 from pyphoplacecellanalysis.GUI.Qt.Mixins.PaginationMixins import PaginatedFigureController
@@ -992,7 +993,7 @@ class PhoJonathanPlotHelpers:
                 'all': {**common_simple_kwargs_overrides, 'markersize': 1.0, 'marker': '.', 'markerfacecolor':(0.1, 0.1, 0.1, (spikes_alpha*0.6*0.5)), 'markeredgecolor': 'none', 'zorder':10},
                 'is_included_long_pf1D': {**common_simple_kwargs_overrides, 'markersize': 2.0, 'marker': '.', 'markerfacecolor':(0, 0, 1, (spikes_alpha*0.6)), 'markeredgecolor': 'none', 'zorder':15},
                 'is_included_short_pf1D': {**common_simple_kwargs_overrides, 'markersize': 2.0, 'marker': '.', 'markerfacecolor':(1, 0, 0, (spikes_alpha*0.6)), 'markeredgecolor': 'none', 'zorder':15},
-                'is_included_PBE': {**common_simple_kwargs_overrides, 'markersize': 2.0, 'marker': '.', 'markerfacecolor':(0.102, 0.831, 0, (spikes_alpha*0.6)), 'markeredgecolor': 'none', 'zorder':15},
+                'is_included_PBE': {**common_simple_kwargs_overrides, 'markersize': 2.0, 'marker': '.', 'markerfacecolor':(0.102, 0.831, 0, (spikes_alpha*0.6)), 'markeredgecolor': 'none', 'zorder':15}, ## NOTE this is the text 'none' not the value None, which I think has special meaning to matplotlib
             }
                     
         # spike_plot_kwargs_dict.update(
@@ -1371,17 +1372,26 @@ class PhoJonathanPlotHelpers:
 
     @classmethod
     @function_attributes(short_name=None, tags=['private', 'matplotlib', 'pho_jonathan_batch'], input_requires=[], output_provides=[], uses=[], used_by=['_plot_general_all_spikes'], creation_date='2023-10-03 19:42', related_items=[])
-    def _simple_plot_spikes(cls, ax, a_spk_t: NDArray, a_spk_pos: NDArray, spikes_color_RGB=(1, 0, 0), spikes_alpha=0.2, **kwargs):
+    def _simple_plot_spikes(cls, ax, a_spk_t: NDArray, a_spk_pos: NDArray, spikes_color_RGB=(1, 0, 0), spikes_alpha=0.2, should_use_hairy_plot_for_spikes:bool=True, **kwargs):
         if (spikes_color_RGB is None) and (spikes_alpha is None):
             # spikes_color_RGBA = None
             assert kwargs.get('markerfacecolor', None) is not None
             assert kwargs.get('markeredgecolor', None) is not None
-            spikes_color_RGBA = kwargs.get('markeredgecolor', None)
+            spikes_color_RGBA = kwargs.get('markeredgecolor', None) ## why edgecolor and not facecolor?
+            if should_use_hairy_plot_for_spikes:
+                if (spikes_color_RGBA == 'none'):
+                    ## equal to the value 'none', not None, which is used by matplotlib but only in scatter mode and not for hairy plots
+                    spikes_color_RGBA = kwargs.get('markerfacecolor', 'yellow') ## make it obvious when it goes wrong
+                
         else:
             spikes_color_RGBA = [*spikes_color_RGB, spikes_alpha]
 
         spike_plot_kwargs = ({'linestyle':'none', 'markersize':5.0, 'marker': '.', 'markerfacecolor':spikes_color_RGBA, 'markeredgecolor':spikes_color_RGBA, 'zorder':10} | kwargs)
-        ax.plot(a_spk_t, a_spk_pos, color=spikes_color_RGBA, **(spike_plot_kwargs or {})) # , color=[*spikes_color, spikes_alpha]
+        if should_use_hairy_plot_for_spikes:
+            hairs_line_collection, _ = HairyLinePlot._perform_plot_hairy_overlayed_position(x=a_spk_t, y=a_spk_pos, ax=ax, color=spikes_color_RGBA, should_draw_reference_line=False, **(spike_plot_kwargs or {}))
+
+        else:
+            ax.plot(a_spk_t, a_spk_pos, color=spikes_color_RGBA, **(spike_plot_kwargs or {})) # , color=[*spikes_color, spikes_alpha]
         return ax
 
     @classmethod
@@ -1436,7 +1446,8 @@ class PhoJonathanPlotHelpers:
     @classmethod
     @function_attributes(short_name='_plot_pho_jonathan_batch_plot_single_cell', tags=['private', 'matplotlib', 'pho_jonathan_batch'], input_requires=[], output_provides=[],
                           uses=['plot_single_cell_1D_placecell_validation', '_temp_draw_jonathan_ax', '_plot_general_all_spikes'], used_by=['_make_pho_jonathan_batch_plots'], creation_date='2023-04-11 08:06')
-    def _plot_pho_jonathan_batch_plot_single_cell(cls, t_split: float, time_bins: NDArray, unit_specific_time_binned_firing_rates, pf1D_all, rdf_aclu_to_idx, rdf, irdf, show_inter_replay_frs: bool, pf1D_aclu_to_idx: Dict, aclu: int, curr_fig, colors, debug_print=False, disable_top_row=False, disable_extra_info_labels:bool=True, **kwargs):
+    def _plot_pho_jonathan_batch_plot_single_cell(cls, t_split: float, time_bins: NDArray, unit_specific_time_binned_firing_rates, pf1D_all, rdf_aclu_to_idx, rdf, irdf, show_inter_replay_frs: bool, pf1D_aclu_to_idx: Dict, aclu: int, curr_fig, colors,
+                                                   debug_print=False, disable_top_row=False, disable_extra_info_labels:bool=True, **kwargs):
         """ Plots a single cell's plots for a stacked Jonathan-style firing-rate-across-epochs-plot
         Internally calls `plot_single_cell_1D_placecell_validation`, `_temp_draw_jonathan_ax`, and `_plot_general_all_spikes`
 
@@ -1470,12 +1481,21 @@ class PhoJonathanPlotHelpers:
             disable_top_row = True ## override to True
             spike_markersize = 3
             disable_left_and_right_pf_plots = True
-            
+            position_plot_kwargs = {'color': '#757575c8', 'linewidth': 0.4, 'zorder':5} | kwargs.get('position_plot_kwargs', {})
+            suptitle_params = dict(fontsize='11')
+            title_params = dict(fontsize='9')
+
         else:
             title_cell_label_size: float = 22
             inactive_scatter_markersize = 3
             markersize = 5
             spike_markersize = 4
+            position_plot_kwargs = {'color': '#757575c8', 'linewidth': 1.0, 'zorder':5} | kwargs.get('position_plot_kwargs', {})
+            suptitle_params = dict(fontsize='14')
+            title_params = dict(fontsize='10')
+
+        ## builds the kwargs for `plot_single_cell_1D_placecell_validation(...)`
+        plot_single_cell_1D_placecell_validation_kwargs = dict(position_plot_kwargs=position_plot_kwargs, suptitle_params=suptitle_params, title_params=title_params)
 
         debug_print: bool = kwargs.get('debug_print', True)
 
@@ -1538,12 +1558,6 @@ class PhoJonathanPlotHelpers:
         else:
             optional_formatted_cell_label_string = ''
 
-        # cell_linear_fragile_IDX = rdf_aclu_to_idx[aclu] # get the cell_linear_fragile_IDX from aclu
-        # title_string = ' '.join(['pf1D', f'Cell {aclu:02d}'])
-        # subtitle_string = ' '.join([f'{pf1D_all.config.str_for_display(False)}'])
-        # if debug_print:
-        #     print(f'\t{title_string}\n\t{subtitle_string}')
-        
     
         # gridspec mode:
         # curr_fig.set_facecolor('0.65') # light grey
@@ -1657,10 +1671,12 @@ class PhoJonathanPlotHelpers:
         ## global (_all) placefield
         ## I think that `plot_single_cell_1D_placecell_validation` is used to plot the position v time AND the little placefield on the right
         ## Plots: the position v time, the black (non Long/Short pf) spike dots
+        
+        ## INPUTS: plot_single_cell_1D_placecell_validation_kwargs
         _ = plot_single_cell_1D_placecell_validation(pf1D_all, cell_linear_fragile_IDX, extant_fig=curr_fig, extant_axes=(curr_ax_lap_spikes, curr_ax_right_placefield),
                 **({'should_include_labels': False, 'should_plot_spike_indicator_points_on_placefield': should_plot_spike_indicator_points_on_placefield,
                     'should_plot_spike_indicator_lines_on_trajectory': False, 'spike_indicator_lines_alpha': 0.2,
-                    'spikes_color':(0.1, 0.1, 0.1), 'spikes_alpha':0.1, 'should_include_spikes': False, 'spike_markersize': spike_markersize} | kwargs))
+                    'spikes_color':(0.1, 0.1, 0.1), 'spikes_alpha':0.1, 'should_include_spikes': False, 'spike_markersize': spike_markersize, **plot_single_cell_1D_placecell_validation_kwargs} | kwargs)) ## IMPORTANT NOTE: does not plot spikes (see should_include_spikes = False)
 
         if not disable_left_and_right_pf_plots:
 

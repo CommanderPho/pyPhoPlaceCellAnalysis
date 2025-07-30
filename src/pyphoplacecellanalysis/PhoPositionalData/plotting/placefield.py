@@ -244,7 +244,7 @@ def _subfn_plot_pf1D_placefield(active_epoch_placefields1D, placefield_cell_inde
 @function_attributes(short_name=None, tags=['pf1D', '1D'], input_requires=[], output_provides=[],
                       uses=['plot_placefield_tuning_curve', 'active_epoch_placefields1D.plotRaw_v_time', '_subfn_plot_pf1D_placefield', '_plot_helper_setup_gridlines'],
                       used_by=['plot_1d_placecell_validations'], creation_date='2023-09-06 01:55', related_items=[])
-def plot_single_cell_1D_placecell_validation(active_epoch_placefields1D, placefield_cell_index: int, extant_fig=None, extant_axes=None, spike_markersize: float = 3.0, **kwargs):
+def plot_single_cell_1D_placecell_validation(active_epoch_placefields1D, placefield_cell_index: int, extant_fig=None, extant_axes=None, spike_markersize: float = 3.0, should_use_hairy_plot_for_spikes:bool=True, **kwargs):
     """ A single cell method of analyzing 1D placefields and the spikes that create them 
     
     placefield_cell_index: an flat index into active_epoch_placefields1D.cell_ids. Must be between 0 and len(active_epoch_placefields1D.cell_ids). NOT the cell's original ID!
@@ -258,7 +258,7 @@ def plot_single_cell_1D_placecell_validation(active_epoch_placefields1D, placefi
             active_epoch_placefields1D.plotRaw_v_time(...) to plot the main position vs. spike curve
             plot_placefield_tuning_curve(...) to plot the 1D placefield tuning curve
 
-    """
+    """        
     # jitter the curve_value for each spike based on the time it occured along the curve:
     spikes_color_RGB = kwargs.get('spikes_color', (0, 0, 0))
     spikes_alpha = kwargs.get('spikes_alpha', 0.8)
@@ -271,12 +271,12 @@ def plot_single_cell_1D_placecell_validation(active_epoch_placefields1D, placefi
     use_filtered_positions: bool = kwargs.pop('use_filtered_positions', False)
 
     # position_plot_kwargs = {'color': '#393939c8', 'linewidth': 1.0, 'zorder':5} | kwargs.get('position_plot_kwargs', {}) # passed into `active_epoch_placefields1D.plotRaw_v_time`
-    position_plot_kwargs = {'color': '#757575c8', 'linewidth': 1.0, 'zorder':5} | kwargs.get('position_plot_kwargs', {}) # passed into `active_epoch_placefields1D.plotRaw_v_time`
+    position_plot_kwargs = {'color': '#757575c8', 'linewidth': 0.6, 'zorder':5} | kwargs.get('position_plot_kwargs', {}) # passed into `active_epoch_placefields1D.plotRaw_v_time`
     
     # suptitle_params = dict(fontsize='22')
     # title_params = dict(fontsize='16')
-    suptitle_params = dict(fontsize='14')
-    title_params = dict(fontsize='10')
+    suptitle_params = dict(fontsize='14') | kwargs.get('suptitle_params', {})
+    title_params = dict(fontsize='10') | kwargs.get('title_params', {})
     
     if extant_fig is not None:
         fig = extant_fig # use the existing passed figure
@@ -311,10 +311,12 @@ def plot_single_cell_1D_placecell_validation(active_epoch_placefields1D, placefi
     spike_plot_kwargs = {'linestyle':'none', 'markersize': spike_markersize, 'marker': '.', 'markerfacecolor':spikes_color_RGB, 'markeredgecolor':spikes_color_RGB, 'zorder':10}
     active_epoch_placefields1D.plotRaw_v_time(placefield_cell_index, ax=ax_activity_v_time, spikes_alpha=spikes_alpha,
             position_plot_kwargs=position_plot_kwargs,
-            spike_plot_kwargs=spike_plot_kwargs,
+            spike_plot_kwargs=spike_plot_kwargs, ## DOES NOT PLOT SPIKES!!
             should_include_labels=should_include_labels, should_include_trajectory=should_include_trajectory, should_include_spikes=should_include_plotRaw_v_time_spikes,
-            use_filtered_positions=use_filtered_positions,
-        ) # , spikes_color=spikes_color, spikes_alpha=spikes_alpha
+            use_filtered_positions=use_filtered_positions, should_use_hairy_plot_for_spikes=should_use_hairy_plot_for_spikes,
+        ) # NOTE: DOES NOT PLOT SPIKES
+    
+
     t_start = kwargs.get('t_start', active_epoch_placefields1D.t[0])
     t_end = kwargs.get('t_end', active_epoch_placefields1D.t[-1])
 
