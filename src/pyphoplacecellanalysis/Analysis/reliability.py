@@ -243,8 +243,8 @@ class TrialByTrialActivity:
     
     """
     active_epochs_df: pd.DataFrame = field()
-    C_trial_by_trial_correlation_matrix: NDArray = field(metadata={'shape':('n_neurons', 'n_epochs', 'n_epochs')})
-    z_scored_tuning_map_matrix: NDArray = field(metadata={'shape':('n_epochs', 'n_neurons', 'n_pos_bins')})
+    C_trial_by_trial_correlation_matrix: NDArray[ND.Shape["N_ACLUS, N_EPOCHS, N_EPOCHS"], Any] = field(metadata={'shape':('n_neurons', 'n_epochs', 'n_epochs')})
+    z_scored_tuning_map_matrix: NDArray[ND.Shape["N_EPOCHS, N_ACLUS, N_POS_BINS"], Any] = field(metadata={'shape':('n_epochs', 'n_neurons', 'n_pos_bins')})
     aclu_to_matrix_IDX_map: Dict = field() # factory=Factory(dict)
     neuron_ids: NDArray = field(metadata={'shape':('n_neurons',)})
     
@@ -368,7 +368,7 @@ class TrialByTrialActivity:
 
 
     @classmethod
-    def compute_trial_by_trial_correlation_matrix(cls, active_pf_dt: PfND_TimeDependent, occupancy_weighted_tuning_maps_matrix: NDArray, included_neuron_IDs=None):
+    def compute_trial_by_trial_correlation_matrix(cls, active_pf_dt: PfND_TimeDependent, occupancy_weighted_tuning_maps_matrix: NDArray, included_neuron_IDs=None) -> Tuple[NDArray, NDArray, Dict]:
         """ 2024-02-02 - computes the Trial-by-trial Correlation Matrix C 
         
         Returns:
@@ -397,7 +397,7 @@ class TrialByTrialActivity:
         # Assuming 'occupancy_weighted_tuning_maps_matrix' is your dataset with shape (trials, positions)
         # Z-score along the position axis (axis=1)
         position_axis_idx: int = 2 ## 
-        z_scored_tuning_map_matrix: NDArray = (occupancy_weighted_tuning_maps_matrix - np.nanmean(occupancy_weighted_tuning_maps_matrix, axis=position_axis_idx, keepdims=True)) / ((np.nanstd(occupancy_weighted_tuning_maps_matrix, axis=position_axis_idx, keepdims=True))+epsilon_value)
+        z_scored_tuning_map_matrix: NDArray[ND.Shape["N_TRIALS, N_ACLUS, N_XBINS"], Any] = (occupancy_weighted_tuning_maps_matrix - np.nanmean(occupancy_weighted_tuning_maps_matrix, axis=position_axis_idx, keepdims=True)) / ((np.nanstd(occupancy_weighted_tuning_maps_matrix, axis=position_axis_idx, keepdims=True))+epsilon_value)
 
         # trial-by-trial correlation matrix C
         M = float(n_xbins)
@@ -409,11 +409,11 @@ class TrialByTrialActivity:
             C_list.append(C_i)
         # occupancy_weighted_tuning_maps_matrix
 
-        C_trial_by_trial_correlation_matrix = np.stack(C_list, axis=0) # .shape (n_aclus, n_epochs, n_epochs) - (80, 84, 84)
+        C_trial_by_trial_correlation_matrix: NDArray[ND.Shape["N_ACLUS, N_EPOCHS, N_EPOCHS"], Any] = np.stack(C_list, axis=0) # .shape (n_aclus, n_epochs, n_epochs) - (80, 84, 84)
         # outputs: C_trial_by_trial_correlation_matrix
 
         # n_laps: int = len(laps_unique_ids)
-        aclu_to_matrix_IDX_map = dict(zip(neuron_ids, np.arange(n_aclus)))
+        aclu_to_matrix_IDX_map: Dict[int, int] = dict(zip(neuron_ids, np.arange(n_aclus)))
 
         return C_trial_by_trial_correlation_matrix, z_scored_tuning_map_matrix, aclu_to_matrix_IDX_map
 
