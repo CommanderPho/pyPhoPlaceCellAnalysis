@@ -476,12 +476,21 @@ class TrialByTrialActivityWindow:
         # Create a layout for the legend at the new row
         # Add a layout for the legend at the bottom, spanning all columns
         # legend_layout: pg.GraphicsLayout = root_render_widget.addLayout(row=root_render_widget.rowCount(), col=0, colspan=root_render_widget.columnCount())
-        legend_layout: pg.GraphicsLayout = root_render_widget.addLayout()  # Automatically places in the next available row
+        legend_layout: pg.GraphicsLayout = root_render_widget.addLayout(rowspan=2, colspan=1)  # Automatically places in the next available row
+        
+        # Set compact spacing for publication figures
+        if is_publication_ready_figure:
+            legend_layout.setSpacing(1)  # Reduce spacing between items
+            legend_layout.setContentsMargins(0, 0, 0, 0)  # Reduce margins
+        
         legend_entries_dict = {}
         # Add labels for each entry in the legend
         for i, (label, color) in enumerate(additional_legend_entries):
             # legend_text = pg.LabelItem(label, color=color)
             legend_text = SelectableLabelItem(label, color=color, is_selected=True)
+            # Set smaller font size for publication figures
+            if is_publication_ready_figure:
+                legend_text.setText(label, size='8pt')
             legend_entries_dict[label] = legend_text
             # legend_layout.addItem(legend_text, row=0, col=i)  # Place all labels in a single row
             legend_layout.addItem(legend_text, row=i, col=0)  # Place all labels in a single columns
@@ -489,18 +498,20 @@ class TrialByTrialActivityWindow:
         legend_layout.setMaximumWidth(100)
 
         #TODO 2024-11-12 12:22: - [ ] Add position plot to the right-most column of the figure, spanning all rows after the first.
-        ## Add position plot
-        root_render_widget.nextRow()
-        # position_plot_layout: pg.GraphicsLayout = root_render_widget.addLayout()  # Automatically places in the next available row
-        position_plot = root_render_widget.addPlot(row=2, col=5, rowspan=4, colspan=1) # start below the legend. Ideally span to rows until the end of the figure.
-        # position_plot.addCurve() # 
-        # active_trial_by_trial_activity_obj # don't have the position, tragic
-        ## Usage:
-        # position_plot = _a_trial_by_trial_window.plots.position_plot # PlotItem
-        # pos_df: pd.DataFrame = deepcopy(active_pf_dt.position.to_dataframe())
-        # position_plot.clearPlots()
-        # position_plot.plot(x=pos_df['x'].to_numpy(), y=pos_df['t'].to_numpy())
-
+        if not is_publication_ready_figure:
+            ## Add position plot
+            root_render_widget.nextRow()
+            # position_plot_layout: pg.GraphicsLayout = root_render_widget.addLayout()  # Automatically places in the next available row
+            position_plot = root_render_widget.addPlot(row=3, col=5, rowspan=4, colspan=1) # start below the legend. Ideally span to rows until the end of the figure.
+            # position_plot.addCurve() # 
+            # active_trial_by_trial_activity_obj # don't have the position, tragic
+            ## Usage:
+            # position_plot = _a_trial_by_trial_window.plots.position_plot # PlotItem
+            # pos_df: pd.DataFrame = deepcopy(active_pf_dt.position.to_dataframe())
+            # position_plot.clearPlots()
+            # position_plot.plot(x=pos_df['x'].to_numpy(), y=pos_df['t'].to_numpy())
+        else:
+            position_plot = None
             
         # END if is_overlaid_heatmaps_mode                
         parent_root_widget.setWindowTitle('TrialByTrialActivity - trial_to_trial_reliability_all_decoders_image_stack')
