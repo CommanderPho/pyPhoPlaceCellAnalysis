@@ -53,6 +53,7 @@ class TrialByTrialActivityWindow:
         The `self.on_update_epoch_IDX(an_epoch_idx=0)` can be used to control which Epoch is displayed, and is synchronized across all four sorts.
 
     """
+    is_publication_ready_figure: bool = field(default=True)
     plots: RenderPlots = field(init=False)
     plots_data: RenderPlotsData = field(init=False, repr=False)
     ui: PhoUIContainer = field(init=False, repr=False)
@@ -84,21 +85,26 @@ class TrialByTrialActivityWindow:
     
 
     @classmethod
-    def perform_build_single_cell_formatted_descriptor_string(cls, active_one_step_decoder, aclu) -> str:
+    def perform_build_single_cell_formatted_descriptor_string(cls, active_one_step_decoder, aclu, is_publication_ready_figure: bool = False) -> str:
         """ Builds a formatted title for each cell, like "aclu: 19, (shank 2, cluster 22)"
         
-        cls.perform_build_single_cell_formatted_descriptor_string(active_one_step_decoder=override_active_one_step_decoder, aclu=aclu)
+        cls.perform_build_single_cell_formatted_descriptor_string(active_one_step_decoder=override_active_one_step_decoder, aclu=aclu, is_publication_ready_figure=is_publication_ready_figure)
         """
         # neuron_i: int = list(self.plots_data.active_one_step_decoder.included_neuron_IDs).index(aclu)
-        curr_extended_id_string: str = active_one_step_decoder.ratemap.get_extended_neuron_id_string(neuron_id=aclu) # 2025-01-16 05:42  -- AssertionError: neuron_id: 16 is not in self.neuron_ids: [2, 3, 4, 5, 6, 8, 9, 11, 12, 13, 14, 15, 18, 19, 20, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 38, 39, 40, 43, 44, 47, 48, 51, 52, 53, 55, 56, 57, 58, 59, 60, 61, 62, 63, 66, 67, 68, 69, 70, 71, 72, 75, 77, 79, 80, 81, 82, 83, 84, 85, 86, 87, 89, 90, 91, 92, 93, 95, 98, 101, 102, 103, 104]
-        # final_title_str: str = f"aclu: {aclu}: {curr_extended_id_string}" # _build_neuron_identity_label(neuron_extended_id=curr_extended_id_string, brev_mode=None, formatted_max_value_string=None, use_special_overlayed_title=True)
-        final_title_str: str = f"aclu: <span style = 'font-size : 14px;' >{aclu}</span>:\n<span style = 'font-size : 11px;' >{curr_extended_id_string}</span>"
+        if is_publication_ready_figure:
+            # For publication figures: just "Cell ID: {aclu}"
+            final_title_str: str = f"Cell ID: <span style = 'font-size : 14px;' >{aclu}</span>"
+        else:
+            # Original formatting with extended info
+            curr_extended_id_string: str = active_one_step_decoder.ratemap.get_extended_neuron_id_string(neuron_id=aclu) # 2025-01-16 05:42  -- AssertionError: neuron_id: 16 is not in self.neuron_ids: [2, 3, 4, 5, 6, 8, 9, 11, 12, 13, 14, 15, 18, 19, 20, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 38, 39, 40, 43, 44, 47, 48, 51, 52, 53, 55, 56, 57, 58, 59, 60, 61, 62, 63, 66, 67, 68, 69, 70, 71, 72, 75, 77, 79, 80, 81, 82, 83, 84, 85, 86, 87, 89, 90, 91, 92, 93, 95, 98, 101, 102, 103, 104]
+            # final_title_str: str = f"aclu: {aclu}: {curr_extended_id_string}" # _build_neuron_identity_label(neuron_extended_id=curr_extended_id_string, brev_mode=None, formatted_max_value_string=None, use_special_overlayed_title=True)
+            final_title_str: str = f"aclu: <span style = 'font-size : 14px;' >{aclu}</span>:\n<span style = 'font-size : 11px;' >{curr_extended_id_string}</span>"
         return final_title_str
     
 
     @function_attributes(short_name=None, tags=['matplotlib', 'trial-to-trial-variability', 'laps'], input_requires=[], output_provides=[], uses=[], used_by=['plot_trial_to_trial_reliability_all_decoders_image_stack'], creation_date='2024-08-29 03:26', related_items=[])
     @classmethod
-    def _plot_trial_to_trial_reliability_image_array(cls, active_one_step_decoder, z_scored_tuning_map_matrix, active_neuron_IDs=None, max_num_columns=5, drop_below_threshold=0.0000001, cmap=None, app=None, parent_root_widget=None, root_render_widget=None, debug_print=False, defer_show:bool=False):
+    def _plot_trial_to_trial_reliability_image_array(cls, active_one_step_decoder, z_scored_tuning_map_matrix, active_neuron_IDs=None, max_num_columns=5, drop_below_threshold=0.0000001, cmap=None, app=None, parent_root_widget=None, root_render_widget=None, debug_print=False, defer_show:bool=False, is_publication_ready_figure: bool = False):
         """ plots the reliability across laps for each decoder
         
         ## Usage:
@@ -214,7 +220,7 @@ class TrialByTrialActivityWindow:
                 ## `has_active_neuron_IDs`
                 neuron_aclu = curr_included_unit_index
                 # curr_cell_identifier_string = f'Cell[{neuron_aclu}]'
-                curr_cell_identifier_string = cls.perform_build_single_cell_formatted_descriptor_string(active_one_step_decoder=active_one_step_decoder, aclu=neuron_aclu)
+                curr_cell_identifier_string = cls.perform_build_single_cell_formatted_descriptor_string(active_one_step_decoder=active_one_step_decoder, aclu=neuron_aclu, is_publication_ready_figure=is_publication_ready_figure)
                 _curr_plot_data_dict['neuron_IDX'] = None
                 _curr_plot_data_dict['neuron_aclu'] = neuron_aclu
 
@@ -236,7 +242,10 @@ class TrialByTrialActivityWindow:
             root_render_widget.addItem(curr_plot, row=(curr_row + plots_start_row_idx), col=curr_col)            
             curr_plot.setObjectName(curr_plot_identifier_string)
             # curr_plot.showAxes(False)
-            curr_plot.showAxes(True)
+            if is_publication_ready_figure:
+                curr_plot.showAxes(False)
+            else:
+                curr_plot.showAxes(True)
             curr_plot.setDefaultPadding(0.0)  # plot without padding data range
 
             # Set the plot title:
@@ -245,19 +254,20 @@ class TrialByTrialActivityWindow:
             curr_plot.setMouseEnabled(x=False, y=False)
             ## Common formatting:    
         
-            if is_last_row:
-                curr_plot.showAxes('x', True)
-                curr_plot.showAxis('bottom', show=True)
-            else:
-                curr_plot.showAxes('x', False)
-                curr_plot.showAxis('bottom', show=False)
-                
-            if is_first_column:
-                curr_plot.showAxes('y', True)
-                curr_plot.showAxis('left', show=True)
-            else:
-                curr_plot.showAxes('y', False)
-                curr_plot.showAxis('left', show=False)
+            if not is_publication_ready_figure:
+                if is_last_row:
+                    curr_plot.showAxes('x', True)
+                    curr_plot.showAxis('bottom', show=True)
+                else:
+                    curr_plot.showAxes('x', False)
+                    curr_plot.showAxis('bottom', show=False)
+                    
+                if is_first_column:
+                    curr_plot.showAxes('y', True)
+                    curr_plot.showAxis('left', show=True)
+                else:
+                    curr_plot.showAxes('y', False)
+                    curr_plot.showAxis('left', show=False)
             
             curr_plot.hideButtons() # Hides the auto-scale button
             curr_plot.addItem(img_item, defaultPadding=0.0)  # add ImageItem to PlotItem
@@ -338,7 +348,7 @@ class TrialByTrialActivityWindow:
     @classmethod
     def plot_trial_to_trial_reliability_all_decoders_image_stack(cls, directional_active_lap_pf_results_dicts: Dict[types.DecoderName, TrialByTrialActivity], active_one_step_decoder, drop_below_threshold=0.0000001,
                                                                   app=None, parent_root_widget=None, root_render_widget=None, debug_print=False, defer_show:bool=False, name:str = 'TrialByTrialActivityWindow',
-                                                                  override_active_neuron_IDs=None,
+                                                                  override_active_neuron_IDs=None, is_publication_ready_figure: bool = False,
                                                                    **param_kwargs):
         """ Calls `plot_trial_to_trial_reliability_image_array` for each decoder's reliability from lap-top-lap, overlaying the results as different color heatmaps
         
@@ -392,7 +402,7 @@ class TrialByTrialActivityWindow:
 
         # Plots only the first data-series ('long_LR')
         app, parent_root_widget, root_render_widget, plot_array, img_item_array, other_components_array, plot_data_array, (lblTitle, lblFooter) = cls._plot_trial_to_trial_reliability_image_array(active_one_step_decoder=active_one_step_decoder, z_scored_tuning_map_matrix=active_z_scored_tuning_map_matrix, active_neuron_IDs=active_neuron_IDs,
-                                                                                                                                                     drop_below_threshold=drop_below_threshold, cmap=additional_cmaps['long_LR'])
+                                                                                                                                                     drop_below_threshold=drop_below_threshold, cmap=additional_cmaps['long_LR'], is_publication_ready_figure=is_publication_ready_figure)
         
 
         occupancy = deepcopy(active_one_step_decoder.ratemap.occupancy)
@@ -485,7 +495,7 @@ class TrialByTrialActivityWindow:
 
         additional_img_items_dict['long_LR'] = img_item_array # set first decoder to original image items
 
-        _obj = cls()
+        _obj = cls(is_publication_ready_figure=is_publication_ready_figure)
         ## Build final .plots and .plots_data:
         _obj.plots = RenderPlots(name=name,
                                  root_render_widget=root_render_widget,
@@ -523,7 +533,7 @@ class TrialByTrialActivityWindow:
         """
         if override_active_one_step_decoder is None:
             override_active_one_step_decoder = self.plots_data.active_one_step_decoder
-        return self.perform_build_single_cell_formatted_descriptor_string(active_one_step_decoder=override_active_one_step_decoder, aclu=aclu)
+        return self.perform_build_single_cell_formatted_descriptor_string(active_one_step_decoder=override_active_one_step_decoder, aclu=aclu, is_publication_ready_figure=self.is_publication_ready_figure)
 
     def build_internal_callbacks(self):
         ## add selection changed callbacks
