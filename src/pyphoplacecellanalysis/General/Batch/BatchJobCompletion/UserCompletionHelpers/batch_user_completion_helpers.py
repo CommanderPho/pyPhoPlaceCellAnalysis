@@ -1114,7 +1114,8 @@ def compute_and_export_session_trial_by_trial_performance_completion_function(se
         print(f'\tincluded_qclu_values: {included_qclu_values}')
     
         ## INPUTS: curr_active_pipeline, track_templates, global_epoch_name, (long_LR_epochs_obj, long_RL_epochs_obj, short_LR_epochs_obj, short_RL_epochs_obj)
-        any_decoder_neuron_IDs: NDArray = deepcopy(track_templates.any_decoder_neuron_IDs)
+        # any_decoder_neuron_IDs: NDArray = deepcopy(track_templates.any_decoder_neuron_IDs)
+        any_decoder_neuron_IDs = None ## set to None to auto-build them
         # long_epoch_name, short_epoch_name, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
 
         # ## Directional Trial-by-Trial Activity:
@@ -1122,12 +1123,37 @@ def compute_and_export_session_trial_by_trial_performance_completion_function(se
             # if `KeyError: 'pf1D_dt'` recompute
             curr_active_pipeline.perform_specific_computation(computation_functions_name_includelist=['pfdt_computation'], enabled_filter_names=None, fail_on_exception=True, debug_print=False)
 
-        active_pf_1D_dt: PfND_TimeDependent = deepcopy(curr_active_pipeline.computation_results[global_epoch_name].computed_data['pf1D_dt'])
+
+        ## Copy previously existing one:
+        # active_pf_1D_dt: PfND_TimeDependent = deepcopy(curr_active_pipeline.computation_results[global_epoch_name].computed_data['pf1D_dt'])
         # active_pf_2D_dt: PfND_TimeDependent = deepcopy(curr_active_pipeline.computation_results[global_epoch_name].computed_data['pf2D_dt'])
 
+        
+        ## REBUILD NEW
+        computation_result = curr_active_pipeline.computation_results[global_epoch_name]
+        active_session, pf_computation_config = computation_result.sess, computation_result.computation_config.pf_params
+        active_session_spikes_df, active_pos, computation_config, active_epoch_placefields1D, active_epoch_placefields2D = active_session.spikes_df, active_session.position, pf_computation_config, None, None
+        included_epochs = deepcopy(pf_computation_config.computation_epochs)
+        should_force_recompute_placefields: bool = True
+
+        if any_decoder_neuron_IDs is None:
+            any_decoder_neuron_IDs = deepcopy(active_session_spikes_df.spikes.neuron_ids)
+            print(f'any_decoder_neuron_IDs is None, using all aclus in spikes_df:\n\tany_decoder_neuron_IDs: {any_decoder_neuron_IDs}')
+        # NOTE: even in TimeDependentPlacefieldSurpriseMode.STATIC_METHOD_ONLY a PfND_TimeDependent object is used to access its properties for the Static Method (although it isn't modified)
+        active_pf_1D_dt = PfND_TimeDependent(deepcopy(active_session_spikes_df), deepcopy(active_pos.linear_pos_obj), epochs=deepcopy(included_epochs),
+                                             config=deepcopy(pf_computation_config),
+                                            # speed_thresh=computation_config.speed_thresh, frate_thresh=computation_config.frate_thresh,
+                                            # grid_bin=computation_config.grid_bin, grid_bin_bounds=computation_config.grid_bin_bounds, smooth=computation_config.smooth,
+                                            )
+
+        pf_computation_config
+        # PlacefieldComputationParameters(
+
+
         active_pf_dt: PfND_TimeDependent = active_pf_1D_dt
+
         # Limit only to the placefield aclus:
-        active_pf_dt = active_pf_dt.get_by_id(ids=any_decoder_neuron_IDs)
+        # active_pf_dt = active_pf_dt.get_by_id(ids=any_decoder_neuron_IDs) ###TODO 2025-07-31 07:01: - [ ] DISABLE LIMITING TO JUST PLACEFIELDS 
 
         # long_LR_decoder, long_RL_decoder, short_LR_decoder, short_RL_decoder = track_templates.get_decoders()
 
@@ -1169,140 +1195,160 @@ def compute_and_export_session_trial_by_trial_performance_completion_function(se
                     neuron_group_split_stability_dfs_tuple=_neuron_group_split_stability_dfs_tuple, neuron_group_split_stability_aclus_tuple=_neuron_group_split_stability_aclus_tuple,
         ))
         
-
-        # ==================================================================================================================== #
-        # Performs for each subset of cells                                                                                    #
-        # ==================================================================================================================== #
-        _out_subset_decode_results_dict: Dict[str, Tuple] = {}
-        _out_subset_decode_results_track_id_correct_performance_dict: Dict[str, float] = {}
-        for a_subset_name, a_neuron_IDs_subset in subset_neuron_IDs_dict.items():
-            has_valid_result: bool = False
-            if len(a_neuron_IDs_subset) > 0:
-                try:
-                    _out_subset_decode_results_dict[a_subset_name] = _perform_run_rigorous_decoder_performance_assessment(curr_active_pipeline=curr_active_pipeline, included_neuron_IDs=a_neuron_IDs_subset, active_laps_decoding_time_bin_size=active_laps_decoding_time_bin_size)
-                    ## extract results:
-                    complete_decoded_context_correctness_tuple, laps_marginals_df, all_directional_pf1D_Decoder, all_test_epochs_df, test_all_directional_decoder_result, all_directional_laps_filter_epochs_decoder_result, _out_separate_decoder_results = _out_subset_decode_results_dict[a_subset_name]
-                    (is_decoded_track_correct, is_decoded_dir_correct, are_both_decoded_properties_correct), (percent_laps_track_identity_estimated_correctly, percent_laps_direction_estimated_correctly, percent_laps_estimated_correctly) = complete_decoded_context_correctness_tuple
-                    _out_subset_decode_results_track_id_correct_performance_dict[a_subset_name] = float(percent_laps_track_identity_estimated_correctly)
-                    has_valid_result = True
-                except ValueError as err:
-                    # empty pfs: ValueError: need at least one array to concatenate
-                    has_valid_result = False
-                except Exception as err:
-                    raise
-
-            if (not has_valid_result):
-                ## no result, initialize the key to empty/bad values:
-                _out_subset_decode_results_dict[a_subset_name] = None
-                _out_subset_decode_results_track_id_correct_performance_dict[a_subset_name] = np.nan
-
-        _out_subset_decode_results_track_id_correct_performance_dict
-
-        # ## OUTPUTS: `_out_subset_decode_results_track_id_correct_performance_dict`
-        # {'any_decoder': 0.8351648351648352,
-        #  'stable_both': 0.7692307692307693,
-        #  'stable_neither': nan,
-        #  'stable_long': 0.8131868131868132,
-        #  'stable_short': 0.8241758241758241,
-        #  'appearing_or_disappearing': 0.6593406593406593,
-        #  'appearing': 0.7142857142857143,
-        #  'disappearing': 0.6043956043956044}
-
-        callback_outputs['subset_decode_results_track_id_correct_performance_dict'] = _out_subset_decode_results_track_id_correct_performance_dict
-        callback_outputs['subset_decode_results_dict'] = _out_subset_decode_results_dict
-        
-        for a_subset_name, a_neuron_IDs_subset in subset_neuron_IDs_dict.items():
-            percent_laps_track_identity_estimated_correctly: float = (round(_out_subset_decode_results_track_id_correct_performance_dict[a_subset_name], ndigits=5) * 100.0)
-            print(f'aclu subset: "{a_subset_name}"\n\ta_neuron_IDs_subset: {a_neuron_IDs_subset}\n\tpercent_laps_track_identity_estimated_correctly: {percent_laps_track_identity_estimated_correctly} %')
-            
-
-
-        # ==================================================================================================================== #
-        # Process Outputs to get marginals                                                                                     #
-        # ==================================================================================================================== #
-        print(f'\t computing time_bin marginal for context: {curr_session_context}...')
-
-        #TODO 2024-10-09 09:08: - [ ] Could easily do for each set of cells by looping through `_out_subset_decode_results_dict` dict
-        callback_outputs['subset_decode_results_time_bin_marginals_df_dict'] = None
-        
-        (complete_decoded_context_correctness_tuple, laps_marginals_df, all_directional_pf1D_Decoder, all_test_epochs_df, test_all_directional_decoder_result, all_directional_laps_filter_epochs_decoder_result, _out_separate_decoder_results)  = _out_subset_decode_results_dict['any_decoder'] ## get the result for all cells
-        
-
-        ## INPUTS: all_directional_laps_filter_epochs_decoder_result
-        transfer_column_names_list: List[str] = ['maze_id', 'lap_dir', 'lap_id']
-        TIME_OVERLAP_PREVENTION_EPSILON: float = 1e-12
-        (laps_directional_marginals_tuple, laps_track_identity_marginals_tuple, laps_non_marginalized_decoder_marginals_tuple), laps_marginals_df = all_directional_laps_filter_epochs_decoder_result.compute_marginals(epoch_idx_col_name='lap_idx', epoch_start_t_col_name='lap_start_t',
-                                                                                                                                                            additional_transfer_column_names=['start','stop','label','duration','lap_id','lap_dir','maze_id','is_LR_dir'])
-        laps_directional_marginals, laps_directional_all_epoch_bins_marginal, laps_most_likely_direction_from_decoder, laps_is_most_likely_direction_LR_dir  = laps_directional_marginals_tuple
-        laps_track_identity_marginals, laps_track_identity_all_epoch_bins_marginal, laps_most_likely_track_identity_from_decoder, laps_is_most_likely_track_identity_Long = laps_track_identity_marginals_tuple
-        non_marginalized_decoder_marginals, non_marginalized_decoder_all_epoch_bins_marginal, most_likely_decoder_idxs, non_marginalized_decoder_all_epoch_bins_decoder_probs_df = laps_non_marginalized_decoder_marginals_tuple
-        laps_time_bin_marginals_df: pd.DataFrame = all_directional_laps_filter_epochs_decoder_result.build_per_time_bin_marginals_df(active_marginals_tuple=(laps_directional_marginals, laps_track_identity_marginals, non_marginalized_decoder_marginals),
-                                                                                                                                    columns_tuple=(['P_LR', 'P_RL'], ['P_Long', 'P_Short'], ['long_LR', 'long_RL', 'short_LR', 'short_RL']), transfer_column_names_list=transfer_column_names_list)
-        laps_time_bin_marginals_df['start'] = laps_time_bin_marginals_df['start'] + TIME_OVERLAP_PREVENTION_EPSILON ## ENSURE NON-OVERLAPPING
-
-        ## INPUTS: laps_time_bin_marginals_df
-        # active_min_num_unique_aclu_inclusions_requirement: int = track_templates.min_num_unique_aclu_inclusions_requirement(curr_active_pipeline, required_min_percentage_of_active_cells=0.33333333333333)
-        active_min_num_unique_aclu_inclusions_requirement = None # must be none for individual `time_bin` periods
-        filtered_laps_time_bin_marginals_df, active_spikes_df = co_filter_epochs_and_spikes(active_spikes_df=get_proper_global_spikes_df(curr_active_pipeline, minimum_inclusion_fr_Hz=curr_active_pipeline.global_computation_config.rank_order_shuffle_analysis.minimum_inclusion_fr_Hz, included_qclu_values=included_qclu_values),
-                                                                        active_epochs_df=laps_time_bin_marginals_df, included_aclus=track_templates.any_decoder_neuron_IDs, min_num_unique_aclu_inclusions=active_min_num_unique_aclu_inclusions_requirement,
-                                                                        epoch_id_key_name='lap_individual_time_bin_id', no_interval_fill_value=-1, add_unique_aclus_list_column=True, drop_non_epoch_spikes=True)
-        callback_outputs['subset_decode_results_time_bin_marginals_df_dict'] = {'filtered_laps_time_bin_marginals_df': filtered_laps_time_bin_marginals_df,
-                                                                                # 'laps_marginals_df': laps_marginals_df,
-        }
-
-        
-        # aclu subset: "any_decoder"
-        # 	a_neuron_IDs_subset: [  3   5   7   9  10  11  14  15  16  17  19  21  24  25  26  31  32  33  34  35  36  37  41  45  48  49  50  51  53  54  55  56  57  58  59  60  61  62  63  64  66  67  68  69  70  71  73  74  75  76  78  81  82  83  84  85  86  87  88  89  90  92  93  96  98 100 102 107 108]
-        # 	percent_laps_track_identity_estimated_correctly: 86.02199999999999 %
-        # aclu subset: "stable_both"
-        # 	a_neuron_IDs_subset: [  5   7   9  10  17  25  26  31  33  36  41  45  48  49  50  54  55  56  59  61  62  64  66  69  71  75  76  78  83  84  86  88  89  90  92  93  96 107 108]
-        # 	percent_laps_track_identity_estimated_correctly: 82.796 %
-        # aclu subset: "stable_neither"
-        # 	a_neuron_IDs_subset: [16 19 37 60 73 87]
-        # 	percent_laps_track_identity_estimated_correctly: 58.065 %
-        # aclu subset: "stable_long"
-        # 	a_neuron_IDs_subset: [  5   7   9  10  17  25  26  31  32  33  35  36  41  45  48  49  50  53  54  55  56  59  61  62  64  66  68  69  71  74  75  76  78  82  83  84  86  88  89  90  92  93  96 107 108]
-        # 	percent_laps_track_identity_estimated_correctly: 80.645 %
-        # aclu subset: "stable_short"
-        # 	a_neuron_IDs_subset: [  3   5   7   9  10  11  14  15  17  24  25  26  31  33  34  36  41  45  48  49  50  51  54  55  56  57  58  59  61  62  64  66  67  69  71  75  76  78  83  84  85  86  88  89  90  92  93  96 100 102 107 108]
-        # 	percent_laps_track_identity_estimated_correctly: 82.796 %
-        # aclu subset: "appearing_or_disappearing"
-        # 	a_neuron_IDs_subset: [ 3 11 14 15 24 34 35 51 58 67 74 82]
-        # 	percent_laps_track_identity_estimated_correctly: 75.26899999999999 %
-        # aclu subset: "appearing"
-        # 	a_neuron_IDs_subset: [ 3 11 14 15 24 34 51 58 67]
-        # 	percent_laps_track_identity_estimated_correctly: 76.344 %
-        # aclu subset: "disappearing"
-        # 	a_neuron_IDs_subset: [35 74 82]
-        # 	percent_laps_track_identity_estimated_correctly: 61.29 %
-
-        # stability_df
-
-        # a_trial_by_trial_result
-
-        # # Time-dependent
-        # long_pf1D_dt, short_pf1D_dt, global_pf1D_dt = long_results.pf1D_dt, short_results.pf1D_dt, global_results.pf1D_dt
-        # # long_pf2D_dt, short_pf2D_dt, global_pf2D_dt = long_results.pf2D_dt, short_results.pf2D_dt, global_results.pf2D_dt
-        # global_pf1D_dt: PfND_TimeDependent = global_results.pf1D_dt
-        # # global_pf2D_dt: PfND_TimeDependent = global_results.pf2D_dt
-        # _flat_z_scored_tuning_map_matrix, _flat_decoder_identity_arr = a_trial_by_trial_result.build_combined_decoded_epoch_z_scored_tuning_map_matrix() # .shape: (n_epochs, n_neurons, n_pos_bins) 
-        # modified_directional_active_lap_pf_results_dicts: Dict[types.DecoderName, TrialByTrialActivity] = a_trial_by_trial_result.build_separated_nan_filled_decoded_epoch_z_scored_tuning_map_matrix()
-        # # _flat_z_scored_tuning_map_matrix
-
-        ## OUTPUTS: override_active_neuron_IDs
-
-
-        print(f'\t\t done (success).')
-
     except Exception as e:
         exception_info = sys.exc_info()
         err = CapturedException(e, exception_info)
-        print(f"WARN: on_complete_success_execution_session: encountered exception {err} while performing .compute_and_export_session_trial_by_trial_performance_completion_function(...) for curr_session_context: {curr_session_context}")
-        # if self.fail_on_exception:
-        #     raise e.exc
+        print(f"WARN: encountered exception {err} while performing .compute_and_export_session_trial_by_trial_performance_completion_function(...) - PHASE I\n\tfor curr_session_context: {curr_session_context}")
+        if self.fail_on_exception:
+            raise
+            # raise e.exc
         # _out_inst_fr_comps = None
         neuron_replay_stats_df = None
         pass
+    
+
+    # ==================================================================================================================================================================================================================================================================================== #
+    # PHASE II                                                                                                                                                                                                                                                                             #
+    # ==================================================================================================================================================================================================================================================================================== #
+    callback_outputs['subset_decode_results_track_id_correct_performance_dict'] = None
+    callback_outputs['subset_decode_results_dict'] = None
+    callback_outputs['subset_decode_results_time_bin_marginals_df_dict'] = None
+        
+    # try:        
+    #     # ==================================================================================================================== #
+    #     # Performs for each subset of cells                                                                                    #
+    #     # ==================================================================================================================== #
+    #     _out_subset_decode_results_dict: Dict[str, Tuple] = {}
+    #     _out_subset_decode_results_track_id_correct_performance_dict: Dict[str, float] = {}
+    #     for a_subset_name, a_neuron_IDs_subset in subset_neuron_IDs_dict.items():
+    #         has_valid_result: bool = False
+    #         if len(a_neuron_IDs_subset) > 0:
+    #             try:
+    #                 _out_subset_decode_results_dict[a_subset_name] = _perform_run_rigorous_decoder_performance_assessment(curr_active_pipeline=curr_active_pipeline, included_neuron_IDs=a_neuron_IDs_subset, active_laps_decoding_time_bin_size=active_laps_decoding_time_bin_size)
+    #                 ## extract results:
+    #                 complete_decoded_context_correctness_tuple, laps_marginals_df, all_directional_pf1D_Decoder, all_test_epochs_df, test_all_directional_decoder_result, all_directional_laps_filter_epochs_decoder_result, _out_separate_decoder_results = _out_subset_decode_results_dict[a_subset_name]
+    #                 (is_decoded_track_correct, is_decoded_dir_correct, are_both_decoded_properties_correct), (percent_laps_track_identity_estimated_correctly, percent_laps_direction_estimated_correctly, percent_laps_estimated_correctly) = complete_decoded_context_correctness_tuple
+    #                 _out_subset_decode_results_track_id_correct_performance_dict[a_subset_name] = float(percent_laps_track_identity_estimated_correctly)
+    #                 has_valid_result = True
+    #             except ValueError as err:
+    #                 # empty pfs: ValueError: need at least one array to concatenate
+    #                 has_valid_result = False
+    #             except Exception as err:
+    #                 raise
+
+    #         if (not has_valid_result):
+    #             ## no result, initialize the key to empty/bad values:
+    #             _out_subset_decode_results_dict[a_subset_name] = None
+    #             _out_subset_decode_results_track_id_correct_performance_dict[a_subset_name] = np.nan
+
+    #     _out_subset_decode_results_track_id_correct_performance_dict
+
+    #     # ## OUTPUTS: `_out_subset_decode_results_track_id_correct_performance_dict`
+    #     # {'any_decoder': 0.8351648351648352,
+    #     #  'stable_both': 0.7692307692307693,
+    #     #  'stable_neither': nan,
+    #     #  'stable_long': 0.8131868131868132,
+    #     #  'stable_short': 0.8241758241758241,
+    #     #  'appearing_or_disappearing': 0.6593406593406593,
+    #     #  'appearing': 0.7142857142857143,
+    #     #  'disappearing': 0.6043956043956044}
+
+    #     callback_outputs['subset_decode_results_track_id_correct_performance_dict'] = _out_subset_decode_results_track_id_correct_performance_dict
+    #     callback_outputs['subset_decode_results_dict'] = _out_subset_decode_results_dict
+        
+    #     for a_subset_name, a_neuron_IDs_subset in subset_neuron_IDs_dict.items():
+    #         percent_laps_track_identity_estimated_correctly: float = (round(_out_subset_decode_results_track_id_correct_performance_dict[a_subset_name], ndigits=5) * 100.0)
+    #         print(f'aclu subset: "{a_subset_name}"\n\ta_neuron_IDs_subset: {a_neuron_IDs_subset}\n\tpercent_laps_track_identity_estimated_correctly: {percent_laps_track_identity_estimated_correctly} %')
+            
+
+
+    #     # ==================================================================================================================== #
+    #     # Process Outputs to get marginals                                                                                     #
+    #     # ==================================================================================================================== #
+    #     print(f'\t computing time_bin marginal for context: {curr_session_context}...')
+
+    #     #TODO 2024-10-09 09:08: - [ ] Could easily do for each set of cells by looping through `_out_subset_decode_results_dict` dict
+    #     callback_outputs['subset_decode_results_time_bin_marginals_df_dict'] = None
+        
+    #     (complete_decoded_context_correctness_tuple, laps_marginals_df, all_directional_pf1D_Decoder, all_test_epochs_df, test_all_directional_decoder_result, all_directional_laps_filter_epochs_decoder_result, _out_separate_decoder_results)  = _out_subset_decode_results_dict['any_decoder'] ## get the result for all cells
+        
+
+    #     ## INPUTS: all_directional_laps_filter_epochs_decoder_result
+    #     transfer_column_names_list: List[str] = ['maze_id', 'lap_dir', 'lap_id']
+    #     TIME_OVERLAP_PREVENTION_EPSILON: float = 1e-12
+    #     (laps_directional_marginals_tuple, laps_track_identity_marginals_tuple, laps_non_marginalized_decoder_marginals_tuple), laps_marginals_df = all_directional_laps_filter_epochs_decoder_result.compute_marginals(epoch_idx_col_name='lap_idx', epoch_start_t_col_name='lap_start_t',
+    #                                                                                                                                                         additional_transfer_column_names=['start','stop','label','duration','lap_id','lap_dir','maze_id','is_LR_dir'])
+    #     laps_directional_marginals, laps_directional_all_epoch_bins_marginal, laps_most_likely_direction_from_decoder, laps_is_most_likely_direction_LR_dir  = laps_directional_marginals_tuple
+    #     laps_track_identity_marginals, laps_track_identity_all_epoch_bins_marginal, laps_most_likely_track_identity_from_decoder, laps_is_most_likely_track_identity_Long = laps_track_identity_marginals_tuple
+    #     non_marginalized_decoder_marginals, non_marginalized_decoder_all_epoch_bins_marginal, most_likely_decoder_idxs, non_marginalized_decoder_all_epoch_bins_decoder_probs_df = laps_non_marginalized_decoder_marginals_tuple
+    #     laps_time_bin_marginals_df: pd.DataFrame = all_directional_laps_filter_epochs_decoder_result.build_per_time_bin_marginals_df(active_marginals_tuple=(laps_directional_marginals, laps_track_identity_marginals, non_marginalized_decoder_marginals),
+    #                                                                                                                                 columns_tuple=(['P_LR', 'P_RL'], ['P_Long', 'P_Short'], ['long_LR', 'long_RL', 'short_LR', 'short_RL']), transfer_column_names_list=transfer_column_names_list)
+    #     laps_time_bin_marginals_df['start'] = laps_time_bin_marginals_df['start'] + TIME_OVERLAP_PREVENTION_EPSILON ## ENSURE NON-OVERLAPPING
+
+    #     ## INPUTS: laps_time_bin_marginals_df
+    #     # active_min_num_unique_aclu_inclusions_requirement: int = track_templates.min_num_unique_aclu_inclusions_requirement(curr_active_pipeline, required_min_percentage_of_active_cells=0.33333333333333)
+    #     active_min_num_unique_aclu_inclusions_requirement = None # must be none for individual `time_bin` periods
+    #     filtered_laps_time_bin_marginals_df, active_spikes_df = co_filter_epochs_and_spikes(active_spikes_df=get_proper_global_spikes_df(curr_active_pipeline, minimum_inclusion_fr_Hz=curr_active_pipeline.global_computation_config.rank_order_shuffle_analysis.minimum_inclusion_fr_Hz, included_qclu_values=included_qclu_values),
+    #                                                                     active_epochs_df=laps_time_bin_marginals_df, included_aclus=track_templates.any_decoder_neuron_IDs, min_num_unique_aclu_inclusions=active_min_num_unique_aclu_inclusions_requirement,
+    #                                                                     epoch_id_key_name='lap_individual_time_bin_id', no_interval_fill_value=-1, add_unique_aclus_list_column=True, drop_non_epoch_spikes=True)
+    #     callback_outputs['subset_decode_results_time_bin_marginals_df_dict'] = {'filtered_laps_time_bin_marginals_df': filtered_laps_time_bin_marginals_df,
+    #                                                                             # 'laps_marginals_df': laps_marginals_df,
+    #     }
+
+        
+    #     # aclu subset: "any_decoder"
+    #     # 	a_neuron_IDs_subset: [  3   5   7   9  10  11  14  15  16  17  19  21  24  25  26  31  32  33  34  35  36  37  41  45  48  49  50  51  53  54  55  56  57  58  59  60  61  62  63  64  66  67  68  69  70  71  73  74  75  76  78  81  82  83  84  85  86  87  88  89  90  92  93  96  98 100 102 107 108]
+    #     # 	percent_laps_track_identity_estimated_correctly: 86.02199999999999 %
+    #     # aclu subset: "stable_both"
+    #     # 	a_neuron_IDs_subset: [  5   7   9  10  17  25  26  31  33  36  41  45  48  49  50  54  55  56  59  61  62  64  66  69  71  75  76  78  83  84  86  88  89  90  92  93  96 107 108]
+    #     # 	percent_laps_track_identity_estimated_correctly: 82.796 %
+    #     # aclu subset: "stable_neither"
+    #     # 	a_neuron_IDs_subset: [16 19 37 60 73 87]
+    #     # 	percent_laps_track_identity_estimated_correctly: 58.065 %
+    #     # aclu subset: "stable_long"
+    #     # 	a_neuron_IDs_subset: [  5   7   9  10  17  25  26  31  32  33  35  36  41  45  48  49  50  53  54  55  56  59  61  62  64  66  68  69  71  74  75  76  78  82  83  84  86  88  89  90  92  93  96 107 108]
+    #     # 	percent_laps_track_identity_estimated_correctly: 80.645 %
+    #     # aclu subset: "stable_short"
+    #     # 	a_neuron_IDs_subset: [  3   5   7   9  10  11  14  15  17  24  25  26  31  33  34  36  41  45  48  49  50  51  54  55  56  57  58  59  61  62  64  66  67  69  71  75  76  78  83  84  85  86  88  89  90  92  93  96 100 102 107 108]
+    #     # 	percent_laps_track_identity_estimated_correctly: 82.796 %
+    #     # aclu subset: "appearing_or_disappearing"
+    #     # 	a_neuron_IDs_subset: [ 3 11 14 15 24 34 35 51 58 67 74 82]
+    #     # 	percent_laps_track_identity_estimated_correctly: 75.26899999999999 %
+    #     # aclu subset: "appearing"
+    #     # 	a_neuron_IDs_subset: [ 3 11 14 15 24 34 51 58 67]
+    #     # 	percent_laps_track_identity_estimated_correctly: 76.344 %
+    #     # aclu subset: "disappearing"
+    #     # 	a_neuron_IDs_subset: [35 74 82]
+    #     # 	percent_laps_track_identity_estimated_correctly: 61.29 %
+
+    #     # stability_df
+
+    #     # a_trial_by_trial_result
+
+    #     # # Time-dependent
+    #     # long_pf1D_dt, short_pf1D_dt, global_pf1D_dt = long_results.pf1D_dt, short_results.pf1D_dt, global_results.pf1D_dt
+    #     # # long_pf2D_dt, short_pf2D_dt, global_pf2D_dt = long_results.pf2D_dt, short_results.pf2D_dt, global_results.pf2D_dt
+    #     # global_pf1D_dt: PfND_TimeDependent = global_results.pf1D_dt
+    #     # # global_pf2D_dt: PfND_TimeDependent = global_results.pf2D_dt
+    #     # _flat_z_scored_tuning_map_matrix, _flat_decoder_identity_arr = a_trial_by_trial_result.build_combined_decoded_epoch_z_scored_tuning_map_matrix() # .shape: (n_epochs, n_neurons, n_pos_bins) 
+    #     # modified_directional_active_lap_pf_results_dicts: Dict[types.DecoderName, TrialByTrialActivity] = a_trial_by_trial_result.build_separated_nan_filled_decoded_epoch_z_scored_tuning_map_matrix()
+    #     # # _flat_z_scored_tuning_map_matrix
+
+    #     ## OUTPUTS: override_active_neuron_IDs
+
+
+    #     print(f'\t\t done (success).')
+
+    # except (Exception, AssertionError) as e:
+    #     exception_info = sys.exc_info()
+    #     err = CapturedException(e, exception_info)
+    #     print(f"WARN: encountered exception {err} while performing .compute_and_export_session_trial_by_trial_performance_completion_function(...) - PHASE II\n\tfor curr_session_context: {curr_session_context}")
+    #     if self.fail_on_exception:
+    #         raise
+    #         # raise e.exc
+    #     # _out_inst_fr_comps = None
+    #     neuron_replay_stats_df = None
+    #     pass
 
 
     across_session_results_extended_dict['compute_and_export_session_trial_by_trial_performance_completion_function'] = callback_outputs
