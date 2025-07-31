@@ -5205,12 +5205,23 @@ class TrialByTrialActivityResult(ComputedResult):
             print(f'TrialByTrialActivity is not computed.')
 
     """
-    _VersionedResultMixin_version: str = "2024.05.28_0" # to be updated in your IMPLEMENTOR to indicate its version
+    _VersionedResultMixin_version: str = "2025.07.31_0" # to be updated in your IMPLEMENTOR to indicate its version
 
     any_decoder_neuron_IDs: NDArray = serialized_field(default=None)
     active_pf_dt: PfND_TimeDependent = serialized_field(default=None)
     directional_lap_epochs_dict: Dict[decoder_name, Epoch] =  serialized_field(default=None)
     directional_active_lap_pf_results_dicts: Dict[decoder_name, TrialByTrialActivity] = serialized_field(default=None)
+
+    minimum_one_point_stability: float = serialized_attribute_field(default=0.6, metadata={'field_added': '2025.07.31_0'})
+    zero_point_stability: float = serialized_attribute_field(default=0.1, metadata={'field_added': '2025.07.31_0'})
+    # stability_df: pd.DataFrame = serialized_field(default=None)
+
+
+    @property
+    def stability_df(self) -> pd.DataFrame:
+        """The stability_df property."""
+        stability_df = self.get_cell_stability_info(minimum_one_point_stability=self.minimum_one_point_stability, zero_point_stability=self.zero_point_stability)[0]
+        return stability_df
 
 
     def __repr__(self):
@@ -5332,7 +5343,7 @@ class TrialByTrialActivityResult(ComputedResult):
 
         
         Usage:            
-            neuron_group_split_stability_dfs_tuple = self.determine_neuron_stability(stability_df=stability_df)
+            stability_df, neuron_group_split_stability_dfs_tuple = self.determine_neuron_stability(stability_df=stability_df)
             appearing_stability_df, disappearing_stability_df, appearing_or_disappearing_stability_df, stable_both_stability_df, stable_neither_stability_df, stable_long_stability_df, stable_short_stability_df = neuron_group_split_stability_dfs_tuple
             neuron_group_split_stability_aclus_tuple = [sort(a_df.aclu.values) for a_df in neuron_group_split_stability_dfs_tuple]
             appearing_aclus, disappearing_aclus, appearing_or_disappearing_aclus, stable_both_aclus, stable_neither_aclus, stable_long_aclus, stable_short_aclus = neuron_group_split_stability_aclus_tuple
@@ -5344,7 +5355,9 @@ class TrialByTrialActivityResult(ComputedResult):
             stability_df['long_best'] = stability_df[['long_LR', 'long_RL']].max(axis=1, skipna=True)
             stability_df['short_best'] = stability_df[['short_LR', 'short_RL']].max(axis=1, skipna=True)
         
-        stability_df = stability_df.sort_values(['long_best'], ascending=True)
+        # stability_df = stability_df.sort_values(['long_best'], ascending=True)
+
+        stability_df = stability_df.sort_values(['aclu'], ascending=True, ignore_index=True)
 
         ## find effectively zero (unstable/no-pf) cells:    
         is_unstable_long = (stability_df['long_best'] <= zero_point_stability)
@@ -5384,7 +5397,9 @@ class TrialByTrialActivityResult(ComputedResult):
         # override_active_neuron_IDs.extend(appearing_aclus)
         # override_active_neuron_IDs # [ 3 11 14 15 24 34 35 51 58 67 74 82]
         
-        stability_df['stability_class'] = 'none'
+        # Define stability classes as categorical for efficiency
+        stability_categories = ['none', 'appearing', 'disappearing', 'stable_both', 'stable_neither']
+        stability_df['stability_class'] = pd.Categorical(['none'] * len(stability_df), categories=stability_categories)
         stability_df.loc[is_appearing, 'stability_class'] = 'appearing'
         stability_df.loc[is_disappearing, 'stability_class'] = 'disappearing'
                 
@@ -5411,8 +5426,9 @@ class TrialByTrialActivityResult(ComputedResult):
         # return appearing_or_disappearing_aclus, appearing_stability_df, appearing_aclus, disappearing_stability_df, disappearing_aclus, (stable_both_aclus, stable_neither_aclus, stable_long_aclus, stable_short_aclus)
 
 
-    def get_stability_df(self) -> pd.DataFrame:
-        """ the nanmean(C, axis=[1,2]), resulting in a score bounded between [0, 1]
+    def get_basic_stability_df(self) -> pd.DataFrame:
+        """ to get the version with the stability information added, use `self.stability_df` or call `self.get_cell_stability_info(...)` directly
+         the nanmean(C, axis=[1,2]), resulting in a score bounded between [0, 1]
         Usage:
         
             stability_df, stability_dict = a_trial_by_trial_result.get_stability_df()
@@ -5428,18 +5444,28 @@ class TrialByTrialActivityResult(ComputedResult):
         
         return stability_df
     
-    def get_cell_stability_info(self, minimum_one_point_stability: float = 0.6, zero_point_stability: float = 0.1):
+    def get_cell_stability_info(self, minimum_one_point_stability: Optional[float] = None, zero_point_stability: Optional[float] = None):
         """ 
         
         Usage:
             stability_df = a_trial_by_trial_result.get_stability_df()
-            stability_df, appearing_or_disappearing_aclus, appearing_stability_df, appearing_aclus, disappearing_stability_df, disappearing_aclus = a_trial_by_trial_result.get_cell_stability_info(minimum_one_point_stability=0.6, zero_point_stability=0.1)
+            stability_df, neuron_group_split_stability_dfs_tuple, neuron_group_split_stability_aclus_tuple  = a_trial_by_trial_result.get_cell_stability_info(minimum_one_point_stability=0.6, zero_point_stability=0.1)
             override_active_neuron_IDs = deepcopy(appearing_or_disappearing_aclus)
             override_active_neuron_IDs
 
 
         """
-        stability_df = self.get_stability_df()
+        if minimum_one_point_stability is not None:
+            self.minimum_one_point_stability = minimum_one_point_stability
+        else:
+            minimum_one_point_stability = self.minimum_one_point_stability
+            
+        if zero_point_stability is not None:
+            self.zero_point_stability = zero_point_stability
+        else:
+            zero_point_stability = self.zero_point_stability
+
+        stability_df = self.get_basic_stability_df()
         stability_df, neuron_group_split_stability_dfs_tuple = self.determine_neuron_group_from_stability(stability_df=stability_df, minimum_one_point_stability=minimum_one_point_stability, zero_point_stability=zero_point_stability)
         appearing_stability_df, disappearing_stability_df, appearing_or_disappearing_stability_df, stable_both_stability_df, stable_neither_stability_df, stable_long_stability_df, stable_short_stability_df = neuron_group_split_stability_dfs_tuple
         neuron_group_split_stability_aclus_tuple = [np.sort(a_df.aclu.values) for a_df in neuron_group_split_stability_dfs_tuple]

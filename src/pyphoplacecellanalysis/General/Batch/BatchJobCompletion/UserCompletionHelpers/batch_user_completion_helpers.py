@@ -1020,6 +1020,7 @@ def compute_and_export_session_trial_by_trial_performance_completion_function(se
     
         callback_outputs = _across_session_results_extended_dict['compute_and_export_session_trial_by_trial_performance_completion_function']
         a_trial_by_trial_result: TrialByTrialActivityResult = callback_outputs['a_trial_by_trial_result']
+        stability_df: pd.DataFrame = callback_outputs['stability_df']
         subset_neuron_IDs_dict = callback_outputs['subset_neuron_IDs_dict']
         subset_decode_results_dict = callback_outputs['subset_decode_results_dict']
         subset_decode_results_track_id_correct_performance_dict = callback_outputs['subset_decode_results_track_id_correct_performance_dict']
@@ -1127,9 +1128,8 @@ def compute_and_export_session_trial_by_trial_performance_completion_function(se
         ## Copy previously existing one:
         # active_pf_1D_dt: PfND_TimeDependent = deepcopy(curr_active_pipeline.computation_results[global_epoch_name].computed_data['pf1D_dt'])
         # active_pf_2D_dt: PfND_TimeDependent = deepcopy(curr_active_pipeline.computation_results[global_epoch_name].computed_data['pf2D_dt'])
-
-        
-        ## REBUILD NEW
+                
+        ## REBUILD NEW pf1D_dt
         computation_result = curr_active_pipeline.computation_results[global_epoch_name]
         active_session, pf_computation_config = computation_result.sess, computation_result.computation_config.pf_params
         active_session_spikes_df, active_pos, computation_config, active_epoch_placefields1D, active_epoch_placefields2D = active_session.spikes_df, active_session.position, pf_computation_config, None, None
@@ -1142,13 +1142,7 @@ def compute_and_export_session_trial_by_trial_performance_completion_function(se
         # NOTE: even in TimeDependentPlacefieldSurpriseMode.STATIC_METHOD_ONLY a PfND_TimeDependent object is used to access its properties for the Static Method (although it isn't modified)
         active_pf_1D_dt = PfND_TimeDependent(deepcopy(active_session_spikes_df), deepcopy(active_pos.linear_pos_obj), epochs=deepcopy(included_epochs),
                                              config=deepcopy(pf_computation_config),
-                                            # speed_thresh=computation_config.speed_thresh, frate_thresh=computation_config.frate_thresh,
-                                            # grid_bin=computation_config.grid_bin, grid_bin_bounds=computation_config.grid_bin_bounds, smooth=computation_config.smooth,
                                             )
-
-        pf_computation_config
-        # PlacefieldComputationParameters(
-
 
         active_pf_dt: PfND_TimeDependent = active_pf_1D_dt
 
@@ -1191,6 +1185,7 @@ def compute_and_export_session_trial_by_trial_performance_completion_function(se
         
         ## OUTPUTS: a_trial_by_trial_result
         callback_outputs.update(dict(a_trial_by_trial_result=a_trial_by_trial_result,
+                                     stability_df=deepcopy(stability_df),
                                      subset_neuron_IDs_dict=subset_neuron_IDs_dict,
                     neuron_group_split_stability_dfs_tuple=_neuron_group_split_stability_dfs_tuple, neuron_group_split_stability_aclus_tuple=_neuron_group_split_stability_aclus_tuple,
         ))
@@ -3038,7 +3033,7 @@ def determine_session_t_delta_completion_function(self, global_data_root_parent_
     return across_session_results_extended_dict
 
 
-@function_attributes(short_name=None, tags=['all_neuron_stats_table', 'neuron_replay_stats_df_CSV', 'final-publication', 'JSON', 'CSV', 'peak', 'pf', 'peak_promenance'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-01-01 00:00', related_items=[])
+@function_attributes(short_name=None, tags=['all_neuron_stats_table', 'neuron_replay_stats_df_CSV', 'final-publication', 'JSON', 'CSV', 'peak', 'pf', 'peak_promenance'], input_requires=[], output_provides=[], uses=['AcrossSessionsResults.build_neuron_identities_df_for_CSV'], used_by=[], creation_date='2024-01-01 00:00', related_items=[])
 def compute_and_export_session_extended_placefield_peak_information_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict,
                                                                              save_csv:bool=True, save_json:bool=False) -> dict:
     """  Extracts peak information for the placefields for each neuron. Responsible for outputting the combined neuron information CSV used in the final paper results by merging the three+ informationt tables into one `all_neuron_stats_table`
@@ -3050,6 +3045,10 @@ def compute_and_export_session_extended_placefield_peak_information_completion_f
     Results can be extracted from batch output by 
     
     # Extracts the callback results 'compute_and_export_session_extended_placefield_peak_information_completion_function':
+    callback_outputs = across_session_results_extended_dict['compute_and_export_session_extended_placefield_peak_information_completion_function']
+    csv_output_path = callback_outputs['csv_output_path']
+    
+    
     extracted_callback_fn_results = {a_sess_ctxt:a_result.across_session_results.get('compute_and_export_session_extended_placefield_peak_information_completion_function', {}) for a_sess_ctxt, a_result in global_batch_run.session_batch_outputs.items() if a_result is not None}
 
 

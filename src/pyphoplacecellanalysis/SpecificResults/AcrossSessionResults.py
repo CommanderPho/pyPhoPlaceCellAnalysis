@@ -812,16 +812,16 @@ class AcrossSessionsResults:
     # 2025-05-09 - Combined CSV output                                                                                                                                                                                                                                                     #
     # ==================================================================================================================================================================================================================================================================================== #
 
-    @function_attributes(short_name=None, tags=['across-sessions'], input_requires=[], output_provides=[],
+    @function_attributes(short_name=None, tags=['across-sessions', 'publication', 'CSV', '_neuron_replay_stats_df'], input_requires=[], output_provides=[],
                          requires_global_keys=['long_short_fr_indicies_analysis', 'long_short_post_decoding', 'DirectionalLaps'], uses=[], used_by=[], creation_date='2025-06-09 17:31', related_items=['AcrossSessionTables.build_neuron_replay_stats_table'])
     @classmethod
     def build_neuron_identities_df_for_CSV(cls, curr_active_pipeline) -> pd.DataFrame:
-        """ Exports all available neuron information (both identity and computed in computations) for each neuron
+        """ Gathers and then exports all available neuron information (both identity and computed in computations) for each neuron
+
+        Responsible for `*_neuron_replay_stats_df.csv` one for each session
 
         AcrossSessionTables.build_and_save_all_combined_tables, .build_neuron_identities_table, .build_neuron_replay_stats_table, .build_long_short_fr_indicies_analysis_table
-        
-        
-        
+            
         from pyphoplacecellanalysis.SpecificResults.AcrossSessionResults import AcrossSessionsResults
         
         all_neuron_stats_table: pd.DataFrame = AcrossSessionsResults.build_neuron_identities_df_for_CSV(curr_active_pipeline=curr_active_pipeline)
@@ -836,6 +836,9 @@ class AcrossSessionsResults:
         from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.LongShortTrackComputations import InstantaneousSpikeRateGroupsComputation
         from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.LongShortTrackComputations import ExpectedVsObservedResult
         from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import TrackTemplates
+        from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import TrialByTrialActivityResult
+        from pyphoplacecellanalysis.Analysis.reliability import TrialByTrialActivity
+
 
         session_context = curr_active_pipeline.get_session_context() 
 
@@ -930,6 +933,69 @@ class AcrossSessionsResults:
 
         # # expected_v_observed_result.to_hdf(file_path=file_path, key=f'{a_global_computations_group_key}/expected_v_observed_result', active_context=session_context) # 'output/test_ExpectedVsObservedResult.h5', '/expected_v_observed_result')
 
+        force_recompute_TrialByTrialActivity: bool = False
+        # force_recompute_TrialByTrialActivity: bool = True
+        needs_recompute_TrialByTrialActivity: bool = True
+        directional_trial_by_trial_activity_result: TrialByTrialActivityResult = curr_active_pipeline.global_computation_results.computed_data.get('TrialByTrialActivity', None)
+
+        try:
+            if directional_trial_by_trial_activity_result is None:
+                needs_recompute_TrialByTrialActivity = True
+            else:
+                if directional_trial_by_trial_activity_result.is_result_version_earlier_than('2025.07.31_0'):
+                    needs_recompute_TrialByTrialActivity = True
+                else:
+                    needs_recompute_TrialByTrialActivity = False
+
+        except (KeyError, ValueError, AttributeError) as e:
+            print(f'\tfailed to get `directional_trial_by_trial_activity_result`, with error e: {e}. trying recompute.')
+            needs_recompute_TrialByTrialActivity = True    
+        except Exception as e:
+            raise
+
+
+        stability_df = None
+        try:
+            ## Recompute as needed
+            if needs_recompute_TrialByTrialActivity or force_recompute_TrialByTrialActivity:
+                # if `KeyError: 'TrialByTrialActivity'` recompute
+                print(f'TrialByTrialActivity is not computed, computing it...')
+                curr_active_pipeline.perform_specific_computation(computation_functions_name_includelist=['_build_trial_by_trial_activity_metrics'], enabled_filter_names=None, fail_on_exception=True, debug_print=False)
+                directional_trial_by_trial_activity_result = curr_active_pipeline.global_computation_results.computed_data.get('TrialByTrialActivity', None) ## try again to get the result
+                assert directional_trial_by_trial_activity_result is not None, f"directional_trial_by_trial_activity_result is None even after forcing recomputation!!"
+                print(f'\t done.')
+
+
+            stability_df = deepcopy(directional_trial_by_trial_activity_result.stability_df)
+            ## Merge Stability info into neurons CSV
+
+            ## INPUTS: stability_df
+
+            ## Prepare stability_df:
+            # stability_df = stability_df.rename(columns={'stability_stability_class':'stability_class'}, inplace=False)
+            stability_df = deepcopy(stability_df).add_prefix('stability_').rename(columns={'stability_stability_class':'stability_class', 'stability_aclu':'aclu'}, inplace=False) ## add the 'stability_' prefix to all columns, then fixed the doublely named one and the aclu column
+            stability_df = stability_df.neuron_identity.make_neuron_indexed_df_global(session_context, add_expanded_session_context_keys=True, add_extended_aclu_identity_columns=True)
+
+
+            # initial_num_rows: int = len(_neuron_replay_stats_df)
+            # join_cell_id_column_name: str = 'neuron_uid'
+            # # join_cell_id_column_name: str = 'aclu'
+
+            # ## merge in `stability_df`'s unique columns on 'aclu'. Note that 'stability_df' has way more cells than 'all_neuron_stats_table' which I believe are confined to just the place cells
+            # _neuron_replay_stats_df = pd.merge(_neuron_replay_stats_df, stability_df[[join_cell_id_column_name] + [col for col in stability_df.columns if col not in _neuron_replay_stats_df.columns and col != join_cell_id_column_name]], on=join_cell_id_column_name)
+            # ## check
+            # # assert len(all_neuron_stats_table) == initial_num_rows, f"initial_num_rows: {initial_num_rows}, len(all_neuron_stats_table): {len(all_neuron_stats_table)}"
+            # if len(_neuron_replay_stats_df) != initial_num_rows:
+            #     print(f"WARNING: initial_num_rows: {initial_num_rows}, len(all_neuron_stats_table): {len(_neuron_replay_stats_df)}")
+
+            ## OUTPUTS: _neuron_replay_stats_df
+
+        except (KeyError, ValueError, AttributeError) as e:
+            print(f'\tfailed to `directional_trial_by_trial_activity_result`, with error e: {e}. skipping.')            
+            stability_df = None
+        except Exception:
+            raise
+
 
         ##TODO: remainder of global_computations
         # self.global_computation_results.to_hdf(file_path, key=f'{a_global_computations_group_key}')
@@ -958,26 +1024,32 @@ class AcrossSessionsResults:
         
 
         ## Combine all unique columns from the three loaded dataframes: [neuron_identities_table, long_short_fr_indicies_analysis_table, neuron_replay_stats_table], into a merged df `all_neuron_stats_table`
-        all_neuron_stats_table: pd.DataFrame = deepcopy(unique_neuron_identities_df)
+        _neuron_replay_stats_df: pd.DataFrame = deepcopy(unique_neuron_identities_df)
         ## All dataframes have the same number of rows and are uniquely indexed by their 'neuron_uid' column. Add the additional columns from `long_short_fr_indicies_analysis_table` to `all_neuron_stats_table`
 
         ## OUTPUTS: _neuron_replay_stats_df
         ## merge in `_neuron_replay_stats_df`'s columns
-        all_neuron_stats_table = pd.merge(all_neuron_stats_table, _neuron_replay_stats_df[['neuron_uid'] + [col for col in _neuron_replay_stats_df.columns if col not in all_neuron_stats_table.columns and col != 'neuron_uid']], on='neuron_uid')
+        _neuron_replay_stats_df = pd.merge(_neuron_replay_stats_df, _neuron_replay_stats_df[['neuron_uid'] + [col for col in _neuron_replay_stats_df.columns if col not in _neuron_replay_stats_df.columns and col != 'neuron_uid']], on='neuron_uid')
         ## merge in `long_short_fr_indicies_analysis_results_h5_df`'s columns
-        all_neuron_stats_table = pd.merge(all_neuron_stats_table, long_short_fr_indicies_analysis_results_h5_df[['neuron_uid'] + [col for col in long_short_fr_indicies_analysis_results_h5_df.columns if col not in all_neuron_stats_table.columns and col != 'neuron_uid']], on='neuron_uid')
+        _neuron_replay_stats_df = pd.merge(_neuron_replay_stats_df, long_short_fr_indicies_analysis_results_h5_df[['neuron_uid'] + [col for col in long_short_fr_indicies_analysis_results_h5_df.columns if col not in _neuron_replay_stats_df.columns and col != 'neuron_uid']], on='neuron_uid')
         ## merge in `rate_remapping_df`'s columns
-        all_neuron_stats_table = pd.merge(all_neuron_stats_table, rate_remapping_df[['neuron_uid'] + [col for col in rate_remapping_df.columns if col not in all_neuron_stats_table.columns and col != 'neuron_uid']], on='neuron_uid')
+        _neuron_replay_stats_df = pd.merge(_neuron_replay_stats_df, rate_remapping_df[['neuron_uid'] + [col for col in rate_remapping_df.columns if col not in _neuron_replay_stats_df.columns and col != 'neuron_uid']], on='neuron_uid')
         ## merge in `decoders_total_num_spikes_df`'s columns
-        all_neuron_stats_table = pd.merge(all_neuron_stats_table, decoders_total_num_spikes_df[['neuron_uid'] + [col for col in decoders_total_num_spikes_df.columns if col not in all_neuron_stats_table.columns and col != 'neuron_uid']], on='neuron_uid')
+        _neuron_replay_stats_df = pd.merge(_neuron_replay_stats_df, decoders_total_num_spikes_df[['neuron_uid'] + [col for col in decoders_total_num_spikes_df.columns if col not in _neuron_replay_stats_df.columns and col != 'neuron_uid']], on='neuron_uid')
+
+        join_cell_id_column_name: str = 'neuron_uid'
+        # join_cell_id_column_name: str = 'aclu'
+        ## merge in `stability_df`'s unique columns on 'aclu'. Note that 'stability_df' has way more cells than 'all_neuron_stats_table' which I believe are confined to just the place cells
+        _neuron_replay_stats_df = pd.merge(_neuron_replay_stats_df, stability_df[[join_cell_id_column_name] + [col for col in stability_df.columns if col not in _neuron_replay_stats_df.columns and col != join_cell_id_column_name]], on=join_cell_id_column_name)
+
 
         ## check
         # assert len(all_neuron_stats_table) == initial_num_rows, f"initial_num_rows: {initial_num_rows}, len(all_neuron_stats_table): {len(all_neuron_stats_table)}"
 
-        if len(all_neuron_stats_table) != initial_num_rows:
-            print(f"WARNING: initial_num_rows: {initial_num_rows}, len(all_neuron_stats_table): {len(all_neuron_stats_table)}")
+        if len(_neuron_replay_stats_df) != initial_num_rows:
+            print(f"WARNING: initial_num_rows: {initial_num_rows}, len(all_neuron_stats_table): {len(_neuron_replay_stats_df)}")
 
-        return all_neuron_stats_table
+        return _neuron_replay_stats_df
 
 
     @function_attributes(short_name=None, tags=['across-sessions'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-06-09 17:31', related_items=[])
