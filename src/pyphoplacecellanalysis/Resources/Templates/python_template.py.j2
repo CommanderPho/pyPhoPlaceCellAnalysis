@@ -13,6 +13,11 @@ import numpy as np
 import pandas as pd
 pd.options.mode.chained_assignment = None  # default='warn'
 
+{% if should_use_viztracer_logging %}
+from viztracer import VizTracer
+from pyphocorehelpers.general_helpers import get_now_time_str
+{% endif %}
+
 # NeuroPy (Diba Lab Python Repo) Loading
 from neuropy.core.session.Formats.BaseDataSessionFormats import DataSessionFormatRegistryHolder
 from neuropy.core.session.Formats.Specific.KDibaOldDataSessionFormat import KDibaOldDataSessionFormatRegisteredClass
@@ -40,6 +45,16 @@ script_type: str = Path(script_file_path).resolve().stem.split('_')[0] # 'run_kd
 
 session_ctxt_key:str = curr_session_context.get_description(separator='|', subset_includelist=['animal','exper_name','session_name'])
 parameter_specifier_str: str = "{{override_custom_pickle_suffix|default('')}}"
+
+{% if should_use_viztracer_logging %}
+# ==================================================================================================================== #
+# VIZTRACER PERFORMANCE LOGGING                                                                                       #
+# ==================================================================================================================== #
+
+viztracer_output_file = script_file_parent_path / f"viztracer_{get_now_time_str()}-{curr_session_context}_{script_type}.json"
+print(f'VizTracer output will be saved to: {viztracer_output_file}')
+
+{% endif %}
 
 {% if should_use_neptune_logging %}
 
@@ -258,6 +273,25 @@ neptuner_run.sync()
 
 {# Define a block named 'my_block' #}
 {% macro generate_block() %}
+{% if should_use_viztracer_logging %}
+
+new_print(f'/* VizTracer trace will be saved to: {viztracer_output_file} __________________________________________________________________________________ */')
+with VizTracer(
+    output_file=str(viztracer_output_file),
+    min_duration=200,  # only trace functions taking more than 200 microseconds
+    tracer_entries=5000000,  # maximum 3 million trace entries
+    ignore_frozen=True  # skip tracing frozen modules (like standard library)
+) as tracer:
+    run_status, run_errors, run_outputs = run_specific_batch(global_data_root_parent_path=Path(r'{{ global_data_root_parent_path }}').resolve(),
+                                                    curr_session_context=curr_session_context,
+                                                    curr_session_basedir=curr_session_basedir,
+                                                    active_pickle_filename=result_handler.session_computations_options.override_file,
+                                                    existing_task_logger=curr_task_logger,
+                                                    force_reload = result_handler.force_reload_all,
+                                                    post_run_callback_fn=result_handler.on_complete_success_execution_session,
+                                                    fail_on_exception=False,
+                                                    saving_mode=result_handler.saving_mode, override_parameters_flat_keypaths_dict=override_parameters_flat_keypaths_dict, **run_specific_batch_kwargs)
+{% else %}
 run_status, run_errors, run_outputs = run_specific_batch(global_data_root_parent_path=Path(r'{{ global_data_root_parent_path }}').resolve(),
                                                 curr_session_context=curr_session_context,
                                                 curr_session_basedir=curr_session_basedir,
@@ -267,6 +301,7 @@ run_status, run_errors, run_outputs = run_specific_batch(global_data_root_parent
                                                 post_run_callback_fn=result_handler.on_complete_success_execution_session,
                                                 fail_on_exception=False,
                                                 saving_mode=result_handler.saving_mode, override_parameters_flat_keypaths_dict=override_parameters_flat_keypaths_dict, **run_specific_batch_kwargs)
+{% endif %}
 
 new_print(f'finished run: {run_status}\nerrors: {run_errors}\n') # 'outputs: {run_outputs}'
 
@@ -329,6 +364,10 @@ except Exception as e:
 
 new_print(f'\n ALL DONE! \n')
 new_print(f'/* ================================================================================================================== */\n')
+
+{% if should_use_viztracer_logging %}
+    new_print(f'/* VizTracer trace saved to: {viztracer_output_file} __________________________________________________________________________________ */')
+{% endif %}
 
 
 
