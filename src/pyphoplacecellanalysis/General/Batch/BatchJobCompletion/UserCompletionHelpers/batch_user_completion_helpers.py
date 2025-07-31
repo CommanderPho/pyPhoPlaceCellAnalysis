@@ -1176,7 +1176,7 @@ def compute_and_export_session_trial_by_trial_performance_completion_function(se
 
         ## UNPACKING:
         directional_lap_epochs_dict: Dict[str, Epoch] = a_trial_by_trial_result.directional_lap_epochs_dict
-        stability_df, stability_dict = a_trial_by_trial_result.get_stability_df()
+        # stability_df = a_trial_by_trial_result.get_stability_df()
         # appearing_or_disappearing_aclus, appearing_stability_df, appearing_aclus, disappearing_stability_df, disappearing_aclus, (stable_both_aclus, stable_neither_aclus, stable_long_aclus, stable_short_aclus) = a_trial_by_trial_result.get_cell_stability_info(minimum_one_point_stability=0.6, zero_point_stability=0.1)
         _neuron_group_split_stability_dfs_tuple, _neuron_group_split_stability_aclus_tuple = a_trial_by_trial_result.get_cell_stability_info(minimum_one_point_stability=minimum_one_point_stability, zero_point_stability=zero_point_stability)
         # appearing_stability_df, disappearing_stability_df, appearing_or_disappearing_stability_df, stable_both_stability_df, stable_neither_stability_df, stable_long_stability_df, stable_short_stability_df = _neuron_group_split_stability_dfs_tuple
