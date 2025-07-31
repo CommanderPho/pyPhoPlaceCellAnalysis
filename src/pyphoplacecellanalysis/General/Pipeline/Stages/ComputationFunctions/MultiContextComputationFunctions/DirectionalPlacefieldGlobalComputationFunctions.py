@@ -4471,7 +4471,7 @@ def _do_train_test_split_decode_and_evaluate(curr_active_pipeline, active_laps_d
     percent_laps_track_identity_estimated_correctly
 
     """
-    from neuropy.core.session.dataSession import Laps, LapsAccessor
+    from neuropy.core.laps import LapsAccessor, Laps
     from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import PfND
     # from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import compute_weighted_correlations
     # from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import _check_result_laps_epochs_df_performance
