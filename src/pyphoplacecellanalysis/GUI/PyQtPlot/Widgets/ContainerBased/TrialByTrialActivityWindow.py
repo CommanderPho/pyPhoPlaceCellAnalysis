@@ -304,8 +304,9 @@ class TrialByTrialActivityWindow:
             if is_publication_ready_figure:
                 # Add efficient horizontal grid lines using GridItem
                 grid_item = pg.GridItem()
-                grid_item.setTickSpacing(x=[], y=[1.0])  # Only horizontal lines, spaced by 1 unit
-                grid_item.setPen(pg.mkPen(color='darkgray', width=0.5, style=pg.QtCore.Qt.SolidLine))
+                grid_item.setTickSpacing(x=[None], y=[1.0])  # Only horizontal lines, spaced by 1 unit
+                grid_item.setPen(pg.mkPen(color='darkgray', width=0.1, style=pg.QtCore.Qt.SolidLine))
+                grid_item.setTextPen(None) ## disable text hopefully
                 curr_plot.addItem(grid_item)
                 
             img_item_array.append(img_item)
