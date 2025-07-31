@@ -2300,7 +2300,7 @@ def _plot_long_short_firing_rate_indicies(x_frs_index, y_frs_index, active_conte
         if enable_tiny_point_labels:
             # add static tiny labels beside each point
             for i, (x, y, label) in enumerate(zip(x_frs_index.values, y_frs_index.values, point_hover_labels)):
-                ax.annotate(label, (x, y), textcoords="offset points", xytext=(2,2), ha='left', va='bottom', fontsize=8) # , color=rect.get_facecolor()
+                ax.annotate(label, (x, y), textcoords="offset points", xytext=(2,2), ha='left', va='bottom', fontsize=6, zorder=-20) # , color=rect.get_facecolor()
 
         if enable_hover_labels:
             # add hover labels:

@@ -3812,27 +3812,31 @@ class AcrossSessionsVisualizations:
         #     long_short_fr_indicies_analysis_results.loc[long_short_fr_indicies_analysis_results['has_short_pf'], 'point_colors'] = '#0000FFA6'
         #     long_short_fr_indicies_analysis_results.loc[long_short_fr_indicies_analysis_results['has_both_pf'], 'point_colors'] = "#FF00DDA6" ## override with purple for cells that have both
 
-        if 'active_set_membership' in long_short_fr_indicies_analysis_results:
-            ## active_set_membership variable:
-            # long_short_fr_indicies_analysis_results.loc[long_short_fr_indicies_analysis_results['active_set_membership'], 'point_colors'] = "#FF00DDA6" ## override with purple for cells that have both
-            long_short_fr_indicies_analysis_results.loc[(long_short_fr_indicies_analysis_results['active_set_membership'] == 'LxC'), 'edgecolors'] = '#FF0000'
-            long_short_fr_indicies_analysis_results.loc[(long_short_fr_indicies_analysis_results['active_set_membership'] == 'SxC'), 'edgecolors'] = '#0000FF'
+        # if 'active_set_membership' in long_short_fr_indicies_analysis_results:
+        #     ## active_set_membership variable:
+        #     # long_short_fr_indicies_analysis_results.loc[long_short_fr_indicies_analysis_results['active_set_membership'], 'point_colors'] = "#FF00DDA6" ## override with purple for cells that have both
+        #     long_short_fr_indicies_analysis_results.loc[(long_short_fr_indicies_analysis_results['active_set_membership'] == 'LxC'), 'edgecolors'] = '#FF0000'
+        #     long_short_fr_indicies_analysis_results.loc[(long_short_fr_indicies_analysis_results['active_set_membership'] == 'SxC'), 'edgecolors'] = '#0000FF'
 
         ## eXclusivity/dominant cell status - affects ['edgecolors']
-        if 'is_refined_LxC' in long_short_fr_indicies_analysis_results:
-            long_short_fr_indicies_analysis_results.loc[long_short_fr_indicies_analysis_results['is_refined_LxC'], 'edgecolors'] = '#FF0000' #.to_list() # edgecolors=(r, g, b, 1)
-        if 'is_n_spikes_LxC' in long_short_fr_indicies_analysis_results:
-            long_short_fr_indicies_analysis_results.loc[long_short_fr_indicies_analysis_results['is_n_spikes_LxC'], 'edgecolors'] = "#E20000" #.to_list() # edgecolors=(r, g, b, 1)
-        if 'is_fr_Hz_LxC' in long_short_fr_indicies_analysis_results:
-            long_short_fr_indicies_analysis_results.loc[long_short_fr_indicies_analysis_results['is_fr_Hz_LxC'], 'edgecolors'] = "#9C0000" #.to_list() # edgecolors=(r, g, b, 1)
-            
+        # if 'is_refined_LxC' in long_short_fr_indicies_analysis_results:
+        #     long_short_fr_indicies_analysis_results.loc[long_short_fr_indicies_analysis_results['is_refined_LxC'], 'edgecolors'] = '#FF0000' #.to_list() # edgecolors=(r, g, b, 1)
+        # if 'is_n_spikes_LxC' in long_short_fr_indicies_analysis_results:
+        #     long_short_fr_indicies_analysis_results.loc[long_short_fr_indicies_analysis_results['is_n_spikes_LxC'], 'edgecolors'] = "#E20000" #.to_list() # edgecolors=(r, g, b, 1)
+        # if 'is_fr_Hz_LxC' in long_short_fr_indicies_analysis_results:
+        #     long_short_fr_indicies_analysis_results.loc[long_short_fr_indicies_analysis_results['is_fr_Hz_LxC'], 'edgecolors'] = "#9C0000" #.to_list() # edgecolors=(r, g, b, 1)
+        if 'stability_class' in long_short_fr_indicies_analysis_results:
+            long_short_fr_indicies_analysis_results.loc[(long_short_fr_indicies_analysis_results['stability_class'] == 'disappearing'), 'edgecolors'] = "#0000B3" #.to_list() # edgecolors=(r, g, b, 1)   
+       
 
-        if 'is_refined_SxC' in long_short_fr_indicies_analysis_results:
-            long_short_fr_indicies_analysis_results.loc[long_short_fr_indicies_analysis_results['is_refined_SxC'], 'edgecolors'] = '#0000FF' #.to_list() # edgecolors=(r, g, b, 1)
-        if 'is_n_spikes_SxC' in long_short_fr_indicies_analysis_results:
-            long_short_fr_indicies_analysis_results.loc[long_short_fr_indicies_analysis_results['is_n_spikes_SxC'], 'edgecolors'] = '#0000E2' #.to_list() # edgecolors=(r, g, b, 1)
-        if 'is_fr_Hz_SxC' in long_short_fr_indicies_analysis_results:
-            long_short_fr_indicies_analysis_results.loc[long_short_fr_indicies_analysis_results['is_fr_Hz_SxC'], 'edgecolors'] = "#0000B3" #.to_list() # edgecolors=(r, g, b, 1)
+        # if 'is_refined_SxC' in long_short_fr_indicies_analysis_results:
+        #     long_short_fr_indicies_analysis_results.loc[long_short_fr_indicies_analysis_results['is_refined_SxC'], 'edgecolors'] = '#0000FF' #.to_list() # edgecolors=(r, g, b, 1)
+        # if 'is_n_spikes_SxC' in long_short_fr_indicies_analysis_results:
+        #     long_short_fr_indicies_analysis_results.loc[long_short_fr_indicies_analysis_results['is_n_spikes_SxC'], 'edgecolors'] = '#0000E2' #.to_list() # edgecolors=(r, g, b, 1)
+        # if 'is_fr_Hz_SxC' in long_short_fr_indicies_analysis_results:
+        #     long_short_fr_indicies_analysis_results.loc[long_short_fr_indicies_analysis_results['is_fr_Hz_SxC'], 'edgecolors'] = "#0000B3" #.to_list() # edgecolors=(r, g, b, 1)
+        if 'stability_class' in long_short_fr_indicies_analysis_results:
+            long_short_fr_indicies_analysis_results.loc[(long_short_fr_indicies_analysis_results['stability_class'] == 'appearing'), 'edgecolors'] = "#9C0000" #.to_list() # edgecolors=(r, g, b, 1)     
 
 
         scatter_plot_kwargs['point_colors'] = long_short_fr_indicies_analysis_results['point_colors'].to_numpy()

@@ -5331,18 +5331,18 @@ class TrialByTrialActivityResult(ComputedResult):
     
 
     @classmethod    
-    def determine_neuron_group_from_stability(cls, stability_df: pd.DataFrame, minimum_one_point_stability: float = 0.6, zero_point_stability: float = 0.1):
+    def determine_neuron_group_from_stability(cls, stability_df: pd.DataFrame, zero_point_stability: float = 0.1, minimum_one_point_stability: float = 0.6):
         """ try to determine the LxC/SxC remapping cells from their stability 
         
-        zero_point_stability: cells with values below this threshold are considered "unstable"
+        zero_point_stability: cells with values below this threshold are considered "unstable", default 0.1
         
-        minimum_one_point_stability: cells with values exceeding this threshold are considered "stable" -- NOTE that `stable_*` is not the negation of `unstable_*` because they require a minimum `one_point_stability`
+        minimum_one_point_stability: cells with values exceeding this threshold are considered "stable" -- NOTE that `stable_*` is not the negation of `unstable_*` because they require a minimum `one_point_stability`, default 0.6
 
 
         #TODO 2025-07-31 12:52: - [ ] QUESTION: What if cell isn't firing AT ALL on the long track for example, does it appear "stable" for that track as a result, and what is its score?
 
         
-        Usage:            
+        Usage:
             stability_df, neuron_group_split_stability_dfs_tuple = self.determine_neuron_stability(stability_df=stability_df)
             appearing_stability_df, disappearing_stability_df, appearing_or_disappearing_stability_df, stable_both_stability_df, stable_neither_stability_df, stable_long_stability_df, stable_short_stability_df = neuron_group_split_stability_dfs_tuple
             neuron_group_split_stability_aclus_tuple = [sort(a_df.aclu.values) for a_df in neuron_group_split_stability_dfs_tuple]
@@ -5366,9 +5366,6 @@ class TrialByTrialActivityResult(ComputedResult):
         ## NOTE that `stable_*` is not the negation of `unstable_*` because they require a minimum `one_point_stability`
         is_stable_long = (stability_df['long_best'] >= minimum_one_point_stability)
         is_stable_short = (stability_df['short_best'] >= minimum_one_point_stability)
-
-        # stable_long = np.logical_not(unstable_long)
-        # stable_short = np.logical_not(unstable_short)
 
         # is_appearing = np.logical_and(unstable_long, np.logical_not(unstable_short))
         is_appearing = np.logical_and(is_unstable_long, is_stable_short)
@@ -5441,7 +5438,7 @@ class TrialByTrialActivityResult(ComputedResult):
         stability_df['short_best'] = stability_df[['short_LR', 'short_RL']].max(axis=1, skipna=True)
         stability_df['LR_best'] = stability_df[['long_LR', 'short_LR']].max(axis=1, skipna=True)
         stability_df['RL_best'] = stability_df[['long_RL', 'short_RL']].max(axis=1, skipna=True)
-        
+        stability_df['ANY_best'] = stability_df[['long_LR', 'long_RL', 'short_LR', 'short_RL']].max(axis=1, skipna=True)        
         return stability_df
     
     def get_cell_stability_info(self, minimum_one_point_stability: Optional[float] = None, zero_point_stability: Optional[float] = None):
