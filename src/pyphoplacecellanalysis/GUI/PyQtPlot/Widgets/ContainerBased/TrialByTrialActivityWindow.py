@@ -78,10 +78,13 @@ class TrialByTrialActivityWindow:
     # ==================================================================================================================== #
     
     @classmethod
-    def build_formatted_title_string(cls, title: str) -> str:
+    def build_formatted_title_string(cls, title: str, is_publication_ready_figure: bool = False) -> str:
         """ returns the title of the entire plot
         """
-        return f"<span style = 'font-size : 12px;' >{title}</span>"
+        if is_publication_ready_figure:
+            return f"<span style = 'font-family: Arial; font-size : 10pt;' >{title}</span>"
+        else:
+            return f"<span style = 'font-size : 12px;' >{title}</span>"
     
 
     @classmethod
@@ -92,8 +95,8 @@ class TrialByTrialActivityWindow:
         """
         # neuron_i: int = list(self.plots_data.active_one_step_decoder.included_neuron_IDs).index(aclu)
         if is_publication_ready_figure:
-            # For publication figures: just "Cell ID: {aclu}"
-            final_title_str: str = f"Cell ID: <span style = 'font-size : 14px;' >{aclu}</span>"
+            # For publication figures: just "Cell ID: {aclu}" with Arial font and 9pt size
+            final_title_str: str = f"<span style = 'font-family: Arial; font-size : 9pt;' >Cell ID: {aclu}</span>"
         else:
             # Original formatting with extended info
             curr_extended_id_string: str = active_one_step_decoder.ratemap.get_extended_neuron_id_string(neuron_id=aclu) # 2025-01-16 05:42  -- AssertionError: neuron_id: 16 is not in self.neuron_ids: [2, 3, 4, 5, 6, 8, 9, 11, 12, 13, 14, 15, 18, 19, 20, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 38, 39, 40, 43, 44, 47, 48, 51, 52, 53, 55, 56, 57, 58, 59, 60, 61, 62, 63, 66, 67, 68, 69, 70, 71, 72, 75, 77, 79, 80, 81, 82, 83, 84, 85, 86, 87, 89, 90, 91, 92, 93, 95, 98, 101, 102, 103, 104]
@@ -233,7 +236,7 @@ class TrialByTrialActivityWindow:
             # Build the image item:
             img_item = pg.ImageItem(image=image, levels=(0,1))
             
-            formatted_title: str = cls.build_formatted_title_string(title=curr_cell_identifier_string)   
+            formatted_title: str = cls.build_formatted_title_string(title=curr_cell_identifier_string, is_publication_ready_figure=is_publication_ready_figure)   
             _curr_plot_data_dict['formatted_title'] = formatted_title
             
 
@@ -296,6 +299,14 @@ class TrialByTrialActivityWindow:
                 bar.setImageItem(img_item, insert_in=curr_plot)
             else:
                 bar = None
+                
+            # Add horizontal grid lines for publication figures
+            if is_publication_ready_figure:
+                # Add efficient horizontal grid lines using GridItem
+                grid_item = pg.GridItem()
+                grid_item.setTickSpacing(x=[], y=[1.0])  # Only horizontal lines, spaced by 1 unit
+                grid_item.setPen(pg.mkPen(color='darkgray', width=0.5, style=pg.QtCore.Qt.SolidLine))
+                curr_plot.addItem(grid_item)
                 
             img_item_array.append(img_item)
             plot_array.append(curr_plot)
