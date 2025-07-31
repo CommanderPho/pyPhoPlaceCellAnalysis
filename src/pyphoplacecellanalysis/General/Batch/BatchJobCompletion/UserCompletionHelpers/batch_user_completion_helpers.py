@@ -1178,7 +1178,7 @@ def compute_and_export_session_trial_by_trial_performance_completion_function(se
         directional_lap_epochs_dict: Dict[str, Epoch] = a_trial_by_trial_result.directional_lap_epochs_dict
         # stability_df = a_trial_by_trial_result.get_stability_df()
         # appearing_or_disappearing_aclus, appearing_stability_df, appearing_aclus, disappearing_stability_df, disappearing_aclus, (stable_both_aclus, stable_neither_aclus, stable_long_aclus, stable_short_aclus) = a_trial_by_trial_result.get_cell_stability_info(minimum_one_point_stability=0.6, zero_point_stability=0.1)
-        _neuron_group_split_stability_dfs_tuple, _neuron_group_split_stability_aclus_tuple = a_trial_by_trial_result.get_cell_stability_info(minimum_one_point_stability=minimum_one_point_stability, zero_point_stability=zero_point_stability)
+        stability_df, _neuron_group_split_stability_dfs_tuple, _neuron_group_split_stability_aclus_tuple = a_trial_by_trial_result.get_cell_stability_info(minimum_one_point_stability=minimum_one_point_stability, zero_point_stability=zero_point_stability)
         # appearing_stability_df, disappearing_stability_df, appearing_or_disappearing_stability_df, stable_both_stability_df, stable_neither_stability_df, stable_long_stability_df, stable_short_stability_df = _neuron_group_split_stability_dfs_tuple
         appearing_aclus, disappearing_aclus, appearing_or_disappearing_aclus, stable_both_aclus, stable_neither_aclus, stable_long_aclus, stable_short_aclus = _neuron_group_split_stability_aclus_tuple
         ## Compute the track_ID deoding performance for the merged_decoder with some cells left out:
@@ -3038,10 +3038,10 @@ def determine_session_t_delta_completion_function(self, global_data_root_parent_
     return across_session_results_extended_dict
 
 
-@function_attributes(short_name=None, tags=['all_neuron_stats_table', 'final-publication', 'JSON', 'CSV', 'peak', 'pf', 'peak_promenance'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-01-01 00:00', related_items=[])
+@function_attributes(short_name=None, tags=['all_neuron_stats_table', 'neuron_replay_stats_df_CSV', 'final-publication', 'JSON', 'CSV', 'peak', 'pf', 'peak_promenance'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-01-01 00:00', related_items=[])
 def compute_and_export_session_extended_placefield_peak_information_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict,
                                                                              save_csv:bool=True, save_json:bool=False) -> dict:
-    """  Extracts peak information for the placefields for each neuron. Responsible for outputting the combined neuron information CSV used in the final paper results by merging the three+ informationt ables into one `all_neuron_stats_table`
+    """  Extracts peak information for the placefields for each neuron. Responsible for outputting the combined neuron information CSV used in the final paper results by merging the three+ informationt tables into one `all_neuron_stats_table`
     
     
     

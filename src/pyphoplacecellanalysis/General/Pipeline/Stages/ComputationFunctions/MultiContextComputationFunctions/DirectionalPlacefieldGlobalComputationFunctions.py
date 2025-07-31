@@ -5347,22 +5347,22 @@ class TrialByTrialActivityResult(ComputedResult):
         stability_df = stability_df.sort_values(['long_best'], ascending=True)
 
         ## find effectively zero (unstable/no-pf) cells:    
-        unstable_long = (stability_df['long_best'] <= zero_point_stability)
-        unstable_short = (stability_df['short_best'] <= zero_point_stability)
+        is_unstable_long = (stability_df['long_best'] <= zero_point_stability)
+        is_unstable_short = (stability_df['short_best'] <= zero_point_stability)
 
         ## NOTE that `stable_*` is not the negation of `unstable_*` because they require a minimum `one_point_stability`
-        stable_long = (stability_df['long_best'] >= minimum_one_point_stability)
-        stable_short = (stability_df['short_best'] >= minimum_one_point_stability)
+        is_stable_long = (stability_df['long_best'] >= minimum_one_point_stability)
+        is_stable_short = (stability_df['short_best'] >= minimum_one_point_stability)
 
         # stable_long = np.logical_not(unstable_long)
         # stable_short = np.logical_not(unstable_short)
 
         # is_appearing = np.logical_and(unstable_long, np.logical_not(unstable_short))
-        is_appearing = np.logical_and(unstable_long, stable_short)
+        is_appearing = np.logical_and(is_unstable_long, is_stable_short)
         appearing_stability_df = stability_df[is_appearing]
         appearing_aclus = appearing_stability_df.aclu.values
 
-        is_disappearing = np.logical_and(stable_long, unstable_short)
+        is_disappearing = np.logical_and(is_stable_long, is_unstable_short)
         disappearing_stability_df = stability_df[is_disappearing]
         disappearing_aclus = disappearing_stability_df.aclu.values
 
@@ -5384,19 +5384,26 @@ class TrialByTrialActivityResult(ComputedResult):
         # override_active_neuron_IDs.extend(appearing_aclus)
         # override_active_neuron_IDs # [ 3 11 14 15 24 34 35 51 58 67 74 82]
         
-        stable_both_stability_df = stability_df[np.logical_and(stable_long, stable_short)]
+        stability_df['stability_class'] = 'none'
+        stability_df.loc[is_appearing, 'stability_class'] = 'appearing'
+        stability_df.loc[is_disappearing, 'stability_class'] = 'disappearing'
+                
+        stable_both_stability_df = stability_df[np.logical_and(is_stable_long, is_stable_short)]
         stable_both_aclus = stable_both_stability_df.aclu.values
+        stability_df.loc[np.logical_and(is_stable_long, is_stable_short), 'stability_class'] = 'stable_both'
         
-        stable_neither_stability_df = stability_df[np.logical_and(unstable_long, unstable_short)]
+
+        stable_neither_stability_df = stability_df[np.logical_and(is_unstable_long, is_unstable_short)]
         stable_neither_aclus = stable_neither_stability_df.aclu.values
-        
-        stable_long_stability_df = stability_df[stable_long]
+        stability_df.loc[np.logical_and(is_unstable_long, is_unstable_short), 'stability_class'] = 'stable_neither'
+
+        stable_long_stability_df = stability_df[is_stable_long]
         stable_long_aclus = stable_long_stability_df.aclu.values
         
-        stable_short_stability_df = stability_df[stable_short]
+        stable_short_stability_df = stability_df[is_stable_short]
         stable_short_aclus = stable_short_stability_df.aclu.values
 
-        return (appearing_stability_df, disappearing_stability_df, appearing_or_disappearing_stability_df, stable_both_stability_df, stable_neither_stability_df, stable_long_stability_df, stable_short_stability_df)
+        return stability_df, (appearing_stability_df, disappearing_stability_df, appearing_or_disappearing_stability_df, stable_both_stability_df, stable_neither_stability_df, stable_long_stability_df, stable_short_stability_df)
         # (appearing_aclus, disappearing_aclus, appearing_or_disappearing_aclus, stable_both_aclus, stable_neither_aclus, stable_long_aclus, stable_short_aclus)
     
         # return appearing_or_disappearing_aclus, appearing_stability_df, appearing_aclus, disappearing_stability_df, disappearing_aclus, (stable_both_aclus, stable_neither_aclus, stable_long_aclus, stable_short_aclus)
@@ -5425,19 +5432,19 @@ class TrialByTrialActivityResult(ComputedResult):
         """ 
         
         Usage:
-            stability_df, stability_dict = a_trial_by_trial_result.get_stability_df()
-            appearing_or_disappearing_aclus, appearing_stability_df, appearing_aclus, disappearing_stability_df, disappearing_aclus = a_trial_by_trial_result.get_cell_stability_info(minimum_one_point_stability=0.6, zero_point_stability=0.1)
+            stability_df = a_trial_by_trial_result.get_stability_df()
+            stability_df, appearing_or_disappearing_aclus, appearing_stability_df, appearing_aclus, disappearing_stability_df, disappearing_aclus = a_trial_by_trial_result.get_cell_stability_info(minimum_one_point_stability=0.6, zero_point_stability=0.1)
             override_active_neuron_IDs = deepcopy(appearing_or_disappearing_aclus)
             override_active_neuron_IDs
 
 
         """
         stability_df = self.get_stability_df()
-        neuron_group_split_stability_dfs_tuple = self.determine_neuron_group_from_stability(stability_df=stability_df, minimum_one_point_stability=minimum_one_point_stability, zero_point_stability=zero_point_stability)
+        stability_df, neuron_group_split_stability_dfs_tuple = self.determine_neuron_group_from_stability(stability_df=stability_df, minimum_one_point_stability=minimum_one_point_stability, zero_point_stability=zero_point_stability)
         appearing_stability_df, disappearing_stability_df, appearing_or_disappearing_stability_df, stable_both_stability_df, stable_neither_stability_df, stable_long_stability_df, stable_short_stability_df = neuron_group_split_stability_dfs_tuple
         neuron_group_split_stability_aclus_tuple = [np.sort(a_df.aclu.values) for a_df in neuron_group_split_stability_dfs_tuple]
         appearing_aclus, disappearing_aclus, appearing_or_disappearing_aclus, stable_both_aclus, stable_neither_aclus, stable_long_aclus, stable_short_aclus = neuron_group_split_stability_aclus_tuple
-        return (neuron_group_split_stability_dfs_tuple, neuron_group_split_stability_aclus_tuple)
+        return (stability_df, neuron_group_split_stability_dfs_tuple, neuron_group_split_stability_aclus_tuple)
 
 def _workaround_validate_has_directional_trial_by_trial_activity_result(curr_active_pipeline, computation_filter_name='maze') -> bool:
     """ Validates `_build_trial_by_trial_activity_metrics`
