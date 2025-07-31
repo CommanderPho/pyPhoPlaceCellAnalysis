@@ -15,7 +15,7 @@ pd.options.mode.chained_assignment = None  # default='warn'
 
 {% if should_use_viztracer_logging %}
 from viztracer import VizTracer
-from pyphocorehelpers.general_helpers import get_now_time_str
+from pyphocorehelpers.print_helpers import get_now_time_str
 {% endif %}
 
 # NeuroPy (Diba Lab Python Repo) Loading
@@ -366,12 +366,8 @@ new_print(f'\n ALL DONE! \n')
 new_print(f'/* ================================================================================================================== */\n')
 
 {% if should_use_viztracer_logging %}
-    new_print(f'/* VizTracer trace saved to: {viztracer_output_file} __________________________________________________________________________________ */')
+new_print(f'/* VizTracer trace saved to: {viztracer_output_file} __________________________________________________________________________________ */')
 {% endif %}
-
-
-
-
 
 {% endmacro %}
 
