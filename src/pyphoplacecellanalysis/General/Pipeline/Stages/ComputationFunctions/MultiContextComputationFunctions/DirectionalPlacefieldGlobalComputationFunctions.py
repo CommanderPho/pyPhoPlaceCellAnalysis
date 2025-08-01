@@ -5329,9 +5329,91 @@ class TrialByTrialActivityResult(ComputedResult):
         ## OUTPUTS: z_scored_tuning_map_matrix, C_trial_by_trial_correlation_matrix
         return modified_directional_active_lap_pf_results_dicts
     
+    @classmethod
+    def plot_stability_group_diagnostics(cls, stability_df: pd.DataFrame, zero_point_stability: float = 0.1, minimum_one_point_stability: float = 0.6, enable_tiny_point_labels=False, enable_hover_labels=False):
+        """ plots stability 
+
+        Usage:
+            from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import TrialByTrialActivityResult
+
+            zero_point_stability = 0.1
+            minimum_one_point_stability = 0.7
+            all_neuron_stats_table, (appearing_stability_df, disappearing_stability_df, appearing_or_disappearing_stability_df, stable_both_stability_df, stable_neither_stability_df, stable_long_stability_df, stable_short_stability_df) = TrialByTrialActivityResult.determine_neuron_group_from_stability(stability_df=all_neuron_stats_table, zero_point_stability=zero_point_stability, minimum_one_point_stability=minimum_one_point_stability)
+
+            ax, plots_dict = TrialByTrialActivityResult.plot_stability_group_diagnostics(stability_df=all_neuron_stats_table, zero_point_stability=zero_point_stability, minimum_one_point_stability=minimum_one_point_stability)
+
+        """
+        import matplotlib.pyplot as plt
+        stability_column_names = ['stability_long_best', 'stability_short_best']
+        
+        stability_df = deepcopy(stability_df).rename(columns={x:x.removeprefix('stability_') for x in stability_column_names})
+        stability_df, (appearing_stability_df, disappearing_stability_df, appearing_or_disappearing_stability_df, stable_both_stability_df, stable_neither_stability_df, stable_long_stability_df, stable_short_stability_df) = cls.determine_neuron_group_from_stability(stability_df=stability_df, zero_point_stability=zero_point_stability, minimum_one_point_stability=minimum_one_point_stability)
+        # fig = plt.figure(num='stability_group_diagnostics')
+        
+        scatter_props_kwargs = dict()
+
+        fig, ax = plt.subplots(num='stability_group_diagnostics', clear=True)
+        x_values = stability_df['long_best'].to_numpy()
+        y_values = stability_df['short_best'].to_numpy()
+        # Convert categorical values to integers or colors
+        categories = stability_df['stability_class'].astype('category')
+        color_values = categories.cat.codes  # numeric mapping for color
+
+        scatter_plot = ax.scatter(x_values, y_values, c=color_values, **scatter_props_kwargs)
+
+        # ax = stability_df.plot.scatter(x='long_best', y='short_best', c='stability_class', title='stability_group_diagnostics')
+        # Optional: create legend
+        handles = [plt.Line2D([0], [0], marker='o', linestyle='', color=scatter_plot.cmap(scatter_plot.norm(code))) for code in range(len(categories.cat.categories))]
+        ax.legend(handles, categories.cat.categories, title='stability_class', loc='upper center', ncol=len(categories.cat.categories)) # , bbox_to_anchor=(0.5, -0.15)
+        plt.title('stability_group_diagnostics')
+
+        plots_dict = {'scatter': scatter_plot}
+        plots_dict['vlines'] = ax.vlines(x=[zero_point_stability, minimum_one_point_stability], ymin=0, ymax=1, color=['r', 'g'], linestyle='--', linewidth=1)
+        plots_dict['hlines'] = ax.hlines(y=[zero_point_stability, minimum_one_point_stability], xmin=0, xmax=1, color=['r', 'g'], linestyle='--', linewidth=1)
+        
+        plots_dict['hover_label_objects'] = []
+        if (enable_hover_labels or enable_tiny_point_labels):
+            if enable_hover_labels:
+                import mplcursors # for hover tooltips that specify the aclu of the selected point
+                
+            # LxC_aclus = self.computation_result.LxC_aclus
+            # SxC_aclus = self.computation_result.SxC_aclus
+            # _fig_2_theta_out = self.add_optional_aclu_labels(_fig_2_theta_out, LxC_aclus, SxC_aclus, enable_tiny_point_labels=enable_tiny_point_labels, enable_hover_labels=enable_hover_labels, enabled_point_connection_lines=False)
+            # _fig_2_replay_out = self.add_optional_aclu_labels(_fig_2_replay_out, LxC_aclus, SxC_aclus, enable_tiny_point_labels=enable_tiny_point_labels, enable_hover_labels=enable_hover_labels, enabled_point_connection_lines=False)
+        
+
+            # active_labels = stability_df['aclu'].to_list()
+            active_labels = stability_df[['session_name', 'aclu']].astype(str).agg('|'.join, axis=1) # Want a column with the two strings for each row joined by the vertical bar
+            point_hover_labels = [f'{i}' for i in active_labels] # point_hover_labels will be added as tooltip annotations to the datapoints
+            
+            assert len(x_values) == len(y_values) and len(x_values) == len(point_hover_labels), f"len(x_values): {len(x_values)}, len(y_values): {len(y_values)}, len(point_hover_labels): {len(point_hover_labels)}"
+            # add static tiny labels beside each point
+            if (enable_tiny_point_labels):
+                if enable_tiny_point_labels:
+                    temp_annotation_labels_list = []
+                for i, (x, y, label) in enumerate(zip(x_values, y_values, point_hover_labels)):
+                    # print(f'{i}, (x, y, label): ({x}, {y}, {label})')
+                    if enable_tiny_point_labels:
+                        annotation_item = ax.annotate(label, (x, y), textcoords="offset points", xytext=(2,2), ha='left', va='bottom', fontsize=8) # , color=rect.get_facecolor()
+                        temp_annotation_labels_list.append(annotation_item)
+
+                if enable_tiny_point_labels:
+                    plots_dict['tiny_annotation_labels'] = temp_annotation_labels_list
+                
+            # add hover labels:
+            # https://stackoverflow.com/questions/7908636/possible-to-make-labels-appear-when-hovering-over-a-point-in-matplotlib
+            # https://stackoverflow.com/questions/7908636/possible-to-make-labels-appear-when-hovering-over-a-point-in-matplotlib/21654635#21654635
+            # add hover labels using mplcursors
+            if enable_hover_labels:
+                hover_label_obj = mplcursors.cursor(scatter_plot, hover=True).connect("add", lambda sel: sel.annotation.set_text(point_hover_labels[sel.index]))
+                plots_dict['hover_label_objects'] = hover_label_obj
+
+
+
+        return ax, plots_dict
 
     @classmethod    
-    def determine_neuron_group_from_stability(cls, stability_df: pd.DataFrame, zero_point_stability: float = 0.1, minimum_one_point_stability: float = 0.6):
+    def determine_neuron_group_from_stability(cls, stability_df: pd.DataFrame, zero_point_stability: float = 0.1, minimum_one_point_stability: float = 0.6, add_all_intermedia_stability_columns: bool=True):
         """ try to determine the LxC/SxC remapping cells from their stability 
         
         zero_point_stability: cells with values below this threshold are considered "unstable", default 0.1
@@ -5351,9 +5433,15 @@ class TrialByTrialActivityResult(ComputedResult):
         """
         from numpy import sort
 
-        if 'long_best' not in stability_df:        
-            stability_df['long_best'] = stability_df[['long_LR', 'long_RL']].max(axis=1, skipna=True)
-            stability_df['short_best'] = stability_df[['short_LR', 'short_RL']].max(axis=1, skipna=True)
+        # stability_df.columns = [x.str.removeprefix('stability_') for x in stability_df.columns]
+        if ('stability_long_best' in stability_df) or ('stability_short_best' in stability_df):
+            stability_column_names = ['stability_long_best', 'stability_short_best']    
+            stability_df = deepcopy(stability_df).rename(columns={x:x.removeprefix('stability_') for x in stability_column_names})
+            assert ('long_best' in stability_df)
+        else:
+            if 'long_best' not in stability_df:        
+                stability_df['long_best'] = stability_df[['long_LR', 'long_RL']].max(axis=1, skipna=True)
+                stability_df['short_best'] = stability_df[['short_LR', 'short_RL']].max(axis=1, skipna=True)
         
         # stability_df = stability_df.sort_values(['long_best'], ascending=True)
 
@@ -5374,6 +5462,7 @@ class TrialByTrialActivityResult(ComputedResult):
         is_disappearing = np.logical_and(is_stable_long, is_unstable_short)
         disappearing_stability_df = stability_df[is_disappearing]
 
+
         ## OUTPUTS: appearing_stability_df, appearing_aclus, disappearing_stability_df, disappearing_aclus
         # appearing_aclus, disappearing_aclus
         # appearing_stability_df
@@ -5387,6 +5476,18 @@ class TrialByTrialActivityResult(ComputedResult):
         appearing_or_disappearing_aclus = sort(appearing_or_disappearing_stability_df.aclu.values)
         
 
+        if add_all_intermedia_stability_columns:
+            stability_df = stability_df.assign(**{
+             'is_unstable_long':is_unstable_long, 'is_unstable_short':is_unstable_short,
+              'is_stable_long':is_stable_long, 'is_stable_short': is_stable_short,
+              'is_appearing':is_appearing, 'is_disappearing': is_disappearing,
+              'is_appearing_or_disappearing': is_appearing_or_disappearing})
+
+
+        
+        # stability_df['stability_is_ANY_stable'] = np.logical_or(
+
+
         # appearing_or_disappearing_aclus = (disappearing_aclus.tolist() + appearing_aclus.tolist())
         # appearing_or_disappearing_aclus = sort(appearing_or_disappearing_aclus)
         # override_active_neuron_IDs.extend(appearing_aclus)
@@ -5394,18 +5495,25 @@ class TrialByTrialActivityResult(ComputedResult):
         
         # Define stability classes as categorical for efficiency
         stability_categories = ['none', 'appearing', 'disappearing', 'stable_both', 'stable_neither']
-        stability_df['stability_class'] = pd.Categorical(['none'] * len(stability_df), categories=stability_categories)
+        stability_df['stability_class'] = pd.Categorical((['none'] * len(stability_df)), categories=stability_categories)
         stability_df.loc[is_appearing, 'stability_class'] = 'appearing'
         stability_df.loc[is_disappearing, 'stability_class'] = 'disappearing'
-                
-        stable_both_stability_df = stability_df[np.logical_and(is_stable_long, is_stable_short)]
-        stable_both_aclus = stable_both_stability_df.aclu.values
-        stability_df.loc[np.logical_and(is_stable_long, is_stable_short), 'stability_class'] = 'stable_both'
-        
 
-        stable_neither_stability_df = stability_df[np.logical_and(is_unstable_long, is_unstable_short)]
+        is_stable_both = np.logical_and(is_stable_long, is_stable_short)
+        stable_both_stability_df = stability_df[is_stable_both]
+        stable_both_aclus = stable_both_stability_df.aclu.values
+        stability_df.loc[is_stable_both, 'stability_class'] = 'stable_both'
+        
+        is_stable_neither = np.logical_and(is_unstable_long, is_unstable_short)
+        stable_neither_stability_df = stability_df[is_stable_neither]
         stable_neither_aclus = stable_neither_stability_df.aclu.values
-        stability_df.loc[np.logical_and(is_unstable_long, is_unstable_short), 'stability_class'] = 'stable_neither'
+        stability_df.loc[is_stable_neither, 'stability_class'] = 'stable_neither'
+
+        if add_all_intermedia_stability_columns:
+            stability_df = stability_df.assign(**{
+            'is_stable_both':is_stable_both, 'is_stable_neither':is_stable_neither,
+            })
+
 
         stable_long_stability_df = stability_df[is_stable_long]
         stable_long_aclus = stable_long_stability_df.aclu.values
