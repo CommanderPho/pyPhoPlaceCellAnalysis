@@ -3192,7 +3192,7 @@ class InstantaneousSpikeRateGroupsComputation(PickleSerializableMixin, HDF_Seria
                                           )
 
 
-    def compute(self, curr_active_pipeline, **kwargs):
+    def compute(self, curr_active_pipeline, minimum_inclusion_fr_Hz=0.0, **kwargs):
         """ full instantaneous computations for both Long and Short epochs:
 
         Can access via:
@@ -3238,7 +3238,9 @@ class InstantaneousSpikeRateGroupsComputation(PickleSerializableMixin, HDF_Seria
         are_LxC_empty: bool = (self.LxC_aclus is None) or (len(self.LxC_aclus) == 0)
         are_SxC_empty: bool = (self.SxC_aclus is None) or (len(self.SxC_aclus) == 0)
 
-        spikes_df: pd.DataFrame = get_proper_global_spikes_df(curr_active_pipeline)
+        # spikes_df: pd.DataFrame = get_proper_global_spikes_df(curr_active_pipeline) ## this gets too few spikes, should just use the raw spikes maybe
+        spikes_df: pd.DataFrame = get_proper_global_spikes_df(curr_active_pipeline, minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz)
+        
         all_spikes_aclus = deepcopy(spikes_df.spikes.neuron_ids)
         
         if AnyC_aclus is None:
@@ -3267,7 +3269,6 @@ class InstantaneousSpikeRateGroupsComputation(PickleSerializableMixin, HDF_Seria
         # ReplayDeltaPlus: `short_replays`
         self.AnyC_ReplayDeltaPlus: SpikeRateTrends = SpikeRateTrends.init_from_spikes_and_epochs(spikes_df=deepcopy(spikes_df), filter_epochs=short_replays, included_neuron_ids=self.AnyC_aclus, instantaneous_time_bin_size_seconds=self.instantaneous_time_bin_size_seconds, epoch_handling_mode=epoch_handling_mode, **kwargs)
         
-
         # LxC: `long_exclusive.track_exclusive_aclus`
         # ReplayDeltaMinus: `long_replays`
         self.LxC_ReplayDeltaMinus: SpikeRateTrends = SpikeRateTrends.init_from_spikes_and_epochs(spikes_df=deepcopy(spikes_df), filter_epochs=long_replays, included_neuron_ids=self.LxC_aclus, instantaneous_time_bin_size_seconds=self.instantaneous_time_bin_size_seconds, epoch_handling_mode=epoch_handling_mode, **kwargs)
