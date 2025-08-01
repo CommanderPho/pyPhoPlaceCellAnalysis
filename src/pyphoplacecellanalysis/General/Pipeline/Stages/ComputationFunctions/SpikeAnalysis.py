@@ -142,6 +142,7 @@ class SpikeRateTrends(HDFMixin, NeuronUnitSlicableObjectProtocol, AttrsBasedClas
         assert n_epochs > 0        
         n_cells: int = self.inst_fr_df_list[0].shape[1]
         
+        ## Recompute for all time bins within each epoch to get at epoch_aggregated firing rates (one for each epoch):
         is_non_instantaneous = np.all([a_signal is None for a_signal in self.inst_fr_signals_list])
         if is_non_instantaneous:
             epoch_agg_firing_rates_list = np.vstack([np.nanmean(a_df.to_numpy(), axis=0) for a_df in self.inst_fr_df_list])
@@ -153,10 +154,34 @@ class SpikeRateTrends(HDFMixin, NeuronUnitSlicableObjectProtocol, AttrsBasedClas
 
         assert epoch_agg_firing_rates_list.shape == (n_epochs, n_cells)
         self.epoch_agg_inst_fr_list = epoch_agg_firing_rates_list # .shape (n_epochs, n_cells)
-        cell_agg_firing_rates_list = epoch_agg_firing_rates_list.mean(axis=0) # find the peak over all epochs (for all cells) using `.max(...)` --- OOPS, what about the zero epochs? Should those actually effect the rate? Should they be excluded?
+
+        ## OLD WAY that abused directional cells:
+        # cell_agg_firing_rates_list = epoch_agg_firing_rates_list.mean(axis=0) # find the peak over all epochs (for all cells) using `.max(...)` --- OOPS, what about the zero epochs? Should those actually effect the rate? Should they be excluded?
+
+        ## 2025-08-01 07:29 NEW WAY that permits LR/RL/ALL consideration separately so purely directional cells don't get averaged acrossed periods they aren't supposed to be active:
+        ## INPUTS: epoch_agg_inst_fr_list # (N_EPOCHS, N_ACLUS) in period
+
+        # an_inst_fr_list = self.epoch_agg_inst_fr_list # (N_EPOCHS, N_ACLUS) in period
+        # epoch_agg_firing_rates_list = deepcopy(epoch_agg_firing_rates_list) # (N_EPOCHS, N_ACLUS) in period
+        # an_inst_fr_list = np.squeeze(a_pre_post_period_result.epoch_agg_inst_fr_list[:, target_aclu_idx]) # (N_EPOCHS) in period
+        # print(f'an_inst_fr_list.shape: {np.shape(an_inst_fr_list)}') # an_inst_fr_list.shape: (39, 20)
+        LR_an_inst_fr_list = epoch_agg_firing_rates_list[::2, :] ## even epochs only, all aclus
+        RL_an_inst_fr_list = epoch_agg_firing_rates_list[1::2, :] ## odd epochs only, all aclus
+        # print(f'LR_an_inst_fr_list.shape: {np.shape(LR_an_inst_fr_list)}') # LR_an_inst_fr_list.shape: (20, 20)
+        # print(f'RL_an_inst_fr_list.shape: {np.shape(RL_an_inst_fr_list)}') # RL_an_inst_fr_list.shape: (19, 20)
+        a_period_directional_inst_fr_list = [LR_an_inst_fr_list, RL_an_inst_fr_list, epoch_agg_firing_rates_list] # LR, RL, ALL
+        a_period_epoch_agg_frs_list = np.vstack([np.nanmean(a_fr_list, axis=0) for a_fr_list in a_period_directional_inst_fr_list]) ## average over epochs, output (3, N_ACLUS)
+        # print(f'a_period_epoch_agg_frs_list.shape: {np.shape(a_period_epoch_agg_frs_list)}') # a_period_epoch_agg_frs_list.shape: (3, 20)
+        cell_agg_firing_rates_list: float = np.nanmax(a_period_epoch_agg_frs_list, axis=0) ## get the highest fr in any the LR/RL/ALL only
+        # print(f'a_period_epoch_agg_fr.shape: {np.shape(a_period_epoch_agg_fr)}') # a_period_epoch_agg_fr.shape: (20,)
+    
+        ## OVERWRITE cell_agg_inst_fr_list
         assert cell_agg_firing_rates_list.shape == (n_cells,)
-        self.cell_agg_inst_fr_list = cell_agg_firing_rates_list # .shape (n_cells,)
+        self.cell_agg_inst_fr_list = deepcopy(cell_agg_firing_rates_list) # .shape (n_cells,)
+        ## update the all agg result
         self.all_agg_inst_fr = cell_agg_firing_rates_list.mean() # .magnitude.item() # scalar
+
+
 
 
     @classmethod
@@ -240,6 +265,7 @@ class SpikeRateTrends(HDFMixin, NeuronUnitSlicableObjectProtocol, AttrsBasedClas
             epoch_spikes_df = spikes_df.spikes.time_sliced(t_start=epoch_start, t_stop=epoch_end)
             
             if use_instantaneous_firing_rate:
+                # True Instantaneous Firing Rate _____________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
                 unit_specific_inst_spike_rate_values_df, unit_specific_inst_spike_rate_signal, _unit_split_spiketrains = SpikeRateTrends.compute_single_epoch_instantaneous_time_firing_rates(epoch_spikes_df, time_bin_size_seconds=instantaneous_time_bin_size_seconds, kernel=kernel, epoch_t_start=epoch_start, epoch_t_stop=epoch_end, included_neuron_ids=included_neuron_ids, **kwargs)
                 # times accessible via `unit_specific_inst_spike_rate_signal.times`
                 epoch_inst_fr_df_list.append(unit_specific_inst_spike_rate_values_df)
@@ -263,7 +289,7 @@ class SpikeRateTrends(HDFMixin, NeuronUnitSlicableObjectProtocol, AttrsBasedClas
                 unit_specific_binned_spike_counts_df = deepcopy(epoch_units_total_num_spikes_df) ## just to make sure it works
                 
             else:
-                ## Non-instantaneous rate
+                # Non-instantaneous rate _____________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
                 # 2025-07-25 08:51 IMPORTANT: since this is calculated by dividing the number of spikes in each time bin by the duration of each bin, when the duration exceeds the length of the epoch it will be divided by too large of a bin size
                 if instantaneous_time_bin_size_seconds > epoch_duration:
                     epoch_instantaneous_time_bin_size_seconds: float = epoch_duration

@@ -3138,8 +3138,8 @@ class InstantaneousSpikeRateGroupsComputation(PickleSerializableMixin, HDF_Seria
 
 
     @classmethod
-    def _perform_compute_spike_rate_bars(cls, LxC_aclus, SxC_aclus, LxC_ThetaDeltaMinus, LxC_ThetaDeltaPlus, SxC_ThetaDeltaMinus, SxC_ThetaDeltaPlus,
-                                          LxC_ReplayDeltaMinus, LxC_ReplayDeltaPlus, SxC_ReplayDeltaMinus, SxC_ReplayDeltaPlus,
+    def _perform_compute_spike_rate_bars(cls, LxC_aclus: NDArray, SxC_aclus: NDArray, LxC_ThetaDeltaMinus: SpikeRateTrends, LxC_ThetaDeltaPlus: SpikeRateTrends, SxC_ThetaDeltaMinus: SpikeRateTrends, SxC_ThetaDeltaPlus: SpikeRateTrends,
+                                          LxC_ReplayDeltaMinus: SpikeRateTrends, LxC_ReplayDeltaPlus: SpikeRateTrends, SxC_ReplayDeltaMinus: SpikeRateTrends, SxC_ReplayDeltaPlus: SpikeRateTrends,
                                           ):
         """ Computing 
         
