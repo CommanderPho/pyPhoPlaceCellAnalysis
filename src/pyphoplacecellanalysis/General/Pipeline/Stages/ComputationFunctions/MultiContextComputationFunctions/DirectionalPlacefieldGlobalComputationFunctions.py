@@ -5370,11 +5370,9 @@ class TrialByTrialActivityResult(ComputedResult):
         # is_appearing = np.logical_and(unstable_long, np.logical_not(unstable_short))
         is_appearing = np.logical_and(is_unstable_long, is_stable_short)
         appearing_stability_df = stability_df[is_appearing]
-        appearing_aclus = appearing_stability_df.aclu.values
 
         is_disappearing = np.logical_and(is_stable_long, is_unstable_short)
         disappearing_stability_df = stability_df[is_disappearing]
-        disappearing_aclus = disappearing_stability_df.aclu.values
 
         ## OUTPUTS: appearing_stability_df, appearing_aclus, disappearing_stability_df, disappearing_aclus
         # appearing_aclus, disappearing_aclus
