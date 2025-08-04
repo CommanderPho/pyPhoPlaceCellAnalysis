@@ -271,6 +271,26 @@ class TrialByTrialActivityWindow:
                 else:
                     curr_plot.showAxes('y', False)
                     curr_plot.showAxis('left', show=False)
+            else:
+                # Publication figure formatting
+                # Hide y-axis labels completely
+                curr_plot.getAxis('left').setStyle(showValues=False)
+                curr_plot.getAxis('left').setLabel('')
+                curr_plot.getAxis('left').showLabel(False)
+                curr_plot.getAxis('right').setStyle(showValues=False)
+                curr_plot.getAxis('right').setLabel('')
+                curr_plot.getAxis('right').showLabel(False)
+                
+                # Hide x-axis labels as well
+                curr_plot.getAxis('bottom').setLabel('')
+                curr_plot.getAxis('bottom').showLabel(False)
+                curr_plot.getAxis('top').setLabel('')
+                curr_plot.getAxis('top').showLabel(False)
+                
+                # Set x-axis to show only ~10 major ticks
+                x_range_span = x_range[1] - x_range[0]
+                x_tick_spacing = x_range_span / 10.0  # Approximately 10 major ticks
+                curr_plot.getAxis('bottom').setTickSpacing(major=x_tick_spacing, minor=x_tick_spacing/5)
             
             curr_plot.hideButtons() # Hides the auto-scale button
             curr_plot.addItem(img_item, defaultPadding=0.0)  # add ImageItem to PlotItem
@@ -304,9 +324,24 @@ class TrialByTrialActivityWindow:
             if is_publication_ready_figure:
                 # Add efficient horizontal grid lines using GridItem
                 grid_item = pg.GridItem()
-                grid_item.setTickSpacing(x=[None], y=[1.0])  # Only horizontal lines, spaced by 1 unit
-                grid_item.setPen(pg.mkPen(color='darkgray', width=0.1, style=pg.QtCore.Qt.SolidLine))
-                grid_item.setTextPen(None) ## disable text hopefully
+                grid_item.setTickSpacing(x=[], y=[1.0])  # Only horizontal lines, spaced by 1 unit
+                
+                # Create pen for grid lines
+                pen = pg.mkPen(color='darkgray', width=1.0, style=pg.QtCore.Qt.SolidLine)
+                pen.setCosmetic(True)  # Ensures consistent width regardless of zoom
+                grid_item.setPen(pen)
+                grid_item.setTextPen(None)  # disable text
+                
+                # Try to disable any background fill/brush
+                transparent_brush = pg.mkBrush(None)  # No brush/fill
+                if hasattr(grid_item, 'setBrush'):
+                    grid_item.setBrush(transparent_brush)
+                if hasattr(grid_item, 'setBackgroundBrush'):
+                    grid_item.setBackgroundBrush(transparent_brush)
+                
+                # Set opacity to see if that helps
+                grid_item.setOpacity(1.0)
+                
                 curr_plot.addItem(grid_item)
                 
             img_item_array.append(img_item)

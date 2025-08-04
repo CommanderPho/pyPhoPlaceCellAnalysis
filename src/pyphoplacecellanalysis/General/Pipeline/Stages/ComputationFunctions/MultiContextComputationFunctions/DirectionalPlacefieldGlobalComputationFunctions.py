@@ -5364,7 +5364,9 @@ class TrialByTrialActivityResult(ComputedResult):
         # ax = stability_df.plot.scatter(x='long_best', y='short_best', c='stability_class', title='stability_group_diagnostics')
         # Optional: create legend
         handles = [plt.Line2D([0], [0], marker='o', linestyle='', color=scatter_plot.cmap(scatter_plot.norm(code))) for code in range(len(categories.cat.categories))]
-        ax.legend(handles, categories.cat.categories, title='stability_class', loc='upper center', ncol=len(categories.cat.categories)) # , bbox_to_anchor=(0.5, -0.15)
+        ax.legend(handles, categories.cat.categories, title='stability_class', bbox_to_anchor=(1.05, 1), loc='upper left', borderaxespad=0.,
+                #    loc='upper center', ncol=len(categories.cat.categories),
+                   ) # , bbox_to_anchor=(0.5, -0.15)
         plt.title('stability_group_diagnostics')
 
         plots_dict = {'scatter': scatter_plot}
@@ -5409,6 +5411,7 @@ class TrialByTrialActivityResult(ComputedResult):
                 plots_dict['hover_label_objects'] = hover_label_obj
 
 
+        plt.tight_layout()
 
         return ax, plots_dict
 
