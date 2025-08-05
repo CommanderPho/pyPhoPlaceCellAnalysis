@@ -121,20 +121,25 @@ from neuropy.core.user_annotations import SessionCellExclusivityRecord
 class SpareRunningSequenceScore:
     """ Computes 'Spare' (as in the sport American Bowling) scoring of decoded posteriors
     
+    STATUS #TODO 2025-08-05 09:16: - [ ] SpareRunningSequenceScore refinements, finished implementation, now need to check
+    
     Usage:
         from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import SpareRunningSequenceScore
-        
+
+        out_decoder_spare_scores, out_decoder_spare_scores_extras = SpareRunningSequenceScore.bowling_spare_integration(p_x_given_n=p_x_given_n)
+        out_decoder_spare_scores
     
     """
     @function_attributes(short_name=None, tags=['score', 'bowling', 'spare', 'compute'], input_requires=[], output_provides=[], uses=[], used_by=['bowling_spare_integration'], creation_date='2025-08-04 10:11', related_items=[])
     @classmethod
     def compute_spare_operation(cls, a_p_x_given_n: NDArray, final_score_only: bool=True) -> List[NDArray]:
-        """ Done
+        """ Breaks the `a_p_x_given_n` for a single decoder into separate subsequences based on the change direction (currently ignoring no bins) and then computes the "bowling_spare" score for each time bin
+        
         if final_score_only: return only the maximal score (the last sequence bin) instead of the score for each bin within the sequence.
         
         Usage:
         
-            out_spare_score, (p_x_given_n_segments, most_likely_pos_idxs_segments, segement_lengths, sign_change_locations) = compute_spare_operation(a_p_x_given_n=a_p_x_given_n, final_score_only=False)
+            out_spare_score, (p_x_given_n_segments, most_likely_pos_idxs_segments, segement_lengths, sign_change_indicies) = compute_spare_operation(a_p_x_given_n=a_p_x_given_n, final_score_only=False)
         """
         ## start at the end of the posterior
         n_pos, n_time_bins = np.shape(a_p_x_given_n) # np.shape(p_x_given_n) - (59, 69488) -(n_pos, n_time_bins)
@@ -148,9 +153,9 @@ class SpareRunningSequenceScore:
         # sign_change_locations = np.diff(np.sign(most_likely_pos_idx_change)) # -1 if x < 0, 0 if x==0, 1 if x > 0
         diff = np.diff(a_most_likely_pos_idxs)
         signs = np.sign(diff)
-        sign_change_locations = np.where(np.diff(signs) != 0)[0] + 1 ## I believe the +1 is to handle the loss of an index when we performed np.diff(...)
-        p_x_given_n_segments = np.split(a_p_x_given_n, sign_change_locations, axis=1)
-        most_likely_pos_idxs_segments = np.split(a_most_likely_pos_idxs, sign_change_locations)
+        sign_change_indicies = np.where(np.diff(signs) != 0)[0] + 1 ## I believe the +1 is to handle the loss of an index when we performed np.diff(...)
+        p_x_given_n_segments = np.split(a_p_x_given_n, sign_change_indicies, axis=1)
+        most_likely_pos_idxs_segments = np.split(a_most_likely_pos_idxs, sign_change_indicies)
         n_segments: int = len(p_x_given_n_segments)
         segement_lengths = np.array([np.shape(v)[-1] for v in p_x_given_n_segments]) ## each segment is [n_pos_bins, n_seg_time_bins]
 
@@ -189,24 +194,25 @@ class SpareRunningSequenceScore:
                 a_seq_spare_score = a_seq_spare_score[-1] ## only the last bin, which is by defn maximal
             out_spare_score.append(a_seq_spare_score)
                     
-        return out_spare_score, (p_x_given_n_segments, most_likely_pos_idxs_segments, segement_lengths, sign_change_locations)
+        return out_spare_score, (p_x_given_n_segments, most_likely_pos_idxs_segments, segement_lengths, sign_change_indicies)
 
 
     @function_attributes(short_name=None, tags=['MAIN', 'score', 'spare'], input_requires=[], output_provides=[], uses=['compute_spare_operation'], used_by=[], creation_date='2025-08-04 10:11', related_items=[])
     @classmethod
-    def bowling_spare_integration(cls, p_x_given_n: NDArray) -> NDArray:
+    def bowling_spare_integration(cls, p_x_given_n: NDArray, decoder_names = ['Long_LR', 'Long_RL', 'Short_LR', 'Short_RL']) -> NDArray:
         """ Start at the end of the posterior 
 
 
         Usage:
         
-            from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import bowling_spare_integration
-            
-            out_decoder_spare_scores = bowling_spare_integration(p_x_given_n=p_x_given_n)
+            from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import SpareRunningSequenceScore
+
+            out_decoder_spare_scores, out_decoder_spare_scores_extras = SpareRunningSequenceScore.bowling_spare_integration(p_x_given_n=p_x_given_n)
             out_decoder_spare_scores
 
         """
         n_pos, n_decoders, n_time_bins = np.shape(p_x_given_n) # np.shape(p_x_given_n) - (59, 4, 69488) -(n_pos, 4, n_time_bins)
+        assert n_decoders == len(decoder_names), f"{decoder_names} length not equal to n_decoders: {n_decoders}"
         _decoder_prob_sum_over_all_positions = np.nansum(p_x_given_n, axis=0) ## sum over all positions (4, 69488)
         most_likely_decoder_idxs: NDArray = np.argmax(_decoder_prob_sum_over_all_positions, axis=0) ## find the max decoder idx for each time bins (4, 69488) - (n_time_bins, )
         # most_likely_decoder_idxs # .shape
@@ -215,10 +221,11 @@ class SpareRunningSequenceScore:
         most_likely_pos_idxs: NDArray = np.argmax(p_x_given_n, axis=0) ## find the max position bins (4, 69488) - (n_decoders, n_time_bins)
         a_most_likely_pos_idxs = most_likely_pos_idxs[0,:] ## single decoder result .shape (n_time_bins)
             
-        out_decoder_spare_scores = [] ## one for each decoder
-        
+        out_decoder_spare_scores = {} ## one for each decoder
+        out_decoder_spare_scores_extras = {}
         ## compute each decoder indepednently
-        for decoder_idx in np.arange(n_decoders):
+        # for decoder_idx in np.arange(n_decoders):
+        for decoder_idx, a_decoder_name in enumerate(decoder_names):
             a_p_x_given_n = deepcopy(p_x_given_n[:, decoder_idx, :])
             ## Normalize to this decoder by summing over each time bin and dividing by the output
             a_p_x_given_n = a_p_x_given_n / np.nansum(a_p_x_given_n, axis=0)
@@ -227,12 +234,14 @@ class SpareRunningSequenceScore:
             a_most_likely_pos_idxs: NDArray = np.argmax(a_p_x_given_n, axis=0) ## find the max position bins (4, 69488) - (n_decoders, n_time_bins)
             a_most_likely_pos_idxs = most_likely_pos_idxs[0,:] ## single decoder result .shape (n_time_bins)
 
-            out_spare_score, (p_x_given_n_segments, most_likely_pos_idxs_segments, segement_lengths, sign_change_locations) = cls.compute_spare_operation(a_p_x_given_n=a_p_x_given_n, final_score_only=False)
-            out_decoder_spare_scores.append(out_spare_score)
-            
+            out_spare_score, (p_x_given_n_segments, most_likely_pos_idxs_segments, segement_lengths, sign_change_indicies) = cls.compute_spare_operation(a_p_x_given_n=a_p_x_given_n, final_score_only=False)
+            # out_decoder_spare_scores.append(out_spare_score)
+            out_decoder_spare_scores[a_decoder_name] = out_spare_score
+            out_decoder_spare_scores_extras[a_decoder_name] = dict(p_x_given_n_segments=p_x_given_n_segments, most_likely_pos_idxs_segments=most_likely_pos_idxs_segments,
+                                                                    segement_lengths=segement_lengths, sign_change_indicies=sign_change_indicies)
         # Extract the maximum locations for each time bin
         P_max_ind = np.argmax(p_x_given_n, axis=1)
-        return out_decoder_spare_scores
+        return out_decoder_spare_scores, out_decoder_spare_scores_extras
 
 
 
