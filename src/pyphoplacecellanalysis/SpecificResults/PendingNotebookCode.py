@@ -119,12 +119,15 @@ from nptyping import NDArray
 from neuropy.core.user_annotations import SessionCellExclusivityRecord
 
 @function_attributes(short_name=None, tags=['score', 'bowling', 'spare', 'compute'], input_requires=[], output_provides=[], uses=[], used_by=['bowling_spare_integration'], creation_date='2025-08-04 10:11', related_items=[])
-def compute_spare_operation(a_p_x_given_n: NDArray) -> List[NDArray]:
+def compute_spare_operation(a_p_x_given_n: NDArray, final_score_only: bool=True) -> List[NDArray]:
     """ Done
+    if final_score_only: return only the maximal score (the last sequence bin) instead of the score for each bin within the sequence.
+    
     """
     ## start at the end of the posterior
     n_pos, n_time_bins = np.shape(a_p_x_given_n) # np.shape(p_x_given_n) - (59, 69488) -(n_pos, n_time_bins)
-    a_most_likely_pos_idxs: NDArray = np.argmax(a_p_x_given_n, axis=1) ## find the max position bins (69488, ) - (n_time_bins, )
+    max_pos_index: int = n_pos - 1
+    a_most_likely_pos_idxs: NDArray = np.argmax(a_p_x_given_n, axis=0) ## find the max position bins (69488, ) - (n_time_bins, )
     # out_spare_score = np.full_like(a_p_x_given_n, fill_value=np.nan)
     out_spare_score = [] # np.full_like(a_p_x_given_n, fill_value=np.nan)
     
@@ -134,15 +137,15 @@ def compute_spare_operation(a_p_x_given_n: NDArray) -> List[NDArray]:
     diff = np.diff(a_most_likely_pos_idxs)
     signs = np.sign(diff)
     sign_change_locations = np.where(np.diff(signs) != 0)[0] + 1
-    p_x_given_n_segments = np.split(a_p_x_given_n, sign_change_locations)
+    p_x_given_n_segments = np.split(a_p_x_given_n, sign_change_locations, axis=1)
     most_likely_pos_idxs_segments = np.split(a_most_likely_pos_idxs, sign_change_locations)
     n_segments: int = len(p_x_given_n_segments)
-    segement_lengths = np.array([len(v) for v in p_x_given_n_segments])
+    segement_lengths = np.array([np.shape(v)[-1] for v in p_x_given_n_segments]) ## each segment is [n_pos_bins, n_seg_time_bins]
 
     for seg_idx, a_seg in enumerate(p_x_given_n_segments):
         a_seg_len: int = segement_lengths[seg_idx]
         a_most_likely_pos_seg = most_likely_pos_idxs_segments[seg_idx]
-        a_spare_score = []
+        a_seq_spare_score = []
         for t_idx in reversed(np.arange(a_seg_len)):
             ## start in the last frame and work forward until the first
             # sign_change_locations[t_idx]
@@ -154,15 +157,23 @@ def compute_spare_operation(a_p_x_given_n: NDArray) -> List[NDArray]:
                 
             else:
                 ## if it is the first bound in the series, we need to decide which side to integrate from (it should be the closest to curr peak:
-                start_bound = 0
-                # end_bound = a_most_likely_pos_seg[t_idx-1]
-                end_bound = a_most_likely_pos_seg[t_idx]
+                curr_pos_idx: int = a_most_likely_pos_seg[t_idx]
+                _curr_pre_pos_bins: int = (max_pos_index - curr_pos_idx)
+                _curr_post_pos_bins: int = (curr_pos_idx - 0)
+                _curr_should_start_at_pre: bool = _curr_pre_pos_bins <= _curr_post_pos_bins
+                if _curr_should_start_at_pre:
+                    start_bound = 0
+                    end_bound = a_most_likely_pos_seg[t_idx]
+                else:
+                    start_bound = a_most_likely_pos_seg[t_idx]
+                    end_bound = max_pos_index
 
             # out_spare_score[t_idx] =  
-            a_spare_score.append(np.nansum(a_seg[start_bound:end_bound, t_idx])) ## sum over all values of the segment
+            a_seq_spare_score.append(np.nansum(a_seg[start_bound:end_bound, t_idx])) ## sum over all values of the segment
         # for t_idx in reversed(np.arange(a_seg_len))
-        a_spare_score = np.array(a_spare_score)
-        out_spare_score.append(a_spare_score)
+        a_seq_spare_score = np.nan_to_num(np.array(a_seq_spare_score), nan=0.0)
+        a_seq_spare_score = np.cumsum(a_seq_spare_score)
+        out_spare_score.append(a_seq_spare_score)
         
     # for seg_idx, a_seg in enumerate(p_x_given_n_segments)
 
