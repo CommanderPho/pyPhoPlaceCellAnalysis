@@ -703,6 +703,256 @@ def add_significance_bars(ax, p_value, x1, x2, y, significance_level:float=0.05,
 
 
 # Instantaneous versions:
+@metadata_attributes(short_name=None, tags=['debugging'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-08-06 13:22', related_items=[])
+class DebuggingHelpers:
+    """ 
+    from pyphoplacecellanalysis.SpecificResults.PhoDiba2023Paper import DebuggingHelpers
+    
+    """
+    @function_attributes(short_name=None, tags=['participation', 'figure2', 'figure3', 'fixup'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-08-06 05:15', related_items=[])
+    @classmethod
+    def _compute_participation_and_n_spike_fr_stats(cls, across_session_inst_fr_computation_dict: Dict[IdentifyingContext, InstantaneousSpikeRateGroupsComputation], debug_print: bool = False):
+        """ 
+        Usage:
+        
+            _out_new_dfs = DebuggingHelpers._compute_participation_and_n_spike_fr_stats(across_session_inst_fr_computation_dict=across_session_inst_fr_computation_dict)
+            _out_new_dfs
+
+        """
+        from neuropy.core.neuron_identities import NeuronIdentityDataframeAccessor
+        
+        _out_new_dfs = []
+        for a_session_ctxt, a_session_InstantaneousSpikeRateGroupsComputation in across_session_inst_fr_computation_dict.items():
+            session_uid: str = a_session_ctxt.get_description_as_session_global_uid()
+            print(f'processing session_uid: "{session_uid}"...')
+        
+            active_ACLUS = deepcopy(a_session_InstantaneousSpikeRateGroupsComputation.AnyC_aclus)
+            active_neuron_UIDs: List[str] = [f"{session_uid}|{aclu}" for aclu in active_ACLUS]
+            
+            a_sess_pre_post_delta_result_list = [a_session_InstantaneousSpikeRateGroupsComputation.AnyC_ThetaDeltaMinus, a_session_InstantaneousSpikeRateGroupsComputation.AnyC_ThetaDeltaPlus, a_session_InstantaneousSpikeRateGroupsComputation.AnyC_ReplayDeltaMinus, a_session_InstantaneousSpikeRateGroupsComputation.AnyC_ReplayDeltaPlus]
+            a_sess_pre_post_delta_result_dict = dict(zip(['ThetaDeltaMinus', 'ThetaDeltaPlus', 'ReplayDeltaMinus', 'ReplayDeltaPlus'], a_sess_pre_post_delta_result_list))
+
+            _out_dict = {'aclu': active_ACLUS} # , 'ThetaDeltaMinus': None, 'ThetaDeltaPlus': None, 'ReplayDeltaMinus': None, 'ReplayDeltaPlus': None
+            # for a_pre_post_period_result in a_sess_pre_post_delta_result_list:
+            for a_period_name, a_pre_post_period_result in a_sess_pre_post_delta_result_dict.items():
+                an_inst_fr_list = a_pre_post_period_result.epoch_agg_inst_fr_list # (N_EPOCHS, N_ACLUS) in period
+                # an_inst_fr_list = np.squeeze(a_pre_post_period_result.epoch_agg_inst_fr_list[:, target_aclu_idx]) # (N_EPOCHS) in period
+
+                LR_an_inst_fr_list = an_inst_fr_list[::2, :] ## all aclus
+                RL_an_inst_fr_list = an_inst_fr_list[1::2, :] ## all aclus
+
+                a_period_directional_inst_fr_list = [LR_an_inst_fr_list, RL_an_inst_fr_list, an_inst_fr_list] # LR, RL, ALL
+                a_period_epoch_agg_frs_list = np.vstack([np.nanmean(a_fr_list, axis=0) for a_fr_list in a_period_directional_inst_fr_list]) ## average over epochs, output (3, N_ACLUS)
+                
+                a_period_epoch_agg_fr: float = np.nanmax(a_period_epoch_agg_frs_list, axis=0) ## get the highest fr in any the LR/RL/ALL only
+                if debug_print:
+                    print(f'an_inst_fr_list.shape: {np.shape(an_inst_fr_list)}') # (41, N_ACLUS)
+                    print(f'LR_an_inst_fr_list.shape: {np.shape(LR_an_inst_fr_list)}') # (n_LR_epochs, N_ACLUS)
+                    print(f'RL_an_inst_fr_list.shape: {np.shape(RL_an_inst_fr_list)}') # (n_RL_epochs, N_ACLUS)
+                    print(f'a_period_epoch_agg_frs_list.shape: {np.shape(a_period_epoch_agg_frs_list)}')
+                    print(f'a_period_epoch_agg_fr.shape: {np.shape(a_period_epoch_agg_fr)}') # (20,)
+                # a_period_epoch_agg_fr
+                ## OVERWRITE a_pre_post_period_result
+                # a_pre_post_period_result.cell_agg_inst_fr_list = deepcopy(a_period_epoch_agg_fr)
+                a_result_col_name: str = 'fr'
+                _out_dict[f"{a_period_name}_{a_result_col_name}"] = a_period_epoch_agg_fr
+                
+                a_result_col_name: str = 'n_participating_epochs'
+                # has_epoch_participation: NDArray = np.vstack([(v.T[0].to_numpy() > 0.0) for v in a_pre_post_period_result.spike_counts_df_list]) # has_epoch_participation # .shape # (39, 20) - (n_epochs, n_aclus)
+                # n_participating_epochs: NDArray = has_epoch_participation.sum(axis=0) # .shape (N_ACLUS)
+                
+                # assert len(a_pre_post_period_result.included_neuron_ids) == len(n_participating_epochs), f"len(a_pre_post_period_result.included_neuron_ids): {len(a_pre_post_period_result.included_neuron_ids)} != len(n_participating_epochs): {len(n_participating_epochs)}"
+                # assert len(a_pre_post_period_result.included_neuron_ids) == len(active_neuron_UIDs), f"len(a_pre_post_period_result.included_neuron_ids): {len(a_pre_post_period_result.included_neuron_ids)} != len(active_neuron_UIDs): {len(active_neuron_UIDs)}"
+                
+                # input_df = input_df.neuron_identity.make_neuron_indexed_df_global(a_session_ctxt, add_expanded_session_context_keys=False, add_extended_aclu_identity_columns=False)
+                # n_participating_epochs_dict = dict(zip(active_neuron_UIDs, n_participating_epochs))
+            
+                n_participating_epochs_dict, n_participating_epochs, has_epoch_participation, per_aclu_additional_properties_dict = a_pre_post_period_result.compute_participation_stats(a_session_ctxt=a_session_ctxt, should_update_self=True)
+
+                _out_dict[f"{a_period_name}_{a_result_col_name}"] = n_participating_epochs
+                for k, v in per_aclu_additional_properties_dict.items():
+                    _out_dict[f"{a_period_name}_{k}"] = deepcopy(v) 
+                    
+                
+            _out_temp_df: pd.DataFrame = pd.DataFrame(_out_dict)
+            _out_new_dfs.append(_out_temp_df)
+            # _out_temp_df
+        # an_inst_fr_list.shape: (41, 20)
+        # LR_an_inst_fr_list.shape: (21, 20)
+        # RL_an_inst_fr_list.shape: (20, 20)
+        # a_period_epoch_agg_frs_list.shape: (3, 20)
+        # a_period_epoch_agg_fr.shape: (20,)
+        _out_new_dfs: pd.DataFrame = pd.concat(_out_new_dfs)
+        return _out_new_dfs
+
+
+
+
+    @classmethod
+    def _compute_active_set_membership_from_participation(cls, across_session_inst_fr_computation_df: pd.DataFrame, all_neuron_stats_table: pd.DataFrame, 
+                                                          contra_period_max_participating_epochs_ratio: float = 0.6,
+                                                          dominant_period_min_participating_epochs_ratio: float = 0.3,
+                                                          cell_LS_eXclusivity_threshold: Optional[float] = 0.75,
+                                                          debug_print: bool = False):
+        """ 
+        Sets columns: ['active_set_membership_from_participation']
+        
+        Usage:
+            contra_period_max_participating_epochs_ratio: float = 0.6 ## don't allow more than 0.2 stability for the opposite period
+            dominant_period_min_participating_epochs_ratio: float = 0.3 ## allow this to be low and we'll control for this by requiring stability. how much stability is required for the cell's dominant period - #TODO 2025-08-06 08:20: - [ ] Note this has to be less than 0.5 because of directionality
+            
+            _out_new_dfs = DebuggingHelpers._compute_participation_and_n_spike_fr_stats(across_session_inst_fr_computation_dict=across_session_inst_fr_computation_dict)
+            _out_new_dfs
+
+        """
+        ## Add XxC Constraints from `ratio_participating_epochs` columns
+        variable_name: str = 'ratio_participating_epochs'
+
+        # subplot_name: str = 'Laps'
+        # # x_var_name: str = f'ThetaDeltaMinus_n_participating_epochs'
+        # # y_var_name: str = f'ThetaDeltaPlus_n_participating_epochs'
+        x_var_name: str = f'ThetaDeltaMinus_{variable_name}'
+        y_var_name: str = f'ThetaDeltaPlus_{variable_name}'
+
+
+        ## NOTE: uses the values in `all_neuron_stats_table` but actually updates (adding columns ['active_set_membership_from_stability']) to both `all_neuron_stats_table` AND `across_session_inst_fr_computation_df`
+        ## INPUTS: all_neuron_stats_table, across_session_inst_fr_computation_df
+        ## UPDATES: all_neuron_stats_table, across_session_inst_fr_computation_df, 
+         ## don't allow more than 0.2 stability for the opposite period
+        # dominant_period_min_participating_epochs_ratio: float = 0.3 ## allow this to be low and we'll control for this by requiring stability. how much stability is required for the cell's dominant period - #TODO 2025-08-06 08:20: - [ ] Note this has to be less than 0.5 because of directionality
+
+        # participation_df = all_neuron_stats_table
+        ## find effectively zero (unstable/no-pf) cells:    
+        is_not_participating_long = (across_session_inst_fr_computation_df[x_var_name] <= contra_period_max_participating_epochs_ratio)
+        is_not_participating_short = (across_session_inst_fr_computation_df[y_var_name] <= contra_period_max_participating_epochs_ratio)
+
+        ## NOTE that `stable_*` is not the negation of `unstable_*` because they require a minimum `one_point_stability`
+        is_participating_long = (across_session_inst_fr_computation_df[x_var_name] >= dominant_period_min_participating_epochs_ratio)
+        is_participating_short = (across_session_inst_fr_computation_df[y_var_name] >= dominant_period_min_participating_epochs_ratio)
+
+        is_participation_LdC = np.logical_and(is_participating_long, is_not_participating_short)
+        is_participation_SdC = np.logical_and(is_participating_short, is_not_participating_long)
+
+        # all_neuron_stats_table.loc[is_participation_LdC, 'neuron_uid']
+
+        # stability_LdC_neuron_uids: List[str] = across_session_inst_fr_computation_df['neuron_uid'][is_participation_LdC].tolist()
+        # stability_SdC_neuron_uids: List[str] = across_session_inst_fr_computation_df['neuron_uid'][is_participation_SdC].tolist()
+
+        ## Adds the 'active_set_membership_from_stability' col directly to this df
+        across_session_inst_fr_computation_df['active_set_membership_from_participation'] = 'AnyC'
+        across_session_inst_fr_computation_df.loc[is_participation_LdC, 'active_set_membership_from_participation'] = 'LxC'
+        across_session_inst_fr_computation_df.loc[is_participation_SdC, 'active_set_membership_from_participation'] = 'SxC'
+
+        # participation_df
+
+        ## Map new column to other dataframes:
+        neuron_uid_to_active_set_membership_from_participation_dict = deepcopy(across_session_inst_fr_computation_df[['neuron_uid', 'active_set_membership_from_participation']]).set_index('neuron_uid', drop=True).to_dict()['active_set_membership_from_participation']
+
+        across_session_inst_fr_computation_df['active_set_membership_from_participation'] = across_session_inst_fr_computation_df['neuron_uid'].map(lambda x: neuron_uid_to_active_set_membership_from_participation_dict.get(x, 'none')) ## Actually apply changes to `across_session_inst_fr_computation_df`
+        if all_neuron_stats_table is not None:
+            all_neuron_stats_table['active_set_membership_from_participation'] = all_neuron_stats_table['neuron_uid'].map(lambda x: neuron_uid_to_active_set_membership_from_participation_dict.get(x, 'none')) ## Actually apply changes to `all_neuron_stats_table`
+
+
+        # Adds 'active_set_membership_from_n_spikes' _________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
+        if cell_LS_eXclusivity_threshold is not None:
+            # 'active_set_membership_from_n_spikes': New measure 2025-08-06 09:07 
+            all_neuron_stats_table['is_n_spikes_LxC'] = all_neuron_stats_table['pct_long_n_spikes'] >= cell_LS_eXclusivity_threshold
+            all_neuron_stats_table['is_n_spikes_SxC'] = all_neuron_stats_table['pct_short_n_spikes'] >= cell_LS_eXclusivity_threshold
+
+            ## Adds the 'active_set_membership_from_stability' col directly to this df
+            all_neuron_stats_table['active_set_membership_from_n_spikes'] = 'AnyC'
+            all_neuron_stats_table.loc[all_neuron_stats_table['is_n_spikes_LxC'], 'active_set_membership_from_n_spikes'] = 'LxC'
+            all_neuron_stats_table.loc[all_neuron_stats_table['is_n_spikes_SxC'], 'active_set_membership_from_n_spikes'] = 'SxC'
+
+            # participation_df
+
+            ## Map new column to other dataframes:
+            neuron_uid_to_active_set_membership_from_n_spikes_dict = deepcopy(all_neuron_stats_table[['neuron_uid', 'active_set_membership_from_n_spikes']]).set_index('neuron_uid', drop=True).to_dict()['active_set_membership_from_n_spikes']
+
+            across_session_inst_fr_computation_df['active_set_membership_from_n_spikes'] = across_session_inst_fr_computation_df['neuron_uid'].map(lambda x: neuron_uid_to_active_set_membership_from_n_spikes_dict.get(x, 'none')) ## Actually apply changes to `across_session_inst_fr_computation_df`
+            all_neuron_stats_table['active_set_membership_from_n_spikes'] = all_neuron_stats_table['neuron_uid'].map(lambda x: neuron_uid_to_active_set_membership_from_n_spikes_dict.get(x, 'none')) ## Actually apply changes to `all_neuron_stats_table`
+
+
+        ## OUTPUTS: across_session_inst_fr_computation_df
+        return across_session_inst_fr_computation_df, all_neuron_stats_table, (is_not_participating_long, is_not_participating_short, is_participating_long, is_participating_short, is_participation_LdC, is_participation_SdC)
+
+
+
+    @classmethod
+    def _plot_debug_scatter(cls, _out_temp_df: pd.DataFrame, variable_name: str = 'ratio_participating_epochs', subplot_name: str = 'Laps',
+                            x_var_name: str = f'ThetaDeltaMinus_', y_var_name: str = f'ThetaDeltaPlus_', active_set_membership_variable_col_name: Optional[str]=None):
+        """ Inputs:
+
+
+        Usage:        
+            from pyphoplacecellanalysis.SpecificResults.PhoDiba2023Paper import DebuggingHelpers
+
+            ## INPUTS: _out_temp_df
+            _out_temp_df: pd.DataFrame = deepcopy(across_session_inst_fr_computation_df)
+
+            shared_kwargs = dict(active_set_membership_variable_col_name='active_set_membership_from_stability')
+            # variable_name: str = 'n_participating_epochs'
+            variable_name: str = 'ratio_participating_epochs'
+
+            subplot_name: str = 'Laps'
+            x_var_name: str = f'ThetaDeltaMinus_{variable_name}'
+            y_var_name: str = f'ThetaDeltaPlus_{variable_name}'
+            _out_plot_ax_laps = DebuggingHelpers._plot_debug_scatter(_out_temp_df=_out_temp_df, variable_name=variable_name, subplot_name=subplot_name, x_var_name=x_var_name, y_var_name=y_var_name, **shared_kwargs)
+
+            subplot_name: str = 'PBEs'
+            x_var_name: str = f'ReplayDeltaMinus_{variable_name}'
+            y_var_name: str = f'ReplayDeltaPlus_{variable_name}'
+            _out_plot_ax_PBEs = DebuggingHelpers._plot_debug_scatter(_out_temp_df=_out_temp_df, variable_name=variable_name, subplot_name=subplot_name, x_var_name=x_var_name, y_var_name=y_var_name, **shared_kwargs)
+
+
+        """
+        
+
+        ## Plot the result
+        scatter_props_kwargs = dict(alpha=0.9)
+        if (active_set_membership_variable_col_name is None) or (active_set_membership_variable_col_name not in _out_temp_df.columns):
+            # _out_plot_ax = _out_temp_df.plot.scatter(x='ThetaDeltaMinus', y='ThetaDeltaPlus')
+            _out_plot_ax = _out_temp_df.plot.scatter(x=x_var_name, y=y_var_name, **scatter_props_kwargs)
+        else:
+            fig, _out_plot_ax = plt.subplots(num=f'XdC_diagnostics - {variable_name} - {subplot_name}', clear=True)
+            x_values = _out_temp_df[x_var_name].to_numpy()
+            y_values = _out_temp_df[y_var_name].to_numpy()
+
+            # Convert categorical values to integers or colors
+            categories = _out_temp_df[active_set_membership_variable_col_name].astype('category')
+            color_values = categories.cat.codes  # numeric mapping for color
+            XxC_cat_to_marker_size_dict = {0: 1.0, 1: 15.0, 2: 15.0, 3: 1.0}
+            scatter_props_kwargs['s'] = color_values.map(XxC_cat_to_marker_size_dict)
+
+            # _out_plot_ax = _out_temp_df.plot.scatter(x='ThetaDeltaMinus_n_participating_epochs', y='ThetaDeltaPlus_n_participating_epochs', c=color_values, **scatter_props_kwargs)
+            scatter_plot = _out_plot_ax.scatter(x_values, y_values, c=color_values, **scatter_props_kwargs)
+            ## Only need legend if we're coloring by active set indentity:
+            handles = [plt.Line2D([0], [0], marker='o', linestyle='', color=scatter_plot.cmap(scatter_plot.norm(code))) for code in range(len(categories.cat.categories))]
+            _out_plot_ax.legend(handles, categories.cat.categories, title='stability_class', bbox_to_anchor=(1.05, 1), loc='upper left', borderaxespad=0.,
+                    #    loc='upper center', ncol=len(categories.cat.categories),
+                        ) # , bbox_to_anchor=(0.5, -0.15)
+
+        plt.title(f'XdC_diagnostics - {variable_name} - {subplot_name}')
+        # plt.suptitle(f'Stability Group Diagnostics:\n(max_contra={contra_period_max_permitted_stability}, min_dom={dominant_period_min_stability})')
+        # plots_dict = {'scatter': scatter_plot}
+            
+        # Set the x and y axes to standard limits for easy visual comparison across sessions
+        # _out_plot_ax.set_xlim([-1.1, 1.1])
+        # _out_plot_ax.set_ylim([-1.1, 1.1])
+
+        # Add y=x diagonal line:
+        diagonal_y_equals_x_line_kwargs = dict(linestyle='--', color='gray', label='y=x')
+        _out_plot_ax.plot(_out_plot_ax.get_xlim(), _out_plot_ax.get_ylim(), **diagonal_y_equals_x_line_kwargs)
+        # Set the x and y axes to standard limits for easy visual comparison across sessions
+        # _out_plot_ax.set_xlim([-1.1, 1.1])
+        # _out_plot_ax.set_ylim([-1.1, 1.1])
+
+        _out_plot_ax.set_xlabel(x_var_name)
+        _out_plot_ax.set_ylabel(y_var_name)
+        plt.tight_layout()
+
+        return _out_plot_ax
+
 
 # @overwriting_display_context(
 @metadata_attributes(short_name=None, tags=['figure_2', 'paper', 'figure'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-06-26 21:36', related_items=[])
