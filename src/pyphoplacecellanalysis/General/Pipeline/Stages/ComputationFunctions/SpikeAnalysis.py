@@ -1,11 +1,11 @@
 from copy import deepcopy
-from attrs import define, field, asdict
+from attrs import define, field, asdict, Factory
 from neuropy.analyses.decoders import BinningInfo
 from nptyping import NDArray
 import numpy as np
 import pandas as pd
 from indexed import IndexedOrderedDict
-from typing import Any, Optional, Dict, List, Tuple
+from typing import Any, Optional, Dict, List, Tuple, Union
 import nptyping as ND
 from nptyping import NDArray
 import itertools
@@ -344,6 +344,55 @@ class SpikeRateTrends(HDFMixin, NeuronUnitSlicableObjectProtocol, AttrsBasedClas
 
         return epoch_inst_fr_df_list, epoch_inst_fr_signal_list, epoch_avg_firing_rates_list, epoch_results_list_dict
 
+    @function_attributes(short_name=None, tags=['private', 'participation', 'additional'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-08-06 05:33', related_items=[])
+    @classmethod
+    def _perform_compute_participation_stats(cls, a_pre_post_period_result: "SpikeRateTrends", a_session_ctxt: Optional[IdentifyingContext]=None):
+        """ Uses: `a_pre_post_period_result.spike_counts_df_list`
+        """
+        active_ACLUS = deepcopy(a_pre_post_period_result.included_neuron_ids)
+        if a_session_ctxt is not None:
+            session_uid: str = a_session_ctxt.get_description_as_session_global_uid()
+            active_neuron_UIDs: List[str] = [f"{session_uid}|{aclu}" for aclu in active_ACLUS]
+            active_ACLUS = deepcopy(active_neuron_UIDs) ## Use the neuron UIDs instead of the simple aclus if they're available
+
+        per_aclu_additional_properties_dict = {}
+        n_epochs: int = len(a_pre_post_period_result.filter_epochs_df) ## total number of possible epochs
+        
+        has_epoch_participation: NDArray = np.vstack([(v.T[0].to_numpy() > 0.0) for v in a_pre_post_period_result.spike_counts_df_list]) # has_epoch_participation # .shape # (39, 20) - (n_epochs, n_aclus)
+        n_participating_epochs: NDArray = has_epoch_participation.sum(axis=0) # .shape (N_ACLUS)
+        assert len(active_ACLUS) == len(n_participating_epochs), f"len(a_pre_post_period_result.included_neuron_ids): {len(active_ACLUS)} != len(n_participating_epochs): {len(n_participating_epochs)}"
+        n_participating_epochs_dict = dict(zip(active_ACLUS, n_participating_epochs))
+        
+        per_aclu_additional_properties_dict['n_epochs'] = n_epochs # .shape - (n_aclus,)
+
+        ## Compute ratio of participating epochs
+        ratio_participating_epochs = n_participating_epochs.astype(float) / float(n_epochs)
+        per_aclu_additional_properties_dict['ratio_participating_epochs'] = ratio_participating_epochs # .shape - (n_aclus,)
+        
+        return n_participating_epochs_dict, n_participating_epochs, has_epoch_participation, per_aclu_additional_properties_dict
+
+
+    @function_attributes(short_name=None, tags=['pure','participation', 'additional'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-08-06 05:33', related_items=[])
+    def compute_participation_stats(self, a_session_ctxt: Optional[IdentifyingContext]=None, should_update_self: bool=False, **kwargs):
+        """ Uses: `a_pre_post_period_result.spike_counts_df_list`
+        
+        self.per_aclu_additional_properties_dict['n_participating_epochs'] # .shape - (n_aclus,)
+        self.per_aclu_additional_properties_dict['n_participating_epochs_dict']
+        
+        """
+        n_participating_epochs_dict, n_participating_epochs, has_epoch_participation, per_aclu_additional_properties_dict =  self._perform_compute_participation_stats(a_pre_post_period_result=self, a_session_ctxt=a_session_ctxt, **kwargs)
+        if should_update_self:
+            if not hasattr(self, 'per_aclu_additional_properties_dict'):
+                self.per_aclu_additional_properties_dict = {} ## Initialize to a new dict
+            ## apply the update
+            self.per_aclu_additional_properties_dict['has_epoch_participation'] = deepcopy(has_epoch_participation) # .shape - (n_epochs, n_aclus)
+            self.per_aclu_additional_properties_dict['n_participating_epochs'] = deepcopy(n_participating_epochs) # .shape - (n_aclus,)
+            self.per_aclu_additional_properties_dict['n_participating_epochs_dict'] = deepcopy(n_participating_epochs_dict) # Dict len n_aclus,
+            self.per_aclu_additional_properties_dict['included_neuron_uids'] = np.array(deepcopy(list(n_participating_epochs_dict.keys()))) # .shape - (n_aclus,)
+            for k, v in per_aclu_additional_properties_dict.items():
+                self.per_aclu_additional_properties_dict[k] = deepcopy(v) 
+            
+        return n_participating_epochs_dict, n_participating_epochs, has_epoch_participation, per_aclu_additional_properties_dict
 
     # for NeuronUnitSlicableObjectProtocol:
     def get_by_id(self, ids: NDArray[ND.Shape["N_CELLS"], Any]) -> 'SpikeRateTrends':

@@ -3327,11 +3327,37 @@ class InstantaneousSpikeRateGroupsComputation(PickleSerializableMixin, HDF_Seria
         else:
             # Note that in general LxC and SxC might have differing numbers of cells.
             self.Fig2_Laps_FR: list[SingleBarResult] = [SingleBarResult(v.cell_agg_inst_fr_list.mean(), v.cell_agg_inst_fr_list.std(), v.cell_agg_inst_fr_list, self.LxC_aclus, self.SxC_aclus, None, None) for v in (self.LxC_ThetaDeltaMinus, self.LxC_ThetaDeltaPlus, self.SxC_ThetaDeltaMinus, self.SxC_ThetaDeltaPlus)]
+
+
+
+        # ==================================================================================================================================================================================================================================================================================== #
+        # Compute the participation stats but they are only needed for the `AnyC_*` result groups because that is sufficient to provide it for the dataframe                                                                                                                                   #
+        # ==================================================================================================================================================================================================================================================================================== #
+        ### Specifically updates these results by calling `a_pre_post_period_result.compute_participation_stats(..., should_update_self=True)` (which updates the `SpikeRateTrends` result in place)
+                
+        ## add session info
+        # if self.active_identifying_session_ctx is not None:
+            ## Add the extended neuron identifiers (like the global neuron_uid, session_uid) columns
+            # df_combined = df_combined.neuron_identity.make_neuron_indexed_df_global(self.active_identifying_session_ctx, add_expanded_session_context_keys=True, add_extended_aclu_identity_columns=True)
         
+        a_sess_pre_post_delta_result_list = (self.AnyC_ThetaDeltaMinus, self.AnyC_ThetaDeltaPlus, self.AnyC_ReplayDeltaMinus, self.AnyC_ReplayDeltaPlus)
+        a_sess_pre_post_delta_result_dict = dict(zip(['ThetaDeltaMinus', 'ThetaDeltaPlus', 'ReplayDeltaMinus', 'ReplayDeltaPlus'], a_sess_pre_post_delta_result_list))
+        # for a_pre_post_period_result in a_sess_pre_post_delta_result_list:
+        for a_period_name, a_pre_post_period_result in a_sess_pre_post_delta_result_dict.items():
+            a_result_col_name: str = 'n_participating_epochs'
+            n_participating_epochs_dict, n_participating_epochs, has_epoch_participation, per_aclu_additional_properties_dict = a_pre_post_period_result.compute_participation_stats(a_session_ctxt=self.active_identifying_session_ctx, should_update_self=True)
+            # df_combined['lap_delta_minus', 'lap_delta_plus', 'replay_delta_minus', 'replay_delta_plus'
+            assert len(a_pre_post_period_result.included_neuron_ids) == len(n_participating_epochs), f"len(a_pre_post_period_result.included_neuron_ids): {len(a_pre_post_period_result.included_neuron_ids)} != len(n_participating_epochs): {len(n_participating_epochs)}"
+            # assert len(df_combined) == len(n_participating_epochs), f"len(df_combined): {len(df_combined)} != len(n_participating_epochs): {len(n_participating_epochs)}"
+            # df_combined[f"{a_period_name}_{a_result_col_name}"] = deepcopy(n_participating_epochs) ## add this column to the dataframe
+
+
 
     def get_summary_dataframe(self) -> pd.DataFrame:
         """ Returns a summary datatable for each neuron with one entry for each cell in (self.LxC_aclus + self.SxC_aclus)
 
+        Additional Columns:
+            ['ThetaDeltaMinus_n_participating_epochs', 'ThetaDeltaPlus_n_participating_epochs', 'ReplayDeltaMinus_n_participating_epochs', 'ReplayDeltaPlus_n_participating_epochs']
         """
         table_columns = ['aclu', 'lap_delta_minus', 'lap_delta_plus', 'replay_delta_minus', 'replay_delta_plus', 'active_set_membership']
         
@@ -3351,6 +3377,8 @@ class InstantaneousSpikeRateGroupsComputation(PickleSerializableMixin, HDF_Seria
         df_combined = pd.concat([df_LxC_aclus, df_SxC_aclus, df_AnyC_aclus], ignore_index=True)
         ## Drop duplicates, keeping the first (corresponding to the SxC/LxC over the AnyC, although all the values are the same so only the 'active_set_membership' column would need to be changed): 
         df_combined = df_combined.drop_duplicates(subset=['aclu'], keep='first', inplace=False)
+        df_combined['aclu'] = df_combined['aclu'].astype(int)
+        
         ## Add extra columns:
         df_combined['inst_time_bin_seconds'] = float(self.instantaneous_time_bin_size_seconds)        
         ## add session info
@@ -3358,6 +3386,31 @@ class InstantaneousSpikeRateGroupsComputation(PickleSerializableMixin, HDF_Seria
             ## Add the extended neuron identifiers (like the global neuron_uid, session_uid) columns
             df_combined = df_combined.neuron_identity.make_neuron_indexed_df_global(self.active_identifying_session_ctx, add_expanded_session_context_keys=True, add_extended_aclu_identity_columns=True)
         
+
+        # ==================================================================================================================================================================================================================================================================================== #
+        # Compute `n_participating_epochs` and add to the returned dataframe as needed.                                                                                                                                                                                                        #
+        # ==================================================================================================================================================================================================================================================================================== #
+        # Adds columns ['ThetaDeltaMinus_n_participating_epochs', 'ThetaDeltaPlus_n_participating_epochs', 'ReplayDeltaMinus_n_participating_epochs', 'ReplayDeltaPlus_n_participating_epochs']
+
+        # a_sess_pre_post_delta_result_list = (self.AnyC_ThetaDeltaMinus, self.AnyC_ThetaDeltaPlus, self.AnyC_ReplayDeltaMinus, self.AnyC_ReplayDeltaPlus,
+        #                                      self.LxC_ThetaDeltaMinus, self.LxC_ThetaDeltaPlus, self.LxC_ReplayDeltaMinus, self.LxC_ReplayDeltaPlus,
+        #                                      self.SxC_ThetaDeltaMinus, self.SxC_ThetaDeltaPlus, self.SxC_ReplayDeltaMinus, self.SxC_ReplayDeltaPlus)
+        
+        a_sess_pre_post_delta_result_list = (self.AnyC_ThetaDeltaMinus, self.AnyC_ThetaDeltaPlus, self.AnyC_ReplayDeltaMinus, self.AnyC_ReplayDeltaPlus)
+        a_sess_pre_post_delta_result_dict = dict(zip(['ThetaDeltaMinus', 'ThetaDeltaPlus', 'ReplayDeltaMinus', 'ReplayDeltaPlus'], a_sess_pre_post_delta_result_list))
+        # for a_pre_post_period_result in a_sess_pre_post_delta_result_list:
+        for a_period_name, a_pre_post_period_result in a_sess_pre_post_delta_result_dict.items():
+            a_result_col_name: str = 'n_participating_epochs'
+            n_participating_epochs_dict, n_participating_epochs, has_epoch_participation, per_aclu_additional_properties_dict = a_pre_post_period_result.compute_participation_stats(a_session_ctxt=self.active_identifying_session_ctx, should_update_self=True)
+            # df_combined['lap_delta_minus', 'lap_delta_plus', 'replay_delta_minus', 'replay_delta_plus'
+            assert len(a_pre_post_period_result.included_neuron_ids) == len(n_participating_epochs), f"len(a_pre_post_period_result.included_neuron_ids): {len(a_pre_post_period_result.included_neuron_ids)} != len(n_participating_epochs): {len(n_participating_epochs)}"
+            assert len(df_combined) == len(n_participating_epochs), f"len(df_combined): {len(df_combined)} != len(n_participating_epochs): {len(n_participating_epochs)}"
+            df_combined[f"{a_period_name}_{a_result_col_name}"] = deepcopy(n_participating_epochs) ## add this column to the dataframe
+
+            for k, v in per_aclu_additional_properties_dict.items():
+                df_combined[f"{a_period_name}_{k}"] = deepcopy(v) 
+                
+
         return df_combined
 
 
