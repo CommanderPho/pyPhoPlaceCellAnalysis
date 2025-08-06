@@ -5345,7 +5345,9 @@ class TrialByTrialActivityResult(ComputedResult):
         """
         import matplotlib.pyplot as plt
         stability_column_names = ['stability_long_best', 'stability_short_best']
-        
+        x_var_name: str = 'stability_long_best'
+        y_var_name: str = 'stability_short_best'
+
         stability_df = deepcopy(stability_df).rename(columns={x:x.removeprefix('stability_') for x in stability_column_names})
         stability_df, (appearing_stability_df, disappearing_stability_df, appearing_or_disappearing_stability_df, stable_both_stability_df, stable_neither_stability_df, stable_long_stability_df, stable_short_stability_df) = cls.determine_neuron_group_from_stability(stability_df=stability_df, contra_period_max_permitted_stability=contra_period_max_permitted_stability, dominant_period_min_stability=dominant_period_min_stability)
         # fig = plt.figure(num='stability_group_diagnostics')
@@ -5412,6 +5414,9 @@ class TrialByTrialActivityResult(ComputedResult):
                 hover_label_obj = mplcursors.cursor(scatter_plot, hover=True).connect("add", lambda sel: sel.annotation.set_text(point_hover_labels[sel.index]))
                 plots_dict['hover_label_objects'] = hover_label_obj
 
+
+        ax.set_xlabel(x_var_name)
+        ax.set_ylabel(y_var_name)
 
         plt.tight_layout()
 
