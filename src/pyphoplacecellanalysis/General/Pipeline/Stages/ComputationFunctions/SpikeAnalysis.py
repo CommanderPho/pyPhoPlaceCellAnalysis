@@ -244,7 +244,7 @@ class SpikeRateTrends(HDFMixin, NeuronUnitSlicableObjectProtocol, AttrsBasedClas
         epoch_inst_fr_df_list = []
         epoch_inst_fr_signal_list = []
         epoch_avg_firing_rates_list = []
-        epoch_results_list_dict = {'spike_counts': [], 'epoch_avg_spike_counts': [], 'epoch_unit_fr': []}
+        epoch_results_list_dict = {'spike_counts': [], 'epoch_avg_spike_counts': [], 'epoch_unit_fr': [], 'epoch_is_participating_dict': []}
         
         if included_neuron_ids is None:
             included_neuron_ids = spikes_df.spikes.neuron_ids
@@ -319,7 +319,8 @@ class SpikeRateTrends(HDFMixin, NeuronUnitSlicableObjectProtocol, AttrsBasedClas
                 epoch_results_list_dict['spike_counts'].append(unit_specific_binned_spike_counts_df) # one column for every aclu, and one row for every time bin in the epoch
                 # unit_avg_spike_counts = np.nanmean(unit_specific_binned_spike_counts_df.to_numpy(), axis=0) # (n_neurons, )
                 # epoch_results_list_dict['epoch_avg_spike_counts'].append(unit_avg_spike_counts)
-                
+                unit_specific_has_epoch_participation_dict = {aclu:(unit_specific_binned_spike_counts_dict.get(aclu, np.zeros((n_epoch_time_bins, ))) > 0) for aclu in included_neuron_ids}
+                epoch_results_list_dict['epoch_is_participating_dict'].append(unit_specific_has_epoch_participation_dict)
 
             ## Sum up the spikes per epoch for each cell, and then divide each by the epoch duration to get the epoch firing rate
             unit_approximate_entire_epoch_fr_df: pd.DataFrame = deepcopy(unit_specific_binned_spike_counts_df.sum(axis='index', skipna=True, numeric_only=True)).astype(float) / epoch_duration # np.nanmean(unit_specific_binned_spike_counts_df.to_numpy(), axis=0) # (n_neurons, )

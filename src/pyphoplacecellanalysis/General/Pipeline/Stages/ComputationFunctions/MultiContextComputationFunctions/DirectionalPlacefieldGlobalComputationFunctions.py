@@ -5330,24 +5330,24 @@ class TrialByTrialActivityResult(ComputedResult):
         return modified_directional_active_lap_pf_results_dicts
     
     @classmethod
-    def plot_stability_group_diagnostics(cls, stability_df: pd.DataFrame, zero_point_stability: float = 0.1, minimum_one_point_stability: float = 0.6, enable_tiny_point_labels=False, enable_hover_labels=False):
+    def plot_stability_group_diagnostics(cls, stability_df: pd.DataFrame, contra_period_max_permitted_stability: float = 0.1, dominant_period_min_stability: float = 0.6, enable_tiny_point_labels=False, enable_hover_labels=False):
         """ plots stability 
 
         Usage:
             from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import TrialByTrialActivityResult
 
-            zero_point_stability = 0.1
-            minimum_one_point_stability = 0.7
-            all_neuron_stats_table, (appearing_stability_df, disappearing_stability_df, appearing_or_disappearing_stability_df, stable_both_stability_df, stable_neither_stability_df, stable_long_stability_df, stable_short_stability_df) = TrialByTrialActivityResult.determine_neuron_group_from_stability(stability_df=all_neuron_stats_table, zero_point_stability=zero_point_stability, minimum_one_point_stability=minimum_one_point_stability)
+            contra_period_max_permitted_stability = 0.1
+            dominant_period_min_stability = 0.7
+            all_neuron_stats_table, (appearing_stability_df, disappearing_stability_df, appearing_or_disappearing_stability_df, stable_both_stability_df, stable_neither_stability_df, stable_long_stability_df, stable_short_stability_df) = TrialByTrialActivityResult.determine_neuron_group_from_stability(stability_df=all_neuron_stats_table, contra_period_max_permitted_stability=contra_period_max_permitted_stability, dominant_period_min_stability=dominant_period_min_stability)
 
-            ax, plots_dict = TrialByTrialActivityResult.plot_stability_group_diagnostics(stability_df=all_neuron_stats_table, zero_point_stability=zero_point_stability, minimum_one_point_stability=minimum_one_point_stability)
+            ax, plots_dict = TrialByTrialActivityResult.plot_stability_group_diagnostics(stability_df=all_neuron_stats_table, contra_period_max_permitted_stability=contra_period_max_permitted_stability, dominant_period_min_stability=dominant_period_min_stability)
 
         """
         import matplotlib.pyplot as plt
         stability_column_names = ['stability_long_best', 'stability_short_best']
         
         stability_df = deepcopy(stability_df).rename(columns={x:x.removeprefix('stability_') for x in stability_column_names})
-        stability_df, (appearing_stability_df, disappearing_stability_df, appearing_or_disappearing_stability_df, stable_both_stability_df, stable_neither_stability_df, stable_long_stability_df, stable_short_stability_df) = cls.determine_neuron_group_from_stability(stability_df=stability_df, zero_point_stability=zero_point_stability, minimum_one_point_stability=minimum_one_point_stability)
+        stability_df, (appearing_stability_df, disappearing_stability_df, appearing_or_disappearing_stability_df, stable_both_stability_df, stable_neither_stability_df, stable_long_stability_df, stable_short_stability_df) = cls.determine_neuron_group_from_stability(stability_df=stability_df, contra_period_max_permitted_stability=contra_period_max_permitted_stability, dominant_period_min_stability=dominant_period_min_stability)
         # fig = plt.figure(num='stability_group_diagnostics')
         
         scatter_props_kwargs = dict()
@@ -5368,10 +5368,12 @@ class TrialByTrialActivityResult(ComputedResult):
                 #    loc='upper center', ncol=len(categories.cat.categories),
                    ) # , bbox_to_anchor=(0.5, -0.15)
         plt.title('stability_group_diagnostics')
+        plt.suptitle(f'Stability Group Diagnostics:\n(max_contra={contra_period_max_permitted_stability}, min_dom={dominant_period_min_stability})')
 
         plots_dict = {'scatter': scatter_plot}
-        plots_dict['vlines'] = ax.vlines(x=[zero_point_stability, minimum_one_point_stability], ymin=0, ymax=1, color=['r', 'g'], linestyle='--', linewidth=1)
-        plots_dict['hlines'] = ax.hlines(y=[zero_point_stability, minimum_one_point_stability], xmin=0, xmax=1, color=['r', 'g'], linestyle='--', linewidth=1)
+        plots_dict['vlines'] = ax.vlines(x=[contra_period_max_permitted_stability, dominant_period_min_stability], ymin=0, ymax=1, color=['r', 'g'], linestyle='--', linewidth=1, label=f'max_contra={contra_period_max_permitted_stability}')
+        # plots_dict['vlines_labels'] = ax.text(contra_period_max_permitted_stability, 0.1, f'max_contra={contra_period_max_permitted_stability}', rotation=90, verticalalignment='bottom', horizontalalignment='center')
+        plots_dict['hlines'] = ax.hlines(y=[contra_period_max_permitted_stability, dominant_period_min_stability], xmin=0, xmax=1, color=['r', 'g'], linestyle='--', linewidth=1, label=f'min_dom={dominant_period_min_stability}')
         
         plots_dict['hover_label_objects'] = []
         if (enable_hover_labels or enable_tiny_point_labels):
@@ -5416,7 +5418,7 @@ class TrialByTrialActivityResult(ComputedResult):
         return ax, plots_dict
 
     @classmethod    
-    def determine_neuron_group_from_stability(cls, stability_df: pd.DataFrame, zero_point_stability: float = 0.1, minimum_one_point_stability: float = 0.6, add_all_intermedia_stability_columns: bool=True):
+    def determine_neuron_group_from_stability(cls, stability_df: pd.DataFrame, contra_period_max_permitted_stability: float = 0.1, dominant_period_min_stability: float = 0.6, add_all_intermedia_stability_columns: bool=True):
         """ try to determine the LxC/SxC remapping cells from their stability 
         
         zero_point_stability: cells with values below this threshold are considered "unstable", default 0.1
@@ -5426,6 +5428,8 @@ class TrialByTrialActivityResult(ComputedResult):
 
         #TODO 2025-07-31 12:52: - [ ] QUESTION: What if cell isn't firing AT ALL on the long track for example, does it appear "stable" for that track as a result, and what is its score?
 
+        HISTORY 2025-08-05 - Renamed {'zero_point_stability': 'contra_period_max_permitted_stability',
+                                    'minimum_one_point_stability': 'dominant_period_min_stability'}
         
         Usage:
             stability_df, neuron_group_split_stability_dfs_tuple = self.determine_neuron_stability(stability_df=stability_df)
@@ -5451,12 +5455,12 @@ class TrialByTrialActivityResult(ComputedResult):
         stability_df = stability_df.sort_values(['aclu'], ascending=True, ignore_index=True)
 
         ## find effectively zero (unstable/no-pf) cells:    
-        is_unstable_long = (stability_df['long_best'] <= zero_point_stability)
-        is_unstable_short = (stability_df['short_best'] <= zero_point_stability)
+        is_unstable_long = (stability_df['long_best'] <= contra_period_max_permitted_stability)
+        is_unstable_short = (stability_df['short_best'] <= contra_period_max_permitted_stability)
 
         ## NOTE that `stable_*` is not the negation of `unstable_*` because they require a minimum `one_point_stability`
-        is_stable_long = (stability_df['long_best'] >= minimum_one_point_stability)
-        is_stable_short = (stability_df['short_best'] >= minimum_one_point_stability)
+        is_stable_long = (stability_df['long_best'] >= dominant_period_min_stability)
+        is_stable_short = (stability_df['short_best'] >= dominant_period_min_stability)
 
         # is_appearing = np.logical_and(unstable_long, np.logical_not(unstable_short))
         is_appearing = np.logical_and(is_unstable_long, is_stable_short)
@@ -5572,7 +5576,7 @@ class TrialByTrialActivityResult(ComputedResult):
             zero_point_stability = self.zero_point_stability
 
         stability_df = self.get_basic_stability_df()
-        stability_df, neuron_group_split_stability_dfs_tuple = self.determine_neuron_group_from_stability(stability_df=stability_df, minimum_one_point_stability=minimum_one_point_stability, zero_point_stability=zero_point_stability)
+        stability_df, neuron_group_split_stability_dfs_tuple = self.determine_neuron_group_from_stability(stability_df=stability_df, dominant_period_min_stability=minimum_one_point_stability, contra_period_max_permitted_stability=zero_point_stability)
         appearing_stability_df, disappearing_stability_df, appearing_or_disappearing_stability_df, stable_both_stability_df, stable_neither_stability_df, stable_long_stability_df, stable_short_stability_df = neuron_group_split_stability_dfs_tuple
         neuron_group_split_stability_aclus_tuple = [np.sort(a_df.aclu.values) for a_df in neuron_group_split_stability_dfs_tuple]
         appearing_aclus, disappearing_aclus, appearing_or_disappearing_aclus, stable_both_aclus, stable_neither_aclus, stable_long_aclus, stable_short_aclus = neuron_group_split_stability_aclus_tuple

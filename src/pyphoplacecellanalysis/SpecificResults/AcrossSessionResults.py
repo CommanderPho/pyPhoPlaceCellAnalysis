@@ -277,7 +277,7 @@ class InstantaneousFiringRatesDataframeAccessor():
 
 
     @classmethod
-    def build_shell_object_for_plot(cls, loaded_result_df: pd.DataFrame, column_name_to_colorize:str = 'session_name') -> Tuple[InstantaneousSpikeRateGroupsComputation, pd.DataFrame]:
+    def build_shell_object_for_plot(cls, loaded_result_df: pd.DataFrame, column_name_to_colorize:str = 'session_name', active_set_cell_groups_column_name: str = 'active_set_membership') -> Tuple[InstantaneousSpikeRateGroupsComputation, pd.DataFrame]:
         """ loads the previously saved out inst_fr_scatter_plot_results_table and prepares it for plotting.
 
         returns a `InstantaneousSpikeRateGroupsComputation` _shell_obj which can be plotted
@@ -333,7 +333,7 @@ class InstantaneousFiringRatesDataframeAccessor():
         visualization_df['scatter_props'] = [{'marker': a_marker} for a_color, a_marker in zip(visualization_df['color'], visualization_df['marker'])]
 
         # For `loaded_result_df`, to recover the plottable FigureTwo points:
-        table_columns = ['neuron_uid', 'aclu', 'lap_delta_minus', 'lap_delta_plus', 'replay_delta_minus', 'replay_delta_plus', 'active_set_membership']
+        table_columns = ['neuron_uid', 'aclu', 'lap_delta_minus', 'lap_delta_plus', 'replay_delta_minus', 'replay_delta_plus', active_set_cell_groups_column_name]
         # 1. Group by 'active_set_membership' (to get LxC and SxC groups which are processed separately)
 
         # loaded_result_df.groupby('active_set_membership')
@@ -342,7 +342,7 @@ class InstantaneousFiringRatesDataframeAccessor():
         # 3. Compute the mean and error bars for each of the four columns
         data_columns = ['lap_delta_minus', 'lap_delta_plus', 'replay_delta_minus', 'replay_delta_plus']
 
-        grouped_df = visualization_df.groupby(['active_set_membership'])
+        grouped_df = visualization_df.groupby([active_set_cell_groups_column_name])
         LxC_df, SxC_df = [grouped_df.get_group(aValue) for aValue in ['LxC','SxC']] # Note that in general LxC and SxC might have differing numbers of cells.
 
         #TODO 2023-08-11 02:09: - [ ] These LxC/SxC_aclus need to be globally unique probably.
