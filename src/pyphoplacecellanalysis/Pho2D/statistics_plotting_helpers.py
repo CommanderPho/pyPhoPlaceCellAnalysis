@@ -580,7 +580,8 @@ def plot_pre_scatter_post_matplotlib(data_results_df: pd.DataFrame, data_type: s
     from pyphocorehelpers.DataStructure.RenderPlots.MatplotLibRenderPlots import MatplotlibRenderPlots # plot_histogram #TODO 2024-01-02 12:41: - [ ] Is this where the Qt5 Import dependency Pickle complains about is coming from?
     from pyphoplacecellanalysis.SpecificResults.AcrossSessionResults import AcrossSessionsVisualizations
     from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.ContainerBased.PhoContainerTool import GenericMatplotlibContainer
-
+    import seaborn as sns
+    
     layout = kwargs.pop('layout', 'none')
     defer_show = kwargs.pop('defer_show', False)
     figsize = kwargs.pop('figsize', (6.5, 2))
@@ -649,9 +650,10 @@ def plot_pre_scatter_post_matplotlib(data_results_df: pd.DataFrame, data_type: s
             _fig_container.ax_dict = ax_dict
             fig.suptitle(f'{descriptor_str}')
 
-            scatter_kwargs = dict(c='black', s=8) # , alpha=0.5
+            # scatter_kwargs = dict(c='black', s=8) # , alpha=0.5
+            scatter_kwargs = dict(c='black', s=8)
 
-            histogram_kwargs = dict(orientation="horizontal", bins=25)
+            histogram_kwargs = dict(orientation="horizontal", bins=11)
             
             assert column_name in data_results_df, f"column_name: {column_name} missing from df. {list(data_results_df.columns)}"
             time_bin_sizes: int = data_results_df['time_bin_size'].unique()
@@ -679,11 +681,20 @@ def plot_pre_scatter_post_matplotlib(data_results_df: pd.DataFrame, data_type: s
             ## Plot Scatter Points
             # "scatter"
             
+            # Get unique categories
+            # categories = df_tbs['session_uid'].unique()
+            categories = df_tbs['animal'].unique()
+            
+            # Create a color palette with one color per category
+            palette = sns.color_palette('tab10', n_colors=len(categories))  # You can use any palette
+            # Map categories to colors
+            color_mapping = dict(zip(categories, palette))
+            # scatter_kwargs['c'] = df_tbs['animal'].map(color_mapping)
             time_bin_sizes: int = data_results_df['time_bin_size'].unique()
             for time_bin_size in time_bin_sizes:
                 df_tbs = data_results_df[data_results_df['time_bin_size']==time_bin_size]
                 df_tbs.plot.scatter(x=time_bin_column_name, y=column_name, ax=ax_dict['scatter'], alpha=0.5, label=str(time_bin_size), **scatter_kwargs) 
-            
+                # sns.scatterplot(data=df_tbs, x='t', y='P_Short', hue=color_mapping, size=8, ax=ax_dict['scatter'])
             ax_dict['scatter'].set_title(f'Scatter over Time {title_indicator}')
 
             # plot post-delta histogram:

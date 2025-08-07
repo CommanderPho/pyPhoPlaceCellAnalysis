@@ -125,10 +125,31 @@ class SpareRunningSequenceScore:
     
     Usage:
         from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import SpareRunningSequenceScore
+        from pyphoplacecellanalysis.Analysis.Decoder.context_dependent import GenericDecoderDictDecodedEpochsDictResult
+        from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import _helper_add_interpolated_position_columns_to_decoded_result_df
 
+        ## Run heuristic continuously to determine when to split sequences and thus where replays are
+
+        valid_EpochComputations_result: EpochComputationsComputationsContainer = curr_active_pipeline.global_computation_results.computed_data['EpochComputations']
+        a_new_fully_generic_result: GenericDecoderDictDecodedEpochsDictResult = valid_EpochComputations_result.a_generic_decoder_dict_decoded_epochs_dict_result
+
+        ## INPUTS: a_new_fully_generic_result
+        # a_target_context: IdentifyingContext = IdentifyingContext(trained_compute_epochs='laps', pfND_ndim=1, decoder_identifier='pseudo2D', known_named_decoding_epochs_type='global', masked_time_bin_fill_type='nan_filled', data_grain='per_time_bin')
+        a_target_context: IdentifyingContext = IdentifyingContext(trained_compute_epochs='laps', pfND_ndim=1, decoder_identifier='pseudo2D', known_named_decoding_epochs_type='global', masked_time_bin_fill_type='ignore', data_grain='per_time_bin')
+        best_matching_context, a_result, a_decoder, a_decoded_marginal_posterior_df = a_new_fully_generic_result.get_results_best_matching_context(context_query=a_target_context, debug_print=False)
+        ## OUTPUTS: a_result, a_decoder, a_decoded_marginal_posterior_df
+        ## INPUTS: curr_active_pipeline, a_result, a_decoder, a_decoded_marginal_posterior_df
+        global_measured_position_df: pd.DataFrame = deepcopy(curr_active_pipeline.sess.position.to_dataframe())
+        a_decoded_marginal_posterior_df: pd.DataFrame = _helper_add_interpolated_position_columns_to_decoded_result_df(a_result=a_result, a_decoder=a_decoder, a_decoded_marginal_posterior_df=a_decoded_marginal_posterior_df, global_measured_position_df=global_measured_position_df)
+
+        global_decoded_result: SingleEpochDecodedResult = a_result.get_result_for_epoch(0)
+        p_x_given_n: NDArray[ND.Shape["N_POS_BINS, 4, N_TIME_BINS"], np.floating] = deepcopy(global_decoded_result.p_x_given_n) # .shape # (59, 4, 69488)
+        time_bin_centers: NDArray[ND.Shape["N_TIME_BINS"], np.floating] = deepcopy(global_decoded_result.time_bin_container.centers)
+        xbin: NDArray[ND.Shape["N_POS_BINS"], np.floating] = deepcopy(a_decoder.xbin)
+
+        ## INPUTS: p_x_given_n
         out_decoder_spare_scores, out_decoder_spare_scores_extras = SpareRunningSequenceScore.bowling_spare_integration(p_x_given_n=p_x_given_n)
         out_decoder_spare_scores
-    
     """
     @function_attributes(short_name=None, tags=['score', 'bowling', 'spare', 'compute'], input_requires=[], output_provides=[], uses=[], used_by=['bowling_spare_integration'], creation_date='2025-08-04 10:11', related_items=[])
     @classmethod
