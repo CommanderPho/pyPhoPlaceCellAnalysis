@@ -3364,21 +3364,34 @@ class InstantaneousSpikeRateGroupsComputation(PickleSerializableMixin, HDF_Seria
         n_LxC_aclus: int = len(self.LxC_aclus)        
         v_LxC_aclus = [list(self.LxC_aclus)] + [v.cell_agg_inst_fr_list for v in (self.LxC_ThetaDeltaMinus, self.LxC_ThetaDeltaPlus, self.LxC_ReplayDeltaMinus, self.LxC_ReplayDeltaPlus) if v is not None] + [(['LxC'] * n_LxC_aclus)]
         df_LxC_aclus = pd.DataFrame(dict(zip(table_columns, v_LxC_aclus)))
-
+        df_LxC_aclus['aclu'] = df_LxC_aclus['aclu'].astype(int)
+        
         n_SxC_aclus: int = len(self.SxC_aclus)
         v_SxC_aclus = [list(self.SxC_aclus)] + [v.cell_agg_inst_fr_list for v in (self.SxC_ThetaDeltaMinus, self.SxC_ThetaDeltaPlus, self.SxC_ReplayDeltaMinus, self.SxC_ReplayDeltaPlus) if v is not None] + [(['SxC'] * n_SxC_aclus)]
         df_SxC_aclus = pd.DataFrame(dict(zip(table_columns, v_SxC_aclus)))
+        df_SxC_aclus['aclu'] = df_SxC_aclus['aclu'].astype(int)
         
         n_AnyC_aclus: int = len(self.AnyC_aclus)
         v_AnyC_aclus = [list(self.AnyC_aclus)] + [v.cell_agg_inst_fr_list for v in (self.AnyC_ThetaDeltaMinus, self.AnyC_ThetaDeltaPlus, self.AnyC_ReplayDeltaMinus, self.AnyC_ReplayDeltaPlus) if v is not None] + [(['AnyC'] * n_AnyC_aclus)]
         df_AnyC_aclus = pd.DataFrame(dict(zip(table_columns, v_AnyC_aclus)))
+        df_AnyC_aclus['aclu'] = df_AnyC_aclus['aclu'].astype(int)        
+        ## Drop any that are present in the LxC/SxC df:
+        df_AnyC_aclus = df_AnyC_aclus.loc[~df_AnyC_aclus['aclu'].isin(self.SxC_aclus)]
+        df_AnyC_aclus = df_AnyC_aclus.loc[~df_AnyC_aclus['aclu'].isin(self.LxC_aclus)]
 
+        #TODO 2025-08-07 13:58: - [ ] Surprisingly these sets ARE already disjoint (mostly?!?), meaning AnyC_aclus doesn't include LxC_aclus or SxC_aclus
+        ## aclu=58 is present in both AnyC_aclus and SxC_aclus, while [4, 13, 23] are exclusive to SxC_aclus
+        
         # Concatenate the two dataframes
         df_combined = pd.concat([df_LxC_aclus, df_SxC_aclus, df_AnyC_aclus], ignore_index=True)
+        df_combined['aclu'] = df_combined['aclu'].astype(int)
+        n_final_aclus: int = len(df_combined)
         ## Drop duplicates, keeping the first (corresponding to the SxC/LxC over the AnyC, although all the values are the same so only the 'active_set_membership' column would need to be changed): 
         df_combined = df_combined.drop_duplicates(subset=['aclu'], keep='first', inplace=False)
-        df_combined['aclu'] = df_combined['aclu'].astype(int)
-        
+        assert n_final_aclus == len(df_combined), f"drop should do nothing after removing common aclus before: len(df_combined): {len(df_combined)}, n_final_aclus: {n_final_aclus}"
+        ## Sort ascending by aclu
+        df_combined = df_combined.sort_values(by='aclu', ascending=True).reset_index(drop=True)
+
         ## Add extra columns:
         df_combined['inst_time_bin_seconds'] = float(self.instantaneous_time_bin_size_seconds)        
         ## add session info
@@ -3387,6 +3400,12 @@ class InstantaneousSpikeRateGroupsComputation(PickleSerializableMixin, HDF_Seria
             df_combined = df_combined.neuron_identity.make_neuron_indexed_df_global(self.active_identifying_session_ctx, add_expanded_session_context_keys=True, add_extended_aclu_identity_columns=True)
         
 
+        # assert len(df_combined) == n_AnyC_aclus, f"len(df_combined): {len(df_combined)} != n_AnyC_aclus: {n_AnyC_aclus}"
+        if len(df_combined) != n_AnyC_aclus:
+            print(f'WARN: len(df_combined): {len(df_combined)} != n_AnyC_aclus: {n_AnyC_aclus}')
+            
+        included_neuron_ids = np.unique(df_combined['aclu'].to_numpy())
+        
         # ==================================================================================================================================================================================================================================================================================== #
         # Compute `n_participating_epochs` and add to the returned dataframe as needed.                                                                                                                                                                                                        #
         # ==================================================================================================================================================================================================================================================================================== #
@@ -3401,14 +3420,23 @@ class InstantaneousSpikeRateGroupsComputation(PickleSerializableMixin, HDF_Seria
         # for a_pre_post_period_result in a_sess_pre_post_delta_result_list:
         for a_period_name, a_pre_post_period_result in a_sess_pre_post_delta_result_dict.items():
             a_result_col_name: str = 'n_participating_epochs'
-            n_participating_epochs_dict, n_participating_epochs, has_epoch_participation, per_aclu_additional_properties_dict = a_pre_post_period_result.compute_participation_stats(a_session_ctxt=self.active_identifying_session_ctx, should_update_self=True)
+            n_participating_epochs_dict, n_participating_epochs, has_epoch_participation, per_aclu_additional_properties_dict = a_pre_post_period_result.compute_participation_stats(a_session_ctxt=self.active_identifying_session_ctx, should_update_self=True,
+                                                                                                                                                                                      included_neuron_ids=included_neuron_ids,
+                                                                                                                                                                                      )
             # df_combined['lap_delta_minus', 'lap_delta_plus', 'replay_delta_minus', 'replay_delta_plus'
-            assert len(a_pre_post_period_result.included_neuron_ids) == len(n_participating_epochs), f"len(a_pre_post_period_result.included_neuron_ids): {len(a_pre_post_period_result.included_neuron_ids)} != len(n_participating_epochs): {len(n_participating_epochs)}"
-            assert len(df_combined) == len(n_participating_epochs), f"len(df_combined): {len(df_combined)} != len(n_participating_epochs): {len(n_participating_epochs)}"
+            # assert len(a_pre_post_period_result.included_neuron_ids) == len(n_participating_epochs), f"len(a_pre_post_period_result.included_neuron_ids): {len(a_pre_post_period_result.included_neuron_ids)} != len(n_participating_epochs): {len(n_participating_epochs)}"
+            assert len(df_combined) == len(n_participating_epochs), f"len(df_combined): {len(df_combined)} != len(n_participating_epochs): {len(n_participating_epochs)}" ## Why would this ever be true? df_combined is about cells
             df_combined[f"{a_period_name}_{a_result_col_name}"] = deepcopy(n_participating_epochs) ## add this column to the dataframe
 
             for k, v in per_aclu_additional_properties_dict.items():
-                df_combined[f"{a_period_name}_{k}"] = deepcopy(v) 
+                try:
+                    if len(v) == len(included_neuron_ids):
+                        df_combined[f"{a_period_name}_{k}"] = deepcopy(v)
+                except (TypeError, ValueError) as e:
+                    print(f'failed to add optional member per_aclu_additional_properties_dict[{k}] to df. Skipping.')
+                    pass 
+                except Exception as e:
+                    raise e
                 
 
         return df_combined

@@ -350,19 +350,35 @@ class SpikeRateTrends(HDFMixin, NeuronUnitSlicableObjectProtocol, AttrsBasedClas
         """ Uses: `a_pre_post_period_result.spike_counts_df_list`
         """
         active_ACLUS = deepcopy(a_pre_post_period_result.included_neuron_ids)
+            
         if a_session_ctxt is not None:
             session_uid: str = a_session_ctxt.get_description_as_session_global_uid()
-            active_neuron_UIDs: List[str] = [f"{session_uid}|{aclu}" for aclu in active_ACLUS]
-            active_ACLUS = deepcopy(active_neuron_UIDs) ## Use the neuron UIDs instead of the simple aclus if they're available
-
+            if not isinstance(active_ACLUS[0], str):
+                active_neuron_UIDs: List[str] = [f"{session_uid}|{aclu}" for aclu in active_ACLUS]
+            else:
+                raise NotImplementedError(f'already have neuron_UIDs or nah? {active_ACLUS}')
+                active_neuron_UIDs = deepcopy(active_ACLUS)
+            # active_ACLUS = deepcopy(active_neuron_UIDs) ## Use the neuron UIDs instead of the simple aclus if they're available
+            active_neuron_identifiers = deepcopy(active_neuron_UIDs)
+        else:
+            active_neuron_identifiers = deepcopy(active_ACLUS)
+            active_neuron_UIDs = None
+            
         per_aclu_additional_properties_dict = {}
+        per_aclu_additional_properties_dict['active_ACLUS'] = active_ACLUS
+        if active_neuron_UIDs is not None:
+            per_aclu_additional_properties_dict['active_neuron_UIDs'] = active_neuron_UIDs
         n_epochs: int = len(a_pre_post_period_result.filter_epochs_df) ## total number of possible epochs
         
         has_epoch_participation: NDArray = np.vstack([(v.T[0].to_numpy() > 0.0) for v in a_pre_post_period_result.spike_counts_df_list]) # has_epoch_participation # .shape # (39, 20) - (n_epochs, n_aclus)
         n_participating_epochs: NDArray = has_epoch_participation.sum(axis=0) # .shape (N_ACLUS)
-        assert len(active_ACLUS) == len(n_participating_epochs), f"len(a_pre_post_period_result.included_neuron_ids): {len(active_ACLUS)} != len(n_participating_epochs): {len(n_participating_epochs)}"
-        n_participating_epochs_dict = dict(zip(active_ACLUS, n_participating_epochs))
-        
+        assert len(active_neuron_identifiers) == len(n_participating_epochs), f"len(a_pre_post_period_result.included_neuron_ids): {len(active_neuron_identifiers)} != len(n_participating_epochs): {len(n_participating_epochs)}"
+        n_participating_epochs_dict = dict(zip(active_neuron_identifiers, n_participating_epochs))
+
+        active_neuron_UIDs_to_aclu_dict: Dict[str, int] = dict(zip(active_neuron_UIDs, active_ACLUS))
+        per_aclu_additional_properties_dict['active_neuron_UIDs_to_aclu_dict'] = active_neuron_UIDs_to_aclu_dict
+        per_aclu_additional_properties_dict['active_aclu_to_neuron_UIDs_dict'] = dict(zip(active_ACLUS, active_neuron_UIDs))
+
         per_aclu_additional_properties_dict['n_epochs'] = n_epochs # .shape - (n_aclus,)
 
         ## Compute ratio of participating epochs
@@ -373,14 +389,53 @@ class SpikeRateTrends(HDFMixin, NeuronUnitSlicableObjectProtocol, AttrsBasedClas
 
 
     @function_attributes(short_name=None, tags=['pure','participation', 'additional'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-08-06 05:33', related_items=[])
-    def compute_participation_stats(self, a_session_ctxt: Optional[IdentifyingContext]=None, should_update_self: bool=False, **kwargs):
+    def compute_participation_stats(self, a_session_ctxt: Optional[IdentifyingContext]=None, should_update_self: bool=False, included_neuron_ids: Optional[NDArray]=None, **kwargs):
         """ Uses: `a_pre_post_period_result.spike_counts_df_list`
         
         self.per_aclu_additional_properties_dict['n_participating_epochs'] # .shape - (n_aclus,)
         self.per_aclu_additional_properties_dict['n_participating_epochs_dict']
         
         """
-        n_participating_epochs_dict, n_participating_epochs, has_epoch_participation, per_aclu_additional_properties_dict =  self._perform_compute_participation_stats(a_pre_post_period_result=self, a_session_ctxt=a_session_ctxt, **kwargs)
+        # if included_neuron_ids is None:
+        #     included_neuron_ids = deepcopy(self.included_neuron_ids)
+        # else:
+        #     ## Do not override or else we lose information about the meaning of the fields
+        #     # print(f'2025-08-08 - Overriding self.included_neuron_ids!!')
+        #     # self.included_neuron_ids = deepcopy(included_neuron_ids) ## override included neuron_ids
+        #     pass
+
+        n_participating_epochs_dict, n_participating_epochs, has_epoch_participation, per_aclu_additional_properties_dict =  self._perform_compute_participation_stats(a_pre_post_period_result=self, a_session_ctxt=a_session_ctxt, **kwargs) # , included_neuron_ids=included_neuron_ids
+        
+        ## Add in missing neurons
+        if included_neuron_ids is not None:
+            # ## convert from aclus to neuron_uids
+            # if a_session_ctxt is not None:
+            #     session_uid: str = a_session_ctxt.get_description_as_session_global_uid()
+            #     if not isinstance(included_neuron_ids[0], str):
+            #         active_neuron_UIDs: List[str] = [f"{session_uid}|{aclu}" for aclu in included_neuron_ids]
+            #     else:
+            #         raise NotImplementedError(f'already have neuron_UIDs or nah? {included_neuron_ids}')
+            #         active_neuron_UIDs = deepcopy(included_neuron_ids)
+            #     # active_ACLUS = deepcopy(active_neuron_UIDs) ## Use the neuron UIDs instead of the simple aclus if they're available
+            #     active_neuron_identifiers = deepcopy(active_neuron_UIDs)
+            # else:
+            #     active_neuron_identifiers = deepcopy(included_neuron_ids)
+            #     active_neuron_UIDs = None
+            old_included_neuron_ids = deepcopy(self.included_neuron_ids) 
+            active_aclu_to_neuron_UIDs_dict = deepcopy(per_aclu_additional_properties_dict['active_aclu_to_neuron_UIDs_dict'])
+
+            n_participating_epochs_dict = {aclu:n_participating_epochs_dict.get(active_aclu_to_neuron_UIDs_dict.get(aclu, -1), 0) for aclu in included_neuron_ids} ## use zeros for the missing aclus
+            n_participating_epochs = np.array(list(n_participating_epochs_dict.values()))
+            _bak_has_epoch_participation = deepcopy(has_epoch_participation)
+            n_epochs, n_old_aclus = np.shape(_bak_has_epoch_participation)
+            assert len(old_included_neuron_ids) == n_old_aclus
+            has_epoch_participation = np.zeros((n_epochs, len(included_neuron_ids)))
+            old_to_new_aclu_idx_map = {}
+            for i, aclu in enumerate(old_included_neuron_ids):
+                new_i = included_neuron_ids.tolist().index(aclu)
+                old_to_new_aclu_idx_map[new_i] = i
+                has_epoch_participation[:, new_i] = _bak_has_epoch_participation[:, i]
+
         if should_update_self:
             if not hasattr(self, 'per_aclu_additional_properties_dict'):
                 self.per_aclu_additional_properties_dict = {} ## Initialize to a new dict
