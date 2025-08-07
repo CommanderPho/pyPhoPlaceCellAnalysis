@@ -3381,7 +3381,16 @@ class InstantaneousSpikeRateGroupsComputation(PickleSerializableMixin, HDF_Seria
 
         #TODO 2025-08-07 13:58: - [ ] Surprisingly these sets ARE already disjoint (mostly?!?), meaning AnyC_aclus doesn't include LxC_aclus or SxC_aclus
         ## aclu=58 is present in both AnyC_aclus and SxC_aclus, while [4, 13, 23] are exclusive to SxC_aclus
+        LxC_aclus = set(self.LxC_aclus)
+        SxC_aclus = set(self.SxC_aclus)
+        AnyC_aclus = set(self.AnyC_aclus)
+
+        # LxC_aclus, SxC_aclus, AnyC_aclus
+        ALL_aclus = AnyC_aclus.union(LxC_aclus).union(SxC_aclus)
         
+
+
+
         # Concatenate the two dataframes
         df_combined = pd.concat([df_LxC_aclus, df_SxC_aclus, df_AnyC_aclus], ignore_index=True)
         df_combined['aclu'] = df_combined['aclu'].astype(int)
@@ -3405,7 +3414,9 @@ class InstantaneousSpikeRateGroupsComputation(PickleSerializableMixin, HDF_Seria
             print(f'WARN: len(df_combined): {len(df_combined)} != n_AnyC_aclus: {n_AnyC_aclus}')
             
         included_neuron_ids = np.unique(df_combined['aclu'].to_numpy())
-        
+        assert len(df_combined) == len(included_neuron_ids), f"len(df_combined): {len(df_combined)} != len(included_neuron_ids): {len(included_neuron_ids)}"
+        assert len(df_combined) == len(ALL_aclus), f"len(df_combined): {len(df_combined)} != len(ALL_aclus): {len(ALL_aclus)}"
+
         # ==================================================================================================================================================================================================================================================================================== #
         # Compute `n_participating_epochs` and add to the returned dataframe as needed.                                                                                                                                                                                                        #
         # ==================================================================================================================================================================================================================================================================================== #
