@@ -3340,20 +3340,20 @@ class InstantaneousSpikeRateGroupsComputation(PickleSerializableMixin, HDF_Seria
             ## Add the extended neuron identifiers (like the global neuron_uid, session_uid) columns
             # df_combined = df_combined.neuron_identity.make_neuron_indexed_df_global(self.active_identifying_session_ctx, add_expanded_session_context_keys=True, add_extended_aclu_identity_columns=True)
         
-        a_sess_pre_post_delta_result_list = (self.AnyC_ThetaDeltaMinus, self.AnyC_ThetaDeltaPlus, self.AnyC_ReplayDeltaMinus, self.AnyC_ReplayDeltaPlus)
-        a_sess_pre_post_delta_result_dict = dict(zip(['ThetaDeltaMinus', 'ThetaDeltaPlus', 'ReplayDeltaMinus', 'ReplayDeltaPlus'], a_sess_pre_post_delta_result_list))
-        # for a_pre_post_period_result in a_sess_pre_post_delta_result_list:
-        for a_period_name, a_pre_post_period_result in a_sess_pre_post_delta_result_dict.items():
-            a_result_col_name: str = 'n_participating_epochs'
-            n_participating_epochs_dict, n_participating_epochs, has_epoch_participation, per_aclu_additional_properties_dict = a_pre_post_period_result.compute_participation_stats(a_session_ctxt=self.active_identifying_session_ctx, should_update_self=True)
-            # df_combined['lap_delta_minus', 'lap_delta_plus', 'replay_delta_minus', 'replay_delta_plus'
-            assert len(a_pre_post_period_result.included_neuron_ids) == len(n_participating_epochs), f"len(a_pre_post_period_result.included_neuron_ids): {len(a_pre_post_period_result.included_neuron_ids)} != len(n_participating_epochs): {len(n_participating_epochs)}"
-            # assert len(df_combined) == len(n_participating_epochs), f"len(df_combined): {len(df_combined)} != len(n_participating_epochs): {len(n_participating_epochs)}"
-            # df_combined[f"{a_period_name}_{a_result_col_name}"] = deepcopy(n_participating_epochs) ## add this column to the dataframe
+        # a_sess_pre_post_delta_result_list = (self.AnyC_ThetaDeltaMinus, self.AnyC_ThetaDeltaPlus, self.AnyC_ReplayDeltaMinus, self.AnyC_ReplayDeltaPlus)
+        # a_sess_pre_post_delta_result_dict = dict(zip(['ThetaDeltaMinus', 'ThetaDeltaPlus', 'ReplayDeltaMinus', 'ReplayDeltaPlus'], a_sess_pre_post_delta_result_list))
+        # # for a_pre_post_period_result in a_sess_pre_post_delta_result_list:
+        # for a_period_name, a_pre_post_period_result in a_sess_pre_post_delta_result_dict.items():
+        #     a_result_col_name: str = 'n_participating_epochs'
+        #     n_participating_epochs_dict, n_participating_epochs, has_epoch_participation, per_aclu_additional_properties_dict = a_pre_post_period_result.compute_participation_stats(a_session_ctxt=self.active_identifying_session_ctx, should_update_self=True)
+        #     # df_combined['lap_delta_minus', 'lap_delta_plus', 'replay_delta_minus', 'replay_delta_plus'
+        #     assert len(a_pre_post_period_result.included_neuron_ids) == len(n_participating_epochs), f"len(a_pre_post_period_result.included_neuron_ids): {len(a_pre_post_period_result.included_neuron_ids)} != len(n_participating_epochs): {len(n_participating_epochs)}"
+        #     # assert len(df_combined) == len(n_participating_epochs), f"len(df_combined): {len(df_combined)} != len(n_participating_epochs): {len(n_participating_epochs)}"
+        #     # df_combined[f"{a_period_name}_{a_result_col_name}"] = deepcopy(n_participating_epochs) ## add this column to the dataframe
 
 
 
-    def get_summary_dataframe(self) -> pd.DataFrame:
+    def get_summary_dataframe(self, should_add_participation: bool=False) -> pd.DataFrame:
         """ Returns a summary datatable for each neuron with one entry for each cell in (self.LxC_aclus + self.SxC_aclus)
 
         Additional Columns:
@@ -3388,9 +3388,6 @@ class InstantaneousSpikeRateGroupsComputation(PickleSerializableMixin, HDF_Seria
         # LxC_aclus, SxC_aclus, AnyC_aclus
         ALL_aclus = AnyC_aclus.union(LxC_aclus).union(SxC_aclus)
         
-
-
-
         # Concatenate the two dataframes
         df_combined = pd.concat([df_LxC_aclus, df_SxC_aclus, df_AnyC_aclus], ignore_index=True)
         df_combined['aclu'] = df_combined['aclu'].astype(int)
@@ -3420,36 +3417,41 @@ class InstantaneousSpikeRateGroupsComputation(PickleSerializableMixin, HDF_Seria
         # ==================================================================================================================================================================================================================================================================================== #
         # Compute `n_participating_epochs` and add to the returned dataframe as needed.                                                                                                                                                                                                        #
         # ==================================================================================================================================================================================================================================================================================== #
-        # Adds columns ['ThetaDeltaMinus_n_participating_epochs', 'ThetaDeltaPlus_n_participating_epochs', 'ReplayDeltaMinus_n_participating_epochs', 'ReplayDeltaPlus_n_participating_epochs']
+        if should_add_participation:
+            # Adds columns ['ThetaDeltaMinus_n_participating_epochs', 'ThetaDeltaPlus_n_participating_epochs', 'ReplayDeltaMinus_n_participating_epochs', 'ReplayDeltaPlus_n_participating_epochs']
 
-        # a_sess_pre_post_delta_result_list = (self.AnyC_ThetaDeltaMinus, self.AnyC_ThetaDeltaPlus, self.AnyC_ReplayDeltaMinus, self.AnyC_ReplayDeltaPlus,
-        #                                      self.LxC_ThetaDeltaMinus, self.LxC_ThetaDeltaPlus, self.LxC_ReplayDeltaMinus, self.LxC_ReplayDeltaPlus,
-        #                                      self.SxC_ThetaDeltaMinus, self.SxC_ThetaDeltaPlus, self.SxC_ReplayDeltaMinus, self.SxC_ReplayDeltaPlus)
-        
-        a_sess_pre_post_delta_result_list = (self.AnyC_ThetaDeltaMinus, self.AnyC_ThetaDeltaPlus, self.AnyC_ReplayDeltaMinus, self.AnyC_ReplayDeltaPlus)
-        a_sess_pre_post_delta_result_dict = dict(zip(['ThetaDeltaMinus', 'ThetaDeltaPlus', 'ReplayDeltaMinus', 'ReplayDeltaPlus'], a_sess_pre_post_delta_result_list))
-        # for a_pre_post_period_result in a_sess_pre_post_delta_result_list:
-        for a_period_name, a_pre_post_period_result in a_sess_pre_post_delta_result_dict.items():
-            a_result_col_name: str = 'n_participating_epochs'
-            n_participating_epochs_dict, n_participating_epochs, has_epoch_participation, per_aclu_additional_properties_dict = a_pre_post_period_result.compute_participation_stats(a_session_ctxt=self.active_identifying_session_ctx, should_update_self=True,
-                                                                                                                                                                                      included_neuron_ids=included_neuron_ids,
-                                                                                                                                                                                      )
-            # df_combined['lap_delta_minus', 'lap_delta_plus', 'replay_delta_minus', 'replay_delta_plus'
-            # assert len(a_pre_post_period_result.included_neuron_ids) == len(n_participating_epochs), f"len(a_pre_post_period_result.included_neuron_ids): {len(a_pre_post_period_result.included_neuron_ids)} != len(n_participating_epochs): {len(n_participating_epochs)}"
-            assert len(df_combined) == len(n_participating_epochs), f"len(df_combined): {len(df_combined)} != len(n_participating_epochs): {len(n_participating_epochs)}" ## Why would this ever be true? df_combined is about cells
-            df_combined[f"{a_period_name}_{a_result_col_name}"] = deepcopy(n_participating_epochs) ## add this column to the dataframe
+            # a_sess_pre_post_delta_result_list = (self.AnyC_ThetaDeltaMinus, self.AnyC_ThetaDeltaPlus, self.AnyC_ReplayDeltaMinus, self.AnyC_ReplayDeltaPlus,
+            #                                      self.LxC_ThetaDeltaMinus, self.LxC_ThetaDeltaPlus, self.LxC_ReplayDeltaMinus, self.LxC_ReplayDeltaPlus,
+            #                                      self.SxC_ThetaDeltaMinus, self.SxC_ThetaDeltaPlus, self.SxC_ReplayDeltaMinus, self.SxC_ReplayDeltaPlus)
+            
+            a_sess_pre_post_delta_result_list = (self.AnyC_ThetaDeltaMinus, self.AnyC_ThetaDeltaPlus, self.AnyC_ReplayDeltaMinus, self.AnyC_ReplayDeltaPlus)
+            a_sess_pre_post_delta_result_dict = dict(zip(['ThetaDeltaMinus', 'ThetaDeltaPlus', 'ReplayDeltaMinus', 'ReplayDeltaPlus'], a_sess_pre_post_delta_result_list))
+            # for a_pre_post_period_result in a_sess_pre_post_delta_result_list:
+            for a_period_name, a_pre_post_period_result in a_sess_pre_post_delta_result_dict.items():
+                a_result_col_name: str = 'n_participating_epochs'
+                n_participating_epochs_dict, n_participating_epochs, has_epoch_participation, per_aclu_additional_properties_dict = a_pre_post_period_result.compute_participation_stats(a_session_ctxt=self.active_identifying_session_ctx, should_update_self=False,
+                                                                                                                                                                                        included_neuron_ids=included_neuron_ids,
+                                                                                                                                                                                        )
+                # df_combined['lap_delta_minus', 'lap_delta_plus', 'replay_delta_minus', 'replay_delta_plus'
+                # assert len(a_pre_post_period_result.included_neuron_ids) == len(n_participating_epochs), f"len(a_pre_post_period_result.included_neuron_ids): {len(a_pre_post_period_result.included_neuron_ids)} != len(n_participating_epochs): {len(n_participating_epochs)}"
+                assert len(df_combined) == len(n_participating_epochs), f"len(df_combined): {len(df_combined)} != len(n_participating_epochs): {len(n_participating_epochs)}" ## Why would this ever be true? df_combined is about cells
+                df_combined[f"{a_period_name}_{a_result_col_name}"] = deepcopy(n_participating_epochs) ## add this column to the dataframe
 
-            for k, v in per_aclu_additional_properties_dict.items():
-                try:
-                    if len(v) == len(included_neuron_ids):
-                        df_combined[f"{a_period_name}_{k}"] = deepcopy(v)
-                except (TypeError, ValueError) as e:
-                    print(f'failed to add optional member per_aclu_additional_properties_dict[{k}] to df. Skipping.')
-                    pass 
-                except Exception as e:
-                    raise e
-                
-
+                skip_column_names: List[str] = ['active_neuron_UIDs', 'active_neuron_UIDs_to_aclu_dict', 'active_aclu_to_neuron_UIDs_dict', 'n_epochs']
+                for k, v in per_aclu_additional_properties_dict.items():
+                    if k not in skip_column_names:
+                        try:
+                            if isinstance(v, (NDArray, np.array)) and (len(v) == len(included_neuron_ids)):
+                                df_combined[f"{a_period_name}_{k}"] = deepcopy(v)
+                            else:
+                                pass
+                        except (TypeError, ValueError) as e:
+                            print(f'failed to add optional member per_aclu_additional_properties_dict[{k}] to df. Skipping.')
+                            pass 
+                        except Exception as e:
+                            raise e
+        ## END if should_add_participation...
+                    
         return df_combined
 
 

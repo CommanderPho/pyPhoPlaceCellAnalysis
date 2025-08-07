@@ -280,6 +280,7 @@ class InstantaneousFiringRatesDataframeAccessor():
     def build_shell_object_for_plot(cls, loaded_result_df: pd.DataFrame, column_name_to_colorize:str = 'session_name', active_set_cell_groups_column_name: str = 'active_set_membership') -> Tuple[InstantaneousSpikeRateGroupsComputation, pd.DataFrame]:
         """ loads the previously saved out inst_fr_scatter_plot_results_table and prepares it for plotting.
 
+        The values come from the `data_columns = ['lap_delta_minus', 'lap_delta_plus', 'replay_delta_minus', 'replay_delta_plus']` of the `loaded_result_df`
         returns a `InstantaneousSpikeRateGroupsComputation` _shell_obj which can be plotted
 
         Creates a modified 'visualization_df' from 'loaded_result_df' by adding columns: ['color', 'marker', 'scatter_props']
@@ -3711,7 +3712,14 @@ class AcrossSessionsVisualizations:
     @classmethod
     def across_sessions_bar_graphs(cls, across_session_inst_fr_computation: Dict[IdentifyingContext, InstantaneousSpikeRateGroupsComputation], num_sessions:int, save_figure=True, instantaneous_time_bin_size_seconds=0.003, **kwargs):
         """ 2023-07-21 - Across Sessions Aggregate Figure - I know this is hacked-up to use `PaperFigureTwo`'s existing plotting machinery (which was made to plot a single session) to plot something it isn't supposed to.
-        Aggregate across all of the sessions to build a new combined `InstantaneousSpikeRateGroupsComputation`, which can be used to plot the "PaperFigureTwo", bar plots for many sessions."""
+        Aggregate across all of the sessions to build a new combined `InstantaneousSpikeRateGroupsComputation`, which can be used to plot the "PaperFigureTwo", bar plots for many sessions.
+        
+        
+        Values come from:
+            `self.computation_result.Fig2_Laps_FR`
+            `self.computation_result.Fig2_Replay_FR`
+            
+        """
 
         # num_sessions = len(across_sessions_instantaneous_fr_dict)
         print(f'num_sessions: {num_sessions}')

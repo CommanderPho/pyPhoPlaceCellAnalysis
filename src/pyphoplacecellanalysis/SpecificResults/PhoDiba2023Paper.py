@@ -767,7 +767,7 @@ class DebuggingHelpers:
                 # input_df = input_df.neuron_identity.make_neuron_indexed_df_global(a_session_ctxt, add_expanded_session_context_keys=False, add_extended_aclu_identity_columns=False)
                 # n_participating_epochs_dict = dict(zip(active_neuron_UIDs, n_participating_epochs))
             
-                n_participating_epochs_dict, n_participating_epochs, has_epoch_participation, per_aclu_additional_properties_dict = a_pre_post_period_result.compute_participation_stats(a_session_ctxt=a_session_ctxt, should_update_self=True)
+                n_participating_epochs_dict, n_participating_epochs, has_epoch_participation, per_aclu_additional_properties_dict = a_pre_post_period_result.compute_participation_stats(a_session_ctxt=a_session_ctxt, should_update_self=False)
 
                 _out_dict[f"{a_period_name}_{a_result_col_name}"] = n_participating_epochs
                 for k, v in per_aclu_additional_properties_dict.items():
@@ -1167,6 +1167,9 @@ class PaperFigureTwo(SerializedAttributesAllowBlockSpecifyingClass):
         
         title_modifier: lambda original_title: f"{original_title} (all sessions)"
 
+        Values come from:
+        `self.computation_result.Fig2_Laps_FR`
+        `self.computation_result.Fig2_Replay_FR`
         """
         
         
