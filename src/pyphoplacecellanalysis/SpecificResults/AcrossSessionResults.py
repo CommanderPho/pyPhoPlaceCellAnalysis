@@ -3919,8 +3919,10 @@ class AcrossSessionsVisualizations:
         #     long_short_fr_indicies_analysis_results.loc[long_short_fr_indicies_analysis_results['is_n_spikes_LxC'], 'edgecolors'] = "#E20000" #.to_list() # edgecolors=(r, g, b, 1)
         # if 'is_fr_Hz_LxC' in long_short_fr_indicies_analysis_results:
         #     long_short_fr_indicies_analysis_results.loc[long_short_fr_indicies_analysis_results['is_fr_Hz_LxC'], 'edgecolors'] = "#9C0000" #.to_list() # edgecolors=(r, g, b, 1)
-        if 'stability_class' in long_short_fr_indicies_analysis_results:
-            long_short_fr_indicies_analysis_results.loc[(long_short_fr_indicies_analysis_results['stability_class'] == 'disappearing'), 'edgecolors'] = "#0000B3" #.to_list() # edgecolors=(r, g, b, 1)   
+        # if 'stability_class' in long_short_fr_indicies_analysis_results:
+        #     long_short_fr_indicies_analysis_results.loc[(long_short_fr_indicies_analysis_results['stability_class'] == 'disappearing'), 'edgecolors'] = "#0000B3" #.to_list() # edgecolors=(r, g, b, 1)   
+        if 'active_set_membership_from_user_annotations' in long_short_fr_indicies_analysis_results:
+            long_short_fr_indicies_analysis_results.loc[(long_short_fr_indicies_analysis_results['active_set_membership_from_user_annotations'] == 'LxC'), 'edgecolors'] = "#0000B3" #.to_list() # edgecolors=(r, g, b, 1)
        
 
         # if 'is_refined_SxC' in long_short_fr_indicies_analysis_results:
@@ -3929,8 +3931,10 @@ class AcrossSessionsVisualizations:
         #     long_short_fr_indicies_analysis_results.loc[long_short_fr_indicies_analysis_results['is_n_spikes_SxC'], 'edgecolors'] = '#0000E2' #.to_list() # edgecolors=(r, g, b, 1)
         # if 'is_fr_Hz_SxC' in long_short_fr_indicies_analysis_results:
         #     long_short_fr_indicies_analysis_results.loc[long_short_fr_indicies_analysis_results['is_fr_Hz_SxC'], 'edgecolors'] = "#0000B3" #.to_list() # edgecolors=(r, g, b, 1)
-        if 'stability_class' in long_short_fr_indicies_analysis_results:
-            long_short_fr_indicies_analysis_results.loc[(long_short_fr_indicies_analysis_results['stability_class'] == 'appearing'), 'edgecolors'] = "#9C0000" #.to_list() # edgecolors=(r, g, b, 1)     
+        # if 'stability_class' in long_short_fr_indicies_analysis_results:
+        #     long_short_fr_indicies_analysis_results.loc[(long_short_fr_indicies_analysis_results['stability_class'] == 'appearing'), 'edgecolors'] = "#9C0000" #.to_list() # edgecolors=(r, g, b, 1)                 
+        if 'active_set_membership_from_user_annotations' in long_short_fr_indicies_analysis_results:
+            long_short_fr_indicies_analysis_results.loc[(long_short_fr_indicies_analysis_results['active_set_membership_from_user_annotations'] == 'SxC'), 'edgecolors'] = "#9C0000" #.to_list() # edgecolors=(r, g, b, 1)
 
 
         scatter_plot_kwargs['point_colors'] = long_short_fr_indicies_analysis_results['point_colors'].to_numpy()
