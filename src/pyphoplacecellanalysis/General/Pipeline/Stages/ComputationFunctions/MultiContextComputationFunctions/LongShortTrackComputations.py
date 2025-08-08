@@ -3225,12 +3225,33 @@ class InstantaneousSpikeRateGroupsComputation(PickleSerializableMixin, HDF_Seria
         SxC_aclus = kwargs.pop('SxC_aclus', None)
         AnyC_aclus = kwargs.pop('AnyC_aclus', None)
 
+
+        # spikes_df: pd.DataFrame = get_proper_global_spikes_df(curr_active_pipeline) ## this gets too few spikes, should just use the raw spikes maybe
+        # spikes_df: pd.DataFrame = get_proper_global_spikes_df(curr_active_pipeline, minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz)
+        spikes_df: pd.DataFrame = deepcopy(curr_active_pipeline.filtered_sessions[global_epoch_name].spikes_df) #.spikes.sliced_by_neuron_id(any_list_neuron_IDs) # Cut spikes_df down to only the neuron_IDs that appear at least in one decoder:        
+        
+        all_spikes_aclus = deepcopy(spikes_df.spikes.neuron_ids)
+        
+        if AnyC_aclus is None:
+            ## build from the LxC and SxCs
+            # AnyC_aclus = np.array([aclu for aclu in all_spikes_aclus if ((aclu not in self.LxC_aclus) and (aclu not in self.SxC_aclus))]) ## shared only
+            AnyC_aclus = np.array([int(aclu) for aclu in all_spikes_aclus]) # All
+            self.AnyC_aclus = deepcopy(AnyC_aclus) ## here this IS supposed to be just any cell ever, so how can there be cells not in AnyC_aclus that are in LxC/SxCs?
+            
+
+
+        ## Get manual User-annotations:
         annotation_man: UserAnnotationsManager = UserAnnotationsManager()
         session_cell_exclusivity: SessionCellExclusivityRecord = annotation_man.annotations[self.active_identifying_session_ctx].get('session_cell_exclusivity', None)
         if ((LxC_aclus is None) or (SxC_aclus is None)) and (session_cell_exclusivity is not None):
             print(f'setting LxC_aclus/SxC_aclus from user annotation.')
-            self.LxC_aclus = session_cell_exclusivity.LxC
-            self.SxC_aclus = session_cell_exclusivity.SxC
+            if LxC_aclus is None:
+                LxC_aclus = deepcopy([int(aclu) for aclu in session_cell_exclusivity.LxC if aclu in all_spikes_aclus])
+            if SxC_aclus is None:
+                SxC_aclus = deepcopy([int(aclu) for aclu in session_cell_exclusivity.SxC if aclu in all_spikes_aclus])
+
+            self.LxC_aclus = deepcopy(LxC_aclus)
+            self.SxC_aclus = deepcopy(SxC_aclus)
         else:
             print(f'WARN: no user annotation for session_cell_exclusivity')
 
@@ -3238,17 +3259,6 @@ class InstantaneousSpikeRateGroupsComputation(PickleSerializableMixin, HDF_Seria
         are_LxC_empty: bool = (self.LxC_aclus is None) or (len(self.LxC_aclus) == 0)
         are_SxC_empty: bool = (self.SxC_aclus is None) or (len(self.SxC_aclus) == 0)
 
-        # spikes_df: pd.DataFrame = get_proper_global_spikes_df(curr_active_pipeline) ## this gets too few spikes, should just use the raw spikes maybe
-        spikes_df: pd.DataFrame = get_proper_global_spikes_df(curr_active_pipeline, minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz)
-        
-        all_spikes_aclus = deepcopy(spikes_df.spikes.neuron_ids)
-        
-        if AnyC_aclus is None:
-            ## build from the LxC and SxCs
-            # AnyC_aclus = np.array([aclu for aclu in all_spikes_aclus if ((aclu not in self.LxC_aclus) and (aclu not in self.SxC_aclus))]) ## shared only
-            AnyC_aclus = np.array([aclu for aclu in all_spikes_aclus]) # All
-            self.AnyC_aclus = AnyC_aclus
-            
 
         # Replays: Uses `global_session.spikes_df`, `long_exclusive.track_exclusive_aclus, `short_exclusive.track_exclusive_aclus`, `long_replays`, `short_replays`
         use_instantaneous_firing_rate: bool = kwargs.get('use_instantaneous_firing_rate', False)
