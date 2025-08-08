@@ -711,7 +711,7 @@ class DebuggingHelpers:
     """
     @function_attributes(short_name=None, tags=['participation', 'figure2', 'figure3', 'fixup'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-08-06 05:15', related_items=[])
     @classmethod
-    def _compute_participation_and_n_spike_fr_stats(cls, across_session_inst_fr_computation_dict: Dict[IdentifyingContext, InstantaneousSpikeRateGroupsComputation], debug_print: bool = False):
+    def _compute_participation_and_n_spike_fr_stats(cls, across_session_inst_fr_computation_dict: Dict[IdentifyingContext, InstantaneousSpikeRateGroupsComputation], debug_print: bool = False, **kwargs):
         """ 
         Usage:
         
@@ -732,7 +732,7 @@ class DebuggingHelpers:
             a_sess_pre_post_delta_result_list = [a_session_InstantaneousSpikeRateGroupsComputation.AnyC_ThetaDeltaMinus, a_session_InstantaneousSpikeRateGroupsComputation.AnyC_ThetaDeltaPlus, a_session_InstantaneousSpikeRateGroupsComputation.AnyC_ReplayDeltaMinus, a_session_InstantaneousSpikeRateGroupsComputation.AnyC_ReplayDeltaPlus]
             a_sess_pre_post_delta_result_dict = dict(zip(['ThetaDeltaMinus', 'ThetaDeltaPlus', 'ReplayDeltaMinus', 'ReplayDeltaPlus'], a_sess_pre_post_delta_result_list))
 
-            _out_dict = {'aclu': active_ACLUS} # , 'ThetaDeltaMinus': None, 'ThetaDeltaPlus': None, 'ReplayDeltaMinus': None, 'ReplayDeltaPlus': None
+            _out_dict = {'aclu': active_ACLUS, 'neuron_uid': deepcopy(active_neuron_UIDs)} # , 'ThetaDeltaMinus': None, 'ThetaDeltaPlus': None, 'ReplayDeltaMinus': None, 'ReplayDeltaPlus': None
             # for a_pre_post_period_result in a_sess_pre_post_delta_result_list:
             for a_period_name, a_pre_post_period_result in a_sess_pre_post_delta_result_dict.items():
                 an_inst_fr_list = a_pre_post_period_result.epoch_agg_inst_fr_list # (N_EPOCHS, N_ACLUS) in period
@@ -767,7 +767,7 @@ class DebuggingHelpers:
                 # input_df = input_df.neuron_identity.make_neuron_indexed_df_global(a_session_ctxt, add_expanded_session_context_keys=False, add_extended_aclu_identity_columns=False)
                 # n_participating_epochs_dict = dict(zip(active_neuron_UIDs, n_participating_epochs))
             
-                n_participating_epochs_dict, n_participating_epochs, has_epoch_participation, per_aclu_additional_properties_dict, skip_column_names = a_pre_post_period_result.compute_participation_stats(a_session_ctxt=a_session_ctxt, should_update_self=False)
+                n_participating_epochs_dict, n_participating_epochs, has_epoch_participation, per_aclu_additional_properties_dict, skip_column_names = a_pre_post_period_result.compute_participation_stats(a_session_ctxt=a_session_ctxt, should_update_self=False, **kwargs)
 
                 _out_dict[f"{a_period_name}_{a_result_col_name}"] = n_participating_epochs
                 for k, v in per_aclu_additional_properties_dict.items():
@@ -1144,6 +1144,8 @@ class PaperFigureTwo(SerializedAttributesAllowBlockSpecifyingClass):
         var_name:str = 'PBE'
         active_context = active_context.adding_context_if_missing(variable=var_name) # title='Laps'
 
+        pbe_y_axis_label: str = kwargs.get('pbe_y_axis_label', 'PBE-averaged Firing Rates (Hz)')
+
         # PBE_fr_label: str = 'R'
         PBE_fr_label: str = '\\text{PBE}'
 
@@ -1160,7 +1162,8 @@ class PaperFigureTwo(SerializedAttributesAllowBlockSpecifyingClass):
             
         all_scatter_props = [{}, {}, {}, {}] # override, 2023-10-03
         # label_list = [LxC_aclus, LxC_aclus, SxC_aclus, SxC_aclus]
-        return cls.create_plot(x_labels, all_data_points, all_scatter_props, 'PBE-averaged Firing Rates (Hz)', 'PBE', 'fig_2_Replay_FR_matplotlib', active_context=active_context, defer_show=defer_show, title_modifier=title_modifier, prepare_for_publication=prepare_for_publication, **kwargs)
+        return cls.create_plot(x_labels, all_data_points, all_scatter_props, pbe_y_axis_label, 'PBE', 'fig_2_Replay_FR_matplotlib', active_context=active_context, defer_show=defer_show, title_modifier=title_modifier, prepare_for_publication=prepare_for_publication, **kwargs)
+
 
     @providing_context(fig='2', display_fn_name='inst_FR_bar_graphs')
     def display(self, defer_show=False, save_figure=True, enable_tiny_point_labels=True, enable_hover_labels=False, enabled_point_connection_lines=True, enable_stats_overlays:bool=True, active_context=None, title_modifier_fn=None, top_margin=0.8, left_margin=0.090, bottom_margin=0.150, prepare_for_publication: bool = False, **kwargs):
@@ -1202,6 +1205,11 @@ class PaperFigureTwo(SerializedAttributesAllowBlockSpecifyingClass):
             ## Add stats from t-tests (check?)
             ## INPUTS: across_session_inst_fr_computation_shell_obj
             LxC_Laps_T_result, SxC_Laps_T_result, LxC_Replay_T_result, SxC_Replay_T_result = pho_stats_bar_graph_t_tests(self.computation_result)
+            
+            ## get the max datapoint so we can position the signifiance indicator bars above them:
+            max_laps_y: float = float(np.nanmax(np.concatenate([v.values for v in self.computation_result.Fig2_Laps_FR])))
+            max_PBEs_y: float = float(np.nanmax(np.concatenate([v.values for v in self.computation_result.Fig2_Replay_FR])))
+            
             # 'Fig2_Laps_FR'
 
             # LxC_Laps_T_result: TtestResult(statistic=6.712433589492588, pvalue=5.2823734983320806e-05, df=10)
@@ -1218,9 +1226,9 @@ class PaperFigureTwo(SerializedAttributesAllowBlockSpecifyingClass):
             # ax = _fig_2_output_dict['theta'].ax
             ax = _fig_2_theta_out.ax
             # ax = _fig_2_theta_out.axes[0] # one shared axis per figure
-            _out_ann_AB = add_significance_bars(ax, LxC_Laps_T_result.pvalue, 0, 1, 6)
+            _out_ann_AB = add_significance_bars(ax, LxC_Laps_T_result.pvalue, x1=0, x2=1, y=max_laps_y)
             # _out_ann_BC = add_significance_bars(ax, SxC_Laps_T_result.pvalue, 1, 2, 6)
-            _out_ann_CD = add_significance_bars(ax, SxC_Laps_T_result.pvalue, 2, 3, 6)
+            _out_ann_CD = add_significance_bars(ax, SxC_Laps_T_result.pvalue, x1=2, x2=3, y=max_laps_y)
 
             # _out_ann_BD = add_significance_bars(ax, SxC_Laps_T_result.pvalue, 0.5, 2.5, 8)
 
@@ -1230,10 +1238,9 @@ class PaperFigureTwo(SerializedAttributesAllowBlockSpecifyingClass):
             # Add significance bars between groups
             # ax = _fig_2_output_dict['replay'].ax
             ax = _fig_2_replay_out.ax
-            _out_ann_AB = add_significance_bars(ax, LxC_Replay_T_result.pvalue, 0, 1, 6)
+            _out_ann_AB = add_significance_bars(ax, LxC_Replay_T_result.pvalue, x1=0, x2=1, y=max_PBEs_y)
             # _out_ann_BC = add_significance_bars(ax, SxC_Laps_T_result.pvalue, 1, 2, 6)
-            _out_ann_CD = add_significance_bars(ax, SxC_Replay_T_result.pvalue, 2, 3, 6)
-
+            _out_ann_CD = add_significance_bars(ax, SxC_Replay_T_result.pvalue, x1=2, x2=3, y=max_PBEs_y)
 
 
 
@@ -1488,6 +1495,9 @@ def pho_stats_bar_graph_t_tests(across_session_inst_fr_computation):
         from pyphoplacecellanalysis.SpecificResults.PhoDiba2023Paper import pho_stats_bar_graph_t_tests
 
         LxC_Laps_T_result, SxC_Laps_T_result, LxC_Replay_T_result, SxC_Replay_T_result = pho_stats_bar_graph_t_tests(across_session_inst_fr_computation)
+
+        max_laps_y = np.nanmax([v.values for v in across_session_inst_fr_computation.Fig2_Laps_FR])
+        max_PBEs_y = np.nanmax([v.values for v in across_session_inst_fr_computation.Fig2_Replay_FR])
 
     """
     ## Laps Bar Graph Statistics:
