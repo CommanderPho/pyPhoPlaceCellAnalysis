@@ -3429,7 +3429,7 @@ class InstantaneousSpikeRateGroupsComputation(PickleSerializableMixin, HDF_Seria
             # for a_pre_post_period_result in a_sess_pre_post_delta_result_list:
             for a_period_name, a_pre_post_period_result in a_sess_pre_post_delta_result_dict.items():
                 a_result_col_name: str = 'n_participating_epochs'
-                n_participating_epochs_dict, n_participating_epochs, has_epoch_participation, per_aclu_additional_properties_dict = a_pre_post_period_result.compute_participation_stats(a_session_ctxt=self.active_identifying_session_ctx, should_update_self=False,
+                n_participating_epochs_dict, n_participating_epochs, has_epoch_participation, per_aclu_additional_properties_dict, skip_column_names = a_pre_post_period_result.compute_participation_stats(a_session_ctxt=self.active_identifying_session_ctx, should_update_self=False,
                                                                                                                                                                                         included_neuron_ids=included_neuron_ids,
                                                                                                                                                                                         )
                 # df_combined['lap_delta_minus', 'lap_delta_plus', 'replay_delta_minus', 'replay_delta_plus'
@@ -3437,7 +3437,6 @@ class InstantaneousSpikeRateGroupsComputation(PickleSerializableMixin, HDF_Seria
                 assert len(df_combined) == len(n_participating_epochs), f"len(df_combined): {len(df_combined)} != len(n_participating_epochs): {len(n_participating_epochs)}" ## Why would this ever be true? df_combined is about cells
                 df_combined[f"{a_period_name}_{a_result_col_name}"] = deepcopy(n_participating_epochs) ## add this column to the dataframe
 
-                skip_column_names: List[str] = ['active_neuron_UIDs', 'active_neuron_UIDs_to_aclu_dict', 'active_aclu_to_neuron_UIDs_dict', 'n_epochs']
                 for k, v in per_aclu_additional_properties_dict.items():
                     if k not in skip_column_names:
                         try:
