@@ -3961,7 +3961,8 @@ class AcrossSessionsVisualizations:
 
     @classmethod
     @function_attributes(short_name=None, tags=['across-session', 'figure', 'matplotlib', 'figure-3'], input_requires=[], output_provides=[], uses=['_plot_single_track_firing_rate_compare'], used_by=[], creation_date='2023-08-24 00:00', related_items=[])
-    def across_sessions_long_and_short_firing_rate_replays_v_laps_figure(cls, neuron_replay_stats_table: pd.DataFrame, num_sessions:int, save_figure=True, prepare_for_publication: bool = False, **kwargs):
+    def across_sessions_long_and_short_firing_rate_replays_v_laps_figure(cls, neuron_replay_stats_table: pd.DataFrame, num_sessions:int, save_figure=True, prepare_for_publication: bool = False, long_col_names:List[str]=['long_non_replay_mean', 'long_replay_mean'],
+                                                                         short_col_names:List[str]=['short_non_replay_mean', 'short_replay_mean'], **kwargs):
         """ 2023-08-24 - Across Sessions Aggregate Figure - Supposed to be the equivalent for Figure 3.
 
         Based off of `pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.MultiContextComparingDisplayFunctions.LongShortTrackComparingDisplayFunctions._plot_session_long_short_track_firing_rate_figures`
@@ -3992,15 +3993,15 @@ class AcrossSessionsVisualizations:
         common_scatter_kwargs = dict(point_colors='#33333333', defer_render=True) | kwargs
         
         ## Long Track Replay|Laps FR Figure
-        neuron_replay_stats_df = neuron_replay_stats_table.dropna(subset=['long_replay_mean', 'long_non_replay_mean'], inplace=False)
-        x_frs = {k:v for k,v in neuron_replay_stats_df['long_non_replay_mean'].items()} 
-        y_frs = {k:v for k,v in neuron_replay_stats_df['long_replay_mean'].items()}
+        neuron_replay_stats_df = neuron_replay_stats_table.dropna(subset=long_col_names, inplace=False)
+        x_frs = {k:v for k,v in neuron_replay_stats_df[long_col_names[0]].items()} 
+        y_frs = {k:v for k,v in neuron_replay_stats_df[long_col_names[1]].items()}
         fig_L, ax_L, active_display_context_L = _plot_single_track_firing_rate_compare(x_frs, y_frs, active_context=final_context.adding_context_if_missing(filter_name='long'), prepare_for_publication=prepare_for_publication, **common_scatter_kwargs)
 
         ## Short Track Replay|Laps FR Figure
-        neuron_replay_stats_df = neuron_replay_stats_table.dropna(subset=['short_replay_mean', 'short_non_replay_mean'], inplace=False)
-        x_frs = {k:v for k,v in neuron_replay_stats_df['short_non_replay_mean'].items()} 
-        y_frs = {k:v for k,v in neuron_replay_stats_df['short_replay_mean'].items()}
+        neuron_replay_stats_df = neuron_replay_stats_table.dropna(subset=short_col_names, inplace=False)
+        x_frs = {k:v for k,v in neuron_replay_stats_df[short_col_names[0]].items()} 
+        y_frs = {k:v for k,v in neuron_replay_stats_df[short_col_names[1]].items()}
         fig_S, ax_S, active_display_context_S = _plot_single_track_firing_rate_compare(x_frs, y_frs, active_context=final_context.adding_context_if_missing(filter_name='short'), prepare_for_publication=prepare_for_publication, **common_scatter_kwargs)
 
         ## Fit both the axes:
