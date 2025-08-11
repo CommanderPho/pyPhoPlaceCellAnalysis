@@ -218,7 +218,7 @@ class SpareRunningSequenceScore:
                 a_seq_spare_score = a_seq_spare_score[-1] ## only the last bin, which is by defn maximal
             out_spare_score.append(a_seq_spare_score)
         # END for seg_idx, a_seg in enumerate(p_x_given_n_segments)
-                    
+                  
         return out_spare_score, (p_x_given_n_segments, most_likely_pos_idxs_segments, segement_lengths, sign_change_indicies)
 
 
@@ -621,6 +621,18 @@ class ContinuousHeuristicScoring:
         
         
         active_most_likely_pos
+
+
+        Usage:
+
+        ## INPUTS: active_most_likely_pos -- original data series
+
+        df_runs, (valid, counts), (P_diff, is_excessive_change_index, series_idx) = ContinuousHeuristicScoring.find_longest_run_of_non_excessive_diffs(active_most_likely_pos=active_most_likely_pos, time_window_centers=time_window_centers, max_jump_distance_cm=max_jump_distance_cm, max_ignore_bins=0,
+                                                                                                                                                        # min_prefix_merge_seq_n_bins=20, min_suffix_merge_seq_n_bins=20,
+                                                                                                                                                        min_prefix_merge_seq_n_bins=200, min_suffix_merge_seq_n_bins=200,
+                                                                                                                                                        )
+        cont_heuristics_dfs_datasources_dict, cont_heuristics_dfs_dict = ContinuousHeuristicScoring.add_spikeRaster2D_interval_rects(active_2d_plot, df_runs=df_runs)
+
         """
         P_diff = np.diff(active_most_likely_pos) # (min: -258, mean: , max: 258, np.nanmean(P_diff): -0.002035577375650436, np.nanmedian(P_diff): 0.0, np.nanstd(P_diff): 122.22033112262098
         is_excessive_change_index = (np.abs(P_diff) > max_jump_distance_cm)
@@ -630,7 +642,7 @@ class ContinuousHeuristicScoring:
         series_idx = ContinuousHeuristicScoring.label_false_series_with_bridging(is_excessive_change_index, min_prefix_merge_seq_n_bins=min_prefix_merge_seq_n_bins, max_ignore_bins=max_ignore_bins, min_suffix_merge_seq_n_bins=min_suffix_merge_seq_n_bins)
 
         # 2) count sizes
-        valid = series_idx >= 0
+        valid = (series_idx >= 0)
         counts = np.bincount(series_idx[valid], minlength=series_idx.max()+1)
         ## OUTPUTS: valid, counts
 
