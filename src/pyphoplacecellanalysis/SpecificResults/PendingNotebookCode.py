@@ -123,6 +123,9 @@ class SpareRunningSequenceScore:
     
     STATUS #TODO 2025-08-05 09:16: - [ ] SpareRunningSequenceScore refinements, finished implementation, now need to check
     
+    #TODO 2025-08-11 10:09: - [ ] Potential issue: doesn't the jump integration method reward larger jumps by making the function grow faster for long jumps than short ones? I mean I suppose it ends earlier too, but kinda opposite of what I'd like. 
+
+    
     Usage:
         from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import SpareRunningSequenceScore
         from pyphoplacecellanalysis.Analysis.Decoder.context_dependent import GenericDecoderDictDecodedEpochsDictResult
@@ -214,6 +217,7 @@ class SpareRunningSequenceScore:
             if final_score_only:
                 a_seq_spare_score = a_seq_spare_score[-1] ## only the last bin, which is by defn maximal
             out_spare_score.append(a_seq_spare_score)
+        # END for seg_idx, a_seg in enumerate(p_x_given_n_segments)
                     
         return out_spare_score, (p_x_given_n_segments, most_likely_pos_idxs_segments, segement_lengths, sign_change_indicies)
 
@@ -263,6 +267,61 @@ class SpareRunningSequenceScore:
         # Extract the maximum locations for each time bin
         P_max_ind = np.argmax(p_x_given_n, axis=1)
         return out_decoder_spare_scores, out_decoder_spare_scores_extras
+
+
+    @classmethod
+    def add_spikeRaster2D_interval_rects(cls, active_2d_plot: Spike2DRaster, seg_df: pd.DataFrame, **kwargs):
+        """ 
+        
+        spare_seq_dfs_datasources_dict, spare_seq_dfs_dict = SpareRunningSequenceScore.add_spikeRaster2D_interval_rects(active_2d_plot, seg_df=seg_df)
+        """
+        
+        from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.Mixins.RenderTimeEpochs.Specific2DRenderTimeEpochs import General2DRenderTimeEpochs, inline_mkColor
+        
+        from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.Mixins.RenderTimeEpochs.EpochRenderingMixin import EpochRenderingMixin, RenderedEpochsItemsContainer
+        from pyphoplacecellanalysis.General.Model.Datasources.IntervalDatasource import IntervalsDatasource
+        from neuropy.utils.mixins.time_slicing import TimeColumnAliasesProtocol
+
+        if 't_duration' not in seg_df.columns:
+            seg_df['t_duration'] = seg_df['t_end'] - seg_df['t_start']
+
+        ## Use the three dataframes as separate Epoch series:
+        spare_seq_dfs_dict = {
+            'SpareSeqScore': seg_df,
+        }
+
+        spare_seq_epochs_formatting_dict = {
+            'SpareSeqScore':dict(y_location=-5.0, height=0.9, pen_color=inline_mkColor('purple', 0.8), brush_color=inline_mkColor('purple', 0.5)),
+        }
+
+        # required_vertical_offsets, required_interval_heights = EpochRenderingMixin.build_stacked_epoch_layout([0.2], epoch_render_stack_height=0.9, interval_stack_location='below') # ratio of heights to each interval
+        # stacked_epoch_layout_dict = {interval_key:dict(y_location=y_location, height=height) for interval_key, y_location, height in zip(list(spare_seq_epochs_formatting_dict.keys()), required_vertical_offsets, required_interval_heights)} # Build a stacked_epoch_layout_dict to update the display
+        # stacked_epoch_layout_dict # {'LapsAll': {'y_location': -3.6363636363636367, 'height': 3.6363636363636367}, 'LapsTrain': {'y_location': -21.818181818181817, 'height': 18.18181818181818}, 'LapsTest': {'y_location': -40.0, 'height': 18.18181818181818}}
+        # stacked_epoch_layout_dict = {}
+        
+        # replaces 'y_location', 'position' for each dict:
+        # spare_seq_epochs_formatting_dict = {k:(v|stacked_epoch_layout_dict[k]) for k, v in spare_seq_epochs_formatting_dict.items()}
+        spare_seq_epochs_formatting_dict = {k:v for k, v in spare_seq_epochs_formatting_dict.items()}
+        
+        
+        ## INPUTS: train_test_split_laps_dfs_dict
+        spare_seq_dfs_dict = {k:TimeColumnAliasesProtocol.renaming_synonym_columns_if_needed(df=v, required_columns_synonym_dict=IntervalsDatasource._time_column_name_synonyms) for k, v in spare_seq_dfs_dict.items()}
+
+        ## Build interval datasources for them:
+        spare_seq_dfs_datasources_dict = {k:General2DRenderTimeEpochs.build_render_time_epochs_datasource(v) for k, v in spare_seq_dfs_dict.items()}
+        ## INPUTS: active_2d_plot, train_test_split_laps_epochs_formatting_dict, train_test_split_laps_dfs_datasources_dict
+        assert len(spare_seq_epochs_formatting_dict) == len(spare_seq_dfs_datasources_dict)
+        for k, an_interval_ds in spare_seq_dfs_datasources_dict.items():
+            an_interval_ds.update_visualization_properties(lambda active_df, **kwargs: General2DRenderTimeEpochs._update_df_visualization_columns(active_df, **(spare_seq_epochs_formatting_dict[k] | kwargs)))
+
+        ## Full output: train_test_split_laps_dfs_datasources_dict
+
+        # actually add the epochs:
+        for k, an_interval_ds in spare_seq_dfs_datasources_dict.items():
+            active_2d_plot.add_rendered_intervals(an_interval_ds, name=f'{k}', debug_print=False) # adds the interval
+
+        return spare_seq_dfs_datasources_dict, spare_seq_dfs_dict
+
 
 
 
