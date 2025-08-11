@@ -539,8 +539,10 @@ def plot_stacked_histograms(data_results_df: pd.DataFrame, data_type: str, sessi
 
 
 @function_attributes(short_name='plot_pre_scatter_post_matplotlib', tags=['matplotlib', 'scatter', 'NEW', 'histogram', 'stacked', 'multi-session', 'plot', 'figure', 'good'], input_requires=[], output_provides=[], uses=[], used_by=['_perform_matplotlib_pre_post_scatter'], creation_date='2025-07-29 20:47', related_items=[])
-def plot_pre_scatter_post_matplotlib(data_results_df: pd.DataFrame, data_type: str, session_spec: str, time_bin_duration_str: str, column_name:str='P_Long', time_bin_column_name:str='t', **kwargs):
-    """ Aimrs to replace the Plotly function: `_perform_plot_pre_post_delta_scatter` with the same functionality. Plots a colorful stacked histogram for each of the many time-bin sizes flanking a scatter showing the value changing over time.
+def plot_pre_scatter_post_matplotlib(data_results_df: pd.DataFrame, data_type: str, session_spec: str, time_bin_duration_str: str, column_name:str='P_Long', time_bin_column_name:str='delta_aligned_start_t', **kwargs):
+    """ Not used by anything else yet, and doesn't require backward compatibility.
+    
+        Aimrs to replace the Plotly function: `_perform_plot_pre_post_delta_scatter` with the same functionality. Plots a colorful stacked histogram for each of the many time-bin sizes flanking a scatter showing the value changing over time.
     
         Generalizing `plot_stacked_histograms`, which just plots the two end histograms, this also plots a central scatter plot showing the value over time like the Plotly version does.
         
@@ -604,6 +606,12 @@ def plot_pre_scatter_post_matplotlib(data_results_df: pd.DataFrame, data_type: s
     
     # display_context = display_context.adding
 
+
+    ## Extract kwargs for scatter plot:
+    # scatter_kwargs = dict(c='black', s=8) # , alpha=0.5
+    scatter_kwargs = kwargs.pop('scatter_kwargs', {}) 
+    scatter_kwargs = (dict(c='black', s=8) | scatter_kwargs)
+
     # ==================================================================================================================================================================================================================================================================================== #
     # Plotting                                                                                                                                                                                                                                                                             #
     # ==================================================================================================================================================================================================================================================================================== #
@@ -650,8 +658,6 @@ def plot_pre_scatter_post_matplotlib(data_results_df: pd.DataFrame, data_type: s
             _fig_container.ax_dict = ax_dict
             fig.suptitle(f'{descriptor_str}')
 
-            # scatter_kwargs = dict(c='black', s=8) # , alpha=0.5
-            scatter_kwargs = dict(c='black', s=8)
 
             histogram_kwargs = dict(orientation="horizontal", bins=11)
             
@@ -670,12 +676,19 @@ def plot_pre_scatter_post_matplotlib(data_results_df: pd.DataFrame, data_type: s
             for time_bin_size in time_bin_sizes:
                 df_tbs = pre_delta_df[pre_delta_df['time_bin_size']==time_bin_size]
                 df_tbs[column_name].hist(ax=ax_dict['epochs_pre_delta'], alpha=0.5, label=str(time_bin_size), **histogram_kwargs) 
+                
+
 
 
             ax_dict['epochs_pre_delta'].set_ylabel(f"{column_name}") # only set on the leftmost subplot
             ax_dict['epochs_pre_delta'].set_title(f'pre-$\Delta$ {title_indicator}')
-            ax_dict['epochs_pre_delta'].legend()
-
+            if len(time_bin_sizes) > 1:
+                ax_dict['epochs_pre_delta'].legend()            
+            # ax_dict['epochs_pre_delta'].axis('off')
+            ax_dict['epochs_pre_delta'].spines['top'].set_visible(False)
+            ax_dict['epochs_pre_delta'].spines['right'].set_visible(False)
+            # ax_dict['epochs_pre_delta'].spines['bottom'].set_visible(False)
+            # ax_dict['epochs_pre_delta'].spines['left'].set_visible(False)
 
 
             ## Plot Scatter Points
@@ -683,12 +696,16 @@ def plot_pre_scatter_post_matplotlib(data_results_df: pd.DataFrame, data_type: s
             
             # Get unique categories
             # categories = df_tbs['session_uid'].unique()
-            categories = df_tbs['animal'].unique()
-            
-            # Create a color palette with one color per category
-            palette = sns.color_palette('tab10', n_colors=len(categories))  # You can use any palette
-            # Map categories to colors
-            color_mapping = dict(zip(categories, palette))
+            if 'animal' in data_results_df:
+                categories = data_results_df['animal'].unique()
+                
+                # Create a color palette with one color per category
+                palette = sns.color_palette('tab10', n_colors=len(categories))  # You can use any palette
+                # Map categories to colors
+                color_mapping = dict(zip(categories, palette))
+                
+
+            ## ['delta_aligned_start_t', 't_bin_center', 'start']
             # scatter_kwargs['c'] = df_tbs['animal'].map(color_mapping)
             time_bin_sizes: int = data_results_df['time_bin_size'].unique()
             for time_bin_size in time_bin_sizes:
@@ -706,6 +723,12 @@ def plot_pre_scatter_post_matplotlib(data_results_df: pd.DataFrame, data_type: s
             ax_dict['epochs_post_delta'].set_title(f'post-$\Delta$ {title_indicator}')
             if len(time_bin_sizes) > 1:
                 ax_dict['epochs_post_delta'].legend()
+            # ax_dict['epochs_post_delta'].axis('off')
+            ax_dict['epochs_post_delta'].spines['top'].set_visible(False)
+            ax_dict['epochs_post_delta'].spines['right'].set_visible(False)
+            # ax_dict['epochs_post_delta'].spines['bottom'].set_visible(False)
+            # ax_dict['epochs_post_delta'].spines['left'].set_visible(False)
+
             
             if not defer_show:
                 fig.show()

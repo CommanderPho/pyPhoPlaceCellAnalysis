@@ -125,6 +125,9 @@ class SpareRunningSequenceScore:
     
     #TODO 2025-08-11 10:09: - [ ] Potential issue: doesn't the jump integration method reward larger jumps by making the function grow faster for long jumps than short ones? I mean I suppose it ends earlier too, but kinda opposite of what I'd like. 
 
+    #TODO 2025-08-11 12:11: - [ ] It really doesn't work very well, much to my surprise. It skips even laps, etc.  
+
+    
     
     Usage:
         from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import SpareRunningSequenceScore

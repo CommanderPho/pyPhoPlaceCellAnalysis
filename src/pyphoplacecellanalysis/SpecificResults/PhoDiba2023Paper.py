@@ -1946,6 +1946,137 @@ def main_complete_figure_generations(curr_active_pipeline, enable_default_neptun
 # ==================================================================================================================== #
 # Plotting Helpers 2024-10-29                                                                                          #
 # ==================================================================================================================== #
+@function_attributes(short_name=None, tags=['ACTIVE'], input_requires=[], output_provides=[], uses=['plot_pre_scatter_post_matplotlib'], used_by=[], creation_date='2025-08-11 13:36', related_items=[])
+def _perform_matplotlib_SINGLE_SERIES_pre_post_scatter(grainularity_desc: str, epochs_df: pd.DataFrame, is_dark_mode: bool=False, legend_groups_to_solo=None, legend_groups_to_hide: Optional[List[str]]=None, time_column: str='t_start', value_column: str='P_Short'):
+    """ plots the stacked histograms for both laps and ripples, with optional scatterplot showing values over time
+    
+    Aims to replace the plotly version `_perform_plot_pre_post_delta_scatter` by implementing the same figure in MATPLOTLIB for easier export to publication
+    
+    
+    Parameters:
+    -----------
+    grainularity_desc : str
+        Description of the granularity
+    laps_df : pd.DataFrame
+        DataFrame containing laps data
+    ripple_df : pd.DataFrame  
+        DataFrame containing ripple data
+    is_dark_mode : bool, optional
+        Whether to use dark mode styling
+    legend_groups_to_solo : optional
+        Groups to show exclusively
+    legend_groups_to_hide : List[str], optional
+        Groups to hide from display
+    include_scatterplot : bool, optional
+        Whether to include a scatterplot between histograms showing values over time
+    time_column : str, optional
+        Column name for time values (default: 't_start')
+    value_column : str, optional
+        Column name for values to plot (default: 'P_Short')
+    
+    Returns:
+    --------
+    tuple
+        Returns histogram outputs and optionally scatterplot figure
+    
+    Usage:
+    ------
+    from pyphoplacecellanalysis.SpecificResults.PhoDiba2023Paper import _perform_matplotlib_pre_post_scatter
+    
+    
+    """
+    from flexitext import flexitext
+    from neuropy.utils.matplotlib_helpers import MatplotlibFigureExtractors, FormattedFigureText ## flexitext version
+    from pyphoplacecellanalysis.Pho2D.statistics_plotting_helpers import plot_pre_scatter_post_matplotlib
+    
+    # if include_scatterplot:
+    #     from pyphoplacecellanalysis.Pho2D.statistics_plotting_helpers import plot_pre_scatter_post_matplotlib
+    #     _active_plot_fn = plot_pre_scatter_post_matplotlib
+    # else:
+    #     from pyphoplacecellanalysis.Pho2D.statistics_plotting_helpers import plot_histograms_across_sessions, plot_stacked_histograms        
+    #     _active_plot_fn = plot_stacked_histograms
+
+    if (legend_groups_to_solo is None) and (legend_groups_to_hide is None):
+        ## if neither are provided, hide none (show all)
+        legend_groups_to_hide = []
+
+    variable_name: str = value_column
+    y_baseline_level: float = 0.5 # for P(short), etc
+    y_ylims = (0, 1)
+
+    # y_baseline_level: float = 0.0 # for wcorr, etc
+    # y_ylims = (-1, 1)
+
+    if is_dark_mode:
+        baseline_kwargs = dict(color=(0.8,0.8,0.8,.75), linewidth=2)
+    else:
+        baseline_kwargs = dict(color=(0.2,0.2,0.2,.75), linewidth=2)
+        
+    def _subfn_update_stacked_post_plot(histogram_out):
+        """ captures: y_baseline_level, y_ylims """
+        # for k, ax in histogram_out.axes.items():
+        for k, ax in histogram_out.ax_dict.items():
+            ## this works for scatter as well
+            _tmp_line = ax.axhline(y_baseline_level, **baseline_kwargs) # draw baseline line (horizontally)
+            ax.set_ylim(*y_ylims)
+            
+        ## add flexitext text:
+        # a_fig = histogram_out.figures[0]
+        a_fig = histogram_out.fig
+        extracted_fig_titles_dict = MatplotlibFigureExtractors.extract_titles(fig=a_fig)
+        suptitle: str = extracted_fig_titles_dict.get('suptitle', None) # 'Laps (by-time-bin)|2 Sessions|5 tbin sizes'
+        subtitle_string = None
+
+        # Clear the normal text:
+        a_fig.suptitle('')
+        # for k, ax in a_histogram_out.axes.items():
+        # 	ax.set_title('')
+
+        text_formatter = FormattedFigureText.init_from_margins() # top_margin=0.8
+        text_formatter.setup_margins(a_fig)
+        # active_config = deepcopy(self.config)
+        # active_config.float_precision = 1
+
+        # subtitle_string = '\n'.join([f'{active_config.str_for_display(is_2D)}'])
+        full_title_str: str = f'<size:22><weight:bold>{suptitle}</></>'
+        if (subtitle_string is not None) and (len(subtitle_string) > 0):
+            full_title_str += f'\n<size:10>{subtitle_string}</>'
+
+        # header_text_obj = flexitext(text_formatter.left_margin, text_formatter.top_margin, full_title_str, va="bottom", xycoords="figure fraction") # 0.90
+        header_text_obj = flexitext(text_formatter.left_margin, 0.89, full_title_str, va="bottom", xycoords="figure fraction")
+        return {'header_text_obj': header_text_obj}
+            
+
+    common_stacked_hist_kwargs = dict(figsize=(12, 3), column_name=variable_name)
+    scatter_kwargs = dict(s=0.25)
+
+    compare_decimal_precision_ndigits: int = 3
+    if (legend_groups_to_solo is not None):
+        assert legend_groups_to_hide is None, f"cannot provide both legend_groups_to_solo and legend_groups_to_hide"
+        legend_groups_to_solo = np.array([round(float(v), ndigits=compare_decimal_precision_ndigits) for v in legend_groups_to_solo]) # convert to float
+        epochs_df = deepcopy(epochs_df)
+        epochs_df = epochs_df[np.isin(epochs_df.time_bin_size.astype(float).round(decimals=compare_decimal_precision_ndigits), legend_groups_to_solo)]		
+
+    elif (legend_groups_to_hide is not None):
+        legend_groups_to_hide = np.array([round(float(v), ndigits=compare_decimal_precision_ndigits) for v in legend_groups_to_hide]) # convert to float
+        epochs_df = deepcopy(epochs_df)
+        epochs_df = epochs_df[np.isin(epochs_df.time_bin_size.astype(float).round(decimals=compare_decimal_precision_ndigits), legend_groups_to_hide, invert=True)]		
+
+    # Add scatterplot if requested
+    scatter_fig = None
+
+    # You can use it like this:
+    num_unique_sessions: int = epochs_df.session_name.nunique(dropna=True) # number of unique sessions, ignoring the NA entries
+    num_unique_time_bins: int = epochs_df.time_bin_size.nunique(dropna=True)
+    _epochs_histogram_out = plot_pre_scatter_post_matplotlib(epochs_df, data_type=f'PBEs ({grainularity_desc})', session_spec=f'{num_unique_sessions} Sessions', time_bin_duration_str=f"{num_unique_time_bins} tbin sizes", time_bin_column_name=time_column, scatter_kwargs=scatter_kwargs, **common_stacked_hist_kwargs)
+    _epochs_flexitext_dict = _subfn_update_stacked_post_plot(_epochs_histogram_out)
+    # fig_to_clipboard(_ripple_histogram_out.figures[0], bbox_inches='tight')
+
+    return _epochs_histogram_out
+
+
+
+
 @function_attributes(short_name=None, tags=['matplotlib', 'good', 'stacked-hist', 'scatter', 'ACTIVE', 'publication'], input_requires=[], output_provides=[], uses=['plot_pre_scatter_post_matplotlib'], used_by=[], creation_date='2024-07-29 00:00', related_items=['_perform_plot_pre_post_delta_scatter'])
 def _perform_matplotlib_pre_post_scatter(grainularity_desc: str, laps_df: pd.DataFrame, ripple_df: pd.DataFrame, is_dark_mode: bool=False, legend_groups_to_solo=None, legend_groups_to_hide: Optional[List[str]]=None, include_scatterplot: bool=True, time_column: str='t_start', value_column: str='P_Short'):
     """ plots the stacked histograms for both laps and ripples, with optional scatterplot showing values over time
@@ -4086,5 +4217,5 @@ class PhoPublicationFigureHelper:
         _out_rcparams =( _out_rcparams | kwargs)
         if prepare_for_publication:
             ## OVERRIDE in the case of publications:
-            _out_rcparams.update({'font.family': 'Arial', 'xtick.labelsize': 5, 'ytick.labelsize': 5, "axes.spines.right": False, "axes.spines.top": False})
+            _out_rcparams.update({'font.family': 'Arial', 'xtick.labelsize': 5, 'ytick.labelsize': 5, "axes.spines.right": False, "axes.spines.top": False, 'axes.linewidth': 0.8})
         return _out_rcparams # 'figure.dpi': '220', 
