@@ -1947,7 +1947,8 @@ def main_complete_figure_generations(curr_active_pipeline, enable_default_neptun
 # Plotting Helpers 2024-10-29                                                                                          #
 # ==================================================================================================================== #
 @function_attributes(short_name=None, tags=['ACTIVE'], input_requires=[], output_provides=[], uses=['plot_pre_scatter_post_matplotlib'], used_by=[], creation_date='2025-08-11 13:36', related_items=[])
-def _perform_matplotlib_SINGLE_SERIES_pre_post_scatter(grainularity_desc: str, epochs_df: pd.DataFrame, is_dark_mode: bool=False, legend_groups_to_solo=None, legend_groups_to_hide: Optional[List[str]]=None, time_column: str='t_start', value_column: str='P_Short'):
+def _perform_matplotlib_SINGLE_SERIES_pre_post_scatter(grainularity_desc: str, epochs_df: pd.DataFrame, is_dark_mode: bool=False, legend_groups_to_solo=None, legend_groups_to_hide: Optional[List[str]]=None, time_column: str='t_start', value_column: str='P_Short',
+                                                       subplot_by_column: Optional[str]=None):
     """ plots the stacked histograms for both laps and ripples, with optional scatterplot showing values over time
     
     Aims to replace the plotly version `_perform_plot_pre_post_delta_scatter` by implementing the same figure in MATPLOTLIB for easier export to publication
@@ -1988,6 +1989,7 @@ def _perform_matplotlib_SINGLE_SERIES_pre_post_scatter(grainularity_desc: str, e
     from flexitext import flexitext
     from neuropy.utils.matplotlib_helpers import MatplotlibFigureExtractors, FormattedFigureText ## flexitext version
     from pyphoplacecellanalysis.Pho2D.statistics_plotting_helpers import plot_pre_scatter_post_matplotlib
+    from pyphocorehelpers.indexing_helpers import partition_df_dict
     
     # if include_scatterplot:
     #     from pyphoplacecellanalysis.Pho2D.statistics_plotting_helpers import plot_pre_scatter_post_matplotlib
@@ -2008,9 +2010,9 @@ def _perform_matplotlib_SINGLE_SERIES_pre_post_scatter(grainularity_desc: str, e
     # y_ylims = (-1, 1)
 
     if is_dark_mode:
-        baseline_kwargs = dict(color=(0.8,0.8,0.8,.75), linewidth=2)
+        baseline_kwargs = dict(color=(0.8,0.8,0.8,.75), linewidth=1)
     else:
-        baseline_kwargs = dict(color=(0.2,0.2,0.2,.75), linewidth=2)
+        baseline_kwargs = dict(color=(0.2,0.2,0.2,.75), linewidth=1)
         
     def _subfn_update_stacked_post_plot(histogram_out):
         """ captures: y_baseline_level, y_ylims """
@@ -2068,9 +2070,21 @@ def _perform_matplotlib_SINGLE_SERIES_pre_post_scatter(grainularity_desc: str, e
     # You can use it like this:
     num_unique_sessions: int = epochs_df.session_name.nunique(dropna=True) # number of unique sessions, ignoring the NA entries
     num_unique_time_bins: int = epochs_df.time_bin_size.nunique(dropna=True)
-    _epochs_histogram_out = plot_pre_scatter_post_matplotlib(epochs_df, data_type=f'PBEs ({grainularity_desc})', session_spec=f'{num_unique_sessions} Sessions', time_bin_duration_str=f"{num_unique_time_bins} tbin sizes", time_bin_column_name=time_column, scatter_kwargs=scatter_kwargs, **common_stacked_hist_kwargs)
-    _epochs_flexitext_dict = _subfn_update_stacked_post_plot(_epochs_histogram_out)
-    # fig_to_clipboard(_ripple_histogram_out.figures[0], bbox_inches='tight')
+    
+    if subplot_by_column is not None:
+        assert subplot_by_column in epochs_df, f"epochs_df.columns: {list(epochs_df.columns)}"
+        # partitioned_dfs = epochs_df.pho.partition_df_dict(partitionColumn=subplot_by_column)
+        partitioned_dfs = partition_df_dict(epochs_df, partitionColumn=subplot_by_column)
+        unique_subplot_column_values = list(partitioned_dfs.keys())
+        print(f'subplot_by_column: "{subplot_by_column}", unique_subplot_column_values: {unique_subplot_column_values}')
+        for a_subplot, an_epochs_df in partitioned_dfs.items():
+            _an_epochs_histogram_out = plot_pre_scatter_post_matplotlib(an_epochs_df, data_type=f'PBEs ({grainularity_desc})', session_spec=f'{num_unique_sessions} Sessions', time_bin_duration_str=f"{num_unique_time_bins} tbin sizes", time_bin_column_name=time_column, scatter_kwargs=scatter_kwargs, **common_stacked_hist_kwargs)
+            # _epochs_flexitext_dict = _subfn_update_stacked_post_plot(_an_epochs_histogram_out)
+
+    else:
+        _epochs_histogram_out = plot_pre_scatter_post_matplotlib(epochs_df, data_type=f'PBEs ({grainularity_desc})', session_spec=f'{num_unique_sessions} Sessions', time_bin_duration_str=f"{num_unique_time_bins} tbin sizes", time_bin_column_name=time_column, scatter_kwargs=scatter_kwargs, **common_stacked_hist_kwargs)
+        _epochs_flexitext_dict = _subfn_update_stacked_post_plot(_epochs_histogram_out)
+        # fig_to_clipboard(_ripple_histogram_out.figures[0], bbox_inches='tight')
 
     return _epochs_histogram_out
 
@@ -2948,8 +2962,10 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
 
         """
         import ipywidgets as widgets
+        # import traitlets
         from traitlets import Dict as TraitDict  # Import the Dict traitlet
-
+        from traitlets import TraitError # traitlets.traitlets.TraitError
+        
         a_widget_name: str = f"{a_name}_widget" # replay_name_widget
         extant_widget = getattr(self, a_widget_name, None)
         if extant_widget is not None:
@@ -2994,7 +3010,18 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
         # Set initial widget selection/selections ____________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
         if custom_initial_selection is not None:
             initial_selection_mode = InitialSelectionModeEnum.CUSTOM_SELECTED
-        initial_selection = self.set_initial_selection(a_widget=a_widget, initial_selection_mode=initial_selection_mode, custom_initial_selections=custom_initial_selection)
+
+        try:
+            ## try to set the selection
+            initial_selection = self.set_initial_selection(a_widget=a_widget, initial_selection_mode=initial_selection_mode, custom_initial_selections=custom_initial_selection)
+
+        except (TraitError, ValueError) as e:
+            # `traitlets.traitlets.TraitError: Invalid selection: value not found`
+            print(f'WARN: could not set initial selection to custom_initial_selection: "{custom_initial_selection}". Valid values: {a_widget.options} (a_widget.options). Skipping setting default...')
+            pass
+        except Exception as e:
+            raise e
+
 
         return a_widget
 
@@ -3235,11 +3262,13 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
             preferred_filename = fig.layout.meta.get('preferred_filename') if fig.layout.meta else None
             if preferred_filename:
                 self.filename = f"{preferred_filename}.png"
-                self.filename_label.value = preferred_filename
+                if self.filename_label is not None:
+                    self.filename_label.value = preferred_filename
             else:
                 title = fig.layout.title.text if fig.layout.title and fig.layout.title.text else "figure"
                 self.filename = f"{title.replace(' ', '_')}.png"
-                self.filename_label.value = title
+                if self.filename_label is not None:
+                    self.filename_label.value = title
 
             ## rebuild the download widget with the current figure
             # self.button_download =  _build_solera_file_download_widget(fig=self.figure_widget, filename=Path(self.filename).with_suffix('.png').as_posix())
@@ -3281,8 +3310,17 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
         self.active_plot_df_name = active_plot_df_name # self.active_plot_df_name_selector_widget.value
         self.active_plot_variable_name = active_plot_variable_name # self.active_plot_variable_name_widget.value             
 
-        self.update_filtered_dataframes(replay_name, time_bin_sizes)
-        self.on_widget_update_filename()
+        try:
+            self.update_filtered_dataframes(replay_name, time_bin_sizes)
+            self.on_widget_update_filename()
+
+        except (AttributeError, ValueError) as e:
+            ## usually called before the UI/widgets are fully initialized - e.g. `AttributeError: 'NoneType' object has no attribute 'value'`
+            print(f'WARN: ._debounced_update(...) encountered error : {e} while trying to update. Continuing.')
+            pass
+                  
+        except Exception as e:
+            raise e
         
 
 
