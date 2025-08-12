@@ -2880,7 +2880,9 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
         
         self._setup_widgets()
         # Initial filtering with default widget values
+        # Ensure a valid initial selection BEFORE first update to avoid empty selection errors        
         if getattr(self, 'time_bin_size_widget', None) is not None:
+            self.set_initial_selection(a_widget=self.time_bin_size_widget, initial_selection_mode=InitialSelectionModeEnum.FIRST_SELECTED)
             self.update_filtered_dataframes(self.replay_name_widget.value, self.time_bin_size_widget.value)
         # else:
         #     self.update_filtered_dataframes(self.replay_name_widget.value)
@@ -2889,11 +2891,6 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
         # Set up the buttons after figure_widget is created
         if self.is_figure_widget_mode:
             self._setup_widgets_buttons()
-
-
-        ## set time_bin_size selections to the first value by default
-        initial_selection = self.set_initial_selection(a_widget=self.time_bin_size_widget, initial_selection_mode=InitialSelectionModeEnum.FIRST_SELECTED)
-
 
     
     @classmethod
