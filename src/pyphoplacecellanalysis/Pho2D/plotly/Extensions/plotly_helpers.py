@@ -611,11 +611,13 @@ def plotly_pre_post_delta_scatter(data_results_df: pd.DataFrame, data_context: O
                 print(f'shared_color_key: "{shared_color_key}"')
 
             # 'color_discrete_sequence'
+            # Always ensure categorical helper runs to create the duplicated _col_<key> even if a color sequence was provided
+            a_kwargs_update_dict = _subfn_build_categorical_color_kwargs(shared_color_key=shared_color_key)
             if 'color_discrete_sequence' in common_plot_kwargs:
                 print(f'already have common_plot_kwargs["color_discrete_sequence"]: {common_plot_kwargs["color_discrete_sequence"]}, will not override!')
-            else:
-                a_kwargs_update_dict = _subfn_build_categorical_color_kwargs(shared_color_key=shared_color_key)
-                common_plot_kwargs.update(a_kwargs_update_dict)
+                # Preserve existing sequence, but still use returned category_orders and color column mapping
+                a_kwargs_update_dict.pop('color_discrete_sequence', None)
+            common_plot_kwargs.update(a_kwargs_update_dict)
             
             # shared_color_key: 'time_bin_size'
             
