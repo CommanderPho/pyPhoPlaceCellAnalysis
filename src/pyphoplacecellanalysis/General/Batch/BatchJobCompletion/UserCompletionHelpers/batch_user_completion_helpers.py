@@ -3347,8 +3347,8 @@ def figures_plot_generalized_decode_epochs_dict_and_export_results_completion_fu
                                                                                         included_figures_names=['_display_directional_merged_pf_decoded_stacked_epoch_slices', '_display_generalized_decoded_yellow_blue_marginal_epochs', '_display_decoded_trackID_marginal_hairy_position', '_display_decoded_trackID_weighted_position_posterior_withMultiColorOverlay'],
                                                                                         extreme_threshold: float=0.8, opacity_max:float=0.7, thickness_ramping_multiplier:float=35.0,
                                                                                         **additional_marginal_overlaying_measured_position_kwargs) -> dict:
-    """ Simple function that just plots the figure corresponding to by `generalized_decode_epochs_dict_and_export_results_completion_function` so we don't have to wait for the entire batch_figures_plotting on 2025-04-16 15:22.
-    
+    """ Multi-purpose batch display function that just plots the figures so we don't have to wait for the entire batch_figures_plotting on 2025-04-16 15:22.
+    corresponding to by `generalized_decode_epochs_dict_and_export_results_completion_function` 
     
     This is the global across-session marginal over trackID
     
@@ -3378,6 +3378,9 @@ def figures_plot_generalized_decode_epochs_dict_and_export_results_completion_fu
 
 
     # 'trackID_weighted_position_posterior'
+    if across_session_results_extended_dict is None:
+        across_session_results_extended_dict = {}
+
 
     across_session_results_extended_dict['figures_plot_generalized_decode_epochs_dict_and_export_results_completion_function'] = {}
 
