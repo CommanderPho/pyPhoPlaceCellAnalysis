@@ -1301,7 +1301,7 @@ class PosteriorExporting:
 
     @function_attributes(short_name=None, tags=['TEMP', 'export', 'image', 'files', 'merge', 'combine', 'posterior'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-05-30 14:51', related_items=[])
     @classmethod
-    def post_export_build_combined_images(cls, out_custom_formats_dict, epoch_name_list = ['laps', 'ripple'], included_epoch_idxs: Optional[List]=None, progress_print:bool=False):
+    def post_export_build_combined_images(cls, out_custom_formats_dict, custom_merge_layout_dict: Optional[Dict]=None, epoch_name_list = ['laps', 'ripple'], included_epoch_idxs: Optional[List]=None, progress_print:bool=False):
         """merges the 4 1D decoders and the multi-color pseudo2D to produce a single combined output image for each epoch
 
         Responsible for the `_temp_individual_posteriors/2025-08-13/gor01_one_2006-6-09_1-22-43/ripple/combined/multi` images
@@ -1327,47 +1327,80 @@ class PosteriorExporting:
         _out_final_merged_images = []
         _out_final_merged_image_save_paths: List[Path] = []
 
-        # export_format_name_options = ['greyscale_shared_norm', 'viridis_shared_norm', 'greyscale']
-        # separator_color=f'#1b0000' ## for greyscale
-        export_format_name_options = ['viridis_shared_norm', 'greyscale_shared_norm', 'greyscale']
-        separator_color=f'#fae2e2'
+        ## The preferred search order to look for images. Stops after finding the first one:
+        export_format_name_options = ['greyscale_shared_norm', 'viridis_shared_norm', 'greyscale']
+        separator_color=f'#1b0000' ## for greyscale
+        # export_format_name_options = ['viridis_shared_norm', 'greyscale_shared_norm', 'greyscale']
+        # separator_color=f'#fae2e2'
+
+        def _subfn_try_find_existing_format(out_custom_formats_dict, export_format_name_options = ['greyscale_shared_norm', 'viridis_shared_norm', 'greyscale']) -> Tuple[Optional[str], int]:
+            """ tries to find the existing export name from a list of options 
+            """
+            active_found_export_format_name: str = None
+            a_decoder_name = 'long_LR' ## temp
+            _a_partial_dict = out_custom_formats_dict[f'{a_decoding_epoch_name}.{a_decoder_name}']
+            
+
+            ## find the appropriate `active_found_export_format_name`
+            for an_export_format_name in export_format_name_options:
+                if (active_found_export_format_name is None):
+                    if (an_export_format_name in _a_partial_dict):
+                        active_found_export_format_name = an_export_format_name
+
+            num_epochs: int = 0
+            if active_found_export_format_name is not None:
+                num_epochs = len(_a_partial_dict[active_found_export_format_name])
+            
+            return active_found_export_format_name, num_epochs
+
+
+
+        if custom_merge_layout_dict is None:
+            custom_merge_layout_dict = [['greyscale'],
+                ['greyscale_shared_norm'],
+                # ['psuedo2D_ignore/raw_rgba'], ## Implicitly always appends the pseudo2D_ignore/raw_rgba image at the bottom row
+            ]
         
         for a_decoding_epoch_name in epoch_name_list:
             ## e.g. 'laps' or 'ripple'
             try:
-                a_decoder_name = 'long_LR' ## temp
-                _a_partial_dict = out_custom_formats_dict[f'{a_decoding_epoch_name}.{a_decoder_name}']
                 ## find the appropriate `active_found_export_format_name`
-                active_found_export_format_name: str = None
-                for an_export_format_name in export_format_name_options:
-                    if (active_found_export_format_name is None):
-                        if (an_export_format_name in _a_partial_dict):
-                            active_found_export_format_name = an_export_format_name
+                active_found_export_format_name, num_epochs = _subfn_try_find_existing_format(out_custom_formats_dict=out_custom_formats_dict, export_format_name_options=export_format_name_options)
                 if active_found_export_format_name is None:
                     raise KeyError('skipping')
-
-                num_epochs: int = len(_a_partial_dict[active_found_export_format_name])
 
                 ## Iterate through each epoch:
                 for epoch_IDX in np.arange(num_epochs):
                     if (included_epoch_idxs is not None) and (epoch_IDX in included_epoch_idxs):
                         if progress_print:
                             print(f'{a_decoding_epoch_name}[{epoch_IDX}]: processing...')
-                        # vertical stack
-                        _tmp_curr_raster_imgs = []
-                        for decoder_IDX, a_decoder_name in enumerate(active_1D_decoder_names):
-                            a_config = out_custom_formats_dict[f'{a_decoding_epoch_name}.{a_decoder_name}'][active_found_export_format_name][epoch_IDX] # a HeatmapExportConfig
-                            # a_config.posterior_saved_path ## the saved image file
-                            an_active_img = deepcopy(a_config.posterior_saved_image) ## the actual image object
-                            an_active_img = an_active_img.reduce(factor=(1, 4)) ## scale image down by 1/4 in height but leave the original width
                             
-                            _tmp_curr_raster_imgs.append(an_active_img)
-                        ## END for decoder_IDX, a_d...
+                        _tmp_curr_merge_layout_raster_imgs = []
+                        for row_idx, a_merge_layout_row in enumerate(custom_merge_layout_dict):
+                            _tmp_curr_row_raster_imgs = []
+                            for col_idx, a_merge_layout_col in enumerate(a_merge_layout_row):
+                                # vertical stack
+                                # _tmp_curr_raster_imgs = []
+                                for decoder_IDX, a_decoder_name in enumerate(active_1D_decoder_names):
+                                    ## get the single decoder image for this format:
+                                    # a_config = out_custom_formats_dict[f'{a_decoding_epoch_name}.{a_decoder_name}'][active_found_export_format_name][epoch_IDX] # a HeatmapExportConfig
+                                    a_config = out_custom_formats_dict[f'{a_decoding_epoch_name}.{a_decoder_name}'][a_merge_layout_col][epoch_IDX] # a HeatmapExportConfig
+                                    # a_config.posterior_saved_path ## the saved image file
+                                    an_active_img = deepcopy(a_config.posterior_saved_image) ## the actual image object
+                                    an_active_img = an_active_img.reduce(factor=(1, 4)) ## scale image down by 1/4 in height but leave the original width
+                                    
+                                    _tmp_curr_row_raster_imgs.append(an_active_img)
+                                ## END for decoder_IDX, a_d...
+                            ## Build merged row image:
+                            _out_row_stack = horizontal_image_stack(_tmp_curr_row_raster_imgs, padding=5, separator_color=separator_color)
+                            _tmp_curr_merge_layout_raster_imgs.append(_out_row_stack)
 
-                        ## get the multicolor iamge:
+                        ## END for row_idx, a_merge_layout_row in enumerate(custom_merge_layout_dict)
+
+                        ## get the multicolor iamge last:
                         try:
                             a_config = out_custom_formats_dict[f'{a_decoding_epoch_name}.{pseudo_2D_decoder_name}']['raw_rgba'][epoch_IDX] # a HeatmapExportConfig
-                            _tmp_curr_raster_imgs.append(a_config.posterior_saved_image)
+                            _tmp_curr_merge_layout_raster_imgs.append(a_config.posterior_saved_image)
                         except KeyError as e:
                             # KeyError: "Invalid keys: '['laps', 'long_LR']'"
                             print(f"\tcould not get multicolor image data for out_custom_formats_dict[f'{a_decoding_epoch_name}.{pseudo_2D_decoder_name}']['raw_rgba'][{epoch_IDX}], key error: {e}\n\tskipping.")    
@@ -1381,8 +1414,8 @@ class PosteriorExporting:
                         merged_dir.mkdir(exist_ok=True, parents=True)
                         a_merged_posterior_export_path: Path = merged_dir.joinpath(a_posterior_saved_path.name) # '_temp_individual_posteriors/2025-05-30/gor01_one_2006-6-12_15-55-31/ripple/combined/multi/p_x_given_n[2].png'
                         
-                        ## Build merged image:
-                        _out_vstack = vertical_image_stack(_tmp_curr_raster_imgs, padding=5, separator_color=separator_color)
+                        ## Build merged all rows image:
+                        _out_vstack = vertical_image_stack(_tmp_curr_merge_layout_raster_imgs, padding=5, separator_color=separator_color)
                         _out_final_merged_images.append(_out_vstack)
 
                         ## save it
@@ -1390,11 +1423,14 @@ class PosteriorExporting:
                         _out_vstack.save(a_merged_posterior_export_path) # Save image to file
                         _out_final_merged_image_save_paths.append(a_merged_posterior_export_path)
 
+                        ## END for col_idx, a_merge_layout_col in enumerate(a_merge_layout_row)...
+                        
                 ## END for epoch_IDX in np.arange(num_epochs)...
             except KeyError as e:
                 # KeyError: "Invalid keys: '['laps', 'long_LR']'"
                 print(f'\tcould not get export data for a_decoding_epoch_name: "{a_decoding_epoch_name}", key error: {e}\n\tskipping.')    
-                continue
+                # continue
+                raise
             
             except Exception as e:
                 raise
