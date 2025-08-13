@@ -1327,10 +1327,11 @@ class PosteriorExporting:
         _out_final_merged_images = []
         _out_final_merged_image_save_paths: List[Path] = []
 
-        normalization_column_labels: List[str] = ['individual norm', 'context-weighted norm']
+        # normalization_column_labels: List[str] = ['individual norm', 'context-weighted norm']
+        normalization_column_labels: List[str] = ['indiv.', 'global']
         ## The preferred search order to look for images. Stops after finding the first one:
         export_format_name_options = ['greyscale_shared_norm', 'viridis_shared_norm', 'greyscale']
-        separator_color=f'#1b0000' ## for greyscale
+        separator_color=f'#1b0014' ## for greyscale
         # export_format_name_options = ['viridis_shared_norm', 'greyscale_shared_norm', 'greyscale']
         # separator_color=f'#fae2e2'
 
@@ -1400,7 +1401,7 @@ class PosteriorExporting:
                                     _tmp_curr_row_raster_imgs.append(an_active_img)
                                 ## END for decoder_IDX, a_d...
                             ## Build merged row image:
-                            separator_color=f'#ff0000' 
+                            # separator_color=f'#ff0000'
                             _out_row_stack = vertical_image_stack(_tmp_curr_row_raster_imgs, padding=5, separator_color=separator_color)
                             # _out_row_stack = horizontal_image_stack(_tmp_curr_row_raster_imgs, padding=5, separator_color=separator_color)
 
@@ -1409,10 +1410,9 @@ class PosteriorExporting:
                             
                             if row_idx < len(normalization_column_labels):
                                 normalization_label_text: str = normalization_column_labels[row_idx] # 'global'      
-                                _out_row_stack = ImageOperationsAndEffects.add_boxed_adjacent_label(_out_row_stack, normalization_label_text, image_edge='top', font_size=48, text_color="#000000", #(33, 255, 33),
-                                                                                                    background_color=(255, 255, 255, 0), # text_outline_shadow_color=(0, 0, 0, 255), # corner='bottom-right' 
-                                                                                                    #  inverse_scale_factor=(2, 1),
-                                                                                                    # stroke_width=1, stroke_fill="#000000",
+                                _out_row_stack = ImageOperationsAndEffects.add_boxed_adjacent_label(_out_row_stack, normalization_label_text, image_edge='top', font_size=48, text_color="#000000",
+                                                                                                    background_color=(255, 255, 255, 0),
+                                                                                                    fixed_label_region_size = [_out_row_stack.width, 62]
                                                                                                     )
 
 
@@ -1422,7 +1422,7 @@ class PosteriorExporting:
                         
 
                         ## Build merged all rows image:
-                        separator_color=f'#66ff00' 
+                        # separator_color=f'#66ff00' 
                         _out_vstack = horizontal_image_stack(_tmp_curr_merge_layout_raster_imgs, padding=25, separator_color=separator_color) # , separator_color=separator_color
                         # _out_vstack = vertical_image_stack(_tmp_curr_merge_layout_raster_imgs, padding=35, separator_color=separator_color)
                         _out_vstack = _out_vstack.reduce(factor=(2, 1)) ## scale image down by 1/2 in width but leave the original height
@@ -1446,7 +1446,7 @@ class PosteriorExporting:
                         a_merged_posterior_export_path: Path = merged_dir.joinpath(a_posterior_saved_path.name) # '_temp_individual_posteriors/2025-05-30/gor01_one_2006-6-12_15-55-31/ripple/combined/multi/p_x_given_n[2].png'
                         
                         ## Build merged all rows image:
-                        separator_color=f'#006eff' 
+                        # separator_color=f'#006eff' 
                         _out_vstack = vertical_image_stack(_tmp_curr_merge_layout_raster_imgs, padding=10, separator_color=separator_color)
                         _out_final_merged_images.append(_out_vstack)
 
