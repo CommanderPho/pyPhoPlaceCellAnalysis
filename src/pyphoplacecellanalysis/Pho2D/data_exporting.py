@@ -1393,11 +1393,19 @@ class PosteriorExporting:
                                     # an_active_img = an_active_img.reduce(factor=(4, 1)) ## scale image down by 1/4 in width but leave the original height
                                     
                                     ## Add overlay text
-                                    an_active_img = ImageOperationsAndEffects.add_overlayed_text(an_active_img, a_decoder_name, font_size=48, text_color="#FF00EACA",
-                                                                                                        #  inverse_scale_factor=(2, 1),
-                                                                                                        stroke_width=1, stroke_fill="#000000",
-                                                                                                         )
+                                    # an_active_img = ImageOperationsAndEffects.add_overlayed_text(an_active_img, a_decoder_name, font_size=48, text_color="#FF00EACA",
+                                    #                                                                     #  inverse_scale_factor=(2, 1),
+                                    #                                                                     stroke_width=1, stroke_fill="#000000",
+                                    #                                                                      )
+                                    ## Decoder label to the left, and only on the first col
+                                    if (col_idx == 0) and (row_idx == 0):
+                                        ## note, these aren't really the row/col index because they're kinda hardcoded rn.
+                                        an_active_img = ImageOperationsAndEffects.add_boxed_adjacent_label(an_active_img, a_decoder_name, image_edge='left', font_size=48, text_color="#000000",
+                                                                                                            background_color=(255, 255, 255, 0),
+                                                                                                            # fixed_label_region_size = [_out_row_stack.width, 62]
+                                                                                                            )
                                     
+
                                     _tmp_curr_row_raster_imgs.append(an_active_img)
                                 ## END for decoder_IDX, a_d...
                             ## Build merged row image:
