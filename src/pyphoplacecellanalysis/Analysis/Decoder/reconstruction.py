@@ -1413,9 +1413,22 @@ class DecodedFilterEpochsResult(HDF_SerializationMixin, AttrsBasedClassHelperMix
         
         # _common_epoch_df_column_dict = {}
         _common_epoch_df_column_dict = None
-        for active_marginals, active_columns in zip(active_marginals_tuple, columns_tuple):
+        for marginal_tuple_idx, active_marginals, active_columns in zip(np.arange(len(active_marginals_tuple)), active_marginals_tuple, columns_tuple):
             epoch_extracted_posteriors = [a_result['p_x_given_n'] for a_result in active_marginals]
-            
+            #TODO 2025-08-13 17:28: - [ ] GOAL - Add the 'most_likely_position_1D' for each time bin:
+            epoch_extracted_most_likely_positions_1D = None
+            if (marginal_tuple_idx == (len(active_marginals_tuple)-1)):
+                ## only for last tuple result, corresponding to `non_marginalized_decoder_marginals`
+                epoch_extracted_most_likely_positions_1D = [a_result.get('most_likely_positions_1D', None) for a_result in active_marginals]
+                if len([v for v in epoch_extracted_most_likely_positions_1D if (v is not None)]) != len(epoch_extracted_posteriors):
+                    ## if some entries are None (more likely ALL are None), recompute from p_x_given_n but this only works for `non_marginalized_decoder_marginals`:
+                    ## build new from epoch_extracted_posteriors
+                    # epoch_extracted_most_likely_positions_1D = [np.argmax(a_P_x_given_n, axis=-1) for a_P_x_given_n in epoch_extracted_posteriors]
+                    epoch_extracted_most_likely_positions_1D = deepcopy(self.most_likely_positions_list)
+                    # self.pos_bin_edges
+                    # self.p_x_given_n_list
+                    # self.most_likely_positions_list ## DOES THIS WORK?
+
             if _common_epoch_df_column_dict is None:
                 # NOTE: these values are the same for every iteration of this loop (as the number of epochs in filter_epochs don't change:
                 n_epoch_time_bins = [np.shape(a_posterior)[-1] for a_posterior in epoch_extracted_posteriors]
@@ -1446,6 +1459,11 @@ class DecodedFilterEpochsResult(HDF_SerializationMixin, AttrsBasedClassHelperMix
                 # epoch_neuronal_participation_column = np.concatenate([np.full((an_epoch_time_bins, ), fill_value=filter_epochs_df['participation'].values[i]) for i, an_epoch_time_bins in enumerate(n_epoch_time_bins)])
                 
                 _common_epoch_df_column_dict.update(**{'epoch_id': epochs_repeated_epoch_index, 'sub_epoch_time_bin_index': epochs_repeated_sub_epoch_time_bin_index, 'parent_epoch_id': epochs_repeated_epoch_index, 'parent_epoch_label': epoch_label_column, 'parent_epoch_start_t': epochs_repeated_parent_epoch_start_t, 'parent_epoch_end_t': epochs_repeated_parent_epoch_stop_t, 'parent_epoch_duration': epoch_duration_column})
+                if epoch_extracted_most_likely_positions_1D is not None:
+                    time_bin_extracted_most_likely_positions_1D_column = np.concatenate([np.squeeze(an_epoch_extracted_most_likely_positions_1D[:, 0]) for i, an_epoch_extracted_most_likely_positions_1D in enumerate(epoch_extracted_most_likely_positions_1D)]) 
+                    
+                    assert len(time_bin_extracted_most_likely_positions_1D_column) == len(epoch_label_column), f"len(time_bin_extracted_most_likely_positions_1D_column): {len(time_bin_extracted_most_likely_positions_1D_column)}, len(epoch_label_column): {len(epoch_label_column)}"
+                    _common_epoch_df_column_dict.update(**{'most_likely_positions_1D': time_bin_extracted_most_likely_positions_1D_column, })
 
 
             all_columns.extend(active_columns)
