@@ -1371,7 +1371,7 @@ class PosteriorExporting:
 
                 ## Iterate through each epoch:
                 for epoch_IDX in np.arange(num_epochs):
-                    if (included_epoch_idxs is not None) and (epoch_IDX in included_epoch_idxs):
+                    if (included_epoch_idxs is None) or ((included_epoch_idxs is not None) and (epoch_IDX in included_epoch_idxs)):
                         if progress_print:
                             print(f'{a_decoding_epoch_name}[{epoch_IDX}]: processing...')
                             
