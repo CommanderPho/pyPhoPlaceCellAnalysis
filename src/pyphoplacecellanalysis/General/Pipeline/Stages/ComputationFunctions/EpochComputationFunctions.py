@@ -2818,7 +2818,7 @@ class EpochComputationDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Di
             # a_target_context: IdentifyingContext = IdentifyingContext(trained_compute_epochs='laps', pfND_ndim=1, decoder_identifier='pseudo2D', known_named_decoding_epochs_type='global', masked_time_bin_fill_type='nan_filled', data_grain='per_time_bin')
             a_target_context: IdentifyingContext = IdentifyingContext(trained_compute_epochs='laps', pfND_ndim=1, decoder_identifier='pseudo2D', known_named_decoding_epochs_type='global', masked_time_bin_fill_type='ignore', data_grain='per_time_bin')
             best_matching_context, a_result, a_decoder, a_decoded_marginal_posterior_df = a_new_fully_generic_result.get_results_best_matching_context(context_query=a_target_context, debug_print=False)
-            epochs_decoding_time_bin_size = best_matching_context.get('time_bin_size', None)
+            epochs_decoding_time_bin_size: float = best_matching_context.get('time_bin_size', None)
             assert epochs_decoding_time_bin_size is not None
 
             ## OUTPUTS: a_decoded_marginal_posterior_df
@@ -2847,7 +2847,6 @@ class EpochComputationDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Di
             # active_display_context = display_context.overwriting_context(extreme_threshold=extreme_threshold, opacity_max=opacity_max, thickness_ramping_multiplier=thickness_ramping_multiplier) ## include any that are just the slightest big different
             # active_display_context = deepcopy(display_context)
             
-
             needs_discover_default_collected_outputs_dir: bool = True
             if parent_output_folder is not None:
                 if isinstance(parent_output_folder, str):
