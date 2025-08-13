@@ -1301,9 +1301,11 @@ class PosteriorExporting:
 
     @function_attributes(short_name=None, tags=['TEMP', 'export', 'image', 'files', 'merge', 'combine', 'posterior'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-05-30 14:51', related_items=[])
     @classmethod
-    def post_export_build_combined_images(cls, out_custom_formats_dict):
+    def post_export_build_combined_images(cls, out_custom_formats_dict, epoch_name_list = ['laps', 'ripple'], included_epoch_idxs: Optional[List]=None, progress_print:bool=False):
         """merges the 4 1D decoders and the multi-color pseudo2D to produce a single combined output image for each epoch
 
+        Responsible for the `_temp_individual_posteriors/2025-08-13/gor01_one_2006-6-09_1-22-43/ripple/combined/multi` images
+        
         Usage:
             from pyphoplacecellanalysis.Pho2D.data_exporting import PosteriorExporting
 
@@ -1319,7 +1321,8 @@ class PosteriorExporting:
         # active_decoder_names = ['long_LR', 'long_RL', 'short_LR', 'short_RL', 'psuedo2D_ignore']
         active_1D_decoder_names = ['long_LR', 'long_RL', 'short_LR', 'short_RL']
         pseudo_2D_decoder_name: str = 'psuedo2D_ignore'
-        epoch_name_list = ['laps', 'ripple']
+
+        # epoch_name_list = ['laps', 'ripple']
 
         _out_final_merged_images = []
         _out_final_merged_image_save_paths: List[Path] = []
@@ -1330,6 +1333,7 @@ class PosteriorExporting:
         separator_color=f'#fae2e2'
         
         for a_decoding_epoch_name in epoch_name_list:
+            ## e.g. 'laps' or 'ripple'
             try:
                 a_decoder_name = 'long_LR' ## temp
                 _a_partial_dict = out_custom_formats_dict[f'{a_decoding_epoch_name}.{a_decoder_name}']
@@ -1346,47 +1350,50 @@ class PosteriorExporting:
 
                 ## Iterate through each epoch:
                 for epoch_IDX in np.arange(num_epochs):
-                    # vertical stack
-                    _tmp_curr_raster_imgs = []
-                    for decoder_IDX, a_decoder_name in enumerate(active_1D_decoder_names):
-                        a_config = out_custom_formats_dict[f'{a_decoding_epoch_name}.{a_decoder_name}'][active_found_export_format_name][epoch_IDX] # a HeatmapExportConfig
-                        # a_config.posterior_saved_path ## the saved image file
-                        an_active_img = deepcopy(a_config.posterior_saved_image) ## the actual image object
-                        an_active_img = an_active_img.reduce(factor=(1, 4)) ## scale image down by 1/4 in height but leave the original width
+                    if (included_epoch_idxs is not None) and (epoch_IDX in included_epoch_idxs):
+                        if progress_print:
+                            print(f'{a_decoding_epoch_name}[{epoch_IDX}]: processing...')
+                        # vertical stack
+                        _tmp_curr_raster_imgs = []
+                        for decoder_IDX, a_decoder_name in enumerate(active_1D_decoder_names):
+                            a_config = out_custom_formats_dict[f'{a_decoding_epoch_name}.{a_decoder_name}'][active_found_export_format_name][epoch_IDX] # a HeatmapExportConfig
+                            # a_config.posterior_saved_path ## the saved image file
+                            an_active_img = deepcopy(a_config.posterior_saved_image) ## the actual image object
+                            an_active_img = an_active_img.reduce(factor=(1, 4)) ## scale image down by 1/4 in height but leave the original width
+                            
+                            _tmp_curr_raster_imgs.append(an_active_img)
+                        ## END for decoder_IDX, a_d...
+
+                        ## get the multicolor iamge:
+                        try:
+                            a_config = out_custom_formats_dict[f'{a_decoding_epoch_name}.{pseudo_2D_decoder_name}']['raw_rgba'][epoch_IDX] # a HeatmapExportConfig
+                            _tmp_curr_raster_imgs.append(a_config.posterior_saved_image)
+                        except KeyError as e:
+                            # KeyError: "Invalid keys: '['laps', 'long_LR']'"
+                            print(f"\tcould not get multicolor image data for out_custom_formats_dict[f'{a_decoding_epoch_name}.{pseudo_2D_decoder_name}']['raw_rgba'][{epoch_IDX}], key error: {e}\n\tskipping.")    
+                            pass
+                        except Exception as e:
+                            raise
+
+                        # a_config.posterior_saved_image ## the actual image object
+                        a_posterior_saved_path: Path = a_config.posterior_saved_path ## the saved image file
+                        merged_dir = a_posterior_saved_path.parent.parent.parent.joinpath('combined', 'multi')
+                        merged_dir.mkdir(exist_ok=True, parents=True)
+                        a_merged_posterior_export_path: Path = merged_dir.joinpath(a_posterior_saved_path.name) # '_temp_individual_posteriors/2025-05-30/gor01_one_2006-6-12_15-55-31/ripple/combined/multi/p_x_given_n[2].png'
                         
-                        _tmp_curr_raster_imgs.append(an_active_img)
-                    ## END for decoder_IDX, a_d...
+                        ## Build merged image:
+                        _out_vstack = vertical_image_stack(_tmp_curr_raster_imgs, padding=5, separator_color=separator_color)
+                        _out_final_merged_images.append(_out_vstack)
 
-                    ## get the multicolor iamge:
-                    try:
-                        a_config = out_custom_formats_dict[f'{a_decoding_epoch_name}.{pseudo_2D_decoder_name}']['raw_rgba'][epoch_IDX] # a HeatmapExportConfig
-                        _tmp_curr_raster_imgs.append(a_config.posterior_saved_image)
-                    except KeyError as e:
-                        # KeyError: "Invalid keys: '['laps', 'long_LR']'"
-                        print(f"could not get multicolor image data for out_custom_formats_dict[f'{a_decoding_epoch_name}.{pseudo_2D_decoder_name}']['raw_rgba'][{epoch_IDX}], key error: {e}\n\tskipping.")    
-                        pass
-                    except Exception as e:
-                        raise
-
-                    # a_config.posterior_saved_image ## the actual image object
-                    a_posterior_saved_path: Path = a_config.posterior_saved_path ## the saved image file
-                    merged_dir = a_posterior_saved_path.parent.parent.parent.joinpath('combined', 'multi')
-                    merged_dir.mkdir(exist_ok=True, parents=True)
-                    a_merged_posterior_export_path: Path = merged_dir.joinpath(a_posterior_saved_path.name) # '_temp_individual_posteriors/2025-05-30/gor01_one_2006-6-12_15-55-31/ripple/combined/multi/p_x_given_n[2].png'
-                    
-                    ## Build merged image:
-                    _out_vstack = vertical_image_stack(_tmp_curr_raster_imgs, padding=5, separator_color=separator_color)
-                    _out_final_merged_images.append(_out_vstack)
-
-                    ## save it
-                    ## a_merged_posterior_export_path, _out_vstack
-                    _out_vstack.save(a_merged_posterior_export_path) # Save image to file
-                    _out_final_merged_image_save_paths.append(a_merged_posterior_export_path)
+                        ## save it
+                        ## a_merged_posterior_export_path, _out_vstack
+                        _out_vstack.save(a_merged_posterior_export_path) # Save image to file
+                        _out_final_merged_image_save_paths.append(a_merged_posterior_export_path)
 
                 ## END for epoch_IDX in np.arange(num_epochs)...
             except KeyError as e:
                 # KeyError: "Invalid keys: '['laps', 'long_LR']'"
-                print(f'could not get export data for a_decoding_epoch_name: "{a_decoding_epoch_name}", key error: {e}\n\tskipping.')    
+                print(f'\tcould not get export data for a_decoding_epoch_name: "{a_decoding_epoch_name}", key error: {e}\n\tskipping.')    
                 continue
             
             except Exception as e:
