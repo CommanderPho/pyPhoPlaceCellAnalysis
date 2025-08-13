@@ -512,6 +512,7 @@ class GenericDecoderDictDecodedEpochsDictResult(ComputedResult):
                 a_dropping_masked_pseudo2D_continuous_specific_decoded_result, _dropping_mask_index_tuple = a_decoder_epochs_filter_epochs_decoder_result.mask_computed_DecodedFilterEpochsResult_by_required_spike_counts_per_time_bin(spikes_df=deepcopy(spikes_df), masked_bin_fill_mode=masked_bin_fill_mode) ## Masks the low-firing bins so they don't confound the analysis.
                 ## Computes marginals for `dropping_masked_laps_pseudo2D_continuous_specific_decoded_result`
                 a_dropping_masked_decoded_marginal_posterior_df = DirectionalPseudo2DDecodersResult.perform_compute_specific_marginals(a_result=a_dropping_masked_pseudo2D_continuous_specific_decoded_result, marginal_context=a_masked_updated_context)
+                
                 _was_update_success = self.updating_results_for_context(new_context=a_masked_updated_context, a_result=deepcopy(a_dropping_masked_pseudo2D_continuous_specific_decoded_result), a_decoder=deepcopy(all_directional_pf1D_Decoder), a_decoded_marginal_posterior_df=deepcopy(a_dropping_masked_decoded_marginal_posterior_df)) ## update using the result
                 if not _was_update_success:
                     print(f'update failed for masked context: {a_masked_updated_context}')
@@ -1983,7 +1984,9 @@ class GenericDecoderDictDecodedEpochsDictResult(ComputedResult):
 
     @function_attributes(short_name=None, tags=['export', 'CSV'], input_requires=[], output_provides=[], uses=['export_csvs'], used_by=[], creation_date='2025-04-14 17:56', related_items=[])
     def default_export_all_CSVs(self, active_export_parent_output_path: Path, owning_pipeline_reference, decoding_time_bin_size: float):
-        """ 
+        """ Exports all CSVs needed, I think this is responsible for the (FAT) .csv output too
+        
+        
         active_export_parent_output_path = self.collected_outputs_path.resolve()
         Assert.path_exists(parent_output_path)
         csv_save_paths_dict = a_new_fully_generic_result.default_export_all_CSVs(active_export_parent_output_path=active_export_parent_output_path, owning_pipeline_reference=owning_pipeline_reference, decoding_time_bin_size=decoding_time_bin_size)
