@@ -1327,6 +1327,7 @@ class PosteriorExporting:
         _out_final_merged_images = []
         _out_final_merged_image_save_paths: List[Path] = []
 
+        normalization_column_labels: List[str] = ['individual norm', 'context-weighted norm']
         ## The preferred search order to look for images. Stops after finding the first one:
         export_format_name_options = ['greyscale_shared_norm', 'viridis_shared_norm', 'greyscale']
         separator_color=f'#1b0000' ## for greyscale
@@ -1402,6 +1403,19 @@ class PosteriorExporting:
                             separator_color=f'#ff0000' 
                             _out_row_stack = vertical_image_stack(_tmp_curr_row_raster_imgs, padding=5, separator_color=separator_color)
                             # _out_row_stack = horizontal_image_stack(_tmp_curr_row_raster_imgs, padding=5, separator_color=separator_color)
+
+                            ## Add top normalization labels:
+                            # [row_idx]
+                            
+                            if row_idx < len(normalization_column_labels):
+                                normalization_label_text: str = normalization_column_labels[row_idx] # 'global'      
+                                _out_row_stack = ImageOperationsAndEffects.add_boxed_adjacent_label(_out_row_stack, normalization_label_text, image_edge='top', font_size=48, text_color="#000000", #(33, 255, 33),
+                                                                                                    background_color=(255, 255, 255, 0), # text_outline_shadow_color=(0, 0, 0, 255), # corner='bottom-right' 
+                                                                                                    #  inverse_scale_factor=(2, 1),
+                                                                                                    # stroke_width=1, stroke_fill="#000000",
+                                                                                                    )
+
+
                             _tmp_curr_merge_layout_raster_imgs.append(_out_row_stack)
 
                         ## END for row_idx, a_merge_layout_row in enumerate(custom_merge_layout_dict)
