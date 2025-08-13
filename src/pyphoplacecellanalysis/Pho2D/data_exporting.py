@@ -1312,7 +1312,7 @@ class PosteriorExporting:
             _out_final_merged_image_save_paths, _out_final_merged_images = PosteriorExporting.post_export_build_combined_images(out_custom_formats_dict=out_custom_formats_dict)
         
         """
-        from pyphocorehelpers.plotting.media_output_helpers import vertical_image_stack, horizontal_image_stack, image_grid
+        from pyphocorehelpers.plotting.media_output_helpers import vertical_image_stack, horizontal_image_stack, image_grid, ImageOperationsAndEffects
         
         ## INPUTS: out_custom_formats_dict
 
@@ -1388,15 +1388,30 @@ class PosteriorExporting:
                                     # a_config.posterior_saved_path ## the saved image file
                                     an_active_img = deepcopy(a_config.posterior_saved_image) ## the actual image object
                                     an_active_img = an_active_img.reduce(factor=(1, 4)) ## scale image down by 1/4 in height but leave the original width
+                                    # an_active_img = an_active_img.reduce(factor=(4, 1)) ## scale image down by 1/4 in width but leave the original height
+                                    
+                                    ## Add overlay text
+                                    an_active_img = ImageOperationsAndEffects.add_top_left_overlay_label( an_active_img, a_decoder_name, font_size=18, text_color=(33, 255, 33), # background_color=(0, 0, 0, 180), # text_outline_shadow_color=(0, 0, 0, 255), # corner='bottom-right' 
+                                                                                                         )
                                     
                                     _tmp_curr_row_raster_imgs.append(an_active_img)
                                 ## END for decoder_IDX, a_d...
                             ## Build merged row image:
-                            _out_row_stack = horizontal_image_stack(_tmp_curr_row_raster_imgs, padding=5, separator_color=separator_color)
+                            separator_color=f'#ff0000' 
+                            _out_row_stack = vertical_image_stack(_tmp_curr_row_raster_imgs, padding=5, separator_color=separator_color)
+                            # _out_row_stack = horizontal_image_stack(_tmp_curr_row_raster_imgs, padding=5, separator_color=separator_color)
                             _tmp_curr_merge_layout_raster_imgs.append(_out_row_stack)
 
                         ## END for row_idx, a_merge_layout_row in enumerate(custom_merge_layout_dict)
+                        
 
+                        ## Build merged all rows image:
+                        separator_color=f'#66ff00' 
+                        _out_vstack = horizontal_image_stack(_tmp_curr_merge_layout_raster_imgs, padding=25, separator_color=separator_color) # , separator_color=separator_color
+                        # _out_vstack = vertical_image_stack(_tmp_curr_merge_layout_raster_imgs, padding=35, separator_color=separator_color)
+                        _out_vstack = _out_vstack.reduce(factor=(2, 1)) ## scale image down by 1/2 in width but leave the original height
+                        _tmp_curr_merge_layout_raster_imgs = [_out_vstack, ] # combined image with both columns concatenated is back
+                        
                         ## get the multicolor iamge last:
                         try:
                             a_config = out_custom_formats_dict[f'{a_decoding_epoch_name}.{pseudo_2D_decoder_name}']['raw_rgba'][epoch_IDX] # a HeatmapExportConfig
@@ -1415,7 +1430,8 @@ class PosteriorExporting:
                         a_merged_posterior_export_path: Path = merged_dir.joinpath(a_posterior_saved_path.name) # '_temp_individual_posteriors/2025-05-30/gor01_one_2006-6-12_15-55-31/ripple/combined/multi/p_x_given_n[2].png'
                         
                         ## Build merged all rows image:
-                        _out_vstack = vertical_image_stack(_tmp_curr_merge_layout_raster_imgs, padding=5, separator_color=separator_color)
+                        separator_color=f'#006eff' 
+                        _out_vstack = vertical_image_stack(_tmp_curr_merge_layout_raster_imgs, padding=10, separator_color=separator_color)
                         _out_final_merged_images.append(_out_vstack)
 
                         ## save it
