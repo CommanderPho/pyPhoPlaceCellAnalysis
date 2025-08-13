@@ -3495,7 +3495,7 @@ def figures_plot_generalized_decode_epochs_dict_and_export_results_completion_fu
 
 
     # ==================================================================================================================================================================================================================================================================================== #
-    # '_display_decoded_trackID_weighted_position_posterior_withMultiColorOverlay'                                                                                                                                                                                                         #
+    # '_display_decoded_trackID_weighted_position_posterior_withMultiColorOverlay' -- NOTE: this does all posterior export formats, not just the MultiColorCoverlay (e.g. 'greyscale', 'greyscale_shared_norm', 'viridis_shared_norm', etc.             #
     # ==================================================================================================================================================================================================================================================================================== #
 
     if ('_display_decoded_trackID_weighted_position_posterior_withMultiColorOverlay' in included_figures_names) or ('trackID_weighted_position_posterior' in included_figures_names):
@@ -3524,7 +3524,12 @@ def figures_plot_generalized_decode_epochs_dict_and_export_results_completion_fu
 
             out_custom_formats_dict = _out.get('out_custom_formats_dict', None)
             if out_custom_formats_dict is not None:
-                _out_final_merged_image_save_paths, _out_final_merged_images = PosteriorExporting.post_export_build_combined_images(out_custom_formats_dict=out_custom_formats_dict)
+                custom_merge_layout_dict = [['greyscale'],
+                    ['greyscale_shared_norm'],
+                    # ['psuedo2D_ignore/raw_rgba'], ## Implicitly always appends the pseudo2D_ignore/raw_rgba image at the bottom row
+                ]
+                _out_final_merged_image_save_paths, _out_final_merged_images = PosteriorExporting.post_export_build_combined_images(out_custom_formats_dict=out_custom_formats_dict, custom_merge_layout_dict=custom_merge_layout_dict,
+                                                                                                                    epoch_name_list=['ripple'], progress_print=True) ## currently skip laps, just do ripples
                 _out['final_merged_image_save_paths'] = deepcopy(_out_final_merged_image_save_paths)
                 # across_session_results_extended_dict['figures_plot_generalized_decode_epochs_dict_and_export_results_completion_function'].update({
                 #     '_display_decoded_trackID_weighted_position_posterior_withMultiColorOverlay': _out,
