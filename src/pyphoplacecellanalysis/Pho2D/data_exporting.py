@@ -1391,7 +1391,9 @@ class PosteriorExporting:
                                     # an_active_img = an_active_img.reduce(factor=(4, 1)) ## scale image down by 1/4 in width but leave the original height
                                     
                                     ## Add overlay text
-                                    an_active_img = ImageOperationsAndEffects.add_top_left_overlay_label( an_active_img, a_decoder_name, font_size=18, text_color=(33, 255, 33), # background_color=(0, 0, 0, 180), # text_outline_shadow_color=(0, 0, 0, 255), # corner='bottom-right' 
+                                    an_active_img = ImageOperationsAndEffects.add_overlayed_text(an_active_img, a_decoder_name, font_size=48, text_color="#FF00EACA",
+                                                                                                        #  inverse_scale_factor=(2, 1),
+                                                                                                        stroke_width=1, stroke_fill="#000000",
                                                                                                          )
                                     
                                     _tmp_curr_row_raster_imgs.append(an_active_img)
