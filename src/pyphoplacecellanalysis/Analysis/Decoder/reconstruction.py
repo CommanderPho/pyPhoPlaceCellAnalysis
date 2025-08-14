@@ -1417,17 +1417,12 @@ class DecodedFilterEpochsResult(HDF_SerializationMixin, AttrsBasedClassHelperMix
             epoch_extracted_posteriors = [a_result['p_x_given_n'] for a_result in active_marginals]
             #TODO 2025-08-13 17:28: - [ ] GOAL - Add the 'most_likely_position_1D' for each time bin:
             epoch_extracted_most_likely_positions_1D = None
-            if (marginal_tuple_idx == (len(active_marginals_tuple)-1)):
-                ## only for last tuple result, corresponding to `non_marginalized_decoder_marginals`
-                epoch_extracted_most_likely_positions_1D = [a_result.get('most_likely_positions_1D', None) for a_result in active_marginals]
-                if len([v for v in epoch_extracted_most_likely_positions_1D if (v is not None)]) != len(epoch_extracted_posteriors):
-                    ## if some entries are None (more likely ALL are None), recompute from p_x_given_n but this only works for `non_marginalized_decoder_marginals`:
-                    ## build new from epoch_extracted_posteriors
-                    # epoch_extracted_most_likely_positions_1D = [np.argmax(a_P_x_given_n, axis=-1) for a_P_x_given_n in epoch_extracted_posteriors]
-                    epoch_extracted_most_likely_positions_1D = deepcopy(self.most_likely_positions_list)
-                    # self.pos_bin_edges
-                    # self.p_x_given_n_list
-                    # self.most_likely_positions_list ## DOES THIS WORK?
+            # if (marginal_tuple_idx == (len(active_marginals_tuple)-1)):
+            ## only for last tuple result, corresponding to `non_marginalized_decoder_marginals`
+            epoch_extracted_most_likely_positions_1D = [a_result.get('most_likely_positions_1D', None) for a_result in active_marginals]
+            if len([v for v in epoch_extracted_most_likely_positions_1D if (v is not None)]) != len(epoch_extracted_posteriors):
+                ## if some entries are None (more likely ALL are None), recompute from p_x_given_n but this only works for `non_marginalized_decoder_marginals`:
+                epoch_extracted_most_likely_positions_1D = deepcopy(self.most_likely_positions_list)
 
             if _common_epoch_df_column_dict is None:
                 # NOTE: these values are the same for every iteration of this loop (as the number of epochs in filter_epochs don't change:
