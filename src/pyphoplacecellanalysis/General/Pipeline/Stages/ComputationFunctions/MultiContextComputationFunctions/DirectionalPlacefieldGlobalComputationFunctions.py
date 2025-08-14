@@ -2187,9 +2187,16 @@ class DirectionalPseudo2DDecodersResult(ComputedResult):
         track_marginal_posterior_df: pd.DataFrame = pd.DataFrame({'t':deepcopy(epochs_t_centers),
                                                                     **_marginal_probs_dict,
                                                                     # 'P_Long': np.squeeze(epochs_p_x_given_n[0, :]), 'P_Short': np.squeeze(epochs_p_x_given_n[1, :]),
-                                                                     **deepcopy(_common_epoch_df_dict),
-                                                                    'most_likely_positions_1D': deepcopy(epochs_most_likely_positions_1D)},
+                                                                     **deepcopy(_common_epoch_df_dict)},
                                                                     ) # , 'time_bin_size': pseudo2D_continuous_specific_decoded_result.decoding_time_bin_size
+        
+        try:
+            track_marginal_posterior_df['most_likely_positions_1D'] = deepcopy(epochs_most_likely_positions_1D)
+        except ValueError as e:
+            print(f'failed to add "most_likely_positions_1D" column to `track_marginal_posterior_df`. Skipping.')
+            pass            
+        except Exception as e:
+            raise e
         ## OUTPUTS: track_marginal_posterior_df
 
         ## Build combined marginals df:
