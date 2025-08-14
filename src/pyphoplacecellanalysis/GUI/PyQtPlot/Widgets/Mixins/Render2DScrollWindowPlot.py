@@ -30,6 +30,9 @@ class Render2DScrollWindowPlotMixin:
         - a dynamically scrolling zoomed-in view of the above raster, controlled by the adjustable window
         
         
+    self.ui.scroll_window_region.setRegion([new_start, new_end])
+        
+        
     Known Uses:
         Implemented by Spike2DRaster
     
@@ -124,6 +127,7 @@ class Render2DScrollWindowPlotMixin:
         return background_static_scroll_window_plot
 
     
+    @function_attributes(short_name=None, tags=['scroller', 'update', 'initialize'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-05-12 15:25', related_items=[])
     def _fix_initial_linearRegionLocation(self, debug_print=False):
         """ Hopefully finally resolves the issue where the linear scroll region window was always cut-off initially. 
         Note that when this is called, self.temporal_axis_length and self.spikes_window.window_duration were both observed to be 0.0, which is why they couldn't be used.
@@ -367,6 +371,53 @@ class Render2DScrollWindowPlotMixin:
             return all_spots, all_scatterplot_tooltips_kwargs
         else:
             return all_spots
+
+
+    @classmethod
+    def add_scroll_region(cls, active_2d_plot, parent_plot, clipItem=None, should_connect=False):
+        """ adds the scroll region control to the specified raster plot
+        
+        scroll_window_region, _conn = add_scroll_region(active_2d_plot, parent_plot=background_static_scroll_window_plot, clipItem=active_2d_plot.plots.preview_overview_scatter_plot)
+        
+        active_2d_plot.ui.scroll_window_region = scroll_window_region
+        """
+        from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.GraphicsObjects.CustomLinearRegionItem import CustomLinearRegionItem
+        if clipItem is None:
+            clipItem = active_2d_plot.plots.preview_overview_scatter_plot
+            
+        # linear_region_display_kwargs = dict(pen=pg.mkPen('#ffffff'), brush=pg.mkBrush('#f004'), hoverBrush=pg.mkBrush('#fff4'), hoverPen=pg.mkPen('#f00'))
+        # linear_region_display_kwargs = dict(pen=pg.mkPen('#1d0000f8', width=2), brush=pg.mkBrush('#00000090'), hoverBrush=pg.mkBrush('#fff40090'), hoverPen=pg.mkPen('#f00000ff', width=2.5))
+        # linear_region_display_kwargs = dict(pen=pg.mkPen('#1d0000f8'), brush=pg.mkBrush('#ffffff90'), hoverBrush=pg.mkBrush('#fff40090'), hoverPen=pg.mkPen('#fffffff4'))
+        linear_region_display_kwargs = dict(pen=pg.mkPen('#ffffffe2', width=1.0), brush=pg.mkBrush('#ffffff90'), hoverBrush=pg.mkBrush('#fff40090'), hoverPen=pg.mkPen('#ff0505f4', width=1.5))
+
+        # Add the linear region overlay:
+        scroll_window_region = CustomLinearRegionItem(**linear_region_display_kwargs, clipItem=clipItem) # bound the LinearRegionItem to the plotted data
+        scroll_window_region.setObjectName('scroll_window_region')
+        scroll_window_region.setZValue(10)
+        
+        ## Set position from spikes_window:
+        confirmed_valid_window_start_t = active_2d_plot.spikes_window.total_data_start_time
+        if (active_2d_plot.spikes_window.window_duration == 0.0):
+            # invalid window length, just choose something reasonable the user can grab, say 5% of the total window data
+            total_data_duration = active_2d_plot.spikes_window.total_data_end_time - active_2d_plot.spikes_window.total_data_start_time
+            reasonable_active_window_duration = float(total_data_duration) * 0.05 # 5%
+            ## UGHH, it works but please note that the final window is actually going to be MORE than 5% of the total data duration because of the temporal_zoom_factor > 1.0. 
+        else:
+            reasonable_active_window_duration = float(active_2d_plot.spikes_window.window_duration)        
+        # Compute the final reasonable window end_t:
+        confirmed_valid_window_end_t = confirmed_valid_window_start_t + reasonable_active_window_duration
+            
+        scroll_window_region.setRegion([confirmed_valid_window_start_t, confirmed_valid_window_end_t]) # adjust scroll control
+        
+        # Add the LinearRegionItem to the ViewBox, but tell the ViewBox to exclude this item when doing auto-range calculations.
+        parent_plot.addItem(scroll_window_region, ignoreBounds=True)
+        if should_connect:
+            _conn = scroll_window_region.sigRegionChanged.connect(active_2d_plot._Render2DScrollWindowPlot_on_linear_region_item_update)
+        else:
+            _conn = None
+            
+        return scroll_window_region, _conn
+
 
 
 

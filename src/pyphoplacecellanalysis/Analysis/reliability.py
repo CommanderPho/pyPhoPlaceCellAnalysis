@@ -10,6 +10,7 @@ from nptyping import NDArray
 from attrs import define, field, Factory
 
 import neuropy.utils.type_aliases as types
+from neuropy.core.epoch import Epoch, ensure_dataframe, ensure_Epoch
 from neuropy.analyses.time_dependent_placefields import PfND_TimeDependent
 
 from pyphocorehelpers.indexing_helpers import build_pairwise_indicies
@@ -243,13 +244,14 @@ class TrialByTrialActivity:
     
     """
     active_epochs_df: pd.DataFrame = field()
-    C_trial_by_trial_correlation_matrix: NDArray = field(metadata={'shape':('n_neurons', 'n_epochs', 'n_epochs')})
-    z_scored_tuning_map_matrix: NDArray = field(metadata={'shape':('n_epochs', 'n_neurons', 'n_pos_bins')})
+    C_trial_by_trial_correlation_matrix: NDArray[ND.Shape["N_ACLUS, N_EPOCHS, N_EPOCHS"], Any] = field(metadata={'shape':('n_neurons', 'n_epochs', 'n_epochs')})
+    z_scored_tuning_map_matrix: NDArray[ND.Shape["N_EPOCHS, N_ACLUS, N_POS_BINS"], Any] = field(metadata={'shape':('n_epochs', 'n_neurons', 'n_pos_bins')})
     aclu_to_matrix_IDX_map: Dict = field() # factory=Factory(dict)
     neuron_ids: NDArray = field(metadata={'shape':('n_neurons',)})
     
     @property 
     def stability_score(self) -> NDArray:
+        """ nanmedian(C, axis=(1,2)) # Over the two epochs dimensions... is this a double counting issue that would effect the median?"""
         return np.nanmedian(self.C_trial_by_trial_correlation_matrix, axis=(1,2))
     
     @property 
@@ -316,7 +318,9 @@ class TrialByTrialActivity:
         if included_neuron_IDs is None:
             included_neuron_IDs = deepcopy(active_pf_dt.included_neuron_IDs) # this may be under-included. Is there like an "all-times-neuron_IDs?"
             
-        if isinstance(epochs_df, pd.DataFrame):
+        
+        if isinstance(epochs_df, (pd.DataFrame, Epoch)):
+            epochs_df = ensure_dataframe(epochs_df)
             # dataframes are treated weird by PfND_dt, convert to basic numpy array of shape (n_epochs, 2)
             time_intervals = epochs_df[['start', 'stop']].to_numpy() # .shape # (n_epochs, 2)
         else:
@@ -368,7 +372,7 @@ class TrialByTrialActivity:
 
 
     @classmethod
-    def compute_trial_by_trial_correlation_matrix(cls, active_pf_dt: PfND_TimeDependent, occupancy_weighted_tuning_maps_matrix: NDArray, included_neuron_IDs=None):
+    def compute_trial_by_trial_correlation_matrix(cls, active_pf_dt: PfND_TimeDependent, occupancy_weighted_tuning_maps_matrix: NDArray[ND.Shape["N_ACLUS, N_TRIALS, N_XBINS"], Any], included_neuron_IDs=None, epsilon_value: float = 1e-12) -> Tuple[NDArray, NDArray, Dict]:
         """ 2024-02-02 - computes the Trial-by-trial Correlation Matrix C 
         
         Returns:
@@ -393,11 +397,11 @@ class TrialByTrialActivity:
         assert np.shape(occupancy_weighted_tuning_maps_matrix)[1] == n_aclus
         assert np.shape(occupancy_weighted_tuning_maps_matrix)[2] == n_xbins
 
-        epsilon_value: float = 1e-12
+        
         # Assuming 'occupancy_weighted_tuning_maps_matrix' is your dataset with shape (trials, positions)
         # Z-score along the position axis (axis=1)
         position_axis_idx: int = 2 ## 
-        z_scored_tuning_map_matrix: NDArray = (occupancy_weighted_tuning_maps_matrix - np.nanmean(occupancy_weighted_tuning_maps_matrix, axis=position_axis_idx, keepdims=True)) / ((np.nanstd(occupancy_weighted_tuning_maps_matrix, axis=position_axis_idx, keepdims=True))+epsilon_value)
+        z_scored_tuning_map_matrix: NDArray[ND.Shape["N_TRIALS, N_ACLUS, N_XBINS"], Any] = (occupancy_weighted_tuning_maps_matrix - np.nanmean(occupancy_weighted_tuning_maps_matrix, axis=position_axis_idx, keepdims=True)) / ((np.nanstd(occupancy_weighted_tuning_maps_matrix, axis=position_axis_idx, keepdims=True))+epsilon_value)
 
         # trial-by-trial correlation matrix C
         M = float(n_xbins)
@@ -409,19 +413,20 @@ class TrialByTrialActivity:
             C_list.append(C_i)
         # occupancy_weighted_tuning_maps_matrix
 
-        C_trial_by_trial_correlation_matrix = np.stack(C_list, axis=0) # .shape (n_aclus, n_epochs, n_epochs) - (80, 84, 84)
+        C_trial_by_trial_correlation_matrix: NDArray[ND.Shape["N_ACLUS, N_EPOCHS, N_EPOCHS"], Any] = np.stack(C_list, axis=0) # .shape (n_aclus, n_epochs, n_epochs) - (80, 84, 84)
         # outputs: C_trial_by_trial_correlation_matrix
 
         # n_laps: int = len(laps_unique_ids)
-        aclu_to_matrix_IDX_map = dict(zip(neuron_ids, np.arange(n_aclus)))
+        aclu_to_matrix_IDX_map: Dict[int, int] = dict(zip(neuron_ids, np.arange(n_aclus)))
 
         return C_trial_by_trial_correlation_matrix, z_scored_tuning_map_matrix, aclu_to_matrix_IDX_map
 
 
     ## MAIN CALL:
     @classmethod
-    def directional_compute_trial_by_trial_correlation_matrix(cls, active_pf_dt: PfND_TimeDependent, directional_lap_epochs_dict, included_neuron_IDs=None) -> Dict[types.DecoderName, "TrialByTrialActivity"]:
-        """ 
+    def directional_compute_trial_by_trial_correlation_matrix(cls, active_pf_dt: PfND_TimeDependent, directional_lap_epochs_dict: Dict[types.DecoderName, Epoch], included_neuron_IDs=None) -> Dict[types.DecoderName, "TrialByTrialActivity"]:
+        """ Computes the trial-by-trial (lap-by-lap) correlation for each cell
+
         
         2024-02-02 - 10pm - Have global version working but want seperate directional versions. Seperately do `(long_LR_name, long_RL_name, short_LR_name, short_RL_name)`:
         
@@ -468,9 +473,9 @@ class TrialByTrialActivity:
         #     active_pf_dt.all_time_filtered_spikes_df, active_aclu_to_fragile_linear_neuron_IDX_dict = active_pf_dt.all_time_filtered_spikes_df.spikes.rebuild_fragile_linear_neuron_IDXs()
 
 
-        # Seperately do (long_LR_epochs_obj, long_RL_epochs_obj, short_LR_epochs_obj, short_RL_epochs_obj):
+        # Seperately do each decoder as they represent laps from each direction and track (long_LR_epochs_obj, long_RL_epochs_obj, short_LR_epochs_obj, short_RL_epochs_obj):
         for an_epoch_name, active_laps_epoch in directional_lap_epochs_dict.items():
-            active_laps_df = deepcopy(active_laps_epoch.to_dataframe())
+            active_laps_df = deepcopy(active_laps_epoch.to_dataframe()) # ensure_dataframe
             active_lap_pf_results_dict = cls.compute_spatial_binned_activity_via_pfdt(active_pf_dt=active_pf_dt, epochs_df=active_laps_df, included_neuron_IDs=included_neuron_IDs)
             # Unpack the variables:
             historical_snapshots = active_lap_pf_results_dict['historical_snapshots']

@@ -7,10 +7,16 @@ from typing_extensions import TypeAlias
 from nptyping import NDArray
 import neuropy.utils.type_aliases as types
 from contextlib import redirect_stdout, redirect_stderr
-
+import json
+from datetime import datetime
 import numpy as np
 import pandas as pd
 pd.options.mode.chained_assignment = None  # default='warn'
+
+{% if should_use_viztracer_logging %}
+from viztracer import VizTracer
+from pyphocorehelpers.print_helpers import get_now_time_str
+{% endif %}
 
 # NeuroPy (Diba Lab Python Repo) Loading
 from neuropy.core.session.Formats.BaseDataSessionFormats import DataSessionFormatRegistryHolder
@@ -33,10 +39,22 @@ script_file_parent_path = Path(os.path.dirname(script_file_path)).resolve()
 
 curr_session_context = {{ curr_session_context }}
 curr_session_basedir = Path(r'{{ curr_session_basedir }}').resolve()
+job_suffix: str = "{{job_suffix|default('')}}"
+curr_session_complete_identifier: str = "{{curr_session_complete_identifier|default('')}}"
 script_type: str = Path(script_file_path).resolve().stem.split('_')[0] # 'run_kdiba_gor01_one_2006-6-07_11-26-53', either ['run', 'figures']
 
 session_ctxt_key:str = curr_session_context.get_description(separator='|', subset_includelist=['animal','exper_name','session_name'])
+parameter_specifier_str: str = "{{override_custom_pickle_suffix|default('')}}"
 
+{% if should_use_viztracer_logging %}
+# ==================================================================================================================== #
+# VIZTRACER PERFORMANCE LOGGING                                                                                       #
+# ==================================================================================================================== #
+
+viztracer_output_file = script_file_parent_path / f"viztracer_{get_now_time_str()}-{curr_session_context}_{script_type}.json"
+print(f'VizTracer output will be saved to: {viztracer_output_file}')
+
+{% endif %}
 
 {% if should_use_neptune_logging %}
 
@@ -67,11 +85,13 @@ if neptuner.run is None:
     for k, v in curr_session_context.to_dict().items():
         neptuner.run[k] = v # add the properties to the run
 
-    neptuner.run["sys/tags"].add(list(curr_session_context.as_tuple()) + [script_type]) # adds the session tags ('kdiba', 'gor01', 'one', '2006-6-09_1-22-43')
-    neptuner.run["sys/group_tags"].add([session_ctxt_key, script_type])
+    neptuner.run["sys/tags"].add(list(curr_session_context.as_tuple()) + [script_type, job_suffix]) # adds the session tags ('kdiba', 'gor01', 'one', '2006-6-09_1-22-43')
+    neptuner.run["sys/group_tags"].add([session_ctxt_key, script_type, job_suffix])
 
     # session_descriptor_string: a string describing the context of the session like 'sess_kdiba_2006-6-07_11-26-53'
     neptuner.run['session_descriptor_string'] = curr_session_context.get_description() # 'kdiba_vvp01_two_2006-4-09_16-40-54_sess'
+    neptuner.run['session_complete_descriptor_string'] = curr_session_complete_identifier # 'kdiba_vvp01_two_2006-4-09_16-40-54_sess'
+
     neptuner.outputs = neptuner.run['outputs']
     neptuner.figures = neptuner.outputs['figures']
 
@@ -79,7 +99,7 @@ neptuner_run: AutoValueConvertingNeptuneRun = neptuner.run
 neptuner_run.sync()
 {% endif %}
 
-curr_task_logger = build_batch_task_logger(session_context=curr_session_context, file_logging_dir=script_file_parent_path, logging_root_FQDN=None, include_curr_time_str=True)
+curr_task_logger = build_batch_task_logger(session_context=curr_session_context, file_logging_dir=script_file_parent_path, logging_root_FQDN=None, include_curr_time_str=True, additional_suffix=job_suffix)
 final_log_file_path: Path = None
 for a_handler in curr_task_logger.handlers:
     if hasattr(a_handler, 'baseFilename'):
@@ -151,7 +171,7 @@ local_computations_override_output_file = None
 global_computation_results_override_output_file = None #}
 
 ## Override input/output files:
-parameter_specifier_str: str = "{{override_custom_pickle_suffix|default('')}}"
+
 {# override_output_folder: Path = script_file_parent_path #}
 override_output_folder: Path = Path(str(curr_session_basedir))
 assert override_output_folder.exists(), f"override_output_folder: '{override_output_folder}' does not exist!"
@@ -188,7 +208,7 @@ result_handler = BatchSessionCompletionHandler(force_reload_all=True,
                                                 session_computations_options=BatchComputationProcessOptions(should_load=False, should_compute=True, should_save=SavingOptions.ALWAYS, override_file=local_computations_override_file, override_output_file=local_computations_override_output_file),
                                                 global_computations_options=BatchComputationProcessOptions(should_load=False, should_compute=True, should_save=SavingOptions.ALWAYS, override_file=global_computation_results_override_file, override_output_file=global_computation_results_override_output_file),
                                                 extended_computations_include_includelist=extended_computations_include_includelist,
-                                                force_recompute_override_computations_includelist=force_recompute_override_computations_includelist, force_recompute_override_computation_kwargs_dict=force_recompute_override_computation_kwargs_dict,
+                                                force_recompute_override_computations_includelist=force_recompute_override_computations_includelist, should_generate_all_plots=True, force_recompute_override_computation_kwargs_dict=force_recompute_override_computation_kwargs_dict,
                                                 should_perform_figure_generation_to_file=should_perform_figure_generation_to_file, saving_mode=PipelineSavingScheme.OVERWRITE_IN_PLACE, force_global_recompute=True,
                                                 **batch_session_completion_handler_kwargs, **multiprocessing_kwargs)
 {% else %}
@@ -253,6 +273,25 @@ neptuner_run.sync()
 
 {# Define a block named 'my_block' #}
 {% macro generate_block() %}
+{% if should_use_viztracer_logging %}
+
+new_print(f'/* VizTracer trace will be saved to: {viztracer_output_file} __________________________________________________________________________________ */')
+with VizTracer(
+    output_file=str(viztracer_output_file),
+    min_duration=200,  # only trace functions taking more than 200 microseconds
+    tracer_entries=5000000,  # maximum 3 million trace entries
+    ignore_frozen=True  # skip tracing frozen modules (like standard library)
+) as tracer:
+    run_status, run_errors, run_outputs = run_specific_batch(global_data_root_parent_path=Path(r'{{ global_data_root_parent_path }}').resolve(),
+                                                    curr_session_context=curr_session_context,
+                                                    curr_session_basedir=curr_session_basedir,
+                                                    active_pickle_filename=result_handler.session_computations_options.override_file,
+                                                    existing_task_logger=curr_task_logger,
+                                                    force_reload = result_handler.force_reload_all,
+                                                    post_run_callback_fn=result_handler.on_complete_success_execution_session,
+                                                    fail_on_exception=False,
+                                                    saving_mode=result_handler.saving_mode, override_parameters_flat_keypaths_dict=override_parameters_flat_keypaths_dict, **run_specific_batch_kwargs)
+{% else %}
 run_status, run_errors, run_outputs = run_specific_batch(global_data_root_parent_path=Path(r'{{ global_data_root_parent_path }}').resolve(),
                                                 curr_session_context=curr_session_context,
                                                 curr_session_basedir=curr_session_basedir,
@@ -262,6 +301,7 @@ run_status, run_errors, run_outputs = run_specific_batch(global_data_root_parent
                                                 post_run_callback_fn=result_handler.on_complete_success_execution_session,
                                                 fail_on_exception=False,
                                                 saving_mode=result_handler.saving_mode, override_parameters_flat_keypaths_dict=override_parameters_flat_keypaths_dict, **run_specific_batch_kwargs)
+{% endif %}
 
 new_print(f'finished run: {run_status}\nerrors: {run_errors}\n') # 'outputs: {run_outputs}'
 
@@ -283,6 +323,7 @@ new_print(f'/* script_file_path: {script_file_path} ____________________________
 {% if should_use_file_redirected_output_logging %}
 new_print(f'/* log_file_path: {final_log_file_path} __________________________________________________________________________________ */')
 {% endif %}
+new_print(f'/* job_suffix: {job_suffix} __________________________________________________________________________________ */')
 new_print(f'/* session_basedir: {curr_session_basedir} __________________________________________________________________________________ */')
 new_print(f'/* local_computations_override_file: {local_computations_override_file} __________________________________________________________________________________ */')
 new_print(f'/* global_computation_results_override_file: {global_computation_results_override_file} __________________________________________________________________________________ */')
@@ -298,8 +339,36 @@ new_print(f'/* batch_session_completion_handler_kwargs: {batch_session_completio
 {# new_print(f'/* run_outputs: {run_outputs} __________________________________________________________________________________ */') #}
 {# new_print(f'/* batch_session_completion_handler_kwargs: {batch_session_completion_handler_kwargs} __________________________________________________________________________________ */') #}
 
+# Write a status_file that can be read by the powershell script:
+try:
+    status_file = Path(script_file_parent_path) / "status.json"
+    status_data = {
+        "status": f"{run_status}",
+        "session_complete_identifier": curr_session_complete_identifier,
+        "session_context": str(curr_session_context),
+        "job_suffix": str(job_suffix) if job_suffix else None,
+        "errors": str(run_errors) if run_errors else None,
+        "log_file": str(final_log_file_path),
+        "completion_time": str(datetime.now()) if 'datetime' in sys.modules else None,
+        "session_basedir": curr_session_basedir.as_posix() if curr_session_basedir else None,
+    }
+
+    with open(status_file, 'w') as f:
+        json.dump(status_data, f, indent=2)
+
+    new_print(f'/* wrote status_file: "{status_file}" __________________________________________________________________________________ */')
+
+except Exception as e:
+    new_print(f'ERROR: writing status_file: "{status_file}" failed with error: {e}')
+    raise e
+
 new_print(f'\n ALL DONE! \n')
 new_print(f'/* ================================================================================================================== */\n')
+
+{% if should_use_viztracer_logging %}
+new_print(f'/* VizTracer trace saved to: {viztracer_output_file} __________________________________________________________________________________ */')
+{% endif %}
+
 {% endmacro %}
 
 

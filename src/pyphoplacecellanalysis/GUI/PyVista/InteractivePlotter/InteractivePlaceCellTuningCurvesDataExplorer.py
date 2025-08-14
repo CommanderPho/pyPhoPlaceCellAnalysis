@@ -45,6 +45,9 @@ class InteractivePlaceCellTuningCurvesDataExplorer(OccupancyPlottingMixin, Place
         
         TODO: see where self.active_session is used. Hopefully it's only in _setup_variables? But it is set as an instance property, so that isn't good.
         
+        #TODO 2025-06-25 13:53: - [ ] How does this relate to `InteractivePlaceCellDataExplorer`
+        
+        
         Function call order:
             __init__
             _setup()
@@ -57,6 +60,8 @@ class InteractivePlaceCellTuningCurvesDataExplorer(OccupancyPlottingMixin, Place
     def __init__(self, active_config, active_session, active_epoch_placefields, pf_colors, extant_plotter=None, **kwargs):
         should_nan_non_visited_elements = kwargs.pop('should_nan_non_visited_elements', None)
         zScalingFactor = kwargs.pop('zScalingFactor', None)
+        show_legend = kwargs.pop('show_legend', None)
+        should_display_placefield_points = kwargs.pop('should_display_placefield_points', None)
         super(InteractivePlaceCellTuningCurvesDataExplorer, self).__init__(active_config=active_config, active_session=active_session, extant_plotter=extant_plotter, data_explorer_name='TuningMapDataExplorer', **kwargs)
         self.params.active_epoch_placefields = deepcopy(active_epoch_placefields)
         self.params.pf_colors = deepcopy(pf_colors)
@@ -72,6 +77,13 @@ class InteractivePlaceCellTuningCurvesDataExplorer(OccupancyPlottingMixin, Place
             
         if zScalingFactor is not None:
             self.params.zScalingFactor =zScalingFactor
+
+        if show_legend is not None:
+            self.params.show_legend = show_legend
+
+        if should_display_placefield_points is not None:
+            self.params.should_display_placefield_points = should_display_placefield_points
+
         
         self.use_fragile_linear_neuron_IDX_as_cell_id = False # if False, uses the normal 'aclu' value as the cell id (which I think is correct)
         
@@ -289,6 +301,8 @@ class InteractivePlaceCellTuningCurvesDataExplorer(OccupancyPlottingMixin, Place
         
 
     def plot(self, pActivePlotter=None):
+        """ called to perform plotting
+        """
         ## Build the new BackgroundPlotter:
         self.p = InteractivePlaceCellTuningCurvesDataExplorer.build_new_plotter_if_needed(pActivePlotter, title=self.data_explorer_name)
         self.p.set_background(self.params.active_plotter_background_gradient[0], top=self.params.active_plotter_background_gradient[1])

@@ -23,6 +23,7 @@ from neuropy.utils.dynamic_container import DynamicContainer
 from neuropy.utils.matplotlib_helpers import matplotlib_file_only
 from neuropy.utils.mixins.AttrsClassHelpers import custom_define, AttrsBasedClassHelperMixin, serialized_attribute_field, serialized_field, non_serialized_field
 from neuropy.utils.mixins.HDF5_representable import HDF_SerializationMixin
+from neuropy.utils.result_context import IdentifyingContext
 
 from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import DirectionalLapsHelpers
 
@@ -215,7 +216,7 @@ class BatchSessionCompletionHandler:
 
     # Figures:
     should_perform_figure_generation_to_file: bool = field(default=True) # controls whether figures are generated to file
-    should_generate_all_plots: bool = field(default=False) # controls whether all plots are generated (when True) or if only non-Neptune paper figure specific plots are generated. Has no effect if self.should_perform_figure_generation_to_file is False.
+    should_generate_all_plots: bool = field(default=True) # controls whether all plots are generated (when True) or if only non-Neptune paper figure specific plots are generated. Has no effect if self.should_perform_figure_generation_to_file is False.
 
 
     # Cross-session Results:
@@ -323,6 +324,8 @@ class BatchSessionCompletionHandler:
         """ 2023-05-16 - Ensures that the laps are used for the placefield computation epochs, the number of bins are the same between the long and short tracks. 
         
         NOTE: returns `was_updated`, not `is_valid` or something similar.
+
+        Several sessions are failing here. 
         
         """
         from pyphoplacecellanalysis.General.Model.SpecificComputationParameterTypes import ComputationKWargParameters
@@ -365,6 +368,7 @@ class BatchSessionCompletionHandler:
 
     
     # Plotting/Figures Helpers ___________________________________________________________________________________________ #
+    @function_attributes(short_name=None, tags=['MAIN', 'figures', 'batch'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-07-02 09:29', related_items=[])
     def try_complete_figure_generation_to_file(self, curr_active_pipeline, enable_default_neptune_plots=False):
         try:
             ## To file only:
@@ -608,7 +612,7 @@ class BatchSessionCompletionHandler:
 
     ## Main function that's called with the complete pipeline:
     @function_attributes(short_name=None, tags=['MAIN', 'IMPORTANT', 'callback', 'replay'], input_requires=['filtered_sessions[*].replay'], output_provides=[], uses=['.completion_functions', '.post_compute_validate', '.try_compute_global_computations_if_needed', '.try_complete_figure_generation_to_file', '.try_export_pipeline_hdf5_if_needed'], used_by=['run_specific_batch'], creation_date='2024-07-02 11:44', related_items=[])  
-    def on_complete_success_execution_session(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline) -> PipelineCompletionResult:
+    def on_complete_success_execution_session(self, global_data_root_parent_path: Path, curr_session_context: IdentifyingContext, curr_session_basedir: Path, curr_active_pipeline) -> PipelineCompletionResult:
         """ called when the execute_session completes like:
             `post_run_callback_fn_output = post_run_callback_fn(curr_session_context, curr_session_basedir, curr_active_pipeline)`
 
@@ -624,7 +628,7 @@ class BatchSessionCompletionHandler:
 
 
         """
-        print(f'on_complete_success_execution_session(curr_session_context: {curr_session_context}, curr_session_basedir: {str(curr_session_basedir)}, ...)')
+        print(f'>>> on_complete_success_execution_session(curr_session_context: {curr_session_context}, curr_session_basedir: {str(curr_session_basedir)}, ...): BEGIN ======')
         # print(f'curr_session_context: {curr_session_context}, curr_session_basedir: {str(curr_session_basedir)}')
         long_epoch_name, short_epoch_name, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
         # Get existing laps from session:
@@ -633,8 +637,8 @@ class BatchSessionCompletionHandler:
         # short_laps.n_epochs: 40, n_long_laps.n_epochs: 40
         # short_replays.n_epochs: 6, long_replays.n_epochs: 8
         if self.debug_print:
-            print(f'short_laps.n_epochs: {short_laps.n_epochs}, n_long_laps.n_epochs: {long_laps.n_epochs}')
-            print(f'short_replays.n_epochs: {short_replays.n_epochs}, long_replays.n_epochs: {long_replays.n_epochs}')
+            print(f'\tshort_laps.n_epochs: {short_laps.n_epochs}, n_long_laps.n_epochs: {long_laps.n_epochs}')
+            print(f'\tshort_replays.n_epochs: {short_replays.n_epochs}, long_replays.n_epochs: {long_replays.n_epochs}')
 
 
         was_updated = False
@@ -645,13 +649,13 @@ class BatchSessionCompletionHandler:
         except Exception as e:
             exception_info = sys.exc_info()
             an_err = CapturedException(e, exception_info)
-            print(f'self.post_compute_validate(...) failed with exception: {an_err}')
+            print(f'\tself.post_compute_validate(...) failed with exception: {an_err}')
             raise
 
         ## Save the pipeline since that's disabled by default now:
         if was_updated and (self.session_computations_options.should_save != SavingOptions.NEVER):
             # override the saving mode:
-            print(f'WARNING: basic pipleine was updated by post_compute_validate and needs to be saved to be correct.Overriding self.save_mode to ensure pipeline is saved!')
+            print(f'\tWARNING: basic pipleine was updated by post_compute_validate and needs to be saved to be correct.Overriding self.save_mode to ensure pipeline is saved!')
             self.saving_mode = PipelineSavingScheme.TEMP_THEN_OVERWRITE
 
         try:
@@ -667,11 +671,11 @@ class BatchSessionCompletionHandler:
 
         ## GLOBAL FUNCTION:
         if self.force_reload_all and (not self.force_global_recompute):
-            print(f'WARNING: self.force_global_recompute was False but self.force_reload_all was true. The global properties must be recomputed when the local functions change, so self.force_global_recompute will be set to True and computation will continue.')
+            print(f'\tWARNING: self.force_global_recompute was False but self.force_reload_all was true. The global properties must be recomputed when the local functions change, so self.force_global_recompute will be set to True and computation will continue.')
             self.force_global_recompute = True
 
         if was_updated and (not self.force_global_recompute):
-            print(f'WARNING: self.force_global_recompute was False but pipeline was_updated. The global properties must be recomputed when the local functions change, so self.force_global_recompute will be set to True and computation will continue.')
+            print(f'\tWARNING: self.force_global_recompute was False but pipeline was_updated. The global properties must be recomputed when the local functions change, so self.force_global_recompute will be set to True and computation will continue.')
             self.force_global_recompute = True
 
         newly_computed_values = self.try_compute_global_computations_if_needed(curr_active_pipeline, curr_session_context=curr_session_context)
@@ -684,7 +688,7 @@ class BatchSessionCompletionHandler:
         if self.should_perform_figure_generation_to_file:
             self.try_complete_figure_generation_to_file(curr_active_pipeline, enable_default_neptune_plots=self.should_generate_all_plots)
         else:
-            print(f'skipping figure generation because should_perform_figure_generation_to_file == False')
+            print(f'\tskipping figure generation because should_perform_figure_generation_to_file == False')
 
 
         ### Aggregate Outputs specific computations:
@@ -724,7 +728,7 @@ class BatchSessionCompletionHandler:
         except Exception as e:
             exception_info = sys.exc_info()
             e = CapturedException(e, exception_info)
-            print(f"WARN: on_complete_success_execution_session: encountered exception {e} while trying to compute the instantaneous firing rates and set self.across_sessions_instantaneous_fr_dict[{curr_session_context}]")
+            print(f"\t\tWARN: on_complete_success_execution_session: encountered exception {e} while trying to compute the instantaneous firing rates and set self.across_sessions_instantaneous_fr_dict[{curr_session_context}]")
             # if self.fail_on_exception:
             #     raise e.exc
             _out_inst_fr_comps = None
@@ -732,13 +736,14 @@ class BatchSessionCompletionHandler:
             pass
 
         
-            
         # On large ram systems, we can return the whole pipeline? No, because the whole pipeline can't be pickled.
         across_session_results_extended_dict = {}
 
         ## get override kwargs
         override_user_completion_function_kwargs_dict = deepcopy(self.override_user_completion_function_kwargs_dict) ## previously used a blank override config, making it useless. {}
         
+        print(f'\t\t ---- on_complete_success_execution_session(...): starting self.completion_functions execution...')
+
         ## run external completion functions:
         for a_fn in self.completion_functions:
             print(f'\t>> calling external computation function: {a_fn.__name__}')
@@ -754,6 +759,7 @@ class BatchSessionCompletionHandler:
 
                 across_session_results_extended_dict = a_fn(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict, **a_found_override_kwargs)
             
+        print(f'<<< on_complete_success_execution_session(curr_session_context: {curr_session_context}, curr_session_basedir: {str(curr_session_basedir)}, ...): COMPLETED ======')
 
         return PipelineCompletionResult(long_epoch_name=long_epoch_name, long_laps=long_laps, long_replays=long_replays,
                                            short_epoch_name=short_epoch_name, short_laps=short_laps, short_replays=short_replays,

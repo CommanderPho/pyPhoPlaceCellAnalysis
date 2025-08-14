@@ -1,5 +1,7 @@
 # .SpikeRasterWidgets
-
+from copy import deepcopy
+from typing import Optional
+import numpy as np
 from pyphoplacecellanalysis.External.pyqtgraph.Qt import QtCore, QtGui, QtWidgets
 from pyphocorehelpers.gui.Qt.widget_positioning_helpers import WidgetPositioningHelpers
 from pyphocorehelpers.programming_helpers import metadata_attributes
@@ -53,8 +55,57 @@ from pyphoplacecellanalysis.GUI.Qt.SpikeRasterWindows.Spike3DRasterWindowWidget 
         
         
 
+def _get_required_static_layout_height(active_2d_plot) -> float:
+    """ 
+        from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.SpikeRasterWidgets.spike_raster_widgets import _get_required_static_layout_height
+    
+        required_static_children_bounding_rect_height: float = _get_required_static_layout_height(active_2d_plot=active_2d_plot)
+        main_graphics_layout_widget.setMaximumHeight(required_static_children_bounding_rect_height)
+        
+    """
+    import pyphoplacecellanalysis.External.pyqtgraph as pg
+    root_layout: pg.GraphicsLayout = active_2d_plot.plots.background_static_scroll_window_plot.parentWidget()
+    static_children_bounding_rect = root_layout.childrenBoundingRect() # QRectF
+    required_static_children_bounding_rect_height: float = static_children_bounding_rect.height()
+    return required_static_children_bounding_rect_height
+
+    
+@function_attributes(short_name=None, tags=['resize'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-06-02 14:29', related_items=[])
+def _post_hoc_layout_resize(active_2d_plot, desired_static_area_height: Optional[float]=None):
+    """ resizes the dynamic tracks to static area heights
+    
+    from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.SpikeRasterWidgets.spike_raster_widgets import _post_hoc_layout_resize
+    
+    _post_hoc_layout_resize(active_2d_plot=active_2d_plot, desired_static_area_height=249)
+    
+    """
+
+    if active_2d_plot.ui.has_attr('main_content_splitter'):
+        ## requires main_content_splitter, which is only used when `self.params.use_docked_pyqtgraph_plots` == False
+        main_content_splitter = active_2d_plot.ui.main_content_splitter # QSplitter
+        if active_2d_plot.ui.main_content_splitter is not None:
+            if desired_static_area_height is None:
+                required_static_children_bounding_rect_height: float = _get_required_static_layout_height(active_2d_plot=active_2d_plot)
+                desired_static_area_height = required_static_children_bounding_rect_height
+            else:
+                ## use user provided
+                print(f'desired_static_area_height: {desired_static_area_height}')
+                
+            ## INPUTS: main_content_splitter, desired_static_area_height
+            original_sizes = np.array(main_content_splitter.sizes())
+            extra_v_height = (original_sizes[-1] - desired_static_area_height)
+            desired_sizes = deepcopy(original_sizes)
+            desired_sizes[-1] = desired_static_area_height
+            desired_sizes[0] = desired_sizes[0] + extra_v_height
+
+            assert np.sum(desired_sizes) == np.sum(original_sizes), f"np.sum(desired_sizes): {np.sum(desired_sizes)} != np.sum(original_sizes): {np.sum(original_sizes)}"
+
+            main_content_splitter.setSizes(desired_sizes.tolist())
+
+
+
 @function_attributes(short_name=None, tags=['2024-12-18', 'ACTIVE', 'gui', 'debugging', 'continuous'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-12-18 19:29', related_items=[])
-def _setup_spike_raster_window_for_debugging(spike_raster_window, wants_docked_raster_window_track:bool=False, debug_print=False):
+def _setup_spike_raster_window_for_debugging(spike_raster_window, wants_docked_raster_window_track:bool=False, enable_interval_overview_track:bool=False, allow_replace_hardcoded_main_plots_with_tracks: bool = False, debug_print=False):
     """ Called to setup a specific `spike_raster_window` instance for 2024-12-18 style debugging.
     
     
@@ -73,6 +124,13 @@ def _setup_spike_raster_window_for_debugging(spike_raster_window, wants_docked_r
 
     """
     import pyphoplacecellanalysis.External.pyqtgraph as pg
+    from PyQt5.QtWidgets import QAbstractScrollArea
+    from PyQt5.QtWidgets import QSizePolicy
+
+    is_docked_pyqtgraph_plots_mode: bool = spike_raster_window.params.use_docked_pyqtgraph_plots
+
+
+    _all_outputs_dict = {}
     
     omit_menu_item_names = ['Debug.MenuDebug', 'DockedWidgets.MenuDockedWidgets', ] # maybe , 'CreateNewConnectedWidget.MenuCreateNewConnectedWidget'
     all_global_menus_actionsDict, global_flat_action_dict = spike_raster_window.build_all_menus_actions_dict()
@@ -82,25 +140,90 @@ def _setup_spike_raster_window_for_debugging(spike_raster_window, wants_docked_r
 
     ## extract the components so the `background_static_scroll_window_plot` scroll bar is the right size:
     active_2d_plot = spike_raster_window.spike_raster_plt_2d
-    preview_overview_scatter_plot: pg.ScatterPlotItem  = active_2d_plot.plots.preview_overview_scatter_plot # ScatterPlotItem
-    # preview_overview_scatter_plot.setDownsampling(auto=True, method='subsample', dsRate=10)
-    main_graphics_layout_widget: pg.GraphicsLayoutWidget = active_2d_plot.ui.main_graphics_layout_widget
     wrapper_layout: pg.QtWidgets.QVBoxLayout = active_2d_plot.ui.wrapper_layout
-    main_content_splitter = active_2d_plot.ui.main_content_splitter # QSplitter
-    active_window_container_layout = active_2d_plot.ui.active_window_container_layout
     layout = active_2d_plot.ui.layout
+    
+    _all_outputs_dict.update(**dict(#preview_overview_scatter_plot=preview_overview_scatter_plot, 
+                                    #main_graphics_layout_widget=main_graphics_layout_widget, main_content_splitter=main_content_splitter, active_window_container_layout=active_window_container_layout,
+                                    wrapper_layout=wrapper_layout, layout=layout))
+    
+
+
+    # Non-common (many of these used only in `is_docked_pyqtgraph_plots_mode == True` mode _______________________________________________________________________________________________________________________________________________________________________________________________ #
+    
+    # main_content_splitter = active_2d_plot.ui.main_content_splitter # QSplitter
+    main_content_splitter = active_2d_plot.ui.get('main_content_splitter', None) # QSplitter
+    if main_content_splitter is not None:
+        _all_outputs_dict['main_content_splitter'] = main_content_splitter
+
+    # main_graphics_layout_widget: pg.GraphicsLayoutWidget = active_2d_plot.ui.main_graphics_layout_widget
+    main_graphics_layout_widget = active_2d_plot.ui.get('main_graphics_layout_widget', None) # GraphicsLayoutWidget
+    if main_graphics_layout_widget is not None:
+        _all_outputs_dict['main_graphics_layout_widget'] = main_graphics_layout_widget
+        main_graphics_layout_widget.setSizeAdjustPolicy(QAbstractScrollArea.SizeAdjustPolicy.AdjustToContentsOnFirstShow)
+
+    # active_window_container_layout = active_2d_plot.ui.active_window_container_layout
+    active_window_container_layout = active_2d_plot.ui.get('active_window_container_layout', None) # QSplitter
+    if active_window_container_layout is not None:
+        _all_outputs_dict['active_window_container_layout'] = active_window_container_layout
+
+    main_plot_widget = active_2d_plot.plots.get('main_plot_widget', None) # PlotItem
+    if main_plot_widget is not None:
+        _all_outputs_dict['main_plot_widget'] = main_plot_widget
+
+    # preview_overview_scatter_plot: pg.ScatterPlotItem  = active_2d_plot.plots.preview_overview_scatter_plot # ScatterPlotItem
+    # preview_overview_scatter_plot.setDownsampling(auto=True, method='subsample', dsRate=10)
+    preview_overview_scatter_plot = active_2d_plot.plots.get('preview_overview_scatter_plot', None) # ScatterPlotItem
+    if preview_overview_scatter_plot is not None:
+        _all_outputs_dict['preview_overview_scatter_plot'] = preview_overview_scatter_plot
+            
+
+    background_static_scroll_plot_widget = active_2d_plot.plots.get('background_static_scroll_plot_widget', None) # PlotItem
+    if background_static_scroll_plot_widget is not None:
+        _all_outputs_dict['background_static_scroll_plot_widget'] = background_static_scroll_plot_widget
+    
+    background_static_scroll_window_plot = active_2d_plot.plots.get('background_static_scroll_window_plot', None) # PlotItem
+    if background_static_scroll_window_plot is not None:
+        _all_outputs_dict['background_static_scroll_window_plot'] = background_static_scroll_window_plot
+
+
+    should_replace_hardcoded_main_plots_with_tracks: bool = False
+    if (enable_interval_overview_track and wants_docked_raster_window_track and allow_replace_hardcoded_main_plots_with_tracks):
+        should_replace_hardcoded_main_plots_with_tracks = True
+        print(f'should_replace_hardcoded_main_plots_with_tracks: {should_replace_hardcoded_main_plots_with_tracks}')
+
 
     has_main_raster_plot: bool = (active_2d_plot.plots.main_plot_widget is not None)
     if has_main_raster_plot:
         main_plot_widget = active_2d_plot.plots.main_plot_widget # PlotItem
-        main_plot_widget.setMinimumHeight(20.0)
+        if not should_replace_hardcoded_main_plots_with_tracks:
+            main_plot_widget.setMinimumHeight(20.0)
+        _all_outputs_dict['main_plot_widget'] = main_plot_widget
+        
+        if main_graphics_layout_widget is not None:
+            main_graphics_layout_widget.setSizeAdjustPolicy(QAbstractScrollArea.SizeAdjustPolicy.AdjustToContentsOnFirstShow)                    
+            required_static_children_bounding_rect_height: float = _get_required_static_layout_height(active_2d_plot=active_2d_plot)
+            print(f'required_static_children_bounding_rect_height: {required_static_children_bounding_rect_height}')
+            # main_graphics_layout_widget.setMaximumHeight(required_static_children_bounding_rect_height)
+
     else:
         active_window_container_layout.setVisible(False)
 
-    background_static_scroll_window_plot = active_2d_plot.plots.background_static_scroll_window_plot # PlotItem
-    background_static_scroll_window_plot.setMinimumHeight(50.0)
-    # background_static_scroll_window_plot.setMaximumHeight(75.0)
-    # # background_static_scroll_window_plot.setFixedHeight(50.0)
+
+    # background_static_scroll_window_plot = active_2d_plot.plots.background_static_scroll_window_plot # PlotItem
+    if background_static_scroll_window_plot:
+        background_static_scroll_window_plot.setMinimumHeight(50.0)
+        # background_static_scroll_window_plot.setMaximumHeight(75.0)
+        # # background_static_scroll_window_plot.setFixedHeight(50.0)
+        # background_static_scroll_window_plot.setMaximumHeight(144)
+    # _all_outputs_dict['background_static_scroll_window_plot'] = background_static_scroll_window_plot
+
+    if should_replace_hardcoded_main_plots_with_tracks:
+        if active_window_container_layout:
+            active_window_container_layout.setVisible(False) ## hide the container that contains the main_plot_widget
+        if background_static_scroll_window_plot:
+            background_static_scroll_window_plot.setMaximumHeight(144)
+
 
     # # Set stretch factors to control priority
     # main_graphics_layout_widget.ci.layout.setRowStretchFactor(0, 3)  # Plot1: lowest priority
@@ -108,17 +231,22 @@ def _setup_spike_raster_window_for_debugging(spike_raster_window, wants_docked_r
     # main_graphics_layout_widget.ci.layout.setRowStretchFactor(2, 2)  # Plot3: highest priority
     # main_graphics_layout_widget.ci.layout.setRowStretchFactor(3, 2)  # Plot3: highest priority
 
-    _interval_tracks_out_dict = active_2d_plot.prepare_pyqtgraph_intervalPlot_tracks(enable_interval_overview_track=False, should_link_to_main_plot_widget=has_main_raster_plot)
+    _interval_tracks_out_dict = active_2d_plot.prepare_pyqtgraph_intervalPlot_tracks(enable_interval_overview_track=enable_interval_overview_track, should_link_to_main_plot_widget=has_main_raster_plot)
+    _all_outputs_dict['_interval_tracks_out_dict'] = _interval_tracks_out_dict
+
     # interval_window_dock_config, interval_dock_item, intervals_time_sync_pyqtgraph_widget, intervals_root_graphics_layout_widget, intervals_plot_item = _interval_tracks_out_dict['intervals']
     # dock_config, interval_overview_dock_item, intervals_overview_time_sync_pyqtgraph_widget, intervals_overview_root_graphics_layout_widget, intervals_overview_plot_item = _interval_tracks_out_dict['interval_overview']
 
     if wants_docked_raster_window_track:
         _raster_tracks_out_dict = active_2d_plot.prepare_pyqtgraph_rasterPlot_track(name_modifier_suffix='raster_window', should_link_to_main_plot_widget=has_main_raster_plot)
+        _all_outputs_dict['_raster_tracks_out_dict'] = _raster_tracks_out_dict
+
+
 
 
     # Add Renderables ____________________________________________________________________________________________________ #
     # add_renderables_menu = active_2d_plot.ui.menus.custom_context_menus.add_renderables[0].programmatic_actions_dict
-    menu_commands = ['AddTimeIntervals.Replays', 'AddTimeIntervals.Laps', 'AddTimeIntervals.SessionEpochs'] # , 'AddTimeIntervals.SessionEpochs', 'AddTimeIntervals.PBEs', 'AddTimeIntervals.Ripples',
+    menu_commands = ['AddTimeIntervals.Replays', 'AddTimeIntervals.Laps', 'AddTimeIntervals.SessionEpochs', 'AddTimeIntervals.PBEs'] # , 'AddTimeIntervals.SessionEpochs', 'AddTimeIntervals.PBEs', 'AddTimeIntervals.Ripples',
     for a_command in menu_commands:
         assert a_command in global_flat_action_dict, f"a_command: '{a_command}' is not present in global_flat_action_dict: {list(global_flat_action_dict.keys())}"
         # add_renderables_menu[a_command].trigger()
@@ -133,7 +261,8 @@ def _setup_spike_raster_window_for_debugging(spike_raster_window, wants_docked_r
 
 
     menu_commands = [
-        # 'AddTimeCurves.Position', ## 2025-03-11 02:32 Running this too soon after launching the window causes weird black bars on the top and bottom of the window
+        'AddTimeCurves.Position', ## 2025-03-11 02:32 Running this too soon after launching the window causes weird black bars on the top and bottom of the window
+        'AddTimeCurves.ThetaPhase',
         # 'DockedWidgets.LongShortDecodedEpochsDockedMatplotlibView',
         # 'DockedWidgets.DirectionalDecodedEpochsDockedMatplotlibView',
         # 'DockedWidgets.TrackTemplatesDecodedEpochsDockedMatplotlibView',
@@ -142,11 +271,15 @@ def _setup_spike_raster_window_for_debugging(spike_raster_window, wants_docked_r
 
     ]
     # menu_commands = ['actionPseudo2DDecodedEpochsDockedMatplotlibView', 'actionContinuousPseudo2DDecodedMarginalsDockedMatplotlibView'] # , 'AddTimeIntervals.SessionEpochs'
-    for a_command in menu_commands:
-        # all_global_menus_actionsDict[a_command].trigger()
-        global_flat_action_dict[a_command].trigger()
-
-
+    
+    # Run after a 0.5 second delay
+    from PyQt5.QtCore import QTimer
+    def trigger_commands():
+        for a_command in menu_commands:
+            # all_global_menus_actionsDict[a_command].trigger()
+            global_flat_action_dict[a_command].trigger()
+    
+    QTimer.singleShot(800, trigger_commands)
     # ## add the right sidebar
     # visible_intervals_info_widget_container, visible_intervals_ctrl_layout_widget =  spike_raster_window._perform_build_attached_visible_interval_info_widget() # builds the tables
     
@@ -160,8 +293,10 @@ def _setup_spike_raster_window_for_debugging(spike_raster_window, wants_docked_r
     # ## OUTPUTS: nested_dock_items, nested_dynamic_docked_widget_container_widgets
 
 
+    _post_hoc_layout_resize(active_2d_plot=active_2d_plot, desired_static_area_height=144)
 
-    return all_global_menus_actionsDict, global_flat_action_dict # , (_raster_tracks_out_dict, _raster_tracks_out_dict, _raster_tracks_out_dict)
+
+    return all_global_menus_actionsDict, global_flat_action_dict, _all_outputs_dict # , (_raster_tracks_out_dict, _raster_tracks_out_dict, _raster_tracks_out_dict)
 
         
 

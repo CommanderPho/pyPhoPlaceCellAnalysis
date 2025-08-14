@@ -34,7 +34,7 @@ class NeuronConfigOwningMixin:
         self.params.pf_active_configs = value
 
     @property
-    def num_neuron_configs(self):
+    def num_neuron_configs(self) -> int:
         return len(self.active_neuron_render_configs)
 
     @property

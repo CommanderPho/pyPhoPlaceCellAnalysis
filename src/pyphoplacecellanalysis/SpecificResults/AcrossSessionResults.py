@@ -1,6 +1,8 @@
 from __future__ import annotations # prevents having to specify types for typehinting as strings
 from typing import TYPE_CHECKING, Union
 
+from neuropy.utils.mixins.indexing_helpers import pop_dict_subset
+
 if TYPE_CHECKING:
     ## typehinting only imports here
     from pyphoplacecellanalysis.General.Batch.runBatch import ConcreteSessionFolder
@@ -51,6 +53,8 @@ from neuropy.utils.matplotlib_helpers import matplotlib_configuration_update
 from neuropy.core.neuron_identities import  neuronTypesEnum, NeuronIdentityTable
 from neuropy.utils.mixins.HDF5_representable import HDF_Converter
 from neuropy.utils.indexing_helpers import PandasHelpers
+from neuropy.utils.debug_helpers import parameter_sweeps 
+from neuropy.utils.mixins.dict_representable import override_dict, overriding_dict_with
 
 from pyphocorehelpers.Filesystem.metadata_helpers import  get_file_metadata
 from pyphocorehelpers.assertion_helpers import Assert
@@ -63,6 +67,14 @@ from pyphoplacecellanalysis.General.Mixins.ExportHelpers import  build_and_write
 from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import DecoderDecodedEpochsResult
 
 from pyphocorehelpers.DataStructure.RenderPlots.MatplotLibRenderPlots import MatplotlibRenderPlots
+
+from neuropy.core.user_annotations import UserAnnotationsManager, SessionCellExclusivityRecord
+from neuropy.utils.result_context import IdentifyingContext
+from pyphoplacecellanalysis.SpecificResults.PhoDiba2023Paper import pho_stats_perform_diagonal_line_binomial_test, pho_stats_bar_graph_t_tests
+
+from pyphoplacecellanalysis.General.Mixins.ExportHelpers import FigureOutputLocation, ContextToPathMode, FileOutputManager # used in post_compute_all_sessions_processing
+from pyphoplacecellanalysis.SpecificResults.PhoDiba2023Paper import PaperFigureTwo # used in post_compute_all_sessions_processing
+
 
 """
 from pyphoplacecellanalysis.SpecificResults.AcrossSessionResults import AcrossSessionsResults, AcrossSessionsVisualizations
@@ -256,7 +268,7 @@ class InstantaneousFiringRatesDataframeAccessor():
             print(f'\t\t done (success).')
             return True
 
-        except BaseException as e:
+        except Exception as e:
             exception_info = sys.exc_info()
             e = CapturedException(e, exception_info)
             print(f"ERROR: encountered exception {e} while trying to compute the instantaneous firing rates and set self.across_sessions_instantaneous_fr_dict[{curr_session_context}]")
@@ -265,21 +277,57 @@ class InstantaneousFiringRatesDataframeAccessor():
 
 
     @classmethod
-    def load_and_prepare_for_plot(cls, common_file_path) -> Tuple[InstantaneousSpikeRateGroupsComputation, pd.DataFrame]:
+    def build_shell_object_for_plot(cls, loaded_result_df: pd.DataFrame, column_name_to_colorize:str = 'session_name', active_set_cell_groups_column_name: str = 'active_set_membership', PBE_col_variable_names: Optional[List[str]] = None) -> Tuple[InstantaneousSpikeRateGroupsComputation, pd.DataFrame]:
         """ loads the previously saved out inst_fr_scatter_plot_results_table and prepares it for plotting.
 
+        The values come from the `data_columns = ['lap_delta_minus', 'lap_delta_plus', 'replay_delta_minus', 'replay_delta_plus']` of the `loaded_result_df`
         returns a `InstantaneousSpikeRateGroupsComputation` _shell_obj which can be plotted
 
+        Creates a modified 'visualization_df' from 'loaded_result_df' by adding columns: ['color', 'marker', 'scatter_props']
+
         Usage:
-            _shell_obj, loaded_result_df = InstantaneousFiringRatesDataframeAccessor.load_and_prepare_for_plot(common_file_path)
+            ## Read the previously saved-out result:
+            loaded_result_df: pd.DataFrame = InstantaneousFiringRatesDataframeAccessor.read_scatter_plot_results_table(file_path=common_file_path)
+            _shell_obj, visualization_df = InstantaneousFiringRatesDataframeAccessor.build_shell_object_for_plot(loaded_result_df=loaded_result_df)
             # Perform the actual plotting:
             AcrossSessionsVisualizations.across_sessions_bar_graphs(_shell_obj, num_sessions=1, save_figure=False, enable_tiny_point_labels=False, enable_hover_labels=False)
 
+
+        Usage 2:
+
+            ## NOTE: LxC/SxC groups are determined ONLY by the `across_session_inst_fr_computation_df['active_set_membership']` column, specifically cells that have values of 'LxC' and 'SxC'
+            # active_set_cell_groups_column_name: str = 'active_set_membership'
+            # active_set_cell_groups_column_name: str = 'active_set_membership_from_stability'
+            # active_set_cell_groups_column_name: str = 'active_set_membership_from_participation' # 2025-08-06
+            active_set_cell_groups_column_name: str = 'active_set_membership_from_user_annotations' # 2025-08-08
+            # active_set_cell_groups_column_name: str = 'active_set_membership_from_all' # 2025-08-06
+
+
+            # PBE_col_variable_names: List[str] = ['replay_delta_minus', 'replay_delta_plus'] 
+            PBE_col_variable_names: List[str] = ['ReplayDeltaMinus_ratio_participating_epochs', 'ReplayDeltaPlus_ratio_participating_epochs']
+
+
+            # fig2_export_folder = Path(r"E:/Dropbox (Personal)/Active/Kamran Diba Lab/Pho-Kamran-Meetings/2025-06-06 - EXPORTS FOR PUBLICATION/Figure 2 - XxC Bar").resolve()
+            # Assert.path_exists(fig2_export_folder)
+
+            active_across_session_inst_fr_computation_df = deepcopy(across_session_inst_fr_computation_df)
+            # active_across_session_inst_fr_computation_df = deepcopy(stable_across_session_inst_fr_computation_df)
+            assert active_set_cell_groups_column_name in across_session_inst_fr_computation_df
+
+            ## Publication
+            fig2_kwargs = dict(save_figure=True, enable_tiny_point_labels=False, enable_hover_labels=False, write_vector_format=True, prepare_for_publication=True) ## Publication
+
+            ## Debugging
+            # fig2_kwargs = dict(save_figure=False, enable_tiny_point_labels=False, enable_hover_labels=True, write_vector_format=False, prepare_for_publication=False) ## Debugging
+
+            num_sessions: int = active_across_session_inst_fr_computation_df['session_uid'].nunique(dropna=True)
+            across_session_inst_fr_computation_shell_obj, visualization_df = InstantaneousFiringRatesDataframeAccessor.build_shell_object_for_plot(loaded_result_df=active_across_session_inst_fr_computation_df,
+                                                                                                                                                    active_set_cell_groups_column_name=active_set_cell_groups_column_name, PBE_col_variable_names=PBE_col_variable_names)
+            # Perform the actual plotting:
+            fig2_ctxt, fig2, _fig_2_output_dict = AcrossSessionsVisualizations.across_sessions_bar_graphs(across_session_inst_fr_computation_shell_obj, num_sessions=num_sessions, **fig2_kwargs) # fig2_export_folder
+            fig2
+
         """
-
-        ## Read the previously saved-out result:
-        loaded_result_df = cls.read_scatter_plot_results_table(file_path=common_file_path)
-
         ## Scatter props:
         def build_unique_colors_mapping_for_column(df, column_name:str):
             # Get unique values and map them to colors
@@ -301,24 +349,27 @@ class InstantaneousFiringRatesDataframeAccessor():
             marker_mapping = {value: a_marker for value, a_marker in zip(unique_values, marker_list)}
             return marker_mapping
 
-        scatter_props_column_names = ['color', 'marker']
-        # column_name_to_colorize:str = 'session_name'
-        column_name_to_colorize:str = 'qclu'
-        color_mapping = build_unique_colors_mapping_for_column(loaded_result_df, column_name_to_colorize)
+
+        # Begin Function Body ________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
+        # scatter_props_column_names = ['color', 'marker']
+        # column_name_to_colorize:str = 'qclu'
+
+        visualization_df: pd.DataFrame = deepcopy(loaded_result_df)
+
+        color_mapping = build_unique_colors_mapping_for_column(visualization_df, column_name_to_colorize)
         # Apply the mapping to the 'property' column to create a new 'color' column
-        loaded_result_df['color'] = loaded_result_df[column_name_to_colorize].map(color_mapping)
+        visualization_df['color'] = visualization_df[column_name_to_colorize].map(color_mapping)
 
         column_name_to_markerize:str = 'animal'
-        marker_mapping =  build_unique_markers_mapping_for_column(loaded_result_df, column_name_to_markerize)
-        loaded_result_df['marker'] = loaded_result_df[column_name_to_markerize].map(marker_mapping)
+        marker_mapping =  build_unique_markers_mapping_for_column(visualization_df, column_name_to_markerize)
+        visualization_df['marker'] = visualization_df[column_name_to_markerize].map(marker_mapping)
 
         # build the final 'scatter_props' column
         # loaded_result_df['scatter_props'] = [{'edgecolor': a_color, 'marker': a_marker} for a_color, a_marker in zip(loaded_result_df['color'], loaded_result_df['marker'])]
-        loaded_result_df['scatter_props'] = [{'marker': a_marker} for a_color, a_marker in zip(loaded_result_df['color'], loaded_result_df['marker'])]
-
+        visualization_df['scatter_props'] = [{'marker': a_marker} for a_color, a_marker in zip(visualization_df['color'], visualization_df['marker'])]
 
         # For `loaded_result_df`, to recover the plottable FigureTwo points:
-        table_columns = ['neuron_uid', 'aclu', 'lap_delta_minus', 'lap_delta_plus', 'replay_delta_minus', 'replay_delta_plus', 'active_set_membership']
+        table_columns = ['neuron_uid', 'aclu', 'lap_delta_minus', 'lap_delta_plus', 'replay_delta_minus', 'replay_delta_plus', active_set_cell_groups_column_name]
         # 1. Group by 'active_set_membership' (to get LxC and SxC groups which are processed separately)
 
         # loaded_result_df.groupby('active_set_membership')
@@ -327,7 +378,7 @@ class InstantaneousFiringRatesDataframeAccessor():
         # 3. Compute the mean and error bars for each of the four columns
         data_columns = ['lap_delta_minus', 'lap_delta_plus', 'replay_delta_minus', 'replay_delta_plus']
 
-        grouped_df = loaded_result_df.groupby(['active_set_membership'])
+        grouped_df = visualization_df.groupby([active_set_cell_groups_column_name])
         LxC_df, SxC_df = [grouped_df.get_group(aValue) for aValue in ['LxC','SxC']] # Note that in general LxC and SxC might have differing numbers of cells.
 
         #TODO 2023-08-11 02:09: - [ ] These LxC/SxC_aclus need to be globally unique probably.
@@ -355,7 +406,17 @@ class InstantaneousFiringRatesDataframeAccessor():
 
         ## Convert back to `InstantaneousSpikeRateGroupsComputation`'s language:
         Fig2_Laps_FR: list[SingleBarResult] = [SingleBarResult(v.mean(), v.std(), v, LxC_aclus, SxC_aclus, LxC_scatter_props, SxC_scatter_props) for v in (LxC_df['lap_delta_minus'].values, LxC_df['lap_delta_plus'].values, SxC_df['lap_delta_minus'].values, SxC_df['lap_delta_plus'].values)]
-        Fig2_Replay_FR: list[SingleBarResult] = [SingleBarResult(v.mean(), v.std(), v, LxC_aclus, SxC_aclus, LxC_scatter_props, SxC_scatter_props) for v in (LxC_df['replay_delta_minus'].values, LxC_df['replay_delta_plus'].values, SxC_df['replay_delta_minus'].values, SxC_df['replay_delta_plus'].values)]
+        
+        if PBE_col_variable_names is None:
+            PBE_col_variable_names = ['replay_delta_minus', 'replay_delta_plus'] 
+            
+        assert len(PBE_col_variable_names) == 2, f'len(PBE_col_variable_names) must be 2, but is {len(PBE_col_variable_names)}'
+        PBE_delta_minus_col_name: str = PBE_col_variable_names[0]
+        PBE_delta_plus_col_name: str = PBE_col_variable_names[1]
+        
+        Fig2_Replay_FR: list[SingleBarResult] = [SingleBarResult(v.mean(), v.std(), v, LxC_aclus, SxC_aclus, LxC_scatter_props, SxC_scatter_props) for v in (LxC_df[PBE_delta_minus_col_name].values, LxC_df[PBE_delta_plus_col_name].values, SxC_df[PBE_delta_minus_col_name].values, SxC_df[PBE_delta_plus_col_name].values)]
+
+        # Fig2_Replay_FR: list[SingleBarResult] = [SingleBarResult(v.mean(), v.std(), v, LxC_aclus, SxC_aclus, LxC_scatter_props, SxC_scatter_props) for v in (LxC_df['replay_delta_minus'].values, LxC_df['replay_delta_plus'].values, SxC_df['replay_delta_minus'].values, SxC_df['replay_delta_plus'].values)]
 
         _shell_obj = InstantaneousSpikeRateGroupsComputation()
         _shell_obj.Fig2_Laps_FR = Fig2_Laps_FR
@@ -365,19 +426,30 @@ class InstantaneousFiringRatesDataframeAccessor():
         # _shell_obj.LxC_scatter_props = LxC_scatter_props
         # _shell_obj.SxC_scatter_props = SxC_scatter_props
 
-        return _shell_obj, loaded_result_df
+        return _shell_obj, visualization_df
+
+
+    @classmethod
+    def load_and_prepare_for_plot(cls, common_file_path) -> Tuple[InstantaneousSpikeRateGroupsComputation, pd.DataFrame]:
+        """ loads the previously saved out inst_fr_scatter_plot_results_table and prepares it for plotting.
+
+        returns a `InstantaneousSpikeRateGroupsComputation` _shell_obj which can be plotted
+
+        Usage:
+            _shell_obj, loaded_result_df = InstantaneousFiringRatesDataframeAccessor.load_and_prepare_for_plot(common_file_path)
+            # Perform the actual plotting:
+            AcrossSessionsVisualizations.across_sessions_bar_graphs(_shell_obj, num_sessions=1, save_figure=False, enable_tiny_point_labels=False, enable_hover_labels=False)
+
+        """
+
+        ## Read the previously saved-out result:
+        loaded_result_df: pd.DataFrame = cls.read_scatter_plot_results_table(file_path=common_file_path)
+        _shell_obj, visualization_df = cls.build_shell_object_for_plot(loaded_result_df=loaded_result_df)
+        return _shell_obj, visualization_df
 
 
 
 
-
-from neuropy.core.user_annotations import UserAnnotationsManager, SessionCellExclusivityRecord
-from neuropy.utils.result_context import IdentifyingContext
-from pyphoplacecellanalysis.SpecificResults.PhoDiba2023Paper import pho_stats_perform_diagonal_line_binomial_test, pho_stats_bar_graph_t_tests
-
-
-from pyphoplacecellanalysis.General.Mixins.ExportHelpers import FigureOutputLocation, ContextToPathMode, FileOutputManager # used in post_compute_all_sessions_processing
-from pyphoplacecellanalysis.SpecificResults.PhoDiba2023Paper import PaperFigureTwo # used in post_compute_all_sessions_processing
 
 
 class AcrossSessionsResults:
@@ -509,10 +581,58 @@ class AcrossSessionsResults:
 
 
 
+    @function_attributes(short_name=None, tags=['HDF5', 'csv'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-06-09 16:35', related_items=[])
     @classmethod
     def post_compute_all_sessions_processing(cls, global_data_root_parent_path:Path, output_path_suffix: str, plotting_enabled:bool, output_override_path=None, inst_fr_output_filename: str=None):
         """ 2023-11-15 - called after batch computing all of the sessions and building the required output files. Loads them, processes them, and then plots them!
 
+        
+        from pyphoplacecellanalysis.SpecificResults.AcrossSessionResults import AcrossSessionTables, AcrossSessionsResults, AcrossSessionsVisualizations
+        from neuropy.utils.mixins.HDF5_representable import HDF_Converter
+        from pyphoplacecellanalysis.General.Batch.runBatch import BatchResultDataframeAccessor
+
+        # output_path_suffix: str = '2024-09-26'
+        # output_path_suffix: str = '2024-10-22'
+        output_path_suffix: str = '2025-04-17' 
+        # output_path_suffix: str = '2025-06-03'
+        # output_path_suffix: str = '2024-10-04'
+        # inst_fr_output_filename: str = f'across_session_result_long_short_recomputed_inst_firing_rate_{output_path_suffix}.pkl'
+        # inst_fr_output_filename: str = f'across_session_result_long_short_recomputed_inst_firing_rate_{output_path_suffix}_0.0009.pkl' # single time bin size
+        # inst_fr_output_filename: str = f'across_session_result_long_short_recomputed_inst_firing_rate_{output_path_suffix}_0.0015.pkl' # single time bin size
+        # inst_fr_output_filename: str = f'across_session_result_long_short_recomputed_inst_firing_rate_{output_path_suffix}_0.0025.pkl' # single time bin size
+        # inst_fr_output_filename: str = f'across_session_result_long_short_recomputed_inst_firing_rate_{output_path_suffix}_0.025.pkl' # single time bin size
+        inst_fr_output_filename: str = f'across_session_result_long_short_recomputed_inst_firing_rate_{output_path_suffix}_1000.0.pkl' # single time bin size
+
+        ## INPUTS: included_session_contexts, included_h5_paths
+        neuron_identities_table, long_short_fr_indicies_analysis_table, neuron_replay_stats_table = AcrossSessionTables.build_all_known_tables(included_session_contexts, included_h5_paths, should_restore_native_column_types=True)
+
+        ## different than load_all_combined_tables, which seems to work with `long_short_fr_indicies_analysis_table`
+        # graphics_output_dict |= AcrossSessionsVisualizations.across_sessions_firing_rate_index_figure(long_short_fr_indicies_analysis_results=long_short_fr_indicies_analysis_table, num_sessions=num_sessions, save_figure=True)
+
+        ## Load all across-session tables from the pickles:
+        output_path_suffix: str = f'{output_path_suffix}'
+        neuron_identities_table, long_short_fr_indicies_analysis_table, neuron_replay_stats_table = AcrossSessionTables.load_all_combined_tables(override_output_parent_path=collected_outputs_directory, output_path_suffix=output_path_suffix) # output_path_suffix=f'2023-10-04-GL-Recomp'
+        # num_sessions = len(neuron_replay_stats_table.session_uid.unique().to_numpy())
+        # print(f'num_sessions: {num_sessions}')
+        num_sessions: int = len(long_short_fr_indicies_analysis_table['session_uid'].unique())
+        print(f'num_sessions: {num_sessions}')
+
+        inst_fr_output_load_filepath: Path = collected_outputs_directory.joinpath(inst_fr_output_filename).resolve() # single time bin size # non-instantaneous version
+        assert inst_fr_output_load_filepath.exists()
+        # inst_fr_output_filename: str = inst_fr_output_load_filepath.name
+        # across_session_inst_fr_computation, across_sessions_instantaneous_fr_dict, across_sessions_instantaneous_frs_list = AcrossSessionsResults.load_across_sessions_data(global_data_root_parent_path=global_data_root_parent_path, inst_fr_output_filename=inst_fr_output_filename)
+        across_session_inst_fr_computation, across_sessions_instantaneous_fr_dict, across_sessions_instantaneous_frs_list = AcrossSessionsResults.load_across_sessions_data(global_data_root_parent_path=inst_fr_output_load_filepath.parent, inst_fr_output_filename=inst_fr_output_filename)
+
+        graphics_output_dict = AcrossSessionsResults.post_compute_all_sessions_processing(global_data_root_parent_path=collected_outputs_directory, output_path_suffix=output_path_suffix, plotting_enabled=False, output_override_path=Path('../../output'), inst_fr_output_filename=inst_fr_output_filename)
+
+        num_sessions = len(across_sessions_instantaneous_fr_dict)
+        print(f'num_sessions: {num_sessions}')
+
+        # Convert byte strings to regular strings
+        neuron_replay_stats_table = neuron_replay_stats_table.applymap(lambda x: x.decode('utf-8') if isinstance(x, bytes) else x)
+        neuron_replay_stats_table
+
+        
         """
         # 2023-10-04 - Load Saved across-sessions-data and testing Batch-computed inst_firing_rates:
         ## Load the saved across-session results:
@@ -528,7 +648,6 @@ class AcrossSessionsResults:
         neuron_identities_table, long_short_fr_indicies_analysis_table, neuron_replay_stats_table = AcrossSessionTables.load_all_combined_tables(override_output_parent_path=global_data_root_parent_path, output_path_suffix=output_path_suffix) # output_path_suffix=f'2023-10-04-GL-Recomp'
         num_sessions = len(neuron_replay_stats_table.session_uid.unique().to_numpy())
         print(f'num_sessions: {num_sessions}')
-
 
         # Does its own additions to `long_short_fr_indicies_analysis_table` table based on the user labeled LxC/SxCs
         annotation_man = UserAnnotationsManager()
@@ -668,7 +787,7 @@ class AcrossSessionsResults:
         across_session_inst_fr_computation.active_identifying_session_ctx = global_multi_session_context
 
         all_contexts_list: List[IdentifyingContext] = list(across_sessions_instantaneous_fr_dict.keys())
-        assert len(all_contexts_list) > 0 # must have at least one element
+        assert len(all_contexts_list) > 0, f"len(all_contexts_list) should be > 0 -- must have at least one element"
         first_context = all_contexts_list[0]
         context_column_names = list(first_context.keys()) # ['format_name', 'animal', 'exper_name', 'session_name']
         expanded_context_df = pd.DataFrame.from_records([a_ctx.as_tuple() for a_ctx in all_contexts_list], columns=context_column_names)
@@ -733,6 +852,318 @@ class AcrossSessionsResults:
                                                         np.concatenate([across_sessions_instantaneous_frs_list[i].SxC_ReplayDeltaPlus.cell_agg_inst_fr_list for i in np.arange(num_sessions) if across_sessions_instantaneous_frs_list[i].SxC_ReplayDeltaPlus is not None]))]
 
         return across_session_inst_fr_computation, across_sessions_instantaneous_fr_dict, across_sessions_instantaneous_frs_list
+
+
+    # ==================================================================================================================================================================================================================================================================================== #
+    # 2025-05-09 - Combined CSV output                                                                                                                                                                                                                                                     #
+    # ==================================================================================================================================================================================================================================================================================== #
+
+    @function_attributes(short_name=None, tags=['across-sessions', 'publication', 'CSV', '_neuron_replay_stats_df'], input_requires=[], output_provides=[],
+                         requires_global_keys=['long_short_fr_indicies_analysis', 'long_short_post_decoding', 'DirectionalLaps'], uses=[], used_by=[], creation_date='2025-06-09 17:31', related_items=['AcrossSessionTables.build_neuron_replay_stats_table'])
+    @classmethod
+    def build_neuron_identities_df_for_CSV(cls, curr_active_pipeline) -> pd.DataFrame:
+        """ Gathers and then exports all available neuron information (both identity and computed in computations) for each neuron
+
+        Responsible for `*_neuron_replay_stats_df.csv` one for each session
+
+        AcrossSessionTables.build_and_save_all_combined_tables, .build_neuron_identities_table, .build_neuron_replay_stats_table, .build_long_short_fr_indicies_analysis_table
+            
+        from pyphoplacecellanalysis.SpecificResults.AcrossSessionResults import AcrossSessionsResults
+        
+        all_neuron_stats_table: pd.DataFrame = AcrossSessionsResults.build_neuron_identities_df_for_CSV(curr_active_pipeline=curr_active_pipeline)
+        
+        
+        """
+        from neuropy.core.neuron_identities import NeuronExtendedIdentityTuple, neuronTypesEnum, NeuronIdentityTable, NeuronIdentityDataframeAccessor
+        from neuropy.utils.mixins.HDF5_representable import HDF_Converter
+        from pyphoplacecellanalysis.SpecificResults.AcrossSessionResults import AcrossSessionsResults # for build_neuron_identity_table_to_hdf
+        from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import get_proper_global_spikes_df
+        from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.LongShortTrackComputations import JonathanFiringRateAnalysisResult        
+        from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.LongShortTrackComputations import InstantaneousSpikeRateGroupsComputation
+        from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.LongShortTrackComputations import ExpectedVsObservedResult
+        from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import TrackTemplates
+        from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import TrialByTrialActivityResult
+        from pyphoplacecellanalysis.Analysis.reliability import TrialByTrialActivity
+
+
+        session_context = curr_active_pipeline.get_session_context() 
+
+        # Handle long|short firing rate index:
+        long_short_fr_indicies_analysis_results = curr_active_pipeline.global_computation_results.computed_data['long_short_fr_indicies_analysis']
+        x_frs_index, y_frs_index = long_short_fr_indicies_analysis_results['x_frs_index'], long_short_fr_indicies_analysis_results['y_frs_index'] # use the all_results_dict as the computed data value
+        active_context = long_short_fr_indicies_analysis_results['active_context']
+        # Need to map keys of dict to an absolute dict value:
+        sess_specific_aclus = list(x_frs_index.keys())
+        session_ctxt_key:str = active_context.get_description(separator='|', subset_includelist=IdentifyingContext._get_session_context_keys())
+
+        long_short_fr_indicies_analysis_results_h5_df = pd.DataFrame([(f"{session_ctxt_key}|{aclu}", session_ctxt_key, aclu, x_frs_index[aclu], y_frs_index[aclu]) for aclu in sess_specific_aclus], columns=['neuron_uid', 'session_uid', 'aclu','x_frs_index', 'y_frs_index'])
+        # long_short_fr_indicies_analysis_results_h5_df.to_hdf(file_path, key=f'{a_global_computations_group_key}/long_short_fr_indicies_analysis', format='table', data_columns=True)
+        ## OUTPUTS: long_short_fr_indicies_analysis_results_h5_df
+        
+
+        # long_short_post_decoding result: __________________________________________________________________________________ #
+        curr_long_short_post_decoding = curr_active_pipeline.global_computation_results.computed_data['long_short_post_decoding']
+        # expected_v_observed_result = curr_long_short_post_decoding.expected_v_observed_result
+        curr_long_short_rr = curr_long_short_post_decoding.rate_remapping
+        rate_remapping_df = curr_long_short_rr.rr_df
+        # Flat_epoch_time_bins_mean, Flat_decoder_time_bin_centers, num_neurons, num_timebins_in_epoch, num_total_flat_timebins, is_short_track_epoch, is_long_track_epoch, short_short_diff, long_long_diff = expected_v_observed_result.Flat_epoch_time_bins_mean, expected_v_observed_result.Flat_decoder_time_bin_centers, expected_v_observed_result.num_neurons, expected_v_observed_result.num_timebins_in_epoch, expected_v_observed_result.num_total_flat_timebins, expected_v_observed_result.is_short_track_epoch, expected_v_observed_result.is_long_track_epoch, expected_v_observed_result.short_short_diff, expected_v_observed_result.long_long_diff
+        ## OUTPUTS: rate_remapping_df
+        
+
+        # Rate Remapping _____________________________________________________________________________________________________ #
+        rate_remapping_df: pd.DataFrame = rate_remapping_df[['laps', 'replays', 'skew', 'max_axis_distance_from_center', 'distance_from_center', 'has_considerable_remapping']]
+        # rate_remapping_df.to_hdf(file_path, key=f'{a_global_computations_group_key}/rate_remapping', format='table', data_columns=True)
+        rate_remapping_df = rate_remapping_df.reset_index(drop=False).neuron_identity.make_neuron_indexed_df_global(session_context, add_expanded_session_context_keys=True, add_extended_aclu_identity_columns=True)
+
+
+        # jonathan_firing_rate_analysis_result _______________________________________________________________________________ #
+        jonathan_firing_rate_analysis_result: JonathanFiringRateAnalysisResult = curr_active_pipeline.global_computation_results.computed_data.jonathan_firing_rate_analysis
+
+        ## try to add extra columns if available:
+        directional_laps_results = curr_active_pipeline.global_computation_results.computed_data['DirectionalLaps']
+        assert directional_laps_results is not None, f"Must have directional_laps_results!"
+        rank_order_results = curr_active_pipeline.global_computation_results.computed_data.get('RankOrder', None) # : "RankOrderComputationsContainer"
+        if rank_order_results is not None:
+            minimum_inclusion_fr_Hz: float = rank_order_results.minimum_inclusion_fr_Hz
+            included_qclu_values: List[int] = rank_order_results.included_qclu_values
+        else:        
+            ## get from parameters:
+            minimum_inclusion_fr_Hz: float = curr_active_pipeline.global_computation_results.computation_config.rank_order_shuffle_analysis.minimum_inclusion_fr_Hz
+            included_qclu_values: List[int] = curr_active_pipeline.global_computation_results.computation_config.rank_order_shuffle_analysis.included_qclu_values
+                    
+
+        track_templates = directional_laps_results.get_templates(minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz, included_qclu_values=included_qclu_values) # non-shared-only -- !! Is minimum_inclusion_fr_Hz=None the issue/difference?
+        
+        try:
+            _neuron_replay_stats_df, _all_pf2D_peaks_modified_columns = jonathan_firing_rate_analysis_result.add_peak_promenance_pf_peaks(curr_active_pipeline=curr_active_pipeline, track_templates=track_templates)
+        except (KeyError, ValueError, AttributeError) as e:
+            print(f'\tfailed to `add_peak_promenance_pf_peaks`, with error e: {e}. skipping.')            
+        except Exception:
+            raise
+
+        try:
+            _neuron_replay_stats_df, _all_pf1D_peaks_modified_columns = jonathan_firing_rate_analysis_result.add_directional_pf_maximum_peaks(track_templates=track_templates)
+        except (KeyError, ValueError, AttributeError) as e:
+            print(f'\tfailed to `add_directional_pf_maximum_peaks`, with error e: {e}. skipping.')            
+        except Exception:
+            raise
+
+
+        _neuron_replay_stats_df = deepcopy(jonathan_firing_rate_analysis_result.neuron_replay_stats_df)
+        _neuron_replay_stats_df = HDF_Converter.prepare_neuron_indexed_dataframe_for_hdf(_neuron_replay_stats_df, active_context=deepcopy(session_context), aclu_column_name=None)        
+        
+        # jonathan_firing_rate_analysis_result.to_hdf(file_path=file_path, key=f'{a_global_computations_group_key}/jonathan_fr_analysis', active_context=session_context)
+        # jonathan_firing_rate_analysis_result
+
+        ## OUTPUTS: _neuron_replay_stats_df
+
+        ## InstantaneousSpikeRateGroupsComputation ____________________________________________________________________________ #
+        # try:
+        #     inst_spike_rate_groups_result: InstantaneousSpikeRateGroupsComputation = curr_active_pipeline.global_computation_results.computed_data.long_short_inst_spike_rate_groups # = InstantaneousSpikeRateGroupsComputation(instantaneous_time_bin_size_seconds=0.01) # 10ms
+        #     # inst_spike_rate_groups_result.compute(curr_active_pipeline=self, active_context=self.sess.get_context())
+        #     # inst_spike_rate_groups_result.to_hdf(file_path, f'{a_global_computations_group_key}/inst_fr_comps') # held up by SpikeRateTrends.inst_fr_df_list  # to HDF, don't need to split it
+        #     # NotImplementedError: a_field_attr: Attribute(name='LxC_aclus', default=None, validator=None, repr=True, eq=True, eq_key=None, order=True, order_key=None, hash=None, init=False, metadata=mappingproxy({'tags': ['dataset'], 'serialization': {'hdf': True}, 'custom_serialization_fn': None, 'hdf_metadata': {'track_eXclusive_cells': 'LxC'}}), type=<class 'numpy.ndarray'>, converter=None, kw_only=False, inherited=False, on_setattr=None, alias='LxC_aclus') could not be serialized and _ALLOW_GLOBAL_NESTED_EXPANSION is not allowed.
+            
+        # except (KeyError, AttributeError) as e:
+        #     print(f'long_short_inst_spike_rate_groups is missing and will be skipped. Error: {e}')
+        # except NotImplementedError as e:
+        #     print(f'long_short_inst_spike_rate_groups failed to save to HDF5 due to NotImplementedError issues and will be skipped. Error {e}')
+        # except TypeError as e:
+        #     # TypeError: Object dtype dtype('O') has no native HDF5 equivalent
+        #     print(f'long_short_inst_spike_rate_groups failed to save to HDF5 due to type issues and will be skipped. This is usually caused by Python None values. Error {e}')
+        # except Exception:
+        #     raise
+
+        # if not isinstance(expected_v_observed_result, ExpectedVsObservedResult):
+        #     expected_v_observed_result = ExpectedVsObservedResult(**expected_v_observed_result.to_dict())
+
+        # # expected_v_observed_result.to_hdf(file_path=file_path, key=f'{a_global_computations_group_key}/expected_v_observed_result', active_context=session_context) # 'output/test_ExpectedVsObservedResult.h5', '/expected_v_observed_result')
+
+        force_recompute_TrialByTrialActivity: bool = False
+        # force_recompute_TrialByTrialActivity: bool = True
+        needs_recompute_TrialByTrialActivity: bool = True
+        directional_trial_by_trial_activity_result: TrialByTrialActivityResult = curr_active_pipeline.global_computation_results.computed_data.get('TrialByTrialActivity', None)
+
+        try:
+            if directional_trial_by_trial_activity_result is None:
+                needs_recompute_TrialByTrialActivity = True
+            else:
+                if directional_trial_by_trial_activity_result.is_result_version_earlier_than('2025.07.31_0'):
+                    needs_recompute_TrialByTrialActivity = True
+                else:
+                    needs_recompute_TrialByTrialActivity = False
+
+        except (KeyError, ValueError, AttributeError) as e:
+            print(f'\tfailed to get `directional_trial_by_trial_activity_result`, with error e: {e}. trying recompute.')
+            needs_recompute_TrialByTrialActivity = True    
+        except Exception as e:
+            raise
+
+
+        stability_df = None
+        try:
+            ## Recompute as needed
+            if needs_recompute_TrialByTrialActivity or force_recompute_TrialByTrialActivity:
+                # if `KeyError: 'TrialByTrialActivity'` recompute
+                print(f'TrialByTrialActivity is not computed, computing it...')
+                curr_active_pipeline.perform_specific_computation(computation_functions_name_includelist=['_build_trial_by_trial_activity_metrics'], enabled_filter_names=None, fail_on_exception=True, debug_print=False)
+                directional_trial_by_trial_activity_result = curr_active_pipeline.global_computation_results.computed_data.get('TrialByTrialActivity', None) ## try again to get the result
+                assert directional_trial_by_trial_activity_result is not None, f"directional_trial_by_trial_activity_result is None even after forcing recomputation!!"
+                print(f'\t done.')
+
+
+            stability_df = deepcopy(directional_trial_by_trial_activity_result.stability_df)
+            ## Merge Stability info into neurons CSV
+
+            ## INPUTS: stability_df
+
+            ## Prepare stability_df:
+            # stability_df = stability_df.rename(columns={'stability_stability_class':'stability_class'}, inplace=False)
+            stability_df = deepcopy(stability_df).add_prefix('stability_').rename(columns={'stability_stability_class':'stability_class', 'stability_aclu':'aclu'}, inplace=False) ## add the 'stability_' prefix to all columns, then fixed the doublely named one and the aclu column
+            stability_df = stability_df.neuron_identity.make_neuron_indexed_df_global(session_context, add_expanded_session_context_keys=True, add_extended_aclu_identity_columns=True)
+
+
+            # initial_num_rows: int = len(_neuron_replay_stats_df)
+            # join_cell_id_column_name: str = 'neuron_uid'
+            # # join_cell_id_column_name: str = 'aclu'
+
+            # ## merge in `stability_df`'s unique columns on 'aclu'. Note that 'stability_df' has way more cells than 'all_neuron_stats_table' which I believe are confined to just the place cells
+            # _neuron_replay_stats_df = pd.merge(_neuron_replay_stats_df, stability_df[[join_cell_id_column_name] + [col for col in stability_df.columns if col not in _neuron_replay_stats_df.columns and col != join_cell_id_column_name]], on=join_cell_id_column_name)
+            # ## check
+            # # assert len(all_neuron_stats_table) == initial_num_rows, f"initial_num_rows: {initial_num_rows}, len(all_neuron_stats_table): {len(all_neuron_stats_table)}"
+            # if len(_neuron_replay_stats_df) != initial_num_rows:
+            #     print(f"WARNING: initial_num_rows: {initial_num_rows}, len(all_neuron_stats_table): {len(_neuron_replay_stats_df)}")
+
+            ## OUTPUTS: _neuron_replay_stats_df
+
+        except (KeyError, ValueError, AttributeError) as e:
+            print(f'\tfailed to `directional_trial_by_trial_activity_result`, with error e: {e}. skipping.')            
+            stability_df = None
+        except Exception:
+            raise
+
+
+        ##TODO: remainder of global_computations
+        # self.global_computation_results.to_hdf(file_path, key=f'{a_global_computations_group_key}')
+
+        # AcrossSessionsResults.build_neuron_identity_table_to_hdf(file_path, key=session_group_key, spikes_df=self.sess.spikes_df, session_uid=session_uid)
+
+        decoders_total_num_spikes_df, (_LxC_cells_df, _SxC_cells_df) = TrackTemplates.perform_determine_quant_cell_eXclusivities(track_templates=track_templates)
+        decoders_total_num_spikes_df = decoders_total_num_spikes_df.neuron_identity.make_neuron_indexed_df_global(curr_active_pipeline.get_session_context(), add_expanded_session_context_keys=False, add_extended_aclu_identity_columns=True)
+        
+        ## OUTPUTS: decoders_total_num_spikes_df
+
+        # ==================================================================================================================================================================================================================================================================================== #
+        # Begin building fresh df                                                                                                                                                                                                                                                              #
+        # ==================================================================================================================================================================================================================================================================================== #
+        spikes_df: pd.DataFrame = get_proper_global_spikes_df(owning_pipeline_reference=curr_active_pipeline)
+        unique_neuron_identities_df: pd.DataFrame = spikes_df.spikes.extract_unique_neuron_identities()
+        neuron_types_enum_array = np.array([neuronTypesEnum[a_type.hdfcodingClassName] for a_type in unique_neuron_identities_df['neuron_type']]) # convert NeuronTypes to neuronTypesEnum
+        unique_neuron_identities_df['neuron_type']  = neuron_types_enum_array
+        unique_neuron_identities_df = unique_neuron_identities_df.neuron_identity.make_neuron_indexed_df_global(curr_active_pipeline.get_session_context(), add_expanded_session_context_keys=True, add_extended_aclu_identity_columns=True)
+        # unique_neuron_identities_df
+
+        initial_num_rows: int = len(unique_neuron_identities_df)
+        
+        ## OUTPUT: unique_neuron_identities_df
+        ## INPUTS: long_short_fr_indicies_analysis_results_h5_df, rate_remapping_df, _neuron_replay_stats_df
+        
+
+        ## Combine all unique columns from the three loaded dataframes: [neuron_identities_table, long_short_fr_indicies_analysis_table, neuron_replay_stats_table], into a merged df `all_neuron_stats_table`
+        _neuron_replay_stats_df: pd.DataFrame = deepcopy(unique_neuron_identities_df)
+        ## All dataframes have the same number of rows and are uniquely indexed by their 'neuron_uid' column. Add the additional columns from `long_short_fr_indicies_analysis_table` to `all_neuron_stats_table`
+
+        ## OUTPUTS: _neuron_replay_stats_df
+        ## merge in `_neuron_replay_stats_df`'s columns
+        _neuron_replay_stats_df = pd.merge(_neuron_replay_stats_df, _neuron_replay_stats_df[['neuron_uid'] + [col for col in _neuron_replay_stats_df.columns if col not in _neuron_replay_stats_df.columns and col != 'neuron_uid']], on='neuron_uid')
+        ## merge in `long_short_fr_indicies_analysis_results_h5_df`'s columns
+        _neuron_replay_stats_df = pd.merge(_neuron_replay_stats_df, long_short_fr_indicies_analysis_results_h5_df[['neuron_uid'] + [col for col in long_short_fr_indicies_analysis_results_h5_df.columns if col not in _neuron_replay_stats_df.columns and col != 'neuron_uid']], on='neuron_uid')
+        ## merge in `rate_remapping_df`'s columns
+        _neuron_replay_stats_df = pd.merge(_neuron_replay_stats_df, rate_remapping_df[['neuron_uid'] + [col for col in rate_remapping_df.columns if col not in _neuron_replay_stats_df.columns and col != 'neuron_uid']], on='neuron_uid')
+        ## merge in `decoders_total_num_spikes_df`'s columns
+        _neuron_replay_stats_df = pd.merge(_neuron_replay_stats_df, decoders_total_num_spikes_df[['neuron_uid'] + [col for col in decoders_total_num_spikes_df.columns if col not in _neuron_replay_stats_df.columns and col != 'neuron_uid']], on='neuron_uid')
+
+        join_cell_id_column_name: str = 'neuron_uid'
+        # join_cell_id_column_name: str = 'aclu'
+        ## merge in `stability_df`'s unique columns on 'aclu'. Note that 'stability_df' has way more cells than 'all_neuron_stats_table' which I believe are confined to just the place cells
+        _neuron_replay_stats_df = pd.merge(_neuron_replay_stats_df, stability_df[[join_cell_id_column_name] + [col for col in stability_df.columns if col not in _neuron_replay_stats_df.columns and col != join_cell_id_column_name]], on=join_cell_id_column_name)
+
+
+        ## check
+        # assert len(all_neuron_stats_table) == initial_num_rows, f"initial_num_rows: {initial_num_rows}, len(all_neuron_stats_table): {len(all_neuron_stats_table)}"
+
+        if len(_neuron_replay_stats_df) != initial_num_rows:
+            print(f"WARNING: initial_num_rows: {initial_num_rows}, len(all_neuron_stats_table): {len(_neuron_replay_stats_df)}")
+
+        return _neuron_replay_stats_df
+
+
+    @function_attributes(short_name=None, tags=['across-sessions'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-06-09 17:31', related_items=[])
+    @classmethod
+    def build_neuron_identities_CSV(cls, file_path, curr_active_pipeline) -> pd.DataFrame:
+        """ 
+        from pyphoplacecellanalysis.SpecificResults.AcrossSessionResults import AcrossSessionsResults
+        
+        all_neuron_stats_table, file_path = AcrossSessionsResults.build_neuron_identities_CSV(curr_active_pipeline=curr_active_pipeline)
+        
+        
+        """
+        all_neuron_stats_table: pd.DataFrame = AcrossSessionsResults.build_neuron_identities_df_for_CSV(curr_active_pipeline=curr_active_pipeline)
+        file_path = Path(file_path)
+        file_path = file_path.with_suffix('.csv')
+        all_neuron_stats_table.to_csv(file_path)
+        return (all_neuron_stats_table, file_path)
+    
+
+
+    @classmethod
+    def load_all_neuron_identities_CSV(cls, override_output_parent_path:Optional[Path]=None, output_path_suffix:Optional[str]=None):
+        """Save converted back to .h5 file, .csv file, and several others
+
+        Usage:
+            from pyphoplacecellanalysis.SpecificResults.AcrossSessionResults import AcrossSessionsResults
+
+            all_neuron_stats_table, all_loaded_csv_dfs = AcrossSessionsResults.load_all_neuron_identities_CSV(override_output_parent_path=global_data_root_parent_path, output_path_suffix=f'_{BATCH_DATE_TO_USE}')
+
+
+        """
+        # Build the output paths:
+        out_parent_path: Path = override_output_parent_path or Path('output/across_session_results')
+        out_parent_path = out_parent_path.resolve()
+
+        if output_path_suffix is not None:
+            out_parent_path = out_parent_path.joinpath(output_path_suffix).resolve()
+
+        # out_parent_path.mkdir(parents=True, exist_ok=True)
+        assert out_parent_path.exists(), f"out_parent_path: '{out_parent_path}' must exist to load the tables!"
+
+        # '2025-06-10_Lab_withNormalComputedReplays-qclu_[1, 2, 4, 6, 7, 8, 9]-frateThresh_5.0-2006-6-07_16-40-19_neuron_replay_stats_df.csv'
+        csv_file_match_glob = '*_neuron_replay_stats_df.csv'
+        
+        found_files = list(out_parent_path.glob(csv_file_match_glob))
+        all_loaded_csv_dfs = []
+        for a_found_csv in found_files:
+            print(f'loading "{a_found_csv}"...')
+            a_found_df: pd.DataFrame = pd.read_csv(a_found_csv)
+            # try to rename the columns if needed
+            # a_found_df.rename(columns=cls.aliases_columns_dict, inplace=True)
+            all_loaded_csv_dfs.append(a_found_df)
+
+        all_neuron_stats_table: pd.DataFrame = pd.concat(all_loaded_csv_dfs, axis='index')
+
+        ## Load the exported sessions experience_ranks CSV and use it to add the ['session_experience_rank', 'session_experience_orientation_rank'] columns to the tables:
+        try:
+            sessions_df, (experience_rank_map_dict, experience_orientation_rank_map_dict), _callback_add_df_columns = load_and_apply_session_experience_rank_csv("./data/sessions_experiment_datetime_df.csv", session_uid_str_sep='|')
+            all_loaded_csv_dfs = [_callback_add_df_columns(v, session_id_column_name='session_uid') for v in all_loaded_csv_dfs]
+            all_neuron_stats_table: pd.DataFrame = pd.concat(all_loaded_csv_dfs, axis='index')
+
+        except Exception as e:
+            print(f'failed to load and apply the sessions rank CSV to tables. Error: {e}')
+            raise
+        
+        return all_neuron_stats_table, all_loaded_csv_dfs
+    
+
 
 
 class ConciseSessionIdentifiers:
@@ -890,7 +1321,7 @@ class H5FileAggregator:
                 # for Path inputs:
                 short_name_list = [a_file.name for a_file in file_list]
 
-        assert len(short_name_list) == len(file_list)
+        assert len(short_name_list) == len(file_list), f"short_name_list: {short_name_list} is not equal length to file_list: {file_list}"
         if table_key_list is not None:
             assert len(table_key_list) == len(file_list)
         return cls(file_reference_list=[H5FileReference(short_name=a_short_name, path=a_file) for a_short_name, a_file in zip(short_name_list, file_list)], table_key_list=table_key_list)
@@ -1196,6 +1627,126 @@ def copy_session_folder_files_to_target_dir(good_session_concrete_folders, targe
     return moved_files_dict_files, (filelist_path, filedict_out_path)
 
 
+@function_attributes(short_name=None, tags=['batch', 'collect', 'figures'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-07-02 15:05', related_items=[])
+def copy_batch_output_figures_to_common_figures_dir(generate_figures_script_paths: List[Path], common_destination: Path = Path(r"K:/scratch/collected_figures").resolve(), previous_gen_scripts_path: Path = Path('C:\\Users\\pho\\repos\\Spike3DWorkEnv\\Spike3D\\output\\gen_scripts'), curr_gen_scripts_path: Optional[Path] = Path(r'K:/scratch/gen_scripts'), batch_export_folder_date:str='2025-07-02', append_session_name_as_suffix: bool = True, append_session_name_as_prefix: bool = False) -> List[Path]:
+    """ copies each session's gen_output figures to a common figures folder
+
+    Should be used after running the figures phase of batch output to collect the figures from greatlakes.
+
+    By default the batch-exported figures are just stored in the gen_script's in individual session folders like:
+         'gen_scripts/{session_folder}/EXTERNAL/Screenshots/ProgrammaticDisplayFunctionTesting/{batch_export_day_date}/{session_context_path_parts}'
+             e.g. 'gen_scripts/run_kdiba_gor01_one_2006-6-08_14-26-15/EXTERNAL/Screenshots/ProgrammaticDisplayFunctionTesting/2025-07-02/kdiba/gor01/one/2006-6-08_14-26-15'
+
+    Usage:
+
+        from pyphoplacecellanalysis.SpecificResults.AcrossSessionResults import copy_batch_output_figures_to_common_figures_dir
+
+        ## Move figures
+        generate_figures_script_paths = [Path(v) for v in ['C:/Users/pho/repos/Spike3DWorkEnv/Spike3D/output/gen_scripts/run_kdiba_gor01_one_2006-6-07_11-26-53/figures_kdiba_gor01_one_2006-6-07_11-26-53.py',
+            'C:/Users/pho/repos/Spike3DWorkEnv/Spike3D/output/gen_scripts/run_kdiba_gor01_one_2006-6-08_14-26-15/figures_kdiba_gor01_one_2006-6-08_14-26-15.py',
+            ...
+            'C:/Users/pho/repos/Spike3DWorkEnv/Spike3D/output/gen_scripts/run_kdiba_pin01_one_fet11-01_12-58-54/figures_kdiba_pin01_one_fet11-01_12-58-54.py'],
+        ]
+
+        _copied_outputs = copy_batch_output_figures_to_common_figures_dir(generate_figures_script_paths=generate_figures_script_paths)
+        _copied_outputs
+    """
+
+    def find_deepest_directory_iterative(path: Path) -> Path:
+        """
+        Iteratively find the deepest directory (first directory with no subdirectories).
+        # Usage:
+            deepest_dir = find_deepest_directory_iterative(gen_scripts_fig_path)
+            deepest_dir
+        ## Output:
+        [
+            WindowsPath('K:/scratch/gen_scripts/run_kdiba_gor01_one_2006-6-08_14-26-15/EXTERNAL/Screenshots/ProgrammaticDisplayFunctionTesting/2025-07-02/kdiba/gor01/one/2006-6-08_14-26-15'),
+            WindowsPath('K:/scratch/gen_scripts/run_kdiba_gor01_one_2006-6-09_1-22-43/EXTERNAL/Screenshots/ProgrammaticDisplayFunctionTesting/2025-07-02/kdiba/gor01/one/2006-6-09_1-22-43'),
+            ...
+            WindowsPath('K:/scratch/gen_scripts/run_kdiba_pin01_one_fet11-01_12-58-54/EXTERNAL/Screenshots/ProgrammaticDisplayFunctionTesting/2025-07-02/kdiba/pin01/one/fet11-01_12-58-54'),
+        ]
+
+        """
+        current_path = Path(path)
+
+        while True:
+            # Get all subdirectories
+            subdirs = [p for p in current_path.iterdir() if p.is_dir()]
+
+            # If no subdirectories, we've found the deepest directory
+            if not subdirs:
+                return current_path
+
+            # Move to the first subdirectory (or you could choose based on other criteria)
+            current_path = subdirs[0]  # or sorted(subdirs)[0] for alphabetical order
+
+    # ==================================================================================================================================================================================================================================================================================== #
+    # BEGIN FUNCTION BODY                                                                                                                                                                                                                                                                  #
+    # ==================================================================================================================================================================================================================================================================================== #
+    if curr_gen_scripts_path is None:
+        curr_gen_scripts_path = previous_gen_scripts_path ## assumed to be the same
+        gen_scripts_sess_paths = [curr_gen_scripts_path.joinpath(Path(k).parent.relative_to(previous_gen_scripts_path)).resolve() for k in generate_figures_script_paths]
+    else:
+        Assert.path_exists(curr_gen_scripts_path)
+
+
+        gen_scripts_sess_paths = [curr_gen_scripts_path.joinpath(Path(k).parent.relative_to(previous_gen_scripts_path)).resolve() for k in generate_figures_script_paths]
+    gen_scripts_sess_paths = [v for v in gen_scripts_sess_paths if v.exists()]
+    gen_scripts_sess_path_dict = {v.name.removeprefix('run_'):v for v in gen_scripts_sess_paths}
+    gen_scripts_sess_paths
+    gen_scripts_sess_path_dict
+
+    ### gen_scripts_sess_path_dict
+    # {'kdiba_gor01_one_2006-6-07_11-26-53': WindowsPath('K:/scratch/gen_scripts/run_kdiba_gor01_one_2006-6-07_11-26-53'),
+    #  'kdiba_gor01_one_2006-6-08_14-26-15': WindowsPath('K:/scratch/gen_scripts/run_kdiba_gor01_one_2006-6-08_14-26-15'),
+    #   ...
+    #  'kdiba_pin01_one_fet11-01_12-58-54': WindowsPath('K:/scratch/gen_scripts/run_kdiba_pin01_one_fet11-01_12-58-54')}
+
+    ## OUTPUTS: gen_scripts_sess_paths, gen_scripts_sess_path_dict
+
+    # generate_figures_script_paths
+    gen_scripts_fig_paths = [k.joinpath(f'EXTERNAL/Screenshots/ProgrammaticDisplayFunctionTesting/{batch_export_folder_date}').resolve() for k in gen_scripts_sess_paths]
+    gen_scripts_fig_paths = [v for v in gen_scripts_fig_paths if v.exists()]
+    gen_scripts_fig_path_dict = dict(zip(gen_scripts_sess_path_dict.keys(), gen_scripts_fig_paths))
+    ## OUTPUTS: gen_scripts_fig_path_dict, gen_scripts_fig_paths
+
+    # INPUTS: gen_scripts_fig_paths
+    gen_scripts_fig_flat_child_paths = [find_deepest_directory_iterative(gen_scripts_fig_path) for gen_scripts_fig_path in gen_scripts_fig_paths]
+    gen_scripts_fig_flat_child_path_dict = dict(zip(gen_scripts_sess_path_dict.keys(), gen_scripts_fig_flat_child_paths))
+
+
+    common_destination.mkdir(exist_ok=True)
+
+    _active_format_fn = lambda a_sess_name, f_str: f_str ## no-op
+    if append_session_name_as_prefix:
+        _append_as_prefix_fn = lambda a_sess_name, f_str: f'{a_sess_name}_{f_str}'
+        # _active_format_fn = _active_format_fn
+        _active_format_fn = _append_as_prefix_fn
+
+    if append_session_name_as_suffix:
+        _append_as_suffix_fn = lambda a_sess_name, f_str: f'{f_str}_{a_sess_name}'
+        # _active_format_fn = _active_format_fn
+        _active_format_fn = _append_as_suffix_fn
+
+
+    ## perform the copy
+    # _copied_outputs = [shutil.copy2(f, common_destination.joinpath(f.with_stem(f"{k}_{f.stem}").name)) for k, path in gen_scripts_fig_flat_child_path_dict.items() for f in path.iterdir() if f.is_file()] ## append the session name (k) to each file as a prefix
+    _copied_outputs = [shutil.copy2(f, common_destination.joinpath(f.with_stem(_active_format_fn(k, f.stem)).name)) for k, path in gen_scripts_fig_flat_child_path_dict.items() for f in path.iterdir() if f.is_file()] ## append the session name (k) to each file as a prefix
+
+
+
+    # for k, path in gen_scripts_fig_flat_child_path_dict.items():
+    #     print(f'k: {k}, path: {path}')
+    #     for f in path.iterdir():
+    #         if f.is_file():
+    #             new_dest_f = common_destination.joinpath(f.with_stem(f"{k}_{f.stem}").name)
+    #             print(f'new_dest_f: {new_dest_f}')
+    #             shutil.copy2(f, new_dest_f) 
+
+    return _copied_outputs
+
+
+
 
 @function_attributes(short_name=None, tags=['inst_fr', 'across_session'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-09-12 09:48', related_items=[])
 def copy_session_inst_fr_data_to_across_session_pkl(RESULT_DATE_TO_USE, collected_outputs_path, instantaneous_time_bin_size_seconds_list:List[float], debug_print = False):
@@ -1301,6 +1852,8 @@ class AcrossSessionTables:
         """
         session_short_names: List[str] = [a_ctxt.get_description(separator='_') for a_ctxt in included_session_contexts] # 'kdiba.gor01.one.2006-6-08_14-26-15'
         # session_group_keys: List[str] = [("/" + a_ctxt.get_description(separator="/", include_property_names=False)) for a_ctxt in included_session_contexts] # 'kdiba/gor01/one/2006-6-08_14-26-15'
+        ## currently only handles one type of session run 
+
         a_loader = H5FileAggregator.init_from_file_lists(file_list=included_h5_paths, short_name_list=session_short_names)
         _out_table = a_loader.load_and_consolidate(table_key_list=df_table_keys, fail_on_exception=False)
         if _out_table is not None:
@@ -1492,7 +2045,7 @@ class AcrossSessionTables:
 
     @classmethod
     def load_all_combined_tables(cls, override_output_parent_path:Optional[Path]=None, output_path_suffix:Optional[str]=None):
-        """Save converted back to .h5 file, .csv file, and several others
+        """ 
 
         Usage:
             from pyphoplacecellanalysis.SpecificResults.AcrossSessionResults import AcrossSessionTables
@@ -1546,6 +2099,7 @@ class AcrossSessionTables:
 
 
 
+    @function_attributes(short_name=None, tags=['HDF5'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-06-09 16:37', related_items=[])
     @classmethod
     def build_all_known_tables(cls, included_session_contexts, included_h5_paths, should_restore_native_column_types:bool=True):
         """ Extracts the neuron identities table from across the **.h5** files.
@@ -1607,7 +2161,7 @@ def build_session_t_delta(t_delta_csv_path: Path):
     """
     assert t_delta_csv_path.exists(), f"t_split_df CSV at '{t_delta_csv_path}' does not exist!"
     ## The CSV containing the session delta time:
-    t_delta_df = pd.read_csv(t_delta_csv_path, index_col=0) # Assuming that your CSV file has an index column
+    t_delta_df = pd.read_csv(t_delta_csv_path, index_col=0, low_memory=False) # Assuming that your CSV file has an index column
     # adds `delta_aligned_t_start`, `delta_aligned_t_end` columns
     t_delta_df['delta_aligned_t_start'] = t_delta_df['t_start'] - t_delta_df['t_delta']
     t_delta_df['delta_aligned_t_end'] = t_delta_df['t_end'] - t_delta_df['t_delta']
@@ -1636,7 +2190,7 @@ def load_and_apply_session_experience_rank_csv(csv_path="./data/sessions_experim
         csv_path = Path(csv_path).resolve()
         
     assert csv_path.exists(), f"csv_path: '{csv_path}' does not exist!"
-    sessions_df: pd.DataFrame = pd.read_csv(csv_path) # KDibaOldDataSessionFormatRegisteredClass.find_all_existing_sessions(global_data_root_parent_path=global_data_root_parent_path).sort_values(['session_datetime'])
+    sessions_df: pd.DataFrame = pd.read_csv(csv_path, low_memory=False) # KDibaOldDataSessionFormatRegisteredClass.find_all_existing_sessions(global_data_root_parent_path=global_data_root_parent_path).sort_values(['session_datetime'])
             
     session_uid_strs = sessions_df['session_uid'].values
             
@@ -1696,7 +2250,7 @@ def find_pkl_files(directory: str, recurrsive: bool=False):
 
 
 @function_attributes(short_name=None, tags=['parse'], input_requires=[], output_provides=[], uses=['try_parse_chain'], used_by=['find_most_recent_files'], creation_date='2024-03-28 10:16', related_items=[])
-def parse_filename(path: Union[Path, str], debug_print:bool=False) -> Tuple[datetime, str, Optional[str], str, str]:
+def parse_filename(path: Union[Path, str], should_print_unparsable_filenames: bool=True, debug_print:bool=False) -> Tuple[datetime, str, Optional[str], str, str]:
     """
     A revised version built on 2024-03-28 that uses `try_parse_chain` instead of nested for loops.
 
@@ -1748,7 +2302,7 @@ def parse_filename(path: Union[Path, str], debug_print:bool=False) -> Tuple[date
         filename: str = path  
     else:
         filename: str = path.stem  # Get filename without extension
-    final_parsed_output_dict = try_parse_chain(basename=filename, debug_print=debug_print) ## previous implementation
+    final_parsed_output_dict = try_parse_chain(basename=filename, should_print_unparsable_filenames=should_print_unparsable_filenames, debug_print=debug_print) ## previous implementation
     # final_parsed_output_dict = try_iterative_parse_chain(basename=filename)
     export_file_type = (final_parsed_output_dict or {}).get('export_file_type', None)
     session_str = (final_parsed_output_dict or {}).get('session_str', None)
@@ -1756,13 +2310,14 @@ def parse_filename(path: Union[Path, str], debug_print:bool=False) -> Tuple[date
         ## do the new 2024-11-15 19:01 parse instead    
         print(f'Using `try_iterative_parse_chain(...)` for file "{filename}" (more modern parse method)...')
         # final_parsed_output_dict = try_parse_chain(basename=filename) ## previous implementation
-        final_parsed_output_dict = try_iterative_parse_chain(basename=filename, debug_print=debug_print)
+        final_parsed_output_dict = try_iterative_parse_chain(basename=filename, should_print_unparsable_filenames=should_print_unparsable_filenames, debug_print=debug_print)
     # if final_parsed_output_dict is None:
     #     ## this version failed, fall-back to the older implementation
     #     final_parsed_output_dict = try_parse_chain(basename=filename) ## previous implementation
     
     if final_parsed_output_dict is None:
-        print(f'ERR: Could not parse filename: "{filename}"') # 2024-01-18_GL_t_split_df
+        if should_print_unparsable_filenames:
+            print(f'ERR: Could not parse filename: "{filename}"') # 2024-01-18_GL_t_split_df
         return None, None, None, None, None # used to return ValueError when it couldn't parse, but we'd rather skip unparsable files
 
 
@@ -1843,7 +2398,7 @@ def get_only_most_recent_session_files(parsed_paths_df: pd.DataFrame, group_colu
 
 
 @function_attributes(short_name=None, tags=['recent', 'parse'], input_requires=[], output_provides=[], uses=['parse_filename'], used_by=[], creation_date='2024-04-15 09:18', related_items=['convert_to_dataframe'])
-def find_most_recent_files(found_session_export_paths: List[Path], cuttoff_date:Optional[datetime]=None, debug_print: bool = False) -> Tuple[Dict[str, Dict[str, Tuple[Path, str, datetime]]], pd.DataFrame, pd.DataFrame]:
+def find_most_recent_files(found_session_export_paths: List[Path], cuttoff_date:Optional[datetime]=None, debug_print: bool = False, should_print_unparsable_filenames: bool=True, should_fallback_to_filesystem_modification_datetime: bool=False) -> Tuple[Dict[str, Dict[str, Tuple[Path, str, datetime]]], pd.DataFrame, pd.DataFrame]:
     """
     Returns a dictionary representing the most recent files for each session type among a list of provided file paths.
 
@@ -1851,6 +2406,7 @@ def find_most_recent_files(found_session_export_paths: List[Path], cuttoff_date:
     found_session_export_paths (List[Path]): A list of Paths representing files to be checked.
     cuttoff_date (datetime): a date which all files must be newer than to be considered for inclusion. If not provided, the most recent files will be included regardless of their date.
     debug_print (bool): A flag to trigger debugging print statements within the function. Default is False.
+    should_fallback_to_filesystem_modification_datetime (bool): If True, use file modification time when export date can't be parsed from filename. Default is False.
 
     Returns:
     Dict[str, Dict[str, Tuple[Path, datetime]]]: A nested dictionary where the main keys represent
@@ -1860,11 +2416,46 @@ def find_most_recent_files(found_session_export_paths: List[Path], cuttoff_date:
     # now sessions is a dictionary where the key is the session_str and the value is another dictionary.
     # This inner dictionary's key is the file type and the value is the most recent path for this combination of session and file type
     # Thus, laps_csv and ripple_csv can be obtained from the dictionary for each session
-
+    
+    
+    Usage:
+    
+    
     """
-    # Function 'parse_filename' should be defined in the global scope
-    parsed_paths: List[Tuple] = [(*parse_filename(p), p) for p in found_session_export_paths if (parse_filename(p)[0] is not None)] # note we append path p to the end of the tuple
-    # '2024-11-22_GL-kdiba_gor01_one_2006-6-09_1-22-43__withNormalComputedReplays-qclu_[1, 2, 4, 6, 7, 9]-frateThresh_5.0-(ripple_all_scores_merged_df)_tbin-0.025.csv' in [v.name for v in found_session_export_paths]
+    # Process each path to extract information or use file modification time as fallback
+    parsed_paths: List[Tuple] = []
+
+
+    parse_filename_kwargs = dict(should_print_unparsable_filenames=should_print_unparsable_filenames, debug_print=debug_print)
+
+    # Original behavior: filter out files where parse_filename returns None for the first element
+    if not should_fallback_to_filesystem_modification_datetime:
+        parsed_paths = [(*parse_filename(p, **parse_filename_kwargs), p) for p in found_session_export_paths if (parse_filename(p, should_print_unparsable_filenames=False, debug_print=False)[0] is not None)]
+    else:
+        # Extended behavior with fallback to file modification time
+        for p in found_session_export_paths:
+            parsed_info = parse_filename(p, **parse_filename_kwargs)
+            if parsed_info[0] is not None:
+                # Use parsed datetime from filename
+                parsed_paths.append((*parsed_info, p))
+            else:
+                # Fallback to file modification time
+                try:
+                    # Get file modification time
+                    mtime = datetime.fromtimestamp(p.stat().st_mtime)
+                    # Try to parse other info, use fallback values if needed
+                    session_str = parsed_info[1] if parsed_info[1] is not None else "unknown_session"
+                    custom_replay_name = parsed_info[2] if parsed_info[2] is not None else ""
+                    file_type = parsed_info[3] if parsed_info[3] is not None else p.suffix.lstrip('.')
+                    tbin_size = parsed_info[4] if parsed_info[4] is not None else ""
+                    parsed_paths.append((mtime, session_str, custom_replay_name, file_type, tbin_size, p))
+                    if debug_print:
+                        print(f"Using file modification time for {p.name}: {mtime}")
+                except Exception as e:
+                    if debug_print:
+                        print(f"WARN (SKIP): Skipping file {p.name} due to error: {e}")
+                    continue
+
     # Function that helps sort tuples by handling None values.
     def sort_key(tup):
         # Assign a boolean for each element, True if it's None, to ensure None values are sorted last.
@@ -1877,51 +2468,31 @@ def find_most_recent_files(found_session_export_paths: List[Path], cuttoff_date:
             tup[-1]                         # Finally by path which should handle None by itself
         )
 
-    # '2024-11-22_GL-kdiba_gor01_one_2006-6-09_1-22-43__withNormalComputedReplays-qclu_[1, 2, 4, 6, 7, 9]-frateThresh_5.0-(ripple_all_scores_merged_df)_tbin-0.025.csv' in [v[-1].name for v in parsed_paths] # true
-    
     # Now we sort the data using our custom sort key
     parsed_paths = sorted(parsed_paths, key=sort_key, reverse=True)
-    # parsed_paths.sort(key=lambda x: (x[3] is not None, x), reverse=True)
-    # parsed_paths.sort(reverse=True) # old way
 
-    # '2024-11-22_GL-kdiba_gor01_one_2006-6-09_1-22-43__withNormalComputedReplays-qclu_[1, 2, 4, 6, 7, 9]-frateThresh_5.0-(ripple_all_scores_merged_df)_tbin-0.025.csv' in [v[-1].name for v in parsed_paths] # true
-    #  '2024-11-22_GL-kdiba_gor01_one_2006-6-09_1-22-43__withNormalComputedReplays-qclu_[1, 2, 4, 6, 7, 9]-frateThresh_5.0-(ripple_all_scores_merged_df)_tbin-0.025.csv' in [v.name for v in found_session_export_paths]
-    
     if debug_print:
         print(f'parsed_paths: {parsed_paths}')
 
     tuple_column_names = ['export_datetime', 'session', 'custom_replay_name', 'file_type', 'decoding_time_bin_size_str', 'path']
     all_parsed_paths_df: pd.DataFrame = pd.DataFrame(parsed_paths, columns=tuple_column_names)
-   
+
     # compare_custom_replay_name_col_name: str = 'custom_replay_name'
     compare_custom_replay_name_col_name: str = '_comparable_custom_replay_name'
-    
-    ## replace undscores with hyphens so comparisons are insensitive to whether '_' or '-' are used:
-    # parsed_paths_df['session'] = parsed_paths_df['session'].str.replace('_','-') # replace both with hyphens so they match
-    # parsed_paths_df['custom_replay_name'] = parsed_paths_df['custom_replay_name'].str.replace('_','-') # replace both with hyphens so they match
-    all_parsed_paths_df['_comparable_custom_replay_name'] = all_parsed_paths_df['custom_replay_name'].str.replace('_','-') # replace both with hyphens so they match
-    # parsed_paths_df[['session_name', '_comparable_custom_replay_name']]
-    
-    # _preferred_form_session_names = deepcopy(parsed_paths_df['session_name'].unique()) ## the one with underscores like "kdiba_gor01_one_2006-6-08_14-26-15"
-    # _compare_form_session_names = deepcopy(parsed_paths_df['session_name'].unique())
-    # _compare_to_preferred_session_name_map = dict(zip(_compare_form_session_names, _preferred_form_session_names)) # used to replace desired session names when done
 
+    ## replace undscores with hyphens so comparisons are insensitive to whether '_' or '-' are used:
+    all_parsed_paths_df['_comparable_custom_replay_name'] = all_parsed_paths_df['custom_replay_name'].str.replace('_','-') # replace both with hyphens so they match
 
     # Sort by columns: 'session' (ascending), 'custom_replay_name' (ascending) and 3 other columns
     all_parsed_paths_df = all_parsed_paths_df.sort_values(['session', 'file_type', compare_custom_replay_name_col_name, 'decoding_time_bin_size_str', 'export_datetime']).reset_index(drop=True)
-    ## #TODO 2024-09-27 01:49: - [ ] Confirmed that `parsed_paths_df` still has the `laps_time_bin_marginals` outputs in the list
-    # '2024-11-22_GL-kdiba_gor01_one_2006-6-09_1-22-43__withNormalComputedReplays-qclu_[1, 2, 4, 6, 7, 9]-frateThresh_5.0-(ripple_all_scores_merged_df)_tbin-0.025.csv' in [Path(v).name for v in parsed_paths_df['path'].to_list()]
-    # parsed_paths_df['filename'] = [Path(v).name for v in parsed_paths_df['path'].to_list()]    
-    # _test_df = parsed_paths_df[parsed_paths_df['filename'] == '2024-11-22_GL-kdiba_gor01_one_2006-6-09_1-22-43__withNormalComputedReplays-qclu_[1, 2, 4, 6, 7, 9]-frateThresh_5.0-(ripple_all_scores_merged_df)_tbin-0.025.csv']
 
     # get_only_most_recent_session_files _________________________________________________________________________________ #
     ## This is where we drop all but the most recent:
     filtered_parsed_paths_df = get_only_most_recent_session_files(parsed_paths_df=deepcopy(all_parsed_paths_df), group_column_names=['session', compare_custom_replay_name_col_name, 'file_type', 'decoding_time_bin_size_str']) ## `filtered_parsed_paths_df` still has it
-    
-    # '2024-11-22_GL-kdiba_gor01_one_2006-6-09_1-22-43__withNormalComputedReplays-qclu_[1, 2, 4, 6, 7, 9]-frateThresh_5.0-(ripple_all_scores_merged_df)_tbin-0.025.csv' in [Path(v).name for v in filtered_parsed_paths_df['path'].to_list()]
+
     # Drop rows with export_datetime less than or equal to cutoff_date
     if cuttoff_date is not None:
-        filtered_parsed_paths_df = filtered_parsed_paths_df[filtered_parsed_paths_df['export_datetime'] >= cuttoff_date] ## fails HERE?!?
+        filtered_parsed_paths_df = filtered_parsed_paths_df[filtered_parsed_paths_df['export_datetime'] >= cuttoff_date]
 
     ## filtered_parsed_paths_df is new 2024-07-11 output, NOTE we don't use `filtered_parsed_paths_df` below, instead `parsed_paths`.
 
@@ -1939,23 +2510,8 @@ def find_most_recent_files(found_session_export_paths: List[Path], cuttoff_date:
                 # if there is no cutoff date, add
                 should_add = True
 
-            # #TODO 2024-09-27 01:46: - [ ] Is this indentation right? Is it supposed to be out-dented?
             if should_add:
                 sessions[session_str][file_type] = (path, decoding_time_bin_size_str, export_datetime)
-
-
-    ## Post-process to get session info
-    # split_char: str = '__'
-    # for session_str, outer_dict in sessions.items():
-    #     for file_type, inner_dict in outer_dict.items():
-    #         ## Parse
-    #         _split_columns = session_str.split(split_char)
-    #         if len(_split_columns) > 1:
-    #             _session_names.append(_split_columns[0])
-    #             _accrued_replay_epoch_names.append(_split_columns[-1])
-    #         else:
-    #             _session_names.append(_split_columns[0])
-                # _accrued_replay_epoch_names.append('')
 
     return sessions, filtered_parsed_paths_df, all_parsed_paths_df
 
@@ -1999,7 +2555,7 @@ def read_and_process_csv_file(file: str, session_name: str, curr_session_t_delta
     """ reads the CSV file and adds the 'session_name' column if it is missing.
 
     """
-    df = pd.read_csv(file, na_values=['', 'nan', 'np.nan', '<NA>'])
+    df = pd.read_csv(file, na_values=['', 'nan', 'np.nan', '<NA>'], low_memory=False)
     df['session_name'] = session_name
     if curr_session_t_delta is not None:
         df['delta_aligned_start_t'] = df[time_col] - curr_session_t_delta
@@ -2322,8 +2878,12 @@ def _common_cleanup_operations(a_df):
 def load_across_sessions_exported_h5_files(cuttoff_date: Optional[datetime] = None, collected_outputs_directory: Optional[Path]=None, known_bad_session_strs=None, debug_print: bool = False):
     """
 
+    #TODO 2025-04-18 06:22: - [ ] Where do the returned `h5_contexts_paths_dict` come frome?
+    
+    
     from pyphoplacecellanalysis.SpecificResults.AcrossSessionResults import load_across_sessions_exported_h5_files
 
+    
 
     """
     from neuropy.core.user_annotations import UserAnnotationsManager
@@ -2364,9 +2924,20 @@ def load_across_sessions_exported_h5_files(cuttoff_date: Optional[datetime] = No
     ## INPUTS: h5_sessions
     h5_session_names = list(h5_sessions.keys())
     good_sessions = UserAnnotationsManager.get_hardcoded_good_sessions()
-    h5_session_contexts = [a_good_session_ctxt for a_good_session_ctxt in good_sessions if (a_good_session_ctxt.session_name in h5_session_names)]
+    
+
+    def _subfn_session_ctxt_to_dict_key(a_ctxt: IdentifyingContext):
+        # return a_ctxt.session_name #TODO 2025-04-18 06:34: - [ ] OLD, uses session name '2006-6-08_14-26-15'
+        return a_ctxt.get_description(subset_includelist=['format_name', 'animal', 'exper_name', 'session_name'], separator='_') #TODO 2025-04-18 06:34: - [ ] NEW: entire session context string like 'kdiba_gor01_one_2006-6-08_14-26-15'
+    
+    # [a_good_session_ctxt.get_description(subset_includelist=['format_name', 'animal', 'exper_name', 'session_name'], separator='_') for a_good_session_ctxt in good_sessions]
+
+    # h5_session_contexts = [a_good_session_ctxt for a_good_session_ctxt in good_sessions if (a_good_session_ctxt.session_name in h5_session_names)]
+    h5_session_contexts = [a_good_session_ctxt for a_good_session_ctxt in good_sessions if (_subfn_session_ctxt_to_dict_key(a_good_session_ctxt) in h5_session_names)] #TODO 2025-04-18 06:28: - [ ] Had to change to match on just session name to matching on entire string, might need to go farther and add qclu and frHZ filter
+
     # included_h5_paths = [a_session_dict.get('pipeline_results', None)[0] for a_sess_name, a_session_dict in h5_sessions.items()] # these are mis-ordered
-    included_h5_paths = [safe_get_if_not_None(h5_sessions[a_good_session_ctxt.session_name].get('pipeline_results', None), 0, None) for a_good_session_ctxt in h5_session_contexts]
+    # included_h5_paths = [safe_get_if_not_None(h5_sessions[a_good_session_ctxt.session_name].get('pipeline_results', None), 0, None) for a_good_session_ctxt in h5_session_contexts]
+    included_h5_paths = [safe_get_if_not_None(h5_sessions[_subfn_session_ctxt_to_dict_key(a_good_session_ctxt)].get('pipeline_results', None), 0, None) for a_good_session_ctxt in h5_session_contexts]
     assert len(included_h5_paths) == len(h5_session_contexts)
 
     h5_contexts_paths_dict = dict(zip(h5_session_contexts, included_h5_paths))
@@ -2712,7 +3283,7 @@ def _concat_custom_dict_to_df(final_sessions_loaded_df_dict):
 def _subfn_new_df_process_and_load_exported_file(file_path, loaded_dict: Dict, session_name: str, curr_session_t_delta: float, time_key: str, debug_print:bool=False, **additional_columns) -> bool:
     try:
         # loaded_dict[session_name] = read_and_process_csv_file(file_path, session_name, curr_session_t_delta, time_key)
-        df = pd.read_csv(file_path, na_values=['', 'nan', 'np.nan', '<NA>'])
+        df = pd.read_csv(file_path, na_values=['', 'nan', 'np.nan', '<NA>'], low_memory=False) # `low_memory=False` tells pandas to use more memory to correctly infer data types.
         df['session_name'] = session_name
         if curr_session_t_delta is not None:
             df['delta_aligned_start_t'] = df[time_key] - curr_session_t_delta
@@ -3147,14 +3718,22 @@ class OldFileArchiver:
 # Visualizations                                                                                                       #
 # ==================================================================================================================== #
 
-@metadata_attributes(short_name=None, tags=['across-session', 'visualizations', 'figure', 'output'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-07-21 00:00', related_items=[])
+@metadata_attributes(short_name=None, tags=['across-session', 'visualizations', 'figure', 'output'], input_requires=[], output_provides=[], uses=['PaperFigureTwo'], used_by=[], creation_date='2023-07-21 00:00', related_items=[])
 class AcrossSessionsVisualizations:
+    """ 
+
+    
+    publication_figures_output_parent_folder = Path('E:/Dropbox (Personal)/Active/Kamran Diba Lab/Pho-Kamran-Meetings/2025-06-06 - EXPORTS FOR PUBLICATION') # 'Figure 1 - Overview'
+        
+    """
     # 2023-07-21 - Across Sessions Aggregate Figure: __________________________________________________________________________________ #
 
     # _registered_output_files = {}
+    _override_output_parent_path: Optional[Path] = None
+    _fig_out_man: Optional[FileOutputManager] = None
 
     @classmethod
-    def output_figure(cls, final_context: IdentifyingContext, fig, write_vector_format:bool=False, write_png:bool=True, debug_print=True):
+    def output_figure(cls, final_context: IdentifyingContext, fig, write_vector_format:bool=True, write_png:bool=True, debug_print=True, **kwargs):
         """ outputs the figure using the provided context, replacing the pipeline's curr_active_pipeline.output_figure(...) callback which isn't usually accessible for across session figures. """
 
         def register_output_file(output_path, output_metadata=None):
@@ -3162,13 +3741,68 @@ class AcrossSessionsVisualizations:
             print(f'register_output_file(output_path: {output_path}, ...)')
             # registered_output_files[output_path] = output_metadata or {}
 
-        fig_out_man = FileOutputManager(figure_output_location=FigureOutputLocation.DAILY_PROGRAMMATIC_OUTPUT_FOLDER, context_to_path_mode=ContextToPathMode.HIERARCHY_UNIQUE)
-        active_out_figure_paths = build_and_write_to_file(fig, final_context, fig_out_man, write_vector_format=write_vector_format, write_png=write_png, register_output_file_fn=register_output_file)
+        if cls._override_output_parent_path is not None:
+            Assert.path_exists(cls._override_output_parent_path)
+            fig_out_man = FileOutputManager(figure_output_location=FigureOutputLocation.CUSTOM, context_to_path_mode=ContextToPathMode.GLOBAL_UNIQUE, override_output_parent_path=deepcopy(cls._override_output_parent_path))
+        else:
+            # no override path, use default
+            fig_out_man = FileOutputManager(figure_output_location=FigureOutputLocation.DAILY_PROGRAMMATIC_OUTPUT_FOLDER, context_to_path_mode=ContextToPathMode.HIERARCHY_UNIQUE)
+    
+        cls._fig_out_man = fig_out_man
+        
+        active_out_figure_paths = build_and_write_to_file(fig, final_context, fig_out_man, write_vector_format=write_vector_format, write_png=write_png, register_output_file_fn=register_output_file, **kwargs)
         return active_out_figure_paths, final_context
 
 
     @classmethod
-    def across_sessions_bar_graphs(cls, across_session_inst_fr_computation: Dict[IdentifyingContext, InstantaneousSpikeRateGroupsComputation], num_sessions:int, save_figure=True, instantaneous_time_bin_size_seconds=0.003, **kwargs):
+    def across_sessions_bar_graphs(cls, across_session_inst_fr_computation: InstantaneousSpikeRateGroupsComputation, num_sessions:int, save_figure=True, instantaneous_time_bin_size_seconds=0.003, **kwargs):
+        """ 2023-07-21 - Across Sessions Aggregate Figure - I know this is hacked-up to use `PaperFigureTwo`'s existing plotting machinery (which was made to plot a single session) to plot something it isn't supposed to.
+        Aggregate across all of the sessions to build a new combined `InstantaneousSpikeRateGroupsComputation`, which can be used to plot the "PaperFigureTwo", bar plots for many sessions.
+        
+        
+        Values come from:
+            `self.computation_result.Fig2_Laps_FR`
+            `self.computation_result.Fig2_Replay_FR`
+            
+        """
+
+        # num_sessions = len(across_sessions_instantaneous_fr_dict)
+        print(f'num_sessions: {num_sessions}')
+
+        global_multi_session_context = IdentifyingContext(format_name='kdiba', num_sessions=num_sessions) # some global context across all of the sessions, not sure what to put here.
+
+        # To correctly aggregate results across sessions, it only makes sense to combine entries at the `.cell_agg_inst_fr_list` variable and lower (as the number of cells can be added across sessions, treated as unique for each session).
+
+        ## Display the aggregate across sessions:
+        _out_aggregate_fig_2 = PaperFigureTwo(instantaneous_time_bin_size_seconds=instantaneous_time_bin_size_seconds) # WARNING: we didn't save this info
+        _out_aggregate_fig_2.computation_result = across_session_inst_fr_computation
+        _out_aggregate_fig_2.active_identifying_session_ctx = across_session_inst_fr_computation.active_identifying_session_ctx
+        # Set callback, the only self-specific property
+        # _out_fig_2._pipeline_file_callback_fn = curr_active_pipeline.output_figure # lambda args, kwargs: self.write_to_file(args, kwargs, curr_active_pipeline)
+
+        # registered_output_files = {}
+
+        # Set callback, the only self-specific property
+        _out_aggregate_fig_2._pipeline_file_callback_fn = cls.output_figure
+
+        # Showing
+        _fig_2_theta_out = None
+        _fig_2_replay_out = None        
+        _output_dict = {}
+        matplotlib_configuration_update(is_interactive=True, backend='Qt5Agg')
+        # Perform interactive Matplotlib operations with 'Qt5Agg' backend
+        _fig_2_theta_out, _fig_2_replay_out = _out_aggregate_fig_2.display(active_context=global_multi_session_context, title_modifier_fn=lambda original_title: f"{original_title} ({num_sessions} sessions)", save_figure=save_figure, **kwargs)
+        _output_dict.update( {'theta': _fig_2_theta_out, 'replay': _fig_2_replay_out})
+        if save_figure:
+            # _out_aggregate_fig_2.perform_save(_fig_2_theta_out)
+            print(f'save_figure()!')
+
+        return global_multi_session_context, _out_aggregate_fig_2, _output_dict
+
+
+
+    @classmethod
+    def across_sessions_firing_rate_over_time_scatter_figure(cls, across_session_inst_fr_computation: Dict[IdentifyingContext, InstantaneousSpikeRateGroupsComputation], num_sessions:int, save_figure=True, instantaneous_time_bin_size_seconds=0.003, **kwargs):
         """ 2023-07-21 - Across Sessions Aggregate Figure - I know this is hacked-up to use `PaperFigureTwo`'s existing plotting machinery (which was made to plot a single session) to plot something it isn't supposed to.
         Aggregate across all of the sessions to build a new combined `InstantaneousSpikeRateGroupsComputation`, which can be used to plot the "PaperFigureTwo", bar plots for many sessions."""
 
@@ -3192,18 +3826,23 @@ class AcrossSessionsVisualizations:
         _out_aggregate_fig_2._pipeline_file_callback_fn = cls.output_figure
 
         # Showing
+        _fig_2_theta_out = None
+        _fig_2_replay_out = None        
+        _output_dict = {}
         matplotlib_configuration_update(is_interactive=True, backend='Qt5Agg')
         # Perform interactive Matplotlib operations with 'Qt5Agg' backend
         _fig_2_theta_out, _fig_2_replay_out = _out_aggregate_fig_2.display(active_context=global_multi_session_context, title_modifier_fn=lambda original_title: f"{original_title} ({num_sessions} sessions)", save_figure=save_figure, **kwargs)
+        _output_dict.update( {'theta': _fig_2_theta_out, 'replay': _fig_2_replay_out})
         if save_figure:
             # _out_aggregate_fig_2.perform_save(_fig_2_theta_out)
             print(f'save_figure()!')
 
-        return global_multi_session_context, _out_aggregate_fig_2
+        return global_multi_session_context, _out_aggregate_fig_2, _output_dict
+    
 
 
     @classmethod
-    @function_attributes(short_name=None, tags=['across-session', 'figure', 'matplotlib', 'figure-3'], input_requires=[], output_provides=[], uses=['_plot_long_short_firing_rate_indicies'], used_by=[], creation_date='2023-08-24 00:00', related_items=[])
+    @function_attributes(short_name=None, tags=['across-session', 'figure', 'matplotlib', 'publication', 'figure-3'], input_requires=[], output_provides=[], uses=['_plot_long_short_firing_rate_indicies'], used_by=[], creation_date='2023-08-24 00:00', related_items=[])
     def across_sessions_firing_rate_index_figure(cls, long_short_fr_indicies_analysis_results: pd.DataFrame, num_sessions:int, save_figure=True, include_axes_lines:bool=True, **kwargs):
         """ 2023-08-24 - Across Sessions Aggregate Figure - Supposed to be the equivalent for Figure 3.
 
@@ -3221,6 +3860,8 @@ class AcrossSessionsVisualizations:
         from neuropy.utils.result_context import DisplaySpecifyingIdentifyingContext
         from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.MultiContextComparingDisplayFunctions.LongShortTrackComparingDisplayFunctions import _plot_long_short_firing_rate_indicies
 
+        save_figure_kwargs = dict(write_vector_format=kwargs.pop('write_vector_format', False), write_png=kwargs.pop('write_png', True)) | pop_dict_subset(kwargs, ['bbox_inches', 'pad_inches'])
+
         # Plot long|short firing rate index:
         x_frs_index, y_frs_index = long_short_fr_indicies_analysis_results['x_frs_index'], long_short_fr_indicies_analysis_results['y_frs_index'] # use the all_results_dict as the computed data value
         x_frs_index = x_frs_index.set_axis(long_short_fr_indicies_analysis_results['neuron_uid']) # use neuron unique ID as index
@@ -3231,7 +3872,7 @@ class AcrossSessionsVisualizations:
         is_above_diagonal = (y_frs_index > x_frs_index)
         num_above_diagonal = np.sum(is_above_diagonal)
         is_below_count = np.sum(y_frs_index < x_frs_index)
-        total_num_points = np.shape(y_frs_index)[0]
+        total_num_points: int = np.shape(y_frs_index)[0]
         percent_below_diagonal = float(is_below_count) / float(total_num_points)
         percent_above_diagonal = float(num_above_diagonal) / float(total_num_points)
         
@@ -3248,14 +3889,65 @@ class AcrossSessionsVisualizations:
 
         scatter_plot_kwargs = dict(zorder=5)
         scatter_plot_kwargs['point_colors'] = '#33333333'
+        scatter_plot_kwargs['edgecolors'] =  ["#33333300"] * total_num_points
+        
+        ## 2025-07-25 - More advanced point coloring based on place cell and exclusivity/dominance status:
+        long_short_fr_indicies_analysis_results['point_colors'] = "#33333333"
+        long_short_fr_indicies_analysis_results['edgecolors'] = "#33333300"
+        
         if 'has_pf_color' in long_short_fr_indicies_analysis_results:
-            scatter_plot_kwargs['edgecolors'] = long_short_fr_indicies_analysis_results['has_pf_color'].to_numpy() #.to_list() # edgecolors=(r, g, b, 1)
+            long_short_fr_indicies_analysis_results.loc['edgecolors', long_short_fr_indicies_analysis_results['has_pf_color']] = "#7E7E7E" #.to_list() # edgecolors=(r, g, b, 1)
 
 
-        fig, ax, scatter_plot = _plot_long_short_firing_rate_indicies(x_frs_index, y_frs_index, final_context, debug_print=True, is_centered=False, enable_hover_labels=False, enable_tiny_point_labels=False, facecolor='w', include_axes_lines=include_axes_lines, **scatter_plot_kwargs) #  markeredgewidth=1.5,
+        # ## Place field status - affects ['point_colors']
+        # if ('has_long_pf' in long_short_fr_indicies_analysis_results) and ('has_short_pf' in long_short_fr_indicies_analysis_results):
+        #     long_short_fr_indicies_analysis_results['has_both_pf'] = np.logical_and(long_short_fr_indicies_analysis_results['has_long_pf'], long_short_fr_indicies_analysis_results['has_short_pf'])
+        #     long_short_fr_indicies_analysis_results.loc[long_short_fr_indicies_analysis_results['has_long_pf'], 'point_colors'] = "#FF0000A6"
+        #     long_short_fr_indicies_analysis_results.loc[long_short_fr_indicies_analysis_results['has_short_pf'], 'point_colors'] = '#0000FFA6'
+        #     long_short_fr_indicies_analysis_results.loc[long_short_fr_indicies_analysis_results['has_both_pf'], 'point_colors'] = "#FF00DDA6" ## override with purple for cells that have both
+
+        # if 'active_set_membership' in long_short_fr_indicies_analysis_results:
+        #     ## active_set_membership variable:
+        #     # long_short_fr_indicies_analysis_results.loc[long_short_fr_indicies_analysis_results['active_set_membership'], 'point_colors'] = "#FF00DDA6" ## override with purple for cells that have both
+        #     long_short_fr_indicies_analysis_results.loc[(long_short_fr_indicies_analysis_results['active_set_membership'] == 'LxC'), 'edgecolors'] = '#FF0000'
+        #     long_short_fr_indicies_analysis_results.loc[(long_short_fr_indicies_analysis_results['active_set_membership'] == 'SxC'), 'edgecolors'] = '#0000FF'
+
+        ## eXclusivity/dominant cell status - affects ['edgecolors']
+        # if 'is_refined_LxC' in long_short_fr_indicies_analysis_results:
+        #     long_short_fr_indicies_analysis_results.loc[long_short_fr_indicies_analysis_results['is_refined_LxC'], 'edgecolors'] = '#FF0000' #.to_list() # edgecolors=(r, g, b, 1)
+        # if 'is_n_spikes_LxC' in long_short_fr_indicies_analysis_results:
+        #     long_short_fr_indicies_analysis_results.loc[long_short_fr_indicies_analysis_results['is_n_spikes_LxC'], 'edgecolors'] = "#E20000" #.to_list() # edgecolors=(r, g, b, 1)
+        # if 'is_fr_Hz_LxC' in long_short_fr_indicies_analysis_results:
+        #     long_short_fr_indicies_analysis_results.loc[long_short_fr_indicies_analysis_results['is_fr_Hz_LxC'], 'edgecolors'] = "#9C0000" #.to_list() # edgecolors=(r, g, b, 1)
+        # if 'stability_class' in long_short_fr_indicies_analysis_results:
+        #     long_short_fr_indicies_analysis_results.loc[(long_short_fr_indicies_analysis_results['stability_class'] == 'disappearing'), 'edgecolors'] = "#0000B3" #.to_list() # edgecolors=(r, g, b, 1)   
+        if 'active_set_membership_from_user_annotations' in long_short_fr_indicies_analysis_results:
+            long_short_fr_indicies_analysis_results.loc[(long_short_fr_indicies_analysis_results['active_set_membership_from_user_annotations'] == 'LxC'), 'edgecolors'] = "#0000B3" #.to_list() # edgecolors=(r, g, b, 1)
+       
+
+        # if 'is_refined_SxC' in long_short_fr_indicies_analysis_results:
+        #     long_short_fr_indicies_analysis_results.loc[long_short_fr_indicies_analysis_results['is_refined_SxC'], 'edgecolors'] = '#0000FF' #.to_list() # edgecolors=(r, g, b, 1)
+        # if 'is_n_spikes_SxC' in long_short_fr_indicies_analysis_results:
+        #     long_short_fr_indicies_analysis_results.loc[long_short_fr_indicies_analysis_results['is_n_spikes_SxC'], 'edgecolors'] = '#0000E2' #.to_list() # edgecolors=(r, g, b, 1)
+        # if 'is_fr_Hz_SxC' in long_short_fr_indicies_analysis_results:
+        #     long_short_fr_indicies_analysis_results.loc[long_short_fr_indicies_analysis_results['is_fr_Hz_SxC'], 'edgecolors'] = "#0000B3" #.to_list() # edgecolors=(r, g, b, 1)
+        # if 'stability_class' in long_short_fr_indicies_analysis_results:
+        #     long_short_fr_indicies_analysis_results.loc[(long_short_fr_indicies_analysis_results['stability_class'] == 'appearing'), 'edgecolors'] = "#9C0000" #.to_list() # edgecolors=(r, g, b, 1)                 
+        if 'active_set_membership_from_user_annotations' in long_short_fr_indicies_analysis_results:
+            long_short_fr_indicies_analysis_results.loc[(long_short_fr_indicies_analysis_results['active_set_membership_from_user_annotations'] == 'SxC'), 'edgecolors'] = "#9C0000" #.to_list() # edgecolors=(r, g, b, 1)
+
+
+        scatter_plot_kwargs['point_colors'] = long_short_fr_indicies_analysis_results['point_colors'].to_numpy()
+        scatter_plot_kwargs['edgecolors'] = long_short_fr_indicies_analysis_results['edgecolors'].to_numpy()
+
+
+        _plot_long_short_firing_rate_indicies_kwargs = override_dict(dict(debug_print=True, is_centered=False, enable_hover_labels=False, enable_tiny_point_labels=False, facecolor='w', include_axes_lines=include_axes_lines), kwargs) | kwargs
+        
+        
+        fig, ax, scatter_plot = _plot_long_short_firing_rate_indicies(x_frs_index, y_frs_index, final_context, **_plot_long_short_firing_rate_indicies_kwargs, **scatter_plot_kwargs) #, **kwargs  markeredgewidth=1.5,
         
         def _perform_write_to_file_callback():
-            active_out_figure_path, *args_L = cls.output_figure(final_context, fig)
+            active_out_figure_path, *args_L = cls.output_figure(final_context, fig, **save_figure_kwargs)
             return (active_out_figure_path,)
 
         if save_figure:
@@ -3267,12 +3959,10 @@ class AcrossSessionsVisualizations:
         # graphics_output_dict['plot_data'] = {'sort_indicies': (long_sort_ind, short_sort_ind), 'colors':(long_neurons_colors_array, short_neurons_colors_array)}
         return graphics_output_dict
 
-
-
-
     @classmethod
     @function_attributes(short_name=None, tags=['across-session', 'figure', 'matplotlib', 'figure-3'], input_requires=[], output_provides=[], uses=['_plot_single_track_firing_rate_compare'], used_by=[], creation_date='2023-08-24 00:00', related_items=[])
-    def across_sessions_long_and_short_firing_rate_replays_v_laps_figure(cls, neuron_replay_stats_table, num_sessions:int, save_figure=True, **kwargs):
+    def across_sessions_long_and_short_firing_rate_replays_v_laps_figure(cls, neuron_replay_stats_table: pd.DataFrame, num_sessions:int, save_figure=True, prepare_for_publication: bool = False, long_col_names:List[str]=['long_non_replay_mean', 'long_replay_mean'],
+                                                                         short_col_names:List[str]=['short_non_replay_mean', 'short_replay_mean'], **kwargs):
         """ 2023-08-24 - Across Sessions Aggregate Figure - Supposed to be the equivalent for Figure 3.
 
         Based off of `pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.MultiContextComparingDisplayFunctions.LongShortTrackComparingDisplayFunctions._plot_session_long_short_track_firing_rate_figures`
@@ -3292,33 +3982,35 @@ class AcrossSessionsVisualizations:
         from neuropy.utils.matplotlib_helpers import fit_both_axes
         from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.MultiContextComparingDisplayFunctions.LongShortTrackComparingDisplayFunctions import _plot_single_track_firing_rate_compare
 
-
+        save_figure_kwargs = dict(write_vector_format=kwargs.pop('write_vector_format', False), write_png=kwargs.pop('write_png', True), bbox_inches=kwargs.pop('bbox_inches', 'tight'), pad_inches=kwargs.pop('pad_inches', 0))
+        
         global_multi_session_context = IdentifyingContext(format_name='kdiba', num_sessions=num_sessions) # some global context across all of the sessions, not sure what to put here.
         active_context = global_multi_session_context
         final_context = active_context.adding_context('display_fn', display_fn_name='plot_single_track_firing_rate_compare')
 
         # (fig_L, ax_L, active_display_context_L), (fig_S, ax_S, active_display_context_S), _perform_write_to_file_callback = _plot_session_long_short_track_firing_rate_figures(owning_pipeline_reference, jonathan_firing_rate_analysis_result, defer_render=defer_render)
 
-        common_scatter_kwargs = dict(point_colors='#33333333')
+        common_scatter_kwargs = dict(point_colors='#33333333', defer_render=True) | kwargs
         
         ## Long Track Replay|Laps FR Figure
-        neuron_replay_stats_df = neuron_replay_stats_table.dropna(subset=['long_replay_mean', 'long_non_replay_mean'], inplace=False)
-        x_frs = {k:v for k,v in neuron_replay_stats_df['long_non_replay_mean'].items()} 
-        y_frs = {k:v for k,v in neuron_replay_stats_df['long_replay_mean'].items()}
-        fig_L, ax_L, active_display_context_L = _plot_single_track_firing_rate_compare(x_frs, y_frs, active_context=final_context.adding_context_if_missing(filter_name='long'), **common_scatter_kwargs)
+        neuron_replay_stats_df = neuron_replay_stats_table.dropna(subset=long_col_names, inplace=False)
+        x_frs = {k:v for k,v in neuron_replay_stats_df[long_col_names[0]].items()} 
+        y_frs = {k:v for k,v in neuron_replay_stats_df[long_col_names[1]].items()}
+        fig_L, ax_L, active_display_context_L = _plot_single_track_firing_rate_compare(x_frs, y_frs, active_context=final_context.adding_context_if_missing(filter_name='long'), prepare_for_publication=prepare_for_publication, **common_scatter_kwargs)
 
         ## Short Track Replay|Laps FR Figure
-        neuron_replay_stats_df = neuron_replay_stats_table.dropna(subset=['short_replay_mean', 'short_non_replay_mean'], inplace=False)
-        x_frs = {k:v for k,v in neuron_replay_stats_df['short_non_replay_mean'].items()} 
-        y_frs = {k:v for k,v in neuron_replay_stats_df['short_replay_mean'].items()}
-        fig_S, ax_S, active_display_context_S = _plot_single_track_firing_rate_compare(x_frs, y_frs, active_context=final_context.adding_context_if_missing(filter_name='short'), **common_scatter_kwargs)
+        neuron_replay_stats_df = neuron_replay_stats_table.dropna(subset=short_col_names, inplace=False)
+        x_frs = {k:v for k,v in neuron_replay_stats_df[short_col_names[0]].items()} 
+        y_frs = {k:v for k,v in neuron_replay_stats_df[short_col_names[1]].items()}
+        fig_S, ax_S, active_display_context_S = _plot_single_track_firing_rate_compare(x_frs, y_frs, active_context=final_context.adding_context_if_missing(filter_name='short'), prepare_for_publication=prepare_for_publication, **common_scatter_kwargs)
 
         ## Fit both the axes:
         fit_both_axes(ax_L, ax_S)
 
         def _perform_write_to_file_callback():
-            active_out_figure_paths_L, *args_L = cls.output_figure(active_display_context_L, fig_L)
-            active_out_figure_paths_S, *args_S = cls.output_figure(active_display_context_S, fig_S)
+            ## Captures: save_figure_kwargs
+            active_out_figure_paths_L, *args_L = cls.output_figure(active_display_context_L, fig_L, **save_figure_kwargs)
+            active_out_figure_paths_S, *args_S = cls.output_figure(active_display_context_S, fig_S, **save_figure_kwargs)
             return (active_out_figure_paths_L + active_out_figure_paths_S)
 
         if save_figure:
@@ -3331,9 +4023,6 @@ class AcrossSessionsVisualizations:
         return graphics_output_dict
 
 
-from neuropy.utils.debug_helpers import parameter_sweeps
- 
-import re
 
 class ExportValueNameCleaner:
     """ 
@@ -3646,12 +4335,25 @@ class AcrossSessionHelpers:
 
     @function_attributes(short_name=None, tags=['filesystem', 'copy', 'file', 'session_folder'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-11-19 06:02', related_items=[])
     @classmethod
-    def _copy_exported_files_from_session_folder_to_collected_outputs(cls, target_dir: Path, BATCH_DATE_TO_USE = '2024-11-19', cuttoff_date = datetime(2024, 11, 16), is_dry_run:bool=True, debug_print:bool=False, custom_file_globs_dict=None):
-        """ 
+    def _copy_exported_files_from_session_folder_to_collected_outputs(cls, target_dir: Path, BATCH_DATE_TO_USE = '2024-11-19', cuttoff_date = datetime(2024, 11, 16), is_dry_run:bool=True, debug_print:bool=False, custom_file_globs_dict=None, find_most_recent_files_kwargs=None, rename_backup_basename_fn: Optional[Callable]=None):
+        """ Extracts the output files (.pkl, .h5, etc) from the individual session folders to the target folder
+
         
         from pyphoplacecellanalysis.SpecificResults.AcrossSessionResults import AcrossSessionHelpers
 
-        copy_dict, moved_files_dict_files = AcrossSessionHelpers._copy_exported_files_from_session_folder_to_collected_outputs(BATCH_DATE_TO_USE='2024-11-19', cuttoff_date=datetime(2024, 11, 16), target_dir=collected_outputs_directory, is_dry_run=False)
+        
+        
+        def _across_session_h5_output_basename_fn(session_context: Optional[IdentifyingContext], session_descr: Optional[str], basename: str, *args, separator_char: str = "_"):
+            if session_context is not None:
+                session_descr = session_context.session_name # '2006-6-07_16-40-19'
+            _filename_list = [BATCH_DATE_TO_USE, session_descr, basename]
+            if len(args) > 0:
+                _filename_list.extend([str(a_part) for a_part in args if a_part is not None])
+            return separator_char.join(_filename_list)
+
+
+            
+        copy_dict, moved_files_dict_files = AcrossSessionHelpers._copy_exported_files_from_session_folder_to_collected_outputs(BATCH_DATE_TO_USE='2024-11-19', cuttoff_date=datetime(2024, 11, 16), target_dir=collected_outputs_directory, rename_backup_basename_fn=_across_session_h5_output_basename_fn, is_dry_run=False)
         copy_dict
 
         ## Specify which files to match:    
@@ -3659,8 +4361,20 @@ class AcrossSessionHelpers:
            'pkl': '*.pkl',
            'csv': '*ripple_WCorrShuffle_df*.csv',
            'h5': '*.h5',
-        }, is_dry_run=False)
+        }, rename_backup_basename_fn=_across_session_h5_output_basename_fn, is_dry_run=False)
         copy_dict
+        
+        
+        
+        NOTE: Very similar to 
+        
+        copy_dict = ConcreteSessionFolder.build_backup_copydict(good_session_concrete_folders, target_dir=target_dir, backup_mode=BackupMethods.CommonTargetDirectory, rename_backup_basename_fn=_across_session_h5_output_basename_fn,
+        #  only_include_file_types=['h5'],
+            only_include_file_types=[], # exclude the un-parameterized pipeline_results.h5
+            custom_file_types_dict=custom_file_types_dict) # , rename_backup_suffix=BATCH_DATE_TO_USE
+        copy_dict
+
+        
 
         """
         # from pyphoplacecellanalysis.General.Batch.runBatch import get_file_path_if_file_exists
@@ -3669,7 +4383,20 @@ class AcrossSessionHelpers:
         from neuropy.core.user_annotations import UserAnnotationsManager
         from pyphoplacecellanalysis.General.Batch.runBatch import ConcreteSessionFolder, BackupMethods
         # from pyphoplacecellanalysis.SpecificResults.AcrossSessionResults import find_csv_files, find_HDF5_files, find_pkl_files
-        
+
+
+        def _default_rename_basename_fn(session_context: Optional[IdentifyingContext], session_descr: Optional[str], basename: str, *args, separator_char: str = "_"):
+            _filename_list = []
+            if session_context is not None:
+                session_descr = session_context.session_name # '2006-6-07_16-40-19'
+            if session_descr is not None:
+                _filename_list.append(session_descr)
+            _filename_list.append(basename)
+            if len(args) > 0:
+                _filename_list.extend([str(a_part) for a_part in args if a_part is not None])
+            return separator_char.join(_filename_list)
+
+
         included_session_contexts = UserAnnotationsManager.get_hardcoded_good_sessions()
         
         known_global_data_root_parent_paths = [Path('/Users/pho/data'), Path(r'/nfs/turbo/umms-kdiba/Data'), Path(r'/media/halechr/MAX/Data'), Path(r'W:/Data'), Path(r'/home/halechr/FastData'), Path(r'/Volumes/MoverNew/data')] # Path(r'/home/halechr/cloud/turbo/Data'), , Path(r'/nfs/turbo/umms-kdiba/Data'), Path(r'/home/halechr/turbo/Data'), 
@@ -3678,19 +4405,16 @@ class AcrossSessionHelpers:
         good_session_concrete_folders = ConcreteSessionFolder.build_concrete_session_folders(global_data_root_parent_path, included_session_contexts)
         session_basedirs_dict: Dict[IdentifyingContext, Path] = {a_session_folder.context:a_session_folder.path for a_session_folder in good_session_concrete_folders}
 
-        # excluded_session_keys = ['kdiba_pin01_one_fet11-01_12-58-54', 'kdiba_gor01_one_2006-6-08_14-26-15', 'kdiba_gor01_two_2006-6-07_16-40-19']
-        # excluded_session_contexts = [IdentifyingContext(**dict(zip(IdentifyingContext._get_session_context_keys(), v.split('_', maxsplit=3)))) for v in excluded_session_keys]
+        # """ 
+        # /nfs/turbo/umms-kdiba/Data/KDIBA/gor01/one/2006-6-12_15-55-31/output/2024-11-18_1130PM-kdiba_gor01_one_2006-6-12_15-55-31__withNormalComputedReplays-qclu_[1, 2, 4, 6, 7, 9]-frateThresh_1.0-(ripple_WCorrShuffle_df)_tbin-0.025.csv
+        # /nfs/turbo/umms-kdiba/Data/KDIBA/gor01/one/2006-6-12_15-55-31/output/2024-11-18_1130PM_withNormalComputedReplays-qclu_[1, 2, 4, 6, 7, 9]-frateThresh_1.0_standalone_all_shuffles_wcorr_array.mat
+        # /nfs/turbo/umms-kdiba/Data/KDIBA/gor01/one/2006-6-12_15-55-31/output/2024-11-18_1130PM_withNormalComputedReplays-qclu_[1, 2, 4, 6, 7, 9]-frateThresh_1.0_standalone_wcorr_ripple_shuffle_data_only_1028.pkl
+        # """
 
-        """ 
-        /nfs/turbo/umms-kdiba/Data/KDIBA/gor01/one/2006-6-12_15-55-31/output/2024-11-18_1130PM-kdiba_gor01_one_2006-6-12_15-55-31__withNormalComputedReplays-qclu_[1, 2, 4, 6, 7, 9]-frateThresh_1.0-(ripple_WCorrShuffle_df)_tbin-0.025.csv
-        /nfs/turbo/umms-kdiba/Data/KDIBA/gor01/one/2006-6-12_15-55-31/output/2024-11-18_1130PM_withNormalComputedReplays-qclu_[1, 2, 4, 6, 7, 9]-frateThresh_1.0_standalone_all_shuffles_wcorr_array.mat
-        /nfs/turbo/umms-kdiba/Data/KDIBA/gor01/one/2006-6-12_15-55-31/output/2024-11-18_1130PM_withNormalComputedReplays-qclu_[1, 2, 4, 6, 7, 9]-frateThresh_1.0_standalone_wcorr_ripple_shuffle_data_only_1028.pkl
-        """
-        # included_session_keys = ['kdiba_gor01_one_2006-6-09_1-22-43',]
-        # included_session_contexts = [IdentifyingContext(**dict(zip(IdentifyingContext._get_session_context_keys(), v.split('_', maxsplit=3)))) for v in included_session_keys]
 
-        all_found_parsed_csv_files_df_dict = {}
+        all_found_files_df_dict = {}
 
+        # all_found_parsed_csv_files_df_dict = {}
         # all_found_pkl_files_dict = {}
         # all_found_pipeline_pkl_files_dict = {}
         # all_found_global_pkl_files_dict = {}
@@ -3703,13 +4427,17 @@ class AcrossSessionHelpers:
             #    'h5': '*.h5',
             }
 
+        if find_most_recent_files_kwargs is None:
+            find_most_recent_files_kwargs = dict(should_fallback_to_filesystem_modification_datetime=True, should_print_unparsable_filenames=False, debug_print=debug_print)
+
         copy_dict = {}
-        # moved_dict = {}
 
         # scripts_output_path
         for a_good_session_concrete_folder, a_session_basedir in zip(good_session_concrete_folders, session_basedirs_dict):
+            session_descr: str = a_good_session_concrete_folder.context.get_description()
+            
             if debug_print:
-                print(f'a_good_session_concrete_folder: "{a_good_session_concrete_folder}", a_session_basedir: "{a_session_basedir}"')
+                print(f'a_good_session_concrete_folder: "{a_good_session_concrete_folder}", a_session_basedir: "{a_session_basedir}", session_descr: "{session_descr}"')
                 
             should_skip_session: bool = True
                 
@@ -3726,71 +4454,52 @@ class AcrossSessionHelpers:
                 if debug_print:
                     print(f'skipping excluded session: {a_good_session_concrete_folder.context}')
             else:
-                ## 
-                # csv_files = find_csv_files(a_session_output_folder)
-                # csv_sessions, parsed_csv_files_df  = find_most_recent_files(found_session_export_paths=csv_files, cuttoff_date=cuttoff_date) ## this is not working, as it's missing older files with different custom_replay
-                # parsed_csv_files_df['filename'] = parsed_csv_files_df['path'].map(lambda x: x.name)
-                # parsed_csv_files_df['desired_filepath'] = parsed_csv_files_df['path'].map(lambda x: target_dir.joinpath(x.name))
-                # parsed_csv_files_df = parsed_csv_files_df[parsed_csv_files_df['file_type'] == 'ripple_WCorrShuffle_df'] ## only consider 'ripple_WCorrShuffle_df' files
-                # all_found_parsed_csv_files_df_dict[a_session_basedir] = deepcopy(parsed_csv_files_df)
-
-                # _temp_desired_copy_dict = dict(zip(parsed_csv_files_df['path'].to_list(), parsed_csv_files_df['desired_filepath'].to_list()))
-                # # custom_file_types_dict = dict(zip(parsed_csv_files_df['filename'].to_list(), parsed_csv_files_df['path'].to_list()))
-                # copy_dict.update(_temp_desired_copy_dict) 
-                
                 all_found_custom_glob_files_dict = {}
                 all_found_custom_glob_parsed_files_df_dict = {}
                 
                 for k, a_glob in custom_file_globs_dict.items():
-                    all_found_custom_glob_files_dict[k] = list(a_session_output_folder.glob(a_glob))
-                    _, a_most_recent_parsed_files_df, all_parsed_files_df  = find_most_recent_files(found_session_export_paths=all_found_custom_glob_files_dict[k], cuttoff_date=cuttoff_date)
-                    a_most_recent_parsed_files_df['filename'] = a_most_recent_parsed_files_df['path'].map(lambda x: x.name)
-                    a_most_recent_parsed_files_df['desired_filepath'] = a_most_recent_parsed_files_df['path'].map(lambda x: target_dir.joinpath(x.name))
-                    all_found_custom_glob_parsed_files_df_dict[k] = a_most_recent_parsed_files_df
-
-                    # a_parsed_files_df = a_parsed_files_df[a_parsed_files_df['file_type'] == 'ripple_WCorrShuffle_df'] ## only consider 'ripple_WCorrShuffle_df' files
-                    all_found_parsed_csv_files_df_dict[a_session_basedir] = deepcopy(a_most_recent_parsed_files_df)
-
-                    _temp_desired_copy_dict = dict(zip(a_most_recent_parsed_files_df['path'].to_list(), a_most_recent_parsed_files_df['desired_filepath'].to_list()))
                     
+                    all_found_custom_glob_files_dict[k] = list(a_session_output_folder.glob(a_glob))
+                    _, a_most_recent_parsed_files_df, all_parsed_files_df  = find_most_recent_files(found_session_export_paths=all_found_custom_glob_files_dict[k], cuttoff_date=cuttoff_date, **find_most_recent_files_kwargs)
+                    a_most_recent_parsed_files_df['filename'] = a_most_recent_parsed_files_df['path'].map(lambda x: x.name)
+                    
+                    ## Build desired filepaths optionally using the `rename_backup_basename_fn` to rename them
+                    # a_most_recent_parsed_files_df['desired_filepath'] = a_most_recent_parsed_files_df['path'].map(lambda x: target_dir.joinpath(x.name))
+                    a_most_recent_parsed_files_df['desired_filepath'] = []
+                    for src_file in a_most_recent_parsed_files_df['path']:
+                        basename: str = src_file.stem
+                        if rename_backup_basename_fn is not None:
+                            final_dest_basename:str = rename_backup_basename_fn(a_good_session_concrete_folder.context, session_descr, basename)
+                        else:
+                            final_dest_basename:str = basename ## raw basename
+
+                        final_dest_name:str = f'{final_dest_basename}{src_file.suffix}'
+                        if debug_print:
+                            print(f'\tfinal_dest_name: {final_dest_name}')
+                        dest_path: Path = target_dir.joinpath(final_dest_name).resolve()
+                        a_most_recent_parsed_files_df['desired_filepath'].append(dest_path)
+
+
+                    all_found_custom_glob_parsed_files_df_dict[k] = deepcopy(a_most_recent_parsed_files_df)
+                    
+                    # a_parsed_files_df = a_parsed_files_df[a_parsed_files_df['file_type'] == 'ripple_WCorrShuffle_df'] ## only consider 'ripple_WCorrShuffle_df' files
+                    # all_found_parsed_csv_files_df_dict[a_session_basedir] = deepcopy(a_most_recent_parsed_files_df)
+                    all_found_files_df_dict[a_session_basedir] = deepcopy(a_most_recent_parsed_files_df)
+                    _temp_desired_copy_dict = dict(zip(a_most_recent_parsed_files_df['path'].to_list(), a_most_recent_parsed_files_df['desired_filepath'].to_list()))
+
+
+
+
+
                     # custom_file_types_dict = dict(zip(parsed_csv_files_df['filename'].to_list(), parsed_csv_files_df['path'].to_list()))
                     
                     ## this is okay/safe because the keys are absolute paths so each session folder will add unique entries
                     copy_dict.update(_temp_desired_copy_dict) 
-                
-                # # display(parsed_csv_files_df)
-                # all_found_global_pkl_files_dict[a_session_basedir] = list(a_session_output_folder.glob('global_computation_results*.pkl'))
-                
-                # for a_global_file in all_found_global_pkl_files_dict[a_session_basedir]:
-                #     ## iterate through the found global files:
-                #     target_file = a_good_session_concrete_folder.global_computation_result_pickle.with_name(a_global_file.name)
-                #     copy_dict[a_global_file] = target_file
-                #     # if not is_dryrun:
-                #     ## perform the move/copy
-                #     was_success = try_perform_move(src_file=a_global_file, target_file=target_file, is_dryrun=is_dryrun)
-                #     if was_success:
-                #         moved_dict[a_file] = target_file
-                # all_found_pipeline_pkl_files_dict[a_session_basedir] = list(a_session_output_folder.glob('loadedSessPickle*.pkl'))
-                # for a_file in all_found_pipeline_pkl_files_dict[a_session_basedir]:
-                #     ## iterate through the found global files:
-                #     target_file = a_good_session_concrete_folder.session_pickle.with_name(a_file.name)
-                #     copy_dict[a_file] = target_file
-                #     # if not is_dryrun:
-                #     ## perform the move/copy
-                #     was_success = try_perform_move(src_file=a_file, target_file=target_file, is_dryrun=is_dryrun)
-                #     if was_success:
-                #         moved_dict[a_file] = target_file
-                # all_found_pipeline_h5_files_dict[a_session_basedir] = list(a_session_output_folder.glob('loadedSessPickle*.h5'))
-                # for a_file in all_found_pipeline_h5_files_dict[a_session_basedir]:
-                #     ## iterate through the found global files:
-                #     target_file = a_good_session_concrete_folder.pipeline_results_h5.with_name(a_file.name)
-                #     copy_dict[a_file] = target_file
-                #     # if not is_dryrun:
-                #     ## perform the move/copy
-                #     was_success = try_perform_move(src_file=a_file, target_file=target_file, is_dryrun=is_dryrun)
-                #     if was_success:
-                #         moved_dict[a_file] = target_file
-                # all_found_pkl_files_dict[a_session_basedir] = find_pkl_files(a_session_output_folder)
+                ## END for k, a_glob in cus...
+        ## END for a_good_session_concrete_folder, a_session_ba            
+
+
+        ## OUTPUTS: copy_dict
 
         if not is_dry_run:
             copied_files_dict_files = copy_movedict(copy_dict)
@@ -3801,6 +4510,92 @@ class AcrossSessionHelpers:
             copied_files_dict_files = None
         return copy_dict, copied_files_dict_files
 
+
+    @function_attributes(short_name=None, tags=['filesystem', 'copy', 'file', 'gen_scripts', 'scripts_folder', 'session_folder'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-06-11 07:18', related_items=['try_move_pickle_files_on_GL'])
+    @classmethod
+    def _copy_exported_files_from_gen_script_session_folders(cls, target_dir: Path, computation_script_paths: List[Path], global_data_root_parent_path: Path, is_dry_run:bool=True, debug_print:bool=False):
+        """ 
+        #TODO 2025-06-11 07:31: - [ ] Seems nearly identical (and maybe worse) than `try_move_pickle_files_on_GL`
+        
+
+        moved_dict = copy_files_from_gen_script_session_folders(computation_script_paths=computation_script_paths)
+        
+        """
+        from pyphocorehelpers.Filesystem.path_helpers import try_perform_move
+
+
+        # Hardcoded included_session_contexts:
+        included_session_contexts = UserAnnotationsManager.get_hardcoded_good_sessions()
+        good_session_concrete_folders = ConcreteSessionFolder.build_concrete_session_folders(global_data_root_parent_path, included_session_contexts)
+
+        script_output_folders = [Path(v).parent for v in computation_script_paths]
+
+
+        session_basedirs_dict: Dict[IdentifyingContext, Path] = {a_session_folder.context:a_session_folder.path for a_session_folder in good_session_concrete_folders}
+
+        excluded_session_keys = ['kdiba_pin01_one_fet11-01_12-58-54', 'kdiba_gor01_one_2006-6-08_14-26-15', 'kdiba_gor01_two_2006-6-07_16-40-19']
+        excluded_session_contexts = [IdentifyingContext(**dict(zip(IdentifyingContext._get_session_context_keys(), v.split('_', maxsplit=3)))) for v in excluded_session_keys]
+        # excluded_session_contexts
+
+
+        try_perform_move_kwargs = dict(is_dryrun=is_dry_run, allow_overwrite_existing=False)
+
+
+        all_found_pkl_files_dict = {}
+        all_found_pipeline_pkl_files_dict = {}
+        all_found_global_pkl_files_dict = {}
+        all_found_pipeline_h5_files_dict = {}
+
+        copy_dict = {}
+        moved_dict = {}
+
+        # scripts_output_path
+        for a_good_session_concrete_folder, a_session_basedir, a_script_folder in zip(good_session_concrete_folders, session_basedirs_dict, script_output_folders):
+            if debug_print:
+                print(f'a_good_session_concrete_folder: {a_good_session_concrete_folder}, a_session_basedir: {a_session_basedir}. a_script_folder: {a_script_folder}')
+            if a_good_session_concrete_folder.context in excluded_session_contexts:
+                if debug_print:
+                    print(f'skipping excluded session: {a_good_session_concrete_folder.context}')
+            else:
+                all_found_global_pkl_files_dict[a_session_basedir] = list(a_script_folder.glob('global_computation_results*.pkl'))
+                
+                for a_global_file in all_found_global_pkl_files_dict[a_session_basedir]:
+                    ## iterate through the found global files:
+                    target_file = a_good_session_concrete_folder.global_computation_result_pickle.with_name(a_global_file.name)
+                    copy_dict[a_global_file] = target_file
+                    # if not is_dryrun:
+                    ## perform the move/copy
+                    was_success = try_perform_move(src_file=a_global_file, target_file=target_file, **try_perform_move_kwargs)
+                    if was_success:
+                        moved_dict[a_file] = target_file
+                all_found_pipeline_pkl_files_dict[a_session_basedir] = list(a_script_folder.glob('loadedSessPickle*.pkl'))
+                for a_file in all_found_pipeline_pkl_files_dict[a_session_basedir]:
+                    ## iterate through the found global files:
+                    target_file = a_good_session_concrete_folder.session_pickle.with_name(a_file.name)
+                    copy_dict[a_file] = target_file
+                    # if not is_dryrun:
+                    ## perform the move/copy
+                    was_success = try_perform_move(src_file=a_file, target_file=target_file, **try_perform_move_kwargs)
+                    if was_success:
+                        moved_dict[a_file] = target_file
+                all_found_pipeline_h5_files_dict[a_session_basedir] = list(a_script_folder.glob('loadedSessPickle*.h5'))
+                for a_file in all_found_pipeline_h5_files_dict[a_session_basedir]:
+                    ## iterate through the found global files:
+                    target_file = a_good_session_concrete_folder.pipeline_results_h5.with_name(a_file.name)
+                    copy_dict[a_file] = target_file
+                    # if not is_dryrun:
+                    ## perform the move/copy
+                    was_success = try_perform_move(src_file=a_file, target_file=target_file, **try_perform_move_kwargs)
+                    if was_success:
+                        moved_dict[a_file] = target_file
+                # all_found_pkl_files_dict[a_session_basedir] = find_pkl_files(a_script_folder)
+
+        ## discover .pkl files in the root of each folder:
+        # all_found_pipeline_pkl_files_dict
+        # all_found_global_pkl_files_dict
+        ## OUTPUTS: copy_dict
+        # copy_dict
+        return moved_dict
 
 
 
@@ -3831,7 +4626,7 @@ class AcrossSessionIdentityDataframeAccessor:
 
     @classmethod
     def perform_add_session_df_columns(cls, df: pd.DataFrame, session_name: str, time_bin_size: float=None, custom_replay_source: Optional[str]=None,
-                               t_start: Optional[float]=None, curr_session_t_delta: Optional[float]=None, t_end: Optional[float]=None, time_col: str=None, end_time_col_name: Optional[str]=None) -> pd.DataFrame:
+                               t_start: Optional[float]=None, curr_session_t_delta: Optional[float]=None, t_end: Optional[float]=None, time_col: str=None, end_time_col_name: Optional[str]=None, **kwargs) -> pd.DataFrame:
         """ adds session-specific information to the marginal dataframes 
     
         Added Columns: ['session_name', 'time_bin_size', 'delta_aligned_start_t', 'pre_post_delta_category', 'maze_id']
@@ -3848,6 +4643,9 @@ class AcrossSessionIdentityDataframeAccessor:
         from neuropy.core.epoch import EpochsAccessor
         from neuropy.utils.mixins.time_slicing import TimeColumnAliasesProtocol
 
+        should_raise_exception_on_fail: bool = kwargs.pop('should_raise_exception_on_fail', False)
+        
+
         df['session_name'] = session_name
         
         if custom_replay_source is not None:
@@ -3858,10 +4656,10 @@ class AcrossSessionIdentityDataframeAccessor:
         if curr_session_t_delta is not None:
             if time_col is None:
                 # time_col = 'start' # 'ripple_start_t' for ripples, etc
-                time_col: str = TimeColumnAliasesProtocol.find_first_extant_suitable_columns_name(df, col_connonical_name='start', required_columns_synonym_dict={"start":{'begin','start_t','ripple_start_t'}, "stop":['end','stop_t']}, should_raise_exception_on_fail=False)
+                time_col: str = TimeColumnAliasesProtocol.find_first_extant_suitable_columns_name(df, col_connonical_name='start', required_columns_synonym_dict={"start":{'begin','start_t','ripple_start_t'}, "stop":['end','stop_t']}, should_raise_exception_on_fail=should_raise_exception_on_fail)
                 
             if end_time_col_name is None:
-                end_time_col_name: str = TimeColumnAliasesProtocol.find_first_extant_suitable_columns_name(df, col_connonical_name='stop', required_columns_synonym_dict={"start":{'begin','start_t','ripple_start_t'}, "stop":['end','stop_t']}, should_raise_exception_on_fail=False)
+                end_time_col_name: str = TimeColumnAliasesProtocol.find_first_extant_suitable_columns_name(df, col_connonical_name='stop', required_columns_synonym_dict={"start":{'begin','start_t','ripple_start_t'}, "stop":['end','stop_t']}, should_raise_exception_on_fail=should_raise_exception_on_fail)
 
             if time_col is not None:
                 df['delta_aligned_start_t'] = df[time_col] - curr_session_t_delta
@@ -3873,6 +4671,8 @@ class AcrossSessionIdentityDataframeAccessor:
                         df = EpochsAccessor.add_maze_id_if_needed(epochs_df=df, t_start=t_start, t_delta=curr_session_t_delta, t_end=t_end, start_time_col_name=time_col, end_time_col_name=end_time_col_name) # Adds Columns: ['maze_id']
                     except (AttributeError, KeyError) as e:
                         print(f'could not add the "maze_id" column to the dataframe (err: {e})\n\tlikely because it lacks valid "t_start" or "t_end" columns. df.columns: {list(df.columns)}. Skipping.')
+                        if should_raise_exception_on_fail:
+                            raise
                     except Exception as e:
                         raise e
 
@@ -3882,7 +4682,7 @@ class AcrossSessionIdentityDataframeAccessor:
 
 
     def add_session_df_columns(self, session_name: str, time_bin_size: float=None, custom_replay_source: Optional[str]=None,
-                               t_start: Optional[float]=None, curr_session_t_delta: Optional[float]=None, t_end: Optional[float]=None, time_col: str=None, end_time_col_name: Optional[str]=None) -> pd.DataFrame:
+                               t_start: Optional[float]=None, curr_session_t_delta: Optional[float]=None, t_end: Optional[float]=None, time_col: str=None, end_time_col_name: Optional[str]=None, **kwargs) -> pd.DataFrame:
         """         
         Added Columns: ['session_name', 'time_bin_size', 'delta_aligned_start_t', 'pre_post_delta_category', 'maze_id']
 
@@ -3897,7 +4697,7 @@ class AcrossSessionIdentityDataframeAccessor:
     
         """
         df: pd.DataFrame = deepcopy(self._obj)
-        return self.perform_add_session_df_columns(df=df, session_name=session_name, time_bin_size=time_bin_size, custom_replay_source=custom_replay_source, t_start=t_start, curr_session_t_delta=curr_session_t_delta, t_end=t_end, time_col=time_col, end_time_col_name=end_time_col_name)
+        return self.perform_add_session_df_columns(df=df, session_name=session_name, time_bin_size=time_bin_size, custom_replay_source=custom_replay_source, t_start=t_start, curr_session_t_delta=curr_session_t_delta, t_end=t_end, time_col=time_col, end_time_col_name=end_time_col_name, **kwargs)
 
 
     def split_session_key_col_to_fmt_animal_exper_cols(self, session_key_col: str = 'session_name') -> pd.DataFrame:
@@ -3939,7 +4739,6 @@ class SingleFatDataframe:
     """
     to_filename_conversion_dict = {'compute_diba_quiescent_style_replay_events':'_withNewComputedReplays', 'diba_evt_file':'_withNewKamranExportedReplays', 'initial_loaded': '_withOldestImportedReplays', 'normal_computed': '_withNormalComputedReplays'}
     
-
     @classmethod
     def build_fat_df(cls, dfs_dict: Dict[IdentifyingContext, pd.DataFrame], additional_common_context: Optional[IdentifyingContext]=None) -> pd.DataFrame:
         """ builds a single FAT_df from a dict of identities and their corresponding dfs. Adds all of the index keys as columns, and all of their values a duplicated along all rows of the coresponding df.
@@ -3951,10 +4750,9 @@ class SingleFatDataframe:
         from neuropy.utils.mixins.time_slicing import TimeColumnAliasesProtocol
         # from pyphoplacecellanalysis.General.Pipeline.Stages.Computation import to_filename_conversion_dict
         
-
-
         FAT_df_list: List[pd.DataFrame] = []
     
+        df_col_names_dict: Dict[IdentifyingContext, List[str]] = {k:list(v.columns) for k, v in dfs_dict.items()}
         for a_df_context, a_df in dfs_dict.items():
             ## In a single_FAT frame, we add columns with the context value for all entries in the dataframe.
             for a_ctxt_key, a_ctxt_value in a_df_context.to_dict().items():
@@ -3970,19 +4768,13 @@ class SingleFatDataframe:
                     # if (ctxt.get('minimum_inclusion_fr_Hz', None) is not None) and (len(str(ctxt.get('minimum_inclusion_fr_Hz', None))) > 0) and ('minimum_inclusion_fr_Hz' not in subset_excludelist):
                     #     custom_suffix_string_parts.append(f"frateThresh_{ctxt.get('minimum_inclusion_fr_Hz', None):.1f}")
 
-                    specially_formatted_key_names_dict = {'epochs_source':'', 'included_qclu_values':f"qclu_", 'minimum_inclusion_fr_Hz':f"frateThresh_"}
+                    # specially_formatted_key_names_dict = {'epochs_source':'', 'included_qclu_values':f"qclu_", 'minimum_inclusion_fr_Hz':f"frateThresh_"}
                     # specially_formatted_values_dict = {'epochs_source':SingleFatDataframe.to_filename_conversion_dict.get(a_ctxt_value, f'{a_ctxt_value}'), 'included_qclu_values':f"{a_ctxt_value}", 'minimum_inclusion_fr_Hz':f"{a_ctxt_value:.1f}"}
                     
                     _default_formatter_fn = lambda v: f'{v}'
                     specially_formatted_values_dict = {'epochs_source': lambda v: SingleFatDataframe.to_filename_conversion_dict.get(v, f'{v}'), 'included_qclu_values': (lambda v: f"{v}"), 'minimum_inclusion_fr_Hz': (lambda v: f"{v:.1f}")}
-                    
-
-
                     a_ctxt_value_formatter_fn = specially_formatted_values_dict.get(a_ctxt_key, _default_formatter_fn)
                     a_ctxt_value_str: str = a_ctxt_value_formatter_fn(a_ctxt_value)
-
-                    # a_ctxt_value_str: str = specially_formatted_values_dict.get(a_ctxt_value, f'{a_ctxt_value}')
-
                     a_df[a_ctxt_key] = a_ctxt_value_str ## need to turn this into a flat string ValueError: Length of values (6) does not match length of index (19102)
                 
             # time_col = 'start' # 'ripple_start_t' for ripples, etc

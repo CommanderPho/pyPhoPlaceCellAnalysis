@@ -3,6 +3,7 @@ from datetime import datetime
 from enum import Enum # for getting the current date to set the ouptut folder name
 from pathlib import Path
 from typing import Any, Callable, List, Optional, Union, Dict
+from neuropy.core.user_annotations import metadata_attributes
 import pandas as pd
 import numpy as np
 from attrs import define, field, Factory, fields
@@ -11,9 +12,41 @@ from neuropy.utils.result_context import IdentifyingContext
 
 from pyphocorehelpers.DataStructure.dynamic_parameters import DynamicParameters
 from pyphocorehelpers.function_helpers import function_attributes
-from pyphocorehelpers.Filesystem.path_helpers import file_uri_from_path
-
+from pyphocorehelpers.Filesystem.path_helpers import file_uri_from_path, find_first_extant_path, sanitize_filename_for_Windows
 from neuropy.utils.mixins.AttrsClassHelpers import AttrsBasedClassHelperMixin, custom_define, serialized_field, serialized_attribute_field, non_serialized_field
+
+
+@function_attributes(short_name=None, tags=['filesystem', 'collected_output', 'platform_independent'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-06-03 08:10', related_items=[])
+def try_discover_default_collected_outputs_dir(known_collected_outputs_paths: Optional[List[Path]]=None) -> Optional[Path]:
+    """ Tries to find the appropriate "collected_outputs" directory on various known computers.
+
+    Usage:
+        from pyphoplacecellanalysis.General.Mixins.ExportHelpers import try_discover_default_collected_outputs_dir
+
+        collected_outputs_directory = try_discover_default_collected_outputs_dir()
+
+        assert collected_outputs_directory.exists(), f"collected_outputs_directory: {collected_outputs_directory} does not exist! Is the right computer's config commented out above?"
+        # fullwidth_path_widget(scripts_output_path, file_name_label='Scripts Output Path:')
+        print(f'collected_outputs_directory: "{collected_outputs_directory}"')
+        # Create a 'figures' subfolder if it doesn't exist
+        figures_folder: Path = collected_outputs_directory.joinpath('figures', '_temp_individual_posteriors').resolve()
+        figures_folder.mkdir(parents=False, exist_ok=True)
+        assert figures_folder.exists()
+        print(f'\tfigures_folder: "{figures_folder}"')
+        ## this is good
+        parent_output_folder = figures_folder
+
+
+    """
+    ## if none is provided it tries to find one in collected_outputs
+    if known_collected_outputs_paths is None:
+        known_collected_outputs_paths = [Path(v).resolve() for v in ['/Users/pho/data/collected_outputs',
+                                                                    '/Volumes/SwapSSD/Data/collected_outputs', r"K:/scratch/collected_outputs", '/Users/pho/Dropbox (University of Michigan)/MED-DibaLabDropbox/Data/Pho/Outputs/output/collected_outputs', r'C:/Users/pho/repos/Spike3DWorkEnv/Spike3D/output/collected_outputs',
+                                                                    '/home/halechr/FastData/collected_outputs/', '/home/halechr/cloud/turbo/Data/Output/collected_outputs']]
+
+    collected_outputs_directory = find_first_extant_path(known_collected_outputs_paths)
+    return collected_outputs_directory
+
 
 ## General Output Helpers
 @custom_define(slots=False)
@@ -347,6 +380,7 @@ class FileOutputManager:
         
         """
         parent_save_path, fig_save_basename = self.get_figure_output_parent_and_basename(final_context, make_folder_if_needed=make_folder_if_needed, **kwargs)
+        fig_save_basename = sanitize_filename_for_Windows(fig_save_basename)
         return parent_save_path.joinpath(fig_save_basename).resolve()
 
 
@@ -373,7 +407,7 @@ def build_pdf_metadata_from_display_context(active_identifying_ctx: IdentifyingC
 
     # PDF metadata:
     active_identifying_ctx.get_subset(subset_includelist=['format_name', 'session_name'])
-    if active_identifying_ctx.check_keys(keys_list=[['format_name', 'session_name']])[0]:
+    if active_identifying_ctx.check_keys(keys_list=['format_name', 'session_name'])[0]:
         session_descriptor_string: str = '_'.join([active_identifying_ctx.format_name, active_identifying_ctx.session_name]) # 'kdiba_2006-6-08_14-26-15'
     else:
         # print(f'no session. in context (err: {err}). Just using context description')
@@ -435,7 +469,7 @@ def extract_figures_from_display_function_output(out_display_var, out_fig_list:L
     
 
 ## 2022-10-04 Modern Programmatic PDF outputs:
-@function_attributes(short_name=None, tags=['Depricating', 'PDF', 'export', 'output', 'matplotlib', 'display', 'file', 'active'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2022-10-04 00:00', related_items=[])
+@function_attributes(short_name=None, tags=['Depricating', 'PDF', 'export', 'output', 'matplotlib', 'display', 'file', 'active'], input_requires=[], output_provides=[], uses=['create_daily_programmatic_display_function_testing_folder_if_needed', 'session_context_to_relative_path', 'build_pdf_metadata_from_display_context'], used_by=[], creation_date='2022-10-04 00:00', related_items=[])
 def programmatic_display_to_PDF(curr_active_pipeline, curr_display_function_name='_display_plot_decoded_epoch_slices', subset_includelist=None, subset_excludelist=None,  debug_print=False, **kwargs):
     """
     2022-10-04 Modern Programmatic PDF outputs
@@ -511,7 +545,482 @@ def programmatic_display_to_PDF(curr_active_pipeline, curr_display_function_name
                 curr_active_pipeline.register_output_file(output_path=active_pdf_save_path, output_metadata={'filtered_context': a_filtered_context, 'context': active_identifying_ctx, 'fig': out_fig_list})
 
 
+@metadata_attributes(short_name=None, tags=['pdf', 'export', 'helper'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-07-01 01:13', related_items=[])
+class FigureToImageHelpers:
 
+    @function_attributes(short_name=None, tags=['pdf', 'export', 'matplotlib', 'track', 'multi-page'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-07-01 01:13', related_items=[])
+    @classmethod
+    def export_axesimage_to_paged_pdf(cls, ax_image, x_extent: tuple, chunk_width: float, output_pdf_path: str, figsize=(8, 11), dpi=150, override_cmap=None, progress_print: bool=True, debug_max_num_pages: int = 25):
+        """
+        Export an AxesImage to a multi-page PDF, splitting along the x-axis.
+
+        Parameters
+        ----------
+        ax_image : matplotlib.image.AxesImage
+            The AxesImage object (e.g., from imshow()) you want to export.
+        x_extent : tuple
+            (x_min, x_max) data coordinates along the x-axis.
+        chunk_width : float
+            Width of each page in data units.
+        output_pdf_path : str
+            Path to the output PDF file.
+        figsize : tuple
+            Figure size in inches (width, height).
+        dpi : int
+            DPI resolution for rendering.
+        cmap : matplotlib colormap, optional
+            If you want to override the colormap.
+
+        Usage:
+            from pyphoplacecellanalysis.General.Mixins.ExportHelpers import FigureToImageHelpers
+
+            ## INPUTS: im_posterior_x
+            relative_data_output_parent_folder = Path('data').resolve()
+            Assert.path_exists(relative_data_output_parent_folder)
+
+            output_pdf_path: Path = relative_data_output_parent_folder.joinpath('timeline_exported.pdf')
+            FigureToImageHelpers.export_axesimage_to_paged_pdf(ax_image=im_posterior_x, x_extent=(active_2d_plot.total_data_start_time, active_2d_plot.total_data_end_time), chunk_width=active_2d_plot.active_window_duration, output_pdf_path=output_pdf_path, figsize=(11, 8), dpi=150, override_cmap=None)
+
+        """
+        
+        x_min, x_max = x_extent
+        y_min, y_max = ax_image.get_extent()[2:4]
+        img_data = ax_image.get_array()
+        orig_cmap = ax_image.get_cmap() if override_cmap is None else override_cmap
+        curr_page_idx: int = 0
+        # Create multipage PDF
+        with backend_pdf.PdfPages(output_pdf_path) as pdf:
+            start = x_min
+            while (start < x_max) and (curr_page_idx < debug_max_num_pages):
+                end = min(start + chunk_width, x_max)
+                if progress_print:
+                    print(f'processing page_idx: {curr_page_idx}')
+
+                # Create figure
+                fig, ax = plt.subplots(figsize=figsize, dpi=dpi)
+
+                # Plot the image in the current x window
+                ax.imshow(
+                    img_data,
+                    extent=ax_image.get_extent(),
+                    origin=ax_image.origin,
+                    aspect='auto',
+                    cmap=orig_cmap
+                )
+
+                # Set window
+                ax.set_xlim(start, end)
+                ax.set_ylim(y_min, y_max)
+
+                ax.set_title(f"Segment: {start:.2f} to {end:.2f}")
+                ax.set_xlabel("t")
+                ax.set_ylabel("pos")
+
+                pdf.savefig(fig)
+                plt.close(fig)
+
+                start += chunk_width
+                curr_page_idx += 1
+            ## end while
+
+        print(f"Export complete: {output_pdf_path}")
+
+
+    @function_attributes(short_name=None, tags=['pdf', 'export', 'wrapped', 'panelled', 'matplotlib', 'track', 'multi-page'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-07-01 02:08', related_items=[])
+    @classmethod
+    def export_wrapped_axesimage_to_paged_pdf(cls, ax_image, x_extent: tuple, chunk_width: float, output_pdf_path: str, rows_per_page: int=5, figsize=(8, 11), dpi=150, debug_max_num_pages: Optional[int] = 5, track_labels: Optional[List[str]] = None):
+        """
+        Export an AxesImage (such as the entire timeline plot for a MATPLOTLIB-backed track to a wrapped, paged PDF layout (multi-row per page).
+
+        Parameters
+        ----------
+        ax_image : matplotlib.image.AxesImage
+            The source image from imshow().
+        x_extent : tuple
+            (x_min, x_max) of the full timeline.
+        chunk_width : float
+            Width of each timeline chunk (like a line of text).
+        rows_per_page : int
+            Number of horizontal "lines" per page.
+        output_pdf_path : str
+            Output PDF file path.
+        figsize : tuple
+            PDF page size in inches.
+        dpi : int
+            Dots per inch for rendering.
+        vertical_spacing : float
+            Fractional spacing between rows (relative to figure height).
+            
+            
+        Usage (Multiple Tracks):
+            from pyphoplacecellanalysis.General.Mixins.ExportHelpers import FigureToImageHelpers
+            from pyphoplacecellanalysis.General.Model.Configs.LongShortDisplayConfig import DisplayColorsEnum
+
+            formatted_title_strings_dict = DisplayColorsEnum.get_matplotlib_formatted_title_dict()
+            decoder_names_list: List[str] = list(formatted_title_strings_dict.keys())
+
+            ## get the whole stack
+            active_dockGroup_dock_dict = active_2d_plot.get_dockGroup_dock_dict()
+            _curr_active_dock_group = active_dockGroup_dock_dict['ContinuousDecode_ - t_bin_size: 0.025'] # {'long_LR': 'Long◀', 'long_RL': 'Long▶', 'short_LR': 'Short◀', 'short_RL': 'Short▶'}
+            _curr_decoders_dock_item_names_list: List[str] = [v.name() for v in _curr_active_dock_group] # ['ContinuousDecode_long_LR - t_bin_size: 0.025', 'ContinuousDecode_long_RL - t_bin_size: 0.025', 'ContinuousDecode_short_LR - t_bin_size: 0.025', 'ContinuousDecode_short_RL - t_bin_size: 0.025']
+            im_posterior_x_stack = [v.widgets[0].plots.im_posterior_x for v in _curr_active_dock_group]
+
+            _curr_decoder_name_to_decoders_dock_item_name_map = {}
+            _remaining_dock_names = set(_curr_decoders_dock_item_names_list)
+
+            # _curr_decoders_dock_item_names_list
+            for a_decoder_name in decoder_names_list:
+                for a_dock_name in _remaining_dock_names: #_curr_decoders_dock_item_names_list:
+                    if (a_decoder_name in a_dock_name):
+                        _curr_decoder_name_to_decoders_dock_item_name_map[a_decoder_name] = a_dock_name
+                        _remaining_dock_names.remove(a_dock_name)
+                        break
+
+            assert len(_curr_decoder_name_to_decoders_dock_item_name_map) == len(decoder_names_list), f"decoder_names_list: {decoder_names_list} != list(_curr_decoder_name_to_decoders_dock_item_name_map.keys()): {_curr_decoder_name_to_decoders_dock_item_name_map}"
+            track_labels: List[str] = [formatted_title_strings_dict[a_decoder_name] for a_decoder_name, a_dock_name in _curr_decoder_name_to_decoders_dock_item_name_map.items()]
+            track_labels
+
+            ## OUTPUTS: im_posterior_x_stack, track_labels        
+            output_pdf_path: Path = relative_data_output_parent_folder.joinpath('timeline_exported_stack.pdf')
+            FigureToImageHelpers.export_wrapped_axesimage_to_paged_pdf(ax_image=im_posterior_x_stack, x_extent=(active_2d_plot.total_data_start_time, active_2d_plot.total_data_end_time), chunk_width=active_2d_plot.active_window_duration, output_pdf_path=output_pdf_path, figsize=(8, 11), dpi=150,
+                                                                    rows_per_page=5, debug_max_num_pages=3,		    
+                                                                    # rows_per_page=15, debug_max_num_pages=3,
+                                                                    track_labels=track_labels,
+                                                                )
+                                                                        
+        
+        
+        Usage (Simple, single matplotlib axes):
+        
+            from pyphoplacecellanalysis.General.Mixins.ExportHelpers import FigureToImageHelpers
+
+            ## INPUTS: im_posterior_x
+            relative_data_output_parent_folder = Path('data').resolve()
+            Assert.path_exists(relative_data_output_parent_folder)
+
+            output_pdf_path: Path = relative_data_output_parent_folder.joinpath('timeline_exported.pdf')
+            FigureToImageHelpers.export_wrapped_axesimage_to_paged_pdf(ax_image=im_posterior_x, x_extent=(active_2d_plot.total_data_start_time, active_2d_plot.total_data_end_time), chunk_width=active_2d_plot.active_window_duration, output_pdf_path=output_pdf_path, figsize=(8, 11), dpi=150, rows_per_page=15, debug_max_num_pages=3)
+
+        """
+        # track_separator_line_kwargs = dict(color='black', linewidth=1, linestyle='-', alpha=0.8)
+        track_separator_line_kwargs = dict(color='white', linewidth=2, linestyle='-', alpha=0.8)
+        # time_label_formatting_kwargs = dict(fontsize=10, color='red', weight='bold', bbox=dict(boxstyle='round,pad=0.3', facecolor='white', alpha=0.8))
+        time_label_formatting_kwargs = dict(fontsize=10, color='black')
+        multi_track_label_formatting_kwargs = dict(fontsize=9, color='black') # , weight='bold'
+
+
+        # Handle both single AxesImage and List[AxesImage]
+        if isinstance(ax_image, list):
+            ax_images = ax_image
+        else:
+            ax_images = [ax_image]
+
+        # Validate track_labels if provided        
+        if track_labels is not None:
+            if len(track_labels) != len(ax_images):
+                print(f"Warning: track_labels length ({len(track_labels)}) doesn't match ax_images length ({len(ax_images)}). Labels will be ignored.")
+                track_labels = None
+                
+        has_valid_track_labels: bool = (track_labels is not None)
+        x_min, x_max = x_extent
+
+
+        # Get image data and properties from all images
+        image_data_list = []
+        current_y_offset = 0
+
+        for img in ax_images:
+            y_min_img, y_max_img = img.get_extent()[2:4]
+            img_data = img.get_array()
+            cmap = img.get_cmap()
+            origin = img.origin
+            img_height = y_max_img - y_min_img
+
+            # Create stacked extent with precomputed offset
+            original_extent = img.get_extent()  # [x_min, x_max, y_min, y_max]
+            stacked_extent = [
+                original_extent[0],  # x_min (unchanged)
+                original_extent[1],  # x_max (unchanged) 
+                current_y_offset,    # new y_min (stacked position)
+                current_y_offset + img_height  # new y_max (stacked position)
+            ]
+
+            image_data_list.append({
+                'data': img_data,
+                'y_extent': (y_min_img, y_max_img),
+                'cmap': cmap,
+                'origin': origin,
+                'full_extent': original_extent,
+                'stacked_extent': stacked_extent  # Precomputed stacked positioning
+            })
+
+            # Update offset for next image
+            current_y_offset += img_height
+        ## END for img in ax_images...
+        
+        # # Calculate total y extent for stacked images
+        # all_y_mins = [y_ext[0] for y_ext in y_extents]
+        # all_y_maxs = [y_ext[1] for y_ext in y_extents]
+        # total_y_min = min(all_y_mins)
+        # total_y_max = max(all_y_maxs)
+
+        # Total stacked height is the final offset
+        total_y_min = 0
+        total_y_max = current_y_offset
+
+        chunks = []
+        start = x_min
+        while start < x_max:
+            end = min((start + chunk_width), x_max)
+            chunks.append((start, end))
+            start = end
+
+        n_chunks: int = len(chunks)
+        
+        # Group chunks into pages
+        chunks_per_page = rows_per_page
+        pages = [chunks[i:i+chunks_per_page] for i in range(0, len(chunks), chunks_per_page)]
+        n_pages: int = len(pages)
+        if debug_max_num_pages is None:
+            debug_max_num_pages = n_pages # all required pages
+
+        pages = pages[:debug_max_num_pages]
+
+        with backend_pdf.PdfPages(output_pdf_path) as pdf:
+            for page_idx, page_chunks in enumerate(pages):
+                ## for each page:
+                
+                fig, axes = plt.subplots(
+                    nrows=len(page_chunks),
+                    figsize=figsize,
+                    dpi=dpi,
+                    constrained_layout=True
+                )
+
+                # Make sure axes is iterable (even if 1 row)
+                if len(page_chunks) == 1:
+                    axes = [axes]
+
+
+                is_first_chunk_on_page: bool = True
+                for ax, (start, end) in zip(axes, page_chunks):
+                    ## for each chunk within a page:
+                    
+                    # Plot all track images stacked vertically
+                    for img_info in image_data_list:
+                        ax.imshow(
+                            img_info['data'],
+                            extent=img_info['stacked_extent'],  # Use precomputed stacked extent
+                            origin=img_info['origin'],
+                            aspect='auto',
+                            cmap=img_info['cmap']
+                        )
+                    ## END for img_info in image_data_list...
+                    
+                    # Add horizontal separator lines between images
+                    if (len(image_data_list) > 1) and (track_separator_line_kwargs is not None):
+                        for i, img_info in enumerate(image_data_list[:-1]):  # Skip the last image (no line after it)
+                            # Get the top edge of the current image (bottom edge of next image)
+                            separator_y = img_info['stacked_extent'][3]  # y_max of current image
+                            ax.axhline(y=separator_y, **track_separator_line_kwargs)
+                                                
+                    ax.set_xlim(start, end)
+                    ax.set_ylim(total_y_min, total_y_max)
+
+                    # Add track identity labels to the left of the first chunk only
+                    is_first_chunk: bool = is_first_chunk_on_page # (start == x_min)
+                    should_plot_track_labels: bool = (is_first_chunk and (track_labels is not None))
+                    
+                    if should_plot_track_labels:
+                        for i, (img_info, label) in enumerate(zip(image_data_list, track_labels)):
+                            # Calculate the vertical center of this track
+                            track_y_center = (img_info['stacked_extent'][2] + img_info['stacked_extent'][3]) / 2
+
+                            # Convert to axes coordinates for positioning
+                            track_y_center_norm = (track_y_center - total_y_min) / (total_y_max - total_y_min)
+
+                            ax.text(-0.01, track_y_center_norm, label, 
+                                   rotation=90, verticalalignment='center', horizontalalignment='center',
+                                   transform=ax.transAxes, **multi_track_label_formatting_kwargs)
+                    # END if should_plot_track_labels...
+                    
+
+
+                    # ax.set_title(f"Segment: {start:.0f}–{end:.0f}")
+                    if has_valid_track_labels:
+                        ## need extra room to prevent collisions between the labels and the start_t
+                        start_time_x_offset: float = -0.04
+                    else:
+                        # no labels to collide with:
+                        start_time_x_offset: float = -0.02
+                        
+
+                    # Display the chunk start time vertically on left edge (outside axes)
+                    ax.text(start_time_x_offset, 0.5, f'{start:.0f}', 
+                            rotation=90, verticalalignment='center', horizontalalignment='center',
+                            transform=ax.transAxes, **time_label_formatting_kwargs)
+
+                    # Display end time vertically on right edge (outside axes)
+                    ax.text(1.02, 0.5, f'{end:.0f}',
+                            rotation=90, verticalalignment='center', horizontalalignment='center', 
+                            transform=ax.transAxes, **time_label_formatting_kwargs)
+
+                    ax.set_xticks([])
+                    ax.set_yticks([])
+                    is_first_chunk_on_page = False # all later chunks are NOT the first one
+                ## END for ax, (start, end) in zip(axes, page_chunks)...
+                
+                pdf.savefig(fig)
+                plt.close(fig)
+            ## END for page_chunks in pages...
+        print(f"PDF saved to {output_pdf_path}")
+
+
+    @function_attributes(short_name=None, tags=['pdf', 'export', 'wrapped', 'panelled', 'pyqtgraph', 'track', 'multi-page'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-07-01 05:27', related_items=[])
+    @classmethod
+    def export_wrapped_pyqtgraph_to_paged_pdf(cls, plot_item, x_extent: tuple, chunk_width: float, output_pdf_path: str, rows_per_page: int=5, figsize=(8, 11), dpi=150, debug_max_num_pages: Optional[int] = 5):
+        """
+        Export a PyQtGraph PlotItem (such as the entire timeline plot) to a wrapped, paged PDF layout (multi-row per page).
+
+        Parameters
+        ----------
+        plot_item : pg.PlotItem
+            The source PyQtGraph PlotItem.
+        x_extent : tuple
+            (x_min, x_max) of the full timeline.
+        chunk_width : float
+            Width of each timeline chunk (like a line of text).
+        rows_per_page : int
+            Number of horizontal "lines" per page.
+        output_pdf_path : str
+            Output PDF file path.
+        figsize : tuple
+            PDF page size in inches.
+        dpi : int
+            Dots per inch for rendering.
+
+        Usage:
+
+            from pyphoplacecellanalysis.General.Mixins.ExportHelpers import FigureToImageHelpers
+
+            ## INPUTS: active_2d_plot (PyQtGraph widget)
+            relative_data_output_parent_folder = Path('data').resolve()
+            Assert.path_exists(relative_data_output_parent_folder)
+
+            output_pdf_path: Path = relative_data_output_parent_folder.joinpath('timeline_exported_pyqtgraph.pdf')
+            plot_item = active_2d_plot.plots.main_plot_widget  # or wherever your PlotItem is
+            FigureToImageHelpers.export_wrapped_pyqtgraph_to_paged_pdf(
+                plot_item=plot_item, 
+                x_extent=(active_2d_plot.total_data_start_time, active_2d_plot.total_data_end_time), 
+                chunk_width=active_2d_plot.active_window_duration, 
+                output_pdf_path=output_pdf_path, 
+                figsize=(8, 11), 
+                dpi=150, 
+                rows_per_page=15, 
+                debug_max_num_pages=3
+            )
+
+        """
+        from pyphoplacecellanalysis.External.pyqtgraph.exporters.ImageExporter import ImageExporter
+        
+        x_min, x_max = x_extent
+
+        # Get the current view range for y-axis
+        y_range = plot_item.getViewBox().viewRange()[1]  # [y_min, y_max]
+        y_min, y_max = y_range
+
+        chunks = []
+        start = x_min
+        while start < x_max:
+            end = min((start + chunk_width), x_max)
+            chunks.append((start, end))
+            start = end
+
+        n_chunks: int = len(chunks)
+
+        # Group chunks into pages
+        chunks_per_page = rows_per_page
+        pages = [chunks[i:i+chunks_per_page] for i in range(0, len(chunks), chunks_per_page)]
+        n_pages: int = len(pages)
+        if debug_max_num_pages is None:
+            debug_max_num_pages = n_pages # all required pages
+
+        pages = pages[:debug_max_num_pages]
+
+        with backend_pdf.PdfPages(output_pdf_path) as pdf:
+            for page_chunks in pages:
+                fig, axes = plt.subplots(
+                    nrows=len(page_chunks),
+                    figsize=figsize,
+                    dpi=dpi,
+                    constrained_layout=True
+                )
+
+                # Make sure axes is iterable (even if 1 row)
+                if len(page_chunks) == 1:
+                    axes = [axes]
+
+                for ax, (start, end) in zip(axes, page_chunks):
+                    # Set the view range for this chunk
+                    original_x_range = plot_item.getViewBox().viewRange()[0]
+                    original_y_range = plot_item.getViewBox().viewRange()[1]
+
+                    # Temporarily set the view range to the current chunk
+                    plot_item.setXRange(start, end, padding=0)
+                    plot_item.setYRange(y_min, y_max, padding=0)
+
+                    # Export the current view as an image
+                    # exporter = pg.exporters.ImageExporter(plot_item)
+                    exporter = ImageExporter(plot_item)
+                    exporter.parameters()['width'] = int(figsize[0] * dpi)
+                    exporter.parameters()['height'] = int((figsize[1] / len(page_chunks)) * dpi)
+
+                    # Export to a temporary image
+                    img = exporter.export(toBytes=True)
+
+                    # Convert QImage to numpy array for matplotlib
+                    from PyQt5.QtGui import QImage
+                    if isinstance(img, QImage):
+                        # Convert QImage to numpy array
+                        width = img.width()
+                        height = img.height()
+                        ptr = img.bits()
+                        ptr.setsize(img.byteCount())
+                        arr = np.array(ptr).reshape(height, width, 4)  # RGBA
+                        arr = arr[:, :, :3]  # Remove alpha channel, keep RGB
+                    else:
+                        # If it's already a numpy array or PIL Image
+                        arr = np.array(img)
+
+                    # Display in matplotlib
+                    ax.imshow(arr, extent=[start, end, y_min, y_max], aspect='auto', origin='upper')
+                    ax.set_xlim(start, end)
+                    ax.set_ylim(y_min, y_max)
+
+                    # Time labels outside axes bounds
+                    time_label_formatting_kwargs = dict(fontsize=10, color='black')
+
+                    # Display start value vertically on left edge (outside axes)
+                    ax.text(-0.02, 0.5, f'{start:.0f}', 
+                            rotation=90, verticalalignment='center', horizontalalignment='center',
+                            transform=ax.transAxes, **time_label_formatting_kwargs)
+
+                    # Display end value vertically on right edge (outside axes)
+                    ax.text(1.02, 0.5, f'{end:.0f}',
+                            rotation=90, verticalalignment='center', horizontalalignment='center', 
+                            transform=ax.transAxes, **time_label_formatting_kwargs)
+
+                    ax.set_xticks([])
+                    ax.set_yticks([])
+
+                # Restore original view range
+                plot_item.setXRange(*original_x_range, padding=0)
+                plot_item.setYRange(*original_y_range, padding=0)
+
+                pdf.savefig(fig)
+                plt.close(fig)
+            ## END for page_chunks in pages...
+        print(f"PDF saved to {output_pdf_path}")
 
 
 @function_attributes(short_name=None, tags=['PDF', 'export', 'output', 'matplotlib', 'display', 'file', 'active'], input_requires=[], output_provides=[], uses=['extract_figures_from_display_function_output'], used_by=[], creation_date='2023-06-08 11:55', related_items=[])
@@ -522,6 +1031,15 @@ def programmatic_render_to_file(curr_active_pipeline, curr_display_function_name
 
     Looks it this is done for EACH filtered context (in the loop below) whereas the original just did a single specific context
     """
+    from pyphoplacecellanalysis.General.Batch.NonInteractiveProcessing import BatchPlotting
+
+    if BatchPlotting._fig_out_man is None:
+        collected_figures_folder, fig_out_man = BatchPlotting.find_batch_programmatic_figures_output_dir()
+        assert fig_out_man is not None
+
+    out_man: FileOutputManager = deepcopy(BatchPlotting._fig_out_man) # curr_active_pipeline.get_output_manager(figure_output_location=FigureOutputLocation.CUSTOM, context_to_path_mode=ContextToPathMode.GLOBAL_UNIQUE, override_output_parent_path=collected_outputs_path)
+    _batch_figure_kwargs = dict(override_fig_man=out_man)
+
 
     ## Get the output path (active_session_figures_out_path) for this session (and all of its filtered_contexts as well):
     # fig_man = curr_active_pipeline.get_output_manager() # get the output manager
@@ -537,7 +1055,7 @@ def programmatic_render_to_file(curr_active_pipeline, curr_display_function_name
         ## Disables showing the figure by default from within the context manager.
         # active_display_fn_kwargs = overriding_dict_with(lhs_dict=dict(filter_epochs='ripple', debug_test_max_num_slices=128), **kwargs)
         # active_display_fn_kwargs = overriding_dict_with(lhs_dict=dict(), **kwargs) # this is always an error, if lhs_dict is empty the result will be empty regardless of the value of kwargs.
-        active_display_fn_kwargs = kwargs
+        active_display_fn_kwargs = (_batch_figure_kwargs | kwargs)
         
         # Perform for each filtered context:
         for filter_name, a_filtered_context in curr_active_pipeline.filtered_contexts.items():
@@ -574,7 +1092,7 @@ def programmatic_render_to_file(curr_active_pipeline, curr_display_function_name
                 print(f'extracted_context: {extracted_context}')
 
             for fig in out_fig_list:
-                active_out_figure_paths = curr_active_pipeline.output_figure(extracted_context, fig, write_vector_format=write_vector_format, write_png=write_png, debug_print=debug_print)                 
+                active_out_figure_paths = curr_active_pipeline.output_figure(extracted_context, fig, write_vector_format=write_vector_format, write_png=write_png, **_batch_figure_kwargs, debug_print=debug_print)                 
                 all_out_fig_paths.extend(active_out_figure_paths)
 
             # ## Build PDF Output Info
@@ -690,6 +1208,9 @@ def write_to_file(a_fig, active_identifying_ctx: IdentifyingContext, final_fig_s
     is_pillow_image: bool = isinstance(a_fig, Image.Image) # PIL.Image
     
 
+    # Extract saving kwargs
+    
+
     # PDF: .pdf versions:
     if write_vector_format:
         try:
@@ -699,7 +1220,7 @@ def write_to_file(a_fig, active_identifying_ctx: IdentifyingContext, final_fig_s
                 fig_vector_save_path = final_fig_save_basename_path.with_suffix('.pdf')
                 with backend_pdf.PdfPages(fig_vector_save_path, keep_empty=False, metadata=active_pdf_metadata) as pdf:
                     # Save out PDF page:
-                    pdf.savefig(a_fig)
+                    pdf.savefig(a_fig, **kwargs)
                     
                 additional_output_metadata = {'fig_format':'matplotlib', 'pdf_metadata': active_pdf_metadata}
 
@@ -739,7 +1260,7 @@ def write_to_file(a_fig, active_identifying_ctx: IdentifyingContext, final_fig_s
             # fig_png_out_path = fig_png_out_path.with_stem(f'{curr_pdf_save_path.stem}_{curr_page_str}') # note this replaces the current .pdf extension with .png, resulting in a good filename for a .png
             if is_matplotlib_figure:
                 ## MATPLOTLIB only:
-                a_fig.savefig(fig_png_out_path)
+                a_fig.savefig(fig_png_out_path, **kwargs) ## pass kwargs so things like dpi and etc can be passed.
             
             elif is_plotly_figure:
                 ## Plotly only:

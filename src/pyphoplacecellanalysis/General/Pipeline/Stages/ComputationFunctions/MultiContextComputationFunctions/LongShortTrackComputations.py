@@ -1,6 +1,7 @@
 from copy import deepcopy
 from enum import Enum # required by `FiringRateActivitySource` enum
-from dataclasses import dataclass # required by `SortOrderMetric` class
+from dataclasses import dataclass
+from pathlib import Path # required by `SortOrderMetric` class
 
 import h5py # for to_hdf and read_hdf definitions
 import numpy as np
@@ -35,16 +36,16 @@ from scipy.special import rel_entr # alternative for compute_relative_entropy_di
 
 from collections import Counter # Count the Number of Occurrences in a Python list using Counter
 from pyphoplacecellanalysis.General.Mixins.CrossComputationComparisonHelpers import SplitPartitionMembership
-from neuropy.core.neuron_identities import NeuronType
+from neuropy.core.neuron_identities import NeuronIdentityDataframeAccessor, NeuronType
 
 from neuropy.analyses import detect_pbe_epochs # used in `_perform_jonathan_replay_firing_rate_analyses(.)` if replays are missing
 
 from pyphoplacecellanalysis.General.Pipeline.Stages.Loading import saveData # for `pipeline_complete_compute_long_short_fr_indicies`
 from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.EpochComputationFunctions import KnownFilterEpochs # for `pipeline_complete_compute_long_short_fr_indicies`
 from neuropy.core.session.dataSession import DataSession # for `pipeline_complete_compute_long_short_fr_indicies`
+from pyphoplacecellanalysis.General.Mixins.PickleSerializableMixin import PickleSerializableMixin
 
-
-from typing import Dict, List, Any, Optional, Tuple
+from typing import Dict, List, Any, Optional, Tuple, Union
 from scipy.special import factorial, logsumexp
 from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import DecodedFilterEpochsResult
 import nptyping as ND
@@ -244,30 +245,6 @@ class JonathanFiringRateAnalysisResult(HDFMixin, AttrsBasedClassHelperMixin):
         # Finish for the custom properties
         
         #TODO 2023-08-04 12:09: - [ ] Included outputs_local/global
-                 
-        # df: pd.DataFrame = self.rdf.rdf
-        # aclu_to_idx: Dict = self.rdf.aclu_to_idx
-        # aclu_to_idx_df: pd.DataFrame = pd.DataFrame({'aclu': list(aclu_to_idx.keys()), 'fragile_linear_idx': list(aclu_to_idx.values())})
-        
-        # with tb.open_file(file_path, mode='a') as f:
-        #     # f.get_node(f'{key}/rdf/df')._f_remove(recursive=True)
-
-        #     try:
-        #         rdf_group = f.create_group(key, 'rdf', title='replay data frame', createparents=True)
-        #     except tb.exceptions.NodeError:
-        #         # Node already exists
-        #         pass
-        #     except BaseException as e:
-        #         raise
-        #     # rdf_group[f'{outputs_local_key}/df'] = self.rdf.rdf
-        #     try:
-        #         irdf_group = f.create_group(key, 'irdf', title='intra-replay data frame', createparents=True)
-        #     except tb.exceptions.NodeError:
-        #         # Node already exists
-        #         pass
-        #     except BaseException as e:
-        #         raise
-
 
         # Convert the ['track_membership', 'neuron_type'] columns of self._neuron_replay_stats_df to the categorical type if needed
         
@@ -292,6 +269,31 @@ class JonathanFiringRateAnalysisResult(HDFMixin, AttrsBasedClassHelperMixin):
         aclu_to_idx: Dict = self.irdf.aclu_to_idx
         aclu_to_idx_df: pd.DataFrame = pd.DataFrame({'aclu': list(aclu_to_idx.keys()), 'fragile_linear_idx': list(aclu_to_idx.values())})
         aclu_to_idx_df.to_hdf(file_path, key=f'{key}/irdf/aclu_to_idx_df', format='table', data_columns=True)
+
+
+    def get_df_for_CSV(self, *kwargs) -> pd.DataFrame:
+        """ Saves the object to key in the hdf5 file specified by file_path"""    
+        _neuron_replay_stats_df: pd.DataFrame = deepcopy(self.neuron_replay_stats_df)
+        
+        active_context = kwargs.pop('active_context', None) # TODO: requiring that the caller pass active_context isn't optimal
+        _neuron_replay_stats_df = HDF_Converter.prepare_neuron_indexed_dataframe_for_hdf(_neuron_replay_stats_df, active_context=active_context, aclu_column_name=None)
+
+        # _neuron_replay_stats_df.astype(str).to_hdf(file_path, key=f'{key}/neuron_replay_stats_df', format='table', data_columns=True)
+
+        # self.rdf.rdf.to_hdf(file_path, key=f'{key}/rdf/df') # , format='table', data_columns=True Can't do 'table' format because `TypeError: Cannot serialize the column [firing_rates] because its data contents are not [string] but [mixed] object dtype`
+        aclu_to_idx: Dict = self.rdf.aclu_to_idx
+        aclu_to_idx_df: pd.DataFrame = pd.DataFrame({'aclu': list(aclu_to_idx.keys()), 'fragile_linear_idx': list(aclu_to_idx.values())})
+        # aclu_to_idx_df.to_hdf(file_path, key=f'{key}/rdf/aclu_to_idx_df', format='table', data_columns=True)
+
+        # irdf_group[f'{outputs_local_key}/df'] = self.irdf.irdf
+        # self.irdf.irdf.to_hdf(file_path, key=f'{key}/irdf/df') # , format='table', data_columns=True Can't do 'table' format because `TypeError: Cannot serialize the column [firing_rates] because its data contents are not [string] but [mixed] object dtype`
+        aclu_to_idx: Dict = self.irdf.aclu_to_idx
+        aclu_to_idx_df: pd.DataFrame = pd.DataFrame({'aclu': list(aclu_to_idx.keys()), 'fragile_linear_idx': list(aclu_to_idx.values())})
+        # aclu_to_idx_df.to_hdf(file_path, key=f'{key}/irdf/aclu_to_idx_df', format='table', data_columns=True)
+        return _neuron_replay_stats_df
+
+
+
 
     def refine_exclusivity_by_inst_frs_index(self, custom_SpikeRateTrends_df: pd.DataFrame, frs_index_inclusion_magnitude: float = 0.5, override_existing_frs_index_values:bool=False) -> bool: 
         """ 
@@ -2195,7 +2197,7 @@ def compute_rate_remapping_stats(long_short_fr_indicies_analysis, aclu_to_neuron
 
     ## Find only the cells that exhibit considerable remapping:
     # considerable_remapping_threshold = 0.7 # cells exhibit "considerable remapping" when they exceed 0.7
-    rate_remapping_df['has_considerable_remapping'] = rate_remapping_df['max_axis_distance_from_center'] > considerable_remapping_threshold
+    rate_remapping_df['has_considerable_remapping'] = (rate_remapping_df['max_axis_distance_from_center'] > considerable_remapping_threshold)
     
     # rendering only:
     rate_remapping_df['render_color'] = [a_neuron_type.renderColor for a_neuron_type in rate_remapping_df.neuron_type] # Get color corresponding to each neuron type (`NeuronType`):
@@ -2979,6 +2981,103 @@ class SingleBarResult(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
     LxC_scatter_props: Optional[Dict] = non_serialized_field(is_computable=False)
     SxC_scatter_props: Optional[Dict] = non_serialized_field(is_computable=False)
 
+    @classmethod
+    def combine(cls, *results: 'SingleBarResult') -> 'SingleBarResult':
+        """Combines multiple SingleBarResult instances into a new instance.
+
+        Args:
+            *results: One or more SingleBarResult instances to combine
+
+        Returns:
+            A new SingleBarResult with combined data and recomputed statistics
+
+        Raises:
+            ValueError: If no results are provided
+        """
+        if len(results) == 0:
+            raise ValueError("At least one SingleBarResult must be provided")
+
+        if len(results) == 1:
+            # Return a copy of the single result
+            return deepcopy(results[0])
+
+        # Initialize arrays for combining
+        all_values = []
+        all_LxC_aclus = []
+        all_SxC_aclus = []
+
+        # Initialize scatter props dictionaries
+        combined_LxC_scatter_props = {}
+        combined_SxC_scatter_props = {}
+
+        # Collect values from all results
+        for result in results:
+            if result.values is not None and len(result.values) > 0:
+                all_values.append(result.values)
+
+            if result.LxC_aclus is not None and len(result.LxC_aclus) > 0:
+                all_LxC_aclus.append(result.LxC_aclus)
+
+            if result.SxC_aclus is not None and len(result.SxC_aclus) > 0:
+                all_SxC_aclus.append(result.SxC_aclus)
+
+            # Merge scatter properties dictionaries
+            if result.LxC_scatter_props:
+                for key, value in result.LxC_scatter_props.items():
+                    if key in combined_LxC_scatter_props:
+                        # If the key exists and values are arrays, concatenate them
+                        if isinstance(value, np.ndarray) and isinstance(combined_LxC_scatter_props[key], np.ndarray):
+                            combined_LxC_scatter_props[key] = np.concatenate([combined_LxC_scatter_props[key], value])
+                        else:
+                            # For non-array values, keep the most recent
+                            combined_LxC_scatter_props[key] = value
+                    else:
+                        combined_LxC_scatter_props[key] = value
+
+            if result.SxC_scatter_props:
+                for key, value in result.SxC_scatter_props.items():
+                    if key in combined_SxC_scatter_props:
+                        # If the key exists and values are arrays, concatenate them
+                        if isinstance(value, np.ndarray) and isinstance(combined_SxC_scatter_props[key], np.ndarray):
+                            combined_SxC_scatter_props[key] = np.concatenate([combined_SxC_scatter_props[key], value])
+                        else:
+                            # For non-array values, keep the most recent
+                            combined_SxC_scatter_props[key] = value
+                    else:
+                        combined_SxC_scatter_props[key] = value
+
+        # Combine arrays
+        combined_values = np.concatenate(all_values) if all_values else np.array([])
+        combined_LxC_aclus = np.concatenate(all_LxC_aclus) if all_LxC_aclus else np.array([])
+        combined_SxC_aclus = np.concatenate(all_SxC_aclus) if all_SxC_aclus else np.array([])
+
+        # Compute new statistics
+        new_mean = np.mean(combined_values) if len(combined_values) > 0 else 0.0
+        new_std = np.std(combined_values) if len(combined_values) > 0 else 0.0
+
+        # Create and return a new instance
+        return cls(mean=new_mean, std=new_std, values=combined_values, LxC_aclus=combined_LxC_aclus, SxC_aclus=combined_SxC_aclus,
+                   LxC_scatter_props=(combined_LxC_scatter_props if combined_LxC_scatter_props else None), SxC_scatter_props=(combined_SxC_scatter_props if combined_SxC_scatter_props else None))
+
+
+
+
+    @function_attributes(short_name=None, tags=['combine', 'add', 'across-sessions'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-06-12 09:06', related_items=[])
+    def add(self, *others: 'SingleBarResult') -> 'SingleBarResult':
+        """Combines multiple SingleBarResult instances into a new instance.
+
+        Args:
+            *others: One or more SingleBarResult instances to combine with this one
+
+        Returns:
+            A new SingleBarResult with combined data and recomputed statistics
+        """
+        # Create and return a new instance
+        return SingleBarResult.combine(self, *others)
+
+
+
+
 
 def _InstantaneousSpikeRateGroupsComputation_convert_Fig2_ANY_FR_to_hdf_fn(f, key: str, value):
     """ Converts `Fig2_Replay_FR: List[SingleBarResult]` or `Fig2_Laps_FR: List[SingleBarResult]` into something serializable. Unfortunately has to be defined outside the `InstantaneousSpikeRateGroupsComputation` definition so it can be used in the field. value: List[SingleBarResult] """
@@ -2998,8 +3097,9 @@ def _InstantaneousSpikeRateGroupsComputation_convert_Fig2_ANY_FR_to_hdf_fn(f, ke
         raise NotImplementedError
 
 
+
 @custom_define(slots=False)
-class InstantaneousSpikeRateGroupsComputation(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
+class InstantaneousSpikeRateGroupsComputation(PickleSerializableMixin, HDF_SerializationMixin, AttrsBasedClassHelperMixin):
     """ class to handle spike rate computations
 
     Appears to only be for the XxC (LxC, SxC) cells.
@@ -3013,9 +3113,15 @@ class InstantaneousSpikeRateGroupsComputation(HDF_SerializationMixin, AttrsBased
     
     LxC_aclus: np.ndarray = serialized_field(init=False, hdf_metadata={'track_eXclusive_cells': 'LxC'}) # the list of long-eXclusive cell aclus
     SxC_aclus: np.ndarray = serialized_field(init=False, hdf_metadata={'track_eXclusive_cells': 'SxC'}) # the list of short-eXclusive cell aclus
+    AnyC_aclus: NDArray = serialized_field(init=False, hdf_metadata={'track_eXclusive_cells': 'AnyC'}, metadata={'field_added': "2025.07.23_0"}) # the list of short-eXclusive cell aclus
 
     Fig2_Replay_FR: List[SingleBarResult] = serialized_field(init=False, is_computable=True, serialization_fn=_InstantaneousSpikeRateGroupsComputation_convert_Fig2_ANY_FR_to_hdf_fn, hdf_metadata={'epochs': 'Replay'}) # a list of the four single-bar results.
     Fig2_Laps_FR: List[SingleBarResult] = serialized_field(init=False, is_computable=True, serialization_fn=_InstantaneousSpikeRateGroupsComputation_convert_Fig2_ANY_FR_to_hdf_fn, hdf_metadata={'epochs': 'Laps'}) # a list of the four single-bar results.
+
+    AnyC_ReplayDeltaMinus: SpikeRateTrends = serialized_field(init=False, repr=False, default=None, is_computable=True, hdf_metadata={'track_eXclusive_cells': 'AnyC', 'epochs': 'Replay', 'track_change_relative_period': 'DeltaMinus'}, metadata={'field_added': "2025.07.23_0"})
+    AnyC_ReplayDeltaPlus: SpikeRateTrends = serialized_field(init=False, repr=False, default=None, is_computable=True, hdf_metadata={'track_eXclusive_cells': 'AnyC', 'epochs': 'Replay', 'track_change_relative_period': 'DeltaPlus'}, metadata={'field_added': "2025.07.23_0"})
+    AnyC_ThetaDeltaMinus: SpikeRateTrends = serialized_field(init=False, repr=False, default=None, is_computable=True, hdf_metadata={'track_eXclusive_cells': 'AnyC', 'epochs': 'Laps', 'track_change_relative_period': 'DeltaMinus'}, metadata={'field_added': "2025.07.23_0"})
+    AnyC_ThetaDeltaPlus: SpikeRateTrends = serialized_field(init=False, repr=False, default=None, is_computable=True, hdf_metadata={'track_eXclusive_cells': 'AnyC', 'epochs': 'Laps', 'track_change_relative_period': 'DeltaPlus'}, metadata={'field_added': "2025.07.23_0"})
 
     LxC_ReplayDeltaMinus: SpikeRateTrends = serialized_field(init=False, repr=False, default=None, is_computable=True, hdf_metadata={'track_eXclusive_cells': 'LxC', 'epochs': 'Replay', 'track_change_relative_period': 'DeltaMinus'})
     LxC_ReplayDeltaPlus: SpikeRateTrends = serialized_field(init=False, repr=False, default=None, is_computable=True, hdf_metadata={'track_eXclusive_cells': 'LxC', 'epochs': 'Replay', 'track_change_relative_period': 'DeltaPlus'})
@@ -3030,7 +3136,63 @@ class InstantaneousSpikeRateGroupsComputation(HDF_SerializationMixin, AttrsBased
     ## New
     all_incl_endPlatforms_InstSpikeRateTrends_df: Optional[pd.DataFrame] = non_serialized_field(repr=False, default=None, is_computable=False) # converter=attrs.converters.default_if_none("")
 
-    def compute(self, curr_active_pipeline, **kwargs):
+
+    @classmethod
+    def _perform_compute_spike_rate_bars(cls, LxC_aclus: NDArray, SxC_aclus: NDArray, LxC_ThetaDeltaMinus: SpikeRateTrends, LxC_ThetaDeltaPlus: SpikeRateTrends, SxC_ThetaDeltaMinus: SpikeRateTrends, SxC_ThetaDeltaPlus: SpikeRateTrends,
+                                          LxC_ReplayDeltaMinus: SpikeRateTrends, LxC_ReplayDeltaPlus: SpikeRateTrends, SxC_ReplayDeltaMinus: SpikeRateTrends, SxC_ReplayDeltaPlus: SpikeRateTrends,
+                                          ):
+        """ Computing 
+        
+
+        (Fig2_Laps_FR, Fig2_Replay_FR) = InstantaneousSpikeRateGroupsComputation._perform_compute_spike_rate_bars(LxC_aclus=LxC_aclus, SxC_aclus=SxC_aclus,
+                                             LxC_ThetaDeltaMinus=LxC_ThetaDeltaMinus, LxC_ThetaDeltaPlus=LxC_ThetaDeltaPlus, SxC_ThetaDeltaMinus=SxC_ThetaDeltaMinus, SxC_ThetaDeltaPlus=SxC_ThetaDeltaPlus,
+                                             LxC_ReplayDeltaMinus=LxC_ReplayDeltaMinus, LxC_ReplayDeltaPlus=LxC_ReplayDeltaPlus, SxC_ReplayDeltaMinus=SxC_ReplayDeltaMinus, SxC_ReplayDeltaPlus=SxC_ReplayDeltaPlus,
+                                          )
+        """
+        # Common:
+        are_LxC_empty: bool = (LxC_aclus is None) or (len(LxC_aclus) == 0)
+        are_SxC_empty: bool = (SxC_aclus is None) or (len(SxC_aclus) == 0)
+        
+        # Note that in general LxC and SxC might have differing numbers of cells.
+        if (are_LxC_empty or are_SxC_empty):
+            # self.Fig2_Replay_FR = None # None mode
+            # initialize with an empty array and None values for the mean and std.
+            Fig2_Replay_FR: List[SingleBarResult] = []
+            for v in (LxC_ReplayDeltaMinus, LxC_ReplayDeltaPlus, SxC_ReplayDeltaMinus, SxC_ReplayDeltaPlus):
+                if v is not None:
+                    Fig2_Replay_FR.append(SingleBarResult(v.cell_agg_inst_fr_list.mean(), v.cell_agg_inst_fr_list.std(), v.cell_agg_inst_fr_list, LxC_aclus, SxC_aclus, None, None))
+                else:
+                    Fig2_Replay_FR.append(SingleBarResult(None, None, np.array([], dtype=float), LxC_aclus, SxC_aclus, None, None))
+        else:
+            Fig2_Replay_FR: list[SingleBarResult] = [SingleBarResult(v.cell_agg_inst_fr_list.mean(), v.cell_agg_inst_fr_list.std(), v.cell_agg_inst_fr_list, LxC_aclus, SxC_aclus, None, None) for v in (LxC_ReplayDeltaMinus, LxC_ReplayDeltaPlus, SxC_ReplayDeltaMinus, SxC_ReplayDeltaPlus)]
+        
+        # Note that in general LxC and SxC might have differing numbers of cells.
+        if are_LxC_empty or are_SxC_empty:
+            # self.Fig2_Laps_FR = None # NONE mode
+            Fig2_Laps_FR: List[SingleBarResult] = []
+            for v in (LxC_ThetaDeltaMinus, LxC_ThetaDeltaPlus, SxC_ThetaDeltaMinus, SxC_ThetaDeltaPlus):
+                if v is not None:
+                    Fig2_Laps_FR.append(SingleBarResult(v.cell_agg_inst_fr_list.mean(), v.cell_agg_inst_fr_list.std(), v.cell_agg_inst_fr_list, LxC_aclus, SxC_aclus, None, None))
+                else:
+                    Fig2_Laps_FR.append(SingleBarResult(None, None, np.array([], dtype=float), LxC_aclus, SxC_aclus, None, None))
+                    
+        else:
+            # Note that in general LxC and SxC might have differing numbers of cells.
+            Fig2_Laps_FR: list[SingleBarResult] = [SingleBarResult(v.cell_agg_inst_fr_list.mean(), v.cell_agg_inst_fr_list.std(), v.cell_agg_inst_fr_list, LxC_aclus, SxC_aclus, None, None) for v in (LxC_ThetaDeltaMinus, LxC_ThetaDeltaPlus, SxC_ThetaDeltaMinus, SxC_ThetaDeltaPlus)]
+            
+        return (Fig2_Laps_FR, Fig2_Replay_FR)
+
+
+
+    def compute_spike_rate_bars(self):
+        """ Computing """
+        (self.Fig2_Laps_FR, self.Fig2_Replay_FR) = InstantaneousSpikeRateGroupsComputation._perform_compute_spike_rate_bars(LxC_aclus=self.LxC_aclus, SxC_aclus=self.SxC_aclus,
+                                             LxC_ThetaDeltaMinus=self.LxC_ThetaDeltaMinus, LxC_ThetaDeltaPlus=self.LxC_ThetaDeltaPlus, SxC_ThetaDeltaMinus=self.SxC_ThetaDeltaMinus, SxC_ThetaDeltaPlus=self.SxC_ThetaDeltaPlus,
+                                             LxC_ReplayDeltaMinus=self.LxC_ReplayDeltaMinus, LxC_ReplayDeltaPlus=self.LxC_ReplayDeltaPlus, SxC_ReplayDeltaMinus=self.SxC_ReplayDeltaMinus, SxC_ReplayDeltaPlus=self.SxC_ReplayDeltaPlus,
+                                          )
+
+
+    def compute(self, curr_active_pipeline, minimum_inclusion_fr_Hz=0.0, **kwargs):
         """ full instantaneous computations for both Long and Short epochs:
 
         Can access via:
@@ -3042,54 +3204,98 @@ class InstantaneousSpikeRateGroupsComputation(HDF_SerializationMixin, AttrsBased
             LxC_ThetaDeltaMinus, LxC_ThetaDeltaPlus, SxC_ThetaDeltaMinus, SxC_ThetaDeltaPlus = _out_inst_fr_comps.LxC_ThetaDeltaMinus, _out_inst_fr_comps.LxC_ThetaDeltaPlus, _out_inst_fr_comps.SxC_ThetaDeltaMinus, _out_inst_fr_comps.SxC_ThetaDeltaPlus
 
         """
+        from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import get_proper_global_spikes_df
+
+    
         sess = curr_active_pipeline.sess
         # Get the provided context or use the session context:
         active_context = kwargs.get('active_context', sess.get_context())
 
-
-        epoch_handling_mode:str = kwargs.get('epoch_handling_mode', 'DropShorterMode')
-        
-        
+        epoch_handling_mode:str = kwargs.pop('epoch_handling_mode', 'DropShorterMode')
+            
         self.active_identifying_session_ctx = active_context
         long_epoch_name, short_epoch_name, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
-        long_session, short_session, global_session = [curr_active_pipeline.filtered_sessions[an_epoch_name] for an_epoch_name in [long_epoch_name, short_epoch_name, global_epoch_name]] # only uses global_session
+        # long_session, short_session, global_session = [curr_active_pipeline.filtered_sessions[an_epoch_name] for an_epoch_name in [long_epoch_name, short_epoch_name, global_epoch_name]] # only uses global_session
 
         long_short_fr_indicies_analysis_results = curr_active_pipeline.global_computation_results.computed_data['long_short_fr_indicies_analysis']
         long_laps, long_replays, short_laps, short_replays, global_laps, global_replays = [long_short_fr_indicies_analysis_results[k] for k in ['long_laps', 'long_replays', 'short_laps', 'short_replays', 'global_laps', 'global_replays']]
 
         ## Manual User-annotation mode:
+        LxC_aclus = kwargs.pop('LxC_aclus', None)
+        SxC_aclus = kwargs.pop('SxC_aclus', None)
+        AnyC_aclus = kwargs.pop('AnyC_aclus', None)
+
+
+        # spikes_df: pd.DataFrame = get_proper_global_spikes_df(curr_active_pipeline) ## this gets too few spikes, should just use the raw spikes maybe
+        # spikes_df: pd.DataFrame = get_proper_global_spikes_df(curr_active_pipeline, minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz)
+        spikes_df: pd.DataFrame = deepcopy(curr_active_pipeline.filtered_sessions[global_epoch_name].spikes_df) #.spikes.sliced_by_neuron_id(any_list_neuron_IDs) # Cut spikes_df down to only the neuron_IDs that appear at least in one decoder:        
+        
+        all_spikes_aclus = deepcopy(spikes_df.spikes.neuron_ids)
+        
+        if AnyC_aclus is None:
+            ## build from the LxC and SxCs
+            # AnyC_aclus = np.array([aclu for aclu in all_spikes_aclus if ((aclu not in self.LxC_aclus) and (aclu not in self.SxC_aclus))]) ## shared only
+            AnyC_aclus = np.array([int(aclu) for aclu in all_spikes_aclus]) # All
+            self.AnyC_aclus = deepcopy(AnyC_aclus) ## here this IS supposed to be just any cell ever, so how can there be cells not in AnyC_aclus that are in LxC/SxCs?
+            
+
+
+        ## Get manual User-annotations:
         annotation_man: UserAnnotationsManager = UserAnnotationsManager()
         session_cell_exclusivity: SessionCellExclusivityRecord = annotation_man.annotations[self.active_identifying_session_ctx].get('session_cell_exclusivity', None)
-        if session_cell_exclusivity is not None:
+        if ((LxC_aclus is None) or (SxC_aclus is None)) and (session_cell_exclusivity is not None):
             print(f'setting LxC_aclus/SxC_aclus from user annotation.')
-            self.LxC_aclus = session_cell_exclusivity.LxC
-            self.SxC_aclus = session_cell_exclusivity.SxC
+            if LxC_aclus is None:
+                LxC_aclus = deepcopy([int(aclu) for aclu in session_cell_exclusivity.LxC if aclu in all_spikes_aclus])
+            if SxC_aclus is None:
+                SxC_aclus = deepcopy([int(aclu) for aclu in session_cell_exclusivity.SxC if aclu in all_spikes_aclus])
+
+            self.LxC_aclus = deepcopy(LxC_aclus)
+            self.SxC_aclus = deepcopy(SxC_aclus)
         else:
             print(f'WARN: no user annotation for session_cell_exclusivity')
-
 
         # Common:
         are_LxC_empty: bool = (self.LxC_aclus is None) or (len(self.LxC_aclus) == 0)
         are_SxC_empty: bool = (self.SxC_aclus is None) or (len(self.SxC_aclus) == 0)
 
+
         # Replays: Uses `global_session.spikes_df`, `long_exclusive.track_exclusive_aclus, `short_exclusive.track_exclusive_aclus`, `long_replays`, `short_replays`
+        use_instantaneous_firing_rate: bool = kwargs.get('use_instantaneous_firing_rate', False)
+        if (self.instantaneous_time_bin_size_seconds >= 5.0):
+            print(f'self.instantaneous_time_bin_size_seconds: {self.instantaneous_time_bin_size_seconds} >= 5.0 so not using instantaneous firing rate')
+            use_instantaneous_firing_rate = False
+            kwargs['use_instantaneous_firing_rate'] = False            
+
+        else:
+            print(f'self.instantaneous_time_bin_size_seconds: {self.instantaneous_time_bin_size_seconds} < 5.0 so using instantaneous firing rate')
+            use_instantaneous_firing_rate = True ## override True
+            kwargs['use_instantaneous_firing_rate'] = True
+            
+            
+        # AnyC: `AnyC.track_exclusive_aclus`
+        # ReplayDeltaMinus: `long_replays`
+        self.AnyC_ReplayDeltaMinus: SpikeRateTrends = SpikeRateTrends.init_from_spikes_and_epochs(spikes_df=deepcopy(spikes_df), filter_epochs=long_replays, included_neuron_ids=self.AnyC_aclus, instantaneous_time_bin_size_seconds=self.instantaneous_time_bin_size_seconds, epoch_handling_mode=epoch_handling_mode, **kwargs)
+        # ReplayDeltaPlus: `short_replays`
+        self.AnyC_ReplayDeltaPlus: SpikeRateTrends = SpikeRateTrends.init_from_spikes_and_epochs(spikes_df=deepcopy(spikes_df), filter_epochs=short_replays, included_neuron_ids=self.AnyC_aclus, instantaneous_time_bin_size_seconds=self.instantaneous_time_bin_size_seconds, epoch_handling_mode=epoch_handling_mode, **kwargs)
+        
         # LxC: `long_exclusive.track_exclusive_aclus`
         # ReplayDeltaMinus: `long_replays`
-        self.LxC_ReplayDeltaMinus: SpikeRateTrends = SpikeRateTrends.init_from_spikes_and_epochs(spikes_df=global_session.spikes_df, filter_epochs=long_replays, included_neuron_ids=self.LxC_aclus, instantaneous_time_bin_size_seconds=self.instantaneous_time_bin_size_seconds, epoch_handling_mode=epoch_handling_mode)
+        self.LxC_ReplayDeltaMinus: SpikeRateTrends = SpikeRateTrends.init_from_spikes_and_epochs(spikes_df=deepcopy(spikes_df), filter_epochs=long_replays, included_neuron_ids=self.LxC_aclus, instantaneous_time_bin_size_seconds=self.instantaneous_time_bin_size_seconds, epoch_handling_mode=epoch_handling_mode, **kwargs)
         # ReplayDeltaPlus: `short_replays`
-        self.LxC_ReplayDeltaPlus: SpikeRateTrends = SpikeRateTrends.init_from_spikes_and_epochs(spikes_df=global_session.spikes_df, filter_epochs=short_replays, included_neuron_ids=self.LxC_aclus, instantaneous_time_bin_size_seconds=self.instantaneous_time_bin_size_seconds, epoch_handling_mode=epoch_handling_mode)
+        self.LxC_ReplayDeltaPlus: SpikeRateTrends = SpikeRateTrends.init_from_spikes_and_epochs(spikes_df=deepcopy(spikes_df), filter_epochs=short_replays, included_neuron_ids=self.LxC_aclus, instantaneous_time_bin_size_seconds=self.instantaneous_time_bin_size_seconds, epoch_handling_mode=epoch_handling_mode, **kwargs)
 
         # SxC: `short_exclusive.track_exclusive_aclus`
         # ReplayDeltaMinus: `long_replays`
-        self.SxC_ReplayDeltaMinus: SpikeRateTrends = SpikeRateTrends.init_from_spikes_and_epochs(spikes_df=global_session.spikes_df, filter_epochs=long_replays, included_neuron_ids=self.SxC_aclus, instantaneous_time_bin_size_seconds=self.instantaneous_time_bin_size_seconds, epoch_handling_mode=epoch_handling_mode)
+        self.SxC_ReplayDeltaMinus: SpikeRateTrends = SpikeRateTrends.init_from_spikes_and_epochs(spikes_df=deepcopy(spikes_df), filter_epochs=long_replays, included_neuron_ids=self.SxC_aclus, instantaneous_time_bin_size_seconds=self.instantaneous_time_bin_size_seconds, epoch_handling_mode=epoch_handling_mode, **kwargs)
         # ReplayDeltaPlus: `short_replays`
-        self.SxC_ReplayDeltaPlus: SpikeRateTrends = SpikeRateTrends.init_from_spikes_and_epochs(spikes_df=global_session.spikes_df, filter_epochs=short_replays, included_neuron_ids=self.SxC_aclus, instantaneous_time_bin_size_seconds=self.instantaneous_time_bin_size_seconds, epoch_handling_mode=epoch_handling_mode)
+        self.SxC_ReplayDeltaPlus: SpikeRateTrends = SpikeRateTrends.init_from_spikes_and_epochs(spikes_df=deepcopy(spikes_df), filter_epochs=short_replays, included_neuron_ids=self.SxC_aclus, instantaneous_time_bin_size_seconds=self.instantaneous_time_bin_size_seconds, epoch_handling_mode=epoch_handling_mode, **kwargs)
 
         # Note that in general LxC and SxC might have differing numbers of cells.
         if (are_LxC_empty or are_SxC_empty):
             # self.Fig2_Replay_FR = None # None mode
             # initialize with an empty array and None values for the mean and std.
-            self.Fig2_Replay_FR: list[SingleBarResult] = []
+            self.Fig2_Replay_FR: List[SingleBarResult] = []
             for v in (self.LxC_ReplayDeltaMinus, self.LxC_ReplayDeltaPlus, self.SxC_ReplayDeltaMinus, self.SxC_ReplayDeltaPlus):
                 if v is not None:
                     self.Fig2_Replay_FR.append(SingleBarResult(v.cell_agg_inst_fr_list.mean(), v.cell_agg_inst_fr_list.std(), v.cell_agg_inst_fr_list, self.LxC_aclus, self.SxC_aclus, None, None))
@@ -3100,22 +3306,28 @@ class InstantaneousSpikeRateGroupsComputation(HDF_SerializationMixin, AttrsBased
         
 
         # Laps/Theta: Uses `global_session.spikes_df`, `long_exclusive.track_exclusive_aclus, `short_exclusive.track_exclusive_aclus`, `long_laps`, `short_laps`
+        # AnyC: `AnyC.track_exclusive_aclus`
+        # ThetaDeltaMinus: `long_laps`
+        self.AnyC_ThetaDeltaMinus: SpikeRateTrends = SpikeRateTrends.init_from_spikes_and_epochs(spikes_df=deepcopy(spikes_df), filter_epochs=long_laps, included_neuron_ids=self.AnyC_aclus, instantaneous_time_bin_size_seconds=self.instantaneous_time_bin_size_seconds, epoch_handling_mode=epoch_handling_mode, **kwargs)
+        # ThetaDeltaPlus: `short_laps`
+        self.AnyC_ThetaDeltaPlus: SpikeRateTrends = SpikeRateTrends.init_from_spikes_and_epochs(spikes_df=deepcopy(spikes_df), filter_epochs=short_laps, included_neuron_ids=self.AnyC_aclus, instantaneous_time_bin_size_seconds=self.instantaneous_time_bin_size_seconds, epoch_handling_mode=epoch_handling_mode, **kwargs)
+
         # LxC: `long_exclusive.track_exclusive_aclus`
         # ThetaDeltaMinus: `long_laps`
-        self.LxC_ThetaDeltaMinus: SpikeRateTrends = SpikeRateTrends.init_from_spikes_and_epochs(spikes_df=global_session.spikes_df, filter_epochs=long_laps, included_neuron_ids=self.LxC_aclus, instantaneous_time_bin_size_seconds=self.instantaneous_time_bin_size_seconds, epoch_handling_mode=epoch_handling_mode)
+        self.LxC_ThetaDeltaMinus: SpikeRateTrends = SpikeRateTrends.init_from_spikes_and_epochs(spikes_df=deepcopy(spikes_df), filter_epochs=long_laps, included_neuron_ids=self.LxC_aclus, instantaneous_time_bin_size_seconds=self.instantaneous_time_bin_size_seconds, epoch_handling_mode=epoch_handling_mode, **kwargs)
         # ThetaDeltaPlus: `short_laps`
-        self.LxC_ThetaDeltaPlus: SpikeRateTrends = SpikeRateTrends.init_from_spikes_and_epochs(spikes_df=global_session.spikes_df, filter_epochs=short_laps, included_neuron_ids=self.LxC_aclus, instantaneous_time_bin_size_seconds=self.instantaneous_time_bin_size_seconds, epoch_handling_mode=epoch_handling_mode)
+        self.LxC_ThetaDeltaPlus: SpikeRateTrends = SpikeRateTrends.init_from_spikes_and_epochs(spikes_df=deepcopy(spikes_df), filter_epochs=short_laps, included_neuron_ids=self.LxC_aclus, instantaneous_time_bin_size_seconds=self.instantaneous_time_bin_size_seconds, epoch_handling_mode=epoch_handling_mode, **kwargs)
 
         # SxC: `short_exclusive.track_exclusive_aclus`
         # ThetaDeltaMinus: `long_laps`
-        self.SxC_ThetaDeltaMinus: SpikeRateTrends = SpikeRateTrends.init_from_spikes_and_epochs(spikes_df=global_session.spikes_df, filter_epochs=long_laps, included_neuron_ids=self.SxC_aclus, instantaneous_time_bin_size_seconds=self.instantaneous_time_bin_size_seconds, epoch_handling_mode=epoch_handling_mode)
+        self.SxC_ThetaDeltaMinus: SpikeRateTrends = SpikeRateTrends.init_from_spikes_and_epochs(spikes_df=deepcopy(spikes_df), filter_epochs=long_laps, included_neuron_ids=self.SxC_aclus, instantaneous_time_bin_size_seconds=self.instantaneous_time_bin_size_seconds, epoch_handling_mode=epoch_handling_mode, **kwargs)
         # ThetaDeltaPlus: `short_laps`
-        self.SxC_ThetaDeltaPlus: SpikeRateTrends = SpikeRateTrends.init_from_spikes_and_epochs(spikes_df=global_session.spikes_df, filter_epochs=short_laps, included_neuron_ids=self.SxC_aclus, instantaneous_time_bin_size_seconds=self.instantaneous_time_bin_size_seconds, epoch_handling_mode=epoch_handling_mode)
+        self.SxC_ThetaDeltaPlus: SpikeRateTrends = SpikeRateTrends.init_from_spikes_and_epochs(spikes_df=deepcopy(spikes_df), filter_epochs=short_laps, included_neuron_ids=self.SxC_aclus, instantaneous_time_bin_size_seconds=self.instantaneous_time_bin_size_seconds, epoch_handling_mode=epoch_handling_mode, **kwargs)
 
         # Note that in general LxC and SxC might have differing numbers of cells.
         if are_LxC_empty or are_SxC_empty:
             # self.Fig2_Laps_FR = None # NONE mode
-            self.Fig2_Laps_FR: list[SingleBarResult] = []
+            self.Fig2_Laps_FR: List[SingleBarResult] = []
             for v in (self.LxC_ThetaDeltaMinus, self.LxC_ThetaDeltaPlus, self.SxC_ThetaDeltaMinus, self.SxC_ThetaDeltaPlus):
                 if v is not None:
                     self.Fig2_Laps_FR.append(SingleBarResult(v.cell_agg_inst_fr_list.mean(), v.cell_agg_inst_fr_list.std(), v.cell_agg_inst_fr_list, self.LxC_aclus, self.SxC_aclus, None, None))
@@ -3125,24 +3337,581 @@ class InstantaneousSpikeRateGroupsComputation(HDF_SerializationMixin, AttrsBased
         else:
             # Note that in general LxC and SxC might have differing numbers of cells.
             self.Fig2_Laps_FR: list[SingleBarResult] = [SingleBarResult(v.cell_agg_inst_fr_list.mean(), v.cell_agg_inst_fr_list.std(), v.cell_agg_inst_fr_list, self.LxC_aclus, self.SxC_aclus, None, None) for v in (self.LxC_ThetaDeltaMinus, self.LxC_ThetaDeltaPlus, self.SxC_ThetaDeltaMinus, self.SxC_ThetaDeltaPlus)]
+
+
+
+        # ==================================================================================================================================================================================================================================================================================== #
+        # Compute the participation stats but they are only needed for the `AnyC_*` result groups because that is sufficient to provide it for the dataframe                                                                                                                                   #
+        # ==================================================================================================================================================================================================================================================================================== #
+        ### Specifically updates these results by calling `a_pre_post_period_result.compute_participation_stats(..., should_update_self=True)` (which updates the `SpikeRateTrends` result in place)
+                
+        ## add session info
+        # if self.active_identifying_session_ctx is not None:
+            ## Add the extended neuron identifiers (like the global neuron_uid, session_uid) columns
+            # df_combined = df_combined.neuron_identity.make_neuron_indexed_df_global(self.active_identifying_session_ctx, add_expanded_session_context_keys=True, add_extended_aclu_identity_columns=True)
         
-    def get_summary_dataframe(self) -> pd.DataFrame:
+        # a_sess_pre_post_delta_result_list = (self.AnyC_ThetaDeltaMinus, self.AnyC_ThetaDeltaPlus, self.AnyC_ReplayDeltaMinus, self.AnyC_ReplayDeltaPlus)
+        # a_sess_pre_post_delta_result_dict = dict(zip(['ThetaDeltaMinus', 'ThetaDeltaPlus', 'ReplayDeltaMinus', 'ReplayDeltaPlus'], a_sess_pre_post_delta_result_list))
+        # # for a_pre_post_period_result in a_sess_pre_post_delta_result_list:
+        # for a_period_name, a_pre_post_period_result in a_sess_pre_post_delta_result_dict.items():
+        #     a_result_col_name: str = 'n_participating_epochs'
+        #     n_participating_epochs_dict, n_participating_epochs, has_epoch_participation, per_aclu_additional_properties_dict = a_pre_post_period_result.compute_participation_stats(a_session_ctxt=self.active_identifying_session_ctx, should_update_self=True)
+        #     # df_combined['lap_delta_minus', 'lap_delta_plus', 'replay_delta_minus', 'replay_delta_plus'
+        #     assert len(a_pre_post_period_result.included_neuron_ids) == len(n_participating_epochs), f"len(a_pre_post_period_result.included_neuron_ids): {len(a_pre_post_period_result.included_neuron_ids)} != len(n_participating_epochs): {len(n_participating_epochs)}"
+        #     # assert len(df_combined) == len(n_participating_epochs), f"len(df_combined): {len(df_combined)} != len(n_participating_epochs): {len(n_participating_epochs)}"
+        #     # df_combined[f"{a_period_name}_{a_result_col_name}"] = deepcopy(n_participating_epochs) ## add this column to the dataframe
+
+
+
+    def get_summary_dataframe(self, should_add_participation: bool=False) -> pd.DataFrame:
         """ Returns a summary datatable for each neuron with one entry for each cell in (self.LxC_aclus + self.SxC_aclus)
 
+        Additional Columns:
+            ['ThetaDeltaMinus_n_participating_epochs', 'ThetaDeltaPlus_n_participating_epochs', 'ReplayDeltaMinus_n_participating_epochs', 'ReplayDeltaPlus_n_participating_epochs']
         """
         table_columns = ['aclu', 'lap_delta_minus', 'lap_delta_plus', 'replay_delta_minus', 'replay_delta_plus', 'active_set_membership']
-        n_LxC_aclus: int = len(self.LxC_aclus)
-        v_LxC_aclus = [list(self.LxC_aclus)] + [v.cell_agg_inst_fr_list for v in (self.LxC_ThetaDeltaMinus, self.LxC_ThetaDeltaPlus, self.LxC_ReplayDeltaMinus, self.LxC_ReplayDeltaPlus)] + [(['LxC'] * n_LxC_aclus)]
+        
+        n_LxC_aclus: int = len(self.LxC_aclus)        
+        v_LxC_aclus = [list(self.LxC_aclus)] + [v.cell_agg_inst_fr_list for v in (self.LxC_ThetaDeltaMinus, self.LxC_ThetaDeltaPlus, self.LxC_ReplayDeltaMinus, self.LxC_ReplayDeltaPlus) if v is not None] + [(['LxC'] * n_LxC_aclus)]
         df_LxC_aclus = pd.DataFrame(dict(zip(table_columns, v_LxC_aclus)))
-
+        df_LxC_aclus['aclu'] = df_LxC_aclus['aclu'].astype(int)
+        
         n_SxC_aclus: int = len(self.SxC_aclus)
-        v_SxC_aclus = [list(self.SxC_aclus)] + [v.cell_agg_inst_fr_list for v in (self.SxC_ThetaDeltaMinus, self.SxC_ThetaDeltaPlus, self.SxC_ReplayDeltaMinus, self.SxC_ReplayDeltaPlus)] + [(['SxC'] * n_SxC_aclus)]
+        v_SxC_aclus = [list(self.SxC_aclus)] + [v.cell_agg_inst_fr_list for v in (self.SxC_ThetaDeltaMinus, self.SxC_ThetaDeltaPlus, self.SxC_ReplayDeltaMinus, self.SxC_ReplayDeltaPlus) if v is not None] + [(['SxC'] * n_SxC_aclus)]
         df_SxC_aclus = pd.DataFrame(dict(zip(table_columns, v_SxC_aclus)))
+        df_SxC_aclus['aclu'] = df_SxC_aclus['aclu'].astype(int)
+        
+        n_AnyC_aclus: int = len(self.AnyC_aclus)
+        v_AnyC_aclus = [list(self.AnyC_aclus)] + [v.cell_agg_inst_fr_list for v in (self.AnyC_ThetaDeltaMinus, self.AnyC_ThetaDeltaPlus, self.AnyC_ReplayDeltaMinus, self.AnyC_ReplayDeltaPlus) if v is not None] + [(['AnyC'] * n_AnyC_aclus)]
+        df_AnyC_aclus = pd.DataFrame(dict(zip(table_columns, v_AnyC_aclus)))
+        df_AnyC_aclus['aclu'] = df_AnyC_aclus['aclu'].astype(int)        
+        ## Drop any that are present in the LxC/SxC df:
+        df_AnyC_aclus = df_AnyC_aclus.loc[~df_AnyC_aclus['aclu'].isin(self.SxC_aclus)]
+        df_AnyC_aclus = df_AnyC_aclus.loc[~df_AnyC_aclus['aclu'].isin(self.LxC_aclus)]
 
+        #TODO 2025-08-07 13:58: - [ ] Surprisingly these sets ARE already disjoint (mostly?!?), meaning AnyC_aclus doesn't include LxC_aclus or SxC_aclus
+        ## aclu=58 is present in both AnyC_aclus and SxC_aclus, while [4, 13, 23] are exclusive to SxC_aclus
+        LxC_aclus = set(self.LxC_aclus)
+        SxC_aclus = set(self.SxC_aclus)
+        AnyC_aclus = set(self.AnyC_aclus)
+
+        # LxC_aclus, SxC_aclus, AnyC_aclus
+        ALL_aclus = AnyC_aclus.union(LxC_aclus).union(SxC_aclus)
+        
         # Concatenate the two dataframes
-        df_combined = pd.concat([df_LxC_aclus, df_SxC_aclus], ignore_index=True)
-        df_combined['inst_time_bin_seconds'] = float(self.instantaneous_time_bin_size_seconds)
+        df_combined = pd.concat([df_LxC_aclus, df_SxC_aclus, df_AnyC_aclus], ignore_index=True)
+        df_combined['aclu'] = df_combined['aclu'].astype(int)
+        n_final_aclus: int = len(df_combined)
+        ## Drop duplicates, keeping the first (corresponding to the SxC/LxC over the AnyC, although all the values are the same so only the 'active_set_membership' column would need to be changed): 
+        df_combined = df_combined.drop_duplicates(subset=['aclu'], keep='first', inplace=False)
+        assert n_final_aclus == len(df_combined), f"drop should do nothing after removing common aclus before: len(df_combined): {len(df_combined)}, n_final_aclus: {n_final_aclus}"
+        ## Sort ascending by aclu
+        df_combined = df_combined.sort_values(by='aclu', ascending=True).reset_index(drop=True)
+
+        ## Add extra columns:
+        df_combined['inst_time_bin_seconds'] = float(self.instantaneous_time_bin_size_seconds)        
+        ## add session info
+        if self.active_identifying_session_ctx is not None:
+            ## Add the extended neuron identifiers (like the global neuron_uid, session_uid) columns
+            df_combined = df_combined.neuron_identity.make_neuron_indexed_df_global(self.active_identifying_session_ctx, add_expanded_session_context_keys=True, add_extended_aclu_identity_columns=True)
+        
+
+        # assert len(df_combined) == n_AnyC_aclus, f"len(df_combined): {len(df_combined)} != n_AnyC_aclus: {n_AnyC_aclus}"
+        if len(df_combined) != n_AnyC_aclus:
+            print(f'WARN: len(df_combined): {len(df_combined)} != n_AnyC_aclus: {n_AnyC_aclus}')
+            
+        included_neuron_ids = np.unique(df_combined['aclu'].to_numpy())
+        assert len(df_combined) == len(included_neuron_ids), f"len(df_combined): {len(df_combined)} != len(included_neuron_ids): {len(included_neuron_ids)}"
+        assert len(df_combined) == len(ALL_aclus), f"len(df_combined): {len(df_combined)} != len(ALL_aclus): {len(ALL_aclus)}"
+
+        # ==================================================================================================================================================================================================================================================================================== #
+        # Compute `n_participating_epochs` and add to the returned dataframe as needed.                                                                                                                                                                                                        #
+        # ==================================================================================================================================================================================================================================================================================== #
+        if should_add_participation:
+            # Adds columns ['ThetaDeltaMinus_n_participating_epochs', 'ThetaDeltaPlus_n_participating_epochs', 'ReplayDeltaMinus_n_participating_epochs', 'ReplayDeltaPlus_n_participating_epochs']
+
+            # a_sess_pre_post_delta_result_list = (self.AnyC_ThetaDeltaMinus, self.AnyC_ThetaDeltaPlus, self.AnyC_ReplayDeltaMinus, self.AnyC_ReplayDeltaPlus,
+            #                                      self.LxC_ThetaDeltaMinus, self.LxC_ThetaDeltaPlus, self.LxC_ReplayDeltaMinus, self.LxC_ReplayDeltaPlus,
+            #                                      self.SxC_ThetaDeltaMinus, self.SxC_ThetaDeltaPlus, self.SxC_ReplayDeltaMinus, self.SxC_ReplayDeltaPlus)
+            
+            a_sess_pre_post_delta_result_list = (self.AnyC_ThetaDeltaMinus, self.AnyC_ThetaDeltaPlus, self.AnyC_ReplayDeltaMinus, self.AnyC_ReplayDeltaPlus)
+            a_sess_pre_post_delta_result_dict = dict(zip(['ThetaDeltaMinus', 'ThetaDeltaPlus', 'ReplayDeltaMinus', 'ReplayDeltaPlus'], a_sess_pre_post_delta_result_list))
+            # for a_pre_post_period_result in a_sess_pre_post_delta_result_list:
+            for a_period_name, a_pre_post_period_result in a_sess_pre_post_delta_result_dict.items():
+                a_result_col_name: str = 'n_participating_epochs'
+                n_participating_epochs_dict, n_participating_epochs, has_epoch_participation, per_aclu_additional_properties_dict, skip_column_names = a_pre_post_period_result.compute_participation_stats(a_session_ctxt=self.active_identifying_session_ctx, should_update_self=False,
+                                                                                                                                                                                        included_neuron_ids=included_neuron_ids,
+                                                                                                                                                                                        )
+                # df_combined['lap_delta_minus', 'lap_delta_plus', 'replay_delta_minus', 'replay_delta_plus'
+                # assert len(a_pre_post_period_result.included_neuron_ids) == len(n_participating_epochs), f"len(a_pre_post_period_result.included_neuron_ids): {len(a_pre_post_period_result.included_neuron_ids)} != len(n_participating_epochs): {len(n_participating_epochs)}"
+                assert len(df_combined) == len(n_participating_epochs), f"len(df_combined): {len(df_combined)} != len(n_participating_epochs): {len(n_participating_epochs)}" ## Why would this ever be true? df_combined is about cells
+                df_combined[f"{a_period_name}_{a_result_col_name}"] = deepcopy(n_participating_epochs) ## add this column to the dataframe
+
+                for k, v in per_aclu_additional_properties_dict.items():
+                    if k not in skip_column_names:
+                        try:
+                            if isinstance(v, (NDArray, np.array)) and (len(v) == len(included_neuron_ids)):
+                                df_combined[f"{a_period_name}_{k}"] = deepcopy(v)
+                            else:
+                                pass
+                        except (TypeError, ValueError) as e:
+                            print(f'failed to add optional member per_aclu_additional_properties_dict[{k}] to df. Skipping.')
+                            pass 
+                        except Exception as e:
+                            raise e
+        ## END if should_add_participation...
+                    
         return df_combined
+
+
+    @function_attributes(short_name=None, tags=['UNFINISHED', 'export', 'CSV', 'FAT', 'FAT_df'], input_requires=[], output_provides=[], uses=['.get_comprehensive_dataframe'], used_by=[], creation_date='2025-07-17 16:43', related_items=[])
+    def export_as_FAT_df_CSV(self, active_export_parent_output_path: Path, owning_pipeline_reference, decoding_time_bin_size: float):
+        """  export as a single_FAT .csv file
+        active_export_parent_output_path = self.collected_outputs_path.resolve()
+        Assert.path_exists(parent_output_path)
+        csv_save_paths_dict = a_new_fully_generic_result.export_as_FAT_df_CSV(active_export_parent_output_path=active_export_parent_output_path, owning_pipeline_reference=owning_pipeline_reference, decoding_time_bin_size=decoding_time_bin_size)
+        csv_save_paths_dict
+        
+        History:
+            Extracted from `pyphoplacecellanalysis.Analysis.Decoder.context_dependent.GenericDecoderDictDecodedEpochsDictResult`
+                                `._perform_export_dfs_dict_to_csvs`
+                                `.export_csvs`
+                                `.default_export_all_CSVs`
+            
+
+        """ 
+        from pyphocorehelpers.assertion_helpers import Assert
+        from neuropy.core.epoch import EpochsAccessor, Epoch, ensure_dataframe, ensure_Epoch, TimeColumnAliasesProtocol
+        from pyphocorehelpers.print_helpers import get_now_rounded_time_str
+        from pyphoplacecellanalysis.SpecificResults.AcrossSessionResults import SingleFatDataframe
+
+
+        print(f'WARN: NOT YET IMPLEMENTED 2025-07-17 16:56!!!!!!!!!!!!!!')
+        
+        ## Unpack from pipeline:
+        ## Export to CSVs:
+        result_identifier_str: str = f'FAT_inst_frs'
+
+        Assert.path_exists(active_export_parent_output_path)
+
+        ## INPUTS: collected_outputs_path
+        # decoding_time_bin_size: float = epochs_decoding_time_bin_size
+
+        complete_session_context, (session_context, additional_session_context) = owning_pipeline_reference.get_complete_session_context()
+        active_context = complete_session_context
+        session_name: str = owning_pipeline_reference.session_name
+        earliest_delta_aligned_t_start, t_delta, latest_delta_aligned_t_end = owning_pipeline_reference.find_LongShortDelta_times()
+
+        ## Build the function that uses owning_pipeline_reference to build the correct filename and actually output the .csv to the right place
+        def _subfn_custom_export_df_to_csv(export_df: pd.DataFrame, data_identifier_str: str = f'({result_identifier_str})', parent_output_path: Path=None):
+            """ captures `owning_pipeline_reference`
+            """
+            output_date_str: str = get_now_rounded_time_str(rounded_minutes=10)
+            out_path, out_filename, out_basename = owning_pipeline_reference.build_complete_session_identifier_filename_string(output_date_str=output_date_str, data_identifier_str=data_identifier_str, parent_output_path=parent_output_path, out_extension='.csv')
+            export_df.to_csv(out_path)
+            return out_path 
+
+        custom_export_df_to_csv_fn = _subfn_custom_export_df_to_csv
+
+
+        def _subfn_pre_process_and_export_df(export_df: pd.DataFrame, a_df_identifier: Union[str, IdentifyingContext]):
+            """ sets up all the important metadata and then calls `custom_export_df_to_csv_fn(....)` to actually export the CSV
+            
+            captures: decoding_time_bin_size, t_start, t_delta, t_end, tbin_values_dict, time_col_name_dict, user_annotation_selections, valid_epochs_selections, custom_export_df_to_csv_fn
+            """
+            a_tbin_size: float = float(decoding_time_bin_size)
+            ## Add t_bin column method
+            export_df = export_df.across_session_identity.add_session_df_columns(session_name=session_name, time_bin_size=a_tbin_size) ## #TODO 2025-04-05 18:12: - [ ] what about qclu? FrHz?
+            a_tbin_size_str: str = f"{round(a_tbin_size, ndigits=5)}"
+            a_data_identifier_str: str = f'({a_df_identifier})_tbin-{a_tbin_size_str}' ## build the identifier '(laps_weighted_corr_merged_df)_tbin-1.5'
+            
+            return custom_export_df_to_csv_fn(export_df, data_identifier_str=a_data_identifier_str, parent_output_path=active_export_parent_output_path) # this is exporting corr '(ripple_WCorrShuffle_df)_tbin-0.025'
+        
+
+        # ================================================================================================================================================================================ #
+        # BEGIN FUNCTION BODY                                                                                                                                                              #
+        # ================================================================================================================================================================================ #
+        
+        # tbin_values_dict={'laps': decoding_time_bin_size, 'pbe': decoding_time_bin_size, 'non_pbe': decoding_time_bin_size, 'FAT': decoding_time_bin_size}
+
+        # csv_save_paths_dict = GenericDecoderDictDecodedEpochsDictResult._perform_export_dfs_dict_to_csvs(extracted_dfs_dict=a_new_fully_generic_result.filter_epochs_decoded_track_marginal_posterior_df_dict,
+        # csv_save_paths_dict = self.export_csvs(parent_output_path=active_export_parent_output_path.resolve(),
+        #                                             active_context=active_context, session_name=session_name, #curr_active_pipeline=owning_pipeline_reference,
+        #                                             custom_export_df_to_csv_fn=custom_export_df_to_csv_fn,
+        #                                             decoding_time_bin_size=decoding_time_bin_size,
+        #                                             curr_session_t_delta=t_delta
+        #                                             )
+        
+        csv_save_paths_dict = {}
+        df: pd.DataFrame = self.get_comprehensive_dataframe() ## actually convert to a DF
+        single_FAT_df: pd.DataFrame = SingleFatDataframe.build_fat_df(dfs_dict={result_identifier_str:df}, additional_common_context=active_context)
+        csv_save_paths_dict[result_identifier_str] =  _subfn_pre_process_and_export_df(export_df=single_FAT_df, a_df_identifier="FAT")
+    
+
+        # across_session_results_extended_dict['generalized_decode_epochs_dict_and_export_results_completion_function']['csv_save_paths_dict'] = deepcopy(csv_save_paths_dict)
+        print(f'csv_save_paths_dict: {csv_save_paths_dict}\n')
+        return csv_save_paths_dict
+
+
+
+    # ==================================================================================================================================================================================================================================================================================== #
+    # `get_comprehensive_dataframe(...)` Private Helpers                                                                                                                                                                                                                                   #
+    # ==================================================================================================================================================================================================================================================================================== #
+
+    @function_attributes(short_name=None, tags=['MAIN', 'to_df', 'FAT', 'FAT_df', 'equiv', 'UNVALIDATED'], input_requires=[], output_provides=[], uses=[], used_by=['.export_as_FAT_df_CSV'], creation_date='2025-01-17 15:30', related_items=['cls.from_comprehensive_dataframe'])
+    def get_comprehensive_dataframe(self) -> pd.DataFrame:
+        """ Creates a comprehensive DataFrame with ALL InstantaneousSpikeRateGroupsComputation data.
+        Each row represents one cell with all conditions as columns.
+
+        INVERSE OF: `cls.from_comprehensive_dataframe`
+
+        Returns:
+            pd.DataFrame: Comprehensive DataFrame with all computation data
+
+        Usage:
+
+            from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.LongShortTrackComputations import InstantaneousSpikeRateGroupsComputation
+
+            # Example usage of the complete round-trip functionality:
+
+            # 1. Create and compute the original object
+            inst_fr_comp = InstantaneousSpikeRateGroupsComputation(instantaneous_time_bin_size_seconds=0.01)
+            inst_fr_comp.compute(curr_active_pipeline=curr_active_pipeline)
+
+            # 2. Get comprehensive DataFrame
+            comprehensive_df: pd.DataFrame = inst_fr_comp.get_comprehensive_dataframe()
+            print(f"DataFrame shape: {comprehensive_df.shape}")
+            print(f"Columns: {comprehensive_df.columns.tolist()}")
+            comprehensive_df
+
+        """
+        # Handle empty case
+        if ((self.LxC_aclus is None or len(self.LxC_aclus) == 0) and (self.SxC_aclus is None or len(self.SxC_aclus) == 0) and (self.AnyC_aclus is None or len(self.AnyC_aclus) == 0)):
+            base_columns = ['aclu', 'cell_type', 'cell_index_in_type', 'instantaneous_time_bin_size_seconds']
+            fr_columns = ['replay_delta_minus_firing_rate', 'replay_delta_plus_firing_rate', 
+                        'theta_delta_minus_firing_rate', 'theta_delta_plus_firing_rate']
+            pop_stat_columns = []
+            for condition in ['replay_delta_minus', 'replay_delta_plus', 'theta_delta_minus', 'theta_delta_plus']:
+                pop_stat_columns.extend([f'{condition}_pop_mean', f'{condition}_pop_std', f'{condition}_pop_n_cells'])
+            summary_columns = []
+            for condition in ['LxC_ReplayDeltaMinus', 'LxC_ReplayDeltaPlus', 'SxC_ReplayDeltaMinus', 'SxC_ReplayDeltaPlus',
+                            'LxC_ThetaDeltaMinus', 'LxC_ThetaDeltaPlus', 'SxC_ThetaDeltaMinus', 'SxC_ThetaDeltaPlus']:
+                summary_columns.extend([f'{condition}_summary_mean', f'{condition}_summary_std'])
+            return pd.DataFrame(columns=base_columns + fr_columns + pop_stat_columns + summary_columns)
+
+        records = []
+
+        # Session-level metadata (same for all rows)
+        session_metadata = {'instantaneous_time_bin_size_seconds': self.instantaneous_time_bin_size_seconds}
+        if self.active_identifying_session_ctx is not None:
+            session_ctx_dict = self.active_identifying_session_ctx.to_dict()
+            session_metadata.update({f'session_{k}': v for k, v in session_ctx_dict.items()})
+
+        # Process each cell type
+        for cell_type, aclus in [('LxC', self.LxC_aclus), ('SxC', self.SxC_aclus), ('AnyC', self.AnyC_aclus)]:
+            if aclus is None or len(aclus) == 0:
+                continue
+
+            # Get the relevant SpikeRateTrends objects for this cell type
+            spike_trends = {
+                'replay_delta_minus': getattr(self, f'{cell_type}_ReplayDeltaMinus', None),
+                'replay_delta_plus': getattr(self, f'{cell_type}_ReplayDeltaPlus', None),
+                'theta_delta_minus': getattr(self, f'{cell_type}_ThetaDeltaMinus', None),
+                'theta_delta_plus': getattr(self, f'{cell_type}_ThetaDeltaPlus', None),
+            }
+
+            # Extract population-level metadata once per cell type
+            pop_metadata = {}
+            for condition, trend_obj in spike_trends.items():
+                if trend_obj is not None:
+                    # Extract common attributes
+                    for attr in ['n_epochs', 'total_duration', 'mean_epoch_duration', 'n_cells']:
+                        if hasattr(trend_obj, attr):
+                            pop_metadata[f'{condition}_{attr}'] = getattr(trend_obj, attr)
+
+                    # Add population statistics
+                    if hasattr(trend_obj, 'cell_agg_inst_fr_list'):
+                        fr_list = trend_obj.cell_agg_inst_fr_list
+                        if len(fr_list) > 0:
+                            pop_metadata[f'{condition}_pop_mean'] = np.mean(fr_list)
+                            pop_metadata[f'{condition}_pop_std'] = np.std(fr_list)
+                            pop_metadata[f'{condition}_pop_n_cells'] = len(fr_list)
+                        else:
+                            pop_metadata[f'{condition}_pop_mean'] = np.nan
+                            pop_metadata[f'{condition}_pop_std'] = np.nan
+                            pop_metadata[f'{condition}_pop_n_cells'] = 0
+            ## END for condition, trend_obj in spike_trends.items()
+            
+
+            # Process each cell
+            for i, aclu in enumerate(aclus):
+                record = {
+                    'aclu': aclu,
+                    'cell_type': cell_type,
+                    'cell_index_in_type': i,
+                    **session_metadata,
+                    **pop_metadata  # Add population metadata to each row
+                }
+
+                # Add individual cell firing rates
+                for condition, spike_trend in spike_trends.items():
+                    if spike_trend is not None and hasattr(spike_trend, 'cell_agg_inst_fr_list'):
+                        if i < len(spike_trend.cell_agg_inst_fr_list):
+                            record[f'{condition}_firing_rate'] = spike_trend.cell_agg_inst_fr_list[i]
+                        else:
+                            record[f'{condition}_firing_rate'] = np.nan
+                    else:
+                        record[f'{condition}_firing_rate'] = np.nan
+                ## END for condition, spike_trend in spike_trends.items()...
+                records.append(record)
+            ## END for i, aclu in enumerate(aclus)...
+        ## END for cell_type, aclus in [('LxC', self.LxC_aclus), ('SxC', self.SxC_aclus), ('AnyC', self.AnyC_aclus)]...
+          
+        # Create DataFrame
+        df = pd.DataFrame(records)
+
+        # df = df.drop_duplicates(subset=['aclu'], keep='last', ignore_index=True, inplace=False) ## drop any duplicate aclus, keep the last (AnyC version)
+        df = df.drop_duplicates(subset=['aclu'], keep='first', ignore_index=True, inplace=False) ## keep the first now, so they are still found in LxC and SxCs
+
+        # Add Fig2 summary statistics
+        # Fig2_Replay_FR: [LxC_ReplayDeltaMinus, LxC_ReplayDeltaPlus, SxC_ReplayDeltaMinus, SxC_ReplayDeltaPlus]
+        replay_conditions = ['LxC_ReplayDeltaMinus', 'LxC_ReplayDeltaPlus', 'SxC_ReplayDeltaMinus', 'SxC_ReplayDeltaPlus']
+        if hasattr(self, 'Fig2_Replay_FR') and self.Fig2_Replay_FR and len(self.Fig2_Replay_FR) == 4:
+            for condition, result in zip(replay_conditions, self.Fig2_Replay_FR):
+                cell_type = 'LxC' if condition.startswith('LxC') else 'SxC'
+                mask = df['cell_type'] == cell_type
+                df.loc[mask, f'{condition}_summary_mean'] = result.mean if result.mean is not None else np.nan
+                df.loc[mask, f'{condition}_summary_std'] = result.std if result.std is not None else np.nan
+
+                # Add scatter properties if they exist
+                for scatter_type, scatter_props in [('LxC_scatter', result.LxC_scatter_props), ('SxC_scatter', result.SxC_scatter_props)]:
+                    if scatter_props is not None:
+                        for key, value in scatter_props.items():
+                            column_name = f'{condition}_{scatter_type}_{key}'
+                            if isinstance(value, np.ndarray):
+                                if len(value) == mask.sum():
+                                    df.loc[mask, column_name] = value
+                                else:
+                                    df.loc[mask, column_name] = str(value)
+                            else:
+                                df.loc[mask, column_name] = value
+
+        # Fig2_Laps_FR: [LxC_ThetaDeltaMinus, LxC_ThetaDeltaPlus, SxC_ThetaDeltaMinus, SxC_ThetaDeltaPlus]
+        laps_conditions = ['LxC_ThetaDeltaMinus', 'LxC_ThetaDeltaPlus', 'SxC_ThetaDeltaMinus', 'SxC_ThetaDeltaPlus']
+        if hasattr(self, 'Fig2_Laps_FR') and self.Fig2_Laps_FR and len(self.Fig2_Laps_FR) == 4:
+            for condition, result in zip(laps_conditions, self.Fig2_Laps_FR):
+                cell_type = 'LxC' if condition.startswith('LxC') else 'SxC'
+                mask = df['cell_type'] == cell_type
+                df.loc[mask, f'{condition}_summary_mean'] = result.mean if result.mean is not None else np.nan
+                df.loc[mask, f'{condition}_summary_std'] = result.std if result.std is not None else np.nan
+
+                # Add scatter properties if they exist
+                for scatter_type, scatter_props in [('LxC_scatter', result.LxC_scatter_props), ('SxC_scatter', result.SxC_scatter_props)]:
+                    if scatter_props is not None:
+                        for key, value in scatter_props.items():
+                            column_name = f'{condition}_{scatter_type}_{key}'
+                            if isinstance(value, np.ndarray):
+                                if len(value) == mask.sum():
+                                    df.loc[mask, column_name] = value
+                                else:
+                                    df.loc[mask, column_name] = str(value)
+                            else:
+                                df.loc[mask, column_name] = value
+
+        # Add extended neuron identity columns if session context exists
+        if self.active_identifying_session_ctx is not None:
+            df = df.neuron_identity.make_neuron_indexed_df_global(
+                self.active_identifying_session_ctx, 
+                add_expanded_session_context_keys=True, 
+                add_extended_aclu_identity_columns=True
+            )
+
+        return df
+
+    # ==================================================================================================================================================================================================================================================================================== #
+    # From comprehensive dataframe                                                                                                                                                                                                                                                         #
+    # ==================================================================================================================================================================================================================================================================================== #
+    @function_attributes(short_name=None, tags=['FAT_df', 'df', 'UNVALIDATED'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-07-17 16:57', related_items=['cls.get_comprehensive_dataframe'])
+    @classmethod
+    def from_comprehensive_dataframe(cls, df: pd.DataFrame) -> "InstantaneousSpikeRateGroupsComputation":
+        """ Reconstruct InstantaneousSpikeRateGroupsComputation from comprehensive DataFrame.
+        INVERSE OF: `cls.get_comprehensive_dataframe`
+        Args:
+            df: DataFrame created by get_comprehensive_dataframe()
+
+        Returns:
+            Reconstructed InstantaneousSpikeRateGroupsComputation instance
+
+        Usage:
+            from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.LongShortTrackComputations import InstantaneousSpikeRateGroupsComputation
+
+            # 8. Direct reconstruction from DataFrame
+            df = inst_fr_comp.get_comprehensive_dataframe()
+            reconstructed_comp2 = InstantaneousSpikeRateGroupsComputation.from_comprehensive_dataframe(df)
+
+            # 9. Compare original and reconstructed objects
+            print(f"LxC aclus match: {np.array_equal(inst_fr_comp.LxC_aclus, reconstructed_comp2.LxC_aclus)}")
+            print(f"SxC aclus match: {np.array_equal(inst_fr_comp.SxC_aclus, reconstructed_comp2.SxC_aclus)}")
+
+
+        """
+        from neuropy.utils.mixins.time_slicing import TimeColumnAliasesProtocol
+
+        if df.empty:
+            return cls(instantaneous_time_bin_size_seconds=0.01)
+
+        # Handle column name synonyms
+        df = TimeColumnAliasesProtocol.renaming_synonym_columns_if_needed(df, required_columns_synonym_dict={"cell_type":{'neuron_type',}})
+
+        # Extract scalar session-level metadata
+        instantaneous_time_bin_size_seconds = df['instantaneous_time_bin_size_seconds'].iloc[0]
+
+        # Create instance
+        instance = cls(instantaneous_time_bin_size_seconds=instantaneous_time_bin_size_seconds)
+
+        # Reconstruct session context
+        session_columns = [col for col in df.columns if col.startswith('session_')]
+        if session_columns:
+            session_data = {}
+            for col in session_columns:
+                key = col.replace('session_', '')
+                session_data[key] = df[col].iloc[0]
+
+            try:
+                instance.active_identifying_session_ctx = IdentifyingContext.from_dict(session_data)
+            except:
+                instance.active_identifying_session_ctx = None
+        else:
+            instance.active_identifying_session_ctx = None
+
+        # Reconstruct cell arrays
+        lxc_mask = df['cell_type'] == 'LxC'
+        sxc_mask = df['cell_type'] == 'SxC'
+
+        lxc_df = df[lxc_mask].sort_values('cell_index_in_type') if lxc_mask.any() else pd.DataFrame()
+        sxc_df = df[sxc_mask].sort_values('cell_index_in_type') if sxc_mask.any() else pd.DataFrame()
+
+        instance.LxC_aclus = lxc_df['aclu'].values if not lxc_df.empty else np.array([])
+        instance.SxC_aclus = sxc_df['aclu'].values if not sxc_df.empty else np.array([])
+
+        # Reconstruct SpikeRateTrends objects
+        trend_mappings = {
+            'LxC': {
+                'replay_delta_minus': 'LxC_ReplayDeltaMinus',
+                'replay_delta_plus': 'LxC_ReplayDeltaPlus',
+                'theta_delta_minus': 'LxC_ThetaDeltaMinus',
+                'theta_delta_plus': 'LxC_ThetaDeltaPlus',
+            },
+            'SxC': {
+                'replay_delta_minus': 'SxC_ReplayDeltaMinus',
+                'replay_delta_plus': 'SxC_ReplayDeltaPlus',
+                'theta_delta_minus': 'SxC_ThetaDeltaMinus',
+                'theta_delta_plus': 'SxC_ThetaDeltaPlus',
+            }
+        }
+
+        for cell_type in ['LxC', 'SxC']:
+            cell_mask = df['cell_type'] == cell_type
+            cell_df = df[cell_mask].sort_values('cell_index_in_type') if cell_mask.any() else pd.DataFrame()
+
+            if cell_df.empty:
+                # Set all trends to None for this cell type
+                for condition, attr_name in trend_mappings[cell_type].items():
+                    setattr(instance, attr_name, None)
+                continue
+
+            for condition, attr_name in trend_mappings[cell_type].items():
+                firing_rate_col = f'{condition}_firing_rate'
+
+                if firing_rate_col in cell_df.columns:
+                    firing_rates = cell_df[firing_rate_col].values
+                    valid_rates = firing_rates[~pd.isna(firing_rates)]
+
+                    if len(valid_rates) > 0:
+                        # Create minimal SpikeRateTrends object
+                        trend_obj = SpikeRateTrends.__new__(SpikeRateTrends)
+                        trend_obj.cell_agg_inst_fr_list = valid_rates
+                        trend_obj.instantaneous_time_bin_size_seconds = instance.instantaneous_time_bin_size_seconds
+
+                        # Extract additional metadata if available
+                        metadata_cols = [col for col in cell_df.columns if col.startswith(f'{condition}_')]
+                        for col in metadata_cols:
+                            attr_name_meta = col.replace(f'{condition}_', '')
+                            if attr_name_meta not in ['firing_rate'] and not col.endswith('_firing_rate'):
+                                if hasattr(trend_obj, attr_name_meta):
+                                    value = cell_df[col].iloc[0]
+                                    if not pd.isna(value):
+                                        setattr(trend_obj, attr_name_meta, value)
+
+                        setattr(instance, attr_name, trend_obj)
+                    else:
+                        setattr(instance, attr_name, None)
+                else:
+                    setattr(instance, attr_name, None)
+
+        # Reconstruct Fig2_Replay_FR
+        replay_conditions = ['LxC_ReplayDeltaMinus', 'LxC_ReplayDeltaPlus', 'SxC_ReplayDeltaMinus', 'SxC_ReplayDeltaPlus']
+        instance.Fig2_Replay_FR = []
+
+        for condition in replay_conditions:
+            mean_col = f'{condition}_summary_mean'
+            std_col = f'{condition}_summary_std'
+
+            if mean_col in df.columns and std_col in df.columns:
+                mean_val = df[mean_col].iloc[0] if not df[mean_col].isna().all() else None
+                std_val = df[std_col].iloc[0] if not df[std_col].isna().all() else None
+
+                # Extract values array from individual cell data
+                cell_type = 'LxC' if condition.startswith('LxC') else 'SxC'
+                firing_rate_condition = 'replay_delta_minus' if 'DeltaMinus' in condition else 'replay_delta_plus'
+
+                cell_mask = df['cell_type'] == cell_type
+                firing_rate_col = f'{firing_rate_condition}_firing_rate'
+
+                if firing_rate_col in df.columns and cell_mask.any():
+                    values = df[cell_mask][firing_rate_col].dropna().values
+                else:
+                    values = np.array([])
+
+                result = SingleBarResult(mean=mean_val, std=std_val, values=values, LxC_aclus=instance.LxC_aclus, SxC_aclus=instance.SxC_aclus, LxC_scatter_props=None, SxC_scatter_props=None)  # Could be reconstructed if needed 
+                instance.Fig2_Replay_FR.append(result)
+            else:
+                # Create empty result
+                instance.Fig2_Replay_FR.append(SingleBarResult(mean=None, std=None, values=np.array([]), LxC_aclus=instance.LxC_aclus, SxC_aclus=instance.SxC_aclus, LxC_scatter_props=None, SxC_scatter_props=None))
+
+        # Reconstruct Fig2_Laps_FR
+        laps_conditions = ['LxC_ThetaDeltaMinus', 'LxC_ThetaDeltaPlus', 'SxC_ThetaDeltaMinus', 'SxC_ThetaDeltaPlus']
+        instance.Fig2_Laps_FR = []
+
+        for condition in laps_conditions:
+            mean_col = f'{condition}_summary_mean'
+            std_col = f'{condition}_summary_std'
+
+            if mean_col in df.columns and std_col in df.columns:
+                mean_val = df[mean_col].iloc[0] if not df[mean_col].isna().all() else None
+                std_val = df[std_col].iloc[0] if not df[std_col].isna().all() else None
+
+                # Extract values array
+                cell_type = 'LxC' if condition.startswith('LxC') else 'SxC'
+                firing_rate_condition = 'theta_delta_minus' if 'DeltaMinus' in condition else 'theta_delta_plus'
+
+                cell_mask = df['cell_type'] == cell_type
+                firing_rate_col = f'{firing_rate_condition}_firing_rate'
+
+                if firing_rate_col in df.columns and cell_mask.any():
+                    values = df[cell_mask][firing_rate_col].dropna().values
+                else:
+                    values = np.array([])
+
+                result = SingleBarResult(mean=mean_val, std=std_val, values=values, LxC_aclus=instance.LxC_aclus, SxC_aclus=instance.SxC_aclus, LxC_scatter_props=None, SxC_scatter_props=None)
+                instance.Fig2_Laps_FR.append(result)
+            else:
+                # Create empty result
+                instance.Fig2_Laps_FR.append(SingleBarResult(mean=None, std=None, values=np.array([]), LxC_aclus=instance.LxC_aclus, SxC_aclus=instance.SxC_aclus, LxC_scatter_props=None, SxC_scatter_props=None))
+
+        return instance
+
+
 
 
 @function_attributes(short_name=None, tags=['merged', 'firing_rate_indicies', 'multi_result', 'neuron_indexed'], input_requires=[], output_provides=[], uses=['pyphocorehelpers.indexing_helpers.join_on_index'], used_by=[], creation_date='2023-09-12 18:10', related_items=[])
@@ -3182,7 +3951,7 @@ def build_merged_neuron_firing_rate_indicies(curr_active_pipeline, enable_displa
     #     df_with_prefix.rename(columns={f'prefix_{col}': col}, inplace=True)
         
     if enable_display_intermediate_results:
-        display(long_short_fr_indicies_df)
+        print(long_short_fr_indicies_df)
 
     jonathan_firing_rate_analysis_result: JonathanFiringRateAnalysisResult = curr_active_pipeline.global_computation_results.computed_data.jonathan_firing_rate_analysis # 'jfra'
     neuron_replay_stats_df = deepcopy(jonathan_firing_rate_analysis_result.neuron_replay_stats_df)
@@ -3197,7 +3966,7 @@ def build_merged_neuron_firing_rate_indicies(curr_active_pipeline, enable_displa
     
 
     if enable_display_intermediate_results: 
-        display(neuron_replay_stats_df)
+        print(neuron_replay_stats_df)
 
     ## Get global 'long_short_post_decoding' results:
     curr_long_short_post_decoding = curr_active_pipeline.global_computation_results.computed_data['long_short_post_decoding'] # 'lspd'
@@ -3207,7 +3976,7 @@ def build_merged_neuron_firing_rate_indicies(curr_active_pipeline, enable_displa
     rate_remapping_df.index.name = 'aclu'
     rate_remapping_df = rate_remapping_df.reset_index() 
     if enable_display_intermediate_results:
-        display(rate_remapping_df)
+        print(rate_remapping_df)
 
 
     # suffixes_list = ({'suffixes':('_lsfria', '_jfra')}, )

@@ -42,6 +42,7 @@
      </property>
      <addaction name="actionAddTimeCurves_Position"/>
      <addaction name="actionAddTimeCurves_Velocity"/>
+     <addaction name="actionAddTimeCurves_ThetaPhase"/>
      <addaction name="actionAddTimeCurves_Random"/>
      <addaction name="actionAddTimeCurves_RelativeEntropySurprise"/>
      <addaction name="actionAddTimeCurves_Custom"/>
@@ -60,6 +61,7 @@
      <addaction name="actionAddTimeIntervals_Laps"/>
      <addaction name="actionAddTimeIntervals_PBEs"/>
      <addaction name="actionAddTimeIntervals_NonPBEs"/>
+     <addaction name="actionAddTimeIntervals_NonPBEEndcaps"/>
      <addaction name="actionAddTimeIntervals_Ripples"/>
      <addaction name="actionAddTimeIntervals_Replays"/>
      <addaction name="actionAddTimeIntervals_Bursts"/>
@@ -386,6 +388,16 @@
   <action name="actionDecoded_Epoch_Slices_NonPBEs">
    <property name="text">
     <string>Non-PBEs</string>
+   </property>
+  </action>
+  <action name="actionAddTimeIntervals_NonPBEEndcaps">
+   <property name="text">
+    <string>Non-PBE Endcaps (Only)</string>
+   </property>
+  </action>
+  <action name="actionAddTimeCurves_ThetaPhase">
+   <property name="text">
+    <string>Theta Phase</string>
    </property>
   </action>
  </widget>

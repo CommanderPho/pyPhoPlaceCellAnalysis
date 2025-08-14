@@ -4,13 +4,15 @@
 @author: pho
 NeuropyPipeline.py
 """
+import sys
+from datetime import timedelta, datetime
 from copy import deepcopy
 import importlib
 import sys
 from pathlib import Path
 import shutil # for _backup_extant_file(...)
 
-from typing import Callable, List, Optional, Dict
+from typing import Callable, List, Optional, Dict, Tuple
 import inspect # used for filter_sessions(...)'s inspect.getsource to compare filters:
 
 import numpy as np
@@ -32,6 +34,7 @@ from pyphocorehelpers.mixins.diffable import DiffableObject
 from pyphocorehelpers.print_helpers import print_filesystem_file_size, print_object_memory_usage
 from pyphocorehelpers.print_helpers import build_run_log_task_identifier, build_logger
 from pyphocorehelpers.Filesystem.path_helpers import build_unique_filename, backup_extant_file
+from pyphocorehelpers.Filesystem.metadata_helpers import FilesystemMetadata
 
 from neuropy.core.session.Formats.BaseDataSessionFormats import DataSessionFormatRegistryHolder # hopefully this works without all the other imports
 from neuropy.core.session.KnownDataSessionTypeProperties import KnownDataSessionTypeProperties
@@ -159,7 +162,7 @@ class LoadedObjectPersistanceState:
 
 # Pipeline Pickling Helpers __________________________________________________________________________________________ #
 @function_attributes(short_name=None, tags=['pure', 'pkl'], input_requires=[], output_provides=[], uses=[], used_by=['save_custom_parameters_pipeline'], creation_date='2024-06-28 13:23', related_items=[])
-def helper_perform_pickle_pipeline(a_curr_active_pipeline, custom_save_filenames, custom_save_filepaths, enable_save_pipeline_pkl: bool=True, enable_save_global_computations_pkl: bool=False, enable_save_h5: bool=False, saving_mode=PipelineSavingScheme.TEMP_THEN_OVERWRITE):
+def helper_perform_pickle_pipeline(a_curr_active_pipeline, custom_save_filenames, custom_save_filepaths_dict, enable_save_pipeline_pkl: bool=True, enable_save_global_computations_pkl: bool=False, enable_save_h5: bool=False, saving_mode=PipelineSavingScheme.TEMP_THEN_OVERWRITE) -> Dict[str, Path]:
     """ Pickles the pipelines as needed
 
     from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import helper_perform_pickle_pipeline
@@ -168,21 +171,21 @@ def helper_perform_pickle_pipeline(a_curr_active_pipeline, custom_save_filenames
     """	
     try:
         if enable_save_pipeline_pkl:
-            custom_save_filepaths['pipeline_pkl'] = a_curr_active_pipeline.save_pipeline(saving_mode=saving_mode, active_pickle_filename=custom_save_filenames['pipeline_pkl'])
+            custom_save_filepaths_dict['pipeline_pkl'] = a_curr_active_pipeline.save_pipeline(saving_mode=saving_mode, active_pickle_filename=custom_save_filenames['pipeline_pkl'])
 
         if enable_save_global_computations_pkl:
-            custom_save_filepaths['global_computation_pkl'] = a_curr_active_pipeline.save_global_computation_results(override_global_pickle_filename=custom_save_filenames['global_computation_pkl'])
+            custom_save_filepaths_dict['global_computation_pkl'] = a_curr_active_pipeline.save_global_computation_results(override_global_pickle_filename=custom_save_filenames['global_computation_pkl'])
 
         if enable_save_h5:
-            custom_save_filepaths['pipeline_h5'] = a_curr_active_pipeline.export_pipeline_to_h5(override_filename=custom_save_filenames['pipeline_h5'])
+            custom_save_filepaths_dict['pipeline_h5'], _HDF5_err = a_curr_active_pipeline.export_pipeline_to_h5(override_filename=custom_save_filenames['pipeline_h5'])
         
-        print(f'custom_save_filepaths: {custom_save_filepaths}')
+        print(f'custom_save_filepaths: {custom_save_filepaths_dict}')
 
-    except BaseException as e:
+    except Exception as e:
         print(f'failed pickling in `helper_perform_pickle_pipeline(...)` with error: {e}')
         pass
     
-    return custom_save_filepaths
+    return custom_save_filepaths_dict
 
 
 @function_attributes(short_name=None, tags=['NEEDS_REFACTOR', 'dataframe', 'filename', 'metadata'], input_requires=[], output_provides=[], uses=[], used_by=['_get_custom_filenames_from_computation_metadata'], creation_date='2024-10-28 12:40', related_items=[])
@@ -235,7 +238,7 @@ def _get_custom_filenames_from_computation_metadata(epochs_source: str='normal_c
 
 
 @function_attributes(short_name=None, tags=['NEEDS_REFACTOR', 'save', 'save_custom'], input_requires=[], output_provides=[], uses=['_get_custom_suffix_for_filename_from_computation_metadata', 'helper_perform_pickle_pipeline'], used_by=[], creation_date='2024-10-28 14:08', related_items=[])
-def save_custom_parameters_pipeline(a_curr_active_pipeline, epochs_source: str='normal_computed', minimum_inclusion_fr_Hz=None, included_qclu_values=None, enable_save_pipeline_pkl: bool=True, enable_save_global_computations_pkl: bool=False, enable_save_h5: bool = False, saving_mode=PipelineSavingScheme.TEMP_THEN_OVERWRITE, parts_separator:str='-'):
+def save_custom_parameters_pipeline(a_curr_active_pipeline, epochs_source: str='normal_computed', minimum_inclusion_fr_Hz=None, included_qclu_values=None, enable_save_pipeline_pkl: bool=True, enable_save_global_computations_pkl: bool=False, enable_save_h5: bool = False, saving_mode=PipelineSavingScheme.TEMP_THEN_OVERWRITE, parts_separator:str='-') -> Tuple[Dict[str, Path], str]:
     """ Saves a pipeline with custom parameters
 
     Usage:   
@@ -246,10 +249,10 @@ def save_custom_parameters_pipeline(a_curr_active_pipeline, epochs_source: str='
     custom_save_filepaths, custom_save_filenames, custom_suffix = _get_custom_filenames_from_computation_metadata(epochs_source=epochs_source, included_qclu_values=included_qclu_values, minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz, parts_separator=parts_separator)
     print(f'custom_save_filenames: {custom_save_filenames}')
     ## Pickle again after recomputing:
-    custom_save_filepaths = helper_perform_pickle_pipeline(a_curr_active_pipeline=a_curr_active_pipeline, custom_save_filenames=custom_save_filenames, custom_save_filepaths=custom_save_filepaths,
+    custom_save_filepaths_dict = helper_perform_pickle_pipeline(a_curr_active_pipeline=a_curr_active_pipeline, custom_save_filenames=custom_save_filenames, custom_save_filepaths_dict=custom_save_filepaths,
                                                             enable_save_pipeline_pkl=enable_save_pipeline_pkl, enable_save_global_computations_pkl=enable_save_global_computations_pkl, enable_save_h5=enable_save_h5, saving_mode=saving_mode)
 
-    return custom_save_filepaths, custom_suffix
+    return custom_save_filepaths_dict, custom_suffix
 
 
 
@@ -1029,12 +1032,12 @@ class NeuropyPipeline(PipelineWithInputStage, PipelineWithLoadableStage, Filtere
         return hdf5_output_path
 
 
-    @function_attributes(short_name=None, tags=['h5', 'export', 'output', 'filesystem'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-09-26 06:38', related_items=[])
-    def export_pipeline_to_h5(self, override_path: Optional[Path]=None, override_filename: Optional[str]=None, fail_on_exception:bool=True):
+    @function_attributes(short_name=None, tags=['h5', 'export', 'output', 'filesystem'], input_requires=[], output_provides=[], uses=['FilesystemMetadata'], used_by=[], creation_date='2023-09-26 06:38', related_items=[])
+    def export_pipeline_to_h5(self, override_path: Optional[Path]=None, override_filename: Optional[str]=None, fail_on_exception:bool=True, skip_overwriting_files_newer_than_specified:bool=False) -> Tuple[Path, Optional[CapturedException]]:
         """ Export the pipeline's HDF5 as 'pipeline_results.h5'
 
-        TODO: check timestamp of last computed file.
-
+        #2025-04-18 06:57: - [X] check timestamp of last exported file, and prevent overwriting if newer than the specified date if `skip_overwriting_files_newer_than_specified` is True
+        
         """
         ## Case 1. `override_path` is provided:
         if override_path is not None:
@@ -1058,19 +1061,41 @@ class NeuropyPipeline(PipelineWithInputStage, PipelineWithLoadableStage, Filtere
                 # Otherwise use default output path but specified override_global_pickle_filename:
                 hdf5_output_path = self.get_output_path().joinpath(override_filename).resolve() 
 
-        print(f'pipeline hdf5_output_path: {hdf5_output_path}')
-        e = None
-        try:
-            self.to_hdf(file_path=hdf5_output_path, key="/")
+        print(f'pipeline hdf5_output_path: "{hdf5_output_path}"')
+        err = None
+        was_write_good: bool = False
+        can_skip_if_allowed: bool = False
+        if skip_overwriting_files_newer_than_specified:
+            ## only if datetime checking of existing file is active should we waste time checking:
+            newest_file_to_overwrite_date = datetime.now() - timedelta(days=1) # don't overwrite any files more recent than 1 day ago
+            can_skip_if_allowed = (hdf5_output_path.exists() and (FilesystemMetadata.get_last_modified_time(hdf5_output_path)<=newest_file_to_overwrite_date))
+            
+        if (not skip_overwriting_files_newer_than_specified) or (not can_skip_if_allowed):
+            # if skipping is disabled OR skipping is enabled but it's not valid to skip, overwrite.
+            # file is folder than the date to overwrite, so overwrite it
+            print(f'\tOVERWRITING (or writing) the file "{hdf5_output_path}"!')
+            try:
+                self.to_hdf(file_path=hdf5_output_path, key="/")
+                was_write_good = True
+                return (hdf5_output_path, None)
+
+            except Exception as err:
+                exception_info = sys.exc_info()
+                err = CapturedException(err, exception_info)
+                print(f"ERROR: encountered exception {err} while trying to build the session HDF output.")
+                if fail_on_exception:
+                    raise
+                hdf5_output_path = None # set to None because it failed.
+                return (hdf5_output_path, err)
+            
+        else:
+            print(f'\tWARNING: file "{hdf5_output_path}" is newer than the allowed overwrite date, so it will be skipped.')
+            print(f'\t\tnewest_file_to_overwrite_date: {newest_file_to_overwrite_date}\t can_skip_if_allowed: {can_skip_if_allowed}\n')
             return (hdf5_output_path, None)
-        except Exception as e:
-            exception_info = sys.exc_info()
-            e = CapturedException(e, exception_info)
-            print(f"ERROR: encountered exception {e} while trying to build the session HDF output.")
-            if fail_on_exception:
-                raise
-            hdf5_output_path = None # set to None because it failed.
-            return (hdf5_output_path, e)
+
+
+
+
 
     @classmethod
     def read_hdf(cls, file_path, key: str, **kwargs) -> "NeuropyPipeline":
@@ -1094,7 +1119,7 @@ class NeuropyPipeline(PipelineWithInputStage, PipelineWithLoadableStage, Filtere
 
     @function_attributes(short_name=None, tags=['save', 'custom_save', 'export'], input_requires=[], output_provides=[], uses=['save_custom_parameters_pipeline', 'self.get_all_parameters'], used_by=[], creation_date='2024-10-28 14:04', related_items=[])
     def custom_save_pipeline_as(self, saving_mode=PipelineSavingScheme.TEMP_THEN_OVERWRITE,
-                                 enable_save_pipeline_pkl: bool=True, enable_save_global_computations_pkl: bool=False, enable_save_h5: bool = False):
+                                 enable_save_pipeline_pkl: bool=True, enable_save_global_computations_pkl: bool=False, enable_save_h5: bool = False) -> Tuple[Dict[str, Path], str]:
         """ uses the pipeline's parameters to determine proper save names 
         """
         all_params_dict = self.get_all_parameters()
@@ -1108,8 +1133,8 @@ class NeuropyPipeline(PipelineWithInputStage, PipelineWithLoadableStage, Filtere
         active_replay_epoch_parameters = deepcopy(self.sess.config.preprocessing_parameters.epoch_estimation_parameters.replays)
         epochs_source: str = active_replay_epoch_parameters.get('epochs_source', 'normal_computed')
 
-        custom_save_filepaths = save_custom_parameters_pipeline(self, epochs_source=epochs_source, minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz, included_qclu_values=included_qclu_values, 
+        custom_save_filepaths_dict, custom_suffix = save_custom_parameters_pipeline(self, epochs_source=epochs_source, minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz, included_qclu_values=included_qclu_values, 
                                                                 saving_mode=saving_mode, enable_save_pipeline_pkl=enable_save_pipeline_pkl, enable_save_global_computations_pkl=enable_save_global_computations_pkl, enable_save_h5=enable_save_h5)
-        return custom_save_filepaths
+        return custom_save_filepaths_dict, custom_suffix
 
 

@@ -44,6 +44,31 @@ Usage:
 
 """
 
+
+# LR_RL_Strings_Dict = {
+#     "LR": "◁",
+#     "RL": "▷",
+# }
+
+# LR_RL_Strings_Dict = {
+#     "LR": "⤞",
+#     "RL": "⤝",
+# }
+
+# ## TRIANGLES: good, but not supported by Arial       
+# LR_RL_Strings_Dict = {
+#     "LR": "◀",
+#     "RL": "▶",
+# }
+
+
+## TRIANGLES: good, but not supported by Arial       
+LR_RL_Strings_Dict = {
+    "LR": "<",
+    "RL": ">",
+}
+
+
 @function_attributes(short_name=None, tags=['pyqtgraph', 'color'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-08-29 00:00', related_items=[])
 def apply_LR_to_RL_adjustment(an_RL_color):
     """ applies a consistent visual transformation to a color that represents LR direction to get the corresponding RL color. 
@@ -247,6 +272,10 @@ class DisplayColorsEnum:
             return fg_color, bg_color, border_color
 
 
+
+
+
+
     @classmethod
     @function_attributes(short_name=None, tags=['pyqtgraph', 'title', 'format'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-09-02 15:14', related_items=[])
     def get_pyqtgraph_formatted_title_dict(cls, is_dark_bg: bool = True) -> Dict:
@@ -276,6 +305,45 @@ class DisplayColorsEnum:
         #                         "RL_Short":(generate_html_string("RL", color=RL_bg_color, bold=True, font_size=14) + '_' + generate_html_string("Short", color=Short_color, bold=True, font_size=14)),
         #                         }
         
+
+        formatted_title_strings_dict = {"LR_Long":(generate_html_string(LR_RL_Strings_Dict["LR"], color=LR_bg_color, bold=True, font_size=14) + '_' + generate_html_string("Long", color=Long_color, bold=True, font_size=14)),
+                                "RL_Long":(generate_html_string(LR_RL_Strings_Dict["RL"], color=RL_bg_color, bold=True, font_size=14) + '_' + generate_html_string("Long", color=Long_color, bold=True, font_size=14)),
+                                "LR_Short":(generate_html_string(LR_RL_Strings_Dict["LR"], color=LR_bg_color, bold=True, font_size=14) + '_' + generate_html_string("Short", color=Short_color, bold=True, font_size=14)),
+                                "RL_Short":(generate_html_string(LR_RL_Strings_Dict["RL"], color=RL_bg_color, bold=True, font_size=14) + '_' + generate_html_string("Short", color=Short_color, bold=True, font_size=14)),
+                                }
+        
+        return formatted_title_strings_dict
+    
+
+    @classmethod
+    @function_attributes(short_name=None, tags=['matplotlib', 'title', 'format'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-09-02 15:14', related_items=[])
+    def get_matplotlib_formatted_title_dict(cls, is_dark_bg: bool = True, prepare_for_publication:bool=True) -> Dict:
+        """ Generates the two-color LR_Long/LR_Short/RL_Long/RL_Short labels with color formatting for pyqtgraph plots
+        
+        formatted_title_strings_dict = DisplayColorsEnum.get_matplotlib_formatted_title_dict()
+
+        """
+        # long_short_display_config_manager = LongShortDisplayConfigManager()
+        # long_epoch_config = long_short_display_config_manager.long_epoch_config #.as_pyqtgraph_kwargs()
+        # short_epoch_config = long_short_display_config_manager.short_epoch_config #.as_pyqtgraph_kwargs()
+
+        # if is_dark_bg:
+        #     Long_color = DisplayColorsEnum.Epochs.long_dark_bg
+        #     Short_color = DisplayColorsEnum.Epochs.short_dark_bg
+        # else:
+        #     Long_color = long_epoch_config.mpl_color
+        #     Short_color = short_epoch_config.mpl_color
+
+
+        # RL_fg_color, RL_bg_color, RL_border_color = DisplayColorsEnum.Laps.get_RL_dock_colors(None, is_dim=False)
+        # LR_fg_color, LR_bg_color, LR_border_color = DisplayColorsEnum.Laps.get_LR_dock_colors(None, is_dim=False)
+
+        # formatted_title_strings_dict = {"LR_Long":(generate_html_string("LR", color=LR_bg_color, bold=True, font_size=14) + '_' + generate_html_string("Long", color=Long_color, bold=True, font_size=14)),
+        #                         "RL_Long":(generate_html_string("RL", color=RL_bg_color, bold=True, font_size=14) + '_' + generate_html_string("Long", color=Long_color, bold=True, font_size=14)),
+        #                         "LR_Short":(generate_html_string("LR", color=LR_bg_color, bold=True, font_size=14) + '_' + generate_html_string("Short", color=Short_color, bold=True, font_size=14)),
+        #                         "RL_Short":(generate_html_string("RL", color=RL_bg_color, bold=True, font_size=14) + '_' + generate_html_string("Short", color=Short_color, bold=True, font_size=14)),
+        #                         }
+        
         # LR_RL_Strings_Dict = {
         #     "LR": "◁",
         #     "RL": "▷",
@@ -286,18 +354,42 @@ class DisplayColorsEnum:
         #     "RL": "⤝",
         # }
         
-        LR_RL_Strings_Dict = {
-            "LR": "◀",
-            "RL": "▶",
-        }
+        # LR_RL_Strings_Dict = {
+        #     "LR": "◀",
+        #     "RL": "▶",
+        # }
 
-        formatted_title_strings_dict = {"LR_Long":(generate_html_string(LR_RL_Strings_Dict["LR"], color=LR_bg_color, bold=True, font_size=14) + '_' + generate_html_string("Long", color=Long_color, bold=True, font_size=14)),
-                                "RL_Long":(generate_html_string(LR_RL_Strings_Dict["RL"], color=RL_bg_color, bold=True, font_size=14) + '_' + generate_html_string("Long", color=Long_color, bold=True, font_size=14)),
-                                "LR_Short":(generate_html_string(LR_RL_Strings_Dict["LR"], color=LR_bg_color, bold=True, font_size=14) + '_' + generate_html_string("Short", color=Short_color, bold=True, font_size=14)),
-                                "RL_Short":(generate_html_string(LR_RL_Strings_Dict["RL"], color=RL_bg_color, bold=True, font_size=14) + '_' + generate_html_string("Short", color=Short_color, bold=True, font_size=14)),
-                                }
+        # formatted_title_strings_dict = {"LR_Long":(generate_html_string(LR_RL_Strings_Dict["LR"], color=LR_bg_color, bold=True, font_size=14) + '_' + generate_html_string("Long", color=Long_color, bold=True, font_size=14)),
+        #                         "RL_Long":(generate_html_string(LR_RL_Strings_Dict["RL"], color=RL_bg_color, bold=True, font_size=14) + '_' + generate_html_string("Long", color=Long_color, bold=True, font_size=14)),
+        #                         "LR_Short":(generate_html_string(LR_RL_Strings_Dict["LR"], color=LR_bg_color, bold=True, font_size=14) + '_' + generate_html_string("Short", color=Short_color, bold=True, font_size=14)),
+        #                         "RL_Short":(generate_html_string(LR_RL_Strings_Dict["RL"], color=RL_bg_color, bold=True, font_size=14) + '_' + generate_html_string("Short", color=Short_color, bold=True, font_size=14)),
+        #                         }
         
+        # formatted_title_strings_dict = {
+        #     'long_LR': ('◀', '_', 'Long'),
+        #     'long_RL': ('▶', '_', 'Long'),
+        #     'short_LR': ('◀', '_', 'Short'),
+        #     'short_RL': ('▶', '_', 'Short'),
+        # }
+        
+        # LR_RL_Strings_Dict['LR']
+        if not prepare_for_publication:
+            formatted_title_strings_dict = {
+                'long_LR': 'Long◀',
+                'long_RL': 'Long▶',
+                'short_LR': 'Short◀',
+                'short_RL': 'Short▶',
+            }
+        else:
+            formatted_title_strings_dict = {
+                'long_LR': 'Long <',
+                'long_RL': 'Long >',
+                'short_LR': 'Short <',
+                'short_RL': 'Short >',
+            }
+
         return formatted_title_strings_dict
+    
 
 
 
@@ -569,7 +661,7 @@ class PlottingHelpers:
 
     @function_attributes(short_name=None, tags=['matplotlib', 'draw'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-01-01 18:44', related_items=[])
     @classmethod
-    def helper_matplotlib_add_pseudo2D_marginal_labels(cls, ax, y_bin_labels: List[str], enable_draw_decoder_labels: bool = True, enable_draw_decoder_colored_lines: bool = False, should_use_ax_fraction_positioning: bool = True) -> Dict[str, Dict]:
+    def helper_matplotlib_add_pseudo2D_marginal_labels(cls, ax, y_bin_labels: List[str], enable_draw_decoder_labels: bool = True, enable_draw_decoder_colored_lines: bool = False, should_use_ax_fraction_positioning: bool = True, should_use_outer_labels: bool=False, additional_label_kwargs:dict=None, **kwargs) -> Dict[str, Dict]:
         """ adds fixed inner-y labels (along the inside left edge of the ax) containing reference names -- such as ('Long_LR', etc)
         
         should_use_ax_fraction_positioning: bool : if True, the labels and lines are positioned relative to the ax frame in [0, 1] coords, independent of the data ylims
@@ -606,8 +698,10 @@ class PlottingHelpers:
 
 
         # BEGIN PLOTTING: ____________________________________________________________________________________________________ #
-        
-        _common_label_kwargs = dict(alpha=0.8, fontsize=10, va='center')
+        if additional_label_kwargs is None:
+            additional_label_kwargs = {} ## empty        
+
+        _common_label_kwargs = (dict(alpha=0.8, fontsize=10, va='center') | additional_label_kwargs)
         _common_hlines_kwargs = dict(alpha=0.6, linewidths=4)
         
         if should_use_ax_fraction_positioning:
@@ -633,7 +727,19 @@ class PlottingHelpers:
             track_ID_line_y = y_bin_centers - center_offset_px
             track_dir_line_y = y_bin_centers + center_offset_px
             
-            
+        # Determine label position based on should_use_outer_labels
+        if should_use_outer_labels:
+            if should_use_ax_fraction_positioning:
+                label_x_position = -0.01  # Just outside the axis on the left
+                _common_label_kwargs.update(ha='right')  # Right-align text to place near axis
+            else:
+                label_x_position = x_start_ax - 0.05 * (x_stop_ax - x_start_ax)  # Outside left in data coordinates
+                _common_label_kwargs.update(ha='right')
+        else:
+            label_x_position = x_start_ax  # Default - inside left edge
+            _common_label_kwargs.update(ha='left')            
+
+
         output_dict = {}
         for i, (decoder_name, (a_track_id_color, a_track_dir_color)) in enumerate(active_color_dict.items()):
             if enable_draw_decoder_colored_lines:
@@ -642,7 +748,8 @@ class PlottingHelpers:
                 if a_track_dir_color is not None:
                     output_dict[f"{decoder_name}_track_dir"] = ax.hlines(track_dir_line_y[i], xmin=x_start_ax, xmax=x_stop_ax, color=a_track_dir_color, zorder=25, label=f'{decoder_name}', **_common_hlines_kwargs) # divider should be in very front
             if enable_draw_decoder_labels:
-                output_dict[f"{decoder_name}_label"] = ax.annotate(f'{decoder_name}', (x_start_ax, y_bin_centers[i]), **_common_label_kwargs)
+                # output_dict[f"{decoder_name}_label"] = ax.annotate(f'{decoder_name}', (x_start_ax, y_bin_centers[i]), **_common_label_kwargs)
+                output_dict[f"{decoder_name}_label"] = ax.annotate(f'{decoder_name}', (label_x_position, y_bin_centers[i]), **_common_label_kwargs)
 
         return output_dict
         
@@ -686,20 +793,32 @@ class FixedCustomColormaps:
         return LinearSegmentedColormap.from_list(f"dropping_low_values_black_colormap", colors)
 
     @classmethod
-    def get_custom_greyscale_with_low_values_dropped_cmap(cls, low_value_cutoff:float=0.05, full_opacity_threshold:float=0.4, grey_value: float = 0.1):
+    def get_custom_greyscale_with_low_values_dropped_cmap(cls, low_value_cutoff:float=0.05, full_opacity_threshold:float=0.4, grey_value: float = 0.1, invert_for_black_bg: bool = False):
         """ Oranges with low values omitted
         """
         from matplotlib.colors import LinearSegmentedColormap, Colormap
         assert low_value_cutoff < 1.0, f"low_value_cutoff: {low_value_cutoff}"
         # Each point is (normalized value, color)
         assert full_opacity_threshold > low_value_cutoff
+        # colors = [
+        #     (0.0, [grey_value, grey_value, grey_value, 0.0]),    # Start: 0.0 mapped to blue
+        #     (low_value_cutoff, [grey_value, grey_value, grey_value, 0.0]),   # Middle: 0.5 mapped to white
+        #     (full_opacity_threshold, [grey_value, grey_value, grey_value, 1.0]),   # Middle: 0.5 mapped to white
+        #     (1.0, [0.0, 0.0, 0.0, 1.0])      # End: 1.0 mapped to red
+        # ]
+        # return LinearSegmentedColormap.from_list(f"dropping_low_values_black_colormap", colors)
+        # Determine final color based on background
+        final_color = [1.0, 1.0, 1.0, 1.0] if invert_for_black_bg else [0.0, 0.0, 0.0, 1.0]
         colors = [
-            (0.0, [grey_value, grey_value, grey_value, 0.0]),    # Start: 0.0 mapped to blue
-            (low_value_cutoff, [grey_value, grey_value, grey_value, 0.0]),   # Middle: 0.5 mapped to white
-            (full_opacity_threshold, [grey_value, grey_value, grey_value, 1.0]),   # Middle: 0.5 mapped to white
-            (1.0, [0.0, 0.0, 0.0, 1.0])      # End: 1.0 mapped to red
+            (0.0, [grey_value, grey_value, grey_value, 0.0]),    # Start: 0.0 mapped to transparent grey
+            (low_value_cutoff, [grey_value, grey_value, grey_value, 0.0]),   # Low cutoff: still transparent grey
+            (full_opacity_threshold, [grey_value, grey_value, grey_value, 1.0]),   # Full opacity threshold: opaque grey
+            (1.0, final_color)      # End: 1.0 mapped to black or white depending on background
         ]
-        return LinearSegmentedColormap.from_list(f"dropping_low_values_black_colormap", colors)
+        colormap_name = f"dropping_low_values_{'white' if invert_for_black_bg else 'black'}_colormap"
+        return LinearSegmentedColormap.from_list(colormap_name, colors)
+
+
 
 
 

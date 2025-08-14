@@ -1,3 +1,10 @@
+from __future__ import annotations # prevents having to specify types for typehinting as strings
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    ## typehinting only imports here
+    from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.SpikeRasterWidgets.Spike2DRaster import Spike2DRaster
+
 # 2024-01-29 - A version of "PendingNotebookCode" that is inside the pyphoplacecellanalysis library so that it can be imported from notebook that are not in the root of Spike3D
 ## This file serves as overflow from active Jupyter-lab notebooks, to eventually be refactored.
 from copy import deepcopy
@@ -9,6 +16,7 @@ from matplotlib import cm, pyplot as plt
 from matplotlib.gridspec import GridSpec
 from neuropy.core import Laps, Position
 from neuropy.core.user_annotations import UserAnnotationsManager
+from neuropy.plotting.placemaps import perform_plot_occupancy
 from neuropy.utils.dynamic_container import DynamicContainer
 from neuropy.utils.indexing_helpers import union_of_arrays
 from neuropy.utils.result_context import IdentifyingContext
@@ -44,7 +52,7 @@ import pyphoplacecellanalysis.External.pyqtgraph as pg
 
 from pyphoplacecellanalysis.Analysis.reliability import TrialByTrialActivity
 
-from neuropy.utils.mixins.AttrsClassHelpers import keys_only_repr
+from neuropy.utils.mixins.AttrsClassHelpers import keys_only_repr, shape_only_repr
 from pyphocorehelpers.DataStructure.general_parameter_containers import VisualizationParameters, RenderPlotsData, RenderPlots # PyqtgraphRenderPlots
 from pyphocorehelpers.gui.PhoUIContainer import PhoUIContainer
 
@@ -82,105 +90,4025 @@ from pyphocorehelpers.Filesystem.path_helpers import sanitize_filename_for_Windo
 from pyphoplacecellanalysis.General.Model.Configs.LongShortDisplayConfig import LongShortDisplayConfigManager
 
 
+from neuropy.utils.mixins.binning_helpers import BinningContainer, BinningInfo
+from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import DecodedFilterEpochsResult
+
+import numpy as np
+from pyphoplacecellanalysis.Analysis.Decoder.transition_matrix import TransitionMatrixComputations
+from pyphoplacecellanalysis.Analysis.Decoder.context_dependent import GenericDecoderDictDecodedEpochsDictResult
+from neuropy.utils.mixins.binning_helpers import BinningContainer, BinningInfo
+from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import DecodedFilterEpochsResult
+
+from pyphoplacecellanalysis.SpecificResults.PhoDiba2023Paper import LongShortTrackDataframeAccessor
+from typing import Dict, List, Tuple, Optional, Callable, Union, Any, TypeVar
+from typing_extensions import TypeAlias
+import nptyping as ND
+from nptyping import NDArray
+
+# import neuropy.utils.type_aliases as types
+import pyphoplacecellanalysis.General.type_aliases as types
+from neuropy.utils.mixins.time_slicing import TimeColumnAliasesProtocol
+
+from pyphoplacecellanalysis.General.Model.Configs.LongShortDisplayConfig import DecoderIdentityColors, long_short_display_config_manager, apply_LR_to_RL_adjustment
+from pyphocorehelpers.gui.Qt.color_helpers import ColormapHelpers, ColorFormatConverter, debug_print_color, build_adjusted_color
+
+
+from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.LongShortTrackComputations import SingleBarResult, InstantaneousSpikeRateGroupsComputation, SpikeRateTrends
+import nptyping as ND
+from nptyping import NDArray
+from neuropy.core.user_annotations import SessionCellExclusivityRecord
+
+class SpareRunningSequenceScore:
+    """ Computes 'Spare' (as in the sport American Bowling) scoring of decoded posteriors
+    
+    STATUS #TODO 2025-08-05 09:16: - [ ] SpareRunningSequenceScore refinements, finished implementation, now need to check
+    
+    #TODO 2025-08-11 10:09: - [ ] Potential issue: doesn't the jump integration method reward larger jumps by making the function grow faster for long jumps than short ones? I mean I suppose it ends earlier too, but kinda opposite of what I'd like. 
+
+    #TODO 2025-08-11 12:11: - [ ] It really doesn't work very well, much to my surprise. It skips even laps, etc.  
+
+    
+    
+    Usage:
+        from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import SpareRunningSequenceScore
+        from pyphoplacecellanalysis.Analysis.Decoder.context_dependent import GenericDecoderDictDecodedEpochsDictResult
+        from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import _helper_add_interpolated_position_columns_to_decoded_result_df
+
+        ## Run heuristic continuously to determine when to split sequences and thus where replays are
+
+        valid_EpochComputations_result: EpochComputationsComputationsContainer = curr_active_pipeline.global_computation_results.computed_data['EpochComputations']
+        a_new_fully_generic_result: GenericDecoderDictDecodedEpochsDictResult = valid_EpochComputations_result.a_generic_decoder_dict_decoded_epochs_dict_result
+
+        ## INPUTS: a_new_fully_generic_result
+        # a_target_context: IdentifyingContext = IdentifyingContext(trained_compute_epochs='laps', pfND_ndim=1, decoder_identifier='pseudo2D', known_named_decoding_epochs_type='global', masked_time_bin_fill_type='nan_filled', data_grain='per_time_bin')
+        a_target_context: IdentifyingContext = IdentifyingContext(trained_compute_epochs='laps', pfND_ndim=1, decoder_identifier='pseudo2D', known_named_decoding_epochs_type='global', masked_time_bin_fill_type='ignore', data_grain='per_time_bin')
+        best_matching_context, a_result, a_decoder, a_decoded_marginal_posterior_df = a_new_fully_generic_result.get_results_best_matching_context(context_query=a_target_context, debug_print=False)
+        ## OUTPUTS: a_result, a_decoder, a_decoded_marginal_posterior_df
+        ## INPUTS: curr_active_pipeline, a_result, a_decoder, a_decoded_marginal_posterior_df
+        global_measured_position_df: pd.DataFrame = deepcopy(curr_active_pipeline.sess.position.to_dataframe())
+        a_decoded_marginal_posterior_df: pd.DataFrame = _helper_add_interpolated_position_columns_to_decoded_result_df(a_result=a_result, a_decoder=a_decoder, a_decoded_marginal_posterior_df=a_decoded_marginal_posterior_df, global_measured_position_df=global_measured_position_df)
+
+        global_decoded_result: SingleEpochDecodedResult = a_result.get_result_for_epoch(0)
+        p_x_given_n: NDArray[ND.Shape["N_POS_BINS, 4, N_TIME_BINS"], np.floating] = deepcopy(global_decoded_result.p_x_given_n) # .shape # (59, 4, 69488)
+        time_bin_centers: NDArray[ND.Shape["N_TIME_BINS"], np.floating] = deepcopy(global_decoded_result.time_bin_container.centers)
+        xbin: NDArray[ND.Shape["N_POS_BINS"], np.floating] = deepcopy(a_decoder.xbin)
+
+        ## INPUTS: p_x_given_n
+        out_decoder_spare_scores, out_decoder_spare_scores_extras = SpareRunningSequenceScore.bowling_spare_integration(p_x_given_n=p_x_given_n)
+        out_decoder_spare_scores
+    """
+    @function_attributes(short_name=None, tags=['score', 'bowling', 'spare', 'compute'], input_requires=[], output_provides=[], uses=[], used_by=['bowling_spare_integration'], creation_date='2025-08-04 10:11', related_items=[])
+    @classmethod
+    def compute_spare_operation(cls, a_p_x_given_n: NDArray, final_score_only: bool=True) -> List[NDArray]:
+        """ Breaks the `a_p_x_given_n` for a single decoder into separate subsequences based on the change direction (currently ignoring no bins) and then computes the "bowling_spare" score for each time bin
+        
+        if final_score_only: return only the maximal score (the last sequence bin) instead of the score for each bin within the sequence.
+        
+        Usage:
+        
+            out_spare_score, (p_x_given_n_segments, most_likely_pos_idxs_segments, segement_lengths, sign_change_indicies) = compute_spare_operation(a_p_x_given_n=a_p_x_given_n, final_score_only=False)
+        """
+        ## start at the end of the posterior
+        n_pos, n_time_bins = np.shape(a_p_x_given_n) # np.shape(p_x_given_n) - (59, 69488) -(n_pos, n_time_bins)
+        max_pos_index: int = n_pos - 1
+        a_most_likely_pos_idxs: NDArray = np.argmax(a_p_x_given_n, axis=0) ## find the max position bins (69488, ) - (n_time_bins, )
+        # out_spare_score = np.full_like(a_p_x_given_n, fill_value=np.nan)
+        out_spare_score = [] # np.full_like(a_p_x_given_n, fill_value=np.nan)
+        
+        ## find the "miss" bins
+        # most_likely_pos_idx_change = [0, np.diff(a_most_likely_pos_idxs)]
+        # sign_change_locations = np.diff(np.sign(most_likely_pos_idx_change)) # -1 if x < 0, 0 if x==0, 1 if x > 0
+        diff = np.diff(a_most_likely_pos_idxs)
+        signs = np.sign(diff)
+        sign_change_indicies = np.where(np.diff(signs) != 0)[0] + 1 ## I believe the +1 is to handle the loss of an index when we performed np.diff(...)
+        p_x_given_n_segments = np.split(a_p_x_given_n, sign_change_indicies, axis=1)
+        most_likely_pos_idxs_segments = np.split(a_most_likely_pos_idxs, sign_change_indicies)
+        n_segments: int = len(p_x_given_n_segments)
+        segement_lengths = np.array([np.shape(v)[-1] for v in p_x_given_n_segments]) ## each segment is [n_pos_bins, n_seg_time_bins]
+
+        for seg_idx, a_seg in enumerate(p_x_given_n_segments):
+            a_seg_len: int = segement_lengths[seg_idx]
+            a_most_likely_pos_seg = most_likely_pos_idxs_segments[seg_idx]
+            a_seq_spare_score = []
+            for t_idx in reversed(np.arange(a_seg_len)):
+                ## start in the last frame and work forward until the first
+                # sign_change_locations[t_idx]
+                if t_idx > 0:
+                    ## for any but the first index in the series            
+                    start_bound = a_most_likely_pos_seg[t_idx]
+                    # need to know the max index                
+                    end_bound = a_most_likely_pos_seg[t_idx-1]
+                    
+                else:
+                    ## if it is the first bound in the series, we need to decide which side to integrate from (it should be the closest to curr peak:
+                    curr_pos_idx: int = a_most_likely_pos_seg[t_idx]
+                    _curr_pre_pos_bins: int = (max_pos_index - curr_pos_idx)
+                    _curr_post_pos_bins: int = (curr_pos_idx - 0)
+                    _curr_should_start_at_pre: bool = _curr_pre_pos_bins <= _curr_post_pos_bins
+                    if _curr_should_start_at_pre:
+                        start_bound = 0
+                        end_bound = a_most_likely_pos_seg[t_idx]
+                    else:
+                        start_bound = a_most_likely_pos_seg[t_idx]
+                        end_bound = max_pos_index
+
+                # out_spare_score[t_idx] =  
+                a_seq_spare_score.append(np.nansum(a_seg[start_bound:end_bound, t_idx])) ## sum over all values of the segment
+            # for t_idx in reversed(np.arange(a_seg_len))
+            a_seq_spare_score = np.nan_to_num(np.array(a_seq_spare_score), nan=0.0)
+            a_seq_spare_score = np.cumsum(a_seq_spare_score)
+            if final_score_only:
+                a_seq_spare_score = a_seq_spare_score[-1] ## only the last bin, which is by defn maximal
+            out_spare_score.append(a_seq_spare_score)
+        # END for seg_idx, a_seg in enumerate(p_x_given_n_segments)
+                  
+        return out_spare_score, (p_x_given_n_segments, most_likely_pos_idxs_segments, segement_lengths, sign_change_indicies)
+
+
+    @function_attributes(short_name=None, tags=['MAIN', 'score', 'spare'], input_requires=[], output_provides=[], uses=['compute_spare_operation'], used_by=[], creation_date='2025-08-04 10:11', related_items=[])
+    @classmethod
+    def bowling_spare_integration(cls, p_x_given_n: NDArray, decoder_names = ['Long_LR', 'Long_RL', 'Short_LR', 'Short_RL']) -> NDArray:
+        """ Start at the end of the posterior 
+
+
+        Usage:
+        
+            from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import SpareRunningSequenceScore
+
+            out_decoder_spare_scores, out_decoder_spare_scores_extras = SpareRunningSequenceScore.bowling_spare_integration(p_x_given_n=p_x_given_n)
+            out_decoder_spare_scores
+
+        """
+        n_pos, n_decoders, n_time_bins = np.shape(p_x_given_n) # np.shape(p_x_given_n) - (59, 4, 69488) -(n_pos, 4, n_time_bins)
+        assert n_decoders == len(decoder_names), f"{decoder_names} length not equal to n_decoders: {n_decoders}"
+        _decoder_prob_sum_over_all_positions = np.nansum(p_x_given_n, axis=0) ## sum over all positions (4, 69488)
+        most_likely_decoder_idxs: NDArray = np.argmax(_decoder_prob_sum_over_all_positions, axis=0) ## find the max decoder idx for each time bins (4, 69488) - (n_time_bins, )
+        # most_likely_decoder_idxs # .shape
+        # p_x_given_n.shape # p_x_given_n.shape (59, 4, 69488)
+        # p_x_given_n[most_likely_decoder_idxs, :]
+        most_likely_pos_idxs: NDArray = np.argmax(p_x_given_n, axis=0) ## find the max position bins (4, 69488) - (n_decoders, n_time_bins)
+        a_most_likely_pos_idxs = most_likely_pos_idxs[0,:] ## single decoder result .shape (n_time_bins)
+            
+        out_decoder_spare_scores = {} ## one for each decoder
+        out_decoder_spare_scores_extras = {}
+        ## compute each decoder indepednently
+        # for decoder_idx in np.arange(n_decoders):
+        for decoder_idx, a_decoder_name in enumerate(decoder_names):
+            a_p_x_given_n = deepcopy(p_x_given_n[:, decoder_idx, :])
+            ## Normalize to this decoder by summing over each time bin and dividing by the output
+            a_p_x_given_n = a_p_x_given_n / np.nansum(a_p_x_given_n, axis=0)
+            
+            most_likely_decoder_idxs: NDArray = np.argmax(_decoder_prob_sum_over_all_positions, axis=0) ## find the max decoder idx for each time bins (4, 69488) - (n_time_bins, )
+            a_most_likely_pos_idxs: NDArray = np.argmax(a_p_x_given_n, axis=0) ## find the max position bins (4, 69488) - (n_decoders, n_time_bins)
+            a_most_likely_pos_idxs = most_likely_pos_idxs[0,:] ## single decoder result .shape (n_time_bins)
+
+            out_spare_score, (p_x_given_n_segments, most_likely_pos_idxs_segments, segement_lengths, sign_change_indicies) = cls.compute_spare_operation(a_p_x_given_n=a_p_x_given_n, final_score_only=False)
+            # out_decoder_spare_scores.append(out_spare_score)
+            out_decoder_spare_scores[a_decoder_name] = out_spare_score
+            out_decoder_spare_scores_extras[a_decoder_name] = dict(p_x_given_n_segments=p_x_given_n_segments, most_likely_pos_idxs_segments=most_likely_pos_idxs_segments,
+                                                                    segement_lengths=segement_lengths, sign_change_indicies=sign_change_indicies)
+        # Extract the maximum locations for each time bin
+        P_max_ind = np.argmax(p_x_given_n, axis=1)
+        return out_decoder_spare_scores, out_decoder_spare_scores_extras
+
+
+    @classmethod
+    def add_spikeRaster2D_interval_rects(cls, active_2d_plot: Spike2DRaster, seg_df: pd.DataFrame, **kwargs):
+        """ 
+        
+        spare_seq_dfs_datasources_dict, spare_seq_dfs_dict = SpareRunningSequenceScore.add_spikeRaster2D_interval_rects(active_2d_plot, seg_df=seg_df)
+        """
+        
+        from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.Mixins.RenderTimeEpochs.Specific2DRenderTimeEpochs import General2DRenderTimeEpochs, inline_mkColor
+        
+        from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.Mixins.RenderTimeEpochs.EpochRenderingMixin import EpochRenderingMixin, RenderedEpochsItemsContainer
+        from pyphoplacecellanalysis.General.Model.Datasources.IntervalDatasource import IntervalsDatasource
+        from neuropy.utils.mixins.time_slicing import TimeColumnAliasesProtocol
+
+        if 't_duration' not in seg_df.columns:
+            seg_df['t_duration'] = seg_df['t_end'] - seg_df['t_start']
+
+        ## Use the three dataframes as separate Epoch series:
+        spare_seq_dfs_dict = {
+            'SpareSeqScore': seg_df,
+        }
+
+        spare_seq_epochs_formatting_dict = {
+            'SpareSeqScore':dict(y_location=-5.0, height=0.9, pen_color=inline_mkColor('purple', 0.8), brush_color=inline_mkColor('purple', 0.5)),
+        }
+
+        # required_vertical_offsets, required_interval_heights = EpochRenderingMixin.build_stacked_epoch_layout([0.2], epoch_render_stack_height=0.9, interval_stack_location='below') # ratio of heights to each interval
+        # stacked_epoch_layout_dict = {interval_key:dict(y_location=y_location, height=height) for interval_key, y_location, height in zip(list(spare_seq_epochs_formatting_dict.keys()), required_vertical_offsets, required_interval_heights)} # Build a stacked_epoch_layout_dict to update the display
+        # stacked_epoch_layout_dict # {'LapsAll': {'y_location': -3.6363636363636367, 'height': 3.6363636363636367}, 'LapsTrain': {'y_location': -21.818181818181817, 'height': 18.18181818181818}, 'LapsTest': {'y_location': -40.0, 'height': 18.18181818181818}}
+        # stacked_epoch_layout_dict = {}
+        
+        # replaces 'y_location', 'position' for each dict:
+        # spare_seq_epochs_formatting_dict = {k:(v|stacked_epoch_layout_dict[k]) for k, v in spare_seq_epochs_formatting_dict.items()}
+        spare_seq_epochs_formatting_dict = {k:v for k, v in spare_seq_epochs_formatting_dict.items()}
+        
+        
+        ## INPUTS: train_test_split_laps_dfs_dict
+        spare_seq_dfs_dict = {k:TimeColumnAliasesProtocol.renaming_synonym_columns_if_needed(df=v, required_columns_synonym_dict=IntervalsDatasource._time_column_name_synonyms) for k, v in spare_seq_dfs_dict.items()}
+
+        ## Build interval datasources for them:
+        spare_seq_dfs_datasources_dict = {k:General2DRenderTimeEpochs.build_render_time_epochs_datasource(v) for k, v in spare_seq_dfs_dict.items()}
+        ## INPUTS: active_2d_plot, train_test_split_laps_epochs_formatting_dict, train_test_split_laps_dfs_datasources_dict
+        assert len(spare_seq_epochs_formatting_dict) == len(spare_seq_dfs_datasources_dict)
+        for k, an_interval_ds in spare_seq_dfs_datasources_dict.items():
+            an_interval_ds.update_visualization_properties(lambda active_df, **kwargs: General2DRenderTimeEpochs._update_df_visualization_columns(active_df, **(spare_seq_epochs_formatting_dict[k] | kwargs)))
+
+        ## Full output: train_test_split_laps_dfs_datasources_dict
+
+        # actually add the epochs:
+        for k, an_interval_ds in spare_seq_dfs_datasources_dict.items():
+            active_2d_plot.add_rendered_intervals(an_interval_ds, name=f'{k}', debug_print=False) # adds the interval
+
+        return spare_seq_dfs_datasources_dict, spare_seq_dfs_dict
+
+
+
+
+@function_attributes(short_name=None, tags=['UNFINISHED', 'median', 'dominant'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-07-29 17:41', related_items=[])
+def recompute_dominant_cells_from_median(across_session_inst_fr_computation_dict: Dict[IdentifyingContext, InstantaneousSpikeRateGroupsComputation]) -> Dict[IdentifyingContext, InstantaneousSpikeRateGroupsComputation]:
+    """ Usage:
+    
+    from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import recompute_dominant_cells_from_median
+    _OUT_UPDATED_across_session_inst_fr_computation_dict, df_combined, session_cell_exclusivity_annotations = recompute_dominant_cells_from_median(across_session_inst_fr_computation_dict=across_session_inst_fr_computation_dict)
+    
+    ## Print for UserAnnotations
+    print(',\n'.join([': '.join([k.get_initialization_code_string(), str(v)]) for k, v in session_cell_exclusivity_annotations.items()]))
+
+
+    """
+    from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.LongShortTrackComputations import SingleBarResult, InstantaneousSpikeRateGroupsComputation, SpikeRateTrends
+    import nptyping as ND
+    from nptyping import NDArray
+    from neuropy.core.user_annotations import SessionCellExclusivityRecord
+
+    # an_out: InstantaneousSpikeRateGroupsComputation = across_session_inst_fr_computation_dict[IdentifyingContext(format_name= 'kdiba', animal= 'gor01', exper_name= 'one', session_name= '2006-6-08_14-26-15')]
+
+    _OUT_UPDATED_across_session_inst_fr_computation_dict = deepcopy(across_session_inst_fr_computation_dict)
+    session_cell_exclusivity_annotations: Dict[IdentifyingContext, SessionCellExclusivityRecord] = {}
+    
+    _updated_dfs = []
+    # for a_ctxt, an_out in across_session_inst_fr_computation_dict.items():
+    for a_ctxt, an_out in _OUT_UPDATED_across_session_inst_fr_computation_dict.items():
+        theta_trends_list: List[SpikeRateTrends] = [an_out.AnyC_ThetaDeltaMinus, an_out.AnyC_ThetaDeltaPlus]
+
+        _theta_trends_cell_medians = []
+        for a_named_epochs_period_result in theta_trends_list: 
+            # SpikeRateTrends = an_out.AnyC_ThetaDeltaMinus
+            epoch_agg_inst_fr_list: NDArray[ND.Shape["N_EPOCHS, N_CELLS"], Any] = deepcopy(a_named_epochs_period_result.epoch_agg_inst_fr_list) #.shape (40, 66) - (n_epochs, n_neurons)
+            cell_agg_inst_fr_list: NDArray[ND.Shape["N_CELLS"], Any] = np.median(epoch_agg_inst_fr_list, axis=0) ## Aggregation function applied here -- MEDIAN
+            # a_named_epochs_period_result.epoch_agg_inst_fr_list = deepcopy(epoch_agg_inst_fr_list)
+            a_named_epochs_period_result.cell_agg_inst_fr_list = deepcopy(cell_agg_inst_fr_list) ## OVERRIDE WITH NEW ONE -- UPDATES
+            
+            _theta_trends_cell_medians.append(cell_agg_inst_fr_list)
+
+        _theta_trends_cell_medians = np.vstack(_theta_trends_cell_medians).T # (66, 2) - (n_neurons, 2)
+        _theta_trends_cell_medians_df: pd.DataFrame = pd.DataFrame(_theta_trends_cell_medians, columns=['ThetaDeltaMinus', 'ThetaDeltaPlus'])
+        _theta_trends_cell_medians_df['median_diff'] = _theta_trends_cell_medians_df['ThetaDeltaPlus'] - _theta_trends_cell_medians_df['ThetaDeltaMinus'] 
+        _theta_trends_cell_medians_df['median_diff_idx'] = _theta_trends_cell_medians_df['median_diff'] / (_theta_trends_cell_medians_df['ThetaDeltaMinus'] + _theta_trends_cell_medians_df['ThetaDeltaPlus'])
+
+        ## Add the cell identity columns:
+        _theta_trends_cell_medians_df['aclu'] = deepcopy(an_out.AnyC_aclus)
+
+
+        ## Find LxC-like properties
+
+        dominant_cell_threshold: float = 0.8
+
+        _theta_trends_cell_medians_df['is_LdC'] = _theta_trends_cell_medians_df['median_diff_idx'] <= (-dominant_cell_threshold)
+        _theta_trends_cell_medians_df['is_SdC'] = _theta_trends_cell_medians_df['median_diff_idx'] >= dominant_cell_threshold
+        
+        # ## Find long and short dominant cells:
+        _theta_trends_cell_medians_df[_theta_trends_cell_medians_df['is_LdC']]
+        _theta_trends_cell_medians_df[_theta_trends_cell_medians_df['is_SdC']]
+
+        ## UPDATE:
+        an_out.LxC_aclus = np.array(_theta_trends_cell_medians_df[_theta_trends_cell_medians_df['is_LdC']]['aclu'].tolist())
+        an_out.SxC_aclus = np.array(_theta_trends_cell_medians_df[_theta_trends_cell_medians_df['is_SdC']]['aclu'].tolist())
+
+        session_cell_exclusivity_annotations[a_ctxt] = SessionCellExclusivityRecord(
+            LxC=deepcopy(an_out.LxC_aclus).tolist(),
+            SxC=deepcopy(an_out.SxC_aclus).tolist(),
+            # Others=deepcopy(an_out.AnyC_aclus).tolist(),
+        )
+        
+        # # LxC: `long_exclusive.track_exclusive_aclus`
+        # # ThetaDeltaMinus: `long_laps`
+        # an_out.LxC_ThetaDeltaMinus = an_out.AnyC_ThetaDeltaMinus.get_by_id(an_out.LxC_aclus) # = SpikeRateTrends.init_from_spikes_and_epochs(spikes_df=deepcopy(spikes_df), filter_epochs=long_laps, included_neuron_ids=self.LxC_aclus, instantaneous_time_bin_size_seconds=self.instantaneous_time_bin_size_seconds, epoch_handling_mode=epoch_handling_mode, **kwargs)
+        # # ThetaDeltaPlus: `short_laps`
+        # an_out.LxC_ThetaDeltaPlus = an_out.AnyC_ThetaDeltaPlus.get_by_id(an_out.LxC_aclus) # SpikeRateTrends.init_from_spikes_and_epochs(spikes_df=deepcopy(spikes_df), filter_epochs=short_laps, included_neuron_ids=self.LxC_aclus, instantaneous_time_bin_size_seconds=self.instantaneous_time_bin_size_seconds, epoch_handling_mode=epoch_handling_mode, **kwargs)
+
+        # # SxC: `short_exclusive.track_exclusive_aclus`
+        # # ThetaDeltaMinus: `long_laps`
+        # an_out.SxC_ThetaDeltaMinus = an_out.AnyC_ThetaDeltaMinus.get_by_id(an_out.SxC_aclus) # SpikeRateTrends.init_from_spikes_and_epochs(spikes_df=deepcopy(spikes_df), filter_epochs=long_laps, included_neuron_ids=self.SxC_aclus, instantaneous_time_bin_size_seconds=self.instantaneous_time_bin_size_seconds, epoch_handling_mode=epoch_handling_mode, **kwargs)
+        # # ThetaDeltaPlus: `short_laps`
+        # an_out.SxC_ThetaDeltaPlus = an_out.AnyC_ThetaDeltaPlus.get_by_id(an_out.SxC_aclus) # SpikeRateTrends.init_from_spikes_and_epochs(spikes_df=deepcopy(spikes_df), filter_epochs=short_laps, included_neuron_ids=self.SxC_aclus, instantaneous_time_bin_size_seconds=self.instantaneous_time_bin_size_seconds, epoch_handling_mode=epoch_handling_mode, **kwargs)
+
+        if an_out.active_identifying_session_ctx is not None:
+            ## Add the extended neuron identifiers (like the global neuron_uid, session_uid) columns
+            _theta_trends_cell_medians_df = _theta_trends_cell_medians_df.neuron_identity.make_neuron_indexed_df_global(an_out.active_identifying_session_ctx, add_expanded_session_context_keys=True, add_extended_aclu_identity_columns=True)
+            
+        ## OUTPUTS: _theta_trends_cell_medians_df
+        _updated_dfs.append(_theta_trends_cell_medians_df)
+
+    _updated_dfs
+
+    ## Merge the resultant dfs
+    # Concatenate the two dataframes
+    df_combined = pd.concat(_updated_dfs, ignore_index=True)
+    ## Drop duplicates, keeping the first (corresponding to the SxC/LxC over the AnyC, although all the values are the same so only the 'active_set_membership' column would need to be changed): 
+    df_combined = df_combined.drop_duplicates(subset=['neuron_uid'], keep='first', inplace=False)
+    ## Add extra columns:
+    # df_combined['inst_time_bin_seconds'] = float(self.instantaneous_time_bin_size_seconds)
+    # df_combined
+
+    # ['neuron_uid']
+
+    ## Find long and short dominant cells:
+    df_combined[df_combined['is_LdC']]
+    df_combined[df_combined['is_SdC']]
+    
+    return (_OUT_UPDATED_across_session_inst_fr_computation_dict, df_combined, session_cell_exclusivity_annotations)
+
+
+
+@metadata_attributes(short_name=None, tags=['heuristic', 'continuous-heuristic', 'not-yet-working'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-07-29 00:40', related_items=[])
+class ContinuousHeuristicScoring:
+    """ 
+        Most recent functions to attempt to do continuous/non-PBE period sequence detection via a version of my heuristic decoder
+
+    Usage:
+
+
+        import numpy as np
+        from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import ContinuousHeuristicScoring
+
+        # Example usage
+
+        # a_result.most_likely_position_indicies_list[0].shape # (2, 69488)
+        # np.sum(p_x_given_n, axis=1) ## sum over 4 decoders to find most likely
+
+        _decoder_prob_sum_over_all_positions = np.nansum(p_x_given_n, axis=0) ## sum over all positions (4, 69488)
+        most_likely_decoder_idxs: NDArray = np.argmax(_decoder_prob_sum_over_all_positions, axis=0) ## find the max decoder idx for each time bins (4, 69488) - (n_time_bins, )
+        # most_likely_decoder_idxs # .shape
+        # p_x_given_n.shape # p_x_given_n.shape (59, 4, 69488)
+        # p_x_given_n[most_likely_decoder_idxs, :]
+        most_likely_pos_idxs: NDArray = np.argmax(p_x_given_n, axis=0) ## find the max position bins (4, 69488) - (n_decoders, n_time_bins)
+        a_most_likely_pos_idxs = most_likely_pos_idxs[0,:] ## single decoder result .shape (n_time_bins)
+        # a_most_likely_pos_idxs
+
+        # pos_bin_edges: NDArray = deepcopy(xbin)
+        # track_templates: TrackTemplates
+        use_bin_units_instead_of_realworld:bool=False
+        # max_ignore_bins:float = 2 ## for PBEs
+        max_ignore_bins:float = 9 ## for Laps
+        # 5 skip bins
+        # same_thresh_cm: float = 6.0
+        same_thresh_cm: float = 60.0
+        # max_jump_distance_cm: float = 60.0
+        max_jump_distance_cm: float = 200.0
+        debug_print=False
+
+        # pos_bounds = [np.min([track_templates.long_LR_decoder.xbin, track_templates.short_LR_decoder.xbin]), np.max([track_templates.long_LR_decoder.xbin, track_templates.short_LR_decoder.xbin])] # [37.0773897438341, 253.98616538463315]
+        num_pos_bins: int = track_templates.long_LR_decoder.n_xbin_centers
+        xbin_edges: NDArray = deepcopy(track_templates.long_LR_decoder.xbin)
+        decoder_track_length_dict = track_templates.get_track_length_dict()  # {'long_LR': 214.0, 'long_RL': 214.0, 'short_LR': 144.0, 'short_RL': 144.0}
+
+        time_window_centers: NDArray = deepcopy(a_result.time_window_centers[0]) # (n_time_bins)
+
+        if not use_bin_units_instead_of_realworld:
+            a_most_likely_pos_cm = [xbin_edges[v] for v in a_most_likely_pos_idxs]
+            active_most_likely_pos = deepcopy(a_most_likely_pos_cm)
+        else:
+            active_most_likely_pos = deepcopy(a_most_likely_pos_idxs)
+            
+        if isinstance(active_most_likely_pos, list):
+            active_most_likely_pos = np.array(active_most_likely_pos)
+
+        ## INPUTS: active_most_likely_pos -- original data series
+
+        df_runs, (valid, counts), (P_diff, is_excessive_change_index, series_idx) = ContinuousHeuristicScoring.find_longest_run_of_non_excessive_diffs(active_most_likely_pos=active_most_likely_pos, time_window_centers=time_window_centers, max_jump_distance_cm=max_jump_distance_cm, min_suffix_merge_seq_n_bins=20, max_ignore_bins=0, min_prefix_merge_seq_n_bins=20)
+        df_runs
+
+        ## Add to SpikeRaster2D as intervals:
+        cont_heuristics_dfs_datasources_dict, cont_heuristics_dfs_dict = ContinuousHeuristicScoring.add_spikeRaster2D_interval_rects(active_2d_plot, df_runs=df_runs)
+
+    """
+    @classmethod
+    def add_spikeRaster2D_interval_rects(cls, active_2d_plot: Spike2DRaster, df_runs: pd.DataFrame, **kwargs):
+        """ 
+        
+        cont_heuristics_dfs_datasources_dict, cont_heuristics_dfs_dict = ContinuousHeuristicScoring.add_spikeRaster2D_interval_rects(active_2d_plot, df_runs=df_runs)
+        """
+        
+        from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.Mixins.RenderTimeEpochs.Specific2DRenderTimeEpochs import General2DRenderTimeEpochs, inline_mkColor
+        
+        from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.Mixins.RenderTimeEpochs.EpochRenderingMixin import EpochRenderingMixin, RenderedEpochsItemsContainer
+        from pyphoplacecellanalysis.General.Model.Datasources.IntervalDatasource import IntervalsDatasource
+        from neuropy.utils.mixins.time_slicing import TimeColumnAliasesProtocol
+
+        if 't_duration' not in df_runs.columns:
+            df_runs['t_duration'] = df_runs['t_end'] - df_runs['t_start']
+
+        ## Use the three dataframes as separate Epoch series:
+        cont_heuristics_dfs_dict = {
+            'ContinuousHeuristic': df_runs,
+        }
+
+        cont_heuristics_epochs_formatting_dict = {
+            'ContinuousHeuristic':dict(y_location=-10.0, height=7.5, pen_color=inline_mkColor('purple', 0.8), brush_color=inline_mkColor('purple', 0.5)),
+        }
+
+        required_vertical_offsets, required_interval_heights = EpochRenderingMixin.build_stacked_epoch_layout([0.2], epoch_render_stack_height=10.0, interval_stack_location='below') # ratio of heights to each interval
+        stacked_epoch_layout_dict = {interval_key:dict(y_location=y_location, height=height) for interval_key, y_location, height in zip(list(cont_heuristics_epochs_formatting_dict.keys()), required_vertical_offsets, required_interval_heights)} # Build a stacked_epoch_layout_dict to update the display
+        # stacked_epoch_layout_dict # {'LapsAll': {'y_location': -3.6363636363636367, 'height': 3.6363636363636367}, 'LapsTrain': {'y_location': -21.818181818181817, 'height': 18.18181818181818}, 'LapsTest': {'y_location': -40.0, 'height': 18.18181818181818}}
+
+        # replaces 'y_location', 'position' for each dict:
+        cont_heuristics_epochs_formatting_dict = {k:(v|stacked_epoch_layout_dict[k]) for k, v in cont_heuristics_epochs_formatting_dict.items()}
+        
+        ## INPUTS: train_test_split_laps_dfs_dict
+        cont_heuristics_dfs_dict = {k:TimeColumnAliasesProtocol.renaming_synonym_columns_if_needed(df=v, required_columns_synonym_dict=IntervalsDatasource._time_column_name_synonyms) for k, v in cont_heuristics_dfs_dict.items()}
+
+        ## Build interval datasources for them:
+        cont_heuristics_dfs_datasources_dict = {k:General2DRenderTimeEpochs.build_render_time_epochs_datasource(v) for k, v in cont_heuristics_dfs_dict.items()}
+        ## INPUTS: active_2d_plot, train_test_split_laps_epochs_formatting_dict, train_test_split_laps_dfs_datasources_dict
+        assert len(cont_heuristics_epochs_formatting_dict) == len(cont_heuristics_dfs_datasources_dict)
+        for k, an_interval_ds in cont_heuristics_dfs_datasources_dict.items():
+            an_interval_ds.update_visualization_properties(lambda active_df, **kwargs: General2DRenderTimeEpochs._update_df_visualization_columns(active_df, **(cont_heuristics_epochs_formatting_dict[k] | kwargs)))
+
+        ## Full output: train_test_split_laps_dfs_datasources_dict
+
+        # actually add the epochs:
+        for k, an_interval_ds in cont_heuristics_dfs_datasources_dict.items():
+            active_2d_plot.add_rendered_intervals(an_interval_ds, name=f'{k}', debug_print=False) # adds the interval
+
+        return cont_heuristics_dfs_datasources_dict, cont_heuristics_dfs_dict
+
+
+    @function_attributes(short_name=None, tags=['continuous-heuristic', 'replay-detection', 'PBEs', 'WORKING', 'AI'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-07-29 08:20', related_items=[])
+    @classmethod
+    def label_false_series_with_bridging(cls, is_excessive: np.ndarray, min_prefix_merge_seq_n_bins: int = 4, max_ignore_bins:int=2, min_suffix_merge_seq_n_bins: int = 2):
+        """ 
+        1. Compute the 1st-order-diff of the decoded most-likely-positions 
+        2. determine violations where the change exceeds the `is_excessive`
+        min_prefix_merge_seq_n_bins: minimum number of bins to consider for bridging
+        
+        
+        # Output might look like:
+        # [ 0 0 0 0  -1  0 0 0  -1 -1  1 1 ]
+        # where the single True intrusion at position 4 was bridged into series 0,
+        # but the double True run at 8–9 was not.
+
+        """
+        # 1) RLE helper
+        def rle(arr):
+            # returns (values, lengths, start_positions)
+            n = arr.size
+            if n == 0:
+                return np.array([], bool), np.array([], int), np.array([], int)
+            # find boundaries where value changes
+            change_idx = np.nonzero(np.concatenate(([True], arr[1:] != arr[:-1], [True])))[0]
+            lengths = np.diff(change_idx)
+            starts = change_idx[:-1]
+            vals = arr[starts]
+            return vals, lengths, starts
+
+        # make a copy we can mutate
+        arr = is_excessive.copy()
+        
+        # Run initial RLE
+        vals, lengths, starts = rle(arr)
+        
+        # 2) Find intrusion runs:
+        #    A run of True (vals==True, lengths<2) whose previous False-run is >=4
+        #    and whose following False-run is >=2.
+        intrusion_mask = np.zeros_like(arr, bool)
+        for i, (v, L, st) in enumerate(zip(vals, lengths, starts)):
+            if not v and L >= min_prefix_merge_seq_n_bins:              # false-run of length >=4
+                # check if next is a short intrusion
+                if i+1 < len(vals) and vals[i+1] and lengths[i+1] < max_ignore_bins:
+                    # check the run after intrusion
+                    if i+2 < len(vals) and not vals[i+2] and lengths[i+2] >= min_suffix_merge_seq_n_bins:
+                        # mark that short True-run for flipping
+                        intrusion_start = starts[i+1]
+                        intrusion_len   = lengths[i+1]
+                        intrusion_mask[intrusion_start:intrusion_start+intrusion_len] = True
+
+        # 3) Flip only the marked “short intrusions” from True to False
+        arr[intrusion_mask] = False
+
+        # 4) Rerun RLE on the corrected Boolean array and label each False-block
+        vals2, lengths2, starts2 = rle(arr)
+        series_index = np.full(arr.shape, -1, dtype=int)
+        series_id = 0
+
+        for v, L, st in zip(vals2, lengths2, starts2):
+            if not v:
+                series_index[st:st+L] = series_id
+                series_id += 1
+            # if v is True, we leave series_index at -1
+
+        return series_index
+
+
+    @classmethod
+    def find_longest_run_of_non_excessive_diffs(cls, active_most_likely_pos: NDArray, time_window_centers: NDArray, max_jump_distance_cm: float, min_prefix_merge_seq_n_bins: int = 4, max_ignore_bins:int=2, min_suffix_merge_seq_n_bins: int = 2):
+        """ 
+        
+        1. Compute the 1st-order-diff (`P_diff`) of the decoded most-likely-positions (`active_most_likely_pos`)
+        2. determine violations where the change exceeds the `is_excessive`
+        min_prefix_merge_seq_n_bins: minimum number of bins to consider for bridging
+        
+        
+        active_most_likely_pos
+
+
+        Usage:
+
+        ## INPUTS: active_most_likely_pos -- original data series
+
+        df_runs, (valid, counts), (P_diff, is_excessive_change_index, series_idx) = ContinuousHeuristicScoring.find_longest_run_of_non_excessive_diffs(active_most_likely_pos=active_most_likely_pos, time_window_centers=time_window_centers, max_jump_distance_cm=max_jump_distance_cm, max_ignore_bins=0,
+                                                                                                                                                        # min_prefix_merge_seq_n_bins=20, min_suffix_merge_seq_n_bins=20,
+                                                                                                                                                        min_prefix_merge_seq_n_bins=200, min_suffix_merge_seq_n_bins=200,
+                                                                                                                                                        )
+        cont_heuristics_dfs_datasources_dict, cont_heuristics_dfs_dict = ContinuousHeuristicScoring.add_spikeRaster2D_interval_rects(active_2d_plot, df_runs=df_runs)
+
+        """
+        P_diff = np.diff(active_most_likely_pos) # (min: -258, mean: , max: 258, np.nanmean(P_diff): -0.002035577375650436, np.nanmedian(P_diff): 0.0, np.nanstd(P_diff): 122.22033112262098
+        is_excessive_change_index = (np.abs(P_diff) > max_jump_distance_cm)
+        # is_excessive_change_index # array([False, False, False, ...,  True, False, False])
+
+        # 1) label runs with your function
+        series_idx = ContinuousHeuristicScoring.label_false_series_with_bridging(is_excessive_change_index, min_prefix_merge_seq_n_bins=min_prefix_merge_seq_n_bins, max_ignore_bins=max_ignore_bins, min_suffix_merge_seq_n_bins=min_suffix_merge_seq_n_bins)
+
+        # 2) count sizes
+        valid = (series_idx >= 0)
+        counts = np.bincount(series_idx[valid], minlength=series_idx.max()+1)
+        ## OUTPUTS: valid, counts
+
+        # Sorted run IDs from largest to smallest
+        sorted_ids = np.argsort(counts)[::-1]
+
+        records = []
+
+        for rid in sorted_ids:
+            diff_bins = np.where(series_idx == rid)[0]
+            if diff_bins.size == 0:
+                # no diffs in this run (shouldn’t usually happen)  
+                continue
+
+            # span of diffs is diff_bins.min() … diff_bins.max()
+            start_diff = diff_bins.min()
+            end_diff   = diff_bins.max()
+
+            # that covers positions[start_diff] through positions[end_diff+1]
+            pos_start = start_diff
+            pos_end = end_diff + 1
+
+            # slice out the actual positions
+            seg = active_most_likely_pos[pos_start : pos_end+1]
+
+            records.append({
+                "run_id":       int(rid),
+                "run_length":   int(counts[rid]),    # number of diffs
+                "pos_start":    int(pos_start),
+                "pos_end":      int(pos_end),
+                't_start': float(time_window_centers[pos_start]),
+                't_end': float(time_window_centers[pos_end]),
+                "positions":    list(seg)            # store as list
+            })
+
+        df_runs = pd.DataFrame.from_records(records)
+        return df_runs, (valid, counts), (P_diff, is_excessive_change_index, series_idx)
+
+
+
+# ==================================================================================================================================================================================================================================================================================== #
+# 2025-07-08 - Remapping Models - Not yet working                                                                                                                                                                                                                                      #
+# ==================================================================================================================================================================================================================================================================================== #
+
+@metadata_attributes(short_name=None, tags=['remapping', 'model', 'not-yet-working'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-07-08 17:40', related_items=[])
+class CellFieldRemappingModels:
+    """ Various methods to explain how cells remap. """
+    inward_endcap_offset_magnitude: float = 15.0
+    short_track_distance_bound: float = 57.0 # the amplitude of the max endcap endpoint for the short track (furthest valid point away from midpoint)
+    
+    scale_factor_track_body_only: float = 0.7 # (35.0/50.0)
+    scale_factor_entire_track_length: float = (57.0/72.0)
+
+    # linear_translation_wiggle_room_cm: float = 40.0 ## allow point to be anywhere within 40.0cm of expected point by translation
+    linear_translation_wiggle_room_cm: float = 50.0 ## allow point to be anywhere within 40.0cm of expected point by translation
+
+    @classmethod
+    def nearest_endcap_anchored(cls, L: float, m: float) -> float:
+        """ transformation between long (L) and short (S) for endcap-anchored fields """
+        # Define the piecewise function using np.piecewise
+        return np.piecewise(L, [(L < m), (L == m), (L > m)],           # Conditions
+                        [lambda L, m: L + cls.inward_endcap_offset_magnitude, # anchored to -endcap -> (-endcap_L + 15)
+                         lambda L, m: m,
+                         lambda L, m: L - cls.inward_endcap_offset_magnitude, # anchored to +endcap -> (+endcap_L - 15)
+                         ], m)
+    
+    @classmethod
+    def left_endcap_anchored(cls, L: float, m: float) -> float:
+        """ transformation between long (L) and short (S) for left endcap-anchored fields """
+        return (L + cls.inward_endcap_offset_magnitude) # anchored to -endcap -> (-endcap_L + 15)
+
+    @classmethod
+    def right_endcap_anchored(cls, L: float, m: float) -> float:
+        """ transformation between long (L) and short (S) for right endcap-anchored fields """
+        return (L - cls.inward_endcap_offset_magnitude) # anchored to +endcap -> (+endcap_L - 15) 
+
+
+    # @classmethod
+    # def midpoint_anchored(cls, L: float, m: float) -> float:
+    #     """ transformation between long (L) and short (S) for endcap-anchored fields """
+    #     # Define the piecewise function using np.piecewise
+    #     return L ## L is equal S
+    
+    @classmethod
+    def room_anchored(cls, L: float, m: float) -> float:
+        """ transformation between long (L) and short (S) for endcap-anchored fields """
+        return np.piecewise(L, [(L >= cls.short_track_distance_bound), ((L >= m) and (L < cls.short_track_distance_bound)), ((L < m) and (L > -cls.short_track_distance_bound)), (L <= -cls.short_track_distance_bound)],           # Conditions
+                        [lambda L, m: cls.short_track_distance_bound, ## has to clip to endcap
+                         lambda L, m: L,
+                         lambda L, m: L,
+                         lambda L, m: -cls.short_track_distance_bound, ## clips to -endcap
+                         ], m)
+
+    @classmethod
+    def linear_scaling_by_track_body(cls, L: float, m: float) -> float:
+        """ transformation between long (L) and short (S) for endcap-anchored fields """
+        return L * cls.scale_factor_track_body_only # 0.7 
+    
+
+    @classmethod
+    def linear_scaling_by_entire_track(cls, L: float, m: float) -> float:
+        """ transformation between long (L) and short (S) for endcap-anchored fields """
+        return L * cls.scale_factor_entire_track_length
+    
+
+    
+
+    @classmethod
+    def get_model_test_fns_dict(cls) -> Dict:
+        """ returns a dict containing each of the remapping models
+        """
+        raise NotImplementedError(f' #TODO 2025-07-23 15:47: - [ ] THIS DOES NOT FULLY WORK and is UNTESTED')
+        return {'nearest_endcap_anchored':cls.nearest_endcap_anchored, 'left_endcap_anchored':cls.left_endcap_anchored, 'right_endcap_anchored':cls.right_endcap_anchored, 
+                # 'midpoint_anchored':cls.midpoint_anchored,
+                'room_anchored': cls.room_anchored, 
+                'linear_scaling_by_track_body': cls.linear_scaling_by_track_body, 'linear_scaling_by_entire_track': cls.linear_scaling_by_entire_track}
+
+    # ==================================================================================================================================================================================================================================================================================== #
+    # END MODELS                                                                                                                                                                                                                                                                           #
+    # ==================================================================================================================================================================================================================================================================================== #
+
+    @classmethod
+    def is_non_linear_remapping(cls, L: float, S: float, m: float) -> bool:
+        """ Not a model, takes an L and S field peak and returns True if this remapping requires non-linear shifts. """
+        LS_diff: float = S - L # S - updated, L - original
+        is_non_linear: bool = False
+
+        expected_S_by_lin_trans: float = cls.nearest_endcap_anchored(L=L, m=m)
+        expected_to_observed_diff_cm: float = expected_S_by_lin_trans - S # difference between expected S and the observed one
+        
+        does_exceed_allowed_deviation: bool = (np.abs(expected_to_observed_diff_cm) > cls.linear_translation_wiggle_room_cm)
+        if does_exceed_allowed_deviation:
+            ## implies (S  exceeds the allowed deviation from the S expected by translation
+            is_non_linear = True
+            return is_non_linear
+        
+        ## First question is: does it go the opposite way of the remapping?
+        if L >= m:
+             ## is right of midpoint
+             if (LS_diff > 0.0):
+                  ## implies (S > L) -> moved ++ (to right)
+                  is_non_linear = True
+                  return is_non_linear ## Moved OPPOSITE DIRECTION to expected translation
+        else:
+             ## is left of midpoint
+             if (LS_diff < 0.0):
+                  ## implies (L > S) -> moved -- (to left)
+                  is_non_linear = True
+                  return is_non_linear ## Moved OPPOSITE DIRECTION to expected translation
+             
+        # ## Second question: does it greatly exceed the contraction distance? (it shouldn't):
+        # contraction_amount_cm: float = 15.0
+        # wiggle_room_factor: float = 0.2
+        # if np.abs(LS_diff) > 40.0: #(contraction_amount_cm + (contraction_amount_cm * wiggle_room_factor)):
+        #     is_non_linear = True
+        #     return is_non_linear ## point moved much further than the translation would expect
+        
+        return is_non_linear ## likely False
+
+
+    @function_attributes(short_name=None, tags=['main', 'FIXUP', 'has_considerable_remapping'], input_requires=[], output_provides=[], uses=['cls.is_non_linear_remapping'], used_by=[], creation_date='2025-07-08 17:47', related_items=[])
+    @classmethod
+    def fix_has_considerable_remapping_column(cls, all_neuron_stats_table: pd.DataFrame, x_mid: float = 143.8837168675656) -> pd.DataFrame:
+        """ The 'has_considerable_remapping' as currently computed is wrong. This implements an improved computation for this column.
+
+        NOTE: Independent/unrelated to `cls.main_evaluate_remapping_models`
+        , L_peak_col_name: str='long_LR_pf1D_peak', L_peak_col_name: str='short_LR_pf1D_peak'
+        
+        active_scatter_all_neuron_stats_table = CellFieldRemappingModels.fix_has_considerable_remapping_column(all_neuron_stats_table=active_scatter_all_neuron_stats_table)
+        
+        """
+        active_scatter_all_neuron_stats_table: pd.DataFrame = deepcopy(all_neuron_stats_table).fillna(value=np.nan, inplace=False) ## fill all Pandas.NA values with np.nan so they can be correctly cast to floats
+        # active_scatter_all_neuron_stats_table
+
+        if ('_BAK_has_considerable_remapping' not in active_scatter_all_neuron_stats_table):
+            active_scatter_all_neuron_stats_table['_BAK_has_considerable_remapping'] = deepcopy(active_scatter_all_neuron_stats_table['has_considerable_remapping'])
+        else:
+            print(f'WARN: active_scatter_all_neuron_stats_table already contains the "_BAK_has_considerable_remapping", a backup has already been made and will not be overwritten!')
+
+        active_scatter_all_neuron_stats_table['has_considerable_remapping'] = False ## start with False
+
+        L_peaks = active_scatter_all_neuron_stats_table['long_LR_pf1D_peak'].to_numpy()
+        S_peaks = active_scatter_all_neuron_stats_table['short_LR_pf1D_peak'].to_numpy()
+        active_scatter_all_neuron_stats_table['has_considerable_remapping'] = np.logical_or(active_scatter_all_neuron_stats_table['has_considerable_remapping'], [CellFieldRemappingModels.is_non_linear_remapping(L, S, x_mid) for L, S in zip(L_peaks, S_peaks)])
+
+        L_peaks = active_scatter_all_neuron_stats_table['long_RL_pf1D_peak'].to_numpy()
+        S_peaks = active_scatter_all_neuron_stats_table['short_RL_pf1D_peak'].to_numpy()
+        active_scatter_all_neuron_stats_table['has_considerable_remapping'] = np.logical_or(active_scatter_all_neuron_stats_table['has_considerable_remapping'], [CellFieldRemappingModels.is_non_linear_remapping(L, S, x_mid) for L, S in zip(L_peaks, S_peaks)])
+        return active_scatter_all_neuron_stats_table
+
+
+
+
+    @classmethod
+    def main_evaluate_remapping_models(cls, active_scatter_all_neuron_stats_table: pd.DataFrame, x_mid: float = 143.8837168675656):
+        """ Evaluate each of the models for the remapping cells in `active_scatter_all_neuron_stats_table`
+
+        from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import CellFieldRemappingModels
+
+        model_errors, best_model_name = CellFieldRemappingModels.main_test_models(active_scatter_all_neuron_stats_table=active_scatter_all_neuron_stats_table)
+        
+        """
+        from sklearn.metrics import mean_squared_error
+
+        _model_test_fns_dict = cls.get_model_test_fns_dict() # {'endcap_anchored':CellFieldRemappingModels.endcap_anchored, 'midpoint_anchored':CellFieldRemappingModels.midpoint_anchored, 'room_anchored': CellFieldRemappingModels.room_anchored, 'linear_scaling': CellFieldRemappingModels.linear_scaling}
+
+        L_peaks = active_scatter_all_neuron_stats_table['long_pf_peak_x'].to_numpy()
+        S_peaks_dict = {}
+
+        for k, a_fn in _model_test_fns_dict.items():
+            S_peaks = [a_fn(L, x_mid) for L in L_peaks]
+            S_peaks_dict[k] = np.array(S_peaks)
+
+        S_peaks_dict
+        # --- New code for model evaluation ---
+
+        # 1. Get both the input (L) and the measured output (S) values
+        # Ensure there are no NaN values in the columns you're using
+        valid_data = active_scatter_all_neuron_stats_table[['long_pf_peak_x', 'short_pf_peak_x']].dropna()
+        L_peaks = valid_data['long_pf_peak_x'].to_numpy()
+        S_peaks_measured = valid_data['short_pf_peak_x'].to_numpy()
+
+
+        # 2. Calculate predictions for each model (as in your original code)
+        S_peaks_predicted_dict = {}
+        for k, a_fn in _model_test_fns_dict.items():
+            S_peaks_predicted = np.array([a_fn(L, x_mid) for L in L_peaks])
+            S_peaks_predicted_dict[k] = S_peaks_predicted
+
+
+        # 3. Calculate RMSE for each model
+        model_errors = {}
+        for model_name, S_predicted in S_peaks_predicted_dict.items():
+            # Calculate Mean Squared Error
+            mse = mean_squared_error(S_peaks_measured, S_predicted)
+            # Calculate Root Mean Squared Error
+            rmse = np.sqrt(mse)
+            model_errors[model_name] = rmse
+            print(f"Model: {model_name:<20} | RMSE: {rmse:.4f}")
+
+
+        # 4. Find and announce the best model
+        best_model_name = min(model_errors, key=model_errors.get)
+        print(f"\n🏆 The best model is '{best_model_name}' with an RMSE of {model_errors[best_model_name]:.4f}")
+        return model_errors, best_model_name
+
+
+
+# ==================================================================================================================================================================================================================================================================================== #
+# Long/Short 3D Placefields                                                                                                                                                                                                                                                            #
+# ==================================================================================================================================================================================================================================================================================== #
+from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.Interactive3dDisplayFunctions import Interactive3dDisplayFunctions
+from pyphoplacecellanalysis.GUI.PyVista.InteractivePlotter.InteractivePlaceCellDataExplorer import InteractivePlaceCellDataExplorer
+from pyphoplacecellanalysis.General.Pipeline.Stages.Display import get_neuron_identities
+from pyphoplacecellanalysis.General.Mixins.DataSeriesColorHelpers import DataSeriesColorHelpers
+from pyphoplacecellanalysis.General.Model.Configs.NeuronPlottingParamConfig import SingleNeuronPlottingExtended
+from pyphocorehelpers.gui.Qt.color_helpers import ColorFormatConverter
+from pyphoplacecellanalysis.PhoPositionalData.plotting.placefield import plot_placefields2D, update_plotColorsPlacefield2D
+from pyphoplacecellanalysis.General.Model.Configs.NeuronPlottingParamConfig import NeuronConfigOwningMixin
+from pyphocorehelpers.gui.PyVista.CascadingDynamicPlotsList import CascadingDynamicPlotsList
+from neuropy.utils.mixins.binning_helpers import get_bin_centers
+
+# curr_active_pipeline.reload_default_display_functions()
+# _out = dict()
+
+@metadata_attributes(short_name=None, tags=['3D', 'tracks', 'LS', 'NOT-FINISHED', 'pyvista'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-06-27 00:00', related_items=[])
+class LongShort3DPlacefieldsHelpers:
+    """ Helps plot the placefields from both the long and short track on the same 3D PyVista plotter.
+    Not finished.
+
+    from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import LongShort3DPlacefieldsHelpers
+
+    """
+    @classmethod
+    def _build_merged_long_short_pf2D_neuron_identities(cls, long_pf2D, short_pf2D, should_preview_colors: bool=False):
+        """ builds the merged colors and neuron identities for plotting both the long and short track placefields
+        Usage:
+            ## INPUTS: long_pf2D, short_pf2D
+            (long_or_short_colors_dict, long_pf_colors, short_pf_colors), neuron_plotting_configs_dict = _build_merged_long_short_pf2D_neuron_identities(long_pf2D=long_pf2D, short_pf2D=short_pf2D)
+            list(neuron_plotting_configs_dict.values())[0].qcolor
+            list(neuron_plotting_configs_dict.values())[0].color
+            neuron_plotting_configs_dict
+        """
+        # INPUTS: global_pf2D, long_pf2D, short_pf2D
+        long_pf_neuron_identities, pf_sort_ind, pf_colors, pf_colormap, pf_listed_colormap = get_neuron_identities(long_pf2D)
+        long_pf_aclus = set([int(v.extended_identity_tuple.aclu) for v in long_pf_neuron_identities])
+
+        short_pf_neuron_identities, pf_sort_ind, pf_colors, pf_colormap, pf_listed_colormap = get_neuron_identities(short_pf2D)
+        short_pf_aclus = set([int(v.extended_identity_tuple.aclu) for v in short_pf_neuron_identities])
+        long_or_short_neuron_identities = long_pf_aclus.union(short_pf_aclus)
+        # long_or_short_aclus = np.unique(np.array([int(v.aclu) for v in long_or_short_neuron_identities]))
+        long_or_short_aclus = np.unique(np.array([int(v) for v in long_or_short_neuron_identities]))
+
+        n_neurons: int = len(long_or_short_aclus)
+        neuron_qcolors_list, neuron_colors_ndarray = DataSeriesColorHelpers.build_cell_colors(n_neurons, colormap_name='PAL-relaxed_bright', colormap_source=None, return_255_array=False)
+
+        ## Preview the new colors
+        if should_preview_colors:
+            from pyphocorehelpers.gui.Jupyter.simple_widgets import render_colors
+            render_colors([ColorFormatConverter.qColor_to_hexstring(a_qcolor, include_alpha=False) for a_qcolor in neuron_qcolors_list])
+
+        # neuron_colors_ndarray.shape
+        long_or_short_colors_dict = dict(zip(long_or_short_aclus, neuron_colors_ndarray.T))
+
+        # ipcDataExplorer.params.pf_colors.shape # (4, 52)
+
+        long_pf_colors = np.vstack([long_or_short_colors_dict[aclu] for aclu in long_pf_aclus]).T
+        short_pf_colors = np.vstack([long_or_short_colors_dict[aclu] for aclu in short_pf_aclus]).T
+        # long_or_short_colors_array = np.vstack(long_or_short_colors_dict.values()).T
+        # long_pf_colors.shape # (50, 4)
+        neuron_plotting_configs_dict: Dict[int, SingleNeuronPlottingExtended] = DataSeriesColorHelpers.build_cell_display_configs(long_or_short_aclus, neuron_qcolors_list=neuron_qcolors_list)
+        
+        ## OUTPUTS: long_pf_colors, short_pf_colors
+        return (long_or_short_colors_dict, long_pf_colors, short_pf_colors), neuron_plotting_configs_dict
+
+
+
+    @function_attributes(short_name=None, tags=['plot', 'long-short'], input_requires=[], output_provides=[], uses=['_build_merged_long_short_pf2D_neuron_identities'], used_by=[], creation_date='2025-06-27 00:50', related_items=[])
+    @classmethod
+    def _plot_long_short_placefields(cls, ipcDataExplorer, long_pf2D, short_pf2D, maze_y_offset: float = 20.0, enable_update_spikes: bool=False):
+        """ 
+        Usage:
+            from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import LongShort3DPlacefieldsHelpers
+            from pyphoplacecellanalysis.GUI.PyVista.InteractivePlotter.InteractivePlaceCellDataExplorer import InteractivePlaceCellDataExplorer
+
+            curr_active_pipeline.reload_default_display_functions()
+            _out = {}
+            global_any_context = curr_active_pipeline.filtered_contexts[global_any_name]
+            _out['_display_3d_interactive_tuning_curves_plotter'] = curr_active_pipeline.display(display_function='_display_3d_interactive_tuning_curves_plotter', active_session_configuration_context=global_any_context,
+                                                                                                separate_window = False,
+                                                                                                params_kwargs={'show_legend': False, 'should_display_placefield_points': False, 'should_nan_non_visited_elements': False, 'zScalingFactor': 500.0},
+                                                                                                #  panel_controls_mode = 'Panel',
+                                                                                                # panel_controls_mode = 'Qt',
+                                                                                                panel_controls_mode = None,
+                                                                                                ) # _display_grid_bin_bounds_validation
+
+            ## Move the long-maze to -`maze_y_offset` units and the short-maze to +`maze_y_offset` units along the y-axis 
+            ipcDataExplorer: InteractivePlaceCellDataExplorer = _out['_display_3d_interactive_tuning_curves_plotter']['ipcDataExplorer']
+            pActiveTuningCurvesPlotter = _out['_display_3d_interactive_tuning_curves_plotter']['plotter']
+            pane = _out['_display_3d_interactive_tuning_curves_plotter']['pane']
+            pane = LongShort3DPlacefieldsHelpers._plot_long_short_placefields(ipcDataExplorer=ipcDataExplorer, long_pf2D=long_pf2D, short_pf2D=short_pf2D)
+
+        """
+        def _subfn_scale_ybin_centers_to_track_width(ybin: NDArray, track_y_center: float = 0.0, track_y_width: float = 22.0) -> NDArray:
+            data_y_range: float = np.ptp(ybin)
+            data_y_center_offset: float = ybin[0] + (data_y_range / 2.0)
+
+            _adjusted_ybin_centers = deepcopy(ybin)
+
+            if track_y_width is not None:
+                # First: center the data around 0
+                _adjusted_ybin_centers = _adjusted_ybin_centers - data_y_center_offset
+                # Then: scale to desired width
+                _adjusted_ybin_centers = (_adjusted_ybin_centers / data_y_range) * float(track_y_width)
+                # Finally: offset to desired center
+                _adjusted_ybin_centers = _adjusted_ybin_centers + track_y_center
+            else:
+                # Just center without scaling
+                _adjusted_ybin_centers = _adjusted_ybin_centers - data_y_center_offset + track_y_center
+
+            return _adjusted_ybin_centers
+
+
+        # ==================================================================================================================================================================================================================================================================================== #
+        # Begin Function Body                                                                                                                                                                                                                                                                  #
+        # ==================================================================================================================================================================================================================================================================================== #
+
+
+        ## Remove old placefields:
+        ipcDataExplorer.remove_all_rendered_placefields()
+        
+        ## Adjust mazes
+        long_maze_bg = ipcDataExplorer.long_maze_bg
+        short_maze_bg = ipcDataExplorer.short_maze_bg
+
+        ipcDataExplorer.params.maze_y_offset = maze_y_offset
+
+        ## normal (-, +) offsets        
+        long_y_offset: float = -maze_y_offset
+        short_y_offset: float = maze_y_offset
+        
+        # ## positive-only offsets:
+        # long_y_offset: float = 0.0
+        # short_y_offset: float = maze_y_offset        
+
+        ipcDataExplorer.params.long_y_offset = long_y_offset
+        ipcDataExplorer.params.short_y_offset = short_y_offset
+        
+        long_maze_bg.SetPosition(0.0, ipcDataExplorer.params.long_y_offset, 0.0)
+        short_maze_bg.SetPosition(0.0, ipcDataExplorer.params.short_y_offset, 0.0)
+        
+        long_pf2D = deepcopy(long_pf2D)
+        short_pf2D = deepcopy(short_pf2D)
+
+        # long_adjusted_ybin_centers = _subfn_scale_ybin_centers_to_track_width(ybin_centers=long_pf2D.ratemap.ybin_centers, track_y_center=-maze_y_offset)
+        # short_adjusted_ybin_centers = _subfn_scale_ybin_centers_to_track_width(ybin_centers=short_pf2D.ratemap.ybin_centers, track_y_center=maze_y_offset)
+        print(f'long_pf2D.ratemap.ybin: {long_pf2D.ratemap.ybin}')
+        print(f'short_pf2D.ratemap.ybin: {short_pf2D.ratemap.ybin}')
+        # long_adjusted_ybin = _subfn_scale_ybin_centers_to_track_width(ybin=long_pf2D.ratemap.ybin, track_y_center=-ipcDataExplorer.params.long_y_offset)
+        # short_adjusted_ybin = _subfn_scale_ybin_centers_to_track_width(ybin=short_pf2D.ratemap.ybin, track_y_center=-ipcDataExplorer.params.short_y_offset)
+        long_adjusted_ybin = _subfn_scale_ybin_centers_to_track_width(ybin=long_pf2D.ratemap.ybin, track_y_center=0.0)
+        short_adjusted_ybin = _subfn_scale_ybin_centers_to_track_width(ybin=short_pf2D.ratemap.ybin, track_y_center=0.0)
+        # long_adjusted_ybin = _subfn_scale_ybin_centers_to_track_width(ybin=long_pf2D.ratemap.ybin, track_y_center=-11.0)
+        # short_adjusted_ybin = _subfn_scale_ybin_centers_to_track_width(ybin=short_pf2D.ratemap.ybin, track_y_center=-11.0)
+
+        # long_adjusted_ybin = _subfn_scale_ybin_centers_to_track_width(ybin=long_pf2D.ratemap.ybin, track_y_center=long_pf2D.ratemap.ybin[0])
+        # short_adjusted_ybin = _subfn_scale_ybin_centers_to_track_width(ybin=short_pf2D.ratemap.ybin, track_y_center=short_pf2D.ratemap.ybin[0])
+
+
+        print(f'long_adjusted_ybin: {long_adjusted_ybin}')
+        print(f'short_adjusted_ybin: {short_adjusted_ybin}')
+        
+        long_pf2D.ratemap.ybin = long_adjusted_ybin
+        short_pf2D.ratemap.ybin = short_adjusted_ybin
+        
+        # long_pf2D.ratemap.ybin_centers = get_bin_centers(long_adjusted_ybin)
+        # short_pf2D.ratemap.ybin_centers = get_bin_centers(short_adjusted_ybin)
+        
+        ## INPUTS: long_pf2D, short_pf2D
+        (long_or_short_colors_dict, long_pf_colors, short_pf_colors), neuron_plotting_configs_dict = cls._build_merged_long_short_pf2D_neuron_identities(long_pf2D=long_pf2D, short_pf2D=short_pf2D)
+
+        ## OUTPUTS: long_pf_colors, short_pf_colors, neuron_plotting_configs_dict
+        # ipcDataExplorer.params.zScalingFactor = 500.0
+        ipcDataExplorer.params.zScalingFactor = 2000.0
+        ipcDataExplorer.params.show_legend = False
+        ipcDataExplorer.params.should_display_placefield_points = False
+        # ipcDataExplorer.params.should_display_placefield_points = True
+
+        ipcDataExplorer.params.should_nan_non_visited_elements = False
+        # ipcDataExplorer.params.should_nan_non_visited_elements = True
+        
+        
+        # ipcDataExplorer.params.
+
+        # {'show_legend': False, 'should_display_placefield_points': False, 'should_nan_non_visited_elements': False, 'zScalingFactor': 500.0}
+        # ==================================================================================================================================================================================================================================================================================== #
+        # Begin Plotting Part                                                                                                                                                                                                                                                                  #
+        # ==================================================================================================================================================================================================================================================================================== #
+
+        ## INPUTS: ipcDataExplorer, pActiveTuningCurvesPlotter
+        # INPUTS: global_pf2D, long_pf2D, short_pf2D
+        _temp_input_params = get_dict_subset(ipcDataExplorer.params, ['should_use_normalized_tuning_curves','should_pdf_normalize_manually','should_nan_non_visited_elements','should_force_placefield_custom_color','should_display_placefield_points', 'should_override_disable_smooth_shading', 'nan_opacity',
+                                                'zScalingFactor', 'show_legend'])
+
+        # _temp_input_params['clip_below_plane'] = 1 # 0.5 * ipcDataExplorer.params.zScalingFactor
+
+        _temp_input_params['clip_below_plane'] = 0.6 # 0.2 * ipcDataExplorer.params.zScalingFactor
+        _temp_input_params['clip_below_plane']
+
+        # ipcDataExplorer.p, ipcDataExplorer.plots['tuningCurvePlotActors'], ipcDataExplorer.plots_data['tuningCurvePlotData'], ipcDataExplorer.plots['tuningCurvePlotLegendActor'], temp_plots_data = plot_placefields2D(ipcDataExplorer.p, deepcopy(long_pf2D), pf_colors=ipcDataExplorer.params.pf_colors, zScalingFactor=ipcDataExplorer.params.zScalingFactor, show_legend=ipcDataExplorer.params.show_legend, series_prefix='long' **_temp_input_params) # note that the get_dict_subset(...) thing is just a safe way to get only the relevant members.
+        ## INPUTS: long_pf_colors, short_pf_colors
+        # ipcDataExplorer.p, ipcDataExplorer.plots['tuningCurvePlotActors'], ipcDataExplorer.plots_data['tuningCurvePlotData'], ipcDataExplorer.plots['tuningCurvePlotLegendActor'], temp_plots_data = plot_placefields2D(ipcDataExplorer.p, active_placefields=deepcopy(long_pf2D), pf_colors=long_pf_colors, zScalingFactor=ipcDataExplorer.params.zScalingFactor, show_legend=ipcDataExplorer.params.show_legend, series_prefix='long' **_temp_input_params) # note that the get_dict_subset(...) thing is just a safe way to get only the relevant members.
+
+        ## Long Track pfs:
+        # clip_bounds = long_maze_bg.GetBounds()
+        clip_bounds = None
+        _long_outs = plot_placefields2D(ipcDataExplorer.p, active_placefields=deepcopy(long_pf2D), pf_colors=long_pf_colors, series_prefix='long', clip_bounds=clip_bounds, **_temp_input_params)
+        p, long_tuningCurvePlotActors, long_tuningCurvePlotData, long_tuningCurvePlotLegendActor, long_temp_plots_data = _long_outs
+        for k, a_nested_actors_dict in long_tuningCurvePlotActors.items():
+            # print(f'k: {k}, v: {v}')
+            for a_subactor_key, a_subactor in a_nested_actors_dict.items():
+                if a_subactor is not None:
+                    a_subactor.SetPosition(0.0, ipcDataExplorer.params.long_y_offset, 0.0) ## long offset
+                else:
+                    # print(f'[{k}][{a_subactor_key}] is None!')
+                    pass
+
+        ## Short Track pfs:
+        # clip_bounds = short_maze_bg.GetBounds()
+        clip_bounds = None
+        _short_outs = plot_placefields2D(ipcDataExplorer.p, active_placefields=deepcopy(short_pf2D), pf_colors=short_pf_colors, series_prefix='short', clip_bounds=clip_bounds, **_temp_input_params) 
+        p, short_tuningCurvePlotActors, short_tuningCurvePlotData, short_tuningCurvePlotLegendActor, short_temp_plots_data = _short_outs
+        for k, a_nested_actors_dict in short_tuningCurvePlotActors.items():
+            # print(f'k: {k}, v: {v}')
+            for a_subactor_key, a_subactor in a_nested_actors_dict.items():
+                if a_subactor is not None:
+                    a_subactor.SetPosition(0.0, ipcDataExplorer.params.short_y_offset, 0.0) ## short offset
+                else:
+                    # print(f'[{k}][{a_subactor_key}] is None!')
+                    pass
+                
+
+
+        #TODO 2025-06-27 08:13: - [ ] hardcoded track offsets to re-align appropriately
+        assert (maze_y_offset==20.0), f"2025-06-27 08:13: hardcoded track offsets only work to re-allign with `maze_y_offset=20.0`"
+        long_maze_bg.SetPosition(0.0, -163.0, 0.0)
+        short_maze_bg.SetPosition(0.0, -123.0, 0.0)
+        
+        # ==================================================================================================================================================================================================================================================================================== #
+        # Update Combined Variables                                                                                                                                                                                                                                                            #
+        # ==================================================================================================================================================================================================================================================================================== #
+        ## Combine long/short entries:
+        combined_paired_dict = {}
+        combined_tuningCurvePlotActors = {}
+        combined_tuningCurvePlotData = {}
+        combined_temp_plots_data = {}
+
+        is_flat_key_mode: bool = False
+        ## INPUTS: long_tuningCurvePlotActors, long_tuningCurvePlotData, long_temp_plots_data
+        ## INPUTS: short_tuningCurvePlotActors, short_tuningCurvePlotData, short_temp_plots_data
+
+        ## INPUTS: long_temp_plots_data, long_temp_plots_data
+
+        ## Plots Actors:
+        for k, a_nested_actors_dict in long_tuningCurvePlotActors.items():
+            # print(f'k: {k}, v: {a_nested_actors_dict}')
+            combined_key: str = f'long_{k}'
+            combined_paired_dict[k] = {'long': combined_key, 'short': None}
+                
+            if is_flat_key_mode:
+                combined_tuningCurvePlotActors[combined_key] = a_nested_actors_dict
+            else:
+                combined_tuningCurvePlotActors[k] = {'long': a_nested_actors_dict}
+                a_short_nested_actors_dict = short_tuningCurvePlotActors.get(k, None)
+                if a_short_nested_actors_dict is not None:
+                    combined_tuningCurvePlotActors[k]['short'] = a_short_nested_actors_dict
+
+        for k, a_nested_actors_dict in short_tuningCurvePlotActors.items():
+            # print(f'k: {k}, v: {a_nested_actors_dict}')
+            combined_key: str = f'short_{k}'
+            if k not in combined_paired_dict:
+                combined_paired_dict[k] = {'long': None, 'short': combined_key} ## create a new entry
+            else:
+                ## already in there    
+                # combined_paired_dict.setdefault(k, {'long': None, 'short': a_nested_actors_dict})
+                combined_paired_dict[k]['short'] = combined_key
+                
+            if is_flat_key_mode:
+                combined_tuningCurvePlotActors[combined_key] = a_nested_actors_dict
+            else:
+                ## handle keys only in short
+                if (k not in combined_tuningCurvePlotActors) and (a_nested_actors_dict is not None):
+                    combined_tuningCurvePlotActors[k] = {'short': a_nested_actors_dict}
+
+
+        combined_tuningCurvePlotActors = {k:CascadingDynamicPlotsList(**v) for k, v in combined_tuningCurvePlotActors.items()} ## convert each child to a CascadingDynamicPlotsList
+
+        ## Plots Data:
+        ## INPUTS: long_tuningCurvePlotData, short_tuningCurvePlotData
+
+        combined_tuningCurvePlotData = {}
+        for k, a_nested_plots_data in long_tuningCurvePlotData.items():
+            # print(f'k: {k}, v: {a_nested_actors_dict}')
+            combined_key: str = f'long_{k}'
+            if is_flat_key_mode:
+                combined_tuningCurvePlotData[combined_key] = a_nested_plots_data
+            else:
+                combined_tuningCurvePlotData[k] = {'long': a_nested_plots_data}
+                a_short_data = short_tuningCurvePlotData.get(k, None)
+                if a_short_data is not None:
+                    combined_tuningCurvePlotData[k]['short'] = a_short_data
+
+        for k, a_nested_plots_data in short_tuningCurvePlotData.items():
+            # print(f'k: {k}, v: {a_nested_actors_dict}')
+            combined_key: str = f'short_{k}'
+            if is_flat_key_mode:
+                combined_tuningCurvePlotData[combined_key] = a_nested_plots_data
+            else:
+                ## handle keys only in short
+                if (k not in combined_tuningCurvePlotData) and (a_nested_plots_data is not None):
+                    combined_tuningCurvePlotData[k] = {'short': a_nested_plots_data}
+
+
+        ## Other Data:
+        ## INPUTS: long_temp_plots_data, short_temp_plots_data
+        combined_temp_plots_data = {}
+        for k, v in long_temp_plots_data.items():
+            combined_temp_plots_data[k] = list(v)
+
+        for k, v in short_temp_plots_data.items():
+            if k in combined_temp_plots_data:
+                combined_temp_plots_data[k].extend(v)
+            else:
+                print(F'WARN: k: {k} missing from combined_temp_plots_data. combined_temp_plots_data.keys(): {list(combined_temp_plots_data.keys())}')
+                combined_temp_plots_data[k] = v
+            
+
+        ## Update spikes:
+        if enable_update_spikes:
+            combined_spikes_df: pd.DataFrame = pd.concat([long_pf2D.spikes_df, short_pf2D.spikes_df], axis='index', ignore_index=True).drop_duplicates(subset=['t_rel_seconds'])
+            ipcDataExplorer._spikes_df = combined_spikes_df
+        
+        ## OUTPUTS: combined_paired_dict, combined_tuningCurvePlotActors, combined_tuningCurvePlotData, combined_temp_plots_data, combined_spikes_df
+
+        ipcDataExplorer.params.combined_paired_dict = combined_paired_dict
+        ipcDataExplorer.plots['tuningCurvePlotActors'] = combined_tuningCurvePlotActors
+        ipcDataExplorer.plots_data['tuningCurvePlotData'] = combined_tuningCurvePlotData
+        # ipcDataExplorer.plots['tuningCurvePlotLegendActor'] = combined_tuningCurvePlotActors
+
+        # Build the widget labels:
+        ipcDataExplorer.params.unit_labels = combined_temp_plots_data['unit_labels'] # fetch the unit labels from the extra data dict.
+        ipcDataExplorer.params.pf_fragile_linear_neuron_IDXs = combined_temp_plots_data['good_placefield_neuronIDs'] # fetch the unit labels from the extra data dict.
+        ## Legend data:
+        ipcDataExplorer.plots_data['tuningCurvePlotLegendData'] = combined_temp_plots_data['legend_entries']
+
+        ## build combined legend
+        if ipcDataExplorer.params.show_legend:
+            ipcDataExplorer.plots['tuningCurvePlotLegendActor'] = ipcDataExplorer.p.add_legend(ipcDataExplorer.plots_data['tuningCurvePlotLegendData'], name='tuningCurvesLegend', 
+                                bcolor=(0.05, 0.05, 0.05), border=True,
+                                loc='center right', size=[0.05, 0.85]) # vtk.vtkLegendBoxActor
+
+
+        ## Update: `self.params.pf_active_configs`
+        ## INPUTS: neuron_plotting_configs_dict
+        # ipcDataExplorer.params.pf_active_configs ## replace
+        ipcDataExplorer.params.pf_active_configs = list(neuron_plotting_configs_dict.values())
+        # ipcDataExplorer.active_neuron_render_configs = 
+        ipcDataExplorer.active_neuron_render_configs_map = NeuronConfigOwningMixin._build_id_index_configs_dict(ipcDataExplorer.active_neuron_render_configs)
+        # n_cells: int = len(ipcDataExplorer.active_neuron_render_configs_map)
+        n_cells: int = len(ipcDataExplorer.params.pf_active_configs)
+        
+        ## UPDATES: ipcDataExplorer.params.neuron_colors, ipcDataExplorer.params.neuron_colors_hex
+        print(f'n_cells: {n_cells}')
+        
+        # allocate new neuron_colors array:
+        # ipcDataExplorer.params.neuron_colors = np.zeros((4, n_cells))
+        # for i, curr_config in enumerate(ipcDataExplorer.params.pf_active_configs):
+        #     curr_qcolor = curr_config.qcolor
+        #     curr_color = curr_qcolor.getRgbF() # (1.0, 0.0, 0.0, 0.5019607843137255)
+        #     ipcDataExplorer.params.neuron_colors[:, i] = curr_color[:]
+        #     # self.params.neuron_colors[:, i] = curr_color[:]
+        
+        long_or_short_colors_array = np.vstack(long_or_short_colors_dict.values()).T
+        print(f'np.shape(long_or_short_colors_array): {np.shape(long_or_short_colors_array)}')
+        
+        ipcDataExplorer.params.neuron_colors = long_or_short_colors_array
+        ipcDataExplorer.params.neuron_colors_hex = [v.color for v in list(neuron_plotting_configs_dict.values())]
+
+        ## Called to setup spikes
+        if enable_update_spikes:
+            ipcDataExplorer.setup_spike_rendering_mixin()
+            # ipcDataExplorer._build_flat_color_data()
+            # ipcDataExplorer.plot_spikes()
+            
+        
+        # ==================================================================================================================================================================================================================================================================================== #
+        # Post-update rebuilding widgets and such:                                                                                                                                                                                                                                             #
+        # ==================================================================================================================================================================================================================================================================================== #
+        # Update the ipcDataExplorer's colors for spikes and placefields from its configs on init:
+        defer_update: bool = False
+        # defer_update: bool = True # defer_update=True to prevent self.update_spikes(...) from being erroniously called
+        # ipcDataExplorer.on_config_update({neuron_id:a_config.color for neuron_id, a_config in ipcDataExplorer.active_neuron_render_configs_map.items()}, defer_update=False)
+        ipcDataExplorer.on_config_update({neuron_id:a_config.color for neuron_id, a_config in ipcDataExplorer.active_neuron_render_configs_map.items()}, defer_update=defer_update) 
+    
+
+        ipcDataExplorer.params.panel_controls_mode = None ## override
+        # ipcDataExplorer.params.panel_controls_mode = 'Qt' ## override
+        ipcDataExplorer.params.should_use_separate_window = False ## override
+        
+        # build the output panels if desired:
+        if ipcDataExplorer.params.panel_controls_mode == 'Qt':
+            # Qt-based Placefield controls:
+            from pyphoplacecellanalysis.GUI.Qt.PlacefieldVisualSelectionControls.qt_placefield import build_all_placefield_output_panels
+            from pyphocorehelpers.gui.Qt.widget_positioning_helpers import WidgetPositioningHelpers, DesiredWidgetLocation, WidgetGeometryInfo
+            
+            ## try to remove extant controls
+            placefieldControlsContainerWidget = ipcDataExplorer.ui.pop('placefieldControlsContainerWidget', None)
+            if placefieldControlsContainerWidget is not None:
+                print(f'removing extant Qt controls...')
+                placefieldControlsContainerWidget.close()
+                print(f'done.')        
+
+            # pane: (placefieldControlsContainerWidget, pf_widgets)
+            placefieldControlsContainerWidget, pf_widgets = build_all_placefield_output_panels(ipcDataExplorer)
+            placefieldControlsContainerWidget.show()
+            
+            # Adds the placefield controls container widget and each individual pf widget to the ipcDataExplorer.ui in case it needs to reference them later:
+            ipcDataExplorer.ui['placefieldControlsContainerWidget'] = placefieldControlsContainerWidget
+            
+            # Visually align the widgets:
+            WidgetPositioningHelpers.align_window_edges(ipcDataExplorer.p, placefieldControlsContainerWidget, relative_position = 'above', resize_to_main=(1.0, None))
+            
+            # Wrap:
+            if not ipcDataExplorer.params.should_use_separate_window:
+                from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.DockAreaWrapper import DockAreaWrapper
+                
+                active_root_main_widget = ipcDataExplorer.p.window()
+                root_dockAreaWindow, app = DockAreaWrapper.wrap_with_dockAreaWindow(active_root_main_widget, placefieldControlsContainerWidget, title=ipcDataExplorer.data_explorer_name)
+            else:
+                print(f'Skipping separate window because should_use_separate_window == True')
+                root_dockAreaWindow = None
+            pane = (root_dockAreaWindow, placefieldControlsContainerWidget, pf_widgets)
+            
+        elif ipcDataExplorer.params.panel_controls_mode == 'Panel':        
+            ### Build Dynamic Panel Interactive Controls for configuring Placefields:
+            # Panel library based Placefield controls
+            from pyphoplacecellanalysis.GUI.Panel.panel_placefield import build_panel_interactive_placefield_visibility_controls
+            pane = build_panel_interactive_placefield_visibility_controls(ipcDataExplorer)
+        else:
+            # no controls
+            pane = None
+            # pass
+        
+        ipcDataExplorer.p.update()
+        ipcDataExplorer.p.render() 
+
+        return pane
+
+
+    @function_attributes(short_name=None, tags=['long-short', 'display', '3D', 'pf', 'peaks', 'promienence', 'ratemap'], input_requires=[], output_provides=[], uses=['_render_peak_prominence_2d_results_on_pyvista_plotter'], used_by=[], creation_date='2025-06-27 04:10', related_items=['pyphoplacecellanalysis.Pho3D.PyVista.peak_prominences.render_all_neuron_peak_prominence_2d_results_on_pyvista_plotter'])
+    @classmethod
+    def render_long_short_all_neuron_peak_prominence_2d_results_on_pyvista_plotter(cls, ipcDataExplorer, long_peak_prominence_2d_results, short_peak_prominence_2d_results, debug_print=False, **kwargs):
+        """
+        Computes the appropriate contour/peaks/rectangle/etc components for each neuron_id using the active_peak_prominence_2d_results and uses them to create new:
+        Inputs:
+            `ipcDataExplorer`: a valid and activate 3D Interactive Tuning Curves Plotter instance, as would be produced by calling `curr_active_pipeline.display('_display_3d_interactive_tuning_curves_plotter', ...)`
+            `active_peak_prominence_2d_results`: the computed results from the 'PeakProminence2D' computation stage.
+            
+        Provides: 
+            Modifies ipcDataExplorer's `.plots['tuningCurvePlotActors']` and `.plots_data['tuningCurvePlotActors']` properties just like endogenous ipcDataExplorer functions do.
+            FOR EACH neuron_id -> active_neuron_id:
+                ipcDataExplorer.plots['tuningCurvePlotActors'][active_neuron_id].peaks: a hierarchy of nested CascadingDynamicPlotsList objects
+                ipcDataExplorer.plots_data['tuningCurvePlotData'][active_neuron_id]['peaks']: a series of nested-dicts with the same key hierarchy as the above peaks
+            
+        Usage:
+        
+            from pyphoplacecellanalysis.Pho3D.PyVista.peak_prominences.render_all_neuron_peak_prominence_2d_results_on_pyvista_plotter
+            
+            display_output = {}
+            active_config_name = long_LR_name
+            print(f'active_config_name: {active_config_name}')
+            active_peak_prominence_2d_results = curr_active_pipeline.computation_results[active_config_name].computed_data.get('RatemapPeaksAnalysis', {}).get('PeakProminence2D', None)
+            pActiveTuningCurvesPlotter = None
+            display_output = display_output | curr_active_pipeline.display('_display_3d_interactive_tuning_curves_plotter', active_config_name, extant_plotter=display_output.get('pActiveTuningCurvesPlotter', None), panel_controls_mode='Qt', should_nan_non_visited_elements=False, zScalingFactor=2000.0) # Works now!
+            ipcDataExplorer = display_output['ipcDataExplorer']
+            display_output['pActiveTuningCurvesPlotter'] = display_output.pop('plotter') # rename the key from the generic "plotter" to "pActiveSpikesBehaviorPlotter" to avoid collisions with others
+            pActiveTuningCurvesPlotter = display_output['pActiveTuningCurvesPlotter']
+            root_dockAreaWindow, placefieldControlsContainerWidget, pf_widgets = display_output['pane'] # for Qt mode
+
+            active_peak_prominence_2d_results = curr_active_pipeline.computation_results[active_config_name].computed_data.get('RatemapPeaksAnalysis', {}).get('PeakProminence2D', None)
+            LongShort3DPlacefieldsHelpers.render_long_short_all_neuron_peak_prominence_2d_results_on_pyvista_plotter(ipcDataExplorer, active_peak_prominence_2d_results)
+            
+        """
+        from pyphoplacecellanalysis.Pho3D.PyVista.peak_prominences import render_all_neuron_peak_prominence_2d_results_on_pyvista_plotter, _render_peak_prominence_2d_results_on_pyvista_plotter
+        
+        long_peak_prominence_2d_results_aclus = np.array(list(long_peak_prominence_2d_results.results.keys()))
+        short_peak_prominence_2d_results_aclus = np.array(list(short_peak_prominence_2d_results.results.keys()))
+        # active_peak_prominence_2d_results_aclus = np.array(list(long_peak_prominence_2d_results.results.keys()))
+        either_peak_prominence_2d_results_aclus = np.unique([*long_peak_prominence_2d_results_aclus.tolist(), *short_peak_prominence_2d_results_aclus.tolist()])
+        print(f'long_peak_prominence_2d_results_aclus: {long_peak_prominence_2d_results_aclus}')
+        print(f'short_peak_prominence_2d_results_aclus: {short_peak_prominence_2d_results_aclus}')
+        print(f'either_peak_prominence_2d_results_aclus: {either_peak_prominence_2d_results_aclus}')
+
+        for active_neuron_id in ipcDataExplorer.neuron_ids:
+            if debug_print:
+                print(f'processing active_neuron_id: {active_neuron_id}...')
+                
+            _temp_neuron_id_actors = ipcDataExplorer.plots['tuningCurvePlotActors'].get(active_neuron_id, None)
+            if (active_neuron_id not in ipcDataExplorer.plots['tuningCurvePlotActors']) or (_temp_neuron_id_actors is None):
+                ipcDataExplorer.plots['tuningCurvePlotActors'][active_neuron_id] = CascadingDynamicPlotsList(peaks={})
+            _temp_neuron_id_plot_data = ipcDataExplorer.plots_data['tuningCurvePlotData'].get(active_neuron_id, None)
+            if (active_neuron_id not in ipcDataExplorer.plots_data['tuningCurvePlotData']) or (_temp_neuron_id_plot_data is None):
+                ipcDataExplorer.plots_data['tuningCurvePlotData'][active_neuron_id] = {}
+
+            # Determine if this aclu is present in the `active_peak_prominence_2d_results`
+            if active_neuron_id in either_peak_prominence_2d_results_aclus:
+                
+                try:
+                    tuning_curve_is_visible = ipcDataExplorer.plots['tuningCurvePlotActors'][active_neuron_id].main.GetVisibility() # either 0 or 1 depending on the visibility of this cell
+                except (KeyError, AttributeError, ValueError) as e:
+                    # AttributeError: 'NoneType' object has no attribute 'main'
+                    ## get from the configs:
+                    tuning_curve_is_visible: int = int(ipcDataExplorer.active_neuron_render_configs_map[active_neuron_id].isVisible)            
+                except Exception as e:
+                    raise e
+
+                ## Initialize:
+                ipcDataExplorer.plots['tuningCurvePlotActors'][active_neuron_id]['peaks'] = {} # sets the .peaks property of the CascadingDynamicPlotsList
+                ipcDataExplorer.plots_data['tuningCurvePlotData'][active_neuron_id]['peaks'] = {}
+                
+                if active_neuron_id in long_peak_prominence_2d_results_aclus:
+                    long_all_peaks_data, long_all_peaks_actors = _render_peak_prominence_2d_results_on_pyvista_plotter(ipcDataExplorer, active_peak_prominence_2d_results=long_peak_prominence_2d_results, valid_neuron_id=active_neuron_id, render=False, debug_print=debug_print, **kwargs)
+                    ipcDataExplorer.plots['tuningCurvePlotActors'][active_neuron_id]['peaks']['long'] = long_all_peaks_actors
+                    ipcDataExplorer.plots_data['tuningCurvePlotData'][active_neuron_id]['peaks']['long'] = long_all_peaks_data
+                    long_all_peaks_actors.SetVisibility(tuning_curve_is_visible) # Change the visibility to match the current tuning_curve_visibility_state
+                    for k, a_nested_actors_dict in long_all_peaks_actors.items():
+                        # print(f'k: {k}, v: {v}')
+                        for a_subactor_key, a_subactor in a_nested_actors_dict.items():
+                            if a_subactor is not None:
+                                a_subactor.SetPosition(0.0, ipcDataExplorer.params.long_y_offset, 0.0) ## long offset
+                            else:
+                                # print(f'[{k}][{a_subactor_key}] is None!')
+                                pass
+
+
+                if active_neuron_id in short_peak_prominence_2d_results_aclus:
+                    short_all_peaks_data, short_all_peaks_actors = _render_peak_prominence_2d_results_on_pyvista_plotter(ipcDataExplorer, active_peak_prominence_2d_results=short_peak_prominence_2d_results, valid_neuron_id=active_neuron_id, render=False, debug_print=debug_print, **kwargs)
+                    ipcDataExplorer.plots['tuningCurvePlotActors'][active_neuron_id]['peaks']['short'] = short_all_peaks_actors
+                    ipcDataExplorer.plots_data['tuningCurvePlotData'][active_neuron_id]['peaks']['short'] = short_all_peaks_data
+                    short_all_peaks_actors.SetVisibility(tuning_curve_is_visible) # Change the visibility to match the current tuning_curve_visibility_state
+                    for k, a_nested_actors_dict in short_all_peaks_actors.items():
+                        # print(f'k: {k}, v: {v}')
+                        for a_subactor_key, a_subactor in a_nested_actors_dict.items():
+                            if a_subactor is not None:
+                                a_subactor.SetPosition(0.0, ipcDataExplorer.params.short_y_offset, 0.0) ## short offset
+                            else:
+                                # print(f'[{k}][{a_subactor_key}] is None!')
+                                pass
+                            
+
+                ipcDataExplorer.plots['tuningCurvePlotActors'][active_neuron_id]['peaks'] = CascadingDynamicPlotsList(**ipcDataExplorer.plots['tuningCurvePlotActors'][active_neuron_id]['peaks'])
+                ## visibility and such:                
+                # ipcDataExplorer.plots['tuningCurvePlotActors'][active_neuron_id].peaks = all_peaks_actors # sets the .peaks property of the CascadingDynamicPlotsList
+                # ipcDataExplorer.plots_data['tuningCurvePlotData'][active_neuron_id]['peaks'] = all_peaks_data
+            else:
+                # neuron_id is missing from results:
+                print(f'WARN: neuron_id: {active_neuron_id} is present in ipcDataExplorer but missing from `active_peak_prominence_2d_results`!')
+                # ipcDataExplorer.plots['tuningCurvePlotActors'][active_neuron_id]['peaks'] = None
+                # ipcDataExplorer.plots_data['tuningCurvePlotData'][active_neuron_id]['peaks'] = None
+                pass
+        # END for active_neuron_id in ipcDataExplorer.neuron_i...
+
+        # Once done, render
+        ipcDataExplorer.p.render()
+        
+        if debug_print:
+            print('done.')
+            
+        return ipcDataExplorer
+
+# ==================================================================================================================================================================================================================================================================================== #
+# Time Bin Categorization                                                                                                                                                                                                                                                              #
+# ==================================================================================================================================================================================================================================================================================== #
+
+import numpy as np
+import itertools
+from typing import List, Tuple, Dict
+# from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import analyze_epoch_dynamics
+# from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import MeasuredVsDecodedOccupancy
+from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.EpochComputationFunctions import EpochComputationFunctions, EpochComputationsComputationsContainer
+from neuropy.utils.indexing_helpers import PandasHelpers
+        
+
+from enum import Enum, auto
+
+@metadata_attributes(short_name=None, tags=['run-lengths', 'sequence-analysis', 'temporal'], input_requires=[], output_provides=[], uses=[], used_by=['WithinEpochTimeBinDynamics'], creation_date='2025-05-16 04:30', related_items=[])
+class TimeBinCategorization(Enum):
+    """classifies a single time bin based on its prob 
+    
+    
+        if (self.value == self.pLONG.value):
+            pass
+        elif (self.value == self.pSHORT.value):
+            pass
+        elif (self.value == self.MIXED.value):
+            pass
+        else:
+            raise NotImplementedError(f'{self} is not VALID')
+
+            
+    """
+    pLONG = 'pure.Long'
+    pSHORT = 'pure.Short'
+    MIXED = 'mixed'
+
+    def __str__(self):
+        return self.name
+    
+    @classmethod
+    def list_members(cls) -> List["TimeBinCategorization"]:
+        return [cls.pLONG, cls.pSHORT, cls.MIXED]
+
+    @classmethod
+    def list_values(cls):
+        """Returns a list of all enum values"""
+        return list(cls)
+
+    @classmethod
+    def list_names(cls):
+        """Returns a list of all enum names"""
+        return [e.name for e in cls]
+
+    def lower_name(self) -> str:
+        """Returns a list of all enum names"""
+        return self.name[1:].lower() # 'long', 'short', 'mixed'
+        if (self.value == self.pLONG.value):
+            pass
+        elif (self.value == self.pSHORT.value):
+            pass
+        elif (self.value == self.MIXED.value):
+            pass
+        else:
+            raise NotImplementedError(f'{self} is not VALID')
+
+    def to_numeric(self) -> int:
+        """Returns an integer representation (-1, 0, +1) of the span type"""
+        if (self.value == self.pLONG.value):
+            return 1
+        elif (self.value == self.pSHORT.value):
+            return -1
+        elif (self.value == self.MIXED.value):
+            return 0
+        else:
+            raise NotImplementedError(f'{self} is not VALID')
+
+
+    def to_two_column_vector(self) -> NDArray:
+        """Returns an integer representation (-1, 0, +1) of the span type"""
+        if (self.value == self.pLONG.value):
+            return [1, 0]
+        elif (self.value == self.pSHORT.value):
+            return [0, 1]
+        elif (self.value == self.MIXED.value):
+            return [0.5, 0.5]
+        else:
+            raise NotImplementedError(f'{self} is not VALID')
+        
+
+    
+@metadata_attributes(short_name=None, tags=['run-lengths', 'sequence-analysis', 'temporal'], input_requires=[], output_provides=[], uses=['TimeBinCategorization'], used_by=[], creation_date='2025-05-16 04:28', related_items=[])
+class WithinEpochTimeBinDynamics:
+    """ This class aims to quantify the bin-to-bin changes in decoded context within a given Epoch event. Ideally it would say something about whether it was static, random, flickering (transitions with change inertia), transitioning, etc.
+
+
+    Usage:
+        ## ⚓🎯 2025-05-15 - Within-epoch transition and run-length sequence analyis
+        from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import WithinEpochTimeBinDynamics, TimeBinCategorization
+
+        sequence_dwell_epochs_df = WithinEpochTimeBinDynamics.analyze_subsequence_temporal_dynamics(curr_active_pipeline, time_bin_size=0.050)
+        # int_column_names = [k for k in sequence_dwell_epochs_df.columns if k.startswith('n_')]
+
+        # sequence_dwell_epochs_df.infer_objects()
+        sequence_dwell_epochs_df
+    
+    """
+    @classmethod
+    def classify(cls, p: float) -> TimeBinCategorization:
+        if p > 0.6:
+            return TimeBinCategorization.pLONG # 'pure.Long'
+        elif p < 0.4:
+            return TimeBinCategorization.pSHORT # 'pure.Short'
+        else:
+            return TimeBinCategorization.MIXED # 'mixed'
+
+    @classmethod
+    def classify_binary(cls, p: float) -> TimeBinCategorization:
+        if p >= 0.5:
+            return TimeBinCategorization.pLONG # 'pure.Long'
+        else:
+            return TimeBinCategorization.pSHORT # 'pure.Short'
+
+
+    @function_attributes(short_name=None, tags=['private', 'run-length'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-05-16 01:29', related_items=[])
+    @classmethod
+    def run_length_encoding(cls, seq: List[str]) -> Tuple[NDArray, NDArray, List[str]]:
+        """ For a given sequence of categorized events (one categorization for each time-bin), returns stats about the sequence
+        """
+        n_t_bins: int = len(seq)
+        
+        if n_t_bins == 0:
+            return np.array([], dtype=int), np.array([], dtype=int), [], {}
+        changes = [0] + [i for i in range(1, len(seq)) if seq[i] != seq[i-1]] + [len(seq)]
+        subseq_lengths = np.diff(changes)
+        subseq_start_idxs = changes[:-1]
+        run_subseq_type_id = [seq[i] for i in subseq_start_idxs]
+
+        type_string_seq = [f'{val}[{length}]' for val, length in zip(run_subseq_type_id, subseq_lengths)]
+
+        type_subsequence_lengths_dict = {k:list() for k in TimeBinCategorization.list_members()}
+        
+        for type_name, length in zip(run_subseq_type_id, subseq_lengths):
+            # type_subsequences_dict[type_name].append()
+            type_subsequence_lengths_dict[type_name].append(length)
+
+            
+
+        # type_avg_subseq_lengths_dict = {f"{a_type_name}":np.mean(v) for a_type_name, v in type_subsequence_lengths_dict.items()}
+        type_avg_subseq_lengths_dict = {f"mean_len.{a_type_name}":np.mean(v) for a_type_name, v in type_subsequence_lengths_dict.items()}
+        type_subseq_lengths_variance_dict = {f"var_len.{a_type_name}":np.nanstd(v) for a_type_name, v in type_subsequence_lengths_dict.items()}
+        type_n_bin_counts_dict = {f"n_bins.{a_type_name}":np.nansum(v) for a_type_name, v in type_subsequence_lengths_dict.items()}    
+        type_n_bins_ratios_dict = {f"bins_ratio.{a_type_name}":np.nansum(v)/float(n_t_bins) for a_type_name, v in type_subsequence_lengths_dict.items()}
+
+        _out_dict = {
+            'type_subseq_lengths_dict': type_subsequence_lengths_dict,
+            **type_avg_subseq_lengths_dict,
+            **type_subseq_lengths_variance_dict,
+            #  'type_subseq_lengths_variance_dict': {a_type_name:np.var(v) for a_type_name, v in type_subsequence_lengths_dict.items()},
+            'type_string_seq': type_string_seq,
+            **type_n_bin_counts_dict,
+            **type_n_bins_ratios_dict, # 'mixed_bins_ratio': 
+        }
+        # _out_dict.update(**type_subseq_lengths_variance_dict)
+        return np.array(subseq_lengths), np.array(subseq_start_idxs), run_subseq_type_id, _out_dict
+
+
+    @function_attributes(short_name=None, tags=['MAIN', 'transition-analysis'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-05-16 04:27', related_items=[])
+    @classmethod
+    def analyze_subsequence_temporal_dynamics(cls, curr_active_pipeline, time_bin_size=0.025, should_show_complex_intermediate_columns: bool = False):
+        """ 
+        
+        complex_column_names: List[str] = ['type_subseq_lengths_dict', 'state_seq', 'type_string_seq']
+
+        
+        """        
+        from pyphocorehelpers.assertion_helpers import Assert
+
+        # active_state_col_name: str = 'state_seq'
+        active_state_col_name: str = 'state_seq_binary'
+        
+        complex_column_names: List[str] = ['type_subseq_lengths_dict', 'state_seq', 'type_string_seq']
+        transferred_column_names: List[str] = ['pre_post_delta_category', 'pre_post_delta_id', 'delta_aligned_start_t']
+
+        valid_EpochComputations_result: EpochComputationsComputationsContainer = curr_active_pipeline.global_computation_results.computed_data['EpochComputations']
+        a_new_fully_generic_result: GenericDecoderDictDecodedEpochsDictResult = valid_EpochComputations_result.a_generic_decoder_dict_decoded_epochs_dict_result
+
+        Assert.all_are_not_None(a_new_fully_generic_result)
+
+        # common_constraint_dict = dict(trained_compute_epochs='laps', pfND_ndim=1, time_bin_size=0.025, masked_time_bin_fill_type='ignore')
+        common_constraint_dict = dict(trained_compute_epochs='laps', time_bin_size=time_bin_size, masked_time_bin_fill_type='nan_filled') # , pfND_ndim=1
+
+
+        ## PBEs context:
+        a_target_context: IdentifyingContext = IdentifyingContext(known_named_decoding_epochs_type='pbe', data_grain='per_time_bin', **common_constraint_dict) ## Laps , data_grain='per_epoch'
+        best_matching_context, a_result, a_decoder, a_decoded_marginal_posterior_df = a_new_fully_generic_result.get_results_best_matching_context(context_query=a_target_context)
+        Assert.all_are_not_None(a_decoded_marginal_posterior_df)
+
+        ## INPUTS: a_decoded_marginal_posterior_df
+        epoch_df = deepcopy(a_decoded_marginal_posterior_df)
+        epoch_df['state_seq'] = epoch_df['P_Long'].map(cls.classify)
+        epoch_df['state_seq_binary'] = epoch_df['P_Long'].map(cls.classify_binary) # .map(lambda x: cls.classify_binary(x).to_numeric()).astype(int)
+        
+        #  ['P_LR', 'P_RL', 'P_Long', 'P_Short', 'long_LR', 'long_RL', 'short_LR', 'short_RL', 'result_t_bin_idx', 'epoch_df_idx', 'parent_epoch_label', 'parent_epoch_duration', 'label', 'start', 't_bin_center', 'stop', 'delta_aligned_start_t',
+        #  'session_name', 'time_bin_size', 'pre_post_delta_category', 'trained_compute_epochs', 'pfND_ndim', 'decoder_identifier', 'known_named_decoding_epochs_type', 'masked_time_bin_fill_type', 'data_grain', 'format_name', 'animal', 'exper_name', 'epochs_source', 'included_qclu_values', 'minimum_inclusion_fr_Hz', 'is_t_bin_center_fake', 'pre_post_delta_id', 'state_seq']
+        print(f'epoch_df.columns: {list(epoch_df.columns)}') 
+
+        epoch_split_df_dict = epoch_df.pho.partition_df_dict('parent_epoch_label')
+        ## INPUTS: epoch_split_df_dict
+
+        results = []
+
+        ## iterate through split epochs to compute stats
+        for i, (epoch_label, an_epoch_df) in enumerate(epoch_split_df_dict.items()):
+            # print(f'i: {i}, epoch_label: {epoch_label}')
+            epoch_start_t = an_epoch_df['start'].to_numpy()[0]
+            epoch_end_t =  an_epoch_df['stop'].to_numpy()[-1]
+
+            a_result_dict = {
+                'epoch_start_t': epoch_start_t,
+                'epoch_end_t': epoch_end_t,
+                'epoch_label': epoch_label,
+            }
+
+            for a_col_name in transferred_column_names:
+                if a_col_name in an_epoch_df:
+                    curr_values = an_epoch_df[a_col_name].to_numpy()
+                    if len(curr_values) > 2:
+                        Assert.all_equal(curr_values)
+                    a_value = curr_values[0] ## get the first, they better all match
+                    a_result_dict[a_col_name] = a_value
+                else:
+                    # print(f'WARN: column "{a_col_name}" is missing from epoch_df!')
+                    pass
+                    
+            # epoch_states = state_seq[epoch_start_t:epoch_end_t]
+            epoch_states = an_epoch_df[active_state_col_name].to_numpy()
+            n_t_bins: int = len(epoch_states)
+            n_transitions: int = np.sum(epoch_states[1:] != epoch_states[:-1])
+            subseq_lengths, subseq_start_idxs, run_subseq_type_id, an_epoch_out_dict = cls.run_length_encoding(epoch_states)
+
+            ideal_epoch_states_col_vectors: NDArray = np.vstack([c.to_two_column_vector() for c in epoch_states]).T
+            
+
+            np.ones((1, subseq_lengths[0]))
+
+            np.tile(np.array([1, 0]).T, (1, subseq_lengths[0]))
+            
+            # dist_from_ideal: float = np.nansum((ideal_epoch_states_col_vectors - np.where((an_epoch_df['state_seq_binary'] == TimeBinCategorization.pLONG), an_epoch_df['P_Long'], an_epoch_df['P_Short'])), axis=1)
+            
+            dist_from_ideal: float = np.nansum((ideal_epoch_states_col_vectors - an_epoch_df[['P_Long', 'P_Short']].to_numpy().T), axis=1)
+
+
+            # dist_from_ideal: float = np.nansum(1.0 - np.where((an_epoch_df['state_seq_binary'] == TimeBinCategorization.pLONG), an_epoch_df['P_Long'], an_epoch_df['P_Short']))
+
+            a_result_dict.update({
+                'n_t_bins': n_t_bins,
+                'n_transitions': int(n_transitions),
+                # 'type_subseq_lengths_dict': subsequences,
+                'lengths': subseq_lengths.tolist(),
+                'state_seq': run_subseq_type_id,
+                **an_epoch_out_dict,
+            })
+            
+            results.append(a_result_dict)
+
+        ## END for i, (epoch_label, an_epoch_df) in enumera..
+
+
+
+        sequence_dwell_epochs_df = pd.DataFrame(results)
+        sequence_dwell_epochs_df = sequence_dwell_epochs_df.sort_values('epoch_start_t', ascending=True, inplace=False).reset_index(drop=True)
+        
+        if not should_show_complex_intermediate_columns:
+            sequence_dwell_epochs_df.drop(columns=complex_column_names, inplace=True)
+
+        sequence_dwell_epochs_df = sequence_dwell_epochs_df.convert_dtypes() ## correctly converts columns to integers, etc, but replaces np.nan with <NA>
+        ## Move the "height" columns to the end
+        sequence_dwell_epochs_df = PandasHelpers.reordering_columns_relative(sequence_dwell_epochs_df, column_names=['lengths'], relative_mode='end') # list(filter(lambda column: column.endswith('_peak_heights'), existing_columns))
+        return sequence_dwell_epochs_df
+
+
+
+# ==================================================================================================================================================================================================================================================================================== #
+# 2025-05-15 - Meas vs. Decoded Occupancy                                                                                                                                                                                                                                              #
+# ==================================================================================================================================================================================================================================================================================== #
+
+@metadata_attributes(short_name=None, tags=['VALIDATION', 'occupancy', 'working', 'figure5'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-05-15 14:22', related_items=[])
+class MeasuredVsDecodedOccupancy:
+    """ 2025-05-15 - A validation that Kamran had me to do that showed the expected result
+    
+    
+    from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import MeasuredVsDecodedOccupancy
+    """
+    @function_attributes(short_name=None, tags=['MAIN'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-05-15 19:57', related_items=[])
+    @classmethod
+    def analyze_and_plot_meas_vs_decoded_occupancy(cls, best_matching_context, a_result, a_decoder, a_decoded_marginal_posterior_df, track_templates, figure_title='Laps', plot_in_same_figure:bool=True, should_max_normalize: bool=False, debug_print=False, **kwargs):
+        """ analyze and plot
+
+        
+        Usage:
+            from neuropy.plotting.placemaps import plot_placefield_occupancy, perform_plot_occupancy
+            from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import MeasuredVsDecodedOccupancy
+
+            
+            valid_EpochComputations_result: EpochComputationsComputationsContainer = curr_active_pipeline.global_computation_results.computed_data['EpochComputations']
+            a_new_fully_generic_result: GenericDecoderDictDecodedEpochsDictResult = valid_EpochComputations_result.a_generic_decoder_dict_decoded_epochs_dict_result
+
+
+            # common_constraint_dict = dict(trained_compute_epochs='laps', pfND_ndim=1, time_bin_size=0.025, masked_time_bin_fill_type='ignore')
+            common_constraint_dict = dict(trained_compute_epochs='laps', time_bin_size=0.025, masked_time_bin_fill_type='nan_filled') # , pfND_ndim=1
+
+            ## Laps context:
+            a_target_context: IdentifyingContext = IdentifyingContext(known_named_decoding_epochs_type='laps', data_grain='per_time_bin', **common_constraint_dict) ## Laps , data_grain='per_epoch'
+            best_matching_context, a_result, a_decoder, a_decoded_marginal_posterior_df = a_new_fully_generic_result.get_results_best_matching_context(context_query=a_target_context)
+            MeasuredVsDecodedOccupancy.analyze_and_plot_meas_vs_decoded_occupancy(best_matching_context, a_result, a_decoder, a_decoded_marginal_posterior_df, track_templates, figure_title='Laps')
+
+            ## Global context:
+            a_target_context: IdentifyingContext = IdentifyingContext(known_named_decoding_epochs_type='global', data_grain='per_time_bin', **common_constraint_dict) ## Laps , data_grain='per_epoch'
+            best_matching_context, a_result, a_decoder, a_decoded_marginal_posterior_df = a_new_fully_generic_result.get_results_best_matching_context(context_query=a_target_context)
+            MeasuredVsDecodedOccupancy.analyze_and_plot_meas_vs_decoded_occupancy(best_matching_context, a_result, a_decoder, a_decoded_marginal_posterior_df, track_templates, figure_title='Global (all-time)')
+
+            ## PBEs context:
+            a_target_context: IdentifyingContext = IdentifyingContext(known_named_decoding_epochs_type='pbe', data_grain='per_time_bin', **common_constraint_dict) ## Laps , data_grain='per_epoch'
+            best_matching_context, a_result, a_decoder, a_decoded_marginal_posterior_df = a_new_fully_generic_result.get_results_best_matching_context(context_query=a_target_context)
+            MeasuredVsDecodedOccupancy.analyze_and_plot_meas_vs_decoded_occupancy(best_matching_context, a_result, a_decoder, a_decoded_marginal_posterior_df, track_templates, figure_title='PBEs')
+
+
+        """
+        ## INPUTS: best_matching_context, a_result, a_decoder, a_decoded_marginal_posterior_df
+
+        
+        is_post_delta = (a_decoded_marginal_posterior_df['delta_aligned_start_t'] > 0.0)
+        # a_decoded_marginal_posterior_df['is_post_delta'] = is_post_delta
+
+        a_decoded_marginal_posterior_df['pre_post_delta_id'] = 'pre-delta'
+        a_decoded_marginal_posterior_df.loc[is_post_delta, 'pre_post_delta_id'] = 'post-delta'
+        # a_decoded_marginal_posterior_df['is_post_delta'] = a_decoded_marginal_posterior_df['is_post_delta'].astype(int)
+        a_decoded_marginal_posterior_df
+
+        # pre_post_delta_result_splits_dict = a_decoded_marginal_posterior_df.pho.partition_df_dict('pre_post_delta_id')
+
+        n_timebins, flat_time_bin_containers, timebins_p_x_given_n = a_result.flatten() # (59, 4, 69488)
+        # timebins_p_x_given_n.shape
+
+        pre_post_delta_timebins_p_x_given_n_dict: Dict[str, NDArray] = {'pre-delta': timebins_p_x_given_n[:, :, np.logical_not(is_post_delta)],
+                                                                        'post-delta': timebins_p_x_given_n[:, :, is_post_delta],
+        }
+        # pre_post_delta_timebins_p_x_given_n_dict
+
+        # ==================================================================================================================================================================================================================================================================================== #
+        # Plotting                                                                                                                                                                                                                                                                             #
+        # ==================================================================================================================================================================================================================================================================================== #
+
+        # for k, a_result in pre_post_delta_result_dict.items():
+        if plot_in_same_figure:
+            # Create a single figure with subplots
+            fig = plt.figure(layout="constrained", figsize=[18, 8], dpi=220, clear=True, num=f'{figure_title} - plot_meas_vs_decoded_occupancy', **kwargs)
+            
+            ax_dict = fig.subplot_mosaic(
+                [
+                    # ["pre-delta", "post-delta"],
+                    ["pre-delta_long_LR", "post-delta_long_LR"],
+                    ["pre-delta_long_RL", "post-delta_long_RL"],
+                    ["pre-delta_short_LR", "post-delta_short_LR"],
+                    ["pre-delta_short_RL", "post-delta_short_RL"],
+                    # ["long_LR"], ["long_RL"], ["short_LR"], ["short_RL"],
+                ],
+                # height_ratios=[1],
+                sharex=True, sharey=True,
+                gridspec_kw=dict(wspace=0.1, hspace=0.1)
+            )
+
+            for a_pre_post_delta_name, a_timebins_p_x_given_n in pre_post_delta_timebins_p_x_given_n_dict.items():
+                if debug_print:
+                    print(f'a_pre_post_delta_name: {a_pre_post_delta_name}')
+                # final_ax_key: str = f"{a_pre_post_delta_name}_{}"
+                # np.shape(a_timebins_p_x_given_n)
+                # ax = ax_dict[a_pre_post_delta_name]  # Get the appropriate subplot axis
+                active_ax_dict = {ax_name:v for ax_name, v in ax_dict.items() if (ax_name.split('_', maxsplit=1)[0] == a_pre_post_delta_name)}
+                cls.plot_meas_vs_decoded_occupancy(timebins_p_x_given_n=a_timebins_p_x_given_n, track_templates=track_templates, fig=fig, ax_dict=active_ax_dict, a_pre_post_delta_name=a_pre_post_delta_name, should_max_normalize=should_max_normalize, debug_print=debug_print, **kwargs)
+                # ax.set_title(f'{figure_title} - {a_pre_post_delta_name}')  # Set subplot title
+
+            plt.suptitle(f'{figure_title}')  # Set overall figure title
+            return fig, ax_dict
+        else:
+            # Create separate figures for each condition
+            all_figs = []
+            for a_pre_post_delta_name, a_timebins_p_x_given_n in pre_post_delta_timebins_p_x_given_n_dict.items():
+                if debug_print:
+                    print(f'k: {a_pre_post_delta_name}')
+                # np.shape(a_timebins_p_x_given_n)
+                fig, ax_dict = cls.plot_meas_vs_decoded_occupancy(timebins_p_x_given_n=a_timebins_p_x_given_n, track_templates=track_templates, num=f'{figure_title} - {a_pre_post_delta_name} - plot_meas_vs_decoded_occupancy', a_pre_post_delta_name=a_pre_post_delta_name, should_max_normalize=should_max_normalize, debug_print=debug_print, **kwargs)
+                plt.suptitle(f'{figure_title} - {a_pre_post_delta_name}')
+                all_figs.append((fig, ax_dict))
+            return all_figs
+
+
+
+    @classmethod
+    def plot_meas_vs_decoded_occupancy(cls, timebins_p_x_given_n: NDArray, track_templates, num='plot_meas_vs_decoded_occupancy', fig=None, ax_dict=None, should_max_normalize: bool=False, a_pre_post_delta_name=None, debug_print=False, **kwargs):
+        """ from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import plot_meas_vs_decoded_occupancy
+        a_result: DecodedFilterEpochsResult
+        
+        """
+        from neuropy.plotting.placemaps import plot_placefield_occupancy, perform_plot_occupancy
+        
+        ## Measured
+        decoders_dict: Dict[types.DecoderName, BasePositionDecoder] = track_templates.get_decoders_dict()
+        # ## Decoded:
+        # a_result: DecodedFilterEpochsResult = deepcopy(a_result)
+
+        # n_timebins, flat_time_bin_containers, timebins_p_x_given_n = a_result.flatten()
+        timebins_p_x_given_n.shape
+
+        timebins_p_x_given_n = np.nan_to_num(timebins_p_x_given_n)
+        timebins_p_x_given_n_occupancy = np.nansum(timebins_p_x_given_n, axis=2) # (n_pos, n_decoders)
+        timebins_p_x_given_n_occupancy.shape
+
+        # n_pos_bins, n_decoders = np.shape(timebins_p_x_given_n_occupancy)
+
+        if (fig is None) or (ax_dict is None):
+            # Create a new figure and axes if they are not provided
+            fig = plt.figure(layout="constrained", figsize=kwargs.pop('figsize', [18, 8]), dpi=220, clear=True, num=num, **kwargs) # figsize=[Width, height] in inches.
+            ax_dict = fig.subplot_mosaic(
+                [
+                    ["long_LR"], ["long_RL"], ["short_LR"], ["short_RL"],                    
+                ],            
+                height_ratios=[1, 1, 1, 1],
+                sharex=True, sharey=True,
+                gridspec_kw=dict(wspace=0, hspace=0)
+            )
+        else:
+            # Use the provided figure and axes
+            if (a_pre_post_delta_name is not None) and debug_print:
+                print(f'ax_dict: {list(ax_dict.keys())}')
+                print(f'\ta_pre_post_delta_name: {a_pre_post_delta_name}')
+
+        for i, (ax_name, ax) in enumerate(ax_dict.items()):
+        # for i in np.arange(n_decoders):
+            occupancy = timebins_p_x_given_n_occupancy[:,i]
+            if a_pre_post_delta_name is not None:
+                a_pre_post_delta_name_part, a_decoder_name = ax_name.split('_', maxsplit=1) # "post-delta_long_LR" -> ["post-delta", "long_LR"]
+                a_decoder: BasePositionDecoder = decoders_dict[a_decoder_name]
+                ax_title: str = f"{a_pre_post_delta_name_part} | Decoded Occupancy[{ax_name}]"
+
+            else:
+                a_decoder: BasePositionDecoder = decoders_dict[ax_name]
+                ax_title: str = f"Decoded Occupancy[{ax_name}]"
+
+            # a_pre_post_delta_name
+            measured_occupancy = deepcopy(a_decoder.pf.occupancy)
+            occupancy_fig, occupancy_ax = perform_plot_occupancy(occupancy, xbin_centers=None, ybin_centers=None, fig=fig, ax=ax, plot_pos_bin_axes=False, label='decoded', should_max_normalize=should_max_normalize)
+            occupancy_fig, occupancy_ax = perform_plot_occupancy(measured_occupancy, xbin_centers=None, ybin_centers=None, fig=fig, ax=ax, plot_pos_bin_axes=False, label='measured', should_max_normalize=should_max_normalize)
+            ax.set_title(ax_title)
+
+        plt.legend(['decoded', 'measured'])
+        # occupancy_fig.show()
+        return fig, ax_dict
+
+
+
+
+# ==================================================================================================================================================================================================================================================================================== #
+# 2025-05-06 - Hairy Marginal on timeline                                                                                                                                                                                                                                              #
+# ==================================================================================================================================================================================================================================================================================== #
+from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import DirectionalDecodersContinuouslyDecodedResult
+from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.SpikeRasterWidgets.Spike2DRaster import SynchronizedPlotMode
+from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import _helper_add_interpolated_position_columns_to_decoded_result_df
+from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.EpochComputationFunctions import _perform_plot_hairy_overlayed_position
+from neuropy.utils.matplotlib_helpers import draw_epoch_regions
+
+
+
+@function_attributes(short_name=None, tags=['track', 'hairy', 'plot', 'figure', 'matplotlib'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-05-06 16:08', related_items=[])
+def add_hairy_plot(active_2d_plot, curr_active_pipeline, a_decoded_marginal_posterior_df):
+    """ adds a hiary plot the SpikeRaster2D's timeline as a track
+    
+    Usage:
+        from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import add_hairy_plot
+        
+        fig, ax, out_plot_data, dDisplayItem = add_hairy_plot(active_2d_plot, curr_active_pipeline=curr_active_pipeline, a_decoded_marginal_posterior_df=a_decoded_marginal_posterior_df)
+
+    
+    """
+    from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.EpochComputationFunctions import _perform_plot_hairy_overlayed_position
+
+
+    def _subfn_hide_all_plot_lines(out_plot_data, should_fully_remove_items:bool=False):
+        ## get the lines2D object to turn off the default position lines:
+        removed_item_names = []
+        for a_lines_name, a_lines_collection in out_plot_data.items():
+            ## hide all inactive lines:
+            print(f'hiding: "{a_lines_name}"')        
+            try:
+                ## try iteratring the object
+                for a_line in a_lines_collection:
+                    a_line.set_visible(False)
+                removed_item_names.append(a_lines_name)
+            except TypeError:
+                a_lines_collection.set_visible(False)
+                removed_item_names.append(a_lines_name)
+            # except AttributeError:
+                # when we try to set_visible on non-type
+            except Exception as e:
+                raise e
+        ## end for a_lines_name, a_lin....
+        
+        ## remove theitems
+        if should_fully_remove_items:
+            for a_rm_item_name in removed_item_names:
+                out_plot_data.pop(a_rm_item_name, None) ## remove the the array
+
+        return out_plot_data           
+
+
+
+    ## Build the new dock track:
+    dock_identifier: str = 'HairPlot'
+    ts_widget, fig, ax_list, dDisplayItem = active_2d_plot.add_new_matplotlib_render_plot_widget(name=dock_identifier)
+    ax = ax_list[0]
+    ax.clear()
+    ax.set_facecolor('white')
+
+    ## OUT: all_directional_continuously_decoded_dict
+    ## Draw the position meas/decoded on the plot widget
+    ## INPUT: fig, ax_list, all_directional_continuously_decoded_dict, track_templates
+
+
+    ## INPUTS: a_decoded_marginal_posterior_df
+
+    should_plot_grid_bin_bounds_lines = False
+
+    # plot the basic lap-positions (measured) over time figure:
+    _out = dict()
+    _out['_display_grid_bin_bounds_validation'] = curr_active_pipeline.display(display_function='_display_grid_bin_bounds_validation', active_session_configuration_context=None, include_includelist=[], save_figure=False, ax=ax) # _display_grid_bin_bounds_validation
+    fig = _out['_display_grid_bin_bounds_validation'].figures[0]
+    out_axes_list =_out['_display_grid_bin_bounds_validation'].axes
+    out_plot_data =_out['_display_grid_bin_bounds_validation'].plot_data
+
+    ax = out_axes_list[0]
+
+    ## get the lines2D object to turn off the default position lines:
+    position_lines_2D = out_plot_data['position_lines_2D']
+    ## hide all inactive lines:
+    for a_line in position_lines_2D:
+        a_line.set_visible(False)
+
+
+    interesting_hair_parameter_kwarg_dict = {
+        'defaults': dict(extreme_threshold=0.8, opacity_max=0.7, thickness_ramping_multiplier=35),
+        '50_sec_window_scale': dict(extreme_threshold=0.5, thickness_ramping_multiplier=50),
+        'full_1700_sec_session_scale': dict(extreme_threshold=0.5, thickness_ramping_multiplier=25), ## really interesting, can see the low-magnitude endcap short-like firing
+        'experimental': dict(extreme_threshold=0.8, thickness_ramping_multiplier=55),
+        'pbe': dict(extreme_threshold=0.0, opacity_max=0.9, thickness_ramping_multiplier=55),
+    }
+
+
+    out_plot_data = _subfn_hide_all_plot_lines(out_plot_data)
+    # an_pos_line_artist, df_viz = _perform_plot_hairy_overlayed_position(df=deepcopy(a_decoded_marginal_posterior_df), ax=ax, extreme_threshold=0.5, thickness_ramping_multiplier=50) # , thickness_ramping_multiplier=5
+
+
+
+    ## Named parameter set:
+    # an_pos_line_artist, df_viz = _perform_plot_hairy_overlayed_position(df=deepcopy(a_decoded_marginal_posterior_df), ax=ax, **interesting_hair_parameter_kwarg_dict['50_sec_window_scale'])
+    # an_pos_line_artist, df_viz = _perform_plot_hairy_overlayed_position(df=deepcopy(a_decoded_marginal_posterior_df), ax=ax, **interesting_hair_parameter_kwarg_dict['full_1700_sec_session_scale'])
+    an_pos_line_artist, df_viz = _perform_plot_hairy_overlayed_position(df=deepcopy(a_decoded_marginal_posterior_df), ax=ax, **interesting_hair_parameter_kwarg_dict['pbe'])
+
+
+
+    ## sync up the widgets
+    active_2d_plot.sync_matplotlib_render_plot_widget(dock_identifier, sync_mode=SynchronizedPlotMode.TO_WINDOW)
+    fig.canvas.draw()
+    return fig, ax, out_plot_data, dDisplayItem
+
+
+
+# def blend_over_white(rgba):
+#     rgb = rgba[:, :3]
+#     alpha = rgba[:, 3:4]
+#     return rgb * alpha + (1 - alpha) * 1  # white background (RGB = 1)
+
+def numpy_rgba_composite(rgba_layers: NDArray[ND.Shape["N_DECODERS, N_POS_BINS, 4"], np.floating], debug_print=False) -> NDArray:
+    """
+    rgba_layers: (n_layers, H, W, 4) — ordered bottom to top
+    Returns: (H, W, 4) — final composited RGBA image
+    
+    #TODO 2025-05-05 02:23: - [ ] Note when it works `np.shape(rgba_layers) == (4, 59, 1, 4)`
+    """
+    did_add_singular_W_column: bool = False
+    if np.ndim(rgba_layers) < 4:
+        rgba_layers = rgba_layers[:, :, None, :]  # (n_decoders, H=n_pos_bins, W=1, 4)
+        assert np.ndim(rgba_layers) == 4, f"rgba_layers is the wrong shape. after `rgba_layers = rgba_layers[:, :, None, :]`, np.ndim(rgba_layers): {np.ndim(rgba_layers)} and is still not equal 4!"
+        did_add_singular_W_column = True
+        
+    if debug_print:
+        n_layers, height, width, _RGBA_shape = np.shape(rgba_layers)
+        print(f'n_layers: {n_layers}, H: {height}, W: {width}, _RGBA_shape: {_RGBA_shape}')
+        assert _RGBA_shape == 4, f"_RGBA_shape should be 4 (for RGBA) but is _RGBA_shape: {_RGBA_shape}"
+
+    out_rgb: NDArray[ND.Shape["N_POS_BINS, 3"], np.floating] = np.zeros_like(rgba_layers[0, ..., :3])
+    out_alpha: NDArray[ND.Shape["N_POS_BINS"], np.floating] = np.zeros_like(rgba_layers[0, ..., 3])
+
+    for rgba in rgba_layers:
+        ## when working for each iteration rgba.shape: (59, 1, 4)
+        src_rgb = rgba[..., :3] ## only the RGB components
+        src_alpha = rgba[..., 3] ## only the last component (3rd idx)
+
+        out_rgb = src_rgb * src_alpha[..., None] + out_rgb * (1 - src_alpha)[..., None]
+        out_alpha = src_alpha + out_alpha * (1 - src_alpha)
+
+    if did_add_singular_W_column:
+        return np.concatenate([out_rgb, out_alpha[..., None]], axis=-1)[:, 0, :]
+    else:
+        return np.concatenate([out_rgb, out_alpha[..., None]], axis=-1)
+
+
+
+from pyphoplacecellanalysis.General.Model.ComputationResults import ComputedResult
+from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.ContainerBased.PhoContainerTool import GenericMatplotlibContainer
+import attrs
+from attrs import define, field, Factory, astuple, asdict, fields
+from neuropy.utils.mixins.AttrsClassHelpers import AttrsBasedClassHelperMixin, serialized_attribute_field, serialized_field, non_serialized_field, keys_only_repr, shape_only_repr
+from neuropy.utils.mixins.HDF5_representable import HDF_SerializationMixin
+
+
+@metadata_attributes(short_name=None, tags=['figure', 'posteriors'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-05-04 18:05', related_items=[])
+@define(slots=False, eq=False)
+class MultiDecoderColorOverlayedPosteriors(ComputedResult):
+    """ This class relates to visualizing posterior decoded positions for all four context on the same axes, indicating which posterior is which by assigning each decoder a chracteristic color and weighting their opacity according to their likelyhood for each time bin
+        
+    
+    Usage:
+        from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import MultiDecoderColorOverlayedPosteriors
+
+        import nptyping as ND
+        from nptyping import NDArray
+        from neuropy.utils.result_context import IdentifyingContext
+        from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import _helper_add_interpolated_position_columns_to_decoded_result_df
+        from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import MultiDecoderColorOverlayedPosteriors
+
+        ## INPUTS: a_new_fully_generic_result
+        # a_target_context: IdentifyingContext = IdentifyingContext(trained_compute_epochs='laps', pfND_ndim=1, decoder_identifier='pseudo2D', known_named_decoding_epochs_type='global', masked_time_bin_fill_type='nan_filled', data_grain='per_time_bin')
+        a_target_context: IdentifyingContext = IdentifyingContext(trained_compute_epochs='laps', pfND_ndim=1, decoder_identifier='pseudo2D', known_named_decoding_epochs_type='global', masked_time_bin_fill_type='ignore', data_grain='per_time_bin')
+        best_matching_context, a_result, a_decoder, a_decoded_marginal_posterior_df = a_new_fully_generic_result.get_results_best_matching_context(context_query=a_target_context, debug_print=False)
+        ## OUTPUTS: a_result, a_decoder, a_decoded_marginal_posterior_df
+        ## INPUTS: curr_active_pipeline, a_result, a_decoder, a_decoded_marginal_posterior_df
+        global_measured_position_df: pd.DataFrame = deepcopy(curr_active_pipeline.sess.position.to_dataframe())
+        a_decoded_marginal_posterior_df: pd.DataFrame = _helper_add_interpolated_position_columns_to_decoded_result_df(a_result=a_result, a_decoder=a_decoder, a_decoded_marginal_posterior_df=a_decoded_marginal_posterior_df, global_measured_position_df=global_measured_position_df)
+
+        global_decoded_result: SingleEpochDecodedResult = a_result.get_result_for_epoch(0)
+        p_x_given_n: NDArray[ND.Shape["N_POS_BINS, 4, N_TIME_BINS"], np.floating] = deepcopy(global_decoded_result.p_x_given_n) # .shape # (59, 4, 69488)
+
+        ## INPUTS: p_x_given_n
+        multi_decoder_color_overlay: MultiDecoderColorOverlayedPosteriors = MultiDecoderColorOverlayedPosteriors(p_x_given_n=p_x_given_n, time_bin_centers=time_bin_centers, xbin=xbin, lower_bound_alpha=0.1, drop_below_threshold=1e-3, t_bin_size=0.025)
+        multi_decoder_color_overlay.compute_all()
+        _out_display_dict = multi_decoder_color_overlay.add_tracks_to_spike_raster_window(active_2d_plot=active_2d_plot, dock_identifier_prefix='MergedColorPlot')
+
+
+
+    """
+    _VersionedResultMixin_version: str = "2025.05.12_0" # to be updated in your IMPLEMENTOR to indicate its version
+    
+    spikes_df: pd.DataFrame = serialized_field(repr=shape_only_repr, is_computable=False)
+    p_x_given_n: NDArray[ND.Shape["N_POS_BINS, 4, N_TIME_BINS"], np.floating] = serialized_field(repr=shape_only_repr, is_computable=False, metadata={'shape':('N_POS_BINS','4','N_TIME_BINS')}) # .shape # (59, 4, 69488)
+    time_bin_centers: NDArray[ND.Shape["N_TIME_BINS"], np.floating] = serialized_field(repr=shape_only_repr, is_computable=False, metadata={'shape':('N_TIME_BINS',)})
+    xbin: NDArray[ND.Shape["N_POS_BINS"], np.floating] = serialized_field(repr=shape_only_repr, is_computable=False, metadata={'shape':('N_POS_BINS',)})
+
+    p_x_given_n_track_identity_marginal: NDArray[ND.Shape["N_POS_BINS, 2, N_TIME_BINS"], np.floating] = serialized_field(init=False, default=None, repr=shape_only_repr, is_computable=True, metadata={'shape':('N_POS_BINS','2','N_TIME_BINS')})
+
+    t_bin_size: float = serialized_attribute_field(default=0.025, is_computable=False, repr=True)
+    lower_bound_alpha: float = serialized_attribute_field(default=0.1, is_computable=False, repr=True)
+    drop_below_threshold: float = serialized_attribute_field(default=1e-3, is_computable=False, repr=True) ## 
+
+    ## Computed Results:
+    extra_all_t_bins_outputs_dict_dict: Dict[str, Dict] = field(default=Factory(dict), repr=keys_only_repr)
+    active_colors_dict_dict: Dict[str, Dict] = field(default=Factory(dict), repr=keys_only_repr)
+    
+
+    def __attrs_post_init__(self):
+        # Add post-init logic here        
+        self.p_x_given_n_track_identity_marginal = self.compute_track_ID_marginal(p_x_given_n=self.p_x_given_n)
+
+
+
+    @function_attributes(short_name=None, tags=['MAIN', 'compute'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-05-12 23:50', related_items=[])
+    def compute_all(self, compute_four_decoder_version: bool=False, progress_print: bool=True):
+        """ computes all 
+        
+        Usage:
+            from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import MultiDecoderColorOverlayedPosteriors
+
+            multi_decoder_color_overlay: MultiDecoderColorOverlayedPosteriors = MultiDecoderColorOverlayedPosteriors(p_x_given_n=p_x_given_n, time_bin_centers=time_bin_centers, xbin=xbin, lower_bound_alpha=0.1, drop_below_threshold=1e-3, t_bin_size=0.025)
+            multi_decoder_color_overlay.compute_all()
+
+        
+        """
+        self.p_x_given_n_track_identity_marginal = self.compute_track_ID_marginal(p_x_given_n=self.p_x_given_n)
+        if compute_four_decoder_version:
+            self.extra_all_t_bins_outputs_dict_dict['four_decoders'], self.active_colors_dict_dict['four_decoders'] = MultiDecoderColorOverlayedPosteriors.build_four_decoder_version(p_x_given_n=self.p_x_given_n, lower_bound_alpha=self.lower_bound_alpha, drop_below_threshold=self.drop_below_threshold, progress_print=progress_print)
+        else:
+            self.extra_all_t_bins_outputs_dict_dict.pop('four_decoders', None)
+            self.active_colors_dict_dict.pop('four_decoders', None)
+            
+        self.extra_all_t_bins_outputs_dict_dict['two_decoders'], self.active_colors_dict_dict['two_decoders'] = MultiDecoderColorOverlayedPosteriors.build_two_decoder_version(p_x_given_n=self.p_x_given_n, lower_bound_alpha=self.lower_bound_alpha, drop_below_threshold=self.drop_below_threshold, progress_print=progress_print)
+        if progress_print:
+            print(f'\tdone.')
+
+
+
+    @function_attributes(short_name=None, tags=['decoder_result'], input_requires=[], output_provides=[], uses=['.compute_all_time_bin_RGBA'], used_by=['.compute_all'], creation_date='2025-05-13 00:03', related_items=[])
+    @classmethod
+    def build_four_decoder_version(cls, p_x_given_n: NDArray[ND.Shape["N_POS_BINS, 4, N_TIME_BINS"], np.floating], lower_bound_alpha:float=0.1, drop_below_threshold:float=1e-3, **kwargs):
+        """
+        # , time_bin_centers: NDArray[ND.Shape["N_TIME_BINS"], np.floating], xbin: NDArray[ND.Shape["N_POS_BINS"], np.floating]
+        
+        
+        Usage:        
+            extra_all_t_bins_outputs_dict, active_colors_dict = MultiDecoderColorOverlayedPosteriors.build_four_decoder_version(p_x_given_n=p_x_given_n, lower_bound_alpha=0.1, drop_below_threshold=1e-3)
+            all_t_bins_final_overlayed_out_RGBA = extra_all_t_bins_outputs_dict['all_t_bins_final_overlayed_out_RGBA']
+            all_t_bins_per_decoder_out_RGBA = extra_all_t_bins_outputs_dict['all_t_bins_per_decoder_out_RGBA']
+
+        """
+        from pyphocorehelpers.gui.Qt.color_helpers import ColormapHelpers
+        from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import MultiDecoderColorOverlayedPosteriors
+        from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.SpikeRasterWidgets.Spike2DRaster import SynchronizedPlotMode
+        from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.ContainerBased.PhoContainerTool import GenericMatplotlibContainer, GenericPyQtGraphContainer, PhoBaseContainerTool
+
+        ## Common:
+        all_decoder_colors_dict = {'long': '#4169E1', 'short': '#DC143C', 'long_LR': '#4169E1', 'long_RL': '#607B00', 'short_LR': '#DC143C', 'short_RL': '#990099'} ## Just hardcoded version of `additional_cmap_names`
+        
+        # ==================================================================================================================================================================================================================================================================================== #
+        # N_DECODERS == 4 ['long_LR', 'long_RL', 'short_LR', 'short_RL']                                                                                                                                                                                                                       #
+        # ==================================================================================================================================================================================================================================================================================== #
+        active_cmap_names = ['long_LR', 'long_RL', 'short_LR', 'short_RL']
+        active_p_x_given_n = deepcopy(p_x_given_n)
+
+        # OUTPUTS: all_decoder_colors_dict, p_x_given_n
+        ## OUTPUTS: active_cmap_names, active_p_x_given_n, time_bin_centers, xbin
+        
+        ## INPUTS: all_decoder_colors_dict, active_cmap_names
+        active_colors_dict = {k:v for k, v in all_decoder_colors_dict.items() if k in active_cmap_names}
+        active_decoder_cmap_dict = {k:ColormapHelpers.create_transparent_colormap(color_literal_name=v, lower_bound_alpha=lower_bound_alpha, should_return_LinearSegmentedColormap=True) for k, v in all_decoder_colors_dict.items() if k in active_cmap_names}
+        # additional_legend_entries = list(zip(directional_active_lap_pf_results_dicts.keys(), additional_cmap_names.values() )) # ['red', 'purple', 'green', 'orange']
+
+        ## OUTPUTS: active_cmap_decoder_dict
+        extra_all_t_bins_outputs_dict = MultiDecoderColorOverlayedPosteriors.compute_all_time_bin_RGBA(p_x_given_n=active_p_x_given_n, produce_debug_outputs=False, drop_below_threshold=drop_below_threshold, active_decoder_cmap_dict=active_decoder_cmap_dict, should_constrain_to_four_decoder=True, **kwargs)
+
+        return extra_all_t_bins_outputs_dict, active_colors_dict
+
+
+    @function_attributes(short_name=None, tags=['private', 'helper', 'data'], input_requires=[], output_provides=[], uses=[], used_by=['.build_two_decoder_version'], creation_date='2025-05-13 00:05', related_items=[])
+    @classmethod
+    def compute_track_ID_marginal(cls, p_x_given_n: NDArray[ND.Shape["N_POS_BINS, 4, N_TIME_BINS"], np.floating]):
+        """ Computes the two-decoder marginal of trackID
+
+        Usage:        
+            p_x_given_n_track_identity_marginal: NDArray[ND.Shape["N_POS_BINS, 2, N_TIME_BINS"], np.floating] = multi_decoder_color_overlay.compute_track_ID_marginal(p_x_given_n=p_x_given_n) # .shape (2, n_time_bins)
+            np.shape(p_x_given_n_track_identity_marginal)
+            p_x_given_n_track_identity_marginal
+
+        """
+        # def _subfn_perform_normalization_check(a_marginal_p_x_given_n):
+        #     ## check normalization
+        #     col_contains_nan = np.any(np.isnan(a_marginal_p_x_given_n), axis=1)
+        #     # np.shape(col_contains_nan)
+        #     _post_norm_check_sum = np.nansum(a_marginal_p_x_given_n, axis=1)
+        #     assert np.alltrue(_post_norm_check_sum[np.logical_not(col_contains_nan)]), f"the non-nan containing columns should sum to one after renormalization"
+            
+        def _subfn_perform_area_under_curve_normalization_check(a_marginal_p_x_given_n, axis=(0,1)):
+            ## check normalization
+            col_contains_nan = np.any(np.isnan(a_marginal_p_x_given_n), axis=axis)
+            # np.shape(col_contains_nan)
+            _post_norm_check_sum = np.nansum(a_marginal_p_x_given_n, axis=axis)
+            assert np.alltrue(_post_norm_check_sum[np.logical_not(col_contains_nan)]), f"the non-nan containing columns should sum to one after renormalization"
+            
+
+
+        n_pos_bins, n_decoders, n_time_bins = np.shape(p_x_given_n)
+        assert n_decoders == 4, f"n_decoders: {n_decoders}"
+        
+        marginal_trackID_p_x_given_n: NDArray[ND.Shape["N_POS_BINS, 2, N_TIME_BINS"], np.floating] = np.zeros(shape=(n_pos_bins, 2, n_time_bins))
+            
+        ## Long:
+        long_only_p_x_given_n: NDArray[ND.Shape["N_POS_BINS, 2, N_TIME_BINS"], np.floating] = deepcopy(p_x_given_n[:, (0,1), :])
+        sum_over_all_long_p_x_given_n: NDArray[ND.Shape["N_POS_BINS, N_TIME_BINS"], np.floating] = np.nansum(long_only_p_x_given_n, axis=1) ## sum over the two long columns
+        
+        ## Short:
+        short_only_p_x_given_n: NDArray[ND.Shape["N_POS_BINS, 2, N_TIME_BINS"], np.floating] = deepcopy(p_x_given_n[:, (2,3), :])
+        sum_over_all_short_p_x_given_n: NDArray[ND.Shape["N_POS_BINS, N_TIME_BINS"], np.floating] = np.nansum(short_only_p_x_given_n, axis=1) ## sum over the two long columns
+        
+        ## All
+        sum_over_all_decoders_p_x_given_n: NDArray[ND.Shape["N_POS_BINS, N_TIME_BINS"], np.floating] = np.nansum(p_x_given_n, axis=1) ## sum over all decoders to re-normalize
+        sum_over_all_decoders_and_all_positions_p_x_given_n: NDArray[ND.Shape["N_TIME_BINS"], np.floating] = np.nansum(p_x_given_n, axis=(0,1)) ## sum over all decoders to re-normalize
+
+        ## build result
+        marginal_trackID_p_x_given_n[:, 0, :] = sum_over_all_long_p_x_given_n
+        marginal_trackID_p_x_given_n[:, 1, :] = sum_over_all_short_p_x_given_n
+
+        ## Normalize result:
+        with np.errstate(divide='ignore', invalid='ignore'): # 
+            # marginal_trackID_p_x_given_n = marginal_trackID_p_x_given_n / sum_over_all_decoders_p_x_given_n[:, None, :] ## renormalize by dividing by sum over all decoders
+            # _subfn_perform_normalization_check(a_marginal_p_x_given_n=marginal_trackID_p_x_given_n)
+            
+            marginal_trackID_p_x_given_n = marginal_trackID_p_x_given_n / sum_over_all_decoders_and_all_positions_p_x_given_n ## renormalize by dividing by sum over all decoders
+            _subfn_perform_area_under_curve_normalization_check(a_marginal_p_x_given_n=marginal_trackID_p_x_given_n)
+            # _post_norm_check_sum: NDArray[ND.Shape["N_TIME_BINS"], np.floating] = np.nansum(marginal_trackID_p_x_given_n, axis=(0,1))
+            
+            # long_only_p_x_given_n = long_only_p_x_given_n / sum_over_all_long_p_x_given_n[:, None, :] ## renormalize by dividing by sum over all decoders
+            # _subfn_perform_normalization_check(a_marginal_p_x_given_n=long_only_p_x_given_n)
+        
+
+        # np.shape(_post_norm_check_sum)
+        # np.shape(long_only_p_x_given_n)
+
+        # sum_over_all_long_p_x_given_n.shape
+        # sum_over_all_decoders_p_x_given_n.shape
+        # return long_only_p_x_given_n
+        return marginal_trackID_p_x_given_n
+
+        
+    @function_attributes(short_name=None, tags=['decoder_result'], input_requires=[], output_provides=[], uses=['.compute_all_time_bin_RGBA', '.compute_track_ID_marginal'], used_by=['.compute_all'], creation_date='2025-05-13 00:03', related_items=[])
+    @classmethod
+    def build_two_decoder_version(cls, p_x_given_n: NDArray[ND.Shape["N_POS_BINS, 4, N_TIME_BINS"], np.floating], lower_bound_alpha:float=0.1, drop_below_threshold:float=1e-3, **kwargs):
+        """
+        # , time_bin_centers: NDArray[ND.Shape["N_TIME_BINS"], np.floating], xbin: NDArray[ND.Shape["N_POS_BINS"], np.floating]
+        
+        Usage:        
+            extra_all_t_bins_outputs_dict_dict['two_decoders'], active_colors_dict_dict['two_decoders'] = MultiDecoderColorOverlayedPosteriors.build_two_decoder_version(p_x_given_n=p_x_given_n, lower_bound_alpha=0.1, drop_below_threshold=1e-3)
+            all_t_bins_final_overlayed_out_RGBA = extra_all_t_bins_outputs_dict['all_t_bins_final_overlayed_out_RGBA']
+            all_t_bins_per_decoder_out_RGBA = extra_all_t_bins_outputs_dict['all_t_bins_per_decoder_out_RGBA']
+
+            
+        Usage 2:
+            ## INPUTS: p_x_given_n_track_identity_marginal
+            extra_all_t_bins_outputs_dict_dict['two_decoders'], active_colors_dict_dict['two_decoders'] = MultiDecoderColorOverlayedPosteriors.build_two_decoder_version(p_x_given_n_track_identity_marginal=p_x_given_n_track_identity_marginal, lower_bound_alpha=0.1, drop_below_threshold=1e-3)
+
+        """
+        from pyphocorehelpers.gui.Qt.color_helpers import ColormapHelpers
+        from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import MultiDecoderColorOverlayedPosteriors
+        from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.SpikeRasterWidgets.Spike2DRaster import SynchronizedPlotMode
+        from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.ContainerBased.PhoContainerTool import GenericMatplotlibContainer, GenericPyQtGraphContainer, PhoBaseContainerTool
+
+        ## Common:
+        all_decoder_colors_dict = {'long': '#4169E1', 'short': '#DC143C'} ## Just hardcoded version of `additional_cmap_names`
+        
+
+        # ==================================================================================================================================================================================================================================================================================== #
+        # N_DECODERS == 2 ['long', 'short']                                                                                                                                                                                                                                                    #
+        # ==================================================================================================================================================================================================================================================================================== #
+        active_cmap_names = ['long', 'short']
+
+        # p_x_given_n_track_identity_marginal: NDArray[ND.Shape["N_POS_BINS, 2, N_TIME_BINS"], np.floating]
+
+
+        ## INPUTS: p_x_given_n
+
+        n_pos_bins, n_decoders, n_time_bins = np.shape(p_x_given_n)
+        # assert n_decoders == 4, f"n_decoders: {n_decoders}"
+        if (n_decoders == 4):
+            # # p_x_given_n_track_identity_marginal: NDArray[ND.Shape["N_POS_BINS, 2, N_TIME_BINS"], np.floating] = long_only_p_x_given_n # .shape (2, n_time_bins)
+            p_x_given_n_track_identity_marginal: NDArray[ND.Shape["N_POS_BINS, 2, N_TIME_BINS"], np.floating] = cls.compute_track_ID_marginal(p_x_given_n=p_x_given_n) # .shape (2, n_time_bins)
+
+        elif (n_decoders == 2):
+            p_x_given_n_track_identity_marginal: NDArray[ND.Shape["N_POS_BINS, 2, N_TIME_BINS"], np.floating] = deepcopy(p_x_given_n) # .shape (2, n_time_bins)
+        else:
+            raise ValueError(f'n_decoders: {n_decoders} should be 4 or 2')
+
+
+        active_p_x_given_n = deepcopy(p_x_given_n_track_identity_marginal)
+        # np.shape(active_p_x_given_n)
+
+        # OUTPUTS: all_decoder_colors_dict, p_x_given_n
+        ## OUTPUTS: active_cmap_names, active_p_x_given_n, time_bin_centers, xbin
+        
+        ## INPUTS: all_decoder_colors_dict, active_cmap_names
+        active_colors_dict = {k:v for k, v in all_decoder_colors_dict.items() if k in active_cmap_names}
+        
+        active_decoder_cmap_dict = {k:ColormapHelpers.create_transparent_colormap(color_literal_name=v, lower_bound_alpha=lower_bound_alpha, should_return_LinearSegmentedColormap=True) for k, v in all_decoder_colors_dict.items() if k in active_cmap_names}
+        # additional_legend_entries = list(zip(directional_active_lap_pf_results_dicts.keys(), additional_cmap_names.values() )) # ['red', 'purple', 'green', 'orange']
+
+        ## OUTPUTS: active_cmap_decoder_dict
+        extra_all_t_bins_outputs_dict = cls.compute_all_time_bin_RGBA(p_x_given_n=active_p_x_given_n, produce_debug_outputs=False, drop_below_threshold=drop_below_threshold, active_decoder_cmap_dict=active_decoder_cmap_dict, should_constrain_to_four_decoder=False, **kwargs)
+        
+        return extra_all_t_bins_outputs_dict, active_colors_dict
+    
+
+
+    @function_attributes(short_name=None, tags=['MAIN', 'all_t'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-05-04 18:00', related_items=[])
+    @classmethod
+    def compute_all_time_bin_RGBA(cls, p_x_given_n: NDArray, active_decoder_cmap_dict: Optional[Dict]=None, produce_debug_outputs: bool = False, drop_below_threshold: float = 1e-2, progress_print: bool = True, color_blend_fn=None, should_constrain_to_four_decoder:bool=True, debug_print=False) -> Tuple[NDArray, NDArray]:
+        """ Computes the final RGBA colors for each position x time bin in p_x_given_n by overlaying each of the decoders values
+        
+        
+        NOTE: COMPLETELY INDEPENDENT/DECOUPLED from `cls._test_single_t_bin` (copy/paste synchronized)
+        
+        #TODO 2025-05-05 04:07: - [ ] Can improve by not showing all four bins, but instead marginalizing over Long/Short and just plotting those. The off-color is ugly, and with only 2 options the colors can actually be orthogonal and easy to read
+        
+        
+        import nptyping as ND
+        from nptyping import NDArray
+        from neuropy.utils.result_context import IdentifyingContext
+        from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import _helper_add_interpolated_position_columns_to_decoded_result_df
+        from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import MultiDecoderColorOverlayedPosteriors
+
+        ## INPUTS: a_new_fully_generic_result
+        # a_target_context: IdentifyingContext = IdentifyingContext(trained_compute_epochs='laps', pfND_ndim=1, decoder_identifier='pseudo2D', known_named_decoding_epochs_type='global', masked_time_bin_fill_type='nan_filled', data_grain='per_time_bin')
+        a_target_context: IdentifyingContext = IdentifyingContext(trained_compute_epochs='laps', pfND_ndim=1, decoder_identifier='pseudo2D', known_named_decoding_epochs_type='global', masked_time_bin_fill_type='ignore', data_grain='per_time_bin')
+        best_matching_context, a_result, a_decoder, a_decoded_marginal_posterior_df = a_new_fully_generic_result.get_results_best_matching_context(context_query=a_target_context, debug_print=False)
+        ## OUTPUTS: a_result, a_decoder, a_decoded_marginal_posterior_df
+        ## INPUTS: curr_active_pipeline, a_result, a_decoder, a_decoded_marginal_posterior_df
+        global_measured_position_df: pd.DataFrame = deepcopy(curr_active_pipeline.sess.position.to_dataframe())
+        a_decoded_marginal_posterior_df: pd.DataFrame = _helper_add_interpolated_position_columns_to_decoded_result_df(a_result=a_result, a_decoder=a_decoder, a_decoded_marginal_posterior_df=a_decoded_marginal_posterior_df, global_measured_position_df=global_measured_position_df)
+
+        global_decoded_result: SingleEpochDecodedResult = a_result.get_result_for_epoch(0)
+        p_x_given_n: NDArray[ND.Shape["N_POS_BINS, 4, N_TIME_BINS"], np.floating] = deepcopy(global_decoded_result.p_x_given_n) # .shape # (59, 4, 69488)
+        # p_x_given_n
+
+        ## INPUTS: p_x_given_n
+        extra_all_t_bins_outputs_dict = MultiDecoderColorOverlayedPosteriors.compute_all_time_bin_RGBA(p_x_given_n=p_x_given_n, produce_debug_outputs=False, drop_below_threshold=1e-1)
+        all_t_bins_final_overlayed_out_RGBA = extra_all_t_bins_outputs_dict['all_t_bins_final_overlayed_out_RGBA']
+        all_t_bins_per_decoder_out_RGBA = extra_all_t_bins_outputs_dict['all_t_bins_per_decoder_out_RGBA']
+
+        ## OUTPUTS: extra_all_t_bins_outputs_dict, all_t_bins_per_decoder_out_RGBA, all_t_bins_final_overlayed_out_RGBA
+        
+        """
+        
+        # p_x_given_n: NDArray[ND.Shape["N_TIME_BINS, N_POS_BINS, N_DECODERS"], np.floating]
+        ## INPUTS: p_x_given_n, drop_below_threshold, active_decoder_cmap_dict, produce_debug_outputs
+        p_x_given_n = deepcopy(p_x_given_n) ## copy p_x_given_n so it isn't modified
+
+        if active_decoder_cmap_dict is None:
+            # decoder_names_to_idx_map: Dict[int, types.DecoderName] = {0: 'long_LR', 1: 'long_RL', 2: 'short_LR', 3: 'short_RL'}
+            color_dict: Dict[types.DecoderName, pg.QtGui.QColor] = DecoderIdentityColors.build_decoder_color_dict(wants_hex_str=False)
+            additional_cmap_names: Dict[types.DecoderName, str] = {k: ColorFormatConverter.qColor_to_hexstring(v) for k, v in color_dict.items()}
+            # additional_cmap_names = {'long_LR': '#4169E1', 'long_RL': '#607B00', 'short_LR': '#DC143C', 'short_RL': '#990099'} ## Just hardcoded version of `additional_cmap_names`
+            active_decoder_cmap_dict = {k:ColormapHelpers.create_transparent_colormap(color_literal_name=v, lower_bound_alpha=0.1, should_return_LinearSegmentedColormap=True) for k, v in additional_cmap_names.items()}
+
+        if color_blend_fn is None:
+            # color_blend_fn = cls.composite_multiplied_alpha
+            color_blend_fn = cls.composite_over
+
+        n_pos_bins, n_decoders, n_time_bins = np.shape(p_x_given_n)
+        if should_constrain_to_four_decoder:
+            assert n_decoders == 4, f"n_decoders: {n_decoders}"
+        else:
+            if debug_print:
+                print(f'n_decoders: {n_decoders}')
+
+
+        assert (len(active_decoder_cmap_dict) == n_decoders), f"len(active_decoder_cmap_dict): {len(active_decoder_cmap_dict)} != n_decoders: {n_decoders} but it must!"
+            
+        ## INPUTS: probability_values (n_pos_bins, 4)
+        # all_t_bins_per_decoder_out_RGBA: NDArray[ND.Shape["N_TIME_BINS", "N_POS_BINS, N_DECODERS, 4"], np.floating] = np.zeros((n_time_bins, n_pos_bins, n_decoders, 4))
+        # all_t_bins_final_overlayed_out_RGBA: NDArray[ND.Shape["N_TIME_BINS", "N_POS_BINS, 4"], np.floating] = np.zeros((n_time_bins, n_pos_bins, 4)) # Pre-compute the overlay so that there's only one color that represents up to all four active decoders
+        extra_all_t_bins_outputs_dict: Dict = {
+            'all_t_bins_per_decoder_alphas': np.zeros((n_time_bins, n_decoders)),
+            'all_t_bins_per_decoder_alpha_weighted_RGBA': np.zeros((n_time_bins, n_pos_bins, n_decoders, 4)),
+            'all_t_bins_final_RGBA': np.zeros((n_time_bins, n_pos_bins, 4)),
+            'all_t_bins_per_decoder_out_RGBA': np.zeros((n_time_bins, n_pos_bins, n_decoders, 4)),
+            'all_t_bins_final_overlayed_out_RGBA': np.zeros((n_time_bins, n_pos_bins, 4)),
+        }
+
+        with np.errstate(divide='ignore', invalid='ignore'):
+            ## print log spamming division errors
+            for a_t_bin_idx in np.arange(n_time_bins):
+                ## for each time bin, there are several ways to normalize
+                    # 1. normalize over all in each time bin 
+                    # 2. normalize to max/min in each time (colormapping), means colors aren't consistent between timebins
+                                
+                if progress_print:
+                    is_every_hundreth_t_bin = (a_t_bin_idx % 1000 == 0)
+                    if is_every_hundreth_t_bin:        
+                        print(f'a_t_bin_idx: [{a_t_bin_idx}/{n_time_bins}]')
+
+                # single_t_bin_P_values: NDArray[ND.Shape["N_POS_BINS, N_DECODERS"], np.floating] = deepcopy(p_x_given_n[:, :, a_t_bin_idx])
+                single_t_bin_P_values: NDArray[ND.Shape["N_POS_BINS, N_DECODERS"], np.floating] = p_x_given_n[:, :, a_t_bin_idx]
+
+                if produce_debug_outputs:
+                    _pre_norm_prob_vals = deepcopy(single_t_bin_P_values)
+
+                # DEBUGONLY __________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
+                if produce_debug_outputs:
+                    ## normalize over (decoder, position)
+                    sum_over_all_decoder_pos_values: float = np.nansum(_pre_norm_prob_vals, axis=(0, 1)) # sum over pos
+                    print(f'sum_over_all_decoder_pos_values: {sum_over_all_decoder_pos_values}')
+                    # _all_normed_prob_vals = _pre_norm_prob_vals / sum_over_all_decoder_pos_values ## normalize
+
+                ## normalize over decoder
+                sum_over_all_pos_values: NDArray[ND.Shape["N_DECODERS"], np.floating] = np.nansum(single_t_bin_P_values, axis=0) # sum over pos
+                if produce_debug_outputs:
+                    print(f'sum_over_all_pos_values: {sum_over_all_pos_values}')
+                    
+                decoder_alphas: NDArray[ND.Shape["N_DECODERS"], np.floating] = sum_over_all_pos_values.copy()
+                single_t_bin_P_values = single_t_bin_P_values / sum_over_all_pos_values ## normalize over (decoder x position)
+
+                ## OUT: probability_values
+                ## INPUTS: probability_values (n_pos_bins, 4)
+                # single_t_bin_out_RGBA = np.zeros((n_pos_bins, 4, 4))
+
+                ## pre-plotting only: mask the tiny values:
+                single_t_bin_P_values = cls._prepare_arr_for_conversion_to_RGBA(single_t_bin_P_values, drop_below_threshold=drop_below_threshold)
+
+                ## for each decoder:
+                for i, (a_decoder_name, a_cmap) in enumerate(active_decoder_cmap_dict.items()):
+                    if produce_debug_outputs:
+                        # print(f'i: {i}, a_decoder_name: {a_decoder_name}')
+                        pass
+
+                    a_t_bin_a_decoder_P: NDArray[ND.Shape["N_POS_BINS"], np.floating] = single_t_bin_P_values[:, i]
+                    ## INPUTS: a_t_bin_a_decoder_P
+                    # ignore NaNs when finding data range
+                    is_all_nan_slice: bool = np.all(np.isnan(a_t_bin_a_decoder_P)) # to avoid: RuntimeWarning: All-NaN slice encountered
+                    if not is_all_nan_slice:
+                        a_norm = mpl.colors.Normalize(vmin=np.nanmin(a_t_bin_a_decoder_P), vmax=np.nanmax(a_t_bin_a_decoder_P))
+                        
+                        # mask the NaNs so the cmap knows to use the “bad” color
+                        a_masked = np.ma.masked_invalid(a_t_bin_a_decoder_P)
+                        an_rgba: NDArray[ND.Shape["N_POS_BINS, 4"], np.floating] = a_cmap(a_norm(a_masked)) # rgba.shape (n_pos_bins, 4) # the '4' here is for RGBA, not the decoders, RGB per bin
+                        # rgb = an_rgba[..., :3] 
+                        # single_t_bin_out_RGBA[:, i, :] = an_rgba
+                    else:
+                        ## #TODO 2025-05-30 06:51: - [ ] how to avoid the RuntimeWarning: All-NaN slice encountered
+                        # Handle the all-NaN case by filling with a specific color
+                        # # Option 1: Fill with a neutral gray color (visually indicates "no data")
+                        # neutral_color = np.array([0.5, 0.5, 0.5, 1.0])  # RGBA for gray
+                        # single_t_bin_out_RGBA[:, i, :] = np.tile(neutral_color, (a_t_bin_a_decoder_P.shape[0], 1))
+                        
+                        # Option 2: Fill with transparent color (if you want these bins to be invisible)
+                        # transparent_color = np.array([0.0, 0.0, 0.0, 0.0])  # Fully transparent RGBA
+                        # single_t_bin_out_RGBA[:, i, :] = np.tile(transparent_color, (a_t_bin_a_decoder_P.shape[0], 1))
+                        
+                        # # Option 3: Use the colormap's "bad" color (consistent with how NaNs are handled elsewhere)
+                        # bad_color = np.array(a_cmap.get_bad())
+                        # single_t_bin_out_RGBA[:, i, :] = np.tile(bad_color, (a_t_bin_a_decoder_P.shape[0], 1))
+
+                        # mask the NaNs so the cmap knows to use the “bad” color
+                        a_masked = np.ma.masked_invalid(a_t_bin_a_decoder_P)
+                        an_rgba: NDArray[ND.Shape["N_POS_BINS, 4"], np.floating] = a_cmap(a_masked) # rgba.shape (n_pos_bins, 4) # the '4' here is for RGBA, not the decoders, RGB per bin
+                        # rgb = an_rgba[..., :3] 
+                        # single_t_bin_out_RGBA[:, i, :] = an_rgba
+                        
+                    ## OUTPUT: an_rgba
+                    extra_all_t_bins_outputs_dict['all_t_bins_per_decoder_out_RGBA'][a_t_bin_idx, :, i, :] = an_rgba
+                    
+                ## END for i, (a_decoder_name, a_cmap) in enum....
+                
+                # Add dict entries ___________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
+                # single_t_bin_out_RGBA: (n_pos_bins, 4, 4)
+                single_t_bin_out_RGBA: NDArray[ND.Shape["N_POS_BINS, N_DECODERS, 4"], np.floating] = extra_all_t_bins_outputs_dict['all_t_bins_per_decoder_out_RGBA'][a_t_bin_idx, :, :, :]
+                # single_t_bin_out_alpha_weighted_RGBA: NDArray[ND.Shape["N_POS_BINS, N_DECODERS, 4"], np.floating] = (deepcopy(single_t_bin_out_RGBA) * decoder_alphas[None, :, None]) # (n_pos_bins, n_decoders, 4)
+                extra_all_t_bins_outputs_dict['all_t_bins_per_decoder_alphas'][a_t_bin_idx, :] = decoder_alphas
+                # extra_all_t_bins_outputs_dict['all_t_bins_per_decoder_alpha_weighted_RGBA'][a_t_bin_idx, :, :, :] = (deepcopy(single_t_bin_out_RGBA) * decoder_alphas[None, :, None]) # (n_pos_bins, n_decoders, 4)
+                extra_all_t_bins_outputs_dict['all_t_bins_per_decoder_alpha_weighted_RGBA'][a_t_bin_idx, :, :, :] = (single_t_bin_out_RGBA * decoder_alphas[None, :, None]) # (n_pos_bins, n_decoders, 4)
+
+                extra_all_t_bins_outputs_dict['all_t_bins_final_overlayed_out_RGBA'][a_t_bin_idx, :, :] = color_blend_fn(single_t_bin_out_RGBA, decoder_alphas=decoder_alphas) # (n_pos_bins, 4, 4)?
+                
+                ## `numpy_rgba_composite` -- expects input = rgba_layers: (n_layers, H, W, 4) - here (H:
+                # extra_all_t_bins_outputs_dict['all_t_bins_final_RGBA'][a_t_bin_idx, :, :] = numpy_rgba_composite(np.transpose(single_t_bin_out_RGBA, (1, 0, 2)))  # (n_decoders, H=n_pos_bins, 4)
+                # extra_all_t_bins_outputs_dict['all_t_bins_final_RGBA'][a_t_bin_idx, :, :] = numpy_rgba_composite(np.transpose(extra_all_t_bins_outputs_dict['all_t_bins_per_decoder_alpha_weighted_RGBA'][a_t_bin_idx, :, :, :], (1, 0, 2))) # transpose -> (n_pos_bins, n_decoders, 4) => (n_decoders, n_pos_bins, 4)
+                extra_all_t_bins_outputs_dict['all_t_bins_final_RGBA'][a_t_bin_idx, :, :] = numpy_rgba_composite(np.transpose(extra_all_t_bins_outputs_dict['all_t_bins_per_decoder_alpha_weighted_RGBA'][a_t_bin_idx, :, :, :], (1, 0, 2))) # transpose -> (n_pos_bins, n_decoders, 4) => (n_decoders, n_pos_bins, 4)
+
+                # numpy_rgba_composite: Returns: (H, W, 4) — final composited RGBA image
+            ## END FOR for a_t_bin_idx in np.a...
+            # extra_all_t_bins_outputs_dict['all_t_bins_final_overlayed_out_RGBA'] = all_t_bins_final_overlayed_out_RGBA
+            # extra_all_t_bins_outputs_dict['all_t_bins_per_decoder_out_RGBA'] = all_t_bins_per_decoder_out_RGBA
+
+        if progress_print:
+            print(f'a_t_bin_idx: [{a_t_bin_idx}/{n_time_bins}]')
+            print(f'\tdone.')
+            
+
+        return extra_all_t_bins_outputs_dict
+
+
+    @classmethod
+    def _prepare_arr_for_conversion_to_RGBA(cls, arr: NDArray, alt_arr_to_use_for_drops: Optional[NDArray]=None, drop_below_threshold: float=0.0000001, skip_scaling:bool=True):
+        """ Pure (does not alter `arr`, returns a copy).
+        If `drop_below_threshold`
+        
+        IFF (skip_scaling == False): Regardless of `alt_arr_to_use_for_drops` and `drop_below_threshold`, the image is rescaled to fill its dynamic range by its maximum (meaning the output will be normalized between zero and one).
+        `alt_arr_to_use_for_drops` is not used unless `drop_below_threshold` is non-None
+        
+        Input:
+            drop_below_threshold: if None, no indicies are dropped. Otherwise, values of occupancy less than the threshold specified are used to build a mask, which is subtracted from the returned image (the image is NaN'ed out in these places).
+
+            
+        """
+        # Pre-filter the data:
+        with np.errstate(divide='ignore', invalid='ignore'):
+            arr = np.array(arr.copy())
+            if not skip_scaling:
+                arr = arr / np.nanmax(arr) # note scaling by maximum here!
+            if (drop_below_threshold is not None) and (drop_below_threshold > 0):          
+                if (alt_arr_to_use_for_drops is not None):
+                    Assert.same_shape(arr, alt_arr_to_use_for_drops)
+                else:
+                    alt_arr_to_use_for_drops = arr
+
+                arr[np.where(alt_arr_to_use_for_drops < drop_below_threshold)] = np.nan # null out the values below the threshold for visualization
+                
+            # arr = np.nan_to_num(arr, nan=0.0, posinf=1.0, neginf=0.0) # from prepare_data_for_plotting
+            return arr # return the modified and masked image
+        
+
+    @classmethod
+    def composite_multiplied_alpha(cls, single_t_bin_out_RGBA, decoder_alphas):
+        """ Attempts to compute the final overlayed/merged color across decoders (so there's only a single value for all decoders)
+        Usage:
+            final_overlayed_single_t_bin_out_RGBA = composite_multiplied_alpha(single_t_bin_out_RGBA=single_t_bin_out_RGBA)
+        """
+        # out_rgb = np.zeros(3)
+        return np.nansum((single_t_bin_out_RGBA * decoder_alphas[None, :, None]), axis=1) # (n_pos_bins, 4)
+
+
+    @classmethod
+    def composite_over(cls, single_t_bin_out_RGBA, decoder_alphas):
+        """ Attempts to compute the final overlayed/merged color across decoders (so there's only a single value for all decoders)
+        
+        single_t_bin_out_RGBA: (n_pos_bins, n_decoders, 4)
+        decoder_alphas: (n_decoders,)
+        Returns: (n_pos_bins, 4)
+        """
+        n_pos_bins, n_decoders, _ = single_t_bin_out_RGBA.shape
+        out_rgba = np.zeros((n_pos_bins, 4))
+
+        for i in range(n_decoders):
+            src = single_t_bin_out_RGBA[:, i, :]  # (n_pos_bins, 4)
+            valid = ~np.isnan(src).any(axis=1)    # mask for valid RGBA values
+
+            src_rgb = src[valid, :3]
+            src_alpha = decoder_alphas[i]
+            dst_rgb = out_rgba[valid, :3]
+            dst_alpha = out_rgba[valid, 3]
+
+            out_rgba[valid, :3] = src_rgb * src_alpha + dst_rgb * (1 - src_alpha)
+            out_rgba[valid, 3] = src_alpha + dst_alpha * (1 - src_alpha)
+
+        return out_rgba
+
+
+    @function_attributes(short_name=None, tags=['UNUSED', 'HACK', 'matplotlib', 'overlay', 'figure'], input_requires=[], output_provides=[], uses=['numpy_rgba_composite'], used_by=[], creation_date='2025-05-04 18:19', related_items=[])
+    @classmethod
+    def extract_center_rgba_from_figure(cls, fig, axd, n_pos_bins, subplot_name='matplotlib_combined_rgba', debug_print=False):
+        """ Used to reverse-engeinerr the overlayed colors from the matplotlib plot figure
+
+
+        Extract RGBA values from the center of each position bin in a matplotlib figure.
+        
+        Parameters:
+        -----------
+        fig : matplotlib.figure.Figure
+            The figure containing the subplot
+        axd : dict
+            Dictionary of axes from subplot_mosaic
+        n_pos_bins : int
+            Number of position bins
+        subplot_name : str, optional
+            Name of the subplot to extract from, default 'matplotlib_combined_rgba'
+        debug_print : bool, optional
+            Whether to print debug information, default False
+            
+        Returns:
+        --------
+        center_rgba : ndarray
+            RGBA values at the center of each position bin, shape (n_pos_bins, 4)
+
+
+        Usage:
+
+            center_rgba = MultiDecoderColorOverlayedPosteriors.extract_center_rgba_from_figure(fig, axd, n_pos_bins, debug_print=False)
+            # Now you can use center_rgba for further processing
+            center_rgba
+
+            plt.figure()
+            plt.imshow(center_rgba[:, None, :])
+
+
+        """
+        # Render the figure to get pixel data
+        fig.canvas.draw()
+
+        # Get the dimensions of the figure
+        img_w, img_h = fig.canvas.get_width_height()
+        if debug_print:
+            print(f"Figure dimensions: {img_w} x {img_h}")
+
+        # Get the raw pixel data
+        img_data = np.frombuffer(fig.canvas.tostring_argb(), dtype=np.uint8)
+        if debug_print:
+            print(f"Raw data shape: {img_data.shape}")
+            unique_values = np.unique(img_data)
+            print(f"Number of unique values: {len(unique_values)}")
+            print(f"Min/max values: {unique_values.min()}, {unique_values.max()}")
+
+        # Reshape the data - ARGB format needs special handling
+        img = img_data.reshape(img_h, img_w, 4)
+
+        # Convert from ARGB to RGBA (move alpha from first to last position)
+        img = np.roll(img, 3, axis=2)
+
+        if debug_print:
+            print(f"Reshaped image dimensions: {img.shape}")
+
+        # Verify we have the subplot we're looking for
+        if subplot_name not in axd:
+            error_msg = f"ERROR: '{subplot_name}' subplot not found! Available subplots: {list(axd.keys())}"
+            if debug_print:
+                print(error_msg)
+            raise KeyError(error_msg)
+        
+        # Get the position of the specific subplot
+        bbox = axd[subplot_name].get_window_extent().transformed(fig.dpi_scale_trans.inverted())
+        if debug_print:
+            print(f"Subplot bbox: {bbox}")
+        
+        # Calculate pixel coordinates for the subplot
+        x_start = int(bbox.x0 * fig.dpi)
+        y_start = int(bbox.y0 * fig.dpi)
+        x_end = int(bbox.x1 * fig.dpi)
+        y_end = int(bbox.y1 * fig.dpi)
+        
+        if debug_print:
+            print(f"Subplot pixel coordinates: ({x_start}, {y_start}) to ({x_end}, {y_end})")
+        
+        # Extract just the subplot region
+        subplot_img = img[y_start:y_end, x_start:x_end, :]
+        if debug_print:
+            print(f"Subplot image shape: {subplot_img.shape}")
+        
+        # Calculate center indices
+        if debug_print:
+            print(f"n_pos_bins: {n_pos_bins}")
+        
+        # Calculate center indices - assuming vertical arrangement
+        subplot_height = subplot_img.shape[0]
+        center_indices = np.ceil(subplot_height * (np.arange(n_pos_bins) + 0.5)/float(n_pos_bins)).astype(int)
+        if debug_print:
+            print(f"Center indices: {center_indices}")
+        
+        # Check if indices are within bounds
+        if max(center_indices) >= subplot_height:
+            warning_msg = "WARNING: Some center indices are out of bounds!"
+            if debug_print:
+                print(warning_msg)
+            center_indices = np.clip(center_indices, 0, subplot_height-1)
+        
+        # Extract center RGBA values - assuming we want the middle of each row
+        center_x = subplot_img.shape[1] // 2
+        center_rgba = subplot_img[center_indices, center_x, :]
+        
+        if debug_print:
+            print(f"Extracted center RGBA values shape: {center_rgba.shape}")
+            print("Sample RGBA values:")
+            for i in range(min(5, len(center_indices))):
+                print(f"Position {i}: {center_rgba[i]}")
+        
+        return center_rgba
+
+    @function_attributes(short_name=None, tags=['DEPRICATED', 'UNUSED', 'DEBUGGING'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-05-06 19:34', related_items=[])
+    @classmethod
+    def _plot_single_t_bin_images(cls, fig_num=None, debug_print=True, **kwargs):
+        """ plots debugging plots for this data
+        """
+        # from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import numpy_rgba_composite
+
+        plot_ax_values_dict = kwargs
+
+        subplot_ax_names_list = list(plot_ax_values_dict.keys())
+
+
+        special_single_t_bin_per_decoder_RGBA_var_name: str = 'single_t_bin_per_decoder_alpha_weighted_RGBA'
+        single_t_bin_per_decoder_RGBA = plot_ax_values_dict.get(special_single_t_bin_per_decoder_RGBA_var_name, None)
+        if single_t_bin_per_decoder_RGBA is not None:
+            subplot_ax_names_list.append(f'programmatic_test_{special_single_t_bin_per_decoder_RGBA_var_name}')
+            subplot_ax_names_list.append(f'matplotlib_{special_single_t_bin_per_decoder_RGBA_var_name}')
+            
+
+        fig = plt.figure(num=fig_num, layout="constrained", clear=True)
+        axd = fig.subplot_mosaic(
+            [
+                # ["pre_norm", "all_normed", "normed", "rgba", "_realphaed_single_t_bin_out_RGBA", "final_combined_rgba"],
+                # ["pre_norm", "normed", "rgba", "_realphaed_single_t_bin_out_RGBA", "final_combined_rgba", "matplotlib_combined_rgba"],
+                subplot_ax_names_list,
+                # ["main", "BLANK"],
+            ],
+            sharey=True
+        )
+
+        ## Plot the single time bin figure
+        # _pre_norm_prob_vals = MultiDecoderColorOverlayedPosteriors._prepare_arr_for_conversion_to_RGBA(_pre_norm_prob_vals, drop_below_threshold=drop_below_threshold)
+        # _all_normed_prob_vals = _prepare_arr_for_conversion_to_RGBA(_all_normed_prob_vals, drop_below_threshold=drop_below_threshold)
+
+        # final_overlayed_single_t_bin_out_RGBA = final_overlayed_single_t_bin_out_RGBA[:, None, :]
+        # img = deepcopy(final_overlayed_single_t_bin_out_RGBA)[:, None, :]
+        # final_rgb_on_white = blend_over_white(final_overlayed_single_t_bin_out_RGBA)  # (n_pos_bins, 3)
+        # img = final_rgb_on_white[:, None, :]               # (n_pos_bins, 1, 3)
+
+
+        # axd['pre_norm'].imshow(_pre_norm_prob_vals)
+        # axd['all_normed'].imshow(_all_normed_prob_vals)
+        # axd['normed'].imshow(probability_values)
+        # axd['rgba'].imshow(single_t_bin_out_RGBA)
+        # axd['_realphaed_single_t_bin_out_RGBA'].imshow(_realphaed_single_t_bin_out_RGBA)
+
+
+        for ax_name, vals in plot_ax_values_dict.items():
+            vals_shape = np.shape(vals)
+            if (len(vals_shape) == 2) and (vals_shape[-1] == 4):
+                vals = vals[:, None, :] ## matplotlib assume's its not an RGBA format dict and plots it wrongly
+                
+            axd[ax_name].imshow(vals)
+            axd[ax_name].set_title(ax_name)    
+
+
+        ## plot the computed one (which doesn't work):
+        # axd['final_combined_rgba'].imshow(img)
+
+
+        if single_t_bin_per_decoder_RGBA is not None:
+            
+            ax_name = f'programmatic_test_{special_single_t_bin_per_decoder_RGBA_var_name}'
+            rgba_layers = np.transpose(single_t_bin_per_decoder_RGBA, (1, 0, 2))[:, :, None, :]  # (n_decoders, H=n_pos_bins, W=1, 4)
+            print(f'numpy_rgba_composite(...):')
+            print(f'\trgba_layers.shape: {np.shape(rgba_layers)}')
+            final_rgba = numpy_rgba_composite(rgba_layers, debug_print=debug_print)  # (H, W, 4) (59, 1, 4)
+            if debug_print:
+                print(f'\tfinal_rgba.shape: {np.shape(final_rgba)} (post call to `numpy_rgba_composite(...)`)')
+            axd[ax_name].imshow(final_rgba, aspect='auto')
+            axd[ax_name].set_title(ax_name)
+            print(f'\tfinal_rgba.shape: {np.shape(final_rgba)}')
+
+            ## use matplotlib's rendering to get the final output image:
+            ax_name = f'matplotlib_{special_single_t_bin_per_decoder_RGBA_var_name}'
+            for i in np.arange(4):
+                an_img = single_t_bin_per_decoder_RGBA[:, i, :]
+                # an_img = _realphaed_single_t_bin_out_RGBA[:, i, :] # .shape
+                an_img = an_img[:, None, :]
+                axd[ax_name].imshow(an_img, zorder=i)
+                print(f'\t\ti:{i}, an_img.shape: {np.shape(an_img)}')
+            axd[ax_name].set_title(ax_name)
+            
+        return fig, axd
+
+
+    ## INPUTS: extra_all_t_bins_outputs_dict
+
+    @function_attributes(short_name=None, tags=['plot', 'alt', 'WORKING', 'per_decoder'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-05-06 19:02', related_items=[])
+    @classmethod
+    def plot_mutli_t_bin_p_x_given_n_per_decoder(cls, all_t_bins_per_decoder_out_RGBA: NDArray, time_bin_centers=None, xbin=None, t_bin_size = 0.05, ax=None, use_original_bounds=False) -> GenericMatplotlibContainer:
+        """ plots the *per_decoder* result onto a single matplotlib axes by iterating over the decoders and using matplotlib's built-in overlay/composition (which works better than the manual attempt used in `plot_mutli_t_bin_RGBA_image`)
+        
+
+        Working! Uses a single matplotlib ax to draw `n_decoders` images on top of each other by calling `imshow` sequentially.
+        
+        Usage:
+        
+            from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.ContainerBased.PhoContainerTool import GenericMatplotlibContainer
+            from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import MultiDecoderColorOverlayedPosteriors
+            
+            
+            _out: GenericMatplotlibContainer = MultiDecoderColorOverlayedPosteriors.plot_mutli_t_bin_p_x_given_n(extra_all_t_bins_outputs_dict['all_t_bins_per_decoder_alpha_weighted_RGBA'], xbin=xbin, time_bin_centers=time_bin_centers, t_bin_size=0.025, ax=ax)
+            fig = _out.fig
+            ax = _out.ax
+            im_posterior_x_dict = _out.plots.im_posterior_x_dict
+        """
+        # all_t_bins_per_decoder_out_RGBA: NDArray[ND.Shape["N_TIME_BINS", "N_POS_BINS", "N_DECODERS", "4"], np.floating]
+        
+        from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError import _subfn_try_get_approximate_recovered_t_pos
+        from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.ContainerBased.PhoContainerTool import GenericMatplotlibContainer
+
+        n_time_bins, n_pos_bins, n_decoders, _n_RGBA_channels = np.shape(all_t_bins_per_decoder_out_RGBA)
+        assert _n_RGBA_channels == 4
+
+        if xbin is None:
+            xbin = np.arange(n_pos_bins) + 0.5
+            use_original_bounds = True
+            
+        if time_bin_centers is None:
+            time_bin_centers = (np.arange(n_time_bins) * t_bin_size) + (0.5 * t_bin_size)
+            use_original_bounds = True
+            
+        # rgba.shape (n_pos_bins, 4) # the 4 here is for RGBA, not the decoders
+        # plt.imshow(rgba)
+
+        # img = rgba[:,None,:]            # (59,1,4)
+        if ax is None:
+            plt.style.use('dark_background')
+            # fig = plt.figure(num='NEW_FINAL all_t_bins_final_RGBA', layout="constrained", clear=True)
+            fig, ax = plt.subplots(num='NEW_FINAL plot_mutli_t_bin_p_x_given_n', layout="constrained", clear=True)
+        else:
+            fig = ax.get_figure()           
+
+        # img = np.transpose(active_subset_p_x_given_n, (1, 0, 2))
+        
+        # Compute extents for imshow:
+        main_plot_kwargs = {
+            'origin': 'lower',
+            'vmin': 0,
+            'vmax': 1,
+            # 'cmap': cmap,
+            'interpolation':'nearest',
+            'aspect':'auto',
+        } # merges `posterior_heatmap_imshow_kwargs` into main_plot_kwargs, replacing the existing values if present in both
+        # Posterior distribution heatmaps at each point.
+        enable_set_axis_limits:bool=True
+        
+        _out: GenericMatplotlibContainer = GenericMatplotlibContainer(name='plot_mutli_t_bin_p_x_given_n')
+        _out.fig = fig
+        _out.ax = ax 
+
+
+
+        ## Determine the actual start/end times:
+        x_first_extent = _subfn_try_get_approximate_recovered_t_pos(time_bin_centers, xbin, use_original_bounds=use_original_bounds) # x_first_extent = (xmin, xmax, ymin, ymax)
+        xmin, xmax, ymin, ymax = x_first_extent
+
+        _out.plots.im_posterior_x_dict = {}
+        
+        ## use matplotlib's rendering to get the final output image:
+        for i in np.arange(n_decoders):
+            an_img = all_t_bins_per_decoder_out_RGBA[:, :, i, :] # .shape (n_time_bins, n_pos_bins, _n_RGBA_channels)
+            # an_img = _realphaed_single_t_bin_out_RGBA[:, i, :] # .shape (n_time_bins, n_pos_bins, _n_RGBA_channels)
+            # an_img = an_img[:, None, :]
+            # ax.imshow(an_img, zorder=i)
+            # print(f'\t\ti:{i}, an_img.shape: {np.shape(an_img)}')
+
+            an_img = np.transpose(an_img, (1, 0, 2))
+            # print(f'\t\ti:{i}, an_img.shape: {np.shape(an_img)}')
+
+            try:
+                im_posterior_x = ax.imshow(an_img, zorder=i, extent=x_first_extent, **(dict(animated=False) | main_plot_kwargs)) 
+
+            except ValueError as err:
+                # ValueError: Axis limits cannot be NaN or Inf
+                print(f'WARN: active_extent (xmin, xmax, ymin, ymax): {x_first_extent} contains NaN or Inf.\n\terr: {err}')
+                # ax.clear() # clear the existing and now invalid image
+                im_posterior_x = None
+            _out.plots.im_posterior_x_dict[i] = im_posterior_x
+        # end for i in np.arange(n_decoders)
+        if enable_set_axis_limits:
+            ax.set_xlim((xmin, xmax)) # UserWarning: Attempting to set identical low and high xlims makes transformation singular; automatically expanding.
+            ax.set_ylim((ymin, ymax))        
+
+        # return fig, ax, _out.plots.im_posterior_x_dict
+        return _out
+
+
+
+    @function_attributes(short_name=None, tags=['plot', 'matplotlib', 'RGBA_image'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-05-04 00:00', related_items=[])
+    @classmethod
+    def plot_mutli_t_bin_RGBA_image(cls, all_t_bins_final_RGBA, time_bin_centers=None, xbin=None, start_t_bin_idx: int = 0, desired_n_seconds: Optional[float] = None, t_bin_size = 0.05, ax=None, use_original_bounds=False):
+        """ plots a portion of the color-merged *RGBA_image* onto a matplotlib axes 
+
+        Usage:        
+            from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import MultiDecoderColorOverlayedPosteriors
+
+            # all_t_bins_final_RGBA = extra_all_t_bins_outputs_dict['all_t_bins_final_RGBA']
+            # all_t_bins_final_RGBA.shape # (69488, 59, 4)
+
+            start_t_bin_idx: int = 1338
+            desired_n_seconds: float = 60.0
+            ax = None
+            fig, ax, im_posterior_x = MultiDecoderColorOverlayedPosteriors.plot_mutli_t_bin_RGBA_image(all_t_bins_final_RGBA=all_t_bins_per_decoder_out_RGBA, start_t_bin_idx=start_t_bin_idx, desired_n_seconds=desired_n_seconds, t_bin_size=0.05, ax=ax)
+            plt.show()
+
+        """
+        from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError import _subfn_try_get_approximate_recovered_t_pos
+        
+        if desired_n_seconds is not None:
+            n_samples: int = int(np.ceil(desired_n_seconds / t_bin_size))
+        else:
+            n_samples: int = np.shape(all_t_bins_final_RGBA)[0]
+
+        print(f'n_samples: {n_samples}')
+
+        # n_samples = 2
+        subset_t_bin_indicies = np.arange(n_samples)
+        if start_t_bin_idx is not None:
+            subset_t_bin_indicies += start_t_bin_idx
+
+        active_subset_all_t_bins_final_RGBA = deepcopy(all_t_bins_final_RGBA[subset_t_bin_indicies, :, :])
+
+        # active_subset_all_t_bins_final_RGBA.shape
+        n_dims: int = np.ndim(active_subset_all_t_bins_final_RGBA)
+        if n_dims == 4:
+            ## separate overlayed matplotlib version
+            n_time_bins, n_pos_bins, n_decoders, _n_rgba_channels = np.shape(active_subset_all_t_bins_final_RGBA)
+        elif n_dims == 3:
+            ## how can this case happen?
+            n_pos_bins, n_decoders, _n_rgba_channels = np.shape(active_subset_all_t_bins_final_RGBA)
+        else:
+            raise NotImplementedError(f'Nope: np.shape(active_subset_all_t_bins_final_RGBA): {np.shape(active_subset_all_t_bins_final_RGBA)}')
+
+        # n_time_bins, n_pos_bins, n_decoders, _n_rgba_channels = np.shape(active_subset_all_t_bins_final_RGBA)
+
+        
+        if xbin is None:
+            xbin = np.arange(n_pos_bins) + 0.5
+            use_original_bounds = True
+            
+        if time_bin_centers is None:
+            time_bin_centers = (subset_t_bin_indicies * t_bin_size) + (0.5 * t_bin_size)
+            use_original_bounds = True
+            
+        # rgba.shape (n_pos_bins, 4) # the 4 here is for RGBA, not the decoders
+        # plt.imshow(rgba)
+
+        # img = rgba[:,None,:]            # (59,1,4)
+        if ax is None:
+            plt.style.use('dark_background')
+            # fig = plt.figure(num='NEW_FINAL all_t_bins_final_RGBA', layout="constrained", clear=True)
+            fig, ax = plt.subplots(num='NEW_FINAL all_t_bins_final_RGBA', layout="constrained", clear=True)
+        else:
+            fig = ax.get_figure()           
+
+        img = np.transpose(active_subset_all_t_bins_final_RGBA, (1, 0, 2))
+        
+        # Compute extents for imshow:
+        main_plot_kwargs = {
+            'origin': 'lower',
+            'vmin': 0,
+            'vmax': 1,
+            # 'cmap': cmap,
+            'interpolation':'nearest',
+            'aspect':'auto',
+        } # merges `posterior_heatmap_imshow_kwargs` into main_plot_kwargs, replacing the existing values if present in both
+        # Posterior distribution heatmaps at each point.
+        enable_set_axis_limits:bool=True
+        
+        ## Determine the actual start/end times:
+        x_first_extent = _subfn_try_get_approximate_recovered_t_pos(time_bin_centers, xbin, use_original_bounds=use_original_bounds) # x_first_extent = (xmin, xmax, ymin, ymax)
+        xmin, xmax, ymin, ymax = x_first_extent
+
+        try:
+            im_posterior_x = ax.imshow(img, extent=x_first_extent, **(dict(animated=False) | main_plot_kwargs)) 
+            # assert xmin < xmax
+            if enable_set_axis_limits:
+                ax.set_xlim((xmin, xmax)) # UserWarning: Attempting to set identical low and high xlims makes transformation singular; automatically expanding.
+                ax.set_ylim((ymin, ymax))
+        except ValueError as err:
+            # ValueError: Axis limits cannot be NaN or Inf
+            print(f'WARN: active_extent (xmin, xmax, ymin, ymax): {x_first_extent} contains NaN or Inf.\n\terr: {err}')
+            # ax.clear() # clear the existing and now invalid image
+            im_posterior_x = None
+            
+
+        return fig, ax, im_posterior_x
+
+
+
+
+
+    @function_attributes(short_name=None, tags=['UNFINISHED', 'TODO', 'TODO_2025-05-04'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-05-04 20:01', related_items=[])
+    @classmethod
+    def export_portion_as_images(cls, all_t_bins_out_RGBA, file_save_path='output/all_time_bins.pdf'):
+        """ 
+        
+        MultiDecoderColorOverlayedPosteriors.export_portion_as_images(all_t_bins_out_RGBA=all_t_bins_out_RGBA, file_save_path='output/all_time_bins.pdf')
+        
+        
+        """
+        import matplotlib.pyplot as plt
+        from matplotlib.backends.backend_pdf import PdfPages
+
+        # Save each time bin as a separate image
+        # for t_idx in range(all_t_bins_out_RGBA.shape[0]):
+        #     # Create a figure with subplots for each decoder
+        #     fig, axes = plt.subplots(1, 4, figsize=(20, 5))
+            
+        #     for decoder_idx in range(4):
+        #         # Extract RGBA data for this time bin and decoder
+        #         rgba_data = all_t_bins_out_RGBA[t_idx, :, decoder_idx, :]
+                
+        #         # Display as an image
+        #         axes[decoder_idx].imshow(rgba_data.reshape(1, -1, 4))
+        #         axes[decoder_idx].set_title(f'Decoder {decoder_idx}')
+            
+        #     plt.tight_layout()
+        #     plt.savefig(f'time_bin_{t_idx}.png')
+        #     plt.close()
+
+        # Or save all time bins in a single PDF
+        with PdfPages(file_save_path, keep_empty=False) as pdf:
+            for t_idx in range(all_t_bins_out_RGBA.shape[0]):
+                fig, axes = plt.subplots(1, 4, figsize=(20, 5))
+                for decoder_idx in range(4):
+                    rgba_data = all_t_bins_out_RGBA[t_idx, :, decoder_idx, :]
+                    axes[decoder_idx].imshow(rgba_data.reshape(1, -1, 4))
+                    axes[decoder_idx].set_title(f'Decoder {decoder_idx}')
+                plt.tight_layout()
+                pdf.savefig(fig)
+                plt.close()
+
+
+    # ==================================================================================================================================================================================================================================================================================== #
+    # SpikeRaster2D Decoder Tracks                                                                                                                                                                                                                                                         #
+    # ==================================================================================================================================================================================================================================================================================== #
+
+    
+    @function_attributes(short_name=None, tags=['track', 'SpikeRaster2D', 'private'], input_requires=[], output_provides=[], uses=['.plot_mutli_t_bin_p_x_given_n'], used_by=[], creation_date='2025-05-06 16:08', related_items=[])
+    @classmethod
+    def _perform_add_as_track_to_spike_raster_window(cls, active_2d_plot, all_t_bins_final_RGBA, time_bin_centers=None, xbin=None, t_bin_size = 0.025, dock_identifier: str = 'MergedColorPlot'):
+        """ adds to SpikeRaster2D as a multi-color context-weighted decoding as a track
+        
+        
+        Usage:
+        
+            all_t_bins_final_RGBA = extra_all_t_bins_outputs_dict['all_t_bins_final_RGBA']
+
+            ts_widget, fig, ax_list, dDisplayItem = MultiDecoderColorOverlayedPosteriors.add_as_track_to_spike_raster_window(active_2d_plot, all_t_bins_final_RGBA=extra_all_t_bins_outputs_dict['all_t_bins_per_decoder_alpha_weighted_RGBA'], t_bin_size=0.05)
+
+        
+        """
+        # from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import MultiDecoderColorOverlayedPosteriors
+        from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.SpikeRasterWidgets.Spike2DRaster import SynchronizedPlotMode
+
+
+        ## Build the new dock track:
+        
+        ts_widget, fig, ax_list, dDisplayItem = active_2d_plot.add_new_matplotlib_render_plot_widget(name=dock_identifier)
+        ax = ax_list[0]
+        ax.clear()
+
+        ## INPUTS: time_bin_centers, all_t_bins_final_RGBA, xbin
+        # all_t_bins_final_RGBA.shape # (69488, 59, 4)
+        # fig, ax, im_posterior_x = cls.plot_mutli_t_bin_RGBA_image(all_t_bins_final_RGBA=all_t_bins_final_RGBA, xbin=xbin, time_bin_centers=time_bin_centers, t_bin_size=t_bin_size, ax=ax)
+        _out: GenericMatplotlibContainer = cls.plot_mutli_t_bin_p_x_given_n_per_decoder(all_t_bins_final_RGBA, xbin=xbin, time_bin_centers=time_bin_centers, t_bin_size=t_bin_size, ax=ax)
+        fig = _out.fig
+        ax = _out.ax
+        im_posterior_x_dict = _out.plots.im_posterior_x_dict
+
+        ## sync up the widgets
+        active_2d_plot.sync_matplotlib_render_plot_widget(dock_identifier, sync_mode=SynchronizedPlotMode.TO_WINDOW)
+        # active_2d_plot.sync_matplotlib_render_plot_widget(dock_identifier, sync_mode=SynchronizedPlotMode.TO_GLOBAL_DATA)
+        fig.canvas.draw()
+
+        ## OUTPUTS: fig, ax, out_plot_data  
+        return ts_widget, fig, ax_list, dDisplayItem
+        
+
+
+    @function_attributes(short_name=None, tags=['tracks', 'plotting'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-05-13 00:04', related_items=[])
+    def add_tracks_to_spike_raster_window(self, active_2d_plot, dock_identifier_prefix: str = 'MergedColorPlot'):
+        """ adds two separate tracks to SpikeRaster2D, one for each decoding style (four vs. two) 
+                Each added track is a multi-color context-weighted decoding plot
+                
+        Usage:
+                    
+            multi_decoder_color_overlay: MultiDecoderColorOverlayedPosteriors = MultiDecoderColorOverlayedPosteriors(p_x_given_n=p_x_given_n, time_bin_centers=time_bin_centers, xbin=xbin, lower_bound_alpha=0.1, drop_below_threshold=1e-3, t_bin_size=0.025)
+            multi_decoder_color_overlay.compute_all()
+            _out_display_dict = multi_decoder_color_overlay.add_tracks_to_spike_raster_window(active_2d_plot=active_2d_plot, dock_identifier_prefix='MergedColorPlot')
+
+        
+        """
+        from neuropy.utils.mixins.binning_helpers import get_bin_edges
+        from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import _plot_low_firing_time_bins_overlay_image
+        
+
+        time_bin_edges: NDArray = get_bin_edges(deepcopy(self.time_bin_centers))
+        spikes_df: pd.DataFrame = deepcopy(self.spikes_df)
+        # unique_units = np.unique(spikes_df['aclu']) # sorted
+        unit_specific_time_binned_spike_counts, unique_units, (is_time_bin_active, inactive_mask, low_firing_bins_mask_rgba) = spikes_df.spikes.compute_unit_time_binned_spike_counts_and_mask(time_bin_edges=time_bin_edges)
+
+
+        _out_display_dict = {}
+        
+        if 'four_decoders' in self.extra_all_t_bins_outputs_dict_dict:
+            a_result_name: str = 'four_decoders'
+            dock_identifier: str = f'{dock_identifier_prefix}-AlphaWeighted-{a_result_name}'
+            active_colors_dict = self.active_colors_dict_dict[a_result_name]
+            
+            _out_tuple = self._perform_add_as_track_to_spike_raster_window(active_2d_plot=active_2d_plot, all_t_bins_final_RGBA=self.extra_all_t_bins_outputs_dict_dict[a_result_name]['all_t_bins_per_decoder_alpha_weighted_RGBA'], time_bin_centers=self.time_bin_centers, xbin=self.xbin, t_bin_size=self.t_bin_size, dock_identifier=dock_identifier)
+            ts_widget, fig, ax_list, dDisplayItem = _out_tuple
+            ## Add overlay plot to hide bins that don't meet the firing criteria:
+            low_firing_bins_image = _plot_low_firing_time_bins_overlay_image(widget=ts_widget, time_bin_edges=time_bin_edges, mask_rgba=low_firing_bins_mask_rgba, zorder=11)
+            try:
+                ax_inset, rounded_rect_inset =  self.add_decoder_legend_venn(all_decoder_colors_dict=active_colors_dict, ax=ax_list[0], zorder=13)
+                ts_widget.plots['decoder_legend_venn'] = dict(ax_inset=ax_inset, background_rounded_rect_inset=rounded_rect_inset)
+            except ModuleNotFoundError as e:
+                print(f'WARN: {e}. decoder_legend venn will be missing!')
+                pass
+            except Exception as e:
+                raise e
+
+            # _out_display_dict[dock_identifier] = _out_tuple
+            _out_display_dict[dock_identifier] = (ts_widget, fig, ax_list, dDisplayItem)
+
+
+        if 'two_decoders' in self.extra_all_t_bins_outputs_dict_dict:
+            a_result_name: str = 'two_decoders'
+            dock_identifier: str = f'{dock_identifier_prefix}-AlphaWeighted-{a_result_name}'
+            active_colors_dict = self.active_colors_dict_dict[a_result_name]
+            
+            _out_tuple = self._perform_add_as_track_to_spike_raster_window(active_2d_plot=active_2d_plot, all_t_bins_final_RGBA=self.extra_all_t_bins_outputs_dict_dict[a_result_name]['all_t_bins_per_decoder_alpha_weighted_RGBA'], time_bin_centers=self.time_bin_centers, xbin=self.xbin, t_bin_size=self.t_bin_size, dock_identifier=dock_identifier)
+            ts_widget, fig, ax_list, dDisplayItem = _out_tuple
+            ## Add overlay plot to hide bins that don't meet the firing criteria:
+            low_firing_bins_image = _plot_low_firing_time_bins_overlay_image(widget=ts_widget, time_bin_edges=time_bin_edges, mask_rgba=low_firing_bins_mask_rgba, zorder=11)
+            try:
+                ax_inset, rounded_rect_inset =  self.add_decoder_legend_venn(all_decoder_colors_dict=active_colors_dict, ax=ax_list[0], zorder=13)
+                ts_widget.plots['decoder_legend_venn'] = dict(ax_inset=ax_inset, background_rounded_rect_inset=rounded_rect_inset)
+            except ModuleNotFoundError as e:
+                print(f'WARN: {e}. decoder_legend venn will be missing!')
+                pass
+            except Exception as e:
+                raise e 
+
+            # _out_display_dict[dock_identifier] = _out_tuple
+            _out_display_dict[dock_identifier] = (ts_widget, fig, ax_list, dDisplayItem)
+
+        return _out_display_dict
+
+
+    # ==================================================================================================================================================================================================================================================================================== #
+    # Decoder Legend Venn Diagram:                                                                                                                                                                                                                                                         #
+    # ==================================================================================================================================================================================================================================================================================== #
+
+    @classmethod
+    def add_decoder_legend_venn(cls, all_decoder_colors_dict: Dict[str, str], ax, defer_render:bool=False, zorder:float=137.0):
+        """ Creates an inset axes to serve as the legned, and inside this plots a venn-diagram showing the colors for each decoder, allowing the user to see what they look like overlapping
+
+        Usage:
+
+            all_decoder_colors_dict = {'long_LR': '#4169E1', 'long_RL': '#607B00', 'short_LR': '#DC143C', 'short_RL': '#990099'} ## Just hardcoded version of `additional_cmap_names`
+            ax_inset =  MultiDecoderColorOverlayedPosteriors.add_decoder_legend_venn(all_decoder_colors_dict=all_decoder_colors_dict, ax=ax)
+
+        """
+        import matplotlib.patches as patches
+
+        assert ax is not None
+        fig = ax.get_figure()
+
+        # n_decoders: int = len(all_decoder_colors_dict)
+        # cmap = list(all_decoder_colors_dict.values())
+
+        # Create the inset axes
+        # Define the size and position of the inset axes relative to the parent axes    
+        width = 0.1
+        height = 0.65
+
+        # Define the position of the lower-left corner for top-right alignment
+        x0 = (1 - width)
+        y0 = (1 - height)
+
+        # Create the inset axes, using bbox_to_anchor and bbox_transform for independent positioning
+        ax_inset = ax.inset_axes([x0, y0, width, height])
+        ax_inset =  cls._build_decoder_legend_venn(all_decoder_colors_dict=all_decoder_colors_dict, ax=ax_inset)
+        ax_inset.set_zorder(zorder)  # Set zorder after creation
+        
+        # Now, add the rounded rectangle patch to the inset axes (ax_inset)
+        # We define the rectangle in the coordinate system of ax_inset
+        # (0, 0) is the bottom-left corner of ax_inset
+        # 1 is the width covering 100% of ax_inset's width
+        # 1 is the height covering 100% of ax_inset's height
+        rounded_rect_inset = patches.FancyBboxPatch((0, 0), 1, 1,
+                                                    boxstyle="round,pad=0.5",
+                                                    facecolor='#f5e9e9fa',  # Face color set to white
+                                                    edgecolor='#585252fa',
+                                                    alpha=0.7, # Alpha set to 0.7
+                                                    # mutation_scale=30, # Adjust for desired rounding
+                                                    transform=ax_inset.transAxes, # Crucially, use the inset axes' transform
+                                                    zorder=(zorder-5)) # Set a low zorder to be in the background
+
+        # Add the patch to the inset axes
+        ax_inset.add_patch(rounded_rect_inset)
+
+        # # Optional: Set limits for the inset axes if needed
+        ax_inset.set_xlim(0, 1)
+        ax_inset.set_ylim(0, 1)
+        # # fig.canvas.draw()
+
+        if not defer_render:
+            fig.canvas.draw()
+
+        return ax_inset, rounded_rect_inset
+
+    @classmethod
+    def _build_decoder_legend_venn(cls, all_decoder_colors_dict: Dict[str, str], ax=None):
+        """ builds a simple venn-diagram showing the colors for each decoder, allowing the user to see what they look like overlapping
+
+        Usage:
+
+            all_decoder_colors_dict = {'long_LR': '#4169E1', 'long_RL': '#607B00', 'short_LR': '#DC143C', 'short_RL': '#990099'} ## Just hardcoded version of `additional_cmap_names`
+            ax =  MultiDecoderColorOverlayedPosteriors._build_decoder_legend_venn(all_decoder_colors_dict=all_decoder_colors_dict, ax=None)
+
+        """
+        from matplotlib.pyplot import subplots
+        from venn import draw_venn, generate_colors
+
+        n_sets: int = len(all_decoder_colors_dict)
+        cmap = list(all_decoder_colors_dict.values())
+        if ax is None:
+            ## make new figure if needed
+            fig, ax = subplots(figsize=(18, 8))
+            
+        dataset_dict = {k:{100} for k, v in deepcopy(all_decoder_colors_dict).items()}
+
+        # _out = venn(dataset_dict, fmt="{percentage:.1f}%", cmap=cmap, fontsize=8, legend_loc="upper left", ax=ax)
+        petal_labels = {} ## empty labels
+        ax = draw_venn(
+            petal_labels=petal_labels, dataset_labels=dataset_dict.keys(),
+            hint_hidden=False,
+            colors=generate_colors(cmap=cmap, n_colors=n_sets),
+            # colors=cmap,
+            figsize=(8, 8), fontsize=8, legend_loc="upper left", ax=ax
+        )
+
+        # # Now, add the rounded rectangle patch to the inset axes (ax_inset)
+        # # We define the rectangle in the coordinate system of ax_inset
+        # # (0, 0) is the bottom-left corner of ax_inset
+        # # 1 is the width covering 100% of ax_inset's width
+        # # 1 is the height covering 100% of ax_inset's height
+        # rounded_rect_inset = patches.FancyBboxPatch((0, 0), 1, 1,
+        #                                             boxstyle="round,pad=0.5",
+        #                                             facecolor='#f5e9e9fa',  # Face color set to white
+        #                                             edgecolor='#585252fa',
+        #                                             alpha=0.7, # Alpha set to 0.7
+        #                                             # mutation_scale=30, # Adjust for desired rounding
+        #                                             transform=ax.transAxes, # Crucially, use the inset axes' transform
+        #                                             zorder=-5) # Set a low zorder to be in the background
+
+        # # Add the patch to the inset axes
+        # ax.add_patch(rounded_rect_inset)
+
+        # # # # Optional: Set limits for the inset axes if needed
+        # # ax.set_xlim(0, 1)
+        # # ax.set_ylim(0, 1)
+        # # # fig.canvas.draw()
+            
+        return ax
+
+    # ==================================================================================================================== #
+    # HDF5                                                                                                                 #
+    # ==================================================================================================================== #
+    @classmethod
+    def save_hdf(cls, hdf5_save_file_path: Path, extra_all_t_bins_outputs_dict, **kwargs):
+        """ 
+
+        Usage:
+            from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import MultiDecoderColorOverlayedPosteriors
+
+            ## INPUTS: all_t_bins_final_overlayed_out_RGBA, all_t_bins_per_decoder_out_RGBA
+            hdf5_save_file_path = Path(f'output/2025-05-11_all_t_bins_out_RGBA_thresh.h5').resolve()
+            
+            MultiDecoderColorOverlayedPosteriors.save_hdf(hdf5_save_file_path=hdf5_save_file_path, extra_all_t_bins_outputs_dict=extra_all_t_bins_outputs_dict, drop_below_threshold=drop_below_threshold,
+                                                        all_t_bins_final_overlayed_out_RGBA=all_t_bins_final_overlayed_out_RGBA, all_t_bins_per_decoder_out_RGBA=all_t_bins_per_decoder_out_RGBA,
+                                                        
+            )
+
+
+        
+        Load with reciprocal:
+        
+            hdf5_load_file_path = Path('output/2025-05-11_all_t_bins_out_RGBA_thresh.h5').resolve()
+            all_t_bins_final_RGBA = MultiDecoderColorOverlayedPosteriors.load_hdf(hdf5_load_file_path=hdf5_load_file_path) # Initialize variable
+
+            ## OUTPUTS: all_t_bins_final_RGBA
+            all_t_bins_final_RGBA
+
+        """
+        import h5py
+
+        drop_below_threshold = kwargs.pop('drop_below_threshold', None)
+        all_t_bins_final_overlayed_out_RGBA = kwargs.pop('all_t_bins_final_overlayed_out_RGBA', None)
+        all_t_bins_per_decoder_out_RGBA = kwargs.pop('all_t_bins_per_decoder_out_RGBA', None)
+
+        ## INPUTS: all_t_bins_final_overlayed_out_RGBA, all_t_bins_per_decoder_out_RGBA
+        # hdf5_save_file_path: Path = Path(f'output/2025-05-09_all_t_bins_out_RGBA_thresh.h5').resolve()
+        with h5py.File(hdf5_save_file_path, 'w') as f:
+            if drop_below_threshold:
+                f.create_dataset('drop_below_threshold', data=drop_below_threshold)
+            if all_t_bins_final_overlayed_out_RGBA is None:
+                f.create_dataset('final_overlayed_rgba_data', data=all_t_bins_final_overlayed_out_RGBA, compression='gzip', compression_opts=9)
+            if all_t_bins_per_decoder_out_RGBA is not None:
+                f.create_dataset('rgba_data', data=all_t_bins_per_decoder_out_RGBA, compression='gzip', compression_opts=9)
+                
+            for k, v in extra_all_t_bins_outputs_dict.items():
+                print(f'writing key "{k}"...')
+                f.create_dataset(k, data=v, compression='gzip', compression_opts=9)
+
+            print(f'hdf5_save_file_path: "{hdf5_save_file_path}"')
+
+    @classmethod
+    def load_hdf(cls, hdf5_load_file_path: Path):
+        """ 
+        """
+        import h5py # For loading data from HDF5 file
+
+        # --- Data Preparation ---
+        # Attempt to load data from HDF5 file first.
+        # If loading fails, fall back to placeholder data.
+
+        # hdf5_load_file_path: Path = Path('output/2025-05-06_all_t_bins_out_RGBA_thresh.h5').resolve()
+        data_loaded_from_hdf5 = False
+        all_t_bins_final_RGBA = None # Initialize variable
+
+        print(f"Attempting to load data from: {hdf5_load_file_path}")
+
+        if hdf5_load_file_path.exists():
+            try:
+                with h5py.File(hdf5_load_file_path, 'r') as f:
+                    # The key 'all_t_bins_final_RGBA' is based on the original script's usage:
+                    # all_t_bins_final_RGBA = extra_all_t_bins_outputs_dict['all_t_bins_final_RGBA']
+                    # and the saving loop: f.create_dataset(k, data=v, ...)
+                    dataset_key = 'all_t_bins_final_RGBA'
+                    
+                    if dataset_key in f:
+                        all_t_bins_final_RGBA = f[dataset_key][:] # Load the entire dataset into memory
+                        print(f"Successfully loaded '{dataset_key}' from {hdf5_load_file_path}")
+                        print(f"Loaded data shape: {all_t_bins_final_RGBA.shape}")
+                        
+                        # Basic validation of the loaded data structure
+                        if not (isinstance(all_t_bins_final_RGBA, np.ndarray) and
+                                all_t_bins_final_RGBA.ndim == 3 and
+                                all_t_bins_final_RGBA.shape[2] == 4):
+                            print(f"Warning: Loaded data for '{dataset_key}' does not have the expected "
+                                f"3D shape (time_bins, spatial_bins, 4 channels). "
+                                f"Found shape: {all_t_bins_final_RGBA.shape}. Problems might occur.")
+                            # Decide if this should be a fatal error or allow continuation
+                        
+                        data_loaded_from_hdf5 = True
+                    else:
+                        print(f"Error: Dataset '{dataset_key}' not found in HDF5 file {hdf5_load_file_path}.")
+            except Exception as e:
+                print(f"Error loading data from HDF5 file {hdf5_load_file_path}: {e}")
+        else:
+            print(f"Error: HDF5 file not found at {hdf5_load_file_path}.")
+
+
+        # data_loaded_from_hdf5
+        ## OUTPUTS: all_t_bins_final_RGBA
+        if data_loaded_from_hdf5:
+            return all_t_bins_final_RGBA
+        else:
+            return None
+
+
+
+
+
+
+
+@function_attributes(short_name=None, tags=['private'], input_requires=[], output_provides=[], uses=[], used_by=['build_decoder_prob_as_a_function_of_position'], creation_date='2025-05-02 12:54', related_items=[])
+def _subfn_helper_process_epochs_result_dict(epochs_result_dict: Dict[types.KnownNamedDecodingEpochsType, DecodedFilterEpochsResult], t_delta: float):
+    epoch_name_by_pre_post_delta_category_output_dict_dict: Dict[types.KnownNamedDecodingEpochsType, Dict[types.PrePostDeltaCategory, DecodedFilterEpochsResult]] = {}
+
+    for an_epoch_name, an_out_result in epochs_result_dict.items():
+        print(f'an_epoch_name: "{an_epoch_name}"')
+        an_out_result.filter_epochs = an_out_result.filter_epochs.pho_LS_epoch.adding_pre_post_delta_category_if_needed(t_delta=t_delta)
+        pre_post_delta_epoch_decoded_marginal_posterior_df_dict = an_out_result.filter_epochs.pho.partition_df_dict('pre_post_delta_category') # pre_post_delta_category
+        ## note that the parititoning produces the hyphen separated string values and we want the unscore-separated ones (as specified in `types.PrePostDeltaCategory`) instead, so we need to manually provide the indexes
+        time_col: str = TimeColumnAliasesProtocol.find_first_extant_suitable_columns_name(an_out_result.filter_epochs, col_connonical_name='start', required_columns_synonym_dict={"start":{'begin','start_t','ripple_start_t','lap_start_t'}}, should_raise_exception_on_fail=False)
+        print(f'\ttime_col: "{time_col}"')
+        an_out_result_dict: Dict[types.PrePostDeltaCategory, DecodedFilterEpochsResult] = {'pre_delta': an_out_result.filtered_by_epoch_times(pre_post_delta_epoch_decoded_marginal_posterior_df_dict['pre-delta'][time_col]),
+                            'post_delta': an_out_result.filtered_by_epoch_times(pre_post_delta_epoch_decoded_marginal_posterior_df_dict['post-delta'][time_col]),
+        }
+        # an_out_result_dict['pre-delta']
+        epoch_name_by_pre_post_delta_category_output_dict_dict[an_epoch_name] = deepcopy(an_out_result_dict)
+
+
+    ## OUTPUTS: epoch_name_by_pre_post_delta_category_output_dict_dict
+    return epoch_name_by_pre_post_delta_category_output_dict_dict
+
+
+@function_attributes(short_name='decoded_prob_as_fn_of_pos', tags=['position', 'debug', 'plot'], input_requires=[], output_provides=[], uses=['_subfn_helper_process_epochs_result_dict'], used_by=[], creation_date='2025-05-02 12:54', related_items=[])
+def build_decoder_prob_as_a_function_of_position(epochs_result_dict: Dict[types.KnownNamedDecodingEpochsType, DecodedFilterEpochsResult], xbin_centers, t_delta: float, grid_bin_bounds=None, is_split_by_all_decoders:bool = True, debug_print=False,
+                                                 enable_per_decoder_renormalization: bool=True, enable_per_position_bin_renormalization: bool=False, enable_LS_renormalization: bool=False, num='build_decoder_prob_as_a_function_of_position', **kwargs):
+    """ Plots the Decoder Context Probability as a function of position (split by pre/post-delta, decoded epochs) to check for bias of certain positions to decode to certain decoder-context (like the right-long endcap region might have a strong bias towards 'long_LR' pre-delta.)
+
+    Usage:
+        from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import build_decoder_prob_as_a_function_of_position
+    
+        
+        ## INPUTS: a_laps_decoder, a_laps_result, a_pbes_result
+        t_start, t_delta, t_end = curr_active_pipeline.find_LongShortDelta_times()
+
+        epochs_result_dict: Dict[types.KnownNamedDecodingEpochsType, DecodedFilterEpochsResult] = {'laps': deepcopy(a_laps_result),
+                            'pbe': deepcopy(a_pbes_result),
+        }
+        
+        ## all four decoders as separate rows:
+        fig, ax_dict, epoch_name_by_pre_post_delta_category_output_dict_dict, epoch_name_by_probability_values_output_dict_dict = build_decoder_prob_as_a_function_of_position(epochs_result_dict=epochs_result_dict, xbin_centers=deepcopy(a_laps_decoder.xbin_centers), t_delta=t_delta, grid_bin_bounds=deepcopy(a_laps_decoder.pf.config.grid_bin_bounds), is_split_by_all_decoders=True,
+                                                                                                                                                                            display_context=curr_active_pipeline.build_display_context_for_session('decoded_occupancy_v_measured'))
+
+        ## just long/short
+        fig, ax_dict, epoch_name_by_pre_post_delta_category_output_dict_dict, epoch_name_by_probability_values_output_dict_dict = build_decoder_prob_as_a_function_of_position(epochs_result_dict=epochs_result_dict, xbin_centers=deepcopy(a_laps_decoder.xbin_centers), t_delta=t_delta, grid_bin_bounds=deepcopy(a_laps_decoder.pf.config.grid_bin_bounds), is_split_by_all_decoders=False,
+                                                                                                                                                                            display_context=curr_active_pipeline.build_display_context_for_session('decoded_prob_as_fn_of_pos'))
+    """
+    from pyphoplacecellanalysis.General.Model.Configs.LongShortDisplayConfig import DecoderIdentityColors   
+    from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import plot_linearized_position_probability, plot_linearized_position_prob_p
+    from pyphoplacecellanalysis.Pho2D.track_shape_drawing import add_track_shapes, add_vertical_track_bounds_lines
+    from pyphoplacecellanalysis.SpecificResults.AcrossSessionResults import AcrossSessionsVisualizations
+    from pyphocorehelpers.DataStructure.RenderPlots.MatplotLibRenderPlots import FigureCollector
+    from pyphoplacecellanalysis.SpecificResults.PhoDiba2023Paper import PhoPublicationFigureHelper
+
+
+
+    decoder_color_dict: Dict[types.DecoderName, str] = DecoderIdentityColors.build_decoder_color_dict()
+
+    ## INPUTS: epochs_result_dict, a_laps_decoder, 
+
+    epoch_name_by_pre_post_delta_category_output_dict_dict: Dict[types.KnownNamedDecodingEpochsType, Dict[types.PrePostDeltaCategory, DecodedFilterEpochsResult]] = _subfn_helper_process_epochs_result_dict(epochs_result_dict=epochs_result_dict, t_delta=t_delta)
+    
+    epoch_name_by_probability_values_output_dict_dict: Dict[types.KnownNamedDecodingEpochsType, Dict[str, NDArray]] = {}
+
+
+    if is_split_by_all_decoders:
+        num = f"{num} - 4 decoders"
+    else:
+        num = f"{num} - 2 decoders"
+        
+
+    display_context = kwargs.pop('display_context', None)
+    # display_context = display_context.adding
+
+    # ==================================================================================================================================================================================================================================================================================== #
+    # Plotting                                                                                                                                                                                                                                                                             #
+    # ==================================================================================================================================================================================================================================================================================== #
+    def perform_write_to_file_callback(ctxt, fig):
+        """ captures: Nothing
+        """
+        return (ctxt, AcrossSessionsVisualizations.output_figure(final_context=display_context, fig=fig, write_vector_format=True, write_png=False))
+
+
+    # with mpl.rc_context(PhoPublicationFigureHelper.rc_context_kwargs(prepare_for_publication=True, **{'figure.figsize': (6.5, 2), 'figure.dpi': '220',})):
+    with mpl.rc_context(PhoPublicationFigureHelper.rc_context_kwargs(prepare_for_publication=False, **{})):
+
+        # Create a FigureCollector instance
+        with FigureCollector(name='decoded_prob_as_fn_of_pos', base_context=display_context) as collector:
+
+            # ## Define common operations to do after making the figure:
+            # def setup_common_after_creation(a_collector, fig, axes, sub_context, title=f'<size:22>Track <weight:bold>Remapping</></>'):
+            #     """ Captures:
+
+            #     t_split
+            #     """
+            #     a_collector.contexts.append(sub_context)
+                
+            #     fig.suptitle('Place Cell Remapping (Example Session)')
+                
+            #     if ((perform_write_to_file_callback is not None) and (sub_context is not None)):
+            #         perform_write_to_file_callback(sub_context, fig)
+
+            # BEGIN FUNCTION BODY
+            
+            fig = collector.build_or_reuse_figure(fignum=num, fig=kwargs.pop('fig', None), fig_idx=kwargs.pop('fig_idx', 0), figsize=kwargs.pop('figsize', (6.5, 2)), dpi=kwargs.pop('dpi', None), constrained_layout=True, clear=True, **kwargs) 
+            _fig_container: GenericMatplotlibContainer = GenericMatplotlibContainer(name='decoded_prob_as_fn_of_pos')
+            _fig_container.fig = fig
+            
+            # fig = plt.figure(layout="constrained", num=num, **kwargs)
+            if is_split_by_all_decoders:
+                # ax_dict = fig.subplot_mosaic(
+                fig, ax_dict = collector.subplot_mosaic(
+                    [
+                        ["laps|pre_delta"],
+                        ["laps|post_delta"],
+                        ["pbe|pre_delta"],
+                        ["pbe|post_delta"],        
+                    ],
+                    # set the height ratios between the rows
+                    sharex=True, sharey=True,
+                    gridspec_kw=dict(wspace=0, hspace=0.15), # `wspace=0`` is responsible for sticking the pf and the activity axes together with no spacing
+                    extant_fig=fig,
+                ) 
+            else:
+                # ax_dict = fig.subplot_mosaic(
+                fig, ax_dict = collector.subplot_mosaic(
+                    [
+                        ["laps"],
+                        ["pbe"],
+                    ],
+                    # set the height ratios between the rows
+                    sharex=True, sharey=True,
+                    gridspec_kw=dict(wspace=0, hspace=0.15), # `wspace=0`` is responsible for sticking the pf and the activity axes together with no spacing
+                    extant_fig=fig,
+                )
+
+            decoder_idx_to_name_map: Dict[int, str] = {0: 'long_LR', 1: 'long_RL', 2:'short_LR', 3:'short_RL'}
+            # pre_post_delta_category_name_to_scatter_kwargs_map = {'long': dict(marker='.'), 'short': dict(marker='<')}
+            # pre_post_delta_category_name_to_scatter_kwargs_map = {'pre_delta': dict(marker='<'), 'post_delta': dict(marker='>')}
+            pre_post_delta_category_name_to_scatter_kwargs_map = {'pre_delta': dict(marker='<'), 'post_delta': dict(marker='.')}
+
+            for an_epoch_name, an_out_result_dict in epoch_name_by_pre_post_delta_category_output_dict_dict.items():
+                for a_pre_post_delta_category_name, an_out_result in an_out_result_dict.items():
+                    a_combined_str_name: str = f'{an_epoch_name}|{a_pre_post_delta_category_name}'
+                    print(f'a_combined_str_name: "{a_combined_str_name}"')
+                    # Compute the sum of probabilities from the p_x_given_n_list
+                    summary_values_dict = {}
+                    summary_values_dict['all'] = np.squeeze(np.dstack([np.squeeze(v[:,:,:]) for v in an_out_result.p_x_given_n_list])) 
+                    for a_decoder_idx, a_decoder_name in decoder_idx_to_name_map.items():
+                        summary_values_dict[a_decoder_name] = np.squeeze(np.hstack([np.squeeze(v[:,a_decoder_idx,:]) for v in an_out_result.p_x_given_n_list])) # (n_pos_bins, n_time_bins)
+                        probability_values = np.nansum(summary_values_dict[a_decoder_name], axis=-1) # sum over time
+                        
+                        ## normalize over decoder
+                        if enable_per_decoder_renormalization:
+                            sum_over_all_decoder_p_values = np.nansum(probability_values) # sum over time
+                            probability_values = probability_values / sum_over_all_decoder_p_values ## normalize over decoder
+
+                        summary_values_dict[a_decoder_name] = probability_values # (n_pos_bins)
+                        
+
+
+                    ## normalize over each position decoder
+                    if enable_per_position_bin_renormalization:
+                        sum_over_all_decoders_per_position = summary_values_dict['long_LR'] + summary_values_dict['long_RL'] + summary_values_dict['short_LR'] + summary_values_dict['short_RL'] # sum for each position, .shape (n_pos_bins,)
+                        if debug_print:
+                            print(f'sum_over_all_decoders_per_position.shape: {sum_over_all_decoders_per_position.shape}')
+                        # probability_values = probability_values / sum_over_all_decoders_per_position ## normalize over decoder
+                        for a_decoder_idx, a_decoder_name in decoder_idx_to_name_map.items():
+                            ## normalize each one at a time
+                            summary_values_dict[a_decoder_name] = summary_values_dict[a_decoder_name] / sum_over_all_decoders_per_position
+
+
+                    summary_values_dict['long'] = summary_values_dict['long_LR'] + summary_values_dict['long_RL'] #np.squeeze(np.hstack([np.squeeze(v[:,0,:]) for v in an_out_result.p_x_given_n_list])) +  np.squeeze(np.hstack([np.squeeze(v[:,1,:]) for v in an_out_result.p_x_given_n_list]))
+                    summary_values_dict['short'] = summary_values_dict['short_LR'] + summary_values_dict['short_RL'] # np.squeeze(np.hstack([np.squeeze(v[:,2,:]) for v in an_out_result.p_x_given_n_list])) + np.squeeze(np.hstack([np.squeeze(v[:,3,:]) for v in an_out_result.p_x_given_n_list]))        
+
+
+                    ## potentially redundant long/short renormalization:
+                    if enable_LS_renormalization:
+                        any_long_or_short = summary_values_dict['long'] + summary_values_dict['short']
+                        summary_values_dict['long'] = summary_values_dict['long'] / any_long_or_short
+                        summary_values_dict['short'] = summary_values_dict['short'] / any_long_or_short
+
+                    # scatter_kwargs = {}
+                    scatter_kwargs = pre_post_delta_category_name_to_scatter_kwargs_map[a_pre_post_delta_category_name] # dict(marker='.')
+                    
+                    if is_split_by_all_decoders:
+                        active_decoder_names_list = ['long_LR', 'long_RL', 'short_LR', 'short_RL']
+                    else:
+                        active_decoder_names_list = ['long', 'short']
+                        # active_decoder_names_list = ['long_LR', 'long_RL', 'short_LR', 'short_RL']
+                        
+                    # for a_decoder_idx, a_decoder_name in decoder_idx_to_name_map.items():
+                    for a_decoder_name in active_decoder_names_list:
+                        a_full_combined_str_name: str = f'{a_combined_str_name}|{a_decoder_name}'
+                        print(f'a_full_combined_str_name: "{a_full_combined_str_name}"')
+                        if is_split_by_all_decoders:
+                            ax = ax_dict[a_combined_str_name]
+                            a_decoder_color = decoder_color_dict[a_decoder_name]
+                            scatter_kwargs['color'] = a_decoder_color
+                            a_p_x_given_n = summary_values_dict[a_decoder_name]
+                            active_combined_str_name: str = a_full_combined_str_name
+                        else:
+                            ax = ax_dict[an_epoch_name]
+                            a_decoder_color = decoder_color_dict[f"{a_decoder_name}_LR"]
+                            # a_decoder_color = decoder_color_dict[a_decoder_name]
+                            scatter_kwargs['color'] = a_decoder_color
+                            a_p_x_given_n = summary_values_dict[a_decoder_name]
+                            # active_combined_str_name: str = a_combined_str_name
+                            active_combined_str_name: str = a_full_combined_str_name
+
+                        fig1, ax, prob_values1 = plot_linearized_position_prob_p(a_p_x_given_n=a_p_x_given_n, label=active_combined_str_name, figure_title=f'Joint Position Probability', ax=ax, xbin_centers=xbin_centers, y_label=f'P({a_decoder_name}|x)', **scatter_kwargs)
+                    ## END for a_decoder_name in active_de...
+                    
+
+                    epoch_name_by_probability_values_output_dict_dict[an_epoch_name] = deepcopy(summary_values_dict)
+                ## END for a_pre_post_delta_c...
+            ## END for an_epoch_name, an_....
+            
+            if grid_bin_bounds is not None:
+                for k, ax in ax_dict.items():
+                    long_track_line_collection, short_track_line_collection = add_vertical_track_bounds_lines(grid_bin_bounds=grid_bin_bounds, ax=ax)
+            else:
+                print(f'WARN: grid_bin_bounds is None so we cannot show the track endcap positions!')
+        
+
+    return fig, ax_dict, epoch_name_by_pre_post_delta_category_output_dict_dict, epoch_name_by_probability_values_output_dict_dict
+
+
+
+
+
+
+@function_attributes(short_name=None, tags=['plotting', 'prob_v_position'], input_requires=[], output_provides=[], uses=[], used_by=['plot_linearized_position_probability'], creation_date='2025-05-01 17:00', related_items=[])
+def plot_linearized_position_prob_p(a_p_x_given_n: NDArray, figure_title='Linearized Position Probability', save_path=None, show_figure=True, ax=None, figsize=(10, 6), label=None, y_label: str = 'P(Long|x)', xbin_centers=None,
+                                    add_connecting_line=True, line_alpha=0.2, line_width=0.5, **kwargs):
+    """
+    Produces a figure showing the probability distribution across linearized positions.
+    
+    Parameters:
+    -----------
+    an_out_result : object
+        Result object containing p_x_given_n_list attribute
+    figure_title : str, optional
+        Title for the figure window
+    save_path : str, optional
+        If provided, saves the figure to this path
+    show_figure : bool, optional
+        Whether to display the figure
+        
+    Returns:
+    --------
+    fig : matplotlib.figure.Figure
+        The generated figure object
+    probability_values : numpy.ndarray
+        The normalized probability values plotted
+
+
+    Usage:
+
+        from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import plot_linearized_position_prob_p
+        
+        fig1, ax1, prob_values1 = plot_linearized_position_probability(an_out_result=an_out_result_dict['pre-delta'], figure_title='pre-delta Linearized Position Probability')
+        fig2, ax2, prob_values2 = plot_linearized_position_probability(an_out_result=an_out_result_dict['post-delta'], figure_title='post-delta Linearized Position Probability', ax=ax1)
+
+    """
+    import numpy as np
+    import matplotlib.pyplot as plt
+    
+    # Create figure and axis if not provided
+    if ax is None:
+        fig, ax = plt.subplots(num=figure_title, figsize=figsize, clear=True)
+    else:
+        fig = ax.figure
+    
+    # Plot the data
+    if xbin_centers is None:
+        xbin_centers = np.arange(len(a_p_x_given_n))
+
+    scatter = ax.scatter(xbin_centers, a_p_x_given_n, label=label, **kwargs)
+
+    # Add connecting line if requested
+    if add_connecting_line:
+        # Get the color from the scatter plot if not specified in kwargs
+        if 'color' in kwargs:
+            line_color = kwargs['color']
+        elif hasattr(scatter, 'get_facecolor'):
+            # For single color scatter
+            line_color = scatter.get_facecolor()[0]
+        else:
+            # Default color
+            line_color = 'blue'
+            
+        # Plot the connecting line with transparency
+        ax.plot(xbin_centers, a_p_x_given_n, color=line_color, alpha=line_alpha, linewidth=line_width)
+
+
+    ax.set_title(figure_title)
+    ax.set_ylabel(y_label)
+    ax.set_xlabel('Position x <linearized>')
+    
+    ax.legend()
+
+    # Optional: save the figure
+    if save_path is not None:
+        plt.savefig(save_path, dpi=300, bbox_inches='tight')
+    
+    # Show or close the figure based on parameter
+    if not show_figure:
+        plt.close(fig)
+        
+    return fig, ax, a_p_x_given_n
+
+
+@function_attributes(short_name=None, tags=['plotting', 'prob_v_position'], input_requires=[], output_provides=[], uses=['plot_linearized_position_prob_p'], used_by=[], creation_date='2025-05-01 17:00', related_items=[])
+def plot_linearized_position_probability(an_out_result: DecodedFilterEpochsResult, is_P_long:bool=False, **kwargs):
+    """
+    Produces a figure showing the probability distribution across linearized positions.
+    
+    Parameters:
+    -----------
+    an_out_result : object
+        Result object containing p_x_given_n_list attribute
+    figure_title : str, optional
+        Title for the figure window
+    save_path : str, optional
+        If provided, saves the figure to this path
+    show_figure : bool, optional
+        Whether to display the figure
+        
+    Returns:
+    --------
+    fig : matplotlib.figure.Figure
+        The generated figure object
+    probability_values : numpy.ndarray
+        The normalized probability values plotted
+
+
+    Usage:
+
+        from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import plot_linearized_position_probability
+        
+        fig1, ax1, prob_values1 = plot_linearized_position_probability(an_out_result=an_out_result_dict['pre-delta'], figure_title='pre-delta Linearized Position Probability')
+        fig2, ax2, prob_values2 = plot_linearized_position_probability(an_out_result=an_out_result_dict['post-delta'], figure_title='post-delta Linearized Position Probability', ax=ax1)
+
+    """
+    # Compute the sum of probabilities from the p_x_given_n_list
+    if is_P_long:
+        y_label: str = 'P(Long|x)'
+        summary_values = np.squeeze(np.hstack([np.squeeze(v[:,0,:]) for v in an_out_result.p_x_given_n_list])) + \
+                        np.squeeze(np.hstack([np.squeeze(v[:,1,:]) for v in an_out_result.p_x_given_n_list]))
+    else:
+        ## P_Short
+        y_label: str = 'P(Short|x)'
+        summary_values = np.squeeze(np.hstack([np.squeeze(v[:,2,:]) for v in an_out_result.p_x_given_n_list])) + \
+                        np.squeeze(np.hstack([np.squeeze(v[:,3,:]) for v in an_out_result.p_x_given_n_list]))
+
+
+    # Sum across one dimension and normalize
+    probability_values = np.nansum(summary_values, axis=-1)
+    normalization_factor = np.nansum(probability_values)
+    # probability_values = probability_values / normalization_factor
+    
+    return plot_linearized_position_prob_p(a_p_x_given_n=probability_values, y_label=y_label, **kwargs)
+
+
+
+
+
 
 
 @function_attributes(short_name=None, tags=['plot', 'figure', 'matplotlib'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-04-14 17:55', related_items=[])
-def _plot_all_time_decoded_marginal_figures_non_interactive(curr_active_pipeline, best_matching_context: IdentifyingContext, a_decoded_marginal_posterior_df: pd.DataFrame, epochs_decoding_time_bin_size: float = 0.025):
+def _plot_all_time_decoded_marginal_figures_non_interactive(curr_active_pipeline, best_matching_context: IdentifyingContext, a_decoded_marginal_posterior_df: pd.DataFrame, epochs_decoding_time_bin_size: float = 0.025, constrained_layout=False, **kwargs):
     """ exports the components needed to show the decoded P_Short/P_Long likelihoods over time
 
+    Usage:
+        from neuropy.utils.result_context import IdentifyingContext
+        from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import _plot_all_time_decoded_marginal_figures_non_interactive
+        from pyphocorehelpers.plotting.media_output_helpers import save_array_as_image, get_array_as_image
 
-    from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import _plot_all_time_decoded_marginal_figures
+        curr_active_pipeline.reload_default_display_functions()
 
-    search_context = IdentifyingContext(known_named_decoding_epochs_type='global') # , data_grain= 'per_time_bin -- not really relevant: ['masked_time_bin_fill_type', 'known_named_decoding_epochs_type', 'data_grain']
-    flat_context_list, flat_result_context_dict, flat_decoder_context_dict, flat_decoded_marginal_posterior_df_context_dict = a_new_fully_generic_result.get_results_matching_contexts(context_query=search_context, return_multiple_matches=True, debug_print=True)
-    _all_tracks_active_out_figure_paths, _all_tracks_out_artists, _all_tracks_out_axes = 
+        ## INPUTS: a_new_fully_generic_result
+        # a_target_context: IdentifyingContext = IdentifyingContext(trained_compute_epochs='laps', pfND_ndim=1, decoder_identifier='pseudo2D', known_named_decoding_epochs_type='global', masked_time_bin_fill_type='nan_filled', data_grain='per_time_bin')
+        a_target_context: IdentifyingContext = IdentifyingContext(trained_compute_epochs='laps', pfND_ndim=1, decoder_identifier='pseudo2D', known_named_decoding_epochs_type='global', masked_time_bin_fill_type='ignore', data_grain='per_time_bin')
+        best_matching_context, a_result, a_decoder, a_decoded_marginal_posterior_df = a_new_fully_generic_result.get_results_best_matching_context(context_query=a_target_context, debug_print=False)
+        epochs_decoding_time_bin_size = best_matching_context.get('time_bin_size', None)
+        assert epochs_decoding_time_bin_size is not None
+
+        graphics_output_dict = _plot_all_time_decoded_marginal_figures_non_interactive(curr_active_pipeline=curr_active_pipeline, best_matching_context=best_matching_context, a_decoded_marginal_posterior_df=a_decoded_marginal_posterior_df, epochs_decoding_time_bin_size=epochs_decoding_time_bin_size)
+
+
 
     """
-    from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.SpikeRasterWidgets.Spike2DRaster import Spike2DRaster
-    from pyphoplacecellanalysis.GUI.Qt.SpikeRasterWindows.Spike3DRasterWindowWidget import Spike3DRasterWindowWidget
-    from pyphoplacecellanalysis.GUI.Qt.PlaybackControls.Spike3DRasterBottomPlaybackControlBarWidget import Spike3DRasterBottomPlaybackControlBar
-    from pyphoplacecellanalysis.Pho2D.PyQtPlots.TimeSynchronizedPlotters.PyqtgraphTimeSynchronizedWidget import PyqtgraphTimeSynchronizedWidget
-    # from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.SpikeRasterWidgets.spike_raster_widgets import _setup_spike_raster_window_for_debugging
+    from pyphocorehelpers.DataStructure.RenderPlots.MatplotLibRenderPlots import FigureCollector    
+    from pyphocorehelpers.DataStructure.RenderPlots.MatplotLibRenderPlots import MatplotlibRenderPlots
+    from pyphocorehelpers.plotting.media_output_helpers import save_array_as_image
+    from neuropy.utils.mixins.time_slicing import TimeColumnAliasesProtocol
+    # from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError import plot_decoded_epoch_slices
+    from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError import plot_1D_most_likely_position_comparsions
+    from neuropy.utils.matplotlib_helpers import get_heatmap_cmap
+    from pyphoplacecellanalysis.General.Model.Configs.LongShortDisplayConfig import PlottingHelpers
 
-    all_global_menus_actionsDict, global_flat_action_dict = spike_raster_window.build_all_menus_actions_dict()
+    import matplotlib as mpl
+    import matplotlib.pyplot as plt
+    from flexitext import flexitext ## flexitext for formatted matplotlib text
+    from pyphoplacecellanalysis.General.Model.Configs.LongShortDisplayConfig import PlottingHelpers
+    from neuropy.utils.matplotlib_helpers import FormattedFigureText
+
     complete_session_context, (session_context, additional_session_context) = curr_active_pipeline.get_complete_session_context()
 
+    desired_width = 4096
 
-    # Gets the existing SpikeRasterWindow or creates a new one if one doesn't already exist:
-    # spike_raster_window, (active_2d_plot, active_3d_plot, main_graphics_layout_widget, main_plot_widget, background_static_scroll_plot_widget) = Spike3DRasterWindowWidget.find_or_create_if_needed(curr_active_pipeline, force_create_new=True)
-    # spike_raster_window = active_2d_plot.window()
+    active_context = kwargs.pop('active_context', None)
+    if active_context is not None:
+        # Update the existing context:
+        display_context = active_context.adding_context('display_fn', display_fn_name='generalized_decoded_yellow_blue_marginal_epochs')
+    else:
+        active_context = curr_active_pipeline.sess.get_context()
+        # Build the active context directly:
+        display_context = curr_active_pipeline.build_display_context_for_session('generalized_decoded_yellow_blue_marginal_epochs')
 
-    _all_tracks_active_out_figure_paths = {}
-    _all_tracks_out_artists = {}
-    _all_tracks_out_axes = {}
+    fignum = kwargs.pop('fignum', None)
+    if fignum is not None:
+        print(f'WARNING: fignum will be ignored but it was specified as fignum="{fignum}"!')
+
+    defer_render = kwargs.pop('defer_render', False)
+    debug_print: bool = kwargs.pop('debug_print', False)
+    active_config_name: bool = kwargs.pop('active_config_name', None)
+
+    perform_write_to_file_callback = kwargs.pop('perform_write_to_file_callback', (lambda final_context, fig: curr_active_pipeline.output_figure(final_context, fig)))
+
+
+    # active_config_name = kwargs.pop('active_config_name', None)
+
+    long_epoch_name, short_epoch_name, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
+    # long_epoch_context, short_epoch_context, global_epoch_context = [curr_active_pipeline.filtered_contexts[a_name] for a_name in (long_epoch_name, short_epoch_name, global_epoch_name)]
+    long_session, short_session, global_session = [curr_active_pipeline.filtered_sessions[an_epoch_name] for an_epoch_name in [long_epoch_name, short_epoch_name, global_epoch_name]]
+    long_epoch_name, short_epoch_name, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
+
+
+    # ==================================================================================================================================================================================================================================================================================== #
+    # Start Building Figure                                                                                                                                                                                                                                                                #
+    # ==================================================================================================================================================================================================================================================================================== #
+
+    graphics_output_dict = None
+
     # for best_matching_context, a_decoded_marginal_posterior_df in flat_decoded_marginal_posterior_df_context_dict.items():
     time_bin_size = epochs_decoding_time_bin_size
     info_string: str = f" - t_bin_size: {time_bin_size}"
     plot_row_identifier: str = best_matching_context.get_description(subset_includelist=['known_named_decoding_epochs_type', 'masked_time_bin_fill_type'], include_property_names=True, key_value_separator=':', separator='|', replace_separator_in_property_names='-')
     a_time_window_centers = a_decoded_marginal_posterior_df['t_bin_center'].to_numpy() 
     a_1D_posterior = a_decoded_marginal_posterior_df[['P_Long', 'P_Short']].to_numpy().T
+    # a_1D_posterior = a_decoded_marginal_posterior_df[['P_Long', 'P_Short']].to_numpy()
 
-    identifier_name, widget, matplotlib_fig, matplotlib_fig_axes, dock_item = active_2d_plot.add_docked_marginal_track(name=plot_row_identifier, time_window_centers=a_time_window_centers, a_1D_posterior=a_1D_posterior, extended_dock_title_info=info_string)
-    _all_tracks_out_artists[identifier_name] = widget
-    _all_tracks_out_axes[identifier_name] = matplotlib_fig_axes[0]
-    matplotlib_fig_axes[0].set_xlim(active_2d_plot.total_data_start_time, active_2d_plot.total_data_end_time)
-    widget.draw()
+    # image, out_path = save_array_as_image(a_1D_posterior, desired_height=None, desired_width=desired_width, skip_img_normalization=True)
+    
+    # # Save image to file
+    # active_out_figure_paths, final_context = curr_active_pipeline.output_figure(final_context=complete_session_context.overwriting_context(display='decoded_P_Short_Posterior_global_epoch'), fig=image, write_png=True, write_vector_format=False)
+    # _all_tracks_active_out_figure_paths[final_context] = deepcopy(active_out_figure_paths[0])
+    
+    # ==================================================================================================================================================================================================================================================================================== #
+    # Begin Subfunctions                                                                                                                                                                                                                                                                   #
+    # ==================================================================================================================================================================================================================================================================================== #
 
-    dock_item.hideTitleBar()
-
-    complete_session_context, (session_context, additional_session_context) = curr_active_pipeline.get_complete_session_context()
-
-    active_out_figure_paths, final_context = curr_active_pipeline.output_figure(final_context=complete_session_context.overwriting_context(display='decoded_P_Short_Posterior'), fig=matplotlib_fig)
-    _all_tracks_active_out_figure_paths[final_context] = deepcopy(active_out_figure_paths)
-
-
-    # Position over time _________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
-    curr_identifier_name = 'new_curves_separate_plot'
-
-    menu_commands = [
-        'AddTimeCurves.Position', ## 2025-03-11 02:32 Running this too soon after launching the window causes weird black bars on the top and bottom of the window
-    ]
-    # menu_commands = ['actionPseudo2DDecodedEpochsDockedMatplotlibView', 'actionContinuousPseudo2DDecodedMarginalsDockedMatplotlibView'] # , 'AddTimeIntervals.SessionEpochs'
-
-    a_dock = active_2d_plot.find_display_dock(identifier=curr_identifier_name)
-    if a_dock is None:
-        global_flat_action_dict['AddTimeCurves.Position'].trigger()
-        a_dock = active_2d_plot.find_display_dock(identifier=curr_identifier_name)
-
-    widget: PyqtgraphTimeSynchronizedWidget = a_dock.widgets[0]
-
-    widget.getRootPlotItem().setXRange(active_2d_plot.total_data_start_time, active_2d_plot.total_data_end_time, padding=0) ## global frame
-    # widget.getRootPlotItem().set_xlim(active_2d_plot.total_data_start_time, active_2d_plot.total_data_end_time)
-    widget.update(None)
-
-    _all_tracks_out_artists[curr_identifier_name] = widget
-    _all_tracks_out_axes[curr_identifier_name] = widget.getRootPlotItem()
-
-    ## Export Position over time Figure:
-    active_out_figure_paths, final_context = curr_active_pipeline.output_figure(final_context=complete_session_context.overwriting_context(display='pos_over_t'), fig=widget.getRootPlotItem())
-    _all_tracks_active_out_figure_paths[final_context] = deepcopy(active_out_figure_paths)
+    def _subfn_clean_axes_decorations(an_ax):
+        """ removes ticks, titles, and other intrusive elements from each axes
+        _subfn_clean_axes_decorations(an_ax=ax_dict["ax_top"])
+        """
+        an_ax.set_xticklabels([])
+        an_ax.set_yticklabels([])    
+        an_ax.set_title('') ## remove title
+        # fig.canvas.manager.set_window_title()
+        
 
 
+    def _subfn_display_grid_bin_bounds_validation(owning_pipeline_reference, is_x_axis: bool = True, pos_var_names_override=None, ax=None): # , global_computation_results, computation_results, active_configs, include_includelist=None, defer_render=False, save_figure=True
+        """ Renders a single figure that shows the 1D linearized position from several different sources to ensure sufficient overlap. Useful for validating that the grid_bin_bounds are chosen reasonably.
 
-    # Epoch Intervals figure: ____________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
-    curr_identifier_name = 'interval_overview'
-    _interval_tracks_out_dict = active_2d_plot.prepare_pyqtgraph_intervalPlot_tracks(enable_interval_overview_track=True, should_remove_all_and_re_add=True, should_link_to_main_plot_widget=False)
-    interval_window_dock_config, intervals_dock, intervals_time_sync_pyqtgraph_widget, intervals_root_graphics_layout_widget, intervals_plot_item = _interval_tracks_out_dict['intervals']
-    if curr_identifier_name in _interval_tracks_out_dict:
-        interval_overview_window_dock_config, intervals_overview_dock, intervals_overview_time_sync_pyqtgraph_widget, intervals_overview_root_graphics_layout_widget, intervals_overview_plot_item = _interval_tracks_out_dict[curr_identifier_name]
-        intervals_overview_plot_item.setXRange(active_2d_plot.total_data_start_time, active_2d_plot.total_data_end_time, padding=0) ## global frame
-        # intervals_overview_time_sync_pyqtgraph_widget.setMaximumHeight(39)
+        """
+        from pyphoplacecellanalysis.Pho2D.track_shape_drawing import NotableTrackPositions, perform_add_1D_track_bounds_lines
 
-    a_dock, widget = active_2d_plot.find_dock_item_tuple(identifier=curr_identifier_name)
-    widget.getRootPlotItem().setXRange(active_2d_plot.total_data_start_time, active_2d_plot.total_data_end_time, padding=0) ## global frame
-    widget.update(None)
-    _all_tracks_out_artists[curr_identifier_name] = widget
-    _all_tracks_out_axes[curr_identifier_name] = widget.getRootPlotItem()
+        assert owning_pipeline_reference is not None
+        long_epoch_name, short_epoch_name, global_epoch_name = owning_pipeline_reference.find_LongShortGlobal_epoch_names()
+        long_grid_bin_bounds, short_grid_bin_bounds, global_grid_bin_bounds = [owning_pipeline_reference.computation_results[a_name].computation_config['pf_params'].grid_bin_bounds for a_name in (long_epoch_name, short_epoch_name, global_epoch_name)]
+        # print(long_grid_bin_bounds, short_grid_bin_bounds, global_grid_bin_bounds)
+        
+        long_epoch_context, short_epoch_context, global_epoch_context = [owning_pipeline_reference.filtered_contexts[a_name] for a_name in (long_epoch_name, short_epoch_name, global_epoch_name)]
+        long_session, short_session, global_session = [owning_pipeline_reference.filtered_sessions[an_epoch_name] for an_epoch_name in [long_epoch_name, short_epoch_name, global_epoch_name]]
+        
+        long_pos_df, short_pos_df, global_pos_df, all_pos_df = [a_sess.position.to_dataframe() for a_sess in (long_session, short_session, global_session, owning_pipeline_reference.sess)]
+        combined_pos_df = deepcopy(all_pos_df)
+        combined_pos_df.loc[long_pos_df.index, 'long_lin_pos'] = long_pos_df.lin_pos
+        combined_pos_df.loc[short_pos_df.index, 'short_pos_df'] = short_pos_df.lin_pos
+        combined_pos_df.loc[global_pos_df.index, 'global_lin_pos'] = global_pos_df.lin_pos
 
-    active_out_figure_paths, final_context = curr_active_pipeline.output_figure(final_context=complete_session_context.overwriting_context(display='interval_epochs_overview'), fig=widget.getRootPlotItem())
-    _all_tracks_active_out_figure_paths[final_context] = deepcopy(active_out_figure_paths)
+        title = f'grid_bin_bounds validation across epochs'
+        if is_x_axis:
+            title = f'{title} - X-axis'
+        else:
+            title = f'{title} - Y-axis'
+            
+        const_line_text_label_y_offset: float = 0.05
+        const_line_text_label_x_offset: float = 0.1
+        
+        if is_x_axis:
+            ## plot x-positions
+            if (pos_var_names_override is not None) and (len(pos_var_names_override) > 0):
+                pos_var_names = pos_var_names_override
+            else:
+                pos_var_names = ['x', 'lin_pos', 'long_lin_pos', 'short_pos_df', 'global_lin_pos'] # use the appropriate defaults
+                
+            combined_pos_df_plot_kwargs = dict(x='t', y=pos_var_names, title='grid_bin_bounds validation across epochs - positions along x-axis', ax=ax)
+        else:
+            ## plot y-positions
+            if (pos_var_names_override is not None) and (len(pos_var_names_override) > 0):
+                pos_var_names = pos_var_names_override
+            else:
+                pos_var_names = ['y']
+            # combined_pos_df_plot_kwargs = dict(x='y', y='t', title='grid_bin_bounds validation across epochs - positions along y-axis')
+            combined_pos_df_plot_kwargs = dict(x='t', y=pos_var_names, title='grid_bin_bounds validation across epochs - positions along y-axis', ax=ax)
+            
+        # Plot all 1D position variables:
+        combined_pos_df.plot(**combined_pos_df_plot_kwargs)
+        fig = plt.gcf() ## always get the figure and set the title
+        if ax is None:
+            ax = plt.gca()
+        ax.set_title(title)
+        fig.canvas.manager.set_window_title(title)
+        
+        ax.legend(loc='upper left') # Move legend inside the plot, in the top-left corner
+        # ax.legend(loc='upper left', bbox_to_anchor=(1, 1)) # Move legend outside the plot
+        
+        final_context = owning_pipeline_reference.sess.get_context().adding_context('display_fn', display_fn_name='_display_grid_bin_bounds_validation')
+        
+        ## Add grid_bin_bounds, track limits, and midpoint lines:
+        curr_config = owning_pipeline_reference.active_configs['maze_any']
 
-    return _all_tracks_active_out_figure_paths, _all_tracks_out_artists, _all_tracks_out_axes
+        grid_bin_bounds = curr_config.computation_config.pf_params.grid_bin_bounds # ((37.0773897438341, 250.69004399129707), (137.925447118083, 145.16448776601297))
+        # curr_config.computation_config.pf_params.grid_bin # (3.793023081021702, 1.607897707662558)
+        # loaded_track_limits = curr_config.active_session_config.loaded_track_limits
+
+
+        # curr_config.active_session_config.y_midpoint
+        
+        (long_notable_x_platform_positions, short_notable_x_platform_positions), (long_notable_y_platform_positions, short_notable_y_platform_positions) = NotableTrackPositions.init_notable_track_points_from_session_config(owning_pipeline_reference.sess.config)
+        
+        if is_x_axis:
+            ## plot x-positions
+            perform_add_1D_track_bounds_lines_kwargs = dict(long_notable_x_platform_positions=tuple(long_notable_x_platform_positions), short_notable_x_platform_positions=tuple(short_notable_x_platform_positions), is_vertical=False)
+        else:
+            ## plot y-positions
+            perform_add_1D_track_bounds_lines_kwargs = dict(long_notable_x_platform_positions=tuple(long_notable_y_platform_positions), short_notable_x_platform_positions=tuple(short_notable_y_platform_positions), is_vertical=False)
+            
+        long_track_line_collection, short_track_line_collection = perform_add_1D_track_bounds_lines(**perform_add_1D_track_bounds_lines_kwargs, ax=ax)
+
+
+        # Plot REAL `grid_bin_bounds` ________________________________________________________________________________________ #
+        ((grid_bin_bounds_x0, grid_bin_bounds_x1), (grid_bin_bounds_y0, grid_bin_bounds_y1)) = grid_bin_bounds
+        if is_x_axis:
+            ## horizontal lines:
+            common_ax_bound_kwargs = dict(xmin=ax.get_xbound()[0], xmax=ax.get_xbound()[1])
+        else:
+            # common_ax_bound_kwargs = dict(ymin=ax.get_ybound()[0], ymax=ax.get_ybound()[1]) 
+            common_ax_bound_kwargs = dict(xmin=ax.get_xbound()[0], xmax=ax.get_xbound()[1])  ## y-axis along x (like a 1D plot) Mode
+
+        if is_x_axis:
+            ## plot x-positions
+            ## horizontal lines:
+            ## midpoint line: dotted blue line centered in the bounds (along y)
+            x_midpoint = curr_config.active_session_config.x_midpoint # 143.88489208633095
+            midpoint_line_collection = ax.hlines(x_midpoint, label='x_midpoint', xmin=ax.get_xbound()[0], xmax=ax.get_xbound()[1], colors='#0000FFAA', linewidths=1.0, linestyles='dashed', zorder=-98) # matplotlib.collections.LineCollection midpoint_line_collection
+            ax.text(ax.get_xbound()[1], (x_midpoint + const_line_text_label_y_offset), 'x_mid', ha='right', va='bottom', fontsize=8, color='#0000FFAA', zorder=-98) # Add right-aligned text label slightly above the hline
+        
+            ## 2 lines corresponding to the x0 and x1 of the grid_bin_bounds:
+            grid_bin_bounds_line_collection = ax.hlines([grid_bin_bounds_x0, grid_bin_bounds_x1], label='grid_bin_bounds - after - dark blue', **common_ax_bound_kwargs, colors='#2e2e20', linewidths=2.0, linestyles='solid', zorder=-98) # grid_bin_bounds_line_collection
+            # _grid_bin_bound_labels_x_pos = (ax.get_xbound()[1] - const_line_text_label_x_offset)
+            _grid_bin_bound_labels_x_pos: float = ax.get_xbound()[0] + ((ax.get_xbound()[1] - ax.get_xbound()[0])/2.0) # center point
+            print(f'_grid_bin_bound_labels_x_pos: {_grid_bin_bound_labels_x_pos}')
+            ax.text(_grid_bin_bound_labels_x_pos, (grid_bin_bounds_x0 - const_line_text_label_y_offset), 'grid_bin_bounds[x0]', ha='center', va='bottom', fontsize=9, color='#2e2d20', zorder=-97) # Add right-aligned text label slightly above the hline
+            ax.text(_grid_bin_bound_labels_x_pos, (grid_bin_bounds_x1 + const_line_text_label_y_offset), 'grid_bin_bounds[x1]', ha='center', va='top', fontsize=9, color='#2e2d20', zorder=-97) # this will be the top (highest y-pos) line.
+            
+        else:
+            ## plot y-positions
+            midpoint_line_collection = None
+            # grid_bin_bounds_line_collection = None
+            grid_bin_bounds_positions_list = [grid_bin_bounds_y0, grid_bin_bounds_y1]
+            grid_bin_bounds_label_names_list = ['grid_bin_bounds[y0]', 'grid_bin_bounds[y1]']
+            ## 2 lines corresponding to the x0 and x1 of the grid_bin_bounds:
+            grid_bin_bounds_line_collection = ax.hlines(grid_bin_bounds_positions_list, label='grid_bin_bounds - after - dark blue', **common_ax_bound_kwargs, colors='#2e2e20', linewidths=2.0, linestyles='solid', zorder=-98) # grid_bin_bounds_line_collection
+            # _grid_bin_bound_labels_x_pos = (ax.get_xbound()[1] - const_line_text_label_x_offset)
+            _grid_bin_bound_labels_x_pos: float = ax.get_xbound()[0] + ((ax.get_xbound()[1] - ax.get_xbound()[0])/2.0) # center point
+            # print(f'_grid_bin_bound_labels_y_pos: {_grid_bin_bound_labels_y_pos}')
+            # ax.text(_grid_bin_bound_labels_y_pos, (grid_bin_bounds_y0 - const_line_text_label_y_offset), 'grid_bin_bounds[x0]', ha='center', va='bottom', fontsize=9, color='#2e2d20', zorder=-97) # Add right-aligned text label slightly above the hline
+            # ax.text(_grid_bin_bound_labels_y_pos, (grid_bin_bounds_x1 + const_line_text_label_y_offset), 'grid_bin_bounds[x1]', ha='center', va='top', fontsize=9, color='#2e2d20', zorder=-97) # this will be the top (highest y-pos) line.	
+            # Iterate through the hlines in the LineCollection and add labels
+            assert len(grid_bin_bounds_label_names_list) == len(grid_bin_bounds_positions_list)
+            for pos, a_txt_label in zip(grid_bin_bounds_positions_list, grid_bin_bounds_label_names_list):
+                # ax.text(ax.get_xbound()[1], (pos + const_line_text_label_y_offset), a_txt_label, color='#2e2d20', fontsize=9, ha='center', va='center', zorder=-97)
+                ax.text(_grid_bin_bound_labels_x_pos, (pos + const_line_text_label_y_offset), a_txt_label, color='#2e2d20', fontsize=9, ha='center', va='center', zorder=-97)
+        
+        # Show legend
+        # ax.legend()
+
+        # if save_figure:
+        #     saved_figure_paths = owning_pipeline_reference.output_figure(final_context, fig)
+        # else:
+        #     saved_figure_paths = []
+
+        graphics_output_dict = MatplotlibRenderPlots(name='_display_grid_bin_bounds_validation', figures=(fig,), axes=(ax,), plot_data={'midpoint_line_collection': midpoint_line_collection, 'grid_bin_bounds_line_collection': grid_bin_bounds_line_collection, 'long_track_line_collection': long_track_line_collection, 'short_track_line_collection': short_track_line_collection}, context=final_context, saved_figures=[])
+        return graphics_output_dict
+    ## END _subfn_display_grid_bin_bounds_validation...
+
+
+    # ==================================================================================================================================================================================================================================================================================== #
+    # Begin Function Body                                                                                                                                                                                                                                                                  #
+    # ==================================================================================================================================================================================================================================================================================== #
+
+    graphics_output_dict = {}
+
+    # Shared active_decoder, global_session:
+    global_session = deepcopy(curr_active_pipeline.filtered_sessions[global_epoch_name]) # used for validate_lap_dir_estimations(...) 
+
+    # 'figure.constrained_layout.use': False, 'figure.autolayout': False, 'figure.subplot.bottom': 0.11, 'figure.figsize': (6.4, 4.8)
+    # 'figure.constrained_layout.use': constrained_layout, 'figure.autolayout': False, 'figure.subplot.bottom': 0.11, 'figure.figsize': (6.4, 4.8)
+    # with mpl.rc_context({'figure.dpi': '220', 'savefig.transparent': True, 'ps.fonttype': 42, 'pdf.fonttype': 42, 'figure.constrained_layout.use': (constrained_layout or False), 'figure.frameon': False, 'figure.figsize': (35, 3), }):
+    with mpl.rc_context({'figure.dpi': '100', 'savefig.transparent': True, 'ps.fonttype': 42, 'pdf.fonttype': 42, 'figure.constrained_layout.use': (constrained_layout or False), 'figure.frameon': False, 'figure.figsize': (35, 3), }): # 'figure.figsize': (12.4, 4.8), 
+        # Create a FigureCollector instance
+        with FigureCollector(name='plot_all_time_decoded_marginal_figures', base_context=display_context) as collector:
+            fig, ax_dict = collector.subplot_mosaic(
+                # fig = plt.figure(layout="constrained")
+                # ax_dict = fig.subplot_mosaic(
+                [
+                    ["ax_top"],
+                    ["ax_decodedMarginal_P_Short_v_time"],
+                    # ["ax_position_and_laps_v_time"],
+                ],
+                # set the width ratios between the columns
+                # height_ratios=[2, 1, 4],
+                height_ratios=[3, 1],
+                sharex=True,
+                gridspec_kw=dict(wspace=0, hspace=0) # `wspace=0`` is responsible for sticking the pf and the activity axes together with no spacing
+            )
+
+
+            # fig = None
+            an_ax = ax_dict["ax_decodedMarginal_P_Short_v_time"] ## no figure (should I be using collector??)
+
+            # decoded posterior overlay __________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
+            variable_name: str = ''
+            y_bin_labels = ['P_Long', 'P_Short']
+            xbin = None
+            active_most_likely_positions = None
+            active_posterior = deepcopy(a_1D_posterior)
+            posterior_heatmap_imshow_kwargs = dict() # zorder=-1, alpha=0.1
+            
+            ### construct fake position axis (xbin):
+            n_xbins, n_t_bins = np.shape(a_1D_posterior)
+            if xbin is None:
+                xbin = np.arange(n_xbins)
+
+            ## Actual plotting portion:
+            fig, an_ax, _return_out_artists_dict = plot_1D_most_likely_position_comparsions(measured_position_df=None, time_window_centers=a_time_window_centers, xbin=deepcopy(xbin),
+                                                                    posterior=active_posterior,
+                                                                    active_most_likely_positions_1D=active_most_likely_positions,
+                                                                    ax=an_ax, variable_name=variable_name, debug_print=True, enable_flat_line_drawing=False,
+                                                                    posterior_heatmap_imshow_kwargs=posterior_heatmap_imshow_kwargs, return_created_artists=True)
+            
+            label_artists_dict = PlottingHelpers.helper_matplotlib_add_pseudo2D_marginal_labels(an_ax, y_bin_labels=y_bin_labels, enable_draw_decoder_colored_lines=False)
+            _subfn_clean_axes_decorations(an_ax=ax_dict["ax_decodedMarginal_P_Short_v_time"])
+        
+
+            # # Position/bounds lines ______________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
+            # an_ax = ax_dict["ax_position_and_laps_v_time"]
+            # graphics_output_dict: MatplotlibRenderPlots = _subfn_display_grid_bin_bounds_validation(owning_pipeline_reference=curr_active_pipeline, pos_var_names_override=['lin_pos'], ax=an_ax) # (or ['x']) build basic position/bounds figure as a starting point
+            # an_ax = graphics_output_dict.axes[0]
+            # fig = graphics_output_dict.figures[0]
+            # _subfn_clean_axes_decorations(an_ax=ax_dict["ax_position_and_laps_v_time"])
+
+
+            # Add Epochs (Laps/PBEs/Delta_t/etc) _________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
+            ## from `_display_long_short_laps`
+            from pyphoplacecellanalysis.PhoPositionalData.plotting.laps import plot_laps_2d
+            
+            an_ax = ax_dict["ax_top"]
+            fig, out_axes_list = plot_laps_2d(global_session, legacy_plotting_mode=False, include_velocity=False, include_accel=False, axes_list=[an_ax], **kwargs)
+            _subfn_clean_axes_decorations(an_ax=ax_dict["ax_top"])
+
+
+
+            # final_context = curr_active_pipeline.sess.get_context().adding_context('display_fn', display_fn_name='display_long_short_laps')
+
+            # def _perform_write_to_file_callback():
+            #     return curr_active_pipeline.output_figure(final_context, fig)
+
+            # if save_figure:
+            #     active_out_figure_paths = _perform_write_to_file_callback()
+            # else:
+            #     active_out_figure_paths = []
+                            
+            # graphics_output_dict = MatplotlibRenderPlots(name='_display_long_short_laps', figures=(fig,), axes=out_axes_list, plot_data={}, context=final_context, saved_figures=active_out_figure_paths)
+
+    return graphics_output_dict
+
+
 
 
 
@@ -191,7 +4119,7 @@ from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.SpikeRasterWidgets.Spike2DRaste
 from pyphoplacecellanalysis.GUI.Qt.SpikeRasterWindows.Spike3DRasterWindowWidget import Spike3DRasterWindowWidget
 
 
-@function_attributes(short_name=None, tags=['plot', 'figure', 'export'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-04-14 10:50', related_items=[])
+@function_attributes(short_name=None, tags=['interactive', 'widget', 'plot', 'figure', 'export'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-04-14 10:50', related_items=[])
 def _plot_all_time_decoded_marginal_figures(curr_active_pipeline, best_matching_context: IdentifyingContext, a_decoded_marginal_posterior_df: pd.DataFrame, spike_raster_window: Spike3DRasterWindowWidget, active_2d_plot: Spike2DRaster, epochs_decoding_time_bin_size: float = 0.025, write_vector_format:bool=False, write_png:bool=True):
     """ exports the components needed to show the decoded P_Short/P_Long likelihoods over time
 
@@ -254,11 +4182,60 @@ def _plot_all_time_decoded_marginal_figures(curr_active_pipeline, best_matching_
 
 
 
-    with mpl.rc_context({'figure.dpi': str(dpi), 'savefig.transparent': True, 'ps.fonttype': 42, 'figure.constrained_layout.use': (constrained_layout or False), 'figure.frameon': False, 'figure.figsize': figsize_inches, }): # 'figure.figsize': (12.4, 4.8), 
+    with mpl.rc_context({'figure.dpi': str(dpi), 'savefig.transparent': True, 'ps.fonttype': 42, 'pdf.fonttype': 42, 'figure.constrained_layout.use': (constrained_layout or False), 'figure.frameon': False, 'figure.figsize': figsize_inches, }): # 'figure.figsize': (12.4, 4.8), 
         # Create a FigureCollector instance
         # with FigureCollector(name='plot_directional_merged_pf_decoded_epochs', base_context=display_context) as collector:
 
         curr_identifier_name, widget, matplotlib_fig, matplotlib_fig_axes, dock_item = active_2d_plot.add_docked_marginal_track(name=plot_row_identifier, time_window_centers=a_time_window_centers, a_1D_posterior=a_1D_posterior, extended_dock_title_info=info_string, sync_mode=sync_mode)
+        
+        # from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError import plot_1D_most_likely_position_comparsions
+        # from neuropy.utils.matplotlib_helpers import get_heatmap_cmap
+        # from pyphoplacecellanalysis.General.Model.Configs.LongShortDisplayConfig import PlottingHelpers
+        
+        # if a_variable_name is None:
+        #     a_variable_name = name
+
+        # if a_dock_config is None:
+        #     override_dock_group_name: str = None ## this feature doesn't work
+        #     a_dock_config = CustomCyclicColorsDockDisplayConfig(showCloseButton=True, named_color_scheme=NamedColorScheme.grey)
+        #     a_dock_config.dock_group_names = [override_dock_group_name] # , 'non-PBE Continuous Decoding'
+
+
+        # n_xbins, n_t_bins = np.shape(a_1D_posterior)
+
+        # if xbin is None:
+        #     xbin = np.arange(n_xbins)
+
+        # ## ✅ Add a new row for each of the four 1D directional decoders:
+        # identifier_name: str = name
+        # if extended_dock_title_info is not None:
+        #     identifier_name += extended_dock_title_info ## add extra info like the time_bin_size in ms
+        # print(f'identifier_name: {identifier_name}')
+        # widget, matplotlib_fig, matplotlib_fig_axes, dock_item = self.add_new_matplotlib_render_plot_widget(name=identifier_name, dockSize=(25, 200), display_config=a_dock_config, **kwargs)
+        # an_ax = matplotlib_fig_axes[0]
+
+        # variable_name: str = a_variable_name
+        
+        # # active_most_likely_positions = active_marginals.most_likely_positions_1D # Raw decoded positions
+        # active_most_likely_positions = None
+        # active_posterior = deepcopy(a_1D_posterior)
+        # a_time_window_centers = a_df['t_bin_center'].to_numpy() 
+        # a_1D_posterior = a_df[['P_Long', 'P_Short']].to_numpy().T
+
+        # posterior_heatmap_imshow_kwargs = dict()
+        
+        # # most_likely_positions_mode: 'standard'|'corrected'
+        # ## Actual plotting portion:
+        # fig, an_ax = plot_1D_most_likely_position_comparsions(measured_position_df=None, time_window_centers=time_window_centers, xbin=deepcopy(xbin),
+        #                                                         posterior=active_posterior,
+        #                                                         active_most_likely_positions_1D=active_most_likely_positions,
+        #                                                         ax=an_ax, variable_name=variable_name, debug_print=True, enable_flat_line_drawing=False,
+        #                                                         posterior_heatmap_imshow_kwargs=posterior_heatmap_imshow_kwargs)
+
+        # return identifier_name, widget, matplotlib_fig, matplotlib_fig_axes, dock_item
+        ## END EXPANSION
+
+
         _all_tracks_out_artists[curr_identifier_name] = widget
         _all_tracks_out_axes[curr_identifier_name] = matplotlib_fig_axes[0]
         matplotlib_fig_axes[0].set_xlim(active_2d_plot.total_data_start_time, active_2d_plot.total_data_end_time)
@@ -285,8 +4262,8 @@ def _plot_all_time_decoded_marginal_figures(curr_active_pipeline, best_matching_
 
         a_dock = active_2d_plot.find_display_dock(identifier=curr_identifier_name)
         if a_dock is None:
-            global_flat_action_dict['AddTimeCurves.Position'].trigger()
-            a_dock = active_2d_plot.find_display_dock(identifier=curr_identifier_name)
+            global_flat_action_dict['AddTimeCurves.Position'].trigger() ## build the item
+            a_dock = active_2d_plot.find_display_dock(identifier=curr_identifier_name) ## get the item
 
         widget: PyqtgraphTimeSynchronizedWidget = a_dock.widgets[0]
         # active_2d_plot.sync_matplotlib_render_plot_widget(identifier=curr_identifier_name, sync_mode=sync_mode) ## set sync mode
@@ -294,7 +4271,8 @@ def _plot_all_time_decoded_marginal_figures(curr_active_pipeline, best_matching_
         # widget.getRootPlotItem().set_xlim(active_2d_plot.total_data_start_time, active_2d_plot.total_data_end_time)
         # widget.update(None)
         # widget.draw()
-        
+        widget.getRootPlotItem().update()
+
         _all_tracks_out_artists[curr_identifier_name] = widget
         _all_tracks_out_axes[curr_identifier_name] = widget.getRootPlotItem()
 
@@ -845,12 +4823,26 @@ def pyqtgraph_pre_post_delta_scatter(data_results_df: pd.DataFrame, data_context
 
 
 @function_attributes(short_name=None, tags=['plot-helper', 'matplotlib', 'unit-activity', 'black-inactive-time-bins', 'time-bin'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-03-04 10:11', related_items=[])
-def _plot_low_firing_time_bins_overlay_image(widget, time_bin_edges, mask_rgba):
+def _plot_low_firing_time_bins_overlay_image(widget, time_bin_edges, mask_rgba, zorder=11.0):
     """ plots the black masks for low-firing time bins on the specified widget track
     
+    ## Visually dimming low-firing bins
+
+        ## find the time bins with insufficient spikes in them.
+
+        ## Darken them by overlaying something
+
+
     Usage:
         from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import _plot_low_firing_time_bins_overlay_image
 
+        
+        # time_window_centers = deepcopy(results1D.continuous_results['global'].time_bin_containers[0].centers)
+        ## INPUTS: unique_units, time_bin_edges, unit_specific_time_binned_spike_counts
+        time_bin_edges: NDArray = deepcopy(results1D.continuous_results['global'].time_bin_edges[0])
+        spikes_df: pd.DataFrame = deepcopy(get_proper_global_spikes_df(curr_active_pipeline))
+        # unique_units = np.unique(spikes_df['aclu']) # sorted
+        unit_specific_time_binned_spike_counts, unique_units, (is_time_bin_active, inactive_mask, mask_rgba) = spikes_df.spikes.compute_unit_time_binned_spike_counts_and_mask(time_bin_edges=time_bin_edges)
         _plot_low_firing_time_bins_overlay_image(widget=widget, time_bin_edges=time_bin_edges, mask_rgba=mask_rgba)
     """
     ## INPUTS: is_time_bin_active
@@ -876,8 +4868,9 @@ def _plot_low_firing_time_bins_overlay_image(widget, time_bin_edges, mask_rgba):
     )
 
     # Plot the spike counts as a heatmap
-    low_firing_bins_image = an_ax.imshow(mask_rgba, **low_spiking_heatmap_imshow_kwargs)
+    low_firing_bins_image = an_ax.imshow(mask_rgba, **low_spiking_heatmap_imshow_kwargs, zorder=zorder)
     widget.plots.low_firing_bins_image = low_firing_bins_image
+    return low_firing_bins_image
 
 
 @function_attributes(short_name=None, tags=['timeline-track', 'firing-rate', 'unit-spiking'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-03-03 15:28', related_items=[])
@@ -915,6 +4908,16 @@ def add_unit_spike_count_visualization(active_2d_plot, neuron_ids: NDArray, time
         ## INPUTS: unique_units, time_bin_edges, unit_specific_time_binned_spike_counts
         widget, matplotlib_fig, matplotlib_fig_axes, dDisplayItem = add_unit_spike_count_visualization(active_2d_plot, neuron_ids=unique_units, time_bin_edges=time_bin_edges, unit_specific_time_binned_spike_counts=unit_specific_time_binned_spike_counts, a_dock_config=None, extended_dock_title_info=None)
 
+        
+    Usage 2:
+        from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import _plot_low_firing_time_bins_overlay_image
+    
+        target_item_identifiers_list = ['ContinuousDecode_long_LR - t_bin_size: 0.025', 'ContinuousDecode_long_RL - t_bin_size: 0.025', 'ContinuousDecode_short_LR - t_bin_size: 0.025', 'ContinuousDecode_short_RL - t_bin_size: 0.025', 'ContinuousDecode_longnon-PBE-pseudo2D marginals', 'ContinuousDecode_shortnon-PBE-pseudo2D marginals', 'non-PBE_marginal_over_track_ID_ContinuousDecode - t_bin_size: 0.05', 'Masked Non-PBE Pseudo2D']
+    for an_identifier in target_item_identifiers_list:
+        widget, matplotlib_fig, matplotlib_fig_axes = active_2d_plot.find_matplotlib_render_plot_widget(an_identifier)
+        if widget is not None:
+            _plot_low_firing_time_bins_overlay_image(widget=widget, time_bin_edges=time_bin_edges, mask_rgba=mask_rgba)
+            
     """
     
 
@@ -1117,6 +5120,7 @@ def filtered_by_frate_and_qclu(curr_active_pipeline, desired_qclu_subset=[1, 2],
 # Pre 2025-02-27                                                                                                       #
 # ==================================================================================================================== #
 
+@function_attributes(short_name=None, tags=['USEFUL', 'unused', 'debug', 'visualizztion'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-05-14 14:01', related_items=[])
 def plot_attached_BinByBinDecodingDebugger(spike_raster_window, curr_active_pipeline, a_decoder: BasePositionDecoder, a_decoded_result: Union[DecodedFilterEpochsResult, SingleEpochDecodedResult]):
     """ 
     
@@ -2471,8 +6475,8 @@ def _perform_plot_multi_decoder_meas_pred_position_track(curr_active_pipeline, f
         if is_first_iteration:
             pos_df = pos_df.position.add_binned_time_column(time_window_edges=time_bin_containers.edges, time_window_edges_binning_info=time_bin_containers.edge_info) # 'binned_time' refers to which time bins these are
             # Plot the measured position X:
-            _, ax = plot_1D_most_likely_position_comparsions(pos_df, variable_name='x', time_window_centers=None, xbin=None, posterior=None, active_most_likely_positions_1D=None, ax=ax_list[0],
-                                                            enable_flat_line_drawing=enable_flat_line_drawing, debug_print=debug_print, **kwargs)
+            _, ax, _return_out_artists_dict = plot_1D_most_likely_position_comparsions(pos_df, variable_name='x', time_window_centers=None, xbin=None, posterior=None, active_most_likely_positions_1D=None, ax=ax_list[0],
+                                                            enable_flat_line_drawing=enable_flat_line_drawing, debug_print=debug_print, return_created_artists=True, **kwargs)
         ## END if is_first_iteration...
 
         _out_data[a_decoder_name] = pd.DataFrame({'t': time_window_centers, 'x': active_most_likely_positions_x, 'binned_time': np.arange(len(time_window_centers))})
@@ -2496,89 +6500,6 @@ def _perform_plot_multi_decoder_meas_pred_position_track(curr_active_pipeline, f
 
     ## OUTPUT: _out_artists
     return _out_artists
-
-
-
-
-# ==================================================================================================================== #
-# 2025-01-13 - Lap Overriding/qclu filtering                                                                           #
-# ==================================================================================================================== #
-from neuropy.core.user_annotations import UserAnnotationsManager
-
-
-@function_attributes(short_name=None, tags=['laps', 'update', 'session', 'TODO', 'UNFINISHED'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-01-13 15:45', related_items=[])
-def override_laps(curr_active_pipeline, override_laps_df: pd.DataFrame, debug_print=False):
-    """
-    overrides the laps
-
-    Usage:
-
-        from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import override_laps
-
-        override_laps_df: Optional[pd.DataFrame] = UserAnnotationsManager.get_hardcoded_laps_override_dict().get(curr_active_pipeline.get_session_context(), None)
-        if override_laps_df is not None:
-            print(f'overriding laps....')
-            display(override_laps_df)
-            override_laps(curr_active_pipeline, override_laps_df=override_laps_df)
-
-
-
-    """
-    from neuropy.core.laps import Laps
-
-    t_start, t_delta, t_end = curr_active_pipeline.find_LongShortDelta_times()
-
-    ## Load the custom laps
-    if debug_print:
-        print(f'override_laps_df: {override_laps_df}')
-    if 'lap_id' not in override_laps_df:
-        override_laps_df['lap_id'] = override_laps_df.index.astype('int') ## set lap_id from the index
-    else:
-        override_laps_df[['lap_id']] = override_laps_df[['lap_id']].astype('int')
-
-    # Either way, ensure that the lap_dir is an 'int' column.
-    override_laps_df['lap_dir'] = override_laps_df['lap_dir'].astype('int')
-    # override_laps_df['lap_dir'] = override_laps_df['lap_dir'].astype('int')
-    # override_laps_df['is_LR_dir'] = (override_laps_df['lap_dir'] < 1.0)
-
-    if 'label' not in override_laps_df:
-        override_laps_df['label'] = override_laps_df['lap_id'].astype('str') # add the string "label" column
-    else:
-        override_laps_df['label'] = override_laps_df['label'].astype('str')
-
-    # curr_laps_df = Laps._compute_lap_dir_from_smoothed_velocity(laps_df=curr_laps_df, global_session=global_session, replace_existing=True)
-
-    override_laps_df = Laps._compute_lap_dir_from_smoothed_velocity(laps_df=override_laps_df, global_session=curr_active_pipeline.sess, replace_existing=True)
-    override_laps_df = Laps._update_dataframe_computed_vars(laps_df=override_laps_df, t_start=t_start, t_delta=t_delta, t_end=t_end, global_session=curr_active_pipeline.sess, replace_existing=False)
-    override_laps_obj = Laps(laps=override_laps_df, metadata=None).filter_to_valid()
-    ## OUTPUTS: override_laps_obj
-
-    curr_active_pipeline.sess.laps = deepcopy(override_laps_obj)
-
-    # curr_active_pipeline.sess.laps_df = override_laps_df
-    curr_active_pipeline.sess.compute_position_laps()
-
-    # curr_active_pipeline.sess = curr_active_pipeline.sess
-    # a_pf1D_dt.replacing_computation_epochs(epochs=override_laps_df)
-
-    for a_filtered_context_name, a_filtered_context in curr_active_pipeline.filtered_contexts.items():
-        ## current session
-        a_filtered_epoch = curr_active_pipeline.filtered_epochs[a_filtered_context_name]
-        filtered_sess = curr_active_pipeline.filtered_sessions[a_filtered_context_name]
-        if debug_print:
-            print(f'a_filtered_context_name: {a_filtered_context_name}, a_filtered_context: {a_filtered_context}')
-            display(a_filtered_context)
-        # override_laps_obj.filter_to_valid()
-        a_filtered_override_laps_obj: Laps = deepcopy(override_laps_obj).time_slice(t_start=filtered_sess.t_start, t_stop=filtered_sess.t_stop)
-        # a_filtered_context.lap_dir
-        filtered_sess.laps = deepcopy(a_filtered_override_laps_obj)
-        filtered_sess.compute_position_laps()
-        if debug_print:
-            print(f'\tupdated.')
-
-
-
-
 
 
 # ==================================================================================================================== #
@@ -2795,152 +6716,7 @@ class EstimationCorrectnessPlots:
         plt.show()
 
 
-@function_attributes(short_name=None, tags=['transition_matrix', 'position', 'decoder_id', '2D'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-12-31 10:05', related_items=[])
-def build_position_by_decoder_transition_matrix(p_x_given_n, debug_print=False):
-    """
-    given a decoder that gives a probability that the generating process is one of two possibilities, what methods are available to estimate the probability for a contiguous epoch made of many time bins?
-    Note: there is most certainly temporal dependence, how should I go about dealing with this?
 
-    Usage:
-
-        from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import build_position_by_decoder_transition_matrix, plot_blocked_transition_matrix
-
-        ## INPUTS: p_x_given_n
-        n_position_bins, n_decoding_models, n_time_bins = p_x_given_n.shape
-        A_position, A_model, A_big = build_position_by_decoder_transition_matrix(p_x_given_n)
-
-        ## Plotting:
-        import matplotlib.pyplot as plt; import seaborn as sns
-
-        # plt.figure(figsize=(8,6)); sns.heatmap(A_big, cmap='viridis'); plt.title("Transition Matrix A_big"); plt.show()
-        plt.figure(figsize=(8,6)); sns.heatmap(A_position, cmap='viridis'); plt.title("Transition Matrix A_position"); plt.show()
-        plt.figure(figsize=(8,6)); sns.heatmap(A_model, cmap='viridis'); plt.title("Transition Matrix A_model"); plt.show()
-
-        plot_blocked_transition_matrix(A_big, n_position_bins, n_decoding_models)
-
-
-    """
-    # Assume p_x_given_n is already loaded with shape (57, 4, 29951).
-    # We'll demonstrate by generating random data:
-    # p_x_given_n = np.random.rand(57, 4, 29951)
-
-    n_position_bins, n_decoding_models, n_time_bins = p_x_given_n.shape
-
-    # 1. Determine the most likely model for each time bin
-    sum_over_positions = p_x_given_n.sum(axis=0)  # (n_decoding_models, n_time_bins)
-    best_model_each_bin = sum_over_positions.argmax(axis=0)  # (n_time_bins,)
-
-    # 2. Determine the most likely position for each time bin (conditional on chosen model)
-    best_position_each_bin = np.array([
-        p_x_given_n[:, best_model_each_bin[t], t].argmax()
-        for t in range(n_time_bins)
-    ])
-
-    # 3. Build position transition matrix
-    A_position_counts = np.zeros((n_position_bins, n_position_bins))
-    for t in range(n_time_bins - 1):
-        A_position_counts[best_position_each_bin[t], best_position_each_bin[t+1]] += 1
-    A_position = A_position_counts / A_position_counts.sum(axis=1, keepdims=True)
-    A_position = np.nan_to_num(A_position)  # handle rows with zero counts
-
-    # 4. Build model transition matrix
-    A_model_counts = np.zeros((n_decoding_models, n_decoding_models))
-    for t in range(n_time_bins - 1):
-        A_model_counts[best_model_each_bin[t], best_model_each_bin[t+1]] += 1
-    A_model = A_model_counts / A_model_counts.sum(axis=1, keepdims=True)
-    A_model = np.nan_to_num(A_model)
-
-    # 5. Construct combined transition matrix (Kronecker product)
-    A_big = np.kron(A_position, A_model)
-    if debug_print:
-        print("A_position:", A_position)
-        print("A_model:", A_model)
-        print("A_big shape:", A_big.shape)
-    return A_position, A_model, A_big
-
-
-
-def plot_blocked_transition_matrix(A_big, n_position_bins, n_decoding_models, tick_labels=('long_LR', 'long_RL', 'short_LR', 'short_RL'), should_show_marginals:bool=True, extra_title_suffix:str=''):
-    """
-
-    plot_blocked_transition_matrix(A_big, n_position_bins, n_decoding_models)
-
-
-    """
-    import matplotlib.pyplot as plt
-    import seaborn as sns
-    import matplotlib.gridspec as gridspec
-    from neuropy.utils.matplotlib_helpers import perform_update_title_subtitle
-
-    if should_show_marginals:
-        fig = plt.figure(figsize=(9, 9))
-        gs = gridspec.GridSpec(2, 2, width_ratios=[10, 1], height_ratios=[1, 10])
-
-        ax_heatmap = fig.add_subplot(gs[1, 0])
-        ax_row_sums = fig.add_subplot(gs[1, 1], sharey=ax_heatmap)
-        ax_col_sums = fig.add_subplot(gs[0, 0], sharex=ax_heatmap)
-
-        # Hide tick labels on margin plots
-        plt.setp(ax_row_sums.get_yticklabels(), visible=False)
-        plt.setp(ax_col_sums.get_xticklabels(), visible=False)
-
-        # Main heatmap
-        sns.heatmap(A_big, cmap='viridis', ax=ax_heatmap, cbar=False)
-
-        # Draw lines separating decoder blocks
-        for i in range(1, n_decoding_models):
-            ax_heatmap.axhline(i * n_position_bins, color='white')
-            ax_heatmap.axvline(i * n_position_bins, color='white')
-
-        # Row sums (marginal over columns)
-        row_sums = A_big.sum(axis=1)
-        ax_row_sums.barh(np.arange(len(row_sums)), row_sums, color='gray')
-        ax_row_sums.invert_xaxis()
-
-        # Column sums (marginal over rows)
-        col_sums = A_big.sum(axis=0)
-        ax_col_sums.bar(np.arange(len(col_sums)), col_sums, color='gray')
-
-        # Tick positions (centered in each block)
-        tick_locs = [i * n_position_bins + n_position_bins / 2 for i in range(n_decoding_models)]
-        if tick_labels is not None:
-            assert len(tick_labels) == n_decoding_models, f"n_decoding_models: {n_decoding_models}, len(tick_labels): {len(tick_labels)}"
-            tick_labels = list(tick_labels)
-        else:
-            tick_labels = [f'Decoder {i}' for i in range(n_decoding_models)]
-
-        # Apply block-centered labels
-        ax_heatmap.set_xticks(tick_locs)
-        ax_heatmap.set_xticklabels(tick_labels, rotation=90)
-        ax_heatmap.set_yticks(tick_locs)
-        ax_heatmap.set_yticklabels(tick_labels)
-
-        plt.tight_layout()
-        title_text =  "Transition Matrix Blocks by Decoder w/ Marginals"
-
-    else:
-        fig = plt.figure(figsize=(8,8))
-        ax_heatmap = sns.heatmap(A_big, cmap='viridis')
-
-        for i in range(1, n_decoding_models):
-            plt.axhline(i * n_position_bins, color='white')
-            plt.axvline(i * n_position_bins, color='white')
-
-        tick_locs = [i * n_position_bins + n_position_bins / 2 for i in range(n_decoding_models)]
-        if tick_labels is not None:
-            assert len(tick_labels) == n_decoding_models, f"n_decoding_models: {n_decoding_models}, len(tick_labels): {len(tick_labels)}"
-            tick_labels = list(tick_labels)
-        else:
-            tick_labels = [f'Decoder {i}' for i in range(n_decoding_models)]
-
-        plt.xticks(tick_locs, tick_labels, rotation=90)
-        plt.yticks(tick_locs, tick_labels, rotation=0)
-        title_text = "Transition Matrix Blocks by Decoder"
-
-
-    perform_update_title_subtitle(fig=fig, ax=None, title_string=f"plot_blocked_transition_matrix()- {title_text}{extra_title_suffix}", subtitle_string=None)
-    plt.show()
-    return fig, ax_heatmap
 
 
 # ==================================================================================================================== #
@@ -2950,9 +6726,6 @@ from pyphoplacecellanalysis.Analysis.Decoder.heuristic_replay_scoring import Sub
 from neuropy.utils.indexing_helpers import PandasHelpers
 from pyphoplacecellanalysis.Pho2D.track_shape_drawing import LinearTrackInstance
 # from pyphoplacecellanalysis.Analysis.Decoder.heuristic_replay_scoring import SubsequenceDetectionSamples, GroundTruthData
-
-
-
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -3116,8 +6889,11 @@ def _plot_heuristic_evaluation_epochs(curr_active_pipeline, track_templates, fil
     active_cmap = FixedCustomColormaps.get_custom_greyscale_with_low_values_dropped_cmap(low_value_cutoff=0.05, full_opacity_threshold=0.4)
 
     ## filter by 'is_valid_epoch' first:
-    ripple_merged_complete_epoch_stats_df = ripple_merged_complete_epoch_stats_df[ripple_merged_complete_epoch_stats_df['is_valid_epoch']] ## 136, 71 included requiring both
-
+    if 'is_valid_epoch' in ripple_merged_complete_epoch_stats_df:
+        ripple_merged_complete_epoch_stats_df = ripple_merged_complete_epoch_stats_df[ripple_merged_complete_epoch_stats_df['is_valid_epoch']] ## 136, 71 included requiring both
+    else:
+        print(f'WARN: missing column "is_valid_epoch" in `ripple_merged_complete_epoch_stats_df`')
+        
     ## filter by `included_epoch_indicies`
     # filter_thresholds_dict = {'mseq_len_ignoring_intrusions': 5, 'mseq_tcov': 0.35}
     # df_is_included_criteria_fn = lambda df: NumpyHelpers.logical_and(*[(df[f'overall_best_{a_col_name}'] >= a_thresh) for a_col_name, a_thresh in filter_thresholds_dict.items()])
@@ -3396,6 +7172,7 @@ import neuropy.utils.type_aliases as types
 
 # DecoderName = NewType('DecoderName', str)
 
+@function_attributes(short_name=None, tags=['matplotlib', 'helper'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-05-14 14:09', related_items=[])
 def add_time_indicator_lines(active_figures_dict, later_lap_appearing_aclus_times_dict: Dict[types.aclu_index, Dict[str, float]], time_point_formatting_kwargs_dict=None, defer_draw: bool=False):
     """
         from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import add_time_indicator_lines
@@ -3580,119 +7357,6 @@ def perform_timeseries_stationarity_tests(time_series) -> Tuple[ADFResult, KPSSR
 
     return adf_result, kpss_result
 
-
-
-
-
-# ==================================================================================================================== #
-# 2024-11-04 - Moving Misplaced Pickles on GL                                                                          #
-# ==================================================================================================================== #
-import shutil
-
-def try_perform_move(src_file, target_file, is_dryrun: bool, allow_overwrite_existing: bool):
-    """ tries to move the file from src_file to target_file """
-    print(f'try_perform_move(src_file: "{src_file}", target_file: "{target_file}")')
-    if not src_file.exists():
-        print(f'\tsrc_file "{src_file}" does not exist!')
-        return False
-    else:
-        if (target_file.exists() and (not allow_overwrite_existing)):
-            print(f'\ttarget_file: "{target_file}" already exists!')
-            return False
-        else:
-            # does not exist, safe to copy
-            print(f'\t moving "{src_file}" -> "{target_file}"...')
-            if not is_dryrun:
-                shutil.move(src_file, target_file)
-            else:
-                print(f'\t\t(is_dryrun==True, so not actually moving.)')
-            print(f'\t\tdone!')
-            return True
-
-
-@function_attributes(short_name=None, tags=['move', 'pickle', 'filesystem', 'GL'], input_requires=[], output_provides=[], uses=['try_perform_move'], used_by=[], creation_date='2024-11-04 19:41', related_items=[])
-def try_move_pickle_files_on_GL(good_session_concrete_folders, session_basedirs_dict, computation_script_paths, excluded_session_keys=None, is_dryrun: bool=True, debug_print: bool=False, allow_overwrite_existing: bool=False):
-    """
-    from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import try_move_pickle_files_on_GL
-
-
-    copy_dict, moved_dict, (all_found_pipeline_pkl_files_dict, all_found_global_pkl_files_dict, all_found_pipeline_h5_files_dict) = try_move_pickle_files_on_GL(good_session_concrete_folders, session_basedirs_dict, computation_script_paths,
-             is_dryrun: bool=True, debug_print: bool=False)
-
-    """
-    ## INPUTS: good_session_concrete_folders, session_basedirs_dict, computation_script_paths
-    # session_basedirs_dict: Dict[IdentifyingContext, Path] = {a_session_folder.context:a_session_folder.path for a_session_folder in good_session_concrete_folders}
-
-    # is_dryrun: bool = False
-    assert len(good_session_concrete_folders) == len(session_basedirs_dict)
-    assert len(good_session_concrete_folders) == len(computation_script_paths)
-
-    script_output_folders = [Path(v).parent for v in computation_script_paths]
-
-    if excluded_session_keys is None:
-        excluded_session_keys = []
-
-
-    # excluded_session_keys = ['kdiba_pin01_one_fet11-01_12-58-54', 'kdiba_gor01_one_2006-6-08_14-26-15', 'kdiba_gor01_two_2006-6-07_16-40-19']
-    excluded_session_contexts = [IdentifyingContext(**dict(zip(IdentifyingContext._get_session_context_keys(), v.split('_', maxsplit=3)))) for v in excluded_session_keys]
-
-    # excluded_session_contexts
-
-    # all_found_pkl_files_dict = {}
-    all_found_pipeline_pkl_files_dict = {}
-    all_found_global_pkl_files_dict = {}
-    all_found_pipeline_h5_files_dict = {}
-
-    copy_dict = {}
-    moved_dict = {}
-
-    # scripts_output_path
-    for a_good_session_concrete_folder, a_session_basedir, a_script_folder in zip(good_session_concrete_folders, session_basedirs_dict, script_output_folders):
-        if debug_print:
-            print(f'a_good_session_concrete_folder: {a_good_session_concrete_folder}, a_session_basedir: {a_session_basedir}. a_script_folder: {a_script_folder}')
-        if a_good_session_concrete_folder.context in excluded_session_contexts:
-            if debug_print:
-                print(f'skipping excluded session: {a_good_session_concrete_folder.context}')
-        else:
-            all_found_global_pkl_files_dict[a_session_basedir] = list(a_script_folder.glob('global_computation_results*.pkl'))
-
-            for a_global_file in all_found_global_pkl_files_dict[a_session_basedir]:
-                ## iterate through the found global files:
-                target_file = a_good_session_concrete_folder.global_computation_result_pickle.with_name(a_global_file.name)
-                copy_dict[a_global_file] = target_file
-                # if not is_dryrun:
-                ## perform the move/copy
-                was_success = try_perform_move(src_file=a_global_file, target_file=target_file, is_dryrun=is_dryrun, allow_overwrite_existing=allow_overwrite_existing)
-                if was_success:
-                    moved_dict[a_global_file] = target_file
-            all_found_pipeline_pkl_files_dict[a_session_basedir] = list(a_script_folder.glob('loadedSessPickle*.pkl'))
-            for a_file in all_found_pipeline_pkl_files_dict[a_session_basedir]:
-                ## iterate through the found global files:
-                target_file = a_good_session_concrete_folder.session_pickle.with_name(a_file.name)
-                copy_dict[a_file] = target_file
-                # if not is_dryrun:
-                ## perform the move/copy
-                was_success = try_perform_move(src_file=a_file, target_file=target_file, is_dryrun=is_dryrun, allow_overwrite_existing=allow_overwrite_existing)
-                if was_success:
-                    moved_dict[a_file] = target_file
-            all_found_pipeline_h5_files_dict[a_session_basedir] = list(a_script_folder.glob('loadedSessPickle*.h5'))
-            for a_file in all_found_pipeline_h5_files_dict[a_session_basedir]:
-                ## iterate through the found global files:
-                target_file = a_good_session_concrete_folder.pipeline_results_h5.with_name(a_file.name)
-                copy_dict[a_file] = target_file
-                # if not is_dryrun:
-                ## perform the move/copy
-                was_success = try_perform_move(src_file=a_file, target_file=target_file, is_dryrun=is_dryrun, allow_overwrite_existing=allow_overwrite_existing)
-                if was_success:
-                    moved_dict[a_file] = target_file
-            # all_found_pkl_files_dict[a_session_basedir] = find_pkl_files(a_script_folder)
-
-    ## discover .pkl files in the root of each folder:
-    # all_found_pipeline_pkl_files_dict
-    # all_found_global_pkl_files_dict
-    ## OUTPUTS: copy_dict
-    # copy_dict
-    return copy_dict, moved_dict, (all_found_pipeline_pkl_files_dict, all_found_global_pkl_files_dict, all_found_pipeline_h5_files_dict)
 
 
 # ==================================================================================================================== #
@@ -5333,137 +8997,6 @@ class ProgrammaticDisplayFunctionTestingFolderImageLoading:
 
 
         return sidebar, context_tabs_dict, _final_out_dict_dict
-
-
-
-
-
-# ==================================================================================================================== #
-# 2024-08-21 Plotting Generated Transition Matrix Sequences                                                            #
-# ==================================================================================================================== #
-from matplotlib.colors import Normalize
-
-@function_attributes(short_name=None, tags=['colormap', 'grayscale', 'image'], input_requires=[], output_provides=[], uses=[], used_by=['blend_images'], creation_date='2024-08-21 00:00', related_items=[])
-def apply_colormap(image: np.ndarray, color: tuple) -> np.ndarray:
-    colored_image = np.zeros((*image.shape, 3), dtype=np.float32)
-    for i in range(3):
-        colored_image[..., i] = image * color[i]
-    return colored_image
-
-@function_attributes(short_name=None, tags=['image'], input_requires=[], output_provides=[], uses=['apply_colormap'], used_by=[], creation_date='2024-08-21 00:00', related_items=[])
-def blend_images(images: list, cmap=None) -> np.ndarray:
-    """ Tries to pre-combine images to produce an output image of the same size
-
-    # 'coolwarm'
-    images = [a_seq_mat.todense().T for i, a_seq_mat in enumerate(sequence_frames_sparse)]
-    blended_image = blend_images(images)
-    # blended_image = blend_images(images, cmap='coolwarm')
-    blended_image
-
-    # blended_image = Image.fromarray(blended_image, mode="RGB")
-    # # blended_image = get_array_as_image(blended_image, desired_height=100, desired_width=None, skip_img_normalization=True)
-    # blended_image
-
-
-    """
-    if cmap is None:
-        # Non-colormap mode:
-        # Ensure images are in the same shape
-        combined_image = np.zeros_like(images[0], dtype=np.float32)
-
-        for img in images:
-            combined_image += img.astype(np.float32)
-
-    else:
-        # colormap mode
-        # Define a colormap (blue to red)
-        cmap = plt.get_cmap(cmap)
-        norm = Normalize(vmin=0, vmax=(len(images) - 1))
-
-        combined_image = np.zeros((*images[0].shape, 3), dtype=np.float32)
-
-        for i, img in enumerate(images):
-            color = cmap(norm(i))[:3]  # Get RGB color from colormap
-            colored_image = apply_colormap(img, color)
-            combined_image += colored_image
-
-    combined_image = np.clip(combined_image, 0, 255)  # Ensure pixel values are within valid range
-    return combined_image.astype(np.uint8)
-
-
-def visualize_multiple_image_items(images: list, threshold=1e-3) -> None:
-    """ Sample multiple pg.ImageItems overlayed on one another
-
-    # Example usage:
-    image1 = np.random.rand(100, 100) * 100  # Example image 1
-    image2 = np.random.rand(100, 100) * 100  # Example image 2
-    image3 = np.random.rand(100, 100) * 100  # Example image 3
-
-    image1
-    # Define the threshold
-
-    _out = visualize_multiple_image_items([image1, image2, image3], threshold=50)
-
-    """
-    app = pg.mkQApp('visualize_multiple_image_items')  # Initialize the Qt application
-    win = pg.GraphicsLayoutWidget(show=True)
-    view = win.addViewBox()
-    view.setAspectLocked(True)
-
-    for img in images:
-        if threshold is not None:
-            # Create a masked array, masking values below the threshold
-            img = np.ma.masked_less(img, threshold)
-
-        image_item = pg.ImageItem(img)
-        view.addItem(image_item)
-
-    # QtGui.QApplication.instance().exec_()
-    return app, win, view
-
-
-# ==================================================================================================================== #
-# 2024-08-16 - Image Processing Techniques                                                                             #
-# ==================================================================================================================== #
-def plot_grad_quiver(sobel_x, sobel_y, downsample_step=1):
-    """
-
-    # Compute the magnitude of the gradient
-    gradient_magnitude = np.hypot(sobel_x, sobel_y)
-    gradient_direction = np.arctan2(sobel_y, sobel_x)
-
-    """
-    # Compute the magnitude of the gradient
-    gradient_magnitude = np.hypot(sobel_x, sobel_y)
-    gradient_direction = np.arctan2(sobel_y, sobel_x)
-
-    # Create a grid of coordinates for plotting arrows
-    Y, X = np.meshgrid(np.arange(gradient_magnitude.shape[0]), np.arange(gradient_magnitude.shape[1]), indexing='ij')
-
-    # Downsample the arrow plot for better visualization (optional)
-
-    X_downsampled = X[::downsample_step, ::downsample_step]
-    Y_downsampled = Y[::downsample_step, ::downsample_step]
-    sobel_x_downsampled = sobel_x[::downsample_step, ::downsample_step]
-    sobel_y_downsampled = sobel_y[::downsample_step, ::downsample_step]
-
-    # Plotting the gradient magnitude and arrows representing the direction
-    fig = plt.figure(figsize=(10, 10))
-    plt.imshow(gradient_magnitude, cmap='gray', origin='lower')
-    plt.quiver(X_downsampled, Y_downsampled, sobel_x_downsampled, sobel_y_downsampled,
-            color='red', angles='xy', scale_units='xy') # , scale=5, width=0.01
-    plt.title('Gradient Magnitude with Direction Arrows')
-    plt.axis('off')
-    plt.show()
-
-    return fig
-
-
-
-# ==================================================================================================================== #
-# 2024-07-15 - Factored out of Across Session Notebook                                                                 #
-# ==================================================================================================================== #
-
 
 
 

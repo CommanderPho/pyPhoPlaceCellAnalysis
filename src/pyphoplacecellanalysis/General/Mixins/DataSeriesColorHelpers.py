@@ -159,6 +159,7 @@ class DataSeriesColorHelpers:
         
         Usage:
             from pyphoplacecellanalysis.General.Mixins.DataSeriesColorHelpers import DataSeriesColorHelpers
+            from pyphocorehelpers.gui.Qt.color_helpers import ColorFormatConverter
 
             n_neurons = len(active_2d_plot.neuron_ids)
             neuron_qcolors_list, neuron_colors_ndarray = DataSeriesColorHelpers.build_cell_colors(n_neurons, colormap_name='PAL-relaxed_bright', colormap_source=None)
@@ -182,6 +183,8 @@ class DataSeriesColorHelpers:
         """
 
         Usage:
+            from pyphoplacecellanalysis.General.Model.Configs.NeuronPlottingParamConfig import SingleNeuronPlottingExtended
+        
             neuron_plotting_configs_dict: Dict = DataSeriesColorHelpers.build_cell_display_configs(active_2d_plot.neuron_ids, neuron_qcolors_list)
             spike_raster_window.update_neurons_color_data(neuron_plotting_configs_dict)
 

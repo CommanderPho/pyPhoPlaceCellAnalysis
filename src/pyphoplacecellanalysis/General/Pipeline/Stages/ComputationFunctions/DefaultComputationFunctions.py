@@ -39,8 +39,8 @@ class DefaultComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Computa
     def _perform_lap_direction_determination(computation_result: ComputationResult, **kwargs):
         """ Adds the 'is_LR_dir' column to the laps dataframe and updates 'lap_dir' if needed.        
         """
-        computation_result.sess.laps.update_lap_dir_from_smoothed_velocity(pos_input=computation_result.sess.position) # confirmed in-place
-        # computation_result.sess.laps.update_lap_dir_from_smoothed_velocity(pos_input=computation_result.sess.position)
+        computation_result.sess.laps.update_lap_dir_from_net_displacement(pos_input=computation_result.sess.position) # confirmed in-place
+        # computation_result.sess.laps.update_lap_dir_from_net_displacement(pos_input=computation_result.sess.position)
         # curr_sess.laps.update_maze_id_if_needed(t_start=t_start, t_delta=t_delta, t_end=t_end) # this doesn't make sense for the filtered sessions unfortunately.
         return computation_result # no changes except to the internal sessions
     
@@ -70,7 +70,9 @@ class DefaultComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Computa
         computation_result.computed_data['pf1D_Decoder'].compute_all() # this is what breaks it
 
         if ('pf2D' in computation_result.computed_data) and (computation_result.computed_data.get('pf2D', None) is not None):
-            computation_result.computed_data['pf2D_Decoder'] = BayesianPlacemapPositionDecoder(time_bin_size=placefield_computation_config.time_bin_size, pf=computation_result.computed_data['pf2D'], spikes_df=computation_result.computed_data['pf2D'].filtered_spikes_df.copy(), debug_print=False)
+            pf = computation_result.computed_data['pf2D']
+
+            computation_result.computed_data['pf2D_Decoder'] = BayesianPlacemapPositionDecoder(time_bin_size=placefield_computation_config.time_bin_size, pf=pf, spikes_df=computation_result.computed_data['pf2D'].filtered_spikes_df.copy(), debug_print=False)
             computation_result.computed_data['pf2D_Decoder'].compute_all() # Changing to fIXED grid_bin_bounds ===> MUCH (10x?) slower than before
         else:
             computation_result.computed_data['pf2D_Decoder'] = None
@@ -80,9 +82,9 @@ class DefaultComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Computa
 
     @function_attributes(short_name='position_decoding_two_step', tags=['decoding', 'position', 'two-step'],
                           input_requires=["computation_result.computed_data['pf1D_Decoder']", "computation_result.computed_data['pf2D_Decoder']"], output_provides=["computation_result.computed_data['pf1D_TwoStepDecoder']", "computation_result.computed_data['pf2D_TwoStepDecoder']"],
-                          uses=[], used_by=[], creation_date='2023-09-12 17:32', related_items=[],
+                          uses=['_compute_avg_speed_at_each_position_bin'], used_by=[], creation_date='2023-09-12 17:32', related_items=[],
         validate_computation_test=lambda curr_active_pipeline, computation_filter_name='maze': (curr_active_pipeline.computation_results[computation_filter_name].computed_data['pf1D_TwoStepDecoder'], curr_active_pipeline.computation_results[computation_filter_name].computed_data['pf2D_TwoStepDecoder']), is_global=False)
-    def _perform_two_step_position_decoding_computation(computation_result: ComputationResult, debug_print=False, **kwargs):
+    def _perform_two_step_position_decoding_computation(computation_result: ComputationResult, debug_print=False, ndim: int=2, **kwargs):
         """ Builds the Zhang Velocity/Position For 2-step Bayesian Decoder for 2D Placefields
         """
 
@@ -148,7 +150,7 @@ class DefaultComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Computa
             
             # TODO: Efficiency: This will be inefficient, but do a slow iteration. 
             for time_window_bin_idx in np.arange(prev_one_step_bayesian_decoder.num_time_windows):
-                flat_p_x_given_n = prev_one_step_bayesian_decoder.flat_p_x_given_n[:, time_window_bin_idx] # this gets the specific n_t for this time window                
+                curr_flat_p_x_given_n = prev_one_step_bayesian_decoder.flat_p_x_given_n[:, time_window_bin_idx] # this gets the specific n_t for this time window                
                 # previous positions as determined by the two-step decoder: this uses the two_step previous position instead of the one_step previous position:
                 prev_x_position = two_step_decoder_result['most_likely_positions'][:, time_window_bin_idx-1] # TODO: is this okay for 1D as well?
                 active_k = two_step_decoder_result['all_scaling_factors_k'][time_window_bin_idx] # get the specific k value
@@ -157,7 +159,7 @@ class DefaultComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Computa
                     print(f'np.shape(prev_x_position): {np.shape(prev_x_position)}')
                             
                 # Flat version:
-                two_step_decoder_result['flat_p_x_given_n_and_x_prev'][:,time_window_bin_idx] = Zhang_Two_Step.compute_bayesian_two_step_prob_single_timestep(flat_p_x_given_n, prev_x_position, two_step_decoder_result['flat_all_x'], two_step_decoder_result['flat_sigma_t_all'], two_step_decoder_result['C'], active_k) # output shape (1856, )            
+                two_step_decoder_result['flat_p_x_given_n_and_x_prev'][:,time_window_bin_idx] = Zhang_Two_Step.compute_bayesian_two_step_prob_single_timestep(curr_flat_p_x_given_n, prev_x_position, two_step_decoder_result['flat_all_x'], two_step_decoder_result['flat_sigma_t_all'], two_step_decoder_result['C'], active_k) # output shape (1856, )            
                 
 
                 if (prev_one_step_bayesian_decoder.ndim < 2):
@@ -203,13 +205,12 @@ class DefaultComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Computa
             return two_step_decoder_result
 
 
-        ndim = kwargs.get('ndim', 2)
         if ndim is None:
             ndim = 2 # add the 2D version if no alterantive is passed in.
+
         if ndim == 1:
             one_step_decoder_key = 'pf1D_Decoder'
             two_step_decoder_key = 'pf1D_TwoStepDecoder'
-
         elif ndim == 2:
             one_step_decoder_key = 'pf2D_Decoder'
             two_step_decoder_key = 'pf2D_TwoStepDecoder'
@@ -219,7 +220,9 @@ class DefaultComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Computa
         # Get the one-step decoder:
         prev_one_step_bayesian_decoder = computation_result.computed_data[one_step_decoder_key]
         ## New 2022-09-15 direct neuropy.utils.mixins.binning_helpers.build_df_discretized_binned_position_columns version:
-        computation_result.sess.position.df, (xbin, ybin), bin_infos = build_df_discretized_binned_position_columns(computation_result.sess.position.df, bin_values=(prev_one_step_bayesian_decoder.xbin_centers, prev_one_step_bayesian_decoder.ybin_centers), active_computation_config=computation_result.computation_config.pf_params, force_recompute=False, debug_print=debug_print)
+        computation_result.sess.position.df, (xbin, ybin), bin_infos = build_df_discretized_binned_position_columns(computation_result.sess.position.df, 
+            bin_values=(prev_one_step_bayesian_decoder.xbin, prev_one_step_bayesian_decoder.ybin),
+            active_computation_config=computation_result.computation_config.pf_params, force_recompute=False, debug_print=debug_print)
         active_xbins = xbin
         active_ybins = ybin
 
@@ -229,6 +232,7 @@ class DefaultComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Computa
         prev_one_step_bayesian_decoder.add_two_step_decoder_results(computation_result.computed_data[two_step_decoder_key])
 
         return computation_result
+
 
     @function_attributes(short_name='recursive_latent_pf_decoding', tags=['decoding', 'recursive', 'latent'],
                           input_requires=["computation_result.computation_config.pf_params", "computation_result.computed_data['pf1D']", "computation_result.computed_data['pf2D']", "computation_result.computed_data['pf1D_Decoder']", "computation_result.computed_data['pf2D_Decoder']"],
@@ -419,7 +423,7 @@ def _subfn_compute_decoded_epochs(computation_result, active_config, filter_epoc
     
     default_figure_name = 'stacked_epoch_slices_matplotlib_subplots'
     min_epoch_included_duration = decoding_time_bin_size * float(2) # 0.06666 # all epochs shorter than min_epoch_included_duration will be excluded from analysis
-    active_filter_epochs, default_figure_name, epoch_description_list = KnownFilterEpochs.process_functionList(sess=computation_result, filter_epochs=filter_epochs, min_epoch_included_duration=min_epoch_included_duration, default_figure_name=default_figure_name)
+    active_filter_epochs, default_figure_name, epoch_description_list = KnownFilterEpochs.process_functionList(sess=computation_result.sess, filter_epochs=filter_epochs, min_epoch_included_duration=min_epoch_included_duration, default_figure_name=default_figure_name)
 
     ## BEGIN_FUNCTION_BODY _subfn_compute_decoded_epochs:
     if decoder_ndim is None:

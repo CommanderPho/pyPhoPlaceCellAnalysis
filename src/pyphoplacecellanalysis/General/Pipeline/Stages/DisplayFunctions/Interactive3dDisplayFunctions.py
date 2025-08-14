@@ -27,7 +27,7 @@ from pyphoplacecellanalysis.GUI.Qt.Menus.SpecificMenus.ConnectionControlsMenuMix
 class Interactive3dDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=DisplayFunctionRegistryHolder):
     
     ## Tuning Curves 3D Plot:
-    @function_attributes(short_name='3d_interactive_tuning_curves_plotter', tags=['display', 'placefields', '3D', 'pyqtgraph'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2022-01-01 00:00')
+    @function_attributes(short_name='3d_interactive_tuning_curves_plotter', tags=['display', 'placefields', '3D', 'pyqtgraph'], input_requires=[], output_provides=[], uses=['InteractivePlaceCellTuningCurvesDataExplorer', 'build_all_placefield_output_panels'], used_by=['CreateNewDataExplorer_ipc_PlotterCommand'], creation_date='2022-01-01 00:00')
     def _display_3d_interactive_tuning_curves_plotter(computation_result, active_config, **kwargs):
         """ Tuning Curves 3D Plot
         Inputs: {'extant_plotter': None} 
@@ -43,10 +43,11 @@ class Interactive3dDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Displ
         from pyphoplacecellanalysis.GUI.Qt.PlacefieldVisualSelectionControls.qt_placefield import build_all_placefield_output_panels
         
         panel_controls_mode = kwargs.pop('panel_controls_mode', 'Qt') # valid options are 'Qt', 'Panel', or None
-        should_use_separate_window = kwargs.pop('separate_window', True)
+        should_use_separate_window = kwargs.pop('separate_window', False)
         pActiveTuningCurvesPlotter = kwargs.get('extant_plotter', None)
         active_pf2D = kwargs.get('override_pf2D', computation_result.computed_data['pf2D'])
 
+        
         # Modify active_config before creating/updating plotter
         active_config.plotting_config.should_use_linear_track_geometry = kwargs.get('should_use_linear_track_geometry', True)
         # active_config.plotting_config.t_start = t_start
@@ -54,14 +55,16 @@ class Interactive3dDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Displ
         # active_config.plotting_config.t_end = t_end
                 
 
-        ipcDataExplorer = InteractivePlaceCellTuningCurvesDataExplorer(active_config, computation_result.sess, active_pf2D, active_config.plotting_config.pf_colors, **({'extant_plotter':None} | kwargs))
+        ipcDataExplorer = InteractivePlaceCellTuningCurvesDataExplorer(active_config, computation_result.sess, active_pf2D, pf_colors=active_config.plotting_config.pf_colors, **({'extant_plotter':None} | kwargs))
         pActiveTuningCurvesPlotter = ipcDataExplorer.plot(pActiveTuningCurvesPlotter) # [2, 17449]
         # Update the ipcDataExplorer's colors for spikes and placefields from its configs on init:
         ipcDataExplorer.on_config_update({neuron_id:a_config.color for neuron_id, a_config in ipcDataExplorer.active_neuron_render_configs_map.items()}, defer_update=False)
 
+        ipcDataExplorer.params.panel_controls_mode = panel_controls_mode
+        ipcDataExplorer.params.should_use_separate_window = should_use_separate_window
         
         # build the output panels if desired:
-        if panel_controls_mode == 'Qt':
+        if ipcDataExplorer.params.panel_controls_mode == 'Qt':
             # pane: (placefieldControlsContainerWidget, pf_widgets)
             placefieldControlsContainerWidget, pf_widgets = build_all_placefield_output_panels(ipcDataExplorer)
             placefieldControlsContainerWidget.show()
@@ -73,7 +76,7 @@ class Interactive3dDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Displ
             WidgetPositioningHelpers.align_window_edges(ipcDataExplorer.p, placefieldControlsContainerWidget, relative_position = 'above', resize_to_main=(1.0, None))
             
             # Wrap:
-            if not should_use_separate_window:
+            if not ipcDataExplorer.params.should_use_separate_window:
                 active_root_main_widget = ipcDataExplorer.p.window()
                 root_dockAreaWindow, app = DockAreaWrapper.wrap_with_dockAreaWindow(active_root_main_widget, placefieldControlsContainerWidget, title=ipcDataExplorer.data_explorer_name)
             else:
@@ -81,7 +84,7 @@ class Interactive3dDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Displ
                 root_dockAreaWindow = None
             pane = (root_dockAreaWindow, placefieldControlsContainerWidget, pf_widgets)
             
-        elif panel_controls_mode == 'Panel':        
+        elif ipcDataExplorer.params.panel_controls_mode == 'Panel':        
             ### Build Dynamic Panel Interactive Controls for configuring Placefields:
             pane = build_panel_interactive_placefield_visibility_controls(ipcDataExplorer)
         else:
@@ -94,7 +97,7 @@ class Interactive3dDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Displ
         
 
     ## Interactive 3D Spike and Behavior Browser: 
-    @function_attributes(short_name='3d_interactive_spike_and_behavior_browser', tags=['display', 'placefields', 'spikes', 'behavior', '3D', 'pyqtgraph'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2022-01-01 00:00')
+    @function_attributes(short_name='3d_interactive_spike_and_behavior_browser', tags=['display', 'placefields', 'spikes', 'behavior', '3D', 'pyqtgraph'], input_requires=[], output_provides=[], uses=['InteractivePlaceCellDataExplorer'], used_by=[], creation_date='2022-01-01 00:00')
     def _display_3d_interactive_spike_and_behavior_browser(computation_result, active_config, **kwargs):
         """ 
         Inputs: {'extant_plotter': None} 

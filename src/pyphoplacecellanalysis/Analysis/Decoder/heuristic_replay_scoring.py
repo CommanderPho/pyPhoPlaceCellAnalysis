@@ -21,6 +21,7 @@ from pyphocorehelpers.assertion_helpers import Assert
 
 from neuropy.utils.mixins.indexing_helpers import UnpackableMixin, get_dict_subset
 from neuropy.utils.indexing_helpers import PandasHelpers, flatten, ListHelpers, NumpyHelpers
+from neuropy.utils.mixins.time_slicing import TimeColumnAliasesProtocol
 
 from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import DecodedFilterEpochsResult # used in compute_pho_heuristic_replay_scores
 from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import DecoderDecodedEpochsResult, TrackTemplates
@@ -116,7 +117,6 @@ def _compute_integral_second_derivative(arr, dx=1) -> float:
     return (np.nansum((np.diff(arr, n=2) ** 2.0))/dx) 
 
 
-
 def _compute_stddev_of_diff(arr) -> float:
     """ very simple description of how much each datapoint varies
      from pyphoplacecellanalysis.Analysis.Decoder.heuristic_replay_scoring import _compute_stddev_of_diff
@@ -141,6 +141,8 @@ class SubsequencesPartitioningResult(ComputedResult):
 
 
     Usage:
+        from pyphoplacecellanalysis.Analysis.Decoder.heuristic_replay_scoring import SubsequencesPartitioningResult
+
         diff_index_subsequence_indicies = NumpyHelpers.split(np.arange(n_diff_bins), list_split_indicies)
         no_low_magnitude_diff_index_subsequence_indicies = [v[np.isin(v, low_magnitude_change_indicies, invert=True)] for v in diff_index_subsequence_indicies] # get the list of indicies for each subsequence without the low-magnitude ones
         num_subsequence_bins: List[int] = [len(v) for v in diff_index_subsequence_indicies]
@@ -403,29 +405,6 @@ class SubsequencesPartitioningResult(ComputedResult):
         main_subsequence_df = self.subsequences_df[self.subsequences_df['is_main']]
         # ['n_intrusion_bins', 'len', 'len_excluding_repeats', 'len_excluding_intrusions', 'len_excluding_both']
 
-        # if should_use_no_repeat_values:
-        #     # _, all_value_equiv_group_idxs_list = SubsequencesPartitioningResult.find_value_equiv_groups(flat_positions, same_thresh_cm=self.same_thresh)
-        #     # total_num_all_good_values: int = len(all_value_equiv_group_idxs_list) # the number of equivalence value sets in the longest subsequence
-        #     # _, value_equiv_group_idxs_list = SubsequencesPartitioningResult.find_value_equiv_groups(longest_subsequence, same_thresh_cm=self.same_thresh)
-        #     # num_items_per_equiv_list: List[int] = [len(v) for v in value_equiv_group_idxs_list] ## number of items in each equiv-list
-        #     # num_longest_subsequence_good_values: int = len(value_equiv_group_idxs_list) # the number of equivalence value sets in the longest subsequence
-        #     num_longest_subsequence_good_values = main_subsequence_df['len_excluding_repeats'].to_numpy()[0]
-
-            
-        # else:
-        #     ## version that doesn't ignore repeats:
-        #     # total_num_all_good_values = self.total_num_subsequence_bins
-        #     # num_longest_subsequence_good_values = len(longest_subsequence)
-        #     num_longest_subsequence_good_values = main_subsequence_df['len'].to_numpy()[0]
-            
-
-        # if should_ignore_intrusion_bins:
-        #     ## Ignoring intrusion bins
-        #     num_longest_subsequence_good_values = num_longest_subsequence_good_values - main_subsequence_df['n_intrusion_bins'].to_numpy()[0]
-            
-        # assert (not (should_ignore_intrusion_bins and should_use_no_repeat_values)), f"not currently correct with both should_use_no_repeat_values AND should_ignore_intrusion_bins"
-        #TODO 2024-12-13 14:30: - [ ] {'n_intrusion_bins': 10, 'len': 20, 'len_excluding_repeats': 11, 'len_excluding_intrusions': 10, 'len_excluding_both': 1}
-
         if should_ignore_intrusion_bins:
             if should_use_no_repeat_values:
                 num_longest_subsequence_good_values = main_subsequence_df['len_excluding_both'].to_numpy()[0]
@@ -437,8 +416,6 @@ class SubsequencesPartitioningResult(ComputedResult):
                 num_longest_subsequence_good_values = main_subsequence_df['len_excluding_repeats'].to_numpy()[0]
             else:
                 num_longest_subsequence_good_values = main_subsequence_df['len'].to_numpy()[0]
-
-
 
         if not return_ratio:
             return int(num_longest_subsequence_good_values)
@@ -971,7 +948,7 @@ class SubsequencesPartitioningResult(ComputedResult):
         return original_split_positions_arrays, final_out_subsequences, (subsequence_replace_dict, subsequences_to_add, subsequences_to_remove, final_intrusion_idxs)
 
 
-    @function_attributes(short_name=None, tags=['partition'], input_requires=['self.merged_split_positions_arrays'], output_provides=['self.merged_split_positions_arrays'], uses=[], used_by=['compute'], creation_date='2024-12-11 23:42', related_items=[])
+    @function_attributes(short_name=None, tags=['partition', '_DEP'], input_requires=['self.merged_split_positions_arrays'], output_provides=['self.merged_split_positions_arrays'], uses=[], used_by=['compute'], creation_date='2024-12-11 23:42', related_items=[])
     def enforce_max_jump_distance(self, max_jump_distance_cm: float = 60.0, debug_print=False, enable_debug_step_logging: bool=True):
         """ an "intrusion" refers to one or more time bins that interrupt a longer sequence that would be monotonic if the intrusions were removed.
 
@@ -3016,19 +2993,13 @@ class HeuristicReplayScoring:
             time_window_centers = np.arange(n_time_bins) + 0.5 # time-bin units, plot range would then be from (0.0, (float(n_time_bins) + 0.5))
             a_most_likely_positions_list = a_result.most_likely_position_indicies_list[an_epoch_idx] # pos-bins
             if np.ndim(a_most_likely_positions_list) == 2:
-                a_most_likely_positions_list = a_most_likely_positions_list.flatten()
-                
-            
+                a_most_likely_positions_list = a_most_likely_positions_list.flatten() # WTF is this, shouldn't we only get the x component or is it 2D for a different reason?
+
         else:
             # time_window_centers = a_result.time_bin_containers[an_epoch_idx].centers
             time_window_centers = a_result.time_window_centers[an_epoch_idx]
             a_most_likely_positions_list = a_result.most_likely_positions_list[an_epoch_idx]
             
-
-        # a_p_x_given_n
-        # a_result.p_x_given_n_list
-        # a_result.marginal_x_list
-        # a_result.marginal_y_list
 
         # Usage example:
         # # Set the number of adjacent bins you want to include on either side of the peak
@@ -3064,36 +3035,12 @@ class HeuristicReplayScoring:
             # a_first_order_diff = np.diff(a_most_likely_positions_list, n=1, prepend=[0.0])
             a_first_order_diff = np.diff(a_most_likely_positions_list, n=1, prepend=[a_most_likely_positions_list[0]]) ## #TODO ⚠️ 2024-08-01 07:27: - [ ] :this diff represents the velocity doesn't it, so prepending the position in the first bin makes zero sense. UPDATE: prepend means its prepended to the input before the diff, meaning the first value should always be zero
             
-            
-            # a_first_order_diff
             total_first_order_change: float = np.nansum(a_first_order_diff[1:]) # the *NET* position change over all epoch bins
-            # total_first_order_change
             epoch_change_direction: float = np.sign(total_first_order_change) # -1.0 or 1.0, the general direction trend for the entire epoch
-            # epoch_change_direction
-
-            # a_result
-
-            # a_track_length: float = 170.0
-            # effectively_same_location_size = 0.1 * a_track_length # 10% of the track length
-            # effectively_same_location_num_bins: int = np.rint(effectively_same_location_size)
-            # effectively_same_location_num_bins: int = 4
-
-            # non_same_indicies = (np.abs(a_first_order_diff) > float(effectively_same_location_num_bins))
-            # effectively_same_indicies = np.logical_not(non_same_indicies)
-
-            # an_effective_change_first_order_diff = deepcopy(a_first_order_diff)
-            # an_effective_change_first_order_diff[effectively_same_location_num_bins] = 0.0 # treat as non-changing
-
-
+            
             # Now split the array at each point where a direction change occurs
             # Calculate the signs of the differences
             a_first_order_diff_sign = np.sign(a_first_order_diff)
-
-            # an_effective_first_order_diff_sign = deepcopy(a_first_order_diff_sign)
-            # an_effective_first_order_diff_sign[effectively_same_indicies] = 0.0
-
-            # Calculate where the sign changes occur (non-zero after taking diff of signs)
-            # sign_change_indices = np.where(np.diff(a_first_order_diff_sign) != 0)[0] + 1  # Add 1 because np.diff reduces the index by 1
 
             ## 2024-05-09 Smarter method that can handle relatively constant decoded positions with jitter:
             partition_result: SubsequencesPartitioningResult = SubsequencesPartitioningResult.init_from_positions_list(a_most_likely_positions_list=a_most_likely_positions_list, pos_bin_edges=pos_bin_edges, max_ignore_bins=max_ignore_bins, same_thresh=same_thresh_cm, max_jump_distance_cm=max_jump_distance_cm) # (a_first_order_diff, same_thresh=same_thresh)
@@ -3150,11 +3097,6 @@ class HeuristicReplayScoring:
             max_total_change_quantity = np.nanmax(np.abs(contiguous_total_change_quantity))
             if debug_print:
                 print(f'max_total_change_quantity: {max_total_change_quantity}')
-
-            # for i, (a_split_most_likely_positions_array, a_split_first_order_diff_array) in enumerate(zip(split_most_likely_positions_arrays, split_first_order_diff_arrays)):
-            #     print(f"Sequence {i}: {a_split_most_likely_positions_array}, {a_split_first_order_diff_array}")
-            #     a_split_first_order_diff_array
-            #     np.nansum(a_split_first_order_diff_array)
 
             ## a bin's direction is said to be "congruent" if it's consistent with the general trend in direction across the entire epoch duration:
             is_non_congruent_direction_bin = (a_first_order_diff_sign != epoch_change_direction)
@@ -3536,6 +3478,10 @@ class HeuristicThresholdFiltering:
 
 
         """
+        from neuropy.utils.mixins.time_slicing import TimeColumnAliasesProtocol
+
+        start_col_name: str = TimeColumnAliasesProtocol.find_first_extant_suitable_columns_name(df, col_connonical_name='start', required_columns_synonym_dict={"start":{'begin','start_t','ripple_start_t'}, "stop":['end','stop_t']}, should_raise_exception_on_fail=True)
+
         assert PandasHelpers.require_columns(df, required_columns=[start_col_name], print_missing_columns=True)
         if override_filter_thresholds_dict is not None:
             _tmp_backup_default_filter_thresholds_dict = deepcopy(cls.filter_thresholds_dict)
@@ -3616,8 +3562,6 @@ class HeuristicThresholdFiltering:
 # ==================================================================================================================== #
 
 from neuropy.utils.indexing_helpers import NumpyHelpers
-    
-
 
 desired_selected_indicies_dict = {'chose_incorrect_subsequence_as_main_list[0]': [17, 18, 19, 20, 21, 22, 16],
                          'intrusion[0]': [11, 10, 9, 8, 7, 5, 4, 3],

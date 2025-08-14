@@ -1,3 +1,12 @@
+ 
+from __future__ import annotations # prevents having to specify types for typehinting as strings
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    ## typehinting only imports here
+    from pyphoplacecellanalysis.Pho2D.data_exporting import HeatmapExportKind
+
+
 from copy import deepcopy
 from pathlib import Path
 from typing import Any, Dict, List, Tuple, Union, Optional
@@ -30,7 +39,8 @@ from pyphocorehelpers.function_helpers import function_attributes
 from pyphocorehelpers.general_helpers import OrderedMeta
 from pyphocorehelpers.indexing_helpers import np_ffill_1D # for compute_corrected_positions(...)
 from neuropy.utils.mixins.binning_helpers import compute_spanning_bins, build_spanning_grid_matrix # for compute_corrected_positions(...)
-from pyphocorehelpers.print_helpers import WrappingMessagePrinter, SimplePrintable, safe_get_variable_shape
+from pyphocorehelpers.print_helpers import WrappingMessagePrinter
+from pyphocorehelpers.indexing_helpers import safe_get_variable_shape
 from pyphocorehelpers.mixins.serialized import SerializedAttributesAllowBlockSpecifyingClass
 
 from pyphoplacecellanalysis.General.Mixins.CrossComputationComparisonHelpers import _compare_computation_results # for finding common neurons in `prune_to_shared_aclus_only`
@@ -116,6 +126,7 @@ class ZhangReconstructionImplementation:
         unit_specific_binned_spike_counts = pd.DataFrame(unit_specific_binned_spike_counts, columns=active_unique_aclu_values, index=time_bin_indicies)
         return unit_specific_binned_spike_counts
     
+
     @staticmethod
     def compute_time_binned_spiking_activity(spikes_df, max_time_bin_size:float=0.02, debug_print=False):
         """Given a spikes dataframe, this function temporally bins the spikes, counting the number that fall into each bin.
@@ -145,7 +156,7 @@ class ZhangReconstructionImplementation:
         """
         time_window_edges, time_window_edges_binning_info, spikes_df = ZhangReconstructionImplementation.compute_time_bins(spikes_df, max_time_bin_size=max_time_bin_size, debug_print=debug_print) # importantly adds 'binned_time' column to spikes_df
         active_indicies = time_window_edges_binning_info.bin_indicies[1:] # pre-2025-01-13 Old way that led to losing a time bin
-        # active_indicies = time_window_edges_binning_info.bin_indicies[:-1] # 2025-01-14 New way that supposedly uses correct indexing
+        # active_indicies = time_window_edges_binning_info.bin_indicies[:-1] # ABORT - 2025-01-14 New way that supposedly uses correct indexing - ACTUALLY Mismatch: The binned_time column contains labels [1, 2, ..., N] but your DataFrame uses index [0, 1, ..., N-1] when using [:-1]
         unit_specific_binned_spike_counts = ZhangReconstructionImplementation.compute_unit_specific_bin_specific_spike_counts(spikes_df, active_indicies, debug_print=debug_print) # 2025-01-13 16:14 replaced [1:] with [:-1]
         return unit_specific_binned_spike_counts, time_window_edges, time_window_edges_binning_info
 
@@ -432,8 +443,8 @@ class SingleEpochDecodedResult(HDF_SerializationMixin, AttrsBasedClassHelperMixi
     time_bin_container: Any = non_serialized_field()
     time_bin_edges: NDArray = non_serialized_field()
 
-    marginal_x: NDArray = non_serialized_field()
-    marginal_y: Optional[NDArray] = non_serialized_field()
+    marginal_x: DynamicContainer = non_serialized_field()
+    marginal_y: Optional[DynamicContainer] = non_serialized_field()
 
     epoch_data_index: Optional[int] = non_serialized_field()
 
@@ -445,10 +456,22 @@ class SingleEpochDecodedResult(HDF_SerializationMixin, AttrsBasedClassHelperMixi
     # band_width: float = field()
 
     @property
-    def n_xbins(self):
+    def n_xbins(self) -> int:
         """The n_xbins property."""
         return np.shape(self.p_x_given_n)[0]
-    
+
+
+    @property
+    def num_time_windows(self) -> int:
+        """The num_time_windows property."""
+        return (self.nbins - 1)
+
+
+    @property
+    def flat_p_x_given_n(self) -> NDArray:
+        """The num_time_windows property."""
+        return deepcopy(self.p_x_given_n).flatten()
+
 
     def __repr__(self):
         """ 2024-01-11 - Renders only the fields and their sizes  """
@@ -465,9 +488,87 @@ class SingleEpochDecodedResult(HDF_SerializationMixin, AttrsBasedClassHelperMixi
                 attr_reprs.append(f"{a.name}: {attr_type}")
         content = ",\n\t".join(attr_reprs)
         return f"{type(self).__name__}({content}\n)"
-    
+
+
+
+    @function_attributes(short_name=None, tags=['image', 'multi-color-decoder-overlay', 'MultiDecoderColorOverlayedPosteriors'], input_requires=[], output_provides=[], uses=['MultiDecoderColorOverlayedPosteriors'], used_by=['.build_multi_decoder_color_overlay_image', '.save_posterior_as_image'], creation_date='2025-05-14 02:21', related_items=[])    
+    def _perform_build_multi_decoder_color_overlay_image_data(self, spikes_df: pd.DataFrame, xbin: NDArray[ND.Shape["N_POS_BINS"], np.floating], lower_bound_alpha=0.0, drop_below_threshold=1e-3, t_bin_size=0.025, use_four_decoders_version: bool = False, **kwargs):
+        """ Builds the RGBA output NDArray img_data for the multi-color decoder overlay (that will be built into a PIL.Image object later).
+        
+        
+        global_decoded_result: SingleEpochDecodedResult = a_result.get_result_for_epoch(0)
+        # xbin: NDArray[ND.Shape["N_POS_BINS"], np.floating] = deepcopy(a_decoder.xbin)
+        
+        _out_img, multi_decoder_color_overlay = global_decoded_result.build_multi_decoder_color_overlay_image(spikes_df=deepcopy(get_proper_global_spikes_df(curr_active_pipeline)), xbin=deepcopy(a_decoder.xbin))
+        
+        
+        """
+        from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import MultiDecoderColorOverlayedPosteriors
+
+        if not use_four_decoders_version:
+            decoders_version_name: str = 'two_decoders'
+
+        else:
+            decoders_version_name: str = 'four_decoders'
+                            
+
+        ## INPUTS: global_decoded_result, xbin
+        p_x_given_n: NDArray[ND.Shape["N_POS_BINS, 4, N_TIME_BINS"], np.floating] = deepcopy(self.p_x_given_n) # .shape # (59, 4, 69488)
+        time_bin_centers: NDArray[ND.Shape["N_TIME_BINS"], np.floating] = deepcopy(self.time_bin_container.centers)
+
+
+        # with VizTracer(output_file=f"viztracer_{get_now_time_str()}-MultiDecoderColorOverlayedPosteriors.json", min_duration=200, tracer_entries=3000000, ignore_frozen=True) as tracer:
+        multi_decoder_color_overlay: MultiDecoderColorOverlayedPosteriors = MultiDecoderColorOverlayedPosteriors(spikes_df=spikes_df, p_x_given_n=p_x_given_n, time_bin_centers=time_bin_centers, xbin=xbin, lower_bound_alpha=lower_bound_alpha, drop_below_threshold=drop_below_threshold, t_bin_size=t_bin_size)
+        multi_decoder_color_overlay.compute_all(compute_four_decoder_version=use_four_decoders_version, progress_print=False) ## single compute
+        img_data: NDArray[ND.Shape["N_TIME_BINS, N_POS_BINS, 4"], np.floating] = multi_decoder_color_overlay.extra_all_t_bins_outputs_dict_dict[decoders_version_name]['all_t_bins_final_overlayed_out_RGBA'].astype(float) # (69488, 59, 4)
+        img_data = np.transpose(img_data, axes=(1, 0, 2)) # Convert to (H, W, 4)
+        return img_data.astype(float), multi_decoder_color_overlay
+
+
+    @function_attributes(short_name=None, tags=['image', 'multi-color-decoder-overlay', 'MultiDecoderColorOverlayedPosteriors'], input_requires=[], output_provides=[], uses=['._perform_build_multi_decoder_color_overlay_image_data'], used_by=[], creation_date='2025-05-14 02:21', related_items=[])    
+    def build_multi_decoder_color_overlay_image(self, spikes_df: pd.DataFrame, xbin: NDArray[ND.Shape["N_POS_BINS"], np.floating], lower_bound_alpha=0.0, drop_below_threshold=1e-3, t_bin_size=0.025, desired_height=None, desired_width=None, **kwargs):
+        """ Builds the final PIL.Image RGBA output image for the multi-color decoder overlay.
+        
+        
+        global_decoded_result: SingleEpochDecodedResult = a_result.get_result_for_epoch(0)
+        # xbin: NDArray[ND.Shape["N_POS_BINS"], np.floating] = deepcopy(a_decoder.xbin)
+        
+        _out_img, multi_decoder_color_overlay = global_decoded_result.build_multi_decoder_color_overlay_image(spikes_df=deepcopy(get_proper_global_spikes_df(curr_active_pipeline)), xbin=deepcopy(a_decoder.xbin))
+        
+        
+        """
+        from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import MultiDecoderColorOverlayedPosteriors
+        from pyphocorehelpers.plotting.media_output_helpers import save_array_as_image, get_array_as_image, get_array_as_image_stack
+        from pyphoplacecellanalysis.Pho2D.data_exporting import HeatmapExportKind
+
+        
+        # ## INPUTS: global_decoded_result, xbin
+        # p_x_given_n: NDArray[ND.Shape["N_POS_BINS, 4, N_TIME_BINS"], np.floating] = deepcopy(self.p_x_given_n) # .shape # (59, 4, 69488)
+        # time_bin_centers: NDArray[ND.Shape["N_TIME_BINS"], np.floating] = deepcopy(self.time_bin_container.centers)
+
+        # # with VizTracer(output_file=f"viztracer_{get_now_time_str()}-MultiDecoderColorOverlayedPosteriors.json", min_duration=200, tracer_entries=3000000, ignore_frozen=True) as tracer:
+        # multi_decoder_color_overlay: MultiDecoderColorOverlayedPosteriors = MultiDecoderColorOverlayedPosteriors(spikes_df=spikes_df, p_x_given_n=p_x_given_n, time_bin_centers=time_bin_centers, xbin=xbin, lower_bound_alpha=lower_bound_alpha, drop_below_threshold=drop_below_threshold, t_bin_size=t_bin_size)
+        # multi_decoder_color_overlay.compute_all() ## single compute
+        
+        # img_data: NDArray[ND.Shape["N_TIME_BINS, N_POS_BINS, 4"], np.floating] = multi_decoder_color_overlay.extra_all_t_bins_outputs_dict_dict['two_decoders']['all_t_bins_final_overlayed_out_RGBA'].astype(float) # (69488, 59, 4)
+        
+        # img_data = np.transpose(img_data, axes=(1, 0, 2)) # Convert to (H, W, 4)
+        
+        img_data, multi_decoder_color_overlay = self._perform_build_multi_decoder_color_overlay_image_data(spikes_df=spikes_df, xbin=xbin, lower_bound_alpha=lower_bound_alpha, drop_below_threshold=drop_below_threshold, t_bin_size=t_bin_size)
+        
+        kwargs = {}
+        desired_height = 400
+        desired_width = None
+        skip_img_normalization = True
+        _out_img = get_array_as_image(img_data, desired_height=desired_height, desired_width=desired_width, skip_img_normalization=skip_img_normalization, export_kind=HeatmapExportKind.RAW_RGBA, **kwargs) # Image.Image - NDArray[ND.Shape["IM_HEIGHT, IM_WIDTH, 4"], np.floating]
+        
+        return _out_img, multi_decoder_color_overlay
+
+
+    # Images _____________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
+
     @function_attributes(short_name=None, tags=['image', 'posterior'], input_requires=[], output_provides=[], uses=['get_array_as_image'], used_by=[], creation_date='2024-05-09 05:49', related_items=[])
-    def get_posterior_as_image(self, epoch_id_identifier_str: str = 'p_x_given_n', desired_height=None, desired_width=None, skip_img_normalization=True, export_grayscale:bool=False, **kwargs):
+    def get_posterior_as_image(self, epoch_id_identifier_str: str = 'p_x_given_n', desired_height=None, desired_width=None, export_kind: Optional[HeatmapExportKind] = None, skip_img_normalization=True, export_grayscale:bool=False, **kwargs):
         """ gets the posterior as a colormapped image 
         
         Usage:
@@ -478,19 +579,42 @@ class SingleEpochDecodedResult(HDF_SerializationMixin, AttrsBasedClassHelperMixi
 
         """
         from pyphocorehelpers.plotting.media_output_helpers import get_array_as_image
+        from pyphoplacecellanalysis.Pho2D.data_exporting import HeatmapExportKind
+
+
+        if export_kind is None:
+            export_kind = HeatmapExportKind.COLORMAPPED
+
 
         if self.epoch_data_index is not None:
             epoch_id_str = f"{epoch_id_identifier_str}[{self.epoch_data_index}]"
         else:
             epoch_id_str = f"{epoch_id_identifier_str}"
 
-        img_data = self.p_x_given_n.astype(float)  # .shape: (4, n_curr_epoch_time_bins) - (63, 4, 120)
+        
+        # `raw_RGBA_only_parameters` dict with keys: ['spikes_df', 'xbin', 'lower_bound_alpha', 'drop_below_threshold', 't_bin_size']
+        raw_RGBA_only_parameters = kwargs.pop('raw_RGBA_only_parameters', {})
+
+        if export_kind.value == HeatmapExportKind.RAW_RGBA.value:
+            ## check values in `raw_RGBA_only_parameters`:
+            required_keys = ['spikes_df', 'xbin', 'lower_bound_alpha', 'drop_below_threshold', 't_bin_size']
+            assert np.all([k in raw_RGBA_only_parameters.keys() for k in required_keys]), f"missing required keys:\n\tequired_keys: {required_keys}\n\tlist(raw_RGBA_only_parameters.keys()): {list(raw_RGBA_only_parameters.keys())}\n"
+            # build_multi_decoder_color_overlay_image
+            _out_img, multi_decoder_color_overlay = self.build_multi_decoder_color_overlay_image(**raw_RGBA_only_parameters)
+            img_data = _out_img.astype(float)  # .shape: (4, n_curr_epoch_time_bins) - (63, 4, 120)
+        
+        else:
+            img_data = self.p_x_given_n.astype(float)  # .shape: (4, n_curr_epoch_time_bins) - (63, 4, 120)
+            
+
         return get_array_as_image(img_data, desired_height=desired_height, desired_width=desired_width, skip_img_normalization=skip_img_normalization, export_grayscale=export_grayscale, **kwargs)
 
 
-    @function_attributes(short_name=None, tags=['export', 'image', 'posterior'], input_requires=[], output_provides=[], uses=['pyphocorehelpers.plotting.media_output_helpers.save_array_as_image'], used_by=['PosteriorExporting.export_decoded_posteriors_as_images'], creation_date='2024-05-09 05:49', related_items=[])
-    def save_posterior_as_image(self, parent_array_as_image_output_folder: Union[Path, str]='', epoch_id_identifier_str: str = 'p_x_given_n', desired_height=None, desired_width=None, colormap:str='viridis', skip_img_normalization=True, export_grayscale:bool=False, allow_override_aspect_ratio:bool=False, **kwargs):
+    @function_attributes(short_name=None, tags=['export', 'image', 'posterior'], input_requires=[], output_provides=[], uses=['pyphocorehelpers.plotting.media_output_helpers.save_array_as_image', '.build_multi_decoder_color_overlay_image', '._perform_build_multi_decoder_color_overlay_image_data'], used_by=['PosteriorExporting.export_decoded_posteriors_as_images'], creation_date='2024-05-09 05:49', related_items=[])
+    def save_posterior_as_image(self, parent_array_as_image_output_folder: Union[Path, str]='', epoch_id_identifier_str: str = 'p_x_given_n', complete_epoch_identifier_str: Optional[str]=None, desired_height=None, desired_width=None, export_kind: Optional[HeatmapExportKind] = None, colormap:str='viridis', skip_img_normalization=True, export_grayscale:bool=False, allow_override_aspect_ratio:bool=False, **kwargs):
         """ saves the posterior to disk
+        
+        this is where `self.build_multi_decoder_color_overlay_image(...)` should be called for export_kind == 
         
         Usage:
 
@@ -500,29 +624,58 @@ class SingleEpochDecodedResult(HDF_SerializationMixin, AttrsBasedClassHelperMixi
 
         """
         from pyphocorehelpers.plotting.media_output_helpers import save_array_as_image
-
+        from pyphoplacecellanalysis.Pho2D.data_exporting import HeatmapExportKind
+        
         if isinstance(parent_array_as_image_output_folder, str):
             parent_array_as_image_output_folder = Path(parent_array_as_image_output_folder).resolve()
             
-            
+        if kwargs.get('debug_print', False):
+            print(f'self.epoch_data_index: {self.epoch_data_index}')
+
         if parent_array_as_image_output_folder.is_dir():
             assert parent_array_as_image_output_folder.exists(), f"path '{parent_array_as_image_output_folder}' does not exist!"
-            
-            if self.epoch_data_index is not None:
-                epoch_id_str = f"{epoch_id_identifier_str}[{self.epoch_data_index}]"
-            else:
-                epoch_id_str = f"{epoch_id_identifier_str}"
-            _img_path = parent_array_as_image_output_folder.joinpath(f'{epoch_id_str}.png').resolve()
+            if complete_epoch_identifier_str is None:
+                ## mode to use
+                # active_epoch_data_IDX: int = self.epoch_data_index
+                curr_epoch_info_dict = self.epoch_info_tuple._asdict()
+                active_epoch_id: int = curr_epoch_info_dict.get('label', None)
+                if active_epoch_id is not None:
+                    active_epoch_id = int(active_epoch_id)
+                    complete_epoch_identifier_str = f"{epoch_id_identifier_str}[{active_epoch_id:03d}]" # 2025-06-03 - 'p_x_given_n[067]'
+                else:
+                    complete_epoch_identifier_str = f"{epoch_id_identifier_str}"
+
+            assert complete_epoch_identifier_str is not None
+            _img_path = parent_array_as_image_output_folder.joinpath(f'{complete_epoch_identifier_str}.png').resolve()
         else:
             _img_path = parent_array_as_image_output_folder.resolve() # already a direct path
-            
+            assert complete_epoch_identifier_str is None, f"complete_epoch_identifier_str is provided (not-None), complete_epoch_identifier_str: '{complete_epoch_identifier_str}', but a full path was provided in parent_array_as_image_output_folder: {parent_array_as_image_output_folder.as_posix()}! This will override and ignore complete_epoch_identifier_str. So please only specify one or the other."
 
         if (desired_height is None) and (desired_width is None):
             # only if the user hasn't provided a desired width OR height should we suggest a height of 100
             desired_height = 100
             
-        img_data = self.p_x_given_n.astype(float)  # .shape: (4, n_curr_epoch_time_bins) - (63, 4, 120)
-        raw_tuple = save_array_as_image(img_data, desired_height=desired_height, desired_width=desired_width, colormap=colormap, skip_img_normalization=skip_img_normalization, out_path=_img_path, export_grayscale=export_grayscale, allow_override_aspect_ratio=allow_override_aspect_ratio, **kwargs)
+
+        # `raw_RGBA_only_parameters` dict with keys: ['spikes_df', 'xbin', 'lower_bound_alpha', 'drop_below_threshold', 't_bin_size']
+        raw_RGBA_only_parameters = kwargs.pop('raw_RGBA_only_parameters', {})
+
+        if (export_kind is not None) and (export_kind.value == HeatmapExportKind.RAW_RGBA.value):
+            ## check values in `raw_RGBA_only_parameters`:
+            required_keys = ['spikes_df', 'xbin', 'lower_bound_alpha', 'drop_below_threshold', 't_bin_size']
+            assert np.all([k in raw_RGBA_only_parameters.keys() for k in required_keys]), f"missing required keys:\n\tequired_keys: {required_keys}\n\tlist(raw_RGBA_only_parameters.keys()): {list(raw_RGBA_only_parameters.keys())}\n"
+            # ## need to remove these RAW_RGBA-specific kwarg parameters for the other two cases anyway:
+            # lower_bound_alpha = kwargs.pop('lower_bound_alpha', 0.1)
+            # drop_below_threshold = kwargs.pop('drop_below_threshold', 1e-2)
+            # t_bin_size = kwargs.pop('t_bin_size', 0.025)
+
+            # _out_img, multi_decoder_color_overlay = self.build_multi_decoder_color_overlay_image(spikes_df=deepcopy(get_proper_global_spikes_df(curr_active_pipeline)), xbin=deepcopy(a_decoder.xbin), lower_bound_alpha=lower_bound_alpha, drop_below_threshold=drop_below_threshold, t_bin_size=t_bin_size)
+            # _out_img, multi_decoder_color_overlay = self.build_multi_decoder_color_overlay_image(**raw_RGBA_only_parameters)
+            img_data, multi_decoder_color_overlay = self._perform_build_multi_decoder_color_overlay_image_data(**raw_RGBA_only_parameters) # .shape: (4, n_curr_epoch_time_bins) - (400, 454, 4)
+        
+        else:
+            img_data = self.p_x_given_n.astype(float)  # .shape: (4, n_curr_epoch_time_bins) - (63, 4, 120)
+        
+        raw_tuple = save_array_as_image(img_data, desired_height=desired_height, desired_width=desired_width, export_kind=export_kind, colormap=colormap, skip_img_normalization=skip_img_normalization, out_path=_img_path, export_grayscale=export_grayscale, allow_override_aspect_ratio=allow_override_aspect_ratio, **kwargs)
         image_raw, path_raw = raw_tuple
         return image_raw, path_raw
 
@@ -1134,7 +1287,7 @@ class DecodedFilterEpochsResult(HDF_SerializationMixin, AttrsBasedClassHelperMix
             # assert a_time_window_centers_n_time_bins == n_time_bins, f"a_time_window_centers_n_time_bins: {a_time_window_centers_n_time_bins} != n_time_bins_posterior: {n_time_bins}"
 
 
-    @function_attributes(short_name=None, tags=['marginal', 'direction', 'track_id', 'NEEDS_GENERALIZATION'], input_requires=[], output_provides=[], uses=[], used_by=['self.compute_marginals'], creation_date='2024-10-08 00:40', related_items=[]) 
+    @function_attributes(short_name=None, tags=['marginal', 'direction', 'track_id', 'NEEDS_GENERALIZATION'], input_requires=[], output_provides=[], uses=['DirectionalPseudo2DDecodersResult.determine_directional_likelihoods', 'DirectionalPseudo2DDecodersResult.determine_long_short_likelihoods', 'DirectionalPseudo2DDecodersResult.determine_non_marginalized_decoder_likelihoods'], used_by=['self.compute_marginals'], creation_date='2024-10-08 00:40', related_items=[]) 
     @classmethod
     def perform_compute_marginals(cls, filter_epochs_decoder_result: Union[List[NDArray], List[DynamicContainer], NDArray, "DecodedFilterEpochsResult"], filter_epochs: pd.DataFrame, epoch_idx_col_name: str = 'lap_idx', epoch_start_t_col_name: str = 'lap_start_t', additional_transfer_column_names: Optional[List[str]]=None, auto_transfer_all_columns:bool=True): # -> tuple[tuple["DecodedMarginalResultTuple", "DecodedMarginalResultTuple", Tuple[List[DynamicContainer], Any, Any, pd.DataFrame]], pd.DataFrame]:
         """Computes and initializes the marginal properties
@@ -1182,6 +1335,13 @@ class DecodedFilterEpochsResult(HDF_SerializationMixin, AttrsBasedClassHelperMix
         epochs_marginals_df = pd.DataFrame(np.hstack((non_marginalized_decoder_all_epoch_bins_marginal, epochs_directional_all_epoch_bins_marginal, epochs_track_identity_all_epoch_bins_marginal)), columns=['long_LR', 'long_RL', 'short_LR', 'short_RL', 'P_LR', 'P_RL', 'P_Long', 'P_Short'])
         epochs_marginals_df[epoch_idx_col_name] = epochs_marginals_df.index.to_numpy()
         epochs_marginals_df[epoch_start_t_col_name] = epochs_df['start'].to_numpy()
+        
+        ## ensure we have the generic columns too (duplicated):
+        if (epoch_idx_col_name != 'epoch_idx') and ('epoch_idx' not in epochs_marginals_df):
+            epochs_marginals_df['epoch_idx'] = epochs_marginals_df[epoch_idx_col_name]
+        if (epoch_start_t_col_name != 'epoch_start_t') and ('epoch_start_t' not in epochs_marginals_df):
+            epochs_marginals_df['epoch_start_t'] = epochs_marginals_df[epoch_start_t_col_name]
+
         # epochs_marginals_df['stop'] = epochs_epochs_df['stop'].to_numpy()
         # epochs_marginals_df['label'] = epochs_epochs_df['label'].to_numpy()
         if auto_transfer_all_columns and (additional_transfer_column_names is None):
@@ -1200,7 +1360,7 @@ class DecodedFilterEpochsResult(HDF_SerializationMixin, AttrsBasedClassHelperMix
         
 
 
-    @function_attributes(short_name=None, tags=['marginal', 'direction', 'track_id', 'NEEDS_GENERALIZATION'], input_requires=[], output_provides=[], uses=['self.perform_compute_marginals'], used_by=[], creation_date='2024-10-08 00:40', related_items=[]) 
+    @function_attributes(short_name=None, tags=['marginal', 'direction', 'track_id', 'NEEDS_GENERALIZATION'], input_requires=[], output_provides=[], uses=['cls.perform_compute_marginals'], used_by=[], creation_date='2024-10-08 00:40', related_items=[]) 
     def compute_marginals(self, epoch_idx_col_name: str = 'lap_idx', epoch_start_t_col_name: str = 'lap_start_t', additional_transfer_column_names: Optional[List[str]]=None, auto_transfer_all_columns:bool=True): # -> tuple[tuple["DecodedMarginalResultTuple", "DecodedMarginalResultTuple", Tuple[List[DynamicContainer], Any, Any, pd.DataFrame]], pd.DataFrame]:
         """Computes and initializes the marginal properties
         
@@ -1232,6 +1392,7 @@ class DecodedFilterEpochsResult(HDF_SerializationMixin, AttrsBasedClassHelperMix
         
         History: Extracted from `pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions.DirectionalPseudo2DDecodersResult._build_multiple_per_time_bin_marginals` on 2024-10-09 
         
+        History #TODO 2025-05-02 18:53: - [ ] renamed ['epoch_df_idx', ] to ['parent_epoch_df_idx', ]
         """
         parent_epoch_label_col_name: str = 'label' # column in `filter_epochs_df` that can be used to index into the epochs
         filter_epochs_df = deepcopy(self.filter_epochs)
@@ -1250,12 +1411,57 @@ class DecodedFilterEpochsResult(HDF_SerializationMixin, AttrsBasedClassHelperMix
         all_epoch_extracted_posteriors = []
         assert len(active_marginals_tuple) == len(columns_tuple)
         
-        for active_marginals, active_columns in zip(active_marginals_tuple, columns_tuple):
+        # _common_epoch_df_column_dict = {}
+        _common_epoch_df_column_dict = None
+        for marginal_tuple_idx, active_marginals, active_columns in zip(np.arange(len(active_marginals_tuple)), active_marginals_tuple, columns_tuple):
             epoch_extracted_posteriors = [a_result['p_x_given_n'] for a_result in active_marginals]
-            n_epoch_time_bins = [np.shape(a_posterior)[-1] for a_posterior in epoch_extracted_posteriors]
-            result_t_bin_idx_column = np.concatenate([np.full((an_epoch_time_bins, ), fill_value=i) for i, an_epoch_time_bins in enumerate(n_epoch_time_bins)])
-            epoch_df_idx_column = np.concatenate([np.full((an_epoch_time_bins, ), fill_value=filter_epochs_df.index[i]) for i, an_epoch_time_bins in enumerate(n_epoch_time_bins)])
-            epoch_label_column = np.concatenate([np.full((an_epoch_time_bins, ), fill_value=filter_epochs_df[parent_epoch_label_col_name].values[i]) for i, an_epoch_time_bins in enumerate(n_epoch_time_bins)])
+            #TODO 2025-08-13 17:28: - [ ] GOAL - Add the 'most_likely_position_1D' for each time bin:
+            epoch_extracted_most_likely_positions_1D = None
+            # if (marginal_tuple_idx == (len(active_marginals_tuple)-1)):
+            ## only for last tuple result, corresponding to `non_marginalized_decoder_marginals`
+            epoch_extracted_most_likely_positions_1D = [a_result.get('most_likely_positions_1D', None) for a_result in active_marginals]
+            if len([v for v in epoch_extracted_most_likely_positions_1D if (v is not None)]) != len(epoch_extracted_posteriors):
+                ## if some entries are None (more likely ALL are None), recompute from p_x_given_n but this only works for `non_marginalized_decoder_marginals`:
+                epoch_extracted_most_likely_positions_1D = deepcopy(self.most_likely_positions_list)
+
+            if _common_epoch_df_column_dict is None:
+                # NOTE: these values are the same for every iteration of this loop (as the number of epochs in filter_epochs don't change:
+                n_epoch_time_bins = [np.shape(a_posterior)[-1] for a_posterior in epoch_extracted_posteriors]
+                result_t_bin_idx_column = np.concatenate([np.full((an_epoch_time_bins, ), fill_value=i) for i, an_epoch_time_bins in enumerate(n_epoch_time_bins)])
+                epoch_df_idx_column = np.concatenate([np.full((an_epoch_time_bins, ), fill_value=filter_epochs_df.index[i]) for i, an_epoch_time_bins in enumerate(n_epoch_time_bins)])
+
+
+                # set `_common_epoch_df_column_dict` so it is no longer None:
+                # _common_epoch_df_column_dict = {'result_t_bin_idx': result_t_bin_idx_column, 'epoch_df_idx': epoch_df_idx_column, 'parent_epoch_label': epoch_label_column, 'parent_epoch_duration': epoch_duration_column}
+                # _common_epoch_df_column_dict = {'result_t_bin_idx': result_t_bin_idx_column, 'epoch_df_idx': epoch_df_idx_column}
+                _common_epoch_df_column_dict = {'parent_epoch_df_idx': epoch_df_idx_column, 'result_t_bin_idx': result_t_bin_idx_column}
+
+                # ## All
+                # epochs_repeated_epoch_index: NDArray = np.hstack([np.full((n_bins, ), i) for i, n_bins in enumerate(n_epoch_time_bins)]) # np.shape(epochs_p_x_given_n) # (2, 19018)
+                # epochs_repeated_sub_epoch_time_bin_index: NDArray = np.hstack([np.arange(n_bins) for n_bins in n_epoch_time_bins]) # np.shape(epochs_t_centers) # (19018,)
+                # ## Redundant but very helpful parent_epoch_* columns
+                # epochs_repeated_parent_epoch_start_t: NDArray = np.hstack([np.full((n_bins, ), filter_epochs_df['start'].values[i]) for i, n_bins in enumerate(n_epoch_time_bins)]) # np.shape(epochs_p_x_given_n) # (2, 19018)
+                # epochs_repeated_parent_epoch_stop_t: NDArray = np.hstack([np.full((n_bins, ), filter_epochs_df['stop'].values[i]) for i, n_bins in enumerate(n_epoch_time_bins)]) # np.shape(epochs_p_x_given_n) # (2, 19018)
+
+                ## All
+                epochs_repeated_epoch_index: NDArray = np.concatenate([np.full((n_bins, ), i) for i, n_bins in enumerate(n_epoch_time_bins)]) # np.shape(epochs_p_x_given_n) # (2, 19018)
+                epochs_repeated_sub_epoch_time_bin_index: NDArray = np.concatenate([np.arange(n_bins) for n_bins in n_epoch_time_bins]) # np.shape(epochs_t_centers) # (19018,)
+                ## Redundant but very helpful parent_epoch_* columns
+                epochs_repeated_parent_epoch_start_t: NDArray = np.concatenate([np.full((n_bins, ), filter_epochs_df['start'].values[i]) for i, n_bins in enumerate(n_epoch_time_bins)]) # np.shape(epochs_p_x_given_n) # (2, 19018)
+                epochs_repeated_parent_epoch_stop_t: NDArray = np.concatenate([np.full((n_bins, ), filter_epochs_df['stop'].values[i]) for i, n_bins in enumerate(n_epoch_time_bins)]) # np.shape(epochs_p_x_given_n) # (2, 19018)
+                epoch_label_column = np.concatenate([np.full((an_epoch_time_bins, ), fill_value=filter_epochs_df[parent_epoch_label_col_name].values[i]) for i, an_epoch_time_bins in enumerate(n_epoch_time_bins)])
+                epoch_duration_column = np.concatenate([np.full((an_epoch_time_bins, ), fill_value=filter_epochs_df['duration'].values[i]) for i, an_epoch_time_bins in enumerate(n_epoch_time_bins)]) #TODO 2025-04-18 21:05: - [ ] Added 'parent_epoch_duration' to output dataframe!
+                # epoch_neuronal_participation_column = np.concatenate([np.full((an_epoch_time_bins, ), fill_value=filter_epochs_df['participation'].values[i]) for i, an_epoch_time_bins in enumerate(n_epoch_time_bins)])
+                
+                _common_epoch_df_column_dict.update(**{'epoch_id': epochs_repeated_epoch_index, 'sub_epoch_time_bin_index': epochs_repeated_sub_epoch_time_bin_index, 'parent_epoch_id': epochs_repeated_epoch_index, 'parent_epoch_label': epoch_label_column, 'parent_epoch_start_t': epochs_repeated_parent_epoch_start_t, 'parent_epoch_end_t': epochs_repeated_parent_epoch_stop_t, 'parent_epoch_duration': epoch_duration_column, 'most_likely_positions_1D': np.nan})
+                
+
+            if epoch_extracted_most_likely_positions_1D is not None:
+                time_bin_extracted_most_likely_positions_1D_column = np.concatenate([np.atleast_1d(an_epoch_extracted_most_likely_positions_1D[:, 0]) for i, an_epoch_extracted_most_likely_positions_1D in enumerate(epoch_extracted_most_likely_positions_1D)]) 
+                assert len(time_bin_extracted_most_likely_positions_1D_column) == len(epoch_label_column), f"len(time_bin_extracted_most_likely_positions_1D_column): {len(time_bin_extracted_most_likely_positions_1D_column)}, len(epoch_label_column): {len(epoch_label_column)}"
+                _common_epoch_df_column_dict.update(**{'most_likely_positions_1D': time_bin_extracted_most_likely_positions_1D_column, })
+                print(f'2025-08-13 19:18 Adding "most_likely_positions_1D" column to `epoch_time_bin_marginals_df`.')
+
             all_columns.extend(active_columns)
             # all_epoch_extracted_posteriors = np.hstack((all_epoch_extracted_posteriors, epoch_extracted_posteriors))
             all_epoch_extracted_posteriors.append(np.hstack((epoch_extracted_posteriors)))
@@ -1263,10 +1469,16 @@ class DecodedFilterEpochsResult(HDF_SerializationMixin, AttrsBasedClassHelperMix
 
         all_epoch_extracted_posteriors = np.vstack(all_epoch_extracted_posteriors) # (4, n_time_bins) - (4, 5495)
         epoch_time_bin_marginals_df = pd.DataFrame(all_epoch_extracted_posteriors.T, columns=all_columns)
-        epoch_time_bin_marginals_df['result_t_bin_idx'] = result_t_bin_idx_column # a.k.a result label
-        epoch_time_bin_marginals_df['epoch_df_idx'] = epoch_df_idx_column
-        epoch_time_bin_marginals_df['parent_epoch_label'] = epoch_label_column
-        
+        ## add all extra columns (parent epoch columns, etc):
+        for k, v in _common_epoch_df_column_dict.items():
+            epoch_time_bin_marginals_df[k] = v
+            
+        # epoch_time_bin_marginals_df['result_t_bin_idx'] = result_t_bin_idx_column # a.k.a result label
+        # epoch_time_bin_marginals_df['epoch_df_idx'] = epoch_df_idx_column
+        # epoch_time_bin_marginals_df['parent_epoch_label'] = epoch_label_column
+        # epoch_time_bin_marginals_df['parent_epoch_duration'] = epoch_duration_column
+        # epoch_time_bin_marginals_df['parent_epoch_neuronal_participation'] = epoch_neuronal_participation_column
+
         if (len(flat_time_bin_centers_column) < len(epoch_time_bin_marginals_df)):
             # 2024-01-25 - This fix DOES NOT HELP. The constructed size is the same as the existing `flat_time_bin_centers_column`.
             
@@ -1299,7 +1511,7 @@ class DecodedFilterEpochsResult(HDF_SerializationMixin, AttrsBasedClassHelperMix
         if transfer_column_names_list is not None:
             for a_test_transfer_column_name in transfer_column_names_list:
                 # a_test_transfer_column_name: str = 'maze_id'
-                epoch_time_bin_marginals_df[a_test_transfer_column_name] = epoch_time_bin_marginals_df['epoch_df_idx'].map(lambda idx: filter_epochs_df.loc[idx, a_test_transfer_column_name])
+                epoch_time_bin_marginals_df[a_test_transfer_column_name] = epoch_time_bin_marginals_df['parent_epoch_df_idx'].map(lambda idx: filter_epochs_df.loc[idx, a_test_transfer_column_name])
             
         return epoch_time_bin_marginals_df
     
@@ -1492,11 +1704,15 @@ class DecodedFilterEpochsResult(HDF_SerializationMixin, AttrsBasedClassHelperMix
         return a_decoded_result, (is_time_bin_active_list, inactive_mask_list, all_time_bin_indicies_list, last_valid_indices_list)
 
 
-    @function_attributes(short_name=None, tags=['pseudo2D', 'timeline-track', '1D', 'split-to-1D'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-02-26 07:23', related_items=[])
-    def split_pseudo2D_result_to_1D_result(self, pseudo2D_decoder_names_list: Optional[str]=None, debug_print=False) -> Dict[types.DecoderName, "DecodedFilterEpochsResult"]:
+    @function_attributes(short_name=None, tags=['pseudo2D', 'timeline-track', '1D', 'split-to-1D'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-02-26 07:23', related_items=['pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions.DirectionalDecodersContinuouslyDecodedResult.split_pseudo2D_continuous_result_to_1D_continuous_result'])
+    def split_pseudo2D_result_to_1D_result(self, pseudo2D_decoder_names_list: Optional[str]=None, a_pseudo2D_decoder: Optional[Any]=None, xbin_centers: Optional[NDArray]=None, ybin_centers: Optional[NDArray]=None, debug_print=False) -> Dict[types.DecoderName, "DecodedFilterEpochsResult"]:
         """ Get 1D representations of the Pseudo2D track (4 decoders) so they can be plotted on seperate tracks and bin-debugged independently.
 
         This returns the "all-decoders-sum-to-1-across-time' normalization style that Kamran likes
+
+        xbin_centers: the optional position x-bin centers
+        ybin_centers: the optional position x-bin centers, emphatically not the decoder centers
+
 
         Usage:        
             from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import DirectionalDecodersContinuouslyDecodedResult, DecodedFilterEpochsResult
@@ -1517,6 +1733,12 @@ class DecodedFilterEpochsResult(HDF_SerializationMixin, AttrsBasedClassHelperMix
         p_x_given_n_shapes_list = [np.shape(v) for v in self.p_x_given_n_list]  #  [(59, 2, 66), (59, 2, 102), (59, 2, 226), ...]
         p_x_given_n_shapes_list = np.vstack(p_x_given_n_shapes_list) # (84, 3)
         posterior_ndim: int = (np.shape(p_x_given_n_shapes_list)[-1]-1) # 1 or 2
+        if a_pseudo2D_decoder is not None:
+            assert xbin_centers is None, f"don't provide both xbin_centers and a_pseudo2D_decoder"
+            assert ybin_centers is None, f"don't provide both ybin_centers and a_pseudo2D_decoder"
+            original_position_data_shape = deepcopy(a_pseudo2D_decoder.original_position_data_shape[:-1]) ## all but the pseudo dim
+            xbin_centers: Optional[NDArray] = deepcopy(a_pseudo2D_decoder.xbin_centers)
+            ybin_centers: Optional[NDArray] = None
 
         if posterior_ndim == 1:
             print(f'WARN: already 1D')
@@ -1529,7 +1751,10 @@ class DecodedFilterEpochsResult(HDF_SerializationMixin, AttrsBasedClassHelperMix
             if debug_print:
                 print(f'n_xbins: {n_xbins}, n_ybins: {n_ybins}')
             ## we will reduce along the y-dim dimension
-                
+
+            if xbin_centers is None:
+                print(f'WARN: xbin_centers was not provided, so the output 1D `output_pseudo2D_split_to_1D_continuous_results_dict[a_decoder_name].most_likely_positions_list` WILL BE INCORRECT!')
+
             ## Extract the Pseudo2D results as separate 1D tracks
             ## Split across the 2nd axis to make 1D posteriors that can be displayed in separate dock rows:
             assert n_ybins == len(pseudo2D_decoder_names_list), f"for pseudo2D_decoder_names_list: {pseudo2D_decoder_names_list}\n\texpected the len(pseudo2D_decoder_names_list): {len(pseudo2D_decoder_names_list)} pseudo-y bins for the decoder in n_ybins. but found n_ybins: {n_ybins}"
@@ -1539,7 +1764,25 @@ class DecodedFilterEpochsResult(HDF_SerializationMixin, AttrsBasedClassHelperMix
                 ## make separate `DecodedFilterEpochsResult` objects                
                 output_pseudo2D_split_to_1D_continuous_results_dict[a_decoder_name] = deepcopy(self) ## copy the whole pseudo2D result
                 output_pseudo2D_split_to_1D_continuous_results_dict[a_decoder_name].p_x_given_n_list = [np.squeeze(p_x_given_n[:, i, :]) for p_x_given_n in output_pseudo2D_split_to_1D_continuous_results_dict[a_decoder_name].p_x_given_n_list] ## or could squish them here
+
+                # #TODO 2025-06-13 14:29: - [X] fix busted-up columns: ['most_likely_position_indicies_list', 'most_likely_positions'
+                output_pseudo2D_split_to_1D_continuous_results_dict[a_decoder_name].most_likely_position_indicies_list = [np.squeeze(np.argmax(p_x_given_n, axis=0)) for p_x_given_n in output_pseudo2D_split_to_1D_continuous_results_dict[a_decoder_name].p_x_given_n_list]  # average along time dimension
+                # output_pseudo2D_split_to_1D_continuous_results_dict[a_decoder_name].most_likely_positions_list = None
+                if (xbin_centers is not None) and (ybin_centers is not None):
+                    ## NOTE: I think 2D position decoding isn't implemented here.
+                    # much more efficient than the other implementation. Result is # (85844, 2)
+                    output_pseudo2D_split_to_1D_continuous_results_dict[a_decoder_name].most_likely_positions_list = [np.vstack((xbin_centers[most_likely_position_indicies[0,:]], self.ybin_centers[most_likely_position_indicies[1,:]])).T for most_likely_position_indicies in output_pseudo2D_split_to_1D_continuous_results_dict[a_decoder_name].most_likely_position_indicies_list]
+                elif (xbin_centers is not None):
+                    # 1D Decoder case:
+                    output_pseudo2D_split_to_1D_continuous_results_dict[a_decoder_name].most_likely_positions_list = [np.squeeze(xbin_centers[most_likely_position_indicies]) for most_likely_position_indicies in output_pseudo2D_split_to_1D_continuous_results_dict[a_decoder_name].most_likely_position_indicies_list]
+                else:
+                    output_pseudo2D_split_to_1D_continuous_results_dict[a_decoder_name].most_likely_positions_list = [[] for most_likely_position_indicies in output_pseudo2D_split_to_1D_continuous_results_dict[a_decoder_name].most_likely_position_indicies_list]
+                # #TODO 2025-06-13 14:30: - [ ] Finish recomputing marginals
+                # output_pseudo2D_split_to_1D_continuous_results_dict[a_decoder_name].marginal_x_list = None
+                # output_pseudo2D_split_to_1D_continuous_results_dict[a_decoder_name].marginal_y_list = None
                 # output_pseudo2D_split_to_1D_continuous_results_dict[a_decoder_name].compute_marginals()
+
+
             ## END for i, a_de...
             return output_pseudo2D_split_to_1D_continuous_results_dict
 
@@ -1571,8 +1814,41 @@ class DecodedFilterEpochsResult(HDF_SerializationMixin, AttrsBasedClassHelperMix
         assert n_ybins == len(pseudo2D_decoder_names_list), f"for pseudo2D_decoder_names_list: {pseudo2D_decoder_names_list}\n\texpected the len(pseudo2D_decoder_names_list): {len(pseudo2D_decoder_names_list)} pseudo-y bins for the decoder in n_ybins. but found n_ybins: {n_ybins}"
     
         return flat_time_window_centers, flat_marginal_y_p_x_given_n
-        
 
+
+    @classmethod
+    def perform_add_additional_epochs_columns(cls, a_result: "DecodedFilterEpochsResult", session_name: str, t_delta: float, **kwargs) -> "DecodedFilterEpochsResult":
+        """ adds the session-related extra columns to the result's .filter_epochs
+
+        session_name: str = curr_active_pipeline.session_name
+        t_start, t_delta, t_end = curr_active_pipeline.find_LongShortDelta_times()
+        a_result = DecodedFilterEpochsResult.perform_add_additional_epochs_columns(a_result=a_result, session_name=session_name, t_delta=t_delta)
+
+        """
+        active_filter_epochs: pd.DataFrame = ensure_dataframe(deepcopy(a_result.filter_epochs))        
+        # Add the maze_id to the active_filter_epochs so we can see how properties change as a function of which track the replay event occured on:
+        active_filter_epochs = active_filter_epochs.across_session_identity.add_session_df_columns(session_name=session_name, curr_session_t_delta=t_delta, **kwargs) # , time_bin_size=None, time_col='ripple_start_t'
+        a_result.filter_epochs = active_filter_epochs ## assign
+        return a_result
+
+
+    def add_additional_epochs_columns(self, session_name: str, t_delta: float, **kwargs) -> pd.DataFrame:
+        """ updates self.filter_epochs
+
+        session_name: str = curr_active_pipeline.session_name
+        t_start, t_delta, t_end = curr_active_pipeline.find_LongShortDelta_times()
+        a_result.add_additional_epochs_columns(session_name=session_name, t_delta=t_delta)
+
+        """
+        self.perform_add_additional_epochs_columns(a_result=self, session_name=session_name, t_delta=t_delta, **kwargs)
+        # active_filter_epochs: pd.DataFrame = ensure_dataframe(deepcopy(self.filter_epochs))        
+        # # Add the maze_id to the active_filter_epochs so we can see how properties change as a function of which track the replay event occured on:
+        # active_filter_epochs = active_filter_epochs.across_session_identity.add_session_df_columns(session_name=session_name, curr_session_t_delta=t_delta, **kwargs) # , time_bin_size=None, time_col='ripple_start_t'
+        # self.filter_epochs = active_filter_epochs ## assign
+        return self.filter_epochs
+
+
+        
 
 # ==================================================================================================================== #
 # Placemap Position Decoders                                                                                           #
@@ -1852,7 +2128,7 @@ class BasePositionDecoder(HDFMixin, AttrsBasedClassHelperMixin, ContinuousPeakLo
     # ==================================================================================================================== #
     # Non-Modifying Methods:                                                                                               #
     # ==================================================================================================================== #
-    @function_attributes(short_name='decode', tags=['decode', 'pure'], input_requires=[], output_provides=[], creation_date='2023-03-23 19:10',
+    @function_attributes(short_name='decode', tags=['MAIN', 'decode', 'pure'], input_requires=[], output_provides=[], creation_date='2023-03-23 19:10',
         uses=['BayesianPlacemapPositionDecoder.perform_compute_most_likely_positions', 'ZhangReconstructionImplementation.neuropy_bayesian_prob'],
         used_by=['BayesianPlacemapPositionDecoder.perform_decode_specific_epochs'])
     def decode(self, unit_specific_time_binned_spike_counts, time_bin_size:float, output_flat_versions=False, debug_print=True):
@@ -1980,6 +2256,11 @@ class BasePositionDecoder(HDFMixin, AttrsBasedClassHelperMixin, ContinuousPeakLo
         History:
             Used to be named `_setup_concatenated_F` but renamed because it computes more than that.
         """
+        # assert self.pf.ratemap.n_neurons > 0, f"self.pf.ratemap.n_neurons == 0! (No Neurons!)"
+        if self.pf.ratemap.n_neurons == 0:
+            print(f"self.pf.ratemap.n_neurons == 0! (No Neurons!)")
+            raise ValueError(f"self.pf.ratemap.n_neurons == 0! (No Neurons!)")
+        
         self.neuron_IDXs, self.neuron_IDs, f_i, F_i, self.F, self.P_x = ZhangReconstructionImplementation.build_concatenated_F(self.pf, debug_print=self.debug_print) # fails when `self.pf.ratemap.n_neurons == 0` aka `self.pf.ratemap.ndim == 0`
         if not isinstance(self.neuron_IDs, np.ndarray):
             self.neuron_IDs = np.array(self.neuron_IDs)
@@ -2430,6 +2711,263 @@ class BasePositionDecoder(HDFMixin, AttrsBasedClassHelperMixin, ContinuousPeakLo
         return _obj
 
 
+    # ==================================================================================================================== #
+    # Average Speed/Acceleration per Position Bin                                                                          #
+    # ==================================================================================================================== #
+    @classmethod
+    def _compute_group_stats_for_var(cls, active_position_df: pd.DataFrame, xbin, ybin, variable_name:str = 'speed', debug_print=False):
+        """Can compute aggregate statistics (such as the mean) for any column of the position dataframe.
+
+        Args:
+            active_position_df (_type_): _description_
+            xbin (_type_): _description_
+            ybin (_type_): _description_
+            variable_name (str, optional): _description_. Defaults to 'speed'.
+            debug_print (bool, optional): _description_. Defaults to False.
+
+        Returns:
+            _type_: _description_
+        """
+        if ybin is None:
+            # Assume 1D:
+            ndim = 1
+            binned_col_names = ['binned_x',]
+
+        else:
+            # otherwise assume 2D:
+            ndim = 2
+            binned_col_names = ['binned_x','binned_y']
+
+
+        # For each unique binned_x and binned_y value, what is the average velocity_x at that point?
+        position_bin_dependent_specific_average_velocities = active_position_df.groupby(binned_col_names)[variable_name].agg([np.nansum, np.nanmean, np.nanmin, np.nanmax]).reset_index() #.apply(lambda g: g.mean(skipna=True)) #.agg((lambda x: x.mean(skipna=False)))
+        if debug_print:
+            print(f'np.shape(position_bin_dependent_specific_average_velocities): {np.shape(position_bin_dependent_specific_average_velocities)}')
+        # position_bin_dependent_specific_average_velocities # 1856 rows
+        if debug_print:
+            print(f'np.shape(output): {np.shape(output)}')
+            print(f"np.shape(position_bin_dependent_specific_average_velocities['binned_x'].to_numpy()): {np.shape(position_bin_dependent_specific_average_velocities['binned_x'])}")
+            max_binned_x_index = np.max(position_bin_dependent_specific_average_velocities['binned_x'].to_numpy()-1) # 63
+            print(f'max_binned_x_index: {max_binned_x_index}')
+        # (len(xbin), len(ybin)): (59, 21)
+
+        if ndim == 1:
+            # 1D Position:
+            output = np.zeros((len(xbin),)) # (65,)
+            output[position_bin_dependent_specific_average_velocities['binned_x'].to_numpy()-1] = position_bin_dependent_specific_average_velocities['nanmean'].to_numpy() # ValueError: shape mismatch: value array of shape (1856,) could not be broadcast to indexing result of shape (1856,2,30)
+
+        else:
+            # 2D+ Position:
+            if debug_print:
+                max_binned_y_index = np.max(position_bin_dependent_specific_average_velocities['binned_y'].to_numpy()-1) # 28
+                print(f'max_binned_y_index: {max_binned_y_index}')
+            output = np.zeros((len(xbin), len(ybin))) # (65, 30)
+            output[position_bin_dependent_specific_average_velocities['binned_x'].to_numpy()-1, position_bin_dependent_specific_average_velocities['binned_y'].to_numpy()-1] = position_bin_dependent_specific_average_velocities['nanmean'].to_numpy() # ValueError: shape mismatch: value array of shape (1856,) could not be broadcast to indexing result of shape (1856,2,30)
+
+        return output
+
+
+    @classmethod
+    def _compute_avg_speed_at_each_position_bin(cls, active_position_df: pd.DataFrame, xbin: NDArray, ybin: NDArray, debug_print=False):
+        """ compute the average speed at each position x. Used only by the two-step decoder above. """
+        outputs = dict()
+        outputs['speed'] = cls._compute_group_stats_for_var(active_position_df=active_position_df, xbin=xbin, ybin=ybin, variable_name='speed')
+        # outputs['velocity_x'] = _compute_group_stats_for_var(active_position_df=active_position_df, xbin=xbin, ybin=ybin, variable_name='velocity_x')
+        # outputs['acceleration_x'] = _compute_group_stats_for_var(active_position_df=active_position_df, xbin=xbin, ybin=ybin, variable_name='acceleration_x')
+        return outputs['speed']
+
+
+
+    @function_attributes(short_name=None, tags=['two-step-decoder', 'compute', 'pure'], input_requires=[], output_provides=[], uses=['cls._compute_avg_speed_at_each_position_bin', 'Zhang_Two_Step.compute_bayesian_two_step_prob_single_timestep', 'self.perform_build_marginals'], used_by=[], creation_date='2025-06-30 09:07', related_items=[])
+    @classmethod    
+    def perform_compute_two_step_decoder(cls, active_decoder: "BasePositionDecoder", active_one_step_result: DecodedFilterEpochsResult, pos_df: pd.DataFrame, debug_print=False):
+        """ computes the "two-step" position posterior decoding from the one-step results and decoder
+
+        Heavy lifting performed by `Zhang_Two_Step.compute_bayesian_two_step_prob_single_timestep`
+
+        active_one_step_decoder.flat_p_x_given_n.shape # (472, 66151)
+        np.shape(active_one_step_decoder.p_x_given_n) # (59, 8, 66151)
+        np.shape(active_one_step_decoder.P_x) # (472, 1)
+        active_one_step_decoder.original_position_data_shape # (59, 8)
+        active_one_step_decoder.flat_position_size # 472
+
+
+        Usage:
+
+            from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import BasePositionDecoder
+
+            pos_df = deepcopy(results2D.pos_df) # computation_result.sess.position.to_dataframe()
+
+            two_step_decoder_result = BasePositionDecoder.perform_compute_two_step_decoder(active_decoder=a_new_global2D_decoder, pos_df=pos_df)
+
+        """
+        from pyphocorehelpers.DataStructure.dynamic_parameters import DynamicParameters
+        from neuropy.core.position import PositionComputedDataMixin
+        
+        # self = active_decoder: "BasePositionDecoder"
+        active_xbins = active_decoder.xbin
+        active_ybins = active_decoder.ybin
+
+        active_xbin_centers = active_decoder.xbin_centers
+        active_ybin_centers = active_decoder.ybin_centers
+
+        pos_df = pos_df.position.adding_binned_position_columns(xbin_edges=active_xbins, ybin_edges=active_ybins, active_computation_config=None)
+
+        avg_speed_per_pos = active_decoder._compute_avg_speed_at_each_position_bin(pos_df, xbin=active_xbin_centers, ybin=active_ybin_centers, debug_print=debug_print)
+
+        if debug_print:
+            print(f'np.shape(avg_speed_per_pos): {np.shape(avg_speed_per_pos)}')
+
+        max_speed = np.nanmax(avg_speed_per_pos)
+        # max_speed # 73.80995983236636
+        min_speed = np.nanmin(avg_speed_per_pos)
+        # min_speed # 0.0
+        K_over_V = 60.0 / max_speed # K_over_V = 0.8128984236852197
+
+        # K = 1.0
+        K = K_over_V
+        V = 1.0
+        sigma_t_all = Zhang_Two_Step.sigma_t(avg_speed_per_pos, K, V, d=1.0) # np.shape(sigma_t_all): (64, 29)
+        if debug_print:
+            print(f'np.shape(sigma_t_all): {np.shape(sigma_t_all)}')
+
+        # normalize sigma_t_all:
+        _OLD_two_step_decoder_result = DynamicParameters.init_from_dict({'xbin':active_xbins, 'ybin':active_ybins,
+                                                                'avg_speed_per_pos': avg_speed_per_pos,
+                                                                'K':K, 'V':V,
+                                                                'sigma_t_all':sigma_t_all, 'flat_sigma_t_all': np.squeeze(np.reshape(sigma_t_all, (-1, 1)))
+        })
+
+        _OLD_two_step_decoder_result['C'] = 1.0
+        _OLD_two_step_decoder_result['k'] = 1.0
+
+        if (active_decoder.ndim < 2):
+            assert active_decoder.ndim == 1, f"prev_one_step_bayesian_decoder.ndim must be either 1 or 2, but prev_one_step_bayesian_decoder.ndim: {active_decoder.ndim}"
+            print(f'prev_one_step_bayesian_decoder.ndim == 1, so using [0.0] as active_ybin_centers.')
+            active_ybin_centers = np.array([0.0])
+
+        else:
+            # 2D Case:
+            assert active_decoder.ndim == 2, f"prev_one_step_bayesian_decoder.ndim must be either 1 or 2, but prev_one_step_bayesian_decoder.ndim: {active_decoder.ndim}"
+            active_ybin_centers = active_decoder.ybin_centers
+
+        # pre-allocate outputs:
+        _OLD_two_step_decoder_result['all_x'], _OLD_two_step_decoder_result['flat_all_x'], original_data_shape = Zhang_Two_Step.build_all_positions_matrix(active_decoder.xbin_centers, active_ybin_centers) # all_x: (64, 29, 2), flat_all_x: (1856, 2)
+        _OLD_two_step_decoder_result['original_all_x_shape'] = original_data_shape # add the original data shape to the computed data
+
+        # Pre-allocate output:
+        active_two_step_result: DecodedFilterEpochsResult = deepcopy(active_one_step_result) ## copy the one-step result
+        num_filter_epochs: int = active_one_step_result.num_filter_epochs
+        ## Add extra fields to the two-step `DecodedFilterEpochsResult`
+        active_two_step_result.all_scaling_factors_k = []
+        active_two_step_result.p_x_given_n_and_x_prev_list = []
+
+        for an_epoch_idx in np.arange(num_filter_epochs):
+            ## single epoch:
+            # flat_p_x_given_n: NDArray = np.atleast_1d(active_two_step_result.p_x_given_n_list[an_epoch_idx].flatten())
+            
+            curr_single_epoch_result: SingleEpochDecodedResult = active_two_step_result.get_result_for_epoch(active_epoch_idx=an_epoch_idx)
+            curr_epoch_p_x_given_n: NDArray = curr_single_epoch_result.p_x_given_n ## flatten all spatial dimensions (all dimension but the last)
+            if debug_print:
+                print("\tOriginal shape:", np.shape(curr_epoch_p_x_given_n))
+
+            # curr_epoch_active_n_time_bins: int = curr_single_epoch_result.num_time_windows ## (one less than needed
+            curr_epoch_active_n_time_bins: int = curr_single_epoch_result.nbins ## (one less than needed
+            
+            # Flatten all but the last dimension
+            new_shape = (-1, curr_epoch_p_x_given_n.shape[-1])
+            curr_epoch_flat_p_x_given_n: NDArray = curr_epoch_p_x_given_n.reshape(new_shape)
+            # print("Resulting array:\n", flat_p_x_given_n)
+            if debug_print:
+                print("\tShape:", np.shape(curr_epoch_flat_p_x_given_n))
+
+            # flat_p_x_given_n: NDArray = curr_single_epoch_result.p_x_given_n
+            flat_p_x_given_n_and_x_prev = np.full_like(curr_epoch_flat_p_x_given_n, 0.0) # fill with NaNs. 
+            p_x_given_n_and_x_prev = np.full_like(curr_epoch_p_x_given_n, 0.0) # fill with NaNs. Pre-allocate output
+            
+            ## Add extra fields to the two-step result
+            active_two_step_result.most_likely_positions_list[an_epoch_idx] = np.zeros((2, curr_epoch_active_n_time_bins)) # (2, 85841)
+
+            if debug_print:
+                print(f'np.shape(prev_one_step_bayesian_decoder.p_x_given_n): {np.shape(curr_epoch_p_x_given_n)}')
+
+            all_scaling_factors_k = Zhang_Two_Step.compute_scaling_factor_k(curr_epoch_flat_p_x_given_n)
+
+            # TODO: Efficiency: This will be inefficient, but do a slow iteration. 
+            for time_window_bin_idx in np.arange(curr_epoch_active_n_time_bins):
+                ## Iterate through all time bins within the epoch:
+                curr_t_step_flat_p_x_given_n = curr_epoch_flat_p_x_given_n[:, time_window_bin_idx] # this gets the specific n_t for this time window           
+                active_k = all_scaling_factors_k[time_window_bin_idx] # get the specific k value
+                     
+                # previous positions as determined by the two-step decoder: this uses the two_step previous position instead of the one_step previous position:
+                if time_window_bin_idx > 0:
+                    ## have a valid previous timestep to use (t-1)
+                    prev_x_position = active_two_step_result.most_likely_positions_list[an_epoch_idx][:, time_window_bin_idx-1] # TODO: is this okay for 1D as well?
+                    # active_k = two_step_decoder_result['k']
+                    if debug_print:
+                        print(f'np.shape(prev_x_position): {np.shape(prev_x_position)}')
+
+                    # Flat version:
+                    flat_p_x_given_n_and_x_prev[:,time_window_bin_idx] = Zhang_Two_Step.compute_bayesian_two_step_prob_single_timestep(curr_t_step_flat_p_x_given_n, prev_x_position, _OLD_two_step_decoder_result['flat_all_x'], _OLD_two_step_decoder_result['flat_sigma_t_all'], _OLD_two_step_decoder_result['C'], active_k) # output shape (1856, )            
+
+
+                else:
+                    # no valid previous timestep because t=0:
+                    prev_x_position = None # active_two_step_result.most_likely_positions_list[an_epoch_idx][:, time_window_bin_idx]
+                    # Flat version:
+                    flat_p_x_given_n_and_x_prev[:,time_window_bin_idx] = deepcopy(curr_t_step_flat_p_x_given_n) ## same as p_x_given_n # output shape (1856, )            
+
+                    
+                if (active_decoder.ndim < 2):
+                    # 1D case:
+                    p_x_given_n_and_x_prev[:,time_window_bin_idx] = flat_p_x_given_n_and_x_prev[:,time_window_bin_idx] # used to be (original_data_shape[0], original_data_shape[1])
+                else:
+                    # 2D:
+                    p_x_given_n_and_x_prev[:,:,time_window_bin_idx] = np.reshape(flat_p_x_given_n_and_x_prev[:,time_window_bin_idx], (original_data_shape[0], original_data_shape[1]))        
+            ## END for time_window_bin_idx in np.arange(curr_epoch_active_n_time_bins)...
+            
+            active_two_step_result.p_x_given_n_and_x_prev_list.append(p_x_given_n_and_x_prev) # (59, 8, 400)
+            
+
+            # POST-hoc most-likely computations: Compute the most-likely positions from the p_x_given_n_and_x_prev:
+            # # np.shape(self.most_likely_position_indicies) # (2, 85841)
+            """ Computes the most likely positions at each timestep from flat_p_x_given_n_and_x_prev """
+            most_likely_position_flat_indicies = np.argmax(flat_p_x_given_n_and_x_prev, axis=0)
+
+            # Adds `most_likely_position_flat_max_likelihood_values`:
+            # Same as np.amax(x, axis=axis_idx)
+            # axis_idx = 0
+            # x = two_step_decoder_result['flat_p_x_given_n_and_x_prev']
+            # index_array = two_step_decoder_result['most_likely_position_flat_indicies']
+            # two_step_decoder_result['most_likely_position_flat_max_likelihood_values'] = np.take_along_axis(x, np.expand_dims(index_array, axis=axis_idx), axis=axis_idx).squeeze(axis=axis_idx)
+            most_likely_position_flat_max_likelihood_values = np.take_along_axis(flat_p_x_given_n_and_x_prev, np.expand_dims(most_likely_position_flat_indicies, axis=0), axis=0).squeeze(axis=0) # get the flat maximum values
+            if debug_print:
+                print(f"\t{most_likely_position_flat_max_likelihood_values.shape = }")
+            # Reshape the maximum values:
+            # two_step_decoder_result['most_likely_position_max_likelihood_values'] = np.array(np.unravel_index(two_step_decoder_result['most_likely_position_flat_max_likelihood_values'], prev_one_step_bayesian_decoder.original_position_data_shape)) # convert back to an array
+
+            # np.shape(self.most_likely_position_flat_indicies) # (85841,)
+            active_two_step_result.most_likely_position_indicies_list[an_epoch_idx] = np.array(np.unravel_index(most_likely_position_flat_indicies, active_decoder.original_position_data_shape)) # convert back to an array
+            # np.shape(self.most_likely_position_indicies) # (2, 85841)
+            active_two_step_result.most_likely_positions_list[an_epoch_idx][0, :] = active_decoder.xbin_centers[active_two_step_result.most_likely_position_indicies_list[an_epoch_idx][0, :]]
+            if active_decoder.ndim > 1:
+                active_two_step_result.most_likely_positions_list[an_epoch_idx][1, :] = active_decoder.ybin_centers[active_two_step_result.most_likely_position_indicies_list[an_epoch_idx][1, :]]
+            # two_step_decoder_result['sigma_t_all'] = sigma_t_all # set sigma_t_all                
+
+            ## For some reason we set up the two-step decoder's most_likely_positions with the tranposed shape compared to the one-step decoder:
+            active_two_step_result.most_likely_positions_list[an_epoch_idx] = active_two_step_result.most_likely_positions_list[an_epoch_idx].T
+
+            ## Once done, compute marginals for the two-step:
+            curr_unit_marginal_x, curr_unit_marginal_y = active_decoder.perform_build_marginals(p_x_given_n_and_x_prev, active_two_step_result.most_likely_positions_list[an_epoch_idx], debug_print=debug_print)
+            _OLD_two_step_decoder_result['marginal'] = DynamicContainer(x=curr_unit_marginal_x, y=curr_unit_marginal_y)
+        ## END for i in np.arange(num_filter_epochs)...
+        
+
+        return active_two_step_result, _OLD_two_step_decoder_result
+
+
+
+
 
 # ==================================================================================================================== #
 # Bayesian Decoder                                                                                                     #
@@ -2670,6 +3208,7 @@ class BayesianPlacemapPositionDecoder(SerializedAttributesAllowBlockSpecifyingCl
         if self.marginal.y is not None:
             self.marginal.y.p_x_given_n_and_x_prev = two_step_decoder_result.marginal.y.p_x_given_n.copy()
             self.marginal.y.two_step_most_likely_positions_1D = two_step_decoder_result.marginal.y.most_likely_positions_1D.copy()
+
 
     @function_attributes(short_name='to_1D_maximum_projection', tags=['updated'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-04-06 22:06')
     def to_1D_maximum_projection(self, defer_compute_all:bool=True):

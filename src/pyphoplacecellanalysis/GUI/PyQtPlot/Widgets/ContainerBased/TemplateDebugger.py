@@ -7,6 +7,7 @@ from nptyping import NDArray
 import numpy as np
 import pandas as pd
 import neuropy.utils.type_aliases as types
+import html
 
 from pyphocorehelpers.programming_helpers import metadata_attributes
 from pyphocorehelpers.function_helpers import function_attributes
@@ -590,11 +591,21 @@ class TemplateDebugger:
     
 
 
+    @property
+    def is_publication_figure_mode(self) -> bool:
+        """Whether the figure is for export to publication."""
+        return self.params.prepare_for_publication
+    @is_publication_figure_mode.setter
+    def is_publication_figure_mode(self, value):
+        self.params.prepare_for_publication = value
+    
+
+
     # Initializer ________________________________________________________________________________________________________ #
     
     @function_attributes(short_name=None, tags=['init', 'buildUI'], input_requires=[], output_provides=[], uses=['buildUI_directional_template_debugger_data'], used_by=[], creation_date='2024-10-21 19:22', related_items=[])
     @classmethod
-    def init_templates_debugger(cls, track_templates: TrackTemplates, included_any_context_neuron_ids=None, use_incremental_sorting:bool=False, enable_pf_peak_indicator_lines:bool=True, **kwargs):
+    def init_templates_debugger(cls, track_templates: TrackTemplates, included_any_context_neuron_ids=None, use_incremental_sorting:bool=False, enable_pf_peak_indicator_lines:bool=True, prepare_for_publication: bool=False, **kwargs):
         """
         long_epoch_name, short_epoch_name, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
         global_spikes_df = deepcopy(curr_active_pipeline.computation_results[global_epoch_name]['computed_data'].pf1D.spikes_df)
@@ -614,8 +625,6 @@ class TemplateDebugger:
         else:
             track_templates: TrackTemplates = directional_laps_results.get_templates(minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz, included_qclu_values=included_qclu_values) # non-shared-only
 
-        
-        
         """
         fignum = kwargs.pop('fignum', None)
         if fignum is not None:
@@ -637,8 +646,13 @@ class TemplateDebugger:
         _out_plots = RenderPlots(name=figure_name, pf1D_heatmaps=None)
         _out_params = VisualizationParameters(name=figure_name, enable_cell_colored_heatmap_rows=enable_cell_colored_heatmap_rows, use_shared_aclus_only_templates=use_shared_aclus_only_templates,
                                              debug_print=debug_print, debug_draw=debug_draw, use_incremental_sorting=use_incremental_sorting, enable_pf_peak_indicator_lines=enable_pf_peak_indicator_lines, included_any_context_neuron_ids=included_any_context_neuron_ids,
-                                             solo_emphasized_aclus=None, **kwargs)
-                
+                                             solo_emphasized_aclus=None, prepare_for_publication=prepare_for_publication, enable_cell_text_labels=True,
+                                             publication_titles = dict(zip(('long_LR', 'long_RL', 'short_LR', 'short_RL'), [html.escape(v) for v in ('Long <', 'Long >', 'Short <', 'Short >')])), 
+                                             **kwargs)
+
+        ## #TODO 2025-07-22 08:33: - [ ] Currently disable cell labels for publication because they'll be too small when scaled down:
+        _out_params.enable_cell_text_labels = (not prepare_for_publication)
+        
         # build the window with the dock widget in it:
         root_dockAreaWindow, app = DockAreaWrapper.build_default_dockAreaWindow(title=f'Pho Directional Template Debugger: {figure_name}', defer_show=False)
         icon = try_get_icon(icon_path=":/Icons/Icons/visualizations/template_1D_debugger.ico")
@@ -649,7 +663,11 @@ class TemplateDebugger:
 
         _out_ui = PhoUIContainer(name=figure_name, app=app, root_dockAreaWindow=root_dockAreaWindow, text_items_dict=None, order_location_lines_dict=None, dock_widgets=None, dock_configs=None, on_update_callback=None)
         
-        root_dockAreaWindow.resize(900, 700)
+        if prepare_for_publication:
+            root_dockAreaWindow.resize(1800, 700)
+        else:
+            root_dockAreaWindow.resize(900, 700)
+            
 
         ## Initialize Class here:
         _obj = cls(plots=_out_plots, plots_data=_out_data, ui=_out_ui, params=_out_params)
@@ -681,46 +699,45 @@ class TemplateDebugger:
     # Saving/Exporting to file ___________________________________________________________________________________________ #
     #TODO 2023-11-16 22:16: - [ ] Figure out how to save
 
-    def save_figure(self): # export_file_base_path: Path = Path(f'output').resolve()
-        """ captures: epochs_editor, _out_pf1D_heatmaps
-
-        TODO: note output paths are currently hardcoded. Needs to add the animal's context at least. Probably needs to be integrated into pipeline.
-        import pyqtgraph as pg
-        import pyqtgraph.exporters
-        from pyphoplacecellanalysis.General.Mixins.ExportHelpers import export_pyqtgraph_plot
+    def save_figure(self, shared_output_file_prefix = f'output/2025-07-21', export_format: str='.svg', export_merged:bool=True) -> Dict[str, Path]: # export_file_base_path: Path = Path(f'output').resolve()
+        """ Exports the four decoder's pf1D heatmaps and a horizontally merged version if desired.
+                
+        export_dict, _merged_svg_output_path = template_debugger.save_figure(shared_output_file_prefix = f'output/2025-07-22')
+        
         """
-        ## Get main laps plotter:
-        # print_keys_if_possible('_out', _out, max_depth=4)
-        # plots = _out['plots']
+        if not export_format.startswith('.'):
+            export_format = f'.{export_format}'
 
-        ## Already have: epochs_editor, _out_pf1D_heatmaps
-        epochs_editor = graphics_output_dict['ui'][0]
-
-        shared_output_file_prefix = f'output/2023-11-20'
-        # print(list(plots.keys()))
-        # pg.GraphicsLayoutWidget
-        main_graphics_layout_widget = epochs_editor.plots.win
-        export_file_path = Path(f'{shared_output_file_prefix}_test_main_position_laps_line_plot').with_suffix('.svg').resolve()
-        export_pyqtgraph_plot(main_graphics_layout_widget, savepath=export_file_path) # works
-
-        _out_pf1D_heatmaps = graphics_output_dict['plots']
+        export_dict = {}    
+        _out_pf1D_heatmaps = self.plots.pf1D_heatmaps
+        # _out_pf1D_heatmaps = graphics_output_dict['plots']
         for a_decoder_name, a_decoder_heatmap_tuple in _out_pf1D_heatmaps.items():
             a_win, a_img = a_decoder_heatmap_tuple
             # a_win.export_image(f'{a_decoder_name}_heatmap.png')
             print(f'a_win: {type(a_win)}')
-
-            # create an exporter instance, as an argument give it the item you wish to export
-            exporter = pg.exporters.ImageExporter(a_win.plotItem)
-            # exporter = pg.exporters.SVGExporter(a_win.plotItem)
-            # set export parameters if needed
-            # exporter.parameters()['width'] = 300   # (note this also affects height parameter)
-
             # save to file
-            export_file_path = Path(f'{shared_output_file_prefix}_test_{a_decoder_name}_heatmap').with_suffix('.png').resolve() # '.svg' # .resolve()
-
-            exporter.export(str(export_file_path)) # '.png'
+            export_file_path = Path(f'{shared_output_file_prefix}_test_{a_decoder_name}_heatmap').with_suffix(export_format).resolve() # '.svg' # .resolve()
+            try:
+                export_pyqtgraph_plot(a_win.plotItem, savepath=export_file_path) # works
+                export_dict[a_decoder_name] = export_file_path
+            except Exception as e:
+                raise
+            
             print(f'exporting to {export_file_path}')
             # .scene()
+        if export_merged:
+            from pyphocorehelpers.plotting.media_output_helpers import SVGHelpers
+
+            try:
+                _merged_svg_output_path: Path = Path(f'{shared_output_file_prefix}_MERGED_heatmap').with_suffix(export_format).resolve()
+                SVGHelpers.concatenate_svgs_horizontally(list(export_dict.values()), _merged_svg_output_path)
+            except Exception as e:
+                raise
+
+            return export_dict, _merged_svg_output_path
+
+        else:
+            return export_dict
 
 
     def _build_internal_callback_functions(self, debug_print: bool = False):
@@ -838,6 +855,7 @@ class TemplateDebugger:
         _out_data.active_pfs_img_extents_dict = deepcopy(img_extents_dict)
         return _out_data
 
+
     # 2023-11-28 - New Sorting using `paired_incremental_sort_neurons` via `paired_incremental_sorting`
     @function_attributes(short_name=None, tags=['buildUI'], input_requires=[], output_provides=[], uses=['visualize_heatmap_pyqtgraph', 'cls._subfn_rebuild_sort_idxs'], used_by=[], creation_date='2024-10-21 19:20', related_items=[])
     @classmethod
@@ -856,17 +874,27 @@ class TemplateDebugger:
         _out_ui.order_location_lines_dict = {}
         
         for i, (a_decoder_name, a_decoder) in enumerate(decoders_dict.items()):
-            if use_incremental_sorting:
-                title_str = f'{a_decoder_name}_pf1Ds [sort: {_out_data.ref_decoder_name}]'
+            if _out_params.prepare_for_publication:
+                a_decoder_title: str = _out_params.publication_titles[a_decoder_name] # a cleaner title like 'Long <'
             else:
-                title_str = f'{a_decoder_name}_pf1Ds'
+                a_decoder_title: str = a_decoder_name ## just the name
+                
+            if use_incremental_sorting:
+                if _out_params.prepare_for_publication:
+                    a_ref_decoder_title: str = _out_params.publication_titles[_out_data.ref_decoder_name] # a cleaner title like 'Long <'
+                else:
+                    a_ref_decoder_title: str = _out_data.ref_decoder_name ## just the name
+                
+                title_str = f'{a_decoder_title} Placefields [sort: {a_ref_decoder_title}]'
+            else:
+                title_str = f'{a_decoder_title} Placefields'            
+
 
             curr_curves = sorted_pf_tuning_curves[i]
             curr_pf_peak_locations = sorted_pf_peak_location_list[i]
             curr_xbins = deepcopy(a_decoder.pf.ratemap.xbin)
             
             _out_plots.pf1D_heatmaps[a_decoder_name] = visualize_heatmap_pyqtgraph(curr_curves, title=title_str, show_value_labels=False, show_xticks=False, show_yticks=False, show_colorbar=False, win=None, defer_show=True) # Sort to match first decoder (long_LR)
-
             # Adds aclu text labels with appropriate colors to y-axis: uses `sorted_shared_sort_neuron_IDs`:
             curr_win, curr_img = _out_plots.pf1D_heatmaps[a_decoder_name] # win, img
             # curr_win.setObjectName(a_decoder_name)
@@ -874,6 +902,13 @@ class TemplateDebugger:
             if _out_params.debug_draw:
                 # Shows the axes if debug_print == true
                 curr_win.showAxes(True)
+                # win.centralWidget.layout.setContentsMargins(0, 0, 0, 0) # left, top, right, bottom
+                
+            if _out_params.prepare_for_publication:
+                curr_vb = curr_img.getViewBox()
+                curr_vb.setBackgroundColor('w')
+                # curr_win.setBackgroundColor('w') # PlotWidget
+                curr_vb.setDefaultPadding(0)
                 
             a_decoder_color_map: Dict = sort_helper_neuron_id_to_neuron_colors_dicts[i] # 34 (n_neurons)
 
@@ -894,19 +929,19 @@ class TemplateDebugger:
             
 
             for cell_i, (aclu, a_color_vector) in enumerate(a_decoder_color_map.items()):
-                # anchor=(1,0) specifies the item's upper-right corner is what setPos specifies. We switch to right vs. left so that they are all aligned appropriately.
-                # text = pg.TextItem(f"{int(aclu)}", color=pg.mkColor(a_color_vector), anchor=(1,0)) # , angle=15
-                text = SelectableTextItem(f"{int(aclu)}", color=pg.mkColor(a_color_vector), anchor=(1,0))
-                text.setPos(-1.0, (cell_i+1)) # the + 1 is because the rows are seemingly 1-indexed?
-                curr_win.addItem(text)
-                _out_ui.text_items_dict[a_decoder_name][aclu] = text # add the TextItem to the map
+                if _out_params.enable_cell_text_labels:
+                    # anchor=(1,0) specifies the item's upper-right corner is what setPos specifies. We switch to right vs. left so that they are all aligned appropriately.
+                    # text = pg.TextItem(f"{int(aclu)}", color=pg.mkColor(a_color_vector), anchor=(1,0)) # , angle=15
+                    text = SelectableTextItem(f"{int(aclu)}", color=pg.mkColor(a_color_vector), anchor=(1,0))
+                    text.setPos(-1.0, (cell_i+1)) # the + 1 is because the rows are seemingly 1-indexed?
+                    curr_win.addItem(text)
+                    _out_ui.text_items_dict[a_decoder_name][aclu] = text # add the TextItem to the map
 
                 # modulate heatmap color for this row (`curr_data[i, :]`):
                 heatmap_base_color = pg.mkColor(a_color_vector)
                 out_colors_row = DataSeriesColorHelpers.qColorsList_to_NDarray([build_adjusted_color(heatmap_base_color, value_scale=v) for v in curr_data[cell_i, :]], is_255_array=False).T # (62, 4)
                 _temp_curr_out_colors_heatmap_image.append(out_colors_row)
                 
-
                 # Add vertical lines
                 if _out_params.enable_pf_peak_indicator_lines:
                     x_offset = curr_pf_peak_locations[cell_i]
@@ -940,13 +975,21 @@ class TemplateDebugger:
 
         ## Setup the Docks: 
         # decoder_names_list = ('long_LR', 'long_RL', 'short_LR', 'short_RL')
+        if _out_params.prepare_for_publication:
+            ## single rows:
+            _dock_positions = (['right'], ['right'], ['right'], ['right'])
+        else:   
+            # two rows:
+            _dock_positions = (['left'], ['bottom'], ['right'], ['right'])
+
+
         _out_ui.dock_widgets = {}
         _out_ui.dock_configs = dict(zip(('long_LR', 'long_RL', 'short_LR', 'short_RL'), (CustomDockDisplayConfig(custom_get_colors_callback_fn=DisplayColorsEnum.Laps.get_LR_dock_colors, showCloseButton=False), CustomDockDisplayConfig(custom_get_colors_callback_fn=DisplayColorsEnum.Laps.get_RL_dock_colors, showCloseButton=False),
                         CustomDockDisplayConfig(custom_get_colors_callback_fn=DisplayColorsEnum.Laps.get_LR_dock_colors, showCloseButton=False), CustomDockDisplayConfig(custom_get_colors_callback_fn=DisplayColorsEnum.Laps.get_RL_dock_colors, showCloseButton=False))))
-        dock_add_locations = dict(zip(('long_LR', 'long_RL', 'short_LR', 'short_RL'), (['left'], ['bottom'], ['right'], ['right'])))
+        dock_add_locations = dict(zip(('long_LR', 'long_RL', 'short_LR', 'short_RL'), _dock_positions))
 
         for i, (a_decoder_name, a_heatmap) in enumerate(_out_plots.pf1D_heatmaps.items()):
-            if (a_decoder_name == 'short_RL'):
+            if (not _out_params.prepare_for_publication) and (a_decoder_name == 'short_RL'):
                 short_LR_dock = _out_ui.root_dockAreaWindow.find_display_dock('short_LR')
                 assert short_LR_dock is not None
                 dock_add_locations['short_RL'] = ['bottom', short_LR_dock]
@@ -975,15 +1018,12 @@ class TemplateDebugger:
         sorted_pf_peak_location_list = _out_data.sorted_pf_peak_location_list
 
         _out_data.included_any_context_neuron_ids = deepcopy(included_neuron_ids)
-
+        
+        
         ## Plot the placefield 1Ds as heatmaps and then wrap them in docks and add them to the window:
         assert _out_plots.pf1D_heatmaps is not None
         for i, (a_decoder_name, a_decoder) in enumerate(decoders_dict.items()):
-            if use_incremental_sorting:
-                title_str = f'{a_decoder_name}_pf1Ds [sort: {_out_data.ref_decoder_name}]'
-            else:
-                title_str = f'{a_decoder_name}_pf1Ds'
-
+            
             curr_curves = sorted_pf_tuning_curves[i]
             curr_pf_peak_locations = sorted_pf_peak_location_list[i]
             curr_xbins = deepcopy(a_decoder.pf.ratemap.xbin)
@@ -1057,12 +1097,13 @@ class TemplateDebugger:
                         ## hide
                         continue
 
-                # Create a new text item:
-                text = SelectableTextItem(f"{int(aclu)}", color=build_adjusted_color(pg.mkColor(a_color_vector), value_scale=value_scale_multiplier, saturation_scale=saturation_scale), anchor=(1,0))
-                # text.setPos(-1.0, (cell_i+1)) # the + 1 is because the rows are seemingly 1-indexed?
-                text.setPos(-1.0, (visible_cell_i+1)) # the + 1 is because the rows are seemingly 1-indexed?
-                curr_win.addItem(text)
-                _out_ui.text_items_dict[a_decoder_name][aclu] = text # add the TextItem to the map
+                if _out_params.enable_cell_text_labels:
+                    # Create a new text item:
+                    text = SelectableTextItem(f"{int(aclu)}", color=build_adjusted_color(pg.mkColor(a_color_vector), value_scale=value_scale_multiplier, saturation_scale=saturation_scale), anchor=(1,0))
+                    # text.setPos(-1.0, (cell_i+1)) # the + 1 is because the rows are seemingly 1-indexed?
+                    text.setPos(-1.0, (visible_cell_i+1)) # the + 1 is because the rows are seemingly 1-indexed?
+                    curr_win.addItem(text)
+                    _out_ui.text_items_dict[a_decoder_name][aclu] = text # add the TextItem to the map
 
                 # modulate heatmap color for this row (`curr_data[i, :]`):
                 heatmap_base_color = pg.mkColor(a_color_vector)

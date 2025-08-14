@@ -3,6 +3,8 @@
 from functools import partial
 import numpy as np
 
+from pyphocorehelpers.programming_helpers import metadata_attributes
+from pyphocorehelpers.function_helpers import function_attributes
 import pyphoplacecellanalysis.External.pyqtgraph as pg
 from pyphoplacecellanalysis.External.pyqtgraph.Qt import QtCore, QtGui, QtWidgets, mkQApp
 
@@ -38,7 +40,7 @@ def build_single_placefield_output_widget(render_config) -> PlacefieldVisualSele
     return curr_widget
 
 
-
+@function_attributes(short_name=None, tags=['widget'], input_requires=[], output_provides=[], uses=[], used_by=['build_batch_interactive_placefield_visibility_controls'], creation_date='2025-06-27 00:59', related_items=[])
 class BatchActionsEndButtonPanelHelper(object):
     """ Enables performing batch actions on the placefields, such as hiding all pfs/spikes, etc.
         Analagous to PlacefieldBatchActionsEndButtonPanel 
@@ -85,6 +87,8 @@ class BatchActionsEndButtonPanelHelper(object):
         if self.debug_logging:
             print('BatchActionsEndButtonPanelHelper.btn_update_active_placefields(...)')
 
+
+@function_attributes(short_name=None, tags=['widget'], input_requires=[], output_provides=[], uses=['BatchActionsEndButtonPanelHelper'], used_by=['build_all_placefield_output_panels'], creation_date='2025-06-27 00:58', related_items=[])
 def build_batch_interactive_placefield_visibility_controls(rootControlsBarWidget, ipcDataExplorer, debug_logging=False):
     """Builds a panel containing a series of widgets that control the spike/placemap/etc visibility for each placecell
 
@@ -263,7 +267,7 @@ def build_batch_interactive_placefield_visibility_controls(rootControlsBarWidget
     return end_button_helper_obj, connections
 
 
-
+@function_attributes(short_name=None, tags=['widget', 'qt'], input_requires=[], output_provides=[], uses=['build_batch_interactive_placefield_visibility_controls'], used_by=[], creation_date='2025-06-27 00:57', related_items=[])
 def build_all_placefield_output_panels(ipcDataExplorer):
     """ Builds the row of custom SingleEditablePlacefieldDisplayConfiguration widgets for each placecell that allow configuring their display
     

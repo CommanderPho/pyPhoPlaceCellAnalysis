@@ -165,13 +165,21 @@ class Ui_LocalMenus_AddRenderable(object):
         self.actionAddTimeCurves_RelativeEntropySurprise = QtWidgets.QAction(LocalMenus_AddRenderable)
         self.actionAddTimeCurves_RelativeEntropySurprise.setObjectName("actionAddTimeCurves_RelativeEntropySurprise")
         self.actionSpike3DLauncher = QtWidgets.QAction(LocalMenus_AddRenderable)
+        icon10 = QtGui.QIcon()
+        icon10.addPixmap(QtGui.QPixmap(":/Graphics/Icons/Icon/LauncherWidget@22w.png"), QtGui.QIcon.Normal, QtGui.QIcon.Off)
+        self.actionSpike3DLauncher.setIcon(icon10)
         self.actionSpike3DLauncher.setObjectName("actionSpike3DLauncher")
         self.actionAddTimeIntervals_NonPBEs = QtWidgets.QAction(LocalMenus_AddRenderable)
         self.actionAddTimeIntervals_NonPBEs.setObjectName("actionAddTimeIntervals_NonPBEs")
         self.actionDecoded_Epoch_Slices_NonPBEs = QtWidgets.QAction(LocalMenus_AddRenderable)
         self.actionDecoded_Epoch_Slices_NonPBEs.setObjectName("actionDecoded_Epoch_Slices_NonPBEs")
+        self.actionAddTimeIntervals_NonPBEEndcaps = QtWidgets.QAction(LocalMenus_AddRenderable)
+        self.actionAddTimeIntervals_NonPBEEndcaps.setObjectName("actionAddTimeIntervals_NonPBEEndcaps")
+        self.actionAddTimeCurves_ThetaPhase = QtWidgets.QAction(LocalMenus_AddRenderable)
+        self.actionAddTimeCurves_ThetaPhase.setObjectName("actionAddTimeCurves_ThetaPhase")
         self.menuAddRenderable_Time_Curves.addAction(self.actionAddTimeCurves_Position)
         self.menuAddRenderable_Time_Curves.addAction(self.actionAddTimeCurves_Velocity)
+        self.menuAddRenderable_Time_Curves.addAction(self.actionAddTimeCurves_ThetaPhase)
         self.menuAddRenderable_Time_Curves.addAction(self.actionAddTimeCurves_Random)
         self.menuAddRenderable_Time_Curves.addAction(self.actionAddTimeCurves_RelativeEntropySurprise)
         self.menuAddRenderable_Time_Curves.addAction(self.actionAddTimeCurves_Custom)
@@ -180,10 +188,11 @@ class Ui_LocalMenus_AddRenderable(object):
         self.menuAddRenderable_Time_Intervals.addAction(self.actionAddTimeIntervals_SessionEpochs)
         self.menuAddRenderable_Time_Intervals.addAction(self.actionAddTimeIntervals_Laps)
         self.menuAddRenderable_Time_Intervals.addAction(self.actionAddTimeIntervals_PBEs)
+        self.menuAddRenderable_Time_Intervals.addAction(self.actionAddTimeIntervals_NonPBEs)
+        self.menuAddRenderable_Time_Intervals.addAction(self.actionAddTimeIntervals_NonPBEEndcaps)
         self.menuAddRenderable_Time_Intervals.addAction(self.actionAddTimeIntervals_Ripples)
         self.menuAddRenderable_Time_Intervals.addAction(self.actionAddTimeIntervals_Replays)
         self.menuAddRenderable_Time_Intervals.addAction(self.actionAddTimeIntervals_Bursts)
-        self.menuAddRenderable_Time_Intervals.addAction(self.actionAddTimeIntervals_NonPBEs)
         self.menuAddRenderable_Time_Intervals.addAction(self.actionAddTimeIntervals_Custom)
         self.menuAddRenderable_Time_Intervals.addSeparator()
         self.menuAddRenderable_Time_Intervals.addAction(self.actionClear_all_Time_Intervals)
@@ -260,6 +269,10 @@ class Ui_LocalMenus_AddRenderable(object):
         self.actionSpike3DLauncher.setText(_translate("LocalMenus_AddRenderable", "Spike3D Launcher"))
         self.actionAddTimeIntervals_NonPBEs.setText(_translate("LocalMenus_AddRenderable", "Non-PBEs"))
         self.actionDecoded_Epoch_Slices_NonPBEs.setText(_translate("LocalMenus_AddRenderable", "Non-PBEs"))
-from pyphoplacecellanalysis.Resources import ActionIcons
-from pyphoplacecellanalysis.Resources import GuiResources
-from pyphoplacecellanalysis.Resources import breeze
+        self.actionAddTimeIntervals_NonPBEEndcaps.setText(_translate("LocalMenus_AddRenderable", "Non-PBE Endcaps (Only)"))
+        self.actionAddTimeCurves_ThetaPhase.setText(_translate("LocalMenus_AddRenderable", "Theta Phase"))
+# from pyphoplacecellanalysis.Resources import ActionIcons_rc
+# from pyphoplacecellanalysis.Resources import GuiResources_rc
+# from pyphoplacecellanalysis.Resources import breeze_rc
+
+from pyphoplacecellanalysis.Resources import GuiResources, ActionIcons, breeze

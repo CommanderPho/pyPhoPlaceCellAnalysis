@@ -2,6 +2,7 @@
 
 """
 from copy import deepcopy
+from typing import Tuple
 import numpy as np
 import pandas as pd
 
@@ -39,7 +40,7 @@ class Render2DEventRectanglesHelper:
         return list(zip(df.t_start, df.series_vertical_offset, df.t_duration, df.series_height, df.pen, df.brush))
         
     @classmethod
-    def build_IntervalRectsItem_from_epoch(cls, epochs: Epoch, dataframe_vis_columns_function, debug_print=False):
+    def build_IntervalRectsItem_from_epoch(cls, epochs: Epoch, dataframe_vis_columns_function, debug_print=False, **kwargs):
         """ Builds an appropriate IntervalRectsItem from any Epoch object and a function that is passed the converted dataframe and adds the visualization specific columns: ['series_vertical_offset', 'series_height', 'pen', 'brush']
         
         Input:
@@ -65,12 +66,12 @@ class Render2DEventRectanglesHelper:
         ## build the output tuple list: fields are (start_t, series_vertical_offset, duration_t, series_height, pen, brush).
         curr_IntervalRectsItem_interval_tuples = cls._build_interval_tuple_list_from_dataframe(active_df)
         ## build the IntervalRectsItem
-        return IntervalRectsItem(curr_IntervalRectsItem_interval_tuples)
+        return IntervalRectsItem(curr_IntervalRectsItem_interval_tuples, **kwargs)
     
     
     # MAIN METHOD to build datasource ____________________________________________________________________________________ #
     @classmethod
-    def build_IntervalRectsItem_from_interval_datasource(cls, interval_datasource: IntervalsDatasource):
+    def build_IntervalRectsItem_from_interval_datasource(cls, interval_datasource: IntervalsDatasource, **kwargs):
         """ Builds an appropriate IntervalRectsItem from any IntervalsDatasource object 
         Input:
             interval_datasource: IntervalsDatasource
@@ -81,7 +82,7 @@ class Render2DEventRectanglesHelper:
         ## build the output tuple list: fields are (start_t, series_vertical_offset, duration_t, series_height, pen, brush).
         curr_IntervalRectsItem_interval_tuples = cls._build_interval_tuple_list_from_dataframe(active_df)
         ## build the IntervalRectsItem
-        return IntervalRectsItem(curr_IntervalRectsItem_interval_tuples)
+        return IntervalRectsItem(curr_IntervalRectsItem_interval_tuples, **kwargs)
     
     
     
@@ -169,9 +170,20 @@ class Render2DEventRectanglesHelper:
             print(f'np.shape(data): {np.shape(data)}') # (25097, 3)
         # np.shape(data): (5412, 6)
         
-        ## build the mesh:
-        active_interval_rects_item = IntervalRectsItem(data)
+        def _custom_format_tooltip_for_rect_data(rect_index: int, rect_data_tuple: Tuple) -> str:
+            """ hover info text tooltip for each epoch in the `IntervalRectsItem`
+            Captures: name 
+            rect_data_tuple = self.data[rect_index]
+            start_t, series_vertical_offset, duration_t, series_height, pen, brush = rect_data_tuple
+            """
+            start_t, series_vertical_offset, duration_t, series_height, pen, brush = rect_data_tuple
+            end_t = start_t + duration_t
+            tooltip_text = f"Burst[{rect_index}]\nStart: {start_t:.3f}\nEnd: {end_t:.3f}\nDuration: {duration_t:.3f}" # The tooltip is set generically here to 'PBEs', 'Replays' or whatever the dataseries name is
+            return tooltip_text
 
+        ## build the mesh:
+        active_interval_rects_item: IntervalRectsItem = IntervalRectsItem(data)
+        active_interval_rects_item._current_hovered_item_tooltip_format_fn = deepcopy(_custom_format_tooltip_for_rect_data) ## TODO: can set a custom tooltip function like this
         ## Add the active_interval_rects_item to the main_plot_widget: 
         main_plot_widget = active_2d_plot.plots.main_plot_widget # PlotItem
         main_plot_widget.addItem(active_interval_rects_item)

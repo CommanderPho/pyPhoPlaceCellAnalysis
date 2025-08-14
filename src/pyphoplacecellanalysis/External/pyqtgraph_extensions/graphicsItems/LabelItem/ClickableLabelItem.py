@@ -64,9 +64,9 @@ class SelectableLabelItem(SelectableItemMixin, pg.LabelItem):
         """ updates the visual displays based on the value of self.is_selected """
         plain_text: str = deepcopy(self.text)
         if self.is_selected:
-            self.setText(plain_text, size='16pt', bold=True) 
+            self.setText(plain_text, size='8pt', bold=True) 
         else:
-            self.setText(plain_text, size='12pt', bold=False) 
+            self.setText(plain_text, size='7pt', bold=False) 
 
 
 

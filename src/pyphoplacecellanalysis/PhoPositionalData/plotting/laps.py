@@ -223,7 +223,7 @@ def plot_laps_2d(sess, legacy_plotting_mode=True, **kwargs):
     pos_df = position_obj.to_dataframe()
     
     curr_laps_df = sess.laps.to_dataframe()
-    fig, out_axes_list = plot_position_curves_figure(position_obj, **(override_dict(dict(include_velocity=True, include_accel=False, figsize=(24, 10)), kwargs))) #include_velocity=True, include_accel=True, figsize=(24, 10))
+    fig, out_axes_list = plot_position_curves_figure(position_obj, **(override_dict(dict(include_velocity=True, include_accel=False, figsize=(24, 10), axes_list=None), kwargs))) #include_velocity=True, include_accel=True, figsize=(24, 10))
 
     ## Draw on top of the existing position curves with the lap colors:
     if legacy_plotting_mode:

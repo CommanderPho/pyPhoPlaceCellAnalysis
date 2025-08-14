@@ -48,6 +48,18 @@ from pyphocorehelpers.function_helpers import function_attributes
 from pyphocorehelpers.assertion_helpers import Assert
 
 
+import functools
+from typing import Callable, TypeVar, Any, get_type_hints
+
+def stage_wrapper_method(func: Callable) -> Callable:
+    """Decorator to create wrapper methods in PipelineWithComputedPipelineStageMixin that delegate to its `self.stage`."""
+    @functools.wraps(func)
+    def wrapper(self, *args, **kwargs):
+        return getattr(self.stage, func.__name__)(*args, **kwargs)
+    return wrapper
+
+
+
 class EvaluationActions(Enum):
     """An enum specifying the available commands that can be performed in the ComputedPipelineStage in regards to computations. Allows generalizing a previously confusing set of functions."""
     EVALUATE_COMPUTATIONS = "evaluate_computations" # replaces .evaluate_computations_for_single_params(...)
@@ -908,6 +920,92 @@ class ComputedPipelineStage(FilterablePipelineStage, LoadedPipelineStage):
                 print(f'done.')
 
 
+    @function_attributes(short_name=None, tags=['dependencies', 'validation', 'computation'], input_requires=[], output_provides=[], uses=['DependencyGraph.resolve_computation_dependencies'], used_by=['.resolve_and_execute_full_required_computation_plan'], creation_date='2025-06-04 07:25', related_items=[])
+    def resolve_full_required_computation_plan(self, active_computation_params=None, enabled_filter_names=None, computation_functions_name_includelist=None, computation_kwargs_list=None, debug_print=False, progress_logger_callback=None) -> List[str]:
+        """ determines the full list of specific computations required to perform a desired specific computation (specified in computation_functions_name_includelist)
+
+        """
+        from pyphoplacecellanalysis.General.Model.SpecificComputationValidation import DependencyGraph
+        from pyphoplacecellanalysis.General.Batch.NonInteractiveProcessing import batch_evaluate_required_computations #, batch_extended_computations
+
+        if progress_logger_callback is None:
+            progress_logger_callback = print
+
+        if enabled_filter_names is None:
+            enabled_filter_names = list(self.filtered_sessions.keys()) # all filters if specific enabled names aren't specified
+
+        has_custom_kwargs_list: bool = False # indicates whether user provided a kwargs list
+        if computation_kwargs_list is None:
+            computation_kwargs_list = [{} for _ in computation_functions_name_includelist]
+        else:
+            has_custom_kwargs_list = np.any([len(x)>0 for x in computation_kwargs_list])
+            # has_custom_kwargs_list = True            
+
+        assert isinstance(computation_kwargs_list, List), f"computation_kwargs_list: Optional<list>: is supposed to be a list of kwargs corresponding to each function name in computation_functions_name_includelist but instead is of type:\n\ttype(computation_kwargs_list): {type(computation_kwargs_list)}"
+        assert len(computation_kwargs_list) == len(computation_functions_name_includelist)
+
+        ## Resolve all required pre-req dependencies to execute this function:
+        ordered_required_dependent_computation_fn_names: List[str] = DependencyGraph.resolve_computation_dependencies(self, target_computation_function_names=computation_functions_name_includelist) # computation_functions_name_includelist = ['directional_decoders_decode_continuous']
+        return ordered_required_dependent_computation_fn_names
+
+
+
+    @function_attributes(short_name=None, tags=['dependencies', 'computation', 'specific', 'validation'], input_requires=[], output_provides=[], uses=['self.resolve_full_required_computation_plan', 'batch_evaluate_required_computations', 'self.perform_specific_computation'], used_by=[], creation_date='2025-06-04 07:45', related_items=[])
+    def resolve_and_execute_full_required_computation_plan(self, active_computation_params=None, enabled_filter_names=None, computation_functions_name_includelist=None, computation_kwargs_list=None, fail_on_exception:bool=False, debug_print=False, progress_logger_callback=None):
+
+        """ determines the full list of specific computations required to perform a desired specific computation (specified in computation_functions_name_includelist) AND THEN PERFORMS all the required functions in a minimally destructive manner using the previously recomputed results 
+
+        Updates:
+            curr_active_pipeline.computation_results
+            curr_active_pipeline.global_computation_results
+        """
+        from pyphoplacecellanalysis.General.Model.SpecificComputationValidation import DependencyGraph
+        from pyphoplacecellanalysis.General.Batch.NonInteractiveProcessing import batch_evaluate_required_computations #, batch_extended_computations
+
+        if progress_logger_callback is None:
+            progress_logger_callback = print
+
+        if enabled_filter_names is None:
+            enabled_filter_names = list(self.filtered_sessions.keys()) # all filters if specific enabled names aren't specified
+
+        has_custom_kwargs_list: bool = False # indicates whether user provided a kwargs list
+        if computation_kwargs_list is None:
+            computation_kwargs_list = [{} for _ in computation_functions_name_includelist]
+        else:
+            has_custom_kwargs_list = np.any([len(x)>0 for x in computation_kwargs_list])
+            # has_custom_kwargs_list = True            
+
+        assert isinstance(computation_kwargs_list, List), f"computation_kwargs_list: Optional<list>: is supposed to be a list of kwargs corresponding to each function name in computation_functions_name_includelist but instead is of type:\n\ttype(computation_kwargs_list): {type(computation_kwargs_list)}"
+        assert len(computation_kwargs_list) == len(computation_functions_name_includelist)
+
+        # Determine the whole plan ___________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
+        ## Resolve all required pre-req dependencies to execute this function:
+        ordered_required_dependent_computation_fn_names: List[str] = self.resolve_full_required_computation_plan(active_computation_params=active_computation_params, enabled_filter_names=enabled_filter_names, computation_functions_name_includelist=computation_functions_name_includelist, computation_kwargs_list=computation_kwargs_list, debug_print=debug_print, progress_logger_callback=progress_logger_callback)
+        if debug_print:
+            progress_logger_callback(f'\tordered_required_dependent_computation_fn_names: {ordered_required_dependent_computation_fn_names}')
+
+        if len(ordered_required_dependent_computation_fn_names) > 0:
+            needs_computation_output_dict, valid_computed_results_output_list, remaining_required_dep_comp_fn_names = batch_evaluate_required_computations(self, include_includelist=ordered_required_dependent_computation_fn_names, include_global_functions=True, fail_on_exception=fail_on_exception, progress_print=True,
+                                                                force_recompute=False, force_recompute_override_computations_includelist=[], debug_print=False)
+
+        ## OUTPUTS: needs_computation_output_dict
+        if len(remaining_required_dep_comp_fn_names) > 0:
+            if debug_print:
+                progress_logger_callback(f'\thave {len(remaining_required_dep_comp_fn_names)} functions to compute: {remaining_required_dep_comp_fn_names}. Performing specific computations: ....')
+
+            self.perform_specific_computation(computation_functions_name_includelist=remaining_required_dep_comp_fn_names, computation_kwargs_list=computation_kwargs_list, enabled_filter_names=None, fail_on_exception=True, debug_print=False)
+            if debug_print:
+                progress_logger_callback(f'done.')
+
+            return
+
+        else:
+            if debug_print:
+                progress_logger_callback(f'\tno computations required, have all required keys!')
+            return
+
+
+
     @function_attributes(short_name=None, tags=['computation', 'specific', 'parallel', 'embarassingly-paralell'], input_requires=[], output_provides=[], uses=['run_specific_computations_single_context', 'cls._build_initial_computationResult'], used_by=[], creation_date='2023-07-21 18:21', related_items=[])
     def perform_specific_computation(self, active_computation_params=None, enabled_filter_names=None, computation_functions_name_includelist=None, computation_kwargs_list=None, fail_on_exception:bool=False, debug_print=False, progress_logger_callback=None, enable_parallel: bool=False):
         """ perform a specific computation (specified in computation_functions_name_includelist) in a minimally destructive manner using the previously recomputed results:
@@ -1490,8 +1588,6 @@ class ComputedPipelineStage(FilterablePipelineStage, LoadedPipelineStage):
                         if needs_compute:
                             needs_computation_output_dict[_comp_specifier.short_name] = _comp_specifier.computation_precidence
 
-                            
-
                     ## ENDIF is_global
                             
                     ## remove from the found name from the list of remaining function names
@@ -2069,6 +2165,11 @@ class PipelineWithComputedPipelineStageMixin:
             ## recompute:
             for k, v in dependent_validators.items():
                 v.try_remove_provided_keys(curr_active_pipeline=self)
+                fcn_kwargs = {}
+                if k == 'perform_rank_order_shuffle_analysis':
+                    fcn_kwargs = dict(included_qclu_values=deepcopy(included_qclu_values), minimum_inclusion_fr_Hz=deepcopy(minimum_inclusion_fr_Hz), num_shuffles=256)
+                    
+                v.computation_fn_kwargs = (v.computation_fn_kwargs | deepcopy(fcn_kwargs))
                 v.try_computation_if_needed(curr_active_pipeline=self, computation_filter_name=None)
                 # remaining_comp_specifiers_dict, dependent_validators, provided_global_keys = SpecificComputationValidator.find_immediate_dependencies(remaining_comp_specifiers_dict=v, provided_global_keys=provided_global_keys)
                 # provided_global_keys
@@ -2293,12 +2394,21 @@ class PipelineWithComputedPipelineStageMixin:
         return self.sess.spikes_df.spikes.extract_unique_neuron_identities()
 
 
-
-    # @property
-    def get_output_manager(self) -> FileOutputManager:
+    def get_output_manager(self, figure_output_location: Optional[FigureOutputLocation]=None, context_to_path_mode=ContextToPathMode.HIERARCHY_UNIQUE, override_output_parent_path: Optional[Path]=None) -> FileOutputManager:
         """ returns the FileOutputManager that specifies where outputs are stored. """
+        if override_output_parent_path is not None:
+            ## custom path
+            if (figure_output_location is not None):
+                assert (figure_output_location.value == FigureOutputLocation.CUSTOM.value), f"if override_output_parent_path is not None (override_output_parent_path: '{override_output_parent_path}', figure_output_location better be CUSTOM but it was specified as figure_output_location: {figure_output_location}."
+            
+            figure_output_location = FigureOutputLocation.CUSTOM ## Override to custom either way
+        else:
+            ## default when no custom path provide
+            figure_output_location = FigureOutputLocation.DAILY_PROGRAMMATIC_OUTPUT_FOLDER
+            
         # return FileOutputManager(figure_output_location=FigureOutputLocation.DAILY_PROGRAMMATIC_OUTPUT_FOLDER, context_to_path_mode=ContextToPathMode.GLOBAL_UNIQUE)
-        return FileOutputManager(figure_output_location=FigureOutputLocation.DAILY_PROGRAMMATIC_OUTPUT_FOLDER, context_to_path_mode=ContextToPathMode.HIERARCHY_UNIQUE)
+        return FileOutputManager(figure_output_location=figure_output_location, context_to_path_mode=context_to_path_mode, override_output_parent_path=override_output_parent_path)
+
 
     def get_computation_times(self, debug_print=False):
         return self.stage.get_computation_times(debug_print=debug_print)
@@ -2897,6 +3007,10 @@ class PipelineWithComputedPipelineStageMixin:
         
         Actually updates `self.global_computation_results.computation_config`
         
+        Usage:
+            layout, _master_params_dict = curr_active_pipeline.get_all_parameters(allow_update_global_computation_config=False, get_panel_gui_widget=True)
+            layout
+
         """
         from benedict import benedict
         from neuropy.core.parameters import ParametersContainer
@@ -2917,13 +3031,16 @@ class PipelineWithComputedPipelineStageMixin:
             curr_global_param_typed_parameters: ComputationKWargParameters = self.global_computation_results.computation_config
             
 
+        _master_params_dict = {}
+        _master_params_dict['preprocessing'] = preprocessing_parameters.to_dict()
+        _master_params_dict.update(curr_global_param_typed_parameters.to_dict())
+        _master_params_dict = benedict(_master_params_dict)
+
+
         if not get_panel_gui_widget:
             ## Ensured that we have a valid `curr_global_param_typed_parameters` that was created with the kwarg defaults if it didn't exist.
             #TODO 2024-10-23 06:45: - [ ] What about when a config was created and then later new kwarg values were added to a computation function, or the default values were updated?
-            _master_params_dict = {}
-            _master_params_dict['preprocessing'] = preprocessing_parameters.to_dict()
-            _master_params_dict.update(curr_global_param_typed_parameters.to_dict())
-            
+
             # if self.global_computation_results.computation_config is not None:
             #     curr_global_param_typed_parameters: ComputationKWargParameters = deepcopy(self.global_computation_results.computation_config)
             #     _master_params_dict.update(curr_global_param_typed_parameters.to_dict())
@@ -2948,7 +3065,7 @@ class PipelineWithComputedPipelineStageMixin:
             #  '_perform_specific_epochs_decoding': {'decoder_ndim': 2, 'filter_epochs': 'ripple', 'decoding_time_bin_size': 0.02},
             #  '_DEP_ratemap_peaks': {'peak_score_inclusion_percent_threshold': 0.25},
             #  'ratemap_peaks_prominence2d': {'step': 0.01, 'peak_height_multiplier_probe_levels': (0.5, 0.9), 'minimum_included_peak_height': 0.2, 'uniform_blur_size': 3, 'gaussian_blur_sigma': 3}}
-            return benedict(_master_params_dict)
+            return _master_params_dict
 
         else:
             ## get_panel_gui_widget
@@ -2973,7 +3090,7 @@ class PipelineWithComputedPipelineStageMixin:
             # style = {"transform": "scale(0.5)", "transform-origin": "top left"}
             # styles_kwargs = dict(styles=style, sizing_mode="fixed")
             layout = pn.Column(*[pn.Param(a_sub_v) for a_sub_v in reversed(out_configs_dict.values())], **styles_kwargs)
-            return layout
+            return layout, _master_params_dict
 
 
         # ## OUTPUTS: param_typed_parameters
@@ -3378,3 +3495,84 @@ class PipelineWithComputedPipelineStageMixin:
         """
         return self.stage.batch_extended_computations(include_includelist=include_includelist, included_computation_filter_names=included_computation_filter_names, include_global_functions=include_global_functions, fail_on_exception=fail_on_exception, progress_print=progress_print, debug_print=debug_print, force_recompute=force_recompute, force_recompute_override_computations_includelist=force_recompute_override_computations_includelist, computation_kwargs_dict=computation_kwargs_dict, dry_run=dry_run)
 
+
+
+    # Your new methods with the decorator
+    @stage_wrapper_method
+    def resolve_full_required_computation_plan(self, *args, **kwargs):
+        """This will be replaced by the decorator but preserves docstring and signature"""
+        pass
+
+    @stage_wrapper_method
+    def resolve_and_execute_full_required_computation_plan(self, *args, **kwargs):
+        """This will be replaced by the decorator but preserves docstring and signature"""
+        pass
+
+
+    @function_attributes(short_name=None, tags=['laps', 'update', 'session', 'TODO', 'UNFINISHED'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-01-13 15:45', related_items=[])
+    def override_laps(self, override_laps_df: pd.DataFrame, debug_print=False) -> bool:
+        """
+        overrides the laps
+
+        Usage:
+
+            from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import override_laps
+
+            override_laps_df: Optional[pd.DataFrame] = UserAnnotationsManager.get_hardcoded_laps_override_dict().get(curr_active_pipeline.get_session_context(), None)
+            if override_laps_df is not None:
+                print(f'overriding laps....')
+                display(override_laps_df)
+                did_laps_change = curr_active_pipeline.override_laps(override_laps_df=override_laps_df)
+
+
+
+        """
+        from neuropy.core.laps import Laps, LapsAccessor
+        did_any_change: bool = False
+
+        t_start, t_delta, t_end = self.find_LongShortDelta_times()
+        laps_df_comparison_column_names = ['start', 'stop']
+        
+        ## Load the custom laps
+        if debug_print:
+            print(f'override_laps_df: {override_laps_df}')
+            
+        # override_laps_df = override_laps_df.laps_accessor.get_valid_laps_epochs_df(rebuild_lap_id_columns=True)
+        override_laps_df = override_laps_df.laps_accessor.filter_to_valid()
+        # curr_laps_df = Laps._compute_lap_dir_from_smoothed_velocity(laps_df=curr_laps_df, global_session=global_session, replace_existing=True)
+        override_laps_df = override_laps_df.laps_accessor.compute_lap_dir_from_net_displacement(global_session=self.sess)
+        override_laps_df = Laps._update_dataframe_computed_vars(laps_df=override_laps_df, t_start=t_start, t_delta=t_delta, t_end=t_end, global_session=self.sess, replace_existing=False)
+        override_laps_obj = Laps(laps=override_laps_df, metadata=None).filter_to_valid()
+        ## OUTPUTS: override_laps_obj
+
+        _original_laps = deepcopy(self.sess.laps.to_dataframe())
+        did_any_change |= np.any(_original_laps[laps_df_comparison_column_names].to_numpy() != override_laps_obj.to_dataframe()[laps_df_comparison_column_names].to_numpy()) ## update did_any_Change
+
+        self.sess.laps = deepcopy(override_laps_obj)
+
+        # curr_active_pipeline.sess.laps_df = override_laps_df
+        self.sess.compute_position_laps()
+
+        # curr_active_pipeline.sess = curr_active_pipeline.sess
+        # a_pf1D_dt.replacing_computation_epochs(epochs=override_laps_df)
+
+        for a_filtered_context_name, a_filtered_context in self.filtered_contexts.items():
+            ## current session
+            a_filtered_epoch = self.filtered_epochs[a_filtered_context_name]
+            filtered_sess = self.filtered_sessions[a_filtered_context_name]
+            if debug_print:
+                print(f'a_filtered_context_name: {a_filtered_context_name}, a_filtered_context: {a_filtered_context}')
+            # override_laps_obj.filter_to_valid()
+            a_filtered_override_laps_obj: Laps = deepcopy(override_laps_obj).time_slice(t_start=filtered_sess.t_start, t_stop=filtered_sess.t_stop)
+            # a_filtered_context.lap_dir
+            
+            _curr_original_laps = deepcopy(filtered_sess.laps.to_dataframe())
+            did_any_change |= np.any(_curr_original_laps[laps_df_comparison_column_names].to_numpy() != a_filtered_override_laps_obj.to_dataframe()[laps_df_comparison_column_names].to_numpy()) ## update did_any_Change
+            
+            filtered_sess.laps = deepcopy(a_filtered_override_laps_obj)
+            filtered_sess.compute_position_laps()
+            if debug_print:
+                print(f'\tupdated.')
+
+
+        return did_any_change

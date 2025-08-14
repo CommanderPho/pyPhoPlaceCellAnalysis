@@ -6,6 +6,8 @@ from attrs import define, field, Factory
 from ..Qt import QtCore, QtGui, QtWidgets
 from ..widgets.VerticalLabel import VerticalLabel
 from .DockDrop import DockDrop
+from pyphocorehelpers.gui.Qt.connections_container import ConnectionsContainer
+
 
 def debug_widget_geometry(a_widget, widget_name="Unknown"):
     """Print comprehensive debug information about a DockLabel to diagnose layout issues."""
@@ -79,9 +81,12 @@ def debug_print_dock(a_dock, widget_name="Unknown"):
 class DockDisplayConfig(object):
     """Holds the display and configuration options for a Dock, such as how to format its title bar (color and font), whether it's closable, etc."""
     showCloseButton: bool = field(default=True)
-    showCollapseButton: bool = field(default=False)
+    showCollapseButton: bool = field(default=True)
     showGroupButton: bool = field(default=False)
     showOrientationButton: bool = field(default=False)
+    showTimelineSyncModeButton: bool = field(default=True)
+    # showCustomButtons: Dict[str, bool] = field(default=Factory(dict))
+    
     
     hideTitleBar: bool = field(default=False)
     fontSize: str = field(default='10px')
@@ -180,6 +185,7 @@ class DockDisplayConfig(object):
     
 buttonIconOrientation = {'horizontal': QtWidgets.QStyle.StandardPixmap.SP_ToolBarHorizontalExtensionButton, 'vertical': QtWidgets.QStyle.StandardPixmap.SP_ToolBarVerticalExtensionButton}
 buttonIconShade = {'shade': QtWidgets.QStyle.StandardPixmap.SP_TitleBarShadeButton, 'unshade': QtWidgets.QStyle.StandardPixmap.SP_TitleBarUnshadeButton}
+buttonIconTimelineSyncMode = {'to_global_data': QtWidgets.QStyle.StandardPixmap.SP_FileDialogContentsView, 'Generic': QtWidgets.QStyle.StandardPixmap.SP_FileDialogDetailedView}
 
 
 
@@ -196,6 +202,7 @@ class Dock(QtWidgets.QWidget, DockDrop):
     sigCollapseClicked = QtCore.Signal(object)
     sigGroupClicked = QtCore.Signal(object)
     sigToggleOrientationClicked = QtCore.Signal(object, bool)
+    sigToggleTimelineSyncModeClicked = QtCore.Signal(object, bool)
     
 
     @property
@@ -216,6 +223,7 @@ class Dock(QtWidgets.QWidget, DockDrop):
         self._container = None
         self._name = name
         self.area = area
+        self.connections = ConnectionsContainer()
         # self.label = DockLabel(name, self, closable, fontSize)
         
         if display_config is None:
@@ -237,8 +245,12 @@ class Dock(QtWidgets.QWidget, DockDrop):
             self.label.sigGroupClicked.connect(self.on_group_btn_clicked)
         if display_config.showOrientationButton:
             self.label.sigToggleOrientationClicked.connect(self.on_orientation_btn_toggled)
+        if display_config.showTimelineSyncModeButton:
+            self.label.sigToggleTimelineSyncModeClicked.connect(self.on_sync_mode_btn_toggled)
+            
+
         # Add this line to connect the new rename signal
-        self.label.sigRenamed.connect(self.on_renamed)
+        self.connections['on_renamed'] = self.label.sigRenamed.connect(self.on_renamed)
         
         self.contentsHidden = False
         self.labelHidden = False
@@ -329,6 +341,20 @@ class Dock(QtWidgets.QWidget, DockDrop):
     def stretch(self):
         return self._stretch
 
+
+
+    def toggleTitleBarVisibility(self):
+        """ toggles the visibility of the titlebar for this Dock.
+        """
+        new_is_hidden: bool = (not self.labelHidden)
+        if new_is_hidden:
+            ## now hidden
+            self.hideTitleBar()
+        else:
+            ## now visible
+            self.showTitleBar()
+
+
     def hideTitleBar(self):
         """
         Hide the title bar for this Dock.
@@ -360,10 +386,6 @@ class Dock(QtWidgets.QWidget, DockDrop):
         self.restoreTitleButton.show()
         self.restoreTitleButton.raise_()
         
-
-
-
-
     def showTitleBar(self):
         """
         Show the title bar for this Dock.
@@ -376,6 +398,7 @@ class Dock(QtWidgets.QWidget, DockDrop):
         # Hide the restore button if it exists
         if hasattr(self, 'restoreTitleButton'):
             self.restoreTitleButton.hide()
+
 
 
     def toggleContentVisibility(self):
@@ -586,7 +609,24 @@ class Dock(QtWidgets.QWidget, DockDrop):
         
         icon = QtWidgets.QApplication.style().standardIcon(new_icon_name)
         self.label.orientationButton.setIcon(icon)
-        self.sigToggleOrientationClicked.emit(self)
+        self.sigToggleOrientationClicked.emit(self, is_checked)
+        
+
+    def on_sync_mode_btn_toggled(self, is_checked):
+        """Remove this dock from the DockArea it lives inside."""
+        # from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.SpikeRasterWidgets.Spike2DRaster import SynchronizedPlotMode
+        
+        if is_checked:
+            print(f'changing to TO_GLOBAL_DATA ("to_global_data").')
+            new_icon_name = buttonIconTimelineSyncMode['to_global_data']
+        else:
+            print(f'changing to TO_WINDOW ("Generic")')
+            new_icon_name = buttonIconTimelineSyncMode['Generic']
+        
+        icon = QtWidgets.QApplication.style().standardIcon(new_icon_name)
+        self.label.timelineSyncModeButton.setIcon(icon)
+        self.sigToggleTimelineSyncModeClicked.emit(self, is_checked)
+
         
 
     # ==================================================================================================================== #
@@ -605,9 +645,15 @@ class Dock(QtWidgets.QWidget, DockDrop):
         menu = QtWidgets.QMenu()
         
         # Create standard actions
-        showTitleAction = menu.addAction("Show title bar")
-        showTitleAction.triggered.connect(self.showTitleBar)
+
+
+        toggleTitleBarAction = menu.addAction("Toggle title bar")
+        toggleTitleBarAction.triggered.connect(self.toggleTitleBarVisibility)
+
         menu.addSeparator()
+
+        copyIdentifierToClipboardAction = menu.addAction("Copy dock identifier")
+        copyIdentifierToClipboardAction.triggered.connect(lambda: QtWidgets.QApplication.clipboard().setText(self.name()))
 
         renameAction = menu.addAction("Rename dock...")
         renameAction.triggered.connect(lambda: self.label.promptRename())
@@ -648,6 +694,13 @@ class Dock(QtWidgets.QWidget, DockDrop):
         showOrientationAction.setCheckable(True)
         showOrientationAction.setChecked(self.config.showOrientationButton)
         showOrientationAction.toggled.connect(lambda checked: self.updateButtonVisibility('orientation', checked))
+        
+
+        # Orientation button toggle
+        showTimelineSyncModeButtonAction = buttonVisibilityMenu.addAction("Timeline Sync Mode button")
+        showTimelineSyncModeButtonAction.setCheckable(True)
+        showTimelineSyncModeButtonAction.setChecked(self.config.showTimelineSyncModeButton)
+        showTimelineSyncModeButtonAction.toggled.connect(lambda checked: self.updateButtonVisibility('timeline_sync_mode', checked))
         
         # Add visibility options
         collapseAction = menu.addAction("Toggle content visibility")
@@ -703,7 +756,9 @@ class Dock(QtWidgets.QWidget, DockDrop):
             self.config.showGroupButton = visible
         elif button_type == 'orientation':
             self.config.showOrientationButton = visible
-        
+        elif button_type == 'timeline_sync_mode':
+            self.config.showTimelineSyncModeButton = visible            
+
         # Update the buttons in the UI
         self.label.updateButtonsFromConfig()
     
@@ -794,7 +849,9 @@ class DockLabel(VerticalLabel):
     sigCollapseClicked = QtCore.Signal()
     sigGroupClicked = QtCore.Signal()
     sigToggleOrientationClicked = QtCore.Signal(bool)
+    sigToggleTimelineSyncModeClicked = QtCore.Signal(bool)
     
+
     sigContextMenuRequested = QtCore.Signal(object, object)  # Emits dock label and QPoint
     sigRenamed = QtCore.Signal(object, str)  # Emits dock and new name
     
@@ -827,13 +884,15 @@ class DockLabel(VerticalLabel):
         self.closeButton.setIcon(QtWidgets.QApplication.style().standardIcon(QtWidgets.QStyle.StandardPixmap.SP_TitleBarCloseButton))
         self.closeButton.setMinimumSize(MIN_BUTTON_SIZE, MIN_BUTTON_SIZE)
         self.closeButton.setFixedSize(MIN_BUTTON_SIZE, MIN_BUTTON_SIZE)
-        
+        self.closeButton.setToolTip("Close dock")
+
         # Create collapse button
         self.collapseButton = QtWidgets.QToolButton(self)
         self.collapseButton.clicked.connect(self.sigCollapseClicked)
         self.collapseButton.setIcon(QtWidgets.QApplication.style().standardIcon(QtWidgets.QStyle.StandardPixmap.SP_TitleBarMinButton))
         self.collapseButton.setMinimumSize(MIN_BUTTON_SIZE, MIN_BUTTON_SIZE)
         self.collapseButton.setFixedSize(MIN_BUTTON_SIZE, MIN_BUTTON_SIZE)
+        self.collapseButton.setToolTip("Collapse dock")
         
         # Create group button
         self.groupButton = QtWidgets.QToolButton(self)
@@ -841,7 +900,9 @@ class DockLabel(VerticalLabel):
         self.groupButton.setIcon(QtWidgets.QApplication.style().standardIcon(QtWidgets.QStyle.StandardPixmap.SP_FileDialogListView))
         self.groupButton.setMinimumSize(MIN_BUTTON_SIZE, MIN_BUTTON_SIZE)
         self.groupButton.setFixedSize(MIN_BUTTON_SIZE, MIN_BUTTON_SIZE)
+        self.groupButton.setToolTip("Change dock Group")
         
+
         # Create orientation button
         self.orientationButton = QtWidgets.QToolButton(self)
         self.orientationButton.setCheckable(True)
@@ -849,6 +910,18 @@ class DockLabel(VerticalLabel):
         self.orientationButton.setIcon(QtWidgets.QApplication.style().standardIcon(QtWidgets.QStyle.StandardPixmap.SP_ToolBarHorizontalExtensionButton))
         self.orientationButton.setMinimumSize(MIN_BUTTON_SIZE, MIN_BUTTON_SIZE)
         self.orientationButton.setFixedSize(MIN_BUTTON_SIZE, MIN_BUTTON_SIZE)
+        self.orientationButton.setToolTip("Change dock Orientation")
+        
+
+        # Create orientation button
+        self.timelineSyncModeButton = QtWidgets.QToolButton(self)
+        self.timelineSyncModeButton.setCheckable(True)
+        self.timelineSyncModeButton.toggled.connect(self.sigToggleTimelineSyncModeClicked)
+        self.timelineSyncModeButton.setIcon(QtWidgets.QApplication.style().standardIcon(QtWidgets.QStyle.StandardPixmap.SP_FileDialogDetailedView))
+        self.timelineSyncModeButton.setMinimumSize(MIN_BUTTON_SIZE, MIN_BUTTON_SIZE)
+        self.timelineSyncModeButton.setFixedSize(MIN_BUTTON_SIZE, MIN_BUTTON_SIZE)
+        self.timelineSyncModeButton.setToolTip("Change Track's Timeline Sync Mode")
+
         
         # Set initial visibility based on config
         self.updateButtonsFromConfig()
@@ -865,12 +938,14 @@ class DockLabel(VerticalLabel):
         self.collapseButton.setVisible(self.config.showCollapseButton)
         self.groupButton.setVisible(self.config.showGroupButton)
         self.orientationButton.setVisible(self.config.showOrientationButton)
+        self.timelineSyncModeButton.setVisible(self.config.showTimelineSyncModeButton)
         
         # Update count of buttons
         self.num_total_title_bar_buttons = (int(self.config.showCloseButton) + 
                                         int(self.config.showCollapseButton) + 
                                         int(self.config.showGroupButton) +
-                                        int(self.config.showOrientationButton))
+                                        int(self.config.showOrientationButton) +
+                                        int(self.config.showTimelineSyncModeButton))
         
         # Force a resize to update button positions
         self.updateGeometry()
@@ -943,7 +1018,7 @@ class DockLabel(VerticalLabel):
         current_y = 0  # Track vertical positioning for buttons in vertical layout
 
         # Calculate button sizes and positions
-        if self.closeButton or self.collapseButton or self.groupButton:
+        if self.closeButton or self.collapseButton or self.orientationButton or self.groupButton or self.timelineSyncModeButton:
             if self.orientation == 'vertical':
                 ## sideways mode with bar on left
                 button_size = ev.size().width()
@@ -988,6 +1063,7 @@ class DockLabel(VerticalLabel):
             if self.orientation == 'vertical':
                 ## sideways mode with bar on left
                 self.orientationButton.move(0, current_y)
+                current_y += button_size
             else:
                 ## regular mode with bar on top
                 # button_x = ((ev.size().width() - button_size) - current_x) ## right aligned
@@ -1002,6 +1078,7 @@ class DockLabel(VerticalLabel):
             if self.orientation == 'vertical':
                 ## sideways mode with bar on left
                 self.groupButton.move(0, current_y)
+                current_y += button_size
             else:
                 ## regular mode with bar on top
                 # button_x = ((ev.size().width() - button_size) - current_x) ## right aligned
@@ -1009,6 +1086,23 @@ class DockLabel(VerticalLabel):
                 self.groupButton.move(button_x, 0)
                 current_x += button_size
         ## END if self.groupButton...   
+        
+
+        # Position timelineSyncModeButton if it exists
+        if self.timelineSyncModeButton:
+            self.timelineSyncModeButton.setFixedSize(QtCore.QSize(button_size, button_size))
+            if self.orientation == 'vertical':
+                ## sideways mode with bar on left
+                self.timelineSyncModeButton.move(0, current_y)
+                current_y += button_size
+            else:
+                ## regular mode with bar on top
+                # button_x = ((ev.size().width() - button_size) - current_x) ## right aligned
+                button_x = current_x ## left aligned
+                self.timelineSyncModeButton.move(button_x, 0)
+                current_x += button_size
+        ## END if self.timelineSyncModeButton...   
+
         
         ## See how much space is left for the text label after subtracting away the buttons:
         button_occupied_space = ((button_size if button_size else 0) * num_total_title_bar_buttons)

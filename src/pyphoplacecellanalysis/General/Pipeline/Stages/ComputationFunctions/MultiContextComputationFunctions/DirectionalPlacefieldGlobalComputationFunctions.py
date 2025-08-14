@@ -27,8 +27,9 @@ from pyphocorehelpers.print_helpers import strip_type_str_to_classname
 from pyphocorehelpers.exception_helpers import ExceptionPrintingContext
 from neuropy.utils.indexing_helpers import NumpyHelpers
 from pyphocorehelpers.assertion_helpers import Assert
+from pyphocorehelpers.indexing_helpers import reorder_columns_relative
 
-from neuropy.core.laps import Laps # used in `DirectionalLapsHelpers`
+from neuropy.core.laps import Laps, LapsAccessor # used in `DirectionalLapsHelpers`
 from neuropy.utils.result_context import IdentifyingContext
 from neuropy.utils.dynamic_container import DynamicContainer
 from neuropy.utils.mixins.dict_representable import override_dict # used to build config
@@ -39,7 +40,9 @@ from neuropy.utils.indexing_helpers import union_of_arrays # `paired_incremental
 from neuropy.utils.mixins.AttrsClassHelpers import AttrsBasedClassHelperMixin, custom_define, serialized_field, serialized_attribute_field, non_serialized_field, keys_only_repr
 from neuropy.utils.mixins.HDF5_representable import HDFMixin
 from neuropy.utils.indexing_helpers import PandasHelpers, NumpyHelpers, flatten
- 
+from neuropy.utils.misc import capitalize_after_underscore
+from neuropy.utils.mixins.binning_helpers import get_bin_centers
+
 from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import BasePositionDecoder # used for `complete_directional_pfs_computations`
 from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import DecodedFilterEpochsResult # needed in DirectionalPseudo2DDecodersResult
 from pyphoplacecellanalysis.General.Model.ComputationResults import ComputedResult
@@ -266,7 +269,7 @@ class TrackTemplates(HDFMixin, AttrsBasedClassHelperMixin):
         """
         # drop_aclu_if_missing_long_or_short: bool = True ## default=True; Drop entire row if either long/short is missing a value
         # drop_aclu_if_missing_long_or_short: bool = False
-        from neuropy.utils.indexing_helpers import intersection_of_arrays, union_of_arrays
+        # from neuropy.utils.indexing_helpers import intersection_of_arrays, union_of_arrays
         from neuropy.utils.indexing_helpers import unwrap_single_item
 
 
@@ -323,6 +326,7 @@ class TrackTemplates(HDFMixin, AttrsBasedClassHelperMixin):
         # OUTPUTS: LR_only_decoder_aclu_MAX_peak_maps_df, RL_only_decoder_aclu_MAX_peak_maps_df
         return (LR_only_decoder_aclu_MAX_peak_maps_df, RL_only_decoder_aclu_MAX_peak_maps_df), AnyDir_decoder_aclu_MAX_peak_maps_df
 
+
     ## WARNING 2024-02-07 - The following all use .peak_tuning_curve_center_of_masses: .get_decoder_aclu_peak_maps, get_decoder_aclu_peak_map_dict, get_decoder_aclu_peak_map_dict
     @function_attributes(short_name=None, tags=[''], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-02-06 00:00', related_items=[])
     def get_long_short_decoder_shifts(self):
@@ -375,6 +379,89 @@ class TrackTemplates(HDFMixin, AttrsBasedClassHelperMixin):
     @function_attributes(short_name=None, tags=[''], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-02-06 00:00', related_items=[])
     def get_decoder_aclu_peak_map_dict(self, peak_mode='CoM') -> Dict[decoder_name_str, Dict]:
         return dict(zip(self.get_decoder_names(), self.get_decoder_aclu_peak_maps(peak_mode=peak_mode)))
+
+    @function_attributes(short_name=None, tags=['n_spikes', 'LxC', 'SxC', 'cell_exclusivity', 'XxC'], input_requires=[], output_provides=[], uses=[], used_by=['compute_and_export_session_extended_placefield_peak_information_completion_function', 'determine_quant_cell_eXclusivities'], creation_date='2025-07-08 06:03', related_items=[])
+    @classmethod
+    def perform_determine_quant_cell_eXclusivities(cls, track_templates: "TrackTemplates", cell_LS_eXclusivity_threshold: bool = 0.85, cell_LS_fr_percent_change_eXclusivity_threshold: bool = 8.0) -> Tuple[pd.DataFrame, Tuple[pd.DataFrame, pd.DataFrame]]:
+        """ Uses the total number of spikes fired during laps for each decoder to determine quantitative/objective cell exclusivity thresholds
+
+        Columns:
+            ['aclu', 'long_LR_n_spikes', 'long_RL_n_spikes', 'short_LR_n_spikes', 'short_RL_n_spikes', 'long_n_spikes', 'short_n_spikes', 'total_n_spikes', 'pct_long_n_spikes', 'pct_short_n_spikes', 'is_n_spikes_LxC', 'is_n_spikes_SxC']
+            ['long_LR_lap_dur', 'long_RL_lap_dur', 'short_LR_lap_dur', 'short_RL_lap_dur', 'long_lap_dur', 'short_lap_dur', 'total_lap_dur', 'long_fr_Hz', 'short_fr_Hz', 'total_fr_Hz', 'pct_long_fr_Hz', 'pct_short_fr_Hz', 'is_fr_Hz_LxC', 'is_fr_Hz_SxC']
+        Usage:        
+            from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import TrackTemplates
+        
+            decoders_total_num_spikes_df, (LxC_cells_df, SxC_cells_df) = TrackTemplates.perform_determine_quant_cell_eXclusivities(track_templates=track_templates)
+            decoders_total_num_spikes_df
+            LxC_cells_df, SxC_cells_df
+
+        """
+        spike_counts_dict = {a_decoder_name:deepcopy(a_decoder.pf.filtered_spikes_df['aclu']).value_counts().to_dict() for a_decoder_name, a_decoder in track_templates.get_decoders_dict().items()}
+        any_decoder_aclus_list = deepcopy(track_templates.any_decoder_neuron_IDs)
+        total_duration_dict = {k:deepcopy(v.pf.epochs.duration).sum() for k, v in track_templates.get_decoders_dict().items()}
+        
+        value_counts = []
+        for aclu in any_decoder_aclus_list:
+            value_counts.append({k:v.get(aclu, 0) for k, v in spike_counts_dict.items()})
+
+        decoders_total_num_spikes_df: pd.DataFrame = pd.DataFrame(value_counts, index=any_decoder_aclus_list)
+        decoders_total_num_spikes_df['long'] = decoders_total_num_spikes_df[['long_LR', 'long_RL']].sum(axis='columns')
+        decoders_total_num_spikes_df['short'] = decoders_total_num_spikes_df[['short_LR', 'short_RL']].sum(axis='columns')
+        decoders_total_num_spikes_df['total'] = decoders_total_num_spikes_df['long'] + decoders_total_num_spikes_df['short']
+
+        ## percent long (used for determing exclusivity)
+        decoders_total_num_spikes_df['pct_long'] = decoders_total_num_spikes_df['long'] / decoders_total_num_spikes_df['total']
+        decoders_total_num_spikes_df['pct_short'] = decoders_total_num_spikes_df['short'] / decoders_total_num_spikes_df['total']
+
+        decoders_total_num_spikes_df = decoders_total_num_spikes_df.add_suffix('_n_spikes')    
+        decoders_total_num_spikes_df['is_n_spikes_LxC'] = decoders_total_num_spikes_df['pct_long_n_spikes'] >= cell_LS_eXclusivity_threshold
+        decoders_total_num_spikes_df['is_n_spikes_SxC'] = decoders_total_num_spikes_df['pct_short_n_spikes'] >= cell_LS_eXclusivity_threshold
+
+        ## Use n_spikes combined with duration info to compute firing rates:
+        for k, laps_duration in total_duration_dict.items():
+            decoders_total_num_spikes_df[f'{k}_lap_dur'] = laps_duration
+        decoders_total_num_spikes_df['long_lap_dur'] = decoders_total_num_spikes_df[['long_LR_lap_dur', 'long_RL_lap_dur']].sum(axis='columns')
+        decoders_total_num_spikes_df['short_lap_dur'] = decoders_total_num_spikes_df[['short_LR_lap_dur', 'short_RL_lap_dur']].sum(axis='columns')
+        decoders_total_num_spikes_df['total_lap_dur'] = decoders_total_num_spikes_df['long_lap_dur'] + decoders_total_num_spikes_df['short_lap_dur']
+        
+        firing_rate_suffix: str = '_fr_Hz'
+        _spikes_col_names = ['long_LR_n_spikes', 'long_RL_n_spikes', 'short_LR_n_spikes', 'short_RL_n_spikes', 'long_n_spikes', 'short_n_spikes', 'total_n_spikes']
+        _duration_col_names = ['long_LR_n_spikes', 'long_RL_n_spikes', 'short_LR_n_spikes', 'short_RL_n_spikes', 'long_n_spikes', 'short_n_spikes', 'total_n_spikes']
+        decoders_total_num_spikes_df['long_fr_Hz'] = decoders_total_num_spikes_df['long_n_spikes'] / decoders_total_num_spikes_df['long_lap_dur'] # , 'long_RL']].sum(axis='columns')
+        decoders_total_num_spikes_df['short_fr_Hz'] = decoders_total_num_spikes_df['short_n_spikes'] / decoders_total_num_spikes_df['short_lap_dur']
+        decoders_total_num_spikes_df['total_fr_Hz'] = decoders_total_num_spikes_df['total_n_spikes'] / decoders_total_num_spikes_df['total_lap_dur']
+                
+        ## percent long (used for determing exclusivity)
+        decoders_total_num_spikes_df['pct_LS_fr_Hz'] = (decoders_total_num_spikes_df['short_fr_Hz'] - decoders_total_num_spikes_df['long_fr_Hz']) / decoders_total_num_spikes_df['long_fr_Hz']
+        # decoders_total_num_spikes_df['pct_short_fr_Hz'] = decoders_total_num_spikes_df['short_fr_Hz'] / decoders_total_num_spikes_df['total_fr_Hz']
+        
+        ## negative if LONG is bigger:
+        decoders_total_num_spikes_df['is_fr_Hz_LxC'] = decoders_total_num_spikes_df['pct_LS_fr_Hz'] <= -cell_LS_fr_percent_change_eXclusivity_threshold
+        decoders_total_num_spikes_df['is_fr_Hz_SxC'] = decoders_total_num_spikes_df['pct_LS_fr_Hz'] >= cell_LS_fr_percent_change_eXclusivity_threshold
+
+        decoders_total_num_spikes_df['aclu'] = decoders_total_num_spikes_df.index
+        decoders_total_num_spikes_df = reorder_columns_relative(decoders_total_num_spikes_df, column_names=['aclu'], relative_mode='start')
+
+        LxC_cells_df: pd.DataFrame = decoders_total_num_spikes_df[decoders_total_num_spikes_df['is_n_spikes_LxC']]
+        SxC_cells_df: pd.DataFrame = decoders_total_num_spikes_df[decoders_total_num_spikes_df['is_n_spikes_SxC']]
+
+        ## OUTPUTS: decoders_total_num_spikes_df
+        return decoders_total_num_spikes_df, (LxC_cells_df, SxC_cells_df)
+
+
+    @function_attributes(short_name=None, tags=['n_spikes', 'LxC', 'SxC', 'cell_exclusivity', 'XxC'], input_requires=[], output_provides=[], uses=['cls.perform_determine_quant_cell_eXclusivities'], used_by=[], creation_date='2025-07-08 06:03', related_items=[])
+    def determine_quant_cell_eXclusivities(self, cell_LS_eXclusivity_threshold: bool = 0.90) -> Tuple[pd.DataFrame, Tuple[pd.DataFrame, pd.DataFrame]]:
+        """ Uses the total number of spikes fired during laps for each decoder to determine quantitative/objective cell exclusivity thresholds
+
+        Usage:        
+            decoders_total_num_spikes_df, (LxC_cells_df, SxC_cells_df) = track_templates.determine_quant_cell_eXclusivities()
+            decoders_total_num_spikes_df
+            LxC_cells_df, SxC_cells_df
+
+        """
+        return self.perform_determine_quant_cell_eXclusivities(track_templates=self, cell_LS_eXclusivity_threshold=cell_LS_eXclusivity_threshold)
+
+
 
 
     def __repr__(self):
@@ -1105,6 +1192,7 @@ class DirectionalLapsHelpers:
         # end for
         return was_updated
 
+
     @function_attributes(short_name=None, tags=['MAIN'], input_requires=[], output_provides=[], uses=['.has_duplicated_memory_references'], used_by=['.fixup_directional_pipeline_if_needed'], creation_date='2025-02-19 13:22', related_items=[])
     @classmethod
     def fix_computation_epochs_if_needed(cls, curr_active_pipeline, debug_print=False):
@@ -1137,19 +1225,19 @@ class DirectionalLapsHelpers:
                 curr_active_pipeline.computation_results[an_epoch_name].computation_config = a_deduplicated_config
             print(f'deduplicated references!')
 
-        original_num_epochs = np.array([curr_active_pipeline.computation_results[an_epoch_name].computation_config.pf_params.computation_epochs.n_epochs for an_epoch_name in (long_LR_name, long_RL_name, short_LR_name, short_RL_name)])
+        original_num_epochs: int = np.array([curr_active_pipeline.computation_results[an_epoch_name].computation_config.pf_params.computation_epochs.n_epochs for an_epoch_name in (long_LR_name, long_RL_name, short_LR_name, short_RL_name)])
         if debug_print:
             print(f'original_num_epochs: {original_num_epochs}')
         assert np.all(original_num_epochs > 0)
         # Fix the computation epochs to be constrained to the proper long/short intervals:
         # relys on: long_epoch_obj, short_epoch_obj
         for an_epoch_name in (long_LR_name, long_RL_name):
-            curr_active_pipeline.computation_results[an_epoch_name].computation_config.pf_params.computation_epochs = deepcopy(curr_active_pipeline.computation_results[an_epoch_name].computation_config.pf_params.computation_epochs.time_slice(long_epoch_obj.t_start, long_epoch_obj.t_stop))
+            curr_active_pipeline.computation_results[an_epoch_name].computation_config.pf_params.computation_epochs = deepcopy(curr_active_pipeline.computation_results[an_epoch_name].computation_config.pf_params.computation_epochs.time_slice(long_epoch_obj.t_start, long_epoch_obj.t_stop)) ## #TODO 2025-07-15 13:07: - [ ] Why not laps for the pf_params?
 
         for an_epoch_name in (short_LR_name, short_RL_name):
-            curr_active_pipeline.computation_results[an_epoch_name].computation_config.pf_params.computation_epochs = deepcopy(curr_active_pipeline.computation_results[an_epoch_name].computation_config.pf_params.computation_epochs.time_slice(short_epoch_obj.t_start, short_epoch_obj.t_stop))
+            curr_active_pipeline.computation_results[an_epoch_name].computation_config.pf_params.computation_epochs = deepcopy(curr_active_pipeline.computation_results[an_epoch_name].computation_config.pf_params.computation_epochs.time_slice(short_epoch_obj.t_start, short_epoch_obj.t_stop)) ## #TODO 2025-07-15 13:07: - [ ] Why not laps for the pf_params?
 
-        modified_num_epochs = np.array([curr_active_pipeline.computation_results[an_epoch_name].computation_config.pf_params.computation_epochs.n_epochs for an_epoch_name in (long_LR_name, long_RL_name, short_LR_name, short_RL_name)])
+        modified_num_epochs: int = np.array([curr_active_pipeline.computation_results[an_epoch_name].computation_config.pf_params.computation_epochs.n_epochs for an_epoch_name in (long_LR_name, long_RL_name, short_LR_name, short_RL_name)])
         if debug_print:
             print(f'modified_num_epochs: {modified_num_epochs}')
         was_modified = was_modified or np.any(original_num_epochs != modified_num_epochs)
@@ -1157,13 +1245,13 @@ class DirectionalLapsHelpers:
 
         return was_modified
 
+
     @function_attributes(short_name=None, tags=['MAIN'], input_requires=[], output_provides=[], uses=['.post_fixup_filtered_contexts', '.fix_computation_epochs_if_needed'], used_by=[], creation_date='2025-02-19 13:22', related_items=[])
     @classmethod
     def fixup_directional_pipeline_if_needed(cls, curr_active_pipeline, debug_print=False) -> bool:
-        """2023-11-29 - Updates the filtered context and decouples the configs and constrains the computation_epochs to the relevant long/short periods as needed. Will need recomputations if was_modified """
+        """2023-11-29 - Updates the filtered context, decouples the configs, and constrains the computation_epochs to the relevant long/short periods as needed. Will need recomputations if was_modified """
         #TODO 2023-11-10 23:32: - [ ] WORKING NOW!
         # 2023-11-10 21:15: - [X] Not yet finished! Does not work due to shared memory issue. Changes to the first two affect the next two
-
         was_modified: bool = False
         was_modified = was_modified or DirectionalLapsHelpers.post_fixup_filtered_contexts(curr_active_pipeline)
         was_modified = was_modified or DirectionalLapsHelpers.fix_computation_epochs_if_needed(curr_active_pipeline)
@@ -1178,13 +1266,13 @@ class DirectionalLapsHelpers:
         origin_lap_df = curr_sess.laps.to_dataframe()
         added_column = ('is_LR_dir' not in origin_lap_df.columns)
         was_modified = was_modified or added_column
-        curr_sess.laps.update_lap_dir_from_smoothed_velocity(pos_input=curr_sess.position)
+        curr_sess.laps.update_lap_dir_from_net_displacement(pos_input=curr_sess.position)
         curr_sess.laps.update_maze_id_if_needed(t_start=t_start, t_delta=t_delta, t_end=t_end)
         
         for an_epoch_name, curr_sess in curr_active_pipeline.filtered_sessions.items():
             origin_lap_df = curr_sess.laps.to_dataframe()
             added_column = ('is_LR_dir' not in origin_lap_df.columns)
-            curr_sess.laps.update_lap_dir_from_smoothed_velocity(pos_input=curr_sess.position)
+            curr_sess.laps.update_lap_dir_from_net_displacement(pos_input=curr_sess.position)
             curr_sess.laps.update_maze_id_if_needed(t_start=t_start, t_delta=t_delta, t_end=t_end)
             was_modified = was_modified or added_column
 
@@ -1436,6 +1524,11 @@ class DirectionalPseudo2DDecodersResult(ComputedResult):
         laps_marginals_df = pd.DataFrame(np.hstack((laps_directional_all_epoch_bins_marginal, laps_track_identity_all_epoch_bins_marginal)), columns=['P_LR', 'P_RL', 'P_Long', 'P_Short'])
         laps_marginals_df['lap_idx'] = laps_marginals_df.index.to_numpy()
         laps_marginals_df['lap_start_t'] = self.laps_epochs_df['start'].to_numpy()
+        
+        ## ensure we have the generic columns too (duplicated):
+        laps_marginals_df['epoch_idx'] = laps_marginals_df['lap_idx']
+        laps_marginals_df['epoch_start_t'] = laps_marginals_df['lap_start_t']
+
         return laps_marginals_df
 
     @property
@@ -1450,6 +1543,11 @@ class DirectionalPseudo2DDecodersResult(ComputedResult):
         ripple_marginals_df = pd.DataFrame(np.hstack((ripple_directional_all_epoch_bins_marginal, ripple_track_identity_all_epoch_bins_marginal)), columns=['P_LR', 'P_RL', 'P_Long', 'P_Short'])
         ripple_marginals_df['ripple_idx'] = ripple_marginals_df.index.to_numpy()
         ripple_marginals_df['ripple_start_t'] = self.ripple_epochs_df['start'].to_numpy()
+        
+        ## ensure we have the generic columns too (duplicated):
+        ripple_marginals_df['epoch_idx'] = ripple_marginals_df['ripple_idx']
+        ripple_marginals_df['epoch_start_t'] = ripple_marginals_df['ripple_start_t']
+
         return ripple_marginals_df
 
     # *time_bin_marginals_df _____________________________________________________________________________________________ #
@@ -1466,7 +1564,6 @@ class DirectionalPseudo2DDecodersResult(ComputedResult):
         laps_track_identity_marginals, laps_track_identity_all_epoch_bins_marginal, laps_most_likely_track_identity_from_decoder, laps_is_most_likely_track_identity_Long = self.laps_track_identity_marginals_tuple
         non_marginalized_decoder_marginals, non_marginalized_decoder_all_epoch_bins_marginal, most_likely_decoder_idxs, non_marginalized_decoder_all_epoch_bins_decoder_probs_df = self.laps_non_marginalized_decoder_marginals_tuple
         laps_time_bin_marginals_df: pd.DataFrame = self.all_directional_laps_filter_epochs_decoder_result.build_per_time_bin_marginals_df(active_marginals_tuple=(laps_directional_marginals, laps_track_identity_marginals, non_marginalized_decoder_marginals), columns_tuple=(['P_LR', 'P_RL'], ['P_Long', 'P_Short'], ['long_LR', 'long_RL', 'short_LR', 'short_RL']))
-        
         
         ## #TODO 2024-10-08 19:37: - [ ] Add extra columns
         return laps_time_bin_marginals_df
@@ -1528,7 +1625,7 @@ class DirectionalPseudo2DDecodersResult(ComputedResult):
         
 
     # Low-level direct marginal computation functions ____________________________________________________________________ #
-    @function_attributes(short_name=None, tags=['pseudo2D', 'marginal', 'laps', 'pbe'], input_requires=[], output_provides=[], uses=[], used_by=['GenericDecoderDictDecodedEpochsDictResult'], creation_date='2025-03-20 08:30', related_items=[])
+    @function_attributes(short_name=None, tags=['pseudo2D', 'marginal', 'laps', 'pbe'], input_requires=[], output_provides=[], uses=['cls.build_generalized_non_marginalized_raw_posteriors'], used_by=['GenericDecoderDictDecodedEpochsDictResult'], creation_date='2025-03-20 08:30', related_items=[])
     @classmethod
     def perform_compute_specific_marginals(cls, a_result: DecodedFilterEpochsResult, marginal_context: IdentifyingContext) -> pd.DataFrame:
         """ Computes the appropriate pseudo2D marginals for the result given the context (requires laps/pbe)        
@@ -1552,13 +1649,15 @@ class DirectionalPseudo2DDecodersResult(ComputedResult):
             a_new_fully_generic_result.updating_results_for_context(new_context=_updated_context, a_result=deepcopy(dropping_masked_laps_pseudo2D_continuous_specific_decoded_result), a_decoder=deepcopy(a_decoder), a_decoded_marginal_posterior_df=deepcopy(dropping_masked_laps_decoded_marginal_posterior_df)) ## update using the result
 
         """
+        from neuropy.utils.mixins.binning_helpers import get_bin_centers
+        
         data_grain = marginal_context.get('data_grain', None)
         assert data_grain is not None, f"marginal_context: {marginal_context}"
         assert data_grain in ['per_time_bin', 'per_epoch'], f"marginal_context: {marginal_context}"
         
         known_named_decoding_epochs_type = marginal_context.get('known_named_decoding_epochs_type', None)
         assert known_named_decoding_epochs_type is not None
-        assert known_named_decoding_epochs_type in ['laps', 'pbe', 'global']
+        assert known_named_decoding_epochs_type in ['laps', 'replay', 'ripple', 'pbe', 'non_pbe', 'non_pbe_endcaps', 'global'], f"known_named_decoding_epochs_type: {known_named_decoding_epochs_type}" # ['laps', 'pbe', 'global']
 
         # ==================================================================================================================== #
         # See if it is a 4-tuple Pseudo2D (all-directional) decoder or a 2-tuple version by checking shape:                    #
@@ -1576,8 +1675,11 @@ class DirectionalPseudo2DDecodersResult(ComputedResult):
             unique_decoder_names: List[str] = ['long', 'short']
             columns_tuple = (['P_Long', 'P_Short'])
         ## OUTPUTS: unique_decoder_names, columns_tuple
-        
 
+        xbin_centers = None
+        if (a_result.pos_bin_edges is not None) and (len(a_result.pos_bin_edges) > 2):
+            xbin_centers = deepcopy(get_bin_centers(a_result.pos_bin_edges))
+            
 
         if known_named_decoding_epochs_type == 'laps':
             # Case: Per-epoch laps marginals
@@ -1597,28 +1699,41 @@ class DirectionalPseudo2DDecodersResult(ComputedResult):
             epoch_idx_col_name='epoch_idx'
             epoch_start_t_col_name='epoch_start_t'
             additional_transfer_column_names=['start', 'stop', 'label', 'duration']
+
+        elif known_named_decoding_epochs_type in ('replay', 'ripple', 'non_pbe', 'non_pbe_endcaps'):
+            # Case: Per-epoch any marginals
+            epoch_idx_col_name='epoch_idx'
+            epoch_start_t_col_name='epoch_start_t'
+            additional_transfer_column_names=['start', 'stop', 'label', 'duration']
     
         else:
             raise ValueError(f"Unexpected value for known_named_decoding_epochs_type: {known_named_decoding_epochs_type}")
 
         ## OUTPUTS: epoch_idx_col_name, epoch_start_t_col_name, additional_transfer_column_names
 
-
-
         if data_grain == 'per_time_bin':
             
-            additional_column_kwargs = dict(epoch_idx_col_name=epoch_idx_col_name, epoch_start_t_col_name=None, additional_transfer_column_names=None) # set to None because we aren't doing epochs, we're doing time bins , epoch_start_t_col_name=epoch_start_t_col_name, additional_transfer_column_names=additional_transfer_column_names
+            additional_column_kwargs = dict(epoch_idx_col_name=epoch_idx_col_name, epoch_start_t_col_name=None, additional_transfer_column_names=None) # set to None because we aren't doing epochs, we're doing time bins, so epoch-specific columns shouldn't be duplicated for every timebin unless we're sure about it.
+            #  , epoch_start_t_col_name=epoch_start_t_col_name, additional_transfer_column_names=additional_transfer_column_names
         
             if (not is_four_tuple_pseudo2D_decoder):
                 ## 2-tuple method
                 assert is_track_identity_only_pseudo2D_decoder
                 # NOTE: non_marginalized_raw_result is a marginal_over_track_ID since there are only two elements
-                _a_marginal_over_track_IDs_list, a_marginal_over_track_ID_posterior_df = cls.build_generalized_non_marginalized_raw_posteriors(a_result, unique_decoder_names=unique_decoder_names, **additional_column_kwargs) # DirectionalPseudo2DDecodersResult
+
+                _a_marginal_over_track_IDs_list, a_marginal_over_track_ID_posterior_df = cls.build_generalized_non_marginalized_raw_posteriors(a_result, unique_decoder_names=unique_decoder_names, **additional_column_kwargs, xbin_centers=xbin_centers) # DirectionalPseudo2DDecodersResult
+                
+                # if 'most_likely_positions_1D' not in a_marginal_over_track_ID_posterior_df.columns:
+                #     time_bin_extracted_most_likely_positions_1D_column = np.concatenate([np.atleast_1d(an_epoch_extracted_most_likely_positions_1D[:, 0]) for i, an_epoch_extracted_most_likely_positions_1D in enumerate(epoch_extracted_most_likely_positions_1D)]) 
+                #     assert len(time_bin_extracted_most_likely_positions_1D_column) == len(epoch_label_column), f"len(time_bin_extracted_most_likely_positions_1D_column): {len(time_bin_extracted_most_likely_positions_1D_column)}, len(epoch_label_column): {len(epoch_label_column)}"
+                #     _common_epoch_df_column_dict.update(**{'most_likely_positions_1D': time_bin_extracted_most_likely_positions_1D_column, })
+                #     print(f'2025-08-13 19:18 Adding "most_likely_positions_1D" column to `epoch_time_bin_marginals_df`.')
+                
 
                 ## Build into a marginal df like `all_sessions_laps_df` - uses `time_window_centers`, pseudo2D_continuous_specific_decoded_result, non_PBE_marginal_over_track_ID:
                 track_marginal_posterior_df : pd.DataFrame = deepcopy(a_marginal_over_track_ID_posterior_df) # pd.DataFrame({'t':deepcopy(time_window_centers), 'P_Long': np.squeeze(non_PBE_marginal_over_track_ID[0, :]), 'P_Short': np.squeeze(non_PBE_marginal_over_track_ID[1, :]), 'time_bin_size': pseudo2D_continuous_specific_decoded_result.decoding_time_bin_size})
                 epoch_time_bin_marginals_df = track_marginal_posterior_df
-                return epoch_time_bin_marginals_df
+                return epoch_time_bin_marginals_df ## this would run without the 'most_likely_positions_1D' column
 
             else:
                 ## standard (4-tuple) method
@@ -1638,7 +1753,7 @@ class DirectionalPseudo2DDecodersResult(ComputedResult):
                     (ripple_directional_marginals_tuple, ripple_track_identity_marginals_tuple, ripple_non_marginalized_decoder_marginals_tuple), _ = a_result.compute_marginals(
                         epoch_idx_col_name='ripple_idx', 
                         epoch_start_t_col_name='ripple_start_t',
-                        additional_transfer_column_names=['start', 'stop', 'label', 'duration']
+                        additional_transfer_column_names=['start', 'stop', 'label', 'duration'] + ['most_likely_positions_1D'], ## adding in this 'most_likely_positions_1D' portion changed nothing
                     )
                     
                     # Expanded implementation of build_ripple_time_bin_marginals_df
@@ -1652,7 +1767,22 @@ class DirectionalPseudo2DDecodersResult(ComputedResult):
                     (epoch_directional_marginals_tuple, epoch_track_identity_marginals_tuple, epoch_non_marginalized_decoder_marginals_tuple), _ = a_result.compute_marginals(
                         epoch_idx_col_name='epoch_idx',
                         epoch_start_t_col_name='epoch_start_t',
-                        additional_transfer_column_names=['start', 'stop', 'label', 'duration']
+                        additional_transfer_column_names=['start', 'stop', 'label', 'duration'] + ['most_likely_positions_1D'],
+                    )
+                    
+                    # Expanded implementation of build_epoch_time_bin_marginals_df
+                    epoch_directional_marginals, _, _, _ = epoch_directional_marginals_tuple
+                    epoch_track_identity_marginals, _, _, _ = epoch_track_identity_marginals_tuple
+                    non_marginalized_decoder_marginals, _, _, _ = epoch_non_marginalized_decoder_marginals_tuple
+
+
+                elif known_named_decoding_epochs_type in ('replay', 'ripple', 'non_pbe', 'non_pbe_endcaps'):
+                    # Case: Per-time-bin any marginals
+                    # Compute the marginals from the result
+                    (epoch_directional_marginals_tuple, epoch_track_identity_marginals_tuple, epoch_non_marginalized_decoder_marginals_tuple), _ = a_result.compute_marginals(
+                        epoch_idx_col_name=epoch_idx_col_name,
+                        epoch_start_t_col_name=epoch_start_t_col_name,
+                        additional_transfer_column_names=additional_transfer_column_names
                     )
                     
                     # Expanded implementation of build_epoch_time_bin_marginals_df
@@ -1667,7 +1797,7 @@ class DirectionalPseudo2DDecodersResult(ComputedResult):
                 # Common (success) marginal code _____________________________________________________________________________________ #
                 epoch_time_bin_marginals_df = a_result.build_per_time_bin_marginals_df(
                     active_marginals_tuple=(epoch_directional_marginals, epoch_track_identity_marginals, non_marginalized_decoder_marginals), 
-                    columns_tuple=columns_tuple
+                    columns_tuple=columns_tuple ## Maybe `columns_tuple` is the problem, as it might be `(['P_Long', 'P_Short'])` only which would explain what was returned.
                 )
             ## END if is_track_....
             
@@ -1701,7 +1831,11 @@ class DirectionalPseudo2DDecodersResult(ComputedResult):
                     epoch_marginals_df = pd.DataFrame(np.hstack((epoch_directional_all_epoch_bins_marginal, epoch_track_identity_all_epoch_bins_marginal)), columns=['P_LR', 'P_RL', 'P_Long', 'P_Short'])
                     epoch_marginals_df['lap_idx'] = epoch_marginals_df.index.to_numpy()
                     epoch_marginals_df['lap_start_t'] = a_result.filter_epochs['start'].to_numpy()
-                    
+                    ## ensure we have the generic columns too (duplicated):
+                    epoch_marginals_df['epoch_idx'] = epoch_marginals_df['lap_idx']
+                    epoch_marginals_df['epoch_start_t'] = epoch_marginals_df['lap_start_t']                    
+
+
                 elif known_named_decoding_epochs_type == 'pbe':
                     # Case: Per-epoch PBE/ripple marginals
                     # Compute the marginals from the result
@@ -1714,6 +1848,10 @@ class DirectionalPseudo2DDecodersResult(ComputedResult):
                     epoch_marginals_df = pd.DataFrame(np.hstack((epoch_directional_all_epoch_bins_marginal, epoch_track_identity_all_epoch_bins_marginal)), columns=['P_LR', 'P_RL', 'P_Long', 'P_Short'])
                     epoch_marginals_df['ripple_idx'] = epoch_marginals_df.index.to_numpy()
                     epoch_marginals_df['ripple_start_t'] = a_result.filter_epochs['start'].to_numpy()
+                    ## ensure we have the generic columns too (duplicated):
+                    epoch_marginals_df['epoch_idx'] = epoch_marginals_df['ripple_idx']
+                    epoch_marginals_df['epoch_start_t'] = epoch_marginals_df['ripple_start_t']
+
                     
                 elif known_named_decoding_epochs_type == 'global':
                     # Case: Per-epoch global marginals
@@ -1728,6 +1866,21 @@ class DirectionalPseudo2DDecodersResult(ComputedResult):
                     epoch_marginals_df['epoch_idx'] = epoch_marginals_df.index.to_numpy()
                     epoch_marginals_df['epoch_start_t'] = a_result.filter_epochs['start'].to_numpy()
                     
+                elif known_named_decoding_epochs_type in ('replay', 'ripple', 'non_pbe', 'non_pbe_endcaps'):
+                    # Case: Per-epoch any marginals
+                    # Compute the marginals from the result                    
+                    overrides_dict = dict(epoch_idx_col_name=epoch_idx_col_name, epoch_start_t_col_name=epoch_start_t_col_name, additional_transfer_column_names=additional_transfer_column_names)
+                    
+                    (epoch_directional_marginals_tuple, epoch_track_identity_marginals_tuple, _), _ = a_result.compute_marginals(**(additional_column_kwargs | overrides_dict))
+                    
+                    # Expanded implementation of build_epoch_all_epoch_bins_marginals_df
+                    epoch_directional_marginals, epoch_directional_all_epoch_bins_marginal, epoch_most_likely_direction_from_decoder, epoch_is_most_likely_direction_LR_dir = epoch_directional_marginals_tuple
+                    epoch_track_identity_marginals, epoch_track_identity_all_epoch_bins_marginal, epoch_most_likely_track_identity_from_decoder, epoch_is_most_likely_track_identity_Long = epoch_track_identity_marginals_tuple
+
+                    epoch_marginals_df = pd.DataFrame(np.hstack((epoch_directional_all_epoch_bins_marginal, epoch_track_identity_all_epoch_bins_marginal)), columns=['P_LR', 'P_RL', 'P_Long', 'P_Short'])
+                    epoch_marginals_df['epoch_idx'] = epoch_marginals_df.index.to_numpy()
+                    epoch_marginals_df['epoch_start_t'] = a_result.filter_epochs['start'].to_numpy()
+
                 else:
                     raise ValueError(f"Unexpected value for known_named_decoding_epochs_type: {known_named_decoding_epochs_type}")
                 ## END if known_named_decoding...
@@ -1758,6 +1911,11 @@ class DirectionalPseudo2DDecodersResult(ComputedResult):
         if isinstance(filter_epochs_decoder_result, (List, NDArray)):
             ## assume it's already `p_x_given_n_list` format
             p_x_given_n_list = filter_epochs_decoder_result
+        elif (not hasattr(filter_epochs_decoder_result, 'p_x_given_n_list')):
+            ## assume it's a SingleEpochDecodedResult and wrap its only entry
+            assert hasattr(filter_epochs_decoder_result, 'p_x_given_n'), f"type(filter_epochs_decoder_result): {type(filter_epochs_decoder_result)}, filter_epochs_decoder_result: {filter_epochs_decoder_result}"
+            p_x_given_n_list = [filter_epochs_decoder_result.p_x_given_n]
+
         else:
             ## assume it's in the `DecodedFilterEpochsResult` format, access its `.p_x_given_n_list`
             p_x_given_n_list = filter_epochs_decoder_result.p_x_given_n_list
@@ -1784,9 +1942,10 @@ class DirectionalPseudo2DDecodersResult(ComputedResult):
         return custom_curr_unit_marginal_list
 
 
-    @function_attributes(short_name=None, tags=['ACTIVE', 'general', 'non_PBE'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-02-20 16:16', related_items=[])
+    @function_attributes(short_name=None, tags=['ACTIVE', 'general', 'non_PBE'], input_requires=[], output_provides=[], uses=[], used_by=['EpochComputationsComputationsContainer._build_merged_joint_placefields_and_decode', 'DirectionalPseudo2DDecodersResult.perform_compute_specific_marginals', 'EpochComputationsComputationsContainer._build_output_decoded_posteriors'], creation_date='2025-02-20 16:16', related_items=[])
     @classmethod
-    def build_generalized_non_marginalized_raw_posteriors(cls, filter_epochs_decoder_result: Union[List[NDArray], List[DynamicContainer], NDArray, DecodedFilterEpochsResult], unique_decoder_names: List[str], epoch_idx_col_name: Optional[str]=None, epoch_start_t_col_name: Optional[str]=None, additional_transfer_column_names: Optional[List[str]]=None, auto_transfer_all_columns:bool=True, debug_print=False) -> Tuple[List[DynamicContainer], pd.DataFrame]:
+    def build_generalized_non_marginalized_raw_posteriors(cls, filter_epochs_decoder_result: Union[List[NDArray], List[DynamicContainer], NDArray, DecodedFilterEpochsResult], unique_decoder_names: List[str], epoch_idx_col_name: Optional[str]=None, epoch_start_t_col_name: Optional[str]=None, additional_transfer_column_names: Optional[List[str]]=None, auto_transfer_all_columns:bool=True,
+                                                               xbin_centers: Optional[NDArray]=None, debug_print=False) -> Tuple[List[DynamicContainer], pd.DataFrame]:
         """ works for an all-directional coder with an arbitrary (but specified as `unique_decoder_names`) n_decoders items
         
         Requires: filter_epochs_decoder_result.p_x_given_n_list
@@ -1798,7 +1957,7 @@ class DirectionalPseudo2DDecodersResult(ComputedResult):
             from pyphocorehelpers.indexing_helpers import partition_df_dict, partition_df        
             # from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import _adding_global_non_PBE_epochs
             # from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.EpochComputationFunctions import Compute_NonPBE_Epochs
-            from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.EpochComputationFunctions import EpochComputationFunctions, EpochComputationsComputationsContainer, NonPBEDimensionalDecodingResult, Compute_NonPBE_Epochs, KnownFilterEpochs
+            from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.EpochComputationFunctions import EpochComputationFunctions, EpochComputationsComputationsContainer, DecodingResultND, Compute_NonPBE_Epochs, KnownFilterEpochs
             from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.EpochComputationFunctions import estimate_memory_requirements_bytes
             from neuropy.core.epoch import Epoch, ensure_dataframe, ensure_Epoch
             from neuropy.analyses.placefields import PfND
@@ -1821,8 +1980,8 @@ class DirectionalPseudo2DDecodersResult(ComputedResult):
             ## Unpack from pipeline:
             nonPBE_results: EpochComputationsComputationsContainer = curr_active_pipeline.global_computation_results.computed_data['EpochComputations']
             a_new_NonPBE_Epochs_obj: Compute_NonPBE_Epochs = nonPBE_results.a_new_NonPBE_Epochs_obj
-            results1D: NonPBEDimensionalDecodingResult = nonPBE_results.results1D
-            results2D: NonPBEDimensionalDecodingResult = nonPBE_results.results2D
+            results1D: DecodingResultND = nonPBE_results.results1D
+            results2D: DecodingResultND = nonPBE_results.results2D
 
             epochs_decoding_time_bin_size = nonPBE_results.epochs_decoding_time_bin_size
             frame_divide_bin_size = nonPBE_results.frame_divide_bin_size
@@ -1942,25 +2101,28 @@ class DirectionalPseudo2DDecodersResult(ComputedResult):
         1: RL
         
         """
+        from neuropy.utils.misc import capitalize_after_underscore
+
         p_x_given_n_list = cls.get_proper_p_x_given_n_list(filter_epochs_decoder_result)
         n_decoders: int = len(unique_decoder_names)
         
-        custom_curr_unit_marginal_list = []
+        custom_curr_unit_marginal_list: List[DynamicContainer] = []
         
-        for a_p_x_given_n in p_x_given_n_list:
+        for epoch_i, a_p_x_given_n in enumerate(p_x_given_n_list):
             # an_array = all_directional_laps_filter_epochs_decoder_result.p_x_given_n_list[0] # .shape # (62, 4, 236)
             curr_array_shape = np.shape(a_p_x_given_n) # .shape # (62, 4, 236) - (n_pos_bins, 4, n_epoch_t_bins[i])
             if debug_print:
-                print(f'a_p_x_given_n.shape: {curr_array_shape}')
+                print(f'p_x_given_n_list[{epoch_i}]:')
+                print(f'\ta_p_x_given_n.shape: {curr_array_shape}')
 
             if debug_print:
-                print(f'np.shape(a_p_x_given_n): {np.shape(curr_array_shape)}')
+                print(f'\tnp.shape(a_p_x_given_n): {np.shape(curr_array_shape)}')
                 
             assert curr_array_shape[1] == n_decoders, f"only works when curr_array_shape[1]: {curr_array_shape[1]} correspond to the unique_decoder_names: {unique_decoder_names}. (typically all-directional decoder)."                
             curr_unit_marginal_x = DynamicContainer(p_x_given_n=a_p_x_given_n, most_likely_positions_1D=None)
             
             if debug_print:
-                print(f'np.shape(curr_unit_posterior_list.p_x_given_n): {np.shape(curr_unit_marginal_x.p_x_given_n)}')
+                print(f'\tnp.shape(curr_unit_posterior_list.p_x_given_n): {np.shape(curr_unit_marginal_x.p_x_given_n)}')
             
             # y-axis marginal:
             curr_unit_marginal_x.p_x_given_n = np.squeeze(np.sum(a_p_x_given_n, axis=0)) # sum over all x. Result should be (n_decoders, n_epoch_t_bins[i])
@@ -1972,27 +2134,51 @@ class DirectionalPseudo2DDecodersResult(ComputedResult):
             elif curr_unit_marginal_x.p_x_given_n.ndim == 1:
                 curr_unit_marginal_x.p_x_given_n = curr_unit_marginal_x.p_x_given_n[:, np.newaxis]
                 if debug_print:
-                    print(f'\t added dimension to curr_posterior for marginal_y: {curr_unit_marginal_x.p_x_given_n.shape}')
-            custom_curr_unit_marginal_list.append(curr_unit_marginal_x)
+                    print(f'\t\t added dimension to curr_posterior for marginal_y: {curr_unit_marginal_x.p_x_given_n.shape}')
 
+
+            ## 2025-08-14 - Set most_likely_positions_1D:
+            if curr_unit_marginal_x['most_likely_positions_1D'] is None:
+                curr_unit_marginal_x['most_likely_positions_1D'] = np.atleast_1d(np.argmax(curr_unit_marginal_x.p_x_given_n, axis=-1)) ## actually just the indicies, to get the positions we'd need to do `curr_unit_marginal_x['most_likely_positions_1D'] = np.atleast_1d(xbin_centers[curr_unit_marginal_x['most_likely_positions_1D']])`
+                if (xbin_centers is not None):
+                    curr_unit_marginal_x['most_likely_positions_1D'] = np.atleast_1d(xbin_centers[curr_unit_marginal_x['most_likely_positions_1D']])
+            # curr_unit_marginal_x.most_likely_positions_1D = np.atleast_1d(most_likely_positions).T # already 1D positions, don't need to extract x-component
+            # most_likely_positions_1D = most_likely_positions[:,0].T
+
+            custom_curr_unit_marginal_list.append(curr_unit_marginal_x)
+        ## END for epoch_i, a_p_x_given_...
+        
         # ## INPUTS: custom_curr_unit_marginal_list
         
         ## All
         epochs_repeated_epoch_index: NDArray = np.hstack([np.full((n_bins, ), i) for i, n_bins in enumerate(filter_epochs_decoder_result.nbins)]) # np.shape(epochs_p_x_given_n) # (2, 19018)
         epochs_repeated_sub_epoch_time_bin_index: NDArray = np.hstack([np.arange(n_bins) for n_bins in filter_epochs_decoder_result.nbins]) # np.shape(epochs_t_centers) # (19018,)
+        
+        ## Redundant but very helpful parent_epoch_* columns
+        epochs_repeated_parent_epoch_start_t: NDArray = np.hstack([np.full((n_bins, ), filter_epochs_decoder_result.time_bin_containers[i].edge_info.variable_extents[0]) for i, n_bins in enumerate(filter_epochs_decoder_result.nbins)]) # np.shape(epochs_p_x_given_n) # (2, 19018)
+        epochs_repeated_parent_epoch_stop_t: NDArray = np.hstack([np.full((n_bins, ), filter_epochs_decoder_result.time_bin_containers[i].edge_info.variable_extents[-1]) for i, n_bins in enumerate(filter_epochs_decoder_result.nbins)]) # np.shape(epochs_p_x_given_n) # (2, 19018)
+
+        # a_masked_decoded_result.time_bin_containers[0].edge_info.variable_extents
 
         ## Non-masked
         epochs_p_x_given_n: NDArray = np.hstack([v['p_x_given_n'] for v in custom_curr_unit_marginal_list]) # np.shape(epochs_p_x_given_n) # (2, 19018)
         epochs_t_centers: NDArray = np.hstack([t.centers for t in filter_epochs_decoder_result.time_bin_containers]) # np.shape(epochs_t_centers) # (19018,)
         assert np.shape(epochs_p_x_given_n)[-1] == np.shape(epochs_t_centers)[0]
 
-        ## OUTPUTS: epochs_repeated_epoch_index, epochs_repeated_sub_epoch_time_bin_index, epochs_t_centers, epochs_p_x_given_n
-        _common_epoch_df_dict = {'epoch_id': epochs_repeated_epoch_index, 'sub_epoch_time_bin_index': epochs_repeated_sub_epoch_time_bin_index}
+        epochs_most_likely_positions_1D: NDArray = np.squeeze(np.concatenate([np.atleast_1d(v['most_likely_positions_1D']) for v in custom_curr_unit_marginal_list])) # np.shape(epochs_most_likely_positions_1D) # (19018,)
 
+
+        ## OUTPUTS: epochs_repeated_epoch_index, epochs_repeated_sub_epoch_time_bin_index, epochs_t_centers, epochs_p_x_given_n
+        # _common_epoch_df_dict = {'epoch_id': epochs_repeated_epoch_index, 'sub_epoch_time_bin_index': epochs_repeated_sub_epoch_time_bin_index}
+        _common_epoch_df_dict = {'epoch_id': epochs_repeated_epoch_index, 'sub_epoch_time_bin_index': epochs_repeated_sub_epoch_time_bin_index}
+        _common_epoch_df_dict.update(**{'parent_epoch_id': epochs_repeated_epoch_index, 'parent_epoch_start_t': epochs_repeated_parent_epoch_start_t, 'parent_epoch_end_t': epochs_repeated_parent_epoch_stop_t})
+        
         assert np.shape(epochs_p_x_given_n)[0] == len(unique_decoder_names), f"unique_decoder_names: {unique_decoder_names} len(unique_decoder_names) != np.shape(epochs_p_x_given_n)[0]: {np.shape(epochs_p_x_given_n)[0]}"
 
-        _marginal_prob_var_names = [f"P_{v.capitalize()}" for v in unique_decoder_names] # ['P_Long', 'P_Short']
+        # _marginal_prob_var_names = [f"P_{v.capitalize()}" for v in unique_decoder_names] # ['P_Long', 'P_Short']
+        _marginal_prob_var_names = [f"P_{capitalize_after_underscore(v, should_capitalize_start=True)}" for v in unique_decoder_names] # ['P_Long', 'P_Short']
         
+
         _marginal_probs_dict = {a_marginal_prob_col_name:np.squeeze(epochs_p_x_given_n[i, :]) for i, (a_marginal_prob_col_name, a_decoder_name) in enumerate(zip(_marginal_prob_var_names, unique_decoder_names))} # 'P_Long': np.squeeze(epochs_p_x_given_n[0, :]), 'P_Short': np.squeeze(epochs_p_x_given_n[1, :]),
         if debug_print:
             print(f'_marginal_probs_dict: {_marginal_probs_dict}')
@@ -2001,7 +2187,16 @@ class DirectionalPseudo2DDecodersResult(ComputedResult):
         track_marginal_posterior_df: pd.DataFrame = pd.DataFrame({'t':deepcopy(epochs_t_centers),
                                                                     **_marginal_probs_dict,
                                                                     # 'P_Long': np.squeeze(epochs_p_x_given_n[0, :]), 'P_Short': np.squeeze(epochs_p_x_given_n[1, :]),
-                                                                     **deepcopy(_common_epoch_df_dict)}) # , 'time_bin_size': pseudo2D_continuous_specific_decoded_result.decoding_time_bin_size
+                                                                     **deepcopy(_common_epoch_df_dict)},
+                                                                    ) # , 'time_bin_size': pseudo2D_continuous_specific_decoded_result.decoding_time_bin_size
+        
+        try:
+            track_marginal_posterior_df['most_likely_positions_1D'] = deepcopy(epochs_most_likely_positions_1D)
+        except ValueError as e:
+            print(f'failed to add "most_likely_positions_1D" column to `track_marginal_posterior_df`. Skipping.')
+            pass            
+        except Exception as e:
+            raise e
         ## OUTPUTS: track_marginal_posterior_df
 
         ## Build combined marginals df:
@@ -2034,10 +2229,13 @@ class DirectionalPseudo2DDecodersResult(ComputedResult):
             if (epoch_start_t_col_name is not None) or (additional_transfer_column_names is not None):
                 print(f'\tWARN: len(epochs_df): {len(tentative_epochs_df)} != len(track_marginal_posterior_df): {len(track_marginal_posterior_df)}. This is expected in time_bin grain (see TODO 2025-03-26 14:27), but you probably called this with the wrong arguments!')
 
+
+        #TODO 2025-08-14 11:52: - [ ] Could add the 'most_likely_positions_1D' column here in a manner similar to the other method
+
         return custom_curr_unit_marginal_list, track_marginal_posterior_df
 
 
-
+    @function_attributes(short_name=None, tags=['marginal'], input_requires=[], output_provides=[], uses=[], used_by=['cls.determine_non_marginalized_decoder_likelihoods', 'AddNewDecodedEpochMarginal_MatplotlibPlotCommand.prepare_and_perform_add_pseudo2D_decoder_decoded_epoch_marginals', '_display_directional_merged_pf_decoded_epochs'], creation_date='2025-05-02 17:29', related_items=[])
     @classmethod
     def build_non_marginalized_raw_posteriors(cls, filter_epochs_decoder_result: Union[List[NDArray], List[DynamicContainer], NDArray, DecodedFilterEpochsResult], debug_print=False) -> List[DynamicContainer]:
         """ only works for the all-directional coder with the four items
@@ -2093,7 +2291,7 @@ class DirectionalPseudo2DDecodersResult(ComputedResult):
             custom_curr_unit_marginal_list.append(curr_unit_marginal_x)
         return custom_curr_unit_marginal_list
 
-
+    @function_attributes(short_name=None, tags=['marginal'], input_requires=[], output_provides=[], uses=[], used_by=['determine_directional_likelihoods'], creation_date='2025-05-02 17:30', related_items=[])
     @classmethod
     def build_custom_marginal_over_direction(cls, filter_epochs_decoder_result: Union[List[NDArray], List[DynamicContainer], NDArray, DecodedFilterEpochsResult], debug_print=False) -> List[DynamicContainer]:
         """ only works for the all-directional coder with the four items
@@ -2169,6 +2367,8 @@ class DirectionalPseudo2DDecodersResult(ComputedResult):
             custom_curr_unit_marginal_list.append(curr_unit_marginal_y)
         return custom_curr_unit_marginal_list
 
+
+    @function_attributes(short_name=None, tags=['marginal'], input_requires=[], output_provides=[], uses=[], used_by=['determine_long_short_likelihoods', 'prepare_and_perform_add_pseudo2D_decoder_decoded_epoch_marginals'], creation_date='2025-05-02 17:30', related_items=[])
     @classmethod
     def build_custom_marginal_over_long_short(cls, filter_epochs_decoder_result: Union[List[NDArray], List[DynamicContainer], NDArray, DecodedFilterEpochsResult], debug_print=False) -> List[DynamicContainer]:
         """ only works for the all-directional coder with the four items
@@ -2218,17 +2418,6 @@ class DirectionalPseudo2DDecodersResult(ComputedResult):
 
             # print(f'np.shape(reshaped_p_x_given_n): {np.shape(reshaped_p_x_given_n)}')
 
-            # normalized_reshaped_p_x_given_n = np.squeeze(np.sum(reshaped_p_x_given_n, axis=(1), keepdims=False)) / np.sum(reshaped_p_x_given_n, axis=(0,1), keepdims=False)
-            # print(f'np.shape(normalized_reshaped_p_x_given_n): {np.shape(normalized_reshaped_p_x_given_n)}')
-
-            # restored_shape_p_x_given_n = np.reshape(normalized_reshaped_p_x_given_n, curr_array_shape)
-            # print(f'np.shape(restored_shape_p_x_given_n): {np.shape(restored_shape_p_x_given_n)}')
-
-            # np.sum(reshaped_array, axis=2) # axis=2 means sum over both long and short for LR/RL
-
-            # to sum over both long/short for LR
-            # np.sum(reshaped_p_x_given_n, axis=1).shape # axis=2 means sum over both long and short for LR/RL
-            
             # input_array = a_p_x_given_n
             # input_array = normalized_reshaped_p_x_given_n
             input_array = normalized_out_p_x_given_n
@@ -2267,6 +2456,7 @@ class DirectionalPseudo2DDecodersResult(ComputedResult):
         return custom_curr_unit_marginal_list
         
     # Higher-level likelihood access functions ___________________________________________________________________________ #
+    @function_attributes(short_name=None, tags=['marginal', 'MAIN'], input_requires=[], output_provides=[], uses=['cls.build_custom_marginal_over_direction'], used_by=['DecodedFilterEpochsResult.perform_compute_marginals'], creation_date='2025-04-01 00:00', related_items=[])
     @classmethod
     def determine_directional_likelihoods(cls, all_directional_laps_filter_epochs_decoder_result: Union[List[NDArray], List[DynamicContainer], NDArray, DecodedFilterEpochsResult]) -> DecodedMarginalResultTuple:
         """ 
@@ -2295,6 +2485,7 @@ class DirectionalPseudo2DDecodersResult(ComputedResult):
         is_most_likely_direction_LR_dir = np.logical_not(most_likely_direction_from_decoder) # consistent with 'is_LR_dir' column. for LR_dir, values become more positive with time
         return directional_marginals, directional_all_epoch_bins_marginal, most_likely_direction_from_decoder, is_most_likely_direction_LR_dir
     
+    @function_attributes(short_name=None, tags=['marginal', 'MAIN'], input_requires=[], output_provides=[], uses=['cls.build_custom_marginal_over_direction'], used_by=['DecodedFilterEpochsResult.perform_compute_marginals'], creation_date='2025-04-01 00:00', related_items=[])
     @classmethod
     def determine_long_short_likelihoods(cls, all_directional_laps_filter_epochs_decoder_result: Union[List[NDArray], List[DynamicContainer], NDArray, DecodedFilterEpochsResult]) -> DecodedMarginalResultTuple:
         """ 
@@ -2310,17 +2501,14 @@ class DirectionalPseudo2DDecodersResult(ComputedResult):
         
         # gives the likelihood of [LR, RL] for each epoch using information from both Long/Short:
         track_identity_all_epoch_bins_marginal = np.stack([np.sum(v.p_x_given_n, axis=-1)/np.sum(v.p_x_given_n, axis=(-2, -1)) for v in track_identity_marginals], axis=0) # sum over all time-bins within the epoch to reach a consensus
-        # # Compute the likelihood of [LR, RL] for each epoch using information from both Long/Short
-        # track_identity_all_epoch_bins_marginal = np.stack([
-        #     np.nansum(v.p_x_given_n, axis=-1) / np.maximum(np.nansum(v.p_x_given_n, axis=(-2, -1)), _prevent_div_by_zero_epsilon)
-        #     for v in track_identity_marginals
-        # ], axis=0)  # sum over all time-bins within the epoch to reach a consensus
 
         # Find the indicies via this method:
         most_likely_track_identity_from_decoder = np.argmax(track_identity_all_epoch_bins_marginal, axis=1) # consistent with 'lap_dir' columns. for LR_dir, values become more positive with time
         is_most_likely_track_identity_Long = np.logical_not(most_likely_track_identity_from_decoder) # consistent with 'is_LR_dir' column. for LR_dir, values become more positive with time
         return track_identity_marginals, track_identity_all_epoch_bins_marginal, most_likely_track_identity_from_decoder, is_most_likely_track_identity_Long
 
+
+    @function_attributes(short_name=None, tags=['marginal', 'MAIN'], input_requires=[], output_provides=[], uses=['cls.build_custom_marginal_over_direction'], used_by=['DecodedFilterEpochsResult.perform_compute_marginals'], creation_date='2025-04-01 00:00', related_items=[])
     @classmethod
     def determine_non_marginalized_decoder_likelihoods(cls, all_directional_laps_filter_epochs_decoder_result: Union[List[NDArray], List[DynamicContainer], NDArray, DecodedFilterEpochsResult], debug_print=False) -> Tuple[List[DynamicContainer], NDArray[float], NDArray[int], pd.DataFrame]:
         """ 
@@ -2334,10 +2522,6 @@ class DirectionalPseudo2DDecodersResult(ComputedResult):
         non_marginalized_decoder_marginals: List[DynamicContainer] = cls.build_non_marginalized_raw_posteriors(all_directional_laps_filter_epochs_decoder_result, debug_print=debug_print) # each P-x[i].shape: (4, n_epoch_t_bins[i])
         # gives the likelihood of [LR, RL] for each epoch using information from both Long/Short:
         non_marginalized_decoder_all_epoch_bins_marginal = np.stack([np.sum(v.p_x_given_n, axis=-1)/np.sum(v.p_x_given_n, axis=(-2, -1)) for v in non_marginalized_decoder_marginals], axis=0) # sum over all time-bins within the epoch to reach a consensus .shape: (4, )
-        # non_marginalized_decoder_all_epoch_bins_marginal = np.stack([
-        #     np.nansum(v.p_x_given_n, axis=-1) / np.maximum(np.nansum(v.p_x_given_n, axis=(-2, -1)), _prevent_div_by_zero_epsilon)
-        #     for v in non_marginalized_decoder_marginals
-        # ], axis=0) # sum over all time-bins within the epoch to reach a consensus .shape: (4, )
 
         # non_marginalized_decoder_all_epoch_bins_marginal.shape: [n_epochs, 4]
         most_likely_decoder_idxs = np.argmax(non_marginalized_decoder_all_epoch_bins_marginal, axis=1) # consistent with 'lap_dir' columns. for LR_dir, values become more positive with time | most_likely_decoder_idxs will always contain valid indices, not NaN.
@@ -2355,8 +2539,9 @@ class DirectionalPseudo2DDecodersResult(ComputedResult):
         """
         # BEGIN FUNCTION BODY ________________________________________________________________________________________________ #
 
-        active_global_laps_df = Laps._compute_lap_dir_from_smoothed_velocity(active_global_laps_df, global_session=global_session, replace_existing=False) ## NOTE: global_session does not work, use curr_active_pipeline.sess instead (unfiltered session) otherwise it clips the last two laps
-
+        # active_global_laps_df = Laps._compute_lap_dir_from_smoothed_velocity(active_global_laps_df, global_session=global_session, replace_existing=False) ## NOTE: global_session does not work, use curr_active_pipeline.sess instead (unfiltered session) otherwise it clips the last two laps
+        active_global_laps_df = active_global_laps_df.laps_accessor.compute_lap_dir_from_net_displacement(global_session=global_session, replace_existing=False) ## NOTE: global_session does not work, use curr_active_pipeline.sess instead (unfiltered session) otherwise it clips the last two laps
+        
         # Validate Laps:
         # ground_truth_lap_dirs = active_global_laps_df['lap_dir'].to_numpy()
         ground_truth_lap_is_LR_dir = active_global_laps_df['is_LR_dir'].to_numpy()
@@ -2799,7 +2984,7 @@ class DirectionalDecodersContinuouslyDecodedResult(ComputedResult):
             return {k:v.get('pseudo2D', None) for k, v in self.continuously_decoded_result_cache_dict.items()}   
 
 
-    @function_attributes(short_name=None, tags=['pseudo2D', 'timeline-track', '1D', 'split-to-1D'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-02-26 07:23', related_items=[])
+    @function_attributes(short_name=None, tags=['pseudo2D', 'timeline-track', '1D', 'split-to-1D'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-02-26 07:23', related_items=['pyphoplacecellanalysis.Analysis.Decoder.reconstruction.DecodedFilterEpochsResult.split_pseudo2D_result_to_1D_result'])
     def split_pseudo2D_continuous_result_to_1D_continuous_result(self, pseudo2D_decoder_names_list: Optional[str]=None, debug_print=False):
         """ Get 1D representations of the Pseudo2D track (4 decoders) so they can be plotted on seperate tracks and bin-debugged independently.
 
@@ -2872,6 +3057,15 @@ class DirectionalDecodersContinuouslyDecodedResult(ComputedResult):
             assert p_x_given_n.shape[1] == len(pseudo2D_decoder_names_list), f"for pseudo2D_decoder_names_list: {pseudo2D_decoder_names_list}\n\texpected the len(pseudo2D_decoder_names_list): {len(pseudo2D_decoder_names_list)} pseudo-y bins for the decoder in p_x_given_n.shape[1]. but found p_x_given_n.shape: {p_x_given_n.shape}"
             # split_pseudo2D_posteriors_dict = {k:np.squeeze(p_x_given_n[:, i, :]) for i, k in enumerate(pseudo2D_decoder_names_list)}
 
+            xbin_centers: Optional[NDArray] = None
+            ybin_centers: Optional[NDArray] = None
+            if pseudo2D_decoder is not None:
+                assert xbin_centers is None, f"don't provide both xbin_centers and pseudo2D_decoder"
+                assert ybin_centers is None, f"don't provide both ybin_centers and pseudo2D_decoder"
+                original_position_data_shape = deepcopy(pseudo2D_decoder.original_position_data_shape[:-1]) ## all but the pseudo dim
+                xbin_centers = deepcopy(pseudo2D_decoder.xbin_centers)
+                ybin_centers = None
+
             # Need all_directional_pf1D_Decoder_dict
             # output_dict = {}
             output_pseudo2D_split_to_1D_continuous_results_dict: Dict[types.DecoderName, SingleEpochDecodedResult] = {}
@@ -2885,6 +3079,26 @@ class DirectionalDecodersContinuouslyDecodedResult(ComputedResult):
                 # output_pseudo2D_split_to_1D_continuous_results_dict[a_decoder_name].p_x_given_n = a_1D_posterior ## or could squish them here
                 output_pseudo2D_split_to_1D_continuous_results_dict[a_decoder_name].p_x_given_n = np.squeeze(output_pseudo2D_split_to_1D_continuous_results_dict[a_decoder_name].p_x_given_n[:, i, :]) ## or could squish them here
                 
+                ## Copied from `pyphoplacecellanalysis.Analysis.Decoder.reconstruction.DecodedFilterEpochsResult.split_pseudo2D_result_to_1D_result`
+                # #TODO 2025-06-13 14:29: - [X] fix busted-up columns: ['most_likely_position_indicies_list', 'most_likely_positions'
+                output_pseudo2D_split_to_1D_continuous_results_dict[a_decoder_name].most_likely_position_indicies = np.squeeze(np.argmax(output_pseudo2D_split_to_1D_continuous_results_dict[a_decoder_name].p_x_given_n, axis=0))   # average along time dimension
+
+                if (xbin_centers is not None) and (ybin_centers is not None):
+                    ## NOTE: I think 2D position decoding isn't implemented here.
+                    # much more efficient than the other implementation. Result is # (85844, 2)
+                    output_pseudo2D_split_to_1D_continuous_results_dict[a_decoder_name].most_likely_positions = np.vstack((xbin_centers[output_pseudo2D_split_to_1D_continuous_results_dict[a_decoder_name].most_likely_position_indicies[0,:]], self.ybin_centers[output_pseudo2D_split_to_1D_continuous_results_dict[a_decoder_name].most_likely_position_indicies[1,:]])).T
+                elif (xbin_centers is not None):
+                    # 1D Decoder case:
+                    output_pseudo2D_split_to_1D_continuous_results_dict[a_decoder_name].most_likely_positions = np.squeeze(xbin_centers[output_pseudo2D_split_to_1D_continuous_results_dict[a_decoder_name].most_likely_position_indicies])
+                else:
+                    output_pseudo2D_split_to_1D_continuous_results_dict[a_decoder_name].most_likely_positions = []
+                # #TODO 2025-06-13 14:30: - [ ] Finish recomputing marginals
+                # output_pseudo2D_split_to_1D_continuous_results_dict[a_decoder_name].marginal_x = None
+                # output_pseudo2D_split_to_1D_continuous_results_dict[a_decoder_name].marginal_y = None
+                # output_pseudo2D_split_to_1D_continuous_results_dict[a_decoder_name].compute_marginals()
+
+
+
                 # _out_tuple = dict(a_decoder_name=a_decoder_name, a_position_decoder=pseudo2D_decoder, time_window_centers=time_window_centers, a_1D_posterior=a_1D_posterior)
                 # identifier_name, widget, matplotlib_fig, matplotlib_fig_axes = _out_tuple
                 # output_dict[a_decoder_name] = _out_tuple
@@ -3798,7 +4012,7 @@ import neuropy.utils.type_aliases as types
 decoder_name: TypeAlias = str # a string that describes a decoder, such as 'LongLR' or 'ShortRL'
 epoch_split_key: TypeAlias = str # a string that describes a split epoch, such as 'train' or 'test'
 
-from neuropy.utils.mixins.indexing_helpers import UnpackableMixin
+from neuropy.utils.mixins.indexing_helpers import UnpackableMixin, pop_dict_subset
 
 from neuropy.core.epoch import Epoch, ensure_dataframe
 from neuropy.utils.efficient_interval_search import convert_PortionInterval_to_epochs_df
@@ -3871,7 +4085,7 @@ class CustomDecodeEpochsResult(UnpackableMixin):
         
 
     @classmethod
-    def build_single_measured_decoded_position_comparison(cls, a_decoder_decoding_result: DecodedFilterEpochsResult, global_measured_position_df: pd.DataFrame) -> MeasuredDecodedPositionComparison:
+    def build_single_measured_decoded_position_comparison(cls, a_decoder_decoding_result: DecodedFilterEpochsResult, global_measured_position_df: pd.DataFrame, should_drop_epochs_with_no_valid_timebins: bool = True) -> MeasuredDecodedPositionComparison:
         """ compare the decoded most-likely-positions and the measured positions interpolated to the same time bins.
         
         """
@@ -3894,16 +4108,48 @@ class CustomDecodeEpochsResult(UnpackableMixin):
                 assert np.ndim(decoded_positions) < 2, f" the new decoded positions should now be 1D but instead: np.ndim(decoded_positions): {np.ndim(decoded_positions)}, and np.shape(decoded_positions): {np.shape(decoded_positions)}"
             assert len(a_sample_times) == len(decoded_positions), f"len(a_sample_times): {len(a_sample_times)} == len(decoded_positions): {len(decoded_positions)}"
             
+
+            interpolated_measured_x = interpolated_measured_df['x'].to_numpy()
+
+            timebin_is_valid_for_both: NDArray = np.logical_and(np.isfinite(decoded_positions), np.isfinite(interpolated_measured_x)) # bool array of valid indicies for both
+            num_valid_timebins = np.sum(timebin_is_valid_for_both)
+            
+            a_valid_sample_times = a_sample_times[timebin_is_valid_for_both]
+            a_valid_decoded_positions = decoded_positions[timebin_is_valid_for_both]
+            a_valid_interpolated_measured_x = interpolated_measured_x[timebin_is_valid_for_both]
+            assert len(a_valid_sample_times) == len(a_valid_decoded_positions), f"len(a_valid_sample_times): {len(a_valid_sample_times)} == len(a_valid_decoded_positions): {len(a_valid_decoded_positions)}"
+            
+
             ## one for each decoder:
-            test_decoded_positions_df = pd.DataFrame({'t':a_sample_times, 'x':decoded_positions})
+            # test_decoded_positions_df = pd.DataFrame({'t':a_sample_times, 'x':decoded_positions, 'is_timebin_valid_for_both': timebin_is_valid_for_both})
+
+            ## only get valid bins: do we need all bins?
+            test_decoded_positions_df = pd.DataFrame({'t':a_valid_sample_times, 'x':a_valid_decoded_positions})
             center_epoch_time = np.mean(a_sample_times)
 
             decoded_positions_df_list.append(test_decoded_positions_df)
             # compute the diff error:
             # mean_squared_error(y_true, y_pred)
-            # test_decoded_measured_diff_df = (interpolated_measured_df[['x']] - pd.DataFrame({'x':v.most_likely_positions_list[epoch_idx]})) ## error at each point
-            test_decoded_measured_diff: float = mean_squared_error(interpolated_measured_df['x'].to_numpy(), decoded_positions) # single float error
-            test_decoded_measured_diff_cm: float = np.sqrt(test_decoded_measured_diff)
+            
+
+            if (num_valid_timebins == 0):
+                print(f'WARN: encountered epoch[{epoch_idx}] with no valid timebins.')
+                if not should_drop_epochs_with_no_valid_timebins:
+                    print(f'\tskipping because `should_drop_epochs_with_no_valid_timebins = True`. Output will have diff number of epochs than input!')
+                    pass
+                else:
+                    print(f'\tfilling with NaN and continuing.')
+                    ## have to fill with something!
+                    test_decoded_measured_diff: float = np.nan
+                    test_decoded_measured_diff_cm: float = np.nan
+                    
+            else:
+                ## has some timebins that are valid:
+
+                # test_decoded_measured_diff_df = (interpolated_measured_df[['x']] - pd.DataFrame({'x':v.most_likely_positions_list[epoch_idx]})) ## error at each point
+                # test_decoded_measured_diff: float = mean_squared_error(interpolated_measured_df['x'].to_numpy(), decoded_positions) # single float error
+                test_decoded_measured_diff: float = mean_squared_error(a_valid_interpolated_measured_x, a_valid_decoded_positions) # single float error
+                test_decoded_measured_diff_cm: float = np.sqrt(test_decoded_measured_diff)
 
             decoded_measured_diff_df.append((center_epoch_time, test_decoded_measured_diff, test_decoded_measured_diff_cm))
 
@@ -4264,7 +4510,7 @@ def _do_train_test_split_decode_and_evaluate(curr_active_pipeline, active_laps_d
     percent_laps_track_identity_estimated_correctly
 
     """
-    from neuropy.core.session.dataSession import Laps
+    from neuropy.core.laps import LapsAccessor, Laps
     from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import PfND
     # from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import compute_weighted_correlations
     # from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import _check_result_laps_epochs_df_performance
@@ -4279,7 +4525,9 @@ def _do_train_test_split_decode_and_evaluate(curr_active_pipeline, active_laps_d
         epochs_df = epochs_df.sort_values(['start', 'stop', 'label']).reset_index(drop=True) # Sort by columns: 'start' (ascending), 'stop' (ascending), 'label' (ascending)
         epochs_df = epochs_df.drop_duplicates(subset=['start', 'stop', 'label'])
         epochs_df = epochs_df.epochs.adding_maze_id_if_needed(t_start=t_start, t_delta=t_delta, t_end=t_end)
-        epochs_df = Laps._compute_lap_dir_from_smoothed_velocity(laps_df=epochs_df, global_session=deepcopy(global_session), replace_existing=True)
+        # epochs_df = Laps._compute_lap_dir_from_smoothed_velocity(laps_df=epochs_df, global_session=deepcopy(global_session), replace_existing=True)
+        epochs_df = epochs_df.laps_accessor.compute_lap_dir_from_net_displacement(global_session=deepcopy(global_session), replace_existing=True)
+        
         return epochs_df
         
 
@@ -4885,13 +5133,13 @@ class TrainTestLapsSplitting:
         # active_decoder_evaluation_df = global_measured_position_df
 
         # ## Get the previously created matplotlib_view_widget figure/ax:
-        fig, curr_ax = plot_1D_most_likely_position_comparsions(active_decoder_evaluation_df, time_window_centers=time_window_centers, xbin=xbin,
+        fig, curr_ax, _return_out_artists_dict = plot_1D_most_likely_position_comparsions(active_decoder_evaluation_df, time_window_centers=time_window_centers, xbin=xbin,
                                                             posterior=active_posterior,
                                                             active_most_likely_positions_1D=active_most_likely_positions,
                                                             # variable_name='x',
                                                             variable_name='measured',
                                                             enable_flat_line_drawing=False,
-                                                            ax=None,
+                                                            ax=None, return_created_artists=True,
                                                         )
         plt.title('decoding performance')
 
@@ -4996,12 +5244,23 @@ class TrialByTrialActivityResult(ComputedResult):
             print(f'TrialByTrialActivity is not computed.')
 
     """
-    _VersionedResultMixin_version: str = "2024.05.28_0" # to be updated in your IMPLEMENTOR to indicate its version
+    _VersionedResultMixin_version: str = "2025.07.31_0" # to be updated in your IMPLEMENTOR to indicate its version
 
     any_decoder_neuron_IDs: NDArray = serialized_field(default=None)
     active_pf_dt: PfND_TimeDependent = serialized_field(default=None)
     directional_lap_epochs_dict: Dict[decoder_name, Epoch] =  serialized_field(default=None)
     directional_active_lap_pf_results_dicts: Dict[decoder_name, TrialByTrialActivity] = serialized_field(default=None)
+
+    minimum_one_point_stability: float = serialized_attribute_field(default=0.6, metadata={'field_added': '2025.07.31_0'})
+    zero_point_stability: float = serialized_attribute_field(default=0.1, metadata={'field_added': '2025.07.31_0'})
+    # stability_df: pd.DataFrame = serialized_field(default=None)
+
+
+    @property
+    def stability_df(self) -> pd.DataFrame:
+        """The stability_df property."""
+        stability_df = self.get_cell_stability_info(minimum_one_point_stability=self.minimum_one_point_stability, zero_point_stability=self.zero_point_stability)[0]
+        return stability_df
 
 
     def __repr__(self):
@@ -5109,42 +5368,151 @@ class TrialByTrialActivityResult(ComputedResult):
         ## OUTPUTS: z_scored_tuning_map_matrix, C_trial_by_trial_correlation_matrix
         return modified_directional_active_lap_pf_results_dicts
     
+    @classmethod
+    def plot_stability_group_diagnostics(cls, stability_df: pd.DataFrame, contra_period_max_permitted_stability: float = 0.1, dominant_period_min_stability: float = 0.6, enable_tiny_point_labels=False, enable_hover_labels=False):
+        """ plots stability 
+
+        Usage:
+            from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import TrialByTrialActivityResult
+
+            contra_period_max_permitted_stability = 0.1
+            dominant_period_min_stability = 0.7
+            all_neuron_stats_table, (appearing_stability_df, disappearing_stability_df, appearing_or_disappearing_stability_df, stable_both_stability_df, stable_neither_stability_df, stable_long_stability_df, stable_short_stability_df) = TrialByTrialActivityResult.determine_neuron_group_from_stability(stability_df=all_neuron_stats_table, contra_period_max_permitted_stability=contra_period_max_permitted_stability, dominant_period_min_stability=dominant_period_min_stability)
+
+            ax, plots_dict = TrialByTrialActivityResult.plot_stability_group_diagnostics(stability_df=all_neuron_stats_table, contra_period_max_permitted_stability=contra_period_max_permitted_stability, dominant_period_min_stability=dominant_period_min_stability)
+
+        """
+        import matplotlib.pyplot as plt
+        stability_column_names = ['stability_long_best', 'stability_short_best']
+        x_var_name: str = 'stability_long_best'
+        y_var_name: str = 'stability_short_best'
+
+        stability_df = deepcopy(stability_df).rename(columns={x:x.removeprefix('stability_') for x in stability_column_names})
+        stability_df, (appearing_stability_df, disappearing_stability_df, appearing_or_disappearing_stability_df, stable_both_stability_df, stable_neither_stability_df, stable_long_stability_df, stable_short_stability_df) = cls.determine_neuron_group_from_stability(stability_df=stability_df, contra_period_max_permitted_stability=contra_period_max_permitted_stability, dominant_period_min_stability=dominant_period_min_stability)
+        # fig = plt.figure(num='stability_group_diagnostics')
+        
+        scatter_props_kwargs = dict()
+
+        fig, ax = plt.subplots(num='stability_group_diagnostics', clear=True)
+        x_values = stability_df['long_best'].to_numpy()
+        y_values = stability_df['short_best'].to_numpy()
+        # Convert categorical values to integers or colors
+        categories = stability_df['stability_class'].astype('category')
+        color_values = categories.cat.codes  # numeric mapping for color
+
+        scatter_plot = ax.scatter(x_values, y_values, c=color_values, **scatter_props_kwargs)
+
+        # ax = stability_df.plot.scatter(x='long_best', y='short_best', c='stability_class', title='stability_group_diagnostics')
+        # Optional: create legend
+        handles = [plt.Line2D([0], [0], marker='o', linestyle='', color=scatter_plot.cmap(scatter_plot.norm(code))) for code in range(len(categories.cat.categories))]
+        ax.legend(handles, categories.cat.categories, title='stability_class', bbox_to_anchor=(1.05, 1), loc='upper left', borderaxespad=0.,
+                #    loc='upper center', ncol=len(categories.cat.categories),
+                   ) # , bbox_to_anchor=(0.5, -0.15)
+        plt.title('stability_group_diagnostics')
+        plt.suptitle(f'Stability Group Diagnostics:\n(max_contra={contra_period_max_permitted_stability}, min_dom={dominant_period_min_stability})')
+
+        plots_dict = {'scatter': scatter_plot}
+        plots_dict['vlines'] = ax.vlines(x=[contra_period_max_permitted_stability, dominant_period_min_stability], ymin=0, ymax=1, color=['r', 'g'], linestyle='--', linewidth=1, label=f'max_contra={contra_period_max_permitted_stability}')
+        # plots_dict['vlines_labels'] = ax.text(contra_period_max_permitted_stability, 0.1, f'max_contra={contra_period_max_permitted_stability}', rotation=90, verticalalignment='bottom', horizontalalignment='center')
+        plots_dict['hlines'] = ax.hlines(y=[contra_period_max_permitted_stability, dominant_period_min_stability], xmin=0, xmax=1, color=['r', 'g'], linestyle='--', linewidth=1, label=f'min_dom={dominant_period_min_stability}')
+        
+        plots_dict['hover_label_objects'] = []
+        if (enable_hover_labels or enable_tiny_point_labels):
+            if enable_hover_labels:
+                import mplcursors # for hover tooltips that specify the aclu of the selected point
+                
+            # LxC_aclus = self.computation_result.LxC_aclus
+            # SxC_aclus = self.computation_result.SxC_aclus
+            # _fig_2_theta_out = self.add_optional_aclu_labels(_fig_2_theta_out, LxC_aclus, SxC_aclus, enable_tiny_point_labels=enable_tiny_point_labels, enable_hover_labels=enable_hover_labels, enabled_point_connection_lines=False)
+            # _fig_2_replay_out = self.add_optional_aclu_labels(_fig_2_replay_out, LxC_aclus, SxC_aclus, enable_tiny_point_labels=enable_tiny_point_labels, enable_hover_labels=enable_hover_labels, enabled_point_connection_lines=False)
+        
+
+            # active_labels = stability_df['aclu'].to_list()
+            active_labels = stability_df[['session_name', 'aclu']].astype(str).agg('|'.join, axis=1) # Want a column with the two strings for each row joined by the vertical bar
+            point_hover_labels = [f'{i}' for i in active_labels] # point_hover_labels will be added as tooltip annotations to the datapoints
+            
+            assert len(x_values) == len(y_values) and len(x_values) == len(point_hover_labels), f"len(x_values): {len(x_values)}, len(y_values): {len(y_values)}, len(point_hover_labels): {len(point_hover_labels)}"
+            # add static tiny labels beside each point
+            if (enable_tiny_point_labels):
+                if enable_tiny_point_labels:
+                    temp_annotation_labels_list = []
+                for i, (x, y, label) in enumerate(zip(x_values, y_values, point_hover_labels)):
+                    # print(f'{i}, (x, y, label): ({x}, {y}, {label})')
+                    if enable_tiny_point_labels:
+                        annotation_item = ax.annotate(label, (x, y), textcoords="offset points", xytext=(2,2), ha='left', va='bottom', fontsize=8) # , color=rect.get_facecolor()
+                        temp_annotation_labels_list.append(annotation_item)
+
+                if enable_tiny_point_labels:
+                    plots_dict['tiny_annotation_labels'] = temp_annotation_labels_list
+                
+            # add hover labels:
+            # https://stackoverflow.com/questions/7908636/possible-to-make-labels-appear-when-hovering-over-a-point-in-matplotlib
+            # https://stackoverflow.com/questions/7908636/possible-to-make-labels-appear-when-hovering-over-a-point-in-matplotlib/21654635#21654635
+            # add hover labels using mplcursors
+            if enable_hover_labels:
+                hover_label_obj = mplcursors.cursor(scatter_plot, hover=True).connect("add", lambda sel: sel.annotation.set_text(point_hover_labels[sel.index]))
+                plots_dict['hover_label_objects'] = hover_label_obj
+
+
+        ax.set_xlabel(x_var_name)
+        ax.set_ylabel(y_var_name)
+
+        plt.tight_layout()
+
+        return ax, plots_dict
 
     @classmethod    
-    def determine_neuron_stability(cls, stability_df: pd.DataFrame, minimum_one_point_stability: float = 0.6, zero_point_stability: float = 0.1):
+    def determine_neuron_group_from_stability(cls, stability_df: pd.DataFrame, contra_period_max_permitted_stability: float = 0.1, dominant_period_min_stability: float = 0.6, add_all_intermedia_stability_columns: bool=True):
         """ try to determine the LxC/SxC remapping cells from their stability 
         
-        neuron_group_split_stability_dfs_tuple = self.determine_neuron_stability(stability_df=stability_df)
-        appearing_stability_df, disappearing_stability_df, appearing_or_disappearing_stability_df, stable_both_stability_df, stable_neither_stability_df, stable_long_stability_df, stable_short_stability_df = neuron_group_split_stability_dfs_tuple
-        neuron_group_split_stability_aclus_tuple = [sort(a_df.aclu.values) for a_df in neuron_group_split_stability_dfs_tuple]
-        appearing_aclus, disappearing_aclus, appearing_or_disappearing_aclus, stable_both_aclus, stable_neither_aclus, stable_long_aclus, stable_short_aclus = neuron_group_split_stability_aclus_tuple
+        zero_point_stability: cells with values below this threshold are considered "unstable", default 0.1
+        
+        minimum_one_point_stability: cells with values exceeding this threshold are considered "stable" -- NOTE that `stable_*` is not the negation of `unstable_*` because they require a minimum `one_point_stability`, default 0.6
+
+
+        #TODO 2025-07-31 12:52: - [ ] QUESTION: What if cell isn't firing AT ALL on the long track for example, does it appear "stable" for that track as a result, and what is its score?
+
+        HISTORY 2025-08-05 - Renamed {'zero_point_stability': 'contra_period_max_permitted_stability',
+                                    'minimum_one_point_stability': 'dominant_period_min_stability'}
+        
+        Usage:
+            stability_df, neuron_group_split_stability_dfs_tuple = self.determine_neuron_stability(stability_df=stability_df)
+            appearing_stability_df, disappearing_stability_df, appearing_or_disappearing_stability_df, stable_both_stability_df, stable_neither_stability_df, stable_long_stability_df, stable_short_stability_df = neuron_group_split_stability_dfs_tuple
+            neuron_group_split_stability_aclus_tuple = [sort(a_df.aclu.values) for a_df in neuron_group_split_stability_dfs_tuple]
+            appearing_aclus, disappearing_aclus, appearing_or_disappearing_aclus, stable_both_aclus, stable_neither_aclus, stable_long_aclus, stable_short_aclus = neuron_group_split_stability_aclus_tuple
         
         """
         from numpy import sort
+
+        # stability_df.columns = [x.str.removeprefix('stability_') for x in stability_df.columns]
+        if ('stability_long_best' in stability_df) or ('stability_short_best' in stability_df):
+            stability_column_names = ['stability_long_best', 'stability_short_best']    
+            stability_df = deepcopy(stability_df).rename(columns={x:x.removeprefix('stability_') for x in stability_column_names})
+            assert ('long_best' in stability_df)
+        else:
+            if 'long_best' not in stability_df:        
+                stability_df['long_best'] = stability_df[['long_LR', 'long_RL']].max(axis=1, skipna=True)
+                stability_df['short_best'] = stability_df[['short_LR', 'short_RL']].max(axis=1, skipna=True)
         
-        stability_df['long_best'] = stability_df[['long_LR', 'long_RL']].max(axis=1, skipna=True)
-        stability_df['short_best'] = stability_df[['short_LR', 'short_RL']].max(axis=1, skipna=True)
-        stability_df = stability_df.sort_values(['long_best'], ascending=True)
+        # stability_df = stability_df.sort_values(['long_best'], ascending=True)
+
+        stability_df = stability_df.sort_values(['aclu'], ascending=True, ignore_index=True)
 
         ## find effectively zero (unstable/no-pf) cells:    
-        unstable_long = (stability_df['long_best'] <= zero_point_stability)
-        unstable_short = (stability_df['short_best'] <= zero_point_stability)
+        is_unstable_long = (stability_df['long_best'] <= contra_period_max_permitted_stability)
+        is_unstable_short = (stability_df['short_best'] <= contra_period_max_permitted_stability)
 
         ## NOTE that `stable_*` is not the negation of `unstable_*` because they require a minimum `one_point_stability`
-        stable_long = (stability_df['long_best'] >= minimum_one_point_stability)
-        stable_short = (stability_df['short_best'] >= minimum_one_point_stability)
-
-        # stable_long = np.logical_not(unstable_long)
-        # stable_short = np.logical_not(unstable_short)
+        is_stable_long = (stability_df['long_best'] >= dominant_period_min_stability)
+        is_stable_short = (stability_df['short_best'] >= dominant_period_min_stability)
 
         # is_appearing = np.logical_and(unstable_long, np.logical_not(unstable_short))
-        is_appearing = np.logical_and(unstable_long, stable_short)
+        is_appearing = np.logical_and(is_unstable_long, is_stable_short)
         appearing_stability_df = stability_df[is_appearing]
-        appearing_aclus = appearing_stability_df.aclu.values
 
-        is_disappearing = np.logical_and(stable_long, unstable_short)
+        is_disappearing = np.logical_and(is_stable_long, is_unstable_short)
         disappearing_stability_df = stability_df[is_disappearing]
-        disappearing_aclus = disappearing_stability_df.aclu.values
+
 
         ## OUTPUTS: appearing_stability_df, appearing_aclus, disappearing_stability_df, disappearing_aclus
         # appearing_aclus, disappearing_aclus
@@ -5159,24 +5527,52 @@ class TrialByTrialActivityResult(ComputedResult):
         appearing_or_disappearing_aclus = sort(appearing_or_disappearing_stability_df.aclu.values)
         
 
+        if add_all_intermedia_stability_columns:
+            stability_df = stability_df.assign(**{
+             'is_unstable_long':is_unstable_long, 'is_unstable_short':is_unstable_short,
+              'is_stable_long':is_stable_long, 'is_stable_short': is_stable_short,
+              'is_appearing':is_appearing, 'is_disappearing': is_disappearing,
+              'is_appearing_or_disappearing': is_appearing_or_disappearing})
+
+
+        
+        # stability_df['stability_is_ANY_stable'] = np.logical_or(
+
+
         # appearing_or_disappearing_aclus = (disappearing_aclus.tolist() + appearing_aclus.tolist())
         # appearing_or_disappearing_aclus = sort(appearing_or_disappearing_aclus)
         # override_active_neuron_IDs.extend(appearing_aclus)
         # override_active_neuron_IDs # [ 3 11 14 15 24 34 35 51 58 67 74 82]
         
-        stable_both_stability_df = stability_df[np.logical_and(stable_long, stable_short)]
+        # Define stability classes as categorical for efficiency
+        stability_categories = ['none', 'appearing', 'disappearing', 'stable_both', 'stable_neither']
+        stability_df['stability_class'] = pd.Categorical((['none'] * len(stability_df)), categories=stability_categories)
+        stability_df.loc[is_appearing, 'stability_class'] = 'appearing'
+        stability_df.loc[is_disappearing, 'stability_class'] = 'disappearing'
+
+        is_stable_both = np.logical_and(is_stable_long, is_stable_short)
+        stable_both_stability_df = stability_df[is_stable_both]
         stable_both_aclus = stable_both_stability_df.aclu.values
+        stability_df.loc[is_stable_both, 'stability_class'] = 'stable_both'
         
-        stable_neither_stability_df = stability_df[np.logical_and(unstable_long, unstable_short)]
+        is_stable_neither = np.logical_and(is_unstable_long, is_unstable_short)
+        stable_neither_stability_df = stability_df[is_stable_neither]
         stable_neither_aclus = stable_neither_stability_df.aclu.values
-        
-        stable_long_stability_df = stability_df[stable_long]
+        stability_df.loc[is_stable_neither, 'stability_class'] = 'stable_neither'
+
+        if add_all_intermedia_stability_columns:
+            stability_df = stability_df.assign(**{
+            'is_stable_both':is_stable_both, 'is_stable_neither':is_stable_neither,
+            })
+
+
+        stable_long_stability_df = stability_df[is_stable_long]
         stable_long_aclus = stable_long_stability_df.aclu.values
         
-        stable_short_stability_df = stability_df[stable_short]
+        stable_short_stability_df = stability_df[is_stable_short]
         stable_short_aclus = stable_short_stability_df.aclu.values
 
-        return (appearing_stability_df, disappearing_stability_df, appearing_or_disappearing_stability_df, stable_both_stability_df, stable_neither_stability_df, stable_long_stability_df, stable_short_stability_df)
+        return stability_df, (appearing_stability_df, disappearing_stability_df, appearing_or_disappearing_stability_df, stable_both_stability_df, stable_neither_stability_df, stable_long_stability_df, stable_short_stability_df)
         # (appearing_aclus, disappearing_aclus, appearing_or_disappearing_aclus, stable_both_aclus, stable_neither_aclus, stable_long_aclus, stable_short_aclus)
     
         # return appearing_or_disappearing_aclus, appearing_stability_df, appearing_aclus, disappearing_stability_df, disappearing_aclus, (stable_both_aclus, stable_neither_aclus, stable_long_aclus, stable_short_aclus)
@@ -5184,8 +5580,9 @@ class TrialByTrialActivityResult(ComputedResult):
         # return appearing_or_disappearing_aclus, appearing_stability_df, appearing_aclus, disappearing_stability_df, disappearing_aclus, (stable_both_aclus, stable_neither_aclus, stable_long_aclus, stable_short_aclus)
 
 
-    def get_stability_df(self):
-        """ 
+    def get_basic_stability_df(self) -> pd.DataFrame:
+        """ to get the version with the stability information added, use `self.stability_df` or call `self.get_cell_stability_info(...)` directly
+         the nanmean(C, axis=[1,2]), resulting in a score bounded between [0, 1]
         Usage:
         
             stability_df, stability_dict = a_trial_by_trial_result.get_stability_df()
@@ -5194,26 +5591,40 @@ class TrialByTrialActivityResult(ComputedResult):
         # directional_lap_epochs_dict: Dict[str, Epoch] = self.directional_lap_epochs_dict
         stability_dict = {k:list(v.aclu_to_stability_score_dict.values()) for k,v in self.directional_active_lap_pf_results_dicts.items()}
         stability_df: pd.DataFrame = pd.DataFrame({'aclu': self.any_decoder_neuron_IDs, **stability_dict})
-        return stability_df, stability_dict
+        stability_df['long_best'] = stability_df[['long_LR', 'long_RL']].max(axis=1, skipna=True)
+        stability_df['short_best'] = stability_df[['short_LR', 'short_RL']].max(axis=1, skipna=True)
+        stability_df['LR_best'] = stability_df[['long_LR', 'short_LR']].max(axis=1, skipna=True)
+        stability_df['RL_best'] = stability_df[['long_RL', 'short_RL']].max(axis=1, skipna=True)
+        stability_df['ANY_best'] = stability_df[['long_LR', 'long_RL', 'short_LR', 'short_RL']].max(axis=1, skipna=True)        
+        return stability_df
     
-    def get_cell_stability_info(self, minimum_one_point_stability: float = 0.6, zero_point_stability: float = 0.1):
+    def get_cell_stability_info(self, minimum_one_point_stability: Optional[float] = None, zero_point_stability: Optional[float] = None):
         """ 
         
         Usage:
-            stability_df, stability_dict = a_trial_by_trial_result.get_stability_df()
-            appearing_or_disappearing_aclus, appearing_stability_df, appearing_aclus, disappearing_stability_df, disappearing_aclus = a_trial_by_trial_result.get_cell_stability_info(minimum_one_point_stability=0.6, zero_point_stability=0.1)
+            stability_df = a_trial_by_trial_result.get_stability_df()
+            stability_df, neuron_group_split_stability_dfs_tuple, neuron_group_split_stability_aclus_tuple  = a_trial_by_trial_result.get_cell_stability_info(minimum_one_point_stability=0.6, zero_point_stability=0.1)
             override_active_neuron_IDs = deepcopy(appearing_or_disappearing_aclus)
             override_active_neuron_IDs
 
 
         """
-        stability_df, stability_dict = self.get_stability_df()
-        
-        neuron_group_split_stability_dfs_tuple = TrialByTrialActivityResult.determine_neuron_stability(stability_df=stability_df, minimum_one_point_stability=minimum_one_point_stability, zero_point_stability=zero_point_stability)
+        if minimum_one_point_stability is not None:
+            self.minimum_one_point_stability = minimum_one_point_stability
+        else:
+            minimum_one_point_stability = self.minimum_one_point_stability
+            
+        if zero_point_stability is not None:
+            self.zero_point_stability = zero_point_stability
+        else:
+            zero_point_stability = self.zero_point_stability
+
+        stability_df = self.get_basic_stability_df()
+        stability_df, neuron_group_split_stability_dfs_tuple = self.determine_neuron_group_from_stability(stability_df=stability_df, dominant_period_min_stability=minimum_one_point_stability, contra_period_max_permitted_stability=zero_point_stability)
         appearing_stability_df, disappearing_stability_df, appearing_or_disappearing_stability_df, stable_both_stability_df, stable_neither_stability_df, stable_long_stability_df, stable_short_stability_df = neuron_group_split_stability_dfs_tuple
         neuron_group_split_stability_aclus_tuple = [np.sort(a_df.aclu.values) for a_df in neuron_group_split_stability_dfs_tuple]
         appearing_aclus, disappearing_aclus, appearing_or_disappearing_aclus, stable_both_aclus, stable_neither_aclus, stable_long_aclus, stable_short_aclus = neuron_group_split_stability_aclus_tuple
-        return (neuron_group_split_stability_dfs_tuple, neuron_group_split_stability_aclus_tuple)
+        return (stability_df, neuron_group_split_stability_dfs_tuple, neuron_group_split_stability_aclus_tuple)
 
 def _workaround_validate_has_directional_trial_by_trial_activity_result(curr_active_pipeline, computation_filter_name='maze') -> bool:
     """ Validates `_build_trial_by_trial_activity_metrics`
@@ -5830,10 +6241,6 @@ def _subfn_compute_complete_df_metrics(directional_merged_decoders_result: "Dire
 
 
 
-
-
-
-
 #TODO 2024-07-03 17:17: - [ ] NOT YET FINISHED
 @function_attributes(short_name=None, tags=['NOT_YET_FINISHED'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-07-03 17:18', related_items=[])
 def _compute_arbitrary_epochs_all_df_score_metrics(directional_merged_decoders_result: "DirectionalPseudo2DDecodersResult", track_templates, new_epochs_decoder_result_dict: Dict[str, Optional[DecodedFilterEpochsResult]],
@@ -5934,11 +6341,6 @@ def _compute_arbitrary_epochs_all_df_score_metrics(directional_merged_decoders_r
     raw_dict_outputs_tuple = (decoder_ripple_radon_transform_df_dict, decoder_ripple_radon_transform_extras_dict, decoder_ripple_weighted_corr_df_dict)
     merged_df_outputs_tuple = (ripple_radon_transform_merged_df, ripple_weighted_corr_merged_df, ripple_simple_pf_pearson_merged_df)
     return (new_epochs_decoder_result_dict, new_epochs_decoder_result_dict), merged_df_outputs_tuple, raw_dict_outputs_tuple
-
-
-
-
-
 
 
 
@@ -6114,6 +6516,54 @@ def _perform_compute_custom_epoch_decoding(curr_active_pipeline, directional_mer
         return decoder_laps_filter_epochs_decoder_result_dict, decoder_ripple_filter_epochs_decoder_result_dict
 
 
+@function_attributes(short_name=None, tags=['add_position_columns', 'decoded_df'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-05-03 17:14', related_items=[])
+def _helper_add_interpolated_position_columns_to_decoded_result_df(a_result: DecodedFilterEpochsResult, a_decoder: BasePositionDecoder, a_decoded_marginal_posterior_df: pd.DataFrame, global_measured_position_df: pd.DataFrame):
+    """ adds the measured positions as columns in the decoded epochs/epoch_time_bins df
+    
+    
+        from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import _helper_add_interpolated_position_columns_to_decoded_result_df
+
+        ## INPUTS: curr_active_pipeline, a_result, a_decoder, a_decoded_marginal_posterior_df
+
+        global_measured_position_df: pd.DataFrame = deepcopy(curr_active_pipeline.sess.position.to_dataframe())
+        
+        a_decoded_marginal_posterior_df: pd.DataFrame = _helper_add_interpolated_position_columns_to_decoded_result_df(a_result=a_result, a_decoder=a_decoder, a_decoded_marginal_posterior_df=a_decoded_marginal_posterior_df, global_measured_position_df=global_measured_position_df)
+    
+    """
+    from neuropy.utils.indexing_helpers import PandasHelpers
+
+    ## add in measured position columns
+    global_measured_position_df: pd.DataFrame = deepcopy(global_measured_position_df) # computation_result.sess.position.to_dataframe()
+    global_all_directional_decoder_result: CustomDecodeEpochsResult = CustomDecodeEpochsResult.init_from_single_decoder_decoding_result_and_measured_pos_df(a_result, global_measured_position_df=global_measured_position_df)
+
+    xbin_edges = deepcopy(a_decoder.xbin)
+    # ybin_edges = deepcopy(a_decoder.ybin)
+    # xbin_edges = None
+    ybin_edges = None
+    active_computation_config = deepcopy(a_decoder.pf.config)
+    # grid_bin_bounds = deepcopy(a_decoder.pf.config.grid_bin_bounds)
+
+    measured_positions_df: pd.DataFrame = deepcopy(global_all_directional_decoder_result.measured_decoded_position_comparion.measured_positions_dfs_list[0])
+    measured_positions_df = measured_positions_df.position.adding_binned_position_columns(xbin_edges=xbin_edges, ybin_edges=ybin_edges, active_computation_config=active_computation_config)
+    measured_positions_df = measured_positions_df.rename(columns={'x':'x_meas', 'y':'y_meas', 'binned_x':'binned_x_meas', 'binned_y':'binned_y_meas'}, inplace=False).drop(columns=['t'], inplace=False) ## measured
+
+    decoded_positions_df: pd.DataFrame = deepcopy(global_all_directional_decoder_result.measured_decoded_position_comparion.decoded_positions_df_list[0])
+    decoded_positions_df = decoded_positions_df.position.adding_binned_position_columns(xbin_edges=xbin_edges, ybin_edges=ybin_edges, active_computation_config=active_computation_config)
+    decoded_positions_df = decoded_positions_df.rename(columns={'x':'x_decoded_most_likely', 'binned_x':'binned_x_decoded_most_likely'}, inplace=False).drop(columns=['t'], inplace=False) ## decoded most likely
+
+    ## OUTPUTS: measured_positions_df, decoded_positions_df
+
+    ## Add directly to `a_decoded_marginal_posterior_df` (concatenating columns to existing rows)
+    a_decoded_marginal_posterior_df = PandasHelpers.adding_additional_df_columns(original_df=a_decoded_marginal_posterior_df,
+                                                                                additional_cols_df=measured_positions_df,
+                                                                                )
+
+    a_decoded_marginal_posterior_df = PandasHelpers.adding_additional_df_columns(original_df=a_decoded_marginal_posterior_df,
+                                                                                additional_cols_df=decoded_positions_df,
+                                                                                )
+    return a_decoded_marginal_posterior_df
+
+
 
 # ==================================================================================================================== #
 # Main Computation Functions                                                                                           #
@@ -6132,7 +6582,7 @@ class DirectionalPlacefieldGlobalComputationFunctions(AllFunctionEnumeratingMixi
     def _split_to_directional_laps(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, debug_print=False):
         """ Splits the existing laps into directional versions
     
-        laps_obj.update_lap_dir_from_smoothed_velocity(pos_input=curr_active_pipeline.sess.position)
+        laps_obj.update_lap_dir_from_net_displacement(pos_input=curr_active_pipeline.sess.position)
         laps_obj.update_maze_id_if_needed(t_start=t_start, t_delta=t_delta, t_end=t_end)
     
         Requires:
@@ -6273,7 +6723,7 @@ class DirectionalPlacefieldGlobalComputationFunctions(AllFunctionEnumeratingMixi
             global_any_laps_epochs_obj = deepcopy(owning_pipeline_reference.computation_results[global_any_name].computation_config.pf_params.computation_epochs) # global_any_name='maze_any' (? same as global_epoch_name?)
             global_any_laps_epochs_df = ensure_dataframe(global_any_laps_epochs_obj)    
             global_any_laps_epochs_df = global_any_laps_epochs_df.epochs.adding_maze_id_if_needed(t_start=t_start, t_delta=t_delta, t_end=t_end)
-            global_any_laps_epochs_df = Laps._compute_lap_dir_from_smoothed_velocity(laps_df=global_any_laps_epochs_df, global_session=deepcopy(global_session), replace_existing=True)
+            global_any_laps_epochs_df = global_any_laps_epochs_df.laps_accessor.compute_lap_dir_from_net_displacement(global_session=deepcopy(global_session), replace_existing=True)
             directional_merged_decoders_result.all_directional_laps_filter_epochs_decoder_result = all_directional_pf1D_Decoder.decode_specific_epochs(spikes_df=deepcopy(get_proper_global_spikes_df(owning_pipeline_reference, minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz, included_qclu_values=included_qclu_values)),
                                                                                                                                                filter_epochs=deepcopy(global_any_laps_epochs_df), decoding_time_bin_size=laps_decoding_time_bin_size, debug_print=False)
         else:
@@ -6372,7 +6822,7 @@ class DirectionalPlacefieldGlobalComputationFunctions(AllFunctionEnumeratingMixi
             had_existing_DirectionalDecodersDecoded_result = False
             directional_decoders_decode_result = None # set to None
 
-
+        did_update_computations: bool = False
         ## Currently used for both cases to decode:
         t_start, t_delta, t_end = owning_pipeline_reference.find_LongShortDelta_times()
         # Build an Epoch object containing a single epoch, corresponding to the global epoch for the entire session:
@@ -6430,6 +6880,7 @@ class DirectionalPlacefieldGlobalComputationFunctions(AllFunctionEnumeratingMixi
             continuously_decoded_result_cache_dict = {time_bin_size:all_directional_continuously_decoded_dict} # result is a single time_bin_size
             print(f'\t computation done. Creating new DirectionalDecodersContinuouslyDecodedResult....')
             directional_decoders_decode_result = DirectionalDecodersContinuouslyDecodedResult(pseudo2D_decoder=pseudo2D_decoder, pf1D_Decoder_dict=all_directional_pf1D_Decoder_dict, spikes_df=deepcopy(global_spikes_df), continuously_decoded_result_cache_dict=continuously_decoded_result_cache_dict)
+            did_update_computations = True
 
         else:
             # had_existing_DirectionalDecodersDecoded_result == True _____________________________________________________________ #
@@ -6460,6 +6911,7 @@ class DirectionalPlacefieldGlobalComputationFunctions(AllFunctionEnumeratingMixi
                 all_directional_continuously_decoded_dict['pseudo2D'] = pseudo2D_decoder_continuously_decoded_result
                 # directional_decoders_decode_result.__dict__.update(pf1D_Decoder_dict=all_directional_pf1D_Decoder_dict)
                 directional_decoders_decode_result.continuously_decoded_result_cache_dict[time_bin_size] = all_directional_continuously_decoded_dict # update the entry for this time_bin_size
+                did_update_computations = True
                 
             else:
                 print(f'(time_bin_size == {time_bin_size}) already found in cache. Not recomputing.')
@@ -6467,7 +6919,16 @@ class DirectionalPlacefieldGlobalComputationFunctions(AllFunctionEnumeratingMixi
         # Set the global result:
         global_computation_results.computed_data['DirectionalDecodersDecoded'] = directional_decoders_decode_result
         
+        if did_update_computations:
+            ## #TODO 2025-06-13 13:46: - [ ] try to add to generic results
+            # try:
+            #     valid_EpochComputations_result: EpochComputationsComputationsContainer = curr_active_pipeline.global_computation_results.computed_data['EpochComputations']
+            #     a_new_fully_generic_result: GenericDecoderDictDecodedEpochsDictResult = valid_EpochComputations_result.a_generic_decoder_dict_decoded_epochs_dict_result
 
+            # except Exception as e:
+            #     print(f'failed to add continuous computation to the generic results with error e: {e}. Skipping.')
+            pass
+                       
         """ Usage:
         
         from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import DirectionalDecodersContinuouslyDecodedResult
@@ -6676,6 +7137,11 @@ class DirectionalPlacefieldGlobalComputationFunctions(AllFunctionEnumeratingMixi
             global_computation_results.computed_data['pf1D_Decoder_dict']
                 ['DirectionalDecodersEpochsEvaluations']['directional_lap_specific_configs']
                 ['DirectionalDecodersEpochsEvaluations']['continuously_decoded_result_cache_dict']
+                
+                
+                from pyphoplacecellanalysis.Analysis.Decoder.heuristic_replay_scoring import HeuristicReplayScoring, HeuristicsResult
+
+                a_heuristics_result: HeuristicsResult = curr_active_pipeline.global_computation_results.computed_data['Heuristics']
                 
         Should call:
         
@@ -7073,6 +7539,7 @@ def plot_all_epoch_bins_marginal_predictions(directional_merged_decoders_result,
     from pyphocorehelpers.DataStructure.RenderPlots.MatplotLibRenderPlots import FigureCollector
     from pyphoplacecellanalysis.General.Model.Configs.LongShortDisplayConfig import PlottingHelpers
     from neuropy.utils.matplotlib_helpers import FormattedFigureText
+    from pyphoplacecellanalysis.SpecificResults.PhoDiba2023Paper import PhoPublicationFigureHelper
     
     laps_all_epoch_bins_marginals_df = deepcopy(directional_merged_decoders_result.laps_all_epoch_bins_marginals_df)
     ripple_all_epoch_bins_marginals_df = deepcopy(directional_merged_decoders_result.ripple_all_epoch_bins_marginals_df)
@@ -7089,9 +7556,9 @@ def plot_all_epoch_bins_marginal_predictions(directional_merged_decoders_result,
     ripple_display_context = display_context.get_subset(subset_excludelist=laps_only_keys) # ripple specific context filtering out the laps keys
 
 
-    with mpl.rc_context({'figure.figsize': (12.4, 4.8), 'figure.dpi': '220', 'savefig.transparent': True, 'ps.fonttype': 42,
+    with mpl.rc_context(PhoPublicationFigureHelper.rc_context_kwargs({'figure.figsize': (12.4, 4.8), 'figure.dpi': '220',
                           "axes.spines.left": False, "axes.spines.right": False, "axes.spines.bottom": False, "axes.spines.top": False,
-                          "axes.edgecolor": "none", "xtick.bottom": False, "xtick.top": False, "ytick.left": False, "ytick.right": False}):
+                          "axes.edgecolor": "none", "xtick.bottom": False, "xtick.top": False, "ytick.left": False, "ytick.right": False})):
         # Create a FigureCollector instance
         with FigureCollector(name='plot_all_epoch_bins_marginal_predictions', base_context=display_context) as collector:
 
@@ -7393,7 +7860,8 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
 
 
     @function_attributes(short_name='directional_template_debugger', tags=['directional','template','debug', 'overview'], conforms_to=['output_registering', 'figure_saving'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-11-28 10:13', related_items=[], is_global=True)
-    def _display_directional_template_debugger(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, save_figure=True, included_any_context_neuron_ids=None, use_incremental_sorting: bool = False, **kwargs):
+    def _display_directional_template_debugger(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, save_figure=True, included_any_context_neuron_ids=None, use_incremental_sorting: bool = False, 
+                                               prepare_for_publication: bool=False, **kwargs):
             """ Renders a window with the four template heatmaps displayed to the left and right of center, and the ability to filter the actively included aclus via `included_any_context_neuron_ids`
 
             enable_cell_colored_heatmap_rows: bool - uses the cell's characteristic assigned color to shade the 1D heatmap row value for that cell. NOTE: there are some perceptual non-uniformities with luminance how it is being applied now.
@@ -7405,7 +7873,17 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
 
             # from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.DockAreaWrapper import DockAreaWrapper, PhoDockAreaContainingWindow
             from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.ContainerBased.TemplateDebugger import TemplateDebugger
-            
+
+
+            if prepare_for_publication:
+                # Black on white background
+                pg.setConfigOption('background', 'w')
+                pg.setConfigOption('foreground', 'k')
+            else:
+                # White on black background
+                pg.setConfigOption('background', 'k')
+                pg.setConfigOption('foreground', 'w')
+                
             active_context = kwargs.pop('active_context', owning_pipeline_reference.sess.get_context())
 
             fignum = kwargs.pop('fignum', None)
@@ -7442,10 +7920,9 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
 
             template_debugger: TemplateDebugger = TemplateDebugger.init_templates_debugger(track_templates=track_templates, included_any_context_neuron_ids=included_any_context_neuron_ids,
                                                       use_incremental_sorting=use_incremental_sorting, enable_cell_colored_heatmap_rows=enable_cell_colored_heatmap_rows, use_shared_aclus_only_templates=use_shared_aclus_only_templates,
-                                                      figure_name=figure_name, debug_print=debug_print, defer_render=defer_render, **kwargs)
+                                                      figure_name=figure_name, debug_print=debug_print, defer_render=defer_render, prepare_for_publication=prepare_for_publication, **kwargs)
 
             # decoders_dict = track_templates.get_decoders_dict() # decoders_dict = {'long_LR': track_templates.long_LR_decoder, 'long_RL': track_templates.long_RL_decoder, 'short_LR': track_templates.short_LR_decoder, 'short_RL': track_templates.short_RL_decoder, }
-
 
             # # build the window with the dock widget in it:
             # root_dockAreaWindow, app = DockAreaWrapper.build_default_dockAreaWindow(title=f'Pho Directional Template Debugger: {figure_name}', defer_show=False)
@@ -7461,118 +7938,54 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
 
             graphics_output_dict = {'win': template_debugger.ui.root_dockAreaWindow, 'app': template_debugger.ui.app,  'ui': template_debugger.ui, 'plots': template_debugger.plots, 'data': template_debugger.plots_data, 'obj': template_debugger}
 
-
-            
-
-            # def on_update(included_any_context_neuron_ids):
-            #     """ call to update when `included_any_context_neuron_ids` changes.
-
-            #      captures: `decoders_dict`, `_out_plots`, 'enable_cell_colored_heatmap_rows'
-
-            #     """
-            #     decoders_dict = track_templates.get_decoders_dict() # decoders_dict = {'long_LR': track_templates.long_LR_decoder, 'long_RL': track_templates.long_RL_decoder, 'short_LR': track_templates.short_LR_decoder, 'short_RL': track_templates.short_RL_decoder, }
-            #     sorted_neuron_IDs_lists, sort_helper_neuron_id_to_neuron_colors_dicts, sorted_pf_tuning_curves = paired_incremental_sort_neurons(decoders_dict=decoders_dict, included_any_context_neuron_ids=included_any_context_neuron_ids)
-            #     # below uses `sorted_pf_tuning_curves`, `sort_helper_neuron_id_to_neuron_colors_dicts`
-
-            #     ## Plot the placefield 1Ds as heatmaps and then wrap them in docks and add them to the window:
-            #     _out_plots.pf1D_heatmaps = {}
-            #     for i, (a_decoder_name, a_decoder) in enumerate(decoders_dict.items()):
-            #         _out_plots.pf1D_heatmaps[a_decoder_name] = visualize_heatmap_pyqtgraph(sorted_pf_tuning_curves[i], title=f'{a_decoder_name}_pf1Ds [sort: long_RL]', show_value_labels=False, show_xticks=False, show_yticks=False, show_colorbar=False, win=None, defer_show=True) # Sort to match first decoder (long_LR)
-            #         # _out_pf1D_heatmaps[a_decoder_name] = visualize_heatmap_pyqtgraph(_get_decoder_sorted_pfs(a_decoder), title=f'{a_decoder_name}_pf1Ds', show_value_labels=False, show_xticks=False, show_yticks=False, show_colorbar=False, win=None, defer_show=True) # Individual Sort
-
-            #         # Adds aclu text labels with appropriate colors to y-axis: uses `sorted_shared_sort_neuron_IDs`:
-            #         curr_win, curr_img = _out_plots.pf1D_heatmaps[a_decoder_name] # win, img
-
-            #         a_decoder_color_map: Dict = sort_helper_neuron_id_to_neuron_colors_dicts[i] # 34 (n_neurons)
-
-            #         # Coloring the heatmap data for each row of the 1D heatmap:
-            #         curr_data = deepcopy(sorted_pf_tuning_curves[i])
-            #         if debug_print:
-            #             print(f'np.shape(curr_data): {np.shape(curr_data)}, np.nanmax(curr_data): {np.nanmax(curr_data)}, np.nanmin(curr_data): {np.nanmin(curr_data)}') # np.shape(curr_data): (34, 62), np.nanmax(curr_data): 0.15320444716258447, np.nanmin(curr_data): 0.0
-
-            #         _temp_curr_out_colors_heatmap_image = [] # used to accumulate the rows so they can be built into a color image in `out_colors_heatmap_image_matrix`
-
-            #         for cell_i, (aclu, a_color_vector) in enumerate(a_decoder_color_map.items()):
-            #             # anchor=(1,0) specifies the item's upper-right corner is what setPos specifies. We switch to right vs. left so that they are all aligned appropriately.
-            #             text = pg.TextItem(f"{int(aclu)}", color=pg.mkColor(a_color_vector), anchor=(1,0)) # , angle=15
-            #             text.setPos(-1.0, (cell_i+1)) # the + 1 is because the rows are seemingly 1-indexed?
-            #             curr_win.addItem(text)
-
-            #             # modulate heatmap color for this row (`curr_data[i, :]`):
-            #             heatmap_base_color = pg.mkColor(a_color_vector)
-            #             out_colors_row = DataSeriesColorHelpers.qColorsList_to_NDarray([build_adjusted_color(heatmap_base_color, value_scale=v) for v in curr_data[cell_i, :]], is_255_array=False).T # (62, 4)
-            #             _temp_curr_out_colors_heatmap_image.append(out_colors_row)
-
-            #         ## Build the colored heatmap:
-            #         out_colors_heatmap_image_matrix = np.stack(_temp_curr_out_colors_heatmap_image, axis=0)
-            #         if debug_print:
-            #             print(f"np.shape(out_colors_heatmap_image_matrix): {np.shape(out_colors_heatmap_image_matrix)}") # (34, 62, 4) - (n_cells, n_pos_bins, n_channels_RGBA)
-
-            #         # Ensure the data is in the correct range [0, 1]
-            #         out_colors_heatmap_image_matrix = np.clip(out_colors_heatmap_image_matrix, 0, 1)
-            #         if enable_cell_colored_heatmap_rows:
-            #             curr_img.updateImage(out_colors_heatmap_image_matrix) # use the color image only if `enable_cell_colored_heatmap_rows==True`
-            #         _out_data['out_colors_heatmap_image_matrix_dicts'][a_decoder_name] = out_colors_heatmap_image_matrix
-
-            # graphics_output_dict['ui'].on_update_callback = on_update
-
-            #TODO 2023-11-16 22:23: - [ ] The other display functions using matplotlib do things like this:
-            # final_context = active_context
-            # graphics_output_dict['context'] = final_context
-            # graphics_output_dict['plot_data'] |= {'df': neuron_replay_stats_df, 'rdf':rdf, 'aclu_to_idx':aclu_to_idx, 'irdf':irdf, 'time_binned_unit_specific_spike_rate': global_computation_results.computed_data['jonathan_firing_rate_analysis'].time_binned_unit_specific_spike_rate,
-            #     'time_variable_name':time_variable_name, 'fignum':curr_fig_num}
-
-            # def _perform_write_to_file_callback():
-            #     ## 2023-05-31 - Reference Output of matplotlib figure to file, along with building appropriate context.
-            #     return owning_pipeline_reference.output_figure(final_context, graphics_output_dict.figures[0])
-
-            # if save_figure:
-            #     active_out_figure_paths = _perform_write_to_file_callback()
-            # else:
-            #     active_out_figure_paths = []
-
-            # graphics_output_dict['saved_figures'] = active_out_figure_paths
-
             return graphics_output_dict
 
 
-    @function_attributes(short_name='directional_track_template_pf1Ds', tags=['directional','template','debug', 'overview'], conforms_to=['output_registering', 'figure_saving'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-12-22 10:41', related_items=[], is_global=True)
-    def _display_directional_track_template_pf1Ds(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, save_figure=True, included_any_context_neuron_ids=None, use_incremental_sorting: bool = False, **kwargs):
+    @function_attributes(short_name='directional_track_template_pf1Ds', tags=['directional','template','debug', 'overview', 'figure'], conforms_to=['output_registering', 'figure_saving'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-12-22 10:41', related_items=[], is_global=True)
+    def _display_directional_track_template_pf1Ds(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, save_figure=True, included_any_context_neuron_ids=None, use_incremental_sorting: bool = False, figsize=(6.26, 5.25), aclu_labels_strokewidth: float = 0.5, **kwargs):
             """ Plots each template's pf1Ds side-by-side in four adjacent subplots. 
             Stack of line-curves style, not heatmap-style
             """
-
-            # from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.DockAreaWrapper import DockAreaWrapper, PhoDockAreaContainingWindow
-            # from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.ContainerBased.TemplateDebugger import TemplateDebugger
             from neuropy.plotting.ratemaps import enumTuningMap2DPlotVariables
-            import matplotlib.pyplot as plt
-
             import matplotlib as mpl
             import matplotlib.pyplot as plt
             from flexitext import flexitext ## flexitext for formatted matplotlib text
             from neuropy.utils.matplotlib_helpers import FormattedFigureText, FigureMargins ## flexitext version
-
+            from pyphoplacecellanalysis.General.Model.Configs.LongShortDisplayConfig import DisplayColorsEnum
             from pyphocorehelpers.DataStructure.RenderPlots.MatplotLibRenderPlots import FigureCollector
             # from pyphoplacecellanalysis.General.Model.Configs.LongShortDisplayConfig import PlottingHelpers
-
-            from matplotlib.gridspec import GridSpec
-            from neuropy.utils.matplotlib_helpers import build_or_reuse_figure, perform_update_title_subtitle
-            from pyphoplacecellanalysis.Pho2D.track_shape_drawing import _plot_track_remapping_diagram
-            from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.SpikeRasters import build_shared_sorted_neuron_color_maps
-            from pyphocorehelpers.gui.Qt.color_helpers import ColorFormatConverter
+            from pyphoplacecellanalysis.SpecificResults.PhoDiba2023Paper import PhoPublicationFigureHelper
             
+            save_figure_kwargs = dict(write_vector_format=kwargs.pop('write_vector_format', False), write_png=kwargs.pop('write_png', True)) | pop_dict_subset(kwargs, ['bbox_inches', 'pad_inches'])
+            prepare_for_publication: bool = kwargs.pop('prepare_for_publication', False)
+
             active_context = kwargs.pop('active_context', owning_pipeline_reference.sess.get_context())
             if active_context is not None:
                     display_context = active_context.adding_context('display_fn', display_fn_name='directional_track_template_pf1Ds')
                 
             def _perform_write_to_file_callback(final_context, fig):
+                """ captures: owning_pipeline_reference, save_figure, """
                 if save_figure:
-                    return owning_pipeline_reference.output_figure(final_context, fig)
+                    return owning_pipeline_reference.output_figure(final_context, fig, **save_figure_kwargs)
                 else:
                     pass # do nothing, don't save
+                
 
+            if prepare_for_publication:
+                from neuropy.utils.matplotlib_helpers import find_first_available_matplotlib_font_name
 
-            with mpl.rc_context({'savefig.transparent': True, 'ps.fonttype': 42, }): # 'figure.dpi': '220', 'figure.figsize': (10, 4), 
+                found_matplotlib_font_name: str = find_first_available_matplotlib_font_name(desired_fonts_list=['Arial'])
+                assert found_matplotlib_font_name, f"found_matplotlib_font_name: {found_matplotlib_font_name} Arial was not found!"
+            else:
+                found_matplotlib_font_name = None
+
+            _rc_context_kwargs = {'savefig.transparent': True, 'ps.fonttype': 42, 'pdf.fonttype': 42, }
+            if prepare_for_publication:
+                formatted_title_strings_dict = DisplayColorsEnum.get_matplotlib_formatted_title_dict()
+                assert found_matplotlib_font_name is not None
+                _rc_context_kwargs.update(PhoPublicationFigureHelper.rc_context_kwargs(prepare_for_publication=prepare_for_publication, **{'figure.dpi': '100', 'figure.frameon': False, 'figure.figsize': figsize, 'font.family': found_matplotlib_font_name})) # , 'figure.constrained_layout.use': (constrained_layout or False)
+
+            with mpl.rc_context(_rc_context_kwargs): # 'figure.dpi': '220', 'figure.figsize': (10, 4), 
                 # Create a FigureCollector instance
                 with FigureCollector(name='directional_track_template_pf1Ds', base_context=display_context) as collector:
                     fignum = kwargs.pop('fignum', None)
@@ -7641,7 +8054,7 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
                         active_display_ctx = active_context.adding_context('display_fn', display_fn_name='plot_ratemaps_1D')
                         # active_display_fn_identifying_ctx = curr_active_pipeline.build_display_context_for_filtered_session(filtered_session_name=a_name, display_fn_name='plot_directional_pf1Ds')
                         # active_display_fn_identifying_ctx
-                        ax_pf_1D = a_decoder.pf.plot_ratemaps_1D(ax=axd["ax_pf_tuning_curve"], active_context=active_display_ctx)
+                        ax_pf_1D = a_decoder.pf.plot_ratemaps_1D(ax=axd["ax_pf_tuning_curve"], active_context=active_display_ctx, aclu_labels_strokewidth=aclu_labels_strokewidth)
                         active_display_ctx = active_context.adding_context('display_fn', display_fn_name='plot_occupancy_1D')
                         # active_display_ctx_string = active_display_ctx.get_description(separator='|')
                         all_display_contexts.append(active_display_ctx)
@@ -7649,6 +8062,18 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
 
                         ## Occupancy:
                         occupancy_ax = a_decoder.pf.plot_occupancy(fig=a_subfigure, ax=axd["ax_pf_occupancy"], active_context=active_display_ctx, use_flexitext_titles=False, skip_update_titles=True, **({} | plot_kwargs))[-1]
+                        occupancy_ax.spines['top'].set_visible(False)
+                        occupancy_ax.spines['right'].set_visible(False)
+                        # You can also set 'left' and 'bottom' to False if desired
+                        # occupancy_ax.set_frame_on(False) # Hides all four spines (top, bottom, left, right)
+
+                        plt.tick_params(
+                            axis='x',          # changes apply to the x-axis
+                            which='both',      # both major and minor ticks are affected
+                            bottom=False,      # ticks along the bottom edge are off
+                            top=False,         # ticks along the top edge are off
+                            labelbottom=False) # labels along the bottom edge are off
+
                         # display_outputs[a_name] =                  
                         # plot_variable_name = ({'plot_variable': None} | kwargs)
                         plot_variable_name = plot_kwargs.get('plot_variable', enumTuningMap2DPlotVariables.OCCUPANCY).name
@@ -7658,7 +8083,12 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
                         
 
                         ## Setup titles:
-                        axd["ax_pf_tuning_curve"].set_title(a_decoder_name)
+                        if not prepare_for_publication:
+                            axd["ax_pf_tuning_curve"].set_title(a_decoder_name)
+                        else:
+                            ## Publication:                        
+                            axd["ax_pf_tuning_curve"].set_title(formatted_title_strings_dict[a_decoder_name]) ## use the formatted string with the unicode arrow instead
+                        
                         axd["ax_pf_occupancy"].set_title('')
                         
                         # Clear the normal text:
@@ -7699,11 +8129,22 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
                         
                     # active_config = deepcopy(self.config)
                     # active_config.float_precision = 1
-                    title_string: str = f"directional_track_template_pf1Ds"
-                    # subtitle_string = '\n'.join([f'{active_config.str_for_display(is_2D)}'])
-                    # header_text_obj = flexitext(text_formatter.left_margin, 0.9, f'<size:22><weight:bold>{title_string}</></>\n<size:10>{subtitle_string}</>', va="bottom", xycoords="figure fraction") # , wrap=False
-                    header_text_obj = flexitext(0.01, 0.85, f'<size:20><weight:bold>{title_string}</></>\n<size:9>{subtitle_string}</>', va="bottom", xycoords="figure fraction") # , wrap=False
-                    footer_text_obj = text_formatter.add_flexitext_context_footer(active_context=active_context) # flexitext((text_formatter.left_margin*0.1), (text_formatter.bottom_margin*0.25), text_formatter._build_footer_string(active_context=active_context), va="top", xycoords="figure fraction")
+
+                    if not prepare_for_publication:
+                        
+                        title_string: str = f"directional_track_template_pf1Ds"
+                        # subtitle_string = '\n'.join([f'{active_config.str_for_display(is_2D)}'])
+                        # header_text_obj = flexitext(text_formatter.left_margin, 0.9, f'<size:22><weight:bold>{title_string}</></>\n<size:10>{subtitle_string}</>', va="bottom", xycoords="figure fraction") # , wrap=False
+                        header_text_obj = flexitext(0.01, 0.85, f'<size:10, family:{found_matplotlib_font_name}><weight:bold>{title_string}</></>\n<size:9>{subtitle_string}</>', va="bottom", xycoords="figure fraction") # , wrap=False
+                    else:
+                        ## Publication:
+                        title_string: str = f"Directional Track Templates"
+                        # header_text_obj = flexitext(0.01, 0.85, f'<size:20><weight:bold>{title_string}</></>\n<size:9>{subtitle_string}</>', va="bottom", xycoords="figure fraction") # , wrap=False
+                        header_text_obj = flexitext(0.01, 0.85, f'<size:20><weight:bold>{title_string}</></>', va="bottom", xycoords="figure fraction")
+
+                    if not prepare_for_publication:
+                        footer_text_obj = text_formatter.add_flexitext_context_footer(active_context=active_context) # flexitext((text_formatter.left_margin*0.1), (text_formatter.bottom_margin*0.25), text_formatter._build_footer_string(active_context=active_context), va="top", xycoords="figure fraction")
+
                     fig.canvas.manager.set_window_title(title_string) # sets the window's title
                     if ((_perform_write_to_file_callback is not None) and (display_context is not None)):
                         _perform_write_to_file_callback(display_context, fig)
@@ -7713,10 +8154,12 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
 
 
     @function_attributes(short_name='track_remapping_diagram', tags=['remapping'], conforms_to=['output_registering', 'figure_saving'], input_requires=[], output_provides=[], uses=['plot_bidirectional_track_remapping_diagram'], used_by=[], creation_date='2024-04-29 09:24', related_items=[], is_global=True)
-    def _display_directional_track_remapping_diagram(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, save_figure=True, included_any_context_neuron_ids=None, use_incremental_sorting: bool = False, is_dark_mode:bool=False, **kwargs):
+    def _display_directional_track_remapping_diagram(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, save_figure=True, included_any_context_neuron_ids=None, use_incremental_sorting: bool = False,
+                                                    is_dark_mode:bool=False, enable_interactivity:bool=True, draw_point_aclu_labels: bool=True,
+                                                    use_separate_plot_for_each_direction:bool=True, use_unique_aclu_colors:bool=False, drop_aclu_if_missing_long_or_short:bool=False, **kwargs):
             """ For both directions, plots a subplot showing the cell's location on the long track and the short track with connecting arrows showing their transition. Draws both tracks in the background as reference. 
             """
-            from pyphoplacecellanalysis.Pho2D.track_shape_drawing import plot_bidirectional_track_remapping_diagram
+            from pyphoplacecellanalysis.Pho2D.track_shape_drawing import TrackRemappingDiagramFigure
 
             active_context = kwargs.pop('active_context', owning_pipeline_reference.sess.get_context())
 
@@ -7766,8 +8209,8 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
                 else:
                     pass # do nothing, don't save
                 
-
-            collector = plot_bidirectional_track_remapping_diagram(track_templates, grid_bin_bounds=grid_bin_bounds, active_context=active_context, perform_write_to_file_callback=_perform_write_to_file_callback, enable_interactivity=True, draw_point_aclu_labels=True, is_dark_mode=is_dark_mode)
+            collector = TrackRemappingDiagramFigure.plot_bidirectional_track_remapping_diagram(track_templates, grid_bin_bounds=grid_bin_bounds, active_context=active_context, perform_write_to_file_callback=_perform_write_to_file_callback, enable_interactivity=enable_interactivity, use_separate_plot_for_each_direction=use_separate_plot_for_each_direction,
+                    draw_point_aclu_labels=draw_point_aclu_labels, is_dark_mode=is_dark_mode, use_unique_aclu_colors=use_unique_aclu_colors, drop_aclu_if_missing_long_or_short=drop_aclu_if_missing_long_or_short)
 
             return collector
 
@@ -7828,7 +8271,9 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
     def _display_directional_merged_pf_decoded_epochs(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, save_figure=True, included_any_context_neuron_ids=None,
                                                     single_plot_fixed_height=50.0, max_num_lap_epochs: int = 25, max_num_ripple_epochs: int = 45, size=(15,7), dpi=72, constrained_layout=True, scrollable_figure=True,
                                                     skip_plotting_measured_positions=True, skip_plotting_most_likely_positions=True, **kwargs):
-            """ Renders two windows, one with the decoded laps and another with the decoded ripple posteriors, computed using the merged pseudo-2D decoder.
+            """ Renders the marignal posteriors as a yellow-blue plot for trackID
+
+            Renders two windows, one with the decoded laps and another with the decoded ripple posteriors, computed using the merged pseudo-2D decoder.
 
             """
             from neuropy.utils.mixins.time_slicing import TimeColumnAliasesProtocol
@@ -7841,7 +8286,7 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
             from pyphocorehelpers.DataStructure.RenderPlots.MatplotLibRenderPlots import FigureCollector
             from pyphoplacecellanalysis.General.Model.Configs.LongShortDisplayConfig import PlottingHelpers
             from neuropy.utils.matplotlib_helpers import FormattedFigureText
-        
+            from pyphoplacecellanalysis.SpecificResults.PhoDiba2023Paper import PhoPublicationFigureHelper
 
             active_context = kwargs.pop('active_context', None)
             if active_context is not None:
@@ -7900,7 +8345,7 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
 
             # 'figure.constrained_layout.use': False, 'figure.autolayout': False, 'figure.subplot.bottom': 0.11, 'figure.figsize': (6.4, 4.8)
             # 'figure.constrained_layout.use': constrained_layout, 'figure.autolayout': False, 'figure.subplot.bottom': 0.11, 'figure.figsize': (6.4, 4.8)
-            with mpl.rc_context({'figure.dpi': '220', 'savefig.transparent': True, 'ps.fonttype': 42, 'figure.constrained_layout.use': (constrained_layout or False), 'figure.frameon': False, }): # 'figure.figsize': (12.4, 4.8), 
+            with mpl.rc_context(PhoPublicationFigureHelper.rc_context_kwargs({'figure.dpi': '220', 'figure.constrained_layout.use': (constrained_layout or False), 'figure.frameon': False, })): # 'figure.figsize': (12.4, 4.8), 
                 # Create a FigureCollector instance
                 with FigureCollector(name='plot_directional_merged_pf_decoded_epochs', base_context=display_context) as collector:
 
@@ -8091,9 +8536,10 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
 
 
 
-    @function_attributes(short_name='directional_decoded_stacked_epoch_slices', tags=['export', 'heatmaps', 'posterior', 'directional_merged_decoder_decoded_epochs','directional','marginal'],
+    @function_attributes(short_name='directional_decoded_stacked_epoch_slices', tags=['export', 'heatmaps', 'posterior', 'directional_merged_decoder_decoded_epochs','directional','marginal','NON-VISUAL','NO-DISPLAY'],
                           input_requires=['RankOrder', 'DirectionalLaps', 'DirectionalMergedDecoders', 'DirectionalDecodersEpochsEvaluations'], output_provides=[], uses=['PosteriorExporting.perform_export_all_decoded_posteriors_as_images'], used_by=[], creation_date='2024-09-27 17:08', related_items=[], is_global=True)
-    def _display_directional_merged_pf_decoded_stacked_epoch_slices(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, save_figure=True, included_any_context_neuron_ids=None, custom_export_formats: Dict[str, "HeatmapExportConfig"]=None, **kwargs):
+    def _display_directional_merged_pf_decoded_stacked_epoch_slices(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, save_figure=True, included_any_context_neuron_ids=None,
+                                                                    custom_export_formats: Dict[str, "HeatmapExportConfig"]=None, parent_output_folder: Optional[Path] = None, desired_height:int=1200, **kwargs):
         """ Exports all decoded epoch posteriors separately to a folder. NON-VISUAL, never displays.
          Effectively the entire stack of decoded epochs for both the long and short, including their Radon transformed lines if that information is available.
 
@@ -8112,6 +8558,8 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
         from datetime import datetime, date, timedelta
         from pyphocorehelpers.Filesystem.path_helpers import find_first_extant_path
         from pyphoplacecellanalysis.Pho2D.data_exporting import HeatmapExportConfig
+        from pyphocorehelpers.plotting.media_output_helpers import ImagePostRenderFunctionSets, ImageOperationsAndEffects
+        from pyphoplacecellanalysis.General.Mixins.ExportHelpers import try_discover_default_collected_outputs_dir
 
         DAY_DATE_STR: str = date.today().strftime("%Y-%m-%d")
         DAY_DATE_TO_USE = f'{DAY_DATE_STR}' # used for filenames throught the notebook
@@ -8122,8 +8570,9 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
         
         # #TODO 2024-01-03 05:24: - [ ] Do something to switch the matplotlib backend to 'AGG' if defer_render == True. Currently only adjusts the pyqtgraph-based figures (`plot_rank_order_epoch_inst_fr_result_tuples`)
 
-        active_context = kwargs.pop('active_context', owning_pipeline_reference.sess.get_context())
-        
+
+        # active_context = kwargs.pop('active_context', owning_pipeline_reference.sess.get_context())
+
         rank_order_results = global_computation_results.computed_data.get('RankOrder', None)
         if rank_order_results is not None:
             minimum_inclusion_fr_Hz: float = rank_order_results.minimum_inclusion_fr_Hz
@@ -8149,7 +8598,34 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
         print(f'ripple_decoding_time_bin_size: {ripple_decoding_time_bin_size}')
         print(f'laps_decoding_time_bin_size: {laps_decoding_time_bin_size}')
         
-        parent_output_folder: Path = kwargs.pop('parent_output_folder', None)
+
+
+        # Get appropriate context ____________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
+        #TODO 2025-05-30 07:52: - [ ] This assumes `ripple_decoding_time_bin_size == laps_decoding_time_bin_size`
+        complete_session_context, (session_context, additional_session_context) = owning_pipeline_reference.get_complete_session_context()
+
+        assert (ripple_decoding_time_bin_size == laps_decoding_time_bin_size), f"ripple_decoding_time_bin_size: {ripple_decoding_time_bin_size} != laps_decoding_time_bin_size: {laps_decoding_time_bin_size}" #TODO 2025-07-10 15:32: - [ ] Why does it matter that they aren't equal?
+        active_context = kwargs.pop('active_context', None)
+        if active_context is not None:
+            # Update the existing context:
+            active_context = deepcopy(active_context).overwriting_context(time_bin_size=ripple_decoding_time_bin_size)
+        else:
+            # active_context = owning_pipeline_reference.sess.get_context()
+            active_context = deepcopy(complete_session_context).overwriting_context(time_bin_size=ripple_decoding_time_bin_size) # owning_pipeline_reference.sess.get_context()
+
+
+
+
+        ## Make sure it has all the epoch info
+        
+        # Add the maze_id to the active_filter_epochs so we can see how properties change as a function of which track the replay event occured on:
+        session_name: str = owning_pipeline_reference.session_name
+        t_start, t_delta, t_end = owning_pipeline_reference.find_LongShortDelta_times()
+
+        decoder_laps_filter_epochs_decoder_result_dict = {k:DecodedFilterEpochsResult.perform_add_additional_epochs_columns(a_result=a_result, session_name=session_name, t_start=t_start, t_delta=t_delta, t_end=t_end) for k, a_result in decoder_laps_filter_epochs_decoder_result_dict.items()}
+        decoder_ripple_filter_epochs_decoder_result_dict = {k:DecodedFilterEpochsResult.perform_add_additional_epochs_columns(a_result=a_result, session_name=session_name, t_start=t_start, t_delta=t_delta, t_end=t_end) for k, a_result in decoder_ripple_filter_epochs_decoder_result_dict.items()}
+
+        # parent_output_folder: Path = kwargs.pop('parent_output_folder', None)
         
         needs_discover_default_collected_outputs_dir: bool = True
         if parent_output_folder is not None:
@@ -8160,10 +8636,10 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
                     
         if needs_discover_default_collected_outputs_dir:
                 ## if none is provided it tries to find one in collected_outputs
-                known_collected_outputs_paths = [Path(v).resolve() for v in ['/Users/pho/data/collected_outputs',
+                collected_outputs_directory = try_discover_default_collected_outputs_dir(known_collected_outputs_paths=[Path(v).resolve() for v in ['/Users/pho/data/collected_outputs',
                                                                             '/Volumes/SwapSSD/Data/collected_outputs', r"K:/scratch/collected_outputs", '/Users/pho/Dropbox (University of Michigan)/MED-DibaLabDropbox/Data/Pho/Outputs/output/collected_outputs', r'C:/Users/pho/repos/Spike3DWorkEnv/Spike3D/output/collected_outputs',
-                                                                            '/home/halechr/FastData/collected_outputs/', '/home/halechr/cloud/turbo/Data/Output/collected_outputs']]
-                collected_outputs_directory = find_first_extant_path(known_collected_outputs_paths)
+                                                                            '/home/halechr/FastData/collected_outputs/', '/home/halechr/cloud/turbo/Data/Output/collected_outputs']])
+                assert collected_outputs_directory is not None, f"no collected output dir found!"
                 assert collected_outputs_directory.exists(), f"collected_outputs_directory: {collected_outputs_directory} does not exist! Is the right computer's config commented out above?"
                 # fullwidth_path_widget(scripts_output_path, file_name_label='Scripts Output Path:')
                 print(f'collected_outputs_directory: "{collected_outputs_directory}"')
@@ -8181,22 +8657,30 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
         posterior_out_folder.mkdir(parents=True, exist_ok=True)
         save_path = posterior_out_folder.resolve()
         _parent_save_context: IdentifyingContext = owning_pipeline_reference.build_display_context_for_session('perform_export_all_decoded_posteriors_as_images')
-        _specific_session_output_folder = save_path.joinpath(active_context.get_description(subset_excludelist=['format_name'])).resolve()
+        # _specific_session_output_folder = save_path.joinpath(active_context.get_description(subset_excludelist=['format_name'])).resolve()
+        _specific_session_output_folder = save_path.joinpath(active_context.get_description(subset_excludelist=['format_name', 'display_fn_name', 'time_bin_size'])).resolve()
+
+
         _specific_session_output_folder.mkdir(parents=True, exist_ok=True)
         print(f'\tspecific_session_output_folder: "{_specific_session_output_folder}"')
 
         if custom_export_formats is None:
             ## use this default instead:
+            common_export_config_kwargs = dict(desired_height = desired_height,
+                post_render_image_functions_builder_fn=ImagePostRenderFunctionSets._build_no_op_image_export_functions_dict,
+                # post_render_image_functions_builder_fn=ImagePostRenderFunctionSets._build_mergedColorDecoders_image_export_functions_dict,
+            )
+
             custom_export_formats: Dict[str, HeatmapExportConfig] = {
-                # 'greyscale': HeatmapExportConfig.init_greyscale(),
-                'color': HeatmapExportConfig(colormap='Oranges', desired_height=400),
+                'greyscale': HeatmapExportConfig.init_greyscale(**common_export_config_kwargs),
+                'color': HeatmapExportConfig(colormap='Oranges', **common_export_config_kwargs), # #TODO 2025-05-30 03:45: - [ ] previous config
                 # 'color': HeatmapExportConfig(colormap=additional_cmaps['long_LR']),
                 # 'color': HeatmapExportConfig(colormap=cmap1, desired_height=200),
             }
 
         out_paths, out_custom_formats_dict = PosteriorExporting.perform_export_all_decoded_posteriors_as_images(decoder_laps_filter_epochs_decoder_result_dict=decoder_laps_filter_epochs_decoder_result_dict, decoder_ripple_filter_epochs_decoder_result_dict=decoder_ripple_filter_epochs_decoder_result_dict,
                                                                                                                  _save_context=_parent_save_context, parent_output_folder=_specific_session_output_folder,
-                                                                                                                  desired_height=None, custom_export_formats=custom_export_formats)
+                                                                                                                  desired_height=desired_height, custom_export_formats=custom_export_formats)
         # out_paths
         print(_specific_session_output_folder)
 
@@ -8222,6 +8706,8 @@ from pyphoplacecellanalysis.GUI.Qt.Menus.BaseMenuProviderMixin import BaseMenuCo
 @define(slots=False)
 class AddNewDirectionalDecodedEpochs_MatplotlibPlotCommand(BaseMenuCommand):
     """ 2024-01-17 
+    ## #TODO 2025-06-02 10:27: - [ ] BROKEN, Not aligned with positions also plotted
+
     Adds four rows to the SpikeRaster2D showing the decoded posteriors for the PBE epochs for each of the four 1D decoders
     These are the ones Kamran wants to be normalized differently.
     
@@ -8237,144 +8723,88 @@ class AddNewDirectionalDecodedEpochs_MatplotlibPlotCommand(BaseMenuCommand):
     _context = field(default=None, alias="active_context")
     _display_output = field(default=Factory(dict))
 
-    @classmethod
-    def _perform_add_new_decoded_row(cls, curr_active_pipeline, active_2d_plot, a_dock_config, a_decoder_name: str, a_decoder, a_decoded_result=None, extended_dock_title_info: Optional[str]=None):
-        """ used by `add_directional_decoder_decoded_epochs`. adds a single decoded row to the matplotlib dynamic output
-        
-        # a_decoder_name: str = "long_LR"
-
-        """
-        from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError import plot_1D_most_likely_position_comparsions
-        from neuropy.utils.matplotlib_helpers import get_heatmap_cmap
-
-        ## ✅ Add a new row for each of the four 1D directional decoders:
-        identifier_name: str = f'ContinuousDecode_{a_decoder_name}'
-        if extended_dock_title_info is not None:
-            identifier_name += extended_dock_title_info ## add extra info like the time_bin_size in ms
-        # print(f'identifier_name: {identifier_name}')
-
-        # print(f'identifier_name: {identifier_name}')
-        widget, matplotlib_fig, matplotlib_fig_axes, dDisplayItem = active_2d_plot.add_new_matplotlib_render_plot_widget(name=identifier_name, dockSize=(65, 200), display_config=a_dock_config)
-        an_ax = matplotlib_fig_axes[0]
-
-        # _active_config_name = None
-        variable_name: str = a_decoder_name
-        active_decoder = deepcopy(a_decoder)
-        assert a_decoded_result is not None, f"a_decoded_result should not be None anymore."
-        
-        if a_decoded_result is not None:
-            active_result = deepcopy(a_decoded_result) # already decoded
-            assert (active_result.num_filter_epochs == 1), f"currently only supports decoded results (DecodedFilterEpochsResult) computed with a single epoch for all time bins, but active_result.num_filter_epochs: {active_result.num_filter_epochs}"
-            active_marginals = active_result.marginal_x_list[0]
-        else:
-            # no previously decoded result, fallback to the decoder's internal properties        
-            active_marginals = active_decoder.marginal.x
-            
-
-        active_bins = active_decoder.xbin
-
-        # active_most_likely_positions = active_marginals.most_likely_positions_1D # Raw decoded positions
-        active_most_likely_positions = None
-        active_posterior = active_marginals.p_x_given_n
-        
-
-        posterior_heatmap_imshow_kwargs = dict(
-            # cmap=get_heatmap_cmap(cmap='Oranges', bad_color='black', under_color='white', over_color='red'),
-            cmap = get_heatmap_cmap(cmap='viridis', bad_color='black', under_color='white', over_color='red'),
-            # cmap = FixedCustomColormaps.get_custom_orange_with_low_values_dropped_cmap()
-            # cmap = FixedCustomColormaps.get_custom_black_with_low_values_dropped_cmap(low_value_cutoff=0.05)
-            # cmap = ColormapHelpers.create_colormap_transparent_below_value(active_cmap, low_value_cuttoff=0.1)
-            # cmap = FixedCustomColormaps.get_custom_greyscale_with_low_values_dropped_cmap(low_value_cutoff=0.01, full_opacity_threshold=0.25)
-            # active_cmap = FixedCustomColormaps.get_custom_orange_with_low_values_dropped_cmap()
-            vmin=0.0, vmax=1.0,
-        )
-        # most_likely_positions_mode: 'standard'|'corrected'
-        # fig, curr_ax = curr_active_pipeline.display('_display_plot_marginal_1D_most_likely_position_comparisons', _active_config_name, variable_name='x', most_likely_positions_mode='corrected', ax=an_ax) # ax=active_2d_plot.ui.matplotlib_view_widget.ax
-        ## Actual plotting portion:
-        fig, curr_ax = plot_1D_most_likely_position_comparsions(None, time_window_centers=active_decoder.time_window_centers, xbin=active_bins,
-                                                                posterior=active_posterior,
-                                                                active_most_likely_positions_1D=active_most_likely_positions,
-                                                                ax=an_ax, variable_name=variable_name, debug_print=True, enable_flat_line_drawing=False,
-                                                                posterior_heatmap_imshow_kwargs=posterior_heatmap_imshow_kwargs)
-
-        ## Update the params
-        widget.params.variable_name = variable_name
-        widget.params.posterior_heatmap_imshow_kwargs = deepcopy(posterior_heatmap_imshow_kwargs)
-        widget.params.enable_flat_line_drawing = False
-        if extended_dock_title_info is not None:
-            widget.params.extended_dock_title_info = deepcopy(extended_dock_title_info)
-            
-        ## Update the plots_data
-        if active_decoder.time_window_centers is not None:
-            widget.plots_data.time_window_centers = deepcopy(active_decoder.time_window_centers)
-        if active_bins is not None:
-            widget.plots_data.xbin = deepcopy(active_bins)
-        if active_most_likely_positions is not None:
-            widget.plots_data.active_most_likely_positions = deepcopy(active_most_likely_positions)
-        widget.plots_data.variable_name = variable_name
-        if active_posterior is not None:
-            widget.plots_data.matrix = deepcopy(active_posterior)
-            
-        widget.draw() # alternative to accessing through full path?
-        active_2d_plot.sync_matplotlib_render_plot_widget(identifier_name) # Sync it with the active window:
-        return identifier_name, widget, matplotlib_fig, matplotlib_fig_axes
-    
 
     @classmethod
     def add_directional_decoder_decoded_epochs(cls, curr_active_pipeline, active_2d_plot, debug_print=False):
         """ adds the decoded epochs for the long/short decoder from the global_computation_results as new matplotlib plot rows. """
         from pyphoplacecellanalysis.General.Model.Configs.LongShortDisplayConfig import DisplayColorsEnum
         from pyphoplacecellanalysis.GUI.PyQtPlot.DockingWidgets.DynamicDockDisplayAreaContent import CustomDockDisplayConfig
-        from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.RankOrderComputations import RankOrderAnalyses
-        showCloseButton = True
-        dock_configs = dict(zip(('long_LR', 'long_RL', 'short_LR', 'short_RL'), (CustomDockDisplayConfig(custom_get_colors_callback_fn=DisplayColorsEnum.Laps.get_LR_dock_colors, showCloseButton=showCloseButton), CustomDockDisplayConfig(custom_get_colors_callback_fn=DisplayColorsEnum.Laps.get_RL_dock_colors, showCloseButton=showCloseButton),
-                        CustomDockDisplayConfig(custom_get_colors_callback_fn=DisplayColorsEnum.Laps.get_LR_dock_colors, showCloseButton=showCloseButton), CustomDockDisplayConfig(custom_get_colors_callback_fn=DisplayColorsEnum.Laps.get_RL_dock_colors, showCloseButton=showCloseButton))))
+        from pyphoplacecellanalysis.GUI.PyQtPlot.DockingWidgets.SpecificDockWidgetManipulatingMixin import SpecificDockWidgetManipulatingMixin #TODO 2025-06-02 10:28: - [ ] Converting to use `SpecificDockWidgetManipulatingMixin`
+        from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import DecodedFilterEpochsResult, SingleEpochDecodedResult
 
 
-        ## Uses the `global_computation_results.computed_data['DirectionalDecodersDecoded']`
-        directional_decoders_decode_result: DirectionalDecodersContinuouslyDecodedResult = curr_active_pipeline.global_computation_results.computed_data['DirectionalDecodersDecoded']
-        all_directional_pf1D_Decoder_dict: Dict[str, BasePositionDecoder] = directional_decoders_decode_result.pf1D_Decoder_dict
-        # continuously_decoded_result_cache_dict = directional_decoders_decode_result.continuously_decoded_result_cache_dict
-        time_bin_size: float = directional_decoders_decode_result.most_recent_decoding_time_bin_size
-        if debug_print:
-            print(f'time_bin_size: {time_bin_size}')
-        continuously_decoded_dict: Dict[str, DecodedFilterEpochsResult] = directional_decoders_decode_result.most_recent_continuously_decoded_dict
-        all_directional_continuously_decoded_dict = continuously_decoded_dict or {}
-
-        # Need all_directional_pf1D_Decoder_dict
         output_dict = {}
 
-
-        for a_decoder_name, a_decoder in all_directional_pf1D_Decoder_dict.items():
-            a_dock_config = dock_configs[a_decoder_name]
-            # a_decoder.conform_to_position_bins
-            # active_posterior = a_decoder.marginal
-            ## renormalize all the posteriors
+        ## get the result data:
+        try:
+            ## Uses the `global_computation_results.computed_data['DirectionalDecodersDecoded']`
+            directional_decoders_decode_result: DirectionalDecodersContinuouslyDecodedResult = curr_active_pipeline.global_computation_results.computed_data['DirectionalDecodersDecoded']
             
-            a_decoded_result = all_directional_continuously_decoded_dict.get(a_decoder_name, None) # already decoded
-            _out_tuple = cls._perform_add_new_decoded_row(curr_active_pipeline=curr_active_pipeline, active_2d_plot=active_2d_plot, a_dock_config=a_dock_config, a_decoder_name=a_decoder_name, a_decoder=a_decoder, a_decoded_result=a_decoded_result)
-            # identifier_name, widget, matplotlib_fig, matplotlib_fig_axes = _out_tuple
-            output_dict[a_decoder_name] = _out_tuple
+            time_bin_size: float = directional_decoders_decode_result.most_recent_decoding_time_bin_size
+            if debug_print:
+                print(f'time_bin_size: {time_bin_size}')
+
+            # pseudo2D_decoder: BasePositionDecoder = directional_decoders_decode_result.pseudo2D_decoder
+            all_directional_pf1D_Decoder_dict: Dict[str, BasePositionDecoder] = directional_decoders_decode_result.pf1D_Decoder_dict
+            a_continuously_decoded_dict: Dict[str, DecodedFilterEpochsResult] = directional_decoders_decode_result.continuously_decoded_result_cache_dict.get(time_bin_size, None)
+            all_time_bin_sizes_output_dict: Dict[float, Dict[types.DecoderName, SingleEpochDecodedResult]] = directional_decoders_decode_result.split_pseudo2D_continuous_result_to_1D_continuous_result()
+            a_split_pseudo2D_continuous_result_to_1D_continuous_result_dict: Dict[types.DecoderName, SingleEpochDecodedResult] = all_time_bin_sizes_output_dict.get(time_bin_size, None)
+
+            assert a_continuously_decoded_dict is not None, f"a_continuously_decoded_dict is None even after recomputing!"
+            assert a_split_pseudo2D_continuous_result_to_1D_continuous_result_dict is not None, f"a_split_pseudo2D_continuous_result_to_1D_continuous_result_dict is None even after recomputing!"
+            info_string: str = f" - t_bin_size: {time_bin_size:.3f}"
+
+        except (KeyError, AttributeError) as e:
+            # KeyError: 'DirectionalDecodersDecoded'
+            print(f'add_all_computed_time_bin_sizes_pseudo2D_decoder_decoded_epochs(...) failed to add any tracks, perhaps because the pipeline is missing any computed "DirectionalDecodersDecoded" global results. Error: "{e}". Skipping.')
+            a_continuously_decoded_dict = None
+            pseudo2D_decoder = None        
+            pass
+
+        except Exception as e:
+            raise
+
+
+        # ==================================================================================================================== #
+        # PLOTTING                                                                                                             #
+        # ==================================================================================================================== #
+        dock_group_sep_character: str = '_'
+        showCloseButton = True
+        _common_dock_config_kwargs = {'dock_group_names': [dock_group_sep_character.join([f'ContinuousDecode', info_string])], 'showCloseButton': showCloseButton}
+        dock_configs: Dict[str, CustomDockDisplayConfig] = dict(zip(('long_LR', 'long_RL', 'short_LR', 'short_RL'),
+                                (CustomDockDisplayConfig(custom_get_colors_callback_fn=DisplayColorsEnum.Laps.get_LR_dock_colors, **_common_dock_config_kwargs),
+                                CustomDockDisplayConfig(custom_get_colors_callback_fn=DisplayColorsEnum.Laps.get_RL_dock_colors, **_common_dock_config_kwargs),
+                                CustomDockDisplayConfig(custom_get_colors_callback_fn=DisplayColorsEnum.Laps.get_LR_dock_colors, **_common_dock_config_kwargs),
+                                CustomDockDisplayConfig(custom_get_colors_callback_fn=DisplayColorsEnum.Laps.get_RL_dock_colors, **_common_dock_config_kwargs))))
+
+        output_dict = active_2d_plot.add_docked_decoded_results_dict_tracks(name=f'ContinuousDecode', a_decoded_result_dict=a_split_pseudo2D_continuous_result_to_1D_continuous_result_dict, dock_configs=dock_configs, pf1D_Decoder_dict=all_directional_pf1D_Decoder_dict,
+                                                                                                    measured_position_df=deepcopy(curr_active_pipeline.sess.position.to_dataframe()),
+                                                                                                    extended_dock_title_info=info_string)
+        ## layout the dockGroups:
+        nested_dock_items, nested_dynamic_docked_widget_container_widgets = active_2d_plot.ui.dynamic_docked_widget_container.layout_dockGroups()
+        
 
         return output_dict
     
     def validate_can_display(self) -> bool:
         """ returns True if the item is enabled, otherwise returns false """
-        try:
-            curr_active_pipeline = self._active_pipeline
-            # assert curr_active_pipeline is not None
-            if curr_active_pipeline is None:
-                raise ValueError("Current active pipeline is None!")
-            active_2d_plot = self._spike_raster_window.spike_raster_plt_2d
-            # assert active_2d_plot is not None
-            if active_2d_plot is None:
-                raise ValueError("active_2d_plot is None!")
+        #TODO 2025-06-02 10:42: - [ ] Fixed, but now redundant, so disable perminantly by default
+        return False
+        # try:
+        #     curr_active_pipeline = self._active_pipeline
+        #     # assert curr_active_pipeline is not None
+        #     if curr_active_pipeline is None:
+        #         raise ValueError("Current active pipeline is None!")
+        #     active_2d_plot = self._spike_raster_window.spike_raster_plt_2d
+        #     # assert active_2d_plot is not None
+        #     if active_2d_plot is None:
+        #         raise ValueError("active_2d_plot is None!")
 
-            return DirectionalDecodersContinuouslyDecodedResult.validate_has_directional_decoded_continuous_epochs(curr_active_pipeline=curr_active_pipeline)
+        #     return DirectionalDecodersContinuouslyDecodedResult.validate_has_directional_decoded_continuous_epochs(curr_active_pipeline=curr_active_pipeline)
             
-        except Exception as e:
-            print(f'Exception {e} occured in validate_can_display(), returning False')
-            return False
+        # except Exception as e:
+        #     print(f'Exception {e} occured in validate_can_display(), returning False')
+        #     return False
 
     def execute(self, *args, **kwargs) -> None:
         print(f'menu execute(): {self}')
@@ -8395,7 +8825,7 @@ class AddNewDirectionalDecodedEpochs_MatplotlibPlotCommand(BaseMenuCommand):
         
 
 
-@metadata_attributes(short_name=None, tags=['track', 'Spike3DRasterWindowWidget', 'MatplotlibPlotCommand', 'epochs', 'decoder'],
+@metadata_attributes(short_name=None, tags=['track', 'KAMRAN_LIKES_NORMALIZATION', 'Spike3DRasterWindowWidget', 'MatplotlibPlotCommand', 'epochs', 'decoder'],
                       input_requires=['DirectionalDecodersDecoded', 'DirectionalDecodersDecoded.most_recent_continuously_decoded_dict["pseudo2D"]'], output_provides=[], uses=['plot_1D_most_likely_position_comparsions'], used_by=[], creation_date='2024-01-22 00:00', related_items=[])
 @define(slots=False)
 class AddNewDecodedPosteriors_MatplotlibPlotCommand(BaseMenuCommand):
@@ -8414,7 +8844,9 @@ class AddNewDecodedPosteriors_MatplotlibPlotCommand(BaseMenuCommand):
     _active_config_name = field(default=None)
     _context = field(default=None, alias="active_context")
     _display_output = field(default=Factory(dict))
-    
+    active_time_bin_sizes_whitelist: Optional[List[float]] = field(default=None, metadata={'desc':'if not None, only results with this decoding_time_bin_size will be plotted, otherwise all available time_bin_sizes will be shown.'})    
+
+
     @function_attributes(short_name=None, tags=['row', 'posterior'], input_requires=[], output_provides=[], uses=['add_new_matplotlib_render_plot_widget', 'plot_1D_most_likely_position_comparsions'], used_by=[], creation_date='2024-12-18 08:53', related_items=[])
     @classmethod
     def _build_dock_group_id(cls, extended_dock_title_info: Optional[str]=None) -> str:
@@ -8428,7 +8860,7 @@ class AddNewDecodedPosteriors_MatplotlibPlotCommand(BaseMenuCommand):
 
     @classmethod
     def _perform_overlay_measured_position(cls, identifier_name, widget, matplotlib_fig, matplotlib_fig_axes, measured_position_df: pd.DataFrame, variable_name = 'x'):
-        """ 
+        """ overlays a red measured position line over the heatmap
         
         if a_position_decoder.pf.filtered_pos_df is not None:
             measured_position_df = deepcopy(a_position_decoder.pf.filtered_pos_df)
@@ -8500,11 +8932,11 @@ class AddNewDecodedPosteriors_MatplotlibPlotCommand(BaseMenuCommand):
         measured_position_df = None # Note: for some reason setting `measured_position_df` to anything other than None here messes up the plotting entirely. Set it to None now, and if we want measured positions plot them after
             
         ## Actual plotting portion:
-        fig, an_ax = plot_1D_most_likely_position_comparsions(measured_position_df=measured_position_df, time_window_centers=time_window_centers, xbin=active_bins,
+        fig, an_ax, _return_out_artists_dict = plot_1D_most_likely_position_comparsions(measured_position_df=measured_position_df, time_window_centers=time_window_centers, xbin=active_bins,
                                                                 posterior=active_posterior,
                                                                 active_most_likely_positions_1D=active_most_likely_positions,
                                                                 ax=an_ax, variable_name=variable_name, debug_print=True, enable_flat_line_drawing=False,
-                                                                posterior_heatmap_imshow_kwargs=posterior_heatmap_imshow_kwargs)
+                                                                posterior_heatmap_imshow_kwargs=posterior_heatmap_imshow_kwargs, return_created_artists=True)
 
         ## Update the params
         widget.params.variable_name = variable_name
@@ -8513,6 +8945,9 @@ class AddNewDecodedPosteriors_MatplotlibPlotCommand(BaseMenuCommand):
         if extended_dock_title_info is not None:
             widget.params.extended_dock_title_info = deepcopy(extended_dock_title_info)
             
+
+
+
         ## Update the plots_data - used for crosshairs tracing and other things
         if time_window_centers is not None:
             widget.plots_data.time_window_centers = deepcopy(time_window_centers)
@@ -8526,6 +8961,9 @@ class AddNewDecodedPosteriors_MatplotlibPlotCommand(BaseMenuCommand):
         if a_position_decoder is not None:
             widget.plots_data.a_decoder = deepcopy(a_position_decoder)
         
+        ## Update the .plots
+        widget.plots.update({k:v for k, v in _return_out_artists_dict.items() if v is not None})
+
         ## try to add the measured_positions
         widget.plots_data.measured_position_df = None
         widget.plots.measured_position_artists = None       
@@ -8548,7 +8986,7 @@ class AddNewDecodedPosteriors_MatplotlibPlotCommand(BaseMenuCommand):
     # ==================================================================================================================== #
     @function_attributes(short_name=None, tags=['main'], input_requires=[], output_provides=[], uses=['_perform_add_new_decoded_posterior_row', '_build_dock_group_id'], used_by=['add_all_computed_time_bin_sizes_pseudo2D_decoder_decoded_epochs', 'add_pseudo2D_decoder_decoded_epochs'], creation_date='2025-01-29 09:25', related_items=[])
     @classmethod
-    def prepare_and_perform_add_add_pseudo2D_decoder_decoded_epochs(cls, curr_active_pipeline, active_2d_plot, continuously_decoded_dict: Dict[str, DecodedFilterEpochsResult], info_string: str, a_pseudo2D_decoder: BasePositionDecoder, debug_print: bool=False, **kwargs):
+    def prepare_and_perform_add_pseudo2D_decoder_decoded_epochs(cls, curr_active_pipeline, active_2d_plot, continuously_decoded_dict: Dict[str, DecodedFilterEpochsResult], info_string: str, a_pseudo2D_decoder: BasePositionDecoder, debug_print: bool=False, **kwargs):
         """ adds the decoded epochs for the long/short decoder from the global_computation_results as new matplotlib plot rows. """
         from pyphoplacecellanalysis.General.Model.Configs.LongShortDisplayConfig import DisplayColorsEnum
         from pyphoplacecellanalysis.GUI.PyQtPlot.DockingWidgets.DynamicDockDisplayAreaContent import CustomDockDisplayConfig, CustomCyclicColorsDockDisplayConfig, NamedColorScheme
@@ -8601,9 +9039,38 @@ class AddNewDecodedPosteriors_MatplotlibPlotCommand(BaseMenuCommand):
         return output_dict
     
 
+
     @function_attributes(short_name=None, tags=['multi-time-bin'], input_requires=[], output_provides=[], uses=['cls.prepare_and_perform_add_add_pseudo2D_decoder_decoded_epochs'], used_by=[], creation_date='2025-02-26 05:37', related_items=[])
     @classmethod
-    def add_all_computed_time_bin_sizes_pseudo2D_decoder_decoded_epochs(cls, curr_active_pipeline, active_2d_plot, debug_print=False, **kwargs):
+    def get_all_computed_time_bin_sizes(cls, curr_active_pipeline) -> List[float]:
+        """ adds all computed time_bin_sizes in `curr_active_pipeline.global_computation_results.computed_data['DirectionalDecodersDecoded'].continuously_decoded_result_cache_dict` from the global_computation_results as new matplotlib plot rows. """
+        time_bin_size_list: List[float] = []
+
+        try:
+            ## Uses the `global_computation_results.computed_data['DirectionalDecodersDecoded']`
+            directional_decoders_decode_result: DirectionalDecodersContinuouslyDecodedResult = curr_active_pipeline.global_computation_results.computed_data['DirectionalDecodersDecoded']
+            # pseudo2D_decoder: BasePositionDecoder = directional_decoders_decode_result.pseudo2D_decoder        
+            # all_directional_pf1D_Decoder_dict: Dict[str, BasePositionDecoder] = directional_decoders_decode_result.pf1D_Decoder_dict
+            continuously_decoded_result_cache_dict = directional_decoders_decode_result.continuously_decoded_result_cache_dict
+            # time_bin_size_list = [str(a_time_bin_size) for a_time_bin_size in continuously_decoded_result_cache_dict.keys()]
+            time_bin_size_list = [float(a_time_bin_size) for a_time_bin_size in continuously_decoded_result_cache_dict.keys()]
+
+        except (KeyError, AttributeError) as e:
+            # KeyError: 'DirectionalDecodersDecoded'
+            print(f'get_all_computed_time_bin_sizes(...) failed to add any tracks, perhaps because the pipeline is missing any computed "DirectionalDecodersDecoded" global results. Error: "{e}". Skipping.')
+            pass                   
+
+        except Exception as e:
+            raise
+
+        ## OUTPUTS: time_bin_size_list
+        return time_bin_size_list
+
+
+
+    @function_attributes(short_name=None, tags=['multi-time-bin'], input_requires=[], output_provides=[], uses=['cls.prepare_and_perform_add_add_pseudo2D_decoder_decoded_epochs'], used_by=[], creation_date='2025-02-26 05:37', related_items=[])
+    @classmethod
+    def add_active_computed_time_bin_sizes_pseudo2D_decoder_decoded_epochs(cls, curr_active_pipeline, active_2d_plot, debug_print=False, active_time_bin_sizes_whitelist: Optional[List[float]]=None, **kwargs):
         """ adds all computed time_bin_sizes in `curr_active_pipeline.global_computation_results.computed_data['DirectionalDecodersDecoded'].continuously_decoded_result_cache_dict` from the global_computation_results as new matplotlib plot rows. """
         flat_all_time_bin_sizes_output_tuples_dict: Dict[str, Tuple] = {}
         
@@ -8621,20 +9088,27 @@ class AddNewDecodedPosteriors_MatplotlibPlotCommand(BaseMenuCommand):
                 ## Each iteration here adds 4 more tracks -- one for each decoding context
                 
                 # a_continuously_decoded_dict: Dict[str, DecodedFilterEpochsResult]
-                if debug_print:
-                    print(f'time_bin_size: {time_bin_size}')
+                will_skip_time_bin_size: bool = False
+                if active_time_bin_sizes_whitelist is not None:
+                    if time_bin_size not in active_time_bin_sizes_whitelist:
+                        will_skip_time_bin_size = True
+                        if debug_print:
+                            print(f'active_time_bin_sizes_whitelist will be used: {active_time_bin_sizes_whitelist} and current time_bin_size: {time_bin_size} will be excluded.')
 
-                info_string: str = f" - t_bin_size: {time_bin_size}"
-                # output_dict = _cmd.prepare_and_perform_add_pseudo2D_decoder_decoded_epoch_marginals(curr_active_pipeline=_cmd._active_pipeline, active_2d_plot=active_2d_plot, continuously_decoded_dict=deepcopy(a_continuously_decoded_dict), info_string=info_string, **enable_rows_config_kwargs)
-                output_dict = cls.prepare_and_perform_add_add_pseudo2D_decoder_decoded_epochs(curr_active_pipeline=curr_active_pipeline, active_2d_plot=active_2d_plot, continuously_decoded_dict=deepcopy(a_continuously_decoded_dict), info_string=info_string, a_pseudo2D_decoder=pseudo2D_decoder, debug_print=debug_print, **kwargs)
-                for a_key, an_output_tuple in output_dict.items():
-                    identifier_name, widget, matplotlib_fig, matplotlib_fig_axes, dDisplayItem = an_output_tuple
-                    # if a_key not in all_time_bin_sizes_output_dict:
-                    #     all_time_bin_sizes_output_dict[a_key] = [] ## init empty list
-                    # all_time_bin_sizes_output_dict[a_key].append(an_output_tuple)
-                    
-                    assert (identifier_name not in flat_all_time_bin_sizes_output_tuples_dict), f"identifier_name: {identifier_name} already in flat_all_time_bin_sizes_output_tuples_dict: {list(flat_all_time_bin_sizes_output_tuples_dict.keys())}"
-                    flat_all_time_bin_sizes_output_tuples_dict[identifier_name] = an_output_tuple
+                if not will_skip_time_bin_size:
+                    info_string: str = f" - t_bin_size: {time_bin_size}"
+                    # output_dict = _cmd.prepare_and_perform_add_pseudo2D_decoder_decoded_epoch_marginals(curr_active_pipeline=_cmd._active_pipeline, active_2d_plot=active_2d_plot, continuously_decoded_dict=deepcopy(a_continuously_decoded_dict), info_string=info_string, **enable_rows_config_kwargs)
+                    output_dict = cls.prepare_and_perform_add_pseudo2D_decoder_decoded_epochs(curr_active_pipeline=curr_active_pipeline, active_2d_plot=active_2d_plot, continuously_decoded_dict=deepcopy(a_continuously_decoded_dict), info_string=info_string, a_pseudo2D_decoder=pseudo2D_decoder, debug_print=debug_print, **kwargs)
+                    for a_key, an_output_tuple in output_dict.items():
+                        identifier_name, widget, matplotlib_fig, matplotlib_fig_axes, dDisplayItem = an_output_tuple
+                        # if a_key not in all_time_bin_sizes_output_dict:
+                        #     all_time_bin_sizes_output_dict[a_key] = [] ## init empty list
+                        # all_time_bin_sizes_output_dict[a_key].append(an_output_tuple)
+                        
+                        assert (identifier_name not in flat_all_time_bin_sizes_output_tuples_dict), f"identifier_name: {identifier_name} already in flat_all_time_bin_sizes_output_tuples_dict: {list(flat_all_time_bin_sizes_output_tuples_dict.keys())}"
+                        flat_all_time_bin_sizes_output_tuples_dict[identifier_name] = an_output_tuple
+                # END if not will_skip_tim...
+
         except (KeyError, AttributeError) as e:
             # KeyError: 'DirectionalDecodersDecoded'
             print(f'add_all_computed_time_bin_sizes_pseudo2D_decoder_decoded_epochs(...) failed to add any tracks, perhaps because the pipeline is missing any computed "DirectionalDecodersDecoded" global results. Error: "{e}". Skipping.')
@@ -8667,7 +9141,7 @@ class AddNewDecodedPosteriors_MatplotlibPlotCommand(BaseMenuCommand):
         info_string: str = f" - t_bin_size: {time_bin_size}"
         most_recent_continuously_decoded_dict: Dict[str, DecodedFilterEpochsResult] = deepcopy(directional_decoders_decode_result.most_recent_continuously_decoded_dict)
         
-        return cls.prepare_and_perform_add_add_pseudo2D_decoder_decoded_epochs(curr_active_pipeline=curr_active_pipeline, active_2d_plot=active_2d_plot, continuously_decoded_dict=most_recent_continuously_decoded_dict, info_string=info_string, pseudo2D_decoder=pseudo2D_decoder, debug_print=debug_print, **kwargs)
+        return cls.prepare_and_perform_add_pseudo2D_decoder_decoded_epochs(curr_active_pipeline=curr_active_pipeline, active_2d_plot=active_2d_plot, continuously_decoded_dict=most_recent_continuously_decoded_dict, info_string=info_string, pseudo2D_decoder=pseudo2D_decoder, debug_print=debug_print, **kwargs)
 
 
     @function_attributes(short_name=None, tags=['tracks', 'custom_decoder'], input_requires=[], output_provides=[], uses=['cls._perform_add_new_decoded_posterior_row'], used_by=[], creation_date='2025-01-29 12:08', related_items=[])
@@ -8758,7 +9232,7 @@ class AddNewDecodedPosteriors_MatplotlibPlotCommand(BaseMenuCommand):
         active_2d_plot = self._spike_raster_window.spike_raster_plt_2d
 
         # output_dict = self.add_pseudo2D_decoder_decoded_epochs(self._active_pipeline, active_2d_plot)
-        output_dict = self.add_all_computed_time_bin_sizes_pseudo2D_decoder_decoded_epochs(self._active_pipeline, active_2d_plot, **kwargs)
+        output_dict = self.add_active_computed_time_bin_sizes_pseudo2D_decoder_decoded_epochs(self._active_pipeline, active_2d_plot, active_time_bin_sizes_whitelist=self.active_time_bin_sizes_whitelist, **kwargs)
         
         # Update display output dict:
         for a_decoder_name, an_output_tuple in output_dict.items():
@@ -8789,7 +9263,7 @@ class AddNewDecodedPosteriors_MatplotlibPlotCommand(BaseMenuCommand):
 class AddNewDecodedEpochMarginal_MatplotlibPlotCommand(AddNewDecodedPosteriors_MatplotlibPlotCommand):
     """ 2024-01-23
     Adds THREE rows ('non_marginalized_raw_result', 'marginal_over_direction', 'marginal_over_track_ID') to the SpikeRaster2D showing the marginalized posteriors for the continuously decoded decoder
-    These are the 4 x n_total_time_bins grid of context likelihoods.
+    These are the 4 x n_total_time_bins grid of context likelihoods. They are normalized okay, maybe how Kamran wants them?
     
     Usage:
     from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import AddNewDecodedPosteriors_MatplotlibPlotCommand
@@ -8804,7 +9278,20 @@ class AddNewDecodedEpochMarginal_MatplotlibPlotCommand(AddNewDecodedPosteriors_M
     enable_marginal_over_direction: bool = field(default=False)
     enable_marginal_over_track_ID: bool = field(default=True)
     allow_overwrite_enabled_marginals_from_params: bool = field(default=True, metadata={'desc': 'if True, allows overwriting self.enable_* properties with the values in `self._spike_raster_window.spike_raster_plt_2d.params`.'})
+    active_time_bin_sizes_whitelist: Optional[List[float]] = field(default=None, metadata={'desc':'if not None, only results with this decoding_time_bin_size will be plotted, otherwise all available time_bin_sizes will be shown.'})
 
+
+    @property
+    def all_computed_time_bin_sizes(self) -> List[float]:
+        """The all_computed_time_bin_sizes property."""
+        assert self._active_pipeline is not None
+        ## Uses the `global_computation_results.computed_data['DirectionalDecodersDecoded']`
+        directional_decoders_decode_result: DirectionalDecodersContinuouslyDecodedResult = self._active_pipeline.global_computation_results.computed_data['DirectionalDecodersDecoded']
+        continuously_decoded_result_cache_dict = directional_decoders_decode_result.continuously_decoded_result_cache_dict
+        return list(continuously_decoded_result_cache_dict.keys())
+
+
+    @function_attributes(short_name=None, tags=['private'], input_requires=[], output_provides=[], uses=['plot_1D_most_likely_position_comparsions', 'get_heatmap_cmap'], used_by=['cls.prepare_and_perform_add_pseudo2D_decoder_decoded_epoch_marginals'], creation_date='2025-06-02 09:55', related_items=[])
     @classmethod
     def _perform_add_new_decoded_posterior_marginal_row(cls, curr_active_pipeline, active_2d_plot, a_dock_config, a_variable_name: str, time_window_centers, xbin, a_1D_posterior, extended_dock_title_info: Optional[str]=None):
         """ used with `add_pseudo2D_decoder_decoded_epoch_marginals` - adds a single decoded row to the matplotlib dynamic output
@@ -8835,11 +9322,11 @@ class AddNewDecodedEpochMarginal_MatplotlibPlotCommand(AddNewDecodedPosteriors_M
         # most_likely_positions_mode: 'standard'|'corrected'
         # fig, curr_ax = curr_active_pipeline.display('_display_plot_marginal_1D_most_likely_position_comparisons', _active_config_name, variable_name='x', most_likely_positions_mode='corrected', ax=an_ax) # ax=active_2d_plot.ui.matplotlib_view_widget.ax
         ## Actual plotting portion:
-        fig, curr_ax = plot_1D_most_likely_position_comparsions(None, time_window_centers=time_window_centers, xbin=deepcopy(xbin),
+        fig, curr_ax, _return_out_artists_dict = plot_1D_most_likely_position_comparsions(None, time_window_centers=time_window_centers, xbin=deepcopy(xbin),
                                                                 posterior=active_posterior,
                                                                 active_most_likely_positions_1D=active_most_likely_positions,
                                                                 ax=an_ax, variable_name=variable_name, debug_print=True, enable_flat_line_drawing=False,
-                                                                posterior_heatmap_imshow_kwargs=posterior_heatmap_imshow_kwargs)
+                                                                posterior_heatmap_imshow_kwargs=posterior_heatmap_imshow_kwargs, return_created_artists=True)
 
         ## Update the params
         widget.params.variable_name = variable_name
@@ -8865,7 +9352,7 @@ class AddNewDecodedEpochMarginal_MatplotlibPlotCommand(AddNewDecodedPosteriors_M
         return identifier_name, widget, matplotlib_fig, matplotlib_fig_axes
     
 
-
+    @function_attributes(short_name=None, tags=['private'], input_requires=[], output_provides=[], uses=['cls._perform_add_new_decoded_posterior_marginal_row', 'DirectionalPseudo2DDecodersResult.build_non_marginalized_raw_posteriors', 'PlottingHelpers.helper_matplotlib_add_pseudo2D_marginal_labels'], used_by=['add_all_computed_time_bin_sizes_pseudo2D_decoder_decoded_epoch_marginals'], creation_date='2025-06-02 09:52', related_items=[])
     @classmethod
     def prepare_and_perform_add_pseudo2D_decoder_decoded_epoch_marginals(cls, curr_active_pipeline, active_2d_plot, continuously_decoded_dict: Dict[str, DecodedFilterEpochsResult], info_string: str, enable_non_marginalized_raw_result: bool=True, 
                                                                          enable_marginal_over_direction: bool=False, enable_marginal_over_track_ID: bool=True, enable_marginal_labels:bool=True, debug_print: bool=False):
@@ -8981,9 +9468,15 @@ class AddNewDecodedEpochMarginal_MatplotlibPlotCommand(AddNewDecodedPosteriors_M
 
 
 
+    @function_attributes(short_name=None, tags=['MAIN'], input_requires=[], output_provides=[], uses=['cls.prepare_and_perform_add_pseudo2D_decoder_decoded_epoch_marginals'], used_by=[], creation_date='2025-06-02 09:50', related_items=[])
     @classmethod
-    def add_all_computed_time_bin_sizes_pseudo2D_decoder_decoded_epoch_marginals(cls, curr_active_pipeline, active_2d_plot, debug_print=False, **kwargs):
-        """ adds all computed time_bin_sizes in `curr_active_pipeline.global_computation_results.computed_data['DirectionalDecodersDecoded'].continuously_decoded_result_cache_dict` from the global_computation_results as new matplotlib plot rows. """
+    def add_active_computed_time_bin_sizes_pseudo2D_decoder_decoded_epoch_marginals(cls, curr_active_pipeline, active_2d_plot, debug_print=False, active_time_bin_sizes_whitelist: Optional[List[float]]=None, **kwargs):
+        """ adds all computed time_bin_sizes in `curr_active_pipeline.global_computation_results.computed_data['DirectionalDecodersDecoded'].continuously_decoded_result_cache_dict` from the global_computation_results as new matplotlib plot rows.
+
+        We might not always want to add all time bin sizes, sometimes they're overwhelming. Better to generate a separate menu option for each size.
+            #TODO 2025-07-01 06:14: - [ ] These can be excluded by specifying active_time_bin_sizes_whitelist.
+
+        """
         
         ## Uses the `global_computation_results.computed_data['DirectionalDecodersDecoded']`
         directional_decoders_decode_result: DirectionalDecodersContinuouslyDecodedResult = curr_active_pipeline.global_computation_results.computed_data['DirectionalDecodersDecoded']
@@ -8996,30 +9489,41 @@ class AddNewDecodedEpochMarginal_MatplotlibPlotCommand(AddNewDecodedPosteriors_M
         flat_all_time_bin_sizes_output_tuples_dict: Dict[str, Tuple] = {}
         for time_bin_size, a_continuously_decoded_dict in continuously_decoded_result_cache_dict.items():
             # a_continuously_decoded_dict: Dict[str, DecodedFilterEpochsResult]
-            if debug_print:
-                print(f'time_bin_size: {time_bin_size}')
+            will_skip_time_bin_size: bool = False
+            if active_time_bin_sizes_whitelist is not None:
+                if time_bin_size not in active_time_bin_sizes_whitelist:
+                    will_skip_time_bin_size = True
+                    if debug_print:
+                        print(f'active_time_bin_sizes_whitelist will be used: {active_time_bin_sizes_whitelist} and current time_bin_size: {time_bin_size} will be excluded.')
 
-            info_string: str = f" - t_bin_size: {time_bin_size}"
-            # output_dict = _cmd.prepare_and_perform_add_pseudo2D_decoder_decoded_epoch_marginals(curr_active_pipeline=_cmd._active_pipeline, active_2d_plot=active_2d_plot, continuously_decoded_dict=deepcopy(a_continuously_decoded_dict), info_string=info_string, **enable_rows_config_kwargs)
-            output_dict = cls.prepare_and_perform_add_pseudo2D_decoder_decoded_epoch_marginals(curr_active_pipeline=curr_active_pipeline, active_2d_plot=active_2d_plot, continuously_decoded_dict=deepcopy(a_continuously_decoded_dict), info_string=info_string, debug_print=debug_print, **kwargs)
-            for a_key, an_output_tuple in output_dict.items():
-                identifier_name, *tuple_extras = an_output_tuple
-                
-                if a_key not in all_time_bin_sizes_output_dict:
-                    all_time_bin_sizes_output_dict[a_key] = [] ## init empty list
-                all_time_bin_sizes_output_dict[a_key].append(an_output_tuple)
-                
-                assert (identifier_name not in flat_all_time_bin_sizes_output_tuples_dict), f"identifier_name: {identifier_name} already in flat_all_time_bin_sizes_output_tuples_dict: {list(flat_all_time_bin_sizes_output_tuples_dict.keys())}"
-                flat_all_time_bin_sizes_output_tuples_dict[identifier_name] = an_output_tuple
-                
-            # all_time_bin_sizes_output_dict['non_marginalized_raw_result'].append(output_dict['non_marginalized_raw_result']) #= all_time_bin_sizes_output_dict['non_marginalized_raw_result'] + 
-            # all_time_bin_sizes_output_dict['marginal_over_direction'].append(output_dict['marginal_over_direction'])
-            # all_time_bin_sizes_output_dict['marginal_over_track_ID'].append(output_dict['marginal_over_track_ID'])
-            
+            if not will_skip_time_bin_size:
+                if debug_print:
+                    print(f'time_bin_size: {time_bin_size}')
+
+                info_string: str = f" - t_bin_size: {time_bin_size}"
+                # output_dict = _cmd.prepare_and_perform_add_pseudo2D_decoder_decoded_epoch_marginals(curr_active_pipeline=_cmd._active_pipeline, active_2d_plot=active_2d_plot, continuously_decoded_dict=deepcopy(a_continuously_decoded_dict), info_string=info_string, **enable_rows_config_kwargs)
+                output_dict = cls.prepare_and_perform_add_pseudo2D_decoder_decoded_epoch_marginals(curr_active_pipeline=curr_active_pipeline, active_2d_plot=active_2d_plot, continuously_decoded_dict=deepcopy(a_continuously_decoded_dict), info_string=info_string, debug_print=debug_print, **kwargs)
+                for a_key, an_output_tuple in output_dict.items():
+                    identifier_name, *tuple_extras = an_output_tuple
+                    
+                    if a_key not in all_time_bin_sizes_output_dict:
+                        all_time_bin_sizes_output_dict[a_key] = [] ## init empty list
+                    all_time_bin_sizes_output_dict[a_key].append(an_output_tuple)
+                    
+                    assert (identifier_name not in flat_all_time_bin_sizes_output_tuples_dict), f"identifier_name: {identifier_name} already in flat_all_time_bin_sizes_output_tuples_dict: {list(flat_all_time_bin_sizes_output_tuples_dict.keys())}"
+                    flat_all_time_bin_sizes_output_tuples_dict[identifier_name] = an_output_tuple
+                ## END for a_key, an_output_tuple in output_d...
+
+                # all_time_bin_sizes_output_dict['non_marginalized_raw_result'].append(output_dict['non_marginalized_raw_result']) #= all_time_bin_sizes_output_dict['non_marginalized_raw_result'] + 
+                # all_time_bin_sizes_output_dict['marginal_over_direction'].append(output_dict['marginal_over_direction'])
+                # all_time_bin_sizes_output_dict['marginal_over_track_ID'].append(output_dict['marginal_over_track_ID'])
+            ## END if not will_skip_time_bin_size...
+
         ## OUTPUTS: all_time_bin_sizes_output_dict
         return flat_all_time_bin_sizes_output_tuples_dict
 
 
+    @function_attributes(short_name=None, tags=['MAIN'], input_requires=[], output_provides=[], uses=['.add_all_computed_time_bin_sizes_pseudo2D_decoder_decoded_epoch_marginals'], used_by=[], creation_date='2025-06-02 09:51', related_items=[])
     def execute(self, *args, **kwargs) -> None:
         """ 
         
@@ -9048,12 +9552,12 @@ class AddNewDecodedEpochMarginal_MatplotlibPlotCommand(AddNewDecodedPosteriors_M
 
         enable_rows_config_kwargs = dict(enable_non_marginalized_raw_result=self.enable_non_marginalized_raw_result, enable_marginal_over_direction=self.enable_marginal_over_direction, enable_marginal_over_track_ID=self.enable_marginal_over_track_ID)
         
+        if self.active_time_bin_sizes_whitelist is None:
+            output_dict = self.add_active_computed_time_bin_sizes_pseudo2D_decoder_decoded_epoch_marginals(self._active_pipeline, active_2d_plot, **enable_rows_config_kwargs, active_time_bin_sizes_whitelist=None)
+        else:
+            ## restrict to the provided time_bin_size:
+            output_dict = self.add_active_computed_time_bin_sizes_pseudo2D_decoder_decoded_epoch_marginals(self._active_pipeline, active_2d_plot, **enable_rows_config_kwargs, active_time_bin_sizes_whitelist=self.active_time_bin_sizes_whitelist) ## set a whitelist of the self.active_only_time_bin_size
 
-        
-
-        # output_dict = self.add_pseudo2D_decoder_decoded_epoch_marginals(self._active_pipeline, active_2d_plot, **enable_rows_config_kwargs)
-        output_dict = self.add_all_computed_time_bin_sizes_pseudo2D_decoder_decoded_epoch_marginals(self._active_pipeline, active_2d_plot, **enable_rows_config_kwargs)
-        
         # Update display output dict:
         for a_decoder_name, an_output_tuple in output_dict.items():
             identifier_name, *tuple_extras = an_output_tuple

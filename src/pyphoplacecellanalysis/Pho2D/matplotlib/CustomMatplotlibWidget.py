@@ -339,6 +339,7 @@ class CustomMatplotlibWidget(CrosshairsTracingMixin, ToastShowingWidgetMixin, Pl
     # ==================================================================================================================== #
     # CrosshairsTracingMixin Conformances                                                                                  #
     # ==================================================================================================================== #
+    @function_attributes(short_name=None, tags=['crosshairs', 'format', 'display-value'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-02-25 00:00', related_items=[])
     def format_crosshair_value_string(self, x_point: float, y_point: Optional[float]=None, matrix=None, xbins=None, ybins=None) -> str:
         """Formats the crosshair value string based on cursor position and data
         
@@ -398,8 +399,7 @@ class CustomMatplotlibWidget(CrosshairsTracingMixin, ToastShowingWidgetMixin, Pl
         value_str = self.params.crosshair_value_format_join_symbol.join(value_str_arr) ## build the final value output string from the value_str_arr
         return value_str
 
-
-    @function_attributes(short_name=None, tags=['callback'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-02-25 18:24', related_items=[])
+    @function_attributes(short_name=None, tags=['crosshairs', 'callback'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-02-25 18:24', related_items=[])
     def on_crosshair_mouse_moved(self, event, ax, vLine, name, matrix=None, xbins=None, ybins=None):
         """ Called when mouse moves to update crosshair positions and emit signals
         
@@ -483,7 +483,7 @@ class CustomMatplotlibWidget(CrosshairsTracingMixin, ToastShowingWidgetMixin, Pl
             ax.figure.canvas.draw_idle()
 
 
-    @function_attributes(short_name=None, tags=['callback', 'matplotlib', 'ax-level'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-02-25 18:55', related_items=[])
+    @function_attributes(short_name=None, tags=['crosshairs', 'callback', 'matplotlib', 'ax-level'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-02-25 18:55', related_items=[])
     def on_axes_enter(self, event):
         """Called when mouse enters an axes to show crosshairs for that axes"""
         if event.inaxes is None:
@@ -500,7 +500,7 @@ class CustomMatplotlibWidget(CrosshairsTracingMixin, ToastShowingWidgetMixin, Pl
                     plot_items['crosshairs_hLine'].set_visible(True)
         event.canvas.draw_idle()
 
-    @function_attributes(short_name=None, tags=['callback', 'matplotlib', 'ax-level'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-02-25 18:56', related_items=[])
+    @function_attributes(short_name=None, tags=['crosshairs', 'callback', 'matplotlib', 'ax-level'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-02-25 18:56', related_items=[])
     def on_axes_leave(self, event):
         """Called when mouse leaves an axes to hide its crosshairs"""
         # if event.inaxes is None:
@@ -523,8 +523,6 @@ class CustomMatplotlibWidget(CrosshairsTracingMixin, ToastShowingWidgetMixin, Pl
             #         plot_items['crosshairs_hLine'].set_visible(is_hline_visible)
                     
         event.canvas.draw_idle()
-
-
 
     # @function_attributes(short_name=None, tags=['callback', 'matplotlib', 'figure-level'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-02-25 18:40', related_items=[])
     # def on_figure_enter(self, event):
@@ -564,12 +562,7 @@ class CustomMatplotlibWidget(CrosshairsTracingMixin, ToastShowingWidgetMixin, Pl
     #     # Redraw to hide changes
     #     event.canvas.draw_idle()
 
-
-
-
-
-
-
+    @function_attributes(short_name=None, tags=['crosshairs', 'matplotlib'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-02-25 00:00', related_items=[])
     def add_crosshairs(self, plot_item, name, matrix=None, xbins=None, ybins=None, enable_y_trace:bool=True, should_force_discrete_to_bins:Optional[bool]=True, **kwargs):
         """ adds crosshairs that allow the user to hover a bin and have the label dynamically display the bin (x, y) and value.
         
@@ -579,8 +572,6 @@ class CustomMatplotlibWidget(CrosshairsTracingMixin, ToastShowingWidgetMixin, Pl
         Updates self.plots[name], self.ui.connections[name]
         
         Emits: self.sigCrosshairsUpdated
-        
-        
         
         Usage:
         
@@ -652,7 +643,7 @@ class CustomMatplotlibWidget(CrosshairsTracingMixin, ToastShowingWidgetMixin, Pl
             print(f"already have 'crosshairs_vLine' in plots_dict")
 
 
-
+    @function_attributes(short_name=None, tags=['crosshairs', 'matplotlib'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-02-25 00:00', related_items=[])
     def remove_crosshairs(self, plot_item, name=None):
         """Removes crosshairs from the specified plot or all plots if name is None
         
@@ -691,6 +682,7 @@ class CustomMatplotlibWidget(CrosshairsTracingMixin, ToastShowingWidgetMixin, Pl
         plot_item.figure.canvas.draw_idle()
 
 
+    @function_attributes(short_name=None, tags=['crosshairs', 'update'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-02-25 00:00', related_items=[])
     def update_crosshair_trace(self, wants_crosshairs_trace: bool):
         """ updates the crosshair trace peferences
         """

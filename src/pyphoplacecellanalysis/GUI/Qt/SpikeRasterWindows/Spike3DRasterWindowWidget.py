@@ -210,7 +210,7 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
         # PhoMenuHelper.try_get_menu_window(self).ui.menus._menu_action_history_list = value # window
 
 
-    def __init__(self, curr_spikes_df, core_app_name='UnifiedSpikeRasterApp', window_duration=15.0, window_start_time=30.0, neuron_colors=None, neuron_sort_order=None, application_name=None, type_of_3d_plotter='pyqtgraph', parent=None):
+    def __init__(self, curr_spikes_df, core_app_name='UnifiedSpikeRasterApp', window_duration=15.0, window_start_time=30.0, neuron_colors=None, neuron_sort_order=None, application_name=None, type_of_3d_plotter='pyqtgraph', params_kwargs=None, parent=None):
         """_summary_
 
         Args:
@@ -233,7 +233,6 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
         # else:
         #     self.applicationName = Spike3DRasterWindowWidget.applicationName
         
-        
         self.enable_debug_print = Spike3DRasterWindowWidget.enable_debug_print
         
         app = pg.mkQApp(self.applicationName) # <PyQt5.QtWidgets.QApplication at 0x1d44a4891f0>
@@ -243,7 +242,10 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
         # self.ui.splitter.setStretchFactor(0, 5) # have the top widget by 3x the height as the bottom widget
         # self.ui.splitter.setStretchFactor(1, 1) # have the top widget by 3x the height as the bottom widget        
         
-        self.params = VisualizationParameters(self.applicationName, _menu_action_history_list=[], type_of_3d_plotter=type_of_3d_plotter, is_crosshair_trace_enabled=False, debug_print=False)
+        if params_kwargs is None:
+            params_kwargs = {}
+
+        self.params = VisualizationParameters(self.applicationName, _menu_action_history_list=[], type_of_3d_plotter=type_of_3d_plotter, is_crosshair_trace_enabled=False, debug_print=False, **params_kwargs)
         self.params.type_of_3d_plotter = type_of_3d_plotter
         self.params._menu_action_history_list = []
         # Helper Mixins: INIT:
@@ -1126,34 +1128,47 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
     
     ##-----------------------------------------
 
+    @function_attributes(short_name=None, tags=['MAIN', 'general'], input_requires=[], output_provides=[], uses=['_display_spike_rasters_pyqtplot_2D'], used_by=[], creation_date='2025-06-13 08:11', related_items=[])
     @classmethod
-    def find_or_create_if_needed(cls, curr_active_pipeline, force_create_new:bool=False, **kwargs):
+    def find_or_create_if_needed(cls, curr_active_pipeline, force_create_new:bool=False, wants_docked_raster_window_track=True, enable_interval_overview_track=True, allow_replace_hardcoded_main_plots_with_tracks=False, **kwargs):
         """ Gets the existing SpikeRasterWindow or creates a new one if one doesn't already exist:
         Usage:
         
         from pyphoplacecellanalysis.GUI.Qt.SpikeRasterWindows.Spike3DRasterWindowWidget import Spike3DRasterWindowWidget
-        spike_raster_window, (active_2d_plot, active_3d_plot, main_graphics_layout_widget, main_plot_widget, background_static_scroll_plot_widget) = Spike3DRasterWindowWidget.find_or_create_if_needed(curr_active_pipeline)
-
+        
+        spike_raster_window, (active_2d_plot, active_3d_plot, _all_outputs_dict) = Spike3DRasterWindowWidget.find_or_create_if_needed(curr_active_pipeline, force_create_new=False)
+        main_graphics_layout_widget = _all_outputs_dict['main_graphics_layout_widget'] 
+        main_plot_widget = _all_outputs_dict['main_plot_widget']
+        background_static_scroll_plot_widget = _all_outputs_dict['background_static_scroll_plot_widget']
         
         """
         # Gets the existing SpikeRasterWindow or creates a new one if one doesn't already exist:
         from pyphocorehelpers.gui.Qt.TopLevelWindowHelper import TopLevelWindowHelper
         import pyphoplacecellanalysis.External.pyqtgraph as pg # Used to get the app for TopLevelWindowHelper.top_level_windows
         ## For searching with `TopLevelWindowHelper.all_widgets(...)`:
+        from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.SpikeRasterWidgets.spike_raster_widgets import _setup_spike_raster_window_for_debugging
 
+        did_create_new_instance: bool = False
         found_spike_raster_windows = TopLevelWindowHelper.all_widgets(pg.mkQApp(), searchType=cls)
-
+        # _out_args = []
+        # _out_args = {}
+        _all_outputs_dict = {}
+        
         if len(found_spike_raster_windows) < 1:
             # no existing spike_raster_windows. Make a new one
             print(f'no existing SpikeRasterWindow. Creating a new one.')
             # Create a new `SpikeRaster2D` instance using `_display_spike_raster_pyqtplot_2D` and capture its outputs:
             active_2d_plot, active_3d_plot, spike_raster_window = curr_active_pipeline.plot._display_spike_rasters_pyqtplot_2D(**kwargs).values()
+            did_create_new_instance = True
+
+
         else:
             print(f'found {len(found_spike_raster_windows)} existing Spike3DRasterWindowWidget windows using TopLevelWindowHelper.all_widgets(...). Will use the most recent.')
             if force_create_new:
                 print(f'force_create_new=True. Creating a new Spike3DRasterWindowWidget.')
                 # Create a new `SpikeRaster2D` instance using `_display_spike_raster_pyqtplot_2D` and capture its outputs:
                 active_2d_plot, active_3d_plot, spike_raster_window = curr_active_pipeline.plot._display_spike_rasters_pyqtplot_2D(**kwargs).values()
+                did_create_new_instance = True
             else:
                 # assert len(found_spike_raster_windows) == 1, f"found {len(found_spike_raster_windows)} Spike3DRasterWindowWidget windows using TopLevelWindowHelper.all_widgets(...) but require exactly one."
                 # Get the most recent existing one and reuse that:
@@ -1167,7 +1182,6 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
                             ## close the window
                             a_canidate_window.deleteLater()
 
-
                 if spike_raster_window is None:
                     raise ValueError(f'WARNING: found no open windows for spike_raster_window out of {len(found_spike_raster_windows)} candidate options!!!')
 
@@ -1175,9 +1189,27 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
                 active_2d_plot = spike_raster_window.spike_raster_plt_2d # <pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.SpikeRasterWidgets.Spike2DRaster.Spike2DRaster at 0x196c7244280>
                 active_3d_plot = spike_raster_window.spike_raster_plt_3d # <pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.SpikeRasterWidgets.Spike2DRaster.Spike2DRaster at 0x196c7244280>
 
-        main_graphics_layout_widget = active_2d_plot.ui.main_graphics_layout_widget # GraphicsLayoutWidget
-        main_plot_widget = active_2d_plot.plots.main_plot_widget # PlotItem
-        background_static_scroll_plot_widget = active_2d_plot.plots.background_static_scroll_window_plot # PlotItem
+
+        
+        # if active_3d_plot is not None:
+        #     _out_args.append(active_3d_plot)
+
+        main_graphics_layout_widget = active_2d_plot.ui.get('main_graphics_layout_widget', None) # GraphicsLayoutWidget
+        _all_outputs_dict['main_graphics_layout_widget'] = main_graphics_layout_widget
+        # if main_graphics_layout_widget is not None:
+        # _out_args.append(main_graphics_layout_widget)
+        main_plot_widget = active_2d_plot.plots.get('main_plot_widget', None) # PlotItem
+        _all_outputs_dict['main_plot_widget'] = main_plot_widget
+        # if main_plot_widget is not None:
+        # _out_args.append(main_plot_widget)
+        background_static_scroll_plot_widget = active_2d_plot.plots.get('background_static_scroll_window_plot', None) # PlotItem
+        _all_outputs_dict['background_static_scroll_plot_widget'] = background_static_scroll_plot_widget
+        # if background_static_scroll_plot_widget is not None:
+        # _out_args.append(background_static_scroll_plot_widget)
+
+        # main_graphics_layout_widget = active_2d_plot.ui.main_graphics_layout_widget # GraphicsLayoutWidget
+        # main_plot_widget = active_2d_plot.plots.main_plot_widget # PlotItem
+        # background_static_scroll_plot_widget = active_2d_plot.plots.background_static_scroll_window_plot # PlotItem
 
         ## Fix window title to display the session context post-hoc
         complete_session_context, (curr_session_context,  additional_session_context) = curr_active_pipeline.get_complete_session_context()
@@ -1186,7 +1218,20 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
         spike_raster_window.params.window_title = f"Spike Raster Window - {complete_session_context_window_title_str}" # Updates `spike_raster_window.params.window_title`
         # spike_raster_window.window().setWindowTitle(spike_raster_window.params.window_title) ## sets the window title
         spike_raster_window.setWindowTitle(spike_raster_window.params.window_title)
-        return spike_raster_window, (active_2d_plot, active_3d_plot, main_graphics_layout_widget, main_plot_widget, background_static_scroll_plot_widget)
+        # return spike_raster_window, (active_2d_plot, active_3d_plot, main_graphics_layout_widget, main_plot_widget, background_static_scroll_plot_widget)
+        
+
+        if did_create_new_instance:
+            assert spike_raster_window is not None
+            all_global_menus_actionsDict, global_flat_action_dict, _all_outputs_dict_subfn = _setup_spike_raster_window_for_debugging(spike_raster_window, wants_docked_raster_window_track=wants_docked_raster_window_track, enable_interval_overview_track=enable_interval_overview_track, allow_replace_hardcoded_main_plots_with_tracks=allow_replace_hardcoded_main_plots_with_tracks)
+            _all_outputs_dict = _all_outputs_dict | _all_outputs_dict_subfn
+            _all_outputs_dict['all_global_menus_actionsDict'] = all_global_menus_actionsDict
+            _all_outputs_dict['global_flat_action_dict'] = global_flat_action_dict
+            
+
+        return spike_raster_window, (active_2d_plot, active_3d_plot, _all_outputs_dict)
+    
+        # return spike_raster_window, (active_2d_plot, active_3d_plot, *_out_args)
 
 
     # ==================================================================================================================== #
@@ -1499,7 +1544,7 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
 
     @function_attributes(short_name=None, tags=['widget', 'interactive', 'display', 'config', 'intervals', 'epoch', 'visual'], input_requires=[], output_provides=[], uses=['EpochRenderConfigsListWidget'], used_by=[], creation_date='2025-01-27 14:06', related_items=[])
     def build_epoch_intervals_visual_configs_widget(self):
-        """ addds to the right sidebar and connects controls 
+        """ adds the epoch interval visual configs to the right sidebar and connects controls 
         
         active_raster_plot.ui.epochs_render_configs_widget
         
@@ -1977,7 +2022,10 @@ if __name__ == "__main__":
         if debug_mode:
             Spike3DRasterWindowWidget.enable_interaction_events_debug_print = True    
         # Gets the existing SpikeRasterWindow or creates a new one if one doesn't already exist:
-        spike_raster_window, (active_2d_plot, active_3d_plot, main_graphics_layout_widget, main_plot_widget, background_static_scroll_plot_widget) = Spike3DRasterWindowWidget.find_or_create_if_needed(curr_active_pipeline, force_create_new=True)
+        spike_raster_window, (active_2d_plot, active_3d_plot, _all_outputs_dict) = Spike3DRasterWindowWidget.find_or_create_if_needed(curr_active_pipeline, force_create_new=True)
+        main_graphics_layout_widget = _all_outputs_dict['main_graphics_layout_widget'] 
+        main_plot_widget = _all_outputs_dict['main_plot_widget']
+        background_static_scroll_plot_widget = _all_outputs_dict['background_static_scroll_plot_widget']
         print(f'built `Spike3DRasterWindowWidget`, launching...')
         if debug_mode:
             spike_raster_window.enable_debug_print = True
@@ -2009,7 +2057,7 @@ if __name__ == "__main__":
         #                                                                                                     should_perform_figure_generation_to_file=should_perform_figure_generation_to_file, 
         #                                                                                                     debug_print=debug_print)
         
-        all_global_menus_actionsDict, global_flat_action_dict = _setup_spike_raster_window_for_debugging(spike_raster_window, debug_print=debug_print)
+        all_global_menus_actionsDict, global_flat_action_dict, _all_outputs_dict = _setup_spike_raster_window_for_debugging(spike_raster_window, debug_print=debug_print)
 
         return spike_raster_window, (active_2d_plot, active_3d_plot, main_graphics_layout_widget, main_plot_widget, background_static_scroll_plot_widget), curr_active_pipeline
         

@@ -116,6 +116,31 @@ class PlacefieldRenderingPyVistaMixin:
         update_plotColorsPlacefield2D(self.plots['tuningCurvePlotActors'], self.plots_data['tuningCurvePlotData'], neuron_id_color_update_dict=neuron_id_color_update_dict)
 
 
+    def remove_all_rendered_placefields(self):
+        """ removes all placefields added by `plot_placefields`
+
+        ipcDataExplorer.remove_all_rendered_placefields()
+
+        """
+        for k, v in self.plots['tuningCurvePlotActors'].items():
+            # print(f'k: {k}, v: {v}')
+            if v is not None:
+                for a_subactor_key, a_subactor in v.items():
+                    was_remove_success = self.p.remove_actor(a_subactor)
+                    if not was_remove_success:
+                            print(f'remove failed for k: {k}, a_subactor_key: {a_subactor_key}')
+                ## END for a_subactor_key, a_sub...
+            # end if v is not None
+        self.plots_data['tuningCurvePlotData'].clear()
+        self.plots['tuningCurvePlotActors'].clear()
+        tuningCurvePlotLegendActor = self.plots.pop('tuningCurvePlotLegendActor', None)
+        if tuningCurvePlotLegendActor is not None:
+            self.p.remove_legend(tuningCurvePlotLegendActor)
+
+
+
+
+
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
 class HideShowPlacefieldsRenderingMixin(PlacefieldOwningMixin):

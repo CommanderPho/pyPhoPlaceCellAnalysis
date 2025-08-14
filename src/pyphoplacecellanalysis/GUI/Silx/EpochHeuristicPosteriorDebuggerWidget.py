@@ -20,6 +20,7 @@ from typing_extensions import TypeAlias
 import nptyping as ND
 from nptyping import NDArray
 import neuropy.utils.type_aliases as types
+from neuropy.core.epoch import ensure_dataframe, ensure_Epoch
 
 from pyphocorehelpers.programming_helpers import metadata_attributes
 from pyphocorehelpers.function_helpers import function_attributes
@@ -223,6 +224,8 @@ class EpochHeuristicDebugger:
         """ initializes to a specific epoch_idx
         
         """        
+        a_decoder_decoded_epochs_result.filter_epochs =  ensure_dataframe(a_decoder_decoded_epochs_result.filter_epochs)
+
         _obj = cls(active_decoder_decoded_epochs_result=deepcopy(a_decoder_decoded_epochs_result), **kwargs)
         if _obj.active_single_epoch_result is None:
             active_captured_single_epoch_result: SingleEpochDecodedResult = a_decoder_decoded_epochs_result.get_result_for_epoch(active_epoch_idx=active_epoch_idx)

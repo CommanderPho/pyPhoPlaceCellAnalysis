@@ -5,6 +5,7 @@ from functools import partial
 from benedict import benedict
 
 from typing import Dict, List, Tuple, Optional, Callable, Union, Any
+from neuropy.core.user_annotations import function_attributes
 from typing_extensions import TypeAlias
 from nptyping import NDArray
 import pyphoplacecellanalysis.External.pyqtgraph as pg
@@ -16,8 +17,8 @@ from pyphoplacecellanalysis.GUI.Qt.Menus.PhoMenuHelper import PhoMenuHelper
 from pyphoplacecellanalysis.Resources import GuiResources, ActionIcons
 from pyphoplacecellanalysis.GUI.Qt.Menus.LocalMenus_AddRenderable.Uic_AUTOGEN_LocalMenus_AddRenderable import Ui_LocalMenus_AddRenderable
 
-from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.Mixins.RenderTimeEpochs.Specific2DRenderTimeEpochs import General2DRenderTimeEpochs, Replays_2DRenderTimeEpochs, Ripples_2DRenderTimeEpochs, SessionEpochs2DRenderTimeEpochs, PBE_2DRenderTimeEpochs, Laps2DRenderTimeEpochs, SpikeBurstIntervals_2DRenderTimeEpochs, NewNonPBE_2DRenderTimeEpochs # Time Intervals/Epochs
-from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.Mixins.TimeCurves.SpecificTimeCurves import GeneralRenderTimeCurves, PositionRenderTimeCurves, VelocityRenderTimeCurves, ConfigurableRenderTimeCurves, MUA_RenderTimeCurves, RelativeEntropySurpriseRenderTimeCurves ## Time Curves
+from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.Mixins.RenderTimeEpochs.Specific2DRenderTimeEpochs import General2DRenderTimeEpochs, Replays_2DRenderTimeEpochs, Ripples_2DRenderTimeEpochs, SessionEpochs2DRenderTimeEpochs, PBE_2DRenderTimeEpochs, Laps2DRenderTimeEpochs, SpikeBurstIntervals_2DRenderTimeEpochs, NewNonPBE_2DRenderTimeEpochs, NewNonPBEEndcaps_2DRenderTimeEpochs # Time Intervals/Epochs
+from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.Mixins.TimeCurves.SpecificTimeCurves import GeneralRenderTimeCurves, PositionRenderTimeCurves, VelocityRenderTimeCurves, ConfigurableRenderTimeCurves, MUA_RenderTimeCurves, RelativeEntropySurpriseRenderTimeCurves, ThetaPhaseRenderTimeCurves ## Time Curves
 
 from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError import AddNewDecodedPosition_MatplotlibPlotCommand ## MatplotlibSubplots
 
@@ -44,7 +45,7 @@ class LocalMenus_AddRenderable(QtWidgets.QMainWindow):
     actionDecoded_Epoch_Slices_NonPBEs
     actionAddTimeIntervals_NonPBEs
     actionSpike3DLauncher
-
+    NewNonPBEEndcaps_2DRenderTimeEpochs
     
     """
     def __init__(self, parent=None):
@@ -88,6 +89,7 @@ class LocalMenus_AddRenderable(QtWidgets.QMainWindow):
         submenu_addTimeIntervals: List[QtWidgets.QAction] = [widget.ui.actionAddTimeIntervals_Laps,
                                     widget.ui.actionAddTimeIntervals_PBEs,
                                     widget.ui.actionAddTimeIntervals_NonPBEs,
+                                    widget.ui.actionAddTimeIntervals_NonPBEEndcaps,
                                     widget.ui.actionAddTimeIntervals_SessionEpochs,
                                     widget.ui.actionAddTimeIntervals_Ripples,
                                     widget.ui.actionAddTimeIntervals_Replays,
@@ -96,6 +98,7 @@ class LocalMenus_AddRenderable(QtWidgets.QMainWindow):
         submenu_addTimeIntervalCallbacks: List[Callable] = [lambda evt=None: Laps2DRenderTimeEpochs.add_render_time_epochs(curr_sess=sess.laps, destination_plot=destination_plot),
                                             lambda evt=None: PBE_2DRenderTimeEpochs.add_render_time_epochs(curr_sess=sess.pbe, destination_plot=destination_plot),
                                             lambda evt=None: NewNonPBE_2DRenderTimeEpochs.add_render_time_epochs(curr_sess=sess.non_pbe, destination_plot=destination_plot),
+                                            lambda evt=None: NewNonPBEEndcaps_2DRenderTimeEpochs.add_render_time_epochs(curr_sess=sess.non_pbe_endcaps, destination_plot=destination_plot),
                                             lambda evt=None: SessionEpochs2DRenderTimeEpochs.add_render_time_epochs(curr_sess=sess.epochs, destination_plot=destination_plot),
                                             lambda evt=None: Ripples_2DRenderTimeEpochs.add_render_time_epochs(curr_sess=sess.ripple, destination_plot=destination_plot),
                                             lambda evt=None: Replays_2DRenderTimeEpochs.add_render_time_epochs(curr_sess=sess.replay, destination_plot=destination_plot),
@@ -118,13 +121,16 @@ class LocalMenus_AddRenderable(QtWidgets.QMainWindow):
         widget.ui.actionAddTimeIntervals_Ripples.setEnabled(Ripples_2DRenderTimeEpochs.is_render_time_epochs_enabled(sess.ripple))
         widget.ui.actionAddTimeIntervals_PBEs.setEnabled(PBE_2DRenderTimeEpochs.is_render_time_epochs_enabled(sess.pbe))
         widget.ui.actionAddTimeIntervals_NonPBEs.setEnabled(NewNonPBE_2DRenderTimeEpochs.is_render_time_epochs_enabled(sess.non_pbe))
+        widget.ui.actionAddTimeIntervals_NonPBEEndcaps.setEnabled(NewNonPBEEndcaps_2DRenderTimeEpochs.is_render_time_epochs_enabled(sess.non_pbe_endcaps))
         widget.ui.actionAddTimeIntervals_Replays.setEnabled(Replays_2DRenderTimeEpochs.is_render_time_epochs_enabled(sess.replay))
         widget.ui.actionAddTimeIntervals_Bursts.setEnabled(SpikeBurstIntervals_2DRenderTimeEpochs.is_render_time_epochs_enabled(curr_sess=curr_active_pipeline, active_config_name=active_config_name)) # disable by default        
 
         # Time Curves: _______________________________________________________________________________________________________ #
-        submenu_addTimeCurves = [widget.ui.actionAddTimeCurves_Position, widget.ui.actionAddTimeCurves_Velocity, widget.ui.actionAddTimeCurves_Random, widget.ui.actionAddTimeCurves_RelativeEntropySurprise, widget.ui.actionAddTimeCurves_Custom]
+        submenu_addTimeCurves = [widget.ui.actionAddTimeCurves_Position, widget.ui.actionAddTimeCurves_Velocity, widget.ui.actionAddTimeCurves_ThetaPhase, widget.ui.actionAddTimeCurves_Random, widget.ui.actionAddTimeCurves_RelativeEntropySurprise, widget.ui.actionAddTimeCurves_Custom]
         submenu_addTimeCurvesCallbacks = [lambda evt=None: PositionRenderTimeCurves.add_render_time_curves(curr_sess=sess, destination_plot=destination_plot),
                                             lambda evt=None: VelocityRenderTimeCurves.add_render_time_curves(curr_sess=sess, destination_plot=destination_plot),
+                                            # lambda evt=None: ConfigurableRenderTimeCurves.add_render_time_curves(curr_sess=sess, destination_plot=destination_plot, override_active_variable_names=['t', 'x', 'theta_phase_radians']), ## thetaphase
+                                            lambda evt=None: ThetaPhaseRenderTimeCurves.add_render_time_curves(curr_sess=sess, destination_plot=destination_plot), ## thetaphase
                                             lambda evt=None: MUA_RenderTimeCurves.add_render_time_curves(curr_sess=sess, destination_plot=destination_plot),
                                             lambda evt=None: RelativeEntropySurpriseRenderTimeCurves.add_render_time_curves(curr_sess=sess, destination_plot=destination_plot),
                                             # lambda evt=None: Laps2DRenderTimeEpochs.add_render_time_epochs(curr_sess=sess.laps, destination_plot=destination_plot),
@@ -170,39 +176,132 @@ class LocalMenus_AddRenderable(QtWidgets.QMainWindow):
         return widget, renderable_menu, (submenu_addTimeIntervals, submenu_addTimeIntervalCallbacks, submenu_addTimeIntervals_Connections), (submenu_addTimeCurves, submenu_addTimeCurvesCallbacks, submenu_addTimeCurves_Connections), (submenu_addMatplotlibPlot, submenu_addMatplotlibPlotCallbacks, submenu_addMatplotlibPlot_Connections)
 
 
+
+    # ==================================================================================================================================================================================================================================================================================== #
+    # Adding right-click Context Menus                                                                                                                                                                                                                                                     #
+    # ==================================================================================================================================================================================================================================================================================== #
+
+
+
+
     @classmethod
-    def add_renderable_context_menu(cls, active_2d_plot, curr_active_pipeline, active_config_name, debug_print=False) -> QtWidgets.QMenu:
+    def _show_qwidget_context_menu(cls, widget, position):
+        """ Helper method to show the context menu for any QWidget """
+        context_menu = getattr(widget, '_pho_custom_context_menu', None)
+        if context_menu is not None:
+            # Convert the position to global coordinates
+            global_pos = widget.mapToGlobal(position)
+
+            # Check if there are any existing actions to add first
+            if hasattr(widget, '_pho_original_context_menu_event'):
+                # If the widget had original context menu functionality, 
+                # we could try to extract those actions, but this is complex
+                # For now, just show our custom menu
+                pass
+
+            # Show the context menu
+            context_menu.exec_(global_pos)
+
+    @function_attributes(short_name=None, tags=['private', 'main'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-06-13 07:39', related_items=[])
+    @classmethod
+    def _helper_append_custom_menu_to_widget_context_menu_universal(cls, parent_widget, additional_menu, debug_print=False):
+        """ Universal helper that works with both pyqtgraph widgets and general QWidgets
+        parent_widget: QWidget or pyqtgraph widget
+        additional_menu: QMenu
+        """
+
+        def _subfn_append_custom_menu_to_QWidget_context_menu(parent_widget, additional_menu, debug_print=False):
+            """ 
+            """
+
+            # Ensure the widget has custom context menu policy enabled
+            if parent_widget.contextMenuPolicy() == QtCore.Qt.NoContextMenu:
+                parent_widget.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
+            elif parent_widget.contextMenuPolicy() == QtCore.Qt.DefaultContextMenu:
+                # Switch from default to custom to allow our menu additions
+                parent_widget.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
+
+            # Get or create the context menu
+            existing_context_menu = getattr(parent_widget, '_pho_custom_context_menu', None)
+
+            if existing_context_menu is None:
+                # Create a new context menu
+                parent_widget._pho_custom_context_menu = QtWidgets.QMenu(parent_widget)
+                existing_context_menu = parent_widget._pho_custom_context_menu
+
+                # Check if we need to preserve any existing context menu actions
+                if hasattr(parent_widget, 'contextMenuEvent'):
+                    # Store the original contextMenuEvent method if it exists
+                    original_context_menu_event = parent_widget.contextMenuEvent
+                    parent_widget._pho_original_context_menu_event = original_context_menu_event
+
+                # Connect the customContextMenuRequested signal
+                if not hasattr(parent_widget, '_pho_context_menu_connected'):
+                    parent_widget.customContextMenuRequested.connect(lambda pos, widget=parent_widget: cls._show_qwidget_context_menu(widget, pos))
+                    parent_widget._pho_context_menu_connected = True
+
+            # Add separator and the additional menu
+            existing_context_menu.addSeparator()
+            existing_context_menu.addMenu(additional_menu)
+
+            if debug_print:
+                print(f'QWidget context menu actions: {[an_action.text() for an_action in existing_context_menu.actions()]}')
+
+
+        # @function_attributes(short_name=None, tags=['pyqtgraph'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-06-13 07:40', related_items=[])
+        def _subfn_append_custom_menu_to_PyQtGraph_based_widget_context_menu(parent_widget, additional_menu, debug_print=False):
+            """ For PyQtGraph-based widgets with an existing context menu (the default one by PyQtGraph)
+            """
+            # plot_options_context_menu = parent_widget.getContextMenus(None) # This gets the "Plot Options" menu
+            # top_level_parent_context_menu = parent_context_menus.parent()
+            top_level_parent_context_menu = parent_widget.vb.menu # ViewBoxMenu
+            if top_level_parent_context_menu is not None:
+                active_parent_menu = top_level_parent_context_menu
+                active_parent_menu.addSeparator()
+                active_parent_menu.addMenu(additional_menu)
+                if debug_print:
+                    print(f'parent_context_menus.actions: {[an_action.text() for an_action in active_parent_menu.actions()]}') # parent_context_menus.actions: ['Transforms', 'Downsample', 'Average', 'Alpha', 'Grid', 'Points']
+
+
+
+        # BEGIN FUNCTION BODY ________________________________________________________________________________________________ #
+
+        # Try pyqtgraph approach first (for PlotItem, ViewBox, etc.)
+        try:
+            if hasattr(parent_widget, 'vb') and hasattr(parent_widget.vb, 'menu'):
+                # This is likely a pyqtgraph PlotItem
+                _subfn_append_custom_menu_to_PyQtGraph_based_widget_context_menu(parent_widget, additional_menu, debug_print)
+                return
+            elif hasattr(parent_widget, 'menu'):
+                # This might be a pyqtgraph ViewBox or similar
+                active_parent_menu = parent_widget.menu
+                active_parent_menu.addSeparator()
+                active_parent_menu.addMenu(additional_menu)
+                if debug_print:
+                    print(f'pyqtgraph widget menu actions: {[an_action.text() for an_action in active_parent_menu.actions()]}')
+                return
+        except Exception as e:
+            if debug_print:
+                print(f'Pyqtgraph approach failed: {e}, falling back to QWidget approach')
+
+        # Fall back to general QWidget approach
+        _subfn_append_custom_menu_to_QWidget_context_menu(parent_widget, additional_menu, debug_print)
+
+
+
+
+
+    @function_attributes(short_name=None, tags=['context-menu', 'right-click'], input_requires=[], output_provides=['active_2d_plot.ui.menus'], uses=['._helper_append_custom_menu_to_widget_context_menu_universal'], used_by=['_build_additional_spikeRaster2D_menus'], creation_date='2022-01-01 00:00', related_items=[])
+    @classmethod
+    def initialize_renderable_context_menu(cls, active_2d_plot, curr_active_pipeline, active_config_name, debug_print=False) -> QtWidgets.QMenu:
         """ Creates the context menus that display when right-clicking a SpikeRaster2D plot showing the actions: add_epochs, add_graph, etc
-        
+        ** ONLY FOR THE two hard-coded pyqtgraph widgets! Must be called before trying to add elsewhere
+
         Usage:
             active_2d_plot = spike_raster_window.spike_raster_plt_2d 
             menuAdd_Renderable = LocalMenus_AddRenderable.add_renderable_context_menu(active_2d_plot, sess)
             
         """
-        def _subFn_append_custom_menu_to_context_menu(parent_widget, additional_menu, debug_print=False):
-            """ Adds the custom menu, such as one loaded from a .ui file, to the end of the *context* menu
-            parent_widget: PlotItem
-            additional_menu: QMenu
-            
-            Example:
-                from pyphoplacecellanalysis.Resources import GuiResources, ActionIcons
-                from pyphoplacecellanalysis.GUI.Qt.GlobalApplicationMenus.LocalMenus_AddRenderable import LocalMenus_AddRenderable
-                widget = LocalMenus_AddRenderable()
-                append_custom_menu_to_context_menu(main_plot_widget, widget.ui.menuAdd_Renderable)
-                append_custom_menu_to_context_menu(background_static_scroll_plot_widget, widget.ui.menuAdd_Renderable)
-            """
-            
-            plot_options_context_menu = parent_widget.getContextMenus(None) # This gets the "Plot Options" menu
-            # top_level_parent_context_menu = parent_context_menus.parent()
-            top_level_parent_context_menu = parent_widget.vb.menu # ViewBoxMenu
-         
-            active_parent_menu = top_level_parent_context_menu
-            active_parent_menu.addSeparator()
-            active_parent_menu.addMenu(additional_menu)
-            if debug_print:
-                print(f'parent_context_menus.actions: {[an_action.text() for an_action in active_parent_menu.actions()]}') # parent_context_menus.actions: ['Transforms', 'Downsample', 'Average', 'Alpha', 'Grid', 'Points']
-                
-
         # BEGIN FUNCTION BODY ________________________________________________________________________________________________ #
         
          ## Build `partial` versions of the functions specific to each raster plotter that can be called with no arguments (capturing the destination plotter and the session
@@ -218,19 +317,26 @@ class LocalMenus_AddRenderable(QtWidgets.QMainWindow):
             print(f'menuAdd_Renderable: {menuAdd_Renderable}, type(menuAdd_Renderable): {type(menuAdd_Renderable)}')
             # print(f'menuAdd_Renderable: {menuAdd_Renderable}, type(menuAdd_Renderable): {type(menuAdd_Renderable)}')
 
+
+        # Add the reference to the context menus to owner, so it isn't released:
+        ## TODO: currently replaces the dict entry, which we might want to use for other menus
+        active_2d_plot.ui.menus = PhoUIContainer.init_from_dict({'custom_context_menus': PhoUIContainer.init_from_dict({'add_renderables': active_2d_plot_renderable_menus})})
+
+
         ## Specific to SpikeRaster2D:        
         ## Add the custom menu to the context menus of the plots in SpikeRaster2D:        
         if menuAdd_Renderable is not None:
             main_plot_widget = active_2d_plot.plots.main_plot_widget # PlotItem
             background_static_scroll_plot_widget = active_2d_plot.plots.background_static_scroll_window_plot # PlotItem
             if main_plot_widget is not None:
-                _subFn_append_custom_menu_to_context_menu(main_plot_widget, menuAdd_Renderable)
+                cls._helper_append_custom_menu_to_widget_context_menu_universal(parent_widget=main_plot_widget, additional_menu=menuAdd_Renderable, debug_print=debug_print)
             if background_static_scroll_plot_widget is not None:
-                _subFn_append_custom_menu_to_context_menu(background_static_scroll_plot_widget, menuAdd_Renderable)
-        
-        # Add the reference to the context menus to owner, so it isn't released:
-        ## TODO: currently replaces the dict entry, which we might want to use for other menus
-        active_2d_plot.ui.menus = PhoUIContainer.init_from_dict({'custom_context_menus': PhoUIContainer.init_from_dict({'add_renderables': active_2d_plot_renderable_menus})})
+                cls._helper_append_custom_menu_to_widget_context_menu_universal(parent_widget=background_static_scroll_plot_widget, additional_menu=menuAdd_Renderable, debug_print=debug_print)
+
+            ## Setup for dock-items:
+            for a_track_widget in active_2d_plot.dock_manager_widget.get_flat_widgets_list():
+                LocalMenus_AddRenderable._helper_append_custom_menu_to_widget_context_menu_universal(parent_widget=a_track_widget, additional_menu=menuAdd_Renderable, debug_print=debug_print)
+
 
         # # Build final programmatic dict from nested PhoUIContainers:
         # out_final = PhoUIContainer.init_from_dict({})

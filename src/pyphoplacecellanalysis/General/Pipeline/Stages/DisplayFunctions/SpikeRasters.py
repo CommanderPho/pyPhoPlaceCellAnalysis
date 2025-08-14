@@ -59,7 +59,7 @@ class SpikeRastersDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Displa
     
     # external_independent_widget_fcns = ['_display_spike_rasters_pyqtplot_2D', '_display_spike_rasters_pyqtplot_3D', '_display_spike_rasters_vedo_3D', '_display_spike_rasters_pyqtplot_3D_with_2D_controls', '_display_spike_rasters_vedo_3D_with_2D_controls', '_display_spike_rasters_window']
     
-    @function_attributes(short_name='spike_rasters_pyqtplot_2D', tags=['display','interactive', 'raster', '2D', 'pyqtplot'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-04-11 03:05')
+    @function_attributes(short_name='spike_rasters_pyqtplot_2D', tags=['display','interactive', 'raster', '2D', 'pyqtplot'], input_requires=[], output_provides=[], uses=[], used_by=['Spike3DRasterWindowWidget.find_or_create_if_needed'], creation_date='2023-04-11 03:05')
     @staticmethod
     def _display_spike_rasters_pyqtplot_2D(computation_result, active_config, enable_saving_to_disk=False, **kwargs):
         """ Plots a standalone 2D raster plot
@@ -98,7 +98,7 @@ class SpikeRastersDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Displa
         active_config_name = kwargs.get('active_config_name', 'Unknown')
         owning_pipeline_reference = kwargs.get('owning_pipeline', None) # A reference to the pipeline upon which this display function is being called
         assert owning_pipeline_reference is not None
-        _active_2d_plot_renderable_menus = LocalMenus_AddRenderable.add_renderable_context_menu(spike_raster_plt_2d, owning_pipeline_reference, active_config_name)
+        _active_2d_plot_renderable_menus = LocalMenus_AddRenderable.initialize_renderable_context_menu(spike_raster_plt_2d, owning_pipeline_reference, active_config_name)
         # _active_2d_plot_renderable_menus = LocalMenus_AddRenderable.add_renderable_context_menu(spike_raster_plt_2d, computation_result.sess)  # Adds the custom context menus for SpikeRaster2D
         return {'spike_raster_plt_2d':spike_raster_plt_2d, 'spike_raster_plt_3d':spike_raster_plt_3d, 'spike_3d_to_2d_window_connection':spike_3d_to_2d_window_connection, 'spike_raster_window': spike_raster_window}
 
@@ -114,7 +114,7 @@ class SpikeRastersDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Displa
         active_config_name = kwargs.get('active_config_name', 'Unknown')
         owning_pipeline_reference = kwargs.get('owning_pipeline', None) # A reference to the pipeline upon which this display function is being called
         assert owning_pipeline_reference is not None
-        _active_2d_plot_renderable_menus = LocalMenus_AddRenderable.add_renderable_context_menu(spike_raster_plt_2d, owning_pipeline_reference, active_config_name)
+        _active_2d_plot_renderable_menus = LocalMenus_AddRenderable.initialize_renderable_context_menu(spike_raster_plt_2d, owning_pipeline_reference, active_config_name)
         # _active_2d_plot_renderable_menus = LocalMenus_AddRenderable.add_renderable_context_menu(spike_raster_plt_2d, computation_result.sess) # Adds the custom context menus for SpikeRaster2D
         return {'spike_raster_plt_2d':spike_raster_plt_2d, 'spike_raster_plt_3d_vedo':spike_raster_plt_3d_vedo, 'spike_3d_to_2d_window_connection':spike_3d_to_2d_window_connection, 'spike_raster_window': spike_raster_window}
 
@@ -131,6 +131,9 @@ class SpikeRastersDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Displa
         """
         use_separate_windows = kwargs.pop('separate_windows', False)
         type_of_3d_plotter = kwargs.pop('type_of_3d_plotter', 'pyqtgraph')
+        use_docked_pyqtgraph_plots: bool = kwargs.pop('use_docked_pyqtgraph_plots', False)
+
+
         # active_plotting_config = active_config.plotting_config # active_config is unused
         active_config_name = kwargs.pop('active_config_name', 'Unknown')
         active_identifying_context = kwargs.pop('active_context', None)
@@ -152,8 +155,11 @@ class SpikeRastersDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Displa
         active_display_fn_identifying_ctx = active_identifying_context.adding_context('display_fn', display_fn_name='display_spike_rasters_window')
         active_display_fn_identifying_ctx_string = active_display_fn_identifying_ctx.get_description(separator='|') # Get final discription string:
 
+
         ## It's passed a specific computation_result which has a .sess attribute that's used to determine which spikes are displayed or not.
-        spike_raster_window: Spike3DRasterWindowWidget = Spike3DRasterWindowWidget(spikes_df, type_of_3d_plotter=type_of_3d_plotter, application_name=f'Spike Raster Window - {active_display_fn_identifying_ctx_string}', neuron_colors=neuron_colors, neuron_sort_order=neuron_sort_order) ## surprisingly only needs spikes_df !!?!
+        spike_raster_window: Spike3DRasterWindowWidget = Spike3DRasterWindowWidget(spikes_df, type_of_3d_plotter=type_of_3d_plotter, application_name=f'Spike Raster Window - {active_display_fn_identifying_ctx_string}', neuron_colors=neuron_colors, neuron_sort_order=neuron_sort_order,
+                                                                                   params_kwargs=dict(use_docked_pyqtgraph_plots=use_docked_pyqtgraph_plots),
+                                                                                   ) ## surprisingly only needs spikes_df !!?!
         # Set Window Title Options:
         a_file_prefix = str(computation_result.sess.filePrefix.resolve())
         spike_raster_window.setWindowFilePath(a_file_prefix)
@@ -617,6 +623,8 @@ class NewSimpleRaster:
             a_spikes_df['visualization_raster_emphasis_state'] = SpikeEmphasisState.Default
         return a_spikes_df
 
+
+    @function_attributes(short_name=None, tags=['SLOW'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-05-12 15:21', related_items=[])
     def build_spikes_all_spots_from_df(self, spikes_df: pd.DataFrame, is_spike_included=None, should_return_data_tooltips_kwargs:bool=True, generate_debug_tuples=False, downsampling_rate: int = 1, **kwargs):
         """ builds the 'all_spots' tuples suitable for setting self.plots_data.all_spots from ALL Spikes 
             Needs to be called whenever:
@@ -728,6 +736,7 @@ def new_plot_raster_plot(spikes_df: pd.DataFrame, included_neuron_ids, unit_sort
         app, win, plots, plots_data = new_plot_raster_plot(_temp_active_spikes_df, shared_aclus)
 
     """
+    downsampling_rate: int = kwargs.pop('downsampling_rate', None)
     
     needs_create_new = ((win is None) or (plots_data is None) or (plots is None))
     if needs_create_new:
@@ -741,15 +750,17 @@ def new_plot_raster_plot(spikes_df: pd.DataFrame, included_neuron_ids, unit_sort
         unit_sort_order = np.arange(len(included_neuron_ids))
     assert len(unit_sort_order) == len(included_neuron_ids)
     active_sorted_neuron_ids = included_neuron_ids[unit_sort_order]
-    plots_data.new_sorted_raster = NewSimpleRaster.init_from_neuron_ids(active_sorted_neuron_ids, neuron_colors=unit_colors_list)
-
+    plots_data.new_sorted_raster = NewSimpleRaster.init_from_neuron_ids(active_sorted_neuron_ids, neuron_colors=unit_colors_list) ## about data, not hte plot itself
+    # self.plots.scatter_plot.opts['useCache'] = True
+    
     ## Add the source data (spikes_df) to the plot_data
     plots_data.spikes_df = deepcopy(spikes_df)    
     # Update the dataframe
     plots_data.spikes_df = plots_data.new_sorted_raster.update_spikes_df_visualization_columns(spikes_df=plots_data.spikes_df)
     ## Build the spots for the raster plot:
-    plots_data.all_spots, plots_data.all_scatterplot_tooltips_kwargs = plots_data.new_sorted_raster.build_spikes_all_spots_from_df(spikes_df=plots_data.spikes_df, should_return_data_tooltips_kwargs=True, generate_debug_tuples=False)
-
+    plots_data.all_spots, plots_data.all_scatterplot_tooltips_kwargs = plots_data.new_sorted_raster.build_spikes_all_spots_from_df(spikes_df=plots_data.spikes_df, should_return_data_tooltips_kwargs=True, generate_debug_tuples=False, downsampling_rate=downsampling_rate)
+    # self.plots.scatter_plot.opts['useCache'] = True
+    
     # Add header label
     if add_debug_header_label:
         # plots.debug_header_label = pg.LabelItem(justify='right', text='debug_header_label')
@@ -765,7 +776,8 @@ def new_plot_raster_plot(spikes_df: pd.DataFrame, included_neuron_ids, unit_sort
 
     if scatter_plot_kwargs is None:
         scatter_plot_kwargs = {} ## make them empty at least
-        
+
+
     scatter_plot_kwargs = build_scatter_plot_kwargs(scatter_plot_kwargs=scatter_plot_kwargs, tick_width=scatter_plot_kwargs.pop('tick_width', 0.1), tick_height=scatter_plot_kwargs.pop('tick_height', 1.0))
     
     plots.scatter_plot = pg.ScatterPlotItem(**scatter_plot_kwargs)
@@ -863,7 +875,7 @@ def _build_default_tick(tick_width: float = 0.1, tick_height: float = 1.0) -> Qt
     return vtick
 
 
-def build_scatter_plot_kwargs(scatter_plot_kwargs=None, tick_width: float = 1.0, tick_height: float = 1.0):
+def build_scatter_plot_kwargs(scatter_plot_kwargs=None, tick_width: float = 1.0, tick_height: float = 1.0, **kwargs):
     """build the default scatter plot kwargs, and merge them with the provided kwargs
     
     
@@ -872,7 +884,7 @@ def build_scatter_plot_kwargs(scatter_plot_kwargs=None, tick_width: float = 1.0,
     """
     # Common Tick Label 
     vtick = _build_default_tick(tick_width=tick_width, tick_height=tick_height)
-    default_scatter_plot_kwargs = dict(name='spikeRasterOverviewWindowScatterPlotItem', pxMode=True, symbol=vtick, size=2, pen={'color': 'w', 'width': 1}, hoverable=True)
+    default_scatter_plot_kwargs = dict(name='spikeRasterOverviewWindowScatterPlotItem', pxMode=True, symbol=vtick, size=2, pen={'color': 'w', 'width': 1}, hoverable=kwargs.pop('hoverable', True), **kwargs)
 
     if scatter_plot_kwargs is None:
         merged_kwargs = default_scatter_plot_kwargs
@@ -1517,12 +1529,14 @@ def _recover_filter_config_name_from_display_context(owning_pipeline_reference, 
 
 @function_attributes(short_name=None, tags=['menu', 'spike_raster', 'ui'], input_requires=[], output_provides=[], uses=['LocalMenus_AddRenderable'], used_by=['_build_additional_window_menus'], creation_date='2023-11-09 19:32', related_items=[])
 def _build_additional_spikeRaster2D_menus(spike_raster_plt_2d, owning_pipeline_reference, computation_result, active_display_fn_identifying_ctx):
+    from pyphoplacecellanalysis.GUI.Qt.Menus.LocalMenus_AddRenderable.LocalMenus_AddRenderable import LocalMenus_AddRenderable
+
     active_config_name: str = _recover_filter_config_name_from_display_context(owning_pipeline_reference, active_display_fn_identifying_ctx) # recover active_config_name from the context
 
     ## Adds the custom renderable menu to the top-level menu of the plots in Spike2DRaster
     # _active_2d_plot_renderable_menus = LocalMenus_AddRenderable.add_renderable_context_menu(spike_raster_window.spike_raster_plt_2d, computation_result.sess)  # Adds the custom context menus for SpikeRaster2D
     
-    _active_2d_plot_renderable_menus = LocalMenus_AddRenderable.add_renderable_context_menu(spike_raster_plt_2d, owning_pipeline_reference, active_config_name)  # Adds the custom context menus for SpikeRaster2D
+    _active_2d_plot_renderable_menus = LocalMenus_AddRenderable.initialize_renderable_context_menu(spike_raster_plt_2d, owning_pipeline_reference, active_config_name)  # Adds the custom context menus for SpikeRaster2D
     
     # spike_raster_plt_2d.menu_action_history_list = []
     
@@ -1537,6 +1551,20 @@ def _build_additional_window_menus(spike_raster_window: Spike3DRasterWindowWidge
 
     TODO: seems like it should be a Spike3DRasterWindowWidget member property
     
+        DockedWidgets_MenuProvider
+        
+    Usage:
+        from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.SpikeRasters import _build_additional_window_menus
+
+        # Set Window Title Options:
+        a_file_prefix = str(computation_result.sess.filePrefix.resolve())
+        spike_raster_window.setWindowFilePath(a_file_prefix)
+        spike_raster_window.setWindowTitle(f'Spike Raster Window - {active_config_name} - {a_file_prefix}')
+
+        ## Build the additional menus:
+        output_references = _build_additional_window_menus(spike_raster_window, owning_pipeline_reference, computation_result, active_display_fn_identifying_ctx) ## the menus on the other hand take the entire pipeline, because they might need that valuable DATA
+
+        
     """
     assert owning_pipeline_reference is not None
     active_config_name: str = _recover_filter_config_name_from_display_context(owning_pipeline_reference, active_display_fn_identifying_ctx) # recover active_config_name from the context
@@ -1576,7 +1604,7 @@ def _build_additional_window_menus(spike_raster_window: Spike3DRasterWindowWidge
 
     # Docked Menu
     _docked_menu_provider = DockedWidgets_MenuProvider(render_widget=spike_raster_window)
-    _docked_menu_provider.DockedWidgets_MenuProvider_on_buildUI(spike_raster_window=spike_raster_window, owning_pipeline_reference=owning_pipeline_reference, context=active_display_fn_identifying_ctx, active_config_name=active_config_name, display_output=owning_pipeline_reference.display_output[active_display_fn_identifying_ctx])
+    _docked_menu_provider.DockedWidgets_MenuProvider_on_buildUI(spike_raster_window=spike_raster_window, owning_pipeline_reference=owning_pipeline_reference, context=active_display_fn_identifying_ctx, active_config_name=active_config_name, display_output=owning_pipeline_reference.display_output[active_display_fn_identifying_ctx], use_time_bin_specific_menus=True)
     spike_raster_window.main_menu_window.ui.menus.global_window_menus.docked_widgets.menu_provider_obj = _docked_menu_provider
 
     # Create Linked Widget Menu
@@ -1593,7 +1621,7 @@ def _build_additional_window_menus(spike_raster_window: Spike3DRasterWindowWidge
                 owning_pipeline_reference.display_output[active_display_fn_identifying_ctx] = PhoUIContainer() # create a new context
         
             display_output = owning_pipeline_reference.display_output[active_display_fn_identifying_ctx]
-            _createLinkedWidget_menu_provider.CreateLinkedWidget_MenuProvider_on_buildUI(spike_raster_window=spike_raster_window, active_pf_2D_dt=active_pf_2D_dt, context=active_display_fn_identifying_ctx, display_output=display_output)
+            _createLinkedWidget_menu_provider.CreateLinkedWidget_MenuProvider_on_buildUI(spike_raster_window=spike_raster_window, owning_pipeline_reference=owning_pipeline_reference, active_pf_2D_dt=active_pf_2D_dt, context=active_display_fn_identifying_ctx, active_config_name=active_config_name, display_output=display_output)
         else:
             print(f'WARNING: owning_pipeline_reference is NONE in  _display_spike_rasters_window!')   
             

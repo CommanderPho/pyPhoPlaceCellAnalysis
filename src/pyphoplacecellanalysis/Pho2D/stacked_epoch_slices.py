@@ -1451,12 +1451,12 @@ class DecodedEpochSlicesPaginatedFigureController(PaginatedFigureController):
                 skip_plotting_most_likely_positions: bool = self.params.get('skip_plotting_most_likely_positions', False)
                 
                 ## NOTE: the actual heatmp is plotted using: 
-                _temp_fig, curr_ax = plot_1D_most_likely_position_comparsions(self.plots_data.global_pos_df, ax=curr_ax, time_window_centers=curr_time_bins, variable_name=self.params.variable_name, xbin=self.params.xbin, # is `self.params.xbin` the problem here? Because there are no positions at all?
+                _temp_fig, curr_ax, _return_out_artists_dict = plot_1D_most_likely_position_comparsions(self.plots_data.global_pos_df, ax=curr_ax, time_window_centers=curr_time_bins, variable_name=self.params.variable_name, xbin=self.params.xbin, # is `self.params.xbin` the problem here? Because there are no positions at all?
                                                                 posterior=curr_posterior,
                                                                 active_most_likely_positions_1D=curr_most_likely_positions,
                                                                 enable_flat_line_drawing=self.params.enable_flat_line_drawing, debug_print=self.params.debug_print,
                                                                 skip_plotting_measured_positions=skip_plotting_measured_positions, skip_plotting_most_likely_positions=skip_plotting_most_likely_positions,
-                                                                posterior_heatmap_imshow_kwargs=self.params.get('posterior_heatmap_imshow_kwargs', None),
+                                                                posterior_heatmap_imshow_kwargs=self.params.get('posterior_heatmap_imshow_kwargs', None), return_created_artists=True,
                                                                 )
                 
                 
@@ -1797,10 +1797,12 @@ class DecodedEpochSlicesPaginatedFigureController(PaginatedFigureController):
 
         pos_bin_edges = deepcopy(self.params.xbin)
         decoder_track_length: float = self.params.get('track_length_cm', None)
+        # heuristic_kwargs = self.params.get('heuristic_kwargs', dict(same_thresh_fraction_of_track = 0.075, max_jump_distance_cm = 60, max_ignore_bins = 2))
+        data_overlay_heuristic_kwargs = self.params.get('data_overlay_heuristic_kwargs', dict(same_thresh_fraction_of_track = 0.075, max_jump_distance_cm = 60, max_ignore_bins = 2))
         # assert decoder_track_length is not None
         if decoder_track_length is not None:
             # Build Decoded Positions Data and add them:    
-            decoded_sequence_and_heuristics_curves_data = DecodedSequenceAndHeuristicsPlotDataProvider.decoder_build_single_decoded_sequence_and_heuristics_curves_data(deepcopy(decoder_decoded_epochs_result), pos_bin_edges=pos_bin_edges, decoder_track_length=decoder_track_length, included_columns=included_columns)
+            decoded_sequence_and_heuristics_curves_data = DecodedSequenceAndHeuristicsPlotDataProvider.decoder_build_single_decoded_sequence_and_heuristics_curves_data(deepcopy(decoder_decoded_epochs_result), pos_bin_edges=pos_bin_edges, decoder_track_length=decoder_track_length, included_columns=included_columns, **data_overlay_heuristic_kwargs)
             if decoded_sequence_and_heuristics_curves_data is not None:
                 DecodedSequenceAndHeuristicsPlotDataProvider.add_data_to_pagination_controller(self, decoded_sequence_and_heuristics_curves_data, update_controller_on_apply=False)
         else:
@@ -2661,6 +2663,7 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
 
         """
         import matplotlib as mpl
+        from pyphoplacecellanalysis.SpecificResults.PhoDiba2023Paper import PhoPublicationFigureHelper
 
         output_figure_kwargs = dict(write_vector_format=True, write_png=True) | kwargs
         pagination_controller_dict = self.pagination_controllers
@@ -2681,8 +2684,7 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
             a_plots = a_pagination_controller.plots # RenderPlots
             # a_params = a_pagination_controller.params
             
-            # with mpl.rc_context({'figure.figsize': (8.4, 4.8), 'figure.dpi': '220', 'savefig.transparent': True, 'ps.fonttype': 42, }):
-            with mpl.rc_context({'figure.figsize': (16.8, 4.8), 'figure.dpi': '420', 'savefig.transparent': True, 'ps.fonttype': 42, }):
+            with mpl.rc_context(PhoPublicationFigureHelper.rc_context_kwargs({'figure.figsize': (16.8, 4.8), 'figure.dpi': '420', })):
                 figs = a_plots.fig
                 # axs = a_plots.axs
                 active_out_figure_paths, final_context = curr_active_pipeline.output_figure(final_context=page_context, fig=figs, **output_figure_kwargs)
@@ -2722,9 +2724,9 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
         return (_flat_png_list, _out_combined_img, combined_img_out_path)
     
 
-    @function_attributes(short_name=None, tags=['export'], input_requires=[], output_provides=[], uses=['export_decoder_pagination_controller_figure_page', 'build_combined_all_pages_image'], used_by=[], creation_date='2024-08-13 13:05', related_items=[])
+    @function_attributes(short_name=None, tags=['DEPRIcATED', 'export'], input_requires=[], output_provides=[], uses=['export_decoder_pagination_controller_figure_page', 'build_combined_all_pages_image'], used_by=[], creation_date='2024-08-13 13:05', related_items=[])
     def export_all_pages(self, curr_active_pipeline, write_vector_format=True, write_png=True, enable_export_combined_img: bool=False, combined_image_basename: str = 'combined', **kwargs):
-        """ exports each pages single-decoder figures separately
+        """ exports each pages single-decoder figures separately (as a page with stacked decoders). Does NOT export the rasters or marginals.
 
         Usage:
             export_decoder_pagination_controller_figure_page(pagination_controller_dict, curr_active_pipeline)
@@ -2922,7 +2924,7 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
 
 
         ## Get the time bin within the clicked epoch
-        @function_attributes(short_name=None, tags=['callback'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-10-10 09:06', related_items=[])
+        @function_attributes(short_name=None, tags=['callback', 'selection', 'time_bin_selection'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-10-10 09:06', related_items=[])
         def update_clicked_epoch_time_bin_selection_callback(a_pagination_controller, event, clicked_ax, clicked_data_index, clicked_epoch_is_selected, clicked_epoch_start_stop_time):
             """ gets the time_bin within the clicked epoch
             
@@ -2993,7 +2995,7 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
 
 
         ## Enable programmatically updating the rasters viewer to the clicked epoch index when middle clicking on a posterior.
-        @function_attributes(short_name=None, tags=['callback', 'raster'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-04-29 17:13', related_items=[])
+        @function_attributes(short_name=None, tags=['callback', 'selection', 'epoch_selection', 'raster'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-04-29 17:13', related_items=[])
         def update_attached_raster_viewer_epoch_callback(a_pagination_controller, event, clicked_ax, clicked_data_index, clicked_epoch_is_selected, clicked_epoch_start_stop_time):
             """ Enable programmatically updating the rasters viewer to the clicked epoch index when middle clicking on a posterior. 
             called when the user middle-clicks an epoch 
@@ -3018,7 +3020,7 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
                 print(f'_did_update_selected_epoch: True, clicked_data_index: {clicked_data_index}')
                 included_page_data_indicies, (curr_page_active_filter_epochs, curr_page_epoch_labels, curr_page_time_bin_containers, curr_page_posterior_containers) = a_pagination_controller.plots_data.paginator.get_page_data(page_idx=a_pagination_controller.current_page_idx)
                 # page_rel_clicked_ax_index = included_page_data_indicies.index(clicked_data_index)
-                page_rel_clicked_ax_index = clicked_data_index-included_page_data_indicies[0]
+                page_rel_clicked_ax_index = clicked_data_index - included_page_data_indicies[0]
                 print(f'\tpage_rel_clicked_ax_index: {page_rel_clicked_ax_index}')
                 # [clicked_ax]
                 # self.plots.axs
@@ -3044,6 +3046,9 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
                     
                 print(f'done.')
                 
+        # ==================================================================================================================================================================================================================================================================================== #
+        # Begin function body                                                                                                                                                                                                                                                                  #
+        # ==================================================================================================================================================================================================================================================================================== #
 
         for a_name, a_pagination_controller in self.pagination_controllers.items():
             # a_pagination_controller.params.debug_print = True
@@ -3260,9 +3265,25 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
 
 
 
-    @function_attributes(short_name=None, tags=['export', 'image', 'marginal'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-10-09 16:29', related_items=[])
+    @function_attributes(short_name=None, tags=['export', 'image', 'marginal'], input_requires=[], output_provides=[], uses=['PosteriorExporting._perform_export_current_epoch_marginal_and_raster_images'], used_by=['cls.export_all_epochs_to_images'], creation_date='2024-10-09 16:29', related_items=[])
     def export_current_epoch_marginal_and_raster_images(self, directional_merged_decoders_result, root_export_path: Path, active_context: Optional[IdentifyingContext]=None):
         """ Export Marginal Pseudo2D posteriors and rasters for middle-clicked epochs
+        
+
+        Usage:        
+            # DirectionalMergedDecoders: Get the result after computation:
+            directional_merged_decoders_result = curr_active_pipeline.global_computation_results.computed_data['DirectionalMergedDecoders'] # uses `DirectionalMergedDecoders`.
+
+            # root_export_path: Path = Path(r"/media/halechr/MAX/cloud/University of Michigan Dropbox/Pho Hale/Pho Diba Paper 2023/array_as_image").resolve() # Lab
+            root_export_path.mkdir(exist_ok=True)
+            Assert.path_exists(root_export_path)
+
+            complete_session_context, (session_context, additional_session_context) = curr_active_pipeline.get_complete_session_context()
+            epoch_specific_folder, (out_image_save_tuple_dict, _out_rasters_save_paths, merged_img_save_path) = paginated_multi_decoder_decoded_epochs_window.export_current_epoch_marginal_and_raster_images(directional_merged_decoders_result=directional_merged_decoders_result, root_export_path=root_export_path, active_context=complete_session_context)
+
+            file_uri_from_path(epoch_specific_folder)
+            fullwidth_path_widget(a_path=epoch_specific_folder, file_name_label="epoch_specific_folder:")
+        
         """
         from pyphoplacecellanalysis.Pho2D.data_exporting import PosteriorExporting
         # root_export_path = Path(r"E:\Dropbox (Personal)\Active\Kamran Diba Lab\Pho-Kamran-Meetings\2024-05-01 - Pseudo2D Again\array_as_image").resolve() # Apogee
@@ -3290,6 +3311,78 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
         return epoch_specific_folder, (out_image_save_tuple_dict, _out_rasters_save_paths, merged_img_save_path)
 
 
+    @function_attributes(short_name=None, tags=['export', 'batch', 'marginals', 'rasters'], input_requires=[], output_provides=[], uses=['export_current_epoch_marginal_and_raster_images'], used_by=[], creation_date='2025-06-03 00:47', related_items=[])
+    @classmethod
+    def perform_export_all_epochs_to_images(cls, paginated_multi_decoder_decoded_epochs_window: "PhoPaginatedMultiDecoderDecodedEpochsWindow", directional_merged_decoders_result, root_export_path: Path, active_context: Optional[IdentifyingContext]=None, **kwargs):
+        """ programmatically iterates through all epochs and exports them to file, including their posteriors, rasters, and marginals 
+
+        Usage:
+            from pyphoplacecellanalysis.Pho2D.stacked_epoch_slices import PhoPaginatedMultiDecoderDecodedEpochsWindow
+
+            # DirectionalMergedDecoders: Get the result after computation:
+            directional_merged_decoders_result = curr_active_pipeline.global_computation_results.computed_data['DirectionalMergedDecoders'] # uses `DirectionalMergedDecoders`.
+
+            # root_export_path: Path = Path(r"/media/halechr/MAX/cloud/University of Michigan Dropbox/Pho Hale/Pho Diba Paper 2023/array_as_image").resolve() # Lab
+            root_export_path: Path = Path(r'K:/scratch/collected_outputs/figures/array_as_image').resolve()
+            root_export_path.mkdir(exist_ok=True)
+            Assert.path_exists(root_export_path)
+
+            complete_session_context, (session_context, additional_session_context) = curr_active_pipeline.get_complete_session_context()
+            _out_path_tuples_dict = PhoPaginatedMultiDecoderDecodedEpochsWindow.perform_export_all_epochs_to_images(paginated_multi_decoder_decoded_epochs_window=paginated_multi_decoder_decoded_epochs_window, directional_merged_decoders_result=directional_merged_decoders_result, root_export_path=root_export_path, active_context=complete_session_context)
+
+        """
+
+        if (not hasattr(paginated_multi_decoder_decoded_epochs_window.ui, 'attached_ripple_rasters_widget') or (paginated_multi_decoder_decoded_epochs_window.ui.attached_ripple_rasters_widget is None)):
+            raise ValueError(f"paginated_multi_decoder_decoded_epochs_window.ui.attached_ripple_rasters_widget is None! Is there an attached raster_widget yet?")
+
+        # attached_yellow_blue_marginals_viewer_widget: DecodedEpochSlicesPaginatedFigureController = paginated_multi_decoder_decoded_epochs_window.attached_yellow_blue_marginals_viewer_widget
+        attached_ripple_rasters_widget: RankOrderRastersDebugger = paginated_multi_decoder_decoded_epochs_window.attached_ripple_rasters_widget
+        # attached_directional_template_pfs_debugger: TemplateDebugger = paginated_multi_decoder_decoded_epochs_window.attached_directional_template_pfs_debugger
+        assert attached_ripple_rasters_widget is not None, f"attached_ripple_rasters_widget is required to export rasters!"
+
+        ## INPUTS: paginated_multi_decoder_decoded_epochs_window, attached_ripple_rasters_widget, root_export_path, directional_merged_decoders_result, complete_session_context
+        _out_path_tuples_dict = {}
+        n_epochs: int = deepcopy(attached_ripple_rasters_widget.n_epochs)
+
+        for an_epoch_idx in np.arange(n_epochs):
+            print(f'processing an_epoch_idx: {an_epoch_idx}/{n_epochs}...')
+            attached_ripple_rasters_widget.programmatically_update_epoch_IDX(an_epoch_idx=an_epoch_idx)
+            _an_out_paths = paginated_multi_decoder_decoded_epochs_window.export_current_epoch_marginal_and_raster_images(directional_merged_decoders_result=directional_merged_decoders_result, root_export_path=root_export_path, active_context=active_context, **kwargs)
+            # epoch_specific_folder, (out_image_save_tuple_dict, _out_rasters_save_paths, merged_img_save_path) = _an_out_paths
+            _out_path_tuples_dict[an_epoch_idx] = (_an_out_paths[0], *_an_out_paths[1]) ## build simple 4-tuple of outputs
+
+        print(f'done with {n_epochs} epochs.')
+        # OUTPUTS: _out_path_tuples_dict
+        return _out_path_tuples_dict
+
+
+
+    
+    @function_attributes(short_name=None, tags=['export', 'batch', 'rasters', 'image', 'marginal'], input_requires=[], output_provides=[], uses=['.perform_export_all_epochs_to_images'], used_by=[], creation_date='2025-06-03 01:47', related_items=[])
+    def export_all_epoch_marginal_and_raster_images(self, directional_merged_decoders_result, root_export_path: Path, active_context: Optional[IdentifyingContext]=None, **kwargs):
+        """ programmatically iterates through all epochs and exports them to file, including their posteriors, rasters, and marginals 
+
+        Usage:
+            from pyphoplacecellanalysis.Pho2D.stacked_epoch_slices import PhoPaginatedMultiDecoderDecodedEpochsWindow
+
+            # DirectionalMergedDecoders: Get the result after computation:
+            directional_merged_decoders_result = curr_active_pipeline.global_computation_results.computed_data['DirectionalMergedDecoders'] # uses `DirectionalMergedDecoders`.
+
+            # root_export_path: Path = Path(r"/media/halechr/MAX/cloud/University of Michigan Dropbox/Pho Hale/Pho Diba Paper 2023/array_as_image").resolve() # Lab
+            root_export_path: Path = Path(r'K:/scratch/collected_outputs/figures/array_as_image').resolve()
+            # root_export_path: Path = Path(r'C:/Users/pho/repos/Spike3DWorkEnv/Spike3D/EXTERNAL/Screenshots/ProgrammaticDisplayFunctionTesting/array_as_image').resolve()
+            root_export_path.mkdir(exist_ok=True)
+            Assert.path_exists(root_export_path)
+
+            complete_session_context, (session_context, additional_session_context) = curr_active_pipeline.get_complete_session_context()
+            _out_path_tuples_dict = paginated_multi_decoder_decoded_epochs_window.export_all_epoch_marginal_and_raster_images(directional_merged_decoders_result=directional_merged_decoders_result, root_export_path=root_export_path, active_context=complete_session_context)
+            
+            
+        """
+        return self.perform_export_all_epochs_to_images(paginated_multi_decoder_decoded_epochs_window=self, directional_merged_decoders_result=directional_merged_decoders_result, root_export_path=root_export_path, active_context=active_context, **kwargs)
+
+
+
     @function_attributes(short_name=None, tags=['multi-window', 'widget', 'helper'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-10-09 14:19', related_items=[])
     @classmethod
     def plot_full_paginated_decoded_epochs_window(cls, curr_active_pipeline, track_templates, active_spikes_df,
@@ -3307,15 +3400,13 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
         assert known_epochs_type in ['ripple', 'laps'], f"known_epochs_type: '{known_epochs_type}' should be either 'ripple' or 'laps'"
         _, _, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
         
-        
-
         active_spikes_df = get_proper_global_spikes_df(curr_active_pipeline)
         # active_filter_epochs_df = deepcopy(decoder_laps_filter_epochs_decoder_result_dict['long_LR'].filter_epochs)
         active_filter_epochs_df = deepcopy(active_decoder_decoded_epochs_result_dict['long_LR'].filter_epochs)
         _co_filter_epochs_and_spikes_kwargs_DICT = {'ripple': dict(epoch_id_key_name='ripple_epoch_id'),
             'laps': dict(epoch_id_key_name='lap_id')
         }
-        active_co_filter_epochs_and_spikes_kwargs = _co_filter_epochs_and_spikes_kwargs_DICT[known_epochs_type] # resolve for the specific known_epochs_type ('ripple'/'lap')
+        active_co_filter_epochs_and_spikes_kwargs = _co_filter_epochs_and_spikes_kwargs_DICT[known_epochs_type] # resolve for the specific known_epochs_type ('ripple'/'laps')
         
         active_min_num_unique_aclu_inclusions_requirement: int = track_templates.min_num_unique_aclu_inclusions_requirement(curr_active_pipeline, required_min_percentage_of_active_cells=0.333333333)
         active_filter_epochs_df, active_spikes_df = co_filter_epochs_and_spikes(active_spikes_df=active_spikes_df, active_epochs_df=active_filter_epochs_df, included_aclus=track_templates.any_decoder_neuron_IDs, min_num_unique_aclu_inclusions=active_min_num_unique_aclu_inclusions_requirement, **active_co_filter_epochs_and_spikes_kwargs, no_interval_fill_value=-1, add_unique_aclus_list_column=True, drop_non_epoch_spikes=True)
@@ -3370,7 +3461,7 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
         _build_attached_yellow_blue_track_identity_marginal_window_kwargs_DICT = {'ripple': dict(decoding_time_bin_size=directional_decoders_epochs_decode_result.ripple_decoding_time_bin_size, name='TrackIdentity_Marginal_Ripples', filter_epochs_decoder_result=deepcopy(directional_merged_decoders_result.all_directional_ripple_filter_epochs_decoder_result)),
             'laps': dict(decoding_time_bin_size=directional_decoders_epochs_decode_result.laps_decoding_time_bin_size, name='TrackIdentity_Marginal_Laps', filter_epochs_decoder_result=deepcopy(directional_merged_decoders_result.all_directional_laps_filter_epochs_decoder_result)),
         }
-        active_build_attached_yellow_blue_track_identity_marginal_window_kwargs = _build_attached_yellow_blue_track_identity_marginal_window_kwargs_DICT[known_epochs_type] # resolve for the specific known_epochs_type ('ripple'/'lap')
+        active_build_attached_yellow_blue_track_identity_marginal_window_kwargs = _build_attached_yellow_blue_track_identity_marginal_window_kwargs_DICT[known_epochs_type] # resolve for the specific known_epochs_type ('ripple'/'laps')
         yellow_blue_plot_context = IdentifyingContext(**{'decoded_epochs': known_epochs_type.title(), 'Marginal': 'TrackID', 't_bin': round(active_build_attached_yellow_blue_track_identity_marginal_window_kwargs['decoding_time_bin_size'], ndigits=5)})
         
         # directional_merged_decoders_result.filtered_by_epoch_times()

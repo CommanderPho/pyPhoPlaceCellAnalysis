@@ -75,6 +75,10 @@ class AnimalTrajectoryPlottingMixin:
     
     
     def AnimalTrajectoryPlottingMixin_update_plots(self):
+        """ 
+        requires: self.curr_recent_trajectory
+        
+        """
         # Update most recent trajectory plot:
         curr_trajectory_rows = self.curr_recent_trajectory
         curr_num_points = np.shape(curr_trajectory_rows)[0]

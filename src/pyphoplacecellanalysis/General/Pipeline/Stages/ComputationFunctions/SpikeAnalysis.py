@@ -1,10 +1,13 @@
-from attrs import define, field, asdict
+from copy import deepcopy
+from attrs import define, field, asdict, Factory
 from neuropy.analyses.decoders import BinningInfo
 from nptyping import NDArray
 import numpy as np
 import pandas as pd
 from indexed import IndexedOrderedDict
-from typing import Any, Optional, Dict, List, Tuple
+from typing import Any, Optional, Dict, List, Tuple, Union
+import nptyping as ND
+from nptyping import NDArray
 import itertools
 
 # from neurodsp.burst import detect_bursts_dual_threshold, compute_burst_stats
@@ -15,6 +18,7 @@ from pybursts import pybursts
 
 # 2022-11-08 Firing Rate Calculations
 from elephant.statistics import mean_firing_rate, instantaneous_rate, time_histogram
+import quantities as pq
 from quantities import ms, s, Hz
 from neo.core.spiketrain import SpikeTrain
 from neo.core.analogsignal import AnalogSignal
@@ -24,9 +28,12 @@ from elephant.kernels import GaussianKernel
 from tqdm.notebook import tqdm
 
 from neuropy.utils.misc import safe_pandas_get_group # for _compute_pybursts_burst_interval_detection
+from neuropy.core.epoch import ensure_dataframe
 from neuropy.utils.mixins.binning_helpers import BinningContainer # used in _perform_firing_rate_trends_computation
 from neuropy.utils.mixins.AttrsClassHelpers import AttrsBasedClassHelperMixin, serialized_field, serialized_attribute_field, non_serialized_field, custom_define
 from neuropy.utils.mixins.HDF5_representable import HDF_DeserializationMixin, post_deserialize, HDF_SerializationMixin, HDFMixin
+from neuropy.utils.mixins.unit_slicing import NeuronUnitSlicableObjectProtocol
+from neuropy.utils.result_context import IdentifyingContext
 
 from pyphocorehelpers.programming_helpers import metadata_attributes
 from pyphocorehelpers.function_helpers import function_attributes
@@ -37,21 +44,17 @@ from pyphocorehelpers.DataStructure.dynamic_parameters import DynamicParameters
 
 from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import ZhangReconstructionImplementation # for _perform_firing_rate_trends_computation
 
-import multiprocessing
-
-
-
 
 @custom_define(slots=False)
-class SpikeRateTrends(HDFMixin, AttrsBasedClassHelperMixin):
+class SpikeRateTrends(HDFMixin, NeuronUnitSlicableObjectProtocol, AttrsBasedClassHelperMixin):
     """ Computes instantaneous firing rates for each cell
     
     from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.SpikeAnalysis import SpikeRateTrends
 
     
     """
-    epoch_agg_inst_fr_list: np.ndarray = serialized_field(is_computable=True, init=False) # .shape (n_epochs, n_cells)
-    cell_agg_inst_fr_list: np.ndarray = serialized_field(is_computable=True, init=False) # .shape (n_cells,)
+    epoch_agg_inst_fr_list: NDArray[ND.Shape["N_EPOCHS, N_CELLS"], Any] = serialized_field(is_computable=True, init=False) # .shape (n_epochs, n_cells)
+    cell_agg_inst_fr_list: NDArray[ND.Shape["N_CELLS"], Any] = serialized_field(is_computable=True, init=False) # .shape (n_cells,)
     all_agg_inst_fr: float = serialized_attribute_field(is_computable=True, init=False) # the scalar value that results from aggregating over ALL (timebins, epochs, cells)
     
     # Add aclu values:
@@ -66,18 +69,23 @@ class SpikeRateTrends(HDFMixin, AttrsBasedClassHelperMixin):
     a `inst_fr_df` is a df with time bins along the rows and aclu values along the columns in the style of `unit_specific_binned_spike_counts`
     """
     #TODO 2023-07-31 08:36: - [ ] both of these properties would ideally be serialized to HDF, but they can't be right now.`
-    inst_fr_df_list: list[pd.DataFrame] = non_serialized_field() # a list containing a inst_fr_df for each epoch. 
-    inst_fr_signals_list: list[AnalogSignal] = non_serialized_field()
-    included_neuron_ids: Optional[np.ndarray] = serialized_field(default=None, is_computable=False) # .shape (n_cells,)
+    inst_fr_df_list: List[pd.DataFrame] = non_serialized_field() # a list containing an`inst_fr_df` for each epoch. 
+    inst_fr_signals_list: List[AnalogSignal] = non_serialized_field()
+    
+    included_neuron_ids: Optional[NDArray[ND.Shape["N_CELLS"], Any]] = serialized_field(default=None, is_computable=False) # .shape (n_cells,)
     filter_epochs_df: pd.DataFrame = serialized_field(is_computable=False) # .shape (n_epochs, ...)
     
     instantaneous_time_bin_size_seconds: float = serialized_attribute_field(default=0.01, is_computable=False)
     kernel_width_ms: float = serialized_attribute_field(default=10.0, is_computable=False)
 
+    spike_counts_df_list: Optional[List[pd.DataFrame]] = non_serialized_field(default=None, metadata={}) # a list containing a df for each epoch with its rows as the number of spikes in each time bin and one column for each neuron. 
+    epoch_unit_fr_df_list: Optional[List[pd.DataFrame]] = non_serialized_field(default=None, metadata={})
+    
+    per_aclu_additional_properties_dict: Dict[str, Union[List, Dict]] = non_serialized_field(default=Factory(dict), metadata={'field_added':'2025.08.06_0'})
     
     @classmethod
-    def init_from_spikes_and_epochs(cls, spikes_df: pd.DataFrame, filter_epochs, included_neuron_ids=None, instantaneous_time_bin_size_seconds=0.01, kernel=GaussianKernel(10*ms),
-                                    use_instantaneous_firing_rate=False, epoch_handling_mode:str='DropShorterMode') -> "SpikeRateTrends":
+    def init_from_spikes_and_epochs(cls, spikes_df: pd.DataFrame, filter_epochs: pd.DataFrame, included_neuron_ids=None, instantaneous_time_bin_size_seconds:float=0.01, kernel=GaussianKernel(10*ms),
+                                    use_instantaneous_firing_rate:bool=False, epoch_handling_mode:str='DropShorterMode', **kwargs) -> "SpikeRateTrends":
         """ the main called function
         
         epoch_handling_mode='DropShorterMode' - the default mode prior to 2024-09-12, drops any epochs shorter than the time_bin_size so binning works appropriately.
@@ -88,14 +96,9 @@ class SpikeRateTrends(HDFMixin, AttrsBasedClassHelperMixin):
         if included_neuron_ids is None:
             included_neuron_ids = spikes_df.spikes.neuron_ids
         if len(included_neuron_ids)>0:
-            if isinstance(filter_epochs, pd.DataFrame):
-                filter_epochs_df = filter_epochs
-            else:
-                filter_epochs_df = filter_epochs.to_dataframe()
-                
-                
+            filter_epochs_df = ensure_dataframe(filter_epochs) 
             assert epoch_handling_mode in ['DropShorterMode', 'UseAllEpochsMode']
-                
+
             if epoch_handling_mode == 'DropShorterMode':
                 minimum_event_duration: float = instantaneous_time_bin_size_seconds # allow direct use            
                 ## Drop those less than the time bin duration
@@ -118,46 +121,75 @@ class SpikeRateTrends(HDFMixin, AttrsBasedClassHelperMixin):
                 print(f'UseAllEpochsMode')
                 pass
             else:
-                raise NotImplementedError(f'epoch_handling_mode: {epoch_handling_mode} is unsupported.')
+                raise NotImplementedError(f'epoch_handling_mode: "{epoch_handling_mode}" is unsupported.')
             
-            
-            
-            epoch_inst_fr_df_list, epoch_inst_fr_signal_list, epoch_agg_firing_rates_list = cls.compute_epochs_unit_avg_inst_firing_rates(spikes_df=spikes_df, filter_epochs=filter_epochs_df, included_neuron_ids=included_neuron_ids, instantaneous_time_bin_size_seconds=instantaneous_time_bin_size_seconds, kernel=kernel,
-                                                                                                                                          use_instantaneous_firing_rate=use_instantaneous_firing_rate)
+            epoch_inst_fr_df_list, epoch_inst_fr_signal_list, epoch_agg_firing_rates_list, epoch_results_list_dict = cls.compute_epochs_unit_avg_inst_firing_rates(spikes_df=spikes_df, filter_epochs=filter_epochs_df, included_neuron_ids=included_neuron_ids, instantaneous_time_bin_size_seconds=instantaneous_time_bin_size_seconds, kernel=kernel,
+                                                                                                                                          use_instantaneous_firing_rate=use_instantaneous_firing_rate, **kwargs)
             _out = cls(inst_fr_df_list=epoch_inst_fr_df_list, inst_fr_signals_list=epoch_inst_fr_signal_list, included_neuron_ids=included_neuron_ids, filter_epochs_df=filter_epochs_df,
-                        instantaneous_time_bin_size_seconds=instantaneous_time_bin_size_seconds, kernel_width_ms=kernel.sigma.magnitude)
+                        instantaneous_time_bin_size_seconds=instantaneous_time_bin_size_seconds, kernel_width_ms=kernel.sigma.magnitude,
+                        spike_counts_df_list=epoch_results_list_dict.pop('spike_counts', None),
+                        epoch_unit_fr_df_list=epoch_results_list_dict.pop('epoch_unit_fr', None),
+                        )
+            _out.per_aclu_additional_properties_dict.update(**epoch_results_list_dict) ## add the rest of the returned properties
             _out.recompute_on_update()
         else:
             _out = None # return None if included_neuron_ids are empty
 
         return _out
 
+
     def recompute_on_update(self):
         """ called after update to self.inst_fr_df_list or self.inst_fr_signals_list to update all of the aggregate properties. 
 
         """
-        n_epochs = len(self.inst_fr_df_list)
+        n_epochs: int = len(self.inst_fr_df_list)
         assert n_epochs > 0        
-        n_cells = self.inst_fr_df_list[0].shape[1]
+        n_cells: int = self.inst_fr_df_list[0].shape[1]
         
-        
+        ## Recompute for all time bins within each epoch to get at epoch_aggregated firing rates (one for each epoch):
         is_non_instantaneous = np.all([a_signal is None for a_signal in self.inst_fr_signals_list])
         if is_non_instantaneous:
             epoch_agg_firing_rates_list = np.vstack([np.nanmean(a_df.to_numpy(), axis=0) for a_df in self.inst_fr_df_list])
         else:
             # use instantaneous version
-            epoch_agg_firing_rates_list = np.vstack([a_signal.max(axis=0).magnitude for a_signal in self.inst_fr_signals_list]) # find the peak within each epoch (for all cells) using `.max(...)`
+            epoch_agg_firing_rates_list = np.vstack([a_signal.max(axis=0).magnitude for a_signal in self.inst_fr_signals_list]) # find the peak within each epoch (for all cells) using `.max(...)` - # (226, 66) - (n_epochs, n_cells)
+            # epoch_agg_firing_rates_list = epoch_agg_firing_rates_list.mean(axis=0)
             
+
         assert epoch_agg_firing_rates_list.shape == (n_epochs, n_cells)
         self.epoch_agg_inst_fr_list = epoch_agg_firing_rates_list # .shape (n_epochs, n_cells)
-        cell_agg_firing_rates_list = epoch_agg_firing_rates_list.mean(axis=0) # find the peak over all epochs (for all cells) using `.max(...)` --- OOPS, what about the zero epochs? Should those actually effect the rate? Should they be excluded?
+
+        ## OLD WAY that abused directional cells:
+        # cell_agg_firing_rates_list = epoch_agg_firing_rates_list.mean(axis=0) # find the peak over all epochs (for all cells) using `.max(...)` --- OOPS, what about the zero epochs? Should those actually effect the rate? Should they be excluded?
+
+        ## 2025-08-01 07:29 NEW WAY that permits LR/RL/ALL consideration separately so purely directional cells don't get averaged acrossed periods they aren't supposed to be active:
+        ## INPUTS: epoch_agg_inst_fr_list # (N_EPOCHS, N_ACLUS) in period
+
+        # an_inst_fr_list = self.epoch_agg_inst_fr_list # (N_EPOCHS, N_ACLUS) in period
+        # epoch_agg_firing_rates_list = deepcopy(epoch_agg_firing_rates_list) # (N_EPOCHS, N_ACLUS) in period
+        # an_inst_fr_list = np.squeeze(a_pre_post_period_result.epoch_agg_inst_fr_list[:, target_aclu_idx]) # (N_EPOCHS) in period
+        # print(f'an_inst_fr_list.shape: {np.shape(an_inst_fr_list)}') # an_inst_fr_list.shape: (39, 20)
+        LR_an_inst_fr_list = epoch_agg_firing_rates_list[::2, :] ## even epochs only, all aclus
+        RL_an_inst_fr_list = epoch_agg_firing_rates_list[1::2, :] ## odd epochs only, all aclus
+        # print(f'LR_an_inst_fr_list.shape: {np.shape(LR_an_inst_fr_list)}') # LR_an_inst_fr_list.shape: (20, 20)
+        # print(f'RL_an_inst_fr_list.shape: {np.shape(RL_an_inst_fr_list)}') # RL_an_inst_fr_list.shape: (19, 20)
+        a_period_directional_inst_fr_list = [LR_an_inst_fr_list, RL_an_inst_fr_list, epoch_agg_firing_rates_list] # LR, RL, ALL
+        a_period_epoch_agg_frs_list = np.vstack([np.nanmean(a_fr_list, axis=0) for a_fr_list in a_period_directional_inst_fr_list]) ## average over epochs, output (3, N_ACLUS)
+        # print(f'a_period_epoch_agg_frs_list.shape: {np.shape(a_period_epoch_agg_frs_list)}') # a_period_epoch_agg_frs_list.shape: (3, 20)
+        cell_agg_firing_rates_list: float = np.nanmax(a_period_epoch_agg_frs_list, axis=0) ## get the highest fr in any the LR/RL/ALL only
+        # print(f'a_period_epoch_agg_fr.shape: {np.shape(a_period_epoch_agg_fr)}') # a_period_epoch_agg_fr.shape: (20,)
+    
+        ## OVERWRITE cell_agg_inst_fr_list
         assert cell_agg_firing_rates_list.shape == (n_cells,)
-        self.cell_agg_inst_fr_list = cell_agg_firing_rates_list # .shape (n_cells,)
+        self.cell_agg_inst_fr_list = deepcopy(cell_agg_firing_rates_list) # .shape (n_cells,)
+        ## update the all agg result
         self.all_agg_inst_fr = cell_agg_firing_rates_list.mean() # .magnitude.item() # scalar
 
 
+
+
     @classmethod
-    def compute_simple_time_binned_firing_rates_df(cls, active_spikes_df, time_bin_size_seconds=0.5, debug_print=False) -> Tuple[pd.DataFrame, pd.DataFrame, NDArray, BinningInfo]:
+    def compute_simple_time_binned_firing_rates_df(cls, active_spikes_df: pd.DataFrame, time_bin_size_seconds: float=0.5, debug_print=False) -> Tuple[pd.DataFrame, pd.DataFrame, NDArray, BinningInfo]:
         """ This simple function computes the firing rates for each time bin. 
         Captures: debug_print
         """
@@ -167,15 +199,23 @@ class SpikeRateTrends(HDFMixin, AttrsBasedClassHelperMixin):
         return unit_specific_binned_spike_rate_df, unit_specific_binned_spike_counts_df, time_window_edges, time_window_edges_binning_info
 
     @classmethod
-    def compute_instantaneous_time_firing_rates(cls, active_spikes_df, time_bin_size_seconds=0.5, kernel=GaussianKernel(200*ms), t_start=0.0, t_stop=1000.0, included_neuron_ids=None) -> Tuple[pd.DataFrame, Any, List[SpikeTrain]]:
-        """ I think the error is actually occuring when: `time_bin_size_seconds > (t_stop - t_start)` """
-        is_smaller_than_single_bin = (time_bin_size_seconds > (t_stop - t_start))
-        assert not is_smaller_than_single_bin, f"ERROR: time_bin_size_seconds ({time_bin_size_seconds}) > (t_stop - t_start) ({t_stop - t_start}). Reduce the bin size or exclude this epoch."
+    def compute_single_epoch_instantaneous_time_firing_rates(cls, active_spikes_df: pd.DataFrame, time_bin_size_seconds:float=0.5, kernel=GaussianKernel(200*ms), epoch_t_start:float=0.0, epoch_t_stop:float=1000.0, included_neuron_ids=None, **kwargs) -> Tuple[pd.DataFrame, Any, List[SpikeTrain]]:
+        """ I think the error is actually occuring when: `time_bin_size_seconds > (t_stop - t_start)`
+        
+        2025-07-25 07:43 Confirmed that changing `sampling_rate: pq.Quantity = (1252 * Hz)` has no effect on the output instantaneous rates
+        
+        """
+        
+        is_smaller_than_single_bin = (time_bin_size_seconds > (epoch_t_stop - epoch_t_start))
+        assert not is_smaller_than_single_bin, f"ERROR: time_bin_size_seconds ({time_bin_size_seconds}) > (t_stop - t_start) ({epoch_t_stop - epoch_t_start}). Reduce the bin size or exclude this epoch."
         
         if included_neuron_ids is None:
             included_neuron_ids = np.unique(active_spikes_df.aclu)
+            
+        active_spikes_df = deepcopy(active_spikes_df).spikes.time_sliced(t_start=epoch_t_start, t_stop=epoch_t_stop)
+        
         # unit_split_spiketrains = [SpikeTrain(t_start=computation_result.sess.t_start, t_stop=computation_result.sess.t_stop, times=spiketrain_times, units=s) for spiketrain_times in computation_result.sess.spikes_df.spikes.time_sliced(t_start=computation_result.sess.t_start, t_stop=computation_result.sess.t_stop).spikes.get_unit_spiketrains()]
-        unit_split_spiketrains = [SpikeTrain(t_start=t_start, t_stop=t_stop, times=spiketrain_times, units=s) for spiketrain_times in active_spikes_df.spikes.time_sliced(t_start=t_start, t_stop=t_stop).spikes.get_unit_spiketrains(included_neuron_ids=included_neuron_ids)]
+        unit_split_spiketrains = [SpikeTrain(t_start=epoch_t_start, t_stop=epoch_t_stop, times=spiketrain_times, units=s) for spiketrain_times in active_spikes_df.spikes.get_unit_spiketrains(included_neuron_ids=included_neuron_ids)]
         # len(unit_split_spiketrains) # 52
         # is_spiketrain_empty = [np.size(spiketrain) == 0 for spiketrain in unit_split_spiketrains]
         # neo.core.spiketrain.SpikeTrain
@@ -188,7 +228,7 @@ class SpikeRateTrends(HDFMixin, AttrsBasedClassHelperMixin):
 
         # elephant.statistics.instantaneous_rate
 
-        inst_rate = instantaneous_rate(unit_split_spiketrains, sampling_period=time_bin_size_seconds*s, kernel=kernel) # ValueError: `bins` must be positive, when an integer
+        inst_rate = instantaneous_rate(unit_split_spiketrains, t_start=epoch_t_start*s, t_stop=epoch_t_stop*s, sampling_period=time_bin_size_seconds*s, kernel=kernel) # ValueError: `bins` must be positive, when an integer
             # Raises `TypeError: The input must be a list of SpikeTrain` when the unit_split_spiketrains are empty, which occurs at least when included_neuron_ids is empty
         # AnalogSignal
         # print(type(inst_rate), f"of shape {inst_rate.shape}: {inst_rate.shape[0]} samples, {inst_rate.shape[1]} channel")
@@ -200,14 +240,15 @@ class SpikeRateTrends(HDFMixin, AttrsBasedClassHelperMixin):
         return instantaneous_unit_specific_spike_rate_values, inst_rate, unit_split_spiketrains
 
     @classmethod
-    def compute_epochs_unit_avg_inst_firing_rates(cls, spikes_df: pd.DataFrame, filter_epochs, included_neuron_ids=None, instantaneous_time_bin_size_seconds=0.02, kernel=GaussianKernel(20*ms), use_instantaneous_firing_rate: bool=False, debug_print=False):
+    def compute_epochs_unit_avg_inst_firing_rates(cls, spikes_df: pd.DataFrame, filter_epochs, included_neuron_ids=None, instantaneous_time_bin_size_seconds:float=0.02, kernel=GaussianKernel(20*ms), use_instantaneous_firing_rate: bool=False, debug_print=False, **kwargs):
         """Computes the average firing rate for each neuron (unit) in each epoch. 
             Usage:
-            epoch_inst_fr_df_list, epoch_inst_fr_signal_list, epoch_avg_firing_rates_list = SpikeRateTrends.compute_epochs_unit_avg_inst_firing_rates(spikes_df=filter_epoch_spikes_df_L, filter_epochs=epochs_df_L, included_neuron_ids=EITHER_subset.track_exclusive_aclus, debug_print=True)
+            epoch_inst_fr_df_list, epoch_inst_fr_signal_list, epoch_avg_firing_rates_list, epoch_results_list_dict = SpikeRateTrends.compute_epochs_unit_avg_inst_firing_rates(spikes_df=filter_epoch_spikes_df_L, filter_epochs=epochs_df_L, included_neuron_ids=EITHER_subset.track_exclusive_aclus, debug_print=True)
         """
         epoch_inst_fr_df_list = []
         epoch_inst_fr_signal_list = []
         epoch_avg_firing_rates_list = []
+        epoch_results_list_dict = {'spike_counts': [], 'epoch_avg_spike_counts': [], 'epoch_unit_fr': [], 'epoch_is_participating_dict': []}
         
         if included_neuron_ids is None:
             included_neuron_ids = spikes_df.spikes.neuron_ids
@@ -224,10 +265,12 @@ class SpikeRateTrends(HDFMixin, AttrsBasedClassHelperMixin):
         for epoch_id in np.arange(n_epochs):
             epoch_start = filter_epochs_df.start.values[epoch_id]
             epoch_end = filter_epochs_df.stop.values[epoch_id]
+            epoch_duration: float = epoch_end - epoch_start
             epoch_spikes_df = spikes_df.spikes.time_sliced(t_start=epoch_start, t_stop=epoch_end)
-
+            
             if use_instantaneous_firing_rate:
-                unit_specific_inst_spike_rate_values_df, unit_specific_inst_spike_rate_signal, _unit_split_spiketrains = SpikeRateTrends.compute_instantaneous_time_firing_rates(epoch_spikes_df, time_bin_size_seconds=instantaneous_time_bin_size_seconds, kernel=kernel, t_start=epoch_start, t_stop=epoch_end, included_neuron_ids=included_neuron_ids)
+                # True Instantaneous Firing Rate _____________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
+                unit_specific_inst_spike_rate_values_df, unit_specific_inst_spike_rate_signal, _unit_split_spiketrains = SpikeRateTrends.compute_single_epoch_instantaneous_time_firing_rates(epoch_spikes_df, time_bin_size_seconds=instantaneous_time_bin_size_seconds, kernel=kernel, epoch_t_start=epoch_start, epoch_t_stop=epoch_end, included_neuron_ids=included_neuron_ids, **kwargs)
                 # times accessible via `unit_specific_inst_spike_rate_signal.times`
                 epoch_inst_fr_df_list.append(unit_specific_inst_spike_rate_values_df)
                 epoch_inst_fr_signal_list.append(unit_specific_inst_spike_rate_signal)
@@ -235,13 +278,34 @@ class SpikeRateTrends(HDFMixin, AttrsBasedClassHelperMixin):
                 # Compute average firing rate for each neuron
                 unit_avg_firing_rates = np.nanmean(unit_specific_inst_spike_rate_signal.magnitude, axis=0)
                 epoch_avg_firing_rates_list.append(unit_avg_firing_rates)
+                
+                ## spike counts:
+                epoch_spike_counts_dict = deepcopy(epoch_spikes_df['aclu']).value_counts().to_dict()            
+                epoch_value_counts = []
+                for aclu in included_neuron_ids:          
+                    epoch_value_counts.append(epoch_spike_counts_dict.get(aclu, 0))
+                    # epoch_value_counts.append({k:v.get(aclu, 0) for k, v in epoch_spike_counts_dict.items()})
+                    
+                epoch_units_total_num_spikes_df: pd.DataFrame = pd.DataFrame(epoch_value_counts, index=deepcopy(included_neuron_ids))
+                # unit_specific_binned_spike_counts = ZhangReconstructionImplementation.compute_unit_specific_bin_specific_spike_counts(spikes_df=epoch_spikes_df, active_indicies, debug_print=debug_print)
+                epoch_results_list_dict['spike_counts'].append(epoch_units_total_num_spikes_df)
+                
+                unit_specific_binned_spike_counts_df = deepcopy(epoch_units_total_num_spikes_df) ## just to make sure it works
+                
             else:
-                unit_specific_binned_spike_rate_df, unit_specific_binned_spike_counts_df, time_window_edges, time_window_edges_binning_info = SpikeRateTrends.compute_simple_time_binned_firing_rates_df(epoch_spikes_df, time_bin_size_seconds=instantaneous_time_bin_size_seconds, debug_print=debug_print) # returns dfs containing only the relevant entries
+                # Non-instantaneous rate _____________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
+                # 2025-07-25 08:51 IMPORTANT: since this is calculated by dividing the number of spikes in each time bin by the duration of each bin, when the duration exceeds the length of the epoch it will be divided by too large of a bin size
+                if instantaneous_time_bin_size_seconds > epoch_duration:
+                    epoch_instantaneous_time_bin_size_seconds: float = epoch_duration
+                else:
+                    epoch_instantaneous_time_bin_size_seconds: float = instantaneous_time_bin_size_seconds
+                                    
+                unit_specific_binned_spike_rate_df, unit_specific_binned_spike_counts_df, time_window_edges, time_window_edges_binning_info = SpikeRateTrends.compute_simple_time_binned_firing_rates_df(epoch_spikes_df, time_bin_size_seconds=epoch_instantaneous_time_bin_size_seconds, debug_print=debug_print) # returns dfs containing only the relevant entries
                 n_epoch_time_bins: int = np.shape(unit_specific_binned_spike_rate_df)[0]
                 ## Convert the returned df to a "full" representation: containing a column for each aclu in `included_neuron_ids` (which will be all zeros for aclus not active in this epoch)
                 unit_specific_binned_spike_rate_dict = unit_specific_binned_spike_rate_df.to_dict('list')
                 unit_specific_binned_spike_rate_dict = {aclu:unit_specific_binned_spike_rate_dict.get(aclu, np.zeros((n_epoch_time_bins, ))) for aclu in included_neuron_ids} # add entries for missing aclus
-                unit_specific_binned_spike_rate_df = pd.DataFrame(unit_specific_binned_spike_rate_dict)
+                unit_specific_binned_spike_rate_df = pd.DataFrame(unit_specific_binned_spike_rate_dict) ## Same as the incomming `unit_specific_binned_spike_rate_df` four lines up except it now has columns for EVERY aclu with zeros as needed
                 
                 epoch_inst_fr_df_list.append(unit_specific_binned_spike_rate_df)
                 epoch_inst_fr_signal_list.append(None)
@@ -249,11 +313,169 @@ class SpikeRateTrends(HDFMixin, AttrsBasedClassHelperMixin):
                 # Compute average firing rate for each neuron
                 unit_avg_firing_rates = np.nanmean(unit_specific_binned_spike_rate_df.to_numpy(), axis=0) # (n_neurons, )
                 epoch_avg_firing_rates_list.append(unit_avg_firing_rates)
+                
+                ## Spike Counts
+                ## Convert the returned df to a "full" representation: containing a column for each aclu in `included_neuron_ids` (which will be all zeros for aclus not active in this epoch)
+                unit_specific_binned_spike_counts_dict = unit_specific_binned_spike_counts_df.to_dict('list')
+                unit_specific_binned_spike_counts_dict = {aclu:unit_specific_binned_spike_counts_dict.get(aclu, np.zeros((n_epoch_time_bins, ))) for aclu in included_neuron_ids} # add entries for missing aclus
+                unit_specific_binned_spike_counts_df = pd.DataFrame(unit_specific_binned_spike_counts_dict)
+                ## OUTPUT unit_specific_binned_spike_counts_df to spike_counts
+                epoch_results_list_dict['spike_counts'].append(unit_specific_binned_spike_counts_df) # one column for every aclu, and one row for every time bin in the epoch
+                # unit_avg_spike_counts = np.nanmean(unit_specific_binned_spike_counts_df.to_numpy(), axis=0) # (n_neurons, )
+                # epoch_results_list_dict['epoch_avg_spike_counts'].append(unit_avg_spike_counts)
+                
+            # Either instantaneous or non-instantaneous
+            # unit_specific_has_epoch_participation_dict = {aclu:(unit_specific_binned_spike_counts_dict.get(aclu, np.zeros((n_epoch_time_bins, ))) > 0) for aclu in included_neuron_ids}
+            # epoch_results_list_dict['epoch_is_participating_dict'].append(unit_specific_has_epoch_participation_dict)
 
-            
+            ## Sum up the spikes per epoch for each cell, and then divide each by the epoch duration to get the epoch firing rate
+            unit_approximate_entire_epoch_fr_df: pd.DataFrame = deepcopy(unit_specific_binned_spike_counts_df.sum(axis='index', skipna=True, numeric_only=True)).astype(float) / epoch_duration # np.nanmean(unit_specific_binned_spike_counts_df.to_numpy(), axis=0) # (n_neurons, )
+            epoch_results_list_dict['epoch_unit_fr'].append(unit_approximate_entire_epoch_fr_df)
+                
+        ## END for epoch_id in np.arange(n_epochs)...
+        has_epoch_participation: NDArray = np.vstack([(unit_specific_binned_spike_counts_df.T[0].to_numpy() > 0.0) for unit_specific_binned_spike_counts_df in epoch_results_list_dict['spike_counts']]) # has_epoch_participation # .shape # (39, 20) - (n_epochs, n_aclus)
+        n_participating_epochs: NDArray = has_epoch_participation.sum(axis=0) # .shape (N_ACLUS)
+        assert len(included_neuron_ids) == len(n_participating_epochs), f"len(included_neuron_ids): {len(included_neuron_ids)} != len(n_participating_epochs): {len(n_participating_epochs)}"
+        epoch_results_list_dict['epoch_is_participating_dict'] = deepcopy(has_epoch_participation)
+
+
         epoch_avg_firing_rates_list = np.vstack(epoch_avg_firing_rates_list)
+        # epoch_results_list_dict['spike_counts'] = np.vstack(epoch_results_list_dict['spike_counts'])
 
-        return epoch_inst_fr_df_list, epoch_inst_fr_signal_list, epoch_avg_firing_rates_list
+        return epoch_inst_fr_df_list, epoch_inst_fr_signal_list, epoch_avg_firing_rates_list, epoch_results_list_dict
+
+    @function_attributes(short_name=None, tags=['private', 'participation', 'additional'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-08-06 05:33', related_items=[])
+    @classmethod
+    def _perform_compute_participation_stats(cls, a_pre_post_period_result: "SpikeRateTrends", a_session_ctxt: Optional[IdentifyingContext]=None):
+        """ Uses: `a_pre_post_period_result.spike_counts_df_list`
+        """
+        skip_column_names: List[str] = ['active_ACLUS', 'active_neuron_UIDs', 'active_neuron_UIDs_to_aclu_dict', 'active_aclu_to_neuron_UIDs_dict', 'active_neuron_identifiers', 'n_epochs']
+        
+        active_ACLUS = deepcopy(a_pre_post_period_result.included_neuron_ids)
+            
+        active_neuron_UIDs: Optional[List[str]] = None
+        if a_session_ctxt is not None:
+            session_uid: str = a_session_ctxt.get_description_as_session_global_uid()
+            if not isinstance(active_ACLUS[0], str):
+                active_neuron_UIDs = [f"{session_uid}|{aclu}" for aclu in active_ACLUS]
+            else:
+                raise NotImplementedError(f'already have neuron_UIDs or nah? {active_ACLUS}')
+                active_neuron_UIDs = deepcopy(active_ACLUS)
+            # active_ACLUS = deepcopy(active_neuron_UIDs) ## Use the neuron UIDs instead of the simple aclus if they're available
+            assert active_neuron_UIDs is not None
+            active_neuron_identifiers = deepcopy(active_neuron_UIDs)
+        else:
+            active_neuron_identifiers = deepcopy(active_ACLUS)
+            active_neuron_UIDs = None
+            
+        per_aclu_additional_properties_dict = {}
+        per_aclu_additional_properties_dict['active_ACLUS'] = deepcopy(active_ACLUS)
+        if active_neuron_UIDs is not None:
+            per_aclu_additional_properties_dict['active_neuron_UIDs'] = deepcopy(active_neuron_UIDs)
+        n_epochs: int = len(a_pre_post_period_result.filter_epochs_df) ## total number of possible epochs
+        
+        has_epoch_participation: NDArray = np.vstack([(v.T[0].to_numpy() > 0.0) for v in a_pre_post_period_result.spike_counts_df_list]) # has_epoch_participation # .shape # (39, 20) - (n_epochs, n_aclus)
+        n_participating_epochs: NDArray = has_epoch_participation.sum(axis=0) # .shape (N_ACLUS)
+        assert len(active_neuron_identifiers) == len(n_participating_epochs), f"len(a_pre_post_period_result.included_neuron_ids): {len(active_neuron_identifiers)} != len(n_participating_epochs): {len(n_participating_epochs)}"
+        n_participating_epochs_dict = dict(zip(active_neuron_identifiers, n_participating_epochs))
+
+        active_neuron_UIDs_to_aclu_dict: Dict[str, int] = dict(zip(active_neuron_UIDs, active_ACLUS))
+        per_aclu_additional_properties_dict['active_neuron_UIDs_to_aclu_dict'] = deepcopy(active_neuron_UIDs_to_aclu_dict)
+        per_aclu_additional_properties_dict['active_aclu_to_neuron_UIDs_dict'] = deepcopy(dict(zip(active_ACLUS, active_neuron_UIDs)))
+        per_aclu_additional_properties_dict['active_neuron_identifiers'] = deepcopy(active_neuron_identifiers)
+        per_aclu_additional_properties_dict['n_epochs'] = n_epochs # .shape - (n_aclus,)
+
+        ## Compute ratio of participating epochs
+        ratio_participating_epochs = n_participating_epochs.astype(float) / float(n_epochs)
+        per_aclu_additional_properties_dict['ratio_participating_epochs'] = ratio_participating_epochs # .shape - (n_aclus,)
+        
+        return n_participating_epochs_dict, n_participating_epochs, has_epoch_participation, per_aclu_additional_properties_dict, skip_column_names
+
+
+    @function_attributes(short_name=None, tags=['pure','participation', 'additional'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-08-06 05:33', related_items=[])
+    def compute_participation_stats(self, a_session_ctxt: Optional[IdentifyingContext]=None, should_update_self: bool=False, included_neuron_ids: Optional[NDArray]=None, **kwargs):
+        """ Uses: `a_pre_post_period_result.spike_counts_df_list`
+        
+        self.per_aclu_additional_properties_dict['n_participating_epochs'] # .shape - (n_aclus,)
+        self.per_aclu_additional_properties_dict['n_participating_epochs_dict']
+        
+        """
+        # if included_neuron_ids is None:
+        #     included_neuron_ids = deepcopy(self.included_neuron_ids)
+        # else:
+        #     ## Do not override or else we lose information about the meaning of the fields
+        #     # print(f'2025-08-08 - Overriding self.included_neuron_ids!!')
+        #     # self.included_neuron_ids = deepcopy(included_neuron_ids) ## override included neuron_ids
+        #     pass
+
+        n_participating_epochs_dict, n_participating_epochs, has_epoch_participation, per_aclu_additional_properties_dict, skip_column_names =  self._perform_compute_participation_stats(a_pre_post_period_result=self, a_session_ctxt=a_session_ctxt, **kwargs) # , included_neuron_ids=included_neuron_ids
+        
+        ## Add in missing neurons
+        if included_neuron_ids is not None:
+            # ## convert from aclus to neuron_uids
+            # if a_session_ctxt is not None:
+            #     session_uid: str = a_session_ctxt.get_description_as_session_global_uid()
+            #     if not isinstance(included_neuron_ids[0], str):
+            #         active_neuron_UIDs: List[str] = [f"{session_uid}|{aclu}" for aclu in included_neuron_ids]
+            #     else:
+            #         raise NotImplementedError(f'already have neuron_UIDs or nah? {included_neuron_ids}')
+            #         active_neuron_UIDs = deepcopy(included_neuron_ids)
+            #     # active_ACLUS = deepcopy(active_neuron_UIDs) ## Use the neuron UIDs instead of the simple aclus if they're available
+            #     active_neuron_identifiers = deepcopy(active_neuron_UIDs)
+            # else:
+            #     active_neuron_identifiers = deepcopy(included_neuron_ids)
+            #     active_neuron_UIDs = None
+            old_included_neuron_ids = deepcopy(self.included_neuron_ids)
+
+
+            active_neuron_identifiers = deepcopy(per_aclu_additional_properties_dict['active_neuron_identifiers'])
+
+            active_aclu_to_neuron_UIDs_dict = deepcopy(per_aclu_additional_properties_dict['active_aclu_to_neuron_UIDs_dict'])
+
+            # n_participating_epochs_dict = {aclu:n_participating_epochs_dict.get(active_aclu_to_neuron_UIDs_dict.get(aclu, -1), 0) for aclu in included_neuron_ids} ## use zeros for the missing aclus
+            n_participating_epochs_dict = {aclu:n_participating_epochs_dict.get(active_aclu_to_neuron_UIDs_dict[aclu], np.nan) for aclu in included_neuron_ids} ## use zeros for the missing aclus
+            n_participating_epochs = np.array(list(n_participating_epochs_dict.values()))
+            
+            _bak_has_epoch_participation = deepcopy(has_epoch_participation)
+            n_epochs, n_old_aclus = np.shape(_bak_has_epoch_participation)
+            assert len(old_included_neuron_ids) == n_old_aclus
+            has_epoch_participation = np.zeros((n_epochs, len(included_neuron_ids)))
+            old_to_new_aclu_idx_map = {}
+            for i, aclu in enumerate(old_included_neuron_ids):
+                new_i = included_neuron_ids.tolist().index(aclu)
+                old_to_new_aclu_idx_map[new_i] = i
+                has_epoch_participation[:, new_i] = _bak_has_epoch_participation[:, i]
+
+        if should_update_self:
+            if not hasattr(self, 'per_aclu_additional_properties_dict'):
+                self.per_aclu_additional_properties_dict = {} ## Initialize to a new dict
+            ## apply the update
+            self.per_aclu_additional_properties_dict['has_epoch_participation'] = deepcopy(has_epoch_participation) # .shape - (n_epochs, n_aclus)
+            self.per_aclu_additional_properties_dict['n_participating_epochs'] = deepcopy(n_participating_epochs) # .shape - (n_aclus,)
+            self.per_aclu_additional_properties_dict['n_participating_epochs_dict'] = deepcopy(n_participating_epochs_dict) # Dict len n_aclus,
+            self.per_aclu_additional_properties_dict['included_neuron_uids'] = np.array(deepcopy(list(n_participating_epochs_dict.keys()))) # .shape - (n_aclus,)
+            for k, v in per_aclu_additional_properties_dict.items():
+                if k not in skip_column_names:
+                    self.per_aclu_additional_properties_dict[k] = deepcopy(v) 
+            
+        return n_participating_epochs_dict, n_participating_epochs, has_epoch_participation, per_aclu_additional_properties_dict, skip_column_names
+
+    # for NeuronUnitSlicableObjectProtocol:
+    def get_by_id(self, ids: NDArray[ND.Shape["N_CELLS"], Any]) -> 'SpikeRateTrends':
+        """Returns object with neuron_ids equal to ids"""
+        _obj = deepcopy(self)        
+        if _obj.included_neuron_ids is not None:
+            is_neuron_id_included = np.isin(_obj.included_neuron_ids, ids)
+            _obj.included_neuron_ids = np.intersect1d(_obj.included_neuron_ids, ids)
+            
+        _obj.epoch_agg_inst_fr_list = _obj.epoch_agg_inst_fr_list[:, ids]
+        _obj.cell_agg_inst_fr_list = _obj.cell_agg_inst_fr_list[ids]
+        # _obj.epoch_agg_inst_fr_list = _obj.epoch_agg_inst_fr_list[:, ids]
+        _obj.inst_fr_signals_list = _obj.inst_fr_signals_list[ids]
+
+        flattened_spiketrains = deepcopy(self)
+        return _obj
+    
 
 
 
@@ -430,7 +652,7 @@ class SpikeAnalysisComputations(AllFunctionEnumeratingMixin, metaclass=Computati
         sess_max_spike_rates = sess_unit_specific_binned_spike_rate_df.max()
             
         # Instantaneous versions:
-        sess_unit_specific_inst_spike_rate_values_df, sess_unit_specific_inst_spike_rate, sess_unit_split_spiketrains = SpikeRateTrends.compute_instantaneous_time_firing_rates(active_session_spikes_df, time_bin_size_seconds=time_bin_size_seconds, t_start=computation_result.sess.t_start, t_stop=computation_result.sess.t_stop)
+        sess_unit_specific_inst_spike_rate_values_df, sess_unit_specific_inst_spike_rate, sess_unit_split_spiketrains = SpikeRateTrends.compute_single_epoch_instantaneous_time_firing_rates(active_session_spikes_df, time_bin_size_seconds=time_bin_size_seconds, epoch_t_start=computation_result.sess.t_start, epoch_t_stop=computation_result.sess.t_stop)
         if debug_print:
             print(f'sess_unit_specific_inst_spike_rate: {sess_unit_specific_inst_spike_rate}')
 

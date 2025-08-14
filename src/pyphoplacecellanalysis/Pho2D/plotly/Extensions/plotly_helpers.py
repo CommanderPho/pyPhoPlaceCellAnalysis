@@ -192,6 +192,11 @@ def plotly_helper_save_figures(figures_folder: Optional[Path]=None, figure_save_
 
 @define(slots=False, eq=False)
 class PlotlyFigureContainer:
+    """ holds a reference to a plotly figure
+
+    from pyphoplacecellanalysis.Pho2D.plotly.Extensions.plotly_helpers import PlotlyFigureContainer
+
+    """
     fig = field()
     
     @classmethod
@@ -295,6 +300,48 @@ class PlotlyFigureContainer:
 
 
 
+    @classmethod
+    def clear_specific_annotations(cls, fig, should_remove_fn: Callable):
+        """ 
+        should_remove_annotation_fn = lambda annotation: (annotation.name in ('figure_footer_text_annotation', 'figure_sup_huge_title_text_annotation'))
+        fig = PlotlyFigureContainer.clear_specific_annotations(fig, should_remove_fn=(lambda annotation: (annotation.name in ('figure_footer_text_annotation', 'figure_sup_huge_title_text_annotation')))
+
+        """
+        items_to_keep = []
+        for annotation in fig.layout.annotations:
+            should_remove: bool = should_remove_fn(annotation)
+            should_keep = not should_remove
+            if should_keep:
+                items_to_keep.append(annotation)
+            else:
+                continue
+        fig = fig.update_layout(
+            annotations=items_to_keep
+        )        
+        return fig
+    
+
+    @classmethod
+    def clear_specific_shapes(cls, fig, should_remove_fn: Callable):
+        """ 
+        fig = PlotlyFigureContainer.clear_specific_shapes(fig, should_remove_fn=(lambda annotation: (annotation.name in ['figure_sup_huge_title_text_line']))
+
+        """
+        items_to_keep = []
+        for annotation in fig.layout.shapes:
+            should_remove: bool = should_remove_fn(annotation)
+            should_keep = not should_remove
+            if should_keep:
+                items_to_keep.append(annotation)
+            else:
+                continue
+            
+        # fig.layout.shapes = items_to_keep
+        fig = fig.update_layout(
+            shapes=items_to_keep
+        )
+        return fig
+    
 
     @classmethod
     def clear_subplot(cls, fig, row, col):
@@ -383,7 +430,7 @@ def plotly_pre_post_delta_scatter(data_results_df: pd.DataFrame, data_context: O
                                    common_plot_kwargs=None, px_scatter_kwargs=None,
                                    histogram_variable_name='P_Long', hist_kwargs=None,
                                    forced_range_y=[0.0, 1.0], time_delta_tuple=None, is_dark_mode: bool = True,
-                                   figure_sup_huge_title_text: str=None, is_top_supertitle: bool = False, figure_footer_text: Optional[str]=None,
+                                   figure_sup_huge_title_text: str=None, is_top_supertitle: bool = False, main_title: Optional[str]=None, figure_footer_text: Optional[str]=None, is_publication_ready_figure: bool=False,
                                    extant_figure=None, # an existing plotly figure
                                     curr_fig_width=1800,
                                     **kwargs):
@@ -467,25 +514,33 @@ def plotly_pre_post_delta_scatter(data_results_df: pd.DataFrame, data_context: O
     if common_plot_kwargs is None:
         common_plot_kwargs = {}
         
-    # f"Across Sessions ({num_unique_sessions} Sessions) - {num_unique_time_bins} Time Bin Sizes"
-    # main_title: str = f"Across Sessions ({num_unique_sessions} Sessions) - {num_unique_time_bins} Time Bin Sizes"
-    if num_unique_sessions == 1:
-        # print(f'single-session mode')
-        main_title: str = f"Session {px_scatter_kwargs.get('title', 'UNKNOWN')}"
-    else:
-        main_title: str = f"Across Sessions {px_scatter_kwargs.get('title', 'UNKNOWN')} ({num_unique_sessions} Sessions)"
+
 
     if num_unique_time_bin_sizes > 1:
-        main_title = main_title + f" - {num_unique_time_bin_sizes} Time Bin Sizes"
         figure_context_dict['n_tbin'] = num_unique_time_bin_sizes
-    elif num_unique_time_bin_sizes == 1:
-        time_bin_size: float = unique_time_bin_sizes[0]
-        main_title = main_title + f" - time bin size: {time_bin_size} sec"
-    else:
-        main_title = main_title + f" - ERR: <No Entries in DataFrame>"
-        
+                
+    # f"Across Sessions ({num_unique_sessions} Sessions) - {num_unique_time_bins} Time Bin Sizes"
+    if (main_title is None) and (not is_publication_ready_figure):
+        # main_title: str = f"Across Sessions ({num_unique_sessions} Sessions) - {num_unique_time_bins} Time Bin Sizes"
+        if num_unique_sessions == 1:
+            # print(f'single-session mode')
+            main_title: str = f"Session {px_scatter_kwargs.get('title', 'UNKNOWN')}"
+        else:
+            main_title: str = f"Across Sessions {px_scatter_kwargs.get('title', 'UNKNOWN')} ({num_unique_sessions} Sessions)"
 
-    figure_context_dict['title'] = main_title
+        if num_unique_time_bin_sizes > 1:
+            main_title = main_title + f" - {num_unique_time_bin_sizes} Time Bin Sizes"
+            # figure_context_dict['n_tbin'] = num_unique_time_bin_sizes
+        elif num_unique_time_bin_sizes == 1:
+            time_bin_size: float = unique_time_bin_sizes[0]
+            main_title = main_title + f" - time bin size: {time_bin_size} sec"
+        else:
+            main_title = main_title + f" - ERR: <No Entries in DataFrame>"
+            
+
+    if main_title:
+        figure_context_dict['title'] = main_title
+
     if debug_print:
         print(f'num_unique_sessions: {num_unique_sessions}, num_unique_time_bins: {num_unique_time_bin_sizes}')
 
@@ -554,9 +609,16 @@ def plotly_pre_post_delta_scatter(data_results_df: pd.DataFrame, data_context: O
             # Categorical 'time_bin_size' as color _______________________________________________________________________________ #
             if debug_print:
                 print(f'shared_color_key: "{shared_color_key}"')
+
+            # 'color_discrete_sequence'
+            # Always ensure categorical helper runs to create the duplicated _col_<key> even if a color sequence was provided
             a_kwargs_update_dict = _subfn_build_categorical_color_kwargs(shared_color_key=shared_color_key)
+            if 'color_discrete_sequence' in common_plot_kwargs:
+                print(f'already have common_plot_kwargs["color_discrete_sequence"]: {common_plot_kwargs["color_discrete_sequence"]}, will not override!')
+                # Preserve existing sequence, but still use returned category_orders and color column mapping
+                a_kwargs_update_dict.pop('color_discrete_sequence', None)
             common_plot_kwargs.update(a_kwargs_update_dict)
-        
+            
             # shared_color_key: 'time_bin_size'
             
 
@@ -598,7 +660,7 @@ def plotly_pre_post_delta_scatter(data_results_df: pd.DataFrame, data_context: O
     # Pre-Delta Histogram
     # trace_name_prefix:str = 'trace_pre_delta_hist'
     trace_name_prefix:str = ''
-    _tmp_pre_delta_fig = px.histogram(pre_delta_df, y=histogram_variable_name, **common_plot_kwargs, **hist_kwargs, title=pre_delta_label)
+    _tmp_pre_delta_fig = px.histogram(pre_delta_df, y=histogram_variable_name, **(common_plot_kwargs | hist_kwargs), title=pre_delta_label)
     for a_trace in _tmp_pre_delta_fig.data:
         a_trace.xbins.start = 0.05
         a_trace.xbins.end = 0.95
@@ -622,7 +684,7 @@ def plotly_pre_post_delta_scatter(data_results_df: pd.DataFrame, data_context: O
             )
     else:
         assert px_scatter_kwargs is not None
-        _tmp_scatter_fig = px.scatter(data_results_df, **common_plot_kwargs, **px_scatter_kwargs)
+        _tmp_scatter_fig = px.scatter(data_results_df, **(common_plot_kwargs | px_scatter_kwargs))
         for i, a_trace in enumerate(_tmp_scatter_fig.data):
             a_trace.marker.line.width = 0 
             a_trace.marker.opacity = 0.5
@@ -633,10 +695,17 @@ def plotly_pre_post_delta_scatter(data_results_df: pd.DataFrame, data_context: O
 
     # Post-Delta Histogram
     trace_name_prefix:str = 'trace_post_delta_hist'
-    _tmp_post_delta_fig = px.histogram(post_delta_df, y=histogram_variable_name, **common_plot_kwargs, **hist_kwargs, title=post_delta_label)
+    _tmp_post_delta_fig = px.histogram(post_delta_df, y=histogram_variable_name, **(common_plot_kwargs | hist_kwargs), title=post_delta_label)
+    
+    # range_y
+
     for a_trace in _tmp_post_delta_fig.data:
-        a_trace.xbins.start = 0.05
-        a_trace.xbins.end = 0.95
+        # a_trace.xbins.start = 0.05
+        # a_trace.xbins.end = 0.95
+        # a_trace.xbins.size = 0.1
+        ## #TODO 2025-07-03 21:42: - [ ] plotly histogram for data strictly between 0.0-1.0 has its outermost bins from -[0.5-0.5], ... [0.95, 1.05]. How can I fix this?   
+        a_trace.xbins.start = 0.0
+        a_trace.xbins.end = 1.0
         a_trace.xbins.size = 0.1
         a_full_trace_name: str = '_'.join([v for v in [trace_name_prefix, a_trace.name] if (len(v)>0)]) ## build new trace name
         PlotlyFigureContainer.add_trace_with_legend_handling(
@@ -647,6 +716,11 @@ def plotly_pre_post_delta_scatter(data_results_df: pd.DataFrame, data_context: O
     if forced_range_y is not None:
         fig.update_layout(yaxis=dict(range=forced_range_y))
     fig.update_layout(yaxis=dict(range=forced_range_y), barmode='overlay')
+
+    # fig = fig.update_yaxes(col=1, range=[-0.05, 1.05])
+    # fig = fig.update_yaxes(col=3, range=[-0.05, 1.05])
+    # # df_filter.figure_widget = df_filter.figure_widget.update_yaxes(col=2, range=[0.0, 1.0])
+    # fig = fig.update_yaxes(col=2, range=[0.0, 5.0])
 
     # Add epoch shapes if provided
     if time_delta_tuple is not None:
@@ -696,6 +770,22 @@ def plotly_pre_post_delta_scatter(data_results_df: pd.DataFrame, data_context: O
         title_text="Probability of Short Track", row=1, col=1, range=[0, 1],
         autorange=False, fixedrange=True
     )
+    
+
+    ## Override y-axis for whole row
+    fig.update_yaxes(row=1, range=[-0.05, 1.05], autorange=False, fixedrange=True)
+    
+    
+    # fig.update_yaxes(
+    #     title_text="Probability of Short Track", row=1, col=0, range=[0, 1],
+    #     autorange=False, fixedrange=True
+    # )
+
+    # fig.update_yaxes(
+    #     title_text="Probability of Short Track", row=1, col=2, range=[0, 1],
+    #     autorange=False, fixedrange=True
+    # )
+
 
     # Add super title if provided
     if figure_sup_huge_title_text is not None:
@@ -717,6 +807,7 @@ def plotly_pre_post_delta_scatter(data_results_df: pd.DataFrame, data_context: O
                 name='figure_sup_huge_title_text_annotation',
             )
         else:
+            # Horizontal (Left Edge) Supertitle __________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
             suptitle_kwarg_fig_width_dict = {
                 1080: {'annotation_kwargs': dict(x=-0.11,), 'line_x_pos': -0.078},
                 1800: {'annotation_kwargs': dict(x=-0.057,), 'line_x_pos': -0.04},
@@ -742,8 +833,6 @@ def plotly_pre_post_delta_scatter(data_results_df: pd.DataFrame, data_context: O
             )
             line_x_pos: float = suptitle_kwarg_fig_width_dict[curr_fig_width]['line_x_pos']
 
-
-            # if did_create_new_figure:
             fig.add_annotation(
                 text=figure_sup_huge_title_text,
                 **annotation_kwargs,
@@ -786,7 +875,7 @@ def plotly_pre_post_delta_scatter(data_results_df: pd.DataFrame, data_context: O
 
 
 @function_attributes(short_name=None, tags=['plotly', 'helper', 'epoch', 'track'], input_requires=[], output_provides=[], uses=[], used_by=['_helper_build_figure'], creation_date='2024-03-01 13:58', related_items=[])
-def plotly_helper_add_epoch_shapes(fig, scatter_column_index: int, t_start: float, t_split:float, t_end: float, is_dark_mode: bool = True, total_rows:int=1):
+def plotly_helper_add_epoch_shapes(fig, scatter_column_index: int, t_start: float, t_split:float, t_end: float, is_dark_mode: bool = True, total_rows:int=1, epoch_text_labels_kwargs=None):
     """ adds shapes representing the epochs to the scatter plot at index scatter_column_index
 
         from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import plotly_helper_add_epoch_shapes
@@ -795,6 +884,9 @@ def plotly_helper_add_epoch_shapes(fig, scatter_column_index: int, t_start: floa
 
     """
     from pyphoplacecellanalysis.General.Model.Configs.LongShortDisplayConfig import LongShortDisplayConfigManager
+
+    # epoch_text_labels_kwargs = dict(size=9, family="Arial") | (epoch_text_labels_kwargs or {}) #TODO 2025-07-03 19:05: - [ ] Corresponding to an exported size of 6.75pt
+    epoch_text_labels_kwargs = dict(size=6.666666666666666, family="Arial") | (epoch_text_labels_kwargs or {}) #TODO 2025-07-03 19:05: - [ ] Corresponding to an exported size of 5pt
 
     _extras_output_dict = {}
     ## Get the track configs for the colors:
@@ -825,8 +917,8 @@ def plotly_helper_add_epoch_shapes(fig, scatter_column_index: int, t_start: floa
         
         # fig.add_hrect(y0=0.9, y1=2.6, line_width=0, fillcolor="red", opacity=0.2)
 
-        fig.add_vrect(x0=t_start, x1=t_split, label=dict(text="Long", textposition="top center", font=dict(size=20, family="Times New Roman"), ), layer="below", opacity=0.5, line_width=1, **long_epoch_kwargs, **row_column_kwargs, name=f"long_region_{row}") # , fillcolor="green", opacity=0.25
-        fig.add_vrect(x0=t_split, x1=t_end, label=dict(text="Short", textposition="top center", font=dict(size=20, family="Times New Roman"), ), layer="below", opacity=0.5, line_width=1, **short_epoch_kwargs, **row_column_kwargs, name=f"short_region_{row}")
+        fig.add_vrect(x0=t_start, x1=t_split, label=dict(text="Long", textposition="top center", font=epoch_text_labels_kwargs, ), layer="below", opacity=0.5, line_width=1, **long_epoch_kwargs, **row_column_kwargs, name=f"long_region_{row}") # , fillcolor="green", opacity=0.25
+        fig.add_vrect(x0=t_split, x1=t_end, label=dict(text="Short", textposition="top center", font=epoch_text_labels_kwargs, ), layer="below", opacity=0.5, line_width=1, **short_epoch_kwargs, **row_column_kwargs, name=f"short_region_{row}")
         
         # _extras_output_dict[f"long_region_{row}"] = blue_shape
         # _extras_output_dict[f"short_region_{row}"] = red_shape

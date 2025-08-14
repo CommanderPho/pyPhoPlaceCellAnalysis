@@ -3,6 +3,7 @@ Demonstrate creation of a custom graphic (a candlestick plot)
 
 """
 import copy
+from typing import Callable, Tuple
 import numpy as np
 import pyphoplacecellanalysis.External.pyqtgraph as pg
 from pyphoplacecellanalysis.External.pyqtgraph import QtCore, QtGui, QtWidgets
@@ -28,28 +29,44 @@ class IntervalRectsItem(pg.GraphicsObject):
     TODO: BUG: Right click currently invokes the custom example context menu that allows you to select between blue/green etc. This is triggered even when you right click on an area that's between the actual interval rect items (when you click in the blank-space between rects).
         Want this to only be triggered when on an interval. And pass through to its parent otherwise.     
         
+    #2025-07-22 18:18: - [x] Custom hover info tooltip text currently works, and the custom formatting function can be set via `self.format_item_tooltip_fn = _custom_format_tooltip_for_rect_data`. An example is provided in 
             
     Usage:
-        from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.GraphicsObjects.IntervalRectsItem import IntervalRectsItem, main
-        active_interval_rects_item = IntervalRectsItem(data)
+        Example 1 (basic):
+            from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.GraphicsObjects.IntervalRectsItem import IntervalRectsItem, main
+            active_interval_rects_item = IntervalRectsItem(data)
+            
+            ## Add the active_interval_rects_item to the main_plot_widget: 
+            main_plot_widget = spike_raster_window.spike_raster_plt_2d.plots.main_plot_widget # PlotItem
+            main_plot_widget.addItem(active_interval_rects_item)
+
+            ## Remove the active_interval_rects_item:
+            main_plot_widget.removeItem(active_interval_rects_item)
+
+            
+        Example 2 (with custom tooltip function):
         
-        ## Add the active_interval_rects_item to the main_plot_widget: 
-        main_plot_widget = spike_raster_window.spike_raster_plt_2d.plots.main_plot_widget # PlotItem
-        main_plot_widget.addItem(active_interval_rects_item)
+            def _custom_format_tooltip_for_rect_data(rect_index: int, rect_data_tuple: Tuple) -> str:
+                start_t, series_vertical_offset, duration_t, series_height, pen, brush = rect_data_tuple
+                end_t = start_t + duration_t
+                tooltip_text = f"{name}[{rect_index}]\nStart: {start_t:.3f}\nEnd: {end_t:.3f}\nDuration: {duration_t:.3f}" # The tooltip is set generically here to 'PBEs', 'Replays' or whatever the dataseries name is
+                return tooltip_text
 
-        ## Remove the active_interval_rects_item:
-        main_plot_widget.removeItem(active_interval_rects_item)
 
+            # Build the rendered interval item:
+            new_interval_rects_item: IntervalRectsItem = Render2DEventRectanglesHelper.build_IntervalRectsItem_from_interval_datasource(interval_datasource, format_tooltip_fn=deepcopy(_custom_format_tooltip_for_rect_data))
+            new_interval_rects_item._current_hovered_item_tooltip_format_fn = deepcopy(_custom_format_tooltip_for_rect_data)
+        
     """
     pressed = False
     clickable = True
     hoverEnter = QtCore.pyqtSignal()
     hoverExit = QtCore.pyqtSignal()
     clicked = QtCore.pyqtSignal()
-    
+    ## data must have fields: start_t, series_vertical_offset, duration_t, series_height, pen, brush
 
 
-    def __init__(self, data):
+    def __init__(self, data, format_tooltip_fn=None):
         # menu creation is deferred because it is expensive and often
         # the user will never see the menu anyway.
         self.menu = None
@@ -59,7 +76,13 @@ class IntervalRectsItem(pg.GraphicsObject):
         self.data = data  ## data must have fields: start_t, series_vertical_offset, duration_t, series_height, pen, brush
         self.generatePicture()
         self.setAcceptHoverEvents(True)
-    
+        self._current_hovered_rect = None  # Track which rectangle is currently hovered
+        self._current_hovered_item_tooltip_format_fn = None
+        if format_tooltip_fn is None:
+            format_tooltip_fn = self._default_format_tooltip_for_rect_data
+        self._current_hovered_item_tooltip_format_fn = format_tooltip_fn
+
+
     def generatePicture(self):
         ## pre-computing a QPicture object allows paint() to run much more quickly, 
         ## rather than re-drawing the shapes every time.
@@ -91,6 +114,15 @@ class IntervalRectsItem(pg.GraphicsObject):
         ## (in this case, QPicture does all the work of computing the bouning rect for us)
         return QtCore.QRectF(self.picture.boundingRect())
 
+
+    @property
+    def format_item_tooltip_fn(self) -> Callable:
+        """The format_item_tooltip_fn property."""
+        return self._current_hovered_item_tooltip_format_fn
+    @format_item_tooltip_fn.setter
+    def format_item_tooltip_fn(self, value: Callable):
+        self._current_hovered_item_tooltip_format_fn = value
+
     ## Copy Constructors:
     def __copy__(self):
         independent_data_copy = RectangleRenderTupleHelpers.copy_data(self.data)
@@ -111,10 +143,35 @@ class IntervalRectsItem(pg.GraphicsObject):
             self.hoverEnter.emit()
 
 
+    def hoverMoveEvent(self, event):
+        """Handle hover move events to show tooltips for individual rectangles."""
+        if not self.clickable:
+            return
+            
+        # Get the position in item coordinates
+        pos = event.pos()
+        
+        # Find which rectangle (if any) contains this position
+        hovered_rect_index = self._get_rect_at_position(pos)
+        
+        if hovered_rect_index != self._current_hovered_rect:
+            self._current_hovered_rect = hovered_rect_index
+            
+            if hovered_rect_index is not None:
+                # Show tooltip for this rectangle
+                global_pos = event.screenPos()
+                self._show_tooltip_for_rect(hovered_rect_index, QtCore.QPoint(int(global_pos.x()), int(global_pos.y())))
+            else:
+                # Hide tooltip when not over any rectangle
+                QtWidgets.QToolTip.hideText()
+
     def hoverLeaveEvent(self, event):
         if self.clickable:
             self.hoverExit.emit()
-
+            # Hide tooltip when leaving the item
+            QtWidgets.QToolTip.hideText()
+            self._current_hovered_rect = None
+            
 
     def mousePressEvent(self, event):
         if self.clickable:
@@ -126,6 +183,75 @@ class IntervalRectsItem(pg.GraphicsObject):
             pressed = False
             self.clicked.emit()
 
+    # ==================================================================================================================================================================================================================================================================================== #
+    # Hover Event Handlers                                                                                                                                                                                                                                                                 #
+    # ==================================================================================================================================================================================================================================================================================== #
+    def _get_rect_at_position(self, pos):
+        """
+        Find which rectangle (if any) contains the given position.
+        Returns the index of the rectangle, or None if no rectangle contains the position.
+        
+        Args:
+            pos: QtCore.QPointF in item coordinates
+            
+        Returns:
+            int or None: Index of the rectangle containing the position, or None
+        """
+        for i, (start_t, series_vertical_offset, duration_t, series_height, pen, brush) in enumerate(self.data):
+            rect = QtCore.QRectF(start_t, series_vertical_offset, duration_t, series_height)
+            if rect.contains(pos):
+                return i
+        return None
+    
+    @classmethod
+    def _default_format_tooltip_for_rect_data(cls, rect_index: int, rect_data_tuple: Tuple) -> str:
+        """ rect_data_tuple = self.data[rect_index]
+        start_t, series_vertical_offset, duration_t, series_height, pen, brush = rect_data_tuple
+        """
+        start_t, series_vertical_offset, duration_t, series_height, pen, brush = rect_data_tuple
+        end_t = start_t + duration_t
+        tooltip_text = f"Item[{rect_index}]\nStart: {start_t:.3f}\nEnd: {end_t:.3f}\nDuration: {duration_t:.3f}"
+        return tooltip_text
+
+    def _show_tooltip_for_rect(self, rect_index, global_pos):
+        """
+        Show tooltip for the specified rectangle.
+        
+        Args:
+            rect_index: Index of the rectangle in self.data
+            global_pos: Global screen position for tooltip
+        """
+        if rect_index is None or rect_index >= len(self.data):
+            return
+        rect_data_tuple = self.data[rect_index]
+        assert self._current_hovered_item_tooltip_format_fn is not None, f"self._current_hovered_item_tooltip_format_fn is None!"
+        # tooltip_text: str = self._default_format_tooltip_for_rect_data(rect_index=rect_index, rect_data_tuple=rect_data_tuple)
+        tooltip_text: str = self._current_hovered_item_tooltip_format_fn(rect_index=rect_index, rect_data_tuple=rect_data_tuple)        
+        QtWidgets.QToolTip.showText(global_pos, tooltip_text)
+        
+    def setToolTip(self, text):
+        """
+        Override setToolTip to provide custom behavior.
+        
+        Args:
+            text: Tooltip text. If None or empty, enables per-rectangle tooltips.
+                  If provided, shows this static text for the entire item.
+        """
+        print(f'WARNING: EpochRenderingMixin.setTooltip(text: "{text}") was called, but this would set a single, static tooltip for the entire graphics item and is very unlikely to be what you want to do!')
+        raise NotImplementedError(f'WARNING: EpochRenderingMixin.setTooltip(text: "{text}") was called, but this would set a single, static tooltip for the entire graphics item and is very unlikely to be what you want to do!')
+        # self._custom_tooltip = text
+        
+        # if text:
+        #     # If tooltip text is provided, disable custom per-rectangle tooltips
+        #     self._use_custom_tooltips = False
+        #     # Call parent implementation to set static tooltip
+        #     super().setToolTip(text)
+        # else:
+        #     # If no text provided, enable custom per-rectangle tooltips
+        #     self._use_custom_tooltips = True
+        #     # Clear any existing static tooltip
+        #     super().setToolTip("")
+        
 
     # ==================================================================================================================== #
     # Context Menu and Interaction Handling                                                                                #

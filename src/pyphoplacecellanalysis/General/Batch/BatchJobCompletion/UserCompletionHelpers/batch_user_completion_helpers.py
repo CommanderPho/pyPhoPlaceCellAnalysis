@@ -505,7 +505,7 @@ def perform_sweep_decoding_time_bin_sizes_marginals_dfs_completion_function(self
     # adds columns: ['maze_id', 'is_LR_dir']
     t_start, t_delta, t_end = curr_active_pipeline.find_LongShortDelta_times()
     laps_obj: Laps = curr_active_pipeline.sess.laps
-    laps_obj.update_lap_dir_from_smoothed_velocity(pos_input=curr_active_pipeline.sess.position)
+    laps_obj.update_lap_dir_from_net_displacement(pos_input=curr_active_pipeline.sess.position)
     laps_obj.update_maze_id_if_needed(t_start=t_start, t_delta=t_delta, t_end=t_end)
     laps_df = laps_obj.to_dataframe()
     assert 'maze_id' in laps_df.columns, f"laps_df is still missing the 'maze_id' column after calling `laps_obj.update_maze_id_if_needed(...)`. laps_df.columns: {print(list(laps_df.columns))}"
@@ -1020,6 +1020,7 @@ def compute_and_export_session_trial_by_trial_performance_completion_function(se
     
         callback_outputs = _across_session_results_extended_dict['compute_and_export_session_trial_by_trial_performance_completion_function']
         a_trial_by_trial_result: TrialByTrialActivityResult = callback_outputs['a_trial_by_trial_result']
+        stability_df: pd.DataFrame = callback_outputs['stability_df']
         subset_neuron_IDs_dict = callback_outputs['subset_neuron_IDs_dict']
         subset_decode_results_dict = callback_outputs['subset_decode_results_dict']
         subset_decode_results_track_id_correct_performance_dict = callback_outputs['subset_decode_results_track_id_correct_performance_dict']
@@ -1030,6 +1031,12 @@ def compute_and_export_session_trial_by_trial_performance_completion_function(se
         filtered_laps_time_bin_marginals_df: pd.DataFrame = callback_outputs['subset_decode_results_time_bin_marginals_df_dict']['filtered_laps_time_bin_marginals_df']
         active_results: Dict[types.DecoderName, DecodedFilterEpochsResult] = deepcopy({k:v.decoder_result for k, v in _out_separate_decoder_results[0].items()})
 
+        neuron_group_split_stability_dfs_tuple = callback_outputs['neuron_group_split_stability_dfs_tuple']
+        neuron_group_split_stability_aclus_tuple = callback_outputs['neuron_group_split_stability_aclus_tuple']
+
+        appearing_stability_df, disappearing_stability_df, appearing_or_disappearing_stability_df, stable_both_stability_df, stable_neither_stability_df, stable_long_stability_df, stable_short_stability_df = neuron_group_split_stability_dfs_tuple
+        appearing_aclus, disappearing_aclus, appearing_or_disappearing_aclus, stable_both_aclus, stable_neither_aclus, stable_long_aclus, stable_short_aclus = neuron_group_split_stability_aclus_tuple
+        
     """
     import sys
     from pyphocorehelpers.print_helpers import get_now_day_str, get_now_rounded_time_str
@@ -1097,7 +1104,7 @@ def compute_and_export_session_trial_by_trial_performance_completion_function(se
         if rank_order_results is not None:
             minimum_inclusion_fr_Hz: float = rank_order_results.minimum_inclusion_fr_Hz
             included_qclu_values: List[int] = rank_order_results.included_qclu_values
-        else:        
+        else:
             ## get from parameters:
             minimum_inclusion_fr_Hz: float = curr_active_pipeline.global_computation_results.computation_config.rank_order_shuffle_analysis.minimum_inclusion_fr_Hz
             included_qclu_values: List[int] = curr_active_pipeline.global_computation_results.computation_config.rank_order_shuffle_analysis.included_qclu_values
@@ -1108,7 +1115,8 @@ def compute_and_export_session_trial_by_trial_performance_completion_function(se
         print(f'\tincluded_qclu_values: {included_qclu_values}')
     
         ## INPUTS: curr_active_pipeline, track_templates, global_epoch_name, (long_LR_epochs_obj, long_RL_epochs_obj, short_LR_epochs_obj, short_RL_epochs_obj)
-        any_decoder_neuron_IDs: NDArray = deepcopy(track_templates.any_decoder_neuron_IDs)
+        # any_decoder_neuron_IDs: NDArray = deepcopy(track_templates.any_decoder_neuron_IDs)
+        any_decoder_neuron_IDs = None ## set to None to auto-build them
         # long_epoch_name, short_epoch_name, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
 
         # ## Directional Trial-by-Trial Activity:
@@ -1116,12 +1124,30 @@ def compute_and_export_session_trial_by_trial_performance_completion_function(se
             # if `KeyError: 'pf1D_dt'` recompute
             curr_active_pipeline.perform_specific_computation(computation_functions_name_includelist=['pfdt_computation'], enabled_filter_names=None, fail_on_exception=True, debug_print=False)
 
-        active_pf_1D_dt: PfND_TimeDependent = deepcopy(curr_active_pipeline.computation_results[global_epoch_name].computed_data['pf1D_dt'])
+
+        ## Copy previously existing one:
+        # active_pf_1D_dt: PfND_TimeDependent = deepcopy(curr_active_pipeline.computation_results[global_epoch_name].computed_data['pf1D_dt'])
         # active_pf_2D_dt: PfND_TimeDependent = deepcopy(curr_active_pipeline.computation_results[global_epoch_name].computed_data['pf2D_dt'])
+                
+        ## REBUILD NEW pf1D_dt
+        computation_result = curr_active_pipeline.computation_results[global_epoch_name]
+        active_session, pf_computation_config = computation_result.sess, computation_result.computation_config.pf_params
+        active_session_spikes_df, active_pos, computation_config, active_epoch_placefields1D, active_epoch_placefields2D = active_session.spikes_df, active_session.position, pf_computation_config, None, None
+        included_epochs = deepcopy(pf_computation_config.computation_epochs)
+        should_force_recompute_placefields: bool = True
+
+        if any_decoder_neuron_IDs is None:
+            any_decoder_neuron_IDs = deepcopy(active_session_spikes_df.spikes.neuron_ids)
+            print(f'any_decoder_neuron_IDs is None, using all aclus in spikes_df:\n\tany_decoder_neuron_IDs: {any_decoder_neuron_IDs}')
+        # NOTE: even in TimeDependentPlacefieldSurpriseMode.STATIC_METHOD_ONLY a PfND_TimeDependent object is used to access its properties for the Static Method (although it isn't modified)
+        active_pf_1D_dt = PfND_TimeDependent(deepcopy(active_session_spikes_df), deepcopy(active_pos.linear_pos_obj), epochs=deepcopy(included_epochs),
+                                             config=deepcopy(pf_computation_config),
+                                            )
 
         active_pf_dt: PfND_TimeDependent = active_pf_1D_dt
+
         # Limit only to the placefield aclus:
-        active_pf_dt = active_pf_dt.get_by_id(ids=any_decoder_neuron_IDs)
+        # active_pf_dt = active_pf_dt.get_by_id(ids=any_decoder_neuron_IDs) ###TODO 2025-07-31 07:01: - [ ] DISABLE LIMITING TO JUST PLACEFIELDS 
 
         # long_LR_decoder, long_RL_decoder, short_LR_decoder, short_RL_decoder = track_templates.get_decoders()
 
@@ -1144,9 +1170,9 @@ def compute_and_export_session_trial_by_trial_performance_completion_function(se
 
         ## UNPACKING:
         directional_lap_epochs_dict: Dict[str, Epoch] = a_trial_by_trial_result.directional_lap_epochs_dict
-        stability_df, stability_dict = a_trial_by_trial_result.get_stability_df()
+        # stability_df = a_trial_by_trial_result.get_stability_df()
         # appearing_or_disappearing_aclus, appearing_stability_df, appearing_aclus, disappearing_stability_df, disappearing_aclus, (stable_both_aclus, stable_neither_aclus, stable_long_aclus, stable_short_aclus) = a_trial_by_trial_result.get_cell_stability_info(minimum_one_point_stability=0.6, zero_point_stability=0.1)
-        _neuron_group_split_stability_dfs_tuple, _neuron_group_split_stability_aclus_tuple = a_trial_by_trial_result.get_cell_stability_info(minimum_one_point_stability=minimum_one_point_stability, zero_point_stability=zero_point_stability)
+        stability_df, _neuron_group_split_stability_dfs_tuple, _neuron_group_split_stability_aclus_tuple = a_trial_by_trial_result.get_cell_stability_info(minimum_one_point_stability=minimum_one_point_stability, zero_point_stability=zero_point_stability)
         # appearing_stability_df, disappearing_stability_df, appearing_or_disappearing_stability_df, stable_both_stability_df, stable_neither_stability_df, stable_long_stability_df, stable_short_stability_df = _neuron_group_split_stability_dfs_tuple
         appearing_aclus, disappearing_aclus, appearing_or_disappearing_aclus, stable_both_aclus, stable_neither_aclus, stable_long_aclus, stable_short_aclus = _neuron_group_split_stability_aclus_tuple
         ## Compute the track_ID deoding performance for the merged_decoder with some cells left out:
@@ -1159,144 +1185,165 @@ def compute_and_export_session_trial_by_trial_performance_completion_function(se
         
         ## OUTPUTS: a_trial_by_trial_result
         callback_outputs.update(dict(a_trial_by_trial_result=a_trial_by_trial_result,
+                                     stability_df=deepcopy(stability_df),
                                      subset_neuron_IDs_dict=subset_neuron_IDs_dict,
                     neuron_group_split_stability_dfs_tuple=_neuron_group_split_stability_dfs_tuple, neuron_group_split_stability_aclus_tuple=_neuron_group_split_stability_aclus_tuple,
         ))
         
-
-        # ==================================================================================================================== #
-        # Performs for each subset of cells                                                                                    #
-        # ==================================================================================================================== #
-        _out_subset_decode_results_dict: Dict[str, Tuple] = {}
-        _out_subset_decode_results_track_id_correct_performance_dict: Dict[str, float] = {}
-        for a_subset_name, a_neuron_IDs_subset in subset_neuron_IDs_dict.items():
-            has_valid_result: bool = False
-            if len(a_neuron_IDs_subset) > 0:
-                try:
-                    _out_subset_decode_results_dict[a_subset_name] = _perform_run_rigorous_decoder_performance_assessment(curr_active_pipeline=curr_active_pipeline, included_neuron_IDs=a_neuron_IDs_subset, active_laps_decoding_time_bin_size=active_laps_decoding_time_bin_size)
-                    ## extract results:
-                    complete_decoded_context_correctness_tuple, laps_marginals_df, all_directional_pf1D_Decoder, all_test_epochs_df, test_all_directional_decoder_result, all_directional_laps_filter_epochs_decoder_result, _out_separate_decoder_results = _out_subset_decode_results_dict[a_subset_name]
-                    (is_decoded_track_correct, is_decoded_dir_correct, are_both_decoded_properties_correct), (percent_laps_track_identity_estimated_correctly, percent_laps_direction_estimated_correctly, percent_laps_estimated_correctly) = complete_decoded_context_correctness_tuple
-                    _out_subset_decode_results_track_id_correct_performance_dict[a_subset_name] = float(percent_laps_track_identity_estimated_correctly)
-                    has_valid_result = True
-                except ValueError as err:
-                    # empty pfs: ValueError: need at least one array to concatenate
-                    has_valid_result = False
-                except BaseException as err:
-                    raise
-
-            if (not has_valid_result):
-                ## no result, initialize the key to empty/bad values:
-                _out_subset_decode_results_dict[a_subset_name] = None
-                _out_subset_decode_results_track_id_correct_performance_dict[a_subset_name] = np.nan
-
-        _out_subset_decode_results_track_id_correct_performance_dict
-
-        # ## OUTPUTS: `_out_subset_decode_results_track_id_correct_performance_dict`
-        # {'any_decoder': 0.8351648351648352,
-        #  'stable_both': 0.7692307692307693,
-        #  'stable_neither': nan,
-        #  'stable_long': 0.8131868131868132,
-        #  'stable_short': 0.8241758241758241,
-        #  'appearing_or_disappearing': 0.6593406593406593,
-        #  'appearing': 0.7142857142857143,
-        #  'disappearing': 0.6043956043956044}
-
-        callback_outputs['subset_decode_results_track_id_correct_performance_dict'] = _out_subset_decode_results_track_id_correct_performance_dict
-        callback_outputs['subset_decode_results_dict'] = _out_subset_decode_results_dict
-        
-        for a_subset_name, a_neuron_IDs_subset in subset_neuron_IDs_dict.items():
-            percent_laps_track_identity_estimated_correctly: float = (round(_out_subset_decode_results_track_id_correct_performance_dict[a_subset_name], ndigits=5) * 100.0)
-            print(f'aclu subset: "{a_subset_name}"\n\ta_neuron_IDs_subset: {a_neuron_IDs_subset}\n\tpercent_laps_track_identity_estimated_correctly: {percent_laps_track_identity_estimated_correctly} %')
-            
-
-
-        # ==================================================================================================================== #
-        # Process Outputs to get marginals                                                                                     #
-        # ==================================================================================================================== #
-        print(f'\t computing time_bin marginal for context: {curr_session_context}...')
-
-        #TODO 2024-10-09 09:08: - [ ] Could easily do for each set of cells by looping through `_out_subset_decode_results_dict` dict
-        callback_outputs['subset_decode_results_time_bin_marginals_df_dict'] = None
-        
-        (complete_decoded_context_correctness_tuple, laps_marginals_df, all_directional_pf1D_Decoder, all_test_epochs_df, test_all_directional_decoder_result, all_directional_laps_filter_epochs_decoder_result, _out_separate_decoder_results)  = _out_subset_decode_results_dict['any_decoder'] ## get the result for all cells
-        
-
-        ## INPUTS: all_directional_laps_filter_epochs_decoder_result
-        transfer_column_names_list: List[str] = ['maze_id', 'lap_dir', 'lap_id']
-        TIME_OVERLAP_PREVENTION_EPSILON: float = 1e-12
-        (laps_directional_marginals_tuple, laps_track_identity_marginals_tuple, laps_non_marginalized_decoder_marginals_tuple), laps_marginals_df = all_directional_laps_filter_epochs_decoder_result.compute_marginals(epoch_idx_col_name='lap_idx', epoch_start_t_col_name='lap_start_t',
-                                                                                                                                                            additional_transfer_column_names=['start','stop','label','duration','lap_id','lap_dir','maze_id','is_LR_dir'])
-        laps_directional_marginals, laps_directional_all_epoch_bins_marginal, laps_most_likely_direction_from_decoder, laps_is_most_likely_direction_LR_dir  = laps_directional_marginals_tuple
-        laps_track_identity_marginals, laps_track_identity_all_epoch_bins_marginal, laps_most_likely_track_identity_from_decoder, laps_is_most_likely_track_identity_Long = laps_track_identity_marginals_tuple
-        non_marginalized_decoder_marginals, non_marginalized_decoder_all_epoch_bins_marginal, most_likely_decoder_idxs, non_marginalized_decoder_all_epoch_bins_decoder_probs_df = laps_non_marginalized_decoder_marginals_tuple
-        laps_time_bin_marginals_df: pd.DataFrame = all_directional_laps_filter_epochs_decoder_result.build_per_time_bin_marginals_df(active_marginals_tuple=(laps_directional_marginals, laps_track_identity_marginals, non_marginalized_decoder_marginals),
-                                                                                                                                    columns_tuple=(['P_LR', 'P_RL'], ['P_Long', 'P_Short'], ['long_LR', 'long_RL', 'short_LR', 'short_RL']), transfer_column_names_list=transfer_column_names_list)
-        laps_time_bin_marginals_df['start'] = laps_time_bin_marginals_df['start'] + TIME_OVERLAP_PREVENTION_EPSILON ## ENSURE NON-OVERLAPPING
-
-        ## INPUTS: laps_time_bin_marginals_df
-        # active_min_num_unique_aclu_inclusions_requirement: int = track_templates.min_num_unique_aclu_inclusions_requirement(curr_active_pipeline, required_min_percentage_of_active_cells=0.33333333333333)
-        active_min_num_unique_aclu_inclusions_requirement = None # must be none for individual `time_bin` periods
-        filtered_laps_time_bin_marginals_df, active_spikes_df = co_filter_epochs_and_spikes(active_spikes_df=get_proper_global_spikes_df(curr_active_pipeline, minimum_inclusion_fr_Hz=curr_active_pipeline.global_computation_config.rank_order_shuffle_analysis.minimum_inclusion_fr_Hz, included_qclu_values=included_qclu_values),
-                                                                        active_epochs_df=laps_time_bin_marginals_df, included_aclus=track_templates.any_decoder_neuron_IDs, min_num_unique_aclu_inclusions=active_min_num_unique_aclu_inclusions_requirement,
-                                                                        epoch_id_key_name='lap_individual_time_bin_id', no_interval_fill_value=-1, add_unique_aclus_list_column=True, drop_non_epoch_spikes=True)
-        callback_outputs['subset_decode_results_time_bin_marginals_df_dict'] = {'filtered_laps_time_bin_marginals_df': filtered_laps_time_bin_marginals_df,
-                                                                                # 'laps_marginals_df': laps_marginals_df,
-        }
-
-        
-        # aclu subset: "any_decoder"
-        # 	a_neuron_IDs_subset: [  3   5   7   9  10  11  14  15  16  17  19  21  24  25  26  31  32  33  34  35  36  37  41  45  48  49  50  51  53  54  55  56  57  58  59  60  61  62  63  64  66  67  68  69  70  71  73  74  75  76  78  81  82  83  84  85  86  87  88  89  90  92  93  96  98 100 102 107 108]
-        # 	percent_laps_track_identity_estimated_correctly: 86.02199999999999 %
-        # aclu subset: "stable_both"
-        # 	a_neuron_IDs_subset: [  5   7   9  10  17  25  26  31  33  36  41  45  48  49  50  54  55  56  59  61  62  64  66  69  71  75  76  78  83  84  86  88  89  90  92  93  96 107 108]
-        # 	percent_laps_track_identity_estimated_correctly: 82.796 %
-        # aclu subset: "stable_neither"
-        # 	a_neuron_IDs_subset: [16 19 37 60 73 87]
-        # 	percent_laps_track_identity_estimated_correctly: 58.065 %
-        # aclu subset: "stable_long"
-        # 	a_neuron_IDs_subset: [  5   7   9  10  17  25  26  31  32  33  35  36  41  45  48  49  50  53  54  55  56  59  61  62  64  66  68  69  71  74  75  76  78  82  83  84  86  88  89  90  92  93  96 107 108]
-        # 	percent_laps_track_identity_estimated_correctly: 80.645 %
-        # aclu subset: "stable_short"
-        # 	a_neuron_IDs_subset: [  3   5   7   9  10  11  14  15  17  24  25  26  31  33  34  36  41  45  48  49  50  51  54  55  56  57  58  59  61  62  64  66  67  69  71  75  76  78  83  84  85  86  88  89  90  92  93  96 100 102 107 108]
-        # 	percent_laps_track_identity_estimated_correctly: 82.796 %
-        # aclu subset: "appearing_or_disappearing"
-        # 	a_neuron_IDs_subset: [ 3 11 14 15 24 34 35 51 58 67 74 82]
-        # 	percent_laps_track_identity_estimated_correctly: 75.26899999999999 %
-        # aclu subset: "appearing"
-        # 	a_neuron_IDs_subset: [ 3 11 14 15 24 34 51 58 67]
-        # 	percent_laps_track_identity_estimated_correctly: 76.344 %
-        # aclu subset: "disappearing"
-        # 	a_neuron_IDs_subset: [35 74 82]
-        # 	percent_laps_track_identity_estimated_correctly: 61.29 %
-
-        # stability_df
-
-        # a_trial_by_trial_result
-
-        # # Time-dependent
-        # long_pf1D_dt, short_pf1D_dt, global_pf1D_dt = long_results.pf1D_dt, short_results.pf1D_dt, global_results.pf1D_dt
-        # # long_pf2D_dt, short_pf2D_dt, global_pf2D_dt = long_results.pf2D_dt, short_results.pf2D_dt, global_results.pf2D_dt
-        # global_pf1D_dt: PfND_TimeDependent = global_results.pf1D_dt
-        # # global_pf2D_dt: PfND_TimeDependent = global_results.pf2D_dt
-        # _flat_z_scored_tuning_map_matrix, _flat_decoder_identity_arr = a_trial_by_trial_result.build_combined_decoded_epoch_z_scored_tuning_map_matrix() # .shape: (n_epochs, n_neurons, n_pos_bins) 
-        # modified_directional_active_lap_pf_results_dicts: Dict[types.DecoderName, TrialByTrialActivity] = a_trial_by_trial_result.build_separated_nan_filled_decoded_epoch_z_scored_tuning_map_matrix()
-        # # _flat_z_scored_tuning_map_matrix
-
-        ## OUTPUTS: override_active_neuron_IDs
-
-
-        print(f'\t\t done (success).')
-
     except Exception as e:
         exception_info = sys.exc_info()
         err = CapturedException(e, exception_info)
-        print(f"WARN: on_complete_success_execution_session: encountered exception {err} while performing .compute_and_export_session_trial_by_trial_performance_completion_function(...) for curr_session_context: {curr_session_context}")
-        # if self.fail_on_exception:
-        #     raise e.exc
+        print(f"WARN: encountered exception {err} while performing .compute_and_export_session_trial_by_trial_performance_completion_function(...) - PHASE I\n\tfor curr_session_context: {curr_session_context}")
+        if self.fail_on_exception:
+            raise
+            # raise e.exc
         # _out_inst_fr_comps = None
         neuron_replay_stats_df = None
         pass
+    
+
+    # ==================================================================================================================================================================================================================================================================================== #
+    # PHASE II                                                                                                                                                                                                                                                                             #
+    # ==================================================================================================================================================================================================================================================================================== #
+    callback_outputs['subset_decode_results_track_id_correct_performance_dict'] = None
+    callback_outputs['subset_decode_results_dict'] = None
+    callback_outputs['subset_decode_results_time_bin_marginals_df_dict'] = None
+        
+    # try:        
+    #     # ==================================================================================================================== #
+    #     # Performs for each subset of cells                                                                                    #
+    #     # ==================================================================================================================== #
+    #     _out_subset_decode_results_dict: Dict[str, Tuple] = {}
+    #     _out_subset_decode_results_track_id_correct_performance_dict: Dict[str, float] = {}
+    #     for a_subset_name, a_neuron_IDs_subset in subset_neuron_IDs_dict.items():
+    #         has_valid_result: bool = False
+    #         if len(a_neuron_IDs_subset) > 0:
+    #             try:
+    #                 _out_subset_decode_results_dict[a_subset_name] = _perform_run_rigorous_decoder_performance_assessment(curr_active_pipeline=curr_active_pipeline, included_neuron_IDs=a_neuron_IDs_subset, active_laps_decoding_time_bin_size=active_laps_decoding_time_bin_size)
+    #                 ## extract results:
+    #                 complete_decoded_context_correctness_tuple, laps_marginals_df, all_directional_pf1D_Decoder, all_test_epochs_df, test_all_directional_decoder_result, all_directional_laps_filter_epochs_decoder_result, _out_separate_decoder_results = _out_subset_decode_results_dict[a_subset_name]
+    #                 (is_decoded_track_correct, is_decoded_dir_correct, are_both_decoded_properties_correct), (percent_laps_track_identity_estimated_correctly, percent_laps_direction_estimated_correctly, percent_laps_estimated_correctly) = complete_decoded_context_correctness_tuple
+    #                 _out_subset_decode_results_track_id_correct_performance_dict[a_subset_name] = float(percent_laps_track_identity_estimated_correctly)
+    #                 has_valid_result = True
+    #             except ValueError as err:
+    #                 # empty pfs: ValueError: need at least one array to concatenate
+    #                 has_valid_result = False
+    #             except Exception as err:
+    #                 raise
+
+    #         if (not has_valid_result):
+    #             ## no result, initialize the key to empty/bad values:
+    #             _out_subset_decode_results_dict[a_subset_name] = None
+    #             _out_subset_decode_results_track_id_correct_performance_dict[a_subset_name] = np.nan
+
+    #     _out_subset_decode_results_track_id_correct_performance_dict
+
+    #     # ## OUTPUTS: `_out_subset_decode_results_track_id_correct_performance_dict`
+    #     # {'any_decoder': 0.8351648351648352,
+    #     #  'stable_both': 0.7692307692307693,
+    #     #  'stable_neither': nan,
+    #     #  'stable_long': 0.8131868131868132,
+    #     #  'stable_short': 0.8241758241758241,
+    #     #  'appearing_or_disappearing': 0.6593406593406593,
+    #     #  'appearing': 0.7142857142857143,
+    #     #  'disappearing': 0.6043956043956044}
+
+    #     callback_outputs['subset_decode_results_track_id_correct_performance_dict'] = _out_subset_decode_results_track_id_correct_performance_dict
+    #     callback_outputs['subset_decode_results_dict'] = _out_subset_decode_results_dict
+        
+    #     for a_subset_name, a_neuron_IDs_subset in subset_neuron_IDs_dict.items():
+    #         percent_laps_track_identity_estimated_correctly: float = (round(_out_subset_decode_results_track_id_correct_performance_dict[a_subset_name], ndigits=5) * 100.0)
+    #         print(f'aclu subset: "{a_subset_name}"\n\ta_neuron_IDs_subset: {a_neuron_IDs_subset}\n\tpercent_laps_track_identity_estimated_correctly: {percent_laps_track_identity_estimated_correctly} %')
+            
+
+
+    #     # ==================================================================================================================== #
+    #     # Process Outputs to get marginals                                                                                     #
+    #     # ==================================================================================================================== #
+    #     print(f'\t computing time_bin marginal for context: {curr_session_context}...')
+
+    #     #TODO 2024-10-09 09:08: - [ ] Could easily do for each set of cells by looping through `_out_subset_decode_results_dict` dict
+    #     callback_outputs['subset_decode_results_time_bin_marginals_df_dict'] = None
+        
+    #     (complete_decoded_context_correctness_tuple, laps_marginals_df, all_directional_pf1D_Decoder, all_test_epochs_df, test_all_directional_decoder_result, all_directional_laps_filter_epochs_decoder_result, _out_separate_decoder_results)  = _out_subset_decode_results_dict['any_decoder'] ## get the result for all cells
+        
+
+    #     ## INPUTS: all_directional_laps_filter_epochs_decoder_result
+    #     transfer_column_names_list: List[str] = ['maze_id', 'lap_dir', 'lap_id']
+    #     TIME_OVERLAP_PREVENTION_EPSILON: float = 1e-12
+    #     (laps_directional_marginals_tuple, laps_track_identity_marginals_tuple, laps_non_marginalized_decoder_marginals_tuple), laps_marginals_df = all_directional_laps_filter_epochs_decoder_result.compute_marginals(epoch_idx_col_name='lap_idx', epoch_start_t_col_name='lap_start_t',
+    #                                                                                                                                                         additional_transfer_column_names=['start','stop','label','duration','lap_id','lap_dir','maze_id','is_LR_dir'])
+    #     laps_directional_marginals, laps_directional_all_epoch_bins_marginal, laps_most_likely_direction_from_decoder, laps_is_most_likely_direction_LR_dir  = laps_directional_marginals_tuple
+    #     laps_track_identity_marginals, laps_track_identity_all_epoch_bins_marginal, laps_most_likely_track_identity_from_decoder, laps_is_most_likely_track_identity_Long = laps_track_identity_marginals_tuple
+    #     non_marginalized_decoder_marginals, non_marginalized_decoder_all_epoch_bins_marginal, most_likely_decoder_idxs, non_marginalized_decoder_all_epoch_bins_decoder_probs_df = laps_non_marginalized_decoder_marginals_tuple
+    #     laps_time_bin_marginals_df: pd.DataFrame = all_directional_laps_filter_epochs_decoder_result.build_per_time_bin_marginals_df(active_marginals_tuple=(laps_directional_marginals, laps_track_identity_marginals, non_marginalized_decoder_marginals),
+    #                                                                                                                                 columns_tuple=(['P_LR', 'P_RL'], ['P_Long', 'P_Short'], ['long_LR', 'long_RL', 'short_LR', 'short_RL']), transfer_column_names_list=transfer_column_names_list)
+    #     laps_time_bin_marginals_df['start'] = laps_time_bin_marginals_df['start'] + TIME_OVERLAP_PREVENTION_EPSILON ## ENSURE NON-OVERLAPPING
+
+    #     ## INPUTS: laps_time_bin_marginals_df
+    #     # active_min_num_unique_aclu_inclusions_requirement: int = track_templates.min_num_unique_aclu_inclusions_requirement(curr_active_pipeline, required_min_percentage_of_active_cells=0.33333333333333)
+    #     active_min_num_unique_aclu_inclusions_requirement = None # must be none for individual `time_bin` periods
+    #     filtered_laps_time_bin_marginals_df, active_spikes_df = co_filter_epochs_and_spikes(active_spikes_df=get_proper_global_spikes_df(curr_active_pipeline, minimum_inclusion_fr_Hz=curr_active_pipeline.global_computation_config.rank_order_shuffle_analysis.minimum_inclusion_fr_Hz, included_qclu_values=included_qclu_values),
+    #                                                                     active_epochs_df=laps_time_bin_marginals_df, included_aclus=track_templates.any_decoder_neuron_IDs, min_num_unique_aclu_inclusions=active_min_num_unique_aclu_inclusions_requirement,
+    #                                                                     epoch_id_key_name='lap_individual_time_bin_id', no_interval_fill_value=-1, add_unique_aclus_list_column=True, drop_non_epoch_spikes=True)
+    #     callback_outputs['subset_decode_results_time_bin_marginals_df_dict'] = {'filtered_laps_time_bin_marginals_df': filtered_laps_time_bin_marginals_df,
+    #                                                                             # 'laps_marginals_df': laps_marginals_df,
+    #     }
+
+        
+    #     # aclu subset: "any_decoder"
+    #     # 	a_neuron_IDs_subset: [  3   5   7   9  10  11  14  15  16  17  19  21  24  25  26  31  32  33  34  35  36  37  41  45  48  49  50  51  53  54  55  56  57  58  59  60  61  62  63  64  66  67  68  69  70  71  73  74  75  76  78  81  82  83  84  85  86  87  88  89  90  92  93  96  98 100 102 107 108]
+    #     # 	percent_laps_track_identity_estimated_correctly: 86.02199999999999 %
+    #     # aclu subset: "stable_both"
+    #     # 	a_neuron_IDs_subset: [  5   7   9  10  17  25  26  31  33  36  41  45  48  49  50  54  55  56  59  61  62  64  66  69  71  75  76  78  83  84  86  88  89  90  92  93  96 107 108]
+    #     # 	percent_laps_track_identity_estimated_correctly: 82.796 %
+    #     # aclu subset: "stable_neither"
+    #     # 	a_neuron_IDs_subset: [16 19 37 60 73 87]
+    #     # 	percent_laps_track_identity_estimated_correctly: 58.065 %
+    #     # aclu subset: "stable_long"
+    #     # 	a_neuron_IDs_subset: [  5   7   9  10  17  25  26  31  32  33  35  36  41  45  48  49  50  53  54  55  56  59  61  62  64  66  68  69  71  74  75  76  78  82  83  84  86  88  89  90  92  93  96 107 108]
+    #     # 	percent_laps_track_identity_estimated_correctly: 80.645 %
+    #     # aclu subset: "stable_short"
+    #     # 	a_neuron_IDs_subset: [  3   5   7   9  10  11  14  15  17  24  25  26  31  33  34  36  41  45  48  49  50  51  54  55  56  57  58  59  61  62  64  66  67  69  71  75  76  78  83  84  85  86  88  89  90  92  93  96 100 102 107 108]
+    #     # 	percent_laps_track_identity_estimated_correctly: 82.796 %
+    #     # aclu subset: "appearing_or_disappearing"
+    #     # 	a_neuron_IDs_subset: [ 3 11 14 15 24 34 35 51 58 67 74 82]
+    #     # 	percent_laps_track_identity_estimated_correctly: 75.26899999999999 %
+    #     # aclu subset: "appearing"
+    #     # 	a_neuron_IDs_subset: [ 3 11 14 15 24 34 51 58 67]
+    #     # 	percent_laps_track_identity_estimated_correctly: 76.344 %
+    #     # aclu subset: "disappearing"
+    #     # 	a_neuron_IDs_subset: [35 74 82]
+    #     # 	percent_laps_track_identity_estimated_correctly: 61.29 %
+
+    #     # stability_df
+
+    #     # a_trial_by_trial_result
+
+    #     # # Time-dependent
+    #     # long_pf1D_dt, short_pf1D_dt, global_pf1D_dt = long_results.pf1D_dt, short_results.pf1D_dt, global_results.pf1D_dt
+    #     # # long_pf2D_dt, short_pf2D_dt, global_pf2D_dt = long_results.pf2D_dt, short_results.pf2D_dt, global_results.pf2D_dt
+    #     # global_pf1D_dt: PfND_TimeDependent = global_results.pf1D_dt
+    #     # # global_pf2D_dt: PfND_TimeDependent = global_results.pf2D_dt
+    #     # _flat_z_scored_tuning_map_matrix, _flat_decoder_identity_arr = a_trial_by_trial_result.build_combined_decoded_epoch_z_scored_tuning_map_matrix() # .shape: (n_epochs, n_neurons, n_pos_bins) 
+    #     # modified_directional_active_lap_pf_results_dicts: Dict[types.DecoderName, TrialByTrialActivity] = a_trial_by_trial_result.build_separated_nan_filled_decoded_epoch_z_scored_tuning_map_matrix()
+    #     # # _flat_z_scored_tuning_map_matrix
+
+    #     ## OUTPUTS: override_active_neuron_IDs
+
+
+    #     print(f'\t\t done (success).')
+
+    # except (Exception, AssertionError) as e:
+    #     exception_info = sys.exc_info()
+    #     err = CapturedException(e, exception_info)
+    #     print(f"WARN: encountered exception {err} while performing .compute_and_export_session_trial_by_trial_performance_completion_function(...) - PHASE II\n\tfor curr_session_context: {curr_session_context}")
+    #     if self.fail_on_exception:
+    #         raise
+    #         # raise e.exc
+    #     # _out_inst_fr_comps = None
+    #     neuron_replay_stats_df = None
+    #     pass
 
 
     across_session_results_extended_dict['compute_and_export_session_trial_by_trial_performance_completion_function'] = callback_outputs
@@ -2019,8 +2066,8 @@ def figures_plot_cell_first_spikes_characteristics_completion_function(self, glo
 @function_attributes(short_name=None, tags=['recomputed_inst_firing_rate', 'inst_fr', 'independent'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-01-01 00:00', related_items=[])
 def compute_and_export_session_instantaneous_spike_rates_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict,
                                                                             #  instantaneous_time_bin_size_seconds_list:List[float]=[0.0005, 0.0009, 0.0015, 0.0025, 0.025], epoch_handling_mode:str='DropShorterMode',
-                                                                            instantaneous_time_bin_size_seconds_list:List[float]=[1000.0], epoch_handling_mode:str='UseAllEpochsMode', # single-bin per epoch
-                                                                            save_hdf:bool=True, save_pickle:bool=True, save_across_session_hdf:bool=False, 
+                                                                            instantaneous_time_bin_size_seconds_list:List[float]=[1000.0], minimum_inclusion_fr_Hz: Optional[float]=0.0, epoch_handling_mode:str='UseAllEpochsMode', # single-bin per epoch
+                                                                            save_hdf:bool=True, save_pickle:bool=True, save_across_session_hdf:bool=False, save_FAT_csv:bool=False, 
                                                                 ) -> dict:
     """  Computes the `InstantaneousSpikeRateGroupsComputation` for the pipleine (completely independent of the internal implementations), and exports it as several output files:
 
@@ -2038,11 +2085,16 @@ def compute_and_export_session_instantaneous_spike_rates_completion_function(sel
     ## previous `instantaneous_time_bin_size_seconds` values:
     0.0005    
     
+    inst_fr_comps: InstantaneousSpikeRateGroupsComputation = callback_outputs['recomputed_inst_fr_time_bin_dict'][1000.0]['inst_fr_comps']
+    
+    
+    subfn_callback_outputs['inst_fr_comps'] 
     
     """
     import sys
     from pyphocorehelpers.print_helpers import get_now_day_str, get_now_rounded_time_str
     from pyphocorehelpers.exception_helpers import ExceptionPrintingContext, CapturedException
+    from pyphocorehelpers.assertion_helpers import Assert
     from pyphoplacecellanalysis.General.Pipeline.Stages.Loading import saveData
     from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.LongShortTrackComputations import SingleBarResult, InstantaneousSpikeRateGroupsComputation
     from pyphoplacecellanalysis.SpecificResults.AcrossSessionResults import InstantaneousFiringRatesDataframeAccessor
@@ -2052,36 +2104,77 @@ def compute_and_export_session_instantaneous_spike_rates_completion_function(sel
         'recomputed_inst_fr_time_bin_dict': None,
     }
     
+    active_export_parent_output_path: Path = self.collected_outputs_path.resolve()
+    Assert.path_exists(active_export_parent_output_path)
+    ## OUTPUTS: active_export_parent_output_path
         
     def _subfn_single_time_bin_size_compute_and_export_session_instantaneous_spike_rates_completion_function(instantaneous_time_bin_size_seconds:float):
+        """ Captures: active_export_parent_output_path, curr_session_context, ...
+        """
         print(f'<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<')
         print(f'compute_and_export_session_instantaneous_spike_rates_completion_function(curr_session_context: {curr_session_context}, curr_session_basedir: {str(curr_session_basedir)}, instantaneous_time_bin_size_seconds: {instantaneous_time_bin_size_seconds}, ...)')
         
         subfn_callback_outputs = {
+            'inst_fr_comps': None, # the actual InstantaneousSpikeRateGroupsComputation
             'recomputed_inst_fr_comps_filepath': None, #'t_end': t_end   
             'recomputed_inst_fr_comps_h5_filepath': None,
+            'recomputed_inst_fr_comps_FAT_CSV_filepath': None,
             'common_across_session_h5': None,
+            
         }
         err = None
 
         try:
             print(f'\t doing specific instantaneous firing rate computation for context: {curr_session_context}...')
-            _out_recomputed_inst_fr_comps = InstantaneousSpikeRateGroupsComputation(instantaneous_time_bin_size_seconds=instantaneous_time_bin_size_seconds) # 3ms, 10ms
-            _out_recomputed_inst_fr_comps.compute(curr_active_pipeline=curr_active_pipeline, active_context=curr_active_pipeline.sess.get_context(), epoch_handling_mode=epoch_handling_mode)
+            _out_recomputed_inst_fr_comps: InstantaneousSpikeRateGroupsComputation = InstantaneousSpikeRateGroupsComputation(instantaneous_time_bin_size_seconds=instantaneous_time_bin_size_seconds) # 3ms, 10ms
+            _out_recomputed_inst_fr_comps.compute(curr_active_pipeline=curr_active_pipeline, active_context=curr_active_pipeline.sess.get_context(), epoch_handling_mode=epoch_handling_mode, minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz)
 
             # LxC_ReplayDeltaMinus, LxC_ReplayDeltaPlus, SxC_ReplayDeltaMinus, SxC_ReplayDeltaPlus = _out_inst_fr_comps.LxC_ReplayDeltaMinus, _out_inst_fr_comps.LxC_ReplayDeltaPlus, _out_inst_fr_comps.SxC_ReplayDeltaMinus, _out_inst_fr_comps.SxC_ReplayDeltaPlus
             # LxC_ThetaDeltaMinus, LxC_ThetaDeltaPlus, SxC_ThetaDeltaMinus, SxC_ThetaDeltaPlus = _out_inst_fr_comps.LxC_ThetaDeltaMinus, _out_inst_fr_comps.LxC_ThetaDeltaPlus, _out_inst_fr_comps.SxC_ThetaDeltaMinus, _out_inst_fr_comps.SxC_ThetaDeltaPlus
+
+            if _out_recomputed_inst_fr_comps is not None:
+                subfn_callback_outputs['inst_fr_comps'] = _out_recomputed_inst_fr_comps            
+
             print(f'\t\t done (success).')
 
-        except BaseException as e:
+        except Exception as e:
             exception_info = sys.exc_info()
             err = CapturedException(e, exception_info)
-            print(f"WARN: on_complete_success_execution_session: encountered exception {err} while trying to compute the instantaneous firing rates and set self.across_sessions_instantaneous_fr_dict[{curr_session_context}]")
+            print(f"WARN: compute_and_export_session_instantaneous_spike_rates_completion_function: encountered exception {err} while trying to compute the instantaneous firing rates and set self.across_sessions_instantaneous_fr_dict[{curr_session_context}]")
             # if self.fail_on_exception:
             #     raise e.exc
             # _out_inst_fr_comps = None
             _out_recomputed_inst_fr_comps = None
             pass
+
+
+        ## 2025-07-17 - FAT_df CSV saving:
+        if (_out_recomputed_inst_fr_comps is not None) and save_FAT_csv:
+            ## FAT_csv Saving:
+            ## Export to CSVs:
+            # FAT_df: pd.DataFrame = _out_recomputed_inst_fr_comps.get_comprehensive_dataframe()
+
+            recomputed_inst_fr_comps_FAT_CSV_filepath = None
+            try:
+                _csv_save_paths_dict = _out_recomputed_inst_fr_comps.export_as_FAT_df_CSV(active_export_parent_output_path=active_export_parent_output_path, owning_pipeline_reference=curr_active_pipeline, decoding_time_bin_size=_out_recomputed_inst_fr_comps.instantaneous_time_bin_size_seconds)
+                recomputed_inst_fr_comps_FAT_CSV_filepath = list(_csv_save_paths_dict.values())[0]
+                print(f'recomputed_inst_fr_comps_FAT_CSV_filepath: "{recomputed_inst_fr_comps_FAT_CSV_filepath}"\n')
+                was_write_good = True
+                subfn_callback_outputs['recomputed_inst_fr_comps_FAT_CSV_filepath'] = deepcopy(recomputed_inst_fr_comps_FAT_CSV_filepath)
+
+            except Exception as e:
+                exception_info = sys.exc_info()
+                err = CapturedException(e, exception_info)
+                print(f"ERROR: encountered exception {err} while trying to perform _out_recomputed_inst_fr_comps.export_as_FAT_df_CSV(...) for {curr_session_context}")
+                recomputed_inst_fr_comps_FAT_CSV_filepath = None # set to None because it failed.
+                if self.fail_on_exception:
+                    raise err.exc
+        else:
+            recomputed_inst_fr_comps_FAT_CSV_filepath = None
+
+        subfn_callback_outputs['recomputed_inst_fr_comps_FAT_CSV_filepath'] = recomputed_inst_fr_comps_FAT_CSV_filepath
+
+
 
 
         ## standalone saving:
@@ -2096,7 +2189,7 @@ def compute_and_export_session_instantaneous_spike_rates_completion_function(sel
                 was_write_good = True
                 subfn_callback_outputs['recomputed_inst_fr_comps_filepath'] = recomputed_inst_fr_comps_filepath
 
-            except BaseException as e:
+            except Exception as e:
                 exception_info = sys.exc_info()
                 err = CapturedException(e, exception_info)
                 print(f"ERROR: encountered exception {err} while trying to perform _out_recomputed_inst_fr_comps.save_data('{recomputed_inst_fr_comps_filepath}') for {curr_session_context}")
@@ -2120,7 +2213,7 @@ def compute_and_export_session_instantaneous_spike_rates_completion_function(sel
                 was_write_good = True
                 subfn_callback_outputs['recomputed_inst_fr_comps_h5_filepath'] = recomputed_inst_fr_comps_h5_filepath
 
-            except BaseException as e:
+            except Exception as e:
                 exception_info = sys.exc_info()
                 err = CapturedException(e, exception_info)
                 print(f"ERROR: encountered exception {err} while trying to perform _out_recomputed_inst_fr_comps.to_hdf('/recomputed_inst_fr_comps', '{recomputed_inst_fr_comps_h5_filepath}') for {curr_session_context}")
@@ -2133,6 +2226,7 @@ def compute_and_export_session_instantaneous_spike_rates_completion_function(sel
 
         ## common_across_session_h5
         if (_out_recomputed_inst_fr_comps is not None) and save_across_session_hdf:
+            ## #TODO 2025-06-11 06:39: - [ ] NOT THREAD/PARALLEL SAFE because they access the same output file
             common_across_session_h5_filename: str = f'{get_now_day_str()}_across_session_recomputed_inst_fr_comps.h5'
             common_file_path = self.collected_outputs_path.resolve().joinpath(common_across_session_h5_filename).resolve()
             print(f'common_file_path: "{common_file_path}"')
@@ -2141,7 +2235,7 @@ def compute_and_export_session_instantaneous_spike_rates_completion_function(sel
                 InstantaneousFiringRatesDataframeAccessor.add_results_to_inst_fr_results_table(inst_fr_comps=_out_recomputed_inst_fr_comps, curr_active_pipeline=curr_active_pipeline, common_file_path=common_file_path)
                 subfn_callback_outputs['common_across_session_h5'] = common_file_path
 
-            except BaseException as e:
+            except Exception as e:
                 exception_info = sys.exc_info()
                 err = CapturedException(e, exception_info)
                 print(f"ERROR: encountered exception {err} while trying to perform InstantaneousFiringRatesDataframeAccessor.add_results_to_inst_fr_results_table(..., common_file_path='{common_file_path}') for {curr_session_context}")
@@ -2162,7 +2256,7 @@ def compute_and_export_session_instantaneous_spike_rates_completion_function(sel
 
 
     across_session_results_extended_dict['compute_and_export_session_instantaneous_spike_rates_completion_function'] = callback_outputs
-    
+
     print(f'>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>')
     print(f'>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>')
 
@@ -2281,7 +2375,7 @@ class PostHocPipelineFixup:
                     will_change: bool = (_old_val != new_val) # Python's != operator returns True when comparing None with any non-None value
                     ## warn for direct comparison
                     if will_change:
-                        print(f'DEBUGWARN - direct comparison used for variables \n\tnew_val: {new_val} and \n\t{_old_val: _old_val}. and found (will_change == True)')
+                        print(f'DEBUGWARN - direct comparison used for variables \n\tnew_val: {new_val} and \n\t_old_val: {_old_val}. and found (will_change == True)')
                     return will_change
         
 
@@ -2433,11 +2527,53 @@ class PostHocPipelineFixup:
         # curr_active_pipeline.sess.config.grid_bin = constrained_grid_bin_sizes
         
         return did_any_change, change_dict
-        
+    
+
+    @classmethod
+    def _perform_required_recompute_on_change(cls, curr_active_pipeline):
+            """ called to actually perform a recomputation when changes are detected/required and it's not dry_run
+            """
+            ## if not dry_run, do the recomputations:
+            ## All invalidated ones:
+            computation_functions_name_includelist=['_perform_baseline_placefield_computation', '_perform_time_dependent_placefield_computation', '_perform_extended_statistics_computation',
+                                                '_perform_position_decoding_computation', 
+                                                '_perform_firing_rate_trends_computation',
+                                                '_perform_pf_find_ratemap_peaks_computation',
+                                                '_perform_time_dependent_pf_sequential_surprise_computation'
+                                                '_perform_two_step_position_decoding_computation',
+                                                # '_perform_recursive_latent_placefield_decoding'
+                                            ]  # '_perform_pf_find_ratemap_peaks_peak_prominence2d_computation'
+
+            # ## Only Essentials:
+            # computation_functions_name_includelist=['_perform_baseline_placefield_computation',
+            #                                         '_perform_time_dependent_placefield_computation',
+            #                                         '_perform_extended_statistics_computation',
+            #                                     '_perform_position_decoding_computation', 
+            #                                     '_perform_firing_rate_trends_computation',
+            #                                     # '_perform_pf_find_ratemap_peaks_computation',
+            #                                     # '_perform_time_dependent_pf_sequential_surprise_computation'
+            #                                     '_perform_two_step_position_decoding_computation',
+            #                                     # '_perform_recursive_latent_placefield_decoding'
+            #                                 ]  # '_perform_pf_find_ratemap_peaks_peak_prominence2d_computation'
+
+            # computation_functions_name_includelist=['_perform_baseline_placefield_computation']
+            # curr_active_pipeline.perform_computations(computation_functions_name_includelist=computation_functions_name_includelist, computation_functions_name_excludelist=None, fail_on_exception=True, debug_print=FalTruese, overwrite_extant_results=True) #, overwrite_extant_results=False  ], fail_on_exception=True, debug_print=False)
+            # curr_active_pipeline.perform_computations(computation_functions_name_includelist=computation_functions_name_includelist, computation_functions_name_excludelist=None, enabled_filter_names=[global_epoch_name], fail_on_exception=True, debug_print=True) # , overwrite_extant_results=False #, overwrite_extant_results=False  ], fail_on_exception=True, debug_print=False)
+
+            # long_epoch_name, short_epoch_name, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
+
+            # curr_active_pipeline.perform_specific_computation(computation_functions_name_includelist=['pf_computation', 'pfdt_computation'], enabled_filter_names=[global_epoch_name], fail_on_exception=True, debug_print=False)
+            # curr_active_pipeline.perform_specific_computation(computation_functions_name_includelist=['pf_computation'], enabled_filter_names=[global_epoch_name], fail_on_exception=True, debug_print=True)
+
+
+            # curr_active_pipeline.perform_specific_computation(computation_functions_name_includelist=computation_functions_name_includelist, enabled_filter_names=[global_epoch_name], fail_on_exception=True, debug_print=True)
+            curr_active_pipeline.perform_specific_computation(computation_functions_name_includelist=computation_functions_name_includelist, fail_on_exception=True, debug_print=True)
+            print(f'\trecomputation complete!')
+                        
 
     @function_attributes(short_name=None, tags=['MAIN', 'ESSENTIAL', 'UNUSED', 'grid_bin_bounds', 'grid_bin'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-02-12 19:50', related_items=[])
     @classmethod
-    def FINAL_FIX_GRID_BIN_BOUNDS(cls, curr_active_pipeline, force_recompute:bool=False, is_dry_run: bool=False, debug_skip_computations_only:bool=False):
+    def FINAL_FIX_GRID_BIN_BOUNDS(cls, curr_active_pipeline, force_recompute:bool=False, is_dry_run: bool=False, debug_skip_computations_only:bool=False, defer_required_compute: bool=False):
         """ perform all fixes regarding the grid_bin_bounds and grid_bin """
         print(f'\t !!!||||||||||||||||||> RUNNING `PostHocPipelineFixup.FINAL_FIX_GRID_BIN_BOUNDS(...)`:')
         correct_grid_bin_bounds = cls.get_hardcoded_known_good_grid_bin_bounds(curr_active_pipeline)
@@ -2454,41 +2590,11 @@ class PostHocPipelineFixup:
             else:
                 if (not is_dry_run):
                     ## if not dry_run, do the recomputations:
-                    ## All invalidated ones:
-                    computation_functions_name_includelist=['_perform_baseline_placefield_computation', '_perform_time_dependent_placefield_computation', '_perform_extended_statistics_computation',
-                                                        '_perform_position_decoding_computation', 
-                                                        '_perform_firing_rate_trends_computation',
-                                                        '_perform_pf_find_ratemap_peaks_computation',
-                                                        '_perform_time_dependent_pf_sequential_surprise_computation'
-                                                        '_perform_two_step_position_decoding_computation',
-                                                        # '_perform_recursive_latent_placefield_decoding'
-                                                    ]  # '_perform_pf_find_ratemap_peaks_peak_prominence2d_computation'
-
-                    # ## Only Essentials:
-                    # computation_functions_name_includelist=['_perform_baseline_placefield_computation',
-                    #                                         '_perform_time_dependent_placefield_computation',
-                    #                                         '_perform_extended_statistics_computation',
-                    #                                     '_perform_position_decoding_computation', 
-                    #                                     '_perform_firing_rate_trends_computation',
-                    #                                     # '_perform_pf_find_ratemap_peaks_computation',
-                    #                                     # '_perform_time_dependent_pf_sequential_surprise_computation'
-                    #                                     '_perform_two_step_position_decoding_computation',
-                    #                                     # '_perform_recursive_latent_placefield_decoding'
-                    #                                 ]  # '_perform_pf_find_ratemap_peaks_peak_prominence2d_computation'
-
-                    # computation_functions_name_includelist=['_perform_baseline_placefield_computation']
-                    # curr_active_pipeline.perform_computations(computation_functions_name_includelist=computation_functions_name_includelist, computation_functions_name_excludelist=None, fail_on_exception=True, debug_print=FalTruese, overwrite_extant_results=True) #, overwrite_extant_results=False  ], fail_on_exception=True, debug_print=False)
-                    # curr_active_pipeline.perform_computations(computation_functions_name_includelist=computation_functions_name_includelist, computation_functions_name_excludelist=None, enabled_filter_names=[global_epoch_name], fail_on_exception=True, debug_print=True) # , overwrite_extant_results=False #, overwrite_extant_results=False  ], fail_on_exception=True, debug_print=False)
-
-                    # long_epoch_name, short_epoch_name, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
-
-                    # curr_active_pipeline.perform_specific_computation(computation_functions_name_includelist=['pf_computation', 'pfdt_computation'], enabled_filter_names=[global_epoch_name], fail_on_exception=True, debug_print=False)
-                    # curr_active_pipeline.perform_specific_computation(computation_functions_name_includelist=['pf_computation'], enabled_filter_names=[global_epoch_name], fail_on_exception=True, debug_print=True)
-
-
-                    # curr_active_pipeline.perform_specific_computation(computation_functions_name_includelist=computation_functions_name_includelist, enabled_filter_names=[global_epoch_name], fail_on_exception=True, debug_print=True)
-                    curr_active_pipeline.perform_specific_computation(computation_functions_name_includelist=computation_functions_name_includelist, fail_on_exception=True, debug_print=True)
-                    print(f'\trecomputation complete!')
+                    if not defer_required_compute:
+                        cls._perform_required_recompute_on_change(curr_active_pipeline=curr_active_pipeline)
+                        print(f'\trecomputation complete!')
+                    else:
+                        print(f'\trecomputation required but defer_required_compute == True, so skipping until later phase.')
                 else:
                     print(f'\tWARNING: is_dry_run is true so no recompute will be done.')
                 ## END if debug_skip_computations_only....
@@ -2498,6 +2604,33 @@ class PostHocPipelineFixup:
             print(f'No grid bin bounds were changed. Everything should be up-to-date!')
 
         return (did_any_change, change_dict), correct_grid_bin_bounds
+
+
+    @function_attributes(short_name=None, tags=['laps'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-07-15 12:45', related_items=[])
+    @classmethod
+    def FINAL_FIX_LAPS_FROM_OVERRIDES(cls, curr_active_pipeline, force_recompute:bool=False, is_dry_run: bool=False, debug_skip_computations_only:bool=False) -> bool:
+        """ perform all fixes regarding any needed replacements for laps indicated in UserAnnotations """
+        print(f'\t !!!||||||||||||||||||> RUNNING `PostHocPipelineFixup.FINAL_FIX_LAPS_FROM_OVERRIDES(...)`:')
+        from neuropy.core.user_annotations import UserAnnotationsManager
+        # from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import override_laps
+        from neuropy.core.laps import Laps
+
+        override_laps_df: Optional[pd.DataFrame] = UserAnnotationsManager.get_hardcoded_laps_override_dict().get(curr_active_pipeline.get_session_context(), None)
+        if override_laps_df is None:
+            return False ## no changes
+        else:
+            ## non-None, override laps
+            print(f'\toverriding laps....')
+            override_laps_df['lap_id'] = override_laps_df.index + 1
+            override_laps_df['label'] = override_laps_df.index
+            ## OUTPUTS: override_laps_df
+            t_start, t_delta, t_end = curr_active_pipeline.find_LongShortDelta_times()
+            override_laps_obj: Laps = Laps(laps=override_laps_df)
+            override_laps_obj.update_lap_dir_from_net_displacement(pos_input=curr_active_pipeline.sess.position)
+            override_laps_obj.update_maze_id_if_needed(t_start=t_start, t_delta=t_delta, t_end=t_end)
+            override_laps_df = override_laps_obj.to_dataframe()
+
+            return curr_active_pipeline.override_laps(override_laps_df=override_laps_df, debug_print=True)
 
 
     # ==================================================================================================================== #
@@ -2537,12 +2670,35 @@ class PostHocPipelineFixup:
         print(f'starting `PostHocPipelineFixup.FINAL_UPDATE_ALL(...)`...')
 
         did_any_change: bool = False
-        (did_any_grid_bin_change, change_dict), correct_grid_bin_bounds = PostHocPipelineFixup.FINAL_FIX_GRID_BIN_BOUNDS(curr_active_pipeline=curr_active_pipeline, force_recompute=force_recompute, is_dry_run=is_dry_run)
 
         did_fixup_any_missing_basepath = PostHocPipelineFixup.FINAL_UPDATE_FILEPATHS(curr_active_pipeline=curr_active_pipeline)
 
         did_any_non_pbe_epochs_change = PostHocPipelineFixup.FINAL_UPDATE_NON_PBE_EPOCHS(curr_active_pipeline=curr_active_pipeline)
 
+        did_override_any_laps = PostHocPipelineFixup.FINAL_FIX_LAPS_FROM_OVERRIDES(curr_active_pipeline=curr_active_pipeline)
+
+        (did_any_grid_bin_change, change_dict), correct_grid_bin_bounds = PostHocPipelineFixup.FINAL_FIX_GRID_BIN_BOUNDS(curr_active_pipeline=curr_active_pipeline, force_recompute=force_recompute, is_dry_run=is_dry_run, defer_required_compute=True)
+
+        did_any_change = (did_any_grid_bin_change or did_fixup_any_missing_basepath or did_any_non_pbe_epochs_change or did_override_any_laps)
+        
+        if (did_any_change or force_recompute):
+            if force_recompute:
+                print(f'(force_recompute==True), (did_any_change: {did_any_change}) recomputing...')
+            else:
+                print(f'at least one grid_bin_bound was changed, recomputing...')
+
+            if (not is_dry_run):
+                ## if not dry_run, do the recomputations:
+                cls._perform_required_recompute_on_change(curr_active_pipeline=curr_active_pipeline)
+                print(f'\trecomputation complete!')
+
+            else:
+                print(f'\tWARNING: is_dry_run is true so no recompute will be done.')
+                
+        else:
+            ## no changes and not force_recompute
+            print(f'No grid bin bounds were changed. Everything should be up-to-date!')
+            
         # Fix the computation epochs to be constrained to the proper long/short intervals:
         # was_directional_pipeline_modified = DirectionalLapsResult.fix_computation_epochs_if_needed(curr_active_pipeline=curr_active_pipeline)
         was_directional_pipeline_modified = DirectionalLapsHelpers.fixup_directional_pipeline_if_needed(curr_active_pipeline)
@@ -2550,15 +2706,16 @@ class PostHocPipelineFixup:
         
         # curr_active_pipeline, directional_lap_specific_configs = DirectionalLapsHelpers.split_to_directional_laps(curr_active_pipeline=curr_active_pipeline, add_created_configs_to_pipeline=True)
 
-        did_any_change = (did_any_grid_bin_change or did_fixup_any_missing_basepath or did_any_non_pbe_epochs_change or was_directional_pipeline_modified)
+        did_any_change = (did_any_grid_bin_change or did_fixup_any_missing_basepath or did_any_non_pbe_epochs_change or was_directional_pipeline_modified or did_override_any_laps)
         print(f'\tPostHocPipelineFixup.FINAL_UPDATE_ALL(...): did_any_change: {did_any_change}')
         return did_any_change
 
 
-    @metadata_attributes(short_name=None, tags=['MAIN'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-02-19 07:24', related_items=[])
+    @metadata_attributes(short_name=None, tags=['MAIN'], input_requires=[], output_provides=[], uses=[], used_by=['kdiba_session_post_fixup_completion_function'], creation_date='2025-02-19 07:24', related_items=[])
     @staticmethod
     def run_as_batch_user_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict, force_recompute: bool=False, is_dry_run: bool=False) -> dict:
-        """ meant to be executed as a _batch_user_completion_function"""
+        """ meant to be executed as a _batch_user_completion_function, called by `kdiba_session_post_fixup_completion_function` 
+        """
         # from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import DirectionalLapsHelpers, DirectionalLapsResult
 
         print(f'\t !!!||||||||||||||||||> RUNNING `PostHocPipelineFixup.run_as_batch_user_completion_function(...)`:')
@@ -2583,8 +2740,16 @@ class PostHocPipelineFixup:
         print(f'\t\tcallback will be assigned to `across_session_results_extended_dict[{PostHocPipelineFixup.across_session_results_extended_dict_data_name}]`:')
         print(f'\t\t\tcallback_outputs: {callback_outputs}')
         across_session_results_extended_dict[PostHocPipelineFixup.across_session_results_extended_dict_data_name] = callback_outputs
+        print(f'_____________________________________________________________________________________________________\n')
+        if did_any_change:
+            print(f'================= CHANGES WERE MADE BY FIXUP! VALUES WILL NEED RECOMPUTE!\n')
+        else:
+            print(f'================= NO changes needed!\n')            
+
+        print(f'_____________________________________________________________________________________________________\n')        
         print('\tdone.')
         return across_session_results_extended_dict
+    
 
 @function_attributes(short_name=None, tags=['IMPORTANT', 'PostHocPipelineFixup', 'non_PBE'], input_requires=[], output_provides=[], uses=['PostHocPipelineFixup'], used_by=[], creation_date='2025-02-19 00:00', related_items=['PostHocPipelineFixup'])
 def kdiba_session_post_fixup_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict, force_recompute:bool=True, is_dry_run: bool=False) -> dict:
@@ -2622,6 +2787,7 @@ def kdiba_session_post_fixup_completion_function(self, global_data_root_parent_p
 
     return across_session_results_extended_dict
 
+
 @function_attributes(short_name=None, tags=['hdf5', 'h5'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-01-01 00:00', related_items=[])
 def export_session_h5_file_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict) -> dict:
     """  Export the pipeline's HDF5 as 'pipeline_results.h5'
@@ -2645,46 +2811,38 @@ def export_session_h5_file_completion_function(self, global_data_root_parent_pat
     print(f'<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<')
     print(f'export_session_h5_file_completion_function(curr_session_context: {curr_session_context}, curr_session_basedir: {str(curr_session_basedir)}, ...)')
     
-
-    hdf5_output_path: Path = curr_active_pipeline.get_output_path().joinpath('pipeline_results.h5').resolve()
-    print(f'pipeline hdf5_output_path: {hdf5_output_path}')
+    # custom_save_filepaths, custom_save_filenames, custom_suffix = curr_active_pipeline.get_custom_pipeline_filenames_from_parameters()
+    # print(f'\tcustom_save_filenames: {custom_save_filenames}')
+    # print(f'\tcustom_suffix: "{custom_suffix}"')
     err = None
-    # Only get files newer than date
-    skip_overwriting_files_newer_than_specified:bool = False
-
+    hdf5_output_path: Path = None
     was_write_good: bool = False
-    newest_file_to_overwrite_date = datetime.now() - timedelta(days=1) # don't overwrite any files more recent than 1 day ago
-    can_skip_if_allowed: bool = (hdf5_output_path.exists() and (FilesystemMetadata.get_last_modified_time(hdf5_output_path)<=newest_file_to_overwrite_date))
-    if (not skip_overwriting_files_newer_than_specified) or (not can_skip_if_allowed):
-        # if skipping is disabled OR skipping is enabled but it's not valid to skip, overwrite.
-        # file is folder than the date to overwrite, so overwrite it
-        print(f'OVERWRITING (or writing) the file {hdf5_output_path}!')
-        # with ExceptionPrintingContext(suppress=False):
-        try:
-            curr_active_pipeline.export_pipeline_to_h5()
-            was_write_good = True
-        except Exception as e:
-            exception_info = sys.exc_info()
-            err = CapturedException(e, exception_info)
-            print(f"ERROR: encountered exception {err} while trying to build the session HDF output for {curr_session_context}")
-            hdf5_output_path = None # set to None because it failed.
-            if self.fail_on_exception:
-                raise err.exc
-    else:
-        print(f'WARNING: file {hdf5_output_path} is newer than the allowed overwrite date, so it will be skipped.')
-        print(f'\t\tnewest_file_to_overwrite_date: {newest_file_to_overwrite_date}\t can_skip_if_allowed: {can_skip_if_allowed}\n')
-        # return (hdf5_output_path, None)
+    
+    try:
+        custom_save_filepaths_dict, custom_suffix = curr_active_pipeline.custom_save_pipeline_as(enable_save_pipeline_pkl=False, enable_save_global_computations_pkl=False, enable_save_h5=True)
+        was_write_good = True
+        hdf5_output_path = custom_save_filepaths_dict['pipeline_h5']
+        print(f'\tpipeline hdf5_output_path: "{hdf5_output_path}"')
 
+    except Exception as e:
+        exception_info = sys.exc_info()
+        err = CapturedException(e, exception_info)
+        print(f"\tERROR: encountered exception {err} while trying to build the session HDF output for {curr_session_context}")
+        if self.fail_on_exception:
+            raise err.exc
 
     callback_outputs = {
      'hdf5_output_path': hdf5_output_path, 'e':err, #'t_end': t_end   
     }
     across_session_results_extended_dict['export_session_h5_file_completion_function'] = callback_outputs
-    
+
+    if was_write_good:
+        print(f'\tHDF5 file "{hdf5_output_path}" successfully written out! done.')    
     print(f'>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>')
     print(f'>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>')
 
     return across_session_results_extended_dict
+
 
 @function_attributes(short_name=None, tags=['save_custom', 'versioning', 'backup', 'export'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-10-28 14:25', related_items=[])
 def save_custom_session_files_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict) -> dict:
@@ -2702,7 +2860,7 @@ def save_custom_session_files_completion_function(self, global_data_root_parent_
     from datetime import timedelta, datetime
     from pyphocorehelpers.exception_helpers import ExceptionPrintingContext, CapturedException
 
-    custom_save_filepaths, custom_save_filenames, custom_suffix = curr_active_pipeline.get_custom_pipeline_filenames_from_parameters()
+    custom_save_filepaths_dict, custom_save_filenames, custom_suffix = curr_active_pipeline.get_custom_pipeline_filenames_from_parameters()
     
     print(f'<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<')
     print(f'save_custom_session_files_completion_function(curr_session_context: {curr_session_context}, curr_session_basedir: {str(curr_session_basedir)}, ...)')
@@ -2712,7 +2870,7 @@ def save_custom_session_files_completion_function(self, global_data_root_parent_
     
     was_write_good: bool = False
     try:
-        custom_save_filepaths = curr_active_pipeline.custom_save_pipeline_as(enable_save_pipeline_pkl=True, enable_save_global_computations_pkl=True, enable_save_h5=True)
+        custom_save_filepaths_dict, custom_suffix = curr_active_pipeline.custom_save_pipeline_as(enable_save_pipeline_pkl=True, enable_save_global_computations_pkl=True, enable_save_h5=True)
         was_write_good = True
 
     except Exception as e:
@@ -2725,7 +2883,7 @@ def save_custom_session_files_completion_function(self, global_data_root_parent_
     callback_outputs = {
      'desired_suffix': custom_suffix,
     #  'session_files_dict': _existing_session_files_dict, 'successfully_copied_files_dict':_successful_copies_dict,
-     'session_files_dict': custom_save_filepaths, 'successfully_copied_files_dict': custom_save_filepaths,
+     'session_files_dict': custom_save_filepaths_dict, 'successfully_copied_files_dict': custom_save_filepaths_dict,
      'was_write_good': was_write_good,
     }
     across_session_results_extended_dict['save_custom_session_files_completion_function'] = callback_outputs
@@ -2734,6 +2892,7 @@ def save_custom_session_files_completion_function(self, global_data_root_parent_
     print(f'>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>')
 
     return across_session_results_extended_dict
+
 
 @function_attributes(short_name=None, tags=['backup', 'versioning', 'copy'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-09-25 06:22', related_items=[])
 def backup_previous_session_files_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict, desired_suffix: str = 'Pre2024-07-16') -> dict:
@@ -2874,15 +3033,22 @@ def determine_session_t_delta_completion_function(self, global_data_root_parent_
     return across_session_results_extended_dict
 
 
-@function_attributes(short_name=None, tags=['JSON', 'CSV', 'peak', 'pf', 'peak_promenance'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-01-01 00:00', related_items=[])
+@function_attributes(short_name=None, tags=['all_neuron_stats_table', 'neuron_replay_stats_df_CSV', 'final-publication', 'JSON', 'CSV', 'peak', 'pf', 'peak_promenance'], input_requires=[], output_provides=[], uses=['AcrossSessionsResults.build_neuron_identities_df_for_CSV'], used_by=[], creation_date='2024-01-01 00:00', related_items=[])
 def compute_and_export_session_extended_placefield_peak_information_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict,
-                                                                             save_hdf:bool=True, save_across_session_hdf:bool=False) -> dict:
-    """  Extracts peak information for the placefields for each neuron
+                                                                             save_csv:bool=True, save_json:bool=False) -> dict:
+    """  Extracts peak information for the placefields for each neuron. Responsible for outputting the combined neuron information CSV used in the final paper results by merging the three+ informationt tables into one `all_neuron_stats_table`
+    
+    
+    
     from pyphoplacecellanalysis.General.Batch.BatchJobCompletion.UserCompletionHelpers.batch_user_completion_helpers import kdiba_session_post_fixup_completion_function
     
     Results can be extracted from batch output by 
     
     # Extracts the callback results 'compute_and_export_session_extended_placefield_peak_information_completion_function':
+    callback_outputs = across_session_results_extended_dict['compute_and_export_session_extended_placefield_peak_information_completion_function']
+    csv_output_path = callback_outputs['csv_output_path']
+    
+    
     extracted_callback_fn_results = {a_sess_ctxt:a_result.across_session_results.get('compute_and_export_session_extended_placefield_peak_information_completion_function', {}) for a_sess_ctxt, a_result in global_batch_run.session_batch_outputs.items() if a_result is not None}
 
 
@@ -2892,10 +3058,8 @@ def compute_and_export_session_extended_placefield_peak_information_completion_f
         
     """
     import sys
-    from pyphocorehelpers.print_helpers import get_now_day_str, get_now_rounded_time_str
     from pyphocorehelpers.exception_helpers import ExceptionPrintingContext, CapturedException
-    from pyphoplacecellanalysis.General.Pipeline.Stages.Loading import saveData
-    from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.LongShortTrackComputations import JonathanFiringRateAnalysisResult
+    from pyphoplacecellanalysis.SpecificResults.AcrossSessionResults import AcrossSessionsResults # for .build_neuron_identities_df_for_CSV
 
     # Dict[IdentifyingContext, InstantaneousSpikeRateGroupsComputation]
 
@@ -2908,8 +3072,9 @@ def compute_and_export_session_extended_placefield_peak_information_completion_f
     print(f'CURR_BATCH_OUTPUT_PREFIX: {CURR_BATCH_OUTPUT_PREFIX}')
 
     callback_outputs = {
-        'json_output_path': None, #'t_end': t_end   
         'csv_output_path': None,
+        'json_output_path': None, #'t_end': t_end   
+        
     }
     err = None
 
@@ -2917,40 +3082,44 @@ def compute_and_export_session_extended_placefield_peak_information_completion_f
     active_export_parent_output_path = self.collected_outputs_path.resolve()
 
     try:
-        rank_order_results = curr_active_pipeline.global_computation_results.computed_data['RankOrder']
-        minimum_inclusion_fr_Hz: float = rank_order_results.minimum_inclusion_fr_Hz
-        included_qclu_values: List[int] = rank_order_results.included_qclu_values
-        directional_laps_results = curr_active_pipeline.global_computation_results.computed_data['DirectionalLaps']
-        track_templates = directional_laps_results.get_templates(minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz, included_qclu_values=included_qclu_values) # non-shared-only -- !! Is minimum_inclusion_fr_Hz=None the issue/difference?
-        print(f'minimum_inclusion_fr_Hz: {minimum_inclusion_fr_Hz}')
-        print(f'included_qclu_values: {included_qclu_values}')
+
+        # 2025-06-09 18:22 - Added combined output helper:        
+        all_neuron_stats_table: pd.DataFrame = AcrossSessionsResults.build_neuron_identities_df_for_CSV(curr_active_pipeline=curr_active_pipeline)
+        # # Pre-2025-06-09 Export mode
+        # rank_order_results = curr_active_pipeline.global_computation_results.computed_data['RankOrder']
+        # minimum_inclusion_fr_Hz: float = rank_order_results.minimum_inclusion_fr_Hz
+        # included_qclu_values: List[int] = rank_order_results.included_qclu_values
+        # directional_laps_results = curr_active_pipeline.global_computation_results.computed_data['DirectionalLaps']
+        # track_templates = directional_laps_results.get_templates(minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz, included_qclu_values=included_qclu_values) # non-shared-only -- !! Is minimum_inclusion_fr_Hz=None the issue/difference?
+        # print(f'minimum_inclusion_fr_Hz: {minimum_inclusion_fr_Hz}')
+        # print(f'included_qclu_values: {included_qclu_values}')
     
-        print(f'\t doing specific instantaneous firing rate computation for context: {curr_session_context}...')
-        jonathan_firing_rate_analysis_result: JonathanFiringRateAnalysisResult = curr_active_pipeline.global_computation_results.computed_data.jonathan_firing_rate_analysis
-        neuron_replay_stats_df: pd.DataFrame = deepcopy(jonathan_firing_rate_analysis_result.neuron_replay_stats_df)
-        neuron_replay_stats_df, all_pf2D_peaks_modified_columns = jonathan_firing_rate_analysis_result.add_peak_promenance_pf_peaks(curr_active_pipeline=curr_active_pipeline, track_templates=track_templates)
-        neuron_replay_stats_df, all_pf1D_peaks_modified_columns = jonathan_firing_rate_analysis_result.add_directional_pf_maximum_peaks(track_templates=track_templates)
-        # both_included_neuron_stats_df = deepcopy(neuron_replay_stats_df[neuron_replay_stats_df['LS_pf_peak_x_diff'].notnull()]).drop(columns=['track_membership', 'neuron_type'])
+        # print(f'\t doing specific instantaneous firing rate computation for context: {curr_session_context}...')
+        # jonathan_firing_rate_analysis_result: JonathanFiringRateAnalysisResult = curr_active_pipeline.global_computation_results.computed_data.jonathan_firing_rate_analysis
+        # neuron_replay_stats_df: pd.DataFrame = deepcopy(jonathan_firing_rate_analysis_result.neuron_replay_stats_df)
+        # neuron_replay_stats_df, all_pf2D_peaks_modified_columns = jonathan_firing_rate_analysis_result.add_peak_promenance_pf_peaks(curr_active_pipeline=curr_active_pipeline, track_templates=track_templates)
+        # neuron_replay_stats_df, all_pf1D_peaks_modified_columns = jonathan_firing_rate_analysis_result.add_directional_pf_maximum_peaks(track_templates=track_templates)
+        # # both_included_neuron_stats_df = deepcopy(neuron_replay_stats_df[neuron_replay_stats_df['LS_pf_peak_x_diff'].notnull()]).drop(columns=['track_membership', 'neuron_type'])
         
         print(f'\t\t done (success).')
 
     except Exception as e:
         exception_info = sys.exc_info()
         err = CapturedException(e, exception_info)
-        print(f"WARN: on_complete_success_execution_session: encountered exception {err} while trying to compute the instantaneous firing rates and set self.across_sessions_instantaneous_fr_dict[{curr_session_context}]")
+        print(f"WARN: on_complete_success_execution_session: encountered exception {err} while trying to compute the extended placefield peak information and set self.across_sessions_instantaneous_fr_dict[{curr_session_context}]")
         # if self.fail_on_exception:
         #     raise e.exc
         # _out_inst_fr_comps = None
-        neuron_replay_stats_df = None
+        all_neuron_stats_table = None
         pass
+    
 
-    if (neuron_replay_stats_df is not None):
+    if (all_neuron_stats_table is not None) and save_csv:
         print(f'\t try saving to CSV...')
         # Save DataFrame to CSV
         csv_output_path = active_export_parent_output_path.joinpath(f'{CURR_BATCH_OUTPUT_PREFIX}_neuron_replay_stats_df.csv').resolve()
         try:
-            
-            neuron_replay_stats_df.to_csv(csv_output_path)
+            all_neuron_stats_table.to_csv(csv_output_path)
             print(f'\t saving to CSV: "{csv_output_path}" done.')
             callback_outputs['csv_output_path'] = csv_output_path
 
@@ -2966,12 +3135,12 @@ def compute_and_export_session_extended_placefield_peak_information_completion_f
 
 
     ## standalone saving:
-    if (neuron_replay_stats_df is not None):
+    if (all_neuron_stats_table is not None) and save_json:
         print(f'\t try saving to JSON...')
         # Save DataFrame to JSON
         json_output_path = active_export_parent_output_path.joinpath(f'{CURR_BATCH_OUTPUT_PREFIX}_neuron_replay_stats_df.json').resolve()
         try:
-            neuron_replay_stats_df.to_json(json_output_path, orient='records', lines=True) ## This actually looks pretty good!
+            all_neuron_stats_table.to_json(json_output_path, orient='records', lines=True) ## This actually looks pretty good!
             print(f'\t saving to JSON: "{json_output_path}" done.')
             callback_outputs['json_output_path'] = json_output_path
 
@@ -2994,7 +3163,7 @@ def compute_and_export_session_extended_placefield_peak_information_completion_f
 
 
 
-@function_attributes(short_name=None, tags=['posterior', 'marginal', 'CSV', 'non-PBE', 'epochs', 'decoding'], input_requires=[], output_provides=[], uses=['GenericDecoderDictDecodedEpochsDictResult', 'pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.EpochComputationFunctions.EpochComputationFunctions.perform_compute_non_PBE_epochs'], used_by=[], creation_date='2025-03-09 16:35', related_items=[])
+@function_attributes(short_name=None, tags=['posterior', 'marginal', 'CSV', 'non-PBE', 'epochs', 'decoding'], input_requires=[], output_provides=[], uses=['GenericDecoderDictDecodedEpochsDictResult', 'pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.EpochComputationFunctions.EpochComputationFunctions.perform_compute_non_PBE_epochs'], used_by=[], creation_date='2025-03-09 16:35', related_items=['figures_plot_generalized_decode_epochs_dict_and_export_results_completion_function'])
 def generalized_decode_epochs_dict_and_export_results_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict, epochs_decoding_time_bin_size:float=0.025, force_recompute:bool=True, debug_print:bool=True) -> dict:
     """ Aims to generally:
     1. Build a dict of decoders (usually 1D) built on several different subsets of input epochs (long_LR_laps-only, long_laps-only, long_non_PBE-only, ...etc
@@ -3029,23 +3198,20 @@ def generalized_decode_epochs_dict_and_export_results_completion_function(self, 
     from typing import Literal
     from neuropy.core.epoch import EpochsAccessor, Epoch, ensure_dataframe, ensure_Epoch, TimeColumnAliasesProtocol
     from pyphocorehelpers.print_helpers import get_now_rounded_time_str
-    from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.EpochComputationFunctions import EpochComputationFunctions, EpochComputationsComputationsContainer, NonPBEDimensionalDecodingResult, Compute_NonPBE_Epochs, KnownFilterEpochs, GeneralDecoderDictDecodedEpochsDictResult
-    from neuropy.analyses.placefields import PfND
-    from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import filter_and_update_epochs_and_spikes
+    from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.EpochComputationFunctions import EpochComputationFunctions, EpochComputationsComputationsContainer, DecodingResultND, Compute_NonPBE_Epochs, KnownFilterEpochs, GeneralDecoderDictDecodedEpochsDictResult
     from neuropy.utils.result_context import DisplaySpecifyingIdentifyingContext
-    from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import EpochFilteringMode, _compute_proper_filter_epochs
     from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import DecodedFilterEpochsResult, SingleEpochDecodedResult
     from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import TrainTestSplitResult, TrainTestLapsSplitting, CustomDecodeEpochsResult, decoder_name, epoch_split_key, get_proper_global_spikes_df, DirectionalPseudo2DDecodersResult
     from pyphoplacecellanalysis.Analysis.Decoder.context_dependent import GenericDecoderDictDecodedEpochsDictResult #, KnownNamedDecoderTrainedComputeEpochsType, KnownNamedDecodingEpochsType, MaskedTimeBinFillType, DataTimeGrain, GenericResultTupleIndexType
     from pyphocorehelpers.assertion_helpers import Assert
-    
+    from pyphoplacecellanalysis.General.Batch.NonInteractiveProcessing import batch_evaluate_required_computations, batch_extended_computations
+
     # ==================================================================================================================== #
     # BEGIN FUNCTION BODY                                                                                                  #
     # ==================================================================================================================== #
 
-
     print(f'<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<')
-    print(f'generalized_decode_epochs_dict_and_export_results_completion_function(curr_session_context: {curr_session_context}, curr_session_basedir: {str(curr_session_basedir)}, ...)')
+    print(f'generalized_decode_epochs_dict_and_export_results_completion_function(curr_session_context: {curr_session_context}, curr_session_basedir: {str(curr_session_basedir)}, epochs_decoding_time_bin_size: {epochs_decoding_time_bin_size}, force_recompute: {force_recompute}, ...)')
 
     # ==================================================================================================================== #
     # New 2025-03-11 Generic Result:                                                                                       #
@@ -3053,13 +3219,91 @@ def generalized_decode_epochs_dict_and_export_results_completion_function(self, 
 
     if ('generalized_decode_epochs_dict_and_export_results_completion_function' in across_session_results_extended_dict) and force_recompute:
         ## drop the existing
+        print(f'\tWARN: dropping the existing `generalized_decode_epochs_dict_and_export_results_completion_function` result because force_recompute is True')
         del across_session_results_extended_dict['generalized_decode_epochs_dict_and_export_results_completion_function']
 
     # a_new_fully_generic_result: GenericDecoderDictDecodedEpochsDictResult = GenericDecoderDictDecodedEpochsDictResult.batch_user_compute_fn(curr_active_pipeline=curr_active_pipeline, force_recompute=force_recompute, time_bin_size=epochs_decoding_time_bin_size, debug_print=debug_print)
                     
     ## Unpack from pipeline:
-    valid_EpochComputations_result: EpochComputationsComputationsContainer = curr_active_pipeline.global_computation_results.computed_data['EpochComputations']
+    # valid_EpochComputations_result: EpochComputationsComputationsContainer = curr_active_pipeline.global_computation_results.computed_data['EpochComputations']
+    fail_on_exception = True
+    EpochComputations_result_needs_full_recompute: bool = False
+
+    valid_EpochComputations_result: EpochComputationsComputationsContainer = curr_active_pipeline.global_computation_results.computed_data.get('EpochComputations', None)
+    if valid_EpochComputations_result is None:
+        print(f'\trecomputation is needed because "EpochComputations" is not in computed_data!')
+        ## call computation function 'generalized_specific_epochs_decoding'        
+        EpochComputations_result_needs_full_recompute = True
+        
+    else:
+        ## already exists:
+        extant_result_decoding_time_bin_size: float = deepcopy(valid_EpochComputations_result.epochs_decoding_time_bin_size) ## just get the standard size. Currently assuming all things are the same size!
+        print(f'\textant_result_decoding_time_bin_size: {extant_result_decoding_time_bin_size}')
+        EpochComputations_result_needs_full_recompute = (epochs_decoding_time_bin_size != extant_result_decoding_time_bin_size)
+        if EpochComputations_result_needs_full_recompute:
+            print(f"\t\tERROR: valid_EpochComputations_result.epochs_decoding_time_bin_size: {extant_result_decoding_time_bin_size} != epochs_decoding_time_bin_size: {epochs_decoding_time_bin_size}.\n\tA FULL RECOMPUTE WILL BE NEEDED!")
+            ## drop existing result
+            dropped_EpochComputations_result: EpochComputationsComputationsContainer = curr_active_pipeline.global_computation_results.computed_data.pop('EpochComputations', None)
+            print(f'\t\t dropped_EpochComputations_result removed!.')
+
+        # assert epochs_decoding_time_bin_size == extant_result_decoding_time_bin_size, f"\tERROR: valid_EpochComputations_result.epochs_decoding_time_bin_size: {extant_result_decoding_time_bin_size} != epochs_decoding_time_bin_size: {epochs_decoding_time_bin_size}"
+
+    if EpochComputations_result_needs_full_recompute:
+        # a_new_fully_generic_result: GenericDecoderDictDecodedEpochsDictResult = GenericDecoderDictDecodedEpochsDictResult.batch_user_compute_fn(curr_active_pipeline=curr_active_pipeline, force_recompute=force_recompute, time_bin_size=epochs_decoding_time_bin_size, debug_print=debug_print)
+
+        ## Next wave of computations
+        extended_computations_include_includelist = ['split_to_directional_laps', 'non_PBE_epochs_results', 'generalized_specific_epochs_decoding',] # do only specified
+        computation_kwargs_dict = {'non_PBE_epochs_results': dict(epochs_decoding_time_bin_size=epochs_decoding_time_bin_size, drop_previous_result_and_compute_fresh=False), }
+
+        # force_recompute_override_computations_includelist = deepcopy(extended_computations_include_includelist)
+        force_recompute_override_computations_includelist = []
+        needs_computation_output_dict, valid_computed_results_output_list, remaining_include_function_names = batch_evaluate_required_computations(curr_active_pipeline, include_includelist=extended_computations_include_includelist, include_global_functions=True, fail_on_exception=False, progress_print=True,
+                                                            force_recompute=force_recompute, force_recompute_override_computations_includelist=force_recompute_override_computations_includelist, debug_print=False)
+
+        if debug_print:
+            print(f'\tPost-load global computations: needs_computation_output_dict: {[k for k,v in needs_computation_output_dict.items() if (v is not None)]}')
+
+        # Post-hoc verification that the computations worked and that the validators reflect that. The list should be empty now.
+        newly_computed_values = batch_extended_computations(curr_active_pipeline, include_includelist=extended_computations_include_includelist, include_global_functions=True, fail_on_exception=False, progress_print=True,
+                                                            force_recompute=force_recompute, force_recompute_override_computations_includelist=force_recompute_override_computations_includelist, 
+                                                            computation_kwargs_dict=computation_kwargs_dict,
+                                                            debug_print=False)
+
+        needs_computation_output_dict, valid_computed_results_output_list, remaining_include_function_names = batch_evaluate_required_computations(curr_active_pipeline, include_includelist=extended_computations_include_includelist, include_global_functions=True, fail_on_exception=False, progress_print=True,
+                                                            force_recompute=force_recompute, force_recompute_override_computations_includelist=force_recompute_override_computations_includelist, debug_print=False)
+        if debug_print:
+            print(f'\tPost-load global computations: needs_computation_output_dict: {[k for k,v in needs_computation_output_dict.items() if (v is not None)]}')
+        print(f'\t...recomputation done.')
+        valid_EpochComputations_result: EpochComputationsComputationsContainer = curr_active_pipeline.global_computation_results.computed_data.get('EpochComputations', None)
+        assert valid_EpochComputations_result is not None, f"valid_EpochComputations_result is still None ever after attempted recomputation!!"
+
+
+
     a_new_fully_generic_result: GenericDecoderDictDecodedEpochsDictResult = valid_EpochComputations_result.a_generic_decoder_dict_decoded_epochs_dict_result
+
+    if (a_new_fully_generic_result is None):
+        print(f'WARN/ERROR: a_new_fully_generic_result is None! Doing last-ditch recomputation...')
+        ## Next wave of computations
+        extended_computations_include_includelist=['generalized_specific_epochs_decoding',] # do only specified
+        force_recompute_override_computations_includelist = []
+        needs_computation_output_dict, valid_computed_results_output_list, remaining_include_function_names = batch_evaluate_required_computations(curr_active_pipeline, include_includelist=extended_computations_include_includelist, include_global_functions=True, fail_on_exception=False, progress_print=True,
+                                                            force_recompute=False, force_recompute_override_computations_includelist=force_recompute_override_computations_includelist, debug_print=False)
+        if debug_print:
+            print(f'\tPost-load global computations: needs_computation_output_dict: {[k for k,v in needs_computation_output_dict.items() if (v is not None)]}')
+        # Post-hoc verification that the computations worked and that the validators reflect that. The list should be empty now.
+        newly_computed_values = batch_extended_computations(curr_active_pipeline, include_includelist=extended_computations_include_includelist, include_global_functions=True, fail_on_exception=fail_on_exception, progress_print=True,
+                                                            force_recompute=False, force_recompute_override_computations_includelist=force_recompute_override_computations_includelist, debug_print=False)
+        needs_computation_output_dict, valid_computed_results_output_list, remaining_include_function_names = batch_evaluate_required_computations(curr_active_pipeline, include_includelist=extended_computations_include_includelist, include_global_functions=True, fail_on_exception=False, progress_print=True,
+                                                            force_recompute=False, force_recompute_override_computations_includelist=force_recompute_override_computations_includelist, debug_print=False)
+        if debug_print:
+            print(f'\tPost-load global computations: needs_computation_output_dict: {[k for k,v in needs_computation_output_dict.items() if (v is not None)]}')
+        print(f'\t...a_generic_decoder_dict_decoded_epochs_dict_result recomputation done.')
+        a_new_fully_generic_result: GenericDecoderDictDecodedEpochsDictResult = valid_EpochComputations_result.a_generic_decoder_dict_decoded_epochs_dict_result
+        assert a_new_fully_generic_result is not None, f"a_new_fully_generic_result is still None ever after attempted recomputation!!"
+        
+    ## now both are good!
+    assert valid_EpochComputations_result is not None
+    assert a_new_fully_generic_result is not None
 
     epochs_decoding_time_bin_size: float = valid_EpochComputations_result.epochs_decoding_time_bin_size ## just get the standard size. Currently assuming all things are the same size!
     print(f'\tepochs_decoding_time_bin_size: {epochs_decoding_time_bin_size}')
@@ -3095,6 +3339,216 @@ def generalized_decode_epochs_dict_and_export_results_completion_function(self, 
     print(f'>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>')
 
     return across_session_results_extended_dict
+
+
+
+@function_attributes(short_name=None, tags=['figure', 'posterior', 'hairly-plot'], input_requires=[], output_provides=[], uses=['_display_generalized_decoded_yellow_blue_marginal_epochs', '_display_decoded_trackID_marginal_hairy_position', '_display_decoded_trackID_weighted_position_posterior_withMultiColorOverlay'], used_by=[], creation_date='2025-05-16 15:17', related_items=['generalized_decode_epochs_dict_and_export_results_completion_function'])
+def figures_plot_generalized_decode_epochs_dict_and_export_results_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict,
+                                                                                        included_figures_names=['_display_directional_merged_pf_decoded_stacked_epoch_slices', '_display_generalized_decoded_yellow_blue_marginal_epochs', '_display_decoded_trackID_marginal_hairy_position', '_display_decoded_trackID_weighted_position_posterior_withMultiColorOverlay'],
+                                                                                        extreme_threshold: float=0.8, opacity_max:float=0.7, thickness_ramping_multiplier:float=35.0,
+                                                                                        **additional_marginal_overlaying_measured_position_kwargs) -> dict:
+    """ Multi-purpose batch display function that just plots the figures so we don't have to wait for the entire batch_figures_plotting on 2025-04-16 15:22.
+    corresponding to by `generalized_decode_epochs_dict_and_export_results_completion_function` 
+    
+    This is the global across-session marginal over trackID
+    
+    
+
+    ## Getting outputs    
+        _flattened_paths_dict = {} ## Outputs:
+
+        _out_dict = _across_session_results_extended_dict.get('figures_plot_generalized_decode_epochs_dict_and_export_results_completion_function', {}).get('_display_decoded_trackID_weighted_position_posterior_withMultiColorOverlay', {}) # FigureCollector 
+        save_paths_dict = _out_dict.get('out_paths', {})
+        for epoch_name, a_variant_paths_dict in save_paths_dict.items():
+            ## loop over all variants:
+            for a_variant_name, a_path in a_variant_paths_dict.items():
+                if a_path is not None:
+                    _curr_key = f"{epoch_name}.{a_variant_name}"
+                    _flattened_paths_dict[_curr_key] = a_path
+
+
+        _flattened_paths_dict
+
+
+    """
+    from pyphoplacecellanalysis.General.Mixins.ExportHelpers import FileOutputManager, FigureOutputLocation, ContextToPathMode	
+    from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.EpochComputationFunctions import EpochComputationDisplayFunctions
+    from benedict import benedict
+    from pyphoplacecellanalysis.Pho2D.data_exporting import PosteriorExporting
+
+
+    # 'trackID_weighted_position_posterior'
+    if across_session_results_extended_dict is None:
+        across_session_results_extended_dict = {}
+
+
+    across_session_results_extended_dict['figures_plot_generalized_decode_epochs_dict_and_export_results_completion_function'] = {}
+
+
+    assert self.collected_outputs_path.exists()
+    curr_session_name: str = curr_active_pipeline.session_name # '2006-6-08_14-26-15'
+    CURR_BATCH_OUTPUT_PREFIX: str = f"{self.BATCH_DATE_TO_USE}-{curr_session_name}"
+    print(f'CURR_BATCH_OUTPUT_PREFIX: {CURR_BATCH_OUTPUT_PREFIX}')
+    
+    print(f'<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<')
+    print(f'figures_plot_generalized_decode_epochs_dict_and_export_results_completion_function(curr_session_context: {curr_session_context}, curr_session_basedir: {str(curr_session_basedir)}, ...)')
+    custom_figure_output_path = self.collected_outputs_path
+    assert custom_figure_output_path.exists(), f"custom_figure_output_path: '{custom_figure_output_path}' does not exist!"
+    
+    custom_fig_man: FileOutputManager = FileOutputManager(figure_output_location=FigureOutputLocation.CUSTOM, context_to_path_mode=ContextToPathMode.GLOBAL_UNIQUE, override_output_parent_path=custom_figure_output_path)
+    
+    # print(f'custom_figure_output_path: "{custom_figure_output_path}"')
+    # test_context = IdentifyingContext(format_name='kdiba',animal='gor01',exper_name='one',session_name='2006-6-08_14-26-15',display_fn_name='display_long_short_laps')
+    test_display_output_path = custom_fig_man.get_figure_save_file_path(curr_active_pipeline.get_session_context(), make_folder_if_needed=False)
+    print(f'\ttest_display_output_path: "{test_display_output_path}"')
+
+    curr_active_pipeline.reload_default_display_functions()
+
+
+
+    # ==================================================================================================================================================================================================================================================================================== #
+    # '_display_directional_merged_pf_decoded_stacked_epoch_slices'                                                                                                                                                                                                         #
+    # ==================================================================================================================================================================================================================================================================================== #
+    ## this is the export of the separate 1D decoder posteriors to images
+    if ('_display_directional_merged_pf_decoded_stacked_epoch_slices' in included_figures_names) or ('directional_decoded_stacked_epoch_slices' in included_figures_names):
+
+        try:
+            print(f'\t trying "_display_directional_merged_pf_decoded_stacked_epoch_slices"')
+            a_params_kwargs = {}
+            display_context = curr_active_pipeline.build_display_context_for_session(display_fn_name='directional_decoded_stacked_epoch_slices')
+            _out = curr_active_pipeline.display('_display_directional_merged_pf_decoded_stacked_epoch_slices', display_context, defer_render=True, save_figure=True,
+                                                # override_fig_man=custom_fig_man, 
+                                                parent_output_folder=custom_figure_output_path,
+                                            )
+            
+            # _out = EpochComputationDisplayFunctions._display_directional_merged_pf_decoded_stacked_epoch_slices(curr_active_pipeline, None, None, None, include_includelist=None, save_figure=True)
+            keys_to_convert_to_benedict = ['export_paths', 'out_custom_formats_dict']
+            _out = {k:benedict(v) if (k in keys_to_convert_to_benedict) else v for k, v in _out.items()}
+            
+            across_session_results_extended_dict['figures_plot_generalized_decode_epochs_dict_and_export_results_completion_function'].update({
+                '_display_directional_merged_pf_decoded_stacked_epoch_slices': _out,
+            })
+            
+
+        except Exception as e:
+            print(f'\tfigures_plot_generalized_decode_epochs_dict_and_export_results_completion_function(...): "_display_directional_merged_pf_decoded_stacked_epoch_slices" failed with error: {e}\n skipping.')
+            raise
+        
+
+
+
+
+    # ==================================================================================================================================================================================================================================================================================== #
+    # '_display_generalized_decoded_yellow_blue_marginal_epochs'                                                                                                                                                                                                                           #
+    # ==================================================================================================================================================================================================================================================================================== #
+    if '_display_generalized_decoded_yellow_blue_marginal_epochs' in included_figures_names:
+        # _display_generalized_decoded_yellow_blue_marginal_epochs ___________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
+        try:
+            print(f'\t trying "_display_generalized_decoded_yellow_blue_marginal_epochs"')
+            _out = curr_active_pipeline.display('_display_generalized_decoded_yellow_blue_marginal_epochs', curr_active_pipeline.get_session_context(), defer_render=True, save_figure=True, is_dark_mode=False, override_fig_man=custom_fig_man)
+            across_session_results_extended_dict['figures_plot_generalized_decode_epochs_dict_and_export_results_completion_function'].update({
+                '_display_generalized_decoded_yellow_blue_marginal_epochs': _out,
+            })
+
+        except Exception as e:
+            print(f'\tgeneralized_export_figures_customizazble_completion_function(...): "_display_generalized_decoded_yellow_blue_marginal_epochs" failed with error: {e}\n skipping.')
+    ## END if '_display_generalized_decoded_yellow...
+
+
+    # ==================================================================================================================================================================================================================================================================================== #
+    # '_display_decoded_trackID_marginal_hairy_position'                                                                                                                                                                                                                                   #
+    # ==================================================================================================================================================================================================================================================================================== #
+    if '_display_decoded_trackID_marginal_hairy_position' in included_figures_names:
+        print(f'\t trying "_display_decoded_trackID_marginal_hairy_position"')
+        interesting_hair_parameter_kwarg_dict = {
+            # 'defaults': dict(extreme_threshold=0.8, opacity_max=0.7, thickness_ramping_multiplier=35),
+            'overrides': dict(extreme_threshold=extreme_threshold, opacity_max=opacity_max, thickness_ramping_multiplier=thickness_ramping_multiplier),
+            # '50_sec_window_scale': dict(extreme_threshold=0.5, thickness_ramping_multiplier=50),
+            'full_1700_sec_session_scale': dict(extreme_threshold=0.5, thickness_ramping_multiplier=12), ## really interesting, can see the low-magnitude endcap short-like firing
+            # 'experimental': dict(extreme_threshold=0.8, thickness_ramping_multiplier=55),
+        }
+        
+        # disable_all_grid_bin_bounds_lines: bool = additional_marginal_overlaying_measured_position_kwargs.get('disable_all_grid_bin_bounds_lines', False)
+        if 'disable_all_grid_bin_bounds_lines' not in additional_marginal_overlaying_measured_position_kwargs:
+            additional_marginal_overlaying_measured_position_kwargs['disable_all_grid_bin_bounds_lines'] = False ## show the lines by default for big figures
+
+
+        ## loop through the configs:
+        for a_plot_name, a_params_kwargs in interesting_hair_parameter_kwarg_dict.items():
+        
+            # _display_decoded_trackID_marginal_hairy_position ___________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
+            display_context = curr_active_pipeline.build_display_context_for_session(display_fn_name='trackID_marginal_hairy_position')
+
+            try:
+                sub_context = display_context.adding_context('subplot', subplot_name=a_plot_name)
+                _out = curr_active_pipeline.display('_display_decoded_trackID_marginal_hairy_position', sub_context, defer_render=True, save_figure=True, override_fig_man=custom_fig_man, 
+                                                    # extreme_threshold=extreme_threshold, opacity_max=opacity_max, thickness_ramping_multiplier=thickness_ramping_multiplier, **additional_marginal_overlaying_measured_position_kwargs,
+                                                    **(a_params_kwargs | additional_marginal_overlaying_measured_position_kwargs), ## expand passed params 
+                                                    )
+                # across_session_results_extended_dict['figures_plot_generalized_decode_epochs_dict_and_export_results_completion_function'].update({
+                #     '_display_decoded_trackID_marginal_hairy_position': _out,
+                # })
+                                
+            except Exception as e:
+                print(f'\tgeneralized_export_figures_customizazble_completion_function(...): "_display_decoded_trackID_marginal_hairy_position" failed with error: {e}\n skipping.')
+    ## END if '_display_decoded_trackID_marginal_hairy_position...
+
+
+    # ==================================================================================================================================================================================================================================================================================== #
+    # '_display_decoded_trackID_weighted_position_posterior_withMultiColorOverlay' -- NOTE: this does all posterior export formats, not just the MultiColorCoverlay (e.g. 'greyscale', 'greyscale_shared_norm', 'viridis_shared_norm', etc.             #
+    # ==================================================================================================================================================================================================================================================================================== #
+
+    if ('_display_decoded_trackID_weighted_position_posterior_withMultiColorOverlay' in included_figures_names) or ('trackID_weighted_position_posterior' in included_figures_names):
+        print(f'\t trying "_display_decoded_trackID_weighted_position_posterior_withMultiColorOverlay"')
+        try:
+            a_params_kwargs = {}
+            display_context = curr_active_pipeline.build_display_context_for_session(display_fn_name='trackID_weighted_position_posterior')
+            _out = curr_active_pipeline.display('_display_decoded_trackID_weighted_position_posterior_withMultiColorOverlay', display_context, defer_render=True, save_figure=True,
+                                                # override_fig_man=custom_fig_man, 
+                                                parent_output_folder=custom_figure_output_path,
+                                            )
+            
+            # _out = EpochComputationDisplayFunctions._display_decoded_trackID_weighted_position_posterior_withMultiColorOverlay(curr_active_pipeline, None, None, None, include_includelist=None, save_figure=True)
+            keys_to_convert_to_benedict = ['out_paths', 'out_custom_formats_dict']
+            _out = {k:benedict(v) if (k in keys_to_convert_to_benedict) else v for k, v in _out.items()}
+
+            ## merge if we can:
+            _prev_out_dict = across_session_results_extended_dict.get('figures_plot_generalized_decode_epochs_dict_and_export_results_completion_function', {}).get('_display_directional_merged_pf_decoded_stacked_epoch_slices', {}) 
+            _out['out_paths'].merge(_prev_out_dict.get('export_paths', {}))
+            _out['out_custom_formats_dict'].merge(_prev_out_dict.get('out_custom_formats_dict', {}))
+
+            across_session_results_extended_dict['figures_plot_generalized_decode_epochs_dict_and_export_results_completion_function'].update({
+                '_display_decoded_trackID_weighted_position_posterior_withMultiColorOverlay': _out,
+            })
+            
+
+            out_custom_formats_dict = _out.get('out_custom_formats_dict', None)
+            if out_custom_formats_dict is not None:
+                custom_merge_layout_dict = [['greyscale'],
+                    ['greyscale_shared_norm'],
+                    # ['psuedo2D_ignore/raw_rgba'], ## Implicitly always appends the pseudo2D_ignore/raw_rgba image at the bottom row
+                ]
+                _out_final_merged_image_save_paths, _out_final_merged_images = PosteriorExporting.post_export_build_combined_images(out_custom_formats_dict=out_custom_formats_dict, custom_merge_layout_dict=custom_merge_layout_dict,
+                                                                                                                    epoch_name_list=['ripple'], progress_print=True) ## currently skip laps, just do ripples
+                _out['final_merged_image_save_paths'] = deepcopy(_out_final_merged_image_save_paths)
+                # across_session_results_extended_dict['figures_plot_generalized_decode_epochs_dict_and_export_results_completion_function'].update({
+                #     '_display_decoded_trackID_weighted_position_posterior_withMultiColorOverlay': _out,
+                # })
+
+        except Exception as e:
+            print(f'\tfigures_plot_generalized_decode_epochs_dict_and_export_results_completion_function(...): "_display_decoded_trackID_weighted_position_posterior_withMultiColorOverlay" failed with error: {e}\n skipping.')
+            raise
+
+
+    print(f'>>\t done with {curr_session_context}')
+    print(f'>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>')
+    print(f'>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>')
+
+    # return True
+    return across_session_results_extended_dict
+
+
+
 
 
 
@@ -3162,6 +3616,8 @@ def MAIN_get_template_string(BATCH_DATE_TO_USE: str, collected_outputs_path:Path
                                     'compute_and_export_cell_first_spikes_characteristics_completion_function': compute_and_export_cell_first_spikes_characteristics_completion_function,
                                     'figures_plot_cell_first_spikes_characteristics_completion_function': figures_plot_cell_first_spikes_characteristics_completion_function,
                                     'generalized_decode_epochs_dict_and_export_results_completion_function': generalized_decode_epochs_dict_and_export_results_completion_function,
+                                    'figures_plot_generalized_decode_epochs_dict_and_export_results_completion_function': figures_plot_generalized_decode_epochs_dict_and_export_results_completion_function,
+                                    # 'generalized_export_figures_customizazble_completion_function': generalized_export_figures_customizazble_completion_function,
                                     }
     else:
         # use the user one:

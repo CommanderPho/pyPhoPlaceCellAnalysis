@@ -1096,7 +1096,7 @@ def run_diba_batch(global_data_root_parent_path: Path, execute_all:bool = False,
 
 @function_attributes(short_name='run_specific_batch', tags=['batch', 'automated', 'load', 'main', 'pipeline'], input_requires=[], output_provides=[], uses=['batch_load_session'], used_by=['python_template.py.j2'], creation_date='2023-03-28 04:46')
 def run_specific_batch(global_data_root_parent_path: Path, curr_session_context: IdentifyingContext, curr_session_basedir: Path, active_pickle_filename:str='loadedSessPickle.pkl', existing_task_logger: Optional[logging.Logger]=None, force_reload:bool=True,
-                        post_run_callback_fn:Optional[Callable]=None, saving_mode=PipelineSavingScheme.OVERWRITE_IN_PLACE, override_parameters_flat_keypaths_dict=None, **kwargs):
+                        post_run_callback_fn:Optional[Callable]=None, saving_mode=PipelineSavingScheme.OVERWRITE_IN_PLACE, override_parameters_flat_keypaths_dict=None, return_post_run_callback_fn_errors: bool=True, **kwargs):
     """ For a specific session (identified by the session context) - calls batch_load_session(...) to get the curr_active_pipeline.
             - Then calls `post_run_callback_fn(...)
             
@@ -1164,6 +1164,7 @@ def run_specific_batch(global_data_root_parent_path: Path, curr_session_context:
     
     fail_on_exception = kwargs.pop('fail_on_exception', True)
     debug_print = kwargs.pop('debug_print', False)
+    _out_error = None
 
     try:
         curr_active_pipeline = batch_load_session(global_data_root_parent_path, active_data_mode_name, basedir, active_pickle_filename=active_pickle_filename, epoch_name_includelist=epoch_name_includelist,
@@ -1179,8 +1180,9 @@ def run_specific_batch(global_data_root_parent_path: Path, curr_session_context:
         if fail_on_exception:
             raise # Re-raises the original exception with its traceback
         new_print(f'"{_line_sweep} END BATCH {_line_sweep}\n\n')
+        _out_error = f"{an_error}"
         
-        return (SessionBatchProgress.FAILED, f"{an_error}", None) # return the Failed status and the exception that occured.
+        return (SessionBatchProgress.FAILED, _out_error, None) # return the Failed status and the exception that occured.
     # finally:
     #     print = _backup_print # restore default print, I think it's okay because it's only used in this context.
 
@@ -1199,12 +1201,15 @@ def run_specific_batch(global_data_root_parent_path: Path, curr_session_context:
                 # if fail_on_exception:
                     # raise e.exc
                 post_run_callback_fn_output = None
+                if return_post_run_callback_fn_errors:
+                    _out_error = f"{an_error}"
+
     #         finally:
     #             print = _backup_print # restore default print, I think it's okay because it's only used in this context.
 
     # print = _backup_print # restore default print, I think it's okay because it's only used in this context.
     new_print(f'"{_line_sweep} END BATCH {_line_sweep}\n\n')
-    return (SessionBatchProgress.COMPLETED, None, post_run_callback_fn_output) # return the success status and None to indicate that no error occured.
+    return (SessionBatchProgress.COMPLETED, _out_error, post_run_callback_fn_output) # return the success status and None to indicate that no error occured.
 
 
 

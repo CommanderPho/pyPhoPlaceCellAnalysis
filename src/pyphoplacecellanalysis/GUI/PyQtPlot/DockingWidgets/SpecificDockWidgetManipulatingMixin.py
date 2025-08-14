@@ -1,3 +1,12 @@
+ 
+from __future__ import annotations # prevents having to specify types for typehinting as strings
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    ## typehinting only imports here
+    from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.SpikeRasterWidgets.Spike2DRaster import SynchronizedPlotMode 
+    
+
 from copy import deepcopy
 from typing import Dict, List, Tuple, Optional, Callable, Union, Any
 from typing_extensions import TypeAlias
@@ -50,6 +59,24 @@ class SpecificDockWidgetManipulatingMixin(BaseDynamicInstanceConformingMixin):
         
 
     """
+    def on_toggle_timeline_sync_mode(self, an_item, is_checked):
+        """ Called to update the sync mode
+        """
+        from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.SpikeRasterWidgets.Spike2DRaster import SynchronizedPlotMode
+
+        print(f'on_toggle_timeline_sync_mode(an_item: {an_item}, is_checked: {is_checked})')
+        identifier_name = an_item._name
+        print(f'\tidentifier_name: "{identifier_name}"')
+        if is_checked:
+            sync_mode: SynchronizedPlotMode = SynchronizedPlotMode.TO_GLOBAL_DATA
+        else:
+            sync_mode: SynchronizedPlotMode = SynchronizedPlotMode.TO_WINDOW
+        print(f'\tsync_mode: {sync_mode}')
+        self.sync_matplotlib_render_plot_widget(identifier_name, sync_mode=sync_mode)
+        print('\tdone.')
+
+
+
     @classmethod
     def _perform_overlay_measured_position(cls, matplotlib_fig_axes, measured_position_df: pd.DataFrame, variable_name = 'x'):
         """ 
@@ -137,11 +164,11 @@ class SpecificDockWidgetManipulatingMixin(BaseDynamicInstanceConformingMixin):
 
         # most_likely_positions_mode: 'standard'|'corrected'
         ## Actual plotting portion:
-        fig, an_ax = plot_1D_most_likely_position_comparsions(measured_position_df=None, time_window_centers=time_window_centers, xbin=deepcopy(xbin),
+        fig, an_ax, _return_out_artists_dict = plot_1D_most_likely_position_comparsions(measured_position_df=None, time_window_centers=time_window_centers, xbin=deepcopy(xbin),
                                                                 posterior=active_posterior,
                                                                 active_most_likely_positions_1D=active_most_likely_positions,
                                                                 ax=an_ax, variable_name=variable_name, debug_print=True, enable_flat_line_drawing=False,
-                                                                posterior_heatmap_imshow_kwargs=posterior_heatmap_imshow_kwargs)
+                                                                posterior_heatmap_imshow_kwargs=posterior_heatmap_imshow_kwargs, return_created_artists=True)
 
         if xbin_labels is not None:
             ## add the labels:
@@ -183,13 +210,31 @@ class SpecificDockWidgetManipulatingMixin(BaseDynamicInstanceConformingMixin):
         if not should_defer_render:
             widget.draw() # alternative to accessing through full path?
         # end if not should_defer_render
+        
         self.sync_matplotlib_render_plot_widget(identifier_name) # Sync it with the active window:
         
-        self.sigDockAdded.emit(self, dock_item) ## sigDockAdded signal to indicate new dock has been added
-        
+        # dock_item.connections['button_action_callbacks'] = {}
+        if 'button_action_callbacks' not in dock_item.connections:
+            dock_item.connections['button_action_callbacks'] = {} ## initialize to new
+
+        _out_connections = dock_item.connections['button_action_callbacks']
+        _prev_conn = _out_connections.pop(identifier_name, None)
+        if _prev_conn is not None:
+            dock_item.sigToggleTimelineSyncModeClicked.disconnect(_prev_conn)
+            _prev_conn = None
+
+        assert identifier_name == dock_item._name
+        # sync_connection = _out_connections.get(identifier_name, None)
+        _out_connections[identifier_name] = dock_item.sigToggleTimelineSyncModeClicked.connect(self.on_toggle_timeline_sync_mode)
+        # dock_item.connections['button_action_callbacks'].update(_out_connections)
+        dock_item.connections['button_action_callbacks'] = _out_connections
+
+
+        self.sigDockAdded.emit(self, dock_item) ## sigDockAdded signal to indicate new dock has been added        
 
         return identifier_name, widget, matplotlib_fig, matplotlib_fig_axes, dock_item
     
+    @function_attributes(short_name=None, tags=['track'], input_requires=[], output_provides=[], uses=['plot_slices_1D_most_likely_position_comparsions', '', ''], used_by=['add_docked_decoded_posterior_track_from_result'], creation_date='2025-05-12 12:18', related_items=[])
     def add_docked_decoded_posterior_slices_track(self, name: str, slices_time_window_centers: List[NDArray], slices_posteriors: List[NDArray], xbin: Optional[NDArray]=None, measured_position_df: Optional[pd.DataFrame]=None, a_variable_name: Optional[str]=None, a_dock_config: Optional[CustomDockDisplayConfig]=None, extended_dock_title_info: Optional[str]=None, should_defer_render:bool=False, **kwargs):
         """ adds a decoded 1D posterior 
 
@@ -308,12 +353,26 @@ class SpecificDockWidgetManipulatingMixin(BaseDynamicInstanceConformingMixin):
         # end if not should_defer_render
         self.sync_matplotlib_render_plot_widget(identifier_name) # Sync it with the active window:
         
+        if 'button_action_callbacks' not in dock_item.connections:
+            dock_item.connections['button_action_callbacks'] = {} ## initialize to new
+        _out_connections = dock_item.connections['button_action_callbacks']
+        _prev_conn = _out_connections.pop(identifier_name, None)
+        if _prev_conn is not None:
+            dock_item.sigToggleTimelineSyncModeClicked.disconnect(_prev_conn)
+            _prev_conn = None
+
+        assert identifier_name == dock_item._name
+        # sync_connection = _out_connections.get(identifier_name, None)
+        _out_connections[identifier_name] = dock_item.sigToggleTimelineSyncModeClicked.connect(self.on_toggle_timeline_sync_mode)
+        # dock_item.connections['button_action_callbacks'].update(_out_connections)
+        dock_item.connections['button_action_callbacks'] = _out_connections
+
         self.sigDockAdded.emit(self, dock_item) ## sigDockAdded signal to indicate new dock has been added
 
         return identifier_name, widget, matplotlib_fig, matplotlib_fig_axes, dock_item
     
 
-    @function_attributes(short_name=None, tags=['IMPORTANT', 'FINAL', 'track', 'posterior'], input_requires=[], output_provides=[], uses=['add_docked_decoded_posterior_track', 'add_docked_decoded_posterior_slices_track'], used_by=[], creation_date='2025-03-21 08:10', related_items=[])
+    @function_attributes(short_name=None, tags=['IMPORTANT', 'FINAL', 'track', 'posterior'], input_requires=[], output_provides=[], uses=['add_docked_decoded_posterior_track', 'add_docked_decoded_posterior_slices_track'], used_by=['.add_docked_decoded_results_dict_tracks'], creation_date='2025-03-21 08:10', related_items=[])
     def add_docked_decoded_posterior_track_from_result(self, name: str, a_1D_decoded_result: Union[SingleEpochDecodedResult, DecodedFilterEpochsResult], xbin: Optional[NDArray]=None, measured_position_df: Optional[pd.DataFrame]=None, **kwargs):
             """ adds a decoded 1D posterior from a decoded result
 
@@ -368,7 +427,7 @@ class SpecificDockWidgetManipulatingMixin(BaseDynamicInstanceConformingMixin):
 
         if a_dock_config is None:
             override_dock_group_name: str = None ## this feature doesn't work
-            a_dock_config = CustomCyclicColorsDockDisplayConfig(showCloseButton=True, named_color_scheme=NamedColorScheme.grey)
+            a_dock_config = CustomCyclicColorsDockDisplayConfig(showCloseButton=True, showTimelineSyncModeButton=True, named_color_scheme=NamedColorScheme.grey)
             a_dock_config.dock_group_names = [override_dock_group_name] # , 'non-PBE Continuous Decoding'
 
 
@@ -395,11 +454,11 @@ class SpecificDockWidgetManipulatingMixin(BaseDynamicInstanceConformingMixin):
         
         # most_likely_positions_mode: 'standard'|'corrected'
         ## Actual plotting portion:
-        fig, an_ax = plot_1D_most_likely_position_comparsions(measured_position_df=None, time_window_centers=time_window_centers, xbin=deepcopy(xbin),
+        fig, an_ax, _return_out_artists_dict = plot_1D_most_likely_position_comparsions(measured_position_df=None, time_window_centers=time_window_centers, xbin=deepcopy(xbin),
                                                                 posterior=active_posterior,
                                                                 active_most_likely_positions_1D=active_most_likely_positions,
                                                                 ax=an_ax, variable_name=variable_name, debug_print=True, enable_flat_line_drawing=False,
-                                                                posterior_heatmap_imshow_kwargs=posterior_heatmap_imshow_kwargs)
+                                                                posterior_heatmap_imshow_kwargs=posterior_heatmap_imshow_kwargs, return_created_artists=True)
 
         ## Update the params
         widget.params.variable_name = variable_name
@@ -419,21 +478,208 @@ class SpecificDockWidgetManipulatingMixin(BaseDynamicInstanceConformingMixin):
         if a_1D_posterior is not None:
             widget.plots_data.matrix = deepcopy(a_1D_posterior)
 
+        widget.draw() # alternative to accessing through full path?
+        sync_mode = kwargs.get('sync_mode', None)
+        if sync_mode is None:
+            self.sync_matplotlib_render_plot_widget(identifier_name) # Sync it with the active window:
+        else:
+            self.sync_matplotlib_render_plot_widget(identifier_name, sync_mode=sync_mode)
+            
+
+        def pyqtgraph_widget_on_toggle_timeline_sync_mode(an_item, is_checked):
+            """ Captures: widget
+            """
+            print(f'pyqtgraph_widget_on_toggle_timeline_sync_mode(an_item: {an_item}, is_checked: {is_checked})')
+            self.on_toggle_timeline_sync_mode(an_item=an_item, is_checked=is_checked)
+            widget.draw()
+            
+        if 'button_action_callbacks' not in dock_item.connections:
+            dock_item.connections['button_action_callbacks'] = {} ## initialize to new
+        _out_connections = dock_item.connections['button_action_callbacks']
+        _prev_conn = _out_connections.pop(identifier_name, None)
+        if _prev_conn is not None:
+            dock_item.sigToggleTimelineSyncModeClicked.disconnect(_prev_conn)
+            _prev_conn = None
+
+        assert identifier_name == dock_item._name
+        # sync_connection = _out_connections.get(identifier_name, None)
+        # _out_connections[identifier_name] = dock_item.sigToggleTimelineSyncModeClicked.connect(self.on_toggle_timeline_sync_mode)
+        _out_connections[identifier_name] = dock_item.sigToggleTimelineSyncModeClicked.connect(pyqtgraph_widget_on_toggle_timeline_sync_mode)
+        # dock_item.connections['button_action_callbacks'].update(_out_connections)
+        dock_item.connections['button_action_callbacks'] = _out_connections
+        widget.draw()
+
+        return identifier_name, widget, matplotlib_fig, matplotlib_fig_axes, dock_item
 
 
+    @function_attributes(short_name=None, tags=['IMPORTANT', 'track', 'posterior', 'marginal'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-03-21 08:10', related_items=[])
+    def add_docked_hairy_marginal_position_track(self, name: str, time_window_centers: NDArray, a_1D_posterior: NDArray, xbin: Optional[NDArray]=None, a_variable_name: Optional[str]=None, a_dock_config: Optional[CustomDockDisplayConfig]=None, extended_dock_title_info: Optional[str]=None, **kwargs):
+        """ adds a marginal (such as Long v. Short, or Long_LR v. Long_RL v. Short_LR v. Short_RL) 
+        
+        time_bin_size = epochs_decoding_time_bin_size
+        info_string: str = f" - t_bin_size: {time_bin_size}"
+        identifier_name, widget, matplotlib_fig, matplotlib_fig_axes, dock_item = active_2d_plot.add_docked_marginal_track(name='non-PBE_marginal_over_track_ID',
+                                                                                                time_window_centers=time_window_centers, a_1D_posterior=non_PBE_marginal_over_track_ID, extended_dock_title_info=info_string)
+        """
+        from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError import plot_1D_most_likely_position_comparsions
+        from neuropy.utils.matplotlib_helpers import get_heatmap_cmap
+        from pyphoplacecellanalysis.General.Model.Configs.LongShortDisplayConfig import PlottingHelpers
+        
+        if a_variable_name is None:
+            a_variable_name = name
+
+        if a_dock_config is None:
+            override_dock_group_name: str = None ## this feature doesn't work
+            a_dock_config = CustomCyclicColorsDockDisplayConfig(showCloseButton=True, showTimelineSyncModeButton=True, named_color_scheme=NamedColorScheme.grey)
+            a_dock_config.dock_group_names = [override_dock_group_name] # , 'non-PBE Continuous Decoding'
+
+
+        n_xbins, n_t_bins = np.shape(a_1D_posterior)
+
+        if xbin is None:
+            xbin = np.arange(n_xbins)
+
+        ## ✅ Add a new row for each of the four 1D directional decoders:
+        identifier_name: str = name
+        if extended_dock_title_info is not None:
+            identifier_name += extended_dock_title_info ## add extra info like the time_bin_size in ms
+        print(f'identifier_name: {identifier_name}')
+        widget, matplotlib_fig, matplotlib_fig_axes, dock_item = self.add_new_matplotlib_render_plot_widget(name=identifier_name, dockSize=(25, 200), display_config=a_dock_config, **kwargs)
+        an_ax = matplotlib_fig_axes[0]
+
+        variable_name: str = a_variable_name
+        
+        # active_most_likely_positions = active_marginals.most_likely_positions_1D # Raw decoded positions
+        active_most_likely_positions = None
+        active_posterior = deepcopy(a_1D_posterior)
+        
+        posterior_heatmap_imshow_kwargs = dict()
+        
+        # most_likely_positions_mode: 'standard'|'corrected'
+        ## Actual plotting portion:
+        fig, an_ax, _return_out_artists_dict = plot_1D_most_likely_position_comparsions(measured_position_df=None, time_window_centers=time_window_centers, xbin=deepcopy(xbin),
+                                                                posterior=active_posterior,
+                                                                active_most_likely_positions_1D=active_most_likely_positions,
+                                                                ax=an_ax, variable_name=variable_name, debug_print=True, enable_flat_line_drawing=False,
+                                                                posterior_heatmap_imshow_kwargs=posterior_heatmap_imshow_kwargs, return_created_artists=True)
+
+        ## Update the params
+        widget.params.variable_name = variable_name
+        widget.params.posterior_heatmap_imshow_kwargs = deepcopy(posterior_heatmap_imshow_kwargs)
+        widget.params.enable_flat_line_drawing = False
+        if extended_dock_title_info is not None:
+            widget.params.extended_dock_title_info = deepcopy(extended_dock_title_info)
+            
+        ## Update the plots_data
+        if time_window_centers is not None:
+            widget.plots_data.time_window_centers = deepcopy(time_window_centers)
+        if xbin is not None:
+            widget.plots_data.xbin = deepcopy(xbin)
+        if active_most_likely_positions is not None:
+            widget.plots_data.active_most_likely_positions = deepcopy(active_most_likely_positions)
+        widget.plots_data.variable_name = variable_name
+        if a_1D_posterior is not None:
+            widget.plots_data.matrix = deepcopy(a_1D_posterior)
 
         widget.draw() # alternative to accessing through full path?
         sync_mode = kwargs.get('sync_mode', None)
         if sync_mode is None:
             self.sync_matplotlib_render_plot_widget(identifier_name) # Sync it with the active window:
+        else:
+            self.sync_matplotlib_render_plot_widget(identifier_name, sync_mode=sync_mode)
             
+
+        def pyqtgraph_widget_on_toggle_timeline_sync_mode(an_item, is_checked):
+            """ Captures: widget
+            """
+            print(f'pyqtgraph_widget_on_toggle_timeline_sync_mode(an_item: {an_item}, is_checked: {is_checked})')
+            self.on_toggle_timeline_sync_mode(an_item=an_item, is_checked=is_checked)
+            widget.draw()
+            
+        if 'button_action_callbacks' not in dock_item.connections:
+            dock_item.connections['button_action_callbacks'] = {} ## initialize to new
+        _out_connections = dock_item.connections['button_action_callbacks']
+        _prev_conn = _out_connections.pop(identifier_name, None)
+        if _prev_conn is not None:
+            dock_item.sigToggleTimelineSyncModeClicked.disconnect(_prev_conn)
+            _prev_conn = None
+
+        assert identifier_name == dock_item._name
+        # sync_connection = _out_connections.get(identifier_name, None)
+        # _out_connections[identifier_name] = dock_item.sigToggleTimelineSyncModeClicked.connect(self.on_toggle_timeline_sync_mode)
+        _out_connections[identifier_name] = dock_item.sigToggleTimelineSyncModeClicked.connect(pyqtgraph_widget_on_toggle_timeline_sync_mode)
+        # dock_item.connections['button_action_callbacks'].update(_out_connections)
+        dock_item.connections['button_action_callbacks'] = _out_connections
+
+
+        # ==================================================================================================================================================================================================================================================================================== #
+        # BEGIN PLOTTING                                                                                                                                                                                                                                                                       #
+        # ==================================================================================================================================================================================================================================================================================== #
+        ax.set_facecolor('white')
+
+        ## OUT: all_directional_continuously_decoded_dict
+        ## Draw the position meas/decoded on the plot widget
+        ## INPUT: fig, ax_list, all_directional_continuously_decoded_dict, track_templates
+
+
+        ## INPUTS: a_decoded_marginal_posterior_df
+
+        should_plot_grid_bin_bounds_lines = False
+
+        # plot the basic lap-positions (measured) over time figure:
+        _out = dict()
+        _out['_display_grid_bin_bounds_validation'] = curr_active_pipeline.display(display_function='_display_grid_bin_bounds_validation', active_session_configuration_context=None, include_includelist=[], save_figure=False, ax=ax) # _display_grid_bin_bounds_validation
+        fig = _out['_display_grid_bin_bounds_validation'].figures[0]
+        out_axes_list =_out['_display_grid_bin_bounds_validation'].axes
+        out_plot_data =_out['_display_grid_bin_bounds_validation'].plot_data
+
+        ax = out_axes_list[0]
+
+        ## get the lines2D object to turn off the default position lines:
+        position_lines_2D = out_plot_data['position_lines_2D']
+        ## hide all inactive lines:
+        for a_line in position_lines_2D:
+            a_line.set_visible(False)
+
+
+        interesting_hair_parameter_kwarg_dict = {
+            'defaults': dict(extreme_threshold=0.8, opacity_max=0.7, thickness_ramping_multiplier=35),
+            '50_sec_window_scale': dict(extreme_threshold=0.5, thickness_ramping_multiplier=50),
+            'full_1700_sec_session_scale': dict(extreme_threshold=0.5, thickness_ramping_multiplier=25), ## really interesting, can see the low-magnitude endcap short-like firing
+            'experimental': dict(extreme_threshold=0.8, thickness_ramping_multiplier=55),
+            'pbe': dict(extreme_threshold=0.0, opacity_max=0.9, thickness_ramping_multiplier=55),
+        }
+
+
+        out_plot_data = _subfn_hide_all_plot_lines(out_plot_data)
+        # an_pos_line_artist, df_viz = _perform_plot_hairy_overlayed_position(df=deepcopy(a_decoded_marginal_posterior_df), ax=ax, extreme_threshold=0.5, thickness_ramping_multiplier=50) # , thickness_ramping_multiplier=5
+
+
+
+        ## Named parameter set:
+        # an_pos_line_artist, df_viz = _perform_plot_hairy_overlayed_position(df=deepcopy(a_decoded_marginal_posterior_df), ax=ax, **interesting_hair_parameter_kwarg_dict['50_sec_window_scale'])
+        # an_pos_line_artist, df_viz = _perform_plot_hairy_overlayed_position(df=deepcopy(a_decoded_marginal_posterior_df), ax=ax, **interesting_hair_parameter_kwarg_dict['full_1700_sec_session_scale'])
+        an_pos_line_artist, df_viz = _perform_plot_hairy_overlayed_position(df=deepcopy(a_decoded_marginal_posterior_df), ax=an_ax, **interesting_hair_parameter_kwarg_dict['pbe'])
+
+
+
+
+        widget.draw()
+
+
+
+
         return identifier_name, widget, matplotlib_fig, matplotlib_fig_axes, dock_item
+
+
+
 
 
 
     # ==================================================================================================================== #
     # Multiple Tracks at once:                                                                                             #
     # ==================================================================================================================== #
+    @function_attributes(short_name=None, tags=['multiple', 'tracks', 'track'], input_requires=[], output_provides=[], uses=['add_docked_decoded_posterior_track_from_result'], used_by=['.compute_if_needed_and_add_continuous_decoded_posterior'], creation_date='2025-05-12 12:21', related_items=[])
     def add_docked_decoded_results_dict_tracks(self, name: str, a_decoded_result_dict: Dict[str, Union[SingleEpochDecodedResult, DecodedFilterEpochsResult]], dock_configs: Dict[str, CustomDockDisplayConfig], pf1D_Decoder_dict: Dict[str, BasePositionDecoder], measured_position_df: Optional[pd.DataFrame]=None, **kwargs):
         """ Adds multiple timeline tracks from a dict of decoded results
         
@@ -497,7 +743,7 @@ class SpecificDockWidgetManipulatingMixin(BaseDynamicInstanceConformingMixin):
         return output_dict
 
 
-
+    @function_attributes(short_name=None, tags=['multiple', 'tracks', 'track'], input_requires=[], output_provides=[], uses=['.add_docked_decoded_results_dict_tracks'], used_by=[], creation_date='2025-05-12 12:21', related_items=[])
     def compute_if_needed_and_add_continuous_decoded_posterior(self, curr_active_pipeline, desired_time_bin_size: float, debug_print=True):
         """ computes the continuously decoded position posteriors (if needed) using the pipeline, then adds them as a new track to the SpikeRaster2D 
         from `pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions.AddNewDecodedPosteriors_MatplotlibPlotCommand.prepare_and_perform_add_add_pseudo2D_decoder_decoded_epochs`
@@ -680,7 +926,7 @@ class SpecificDockWidgetManipulatingMixin(BaseDynamicInstanceConformingMixin):
     # ==================================================================================================================== #
 
     @function_attributes(short_name=None, tags=['intervals', 'tracks', 'pyqtgraph', 'specific', 'dynamic_ui', 'group_matplotlib_render_plot_widget'], input_requires=[], output_provides=[], uses=['self.add_new_embedded_pyqtgraph_render_plot_widget', 'self.add_rendered_intervals'], used_by=[], creation_date='2024-12-31 07:29', related_items=[])
-    def prepare_pyqtgraph_intervalPlot_tracks(self, enable_interval_overview_track: bool = False, should_remove_all_and_re_add: bool=True, name_modifier_suffix: str='', should_link_to_main_plot_widget:bool=True, debug_print=False):
+    def prepare_pyqtgraph_intervalPlot_tracks(self, enable_interval_overview_track: bool = False, should_remove_all_and_re_add: bool=True, name_modifier_suffix: str='', should_link_to_main_plot_widget:bool=True, interval_dock_max_height: int=89, sync_mode:SynchronizedPlotMode=None, debug_print=False):
         """ adds to separate pyqtgraph-backed tracks to the SpikeRaster2D plotter for rendering intervals, and updates `active_2d_plot.params.custom_interval_rendering_plots` so the intervals are rendered on these new tracks in addition to any normal ones
         
         enable_interval_overview_track: bool: if True, renders a track to show all the intervals during the sessions (overview) in addition to the track for the intervals within the current active window
@@ -700,21 +946,33 @@ class SpecificDockWidgetManipulatingMixin(BaseDynamicInstanceConformingMixin):
                 interval_overview_window_dock_config, intervals_overview_dock, intervals_overview_time_sync_pyqtgraph_widget, intervals_overview_root_graphics_layout_widget, intervals_overview_plot_item = _interval_tracks_out_dict['interval_overview']
                 intervals_overview_plot_item.setXRange(active_2d_plot.total_data_start_time, active_2d_plot.total_data_end_time, padding=0) ## global frame
                     
+                
         """
+        from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.SpikeRasterWidgets.Spike2DRaster import SynchronizedPlotMode
         import pyphoplacecellanalysis.External.pyqtgraph as pg
         from pyphoplacecellanalysis.GUI.PyQtPlot.DockingWidgets.DynamicDockDisplayAreaContent import CustomDockDisplayConfig, CustomCyclicColorsDockDisplayConfig, NamedColorScheme
 
+        if sync_mode is None:
+            sync_mode = SynchronizedPlotMode.TO_WINDOW
+            
         _interval_tracks_out_dict = {}
         if enable_interval_overview_track:
-            dock_config = CustomCyclicColorsDockDisplayConfig(named_color_scheme=NamedColorScheme.grey, showCloseButton=False, corner_radius='0px', hideTitleBar=True)
-            name = f'interval_overview{name_modifier_suffix}'
-            intervals_overview_time_sync_pyqtgraph_widget, intervals_overview_root_graphics_layout_widget, intervals_overview_plot_item, intervals_overview_dock = self.add_new_embedded_pyqtgraph_render_plot_widget(name=name, dockSize=(500, 60), display_config=dock_config)
-            _interval_tracks_out_dict[name] = (dock_config, intervals_overview_dock, intervals_overview_time_sync_pyqtgraph_widget, intervals_overview_root_graphics_layout_widget, intervals_overview_plot_item)
+            intervals_overview_dock_config = CustomCyclicColorsDockDisplayConfig(named_color_scheme=NamedColorScheme.grey, showCloseButton=False, showTimelineSyncModeButton=False, corner_radius='0px', hideTitleBar=True)
+            overview_identifier_name = f'interval_overview{name_modifier_suffix}'
+            intervals_overview_time_sync_pyqtgraph_widget, intervals_overview_root_graphics_layout_widget, intervals_overview_plot_item, intervals_overview_dock = self.add_new_embedded_pyqtgraph_render_plot_widget(name=overview_identifier_name, dockSize=(500, 60), display_config=intervals_overview_dock_config)
+            if (interval_dock_max_height is not None) and (interval_dock_max_height > 0):
+                intervals_overview_dock.setMaximumHeight(interval_dock_max_height)
+            _interval_tracks_out_dict[overview_identifier_name] = (intervals_overview_dock_config, intervals_overview_dock, intervals_overview_time_sync_pyqtgraph_widget, intervals_overview_root_graphics_layout_widget, intervals_overview_plot_item)
+            intervals_overview_plot_item.setXRange(self.total_data_start_time, self.total_data_end_time, padding=0) ## global frame
+            
+
         ## Enables creating a new pyqtgraph-based track to display the intervals/epochs
         interval_window_dock_config = CustomCyclicColorsDockDisplayConfig(named_color_scheme=NamedColorScheme.grey, showCloseButton=False, corner_radius='0px', hideTitleBar=True)
-        name = f'intervals{name_modifier_suffix}'
-        intervals_time_sync_pyqtgraph_widget, intervals_root_graphics_layout_widget, intervals_plot_item, intervals_dock = self.add_new_embedded_pyqtgraph_render_plot_widget(name=name, dockSize=(10, 4), display_config=interval_window_dock_config)
-        
+        identifier_name = f'intervals{name_modifier_suffix}'
+        intervals_time_sync_pyqtgraph_widget, intervals_root_graphics_layout_widget, intervals_plot_item, intervals_dock = self.add_new_embedded_pyqtgraph_render_plot_widget(name=identifier_name, dockSize=(10, 4), display_config=interval_window_dock_config)
+        if (interval_dock_max_height is not None) and (interval_dock_max_height > 0):
+            intervals_dock.setMaximumHeight(interval_dock_max_height)
+            
         self.params.custom_interval_rendering_plots.append(intervals_plot_item) # = [self.plots.background_static_scroll_window_plot, self.plots.main_plot_widget, intervals_plot_item]
 
         # self.params.custom_interval_rendering_plots = [self.plots.background_static_scroll_window_plot, self.plots.main_plot_widget, intervals_plot_item]
@@ -724,7 +982,7 @@ class SpecificDockWidgetManipulatingMixin(BaseDynamicInstanceConformingMixin):
             
         # active_2d_plot.interval_rendering_plots
 
-        _interval_tracks_out_dict[name] = (interval_window_dock_config, intervals_dock, intervals_time_sync_pyqtgraph_widget, intervals_root_graphics_layout_widget, intervals_plot_item)
+        _interval_tracks_out_dict[identifier_name] = (interval_window_dock_config, intervals_dock, intervals_time_sync_pyqtgraph_widget, intervals_root_graphics_layout_widget, intervals_plot_item)
 
         ## #TODO 2024-12-31 07:20: - [ ] need to clear/re-add the epochs to make this work
         extant_rendered_interval_plots_lists = {k:list(v.keys()) for k, v in self.list_all_rendered_intervals(debug_print=False).items()}
@@ -756,25 +1014,47 @@ class SpecificDockWidgetManipulatingMixin(BaseDynamicInstanceConformingMixin):
             intervals_plot_item.setXLink(main_plot_widget) # works to synchronize the main zoomed plot (current window) with the epoch_rect_separate_plot (rectangles plotter)
         else:
             ## setup the synchronization:
-            # Perform Initial (one-time) update from source -> controlled:
-            # intervals_time_sync_pyqtgraph_widget.on_window_changed(self.spikes_window.active_window_start_time, self.spikes_window.active_window_end_time)
-            intervals_plot_item.setXRange(self.spikes_window.active_window_start_time, self.spikes_window.active_window_end_time, padding=0)
-            # disable active window syncing if it's enabled:
-            sync_connection = self.ui.connections.get(name, None)
-            if sync_connection is not None:
-                # have an existing sync connection, need to disconnect it.
-                print(f'disconnecting window_scrolled for "{name}"')
-                self.window_scrolled.disconnect(sync_connection)
+            # # Perform Initial (one-time) update from source -> controlled:
+            # # intervals_time_sync_pyqtgraph_widget.on_window_changed(self.spikes_window.active_window_start_time, self.spikes_window.active_window_end_time)
+            # intervals_plot_item.setXRange(self.spikes_window.active_window_start_time, self.spikes_window.active_window_end_time, padding=0)
+            # # disable active window syncing if it's enabled:
+            # sync_connection = self.ui.connections.get(name, None)
+            # if sync_connection is not None:
+            #     # have an existing sync connection, need to disconnect it.
+            #     print(f'disconnecting window_scrolled for "{name}"')
+            #     self.window_scrolled.disconnect(sync_connection)
                     
-            # sync_connection = self.window_scrolled.connect(intervals_time_sync_pyqtgraph_widget.on_window_changed)
-            sync_connection = self.window_scrolled.connect(lambda earliest_t, latest_t: intervals_plot_item.setXRange(earliest_t, latest_t, padding=0)) ## explicitly captures `raster_plot_item`
-            self.ui.connections[name] = sync_connection # add the connection to the connections array
+            # # sync_connection = self.window_scrolled.connect(intervals_time_sync_pyqtgraph_widget.on_window_changed)
+            # sync_connection = self.window_scrolled.connect(lambda earliest_t, latest_t: intervals_plot_item.setXRange(earliest_t, latest_t, padding=0)) ## explicitly captures `raster_plot_item`
+            # self.ui.connections[name] = sync_connection # add the connection to the connections array
+
+            if enable_interval_overview_track and (overview_identifier_name is not None):
+                self.sync_matplotlib_render_plot_widget(overview_identifier_name, sync_mode=SynchronizedPlotMode.TO_GLOBAL_DATA) # Sync it with the active window:
+            
+
+            # 2025-05-12 - more modern syncing ___________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
+            self.sync_matplotlib_render_plot_widget(identifier_name, sync_mode=sync_mode) # Sync it with the active window:
+            
+            if 'button_action_callbacks' not in intervals_dock.connections:
+                intervals_dock.connections['button_action_callbacks'] = {} ## initialize to new
+            _out_connections = intervals_dock.connections['button_action_callbacks']
+            _prev_conn = _out_connections.pop(identifier_name, None)
+            if _prev_conn is not None:
+                intervals_dock.sigToggleTimelineSyncModeClicked.disconnect(_prev_conn)
+                _prev_conn = None
+
+            assert identifier_name == intervals_dock._name
+            # sync_connection = _out_connections.get(identifier_name, None)
+            _out_connections[identifier_name] = intervals_dock.sigToggleTimelineSyncModeClicked.connect(self.on_toggle_timeline_sync_mode)
+            # dock_item.connections['button_action_callbacks'].update(_out_connections)
+            intervals_dock.connections['button_action_callbacks'] = _out_connections
+
 
         return _interval_tracks_out_dict
 
 
     @function_attributes(short_name=None, tags=['raster', 'tracks', 'pyqtgraph', 'specific', 'dynamic_ui', 'group_matplotlib_render_plot_widget'], input_requires=[], output_provides=[], uses=['self.add_new_embedded_pyqtgraph_render_plot_widget', 'new_plot_raster_plot'], used_by=[], creation_date='2025-01-09 10:50', related_items=[])
-    def prepare_pyqtgraph_rasterPlot_track(self, name_modifier_suffix: str='', should_link_to_main_plot_widget:bool=True, debug_print=False):
+    def prepare_pyqtgraph_rasterPlot_track(self, name_modifier_suffix: str='', should_link_to_main_plot_widget:bool=True, sync_mode:SynchronizedPlotMode=None, downsampling_rate: Optional[int]=None, debug_print=False):
         """ adds to separate pyqtgraph-backed tracks to the SpikeRaster2D plotter for rendering a 2D raster `active_2d_plot.params.custom_interval_rendering_plots` so the intervals are rendered on these new tracks in addition to any normal ones
         
         enable_interval_overview_track: bool: if True, renders a track to show all the intervals during the sessions (overview) in addition to the track for the intervals within the current active window
@@ -804,12 +1084,25 @@ class SpecificDockWidgetManipulatingMixin(BaseDynamicInstanceConformingMixin):
         from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.SpikeRasters import new_plot_raster_plot #, NewSimpleRaster, paired_separately_sort_neurons
         from neuropy.utils.indexing_helpers import find_desired_sort_indicies
         from pyphoplacecellanalysis.General.Mixins.SpikesRenderingBaseMixin import SpikeEmphasisState # required for the different emphasis states in ._build_cell_configs()
+        from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.SpikeRasterWidgets.Spike2DRaster import SynchronizedPlotMode
+        
+        if sync_mode is None:
+            sync_mode = SynchronizedPlotMode.TO_WINDOW
+            
+
+        if downsampling_rate is None:
+            downsampling_rate = 1
+            downsampling_rate: int = self.params.setdefault('downsampling_rate', downsampling_rate) ## reduced downsample rate from 100 -> 5 after noticing that it was very desceptive how many spikes it was missing
+        else:
+            downsampling_rate = int(downsampling_rate)
+            self.params.downsampling_rate = downsampling_rate ## set the downsampling rate param
+
 
         _raster_tracks_out_dict = {}
         ## Enables creating a new pyqtgraph-based track to display the intervals/epochs
-        dock_config = CustomCyclicColorsDockDisplayConfig(named_color_scheme=NamedColorScheme.grey, showCloseButton=True, showCollapseButton=False, showGroupButton=False, corner_radius="0px", hideTitleBar=True)
-        name = f'rasters[{name_modifier_suffix}]'
-        time_sync_pyqtgraph_widget, raster_root_graphics_layout_widget, raster_plot_item, raster_dock = self.add_new_embedded_pyqtgraph_render_plot_widget(name=name, dockSize=(10, 4), display_config=dock_config)
+        dock_config = CustomCyclicColorsDockDisplayConfig(named_color_scheme=NamedColorScheme.grey, showCloseButton=True, showCollapseButton=False, showGroupButton=False, showTimelineSyncModeButton=True, corner_radius="0px", hideTitleBar=True)
+        identifier_name = f'rasters[{name_modifier_suffix}]'
+        time_sync_pyqtgraph_widget, raster_root_graphics_layout_widget, raster_plot_item, raster_dock = self.add_new_embedded_pyqtgraph_render_plot_widget(name=identifier_name, dockSize=(10, 4), display_config=dock_config)
 
         if raster_plot_item not in self.params.custom_interval_rendering_plots:
             self.params.custom_interval_rendering_plots.append(raster_plot_item) ## this signals that it should recieve updates for its intervals somewhere else
@@ -842,16 +1135,17 @@ class SpecificDockWidgetManipulatingMixin(BaseDynamicInstanceConformingMixin):
 
         time_sync_pyqtgraph_widget.plots.root_plot = raster_plot_item # name the plotItem "root_plot" so `new_plot_raster_plot` can reuse it
         rasters_display_outputs_tuple = new_plot_raster_plot(a_spikes_df, an_included_unsorted_neuron_ids, unit_sort_order=unit_sort_order, unit_colors_list=deepcopy(unsorted_unit_colors_map),
-                                                        scatter_app_name=name, defer_show=True, active_context=None,
+                                                        scatter_app_name=identifier_name, defer_show=True, active_context=None,
                                                         win=raster_root_graphics_layout_widget, plots_data=time_sync_pyqtgraph_widget.plots_data, plots=time_sync_pyqtgraph_widget.plots,
                                                         add_debug_header_label=False,
                                                         scatter_plot_kwargs=dict(size=5, hoverable=False, tick_width=0.0, tick_height=1.0),
+                                                        downsampling_rate=downsampling_rate,
                                                         ) # defer_show=True so we can add it manually to the track view
 
         # an_app, a_win, a_plots, a_plots_data = rasters_display_outputs_tuple = rasters_display_outputs_tuple
         # raster_root_graphics_layout_widget.addWidget(a_win, row=1, col=1)
         
-        _raster_tracks_out_dict[name] = (dock_config, time_sync_pyqtgraph_widget, raster_root_graphics_layout_widget, raster_plot_item, rasters_display_outputs_tuple)
+        _raster_tracks_out_dict[identifier_name] = (dock_config, time_sync_pyqtgraph_widget, raster_root_graphics_layout_widget, raster_plot_item, rasters_display_outputs_tuple)
         # Setup range for plot:
         # earliest_t, latest_t = active_2d_plot.spikes_window.total_df_start_end_times # global
         earliest_t, latest_t = self.spikes_window.active_time_window # current
@@ -866,17 +1160,35 @@ class SpecificDockWidgetManipulatingMixin(BaseDynamicInstanceConformingMixin):
             ## setup the synchronization:
             # Perform Initial (one-time) update from source -> controlled:
             # time_sync_pyqtgraph_widget.on_window_changed(self.spikes_window.active_window_start_time, self.spikes_window.active_window_end_time)
-            # disable active window syncing if it's enabled:
-            sync_connection = self.ui.connections.get(name, None)
-            if sync_connection is not None:
-                # have an existing sync connection, need to disconnect it.
-                print(f'disconnecting window_scrolled for "{name}"')
-                self.window_scrolled.disconnect(sync_connection)
+            # # disable active window syncing if it's enabled:
+            # sync_connection = self.ui.connections.get(identifier_name, None)
+            # if sync_connection is not None:
+            #     # have an existing sync connection, need to disconnect it.
+            #     print(f'disconnecting window_scrolled for "{identifier_name}"')
+            #     self.window_scrolled.disconnect(sync_connection)
                         
-            # sync_connection = self.window_scrolled.connect(time_sync_pyqtgraph_widget.on_window_changed)
-            sync_connection = self.window_scrolled.connect(lambda earliest_t, latest_t: raster_plot_item.setXRange(earliest_t, latest_t, padding=0)) ## explicitly captures `raster_plot_item`
-            self.ui.connections[name] = sync_connection # add the connection to the connections array
+            # # sync_connection = self.window_scrolled.connect(time_sync_pyqtgraph_widget.on_window_changed)
+            # sync_connection = self.window_scrolled.connect(lambda earliest_t, latest_t: raster_plot_item.setXRange(earliest_t, latest_t, padding=0)) ## explicitly captures `raster_plot_item`
+            # self.ui.connections[identifier_name] = sync_connection # add the connection to the connections array
             
+
+            # 2025-05-12 - more modern syncing ___________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
+            self.sync_matplotlib_render_plot_widget(identifier_name, sync_mode=sync_mode) # Sync it with the active window:
+            
+            if 'button_action_callbacks' not in raster_dock.connections:
+                raster_dock.connections['button_action_callbacks'] = {} ## initialize to new
+            _out_connections = raster_dock.connections['button_action_callbacks']
+            _prev_conn = _out_connections.pop(identifier_name, None)
+            if _prev_conn is not None:
+                raster_dock.sigToggleTimelineSyncModeClicked.disconnect(_prev_conn)
+                _prev_conn = None
+
+            assert identifier_name == raster_dock._name
+            # sync_connection = _out_connections.get(identifier_name, None)
+            _out_connections[identifier_name] = raster_dock.sigToggleTimelineSyncModeClicked.connect(self.on_toggle_timeline_sync_mode)
+            # dock_item.connections['button_action_callbacks'].update(_out_connections)
+            raster_dock.connections['button_action_callbacks'] = _out_connections
+
 
         return _raster_tracks_out_dict
 

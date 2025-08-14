@@ -466,7 +466,7 @@ class PyqtgraphTimeSynchronizedWidget(CrosshairsTracingMixin, PlottingBackendSpe
             # Success message
             print(f"Successfully added crosshairs for {name}")
         except Exception as e:
-            print(f"Failed to add crosshair traces for widget: {self}. Error: {str(e)}")
+            print(f"Failed to add crosshair traces for widget: {self}. Error: {str(e)}") # #TODO 2025-07-22 16:40: - [ ] PyqtgraphTimeSynchronizedWidget - Error: 'traceHairs'
 
 
 

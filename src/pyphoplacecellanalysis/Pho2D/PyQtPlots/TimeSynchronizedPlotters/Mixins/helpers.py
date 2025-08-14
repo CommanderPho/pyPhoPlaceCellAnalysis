@@ -11,9 +11,10 @@ from pyphoplacecellanalysis.Pho2D.PyQtPlots.TimeSynchronizedPlotters.TimeSynchro
 from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.DockAreaWrapper import DockAreaWrapper
 
 from pyphoplacecellanalysis.GUI.PyQtPlot.DockingWidgets.DynamicDockDisplayAreaContent import CustomDockDisplayConfig
+from pyphocorehelpers.function_helpers import function_attributes
 
 
-
+@function_attributes(short_name=None, tags=['occupancy'], input_requires=[], output_provides=[], uses=[], used_by=['CreateNewTimeSynchronizedCombinedPlotterCommand'], creation_date='2022-01-01 00:00', related_items=[])
 def build_combined_time_synchronized_plotters_window(active_pf_2D_dt, fixed_window_duration = 15.0, controlling_widget=None, context=None, create_new_controlling_widget=True):
     """ Builds a single window with time_synchronized (time-dependent placefield) plotters controlled by an internal 2DRasterPlot widget.
     
@@ -112,7 +113,7 @@ def connect_time_synchronized_plotter(curr_plotter, sync_driver):
  
  
  
-# def build_connected_time_synchronized_plotters_window(active_pf_2D_dt, sync_driver):
+@function_attributes(short_name=None, tags=['occupancy'], input_requires=[], output_provides=[], uses=['TimeSynchronizedOccupancyPlotter'], used_by=['CreateNewTimeSynchronizedPlotterCommand'], creation_date='2022-01-01 00:00', related_items=[])
 def build_connected_time_synchronized_occupancy_plotter(active_pf_2D_dt, sync_driver=None, should_defer_show=False):
     """ 
     sync_driver: spike_raster_window, 2DRaster, etc
@@ -128,6 +129,8 @@ def build_connected_time_synchronized_occupancy_plotter(active_pf_2D_dt, sync_dr
         
     return curr_occupancy_plotter, occupancy_raster_window_sync_connection
 
+
+@function_attributes(short_name=None, tags=['occupancy'], input_requires=[], output_provides=[], uses=['TimeSynchronizedPlacefieldsPlotter'], used_by=['CreateNewTimeSynchronizedPlotterCommand'], creation_date='2022-01-01 00:00', related_items=[])
 def build_connected_time_synchronized_placefields_plotter(active_pf_2D_dt, sync_driver=None, should_defer_show=False):
     """ 
     sync_driver: spike_raster_window, 2DRaster, etc
@@ -145,11 +148,13 @@ def build_connected_time_synchronized_placefields_plotter(active_pf_2D_dt, sync_
         
     return curr_placefields_plotter, placefields_raster_window_sync_connection
 
-def build_connected_time_synchronized_decoder_plotter(active_pf_2D_dt, sync_driver=None, should_defer_show=False):
+
+@function_attributes(short_name=None, tags=['occupancy'], input_requires=[], output_provides=[], uses=['TimeSynchronizedPositionDecoderPlotter'], used_by=['CreateNewTimeSynchronizedPlotterCommand'], creation_date='2022-01-01 00:00', related_items=[])
+def build_connected_time_synchronized_decoder_plotter(active_one_step_decoder, active_two_step_decoder, active_pf_2D_dt, sync_driver=None, should_defer_show=False):
     """ 
     sync_driver: spike_raster_window, 2DRaster, etc
     """
-    curr_position_decoder_plotter = TimeSynchronizedPositionDecoderPlotter(active_one_step_decoder, active_two_step_decoder)
+    curr_position_decoder_plotter = TimeSynchronizedPositionDecoderPlotter(active_one_step_decoder=active_one_step_decoder, active_two_step_decoder=active_two_step_decoder)
     if not should_defer_show:
         curr_position_decoder_plotter.show()
     # Control Plotter by spike_raster_window:

@@ -1,3 +1,4 @@
+from neuropy.core.user_annotations import metadata_attributes
 from qtpy import QtCore, QtGui, QtWidgets
 from pyphoplacecellanalysis.Resources import GuiResources, ActionIcons
 
@@ -87,6 +88,8 @@ class CreateLinkedWidget_MenuProvider(BaseMenuProviderMixin):
         
         """
         spike_raster_window = kwargs.get('spike_raster_window', None)
+        curr_active_pipeline = kwargs.get('owning_pipeline_reference', None)
+        active_config_name = kwargs.get('active_config_name', None)
         active_pf_2D_dt = kwargs.get('active_pf_2D_dt', None)
         active_context = kwargs.get('context', None)
         display_output = kwargs.get('display_output', None)
@@ -105,21 +108,10 @@ class CreateLinkedWidget_MenuProvider(BaseMenuProviderMixin):
         
         self.activeMenuReference.top_level_menu.setObjectName("menuCreateLinkedWidget")
         
-        # Manual Setup:
-        # curr_actions_dict['actionTimeSynchronizedOccupancyPlotter'] = widget.ui.actionTimeSynchronizedOccupancyPlotter
-        # curr_actions_dict['actionTimeSynchronizedPlacefieldsPlotter'] = widget.ui.actionTimeSynchronizedPlacefieldsPlotter
-        # curr_actions_dict['actionTimeSynchronizedDecoderPlotter'] = widget.ui.actionTimeSynchronizedDecoderPlotter
-        # curr_actions_dict['actionCombineTimeSynchronizedPlotterWindow'] = widget.ui.actionCombineTimeSynchronizedPlotterWindow
-        
-        # curr_actions_dict['actionTimeSynchronizedOccupancyPlotter'].triggered.connect(CreateNewTimeSynchronizedPlotterCommand(spike_raster_window, active_pf_2D_dt, plotter_type='occupancy', active_context=active_context, display_output=display_output, action_identifier='actionTimeSynchronizedOccupancyPlotter'))
-        # curr_actions_dict['actionTimeSynchronizedPlacefieldsPlotter'].triggered.connect(CreateNewTimeSynchronizedPlotterCommand(spike_raster_window, active_pf_2D_dt, plotter_type='placefields', active_context=active_context, display_output=display_output, action_identifier='actionTimeSynchronizedPlacefieldsPlotter'))
-        # curr_actions_dict['actionTimeSynchronizedDecoderPlotter'].triggered.connect(CreateNewTimeSynchronizedPlotterCommand(spike_raster_window, active_pf_2D_dt, plotter_type='decoder', active_context=active_context, display_output=display_output, action_identifier='actionTimeSynchronizedDecoderPlotter'))
-        # curr_actions_dict['actionCombineTimeSynchronizedPlotterWindow'].triggered.connect(CreateNewTimeSynchronizedCombinedPlotterCommand(spike_raster_window, active_pf_2D_dt, active_context=active_context, display_output=display_output, action_identifier='actionCombineTimeSynchronizedPlotterWindow'))
-        
         action_command_map = {
-            'actionTimeSynchronizedOccupancyPlotter': CreateNewTimeSynchronizedPlotterCommand(spike_raster_window, active_pf_2D_dt, plotter_type='occupancy', active_context=active_context, display_output=display_output, action_identifier='actionTimeSynchronizedOccupancyPlotter'),
-            'actionTimeSynchronizedPlacefieldsPlotter': CreateNewTimeSynchronizedPlotterCommand(spike_raster_window, active_pf_2D_dt, plotter_type='placefields', active_context=active_context, display_output=display_output, action_identifier='actionTimeSynchronizedPlacefieldsPlotter'),
-            'actionTimeSynchronizedDecoderPlotter': CreateNewTimeSynchronizedPlotterCommand(spike_raster_window, active_pf_2D_dt, plotter_type='decoder', active_context=active_context, display_output=display_output, action_identifier='actionTimeSynchronizedDecoderPlotter'),
+            'actionTimeSynchronizedOccupancyPlotter': CreateNewTimeSynchronizedPlotterCommand(spike_raster_window, active_pf_2D_dt, plotter_type='occupancy', curr_active_pipeline=None, active_context=active_context, display_output=display_output, action_identifier='actionTimeSynchronizedOccupancyPlotter'),
+            'actionTimeSynchronizedPlacefieldsPlotter': CreateNewTimeSynchronizedPlotterCommand(spike_raster_window, active_pf_2D_dt, plotter_type='placefields', curr_active_pipeline=None, active_context=active_context, display_output=display_output, action_identifier='actionTimeSynchronizedPlacefieldsPlotter'),
+            'actionTimeSynchronizedDecoderPlotter': CreateNewTimeSynchronizedPlotterCommand(spike_raster_window, active_pf_2D_dt, plotter_type='decoder', curr_active_pipeline=curr_active_pipeline, active_context=active_context, active_config_name=active_config_name, display_output=display_output, action_identifier='actionTimeSynchronizedDecoderPlotter'),
             'actionCombineTimeSynchronizedPlotterWindow': CreateNewTimeSynchronizedCombinedPlotterCommand(spike_raster_window, active_pf_2D_dt, active_context=active_context, display_output=display_output, action_identifier='actionCombineTimeSynchronizedPlotterWindow')
         }
         for a_name, a_build_command in action_command_map.items():
@@ -130,6 +122,7 @@ class CreateLinkedWidget_MenuProvider(BaseMenuProviderMixin):
         # Save references in the curr_window
         self.activeMenuReference.actions_dict['actionMenuCreateLinkedWidget'] = curr_window.ui.actionMenuCreateLinkedWidget 
         return self.activeMenuReference.top_level_menu, self.activeMenuReference.actions_dict
+
 
     @pyqtExceptionPrintingSlot()
     def CreateLinkedWidget_MenuProvider_on_destroy(self):
@@ -145,6 +138,7 @@ class CreateLinkedWidget_MenuProvider(BaseMenuProviderMixin):
         # curr_window.ui.menus.global_window_menus.debug.actions_dict = {} # Empty the dict of actions
         self.CreateLinkedWidget_MenuProvider_actionsDict = {}
 
+
     @pyqtExceptionPrintingSlot()
     def CreateLinkedWidget_MenuProvider_on_menus_update(self):
         """ called to update menus dynamically. Only needed if the menu items themselves change dynamically.
@@ -157,16 +151,20 @@ class CreateLinkedWidget_MenuProvider(BaseMenuProviderMixin):
     
 ## Actions to be executed to create new plotters:
 
-        
+
+@metadata_attributes(short_name=None, tags=['menu', 'command', 'time-synchronized'], input_requires=[], output_provides=[], uses=['build_connected_time_synchronized_occupancy_plotter', 'build_connected_time_synchronized_placefields_plotter', 'build_connected_time_synchronized_decoder_plotter'], used_by=[], creation_date='2025-06-30 06:23', related_items=[])
 class CreateNewTimeSynchronizedPlotterCommand(BaseMenuCommand):
-    """ build_combined_time_synchronized_plotters_window
+    """ build_combined_time_synchronized_plotters_window - used for placefields, occupancy, and decoded posterior position
+
     A command to create a plotter as needed
     """
-    def __init__(self, spike_raster_window, active_pf_2D_dt, plotter_type='occupancy', active_context=None, display_output={}, action_identifier: str=None) -> None:
+    def __init__(self, spike_raster_window, active_pf_2D_dt, plotter_type='occupancy', curr_active_pipeline=None, active_context=None, active_config_name=None, display_output={}, action_identifier: str=None) -> None:
         super(CreateNewTimeSynchronizedPlotterCommand, self).__init__(action_identifier=action_identifier)
         self._spike_raster_window = spike_raster_window
+        self._curr_active_pipeline = curr_active_pipeline
         self._active_pf_2D_dt = active_pf_2D_dt
         self._context = active_context
+        self._active_config_name = active_config_name
         self._display_output = display_output
         self._plotter_type = plotter_type
         
@@ -182,7 +180,12 @@ class CreateNewTimeSynchronizedPlotterCommand(BaseMenuCommand):
         elif self._plotter_type == 'placefields':
             _out_sync_tuple = build_connected_time_synchronized_placefields_plotter(active_pf_2D_dt=self._active_pf_2D_dt, sync_driver=self._spike_raster_window)
         elif self._plotter_type == 'decoder':
-            _out_sync_tuple = build_connected_time_synchronized_decoder_plotter(active_pf_2D_dt=self._active_pf_2D_dt, sync_driver=self._spike_raster_window)
+            assert self._curr_active_pipeline is not None, f"self._curr_active_pipeline is required for decoder type"
+            assert self._active_config_name is not None, f"self._active_config_name is required for decoder type"
+            active_config_name: str = self._active_config_name
+            active_one_step_decoder = self._curr_active_pipeline.computation_results[active_config_name].computed_data.get('pf2D_Decoder', None)
+            active_two_step_decoder = self._curr_active_pipeline.computation_results[active_config_name].computed_data.get('pf2D_TwoStepDecoder', None)
+            _out_sync_tuple = build_connected_time_synchronized_decoder_plotter(active_one_step_decoder=active_one_step_decoder, active_two_step_decoder=active_two_step_decoder, active_pf_2D_dt=self._active_pf_2D_dt, sync_driver=self._spike_raster_window)
         else:
             raise NotImplementedError
         
@@ -191,7 +194,9 @@ class CreateNewTimeSynchronizedPlotterCommand(BaseMenuCommand):
         print(f'_out_display_key: {_out_display_key}')
         self._display_output[_out_display_key] = _out_sync_tuple
         
-    
+
+
+@metadata_attributes(short_name=None, tags=['menu', 'command', 'time-synchronized'], input_requires=[], output_provides=[], uses=['build_combined_time_synchronized_plotters_window'], used_by=[], creation_date='2025-06-30 06:23', related_items=[])
 class CreateNewTimeSynchronizedCombinedPlotterCommand(BaseMenuCommand):
     """ build_combined_time_synchronized_plotters_window
     A command to create a plotter as needed
@@ -206,7 +211,7 @@ class CreateNewTimeSynchronizedCombinedPlotterCommand(BaseMenuCommand):
     def execute(self, *args, **kwargs) -> None:
         """  """
         print(f'menu execute(): {self}')
-        self.log_command(*args, **kwargs) # adds this command to the `menu_action_history_list` 
+        self.log_command(*args, **kwargs) # adds this command to the `menu_action_history_list`
         _out_synchronized_plotter = build_combined_time_synchronized_plotters_window(active_pf_2D_dt=self._active_pf_2D_dt, controlling_widget=self._spike_raster_window.spike_raster_plt_2d, context=self._context, create_new_controlling_widget=False)
         self._display_output['comboSynchronizedPlotter'] = _out_synchronized_plotter
         # (controlling_widget, curr_sync_occupancy_plotter, curr_placefields_plotter), root_dockAreaWindow, app = _out_synchronized_plotter
