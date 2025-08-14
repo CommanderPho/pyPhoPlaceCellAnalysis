@@ -515,11 +515,16 @@ class GenericDecoderDictDecodedEpochsDictResult(ComputedResult):
 
                 ## I guess I need to merge in the columns? Why is this so lame?
                 if a_dropping_masked_pseudo2D_continuous_specific_decoded_result.most_likely_positions_list is not None:
-                    epoch_extracted_most_likely_positions_1D = deepcopy(a_dropping_masked_pseudo2D_continuous_specific_decoded_result.most_likely_positions_list)
-                    time_bin_extracted_most_likely_positions_1D_column = np.concatenate([np.atleast_1d(an_epoch_extracted_most_likely_positions_1D[:, 0]) for i, an_epoch_extracted_most_likely_positions_1D in enumerate(epoch_extracted_most_likely_positions_1D)]) 
-                    assert len(time_bin_extracted_most_likely_positions_1D_column) == len(a_dropping_masked_decoded_marginal_posterior_df), f"len(time_bin_extracted_most_likely_positions_1D_column): {len(time_bin_extracted_most_likely_positions_1D_column)}, len(a_dropping_masked_decoded_marginal_posterior_df): {len(a_dropping_masked_decoded_marginal_posterior_df)}"
-                    a_dropping_masked_decoded_marginal_posterior_df['most_likely_positions_1D'] = time_bin_extracted_most_likely_positions_1D_column
-                    print(f'2025-08-13 19:18 Adding "most_likely_positions_1D" column to `a_dropping_masked_decoded_marginal_posterior_df`.')
+                    try:
+                        epoch_extracted_most_likely_positions_1D = deepcopy(a_dropping_masked_pseudo2D_continuous_specific_decoded_result.most_likely_positions_list)
+                        time_bin_extracted_most_likely_positions_1D_column = np.concatenate([np.atleast_1d(an_epoch_extracted_most_likely_positions_1D[:, 0]) for i, an_epoch_extracted_most_likely_positions_1D in enumerate(epoch_extracted_most_likely_positions_1D)]) 
+                        assert len(time_bin_extracted_most_likely_positions_1D_column) == len(a_dropping_masked_decoded_marginal_posterior_df), f"len(time_bin_extracted_most_likely_positions_1D_column): {len(time_bin_extracted_most_likely_positions_1D_column)}, len(a_dropping_masked_decoded_marginal_posterior_df): {len(a_dropping_masked_decoded_marginal_posterior_df)}"
+                        a_dropping_masked_decoded_marginal_posterior_df['most_likely_positions_1D'] = time_bin_extracted_most_likely_positions_1D_column
+                        print(f'2025-08-13 19:18 Adding "most_likely_positions_1D" column to `a_dropping_masked_decoded_marginal_posterior_df`.')
+                    except (AssertionError, ValueError, AttributeError) as e:
+                        print(f'2025-08-13 19:18 ERROR: Adding "most_likely_positions_1D" column to `a_dropping_masked_decoded_marginal_posterior_df` failed with error: {e}.')  # AssertionError: len(time_bin_extracted_most_likely_positions_1D_column): 9578, len(a_dropping_masked_decoded_marginal_posterior_df): 84
+                    except Exception as e:
+                        raise e
                     
                 _was_update_success = self.updating_results_for_context(new_context=a_masked_updated_context, a_result=deepcopy(a_dropping_masked_pseudo2D_continuous_specific_decoded_result), a_decoder=deepcopy(all_directional_pf1D_Decoder), a_decoded_marginal_posterior_df=deepcopy(a_dropping_masked_decoded_marginal_posterior_df)) ## update using the result
                 if not _was_update_success:
