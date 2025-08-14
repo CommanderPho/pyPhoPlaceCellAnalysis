@@ -2850,13 +2850,7 @@ def export_session_h5_file_completion_function(self, global_data_root_parent_pat
 
     if should_write_posterior_h5:
         try:
-            # posteriors_save_path = Path('output/newest_all_decoded_epoch_posteriors.h5').resolve()
-            _parent_save_context: IdentifyingContext = curr_active_pipeline.build_display_context_for_session('save_decoded_posteriors_to_HDF5')
-            output_man = curr_active_pipeline.get_output_manager(context_to_path_mode=ContextToPathMode.GLOBAL_UNIQUE, override_output_parent_path=active_export_parent_output_path)
-            posteriors_save_path: Path = output_man.get_figure_save_file_path(final_context=_parent_save_context).with_suffix('.h5')
-            print(f'_parent_save_context: {_parent_save_context}')
-            print(f'posteriors_save_path: "{posteriors_save_path}')
-
+            ## Get needed results
             rank_order_results = curr_active_pipeline.global_computation_results.computed_data.get('RankOrder', None)
             if rank_order_results is not None:
                 minimum_inclusion_fr_Hz: float = rank_order_results.minimum_inclusion_fr_Hz
@@ -2871,6 +2865,15 @@ def export_session_h5_file_completion_function(self, global_data_root_parent_pat
             track_templates = directional_laps_results.get_templates(minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz, included_qclu_values=included_qclu_values) # non-shared-only -- !! Is minimum_inclusion_fr_Hz=None the issue/difference? : "TrackTemplates"
             directional_decoders_epochs_decode_result: DecoderDecodedEpochsResult = curr_active_pipeline.global_computation_results.computed_data['DirectionalDecodersEpochsEvaluations']
             directional_decoders_epochs_decode_result.add_all_extra_epoch_columns(curr_active_pipeline, track_templates=track_templates, required_min_percentage_of_active_cells=0.33333333, debug_print=False)
+
+            ## Get save paths
+            # posteriors_save_path = Path('output/newest_all_decoded_epoch_posteriors.h5').resolve()
+            _parent_save_context: IdentifyingContext = curr_active_pipeline.build_display_context_for_session('save_decoded_posteriors_to_HDF5')
+            # output_man = curr_active_pipeline.get_output_manager(context_to_path_mode=ContextToPathMode.GLOBAL_UNIQUE, override_output_parent_path=active_export_parent_output_path)
+            # print(f'_parent_save_context: {_parent_save_context}')
+            # posteriors_save_path: Path = output_man.get_figure_save_file_path(final_context=_parent_save_context).with_suffix('.h5')
+            posteriors_save_path: Path = PosteriorExporting.build_custom_export_to_h5_path(curr_active_pipeline, output_date_str=None, data_identifier_str='(decoded_posteriors)', a_tbin_size=directional_decoders_epochs_decode_result.ripple_decoding_time_bin_size, parent_output_path=active_export_parent_output_path)
+            print(f'posteriors_save_path: "{posteriors_save_path}')
 
             # pos_bin_size: float = directional_decoders_epochs_decode_result.pos_bin_size
             # ripple_decoding_time_bin_size: float = directional_decoders_epochs_decode_result.ripple_decoding_time_bin_size
@@ -3309,7 +3312,7 @@ def generalized_decode_epochs_dict_and_export_results_completion_function(self, 
 
         ## Next wave of computations
         extended_computations_include_includelist = ['split_to_directional_laps', 'non_PBE_epochs_results', 'generalized_specific_epochs_decoding',] # do only specified
-        computation_kwargs_dict = {'non_PBE_epochs_results': dict(epochs_decoding_time_bin_size=epochs_decoding_time_bin_size, drop_previous_result_and_compute_fresh=False), }
+        computation_kwargs_dict = {'non_PBE_epochs_results': dict(epochs_decoding_time_bin_size=epochs_decoding_time_bin_size, drop_previous_result_and_compute_fresh=False, compute_2D=False), }
 
         # force_recompute_override_computations_includelist = deepcopy(extended_computations_include_includelist)
         force_recompute_override_computations_includelist = []

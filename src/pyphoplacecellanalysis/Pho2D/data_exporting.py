@@ -42,6 +42,7 @@ KnownEpochsName = Literal['laps', 'ripple', 'other']
 
 import matplotlib.pyplot as plt
 import pyphoplacecellanalysis.External.pyqtgraph as pg
+from pyphocorehelpers.print_helpers import get_now_day_str, get_now_rounded_time_str
 
 from PIL import Image, ImageOps, ImageFilter # for export_array_as_image
 # from neuropy.utils.result_context import DisplaySpecifyingIdentifyingContext
@@ -170,10 +171,11 @@ class PosteriorExporting:
     
     
     Usage:
+        from pyphoplacecellanalysis.Pho2D.data_exporting import PosteriorExporting
         ## Exports: "2024-11-26_Lab-kdiba_gor01_one_2006-6-09_1-22-43__withNormalComputedReplays-qclu_[1, 2, 4, 6, 7, 9]-frateThresh_5.0-(decoded_posteriors).h5"
 		print(f'save_hdf == True, so exporting posteriors to HDF file...')
 		# parent_output_path = self.collected_outputs_path.resolve()
-		save_path: Path = _subfn_build_custom_export_to_h5_path(data_identifier_str='(decoded_posteriors)', a_tbin_size=directional_decoders_epochs_decode_result.ripple_decoding_time_bin_size, parent_output_path=self.collected_outputs_path.resolve())
+		save_path: Path = PosteriorExporting.build_custom_export_to_h5_path(curr_active_pipeline, output_date_str=None, data_identifier_str='(decoded_posteriors)', a_tbin_size=directional_decoders_epochs_decode_result.ripple_decoding_time_bin_size, parent_output_path=self.collected_outputs_path.resolve())
 		# save_path = Path(f'output/{BATCH_DATE_TO_USE}_newest_all_decoded_epoch_posteriors.h5').resolve()
 		complete_session_context, (session_context, additional_session_context) = curr_active_pipeline.get_complete_session_context()
 		_, _, custom_suffix = curr_active_pipeline.get_custom_pipeline_filenames_from_parameters()
@@ -196,6 +198,29 @@ class PosteriorExporting:
 		print(f'\t\t\tHDF5 Paths: {_output_HDF5_paths_info_str}\n')
         
     """
+    @classmethod
+    def build_custom_export_to_h5_path(cls, curr_active_pipeline, output_date_str: Optional[str]=None, data_identifier_str: str = f'(decoded_posteriors)', a_tbin_size: float=None, parent_output_path: Path=None):
+        """ captures CURR_BATCH_DATE_TO_USE, `curr_active_pipeline`
+        
+        based off of `_subfn_build_custom_export_to_h5_path`
+        
+        Usage:
+        
+        PosteriorExporting.build_custom_export_to_h5_path(
+        
+        """
+        if (output_date_str is None) or (len(output_date_str) < 1):
+            output_date_str = get_now_rounded_time_str(rounded_minutes=10)
+            
+        if (a_tbin_size is not None):
+            ## add optional time bin suffix:
+            a_tbin_size_str: str = f"{round(a_tbin_size, ndigits=5)}"
+            a_data_identifier_str: str = f'{data_identifier_str}_tbin-{a_tbin_size_str}' ## build the identifier '(decoded_posteriors)_tbin-1.5'
+            
+        out_path, out_filename, out_basename = curr_active_pipeline.build_complete_session_identifier_filename_string(output_date_str=output_date_str, data_identifier_str=a_data_identifier_str, parent_output_path=parent_output_path, out_extension='.h5')
+        return out_path 
+    
+
     @classmethod
     def save_posterior_to_video(cls, a_decoder_continuously_decoded_result: DecodedFilterEpochsResult, result_name: str='a_decoder_continuously_decoded_result'):
         """ 
@@ -1568,7 +1593,7 @@ class LoadedPosteriorContainer:
 
     @function_attributes(short_name=None, tags=['MAIN', 'load', 'batch'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-12-17 03:06', related_items=['PosteriorExporting.perform_save_all_decoded_posteriors_to_HDF5'])
     @classmethod
-    def load_batch_hdf5_exports(cls, exported_posterior_data_h5_files) -> Dict[str, "LoadedPosteriorContainer"]:
+    def load_batch_hdf5_exports(cls, exported_posterior_data_h5_files: List[Path]) -> Dict[str, "LoadedPosteriorContainer"]:
         """ 
         
         all_sessions_exported_posteriors_list = LoadedPosteriorContainer.load_batch_hdf5_exports(exported_posterior_data_h5_files=exported_posterior_data_h5_files)
