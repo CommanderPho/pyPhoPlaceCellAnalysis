@@ -2137,13 +2137,14 @@ class DirectionalPseudo2DDecodersResult(ComputedResult):
                     print(f'\t\t added dimension to curr_posterior for marginal_y: {curr_unit_marginal_x.p_x_given_n.shape}')
 
 
-            ## 2025-08-14 - Set most_likely_positions_1D:
-            if curr_unit_marginal_x['most_likely_positions_1D'] is None:
-                curr_unit_marginal_x['most_likely_positions_1D'] = np.atleast_1d(np.argmax(curr_unit_marginal_x.p_x_given_n, axis=-1)) ## actually just the indicies, to get the positions we'd need to do `curr_unit_marginal_x['most_likely_positions_1D'] = np.atleast_1d(xbin_centers[curr_unit_marginal_x['most_likely_positions_1D']])`
-                if (xbin_centers is not None):
-                    curr_unit_marginal_x['most_likely_positions_1D'] = np.atleast_1d(xbin_centers[curr_unit_marginal_x['most_likely_positions_1D']])
-            # curr_unit_marginal_x.most_likely_positions_1D = np.atleast_1d(most_likely_positions).T # already 1D positions, don't need to extract x-component
-            # most_likely_positions_1D = most_likely_positions[:,0].T
+            # ## 2025-08-14 - Set most_likely_positions_1D:
+            # if curr_unit_marginal_x['most_likely_positions_1D'] is None:
+            #     #TODO 2025-08-14 14:05: - [ ] Not going to work because it's a marginal and not a function of position. We don't know the right values
+            #     curr_unit_marginal_x['most_likely_positions_1D'] = np.atleast_1d(np.argmax(curr_unit_marginal_x.p_x_given_n, axis=-1)) ## curr_unit_marginal_x.p_x_given_n.shape: (2, n_time_bins) actually just the indicies, to get the positions we'd need to do `curr_unit_marginal_x['most_likely_positions_1D'] = np.atleast_1d(xbin_centers[curr_unit_marginal_x['most_likely_positions_1D']])`
+            #     if (xbin_centers is not None):
+            #         curr_unit_marginal_x['most_likely_positions_1D'] = np.atleast_1d(xbin_centers[curr_unit_marginal_x['most_likely_positions_1D']])
+            # # curr_unit_marginal_x.most_likely_positions_1D = np.atleast_1d(most_likely_positions).T # already 1D positions, don't need to extract x-component
+            # # most_likely_positions_1D = most_likely_positions[:,0].T
 
             custom_curr_unit_marginal_list.append(curr_unit_marginal_x)
         ## END for epoch_i, a_p_x_given_...
@@ -2190,13 +2191,13 @@ class DirectionalPseudo2DDecodersResult(ComputedResult):
                                                                      **deepcopy(_common_epoch_df_dict)},
                                                                     ) # , 'time_bin_size': pseudo2D_continuous_specific_decoded_result.decoding_time_bin_size
         
-        try:
-            track_marginal_posterior_df['most_likely_positions_1D'] = deepcopy(epochs_most_likely_positions_1D)
-        except ValueError as e:
-            print(f'failed to add "most_likely_positions_1D" column to `track_marginal_posterior_df`. Skipping.')
-            pass            
-        except Exception as e:
-            raise e
+        # try:
+        #     track_marginal_posterior_df['most_likely_positions_1D'] = deepcopy(epochs_most_likely_positions_1D)
+        # except ValueError as e:
+        #     print(f'failed to add "most_likely_positions_1D" column to `track_marginal_posterior_df`. Skipping.')
+        #     pass            
+        # except Exception as e:
+        #     raise e
         ## OUTPUTS: track_marginal_posterior_df
 
         ## Build combined marginals df:
