@@ -1458,13 +1458,14 @@ class DecodedFilterEpochsResult(HDF_SerializationMixin, AttrsBasedClassHelperMix
                 epoch_duration_column = np.concatenate([np.full((an_epoch_time_bins, ), fill_value=filter_epochs_df['duration'].values[i]) for i, an_epoch_time_bins in enumerate(n_epoch_time_bins)]) #TODO 2025-04-18 21:05: - [ ] Added 'parent_epoch_duration' to output dataframe!
                 # epoch_neuronal_participation_column = np.concatenate([np.full((an_epoch_time_bins, ), fill_value=filter_epochs_df['participation'].values[i]) for i, an_epoch_time_bins in enumerate(n_epoch_time_bins)])
                 
-                _common_epoch_df_column_dict.update(**{'epoch_id': epochs_repeated_epoch_index, 'sub_epoch_time_bin_index': epochs_repeated_sub_epoch_time_bin_index, 'parent_epoch_id': epochs_repeated_epoch_index, 'parent_epoch_label': epoch_label_column, 'parent_epoch_start_t': epochs_repeated_parent_epoch_start_t, 'parent_epoch_end_t': epochs_repeated_parent_epoch_stop_t, 'parent_epoch_duration': epoch_duration_column})
-                if epoch_extracted_most_likely_positions_1D is not None:
-                    time_bin_extracted_most_likely_positions_1D_column = np.concatenate([np.squeeze(an_epoch_extracted_most_likely_positions_1D[:, 0]) for i, an_epoch_extracted_most_likely_positions_1D in enumerate(epoch_extracted_most_likely_positions_1D)]) 
-                    
-                    assert len(time_bin_extracted_most_likely_positions_1D_column) == len(epoch_label_column), f"len(time_bin_extracted_most_likely_positions_1D_column): {len(time_bin_extracted_most_likely_positions_1D_column)}, len(epoch_label_column): {len(epoch_label_column)}"
-                    _common_epoch_df_column_dict.update(**{'most_likely_positions_1D': time_bin_extracted_most_likely_positions_1D_column, })
+                _common_epoch_df_column_dict.update(**{'epoch_id': epochs_repeated_epoch_index, 'sub_epoch_time_bin_index': epochs_repeated_sub_epoch_time_bin_index, 'parent_epoch_id': epochs_repeated_epoch_index, 'parent_epoch_label': epoch_label_column, 'parent_epoch_start_t': epochs_repeated_parent_epoch_start_t, 'parent_epoch_end_t': epochs_repeated_parent_epoch_stop_t, 'parent_epoch_duration': epoch_duration_column, 'most_likely_positions_1D': np.nan})
+                
 
+            if epoch_extracted_most_likely_positions_1D is not None:
+                time_bin_extracted_most_likely_positions_1D_column = np.concatenate([np.atleast_1d(an_epoch_extracted_most_likely_positions_1D[:, 0]) for i, an_epoch_extracted_most_likely_positions_1D in enumerate(epoch_extracted_most_likely_positions_1D)]) 
+                assert len(time_bin_extracted_most_likely_positions_1D_column) == len(epoch_label_column), f"len(time_bin_extracted_most_likely_positions_1D_column): {len(time_bin_extracted_most_likely_positions_1D_column)}, len(epoch_label_column): {len(epoch_label_column)}"
+                _common_epoch_df_column_dict.update(**{'most_likely_positions_1D': time_bin_extracted_most_likely_positions_1D_column, })
+                print(f'2025-08-13 19:18 Adding "most_likely_positions_1D" column to `epoch_time_bin_marginals_df`.')
 
             all_columns.extend(active_columns)
             # all_epoch_extracted_posteriors = np.hstack((all_epoch_extracted_posteriors, epoch_extracted_posteriors))
