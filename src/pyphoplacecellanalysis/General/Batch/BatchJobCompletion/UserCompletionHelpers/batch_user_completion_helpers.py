@@ -2789,7 +2789,8 @@ def kdiba_session_post_fixup_completion_function(self, global_data_root_parent_p
 
 
 @function_attributes(short_name=None, tags=['hdf5', 'h5'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-01-01 00:00', related_items=[])
-def export_session_h5_file_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict) -> dict:
+def export_session_h5_file_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict,
+                                                should_write_pipeline_h5: bool=False, should_write_posterior_h5: bool=True) -> dict:
     """  Export the pipeline's HDF5 as 'pipeline_results.h5'
     from pyphoplacecellanalysis.General.Batch.BatchJobCompletion.UserCompletionHelpers.batch_user_completion_helpers import kdiba_session_post_fixup_completion_function
     
@@ -2807,6 +2808,10 @@ def export_session_h5_file_completion_function(self, global_data_root_parent_pat
     from datetime import timedelta, datetime
     from pyphocorehelpers.Filesystem.metadata_helpers import FilesystemMetadata
     from pyphocorehelpers.exception_helpers import ExceptionPrintingContext, CapturedException
+    from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import DecodedFilterEpochsResult, SingleEpochDecodedResult
+    from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import DecoderDecodedEpochsResult
+    from pyphoplacecellanalysis.Pho2D.data_exporting import PosteriorExporting
+    from pyphoplacecellanalysis.General.Mixins.ExportHelpers import ContextToPathMode
 
     print(f'<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<')
     print(f'export_session_h5_file_completion_function(curr_session_context: {curr_session_context}, curr_session_basedir: {str(curr_session_basedir)}, ...)')
@@ -2818,22 +2823,73 @@ def export_session_h5_file_completion_function(self, global_data_root_parent_pat
     hdf5_output_path: Path = None
     was_write_good: bool = False
     
-    try:
-        custom_save_filepaths_dict, custom_suffix = curr_active_pipeline.custom_save_pipeline_as(enable_save_pipeline_pkl=False, enable_save_global_computations_pkl=False, enable_save_h5=True)
-        was_write_good = True
-        hdf5_output_path = custom_save_filepaths_dict['pipeline_h5']
-        print(f'\tpipeline hdf5_output_path: "{hdf5_output_path}"')
 
-    except Exception as e:
-        exception_info = sys.exc_info()
-        err = CapturedException(e, exception_info)
-        print(f"\tERROR: encountered exception {err} while trying to build the session HDF output for {curr_session_context}")
-        if self.fail_on_exception:
-            raise err.exc
+    active_export_parent_output_path: Path = self.collected_outputs_path.resolve()
+    # Assert.path_exists(active_export_parent_output_path)
+    callback_outputs = {}
 
-    callback_outputs = {
-     'hdf5_output_path': hdf5_output_path, 'e':err, #'t_end': t_end   
-    }
+
+    if should_write_pipeline_h5:
+        try:
+            custom_save_filepaths_dict, custom_suffix = curr_active_pipeline.custom_save_pipeline_as(enable_save_pipeline_pkl=False, enable_save_global_computations_pkl=False, enable_save_h5=True)
+            was_write_good = True
+            hdf5_output_path = custom_save_filepaths_dict['pipeline_h5']
+            print(f'\tpipeline hdf5_output_path: "{hdf5_output_path}"')
+
+        except Exception as e:
+            exception_info = sys.exc_info()
+            err = CapturedException(e, exception_info)
+            print(f"\tERROR: encountered exception {err} while trying to build the session HDF output for {curr_session_context}")
+            if self.fail_on_exception:
+                raise err.exc
+            
+        callback_outputs.update(**{
+            'hdf5_output_path': hdf5_output_path, #'t_end': t_end   
+        })
+    # END if should_write_pipeline_h5
+
+    if should_write_posterior_h5:
+        try:
+            # posteriors_save_path = Path('output/newest_all_decoded_epoch_posteriors.h5').resolve()
+            _parent_save_context: IdentifyingContext = curr_active_pipeline.build_display_context_for_session('save_decoded_posteriors_to_HDF5')
+            output_man = curr_active_pipeline.get_output_manager(context_to_path_mode=ContextToPathMode.GLOBAL_UNIQUE, override_output_parent_path=active_export_parent_output_path)
+            posteriors_save_path: Path = output_man.get_figure_save_file_path(final_context=_parent_save_context).with_suffix('.h5')
+            print(f'_parent_save_context: {_parent_save_context}')
+            print(f'posteriors_save_path: "{posteriors_save_path}')
+
+            rank_order_results = curr_active_pipeline.global_computation_results.computed_data.get('RankOrder', None)
+            if rank_order_results is not None:
+                minimum_inclusion_fr_Hz: float = rank_order_results.minimum_inclusion_fr_Hz
+                included_qclu_values: List[int] = rank_order_results.included_qclu_values
+            else:        
+                ## get from parameters:
+                minimum_inclusion_fr_Hz: float = curr_active_pipeline.global_computation_results.computation_config.rank_order_shuffle_analysis.minimum_inclusion_fr_Hz
+                included_qclu_values: List[int] = curr_active_pipeline.global_computation_results.computation_config.rank_order_shuffle_analysis.included_qclu_values
+                
+            # DirectionalMergedDecoders: Get the result after computation:
+            directional_laps_results = curr_active_pipeline.global_computation_results.computed_data['DirectionalLaps'] # : "DirectionalLapsResult"
+            track_templates = directional_laps_results.get_templates(minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz, included_qclu_values=included_qclu_values) # non-shared-only -- !! Is minimum_inclusion_fr_Hz=None the issue/difference? : "TrackTemplates"
+            directional_decoders_epochs_decode_result: DecoderDecodedEpochsResult = curr_active_pipeline.global_computation_results.computed_data['DirectionalDecodersEpochsEvaluations']
+            directional_decoders_epochs_decode_result.add_all_extra_epoch_columns(curr_active_pipeline, track_templates=track_templates, required_min_percentage_of_active_cells=0.33333333, debug_print=False)
+
+            # pos_bin_size: float = directional_decoders_epochs_decode_result.pos_bin_size
+            # ripple_decoding_time_bin_size: float = directional_decoders_epochs_decode_result.ripple_decoding_time_bin_size
+            # laps_decoding_time_bin_size: float = directional_decoders_epochs_decode_result.laps_decoding_time_bin_size
+            decoder_laps_filter_epochs_decoder_result_dict: Dict[str, DecodedFilterEpochsResult] = directional_decoders_epochs_decode_result.decoder_laps_filter_epochs_decoder_result_dict
+            decoder_ripple_filter_epochs_decoder_result_dict: Dict[str, DecodedFilterEpochsResult] = directional_decoders_epochs_decode_result.decoder_ripple_filter_epochs_decoder_result_dict
+
+            out_contexts = PosteriorExporting.perform_save_all_decoded_posteriors_to_HDF5(decoder_laps_filter_epochs_decoder_result_dict, decoder_ripple_filter_epochs_decoder_result_dict, _save_context=_parent_save_context, save_path=posteriors_save_path)
+            callback_outputs['posteriors_h5'] = posteriors_save_path
+            print(f'\tposteriors_save_path: "{posteriors_save_path}"')
+
+        except Exception as e:
+            exception_info = sys.exc_info()
+            err = CapturedException(e, exception_info)
+            print(f"\tERROR: encountered exception {err} while trying to build the session POSTERIORS HDF output for {curr_session_context}")
+            if self.fail_on_exception:
+                raise err.exc
+    # END if should_write_posterior_h5
+
     across_session_results_extended_dict['export_session_h5_file_completion_function'] = callback_outputs
 
     if was_write_good:
