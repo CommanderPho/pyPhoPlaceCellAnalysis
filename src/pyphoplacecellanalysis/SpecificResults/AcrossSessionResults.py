@@ -4635,9 +4635,8 @@ class AcrossSessionIdentityDataframeAccessor:
             # Add the maze_id to the active_filter_epochs so we can see how properties change as a function of which track the replay event occured on:
             session_name: str = curr_active_pipeline.session_name
             t_start, t_delta, t_end = curr_active_pipeline.find_LongShortDelta_times()
-            df = DecoderDecodedEpochsResult.add_session_df_columns(df, session_name=session_name, time_bin_size=None, curr_session_t_delta=t_delta, time_col='ripple_start_t')
-            
-            a_ripple_df = DecoderDecodedEpochsResult.add_session_df_columns(a_ripple_df, session_name=session_name, time_bin_size=None, curr_session_t_delta=t_delta, time_col='ripple_start_t')
+            df = df.across_session_identity.add_session_df_columns(session_name=session_name, time_bin_size=None, curr_session_t_delta=t_delta, time_col='ripple_start_t')
+            a_ripple_df = a_ripple_df.across_session_identity.add_session_df_columns(session_name=session_name, time_bin_size=None, curr_session_t_delta=t_delta, time_col='ripple_start_t')
     
         """
         from neuropy.core.epoch import EpochsAccessor
@@ -4700,7 +4699,7 @@ class AcrossSessionIdentityDataframeAccessor:
         return self.perform_add_session_df_columns(df=df, session_name=session_name, time_bin_size=time_bin_size, custom_replay_source=custom_replay_source, t_start=t_start, curr_session_t_delta=curr_session_t_delta, t_end=t_end, time_col=time_col, end_time_col_name=end_time_col_name, **kwargs)
 
 
-    def split_session_key_col_to_fmt_animal_exper_cols(self, session_key_col: str = 'session_name') -> pd.DataFrame:
+    def split_session_key_col_to_fmt_animal_exper_cols(self, session_key_col: str = 'session_name', separator: str='_') -> pd.DataFrame:
         """ Split 'session_name' to the individual columns:
             adds columns ['format_name', 'animal', 'exper_name', 'session_name'] based on 'session_name'
             
@@ -4709,19 +4708,21 @@ class AcrossSessionIdentityDataframeAccessor:
                 
                 df = df.across_session_identity.split_session_key_col_to_fmt_animal_exper_cols(session_key_col='session_name')
             
+            Usage with Session UIDs:
+                df = df.across_session_identity.split_session_key_col_to_fmt_animal_exper_cols(session_key_col='session_uid', separator='|')
         """
         df: pd.DataFrame = deepcopy(self._obj)
         _added_columns = []
         if session_key_col in df:
             if 'format_name' not in df.columns:
-                df['format_name'] = df[session_key_col].map(lambda x: x.split('_', maxsplit=3)[0]) ## add animal name
+                df['format_name'] = df[session_key_col].map(lambda x: x.split(separator, maxsplit=3)[0]) ## add animal name
             if 'animal' not in df.columns:
-                df['animal'] = df[session_key_col].map(lambda x: x.split('_', maxsplit=3)[1]) ## add animal name
+                df['animal'] = df[session_key_col].map(lambda x: x.split(separator, maxsplit=3)[1]) ## add animal name
                 ## strip the '01' suffix from each
             if 'exper_name' not in df.columns:
-                df['exper_name'] = df[session_key_col].map(lambda x: x.split('_', maxsplit=3)[2]) # not needed
+                df['exper_name'] = df[session_key_col].map(lambda x: x.split(separator, maxsplit=3)[2]) # not needed
             if (('session_name' not in df.columns) and ('session_name' != session_key_col)):
-                df['session_name'] = df[session_key_col].map(lambda x: x.split('_', maxsplit=3)[-1]) # not needed
+                df['session_name'] = df[session_key_col].map(lambda x: x.split(separator, maxsplit=3)[-1]) # not needed
                 
         return df
 

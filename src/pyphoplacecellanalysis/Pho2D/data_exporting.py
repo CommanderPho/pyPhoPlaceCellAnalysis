@@ -989,7 +989,9 @@ class PosteriorExporting:
             custom_suffix_str = custom_replay_parts[0]
             
         else:
-            raise NotImplementedError(f'could not parse curr_export_result_save_properties: {curr_export_result_save_properties}, ')            
+            # raise NotImplementedError(f'could not parse curr_export_result_save_properties: {curr_export_result_save_properties}, ')
+            print(f'ERROR: could not parse curr_export_result_save_properties: {curr_export_result_save_properties} for file: "{load_path.as_posix()}". Skipping those properties but loading anyway.')
+            pass
 
 
         out_dict: Dict = {}
@@ -1537,6 +1539,21 @@ class LoadedPosteriorContainer:
 
         all_sessions_exported_posteriors_dict, all_sessions_exported_posteriors_data_only_dict = LoadedPosteriorContainer.load_batch_hdf5_exports(exported_posterior_data_h5_files=decoded_posteriors_h5_files)
         ## OUTPUTS: all_sessions_exported_posteriors_dict, all_sessions_exported_posteriors_data_only_dict
+        
+        ## Using the outputs:        
+        a_posterior_container: LoadedPosteriorContainer = all_sessions_exported_posteriors_dict['/kdiba/gor01/two/2006-6-12_16-53-46']
+        # list(a_posterior_container.ripple_data_field_dict.keys()) # list(a_posterior_container.ripple_data_field_dict.keys()): ['p_x_given_n', 'p_x_given_n_grey', 'most_likely_positions', 'most_likely_position_indicies', 'time_bin_edges', 't_bin_centers']
+
+        most_likely_positions_dict: Dict[types.DecoderName, List[NDArray]] = a_posterior_container.ripple_data_field_dict['most_likely_positions']
+        t_bin_centers: List[NDArray] = list(a_posterior_container.ripple_data_field_dict['t_bin_centers'].values())[0] ## they're all the same for each decoder, so just get the first decoder's values
+
+        a_decoder_name: str = 'long_LR'
+        t_bin_centers_flat = np.concatenate(t_bin_centers)
+        n_time_bins: int = len(t_bin_centers_flat)
+        most_likely_positions_flat = np.concatenate(most_likely_positions_dict[a_decoder_name])
+        assert np.shape(t_bin_centers_flat) == np.shape(most_likely_positions_flat)
+        print(f'n_time_bins: {n_time_bins}') ## 639? Not so many
+
 
     """
     file_path: Optional[Path] = field(default=None)
