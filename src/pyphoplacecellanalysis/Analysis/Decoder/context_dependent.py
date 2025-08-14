@@ -500,7 +500,7 @@ class GenericDecoderDictDecodedEpochsDictResult(ComputedResult):
                 if debug_print:
                     print(f'\t a_new_data_grain_identifier: "{a_new_data_grain_identifier}"')
                 assert a_new_data_grain_identifier not in self.filter_epochs_decoded_track_marginal_posterior_df_dict
-                self.filter_epochs_decoded_track_marginal_posterior_df_dict[a_new_data_grain_identifier] = deepcopy(a_decoded_marginals_df) 
+                self.filter_epochs_decoded_track_marginal_posterior_df_dict[a_new_data_grain_identifier] = deepcopy(a_decoded_marginals_df) # `a_decoded_marginals_df` has the desired 'most_likely_positions_1D' column
 
                 # TODO 2025-03-20 09:00: - [ ] New Version ___________________________________________________________________________ #
                 ## INPUTS: a_result, masked_bin_fill_mode
@@ -510,7 +510,7 @@ class GenericDecoderDictDecodedEpochsDictResult(ComputedResult):
                 
                 ## MASKED with NaNs (no backfill):
                 a_dropping_masked_pseudo2D_continuous_specific_decoded_result, _dropping_mask_index_tuple = a_decoder_epochs_filter_epochs_decoder_result.mask_computed_DecodedFilterEpochsResult_by_required_spike_counts_per_time_bin(spikes_df=deepcopy(spikes_df), masked_bin_fill_mode=masked_bin_fill_mode) ## Masks the low-firing bins so they don't confound the analysis.
-                ## Computes marginals for `dropping_masked_laps_pseudo2D_continuous_specific_decoded_result`
+                ## Computes marginals for `dropping_masked_laps_pseudo2D_continuous_specific_decoded_result` -- The loss of the 'most_likely_positions_1D' must be happening here -- confirmed previous step does not cause loss in the `a_decoded_marginals_df` variable at least while the next step does.
                 a_dropping_masked_decoded_marginal_posterior_df = DirectionalPseudo2DDecodersResult.perform_compute_specific_marginals(a_result=a_dropping_masked_pseudo2D_continuous_specific_decoded_result, marginal_context=a_masked_updated_context)
                 
                 _was_update_success = self.updating_results_for_context(new_context=a_masked_updated_context, a_result=deepcopy(a_dropping_masked_pseudo2D_continuous_specific_decoded_result), a_decoder=deepcopy(all_directional_pf1D_Decoder), a_decoded_marginal_posterior_df=deepcopy(a_dropping_masked_decoded_marginal_posterior_df)) ## update using the result

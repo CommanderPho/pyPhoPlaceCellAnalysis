@@ -1695,7 +1695,6 @@ class DirectionalPseudo2DDecodersResult(ComputedResult):
             epoch_start_t_col_name='epoch_start_t'
             additional_transfer_column_names=['start', 'stop', 'label', 'duration']
 
-
         elif known_named_decoding_epochs_type in ('replay', 'ripple', 'non_pbe', 'non_pbe_endcaps'):
             # Case: Per-epoch any marginals
             epoch_idx_col_name='epoch_idx'
@@ -1709,7 +1708,8 @@ class DirectionalPseudo2DDecodersResult(ComputedResult):
 
         if data_grain == 'per_time_bin':
             
-            additional_column_kwargs = dict(epoch_idx_col_name=epoch_idx_col_name, epoch_start_t_col_name=None, additional_transfer_column_names=None) # set to None because we aren't doing epochs, we're doing time bins , epoch_start_t_col_name=epoch_start_t_col_name, additional_transfer_column_names=additional_transfer_column_names
+            additional_column_kwargs = dict(epoch_idx_col_name=epoch_idx_col_name, epoch_start_t_col_name=None, additional_transfer_column_names=None) # set to None because we aren't doing epochs, we're doing time bins, so epoch-specific columns shouldn't be duplicated for every timebin unless we're sure about it.
+            #  , epoch_start_t_col_name=epoch_start_t_col_name, additional_transfer_column_names=additional_transfer_column_names
         
             if (not is_four_tuple_pseudo2D_decoder):
                 ## 2-tuple method
@@ -1720,7 +1720,7 @@ class DirectionalPseudo2DDecodersResult(ComputedResult):
                 ## Build into a marginal df like `all_sessions_laps_df` - uses `time_window_centers`, pseudo2D_continuous_specific_decoded_result, non_PBE_marginal_over_track_ID:
                 track_marginal_posterior_df : pd.DataFrame = deepcopy(a_marginal_over_track_ID_posterior_df) # pd.DataFrame({'t':deepcopy(time_window_centers), 'P_Long': np.squeeze(non_PBE_marginal_over_track_ID[0, :]), 'P_Short': np.squeeze(non_PBE_marginal_over_track_ID[1, :]), 'time_bin_size': pseudo2D_continuous_specific_decoded_result.decoding_time_bin_size})
                 epoch_time_bin_marginals_df = track_marginal_posterior_df
-                return epoch_time_bin_marginals_df
+                return epoch_time_bin_marginals_df ## this would run without the 'most_likely_positions_1D' column
 
             else:
                 ## standard (4-tuple) method
@@ -1740,7 +1740,7 @@ class DirectionalPseudo2DDecodersResult(ComputedResult):
                     (ripple_directional_marginals_tuple, ripple_track_identity_marginals_tuple, ripple_non_marginalized_decoder_marginals_tuple), _ = a_result.compute_marginals(
                         epoch_idx_col_name='ripple_idx', 
                         epoch_start_t_col_name='ripple_start_t',
-                        additional_transfer_column_names=['start', 'stop', 'label', 'duration']
+                        additional_transfer_column_names=['start', 'stop', 'label', 'duration'] + ['most_likely_positions_1D'], ## adding in this 'most_likely_positions_1D' portion changed nothing
                     )
                     
                     # Expanded implementation of build_ripple_time_bin_marginals_df
@@ -1754,7 +1754,7 @@ class DirectionalPseudo2DDecodersResult(ComputedResult):
                     (epoch_directional_marginals_tuple, epoch_track_identity_marginals_tuple, epoch_non_marginalized_decoder_marginals_tuple), _ = a_result.compute_marginals(
                         epoch_idx_col_name='epoch_idx',
                         epoch_start_t_col_name='epoch_start_t',
-                        additional_transfer_column_names=['start', 'stop', 'label', 'duration']
+                        additional_transfer_column_names=['start', 'stop', 'label', 'duration'] + ['most_likely_positions_1D'],
                     )
                     
                     # Expanded implementation of build_epoch_time_bin_marginals_df
@@ -1784,7 +1784,7 @@ class DirectionalPseudo2DDecodersResult(ComputedResult):
                 # Common (success) marginal code _____________________________________________________________________________________ #
                 epoch_time_bin_marginals_df = a_result.build_per_time_bin_marginals_df(
                     active_marginals_tuple=(epoch_directional_marginals, epoch_track_identity_marginals, non_marginalized_decoder_marginals), 
-                    columns_tuple=columns_tuple
+                    columns_tuple=columns_tuple ## Maybe `columns_tuple` is the problem, as it might be `(['P_Long', 'P_Short'])` only which would explain what was returned.
                 )
             ## END if is_track_....
             
@@ -2192,6 +2192,9 @@ class DirectionalPseudo2DDecodersResult(ComputedResult):
         else:
             if (epoch_start_t_col_name is not None) or (additional_transfer_column_names is not None):
                 print(f'\tWARN: len(epochs_df): {len(tentative_epochs_df)} != len(track_marginal_posterior_df): {len(track_marginal_posterior_df)}. This is expected in time_bin grain (see TODO 2025-03-26 14:27), but you probably called this with the wrong arguments!')
+
+
+        #TODO 2025-08-14 11:52: - [ ] Could add the 'most_likely_positions_1D' column here in a manner similar to the other method
 
         return custom_curr_unit_marginal_list, track_marginal_posterior_df
 
