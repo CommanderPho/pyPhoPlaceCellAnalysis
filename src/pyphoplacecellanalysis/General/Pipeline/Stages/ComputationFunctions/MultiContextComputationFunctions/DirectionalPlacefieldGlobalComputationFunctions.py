@@ -5627,6 +5627,37 @@ class TrialByTrialActivityResult(ComputedResult):
         appearing_aclus, disappearing_aclus, appearing_or_disappearing_aclus, stable_both_aclus, stable_neither_aclus, stable_long_aclus, stable_short_aclus = neuron_group_split_stability_aclus_tuple
         return (stability_df, neuron_group_split_stability_dfs_tuple, neuron_group_split_stability_aclus_tuple)
 
+
+    @function_attributes(short_name=None, tags=['figure', 'napari', 'visualization'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-08-15 13:21', related_items=[])
+    def plot_napari_trial_by_trial_correlation_matrix(self, include_trial_by_trial_correlation_matrix:bool=True):
+        """ Produces 5 Napari windows to display the trial-by-trial correlation matricies for each of the decoders.
+
+        aTbyT:TrialByTrialActivity = a_trial_by_trial_result.directional_active_lap_pf_results_dicts['long_LR']
+        aTbyT.C_trial_by_trial_correlation_matrix.shape # (40, 21, 21)
+        aTbyT.z_scored_tuning_map_matrix.shape # (21, 40, 57) (n_epochs, n_neurons, n_pos_bins)
+
+        (directional_viewer, directional_image_layer_dict, custom_direction_split_layers_dict) = aTbyT.plot_napari_trial_by_trial_correlation_matrix(directional_active_lap_pf_results_dicts=a_trial_by_trial_result.directional_active_lap_pf_results_dicts)
+        """
+        import napari
+        from pyphoplacecellanalysis.GUI.Napari.napari_helpers import napari_plot_directional_trial_by_trial_activity_viz, napari_trial_by_trial_activity_viz, napari_export_image_sequence
+
+
+        directional_active_lap_pf_results_dicts: Dict[types.DecoderName, "TrialByTrialActivity"] = deepcopy(self.directional_active_lap_pf_results_dicts)
+
+        ## Directional
+        directional_viewer, directional_image_layer_dict, custom_direction_split_layers_dict = napari_plot_directional_trial_by_trial_activity_viz(directional_active_lap_pf_results_dicts, include_trial_by_trial_correlation_matrix=include_trial_by_trial_correlation_matrix)
+    
+        for a_decoder_name, a_result in directional_active_lap_pf_results_dicts.items():
+            ## Global:
+            viewer, image_layer_dict = napari_trial_by_trial_activity_viz(a_result.z_scored_tuning_map_matrix, a_result.C_trial_by_trial_correlation_matrix, title=f'Trial-by-trial Correlation Matrix C - Decoder {a_decoder_name}', axis_labels=('aclu', 'lap', 'xbin')) # GLOBAL
+            
+        ## Global:
+        # viewer, image_layer_dict = napari_trial_by_trial_activity_viz(z_scored_tuning_map_matrix, C_trial_by_trial_correlation_matrix, title='Trial-by-trial Correlation Matrix C', axis_labels=('aclu', 'lap', 'xbin')) # GLOBAL
+
+        return (directional_viewer, directional_image_layer_dict, custom_direction_split_layers_dict)
+    
+
+
 def _workaround_validate_has_directional_trial_by_trial_activity_result(curr_active_pipeline, computation_filter_name='maze') -> bool:
     """ Validates `_build_trial_by_trial_activity_metrics`
     """
