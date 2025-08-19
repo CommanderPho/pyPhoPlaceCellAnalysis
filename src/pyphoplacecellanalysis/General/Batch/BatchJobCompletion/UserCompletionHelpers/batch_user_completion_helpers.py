@@ -3403,7 +3403,7 @@ def generalized_decode_epochs_dict_and_export_results_completion_function(self, 
 
 @function_attributes(short_name=None, tags=['figure', 'posterior', 'hairly-plot'], input_requires=[], output_provides=[], uses=['_display_generalized_decoded_yellow_blue_marginal_epochs', '_display_decoded_trackID_marginal_hairy_position', '_display_decoded_trackID_weighted_position_posterior_withMultiColorOverlay'], used_by=[], creation_date='2025-05-16 15:17', related_items=['generalized_decode_epochs_dict_and_export_results_completion_function'])
 def figures_plot_generalized_decode_epochs_dict_and_export_results_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict,
-                                                                                        included_figures_names=['_display_directional_merged_pf_decoded_stacked_epoch_slices', '_display_generalized_decoded_yellow_blue_marginal_epochs', '_display_decoded_trackID_marginal_hairy_position', '_display_decoded_trackID_weighted_position_posterior_withMultiColorOverlay'],
+                                                                                        included_figures_names=['_display_directional_merged_pf_decoded_stacked_epoch_slices', '_display_generalized_decoded_yellow_blue_marginal_epochs', '_display_decoded_trackID_marginal_hairy_position', '_display_decoded_trackID_weighted_position_posterior_withMultiColorOverlay', '_display_placefield_stable_formation_time_distribution'],
                                                                                         extreme_threshold: float=0.8, opacity_max:float=0.7, thickness_ramping_multiplier:float=35.0,
                                                                                         **additional_marginal_overlaying_measured_position_kwargs) -> dict:
     """ Multi-purpose batch display function that just plots the figures so we don't have to wait for the entire batch_figures_plotting on 2025-04-16 15:22.
@@ -3597,6 +3597,32 @@ def figures_plot_generalized_decode_epochs_dict_and_export_results_completion_fu
         except Exception as e:
             print(f'\tfigures_plot_generalized_decode_epochs_dict_and_export_results_completion_function(...): "_display_decoded_trackID_weighted_position_posterior_withMultiColorOverlay" failed with error: {e}\n skipping.')
             raise
+
+
+
+    # ==================================================================================================================================================================================================================================================================================== #
+    # `_display_placefield_stable_formation_time_distribution`                                                                                                                                                                                                                             #
+    # ==================================================================================================================================================================================================================================================================================== #
+    if ('_display_placefield_stable_formation_time_distribution' in included_figures_names) or ('pf_stable_formation_time' in included_figures_names):
+        print(f'\t trying "_display_placefield_stable_formation_time_distribution"')
+        try:
+            display_context = curr_active_pipeline.build_display_context_for_session(display_fn_name='pf_stable_formation_time')
+            _out = curr_active_pipeline.display('_display_placefield_stable_formation_time_distribution', display_context, defer_render=True, save_figure=True,
+                                                # override_fig_man=custom_fig_man, 
+                                                parent_output_folder=custom_figure_output_path,
+                                            )
+            
+            across_session_results_extended_dict['figures_plot_generalized_decode_epochs_dict_and_export_results_completion_function'].update({
+                '_display_placefield_stable_formation_time_distribution': _out,
+            })
+            
+
+        except Exception as e:
+            print(f'\tfigures_plot_generalized_decode_epochs_dict_and_export_results_completion_function(...): "_display_placefield_stable_formation_time_distribution" failed with error: {e}\n skipping.')
+            raise
+
+
+
 
 
     print(f'>>\t done with {curr_session_context}')
