@@ -177,7 +177,8 @@ class AcluFirstPlacefieldStabilityThresholdFigure:
             # subdiv_df_outputs[a_decoder_name] = deepcopy(subdiv_df)
             _a_pf1D_dt_snapshots = a_pf1D_dt.batch_snapshotting(subdiv_df, is_start_relative_t=False, reset_at_start=True)
             included_neuron_IDs = deepcopy(a_pf1D_dt.included_neuron_IDs)
-            pf1D_dt_snapshot_outputs[a_decoder_name] = deepcopy(_a_pf1D_dt_snapshots)
+            # pf1D_dt_snapshot_outputs[a_decoder_name] = deepcopy(_a_pf1D_dt_snapshots)
+            pf1D_dt_snapshot_outputs[a_decoder_name] = _a_pf1D_dt_snapshots
             pf1D_dt_outputs[a_decoder_name] = a_pf1D_dt
             _outs = PfND_TimeDependent.find_aclu_stabilizing_times(_a_pf1D_dt_snapshots=_a_pf1D_dt_snapshots, included_neuron_IDs=included_neuron_IDs, fr_threshold_Hz=fr_threshold_Hz)
             # (aclu_first_firing_snapshot_duration_fraction, aclu_first_firing_snapshot_timestep, aclu_first_firing_snapshot_idx), (snapshot_timestamps, _a_pf1D_dt_snapshots) = _outs ## Unpack
