@@ -238,10 +238,22 @@ class AcluFirstPlacefieldStabilityThresholdFigure:
 
         axes_list = None
         if extant_ax is not None:
-            axes_list = [extant_ax]
+            raise NotImplementedError(f'OH NO')
+            # axes_list = [extant_ax]
             
-        
-        
+        fig = plt.figure(layout="constrained", figsize=(24, 10), clear=True)
+        ax_dict = fig.subplot_mosaic(
+            [
+                ["ax_cum_hist"],
+                ["ax_main"],
+            ],
+            # set the height ratios between the rows
+            height_ratios=[2, 8],
+            # height_ratios=[1, 1],
+            sharex=True,
+            gridspec_kw=dict(wspace=0, hspace=0) # `wspace=0`` is responsible for sticking the pf and the activity axes together with no spacing
+        )
+        axes_list = [ax_dict['ax_main']]
         plot_laps_kwargs = dict(include_velocity=False, include_accel=False, figsize=(24, 10), axes_list=axes_list, span_where_kwargs=dict(alpha=0.1))
         fig, out_axes_list = plot_laps_2d(global_session, legacy_plotting_mode=True, **plot_laps_kwargs)
         ax = out_axes_list[0]
@@ -253,6 +265,8 @@ class AcluFirstPlacefieldStabilityThresholdFigure:
 
         # decoder_template_names = (long_LR_name, long_RL_name, short_LR_name, short_RL_name)
         decoder_template_names = track_templates.get_decoder_names()
+        long_decoder_names = track_templates.get_decoder_names()[:2]
+        short_decoder_names = track_templates.get_decoder_names()[2:]
 
         ## INPUTS: decoder_template_names
         snap_t_col_names = [f'snap_t_{a_decoder_name}' for a_decoder_name in decoder_template_names] # ['snap_t_long_LR', 'snap_t_long_RL', 'snap_t_short_LR', 'snap_t_short_RL']
@@ -308,9 +322,20 @@ class AcluFirstPlacefieldStabilityThresholdFigure:
         ax.set_title("First Neuron Pf Significant Time")
 
         ax.set_ylim(ymin, ymax)
-        plt.show()
 
-        return fig, ax
+        ## Histogram of cells over time plotted on `ax_dict["ax_cum_hist"]`:        
+        long_col_names = active_cols[:2]
+        short_col_names = active_cols[2:]
+
+        long_aclu_times = np.concatenate([df_merged[a_col].to_numpy()[np.logical_not(np.isnan(df_merged[a_col].to_numpy()))] for a_col in long_col_names]) ## all long_times flattened
+        short_aclu_times = np.concatenate([df_merged[a_col].to_numpy()[np.logical_not(np.isnan(df_merged[a_col].to_numpy()))] for a_col in short_col_names]) ## all long_times flattened
+
+        long_hist_artist = ax_dict['ax_cum_hist'].hist(x=long_aclu_times, cumulative=True, label='long')
+        short_hist_artist = ax_dict['ax_cum_hist'].hist(x=short_aclu_times, cumulative=True, label='short')
+        
+        # plt.show()
+
+        return fig, ax_dict
 
 
 # ==================================================================================================================================================================================================================================================================================== #

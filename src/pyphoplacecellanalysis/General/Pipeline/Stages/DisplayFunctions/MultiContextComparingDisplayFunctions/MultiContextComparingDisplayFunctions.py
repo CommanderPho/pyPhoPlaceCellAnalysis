@@ -697,6 +697,207 @@ class MultiContextComparingDisplayFunctions(AllFunctionEnumeratingMixin, metacla
     
 
 
+    @function_attributes(short_name='pf_stable_formation_time', tags=['pf-formation', 'stability', 'directional'], conforms_to=['output_registering', 'figure_saving'], input_requires=[], output_provides=[], requires_global_keys=["global_computation_results.computed_data['DirectionalLaps']"], uses=['AcluFirstPlacefieldStabilityThresholdFigure', 'FigureCollector'], used_by=[], creation_date='2025-08-19 00:00', related_items=[], is_global=True)
+    def _display_placefield_stable_formation_time_distribution(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, save_figure=True, size=[6.5, 2], dpi=100, constrained_layout=True, override_fig_man: Optional[FileOutputManager]=None, **kwargs):
+            """ Plots the measured vs. decoded occupancy (position) for each of the four decoders for both Pre-delta and Post-delta.
+            
+            Usage:
+            
+                curr_active_pipeline.reload_default_display_functions()
+
+                _out = curr_active_pipeline.display('_display_placefield_stable_formation_time_distribution')
+
+            """
+            from neuropy.utils.result_context import IdentifyingContext
+            from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import AcluFirstPlacefieldStabilityThresholdFigure
+
+            import matplotlib as mpl
+            import matplotlib.pyplot as plt
+            from flexitext import flexitext ## flexitext for formatted matplotlib text
+            from pyphocorehelpers.DataStructure.RenderPlots.MatplotLibRenderPlots import FigureCollector
+            from neuropy.utils.matplotlib_helpers import FormattedFigureText
+            from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import DirectionalLapsResult, TrackTemplates
+            from pyphoplacecellanalysis.SpecificResults.PhoDiba2023Paper import PhoPublicationFigureHelper
+
+            display_fn_name: str = 'pf_stable_formation_time' # same as "short_name"
+
+            export_dpi_multiplier: float = kwargs.pop('export_dpi_multiplier', 2.0)
+            export_dpi: int = int(np.ceil(dpi * export_dpi_multiplier))
+            
+            # ==================================================================================================================================================================================================================================================================================== #
+            # BEGIN FUNCTION BODY                                                                                                                                                                                                                                                                  #
+            # ==================================================================================================================================================================================================================================================================================== #
+
+            ## Unpack from pipeline:
+            # valid_EpochComputations_result: EpochComputationsComputationsContainer = owning_pipeline_reference.global_computation_results.computed_data['EpochComputations'] # owning_pipeline_reference.global_computation_results.computed_data['EpochComputations']
+            # assert valid_EpochComputations_result is not None
+            # epochs_decoding_time_bin_size: float = valid_EpochComputations_result.epochs_decoding_time_bin_size ## just get the standard size. Currently assuming all things are the same size!
+            # print(f'\tepochs_decoding_time_bin_size: {epochs_decoding_time_bin_size}')
+            # assert epochs_decoding_time_bin_size == valid_EpochComputations_result.epochs_decoding_time_bin_size, f"\tERROR: nonPBE_results.epochs_decoding_time_bin_size: {valid_EpochComputations_result.epochs_decoding_time_bin_size} != epochs_decoding_time_bin_size: {epochs_decoding_time_bin_size}"
+            # a_new_fully_generic_result: GenericDecoderDictDecodedEpochsDictResult = valid_EpochComputations_result.a_generic_decoder_dict_decoded_epochs_dict_result ## get existing
+
+            ## INPUTS: a_new_fully_generic_result
+            # a_target_context: IdentifyingContext = IdentifyingContext(trained_compute_epochs='laps', pfND_ndim=1, decoder_identifier='pseudo2D', known_named_decoding_epochs_type='global', masked_time_bin_fill_type='nan_filled', data_grain='per_time_bin')
+            # a_target_context: IdentifyingContext = IdentifyingContext(trained_compute_epochs='laps', pfND_ndim=1, decoder_identifier='pseudo2D', known_named_decoding_epochs_type='global', masked_time_bin_fill_type='ignore', data_grain='per_time_bin')
+            # best_matching_context, a_result, a_decoder, a_decoded_marginal_posterior_df = a_new_fully_generic_result.get_results_best_matching_context(context_query=a_target_context, debug_print=False)
+            # epochs_decoding_time_bin_size = best_matching_context.get('time_bin_size', None)
+            # assert epochs_decoding_time_bin_size is not None
+
+            ## Get the needed data:
+
+            ## get from parameters:
+            minimum_inclusion_fr_Hz: float = owning_pipeline_reference.global_computation_results.computation_config.rank_order_shuffle_analysis.minimum_inclusion_fr_Hz
+            included_qclu_values: List[int] = owning_pipeline_reference.global_computation_results.computation_config.rank_order_shuffle_analysis.included_qclu_values
+
+            directional_laps_results: DirectionalLapsResult = owning_pipeline_reference.global_computation_results.computed_data['DirectionalLaps']
+            track_templates: TrackTemplates = directional_laps_results.get_templates(minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz, included_qclu_values=included_qclu_values) # non-shared-only -- !! Is minimum_inclusion_fr_Hz=None the issue/difference?
+            
+            ## OUTPUTS: a_decoded_marginal_posterior_df
+
+            complete_session_context, (session_context, additional_session_context) = owning_pipeline_reference.get_complete_session_context()
+
+            active_context = kwargs.pop('active_context', None)
+            if active_context is not None:
+                # Update the existing context:
+                display_context = active_context.adding_context('display_fn', display_fn_name=display_fn_name)
+            else:
+                # active_context = owning_pipeline_reference.sess.get_context()
+                active_context = deepcopy(complete_session_context) # owning_pipeline_reference.sess.get_context()
+                
+                # Build the active context directly:
+                display_context = owning_pipeline_reference.build_display_context_for_session(display_fn_name)
+
+            fignum = kwargs.pop('fignum', None)
+            if fignum is not None:
+                print(f'WARNING: fignum will be ignored but it was specified as fignum="{fignum}"!')
+
+
+            ## OUTPUTS: active_context, display_context
+            
+            # ==================================================================================================================================================================================================================================================================================== #
+            # Add display function critical parameters                                                                                                                                                                                                                                             #
+            # ==================================================================================================================================================================================================================================================================================== #
+            # active_display_context = deepcopy(display_context) #.overwriting_context(extreme_threshold=extreme_threshold, opacity_max=opacity_max, thickness_ramping_multiplier=thickness_ramping_multiplier) ## include any that are just the slightest big different
+            
+            active_display_context = display_context ## include any that are just the slightest big different
+            active_display_context = active_display_context.overwriting_context(minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz, included_qclu_values=included_qclu_values) ## include any that are just the slightest big different
+
+
+            # perform_write_to_file_callback = kwargs.pop('perform_write_to_file_callback', (lambda final_context, fig: owning_pipeline_reference.output_figure(final_context, fig)))
+
+            # global_measured_position_df: pd.DataFrame = deepcopy(owning_pipeline_reference.sess.position.to_dataframe())
+            # a_decoded_marginal_posterior_df: pd.DataFrame = _helper_add_interpolated_position_columns_to_decoded_result_df(a_result=a_result, a_decoder=a_decoder, a_decoded_marginal_posterior_df=a_decoded_marginal_posterior_df, global_measured_position_df=global_measured_position_df)
+
+            ## Do required computation:
+            df_merged, decoder_outputs, pf1D_dt_outputs, pf1D_dt_snapshot_outputs = AcluFirstPlacefieldStabilityThresholdFigure._compute_for_all_decoders(owning_pipeline_reference, track_templates, fr_threshold_Hz=minimum_inclusion_fr_Hz)
+
+            # ==================================================================================================================================================================================================================================================================================== #
+            # Start Building Figure                                                                                                                                                                                                                                                                #
+            # ==================================================================================================================================================================================================================================================================================== #
+
+            graphics_output_dict = {}
+
+            if override_fig_man is not None:
+                print(f'override_fig_man is not None! Custom output path will be used!')
+                test_display_output_path = override_fig_man.get_figure_save_file_path(active_display_context, make_folder_if_needed=False)
+                print(f'\ttest_display_output_path: "{test_display_output_path}"')
+    
+
+            def _perform_write_to_file_callback(final_context, fig):
+                """ captures: override_fig_man, export_dpi """
+                if save_figure:
+                    return owning_pipeline_reference.output_figure(final_context, fig, override_fig_man=override_fig_man, dpi=export_dpi, write_vector_format=True, write_png=False)
+                else:
+                    pass # do nothing, don't save
+                
+            # ==================================================================================================================================================================================================================================================================================== #
+            # Titles/Formatting/Marginas and Saving                                                                                                                                                                                                                                                #
+            # ==================================================================================================================================================================================================================================================================================== #
+            def _subfn_apply_formatting_footer_and_etc(fig, figure_title: str, subtitle_string: Optional[str]=None, an_active_display_context: IdentifyingContext=None, graphics_output_dict=None):
+                """ builds titles, footers, etc
+
+                Captures: _subfn_apply_formatting_footer_and_etc
+
+                """
+                if graphics_output_dict is None:
+                    graphics_output_dict = {}
+                # active_config = deepcopy(a_decoder.pf.config)
+
+                # subtitle_string = active_config.str_for_display(is_2D=False) # , normal_to_extras_line_sep=","
+                if subtitle_string is not None:
+                    # subtitle_string = f"{subtitle_string} - only extreme context probs (P(Ctx) > {extreme_threshold}) are shown"
+                    print(f'subtitle_string: {subtitle_string}')
+
+                # print(f'subtitle_string: {subtitle_string}')
+
+                ## BUild figure titles:
+                # INPUTS: main_fig
+                # fig.suptitle('')
+                # out_axes_list[0].set_title('')
+                
+                # text_formatter = FormattedFigureText() # .init_from_margins(left_margin=0.01)
+                # text_formatter.setup_margins(fig, left_margin=0.01) # , left_margin=0.1
+                text_formatter = FormattedFigureText.init_from_margins(left_margin=0.01, right_margin=0.99) # , top_margin=0.9
+                # text_formatter.setup_margins(fig, left_margin=0.01, top_margin=0.9)
+                text_formatter.setup_margins(fig)
+                title_string: str = f"{display_fn_name}: {figure_title}"
+                # session_footer_string: str =  active_context.get_description(subset_includelist=['format_name', 'animal', 'exper_name', 'session_name'], separator=' | ') 
+                session_footer_string: str =  active_context.get_description(separator=' | ') 
+
+                # subtitle_string = '\n'.join([f'{active_config.str_for_display(is_2D)}'])
+                # header_text_obj = flexitext(text_formatter.left_margin, 0.9, f'<size:22><weight:bold>{title_string}</></>\n<size:10>{subtitle_string}</>', va="bottom", xycoords="figure fraction") # , wrap=False
+                formatted_title_str: str = f'<size:20><weight:bold>{title_string}</></>'
+                if subtitle_string is not None:
+                    formatted_title_str = formatted_title_str + f'\n<size:9>{subtitle_string}</>'
+                                    
+
+                header_text_obj = flexitext(0.01, 0.85, formatted_title_str, va="bottom", xycoords="figure fraction") # , wrap=False
+                footer_text_obj = text_formatter.add_flexitext_context_footer(active_context=active_context) # flexitext((text_formatter.left_margin*0.1), (text_formatter.bottom_margin*0.25), text_formatter._build_footer_string(active_context=active_context), va="top", xycoords="figure fraction")
+                
+                complete_title_string: str = f"{title_string} - {session_footer_string}"
+                # complete_title_string: str = f"{complete_title_string} - {subtitle_string}"
+                
+                window_title_string: str = complete_title_string
+                
+                try:
+                    fig.canvas.manager.set_window_title(window_title_string) # sets the window's title
+                except AttributeError as e:
+                    ## Missing canvas to set widnow title of
+                    print(f'Could not set window title with error: {e}. Continuing...')
+                except Exception as e:
+                    raise e
+
+                if ((_perform_write_to_file_callback is not None) and (an_active_display_context is not None)):
+                    _perform_write_to_file_callback(an_active_display_context, fig)
+
+                graphics_output_dict['label_objects'] = {'header': header_text_obj, 'footer': footer_text_obj, 'formatter': text_formatter}
+                return graphics_output_dict
+
+
+
+            with mpl.rc_context(PhoPublicationFigureHelper.rc_context_kwargs({'figure.dpi': str(dpi), 'figure.constrained_layout.use': (constrained_layout or False), 'figure.frameon': False, 'figure.figsize': size, })): # 'figure.figsize': (12.4, 4.8), 
+                # Create a FigureCollector instance
+                with FigureCollector(name=display_fn_name, base_context=active_display_context) as collector:
+                    # from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import _perform_plot_hairy_overlayed_position
+
+                    ## INPUTS: a_decoded_marginal_posterior_df
+ 
+                    ## Laps context:
+                    figure_title ='Placefield First Signifiance Time'
+                    an_active_display_context = active_display_context.overwriting_context(figure_title=figure_title)
+                    fig, ax_dict = AcluFirstPlacefieldStabilityThresholdFigure.plot_aclus_first_significance_figure(curr_active_pipeline=owning_pipeline_reference, track_templates=track_templates, df_merged=df_merged, is_delta_relative=False)                    
+                    _graphics_output_dict = _subfn_apply_formatting_footer_and_etc(fig, figure_title=figure_title, subtitle_string=None, an_active_display_context=an_active_display_context)
+                    collector.post_hoc_append(figs=[fig,], axes=ax_dict, contexts=[an_active_display_context])
+
+            ## END with mpl.rc_context({'figure.dpi': '...
+
+            graphics_output_dict['collector'] = collector
+
+            return graphics_output_dict
+    
+
+
+
 
 # ==================================================================================================================== #
 # Private Display Helpers                                                                                              #
