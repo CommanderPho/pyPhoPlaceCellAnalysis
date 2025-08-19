@@ -113,6 +113,210 @@ from pyphoplacecellanalysis.General.Model.Configs.LongShortDisplayConfig import 
 from pyphocorehelpers.gui.Qt.color_helpers import ColormapHelpers, ColorFormatConverter, debug_print_color, build_adjusted_color
 
 
+
+# ==================================================================================================================================================================================================================================================================================== #
+# 2025-08-19 - Each Cell's Time of reaching pf inclusion criteria                                                                                                                                                                                                                      #
+# ==================================================================================================================================================================================================================================================================================== #
+
+from neuropy.core.epoch import subdivide_epochs, ensure_dataframe
+from neuropy.analyses.time_dependent_placefields import PfND_TimeDependent
+import matplotlib.pyplot as plt
+import numpy as np
+
+@metadata_attributes(short_name=None, tags=['pf1D_dt', 'aclu', 'stability', 'pf'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-08-18 14:24', related_items=[])
+class AcluFirstPlacefieldStabilityThresholdFigure:
+    """ plot the time that each cell crossed the stability threshold (on the occupancy normalized pf)
+    from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import AcluFirstPlacefieldStabilityThresholdFigure
+
+    df_merged, decoder_outputs, pf1D_dt_outputs, pf1D_dt_snapshot_outputs = AcluFirstPlacefieldStabilityThresholdFigure._compute_for_all_decoders(curr_active_pipeline, track_templates, fr_threshold_Hz=2.0)
+    df_merged
+    fig, ax = AcluFirstPlacefieldStabilityThresholdFigure.plot_aclus_first_significance_figure(curr_active_pipeline=curr_active_pipeline, track_templates=track_templates, df_merged=df_merged, is_delta_relative=False)
+    
+    """
+    @classmethod
+    def _compute_for_all_decoders(cls, curr_active_pipeline, track_templates, subdivide_bin_size: float = 0.050, fr_threshold_Hz: float = 1.0) -> pd.DataFrame:
+        """ Computes the first-significance time for each aclu within each decoder
+
+        Usage:
+            from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import AcluFirstPlacefieldStabilityThresholdFigure
+            
+            df_merged, decoder_outputs, pf1D_dt_outputs, pf1D_dt_snapshot_outputs = AcluFirstPlacefieldStabilityThresholdFigure._compute_for_all_decoders(curr_active_pipeline, track_templates, fr_threshold_Hz=2.0)
+            # 10m+ not sure why I started taking so long, I think I just modified the return values (returning more of them)
+
+        """
+        # an_epoch_results = long_LR_results
+
+        # track_templates: TrackTemplates = directional_laps_results.get_templates(minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz, included_qclu_values=included_qclu_values) # non-shared-only
+        # long_LR_decoder, long_RL_decoder, short_LR_decoder, short_RL_decoder = track_templates.get_decoders()
+
+        # # Unpack all directional variables:
+        ## INPUTS: long_LR_epochs_obj, long_RL_epochs_obj, short_LR_epochs_obj, short_RL_epochs_obj
+        # decoder_template_names = (long_LR_name, long_RL_name, short_LR_name, short_RL_name)
+        decoder_template_names = track_templates.get_decoder_names()
+        ## These are the "*_odd"/"*_even" names:
+        long_LR_name, short_LR_name, long_RL_name, short_RL_name = ['maze1_odd', 'maze2_odd', 'maze1_even', 'maze2_even'] ## OLD style
+        # Unpacking for `(long_LR_name, long_RL_name, short_LR_name, short_RL_name)`
+        long_LR_epochs_obj, long_RL_epochs_obj, short_LR_epochs_obj, short_RL_epochs_obj = [curr_active_pipeline.computation_results[an_epoch_name].computation_config.pf_params.computation_epochs for an_epoch_name in (long_LR_name, long_RL_name, short_LR_name, short_RL_name)] # note has global also
+        (long_LR_results, long_RL_results, short_LR_results, short_RL_results) = [curr_active_pipeline.computation_results[an_epoch_name].computed_data for an_epoch_name in (long_LR_name, long_RL_name, short_LR_name, short_RL_name)]
+
+        epoch_results_objs_dict = dict(zip(decoder_template_names, (long_LR_results, long_RL_results, short_LR_results, short_RL_results)))
+        epochs_objs_dict = dict(zip(decoder_template_names, (long_LR_epochs_obj, long_RL_epochs_obj, short_LR_epochs_obj, short_RL_epochs_obj)))
+
+        pf1D_dt_outputs = {}
+        pf1D_dt_snapshot_outputs = {}
+        # subdiv_df_outputs = {}
+        decoder_outputs = {}
+
+        ## Loop through each epoch:
+        for a_decoder_name, an_epoch_results in epoch_results_objs_dict.items():    
+            a_pf1D_dt: PfND_TimeDependent = deepcopy(an_epoch_results.pf1D_dt)
+            df: pd.DataFrame = ensure_dataframe(deepcopy(epochs_objs_dict[a_decoder_name])) ## Should be the laps
+            df['epoch_type'] = 'lap'
+            df['interval_type_id'] = 666 ## sentinal value, unsure what the 'interval_type_id' was used for but it's better to have it unique. 
+            subdiv_df: pd.DataFrame = subdivide_epochs(df, subdivide_bin_size)
+            # subdiv_df_outputs[a_decoder_name] = deepcopy(subdiv_df)
+            _a_pf1D_dt_snapshots = a_pf1D_dt.batch_snapshotting(subdiv_df, is_start_relative_t=False, reset_at_start=True)
+            included_neuron_IDs = deepcopy(a_pf1D_dt.included_neuron_IDs)
+            pf1D_dt_snapshot_outputs[a_decoder_name] = deepcopy(_a_pf1D_dt_snapshots)
+            pf1D_dt_outputs[a_decoder_name] = a_pf1D_dt
+            _outs = PfND_TimeDependent.find_aclu_stabilizing_times(_a_pf1D_dt_snapshots=_a_pf1D_dt_snapshots, included_neuron_IDs=included_neuron_IDs, fr_threshold_Hz=fr_threshold_Hz)
+            # (aclu_first_firing_snapshot_duration_fraction, aclu_first_firing_snapshot_timestep, aclu_first_firing_snapshot_idx), (snapshot_timestamps, _a_pf1D_dt_snapshots) = _outs ## Unpack
+            _aclu_first_firing_tuple, (snapshot_timestamps, _a_pf1D_dt_snapshots) = _outs
+            # decoder_outputs[a_decoder_name] = _outs
+            decoder_outputs[a_decoder_name] = _aclu_first_firing_tuple ## Just the firing rate tuple
+            
+        ## 3m 47s
+        ## Build combined data columns:
+        data_col_names = ['duration_fraction', 'snap_t', 'snap_idx']
+
+        outs_df = []
+        for a_decoder_name, _outs in decoder_outputs.items():
+            # _aclu_first_firing_tuple, (snapshot_timestamps, _a_pf1D_dt_snapshots) = _outs
+            _aclu_first_firing_tuple = _outs
+            _an_outs_df = pd.DataFrame.from_records(_aclu_first_firing_tuple).T
+            _an_outs_df.columns = [f'{c}_{a_decoder_name}' for c in data_col_names]
+            _an_outs_df = _an_outs_df.reset_index(names=['aclu'])
+            outs_df.append(_an_outs_df)
+
+        # outs_df = [df_long_LR, df_short_LR, df_long_RL, df_short_RL]
+        df_merged: pd.DataFrame = outs_df[0]
+        for df in outs_df[1:]:
+            df_merged = pd.merge(df_merged, df, on='aclu', how='outer')
+
+        df_merged = df_merged.sort_values(by='aclu', ascending=True, inplace=False).reset_index(drop=True)
+        # df_merged.drop_duplicates(subset=['aclu'], inplace=False)
+
+        ## Convert to delta relative times:
+        t_start, t_delta, t_end = curr_active_pipeline.find_LongShortDelta_times()
+
+        ## INPUTS: decoder_template_names
+
+        snap_t_col_names = [f'snap_t_{a_decoder_name}' for a_decoder_name in decoder_template_names] # ['snap_t_long_LR', 'snap_t_long_RL', 'snap_t_short_LR', 'snap_t_short_RL']
+        delta_rel_snap_t_col_names = [f'delta_rel_snap_t_{a_decoder_name}' for a_decoder_name in decoder_template_names]
+        df_merged[delta_rel_snap_t_col_names] = deepcopy(df_merged[snap_t_col_names]) - t_delta
+
+        # subdiv_df_outputs is not used
+        return df_merged, decoder_outputs, pf1D_dt_outputs, pf1D_dt_snapshot_outputs
+
+
+    @function_attributes(short_name=None, tags=['figure', 'plot', 'matplotlib', 'aclu'], input_requires=[], output_provides=[], uses=['plot_laps_2d'], used_by=[], creation_date='2025-08-19 13:01', related_items=[])
+    @classmethod
+    def plot_aclus_first_significance_figure(cls, curr_active_pipeline, track_templates, df_merged: pd.DataFrame, is_delta_relative: bool=False, extant_ax=None):
+        """ plot the time that each cell crossed the stability threshold (on the occupancy normalized pf)
+        
+        INPUTS: long_LR_name, long_RL_name, short_LR_name, short_RL_name
+        
+        Usage:
+            fig, ax = AcluFirstPlacefieldStabilityThresholdFigure.plot_aclus_first_significance_figure(curr_active_pipeline=curr_active_pipeline, track_templates=track_templates, df_merged=df_merged, is_delta_relative=False)
+        
+        """
+        ## Add in the position/laps
+        from pyphoplacecellanalysis.PhoPositionalData.plotting.laps import plot_laps_2d
+
+        long_epoch_name, short_epoch_name, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
+        global_session = curr_active_pipeline.filtered_sessions[global_epoch_name]
+
+        axes_list = None
+        if extant_ax is not None:
+            axes_list = [extant_ax]
+            
+        
+        
+        plot_laps_kwargs = dict(include_velocity=False, include_accel=False, figsize=(24, 10), axes_list=axes_list, span_where_kwargs=dict(alpha=0.1))
+        fig, out_axes_list = plot_laps_2d(global_session, legacy_plotting_mode=True, **plot_laps_kwargs)
+        ax = out_axes_list[0]
+        ymin, ymax = ax.get_ylim()
+        ymid: float = (float(ymax) - float(ymin))/2.0
+        
+        ## Plot the aclu lines:
+        t_start, t_delta, t_end = curr_active_pipeline.find_LongShortDelta_times()
+
+        # decoder_template_names = (long_LR_name, long_RL_name, short_LR_name, short_RL_name)
+        decoder_template_names = track_templates.get_decoder_names()
+
+        ## INPUTS: decoder_template_names
+        snap_t_col_names = [f'snap_t_{a_decoder_name}' for a_decoder_name in decoder_template_names] # ['snap_t_long_LR', 'snap_t_long_RL', 'snap_t_short_LR', 'snap_t_short_RL']
+        
+        # fig, ax = plt.subplots()
+        # ax.set_xlim(t_start, t_end)
+        # ax.set_xlim(t_start-t_delta, t_end-t_delta)
+
+        # delta_line = ax.vlines(0.0, ymin=-1, ymax=1)
+        if is_delta_relative:
+            delta_line = plt.axvline(t_delta, color='k', linestyle='--')
+        else:
+            delta_line = plt.axvline(0.0, color='k', linestyle='--')
+            
+        base_line = plt.axhline(ymid, color='k', linestyle='--')
+
+        # snap_t_col_names = [f'snap_t_{a_decoder_name}' for a_decoder_name in decoder_template_names] # ['snap_t_long_LR', 'snap_t_long_RL', 'snap_t_short_LR', 'snap_t_short_RL']
+        # duration_cols = ['duration_fraction_long_LR', 'duration_fraction_short_LR', 'duration_fraction_long_RL', 'duration_fraction_short_RL']
+        if not is_delta_relative:
+            active_cols = deepcopy(snap_t_col_names)
+        else:
+            delta_rel_snap_t_col_names = [f'delta_rel_snap_t_{a_decoder_name}' for a_decoder_name in decoder_template_names]
+            df_merged[delta_rel_snap_t_col_names] = deepcopy(df_merged[snap_t_col_names]) - t_delta
+            active_cols = deepcopy(delta_rel_snap_t_col_names) # ['delta_rel_snap_t_long_LR', 'delta_rel_snap_t_long_RL', 'delta_rel_snap_t_short_LR', 'delta_rel_snap_t_short_RL']
+            
+        _all_common_kwargs = dict(lw=0.5, alpha=0.7)
+        _left_common_kwargs = dict(ymin=ymid, ymax=ymax, **_all_common_kwargs)
+        _right_common_kwargs = dict(ymin=ymin, ymax=ymid, **_all_common_kwargs)
+
+        active_col_kwargs_list = [dict(**_left_common_kwargs, label='Long_LR', colors='red'),
+                                dict(**_right_common_kwargs, label='Long_RL', colors='orange'),
+                                dict(**_left_common_kwargs, label='Short_LR', colors='blue'),
+                                dict(**_right_common_kwargs, label='Short_RL', colors='cyan')]
+
+        offsets = np.linspace(-0.4, 0.4, len(df_merged)) ## stagger the aclus
+
+        for i, row in df_merged.iterrows():
+            for j, col in enumerate(active_cols):
+                if not pd.isna(row[col]):
+                    an_aclu: int = int(row['aclu'])
+                    an_x = row[col]
+                    _lines_artist = ax.vlines(an_x, **active_col_kwargs_list[j]) #+ offsets[j] , -1.0, min(1.0, row[col]), colors=f"C{j}"
+                    # Adding text inside the plot
+                    _aclu_label_artist = ax.text(an_x, offsets[i], f'{an_aclu}', fontsize=9)
+
+                    # _lines_artist = ax.vlines(row['aclu'] + offsets[j], -1.0, min(1.0, row[col]), colors=f"C{j}")
+
+        # plt.legend()
+        
+        fig.canvas.manager.set_window_title("plot_aclus_first_significance_figure")
+        ax.set_xlabel("t (seconds)")
+        # ax.set_ylabel("Y Label")
+        ax.set_title("First Neuron Pf Significant Time")
+
+        ax.set_ylim(ymin, ymax)
+        plt.show()
+
+        return fig, ax
+
+
+# ==================================================================================================================================================================================================================================================================================== #
+# Pre 2025-08-17                                                                                                                                                                                                                                                                       #
+# ==================================================================================================================================================================================================================================================================================== #
+
 from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.LongShortTrackComputations import SingleBarResult, InstantaneousSpikeRateGroupsComputation, SpikeRateTrends
 import nptyping as ND
 from nptyping import NDArray
