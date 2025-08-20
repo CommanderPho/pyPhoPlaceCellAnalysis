@@ -1990,7 +1990,7 @@ class MeasuredVsDecodedOccupancy:
     """
     @function_attributes(short_name=None, tags=['MAIN'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-05-15 19:57', related_items=[])
     @classmethod
-    def analyze_and_plot_meas_vs_decoded_occupancy(cls, best_matching_context, a_result, a_decoder, a_decoded_marginal_posterior_df, track_templates, figure_title='Laps', plot_in_same_figure:bool=True, should_max_normalize: bool=False, debug_print=False, **kwargs):
+    def analyze_and_plot_meas_vs_decoded_occupancy(cls, best_matching_context, a_result, a_decoder, a_decoded_marginal_posterior_df, track_templates, figure_title='Laps', plot_in_same_figure:bool=True, should_max_normalize: bool=False, skip_plotting_measured: bool=False, debug_print=False, **kwargs):
         """ analyze and plot
 
         
@@ -2074,7 +2074,7 @@ class MeasuredVsDecodedOccupancy:
                 # np.shape(a_timebins_p_x_given_n)
                 # ax = ax_dict[a_pre_post_delta_name]  # Get the appropriate subplot axis
                 active_ax_dict = {ax_name:v for ax_name, v in ax_dict.items() if (ax_name.split('_', maxsplit=1)[0] == a_pre_post_delta_name)}
-                cls.plot_meas_vs_decoded_occupancy(timebins_p_x_given_n=a_timebins_p_x_given_n, track_templates=track_templates, fig=fig, ax_dict=active_ax_dict, a_pre_post_delta_name=a_pre_post_delta_name, should_max_normalize=should_max_normalize, debug_print=debug_print, **kwargs)
+                cls.plot_meas_vs_decoded_occupancy(timebins_p_x_given_n=a_timebins_p_x_given_n, track_templates=track_templates, fig=fig, ax_dict=active_ax_dict, a_pre_post_delta_name=a_pre_post_delta_name, should_max_normalize=should_max_normalize, debug_print=debug_print, skip_plotting_measured=skip_plotting_measured, **kwargs)
                 # ax.set_title(f'{figure_title} - {a_pre_post_delta_name}')  # Set subplot title
 
             plt.suptitle(f'{figure_title}')  # Set overall figure title
@@ -2086,7 +2086,7 @@ class MeasuredVsDecodedOccupancy:
                 if debug_print:
                     print(f'k: {a_pre_post_delta_name}')
                 # np.shape(a_timebins_p_x_given_n)
-                fig, ax_dict = cls.plot_meas_vs_decoded_occupancy(timebins_p_x_given_n=a_timebins_p_x_given_n, track_templates=track_templates, num=f'{figure_title} - {a_pre_post_delta_name} - plot_meas_vs_decoded_occupancy', a_pre_post_delta_name=a_pre_post_delta_name, should_max_normalize=should_max_normalize, debug_print=debug_print, **kwargs)
+                fig, ax_dict = cls.plot_meas_vs_decoded_occupancy(timebins_p_x_given_n=a_timebins_p_x_given_n, track_templates=track_templates, num=f'{figure_title} - {a_pre_post_delta_name} - plot_meas_vs_decoded_occupancy', a_pre_post_delta_name=a_pre_post_delta_name, should_max_normalize=should_max_normalize, debug_print=debug_print, skip_plotting_measured=skip_plotting_measured, **kwargs)
                 plt.suptitle(f'{figure_title} - {a_pre_post_delta_name}')
                 all_figs.append((fig, ax_dict))
             return all_figs
@@ -2094,7 +2094,7 @@ class MeasuredVsDecodedOccupancy:
 
 
     @classmethod
-    def plot_meas_vs_decoded_occupancy(cls, timebins_p_x_given_n: NDArray, track_templates, num='plot_meas_vs_decoded_occupancy', fig=None, ax_dict=None, should_max_normalize: bool=False, a_pre_post_delta_name=None, debug_print=False, **kwargs):
+    def plot_meas_vs_decoded_occupancy(cls, timebins_p_x_given_n: NDArray, track_templates, num='plot_meas_vs_decoded_occupancy', fig=None, ax_dict=None, should_max_normalize: bool=False, a_pre_post_delta_name=None, debug_print=False, skip_plotting_measured: bool=False, **kwargs):
         """ from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import plot_meas_vs_decoded_occupancy
         a_result: DecodedFilterEpochsResult
         
@@ -2117,6 +2117,7 @@ class MeasuredVsDecodedOccupancy:
         scalar_likelihood_per_decoder = np.nansum(timebins_p_x_given_n_occupancy, axis=0) # (n_decoders,)
         normalized_scalar_likelihood_per_decoder = scalar_likelihood_per_decoder / np.nansum(scalar_likelihood_per_decoder)
 
+        a_matching_parts_dict = {'long':'pre-delta', 'short':'post-delta'}
         # n_pos_bins, n_decoders = np.shape(timebins_p_x_given_n_occupancy)
 
         if (fig is None) or (ax_dict is None):
@@ -2143,9 +2144,11 @@ class MeasuredVsDecodedOccupancy:
             if a_pre_post_delta_name is not None:
                 assert a_pre_post_delta_name in ['pre-delta', 'post-delta'], f'Invalid a_pre_post_delta_name: {a_pre_post_delta_name}.'
                 a_pre_post_delta_name_part, a_decoder_name = ax_name.split('_', maxsplit=1) # "post-delta_long_LR" -> ["post-delta", "long_LR"]
+                a_long_short_name_part, a_dir_name_part = a_decoder_name.split('_', maxsplit=1) # 'long_LR' -> ['long', 'LR']
                 a_decoder: BasePositionDecoder = decoders_dict[a_decoder_name]
                 ax_title: str = f"{a_pre_post_delta_name_part} | Decoded Occupancy[{ax_name}]"
-                is_measured_result_curr_period =  (a_pre_post_delta_name_part == a_pre_post_delta_name)
+                is_measured_result_curr_period = a_matching_parts_dict[a_long_short_name_part] == a_pre_post_delta_name # (a_pre_post_delta_name_part == a_pre_post_delta_name)
+                print(f'is_measured_result_curr_period: {is_measured_result_curr_period}')
 
             else:
                 a_decoder: BasePositionDecoder = decoders_dict[ax_name]
@@ -2157,12 +2160,13 @@ class MeasuredVsDecodedOccupancy:
             # a_pre_post_delta_name
             measured_occupancy = deepcopy(a_decoder.pf.occupancy)
             occupancy_fig, occupancy_ax = perform_plot_occupancy(occupancy, xbin_centers=None, ybin_centers=None, fig=fig, ax=ax, plot_pos_bin_axes=False, label='decoded', should_max_normalize=should_max_normalize)
-            measured_kwargs = dict(alpha=0.5)
-            if not is_measured_result_curr_period:
-                measured_kwargs = dict(alpha=0.1)
+            measured_kwargs = dict(alpha=0.9)
+            # if not is_measured_result_curr_period:
+            #     measured_kwargs = dict(alpha=0.1)
             # else:
             #     measured_kwargs = dict(alpha=1.0)
             if is_measured_result_curr_period:
+                ## only plot measured for the correct measured period:
                 occupancy_fig, occupancy_ax = perform_plot_occupancy(measured_occupancy, xbin_centers=None, ybin_centers=None, fig=fig, ax=ax, plot_pos_bin_axes=False, label='measured', should_max_normalize=should_max_normalize, **measured_kwargs)
             ax.set_title(ax_title)
 

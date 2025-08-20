@@ -662,7 +662,7 @@ class MultiContextComparingDisplayFunctions(AllFunctionEnumeratingMixin, metacla
                     a_target_context: IdentifyingContext = IdentifyingContext(known_named_decoding_epochs_type=known_named_decoding_epochs_type, data_grain='per_time_bin', **common_constraint_dict) ## Laps , data_grain='per_epoch'
                     best_matching_context, a_result, a_decoder, a_decoded_marginal_posterior_df = a_new_fully_generic_result.get_results_best_matching_context(context_query=a_target_context)
                     an_active_display_context = active_display_context.overwriting_context(known_named_decoding_epochs_type=known_named_decoding_epochs_type, figure_title=figure_title)
-                    fig, ax_dict = MeasuredVsDecodedOccupancy.analyze_and_plot_meas_vs_decoded_occupancy(best_matching_context, a_result, a_decoder, a_decoded_marginal_posterior_df, track_templates, figure_title=figure_title)
+                    fig, ax_dict = MeasuredVsDecodedOccupancy.analyze_and_plot_meas_vs_decoded_occupancy(best_matching_context, a_result, a_decoder, a_decoded_marginal_posterior_df, track_templates, figure_title=figure_title, skip_plotting_measured=False)
                     _graphics_output_dict = _subfn_apply_formatting_footer_and_etc(fig, figure_title=figure_title, subtitle_string=None, an_active_display_context=an_active_display_context)
                     collector.post_hoc_append(figs=[fig,], axes=ax_dict, contexts=[an_active_display_context])
 
@@ -673,7 +673,7 @@ class MultiContextComparingDisplayFunctions(AllFunctionEnumeratingMixin, metacla
                     a_target_context: IdentifyingContext = IdentifyingContext(known_named_decoding_epochs_type=known_named_decoding_epochs_type, data_grain='per_time_bin', **common_constraint_dict) ## Laps , data_grain='per_epoch'
                     best_matching_context, a_result, a_decoder, a_decoded_marginal_posterior_df = a_new_fully_generic_result.get_results_best_matching_context(context_query=a_target_context)
                     an_active_display_context = active_display_context.overwriting_context(known_named_decoding_epochs_type=known_named_decoding_epochs_type, figure_title=figure_title)
-                    fig, ax_dict = MeasuredVsDecodedOccupancy.analyze_and_plot_meas_vs_decoded_occupancy(best_matching_context, a_result, a_decoder, a_decoded_marginal_posterior_df, track_templates, figure_title=figure_title)
+                    fig, ax_dict = MeasuredVsDecodedOccupancy.analyze_and_plot_meas_vs_decoded_occupancy(best_matching_context, a_result, a_decoder, a_decoded_marginal_posterior_df, track_templates, figure_title=figure_title, skip_plotting_measured=False)
                     _graphics_output_dict = _subfn_apply_formatting_footer_and_etc(fig, figure_title=figure_title, subtitle_string=None, an_active_display_context=an_active_display_context)
                     collector.post_hoc_append(figs=[fig,], axes=ax_dict, contexts=[an_active_display_context])
 
@@ -683,7 +683,7 @@ class MultiContextComparingDisplayFunctions(AllFunctionEnumeratingMixin, metacla
                     a_target_context: IdentifyingContext = IdentifyingContext(known_named_decoding_epochs_type=known_named_decoding_epochs_type, data_grain='per_time_bin', **common_constraint_dict) ## Laps , data_grain='per_epoch'
                     best_matching_context, a_result, a_decoder, a_decoded_marginal_posterior_df = a_new_fully_generic_result.get_results_best_matching_context(context_query=a_target_context)
                     an_active_display_context = active_display_context.overwriting_context(known_named_decoding_epochs_type=known_named_decoding_epochs_type, figure_title=figure_title)
-                    fig, ax_dict = MeasuredVsDecodedOccupancy.analyze_and_plot_meas_vs_decoded_occupancy(best_matching_context, a_result, a_decoder, a_decoded_marginal_posterior_df, track_templates, figure_title=figure_title)
+                    fig, ax_dict = MeasuredVsDecodedOccupancy.analyze_and_plot_meas_vs_decoded_occupancy(best_matching_context, a_result, a_decoder, a_decoded_marginal_posterior_df, track_templates, figure_title=figure_title, skip_plotting_measured=True)
                     _graphics_output_dict = _subfn_apply_formatting_footer_and_etc(fig, figure_title=figure_title, subtitle_string=None, an_active_display_context=an_active_display_context)
                     collector.post_hoc_append(figs=[fig,], axes=ax_dict, contexts=[an_active_display_context])
 
