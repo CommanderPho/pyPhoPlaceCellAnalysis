@@ -3411,8 +3411,6 @@ def figures_plot_generalized_decode_epochs_dict_and_export_results_completion_fu
     
     This is the global across-session marginal over trackID
     
-    
-
     ## Getting outputs    
         _flattened_paths_dict = {} ## Outputs:
 
