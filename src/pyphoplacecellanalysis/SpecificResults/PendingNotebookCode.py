@@ -2113,6 +2113,10 @@ class MeasuredVsDecodedOccupancy:
         timebins_p_x_given_n_occupancy = np.nansum(timebins_p_x_given_n, axis=2) # (n_pos, n_decoders)
         timebins_p_x_given_n_occupancy.shape
 
+        ## sum over all positions to get the scalar per decoder
+        scalar_likelihood_per_decoder = np.nansum(timebins_p_x_given_n_occupancy, axis=0) # (n_decoders,)
+        normalized_scalar_likelihood_per_decoder = scalar_likelihood_per_decoder / np.nansum(scalar_likelihood_per_decoder)
+
         # n_pos_bins, n_decoders = np.shape(timebins_p_x_given_n_occupancy)
 
         if (fig is None) or (ax_dict is None):
@@ -2134,20 +2138,32 @@ class MeasuredVsDecodedOccupancy:
 
         for i, (ax_name, ax) in enumerate(ax_dict.items()):
         # for i in np.arange(n_decoders):
+            is_measured_result_curr_period: bool = False
             occupancy = timebins_p_x_given_n_occupancy[:,i]
             if a_pre_post_delta_name is not None:
+                assert a_pre_post_delta_name in ['pre-delta', 'post-delta'], f'Invalid a_pre_post_delta_name: {a_pre_post_delta_name}.'
                 a_pre_post_delta_name_part, a_decoder_name = ax_name.split('_', maxsplit=1) # "post-delta_long_LR" -> ["post-delta", "long_LR"]
                 a_decoder: BasePositionDecoder = decoders_dict[a_decoder_name]
                 ax_title: str = f"{a_pre_post_delta_name_part} | Decoded Occupancy[{ax_name}]"
+                is_measured_result_curr_period =  (a_pre_post_delta_name_part == a_pre_post_delta_name)
 
             else:
                 a_decoder: BasePositionDecoder = decoders_dict[ax_name]
                 ax_title: str = f"Decoded Occupancy[{ax_name}]"
 
+
+            ax_title = f"{ax_title} (total_decoded={normalized_scalar_likelihood_per_decoder[i]:0.2f})"
+
             # a_pre_post_delta_name
             measured_occupancy = deepcopy(a_decoder.pf.occupancy)
             occupancy_fig, occupancy_ax = perform_plot_occupancy(occupancy, xbin_centers=None, ybin_centers=None, fig=fig, ax=ax, plot_pos_bin_axes=False, label='decoded', should_max_normalize=should_max_normalize)
-            occupancy_fig, occupancy_ax = perform_plot_occupancy(measured_occupancy, xbin_centers=None, ybin_centers=None, fig=fig, ax=ax, plot_pos_bin_axes=False, label='measured', should_max_normalize=should_max_normalize)
+            measured_kwargs = dict(alpha=0.5)
+            if not is_measured_result_curr_period:
+                measured_kwargs = dict(alpha=0.1)
+            # else:
+            #     measured_kwargs = dict(alpha=1.0)
+            if is_measured_result_curr_period:
+                occupancy_fig, occupancy_ax = perform_plot_occupancy(measured_occupancy, xbin_centers=None, ybin_centers=None, fig=fig, ax=ax, plot_pos_bin_axes=False, label='measured', should_max_normalize=should_max_normalize, **measured_kwargs)
             ax.set_title(ax_title)
 
         plt.legend(['decoded', 'measured'])
