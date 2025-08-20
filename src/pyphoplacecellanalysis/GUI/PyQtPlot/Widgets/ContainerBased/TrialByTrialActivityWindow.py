@@ -16,7 +16,7 @@ from attrs import asdict, astuple, define, field, Factory
 
 from pyphocorehelpers.function_helpers import function_attributes
 from pyphocorehelpers.programming_helpers import metadata_attributes
-
+from pyphocorehelpers.assertion_helpers import Assert
 
 # from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError import plot_1D_most_likely_position_comparsions
 from typing import Dict, List, Tuple, Optional, Callable, Union, Any
@@ -675,4 +675,115 @@ class TrialByTrialActivityWindow:
         else:
             ## return map from aclu to is_selected
             return is_aclu_selected_dict
+        
+
+
+    @function_attributes(short_name=None, tags=['plot', 'pyqtgraph', 'pf_stable_formation_time', 'AcluFirstPlacefieldStabilityThresholdFigure'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-08-20 10:19', related_items=['AcluFirstPlacefieldStabilityThresholdFigure', 'AcluFirstPlacefieldStabilityThresholdFigure.plot_aclus_first_significance_figure'])
+    def add_pf_stable_formation_time_distribution_results(self, df_merged: pd.DataFrame):
+        """ 2025-08-20 - Not yet finished - add each aclu first-stable-pf time to TrialByTrialActivity figure
+        The difficulty lies in mapping the from one of the `df_merged` columns to trial/lap # (ranging [-2.5, 163.5] on the y-axis of each subplot)  
+
+        #TODO 2025-08-20 10:20: - [ ] y-axis is inverted and not quite working
+        
+        Usage:
+            from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import AcluFirstPlacefieldStabilityThresholdFigure
+            from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.ContainerBased.TrialByTrialActivityWindow import TrialByTrialActivityWindow
+
+            df_merged, decoder_outputs, pf1D_dt_outputs, pf1D_dt_snapshot_outputs = AcluFirstPlacefieldStabilityThresholdFigure._compute_for_all_decoders(curr_active_pipeline, track_templates, fr_threshold_Hz=2.0)
+            
+            _out = dict()
+            _out['_display_trial_to_trial_reliability'] = curr_active_pipeline.display(display_function='_display_trial_to_trial_reliability', active_session_configuration_context=None) # _display_trial_to_trial_reliability
+            a_TbyT_activity_win: TrialByTrialActivityWindow = _out['_display_trial_to_trial_reliability']
+            a_TbyT_activity_win.add_pf_stable_formation_time_distribution_results(df_merged=df_merged) # add the current aclu pf stability times
+
+        
+        """
+        ## INPUTS: df_merged, a_TbyT_activity_win
+        ## get the first plot to determine the y-range:
+        curr_plot = self.plots.plot_array[0] 
+        vb = pg.ViewBox = curr_plot.vb
+        # vb.viewRect()  # Get the current view rectangle of the plot
+        y_min, y_max = vb.viewRange()[1] # [-2.5, 163.5]
+        y_ptp: float = np.abs(y_max) - np.abs(y_min)
+        half_y_ptp: float = y_ptp / 2.0 ## corresponds (roughly) to just the pre/post delta laps
+
+        ## OUTPUTS: y_min, y_max, half_y_ptp
+        active_neuron_IDs = deepcopy(self.plots_data.active_neuron_IDs) # .img_item_array[0].getImage().shape # (62, 29951)
+
+        ## INPUTS: df_merged
+        active_df_merged = deepcopy(df_merged)[np.isin(df_merged['aclu'], active_neuron_IDs)] ## add to TrialByTrialActivity figure
+        self.plots_data.aclu_pf_stable_formation_time_df = deepcopy(active_df_merged) ## add to plots_data
+        # active_df_merged
+
+        Assert.same_length(self.plots.img_item_array, active_df_merged)
+        # active_df_merged.columns ['aclu', 'duration_fraction_long_LR', 'snap_t_long_LR', 'snap_idx_long_LR', 'duration_fraction_long_RL', 'snap_t_long_RL', 'snap_idx_long_RL', 'duration_fraction_short_LR', 'snap_t_short_LR', 'snap_idx_short_LR', 'duration_fraction_short_RL', 'snap_t_short_RL', 'snap_idx_short_RL', 'delta_rel_snap_t_long_LR', 'delta_rel_snap_t_long_RL', 'delta_rel_snap_t_short_LR', 'delta_rel_snap_t_short_RL']
+        active_cols = ['aclu', 'duration_fraction_long_LR', 'duration_fraction_long_RL', 'duration_fraction_short_LR', 'duration_fraction_short_RL']
+        decoder_names = ['long_LR', 'long_RL', 'short_LR', 'short_RL']
+
+        ## INPUTS: df_merged, 
+        # color_dict = {'long_LR': '#4169E1', 'long_RL': '#607B00', 'short_LR': '#DC143C', 'short_RL': '#990099'}
+        color_dict: Dict[types.DecoderName, pg.QtGui.QColor] = deepcopy(self.plots_data.color_dict)
+
+        # _all_common_kwargs = dict(lw=0.5, alpha=0.7)
+        _left_common_kwargs = dict() #dict(ymin=ymid, ymax=ymax, **_all_common_kwargs)
+        _right_common_kwargs = dict() # dict(ymin=ymin, ymax=ymid, **_all_common_kwargs)
+        # active_decoder_kwargs_list = [dict(**_left_common_kwargs, label='Long_LR', pen='red'),
+        #                         dict(**_right_common_kwargs, label='Long_RL', pen='orange'),
+        #                         dict(**_left_common_kwargs, label='Short_LR', pen='blue'),
+        #                         dict(**_right_common_kwargs, label='Short_RL', pen='cyan')]
+
+        active_decoder_kwargs_list = [dict(**_left_common_kwargs, label='Long_LR'),
+                                dict(**_right_common_kwargs, label='Long_RL'),
+                                dict(**_left_common_kwargs, label='Short_LR'),
+                                dict(**_right_common_kwargs, label='Short_RL')]
+
+        active_decoder_kwargs_dict = dict(zip(decoder_names, active_decoder_kwargs_list)) # {'long_LR': {'ymin': -2.5, 'ymax': 81.5, 'label': 'Long_LR', 'pen': 'red'}, ...}
+        ## OUTPUTS: decoder_names, active_decoder_kwargs_dict
+        active_data_cols = ['duration_fraction_long_LR', 'duration_fraction_long_RL', 'duration_fraction_short_LR', 'duration_fraction_short_RL']
+        active_long_cols = active_data_cols[:2] # ['duration_fraction_long_LR', 'duration_fraction_long_RL']
+        active_short_cols = active_data_cols[2:] # ['duration_fraction_short_LR', 'duration_fraction_short_RL']
+        # active_df_merged[active_cols]
+
+        # mapping the from one of the `df_merged` columns [0.0, 1.0] to trial/lap # (ranging [-2.5, 163.5] on the y-axis of each subplot)  
+        ## Handle inversion:
+        active_df_merged[active_long_cols] = (1.0 - active_df_merged[active_long_cols])
+        active_df_merged[active_short_cols] = (1.0 - active_df_merged[active_short_cols])
+        ## perform mapping:
+        active_df_merged[active_long_cols] = (active_df_merged[active_long_cols] * half_y_ptp) + y_min # y_min + (active_df_merged[active_long_cols] * half_y_ptp).values
+        active_df_merged[active_short_cols] = (active_df_merged[active_short_cols] * half_y_ptp) + y_min + half_y_ptp # the 2nd `+ half_y_ptp` is to offset the short lap values to be after the long lap values
+        # active_df_merged[active_cols]
+
+        # a_TbyT_activity_win.plots.img_item_array
+        # curr_plot = a_TbyT_activity_win.plots.plot_array[0]
+
+        new_lines = {}
+        for i, aclu in enumerate(self.plots_data.active_neuron_IDs):
+            curr_plot = self.plots.plot_array[i]
+            vb = curr_plot.vb
+            y_min, y_max = vb.viewRange()[1]
+
+            def map_to_viewbox(y_val):
+                # flip if necessary
+                if vb.invertY():  
+                    return y_max - (y_val - y_min)
+                else:
+                    return y_val
+
+            a_row = active_df_merged[active_df_merged['aclu'] == aclu] 
+            a_row_dict = dict(zip(decoder_names, a_row[active_data_cols].to_numpy().flatten())) # (4,)
+            new_lines[aclu] = {}
+            for a_decoder_name, a_line_y_value in a_row_dict.items():
+                if a_line_y_value is not None and not np.isnan(a_line_y_value):
+                    # print(f'adding line for aclu: {aclu}, a_decoder_name: {a_decoder_name}, a_line_y_value: {a_line_y_value}')
+                    corrected_y = a_line_y_value
+                    # corrected_y = y_max - (a_line_y_value - y_min) # Correct y-value for inverted y-axis
+                    # corrected_y = map_to_viewbox(a_line_y_value)  # Ensure the y-value is mapped to the viewbox
+                    a_line = pg.InfiniteLine(pos=corrected_y, angle=0, **(active_decoder_kwargs_dict[a_decoder_name] | dict(pen=pg.mkPen(color_dict[a_decoder_name], width=2))))  # horizontal line at y=a_line_y_value            
+                    # a_line = pg.InfiniteLine(pos=2, angle=0, pen='r')  # vertical line at x=2
+                    curr_plot.addItem(a_line)
+                    new_lines[aclu][a_decoder_name] = a_line
+
+
+        self.plots.aclu_pf_stable_formation_time_lines = new_lines
+        # self.plots_data.aclu_pf_stable_formation_time_df = deepcopy(active_df_merged)
         
