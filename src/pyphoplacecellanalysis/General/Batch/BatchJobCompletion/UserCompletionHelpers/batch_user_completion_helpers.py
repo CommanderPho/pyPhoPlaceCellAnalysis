@@ -3432,7 +3432,7 @@ def figures_plot_generalized_decode_epochs_dict_and_export_results_completion_fu
     from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.EpochComputationFunctions import EpochComputationDisplayFunctions
     from benedict import benedict
     from pyphoplacecellanalysis.Pho2D.data_exporting import PosteriorExporting
-
+    from pyphocorehelpers.plotting.media_output_helpers import PDFHelpers
 
     # 'trackID_weighted_position_posterior'
     if across_session_results_extended_dict is None:
@@ -3588,6 +3588,7 @@ def figures_plot_generalized_decode_epochs_dict_and_export_results_completion_fu
                 _out_final_merged_image_save_paths, _out_final_merged_images = PosteriorExporting.post_export_build_combined_images(out_custom_formats_dict=out_custom_formats_dict, custom_merge_layout_dict=custom_merge_layout_dict,
                                                                                                                     epoch_name_list=['ripple'], progress_print=True) ## currently skip laps, just do ripples
                 _out['final_merged_image_save_paths'] = deepcopy(_out_final_merged_image_save_paths)
+                
                 # across_session_results_extended_dict['figures_plot_generalized_decode_epochs_dict_and_export_results_completion_function'].update({
                 #     '_display_decoded_trackID_weighted_position_posterior_withMultiColorOverlay': _out,
                 # })
@@ -3636,6 +3637,15 @@ def figures_plot_generalized_decode_epochs_dict_and_export_results_completion_fu
                                                 # prepare_for_publication=True,
                                             )
             
+            ## INPUT: `_out`
+            fig_5_save_paths = _out['save_paths']
+            figure5_final_out_path: Path = fig_5_save_paths[0]
+            curr_stem = figure5_final_out_path.stem.strip('_laps_Laps') # 'meas_v_decoded_occupancy_0•05_2•0_[1, 2, 4, 6, 7, 8, 9]_laps_Laps'
+            curr_stem = f"{curr_stem}_MERGED" # 'meas_v_decoded_occupancy_0•05_2•0_[1, 2, 4, 6, 7, 8, 9]'
+            figure5_final_out_path = figure5_final_out_path.with_stem(curr_stem) # 'ProgrammaticDisplayFunctionTesting/2025-08-21/kdiba/gor01/two/2006-6-12_16-53-46/meas_v_decoded_occupancy_0•05_2•0_[1, 2, 4, 6, 7, 8, 9]_MERGED.pdf'
+            PDFHelpers.concatenate_pdfs_vertically(fig_5_save_paths, figure5_final_out_path)
+            _out['figure5_final_out_path'] = figure5_final_out_path
+
             across_session_results_extended_dict['figures_plot_generalized_decode_epochs_dict_and_export_results_completion_function'].update({
                 '_display_measured_vs_decoded_occupancy_distributions': _out,
             })
