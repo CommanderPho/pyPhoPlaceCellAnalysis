@@ -1628,7 +1628,10 @@ def copy_session_folder_files_to_target_dir(good_session_concrete_folders, targe
 
 
 @function_attributes(short_name=None, tags=['batch', 'collect', 'figures'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-07-02 15:05', related_items=[])
-def copy_batch_output_figures_to_common_figures_dir(generate_figures_script_paths: List[Path], common_destination: Path = Path(r"K:/scratch/collected_figures").resolve(), previous_gen_scripts_path: Path = Path('C:\\Users\\pho\\repos\\Spike3DWorkEnv\\Spike3D\\output\\gen_scripts'), curr_gen_scripts_path: Optional[Path] = Path(r'K:/scratch/gen_scripts'), batch_export_folder_date:str='2025-07-02', append_session_name_as_suffix: bool = True, append_session_name_as_prefix: bool = False) -> List[Path]:
+def copy_batch_output_figures_to_common_figures_dir(generate_figures_script_paths: List[Path], common_destination: Path = Path(r"K:/scratch/collected_figures").resolve(),
+                                                     previous_gen_scripts_path: Path = Path('C:\\Users\\pho\\repos\\Spike3DWorkEnv\\Spike3D\\output\\gen_scripts'),
+                                                     curr_gen_scripts_path: Optional[Path] = Path(r'K:/scratch/gen_scripts'),
+                                                     batch_export_folder_date:str='2025-07-02', append_session_name_as_suffix: bool = True, append_session_name_as_prefix: bool = False, is_dryrun: bool=False) -> List[Path]:
     """ copies each session's gen_output figures to a common figures folder
 
     Should be used after running the figures phase of batch output to collect the figures from greatlakes.
@@ -1705,15 +1708,16 @@ def copy_batch_output_figures_to_common_figures_dir(generate_figures_script_path
     ## OUTPUTS: gen_scripts_sess_paths, gen_scripts_sess_path_dict
 
     # generate_figures_script_paths
-    gen_scripts_fig_paths = [k.joinpath(f'EXTERNAL/Screenshots/ProgrammaticDisplayFunctionTesting/{batch_export_folder_date}').resolve() for k in gen_scripts_sess_paths]
-    gen_scripts_fig_paths = [v for v in gen_scripts_fig_paths if v.exists()]
+    gen_scripts_fig_search_paths = [k.joinpath(f'EXTERNAL/Screenshots/ProgrammaticDisplayFunctionTesting/{batch_export_folder_date}').resolve() for k in gen_scripts_sess_paths]
+    gen_scripts_fig_paths = [v for v in gen_scripts_fig_search_paths if v.exists()]
+    if len(gen_scripts_fig_paths) == 0:
+        raise ValueError(f'none of the figure search paths were found to exist!\n\tgen_scripts_fig_paths: {gen_scripts_fig_search_paths}\n\n was the specfied batch_export_folder_date: {batch_export_folder_date} corresponding to a date that figures were batch produced?')
     gen_scripts_fig_path_dict = dict(zip(gen_scripts_sess_path_dict.keys(), gen_scripts_fig_paths))
     ## OUTPUTS: gen_scripts_fig_path_dict, gen_scripts_fig_paths
 
     # INPUTS: gen_scripts_fig_paths
     gen_scripts_fig_flat_child_paths = [find_deepest_directory_iterative(gen_scripts_fig_path) for gen_scripts_fig_path in gen_scripts_fig_paths]
     gen_scripts_fig_flat_child_path_dict = dict(zip(gen_scripts_sess_path_dict.keys(), gen_scripts_fig_flat_child_paths))
-
 
     common_destination.mkdir(exist_ok=True)
 
@@ -1730,11 +1734,14 @@ def copy_batch_output_figures_to_common_figures_dir(generate_figures_script_path
 
 
     ## perform the copy
-    # _copied_outputs = [shutil.copy2(f, common_destination.joinpath(f.with_stem(f"{k}_{f.stem}").name)) for k, path in gen_scripts_fig_flat_child_path_dict.items() for f in path.iterdir() if f.is_file()] ## append the session name (k) to each file as a prefix
-    _copied_outputs = [shutil.copy2(f, common_destination.joinpath(f.with_stem(_active_format_fn(k, f.stem)).name)) for k, path in gen_scripts_fig_flat_child_path_dict.items() for f in path.iterdir() if f.is_file()] ## append the session name (k) to each file as a prefix
+    if not is_dryrun:
+        # _copied_outputs = [shutil.copy2(f, common_destination.joinpath(f.with_stem(f"{k}_{f.stem}").name)) for k, path in gen_scripts_fig_flat_child_path_dict.items() for f in path.iterdir() if f.is_file()] ## append the session name (k) to each file as a prefix
+        _copied_outputs = [shutil.copy2(f, common_destination.joinpath(f.with_stem(_active_format_fn(k, f.stem)).name)) for k, path in gen_scripts_fig_flat_child_path_dict.items() for f in path.iterdir() if f.is_file()] ## append the session name (k) to each file as a prefix
 
-
-
+    else:
+        print(f'is_dryrun == True, so files will not actually be copied.')
+        _copied_outputs = [f"'{f.as_posix()}' -> '{common_destination.joinpath(f.with_stem(_active_format_fn(k, f.stem)).name).as_posix()}'" for k, path in gen_scripts_fig_flat_child_path_dict.items() for f in path.iterdir() if f.is_file()] ## append the session name (k) to each file as a prefix
+        print('\n'.join(_copied_outputs))
     # for k, path in gen_scripts_fig_flat_child_path_dict.items():
     #     print(f'k: {k}, path: {path}')
     #     for f in path.iterdir():
