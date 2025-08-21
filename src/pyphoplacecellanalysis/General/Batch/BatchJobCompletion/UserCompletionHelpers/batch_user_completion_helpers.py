@@ -3433,9 +3433,9 @@ def generalized_decode_epochs_dict_and_export_results_completion_function(self, 
 
 
 
-@function_attributes(short_name=None, tags=['figure', 'posterior', 'hairly-plot'], input_requires=[], output_provides=[], uses=['_display_generalized_decoded_yellow_blue_marginal_epochs', '_display_decoded_trackID_marginal_hairy_position', '_display_decoded_trackID_weighted_position_posterior_withMultiColorOverlay'], used_by=[], creation_date='2025-05-16 15:17', related_items=['generalized_decode_epochs_dict_and_export_results_completion_function'])
+@function_attributes(short_name=None, tags=['figure', 'batch', 'fig-export', 'hairly-plot'], input_requires=[], output_provides=[], uses=['_display_generalized_decoded_yellow_blue_marginal_epochs', '_display_decoded_trackID_marginal_hairy_position', '_display_decoded_trackID_weighted_position_posterior_withMultiColorOverlay'], used_by=[], creation_date='2025-05-16 15:17', related_items=['generalized_decode_epochs_dict_and_export_results_completion_function'])
 def figures_plot_generalized_decode_epochs_dict_and_export_results_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict,
-                                                                                        included_figures_names=['_display_directional_merged_pf_decoded_stacked_epoch_slices', '_display_generalized_decoded_yellow_blue_marginal_epochs', '_display_decoded_trackID_marginal_hairy_position', '_display_decoded_trackID_weighted_position_posterior_withMultiColorOverlay', '_display_placefield_stable_formation_time_distribution', '_display_measured_vs_decoded_occupancy_distributions'],
+                                                                                        included_figures_names=['_display_directional_merged_pf_decoded_stacked_epoch_slices', '_display_generalized_decoded_yellow_blue_marginal_epochs', '_display_decoded_trackID_marginal_hairy_position', '_display_decoded_trackID_weighted_position_posterior_withMultiColorOverlay', '_display_placefield_stable_formation_time_distribution', '_display_measured_vs_decoded_occupancy_distributions', '_display_trial_to_trial_reliability'],
                                                                                         extreme_threshold: float=0.8, opacity_max:float=0.7, thickness_ramping_multiplier:float=35.0,
                                                                                         **additional_marginal_overlaying_measured_position_kwargs) -> dict:
     """ Multi-purpose batch display function that just plots the figures so we don't have to wait for the entire batch_figures_plotting on 2025-04-16 15:22.
@@ -3687,6 +3687,48 @@ def figures_plot_generalized_decode_epochs_dict_and_export_results_completion_fu
             print(f'\tfigures_plot_generalized_decode_epochs_dict_and_export_results_completion_function(...): "_display_measured_vs_decoded_occupancy_distributions" failed with error: {e}\n skipping.')
             raise
 
+
+
+    # ==================================================================================================================================================================================================================================================================================== #
+    # `_display_trial_to_trial_reliability`                                                                                                                                                                                                                             #
+    # ==================================================================================================================================================================================================================================================================================== #
+    
+
+    if ('_display_trial_to_trial_reliability' in included_figures_names) or ('trial_to_trial_reliability' in included_figures_names):
+        print(f'\t trying "_display_trial_to_trial_reliability"')
+        try:
+            import pyphoplacecellanalysis.External.pyqtgraph as pg
+            from pyphocorehelpers.gui.Qt.color_helpers import ColormapHelpers
+            from pyphoplacecellanalysis.External.pyqtgraph_extensions.graphicsItems.LabelItem.ClickableLabelItem import SelectableLabelItem
+            from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.ContainerBased.TrialByTrialActivityWindow import TrialByTrialActivityWindow
+            from pyphoplacecellanalysis.General.Mixins.ExportHelpers import export_pyqtgraph_plot
+
+            cmap = ColormapHelpers.create_transparent_colormap(cmap_name='Reds', lower_bound_alpha=0.01, should_return_LinearSegmentedColormap=False)
+            
+            pg.setConfigOption('antialias', False)
+            display_context = curr_active_pipeline.build_display_context_for_session(display_fn_name='trial_to_trial_reliability')
+            _out = curr_active_pipeline.display('_display_trial_to_trial_reliability', display_context, defer_render=True, save_figure=True,
+                                                # override_fig_man=custom_fig_man,
+                                                # parent_output_folder=custom_figure_output_path,
+                                                cmap=cmap, is_publication_ready_figure=True,
+                                            )
+            
+            ## INPUT: `_out` -- _a_trial_by_trial_window
+
+            saved_figure_path: Path = _out.plots_data.saved_figure_paths
+
+            # trial_to_trial_reliability_save_path = Path('data').joinpath('trial_to_trial_reliability.svg').resolve()
+            # export_pyqtgraph_plot(_out['_display_trial_to_trial_reliability'].plots['root_render_widget'], savepath=trial_to_trial_reliability_save_path) # works
+
+            across_session_results_extended_dict['figures_plot_generalized_decode_epochs_dict_and_export_results_completion_function'].update({
+                '_display_trial_to_trial_reliability': {'fig_save_path': saved_figure_path},
+            })
+            
+
+        except Exception as e:
+            print(f'\tfigures_plot_generalized_decode_epochs_dict_and_export_results_completion_function(...): "_display_trial_to_trial_reliability" failed with error: {e}\n skipping.')
+            raise
+        
 
 
     print(f'>>\t done with {curr_session_context}')

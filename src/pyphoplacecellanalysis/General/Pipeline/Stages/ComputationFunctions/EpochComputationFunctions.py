@@ -2194,7 +2194,7 @@ class EpochComputationDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Di
     @function_attributes(short_name='generalized_decoded_yellow_blue_marginal_epochs', tags=['yellow-blue-plots', 'directional_merged_decoder_decoded_epochs', 'directional'], conforms_to=['output_registering', 'figure_saving'], input_requires=[], output_provides=[], requires_global_keys=["global_computation_results.computed_data['EpochComputations']"], uses=['plot_1D_most_likely_position_comparsions', 'FigureCollector'], used_by=[], creation_date='2025-04-16 05:49', related_items=[], is_global=True)
     def _display_generalized_decoded_yellow_blue_marginal_epochs(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, save_figure=True,
                                                     single_plot_fixed_height=50.0, size=(35, 3), dpi=100, constrained_layout=True, override_fig_man: Optional[FileOutputManager]=None, **kwargs):
-            """ Displays one figure containing the track_ID marginal, decoded continuously over the entire recording session along with the animal's position.
+            """ Displays one figure showing the rat's position over time across the whole session (above) and below the track_ID marginal, decoded continuously (for all time bins). Allows assessment as to whether the context decoder's track_ID decoding is working well across the whole session.
             
             
             Based off of ``

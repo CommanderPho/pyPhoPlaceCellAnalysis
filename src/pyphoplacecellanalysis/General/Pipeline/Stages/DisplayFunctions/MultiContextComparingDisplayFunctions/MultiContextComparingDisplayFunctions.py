@@ -377,7 +377,7 @@ class MultiContextComparingDisplayFunctions(AllFunctionEnumeratingMixin, metacla
 
     @function_attributes(short_name='trial_to_trial_reliability', tags=['trial-to-trial-reliability', 'display'], is_global=True, input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-08-30 13:27', related_items=[],
         validate_computation_test=lambda curr_active_pipeline, computation_filter_name='maze': (curr_active_pipeline.computation_results[computation_filter_name].computed_data['firing_rate_trends'], curr_active_pipeline.computation_results[computation_filter_name].computed_data['extended_stats']['time_binned_position_df']))
-    def _display_trial_to_trial_reliability(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, drop_below_threshold = 0.0000001, save_figure=False, **kwargs):
+    def _display_trial_to_trial_reliability(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, drop_below_threshold = 0.0000001, save_figure=False, override_fig_man: Optional[FileOutputManager]=None, **kwargs):
         """ Create `master_dock_win` - centralized plot output window to collect individual figures/controls in (2022-08-18)
         NOTE: Ignores `active_config` because context_nested_docks is for all contexts
 
@@ -420,17 +420,39 @@ class MultiContextComparingDisplayFunctions(AllFunctionEnumeratingMixin, metacla
         # any_decoder_neuron_IDs: NDArray = deepcopy(track_templates.any_decoder_neuron_IDs)
         
         # active_pf = deepcopy(directional_trial_by_trial_activity_result.active_pf_dt)
-        any_decoder_neuron_IDs: NDArray = deepcopy(directional_trial_by_trial_activity_result.any_decoder_neuron_IDs)
             
         ## OUTPUTS: directional_trial_by_trial_activity_result, directional_active_lap_pf_results_dicts
         long_epoch_name, short_epoch_name, global_epoch_name = owning_pipeline_reference.find_LongShortGlobal_epoch_names()
         # active_pf = deepcopy(owning_pipeline_reference.computation_results[global_epoch_name].computed_data['pf2D_dt']) # PfND_TimeDependent
         # active_pf = deepcopy(owning_pipeline_reference.computation_results[global_epoch_name].computed_data['pf2D'])
         active_pf = deepcopy(owning_pipeline_reference.computation_results[global_epoch_name].computed_data['pf1D'])
-        
+
         any_decoder_neuron_IDs: NDArray = deepcopy(directional_trial_by_trial_activity_result.any_decoder_neuron_IDs)
         override_active_neuron_IDs = deepcopy(any_decoder_neuron_IDs)
         # curr_active_pipeline.perform_specific_computation(computation_functions_name_includelist=['pf_computation', 'pfdt_computation'], enabled_filter_names=None, fail_on_exception=True, debug_print=False)
+
+        ## #TODO 2025-08-21 17:07: - [ ] BUG - Ratemap (`active_pf.ratemap.neuron_IDs` is missing neurons included in `active_pf.included_neuron_IDs`:
+        if not np.all(np.isin(override_active_neuron_IDs, active_pf.ratemap.neuron_ids)):
+            ## missing some neuron_IDs due to filtering:
+            _bak_frate_thresh = deepcopy(active_pf.config.frate_thresh)
+            active_pf.config.frate_thresh = 0.01 # set to low value so no neuron_ids are excluded
+            active_pf.compute() ## recompute
+            assert np.all(np.isin(override_active_neuron_IDs, active_pf.ratemap.neuron_ids)), f"even after recompute, this failed!"
+            # active_pf. ## filter by neuron_ids?
+            active_pf.config.frate_thresh =  _bak_frate_thresh ## restore the original value even though it isn't true
+        
+        # active_pf.included_neuron_IDs
+        # array([[ 2,  3,  4,  5,  6,  7,  8, 10, 11, 12, 13, 14, 15, 17, 19, 20, 21, 22, 23, 24, 25, 27, 29, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 47, 49, 50, 51, 52, 53, 57, 59, 60]])
+        # override_active_neuron_IDs
+        # array([ 2,  3,  4,  5,  6, 10, 11, 12, 13, 14, 15, 17, 19, 20, 21, 22, 23, 24, 27, 29, 31, 32, 33, 34, 35, 36, 37, 39, 40, 41, 42, 43, 47, 49, 50, 52, 53, 57, 60])
+        # np.isin(override_active_neuron_IDs, active_pf.included_neuron_IDs)
+        # array([ True,  True,  True,  True,  True,  True,  True,  True,  True,  True,  True,  True,  True,  True,  True,  True,  True,  True,  True,  True,  True,  True,  True,  True,  True,  True,  True,  True,  True,  True,  True,  True,  True,  True,  True,  True,  True,  True,  True])
+        # np.all(np.isin(override_active_neuron_IDs, active_pf.included_neuron_IDs))
+        # True
+        # np.all(np.isin(override_active_neuron_IDs, active_pf.ratemap.neuron_ids))
+        # False
+        # np.isin(override_active_neuron_IDs, active_pf.ratemap.neuron_ids)
+        # array([ True,  True,  True,  True,  True, False,  True,  True,  True,  True,  True,  True,  True,  True,  True,  True,  True,  True,  True,  True,  True,  True,  True,  True,  True,  True,  True,  True,  True,  True,  True,  True,  True,  True,  True,  True,  True,  True,  True])
 
         ## Uses `plot_trial_to_trial_reliability_all_decoders_image_stack` to plot the reliability trial-by-trial indicators over time
         ## INPUTS: a_pf2D_dt, z_scored_tuning_map_matrix
@@ -454,9 +476,10 @@ class MultiContextComparingDisplayFunctions(AllFunctionEnumeratingMixin, metacla
         footer_annotation_text = final_context.get_description(separator='\t|\t')
         _a_trial_by_trial_window.ui.lblFooter.setText(footer_annotation_text, size='12pt', bold=True) # update the footer
 
+
         if save_figure:
-            saved_figure_paths = owning_pipeline_reference.output_figure(final_context, _a_trial_by_trial_window.root_render_widget)
-            _a_trial_by_trial_window.plot_data.saved_figure_paths = saved_figure_paths
+            saved_figure_paths = owning_pipeline_reference.output_figure(final_context, _a_trial_by_trial_window.root_render_widget, override_fig_man=override_fig_man)
+            _a_trial_by_trial_window.plots_data.saved_figure_paths = saved_figure_paths[0][0]
         else:
             saved_figure_paths = []
 
