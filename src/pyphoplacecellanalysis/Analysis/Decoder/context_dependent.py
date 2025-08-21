@@ -2047,6 +2047,50 @@ class GenericDecoderDictDecodedEpochsDictResult(ComputedResult):
         return csv_save_paths_dict
 
 
+
+    @function_attributes(short_name=None, tags=['export', 'pkl', 'pure'], input_requires=[], output_provides=[], uses=['export_csvs'], used_by=[], creation_date='2025-08-21 00:00', related_items=[])
+    def export_pkl(self, active_export_parent_output_path: Path, owning_pipeline_reference):
+        """ Exports to pkl, pure
+                
+        active_export_parent_output_path = self.collected_outputs_path.resolve()
+        Assert.path_exists(parent_output_path)
+        pkl_save_path = a_new_fully_generic_result.export_pkl(active_export_parent_output_path=active_export_parent_output_path, owning_pipeline_reference=owning_pipeline_reference)
+        pkl_save_path
+        
+        """ 
+        from pyphocorehelpers.assertion_helpers import Assert
+        from pyphoplacecellanalysis.General.Pipeline.NeuropyPipeline import _get_custom_suffix_for_filename_from_computation_metadata
+        from pyphocorehelpers.Filesystem.path_helpers import sanitize_filename_for_Windows
+        ## Unpack from pipeline:
+        ## Export to CSVs:
+        
+        Assert.path_exists(active_export_parent_output_path)
+
+        ## INPUTS: collected_outputs_path
+
+        complete_session_context, (session_context, additional_session_context) = owning_pipeline_reference.get_complete_session_context()
+
+        data_identifier_str: str = f'(a_new_fully_generic_result)'
+        output_date_str: str = get_now_rounded_time_str(rounded_minutes=10)
+        out_path, out_filename, out_basename = owning_pipeline_reference.build_complete_session_identifier_filename_string(output_date_str=output_date_str, data_identifier_str=data_identifier_str, parent_output_path=active_export_parent_output_path, out_extension='.pkl')
+        print(f'pipeline built-in exporter: out_path: "{out_path.as_posix()}"')
+        
+        ## build output path:
+        custom_suffix: str = _get_custom_suffix_for_filename_from_computation_metadata(use_concise_formatting=True, **additional_session_context.to_dict()).removeprefix('-')
+        full_custom_suffix: str = '_'.join([session_context.get_description(separator='_'), custom_suffix]) # 'kdiba_gor01_two_2006-6-12_16-53-46__withNormalComputedReplays-qclu_1246789-frateThresh_2.0'
+        original_proposed_filename: str = f'{output_date_str}_{full_custom_suffix}_{data_identifier_str}.pkl'
+        good_filename: str = sanitize_filename_for_Windows(original_proposed_filename)
+        out_path = active_export_parent_output_path.joinpath(good_filename).resolve()
+        # a_new_fully_generic_result.to_hdf(test_a_new_fully_generic_result_path, key=complete_session_context.get_description_as_session_global_uid(), enable_hdf_testing_mode=True, OVERRIDE_ALLOW_GLOBAL_NESTED_EXPANSION=True)
+        print(f'\ttrying to export pkl to pkl_save_path: "{out_path.as_posix()}"...')
+        self.save(pkl_output_path=out_path)
+    
+        # across_session_results_extended_dict['generalized_decode_epochs_dict_and_export_results_completion_function']['csv_save_paths_dict'] = deepcopy(csv_save_paths_dict)
+        print(f'pkl_save_path: {out_path}\n')
+        return out_path
+    
+
+
     def __repr__(self):
         """Custom multi-line representation for BinningContainer
         renders like:

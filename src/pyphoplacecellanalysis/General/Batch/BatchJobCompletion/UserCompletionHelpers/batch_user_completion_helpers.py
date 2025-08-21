@@ -3223,7 +3223,7 @@ def compute_and_export_session_extended_placefield_peak_information_completion_f
 
 
 @function_attributes(short_name=None, tags=['posterior', 'marginal', 'CSV', 'non-PBE', 'epochs', 'decoding'], input_requires=[], output_provides=[], uses=['GenericDecoderDictDecodedEpochsDictResult', 'pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.EpochComputationFunctions.EpochComputationFunctions.perform_compute_non_PBE_epochs'], used_by=[], creation_date='2025-03-09 16:35', related_items=['figures_plot_generalized_decode_epochs_dict_and_export_results_completion_function'])
-def generalized_decode_epochs_dict_and_export_results_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict, epochs_decoding_time_bin_size:float=0.025, force_recompute:bool=True, debug_print:bool=True) -> dict:
+def generalized_decode_epochs_dict_and_export_results_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict, epochs_decoding_time_bin_size:float=0.025, force_recompute:bool=True, debug_print:bool=True, export_pkl: bool=True) -> dict:
     """ Aims to generally:
     1. Build a dict of decoders (usually 1D) built on several different subsets of input epochs (long_LR_laps-only, long_laps-only, long_non_PBE-only, ...etc
     2. Use these decoders and the neural data to decode posteriors for a variety of parameters (e.g. cell types, epochs-to-be-decoded, time_bin_sizes, etc)
@@ -3391,6 +3391,38 @@ def generalized_decode_epochs_dict_and_export_results_completion_function(self, 
     csv_save_paths_dict = a_new_fully_generic_result.default_export_all_CSVs(active_export_parent_output_path=active_export_parent_output_path, owning_pipeline_reference=curr_active_pipeline, decoding_time_bin_size=decoding_time_bin_size)
     across_session_results_extended_dict['generalized_decode_epochs_dict_and_export_results_completion_function']['csv_save_paths_dict'] = deepcopy(csv_save_paths_dict)
     print(f'csv_save_paths_dict: {csv_save_paths_dict}\n')
+
+
+
+    if export_pkl:
+        from pyphoplacecellanalysis.General.Pipeline.NeuropyPipeline import _get_custom_suffix_for_filename_from_computation_metadata
+        from pyphocorehelpers.Filesystem.path_helpers import sanitize_filename_for_Windows
+        
+        try:
+            active_export_parent_output_path = self.collected_outputs_path.resolve()
+            Assert.path_exists(active_export_parent_output_path)
+            
+            # ## build output path:
+            # complete_session_context, (session_context, additional_session_context) = curr_active_pipeline.get_complete_session_context()
+            # custom_suffix: str = _get_custom_suffix_for_filename_from_computation_metadata(use_concise_formatting=True, **additional_session_context.to_dict()).removeprefix('-')
+            # full_custom_suffix: str = '_'.join([session_context.get_description(separator='_'), custom_suffix]) # 'kdiba_gor01_two_2006-6-12_16-53-46__withNormalComputedReplays-qclu_1246789-frateThresh_2.0'
+            # original_proposed_filename: str = f'2025-08-21_{full_custom_suffix}_a_new_fully_generic_result.pkl'
+            # good_filename: str = sanitize_filename_for_Windows(original_proposed_filename)
+            # pkl_save_path = active_export_parent_output_path.joinpath(good_filename).resolve()
+            # # a_new_fully_generic_result.to_hdf(test_a_new_fully_generic_result_path, key=complete_session_context.get_description_as_session_global_uid(), enable_hdf_testing_mode=True, OVERRIDE_ALLOW_GLOBAL_NESTED_EXPANSION=True)
+            # print(f'\ttrying to export pkl to pkl_save_path: "{pkl_save_path.as_posix()}"...')
+            # a_new_fully_generic_result.save(pkl_output_path=pkl_save_path)
+            
+            pkl_save_path = a_new_fully_generic_result.export_pkl(active_export_parent_output_path=active_export_parent_output_path, owning_pipeline_reference=curr_active_pipeline)
+            
+            across_session_results_extended_dict['generalized_decode_epochs_dict_and_export_results_completion_function']['pkl_save_path'] = deepcopy(pkl_save_path)
+            print(f'pkl_save_path: {pkl_save_path}\n')
+            
+        except Exception as e:
+            raise e
+
+
+
     print('\t\tdone.')
 
     # print(f'>>\t done with {curr_session_context}')

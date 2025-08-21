@@ -189,27 +189,63 @@ def helper_perform_pickle_pipeline(a_curr_active_pipeline, custom_save_filenames
 
 
 @function_attributes(short_name=None, tags=['NEEDS_REFACTOR', 'dataframe', 'filename', 'metadata'], input_requires=[], output_provides=[], uses=[], used_by=['_get_custom_filenames_from_computation_metadata'], creation_date='2024-10-28 12:40', related_items=[])
-def _get_custom_suffix_for_filename_from_computation_metadata(*extras_strings, included_qclu_values=None, minimum_inclusion_fr_Hz=None, parts_separator:str='-') -> str:
+def _get_custom_suffix_for_filename_from_computation_metadata(*extras_strings, parts_separator:str='-', use_concise_formatting: bool=False, **additional_session_context) -> str:
     """ Uses passed parameters to determine an appropriate filename suffix
     
-    
-    from pyphoplacecellanalysis.General.Pipeline.NeuropyPipeline import _get_custom_suffix_for_filename_from_computation_metadata
-    custom_suffix = _get_custom_suffix_for_filename_from_computation_metadata(new_replay_epochs=new_replay_epochs)
 
-    print(f'custom_suffix: "{custom_suffix}"')
+    Usage:    
+        from pyphoplacecellanalysis.General.Pipeline.NeuropyPipeline import _get_custom_suffix_for_filename_from_computation_metadata
+        
+        custom_suffix: str = _get_custom_suffix_for_filename_from_computation_metadata(**additional_session_context.to_dict())
+        
+        print(f'custom_suffix: "{custom_suffix}"')
+        
+    Usage 2: 
+        from neuropy.utils.result_context import IdentifyingContext
+        from pyphoplacecellanalysis.General.Pipeline.NeuropyPipeline import _get_custom_suffix_for_filename_from_computation_metadata
+
+        complete_session_context, (session_context, additional_session_context) = curr_active_pipeline.get_complete_session_context()
+        custom_suffix: str = _get_custom_suffix_for_filename_from_computation_metadata(use_concise_formatting=True, **additional_session_context.to_dict()).removeprefix('-')
+        full_custom_suffix: str = '_'.join([session_context.get_description_as_session_global_uid(), custom_suffix]) # 'kdiba|gor01|two|2006-6-12_16-53-46__withNormalComputedReplays-qclu_1246789-frateThresh_2.0'
+        full_custom_suffix
+
 
     """
+    additional_value_formatters = {
+        'epochs_source': lambda epochs_source: {'compute_diba_quiescent_style_replay_events':'_withNewComputedReplays', 'diba_evt_file':'_withNewKamranExportedReplays', 'initial_loaded': '_withOldestImportedReplays', 'normal_computed': '_withNormalComputedReplays'}[epochs_source], # 
+        'included_qclu_values': lambda included_qclu_values: "qclu_" + ''.join([str(v) for v in included_qclu_values]), # qclu_list_to_sequence: [1, 2, 4, 6, 7, 8, 9] -> '1246789'
+        'minimum_inclusion_fr_Hz': lambda minimum_inclusion_fr_Hz: f"frateThresh_{minimum_inclusion_fr_Hz:.1f}", ## fixed -- one decimal
+        # 'minimum_inclusion_fr_Hz': lambda minimum_inclusion_fr_Hz: f"frateThresh_{int(minimum_inclusion_fr_Hz*10):02}" if minimum_inclusion_fr_Hz < 1 else (f"{minimum_inclusion_fr_Hz:.1f}".rstrip('0').rstrip('.')), # value less than one like 0.2 to be formatted like 02 (with no decimal). Values like 2.0 -> "2", 2.2" -> "2.2"
+    }
+
+    if not use_concise_formatting:
+        additional_value_formatters.update(**{
+            'included_qclu_values': lambda included_qclu_values: f"qclu_{included_qclu_values}", # qclu_list_to_sequence: [1, 2, 4, 6, 7, 8, 9]
+            'minimum_inclusion_fr_Hz': lambda minimum_inclusion_fr_Hz: f"frateThresh_{minimum_inclusion_fr_Hz:.1f}", ## fixed -- one decimal
+        })
+
+    ## INPUTS: additional_session_context: Dict
+
     custom_suffix_string_parts = []
     custom_suffix: str = ''
-    if included_qclu_values is not None:
-        custom_suffix_string_parts.append(f"qclu_{included_qclu_values}")
-    if minimum_inclusion_fr_Hz is not None:
-        custom_suffix_string_parts.append(f"frateThresh_{minimum_inclusion_fr_Hz:.1f}")
-    custom_suffix = parts_separator.join([custom_suffix, *custom_suffix_string_parts, *extras_strings])
+    for k, v in additional_session_context.items():
+        if v is not None:
+            a_fmt_fn = additional_value_formatters.get(k, None)
+            if a_fmt_fn is None:
+                print(f'WARN: missing formatter for "{k}"')
+                a_fmt_fn = lambda x: f"{k}-{x}"
+            a_str_rep: str = a_fmt_fn(v)
+            if a_str_rep:
+                custom_suffix_string_parts.append(a_str_rep)
+                
+    if len(extras_strings) > 0:
+        custom_suffix = parts_separator.join([custom_suffix, *custom_suffix_string_parts, *extras_strings])
+    else:
+        custom_suffix = parts_separator.join([custom_suffix, *custom_suffix_string_parts])
+        
     return custom_suffix
 
-
-@function_attributes(short_name=None, tags=['NEEDS_REFACTOR', 'dataframe', 'filename', 'metadata'], input_requires=[], output_provides=[], uses=[], used_by=['save_custom_parameters_pipeline', 'get_custom_pipeline_filenames_from_parameters'], creation_date='2024-10-28 12:40', related_items=[])
+@function_attributes(short_name=None, tags=['NEEDS_REFACTOR', 'dataframe', 'filename', 'metadata'], input_requires=[], output_provides=[], uses=['_get_custom_suffix_for_filename_from_computation_metadata'], used_by=['save_custom_parameters_pipeline', 'get_custom_pipeline_filenames_from_parameters'], creation_date='2024-10-28 12:40', related_items=[])
 def _get_custom_filenames_from_computation_metadata(epochs_source: str='normal_computed', included_qclu_values=None, minimum_inclusion_fr_Hz=None, parts_separator:str='-') -> Dict[str, str]:
     """ Uses parameters stored in the pipeline to determine an appropriate filename
     
@@ -225,7 +261,7 @@ def _get_custom_filenames_from_computation_metadata(epochs_source: str='normal_c
     assert epochs_source in valid_epochs_source_values, f"epochs_source: '{epochs_source}' is not in valid_epochs_source_values: {valid_epochs_source_values}"
     to_filename_conversion_dict = {'compute_diba_quiescent_style_replay_events':'_withNewComputedReplays', 'diba_evt_file':'_withNewKamranExportedReplays', 'initial_loaded': '_withOldestImportedReplays', 'normal_computed': '_withNormalComputedReplays'}
     custom_suffix: str = to_filename_conversion_dict[epochs_source]
-    custom_suffix += _get_custom_suffix_for_filename_from_computation_metadata(included_qclu_values=included_qclu_values, minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz, parts_separator=parts_separator) # '_withNormalComputedReplays-qclu_[1, 2, 4, 6, 7, 9]-frateThresh_5.0'
+    custom_suffix += _get_custom_suffix_for_filename_from_computation_metadata(parts_separator=parts_separator, use_concise_formatting=False, **dict(included_qclu_values=included_qclu_values, minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz)) # '_withNormalComputedReplays-qclu_[1, 2, 4, 6, 7, 9]-frateThresh_5.0'
     ## INPUTS: custom_suffix
     custom_save_filenames = {
         'pipeline_pkl':f'loadedSessPickle{custom_suffix}.pkl',
