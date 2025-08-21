@@ -465,7 +465,7 @@ class MultiContextComparingDisplayFunctions(AllFunctionEnumeratingMixin, metacla
 
 
     @function_attributes(short_name='meas_v_decoded_occupancy', tags=['context-decoder-comparison', 'MeasuredVsDecodedOccupancy', 'decoded_position', 'directional'], conforms_to=['output_registering', 'figure_saving'], input_requires=[], output_provides=[], requires_global_keys=["global_computation_results.computed_data['EpochComputations']"], uses=['MeasuredVsDecodedOccupancy', '_helper_add_interpolated_position_columns_to_decoded_result_df', '_display_grid_bin_bounds_validation', 'FigureCollector'], used_by=[], creation_date='2025-05-16 00:00', related_items=[], is_global=True)
-    def _display_measured_vs_decoded_occupancy_distributions(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, save_figure=True, size=[6.5, 2], dpi=100, constrained_layout=True, override_fig_man: Optional[FileOutputManager]=None, **kwargs):
+    def _display_measured_vs_decoded_occupancy_distributions(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, save_figure=True, size=[6.5, 2], dpi=100, constrained_layout=True, override_fig_man: Optional[FileOutputManager]=None, prepare_for_publication: bool=False, **kwargs):
             """ Plots the measured vs. decoded occupancy (position) for each of the four decoders for both Pre-delta and Post-delta.
             
             Usage:
@@ -587,10 +587,10 @@ class MultiContextComparingDisplayFunctions(AllFunctionEnumeratingMixin, metacla
             # ==================================================================================================================================================================================================================================================================================== #
             # Titles/Formatting/Marginas and Saving                                                                                                                                                                                                                                                #
             # ==================================================================================================================================================================================================================================================================================== #
-            def _subfn_apply_formatting_footer_and_etc(fig, figure_title: str, subtitle_string: Optional[str]=None, an_active_display_context: IdentifyingContext=None, graphics_output_dict=None):
+            def _subfn_apply_formatting_footer_and_etc(fig, ax_dict, figure_title: str, subtitle_string: Optional[str]=None, an_active_display_context: IdentifyingContext=None, graphics_output_dict=None, should_include_footer: bool=False):
                 """ builds titles, footers, etc
 
-                Captures: _subfn_apply_formatting_footer_and_etc
+                Captures: _subfn_apply_formatting_footer_and_etc, prepare_for_publication
 
                 """
                 if graphics_output_dict is None:
@@ -605,49 +605,62 @@ class MultiContextComparingDisplayFunctions(AllFunctionEnumeratingMixin, metacla
                 # print(f'subtitle_string: {subtitle_string}')
 
                 ## BUild figure titles:
-                # INPUTS: main_fig
-                # fig.suptitle('')
-                # out_axes_list[0].set_title('')
-                
-                # text_formatter = FormattedFigureText() # .init_from_margins(left_margin=0.01)
-                # text_formatter.setup_margins(fig, left_margin=0.01) # , left_margin=0.1
-                text_formatter = FormattedFigureText.init_from_margins(left_margin=0.01, right_margin=0.99) # , top_margin=0.9
-                # text_formatter.setup_margins(fig, left_margin=0.01, top_margin=0.9)
-                text_formatter.setup_margins(fig)
-                title_string: str = f"{display_fn_name}: {figure_title}"
-                # session_footer_string: str =  active_context.get_description(subset_includelist=['format_name', 'animal', 'exper_name', 'session_name'], separator=' | ') 
-                session_footer_string: str =  active_context.get_description(separator=' | ') 
+                if prepare_for_publication:
+                    # INPUTS: main_fig
+                    # fig.suptitle('')
+                    # out_axes_list[0].set_title('')
+                    pass
+                else:
+                    ## non-publication
+                    fig.suptitle('')
+                    # ax_dict   
+                    # text_formatter = FormattedFigureText() # .init_from_margins(left_margin=0.01)
+                    # text_formatter.setup_margins(fig, left_margin=0.01) # , left_margin=0.1
+                    text_formatter = FormattedFigureText.init_from_margins(left_margin=0.01, right_margin=0.99, bottom_margin=0.1) # , top_margin=0.9
 
-                # subtitle_string = '\n'.join([f'{active_config.str_for_display(is_2D)}'])
-                # header_text_obj = flexitext(text_formatter.left_margin, 0.9, f'<size:22><weight:bold>{title_string}</></>\n<size:10>{subtitle_string}</>', va="bottom", xycoords="figure fraction") # , wrap=False
-                formatted_title_str: str = f'<size:20><weight:bold>{title_string}</></>'
-                if subtitle_string is not None:
-                    formatted_title_str = formatted_title_str + f'\n<size:9>{subtitle_string}</>'
-                                    
+                    # text_formatter.setup_margins(fig, left_margin=0.01, top_margin=0.9)
+                    text_formatter.setup_margins(fig)
+                    title_string: str = f"{display_fn_name}: {figure_title}"
+                    # session_footer_string: str =  active_context.get_description(subset_includelist=['format_name', 'animal', 'exper_name', 'session_name'], separator=' | ') 
+                    session_footer_string: str =  active_context.get_description(separator=' | ') 
 
-                header_text_obj = flexitext(0.01, 0.85, formatted_title_str, va="bottom", xycoords="figure fraction") # , wrap=False
-                footer_text_obj = text_formatter.add_flexitext_context_footer(active_context=active_context) # flexitext((text_formatter.left_margin*0.1), (text_formatter.bottom_margin*0.25), text_formatter._build_footer_string(active_context=active_context), va="top", xycoords="figure fraction")
-                
-                complete_title_string: str = f"{title_string} - {session_footer_string}"
-                # complete_title_string: str = f"{complete_title_string} - {subtitle_string}"
-                
-                window_title_string: str = complete_title_string
-                
-                try:
-                    fig.canvas.manager.set_window_title(window_title_string) # sets the window's title
-                except AttributeError as e:
-                    ## Missing canvas to set widnow title of
-                    print(f'Could not set window title with error: {e}. Continuing...')
-                except Exception as e:
-                    raise e
+                    # subtitle_string = '\n'.join([f'{active_config.str_for_display(is_2D)}'])
+                    # header_text_obj = flexitext(text_formatter.left_margin, 0.9, f'<size:22><weight:bold>{title_string}</></>\n<size:10>{subtitle_string}</>', va="bottom", xycoords="figure fraction") # , wrap=False
+                    formatted_title_str: str = f'<size:20><weight:bold>{title_string}</></>'
+                    if subtitle_string is not None:
+                        formatted_title_str = formatted_title_str + f'\n<size:9>{subtitle_string}</>'
+
+                    plt.title('') ## set to None
+
+                    header_text_obj = flexitext(0.005, 0.85, formatted_title_str, va="bottom", xycoords="figure fraction")
+                    # header_text_obj = flexitext(0.01, 0.85, formatted_title_str, va="bottom", xycoords="figure fraction") # , wrap=False
+                    if should_include_footer:
+                        footer_text_obj = text_formatter.add_flexitext_context_footer(active_context=active_context) # flexitext((text_formatter.left_margin*0.1), (text_formatter.bottom_margin*0.25), text_formatter._build_footer_string(active_context=active_context), va="top", xycoords="figure fraction")
+
+                    complete_title_string: str = f"{title_string} - {session_footer_string}"
+                    # complete_title_string: str = f"{complete_title_string} - {subtitle_string}"
+                    
+                    window_title_string: str = complete_title_string
+                    graphics_output_dict['label_objects'] = {'header': header_text_obj, 'formatter': text_formatter}
+                    if should_include_footer:
+                        graphics_output_dict['footer'] = footer_text_obj
+                    
+                    try:
+                        fig.canvas.manager.set_window_title(window_title_string) # sets the window's title
+                    except AttributeError as e:
+                        ## Missing canvas to set widnow title of
+                        print(f'INFO: Could not set window title with error: {e}. Continuing...')
+                    except Exception as e:
+                        raise e
 
                 if ((_perform_write_to_file_callback is not None) and (an_active_display_context is not None)):
-                    _perform_write_to_file_callback(an_active_display_context, fig)
-
-                graphics_output_dict['label_objects'] = {'header': header_text_obj, 'footer': footer_text_obj, 'formatter': text_formatter}
+                    _out_path = _perform_write_to_file_callback(an_active_display_context, fig)
+                    graphics_output_dict['save_paths'] = deepcopy(_out_path)
+                    
+                
                 return graphics_output_dict
 
-
+            graphics_output_dict['save_paths'] = {} 
 
             with mpl.rc_context(PhoPublicationFigureHelper.rc_context_kwargs({'figure.dpi': str(dpi), 'figure.constrained_layout.use': (constrained_layout or False), 'figure.frameon': False, 'figure.figsize': size, })): # 'figure.figsize': (12.4, 4.8), 
                 # Create a FigureCollector instance
@@ -663,9 +676,9 @@ class MultiContextComparingDisplayFunctions(AllFunctionEnumeratingMixin, metacla
                     best_matching_context, a_result, a_decoder, a_decoded_marginal_posterior_df = a_new_fully_generic_result.get_results_best_matching_context(context_query=a_target_context)
                     an_active_display_context = active_display_context.overwriting_context(known_named_decoding_epochs_type=known_named_decoding_epochs_type, figure_title=figure_title)
                     fig, ax_dict = MeasuredVsDecodedOccupancy.analyze_and_plot_meas_vs_decoded_occupancy(best_matching_context, a_result, a_decoder, a_decoded_marginal_posterior_df, track_templates, figure_title=figure_title, skip_plotting_measured=False)
-                    _graphics_output_dict = _subfn_apply_formatting_footer_and_etc(fig, figure_title=figure_title, subtitle_string=None, an_active_display_context=an_active_display_context)
+                    _graphics_output_dict = _subfn_apply_formatting_footer_and_etc(fig, ax_dict, figure_title=figure_title, subtitle_string=None, an_active_display_context=an_active_display_context)
                     collector.post_hoc_append(figs=[fig,], axes=ax_dict, contexts=[an_active_display_context])
-
+                    graphics_output_dict['save_paths'][an_active_display_context] = deepcopy(_graphics_output_dict['save_paths'])
 
                     ## Global context:
                     figure_title ='Global (all-time)'
@@ -674,9 +687,10 @@ class MultiContextComparingDisplayFunctions(AllFunctionEnumeratingMixin, metacla
                     best_matching_context, a_result, a_decoder, a_decoded_marginal_posterior_df = a_new_fully_generic_result.get_results_best_matching_context(context_query=a_target_context)
                     an_active_display_context = active_display_context.overwriting_context(known_named_decoding_epochs_type=known_named_decoding_epochs_type, figure_title=figure_title)
                     fig, ax_dict = MeasuredVsDecodedOccupancy.analyze_and_plot_meas_vs_decoded_occupancy(best_matching_context, a_result, a_decoder, a_decoded_marginal_posterior_df, track_templates, figure_title=figure_title, skip_plotting_measured=False)
-                    _graphics_output_dict = _subfn_apply_formatting_footer_and_etc(fig, figure_title=figure_title, subtitle_string=None, an_active_display_context=an_active_display_context)
+                    _graphics_output_dict = _subfn_apply_formatting_footer_and_etc(fig, ax_dict, figure_title=figure_title, subtitle_string=None, an_active_display_context=an_active_display_context)
                     collector.post_hoc_append(figs=[fig,], axes=ax_dict, contexts=[an_active_display_context])
-
+                    graphics_output_dict['save_paths'][an_active_display_context] = deepcopy(_graphics_output_dict['save_paths'])
+                    
                     ## PBEs context:
                     figure_title ='PBEs'
                     known_named_decoding_epochs_type='pbe'
@@ -684,14 +698,14 @@ class MultiContextComparingDisplayFunctions(AllFunctionEnumeratingMixin, metacla
                     best_matching_context, a_result, a_decoder, a_decoded_marginal_posterior_df = a_new_fully_generic_result.get_results_best_matching_context(context_query=a_target_context)
                     an_active_display_context = active_display_context.overwriting_context(known_named_decoding_epochs_type=known_named_decoding_epochs_type, figure_title=figure_title)
                     fig, ax_dict = MeasuredVsDecodedOccupancy.analyze_and_plot_meas_vs_decoded_occupancy(best_matching_context, a_result, a_decoder, a_decoded_marginal_posterior_df, track_templates, figure_title=figure_title, skip_plotting_measured=True)
-                    _graphics_output_dict = _subfn_apply_formatting_footer_and_etc(fig, figure_title=figure_title, subtitle_string=None, an_active_display_context=an_active_display_context)
+                    _graphics_output_dict = _subfn_apply_formatting_footer_and_etc(fig, ax_dict, figure_title=figure_title, subtitle_string=None, an_active_display_context=an_active_display_context, should_include_footer=True)
                     collector.post_hoc_append(figs=[fig,], axes=ax_dict, contexts=[an_active_display_context])
-
+                    graphics_output_dict['save_paths'][an_active_display_context] = deepcopy(_graphics_output_dict['save_paths'])
 
             ## END with mpl.rc_context({'figure.dpi': '...
 
-
             graphics_output_dict['collector'] = collector
+            graphics_output_dict['save_paths'] = [v[0][0] for v in list(graphics_output_dict['save_paths'].values())]
 
             return graphics_output_dict
     

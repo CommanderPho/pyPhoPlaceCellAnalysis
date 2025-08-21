@@ -3620,6 +3620,30 @@ def figures_plot_generalized_decode_epochs_dict_and_export_results_completion_fu
             raise
 
 
+    # ==================================================================================================================================================================================================================================================================================== #
+    # `_display_measured_vs_decoded_occupancy_distributions`                                                                                                                                                                                                                             #
+    # ==================================================================================================================================================================================================================================================================================== #
+    if ('_display_measured_vs_decoded_occupancy_distributions' in included_figures_names) or ('meas_v_decoded_occupancy' in included_figures_names):
+        print(f'\t trying "_display_measured_vs_decoded_occupancy_distributions"')
+        try:
+            display_context = curr_active_pipeline.build_display_context_for_session(display_fn_name='meas_v_decoded_occupancy')
+            _out = curr_active_pipeline.display('_display_measured_vs_decoded_occupancy_distributions', display_context, defer_render=True, save_figure=True,
+                                                override_fig_man=custom_fig_man,
+                                                # parent_output_folder=custom_figure_output_path,
+                                                #  size=[6.5, 2], dpi=100,
+                                                size=[3.5, 2], dpi=100,
+                                                prepare_for_publication=False,
+                                                # prepare_for_publication=True,
+                                            )
+            
+            across_session_results_extended_dict['figures_plot_generalized_decode_epochs_dict_and_export_results_completion_function'].update({
+                '_display_measured_vs_decoded_occupancy_distributions': _out,
+            })
+            
+
+        except Exception as e:
+            print(f'\tfigures_plot_generalized_decode_epochs_dict_and_export_results_completion_function(...): "_display_measured_vs_decoded_occupancy_distributions" failed with error: {e}\n skipping.')
+            raise
 
 
 
