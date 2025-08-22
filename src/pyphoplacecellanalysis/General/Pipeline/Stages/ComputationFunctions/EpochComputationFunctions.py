@@ -2338,6 +2338,7 @@ class EpochComputationDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Di
             with mpl.rc_context(PhoPublicationFigureHelper.rc_context_kwargs({'figure.dpi': str(dpi), 'figure.constrained_layout.use': (constrained_layout or False), 'figure.frameon': False, 'figure.figsize': size, })): # 'figure.figsize': (12.4, 4.8), 
                 # Create a FigureCollector instance
                 with FigureCollector(name='generalized_decoded_yellow_blue_marginal_epochs', base_context=display_context) as collector:
+                    
                     fig, ax_dict = collector.subplot_mosaic(
                         [
                             ["ax_top"],
@@ -2347,7 +2348,8 @@ class EpochComputationDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Di
                         # set the width ratios between the columns
                         height_ratios=[3, 1],
                         sharex=True,
-                        gridspec_kw=dict(wspace=0, hspace=0) # `wspace=0`` is responsible for sticking the pf and the activity axes together with no spacing
+                        gridspec_kw=dict(wspace=0, hspace=0), # `wspace=0`` is responsible for sticking the pf and the activity axes together with no spacing
+                        fig_kw = dict(figsize=size, constrained_layout=constrained_layout, frameon=False),
                     )
 
 
