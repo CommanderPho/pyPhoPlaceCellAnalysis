@@ -879,7 +879,7 @@ class FigureToImageHelpers:
     #     print(f"PDF saved to {output_pdf_path}")
 
     @classmethod
-    def prepare_export_wrapped_tracks_to_paged_df(active_2d_plot, included_track_dock_identifiers: Optional[List]=None):
+    def _helper_prepare_export_wrapped_tracks_to_paged_df(active_2d_plot, included_track_dock_identifiers: Optional[List]=None):
         """ 
         Usage:
 
@@ -949,7 +949,7 @@ class FigureToImageHelpers:
 
     @function_attributes(short_name=None, tags=['pdf', 'export', 'wrapped', 'multi-track', 'pyqtgraph', 'matplotlib'], creation_date='2025-08-22 02:30')
     @classmethod
-    def export_wrapped_tracks_to_paged_pdf(cls, tracks, x_extent: tuple, chunk_width: float, output_pdf_path: str, rows_per_page: int=5, figsize=(8, 11), dpi=150, normalized_track_heights: Optional[List]=None, debug_max_num_pages: Optional[int]=5, track_labels: Optional[List[str]]=None, debug_print:bool=False):
+    def perform_export_wrapped_tracks_to_paged_pdf(cls, tracks, x_extent: tuple, chunk_width: float, output_pdf_path: str, rows_per_page: int=5, figsize=(8, 11), dpi=150, normalized_track_heights: Optional[List]=None, debug_max_num_pages: Optional[int]=5, track_labels: Optional[List[str]]=None, debug_print:bool=False):
         """
         Export a mixed list of matplotlib AxesImages and PyQtGraph PlotItems to a wrapped, paged PDF.
 
@@ -991,7 +991,6 @@ class FigureToImageHelpers:
             track_heights = (normalized_track_heights * fig_total_height)
 
 
-
         x_min, x_max = x_extent
 
         ## for extraction from widgets:
@@ -1003,9 +1002,6 @@ class FigureToImageHelpers:
         export_infos = []
         y_offset = 0
         for track_IDX, t in enumerate(tracks):
-
-
-
 
             if isinstance(t, mimage.AxesImage):
                 # ## Data units version:
@@ -1123,6 +1119,81 @@ class FigureToImageHelpers:
                 pdf.savefig(fig)
                 plt.close(fig)
         print(f"PDF saved to {output_pdf_path}")
+        return output_pdf_path
+
+
+    @classmethod
+    def export_wrapped_tracks_to_paged_df(cls, active_2d_plot, output_pdf_path: str, included_track_dock_identifiers: Optional[List]=None, **kwargs):
+        """ 
+        Usage:
+
+            saved_output_pdf_path = FigureToImageHelpers.export_wrapped_tracks_to_paged_df(active_2d_plot, output_pdf_path=output_pdf_path)
+
+        """
+        from pyphoplacecellanalysis.Pho2D.PyQtPlots.TimeSynchronizedPlotters.PyqtgraphTimeSynchronizedWidget import PyqtgraphTimeSynchronizedWidget
+        from pyphoplacecellanalysis.Pho2D.matplotlib.MatplotlibTimeSynchronizedWidget import MatplotlibTimeSynchronizedWidget
+        import matplotlib.image as mimage
+
+
+        if included_track_dock_identifiers is None:
+            ## all tracks:
+            included_track_dock_identifiers = active_2d_plot.dock_manager_widget.get_leaf_only_flat_dock_identifiers_list()
+
+        found_widgets = [active_2d_plot.find_dock_item_tuple(an_id)[-1] for an_id in included_track_dock_identifiers]
+
+        # found_pyqtgraph_stack = []
+        # found_matplotlib_stack = []
+        found_heterogeneous_stack = []
+
+        track_heights = []
+        for a_widget in found_widgets:
+            if isinstance(a_widget, PyqtgraphTimeSynchronizedWidget):
+                widget: PyqtgraphTimeSynchronizedWidget = a_widget
+                root_plot_item: pg.PlotItem = widget.getRootPlotItem()
+                # found_pyqtgraph_stack.append(root_plot_item)
+                found_heterogeneous_stack.append(root_plot_item)
+            elif isinstance(a_widget, MatplotlibTimeSynchronizedWidget):
+                found_ax_img = None
+                try:
+                    found_ax_img = a_widget.plots.im_posterior_x
+                except KeyError as e:
+                    ## try to discover the axes images directly
+                    fig = a_widget.plots.fig # plt.gcf()
+                    assert fig is not None
+                    axes_images = [im for ax in fig.axes for im in ax.get_images() if isinstance(im, mimage.AxesImage)]
+                    assert len(axes_images) > 0
+                    assert len(axes_images) == 1, f"TODO - only allow the first (single) AxesImage to be added."
+                    found_ax_img = axes_images[0] ## Only add the first
+                except Exception as e:
+                    found_ax_img = None
+                    raise e
+
+                if found_ax_img is not None:
+                    # found_matplotlib_stack.append(found_ax_img)
+                    found_heterogeneous_stack.append(found_ax_img)
+            else:
+                raise NotImplementedError(f'unexpected widget type: {type(a_widget), a_widget: {a_widget}}')
+
+            ## get height
+            track_heights.append(a_widget.height())
+
+        # found_matplotlib_stack
+        # found_pyqtgraph_stack
+        found_heterogeneous_stack
+
+        track_heights = np.array(track_heights)
+        normalized_track_heights = track_heights / np.sum(track_heights)
+
+        # track_heights_dict = dict(zip(included_track_dock_identifiers, track_heights))
+        # track_heights_dict = dict(zip(included_track_dock_identifiers, normalized_track_heights))
+
+        return cls.export_wrapped_tracks_to_paged_pdf(tracks=found_heterogeneous_stack, x_extent=(active_2d_plot.total_data_start_time, active_2d_plot.total_data_end_time), chunk_width=active_2d_plot.active_window_duration, output_pdf_path=output_pdf_path, figsize=(8, 11), dpi=150,
+                                                        rows_per_page=5, debug_max_num_pages=2,		    
+                                                        # rows_per_page=15, debug_max_num_pages=3,
+                                                        normalized_track_heights = normalized_track_heights, **kwargs,
+                                                        )
+
+
 
 
 
