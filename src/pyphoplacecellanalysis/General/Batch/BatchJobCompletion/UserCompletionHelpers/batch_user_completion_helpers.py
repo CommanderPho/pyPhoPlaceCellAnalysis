@@ -3465,6 +3465,7 @@ def figures_plot_generalized_decode_epochs_dict_and_export_results_completion_fu
     from benedict import benedict
     from pyphoplacecellanalysis.Pho2D.data_exporting import PosteriorExporting
     from pyphocorehelpers.plotting.media_output_helpers import PDFHelpers
+    from pyphoplacecellanalysis.SpecificResults.AcrossSessionResults import Assert
 
     # 'trackID_weighted_position_posterior'
     if across_session_results_extended_dict is None:
@@ -3729,6 +3730,90 @@ def figures_plot_generalized_decode_epochs_dict_and_export_results_completion_fu
             print(f'\tfigures_plot_generalized_decode_epochs_dict_and_export_results_completion_function(...): "_display_trial_to_trial_reliability" failed with error: {e}\n skipping.')
             raise
         
+
+
+
+    # ==================================================================================================================================================================================================================================================================================== #
+    # `_render_export_all_time_tracks`                                                                                                                                                                                                                             #
+    # ==================================================================================================================================================================================================================================================================================== #
+    
+    if ('_render_export_all_time_tracks' in included_figures_names) or ('export_all_time_tracks' in included_figures_names):
+        print(f'\t trying "_render_export_all_time_tracks"')
+        try:
+            import pyphoplacecellanalysis.External.pyqtgraph as pg
+            from pyphocorehelpers.gui.Qt.color_helpers import ColormapHelpers
+            from pyphoplacecellanalysis.General.Mixins.ExportHelpers import FigureToImageHelpers
+            from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.SpikeRasterWidgets.spike_raster_widgets import _setup_spike_raster_window_for_debugging
+            from PyQt5.QtCore import QTimer
+            
+            # For PlotWidget
+            pg.setConfigOptions(useOpenGL=True)
+            pg.setConfigOption('antialias', False)
+            # _restore_previous_matplotlib_settings_callback = matplotlib_configuration_update(is_interactive=True, backend='Qt5Agg')
+            _, _, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
+            global_epoch_context = curr_active_pipeline.filtered_contexts[global_epoch_name]
+            
+            display_context = curr_active_pipeline.build_display_context_for_session(display_fn_name='export_all_time_tracks')
+
+            #  Create a new `SpikeRaster2D` instance using `_display_spike_raster_pyqtplot_2D` and capture its outputs:
+            _out = curr_active_pipeline.display(display_function='_display_spike_rasters_window',
+                                                 active_session_configuration_context=global_epoch_context,
+                                                #  active_session_configuration_context=IdentifyingContext(format_name='kdiba',animal='vvp01',exper_name='two',session_name='2006-4-10_12-58-3',filter_name='maze_any',lap_dir='any'),
+                                                 ) # _display_spike_rasters_window
+
+            active_2d_plot = _out['spike_raster_plt_2d']
+            assert active_2d_plot is not None, f"failed to get active_2d_plot after trying to display _display_spike_rasters_window."
+                
+            spike_raster_window = _out['spike_raster_window']
+            assert spike_raster_window is not None, f"failed to get spike_raster_window after trying to display _display_spike_rasters_window."
+
+            all_global_menus_actionsDict, global_flat_action_dict, _all_outputs_dict = _setup_spike_raster_window_for_debugging(spike_raster_window, wants_docked_raster_window_track=True, enable_interval_overview_track=False, allow_replace_hardcoded_main_plots_with_tracks=True)
+
+            # Run after a 0.5 second delay
+            def _perform_output_figure_delayed():
+                ## #TODO 2025-08-22 10:25: - [ ] Output to correct path (see above):            
+                if custom_fig_man is not None:
+                    print(f'custom_fig_man is not None! Custom output path will be used!')
+                    test_display_output_path = custom_fig_man.get_figure_save_file_path(display_context, make_folder_if_needed=False)
+                    print(f'\ttest_display_output_path: "{test_display_output_path}"')
+                else:
+                    raise NotImplementedError(f'needs displayman!')
+
+                relative_data_output_parent_folder = Path('data').resolve()
+                Assert.path_exists(relative_data_output_parent_folder)
+
+                ## INPUTS: im_posterior_x_stack, track_labels, 
+                output_pdf_path: Path = test_display_output_path.with_suffix('.pdf') # relative_data_output_parent_folder.joinpath('all_timeline_tracks_exported_stack.pdf')
+                print(f'\t\toutput_pdf_path: "{output_pdf_path}"')
+                ## Export the wrapped tracks:
+                included_track_dock_identifiers = additional_marginal_overlaying_measured_position_kwargs.pop('included_track_dock_identifiers', None)
+                track_labels = additional_marginal_overlaying_measured_position_kwargs.pop('track_labels', None)
+                saved_output_pdf_path = FigureToImageHelpers.export_wrapped_tracks_to_paged_df(active_2d_plot, output_pdf_path=output_pdf_path, included_track_dock_identifiers=included_track_dock_identifiers, track_labels=track_labels, debug_max_num_pages=25)
+                print(f'\t\tsaved_output_pdf_path: "{saved_output_pdf_path}"')
+                across_session_results_extended_dict['figures_plot_generalized_decode_epochs_dict_and_export_results_completion_function'].update({
+                    '_render_export_all_time_tracks': {'fig_save_path': saved_output_pdf_path},
+                })
+
+
+            across_session_results_extended_dict['figures_plot_generalized_decode_epochs_dict_and_export_results_completion_function'].update({
+                '_render_export_all_time_tracks': {'fig_save_path': None},
+            })
+            QTimer.singleShot(800, _perform_output_figure_delayed)
+
+
+            ## INPUT: `_out` -- _a_trial_by_trial_window
+
+            # export_all_time_tracks_save_path = Path('data').joinpath('export_all_time_tracks.svg').resolve()
+            # export_pyqtgraph_plot(_out['_render_export_all_time_tracks'].plots['root_render_widget'], savepath=export_all_time_tracks_save_path) # works
+
+            
+
+        except Exception as e:
+            print(f'\tfigures_plot_generalized_decode_epochs_dict_and_export_results_completion_function(...): "_render_export_all_time_tracks" failed with error: {e}\n skipping.')
+            # raise
+            pass
+        
+
 
 
     print(f'>>\t done with {curr_session_context}')
