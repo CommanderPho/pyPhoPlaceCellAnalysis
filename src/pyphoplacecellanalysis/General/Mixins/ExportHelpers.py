@@ -879,11 +879,11 @@ class FigureToImageHelpers:
     #     print(f"PDF saved to {output_pdf_path}")
 
     @classmethod
-    def _helper_prepare_export_wrapped_tracks_to_paged_df(cls, active_2d_plot, included_track_dock_identifiers: Optional[List]=None):
-        """ 
+    def _helper_extract_renderables_from_track_widgets(cls, active_2d_plot, included_track_dock_identifiers: Optional[List]=None):
+        """ Gets the renderable embedded in the track widget for the provided `included_track_dock_identifiers`.
         Usage:
 
-            found_heterogeneous_stack, normalized_track_heights, included_track_dock_identifiers = cls._helper_prepare_export_wrapped_tracks_to_paged_df(active_2d_plot, included_track_dock_identifiers=None)
+            found_heterogeneous_stack, normalized_track_heights, included_track_dock_identifiers = cls._helper_extract_renderables_from_track_widgets(active_2d_plot, included_track_dock_identifiers=None)
 
         """
         from pyphoplacecellanalysis.Pho2D.PyQtPlots.TimeSynchronizedPlotters.PyqtgraphTimeSynchronizedWidget import PyqtgraphTimeSynchronizedWidget
@@ -956,7 +956,6 @@ class FigureToImageHelpers:
 
         A "chunk" is a block of all tracks (stacked vertically) that makes up the conceptual row (but they themselves have several vertically stacked tracks looking like subrows). 
         Each "page" has a fixed number of rows `rows_per_page`. 
-
 
         """
         from pyphoplacecellanalysis.External.pyqtgraph.exporters.ImageExporter import ImageExporter
@@ -1118,7 +1117,7 @@ class FigureToImageHelpers:
         return output_pdf_path
 
 
-    @function_attributes(short_name=None, tags=['tracks', 'MAIN'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-08-22 08:13', related_items=[])
+    @function_attributes(short_name=None, tags=['tracks', 'MAIN'], input_requires=[], output_provides=[], uses=['_helper_extract_renderables_from_track_widgets', 'perform_export_wrapped_tracks_to_paged_pdf'], used_by=[], creation_date='2025-08-22 08:13', related_items=[])
     @classmethod
     def export_wrapped_tracks_to_paged_df(cls, active_2d_plot, output_pdf_path: str, included_track_dock_identifiers: Optional[List]=None, **kwargs):
         """ 
@@ -1129,11 +1128,9 @@ class FigureToImageHelpers:
         """
 
 
-        found_heterogeneous_stack, normalized_track_heights, included_track_dock_identifiers = cls._helper_prepare_export_wrapped_tracks_to_paged_df(active_2d_plot, included_track_dock_identifiers=included_track_dock_identifiers)
+        found_heterogeneous_stack, normalized_track_heights, included_track_dock_identifiers = cls._helper_extract_renderables_from_track_widgets(active_2d_plot, included_track_dock_identifiers=included_track_dock_identifiers)
 
-        return cls.perform_export_wrapped_tracks_to_paged_pdf(tracks=found_heterogeneous_stack, x_extent=(active_2d_plot.total_data_start_time, active_2d_plot.total_data_end_time), chunk_width=active_2d_plot.active_window_duration, output_pdf_path=output_pdf_path, figsize=(8, 11), dpi=150,
-                                                        rows_per_page=5, debug_max_num_pages=2,		    
-                                                        # rows_per_page=15, debug_max_num_pages=3,
+        return cls.perform_export_wrapped_tracks_to_paged_pdf(tracks=found_heterogeneous_stack, x_extent=(active_2d_plot.total_data_start_time, active_2d_plot.total_data_end_time), chunk_width=active_2d_plot.active_window_duration, output_pdf_path=output_pdf_path,
                                                         normalized_track_heights = normalized_track_heights, **kwargs,
                                                         )
 
