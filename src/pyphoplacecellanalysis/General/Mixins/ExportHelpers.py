@@ -1057,7 +1057,7 @@ class FigureToImageHelpers:
                             arr = info['obj'].get_array()
                             cmap = info['obj'].get_cmap()
                             ax.imshow(arr, extent=[info['extent'][0], info['extent'][1], info['extent'][2], info['extent'][3]], aspect='auto', cmap=cmap, origin=info['obj'].origin)
-                        else:  # pg
+                        else:  # pyqtgraph-backed tracks
                             pi = info['obj']
                             orig_x, orig_y = pi.getViewBox().viewRange()
                             pi.setXRange(start, end, padding=0)
