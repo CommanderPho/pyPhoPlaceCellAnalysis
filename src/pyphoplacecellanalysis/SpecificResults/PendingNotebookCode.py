@@ -5373,7 +5373,6 @@ def filtered_by_frate_and_qclu(curr_active_pipeline, desired_qclu_subset=[1, 2],
 @function_attributes(short_name=None, tags=['USEFUL', 'unused', 'debug', 'visualizztion', 'SpikeRasterWindow'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-05-14 14:01', related_items=[])
 def plot_attached_BinByBinDecodingDebugger(spike_raster_window, curr_active_pipeline, a_decoder: BasePositionDecoder, a_decoded_result: Union[DecodedFilterEpochsResult, SingleEpochDecodedResult], n_max_debugged_time_bins:int=25):
     """ 
-    
     from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import plot_attached_BinByBinDecodingDebugger
 
     ## INPUTS: a_decoder, a_decoded_result
@@ -5433,7 +5432,7 @@ def plot_attached_BinByBinDecodingDebugger(spike_raster_window, curr_active_pipe
     
 
     # Later when data changes:
-    def _on_update_fcn():
+    def _on_update_fcn(*args, **kwargs):
         """ captures: active_spikes_window, bin_by_bin_debugger, bin_by_bin_data 
         """
         ## INPUTS: active_spikes_window, global_spikes_df, decoding_bins_epochs_df
@@ -5446,6 +5445,18 @@ def plot_attached_BinByBinDecodingDebugger(spike_raster_window, curr_active_pipe
         # win, out_pf1D_decoder_template_objects, (plots_container, plots_data) = _update_output
 
     bin_by_bin_debugger.params.on_update_fcn = _on_update_fcn
+
+    ## connect the update event
+
+    # Perform Initial (one-time) update from source -> controlled:
+    # active_matplotlib_view_widget.on_window_changed(active_spikes_window.active_window_start_time, active_spikes_window.active_window_end_time)
+    # sync_connection = active_2d_plot.window_scrolled.connect(active_matplotlib_view_widget.on_window_changed)
+    # active_2d_plot.ui.connections[identifier] = sync_connection # add the connection to the connections array
+
+    ## idk if this will work:
+    _on_update_fcn(active_spikes_window.active_window_start_time, active_spikes_window.active_window_end_time)
+    sync_connection = active_2d_plot.window_scrolled.connect(_on_update_fcn)
+    active_2d_plot.ui.connections['bin_by_bin_debugger'] = sync_connection # add the connection to the connections array
 
     ## END def _on_update_fcn()...
     return bin_by_bin_debugger, win, out_pf1D_decoder_template_objects, (plots_container, plots_data), _on_update_fcn
