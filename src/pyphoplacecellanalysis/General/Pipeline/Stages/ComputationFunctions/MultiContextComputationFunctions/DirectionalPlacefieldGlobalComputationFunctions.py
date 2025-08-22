@@ -6103,7 +6103,7 @@ def compute_weighted_correlations(decoder_decoded_epochs_result_dict: Dict[types
             weighted_corr_data = np.array([wcorr(a_P_x_given_n) for a_P_x_given_n in curr_results_obj.p_x_given_n_list]) # each `wcorr(a_posterior)` call returns a float
             if debug_print:
                 print(f'a_name: "{a_name}"\n\tweighted_corr_data.shape: {np.shape(weighted_corr_data)}') # (84, ) - (n_epochs, )
-            weighted_corr_data_dict[a_name] = pd.DataFrame({'start': curr_results_obj.active_filter_epochs['start'].to_numpy(), 'wcorr': weighted_corr_data})
+            weighted_corr_data_dict[a_name] = pd.DataFrame({'start': curr_results_obj.active_filter_epochs.epochs.starts, 'wcorr': weighted_corr_data})
 
     ## end for
     return weighted_corr_data_dict
