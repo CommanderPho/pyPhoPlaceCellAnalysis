@@ -996,9 +996,14 @@ class FigureToImageHelpers:
 
     @function_attributes(short_name=None, tags=['pdf', 'export', 'wrapped', 'multi-track', 'pyqtgraph', 'matplotlib'], creation_date='2025-08-22 02:30')
     @classmethod
-    def export_wrapped_tracks_to_paged_pdf(cls, tracks, x_extent: tuple, chunk_width: float, output_pdf_path: str, rows_per_page: int=5, figsize=(8, 11), dpi=150, debug_max_num_pages: Optional[int]=5, track_labels: Optional[List[str]]=None, debug_print:bool=True):
+    def export_wrapped_tracks_to_paged_pdf(cls, tracks, x_extent: tuple, chunk_width: float, output_pdf_path: str, rows_per_page: int=5, figsize=(8, 11), dpi=150, debug_max_num_pages: Optional[int]=5, track_labels: Optional[List[str]]=None, normalized_track_heights: Optional[List]=None, debug_print:bool=True):
         """
         Export a mixed list of matplotlib AxesImages and PyQtGraph PlotItems to a wrapped, paged PDF.
+
+        A "chunk" is a block of all tracks (stacked vertically) that makes up the conceptual row (but they themselves have several vertically stacked tracks looking like subrows). 
+        Each "page" has a fixed number of rows `rows_per_page`. 
+
+
         """
         from pyphoplacecellanalysis.External.pyqtgraph.exporters.ImageExporter import ImageExporter
         from PyQt5.QtGui import QImage
@@ -1018,15 +1023,38 @@ class FigureToImageHelpers:
             track_labels = None
         has_labels = track_labels is not None
 
+
+        
+        if normalized_track_heights is not None and len(normalized_track_heights) != len(tracks):
+            print(f"Warning: track_heights length ({len(normalized_track_heights)}) != tracks length ({len(tracks)}). Ignoring track_heights.")
+            normalized_track_heights = None
+        has_track_heights = normalized_track_heights is not None
+        if normalized_track_heights is not None:
+            ## converts the track heights into matplotlib figure units (inches):
+            fig_total_height: float = float(figsize[1])
+            # track_rel_heights = deepcopy(normalized_track_heights)
+            track_heights = (normalized_track_heights * fig_total_height)
+
+
+
         x_min, x_max = x_extent
 
         # Collect metadata for stacking
         export_infos = []
         y_offset = 0
-        for t in tracks:
+        for track_IDX, t in enumerate(tracks):
             if isinstance(t, mimage.AxesImage):
-                y_min, y_max = t.get_extent()[2:4]
-                h = y_max - y_min
+                # ## Data units version:
+                # #t.get_extent() is like [-2.84147705365001e-15, 1458.5500000000002, 0.0, 287.7697841726619] and in data units
+                # y_min, y_max = t.get_extent()[2:4] ## these are in data units, like [0.0, 287.7697841726619] and so the same for many tracks
+                # h = y_max - y_min ## in data units
+                # extent = [t.get_extent()[0], t.get_extent()[1], y_offset, (y_offset+h)]
+
+                ## Figure units version:
+                #t.get_extent() is like [-2.84147705365001e-15, 1458.5500000000002, 0.0, 287.7697841726619] and in data units
+                y_min = 0.0
+                y_max = track_heights[track_IDX] ## these are in data units, like [0.0, 287.7697841726619] and so the same for many tracks
+                h = y_max - y_min ## in data units
                 extent = [t.get_extent()[0], t.get_extent()[1], y_offset, (y_offset+h)]
                 export_infos.append(dict(kind="mpl", obj=t, extent=extent, y_height=h))
             else:  # assume pg.PlotItem
@@ -1034,6 +1062,8 @@ class FigureToImageHelpers:
                 h = y_max - y_min
                 extent = [x_min, x_max, y_offset, y_offset+h]
                 export_infos.append(dict(kind="pg", obj=t, extent=extent, y_height=h))
+
+            ## must spit out `h`
             y_offset += h
 
         total_y_min, total_y_max = 0, y_offset
