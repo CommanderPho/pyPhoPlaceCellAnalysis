@@ -988,6 +988,122 @@ class FigureToImageHelpers:
         print(f"PDF saved to {output_pdf_path}")
 
 
+    @function_attributes(short_name=None, tags=['pdf', 'export', 'wrapped', 'multi-track', 'pyqtgraph', 'matplotlib'], creation_date='2025-08-22 02:30')
+    @classmethod
+    def export_wrapped_tracks_to_paged_pdf(cls, tracks, x_extent: tuple, chunk_width: float, output_pdf_path: str, rows_per_page: int=5, figsize=(8, 11), dpi=150, debug_max_num_pages: Optional[int]=5, track_labels: Optional[List[str]]=None):
+        """
+        Export a mixed list of matplotlib AxesImages and PyQtGraph PlotItems to a wrapped, paged PDF.
+        """
+        from pyphoplacecellanalysis.External.pyqtgraph.exporters.ImageExporter import ImageExporter
+        from PyQt5.QtGui import QImage
+        import matplotlib.image as mimage
+
+
+        # Styling like matplotlib version
+        track_separator_line_kwargs = dict(color='white', linewidth=2, linestyle='-', alpha=0.8)
+        time_label_formatting_kwargs = dict(fontsize=10, color='black')
+        multi_track_label_formatting_kwargs = dict(fontsize=9, color='black')
+
+        if not isinstance(tracks, list):
+            tracks = [tracks]
+
+        if track_labels is not None and len(track_labels) != len(tracks):
+            print(f"Warning: track_labels length ({len(track_labels)}) != tracks length ({len(tracks)}). Ignoring labels.")
+            track_labels = None
+        has_labels = track_labels is not None
+
+        x_min, x_max = x_extent
+
+        # Collect metadata for stacking
+        export_infos = []
+        y_offset = 0
+        for t in tracks:
+            if isinstance(t, mimage.AxesImage):
+                y_min, y_max = t.get_extent()[2:4]
+                h = y_max - y_min
+                extent = [t.get_extent()[0], t.get_extent()[1], y_offset, y_offset+h]
+                export_infos.append(dict(kind="mpl", obj=t, extent=extent, y_height=h))
+            else:  # assume pg.PlotItem
+                y_min, y_max = t.getViewBox().viewRange()[1]
+                h = y_max - y_min
+                extent = [x_min, x_max, y_offset, y_offset+h]
+                export_infos.append(dict(kind="pg", obj=t, extent=extent, y_height=h))
+            y_offset += h
+
+        total_y_min, total_y_max = 0, y_offset
+
+        # Chunking
+        chunks = []
+        start = x_min
+        while start < x_max:
+            end = min(start+chunk_width, x_max)
+            chunks.append((start, end))
+            start = end
+        pages = [chunks[i:i+rows_per_page] for i in range(0, len(chunks), rows_per_page)]
+        if debug_max_num_pages is not None:
+            pages = pages[:debug_max_num_pages]
+
+        with backend_pdf.PdfPages(output_pdf_path) as pdf:
+            for page_chunks in pages:
+                fig, axes = plt.subplots(nrows=len(page_chunks), figsize=figsize, dpi=dpi, constrained_layout=True)
+                if len(page_chunks) == 1:
+                    axes = [axes]
+
+                first_chunk = True
+                for ax, (start, end) in zip(axes, page_chunks):
+                    # render each track
+                    for info in export_infos:
+                        if info['kind'] == "mpl":
+                            arr = info['obj'].get_array()
+                            cmap = info['obj'].get_cmap()
+                            ax.imshow(arr, extent=[info['extent'][0], info['extent'][1], info['extent'][2], info['extent'][3]], aspect='auto', cmap=cmap, origin=info['obj'].origin)
+                        else:  # pg
+                            pi = info['obj']
+                            orig_x, orig_y = pi.getViewBox().viewRange()
+                            pi.setXRange(start, end, padding=0)
+                            pi.setYRange(*orig_y, padding=0)
+                            exporter = ImageExporter(pi)
+                            exporter.parameters()['width'] = int(figsize[0]*dpi)
+                            exporter.parameters()['height'] = int((figsize[1]/len(page_chunks))*dpi/len(tracks))
+                            img = exporter.export(toBytes=True)
+                            if isinstance(img, QImage):
+                                w, h = img.width(), img.height()
+                                ptr = img.bits(); ptr.setsize(img.byteCount())
+                                arr = np.array(ptr).reshape(h, w, 4)[:, :, :3]
+                            else:
+                                arr = np.array(img)
+                            ax.imshow(arr, extent=[start, end, info['extent'][2], info['extent'][3]], aspect='auto', origin='upper')
+                            pi.setXRange(*orig_x, padding=0)
+                            pi.setYRange(*orig_y, padding=0)
+
+                    # separators between tracks
+                    if len(export_infos) > 1:
+                        for i, info in enumerate(export_infos[:-1]):
+                            sep_y = info['extent'][3]
+                            ax.axhline(y=sep_y, **track_separator_line_kwargs)
+
+                    ax.set_xlim(start, end)
+                    ax.set_ylim(total_y_min, total_y_max)
+
+                    # labels (only first chunk per page)
+                    if first_chunk and has_labels:
+                        for info, lbl in zip(export_infos, track_labels):
+                            yc = (info['extent'][2]+info['extent'][3])/2
+                            ynorm = (yc-total_y_min)/(total_y_max-total_y_min)
+                            ax.text(-0.01, ynorm, lbl, rotation=90, va='center', ha='center', transform=ax.transAxes, **multi_track_label_formatting_kwargs)
+
+                    # start/end time outside edges
+                    ax.text(-0.02 if has_labels else -0.01, 0.5, f"{start:.0f}", rotation=90, va='center', ha='center', transform=ax.transAxes, **time_label_formatting_kwargs)
+                    ax.text(1.02, 0.5, f"{end:.0f}", rotation=90, va='center', ha='center', transform=ax.transAxes, **time_label_formatting_kwargs)
+
+                    ax.set_xticks([]); ax.set_yticks([])
+                    first_chunk = False
+
+                pdf.savefig(fig)
+                plt.close(fig)
+        print(f"PDF saved to {output_pdf_path}")
+
+
 
 
 @function_attributes(short_name=None, tags=['PDF', 'export', 'output', 'matplotlib', 'display', 'file', 'active'], input_requires=[], output_provides=[], uses=['extract_figures_from_display_function_output'], used_by=[], creation_date='2023-06-08 11:55', related_items=[])
