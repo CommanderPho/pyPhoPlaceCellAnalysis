@@ -632,6 +632,9 @@ class FigureToImageHelpers:
         """
         Export an AxesImage (such as the entire timeline plot for a MATPLOTLIB-backed track to a wrapped, paged PDF layout (multi-row per page).
 
+        #TODO 2025-08-22 02:07: - [ ] Not quite working perfectly
+
+
         Parameters
         ----------
         ax_image : matplotlib.image.AxesImage
@@ -882,6 +885,9 @@ class FigureToImageHelpers:
         """
         Export one or more PyQtGraph PlotItems to a wrapped, paged PDF layout (multi-row per page).
 
+        #TODO 2025-08-22 02:07: - [ ] Not quite working perfectly
+
+
         Parameters
         ----------
         plot_item : pg.PlotItem | List[pg.PlotItem]
@@ -990,7 +996,7 @@ class FigureToImageHelpers:
 
     @function_attributes(short_name=None, tags=['pdf', 'export', 'wrapped', 'multi-track', 'pyqtgraph', 'matplotlib'], creation_date='2025-08-22 02:30')
     @classmethod
-    def export_wrapped_tracks_to_paged_pdf(cls, tracks, x_extent: tuple, chunk_width: float, output_pdf_path: str, rows_per_page: int=5, figsize=(8, 11), dpi=150, debug_max_num_pages: Optional[int]=5, track_labels: Optional[List[str]]=None):
+    def export_wrapped_tracks_to_paged_pdf(cls, tracks, x_extent: tuple, chunk_width: float, output_pdf_path: str, rows_per_page: int=5, figsize=(8, 11), dpi=150, debug_max_num_pages: Optional[int]=5, track_labels: Optional[List[str]]=None, debug_print:bool=True):
         """
         Export a mixed list of matplotlib AxesImages and PyQtGraph PlotItems to a wrapped, paged PDF.
         """
@@ -1021,7 +1027,7 @@ class FigureToImageHelpers:
             if isinstance(t, mimage.AxesImage):
                 y_min, y_max = t.get_extent()[2:4]
                 h = y_max - y_min
-                extent = [t.get_extent()[0], t.get_extent()[1], y_offset, y_offset+h]
+                extent = [t.get_extent()[0], t.get_extent()[1], y_offset, (y_offset+h)]
                 export_infos.append(dict(kind="mpl", obj=t, extent=extent, y_height=h))
             else:  # assume pg.PlotItem
                 y_min, y_max = t.getViewBox().viewRange()[1]
@@ -1031,6 +1037,9 @@ class FigureToImageHelpers:
             y_offset += h
 
         total_y_min, total_y_max = 0, y_offset
+
+        if debug_print:
+            print(f'export_infos: {export_infos}')
 
         # Chunking
         chunks = []
@@ -1053,6 +1062,9 @@ class FigureToImageHelpers:
                 for ax, (start, end) in zip(axes, page_chunks):
                     # render each track
                     for info in export_infos:
+                        if debug_print:
+                            print(f'info["extent"]: {info["extent"]}')
+
                         if info['kind'] == "mpl":
                             arr = info['obj'].get_array()
                             cmap = info['obj'].get_cmap()
@@ -1065,6 +1077,10 @@ class FigureToImageHelpers:
                             exporter = ImageExporter(pi)
                             exporter.parameters()['width'] = int(figsize[0]*dpi)
                             exporter.parameters()['height'] = int((figsize[1]/len(page_chunks))*dpi/len(tracks))
+                            if debug_print:
+                                print(f"\texporter.parameters(): w: {exporter.parameters()['width']}, h: {exporter.parameters()['height']}")
+                            # exporter.parameters()['width'] = int(figsize[0]*dpi)
+                            # exporter.parameters()['height'] = int((figsize[1]/len(page_chunks))*dpi/len(tracks))
                             img = exporter.export(toBytes=True)
                             if isinstance(img, QImage):
                                 w, h = img.width(), img.height()
