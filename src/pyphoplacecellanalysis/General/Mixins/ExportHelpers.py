@@ -1058,9 +1058,18 @@ class FigureToImageHelpers:
                 extent = [t.get_extent()[0], t.get_extent()[1], y_offset, (y_offset+h)]
                 export_infos.append(dict(kind="mpl", obj=t, extent=extent, y_height=h))
             else:  # assume pg.PlotItem
-                y_min, y_max = t.getViewBox().viewRange()[1]
-                h = y_max - y_min
-                extent = [x_min, x_max, y_offset, y_offset+h]
+                # ## Data units version: for 3 tracks, we get [[-4.4, 0.4], [-4.0, 45.5], [0, 1]]
+                # y_min, y_max = t.getViewBox().viewRange()[1]
+                # h = y_max - y_min
+                # extent = [x_min, x_max, y_offset, y_offset+h]
+
+                ## Figure units version:
+                #t.get_extent() is like [-2.84147705365001e-15, 1458.5500000000002, 0.0, 287.7697841726619] and in data units
+                y_min = 0.0
+                y_max = track_heights[track_IDX] ## these are in data units, like [0.0, 287.7697841726619] and so the same for many tracks
+                h = y_max - y_min ## in data units
+                extent = [x_min, x_max, y_offset, (y_offset+h)]
+
                 export_infos.append(dict(kind="pg", obj=t, extent=extent, y_height=h))
 
             ## must spit out `h`
@@ -1102,11 +1111,13 @@ class FigureToImageHelpers:
                         else:  # pyqtgraph-backed tracks
                             pi = info['obj']
                             orig_x, orig_y = pi.getViewBox().viewRange()
-                            pi.setXRange(start, end, padding=0)
+                            pi.setXRange(start, end, padding=0) ## set to this chunk
                             pi.setYRange(*orig_y, padding=0)
                             exporter = ImageExporter(pi)
-                            exporter.parameters()['width'] = int(figsize[0]*dpi)
-                            exporter.parameters()['height'] = int((figsize[1]/len(page_chunks))*dpi/len(tracks))
+                            # exporter.parameters()['width'] = int(figsize[0]*dpi)
+                            # exporter.parameters()['height'] = int(((figsize[1]/len(page_chunks))*dpi)/len(tracks))
+                            exporter.parameters()['width'] = int((end - start) * dpi)
+                            exporter.parameters()['height'] = int((info['extent'][3] - info['extent'][2]) * dpi)
                             if debug_print:
                                 print(f"\texporter.parameters(): w: {exporter.parameters()['width']}, h: {exporter.parameters()['height']}")
                             # exporter.parameters()['width'] = int(figsize[0]*dpi)
