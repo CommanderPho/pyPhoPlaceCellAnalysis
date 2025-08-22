@@ -5370,15 +5370,22 @@ def filtered_by_frate_and_qclu(curr_active_pipeline, desired_qclu_subset=[1, 2],
 # Pre 2025-02-27                                                                                                       #
 # ==================================================================================================================== #
 
-@function_attributes(short_name=None, tags=['USEFUL', 'unused', 'debug', 'visualizztion'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-05-14 14:01', related_items=[])
-def plot_attached_BinByBinDecodingDebugger(spike_raster_window, curr_active_pipeline, a_decoder: BasePositionDecoder, a_decoded_result: Union[DecodedFilterEpochsResult, SingleEpochDecodedResult]):
+@function_attributes(short_name=None, tags=['USEFUL', 'unused', 'debug', 'visualizztion', 'SpikeRasterWindow'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-05-14 14:01', related_items=[])
+def plot_attached_BinByBinDecodingDebugger(spike_raster_window, curr_active_pipeline, a_decoder: BasePositionDecoder, a_decoded_result: Union[DecodedFilterEpochsResult, SingleEpochDecodedResult], n_max_debugged_time_bins:int=25):
     """ 
     
     from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import plot_attached_BinByBinDecodingDebugger
 
     ## INPUTS: a_decoder, a_decoded_result
-    win, out_pf1D_decoder_template_objects, (plots_container, plots_data), _on_update_fcn = plot_attached_BinByBinDecodingDebugger(spike_raster_window, curr_active_pipeline, a_decoder=a_decoder, a_decoded_result=a_decoded_result)
         
+    a_decoder_name: str = 'long_LR'
+    a_decoder = all_directional_pf1D_Decoder_dict[a_decoder_name]
+    a_decoded_result = a_continuously_decoded_dict[a_decoder_name]
+
+    ## INPUTS: a_decoder, a_decoded_result
+    bin_by_bin_debugger, win, out_pf1D_decoder_template_objects, (plots_container, plots_data), _on_update_fcn = plot_attached_BinByBinDecodingDebugger(spike_raster_window, curr_active_pipeline, a_decoder=a_decoder, a_decoded_result=a_decoded_result)
+
+    
     """
     from pyphocorehelpers.DataStructure.RenderPlots.PyqtgraphRenderPlots import PyqtgraphRenderPlots
     from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.ContainerBased.BinByBinDecodingDebugger import BinByBinDebuggingData, BinByBinDecodingDebugger
@@ -5400,7 +5407,7 @@ def plot_attached_BinByBinDecodingDebugger(spike_raster_window, curr_active_pipe
 
 
     # decoding_bins_epochs_df: pd.DataFrame = single_continuous_result.build_pseudo_epochs_df_from_decoding_bins().epochs.get_valid_df()
-    bin_by_bin_data: BinByBinDebuggingData = BinByBinDebuggingData.init_from_single_continuous_result(a_decoder=a_decoder, global_spikes_df=global_spikes_df, single_continuous_result=single_continuous_result, decoding_time_bin_size=decoding_time_bin_size, n_max_debugged_time_bins=25)
+    bin_by_bin_data: BinByBinDebuggingData = BinByBinDebuggingData.init_from_single_continuous_result(a_decoder=a_decoder, global_spikes_df=global_spikes_df, single_continuous_result=single_continuous_result, decoding_time_bin_size=decoding_time_bin_size, n_max_debugged_time_bins=n_max_debugged_time_bins)
     ## OUTPUTS: bin_by_bin_data
 
     ## INPUTS: active_spikes_window, global_spikes_df, decoding_bins_epochs_df
@@ -5420,21 +5427,28 @@ def plot_attached_BinByBinDecodingDebugger(spike_raster_window, curr_active_pipe
     win, out_pf1D_decoder_template_objects, (plots_container, plots_data) = BinByBinDecodingDebugger._perform_build_time_binned_decoder_debug_plots(a_decoder=a_decoder, time_bin_edges=active_window_time_bin_edges, p_x_given_n=active_p_x_given_n, active_epoch_active_aclu_spike_counts_list=active_epoch_active_aclu_spike_counts_list,
                                                                                                                                 plots_data=plots_data, plots_container=plots_container,
                                                                                                                                 debug_print=False)
+    bin_by_bin_debugger: BinByBinDecodingDebugger = BinByBinDecodingDebugger.init_from_builder_classmethod(win=win, pf1D_decoder_template_objects=out_pf1D_decoder_template_objects, plots_container=plots_container, plot_data=plots_data)
+    
 
+    
 
     # Later when data changes:
     def _on_update_fcn():
-        """ captures: active_spikes_window, bin_by_bin_data, 
+        """ captures: active_spikes_window, bin_by_bin_debugger, bin_by_bin_data 
         """
         ## INPUTS: active_spikes_window, global_spikes_df, decoding_bins_epochs_df
         ## Slice to current window:
         active_window_t_start, active_window_t_end = active_spikes_window.active_time_window
         print(f'active_window_t_start: {active_window_t_start}, active_window_t_end: {active_window_t_end}')
         active_global_spikes_df, active_window_decoded_epochs_df, active_epoch_active_aclu_spike_counts_list, (active_window_slice_idxs, active_window_time_bin_edges, active_p_x_given_n) = bin_by_bin_data.sliced_to_current_window(active_window_t_start, active_window_t_end)
-        win, out_pf1D_decoder_template_objects, (plots_container, plots_data) = BinByBinDecodingDebugger.update_time_binned_decoder_debug_plots(win, out_pf1D_decoder_template_objects, plots_container, plots_data, new_time_bin_edges=active_window_time_bin_edges, new_p_x_given_n=active_p_x_given_n, new_active_aclu_spike_counts_list=active_epoch_active_aclu_spike_counts_list)
+        # win, out_pf1D_decoder_template_objects, (plots_container, plots_data) = BinByBinDecodingDebugger.perform_update_time_binned_decoder_debug_plots(win, out_pf1D_decoder_template_objects, plots_container, plots_data, new_time_bin_edges=active_window_time_bin_edges, new_p_x_given_n=active_p_x_given_n, new_active_aclu_spike_counts_list=active_epoch_active_aclu_spike_counts_list)
+        _update_output = bin_by_bin_debugger.update_time_binned_decoder_debug_plots(new_time_bin_edges=active_window_time_bin_edges, new_p_x_given_n=active_p_x_given_n, new_active_aclu_spike_counts_list=active_epoch_active_aclu_spike_counts_list)
+        # win, out_pf1D_decoder_template_objects, (plots_container, plots_data) = _update_output
+
+    bin_by_bin_debugger.params.on_update_fcn = _on_update_fcn
 
     ## END def _on_update_fcn()...
-    return win, out_pf1D_decoder_template_objects, (plots_container, plots_data), _on_update_fcn
+    return bin_by_bin_debugger, win, out_pf1D_decoder_template_objects, (plots_container, plots_data), _on_update_fcn
 
 
 
@@ -6203,7 +6217,8 @@ def add_continuous_decoded_posterior(spike_raster_window, curr_active_pipeline, 
         # 'DockedWidgets.LongShortDecodedEpochsDockedMatplotlibView',
         # 'DockedWidgets.DirectionalDecodedEpochsDockedMatplotlibView',
         # 'DockedWidgets.TrackTemplatesDecodedEpochsDockedMatplotlibView',
-        'DockedWidgets.Pseudo2DDecodedEpochsDockedMatplotlibView',
+        # 'DockedWidgets.Pseudo2DDecodedEpochsDockedMatplotlibView',
+        f'DockedWidgets.Pseudo2DDecodedEpochsDockedMatplotlibView_tbin_{desired_time_bin_size}' # 0.05
         #  'DockedWidgets.ContinuousPseudo2DDecodedMarginalsDockedMatplotlibView',
 
     ]
