@@ -5799,11 +5799,11 @@ def _update_decoder_result_active_filter_epoch_columns(a_result_obj: DecodedFilt
         assert a_result_obj.num_filter_epochs == np.shape(a_score_result_df)[0], f"a_result_obj.num_filter_epochs: {a_result_obj.num_filter_epochs} != np.shape(a_score_result_df)[0]: {np.shape(a_score_result_df)[0]}" # #TODO 2024-05-23 02:19: - [ ] I don't know the full purpose of this assert, I'm guessing it's to make sure were operating on the same epochs. What's passed in is a flat vector of values so we have no correspondance (like the start_t) if they don't literally correspond
         if isinstance(a_result_obj.filter_epochs, pd.DataFrame):
             a_result_obj.filter_epochs.drop(columns=columns, inplace=True, errors='ignore') # 'ignore' doesn't raise an exception if the columns don't already exist.
-            a_result_obj.filter_epochs = a_result_obj.filter_epochs.join(a_score_result_df) # add the newly computed columns to the Epochs object - ValueError: columns overlap but no suffix specified: Index(['ripple_idx', 'ripple_start_t'], dtype='object')
+            a_result_obj.filter_epochs = a_result_obj.filter_epochs.join(a_score_result_df[columns]) # add the newly computed columns to the Epochs object - ValueError: columns overlap but no suffix specified: Index(['ripple_idx', 'ripple_start_t'], dtype='object')
         else:
             # Otherwise it's an Epoch object
             a_result_obj.filter_epochs._df.drop(columns=columns, inplace=True, errors='ignore') # 'ignore' doesn't raise an exception if the columns don't already exist.
-            a_result_obj.filter_epochs._df = a_result_obj.filter_epochs.to_dataframe().join(a_score_result_df) # add the newly computed columns to the Epochs object
+            a_result_obj.filter_epochs._df = a_result_obj.filter_epochs.to_dataframe().join(a_score_result_df[columns]) # add the newly computed columns to the Epochs object # ValueError: columns overlap but no suffix specified: Index(['start'], dtype='object')
             ## ValueError: columns overlap but no suffix specified: Index(['lap_idx', 'lap_start_t'], dtype='object') -- occured after adding in start_t
 
     return a_result_obj
@@ -6222,6 +6222,12 @@ def _subfn_compute_complete_df_metrics(directional_merged_decoders_result: "Dire
     laps_metric_merged_df = _build_merged_score_metric_df(decoder_laps_df_dict, columns=active_df_columns)
     ripple_metric_merged_df = _build_merged_score_metric_df(decoder_ripple_df_dict, columns=active_df_columns)
     ## OUTPUTS: laps_metric_merged_df, ripple_metric_merged_df
+    ## copy over the optional ['start'] epoch_start_t column for better alignment:
+    for a_merged_df, a_dict in zip((laps_metric_merged_df, ripple_metric_merged_df), (decoder_laps_df_dict, decoder_ripple_df_dict)):
+        a_first_df = list(a_dict.values())[0]
+        if 'start' in a_first_df.columns:
+            ## Add 'start' to the merged df
+            a_merged_df['start'] = deepcopy(a_first_df['start'])
 
     # The output CSVs have the base columns from the `ripple_all_epoch_bins_marginals_df`, which is a bit surprising
     ## why is this even needed? The `directional_merged_decoders_result.laps_all_epoch_bins_marginals_df` come in with the marginals but not the original non-marginalized P_decoder values. 
@@ -6229,10 +6235,12 @@ def _subfn_compute_complete_df_metrics(directional_merged_decoders_result: "Dire
     _laps_all_epoch_bins_marginals_df =  _compute_nonmarginalized_decoder_prob(deepcopy(directional_merged_decoders_result.laps_all_epoch_bins_marginals_df)) # incomming df has columns: ['P_LR', 'P_RL', 'P_Long', 'P_Short', 'lap_idx', 'lap_start_t']
     _ripple_all_epoch_bins_marginals_df =  _compute_nonmarginalized_decoder_prob(deepcopy(directional_merged_decoders_result.ripple_all_epoch_bins_marginals_df)) # incomming ['P_LR', 'P_RL', 'P_Long', 'P_Short', 'ripple_idx', 'ripple_start_t']
     
-
     ## Merge in the RadonTransform df:
-    _mergev_laps_metric_merged_df: pd.DataFrame = deepcopy(_laps_all_epoch_bins_marginals_df).join(deepcopy(laps_metric_merged_df)) #TODO 2025-01-02 13:12: - [ ] !!PITFALL!! `df.join(...)` always seems to mess things up, is this where the problems are happening?
-    _mergev_ripple_metric_merged_df: pd.DataFrame = deepcopy(_ripple_all_epoch_bins_marginals_df).join(deepcopy(ripple_metric_merged_df)) # has ['ripple_idx', 'ripple_start_t'] to join on
+    # _mergev_laps_metric_merged_df: pd.DataFrame = deepcopy(_laps_all_epoch_bins_marginals_df).join(deepcopy(laps_metric_merged_df)) #TODO 2025-01-02 13:12: - [ ] !!PITFALL!! `df.join(...)` always seems to mess things up, is this where the problems are happening?
+    # _mergev_ripple_metric_merged_df: pd.DataFrame = deepcopy(_ripple_all_epoch_bins_marginals_df).join(deepcopy(ripple_metric_merged_df)) # has ['ripple_idx', 'ripple_start_t'] to join on
+    _mergev_laps_metric_merged_df: pd.DataFrame = deepcopy(_laps_all_epoch_bins_marginals_df).join(deepcopy(laps_metric_merged_df).set_index('start'), on='epoch_start_t', how='inner', validate="1:1") #TODO 2025-01-02 13:12: - [ ] !!PITFALL!! `df.join(...)` always seems to mess things up, is this where the problems are happening?
+    _mergev_ripple_metric_merged_df: pd.DataFrame = deepcopy(_ripple_all_epoch_bins_marginals_df).join(deepcopy(ripple_metric_merged_df).set_index('start'), on='epoch_start_t', how='inner', validate="1:1") # has ['ripple_idx', 'ripple_start_t'] to join on
+    # deepcopy(_laps_all_epoch_bins_marginals_df).set_index('epoch_start_t').join(deepcopy(laps_metric_merged_df).set_index('start')) ## Alternative?
     
     # from neuropy.utils.indexing_helpers import PandasHelpers
     laps_metric_merged_df = PandasHelpers.adding_additional_df_columns(original_df=_laps_all_epoch_bins_marginals_df, additional_cols_df=laps_metric_merged_df) # update the filter_epochs with the new columns
@@ -9378,6 +9386,8 @@ class AddNewDecodedEpochMarginal_MatplotlibPlotCommand(AddNewDecodedPosteriors_M
         if a_1D_posterior is not None:
             widget.plots_data.matrix = deepcopy(a_1D_posterior)
 
+        ## Update the .plots
+        widget.plots.update({k:v for k, v in _return_out_artists_dict.items() if v is not None}) ## allows access to the image items?
 
         widget.draw() # alternative to accessing through full path?
         active_2d_plot.sync_matplotlib_render_plot_widget(identifier_name) # Sync it with the active window:
