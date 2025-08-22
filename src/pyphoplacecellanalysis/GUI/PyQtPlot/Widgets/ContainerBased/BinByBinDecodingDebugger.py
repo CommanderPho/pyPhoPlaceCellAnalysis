@@ -322,7 +322,7 @@ class BinByBinDecodingDebugger(GenericPyQtGraphContainer):
 
 
     @classmethod
-    def _perform_build_time_binned_decoder_debug_plots(cls, a_decoder, time_bin_edges, p_x_given_n, active_epoch_active_aclu_spike_counts_list, plots_data: Optional[RenderPlotsData]=None, plots_container: Optional[RenderPlots]=None, debug_print=False):
+    def _perform_build_time_binned_decoder_debug_plots(cls, a_decoder, time_bin_edges, p_x_given_n, active_epoch_active_aclu_spike_counts_list, plots_data: Optional[RenderPlotsData]=None, plots_container: Optional[RenderPlots]=None, debug_print=False, name_suffix: str = 'unknown'):
         """ Builds the time-binned decoder debug plots for visualizing decoding results.
             
             Builds a multi-row plot layout containing:
@@ -413,8 +413,8 @@ class BinByBinDecodingDebugger(GenericPyQtGraphContainer):
         assert plots_data is not None,  f"`plots_data` is None, but required for access to `plots_data.spikes_df` and `plots_data.active_aclus`."
 
         # Epoch Active Spikes, takes up a row _______________________________________________________________ #
-        spanning_spikes_raster_plot = win.addPlot(title="spikes_raster Plot", row=0, rowspan=1, col=0, colspan=n_epoch_time_bins)
-        spanning_spikes_raster_plot.setTitle("spikes_raster Plot")
+        spanning_spikes_raster_plot = win.addPlot(title=f"spikes_raster Plot - {name_suffix}", row=0, rowspan=1, col=0, colspan=n_epoch_time_bins)
+        spanning_spikes_raster_plot.setTitle(f"spikes_raster Plot - {name_suffix}")
         plots_container.root_plot = spanning_spikes_raster_plot
         app, raster_win, plots_container, plots_data = new_plot_raster_plot(plots_data.spikes_df, plots_data.active_aclus, scatter_plot_kwargs=None, win=spanning_spikes_raster_plot, plots_data=plots_data, plots=plots_container,
                                                             scatter_app_name=f'epoch_specific_spike_raster', defer_show=True, active_context=None, add_debug_header_label=False) # RasterPlotSetupTuple
@@ -423,7 +423,7 @@ class BinByBinDecodingDebugger(GenericPyQtGraphContainer):
 
         # Decoded Epoch Posterior (bin-by-bin), takes up a row _______________________________________________________________ #
         spanning_posterior_plot = win.addPlot(title="P_x_given_n Plot", row=1, rowspan=1, col=0, colspan=n_epoch_time_bins)
-        spanning_posterior_plot.setTitle("P_x_given_n Plot - Decoded over epoch")
+        spanning_posterior_plot.setTitle(f"P_x_given_n Plot - Decoded over epoch[{name_suffix}]")
 
         flat_p_x_given_n = deepcopy(p_x_given_n)
         cls._helper_simply_plot_posterior_in_pyqtgraph_plotitem(curr_plot=spanning_posterior_plot, image=flat_p_x_given_n, xbin_edges=np.arange(n_epoch_time_bins+1), ybin_edges=deepcopy(a_decoder.xbin))
@@ -459,7 +459,7 @@ class BinByBinDecodingDebugger(GenericPyQtGraphContainer):
             out_pf1D_decoder_template_objects.append(_obj)
 
         win.nextRow()
-        win.setWindowTitle('BinByBinDecodingDebugger')
+        win.setWindowTitle(f'BinByBinDecodingDebugger - {name_suffix}')
         win.show()
         return win, out_pf1D_decoder_template_objects, (plots_container, plots_data)
     

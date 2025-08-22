@@ -2107,7 +2107,7 @@ class MeasuredVsDecodedOccupancy:
         # a_result: DecodedFilterEpochsResult = deepcopy(a_result)
 
         # n_timebins, flat_time_bin_containers, timebins_p_x_given_n = a_result.flatten()
-        timebins_p_x_given_n.shape
+        # timebins_p_x_given_n.shape
 
         timebins_p_x_given_n = np.nan_to_num(timebins_p_x_given_n)
         timebins_p_x_given_n_occupancy = np.nansum(timebins_p_x_given_n, axis=2) # (n_pos, n_decoders)
@@ -2118,6 +2118,7 @@ class MeasuredVsDecodedOccupancy:
         normalized_scalar_likelihood_per_decoder = scalar_likelihood_per_decoder / np.nansum(scalar_likelihood_per_decoder)
 
         a_matching_parts_dict = {'long':'pre-delta', 'short':'post-delta'}
+        dir_part_to_arrow_map = {'LR':'<', 'RL':'>'} ## not needed rn
         # n_pos_bins, n_decoders = np.shape(timebins_p_x_given_n_occupancy)
 
         if (fig is None) or (ax_dict is None):
@@ -2146,15 +2147,19 @@ class MeasuredVsDecodedOccupancy:
                 a_pre_post_delta_name_part, a_decoder_name = ax_name.split('_', maxsplit=1) # "post-delta_long_LR" -> ["post-delta", "long_LR"]
                 a_long_short_name_part, a_dir_name_part = a_decoder_name.split('_', maxsplit=1) # 'long_LR' -> ['long', 'LR']
                 a_decoder: BasePositionDecoder = decoders_dict[a_decoder_name]
-                ax_title: str = f"{a_pre_post_delta_name_part} | Decoded Occupancy[{ax_name}]"
+                a_formatted_decoder_name: str = a_decoder_name.replace('_LR', ' <', 1).replace('_RL', ' >', 1)
+                ax_title: str = f"{a_pre_post_delta_name_part} | "
                 is_measured_result_curr_period = a_matching_parts_dict[a_long_short_name_part] == a_pre_post_delta_name # (a_pre_post_delta_name_part == a_pre_post_delta_name)
-                print(f'is_measured_result_curr_period: {is_measured_result_curr_period}')
+                if debug_print:
+                    print(f'is_measured_result_curr_period: {is_measured_result_curr_period}')
 
             else:
                 a_decoder: BasePositionDecoder = decoders_dict[ax_name]
-                ax_title: str = f"Decoded Occupancy[{ax_name}]"
+                a_formatted_decoder_name: str = ax_name.replace('_LR', ' <', 1).replace('_RL', ' >', 1)
+                ax_title: str = '' # empty 
+                # ax_title: str = f"Decoded Occupancy[{ax_name}]"
 
-
+            ax_title = f"{ax_title}Decoded Occupancy[{a_formatted_decoder_name}]"
             ax_title = f"{ax_title} (total_decoded={normalized_scalar_likelihood_per_decoder[i]:0.2f})"
 
             # a_pre_post_delta_name
@@ -5371,7 +5376,7 @@ def filtered_by_frate_and_qclu(curr_active_pipeline, desired_qclu_subset=[1, 2],
 # ==================================================================================================================== #
 
 @function_attributes(short_name=None, tags=['USEFUL', 'unused', 'debug', 'visualizztion', 'SpikeRasterWindow'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-05-14 14:01', related_items=[])
-def plot_attached_BinByBinDecodingDebugger(spike_raster_window, curr_active_pipeline, a_decoder: BasePositionDecoder, a_decoded_result: Union[DecodedFilterEpochsResult, SingleEpochDecodedResult], n_max_debugged_time_bins:int=25):
+def plot_attached_BinByBinDecodingDebugger(spike_raster_window, curr_active_pipeline, a_decoder: BasePositionDecoder, a_decoded_result: Union[DecodedFilterEpochsResult, SingleEpochDecodedResult], n_max_debugged_time_bins:int=25, name_suffix: str = 'unknoown'):
     """ 
     from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import plot_attached_BinByBinDecodingDebugger
 
@@ -5421,11 +5426,11 @@ def plot_attached_BinByBinDecodingDebugger(spike_raster_window, curr_active_pipe
 
     ## INPUTS: neuron_IDs, (active_global_spikes_df, active_window_decoded_epochs_df, active_aclu_spike_counts_dict_list)
     ## INPUTS: active_window_slice_idxs, active_window_time_bin_edges, active_p_x_given_n
-    plots_container = PyqtgraphRenderPlots(name='PhoTest', root_plot=None) # Create a new one
-    plots_data = RenderPlotsData(name=f'epoch[Test]', spikes_df=active_global_spikes_df, a_decoder=a_decoder, active_aclus=neuron_IDs, bin_by_bin_data=bin_by_bin_data)
+    plots_container = PyqtgraphRenderPlots(name=f'PhoTest_{name_suffix}', root_plot=None) # Create a new one
+    plots_data = RenderPlotsData(name=f'epoch[{name_suffix}]', spikes_df=active_global_spikes_df, a_decoder=a_decoder, active_aclus=neuron_IDs, bin_by_bin_data=bin_by_bin_data)
     win, out_pf1D_decoder_template_objects, (plots_container, plots_data) = BinByBinDecodingDebugger._perform_build_time_binned_decoder_debug_plots(a_decoder=a_decoder, time_bin_edges=active_window_time_bin_edges, p_x_given_n=active_p_x_given_n, active_epoch_active_aclu_spike_counts_list=active_epoch_active_aclu_spike_counts_list,
                                                                                                                                 plots_data=plots_data, plots_container=plots_container,
-                                                                                                                                debug_print=False)
+                                                                                                                                debug_print=False, name_suffix=name_suffix)
     bin_by_bin_debugger: BinByBinDecodingDebugger = BinByBinDecodingDebugger.init_from_builder_classmethod(win=win, pf1D_decoder_template_objects=out_pf1D_decoder_template_objects, plots_container=plots_container, plot_data=plots_data)
     
 
