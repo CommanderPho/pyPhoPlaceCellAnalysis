@@ -4605,6 +4605,73 @@ class AcrossSessionHelpers:
         return moved_dict
 
 
+    @function_attributes(short_name=None, tags=['IMPORTANT', 'figure', 'plot'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-08-25 15:10', related_items=[])
+    @classmethod
+    def plot_session_delta_relative_start_stop_times(cls, t_delta_df: pd.DataFrame, plot_text_labels: bool = True, plot_delta_t_rel: bool=False):
+        """ Plots the session start/stop times relative to one another so view how well it can align to the t_delta shift
+        
+        from pyphoplacecellanalysis.SpecificResults.AcrossSessionResults import AcrossSessionHelpers
+        
+        fig, ax = AcrossSessionHelpers.plot_session_delta_relative_start_stop_times(t_delta_df=t_delta_df)
+        
+        """
+        import matplotlib.pyplot as plt
+        import matplotlib.patches as patches
+        
+        try:
+            t_delta_df.reset_index(drop=False, names=['sess_name'])
+        except Exception as e:
+            # raise e
+            pass
+        # t_delta_df = deepcopy(t_delta_df).reset_index(drop=False, names=['sess_name'])
+        t_delta_df['duration'] = t_delta_df['delta_aligned_t_end'] - t_delta_df['delta_aligned_t_start']
+        t_delta_df['delta_aligned_t_mid'] = t_delta_df['delta_aligned_t_start'] + (t_delta_df['delta_aligned_t_end'] - t_delta_df['delta_aligned_t_start'])/2.0
+
+        fig, ax = plt.subplots()
+
+        # prev_y: float = 0.0
+        ## plot the range
+        num_sessions: int = len(t_delta_df)
+        cmap = plt.get_cmap('rainbow', num_sessions)
+        single_session_y_height: float = 1.0/float(num_sessions)
+
+        for i, a_row in enumerate(t_delta_df.itertuples()):
+            ## iterate through each row:
+            y_offset: float = (float(i)/float(num_sessions))
+            ## just plot these to begin
+
+            if plot_delta_t_rel:
+                x0 = a_row.delta_aligned_t_start
+                x1 = a_row.delta_aligned_t_end
+            else:
+                ## plot all realtive to zero
+                x0 = a_row.t_start
+                x1 = a_row.t_end
+                
+            width = x1 - x0
+            
+            # ax.broken_barh([(x0, x1)], (y_offset, single_session_y_height), color=cmap(i)) ## DOES NOT WORK, WAY TOO SMALL
+            rectangle = patches.Rectangle((x0, y_offset), width, single_session_y_height, angle=0, edgecolor='black', facecolor=cmap(i), fill=True)
+            ax.add_patch(rectangle)
+
+            ## Add text centered in at the midpoint with the session naeme
+            if plot_text_labels:
+                ax.text(x0, y_offset, f'{a_row.sess_name}')
+            # prev_y = y_offset
+
+        ## plot the delta x=0 line
+        if plot_delta_t_rel:
+            t_delta = 0
+        else:
+            ## plot all realtive to zero
+            t_delta = a_row.t_delta
+            
+        if plot_delta_t_rel:
+            ax.vlines([0.0], 0, 1.0, colors='red', linestyles='dashed', label='Delta')
+            
+        return fig, ax
+
+
 
 # ==================================================================================================================== #
 # 2024-11-15 - `across_session_identity` dataframe helper                                                              #
