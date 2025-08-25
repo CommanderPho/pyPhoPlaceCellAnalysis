@@ -4667,7 +4667,7 @@ class AcrossSessionHelpers:
             t_delta = a_row.t_delta
             
         if plot_delta_t_rel:
-            ax.vlines([0.0], 0, 1.0, colors='red', linestyles='dashed', label='Delta')
+            ax.vlines([0.0], 0, 1.0, colors='black', linestyles='dashed', label='Delta')
             
         return fig, ax
 
