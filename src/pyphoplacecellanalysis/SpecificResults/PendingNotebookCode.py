@@ -5376,7 +5376,7 @@ def filtered_by_frate_and_qclu(curr_active_pipeline, desired_qclu_subset=[1, 2],
 # ==================================================================================================================== #
 
 @function_attributes(short_name=None, tags=['USEFUL', 'unused', 'debug', 'visualizztion', 'SpikeRasterWindow'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-05-14 14:01', related_items=[])
-def plot_attached_BinByBinDecodingDebugger(spike_raster_window, curr_active_pipeline, a_decoder: BasePositionDecoder, a_decoded_result: Union[DecodedFilterEpochsResult, SingleEpochDecodedResult], n_max_debugged_time_bins:int=25, name_suffix: str = 'unknoown'):
+def plot_attached_BinByBinDecodingDebugger(spike_raster_window, curr_active_pipeline, a_decoder: BasePositionDecoder, a_decoded_result: Union[DecodedFilterEpochsResult, SingleEpochDecodedResult], n_max_debugged_time_bins:int=25, name_suffix: str = 'unknoown', **kwargs):
     """ 
     from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import plot_attached_BinByBinDecodingDebugger
 
@@ -5391,80 +5391,10 @@ def plot_attached_BinByBinDecodingDebugger(spike_raster_window, curr_active_pipe
 
     
     """
-    from pyphocorehelpers.DataStructure.RenderPlots.PyqtgraphRenderPlots import PyqtgraphRenderPlots
     from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.ContainerBased.BinByBinDecodingDebugger import BinByBinDebuggingData, BinByBinDecodingDebugger
 
+    return BinByBinDecodingDebugger.plot_attached_BinByBinDecodingDebugger(spike_raster_window=spike_raster_window, curr_active_pipeline=curr_active_pipeline, a_decoder=a_decoder, a_decoded_result=a_decoded_result, n_max_debugged_time_bins=n_max_debugged_time_bins, name_suffix=name_suffix, **kwargs)
 
-    neuron_IDs = deepcopy(a_decoder.neuron_IDs)
-    global_spikes_df = get_proper_global_spikes_df(curr_active_pipeline).spikes.sliced_by_neuron_id(neuron_IDs) ## only get the relevant spikes
-    ## OUTPUTS: neuron_IDs, global_spikes_df, active_window_time_bins
-    active_2d_plot = spike_raster_window.spike_raster_plt_2d
-    active_spikes_window = active_2d_plot.spikes_window
-
-    if isinstance(a_decoded_result, SingleEpochDecodedResult):
-        single_continuous_result = a_decoded_result ## already have this
-        decoding_time_bin_size: float = single_continuous_result.time_bin_container.edge_info.step
-    else:
-        ## extract it
-        single_continuous_result: SingleEpochDecodedResult = a_decoded_result.get_result_for_epoch(0) # SingleEpochDecodedResult            
-        decoding_time_bin_size: float = a_decoded_result.decoding_time_bin_size
-
-
-    # decoding_bins_epochs_df: pd.DataFrame = single_continuous_result.build_pseudo_epochs_df_from_decoding_bins().epochs.get_valid_df()
-    bin_by_bin_data: BinByBinDebuggingData = BinByBinDebuggingData.init_from_single_continuous_result(a_decoder=a_decoder, global_spikes_df=global_spikes_df, single_continuous_result=single_continuous_result, decoding_time_bin_size=decoding_time_bin_size, n_max_debugged_time_bins=n_max_debugged_time_bins)
-    ## OUTPUTS: bin_by_bin_data
-
-    ## INPUTS: active_spikes_window, global_spikes_df, decoding_bins_epochs_df
-    ## Slice to current window:
-    active_window_t_start, active_window_t_end = active_spikes_window.active_time_window
-    print(f'active_window_t_start: {active_window_t_start}, active_window_t_end: {active_window_t_end}')
-    active_global_spikes_df, active_window_decoded_epochs_df, active_epoch_active_aclu_spike_counts_list, (active_window_slice_idxs, active_window_time_bin_edges, active_p_x_given_n) = bin_by_bin_data.sliced_to_current_window(active_window_t_start, active_window_t_end)
-
-    ## OUTPUTS: active_window_slice_idxs, active_window_time_bin_edges, active_p_x_given_n
-
-    ## OUTPUTS: active_global_spikes_df, active_window_decoded_epochs_df, active_epoch_active_aclu_spike_counts_list
-
-    ## INPUTS: neuron_IDs, (active_global_spikes_df, active_window_decoded_epochs_df, active_aclu_spike_counts_dict_list)
-    ## INPUTS: active_window_slice_idxs, active_window_time_bin_edges, active_p_x_given_n
-    plots_container = PyqtgraphRenderPlots(name=f'PhoTest_{name_suffix}', root_plot=None) # Create a new one
-    plots_data = RenderPlotsData(name=f'epoch[{name_suffix}]', spikes_df=active_global_spikes_df, a_decoder=a_decoder, active_aclus=neuron_IDs, bin_by_bin_data=bin_by_bin_data)
-    win, out_pf1D_decoder_template_objects, (plots_container, plots_data) = BinByBinDecodingDebugger._perform_build_time_binned_decoder_debug_plots(a_decoder=a_decoder, time_bin_edges=active_window_time_bin_edges, p_x_given_n=active_p_x_given_n, active_epoch_active_aclu_spike_counts_list=active_epoch_active_aclu_spike_counts_list,
-                                                                                                                                plots_data=plots_data, plots_container=plots_container,
-                                                                                                                                debug_print=False, name_suffix=name_suffix)
-    bin_by_bin_debugger: BinByBinDecodingDebugger = BinByBinDecodingDebugger.init_from_builder_classmethod(win=win, pf1D_decoder_template_objects=out_pf1D_decoder_template_objects, plots_container=plots_container, plot_data=plots_data)
-    
-
-    
-
-    # Later when data changes:
-    def _on_update_fcn(*args, **kwargs):
-        """ captures: active_spikes_window, bin_by_bin_debugger, bin_by_bin_data 
-        """
-        ## INPUTS: active_spikes_window, global_spikes_df, decoding_bins_epochs_df
-        ## Slice to current window:
-        active_window_t_start, active_window_t_end = active_spikes_window.active_time_window
-        print(f'active_window_t_start: {active_window_t_start}, active_window_t_end: {active_window_t_end}')
-        active_global_spikes_df, active_window_decoded_epochs_df, active_epoch_active_aclu_spike_counts_list, (active_window_slice_idxs, active_window_time_bin_edges, active_p_x_given_n) = bin_by_bin_data.sliced_to_current_window(active_window_t_start, active_window_t_end)
-        # win, out_pf1D_decoder_template_objects, (plots_container, plots_data) = BinByBinDecodingDebugger.perform_update_time_binned_decoder_debug_plots(win, out_pf1D_decoder_template_objects, plots_container, plots_data, new_time_bin_edges=active_window_time_bin_edges, new_p_x_given_n=active_p_x_given_n, new_active_aclu_spike_counts_list=active_epoch_active_aclu_spike_counts_list)
-        _update_output = bin_by_bin_debugger.update_time_binned_decoder_debug_plots(new_time_bin_edges=active_window_time_bin_edges, new_p_x_given_n=active_p_x_given_n, new_active_aclu_spike_counts_list=active_epoch_active_aclu_spike_counts_list)
-        # win, out_pf1D_decoder_template_objects, (plots_container, plots_data) = _update_output
-
-    bin_by_bin_debugger.params.on_update_fcn = _on_update_fcn
-
-    ## connect the update event
-
-    # Perform Initial (one-time) update from source -> controlled:
-    # active_matplotlib_view_widget.on_window_changed(active_spikes_window.active_window_start_time, active_spikes_window.active_window_end_time)
-    # sync_connection = active_2d_plot.window_scrolled.connect(active_matplotlib_view_widget.on_window_changed)
-    # active_2d_plot.ui.connections[identifier] = sync_connection # add the connection to the connections array
-
-    ## idk if this will work:
-    _on_update_fcn(active_spikes_window.active_window_start_time, active_spikes_window.active_window_end_time)
-    sync_connection = active_2d_plot.window_scrolled.connect(_on_update_fcn)
-    active_2d_plot.ui.connections['bin_by_bin_debugger'] = sync_connection # add the connection to the connections array
-
-    ## END def _on_update_fcn()...
-    return bin_by_bin_debugger, win, out_pf1D_decoder_template_objects, (plots_container, plots_data), _on_update_fcn
 
 
 
