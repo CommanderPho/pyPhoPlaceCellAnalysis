@@ -4773,6 +4773,25 @@ class AcrossSessionIdentityDataframeAccessor:
         return self.perform_add_session_df_columns(df=df, session_name=session_name, time_bin_size=time_bin_size, custom_replay_source=custom_replay_source, t_start=t_start, curr_session_t_delta=curr_session_t_delta, t_end=t_end, time_col=time_col, end_time_col_name=end_time_col_name, **kwargs)
 
 
+
+    def add_session_df_columns_from_pipeline(self, curr_active_pipeline, time_bin_size: float=None, custom_replay_source: Optional[str]=None, time_col: str=None, end_time_col_name: Optional[str]=None, **kwargs) -> pd.DataFrame:
+        """         
+        Added Columns: ['session_name', 'time_bin_size', 'delta_aligned_start_t', 'pre_post_delta_category', 'maze_id']
+
+        Usage:
+            from pyphoplacecellanalysis.SpecificResults.AcrossSessionResults import AcrossSessionIdentityDataframeAccessor
+
+            # Add the maze_id to the active_filter_epochs so we can see how properties change as a function of which track the replay event occured on:
+            df = df.across_session_identity.add_session_df_columns_from_pipeline(curr_active_pipeline=curr_active_pipeline, time_bin_size=None, time_col='ripple_start_t')
+            a_ripple_df = a_ripple_df.across_session_identity.add_session_df_columns_from_pipeline(curr_active_pipeline=curr_active_pipeline, time_bin_size=None, time_col='ripple_start_t')
+    
+        """
+        session_name: str = curr_active_pipeline.session_name
+        t_start, t_delta, t_end = curr_active_pipeline.find_LongShortDelta_times()
+        return self.add_session_df_columns(session_name=session_name, time_bin_size=time_bin_size, custom_replay_source=custom_replay_source, t_start=t_start, curr_session_t_delta=t_delta, t_end=t_end, time_col=time_col, end_time_col_name=end_time_col_name, **kwargs)
+
+
+
     def split_session_key_col_to_fmt_animal_exper_cols(self, session_key_col: str = 'session_name', separator: str='_') -> pd.DataFrame:
         """ Split 'session_name' to the individual columns:
             adds columns ['format_name', 'animal', 'exper_name', 'session_name'] based on 'session_name'
