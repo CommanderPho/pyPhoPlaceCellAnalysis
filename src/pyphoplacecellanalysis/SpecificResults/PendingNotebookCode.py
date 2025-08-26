@@ -108,9 +108,96 @@ from nptyping import NDArray
 # import neuropy.utils.type_aliases as types
 import pyphoplacecellanalysis.General.type_aliases as types
 from neuropy.utils.mixins.time_slicing import TimeColumnAliasesProtocol
+from pyphocorehelpers.assertion_helpers import Assert
 
 from pyphoplacecellanalysis.General.Model.Configs.LongShortDisplayConfig import DecoderIdentityColors, long_short_display_config_manager, apply_LR_to_RL_adjustment
 from pyphocorehelpers.gui.Qt.color_helpers import ColormapHelpers, ColorFormatConverter, debug_print_color, build_adjusted_color
+
+
+# ==================================================================================================================================================================================================================================================================================== #
+# 2025-08-26 - Final Correct Context Decoding Stabilities:                                                                                                                                                                                                                             #
+# ==================================================================================================================================================================================================================================================================================== #
+def determine_percent_correctly_decoded_contexts(curr_active_pipeline):
+    """ 
+    
+    """
+    from pyphocorehelpers.assertion_helpers import Assert
+
+    def _subfn_determine_num_correctly_decoded_time_bins(a_decoded_marginal_posterior_df):
+        """find the number of correctly decoded components:
+        
+            worse_percent_correct, (percent_correct_pre, n_correct_pre, n_total_pre), (percent_correct_post, n_correct_post, n_total_post) = _subfn_determine_num_correctly_decoded_time_bins(a_decoded_marginal_posterior_df=a_decoded_marginal_posterior_df)
+        """
+        Assert.require_columns(a_decoded_marginal_posterior_df, required_columns=['P_Long', 'pre_post_delta_category'])
+        a_decoded_marginal_posterior_df['is_most_likely_decoder_Long'] = (a_decoded_marginal_posterior_df['P_Long'] > 0.5)
+
+        _split_df = a_decoded_marginal_posterior_df.pho.partition_df_dict('pre_post_delta_category')
+
+        is_correct_pre_delta = _split_df['pre-delta']['is_most_likely_decoder_Long']
+        is_correct_post_delta = np.logical_not(_split_df['post-delta']['is_most_likely_decoder_Long'])
+
+
+        n_correct_pre: int = np.sum(is_correct_pre_delta)
+        n_total_pre: int = len(_split_df['pre-delta'])
+        percent_correct_pre: float = float(n_correct_pre)/float(n_total_pre)
+        percent_correct_pre
+
+
+        n_correct_post: int = np.sum(is_correct_post_delta)
+        n_total_post: int = len(_split_df['post-delta'])
+        percent_correct_post: float = float(n_correct_post)/float(n_total_post)
+        
+        worse_percent_correct: float = min(percent_correct_pre, percent_correct_post)
+        
+        return worse_percent_correct, (percent_correct_pre, n_correct_pre, n_total_pre), (percent_correct_post, n_correct_post, n_total_post)
+    
+    # ==================================================================================================================================================================================================================================================================================== #
+    # BEGIN FUNCTION BODY                                                                                                                                                                                                                                                                  #
+    # ==================================================================================================================================================================================================================================================================================== #
+    valid_EpochComputations_result: EpochComputationsComputationsContainer = curr_active_pipeline.global_computation_results.computed_data['EpochComputations']
+    a_new_fully_generic_result: GenericDecoderDictDecodedEpochsDictResult = valid_EpochComputations_result.a_generic_decoder_dict_decoded_epochs_dict_result
+
+    # a_target_context: IdentifyingContext = IdentifyingContext(trained_compute_epochs='laps', pfND_ndim=1, time_bin_size=0.050, known_named_decoding_epochs_type='pbe', masked_time_bin_fill_type='ignore') # , decoder_identifier='long_LR'
+    # a_target_context: IdentifyingContext = IdentifyingContext(trained_compute_epochs='laps', pfND_ndim=1, time_bin_size=0.025, known_named_decoding_epochs_type='pbe', masked_time_bin_fill_type='ignore', data_grain='per_epoch') # , time_bin_size=0.050, known_named_decoding_epochs_type='pbe', masked_time_bin_fill_type='ignore', decoder_identifier='long_LR'
+
+    # a_target_context: IdentifyingContext = IdentifyingContext(trained_compute_epochs='laps', pfND_ndim=1, time_bin_size=0.025, known_named_decoding_epochs_type='laps', masked_time_bin_fill_type='ignore', data_grain='per_epoch') ## Laps
+    # any_matching_contexts_list, result_context_dict, decoder_context_dict, decoded_marginal_posterior_df_context_dict = a_new_fully_generic_result.get_results_matching_contexts(context_query=a_target_context)
+
+    # common_constraint_dict = dict(trained_compute_epochs='laps', pfND_ndim=1, time_bin_size=0.025, masked_time_bin_fill_type='ignore')
+    # common_constraint_dict = dict(trained_compute_epochs='laps', time_bin_size=0.060, masked_time_bin_fill_type='nan_filled') # , pfND_ndim=1
+    common_constraint_dict = dict(trained_compute_epochs='laps', time_bin_size=0.060, masked_time_bin_fill_type='dropped')
+
+    _output_dict = {}
+    ## Laps context:
+    a_Laps_target_context: IdentifyingContext = IdentifyingContext(known_named_decoding_epochs_type='laps', data_grain='per_time_bin', **common_constraint_dict) ## Laps , data_grain='per_epoch'
+    # best_matching_context, a_result, a_decoder, a_decoded_marginal_posterior_df = a_new_fully_generic_result.get_results_best_matching_context(context_query=a_Laps_target_context)
+    # _output_dict[best_matching_context] = _subfn_determine_num_correctly_decoded_time_bins(a_decoded_marginal_posterior_df=a_decoded_marginal_posterior_df)
+    
+    # ## Global context:
+    a_global_target_context: IdentifyingContext = IdentifyingContext(known_named_decoding_epochs_type='global', data_grain='per_time_bin', **common_constraint_dict)
+    ## PBEs context:
+    a_PBEs_target_context: IdentifyingContext = IdentifyingContext(known_named_decoding_epochs_type='pbe', **common_constraint_dict, data_grain='per_time_bin') 
+    _active_target_context_list = [a_Laps_target_context, a_global_target_context, a_PBEs_target_context]
+    
+    for a_target_context in _active_target_context_list:
+        try:
+            best_matching_context, a_result, a_decoder, a_decoded_marginal_posterior_df = a_new_fully_generic_result.get_results_best_matching_context(context_query=a_target_context)
+            _output_dict[best_matching_context] = _subfn_determine_num_correctly_decoded_time_bins(a_decoded_marginal_posterior_df=a_decoded_marginal_posterior_df)
+        except TypeError as e:
+            print(f'WARN: err: {e} for ctxt: {a_target_context}. Skipping.')
+            pass
+        except Exception as e:
+            raise
+
+    pbes_target_context_results = complete_all_transition_matricies(a_new_fully_generic_result=a_new_fully_generic_result, a_target_context=a_PBEs_target_context)
+    pbes_matched_result_tuple_context_dict, (pbes_time_bin_container_context_dict, pbes_position_transition_matrix_context_dict, pbes_context_state_transition_matrix_context_dict, pbes_combined_transition_matrix_context_dict), (pbes_mean_context_state_transition_matrix_context_dict, pbes_mean_position_transition_matrix_context_dict) = pbes_target_context_results
+    a_pbes_best_matching_context, a_pbes_result, a_pbes_decoder, a_pbes_decoded_marginal_posterior_df = list(pbes_matched_result_tuple_context_dict.values())[0] # [-1] # pbes_matched_result_tuple_context_dict[a_PBEs_target_context]
+
+
+
+    ## OUTPUTS: a_decoded_marginal_posterior_df
+    
+    return _output_dict
 
 
 
