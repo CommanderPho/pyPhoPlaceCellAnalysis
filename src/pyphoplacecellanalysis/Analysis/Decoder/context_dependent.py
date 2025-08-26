@@ -1878,7 +1878,7 @@ class GenericDecoderDictDecodedEpochsDictResult(ComputedResult):
     @classmethod
     def _perform_export_dfs_dict_to_csvs(cls, extracted_dfs_dict: Dict[IdentifyingContext, pd.DataFrame], parent_output_path: Path, active_context: IdentifyingContext, session_name: str, tbin_values_dict: Dict[str, float],
                                     t_start: Optional[float]=None, curr_session_t_delta: Optional[float]=None, t_end: Optional[float]=None,
-                                    user_annotation_selections=None, valid_epochs_selections=None, custom_export_df_to_csv_fn=None, use_single_FAT_df: bool=True):
+                                    user_annotation_selections=None, valid_epochs_selections=None, custom_export_df_to_csv_fn=None, use_single_FAT_df: bool=True, allow_missing_time_columns:bool=False):
         """ Classmethod: export as separate .csv files. 
 
         from pyphoplacecellanalysis.SpecificResults.AcrossSessionResults import SingleFatDataframe
@@ -2075,7 +2075,7 @@ class GenericDecoderDictDecodedEpochsDictResult(ComputedResult):
         export_files_dict = {}
         
         if use_single_FAT_df:
-            single_FAT_df: pd.DataFrame = SingleFatDataframe.build_fat_df(dfs_dict=extracted_dfs_dict, additional_common_context=active_context)
+            single_FAT_df: pd.DataFrame = SingleFatDataframe.build_fat_df(dfs_dict=extracted_dfs_dict, additional_common_context=active_context, allow_missing_time_columns=allow_missing_time_columns)
             export_files_dict['FAT'] =  _subfn_pre_process_and_export_df(export_df=single_FAT_df, a_df_identifier="FAT")
             
         else:
@@ -2156,7 +2156,7 @@ class GenericDecoderDictDecodedEpochsDictResult(ComputedResult):
         #         print(f'WARN: adding the time_bin_size columns: {self.ripple_decoding_time_bin_size}')
         #         extracted_merged_scores_df['time_bin_size'] = self.ripple_decoding_time_bin_size
 
-        #     export_df_dict = {'ripple_all_scores_merged_df': extracted_merged_scores_df}
+        #     export_df_dict = {IdentifyingContext(fn_name='ripple_all_scores_merged_df'): extracted_merged_scores_df}
         #     export_files_dict = export_files_dict | self.perform_export_dfs_dict_to_csvs(extracted_dfs_dict=export_df_dict, parent_output_path=parent_output_path, active_context=active_context, session_name=session_name, curr_session_t_delta=curr_session_t_delta, user_annotation_selections=None, valid_epochs_selections=None, custom_export_df_to_csv_fn=custom_export_df_to_csv_fn)
 
         if should_export_session_correct_decoded_time_bin_performance_df:
@@ -2166,9 +2166,13 @@ class GenericDecoderDictDecodedEpochsDictResult(ComputedResult):
                 ## find the number of correctly decoded components:
                 # session_correct_decoded_time_bin_performance_df: pd.DataFrame = determine_percent_correctly_decoded_contexts(curr_active_pipeline, time_bin_size=decoding_time_bin_size)
                 session_correct_decoded_time_bin_performance_df: pd.DataFrame = self.determine_percent_correctly_decoded_contexts(curr_active_pipeline=None, time_bin_size=decoding_time_bin_size)
-                export_df_dict = {'session_correct_decoded_time_bin_performance_df': session_correct_decoded_time_bin_performance_df}
-                export_files_dict = export_files_dict | self.perform_export_dfs_dict_to_csvs(extracted_dfs_dict=export_df_dict, parent_output_path=parent_output_path, active_context=active_context, session_name=session_name, curr_session_t_delta=curr_session_t_delta, user_annotation_selections=None, valid_epochs_selections=None, custom_export_df_to_csv_fn=custom_export_df_to_csv_fn)
+                export_df_dict = {IdentifyingContext(fn_name='session_correct_decoded_time_bin_performance_df'): session_correct_decoded_time_bin_performance_df}
+                export_files_dict = export_files_dict | self._perform_export_dfs_dict_to_csvs(extracted_dfs_dict=export_df_dict, parent_output_path=parent_output_path, tbin_values_dict=tbin_values_dict,
+                                                                                              active_context=active_context, session_name=session_name, curr_session_t_delta=curr_session_t_delta, user_annotation_selections=None, valid_epochs_selections=None, custom_export_df_to_csv_fn=custom_export_df_to_csv_fn,
+                                                                                          use_single_FAT_df=False,
+                                                                                          allow_missing_time_columns=True)
             except Exception as e:
+                print(f'\tshould_export_session_correct_decoded_time_bin_performance_df exporting failed withe error: {e}')
                 raise
 
         return export_files_dict

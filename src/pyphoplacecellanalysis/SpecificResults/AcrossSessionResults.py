@@ -4735,19 +4735,23 @@ class AcrossSessionIdentityDataframeAccessor:
                 end_time_col_name: str = TimeColumnAliasesProtocol.find_first_extant_suitable_columns_name(df, col_connonical_name='stop', required_columns_synonym_dict={"start":{'begin','start_t','ripple_start_t'}, "stop":['end','stop_t']}, should_raise_exception_on_fail=should_raise_exception_on_fail)
 
             if time_col is not None:
-                df['delta_aligned_start_t'] = df[time_col] - curr_session_t_delta
-                ## Add 'pre_post_delta_category' helper column:
-                df['pre_post_delta_category'] = 'post-delta'
-                df.loc[(df['delta_aligned_start_t'] <= 0.0), 'pre_post_delta_category'] = 'pre-delta'
-                if (t_start is not None) and (t_end is not None) and (end_time_col_name is not None):
-                    try:
-                        df = EpochsAccessor.add_maze_id_if_needed(epochs_df=df, t_start=t_start, t_delta=curr_session_t_delta, t_end=t_end, start_time_col_name=time_col, end_time_col_name=end_time_col_name) # Adds Columns: ['maze_id']
-                    except (AttributeError, KeyError) as e:
-                        print(f'could not add the "maze_id" column to the dataframe (err: {e})\n\tlikely because it lacks valid "t_start" or "t_end" columns. df.columns: {list(df.columns)}. Skipping.')
-                        if should_raise_exception_on_fail:
-                            raise
-                    except Exception as e:
-                        raise e
+                if time_col not in df.columns:
+                    if should_raise_exception_on_fail:
+                        raise ValueError(f'time_col: "{time_col}" not in df.columns: {list(df.columns)}')
+                else:
+                    df['delta_aligned_start_t'] = df[time_col] - curr_session_t_delta
+                    ## Add 'pre_post_delta_category' helper column:
+                    df['pre_post_delta_category'] = 'post-delta'
+                    df.loc[(df['delta_aligned_start_t'] <= 0.0), 'pre_post_delta_category'] = 'pre-delta'
+                    if (t_start is not None) and (t_end is not None) and (end_time_col_name is not None):
+                        try:
+                            df = EpochsAccessor.add_maze_id_if_needed(epochs_df=df, t_start=t_start, t_delta=curr_session_t_delta, t_end=t_end, start_time_col_name=time_col, end_time_col_name=end_time_col_name) # Adds Columns: ['maze_id']
+                        except (AttributeError, KeyError) as e:
+                            print(f'could not add the "maze_id" column to the dataframe (err: {e})\n\tlikely because it lacks valid "t_start" or "t_end" columns. df.columns: {list(df.columns)}. Skipping.')
+                            if should_raise_exception_on_fail:
+                                raise
+                        except Exception as e:
+                            raise e
 
         return df
 
@@ -4834,7 +4838,7 @@ class SingleFatDataframe:
     to_filename_conversion_dict = {'compute_diba_quiescent_style_replay_events':'_withNewComputedReplays', 'diba_evt_file':'_withNewKamranExportedReplays', 'initial_loaded': '_withOldestImportedReplays', 'normal_computed': '_withNormalComputedReplays'}
     
     @classmethod
-    def build_fat_df(cls, dfs_dict: Dict[IdentifyingContext, pd.DataFrame], additional_common_context: Optional[IdentifyingContext]=None) -> pd.DataFrame:
+    def build_fat_df(cls, dfs_dict: Dict[IdentifyingContext, pd.DataFrame], additional_common_context: Optional[IdentifyingContext]=None, allow_missing_time_columns: bool=False) -> pd.DataFrame:
         """ builds a single FAT_df from a dict of identities and their corresponding dfs. Adds all of the index keys as columns, and all of their values a duplicated along all rows of the coresponding df.
         Then stacks them into a single, FAT dataframe.
 
@@ -4850,7 +4854,7 @@ class SingleFatDataframe:
         for a_df_context, a_df in dfs_dict.items():
             ## In a single_FAT frame, we add columns with the context value for all entries in the dataframe.
             for a_ctxt_key, a_ctxt_value in a_df_context.to_dict().items():
-                a_df[a_ctxt_key] = a_ctxt_value
+                a_df[a_ctxt_key] = a_ctxt_value # this is a str, str for working things
                 
             if additional_common_context is not None:
                 for a_ctxt_key, a_ctxt_value in additional_common_context.to_dict().items():
@@ -4872,13 +4876,13 @@ class SingleFatDataframe:
                     a_df[a_ctxt_key] = a_ctxt_value_str ## need to turn this into a flat string ValueError: Length of values (6) does not match length of index (19102)
                 
             # time_col = 'start' # 'ripple_start_t' for ripples, etc
-            extant_time_col: str = TimeColumnAliasesProtocol.find_first_extant_suitable_columns_name(a_df, col_connonical_name='t_bin_center', required_columns_synonym_dict={"t_bin_center":{'lap_start_t','ripple_start_t','start_t','start', 't'}}, should_raise_exception_on_fail=True)
-            if extant_time_col != 't_bin_center':
-                a_df['t_bin_center'] = deepcopy(a_df[extant_time_col])
-            assert 't_bin_center' in a_df
-            # assert np.all(np.logical_not(a_df.isna()))
-            a_df['is_t_bin_center_fake'] = (extant_time_col != 't_bin_center') ## #TODO 2025-03-27 18:31: - [ ] If it's not of t_bin data_grain, it's fake, and just used for temporary calculations
-            
+            extant_time_col: str = TimeColumnAliasesProtocol.find_first_extant_suitable_columns_name(a_df, col_connonical_name='t_bin_center', required_columns_synonym_dict={"t_bin_center":{'lap_start_t','ripple_start_t','start_t','start', 't'}}, should_raise_exception_on_fail=(not allow_missing_time_columns))
+            if extant_time_col is not None:
+                if extant_time_col != 't_bin_center':
+                    a_df['t_bin_center'] = deepcopy(a_df[extant_time_col])
+                assert 't_bin_center' in a_df
+                # assert np.all(np.logical_not(a_df.isna()))
+                a_df['is_t_bin_center_fake'] = (extant_time_col != 't_bin_center') ## #TODO 2025-03-27 18:31: - [ ] If it's not of t_bin data_grain, it's fake, and just used for temporary calculations            
             FAT_df_list.append(a_df)
         # end for a_df_name, a_df
         fat_df: pd.DataFrame = pd.concat(FAT_df_list, ignore_index=True)
