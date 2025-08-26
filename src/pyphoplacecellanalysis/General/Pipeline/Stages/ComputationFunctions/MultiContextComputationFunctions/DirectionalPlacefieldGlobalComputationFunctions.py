@@ -120,6 +120,7 @@ def add_laps_groundtruth_information_to_dataframe(curr_active_pipeline, result_l
 
 
     """
+    from neuropy.core.epoch import ensure_dataframe
     from neuropy.core import Laps
 
     ## Inputs: a_directional_merged_decoders_result, laps_df
@@ -132,8 +133,10 @@ def add_laps_groundtruth_information_to_dataframe(curr_active_pipeline, result_l
     ## Compute the ground-truth information using the position information:
     # adds columns: ['maze_id', 'is_LR_dir']
     t_start, t_delta, t_end = curr_active_pipeline.find_LongShortDelta_times()
-    laps_obj: Laps = curr_active_pipeline.sess.laps
-    laps_df = laps_obj.to_dataframe()
+    laps_obj: Laps = deepcopy(curr_active_pipeline.sess.laps)    
+    laps_df = ensure_dataframe(laps_obj)    
+    laps_df = laps_df.epochs.adding_maze_id_if_needed(t_start=t_start, t_delta=t_delta, t_end=t_end)
+    # laps_df = laps_df.laps_accessor.compute_lap_dir_from_net_displacement(global_session=deepcopy(curr_active_pipeline.sess), replace_existing=True)
     laps_df: pd.DataFrame = Laps._update_dataframe_computed_vars(laps_df=laps_df, t_start=t_start, t_delta=t_delta, t_end=t_end, global_session=curr_active_pipeline.sess, replace_existing=True) # NOTE: .sess is used because global_session is missing the last two laps
 
     ## 2024-04-20 - HACK
@@ -143,10 +146,18 @@ def add_laps_groundtruth_information_to_dataframe(curr_active_pipeline, result_l
     laps_df['lap_dir'] = is_RL_dir.astype(int) # 1 for RL, 0 for LR
 
     ## 2024-01-17 - Updates the `a_directional_merged_decoders_result.laps_epochs_df` with both the ground-truth values and the decoded predictions
-    result_laps_epochs_df['maze_id'] = laps_df['maze_id'].to_numpy()[np.isin(laps_df['lap_id'], result_laps_epochs_df['lap_id'])] # this works despite the different size because of the index matching
-    ## add the 'is_LR_dir' groud-truth column in:
-    result_laps_epochs_df['is_LR_dir'] = laps_df['is_LR_dir'].to_numpy()[np.isin(laps_df['lap_id'], result_laps_epochs_df['lap_id'])] # this works despite the different size because of the index matching
+    try:
+        result_laps_epochs_df['maze_id'] = laps_df['maze_id'].to_numpy()[np.isin(laps_df['lap_id'], result_laps_epochs_df['lap_id'])] # this works despite the different size because of the index matching - ValueError: Length of values (82) does not match length of index (84)
+        ## add the 'is_LR_dir' groud-truth column in:
+        result_laps_epochs_df['is_LR_dir'] = laps_df['is_LR_dir'].to_numpy()[np.isin(laps_df['lap_id'], result_laps_epochs_df['lap_id'])] # this works despite the different size because of the index matching
 
+    except ValueError as e:
+        # ValueError: Length of values (82) does not match length of index (84)
+        result_laps_epochs_df['maze_id'] = laps_df['maze_id'][np.isin(laps_df['lap_id'], result_laps_epochs_df['lap_id'])]
+        ## add the 'is_LR_dir' groud-truth column in:
+        result_laps_epochs_df['is_LR_dir'] = laps_df['is_LR_dir'][np.isin(laps_df['lap_id'], result_laps_epochs_df['lap_id'])] # this works despite the different size because of the index matching
+
+    
     assert np.all([a_col in result_laps_epochs_df.columns for a_col in ('maze_id', 'is_LR_dir')]), f"result_laps_epochs_df.columns: {list(result_laps_epochs_df.columns)}"
 
     result_laps_epochs_df['true_decoder_index'] = (result_laps_epochs_df['maze_id'].astype(int) * 2) + np.logical_not(result_laps_epochs_df['is_LR_dir']).astype(int)
@@ -5780,9 +5791,11 @@ class LapDecodingGroundTruth:
         # adds columns: ['maze_id', 'is_LR_dir']
         t_start, t_delta, t_end = curr_active_pipeline.find_LongShortDelta_times()
         laps_obj: Laps = curr_active_pipeline.sess.laps
-        laps_df = laps_obj.to_dataframe()
+        laps_df = ensure_dataframe(laps_obj).laps_accessor.get_valid_laps_epochs_df(rebuild_lap_id_columns=True)
         laps_df: pd.DataFrame = Laps._update_dataframe_computed_vars(laps_df=laps_df, t_start=t_start, t_delta=t_delta, t_end=t_end, global_session=curr_active_pipeline.sess) # NOTE: .sess is used because global_session is missing the last two laps
 
+        # result_laps_epochs_df = ensure_dataframe(result_laps_epochs_df).laps_accessor.get_valid_laps_epochs_df(rebuild_lap_id_columns=True)
+        
         ## 2024-01-17 - Updates the `a_directional_merged_decoders_result.laps_epochs_df` with both the ground-truth values and the decoded predictions
         result_laps_epochs_df['maze_id'] = laps_df['maze_id'].to_numpy()[np.isin(laps_df['lap_id'], result_laps_epochs_df['lap_id'])] # this works despite the different size because of the index matching
         ## add the 'is_LR_dir' groud-truth column in:
@@ -5897,14 +5910,17 @@ class LapDecodingGroundTruth:
         if use_single_time_bin_per_epoch:
             print(f'WARNING: use_single_time_bin_per_epoch=True so time bin sizes will be ignored.')
 
+        # global_spikes_df: pd.DataFrame = deepcopy(owning_pipeline_reference.sess.spikes_df)
+        global_spikes_df: pd.DataFrame = get_proper_global_spikes_df(owning_pipeline_reference)
+        
         ## Decode Laps:
-        global_any_laps_epochs_obj = deepcopy(owning_pipeline_reference.computation_results[global_epoch_name].computation_config.pf_params.computation_epochs) # global_epoch_name='maze_any' (? same as global_epoch_name?)
+        # global_any_laps_epochs_obj = deepcopy(owning_pipeline_reference.computation_results[global_epoch_name].computation_config.pf_params.computation_epochs) # global_epoch_name='maze_any' (? same as global_epoch_name?)
+        global_any_laps_epochs_obj = ensure_Epoch(deepcopy(owning_pipeline_reference.filtered_sessions[global_epoch_name].laps)) # global_epoch_name='maze_any' (? same as global_epoch_name?)
         min_possible_laps_time_bin_size: float = find_minimum_time_bin_duration(global_any_laps_epochs_obj.to_dataframe()['duration'].to_numpy())
         laps_decoding_time_bin_size: float = min(desired_laps_decoding_time_bin_size, min_possible_laps_time_bin_size) # 10ms # 0.002
         if use_single_time_bin_per_epoch:
             laps_decoding_time_bin_size = None
-
-        alt_directional_merged_decoders_result.all_directional_laps_filter_epochs_decoder_result = all_directional_pf1D_Decoder.decode_specific_epochs(spikes_df=deepcopy(owning_pipeline_reference.sess.spikes_df), filter_epochs=global_any_laps_epochs_obj, decoding_time_bin_size=laps_decoding_time_bin_size, use_single_time_bin_per_epoch=use_single_time_bin_per_epoch, debug_print=False)
+        alt_directional_merged_decoders_result.all_directional_laps_filter_epochs_decoder_result = all_directional_pf1D_Decoder.decode_specific_epochs(spikes_df=deepcopy(global_spikes_df), filter_epochs=global_any_laps_epochs_obj, decoding_time_bin_size=laps_decoding_time_bin_size, use_single_time_bin_per_epoch=use_single_time_bin_per_epoch, debug_print=False)
 
         ## Decode Ripples:
         if desired_ripple_decoding_time_bin_size is not None:
@@ -5913,7 +5929,7 @@ class LapDecodingGroundTruth:
             ripple_decoding_time_bin_size: float = min(desired_ripple_decoding_time_bin_size, min_possible_time_bin_size) # 10ms # 0.002
             if use_single_time_bin_per_epoch:
                 ripple_decoding_time_bin_size = None
-            alt_directional_merged_decoders_result.all_directional_ripple_filter_epochs_decoder_result = all_directional_pf1D_Decoder.decode_specific_epochs(deepcopy(owning_pipeline_reference.sess.spikes_df), global_replays, decoding_time_bin_size=ripple_decoding_time_bin_size, use_single_time_bin_per_epoch=use_single_time_bin_per_epoch)
+            alt_directional_merged_decoders_result.all_directional_ripple_filter_epochs_decoder_result = all_directional_pf1D_Decoder.decode_specific_epochs(deepcopy(global_spikes_df), global_replays, decoding_time_bin_size=ripple_decoding_time_bin_size, use_single_time_bin_per_epoch=use_single_time_bin_per_epoch)
 
         ## Post Compute Validations:
         alt_directional_merged_decoders_result.perform_compute_marginals()
