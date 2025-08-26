@@ -4619,7 +4619,7 @@ class AcrossSessionHelpers:
         import matplotlib.patches as patches
         
         try:
-            t_delta_df.reset_index(drop=False, names=['sess_name'])
+            t_delta_df = deepcopy(t_delta_df).reset_index(drop=False, names=['sess_name'])
         except Exception as e:
             # raise e
             pass
