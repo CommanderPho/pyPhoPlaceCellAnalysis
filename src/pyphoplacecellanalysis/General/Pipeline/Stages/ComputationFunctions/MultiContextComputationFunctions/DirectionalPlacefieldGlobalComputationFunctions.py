@@ -5750,7 +5750,7 @@ class LapDecodingGroundTruth:
 
     Usage:
 
-        from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import LapDecodingGroundTruth
+        from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import LapDecodingGroundTruth
     """
     @function_attributes(short_name=None, tags=['ground-truth', 'laps', 'performance'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-01-15 14:00', related_items=[])
     @classmethod
@@ -5857,7 +5857,8 @@ class LapDecodingGroundTruth:
         """
         from neuropy.utils.indexing_helpers import paired_incremental_sorting, union_of_arrays, intersection_of_arrays, find_desired_sort_indicies
         from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import PfND
-
+        from neuropy.core.epoch import ensure_Epoch, ensure_dataframe
+        
         ## Copy the default result:
         directional_merged_decoders_result: DirectionalPseudo2DDecodersResult = owning_pipeline_reference.global_computation_results.computed_data['DirectionalMergedDecoders']
         alt_directional_merged_decoders_result: DirectionalPseudo2DDecodersResult = deepcopy(directional_merged_decoders_result)
@@ -5931,27 +5932,33 @@ class LapDecodingGroundTruth:
         return alt_directional_merged_decoders_result, result_laps_epochs_df, complete_decoded_context_correctness_tuple
 
 
-    @function_attributes(short_name=None, tags=['laps', 'groundtruith', 'sweep', 'context-decoding', 'context-discrimination'], input_requires=[], output_provides=[], uses=['_perform_variable_time_bin_lap_groud_truth_performance_testing'], used_by=[], creation_date='2024-04-05 22:47', related_items=[])
+    @function_attributes(short_name=None, tags=['laps', 'groundtruith', 'sweep', 'context-decoding', 'context-discrimination', 'pure'], input_requires=[], output_provides=[], uses=['_perform_variable_time_bin_lap_groud_truth_performance_testing'], used_by=[], creation_date='2024-04-05 22:47', related_items=[])
     @classmethod
-    def perform_sweep_lap_groud_truth_performance_testing(cls, curr_active_pipeline, included_neuron_ids_list: List[NDArray], desired_laps_decoding_time_bin_size:float=1.5, allow_skip_invalid_neuron_IDs: bool=True):
+    def perform_sweep_lap_groud_truth_performance_testing(cls, curr_active_pipeline, included_neuron_ids_list: List[NDArray], desired_laps_decoding_time_bin_size:float=1.5, allow_skip_invalid_neuron_IDs: bool=False):
         """ Sweeps through each `included_neuron_ids` in the provided `included_neuron_ids_list` and calls `_perform_variable_time_bin_lap_groud_truth_performance_testing(...)` to get its laps ground-truth performance.
         Can be used to assess the contributes of each set of cells (exclusive, rate-remapping, etc) to the discrimination decoding performance.
 
         Usage:
 
-            from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import perform_sweep_lap_groud_truth_performance_testing
+            from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import LapDecodingGroundTruth
+            
+            # PhoJonathan Results:
+            long_epoch_name, short_epoch_name, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
+            long_results, short_results, global_results = [curr_active_pipeline.computation_results[an_epoch_name]['computed_data'] for an_epoch_name in [long_epoch_name, short_epoch_name, global_epoch_name]]
+            jonathan_firing_rate_analysis_result = curr_active_pipeline.global_computation_results.computed_data.jonathan_firing_rate_analysis
+            neuron_replay_stats_df, short_exclusive, long_exclusive, BOTH_subset, EITHER_subset, XOR_subset, NEITHER_subset = jonathan_firing_rate_analysis_result.get_cell_track_partitions(frs_index_inclusion_magnitude=0.2)
 
             desired_laps_decoding_time_bin_size: float = 1.0
-            included_neuron_ids_list = [short_exclusive, long_exclusive, BOTH_subset, EITHER_subset, XOR_subset, NEITHER_subset]
+            # included_neuron_ids_list = [short_exclusive, long_exclusive, BOTH_subset, EITHER_subset, XOR_subset, NEITHER_subset]
+            included_neuron_ids_list = [None]
 
-            _output_tuples_list = perform_sweep_lap_groud_truth_performance_testing(curr_active_pipeline,
+            _output_tuples_list = LapDecodingGroundTruth.perform_sweep_lap_groud_truth_performance_testing(curr_active_pipeline,
                                                                                     included_neuron_ids_list=included_neuron_ids_list,
                                                                                     desired_laps_decoding_time_bin_size=desired_laps_decoding_time_bin_size)
 
             percent_laps_correctness_df: pd.DataFrame = pd.DataFrame.from_records([complete_decoded_context_correctness_tuple.percent_correct_tuple for (a_directional_merged_decoders_result, result_laps_epochs_df, complete_decoded_context_correctness_tuple) in _output_tuples_list],
                                     columns=("track_ID_correct", "dir_correct", "complete_correct"))
             percent_laps_correctness_df
-
 
 
         Does not modifiy the curr_active_pipeline (pure)
