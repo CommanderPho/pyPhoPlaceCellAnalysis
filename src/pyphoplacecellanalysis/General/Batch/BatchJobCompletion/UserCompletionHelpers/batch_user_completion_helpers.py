@@ -136,8 +136,7 @@ def perform_sweep_decoding_time_bin_sizes_marginals_dfs_completion_function(self
     from neuropy.core.epoch import TimeColumnAliasesProtocol, ensure_dataframe
     from neuropy.utils.mixins.binning_helpers import find_minimum_time_bin_duration
     from pyphocorehelpers.print_helpers import get_now_day_str, get_now_rounded_time_str
-    from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import _check_result_laps_epochs_df_performance
-    from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import DirectionalPseudo2DDecodersResult
+    from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import LapDecodingGroundTruth, DirectionalPseudo2DDecodersResult
     from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import DecodedFilterEpochsResult
     from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import DecoderDecodedEpochsResult
     from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import EpochFilteringMode
@@ -570,7 +569,7 @@ def perform_sweep_decoding_time_bin_sizes_marginals_dfs_completion_function(self
         # get the current lap object and determine the percentage correct:
         if should_output_lap_decoding_performance_info:
             result_laps_epochs_df: pd.DataFrame = _update_result_laps(a_result=an_alt_dir_Pseudo2D_decoders_result, laps_df=laps_df)
-            (is_decoded_track_correct, is_decoded_dir_correct, are_both_decoded_properties_correct), (percent_laps_track_identity_estimated_correctly, percent_laps_direction_estimated_correctly, percent_laps_estimated_correctly) = _check_result_laps_epochs_df_performance(result_laps_epochs_df)
+            (is_decoded_track_correct, is_decoded_dir_correct, are_both_decoded_properties_correct), (percent_laps_track_identity_estimated_correctly, percent_laps_direction_estimated_correctly, percent_laps_estimated_correctly) = LapDecodingGroundTruth._check_result_laps_epochs_df_performance(result_laps_epochs_df)
             output_laps_decoding_accuracy_results_dict[laps_decoding_time_bin_size] = (percent_laps_track_identity_estimated_correctly, percent_laps_direction_estimated_correctly, percent_laps_estimated_correctly)
 
 
