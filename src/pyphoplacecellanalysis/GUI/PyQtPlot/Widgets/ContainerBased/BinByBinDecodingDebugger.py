@@ -655,7 +655,7 @@ class BinByBinDecodingDebugger(GenericPyQtGraphContainer):
 
     @function_attributes(short_name=None, tags=['private', 'plot'], input_requires=[], output_provides=[], uses=['cls.build_spike_counts_and_decoder_outputs', 'cls.build_time_binned_decoder_debug_plots'], used_by=[], creation_date='2025-02-24 12:19', related_items=[])
     @classmethod
-    def plot_bin_by_bin_decoding_example(cls, curr_active_pipeline, a_decoder: BasePositionDecoder, time_bin_size: float = 0.250, epoch_id_col_name: str='lap_id', an_epoch_id: int = 9, name_suffix: str=None):
+    def plot_bin_by_bin_decoding_example(cls, curr_active_pipeline, a_decoder: BasePositionDecoder, time_bin_size: float = 0.250, epoch_id_col_name: str='lap_id', an_epoch_id: int = 9, name_suffix: str=None) -> "BinByBinDecodingDebugger":
         """
         from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import plot_bin_by_bin_decoding_example
 
@@ -707,9 +707,27 @@ class BinByBinDecodingDebugger(GenericPyQtGraphContainer):
         #                                                                                                                             plots_data=plots_data, plots_container=plots_container,
         #                                                                                                                             debug_print=False, name_suffix=name_suffix)
         # bin_by_bin_debugger: BinByBinDecodingDebugger = BinByBinDecodingDebugger.init_from_builder_classmethod(win=win, pf1D_decoder_template_objects=out_pf1D_decoder_template_objects, plots_container=plots_container, plot_data=plots_data)
-        
-        # return bin_by_bin_debugger 
-        return win, out_pf1D_decoder_template_objects, (_out_decoded_active_plots, _out_decoded_active_plots_data)
+
+        _obj_dict = dict()
+        plots_container = PyqtgraphRenderPlots(name=f'PhoTest_{name_suffix}', root_plot=None, _out_decoded_active_plots=_out_decoded_active_plots) # Create a new one
+        _obj_dict['plots'] = plots_container
+
+        plot_data = RenderPlotsData(name=f'epoch[{name_suffix}]', pf1D_decoder_template_objects=out_pf1D_decoder_template_objects, _out_decoded_active_plots_data=_out_decoded_active_plots_data) # , spikes_df=active_global_spikes_df, a_decoder=a_decoder, active_aclus=neuron_IDs, bin_by_bin_data=bin_by_bin_data
+        _obj_dict['plot_data'] = plot_data
+        bin_by_bin_debugger: BinByBinDecodingDebugger = cls(**_obj_dict)
+        bin_by_bin_debugger.plot_data.pf1D_decoder_template_objects = out_pf1D_decoder_template_objects
+        bin_by_bin_debugger.ui.win = win
+        bin_by_bin_debugger.params.on_update_fcn = None        
+
+        # bin_by_bin_debugger: BinByBinDecodingDebugger = BinByBinDecodingDebugger.init_from_plot_bin_by_bin_decoding(win=win, pf1D_decoder_template_objects=out_pf1D_decoder_template_objects,
+        #                                                                                                     _out_decoded_active_plots=_out_decoded_active_plots,
+        #                                                                                                     _out_decoded_active_plots_data=_out_decoded_active_plots_data)
+
+
+
+
+        return bin_by_bin_debugger 
+        # return win, out_pf1D_decoder_template_objects, (_out_decoded_active_plots, _out_decoded_active_plots_data)
     
 
 
