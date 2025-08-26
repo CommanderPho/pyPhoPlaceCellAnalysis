@@ -592,7 +592,7 @@ class BinByBinDecodingDebugger(GenericPyQtGraphContainer):
     
 
 
-    @function_attributes(short_name=None, tags=['MAIN', 'plot', 'GUI'], input_requires=[], output_provides=[], uses=['new_plot_raster_plot', 'pyqtplot_build_image_bounds_extent', 'BaseTemplateDebuggingMixin'], used_by=[], creation_date='2025-02-24 12:20', related_items=[])
+    @function_attributes(short_name=None, tags=['MAIN', 'plot', 'GUI'], input_requires=[], output_provides=[], uses=['new_plot_raster_plot', 'pyqtplot_build_image_bounds_extent', 'BaseTemplateDebuggingMixin'], used_by=['cls.plot_bin_by_bin_decoding_example'], creation_date='2025-02-24 12:20', related_items=[])
     @classmethod
     def build_time_binned_decoder_debug_plots(cls, a_decoder, an_epoch_id, _out_decoded_time_bin_edges, _out_decoded_active_p_x_given_n, _out_decoded_active_unit_lists, _out_decoded_active_plots_data, debug_print=False):
         """ Builds the time-binned decoder debug plots for visualizing decoding results.
