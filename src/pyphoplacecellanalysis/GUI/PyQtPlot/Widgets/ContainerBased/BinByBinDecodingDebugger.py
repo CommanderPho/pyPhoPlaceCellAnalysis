@@ -766,26 +766,6 @@ class BinByBinDecodingDebugger(GenericPyQtGraphContainer):
         return _obj 
 
 
-
-    @classmethod
-    def init_from_plot_bin_by_bin_decoding(cls, win, pf1D_decoder_template_objects, _out_decoded_active_plots, _out_decoded_active_plots_data, name_suffix: str='test') -> "BinByBinDecodingDebugger":
-        """
-        
-        """
-        _obj_dict = dict()
-        plots_container = PyqtgraphRenderPlots(name=f'PhoTest_{name_suffix}', root_plot=None, _out_decoded_active_plots=_out_decoded_active_plots) # Create a new one
-        _obj_dict['plots'] = plots_container
-
-        plot_data = RenderPlotsData(name=f'epoch[{name_suffix}]', pf1D_decoder_template_objects=pf1D_decoder_template_objects, _out_decoded_active_plots_data=_out_decoded_active_plots_data) # , spikes_df=active_global_spikes_df, a_decoder=a_decoder, active_aclus=neuron_IDs, bin_by_bin_data=bin_by_bin_data
-        _obj_dict['plot_data'] = plot_data
-        _obj = cls(**_obj_dict)
-        _obj.plot_data.pf1D_decoder_template_objects = pf1D_decoder_template_objects
-        _obj.ui.win = win
-        _obj.params.on_update_fcn = None
-        return _obj 
-
-
-
     @function_attributes(short_name=None, tags=['USEFUL', 'unused', 'debug', 'visualizztion', 'SpikeRasterWindow'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-05-14 14:01', related_items=[])
     @classmethod
     def plot_attached_BinByBinDecodingDebugger(cls, spike_raster_window, curr_active_pipeline, a_decoder: BasePositionDecoder, a_decoded_result: Union[DecodedFilterEpochsResult, SingleEpochDecodedResult], n_max_debugged_time_bins:int=25, name_suffix: str = 'unknoown'):
