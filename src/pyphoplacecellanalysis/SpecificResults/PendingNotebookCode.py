@@ -117,11 +117,17 @@ from pyphocorehelpers.gui.Qt.color_helpers import ColormapHelpers, ColorFormatCo
 # ==================================================================================================================================================================================================================================================================================== #
 # 2025-08-26 - Final Correct Context Decoding Stabilities:                                                                                                                                                                                                                             #
 # ==================================================================================================================================================================================================================================================================================== #
-def determine_percent_correctly_decoded_contexts(curr_active_pipeline):
+@function_attributes(short_name=None, tags=['decoding', 'performance'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-08-26 17:59', related_items=[])
+def determine_percent_correctly_decoded_contexts(curr_active_pipeline, time_bin_size: float=0.060) -> pd.DataFrame:
     """ 
+    from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import determine_percent_correctly_decoded_contexts
+    ## find the number of correctly decoded components:
+    records_df: pd.DataFrame = determine_percent_correctly_decoded_contexts(curr_active_pipeline, time_bin_size=time_bin_size)
+    records_df
     
     """
     from pyphocorehelpers.assertion_helpers import Assert
+    from pyphoplacecellanalysis.SpecificResults.AcrossSessionResults import AcrossSessionIdentityDataframeAccessor
 
     def _subfn_determine_num_correctly_decoded_time_bins(a_decoded_marginal_posterior_df):
         """find the number of correctly decoded components:
@@ -165,39 +171,37 @@ def determine_percent_correctly_decoded_contexts(curr_active_pipeline):
 
     # common_constraint_dict = dict(trained_compute_epochs='laps', pfND_ndim=1, time_bin_size=0.025, masked_time_bin_fill_type='ignore')
     # common_constraint_dict = dict(trained_compute_epochs='laps', time_bin_size=0.060, masked_time_bin_fill_type='nan_filled') # , pfND_ndim=1
-    common_constraint_dict = dict(trained_compute_epochs='laps', time_bin_size=0.060, masked_time_bin_fill_type='dropped')
+    common_constraint_dict = dict(trained_compute_epochs='laps', time_bin_size=time_bin_size, masked_time_bin_fill_type='dropped')
 
     _output_dict = {}
     ## Laps context:
-    a_Laps_target_context: IdentifyingContext = IdentifyingContext(known_named_decoding_epochs_type='laps', data_grain='per_time_bin', **common_constraint_dict) ## Laps , data_grain='per_epoch'
-    # best_matching_context, a_result, a_decoder, a_decoded_marginal_posterior_df = a_new_fully_generic_result.get_results_best_matching_context(context_query=a_Laps_target_context)
-    # _output_dict[best_matching_context] = _subfn_determine_num_correctly_decoded_time_bins(a_decoded_marginal_posterior_df=a_decoded_marginal_posterior_df)
-    
-    # ## Global context:
+    a_Laps_target_context: IdentifyingContext = IdentifyingContext(known_named_decoding_epochs_type='laps', data_grain='per_time_bin', **common_constraint_dict)
+    ## Global context:
     a_global_target_context: IdentifyingContext = IdentifyingContext(known_named_decoding_epochs_type='global', data_grain='per_time_bin', **common_constraint_dict)
     ## PBEs context:
     a_PBEs_target_context: IdentifyingContext = IdentifyingContext(known_named_decoding_epochs_type='pbe', **common_constraint_dict, data_grain='per_time_bin') 
     _active_target_context_list = [a_Laps_target_context, a_global_target_context, a_PBEs_target_context]
-    
+    records_df = []
     for a_target_context in _active_target_context_list:
         try:
-            best_matching_context, a_result, a_decoder, a_decoded_marginal_posterior_df = a_new_fully_generic_result.get_results_best_matching_context(context_query=a_target_context)
-            _output_dict[best_matching_context] = _subfn_determine_num_correctly_decoded_time_bins(a_decoded_marginal_posterior_df=a_decoded_marginal_posterior_df)
+            best_matching_context, a_result, a_decoder, a_decoded_marginal_posterior_df = a_new_fully_generic_result.get_results_best_matching_context(context_query=a_target_context, debug_print=False)
+            a_num_counts_tuple  = _subfn_determine_num_correctly_decoded_time_bins(a_decoded_marginal_posterior_df=a_decoded_marginal_posterior_df)
+            _output_dict[best_matching_context] = a_num_counts_tuple
+            worse_percent_correct, (percent_correct_pre, n_correct_pre, n_total_pre), (percent_correct_post, n_correct_post, n_total_post) = a_num_counts_tuple
+            a_record = dict(**best_matching_context.to_dict(), worse_percent_correct=worse_percent_correct, percent_correct_pre=percent_correct_pre, n_correct_pre=n_correct_pre, n_total_pre=n_total_pre,  percent_correct_post=percent_correct_post, n_correct_post=n_correct_post, n_total_post=n_total_post)
+            records_df.append(a_record)            
+
         except TypeError as e:
             print(f'WARN: err: {e} for ctxt: {a_target_context}. Skipping.')
             pass
         except Exception as e:
             raise
-
-    pbes_target_context_results = complete_all_transition_matricies(a_new_fully_generic_result=a_new_fully_generic_result, a_target_context=a_PBEs_target_context)
-    pbes_matched_result_tuple_context_dict, (pbes_time_bin_container_context_dict, pbes_position_transition_matrix_context_dict, pbes_context_state_transition_matrix_context_dict, pbes_combined_transition_matrix_context_dict), (pbes_mean_context_state_transition_matrix_context_dict, pbes_mean_position_transition_matrix_context_dict) = pbes_target_context_results
-    a_pbes_best_matching_context, a_pbes_result, a_pbes_decoder, a_pbes_decoded_marginal_posterior_df = list(pbes_matched_result_tuple_context_dict.values())[0] # [-1] # pbes_matched_result_tuple_context_dict[a_PBEs_target_context]
-
-
-
-    ## OUTPUTS: a_decoded_marginal_posterior_df
+    ## END for a_target_context in ...
     
-    return _output_dict
+    ## build output df:
+    records_df: pd.DataFrame = pd.DataFrame.from_records(records_df)
+    records_df = records_df.across_session_identity.add_session_df_columns_from_pipeline(curr_active_pipeline=curr_active_pipeline, time_bin_size=time_bin_size, time_col=None)
+    return records_df
 
 
 
