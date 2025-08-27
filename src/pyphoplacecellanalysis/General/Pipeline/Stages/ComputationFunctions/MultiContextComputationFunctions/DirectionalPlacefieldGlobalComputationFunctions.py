@@ -2485,6 +2485,8 @@ class DirectionalPseudo2DDecodersResult(ComputedResult):
         
         """
         directional_marginals: List[DynamicContainer] = cls.build_custom_marginal_over_direction(all_directional_laps_filter_epochs_decoder_result)
+        if len(directional_marginals) == 0:
+            raise ValueError(f'No values!')
         
         # gives the likelihood of [LR, RL] for each epoch using information from both Long/Short:
         directional_all_epoch_bins_marginal = np.stack([np.sum(v.p_x_given_n, axis=-1)/np.sum(v.p_x_given_n, axis=(-2, -1)) for v in directional_marginals], axis=0) # sum over all time-bins within the epoch to reach a consensus

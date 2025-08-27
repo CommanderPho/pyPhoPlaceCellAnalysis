@@ -258,17 +258,20 @@ class GenericDecoderDictDecodedEpochsDictResult(ComputedResult):
             self.filter_epochs_to_decode_dict[a_new_identifier] = deepcopy(an_epoch)
             self.filter_epochs_specific_decoded_result[a_new_identifier] = deepcopy(a_general_decoder_dict_decoded_epochs_dict_result.filter_epochs_pseudo2D_continuous_specific_decoded_result[a_known_epoch_name])
             ## Marginal dataframes:
-            for a_known_t_bin_fill_type, a_posterior_df in a_general_decoder_dict_decoded_epochs_dict_result.filter_epochs_decoded_filter_epoch_track_marginal_posterior_df_dict[a_known_epoch_name].items():
-                a_new_joint_identifier = IdentifyingContext(**_shared_context_fragment, known_named_decoding_epochs_type=a_known_epoch_name, masked_time_bin_fill_type=a_known_t_bin_fill_type)
-                if flat_contexts:
-                    self.filter_epochs_to_decode_dict[a_new_joint_identifier] = deepcopy(an_epoch)
-                    self.filter_epochs_specific_decoded_result[a_new_joint_identifier] = deepcopy(a_general_decoder_dict_decoded_epochs_dict_result.filter_epochs_pseudo2D_continuous_specific_decoded_result[a_known_epoch_name])
-                    ## #TODO 2025-03-21 09:19: - [ ] unused contexts now in 
-                    # del self.filter_epochs_to_decode_dict[a_new_identifier]
-                    # del self.filter_epochs_specific_decoded_result[a_new_identifier]
-                    
-                self.filter_epochs_decoded_track_marginal_posterior_df_dict[a_new_joint_identifier] = deepcopy(a_posterior_df)
-
+            if a_known_epoch_name in a_general_decoder_dict_decoded_epochs_dict_result.filter_epochs_decoded_filter_epoch_track_marginal_posterior_df_dict:
+                for a_known_t_bin_fill_type, a_posterior_df in a_general_decoder_dict_decoded_epochs_dict_result.filter_epochs_decoded_filter_epoch_track_marginal_posterior_df_dict[a_known_epoch_name].items():
+                    a_new_joint_identifier = IdentifyingContext(**_shared_context_fragment, known_named_decoding_epochs_type=a_known_epoch_name, masked_time_bin_fill_type=a_known_t_bin_fill_type)
+                    if flat_contexts:
+                        self.filter_epochs_to_decode_dict[a_new_joint_identifier] = deepcopy(an_epoch)
+                        self.filter_epochs_specific_decoded_result[a_new_joint_identifier] = deepcopy(a_general_decoder_dict_decoded_epochs_dict_result.filter_epochs_pseudo2D_continuous_specific_decoded_result[a_known_epoch_name])
+                        ## #TODO 2025-03-21 09:19: - [ ] unused contexts now in 
+                        # del self.filter_epochs_to_decode_dict[a_new_identifier]
+                        # del self.filter_epochs_specific_decoded_result[a_new_identifier]
+                        
+                    self.filter_epochs_decoded_track_marginal_posterior_df_dict[a_new_joint_identifier] = deepcopy(a_posterior_df)
+                ## END for a_known_t_bin_fill_type, a_posterior_df in a_general_...
+                
+        ## END for a_known_epoch_name, an_epoch in a_general_decoder_dict_dec...
         return self
     
 
@@ -1214,7 +1217,6 @@ class GenericDecoderDictDecodedEpochsDictResult(ComputedResult):
         a_new_fully_generic_result = a_new_fully_generic_result.computing_for_global_epoch(curr_active_pipeline=curr_active_pipeline, debug_print=debug_print)       
 
 
-
         # ==================================================================================================================== #
         # Phase 2.55 - Add non-PBE decoders to the .decoders dict                                                              #
         # ==================================================================================================================== #
@@ -1263,21 +1265,28 @@ class GenericDecoderDictDecodedEpochsDictResult(ComputedResult):
             masked_contexts_dict = {}
 
             for a_base_context in base_contexts_list:
-
                 a_best_matching_context, a_result, a_decoder, a_decoded_marginal_posterior_df = a_new_fully_generic_result.get_results_matching_contexts(a_base_context, return_multiple_matches=False)
-                ## `a_decoder` is None for some reason?`
-                ## INPUTS: a_result, masked_bin_fill_mode
-                a_masked_updated_context: IdentifyingContext = deepcopy(a_best_matching_context).overwriting_context(masked_time_bin_fill_type=a_masked_bin_fill_mode, data_grain='per_time_bin')
-                masked_contexts_dict[a_base_context] = a_masked_updated_context
-                if debug_print:
-                    print(f'a_masked_updated_context: {a_masked_updated_context}')
-                
-                ## MASKED with NaNs (no backfill):
-                a_dropping_masked_pseudo2D_continuous_specific_decoded_result, _dropping_mask_index_tuple = a_result.mask_computed_DecodedFilterEpochsResult_by_required_spike_counts_per_time_bin(spikes_df=deepcopy(spikes_df), masked_bin_fill_mode=a_masked_bin_fill_mode) ## Masks the low-firing bins so they don't confound the analysis.
-                ## Computes marginals for `dropping_masked_laps_pseudo2D_continuous_specific_decoded_result`
-                a_dropping_masked_decoded_marginal_posterior_df = DirectionalPseudo2DDecodersResult.perform_compute_specific_marginals(a_result=a_dropping_masked_pseudo2D_continuous_specific_decoded_result, marginal_context=a_masked_updated_context)
-                a_new_fully_generic_result.updating_results_for_context(new_context=a_masked_updated_context, a_result=deepcopy(a_dropping_masked_pseudo2D_continuous_specific_decoded_result), a_decoder=deepcopy(a_decoder), a_decoded_marginal_posterior_df=deepcopy(a_dropping_masked_decoded_marginal_posterior_df)) ## update using the result
-                
+                if (a_best_matching_context is not None) and (a_result is not None):
+                    ## `a_decoder` is None for some reason?`
+                    ## INPUTS: a_result, masked_bin_fill_mode
+                    a_masked_updated_context: IdentifyingContext = deepcopy(a_best_matching_context).overwriting_context(masked_time_bin_fill_type=a_masked_bin_fill_mode, data_grain='per_time_bin')
+                    masked_contexts_dict[a_base_context] = a_masked_updated_context
+                    if debug_print:
+                        print(f'a_masked_updated_context: {a_masked_updated_context}')
+                    
+                    if (a_result is not None) and (a_result.num_filter_epochs > 0):
+                        ## MASKED with NaNs (no backfill):
+                        a_dropping_masked_pseudo2D_continuous_specific_decoded_result, _dropping_mask_index_tuple = a_result.mask_computed_DecodedFilterEpochsResult_by_required_spike_counts_per_time_bin(spikes_df=deepcopy(spikes_df), masked_bin_fill_mode=a_masked_bin_fill_mode) ## Masks the low-firing bins so they don't confound the analysis.
+                        ## Computes marginals for `dropping_masked_laps_pseudo2D_continuous_specific_decoded_result`
+                        if (a_dropping_masked_pseudo2D_continuous_specific_decoded_result is not None) and (a_dropping_masked_pseudo2D_continuous_specific_decoded_result.num_filter_epochs > 0):
+                            try:
+                                a_dropping_masked_decoded_marginal_posterior_df = DirectionalPseudo2DDecodersResult.perform_compute_specific_marginals(a_result=a_dropping_masked_pseudo2D_continuous_specific_decoded_result, marginal_context=a_masked_updated_context)
+                                a_new_fully_generic_result.updating_results_for_context(new_context=a_masked_updated_context, a_result=deepcopy(a_dropping_masked_pseudo2D_continuous_specific_decoded_result), a_decoder=deepcopy(a_decoder), a_decoded_marginal_posterior_df=deepcopy(a_dropping_masked_decoded_marginal_posterior_df)) ## update using the result
+                            except ValueError as e:
+                                print(f'\t\tWARN: for a_base_context: {a_base_context} encountered error e: {e}')
+                            except Exception as e:
+                                raise
+
             ## OUTPUTS: masked_contexts_dict
 
             
