@@ -1878,7 +1878,7 @@ class GenericDecoderDictDecodedEpochsDictResult(ComputedResult):
     @classmethod
     def _perform_export_dfs_dict_to_csvs(cls, extracted_dfs_dict: Dict[IdentifyingContext, pd.DataFrame], parent_output_path: Path, active_context: IdentifyingContext, session_name: str, tbin_values_dict: Dict[str, float],
                                     t_start: Optional[float]=None, curr_session_t_delta: Optional[float]=None, t_end: Optional[float]=None,
-                                    user_annotation_selections=None, valid_epochs_selections=None, custom_export_df_to_csv_fn=None, use_single_FAT_df: bool=True, allow_missing_time_columns:bool=False):
+                                    user_annotation_selections=None, valid_epochs_selections=None, custom_export_df_to_csv_fn=None, use_single_FAT_df: bool=True, an_override_df_identifier:Optional[str]=None, allow_missing_time_columns:bool=False):
         """ Classmethod: export as separate .csv files. 
 
         from pyphoplacecellanalysis.SpecificResults.AcrossSessionResults import SingleFatDataframe
@@ -1945,7 +1945,7 @@ class GenericDecoderDictDecodedEpochsDictResult(ComputedResult):
         from pyphocorehelpers.assertion_helpers import Assert
 
         assert parent_output_path.exists(), f"'{parent_output_path}' does not exist!"
-        output_date_str: str = get_now_rounded_time_str(rounded_minutes=10)
+        # output_date_str: str = get_now_rounded_time_str(rounded_minutes=10)
         
         # active_context.custom_suffix = '_withNormalComputedReplays-qclu_[1, 2, 4, 6, 7, 9]-frateThresh_1.0' # '_withNormalComputedReplays-qclu_[1, 2, 4, 6, 7, 9]-frateThresh_1.0normal_computed-frateThresh_1.0-qclu_[1, 2, 4, 6, 7, 9]'
         
@@ -1988,20 +1988,33 @@ class GenericDecoderDictDecodedEpochsDictResult(ComputedResult):
         #         return out_path     
         #     custom_export_df_to_csv_fn = _subfn_export_df_to_csv
 
-        def _subfn_pre_process_and_export_df(export_df: pd.DataFrame, a_df_identifier: Union[str, IdentifyingContext]):
+        def _subfn_pre_process_and_export_df(export_df: pd.DataFrame, a_df_identifier: Union[str, IdentifyingContext], was_override: bool=True):
             """ sets up all the important metadata and then calls `custom_export_df_to_csv_fn(....)` to actually export the CSV
             
             captures: t_start, t_delta, t_end, tbin_values_dict, time_col_name_dict, user_annotation_selections, valid_epochs_selections, custom_export_df_to_csv_fn
             """
+
             if isinstance(a_df_identifier, str):
                 an_epochs_source_name: str = a_df_identifier.split(sep='_', maxsplit=1)[0] # get the first part of the variable names that indicates whether it's for "laps" or "ripple"
             else:
                 ## probably an IdentifyingContext
                 an_epochs_source_name: str = a_df_identifier.known_named_decoding_epochs_type
 
-            a_tbin_size: float = float(tbin_values_dict[an_epochs_source_name])
-            a_time_col_name: str = time_col_name_dict.get(an_epochs_source_name, 't_bin_center')
-            
+
+            if was_override:
+                a_tbin_size: float = tbin_values_dict.get(a_df_identifier, None)
+                if a_tbin_size is None:
+                    a_tbin_size: float = tbin_values_dict.get(an_epochs_source_name, None)
+                a_time_col_name: str = time_col_name_dict.get(a_df_identifier, None)
+                if a_time_col_name is None:
+                    a_time_col_name: str = time_col_name_dict.get(an_epochs_source_name, 't_bin_center')
+            else:
+                a_tbin_size: float = tbin_values_dict.get(an_epochs_source_name, None)
+                a_time_col_name: str = time_col_name_dict.get(an_epochs_source_name, 't_bin_center')
+
+            if a_tbin_size is not None:
+                a_tbin_size = float(a_tbin_size)
+
             ## Add t_bin column method
             export_df = export_df.across_session_identity.add_session_df_columns(session_name=session_name, time_bin_size=a_tbin_size, t_start=t_start, curr_session_t_delta=curr_session_t_delta, t_end=t_end, time_col=a_time_col_name) ## #TODO 2025-04-05 18:12: - [ ] what about qclu? FrHz?
             a_tbin_size_str: str = f"{round(a_tbin_size, ndigits=5)}"
@@ -2080,7 +2093,16 @@ class GenericDecoderDictDecodedEpochsDictResult(ComputedResult):
             
         else:
             for a_df_identifier, a_df in extracted_dfs_dict.items():
-                export_files_dict[a_df_identifier] =  _subfn_pre_process_and_export_df(export_df=a_df, a_df_identifier=a_df_identifier) ## I bet `a_df_identifier` is an IdentifyingContext here, but a string in the above FAT case.
+                was_override = False
+                if an_override_df_identifier is not None:
+                    an_active_df_identifier = an_override_df_identifier ## use the override
+                    was_override = True
+                    # export_files_dict[an_override_df_identifier] =  _subfn_pre_process_and_export_df(export_df=a_df, a_df_identifier=an_active_df_identifier, was_override=was_override)
+                else:
+                    an_active_df_identifier = a_df_identifier
+                    # export_files_dict[a_df_identifier] =  _subfn_pre_process_and_export_df(export_df=a_df, a_df_identifier=an_active_df_identifier, was_override=was_override)
+                    
+                export_files_dict[an_active_df_identifier] =  _subfn_pre_process_and_export_df(export_df=a_df, a_df_identifier=an_active_df_identifier, was_override=was_override) ## I bet `a_df_identifier` is an IdentifyingContext here, but a string in the above FAT case.
             # end for a_df_name, a_df
         # END if use_single_FAT_df
         
@@ -2133,7 +2155,7 @@ class GenericDecoderDictDecodedEpochsDictResult(ComputedResult):
         export_files_dict = {}
         
         if tbin_values_dict is None:
-            tbin_values_dict = {'laps': decoding_time_bin_size, 'pbe': decoding_time_bin_size, 'non_pbe': decoding_time_bin_size, 'FAT': decoding_time_bin_size}
+            tbin_values_dict = {'laps': decoding_time_bin_size, 'pbe': decoding_time_bin_size, 'non_pbe': decoding_time_bin_size, 'FAT': decoding_time_bin_size, 'perfmnc_session': decoding_time_bin_size}
 
         ## to restrict to specific variables
         # _df_variables_names = ['laps_weighted_corr_merged_df', 'ripple_weighted_corr_merged_df', 'laps_simple_pf_pearson_merged_df', 'ripple_simple_pf_pearson_merged_df']
@@ -2166,10 +2188,10 @@ class GenericDecoderDictDecodedEpochsDictResult(ComputedResult):
                 ## find the number of correctly decoded components:
                 # session_correct_decoded_time_bin_performance_df: pd.DataFrame = determine_percent_correctly_decoded_contexts(curr_active_pipeline, time_bin_size=decoding_time_bin_size)
                 session_correct_decoded_time_bin_performance_df: pd.DataFrame = self.determine_percent_correctly_decoded_contexts(curr_active_pipeline=None, time_bin_size=decoding_time_bin_size)
-                export_df_dict = {IdentifyingContext(fn_name='session_correct_decoded_time_bin_performance_df'): session_correct_decoded_time_bin_performance_df}
+                export_df_dict = {IdentifyingContext(fn_name='session_correct_decoded_time_bin_performance_df', known_named_decoding_epochs_type='perfmnc_session'): session_correct_decoded_time_bin_performance_df}
                 export_files_dict = export_files_dict | self._perform_export_dfs_dict_to_csvs(extracted_dfs_dict=export_df_dict, parent_output_path=parent_output_path, tbin_values_dict=tbin_values_dict,
                                                                                               active_context=active_context, session_name=session_name, curr_session_t_delta=curr_session_t_delta, user_annotation_selections=None, valid_epochs_selections=None, custom_export_df_to_csv_fn=custom_export_df_to_csv_fn,
-                                                                                          use_single_FAT_df=False,
+                                                                                          use_single_FAT_df=False, an_override_df_identifier='perfmnc_session',
                                                                                           allow_missing_time_columns=True)
             except Exception as e:
                 print(f'\tshould_export_session_correct_decoded_time_bin_performance_df exporting failed withe error: {e}')
