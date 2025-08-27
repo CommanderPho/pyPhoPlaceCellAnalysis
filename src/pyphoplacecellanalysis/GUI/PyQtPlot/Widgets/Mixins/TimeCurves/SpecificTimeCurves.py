@@ -10,6 +10,8 @@ import pandas as pd
 from sklearn.preprocessing import MinMaxScaler
 from pyphocorehelpers.programming_helpers import metadata_attributes
 from pyphocorehelpers.function_helpers import function_attributes
+from neuropy.utils.mixins.time_slicing import TimeColumnAliasesProtocol
+from pyphocorehelpers.assertion_helpers import Assert
 from pyphoplacecellanalysis.General.Model.RenderDataseries import RenderDataseries
 from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.Mixins.TimeCurves.RenderTimeCurvesMixin import CurveDatasource
 
@@ -350,6 +352,13 @@ class ThetaPhaseRenderTimeCurves(BasePositionDataframeRenderTimeCurves):
         z_scaler = MinMaxScaler()
         transformed_df = plot_df[['t_rel_seconds','theta_phase_radians']].copy()
         transformed_df[['theta_phase_radians']] = z_scaler.fit_transform(transformed_df[['theta_phase_radians']]) # scale speed position separately
+        if 't' not in transformed_df.columns:
+            Assert.require_columns(transformed_df, required_columns=['t_rel_seconds'])
+            transformed_df['t'] = deepcopy(transformed_df['t_rel_seconds'])
+            
+        Assert.require_columns(transformed_df, required_columns=['t'])    
+        # transformed_df = TimeColumnAliasesProtocol.renaming_synonym_columns_if_needed(transformed_df, required_columns_synonym_dict={"t":{'t_rel_seconds'}}) # @IgnoreException 
+        
         return transformed_df
 
 
@@ -378,14 +387,22 @@ class ThetaPhaseRenderTimeCurves(BasePositionDataframeRenderTimeCurves):
         """
         ## firing statistics to bins instead of boolean masking by those meeting criteria
         spikes_df: pd.DataFrame = deepcopy(curr_sess.spikes_df)
-        assert 'theta_phase_radians' in spikes_df.columns, f'theta_phase_radians column is missing. columns: {list(spikes_df.columns)}'
+        # assert 'theta_phase_radians' in spikes_df.columns, f'theta_phase_radians column is missing. columns: {list(spikes_df.columns)}'
+        Assert.require_columns(spikes_df, required_columns=['theta_phase_radians'])   
         # theta_phase_radians = spikes_df['theta_phase_radians'].to_numpy()
         # spikes_df['t_rel_seconds'].to_numpy(), spikes_df['theta_phase_radians'].to_numpy()
 
         # plot_df = curr_sess.position.to_dataframe()
         plot_df = deepcopy(spikes_df)
-        plot_df['t'] = plot_df['t_rel_seconds']
+        # plot_df['t'] = plot_df['t_rel_seconds']
+        if 't' not in plot_df.columns:
+            Assert.require_columns(plot_df, required_columns=['t_rel_seconds'])
+            plot_df['t'] = deepcopy(plot_df['t_rel_seconds'])        
+        Assert.require_columns(plot_df, required_columns=['t'])
+
         data_series_pre_spatial_to_spatial_mappings = cls.build_pre_spatial_to_spatial_mappings(destination_plot)
+        # assert 't' in plot_df.columns, f"'t' is missing from plot_df.columns: {list(plot_df.columns)}"
+        Assert.require_columns(plot_df, required_columns=['t'])
         active_plot_curve_datasource = cls.build_render_time_curves_datasource(plot_df, data_series_pre_spatial_to_spatial_mappings)
         destination_plot.add_3D_time_curves(curve_datasource=active_plot_curve_datasource) # Add the curves from the datasource
         return active_plot_curve_datasource
