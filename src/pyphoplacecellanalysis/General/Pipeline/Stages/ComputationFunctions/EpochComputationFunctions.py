@@ -2315,7 +2315,10 @@ class EpochComputationDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Di
 
             # Shared active_decoder, global_session:
             global_session = deepcopy(owning_pipeline_reference.filtered_sessions[global_epoch_name]) # used for validate_lap_dir_estimations(...) 
+            t_start, t_delta, t_end = owning_pipeline_reference.find_LongShortDelta_times()
 
+            # _line_kwargs = dict(zorder=-1000)
+            _line_kwargs = dict()
 
             active_context = kwargs.pop('active_context', owning_pipeline_reference.sess.get_context())
             if active_context is not None:
@@ -2396,6 +2399,9 @@ class EpochComputationDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Di
                     
                     an_ax = ax_dict["ax_top"]
                     fig, out_axes_list = plot_laps_2d(global_session, legacy_plotting_mode=False, include_velocity=False, include_accel=False, axes_list=[an_ax], **kwargs)
+                    ## Add delta line
+                    print(f't_delta: {t_delta}')
+                    delta_line_artist = an_ax.axvline(x=t_delta, color='black', linestyle='-', linewidth=4, **_line_kwargs)  # Vertical line at x = t_delta
                     _subfn_clean_axes_decorations(an_ax=ax_dict["ax_top"])
                     # an_ax.set_xlabel('')
 
