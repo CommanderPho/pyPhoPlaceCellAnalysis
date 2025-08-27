@@ -1,4 +1,5 @@
 from copy import deepcopy
+from datetime import time
 import shutil
 from typing import Dict, List, Tuple, Optional, Callable, Union, Any
 from neuropy.analyses import Epoch
@@ -3744,6 +3745,9 @@ def figures_plot_generalized_decode_epochs_dict_and_export_results_completion_fu
             from pyphoplacecellanalysis.General.Mixins.ExportHelpers import FigureToImageHelpers
             from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.SpikeRasterWidgets.spike_raster_widgets import _setup_spike_raster_window_for_debugging
             from PyQt5.QtCore import QTimer
+            import time
+            
+            app = pg.mkQApp('render_export_all_time_tracks')
             
             # For PlotWidget
             pg.setConfigOptions(useOpenGL=True)
@@ -3770,7 +3774,8 @@ def figures_plot_generalized_decode_epochs_dict_and_export_results_completion_fu
 
             # Run after a 0.5 second delay
             def _perform_output_figure_delayed():
-                ## #TODO 2025-08-22 10:25: - [ ] Output to correct path (see above):            
+                ## #TODO 2025-08-22 10:25: - [ ] Output to correct path (see above):
+                print(f'\t_perform_output_figure_delayed() running inside timer!')     
                 if custom_fig_man is not None:
                     print(f'custom_fig_man is not None! Custom output path will be used!')
                     test_display_output_path = custom_fig_man.get_figure_save_file_path(display_context, make_folder_if_needed=False)
@@ -3783,29 +3788,40 @@ def figures_plot_generalized_decode_epochs_dict_and_export_results_completion_fu
 
                 ## INPUTS: im_posterior_x_stack, track_labels, 
                 output_pdf_path: Path = test_display_output_path.with_suffix('.pdf') # relative_data_output_parent_folder.joinpath('all_timeline_tracks_exported_stack.pdf')
-                print(f'\t\toutput_pdf_path: "{output_pdf_path}"')
+                print(f'\t\t_render_export_all_time_tracks: output_pdf_path: "{output_pdf_path}"')
                 ## Export the wrapped tracks:
                 included_track_dock_identifiers = additional_marginal_overlaying_measured_position_kwargs.pop('included_track_dock_identifiers', None)
                 track_labels = additional_marginal_overlaying_measured_position_kwargs.pop('track_labels', None)
                 saved_output_pdf_path = FigureToImageHelpers.export_wrapped_tracks_to_paged_df(active_2d_plot, output_pdf_path=output_pdf_path, included_track_dock_identifiers=included_track_dock_identifiers, track_labels=track_labels, debug_max_num_pages=25)
-                print(f'\t\tsaved_output_pdf_path: "{saved_output_pdf_path}"')
+                print(f'\t\t_render_export_all_time_tracks: saved_output_pdf_path: "{saved_output_pdf_path}"')
                 across_session_results_extended_dict['figures_plot_generalized_decode_epochs_dict_and_export_results_completion_function'].update({
                     '_render_export_all_time_tracks': {'fig_save_path': saved_output_pdf_path},
                 })
-
+                print(f'\t_render_export_all_time_tracks: _perform_output_figure_delayed() inside timer -- DONE.')     
 
             across_session_results_extended_dict['figures_plot_generalized_decode_epochs_dict_and_export_results_completion_function'].update({
                 '_render_export_all_time_tracks': {'fig_save_path': None},
             })
-            QTimer.singleShot(800, _perform_output_figure_delayed)
+            
+            print(f'_render_export_all_time_tracks: WAITING to call `_perform_output_figure_delayed`...')
+            # QTimer.singleShot(1800, _perform_output_figure_delayed) # 1.8 sec
 
+            print(f"_render_export_all_time_tracks: I got the QApplication: {app}")
 
+            ## the above `_setup_spike_raster_window_for_debugging` does some rendering asynchronously, so I need to wait until all of that is finished before moving foward and rendering to output...
+            num_process_wait_cycles: int = 20
+            for i in range(num_process_wait_cycles):
+                print(f'\t\t_render_export_all_time_tracks: process wait loop[{i}/{num_process_wait_cycles}]')
+                app.processEvents()
+                time.sleep(0.05)  # 50ms per pass
+
+            print(f'_render_export_all_time_tracks: Calling "_perform_output_figure_delayed" after delay')
+            _perform_output_figure_delayed()
+            print(f'\t\t_render_export_all_time_tracks: done.')
             ## INPUT: `_out` -- _a_trial_by_trial_window
 
             # export_all_time_tracks_save_path = Path('data').joinpath('export_all_time_tracks.svg').resolve()
             # export_pyqtgraph_plot(_out['_render_export_all_time_tracks'].plots['root_render_widget'], savepath=export_all_time_tracks_save_path) # works
-
-            
 
         except Exception as e:
             print(f'\tfigures_plot_generalized_decode_epochs_dict_and_export_results_completion_function(...): "_render_export_all_time_tracks" failed with error: {e}\n skipping.')

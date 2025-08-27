@@ -146,9 +146,7 @@ def determine_percent_correctly_decoded_contexts(curr_active_pipeline, time_bin_
         n_correct_pre: int = np.sum(is_correct_pre_delta)
         n_total_pre: int = len(_split_df['pre-delta'])
         percent_correct_pre: float = float(n_correct_pre)/float(n_total_pre)
-        percent_correct_pre
-
-
+        
         n_correct_post: int = np.sum(is_correct_post_delta)
         n_total_post: int = len(_split_df['post-delta'])
         percent_correct_post: float = float(n_correct_post)/float(n_total_post)
