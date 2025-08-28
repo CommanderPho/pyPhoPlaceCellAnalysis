@@ -3729,7 +3729,7 @@ class OldFileArchiver:
 class AcrossSessionsVisualizations:
     """ 
 
-    
+    from pyphoplacecellanalysis.SpecificResults.AcrossSessionResults import AcrossSessionsVisualizations
     publication_figures_output_parent_folder = Path('E:/Dropbox (Personal)/Active/Kamran Diba Lab/Pho-Kamran-Meetings/2025-06-06 - EXPORTS FOR PUBLICATION') # 'Figure 1 - Overview'
         
     """
@@ -4028,7 +4028,70 @@ class AcrossSessionsVisualizations:
         graphics_output_dict = MatplotlibRenderPlots(name='across_sessions_long_and_short_firing_rate_replays_v_laps', figures=(fig_L, fig_S), axes=(ax_L, ax_S), context=(active_display_context_L, active_display_context_S), plot_data={'context': (active_display_context_L, active_display_context_S)}, saved_figures=active_out_figure_paths)
 
         return graphics_output_dict
+    
 
+    @function_attributes(short_name=None, tags=['sanity-check', 'dropped-t-bins'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-08-28 17:11', related_items=[])
+    @classmethod
+    def _sanity_check_dropped_t_bins_per_session(cls, acitve_dropped_df, acitve_ignore_df, should_plot: bool=True):
+        """ checks that the dropped time bins (due to low firing, too few cells, etc) are approximately the same across sessions)
+        
+        Usage:
+
+            from pyphoplacecellanalysis.SpecificResults.AcrossSessionResults import AcrossSessionsVisualizations
+
+            ## INPUTS: acitve_dropped_df, acitve_ignore_df
+            acitve_counts_df, (acitve_ignore_counts_df, acitve_dropped_counts_df) = AcrossSessionsVisualizations._sanity_check_dropped_t_bins_per_session(acitve_dropped_df=acitve_dropped_df, acitve_ignore_df=acitve_ignore_df)
+            acitve_counts_df
+
+        """
+        import matplotlib.pyplot as plt
+
+        def _subfn_plot_portion_over_time(df: pd.DataFrame, count_col_name: str = 'drop_ratio'):
+            # Plot
+            # count_col_name: str = 'n_dropped'
+            df: pd.DataFrame = deepcopy(df).reset_index()
+            
+            curr_title: str = f'Portion of Dropped (bad) Timebins Per Session: {count_col_name}'
+            fig, ax = plt.subplots(figsize=(10,6), num=curr_title, clear=True)
+            for cat in df['pre_post_delta_category'].unique():
+                subset = df[df['pre_post_delta_category'] == cat]
+                ax.bar(subset['session_name'], subset[count_col_name], label=cat, alpha=0.5)
+
+            # ax.set_xticklabels(df['session_name'], rotation=90)
+            ax.set_ylabel(count_col_name)
+            ax.legend()
+            plt.title(curr_title)
+            plt.tight_layout()
+            plt.show()
+            return fig, ax
+
+
+        # ==================================================================================================================================================================================================================================================================================== #
+        # BEGIN FUNCTION BODY                                                                                                                                                                                                                                                                  #
+        # ==================================================================================================================================================================================================================================================================================== #
+        ## INPUTS: acitve_dropped_df, acitve_ignore_df
+        n_total_dropped = len(acitve_dropped_df)
+        n_total_ignored = len(acitve_ignore_df)
+        # n_total_either = n_total_dropped + n_total_dropped
+
+        # Performed 1 aggregation grouped on columns: 'session_name', 'time_bin_size', 'pre_post_delta_category'
+        acitve_ignore_counts_df = acitve_ignore_df.groupby(['session_name', 'time_bin_size', 'pre_post_delta_category']).agg(t_bin_center_count=('t_bin_center', 'count')) # .reset_index()
+
+        # Performed 1 aggregation grouped on columns: 'session_name', 'time_bin_size', 'pre_post_delta_category'
+        acitve_dropped_counts_df = acitve_dropped_df.groupby(['session_name', 'time_bin_size', 'pre_post_delta_category']).agg(t_bin_center_count=('t_bin_center', 'count')) #.reset_index()
+
+        ## OUTPUTS: acitve_ignore_counts_df, acitve_dropped_counts_df
+        acitve_counts_df = (acitve_ignore_counts_df - acitve_dropped_counts_df)
+        acitve_counts_df['total_bins'] = deepcopy(acitve_ignore_counts_df['t_bin_center_count'])
+        acitve_counts_df['drop_ratio'] = acitve_counts_df['t_bin_center_count'].astype(float) / acitve_counts_df['total_bins'].astype(float)
+        acitve_counts_df = acitve_counts_df.rename(columns={'t_bin_center_count':'n_dropped'}, inplace=False).reset_index(['pre_post_delta_category'])
+        acitve_counts_df
+        
+        if should_plot:
+            for a_count_col_name in ['n_dropped', 'drop_ratio']:
+                _out = _subfn_plot_portion_over_time(df=acitve_counts_df, count_col_name=a_count_col_name)
+                
+        return acitve_counts_df, (acitve_ignore_counts_df, acitve_dropped_counts_df)
 
 
 class ExportValueNameCleaner:
@@ -4246,7 +4309,7 @@ class PerfmncMeasures:
         import plotly.express as px
 
         active_df = deepcopy(perfmnc_per_indv_epochs_df).pho.partition_df_dict('time_bin_size')[time_bin_size]
-        fig = px.bar(active_df, x='parent_epoch_id', y='percent_correct', facet_row='session_name')
+        fig = px.bar(active_df, x='parent_epoch_id', y='percent_correct', facet_row='session_name', facet_col='qclu')
         fig = fig.update_layout(
             height=2200,
             xaxis=dict(showgrid=True, showline=True, mirror=True, linewidth=1, linecolor='black'),
