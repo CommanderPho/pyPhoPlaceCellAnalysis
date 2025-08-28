@@ -469,6 +469,11 @@ def plot_stacked_histograms(data_results_df: pd.DataFrame, data_type: str, sessi
 
     """
     from pyphocorehelpers.DataStructure.RenderPlots.MatplotLibRenderPlots import MatplotlibRenderPlots # plot_histogram #TODO 2024-01-02 12:41: - [ ] Is this where the Qt5 Import dependency Pickle complains about is coming from?
+    from pyphocorehelpers.DataStructure.RenderPlots.MatplotLibRenderPlots import FigureCollector
+    from pyphoplacecellanalysis.SpecificResults.PhoDiba2023Paper import PhoPublicationFigureHelper
+    from pyphoplacecellanalysis.SpecificResults.AcrossSessionResults import AcrossSessionsVisualizations
+    from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.ContainerBased.PhoContainerTool import GenericMatplotlibContainer
+
     layout = kwargs.pop('layout', 'none')
     defer_show = kwargs.pop('defer_show', False)
     figsize = kwargs.pop('figsize', (12, 2))
@@ -486,54 +491,85 @@ def plot_stacked_histograms(data_results_df: pd.DataFrame, data_type: str, sessi
 
     a_context = a_context.adding_context_if_missing(title_indicator=title_indicator)
     
-    fig = plt.figure(num=figure_identifier, clear=True, figsize=figsize, layout=layout, **kwargs) # layout="constrained", 
-    fig.suptitle(f'{descriptor_str}')
-    
-    ax_dict = fig.subplot_mosaic(
-        [
-            # ["epochs_pre_delta", ".", "epochs_post_delta"],
-             ["epochs_pre_delta", "epochs_post_delta"],
-        ],
-        sharey=True,
-        gridspec_kw=dict(wspace=0.25, hspace=0.25) # `wspace=0`` is responsible for sticking the pf and the activity axes together with no spacing
-    )
-    
-    histogram_kwargs = dict(orientation="horizontal", bins=25)
-    
-    assert column_name in data_results_df, f"column_name: {column_name} missing from df. {list(data_results_df.columns)}"
-    time_bin_sizes: int = data_results_df['time_bin_size'].unique()
-    if (not np.all(np.isnan(time_bin_sizes))):
-        # if there's at least one non-NaN time_bin_size, drop the NaNs:
-        data_results_df = data_results_df.dropna(subset=['time_bin_size'], inplace=False)
-        time_bin_sizes = data_results_df['time_bin_size'].unique() # drop the NaN timebin size
 
-    # get the pre-delta epochs
-    pre_delta_df = data_results_df[data_results_df['delta_aligned_start_t'] <= 0]
-    post_delta_df = data_results_df[data_results_df['delta_aligned_start_t'] > 0]
-    
-    # plot pre-delta histogram:
-    for time_bin_size in time_bin_sizes:
-        df_tbs = pre_delta_df[pre_delta_df['time_bin_size']==time_bin_size]
-        df_tbs[column_name].hist(ax=ax_dict['epochs_pre_delta'], alpha=0.5, label=str(time_bin_size), **histogram_kwargs) 
+    display_context = kwargs.pop('display_context', IdentifyingContext(display_fn='plot_stacked_histograms'))
+    display_context = display_context.adding_context_if_missing(**a_context.to_dict())
+
+    # ==================================================================================================================================================================================================================================================================================== #
+    # Plotting                                                                                                                                                                                                                                                                             #
+    # ==================================================================================================================================================================================================================================================================================== #
+    def perform_write_to_file_callback(ctxt, fig):
+        """ captures: Nothing
+        """
+        return (ctxt, AcrossSessionsVisualizations.output_figure(final_context=display_context, fig=fig, write_vector_format=True, write_png=False))
+
+    #TODO 2025-08-28 08:23: - [ ] `perform_write_to_file_callback` never used??
+
+    with mpl.rc_context(PhoPublicationFigureHelper.rc_context_kwargs(prepare_for_publication=True, **{'figure.figsize': figsize, 'figure.dpi': '220',})):
+    # with mpl.rc_context(PhoPublicationFigureHelper.rc_context_kwargs(prepare_for_publication=False, **{})):
+
+        # Create a FigureCollector instance
+        with FigureCollector(name='plot_stacked_histograms', base_context=display_context) as collector:
+            
+            fig = collector.build_or_reuse_figure(fignum=figure_identifier, fig=kwargs.pop('fig', None), fig_idx=kwargs.pop('fig_idx', 0), figsize=figsize, dpi=kwargs.pop('dpi', None), layout=layout, clear=True, **kwargs) 
+            _fig_container: GenericMatplotlibContainer = GenericMatplotlibContainer(name='plot_stacked_histograms')
+            _fig_container.fig = fig
+            fig, ax_dict = collector.subplot_mosaic(
+                [
+                    ["epochs_pre_delta", "epochs_post_delta"],      
+                ],
+                # set the height ratios between the rows
+                sharex=False, sharey=True,
+                gridspec_kw=dict(wspace=0, hspace=0.15), # `wspace=0`` is responsible for sticking the pf and the activity axes together with no spacing
+                extant_fig=fig,
+            ) 
+            _fig_container.ax_dict = ax_dict
+            fig.suptitle(f'{descriptor_str}')
+            
+            histogram_kwargs = dict(orientation="horizontal", bins=25)
+            
+            assert column_name in data_results_df, f"column_name: {column_name} missing from df. {list(data_results_df.columns)}"
+            time_bin_sizes: int = data_results_df['time_bin_size'].unique()
+            if (not np.all(np.isnan(time_bin_sizes))):
+                # if there's at least one non-NaN time_bin_size, drop the NaNs:
+                data_results_df = data_results_df.dropna(subset=['time_bin_size'], inplace=False)
+                time_bin_sizes = data_results_df['time_bin_size'].unique() # drop the NaN timebin size
+
+            # get the pre-delta epochs
+            pre_delta_df = data_results_df[data_results_df['delta_aligned_start_t'] <= 0]
+            post_delta_df = data_results_df[data_results_df['delta_aligned_start_t'] > 0]
+            
+            # plot pre-delta histogram:
+            for time_bin_size in time_bin_sizes:
+                df_tbs = pre_delta_df[pre_delta_df['time_bin_size']==time_bin_size]
+                df_tbs[column_name].hist(ax=ax_dict['epochs_pre_delta'], alpha=0.5, label=str(time_bin_size), **histogram_kwargs) 
 
 
-    ax_dict['epochs_pre_delta'].set_ylabel(f"{column_name}") # only set on the leftmost subplot
-    ax_dict['epochs_pre_delta'].set_title(f'pre-$\Delta$ {title_indicator}')
-    ax_dict['epochs_pre_delta'].legend()
+            ax_dict['epochs_pre_delta'].set_ylabel(f"{column_name}") # only set on the leftmost subplot
+            ax_dict['epochs_pre_delta'].set_title(f'pre-$\Delta$ {title_indicator}')
+            if len(time_bin_sizes) > 1:
+                ax_dict['epochs_pre_delta'].legend()
+            ax_dict['epochs_pre_delta'].spines['top'].set_visible(False)
+            ax_dict['epochs_pre_delta'].spines['right'].set_visible(False)
 
-    # plot post-delta histogram:
-    time_bin_sizes: int = post_delta_df['time_bin_size'].unique()
-    for time_bin_size in time_bin_sizes:
-        df_tbs = post_delta_df[post_delta_df['time_bin_size']==time_bin_size]
-        df_tbs[column_name].hist(ax=ax_dict['epochs_post_delta'], alpha=0.5, label=str(time_bin_size), **histogram_kwargs) 
-    
-    ax_dict['epochs_post_delta'].set_title(f'post-$\Delta$ {title_indicator}')
-    if len(time_bin_sizes) > 1:
-        ax_dict['epochs_post_delta'].legend()
-    
-    if not defer_show:
-        fig.show()
-    return MatplotlibRenderPlots(name='plot_stacked_histograms', figures=[fig], axes=ax_dict, context=a_context)
+            # plot post-delta histogram:
+            time_bin_sizes: int = post_delta_df['time_bin_size'].unique()
+            for time_bin_size in time_bin_sizes:
+                df_tbs = post_delta_df[post_delta_df['time_bin_size']==time_bin_size]
+                df_tbs[column_name].hist(ax=ax_dict['epochs_post_delta'], alpha=0.5, label=str(time_bin_size), **histogram_kwargs) 
+            
+            ax_dict['epochs_post_delta'].set_title(f'post-$\Delta$ {title_indicator}')
+            if len(time_bin_sizes) > 1:
+                ax_dict['epochs_post_delta'].legend()
+            ax_dict['epochs_post_delta'].spines['top'].set_visible(False)
+            ax_dict['epochs_post_delta'].spines['right'].set_visible(False)            
+
+            if not defer_show:
+                fig.show()
+                
+
+
+    return _fig_container # MatplotlibRenderPlots(name='plot_stacked_histograms', figures=[fig], axes=ax_dict, context=a_context)
 
 
 
@@ -604,9 +640,6 @@ def plot_pre_scatter_post_matplotlib(data_results_df: pd.DataFrame, data_type: s
     display_context = kwargs.pop('display_context', IdentifyingContext(display_fn='plot_pre_scatter_post_matplotlib'))
     display_context = display_context.adding_context_if_missing(**a_context.to_dict())
     
-    # display_context = display_context.adding
-
-
     ## Extract kwargs for scatter plot:
     # scatter_kwargs = dict(c='black', s=8) # , alpha=0.5
     scatter_kwargs = kwargs.pop('scatter_kwargs', {}) 
@@ -620,25 +653,13 @@ def plot_pre_scatter_post_matplotlib(data_results_df: pd.DataFrame, data_type: s
         """
         return (ctxt, AcrossSessionsVisualizations.output_figure(final_context=display_context, fig=fig, write_vector_format=True, write_png=False))
 
+    #TODO 2025-08-28 08:23: - [ ] `perform_write_to_file_callback` never used??
 
     with mpl.rc_context(PhoPublicationFigureHelper.rc_context_kwargs(prepare_for_publication=True, **{'figure.figsize': (6.5, 2), 'figure.dpi': '220',})):
     # with mpl.rc_context(PhoPublicationFigureHelper.rc_context_kwargs(prepare_for_publication=False, **{})):
 
         # Create a FigureCollector instance
         with FigureCollector(name='plot_pre_scatter_post_matplotlib', base_context=display_context) as collector:
-
-            # ## Define common operations to do after making the figure:
-            # def setup_common_after_creation(a_collector, fig, axes, sub_context, title=f'<size:22>Track <weight:bold>Remapping</></>'):
-            #     """ Captures:
-
-            #     t_split
-            #     """
-            #     a_collector.contexts.append(sub_context)
-                
-            #     fig.suptitle('Place Cell Remapping (Example Session)')
-                
-            #     if ((perform_write_to_file_callback is not None) and (sub_context is not None)):
-            #         perform_write_to_file_callback(sub_context, fig)
 
             # BEGIN FUNCTION BODY
             
@@ -677,8 +698,6 @@ def plot_pre_scatter_post_matplotlib(data_results_df: pd.DataFrame, data_type: s
                 df_tbs = pre_delta_df[pre_delta_df['time_bin_size']==time_bin_size]
                 df_tbs[column_name].hist(ax=ax_dict['epochs_pre_delta'], alpha=0.5, label=str(time_bin_size), **histogram_kwargs) 
                 
-
-
 
             ax_dict['epochs_pre_delta'].set_ylabel(f"{column_name}") # only set on the leftmost subplot
             ax_dict['epochs_pre_delta'].set_title(f'pre-$\Delta$ {title_indicator}')
