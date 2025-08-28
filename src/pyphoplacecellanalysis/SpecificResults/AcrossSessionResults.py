@@ -4171,6 +4171,105 @@ class ExportValueNameCleaner:
 
 
 
+@metadata_attributes(short_name=None, tags=['perfmnc', 'perfmnc_sesssion', 'specific'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-08-28 08:06', related_items=[])
+class PerfmncMeasures:
+    """ 2025-08-28 - Session-scale lap time bin context-decoding performance (percent of lap time bins that decode to the correct context)
+     
+    Usage:
+
+        from pyphoplacecellanalysis.SpecificResults.AcrossSessionResults import PerfmncMeasures
+        
+        perfmnc_per_session_df, perfmnc_per_indv_epochs_df = PerfmncMeasures.find_and_load_most_recent_parsed_csv_files_df(most_recent_parsed_csv_files_df=most_recent_parsed_csv_files_df)
+        perfmnc_session_df
+
+    """
+    @function_attributes(short_name=None, tags=['perfmnc', 'perfmnc_sesssion'], input_requires=[], output_provides=[], uses=['ExportValueNameCleaner.split_custom_replay_name_col_to_replayMethod_qclu_frateThresh_cols'], used_by=[], creation_date='2025-08-27 00:32', related_items=[])
+    @classmethod
+    def find_and_load_most_recent_parsed_csv_files_df(cls, most_recent_parsed_csv_files_df: pd.DataFrame, debug_print=False, cuttoff_date: Optional[datetime]=None) -> pd.DataFrame:
+        """ 
+        
+        perfmnc_session_df: pd.DataFrame = find_and_load_most_recent_parsed_csv_files_df(most_recent_parsed_csv_files_df=most_recent_parsed_csv_files_df)
+        perfmnc_session_df
+        
+        """
+        from pyphoplacecellanalysis.SpecificResults.AcrossSessionResults import ExportValueNameCleaner
+        
+        ## INPUTS: most_recent_parsed_csv_files_df
+        most_recent_parsed_perfmnc_session_csv_files_df: pd.DataFrame = deepcopy(most_recent_parsed_csv_files_df).pho.constrain_df_cols(file_type='perfmnc_session')
+        if cuttoff_date is not None:
+            most_recent_parsed_perfmnc_session_csv_files_df = most_recent_parsed_perfmnc_session_csv_files_df[most_recent_parsed_perfmnc_session_csv_files_df['export_datetime'] >= cuttoff_date] # , known_named_decoding_epochs_type='pbe'))
+        # Filter rows based on column: 'decoding_time_bin_size_str'
+        # most_recent_parsed_perfmnc_session_csv_files_df = most_recent_parsed_perfmnc_session_csv_files_df[most_recent_parsed_perfmnc_session_csv_files_df['decoding_time_bin_size_str'] == "0.05"] ## NOTE: HARDCODED STRING
+        # most_recent_parsed_perfmnc_session_csv_files_df = most_recent_parsed_perfmnc_session_csv_files_df[most_recent_parsed_perfmnc_session_csv_files_df['known_named_decoding_epochs_type'] == "laps"] # why doesn't this work? `.pho.constrain_df_cols(known_named_decoding_epochs_type='laps')`
+        # Sort by column: 'export_datetime' (descending)
+        most_recent_parsed_perfmnc_session_csv_files_df = most_recent_parsed_perfmnc_session_csv_files_df.sort_values(['export_datetime'], ascending=[False])
+        if debug_print:
+            print(f'================== Most Recent perfmnc_session .csv files:')
+            print(most_recent_parsed_perfmnc_session_csv_files_df)
+
+        ## Add in the `_comparable_custom_replay_name`
+
+        loaded_dfs = []
+        for a_row in most_recent_parsed_perfmnc_session_csv_files_df.itertuples():
+            ## iterate through each row
+            if a_row.path.exists() and a_row.path.is_file():
+                ## load the CSV
+                loaded_df: pd.DataFrame = pd.read_csv(a_row.path)
+                loaded_df['custom_replay_name'] = a_row.custom_replay_name
+                loaded_dfs.append(loaded_df)
+                if debug_print:
+                    print(a_row.path)
+
+
+        perfmnc_session_df: pd.DataFrame = pd.concat(loaded_dfs)
+        drop_column_name = list(perfmnc_session_df.columns)[0]
+        perfmnc_session_df = perfmnc_session_df.drop(columns=drop_column_name).reset_index(drop=True) ## drop first column like 'Unnamed: 0'
+        perfmnc_session_df = perfmnc_session_df.pho.constrain_df_cols(known_named_decoding_epochs_type='laps') ## HARDCODED
+        ## Split custom_replay_name column to separate columns:
+        perfmnc_session_df = ExportValueNameCleaner.split_custom_replay_name_col_to_replayMethod_qclu_frateThresh_cols(perfmnc_session_df)
+
+        ## split on record type:        
+        _out_dfs_dict = perfmnc_session_df.pho.partition_df_dict('record_type')
+        perfmnc_per_indv_epochs_df = _out_dfs_dict['epoch'].drop(columns=['worse_percent_correct', 'percent_correct_pre', 'n_correct_pre', 'n_total_pre', 'percent_correct_post', 'n_correct_post', 'n_total_post'])
+        perfmnc_per_session_df = _out_dfs_dict['all_epochs'].drop(columns=['percent_correct', 'n_correct', 'n_total', 'pre_post_delta_category', 'parent_epoch_id'])
+
+        return (perfmnc_per_session_df, perfmnc_per_indv_epochs_df)	
+    
+
+    @function_attributes(short_name=None, tags=['plotly', 'figure'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-08-28 17:26', related_items=[])
+    @classmethod
+    def plot_per_indiv(cls, perfmnc_per_indv_epochs_df: pd.DataFrame, time_bin_size:float=1.0):
+        """ 
+        
+        """
+        import plotly.io as pio
+        import plotly.express as px
+
+        active_df = deepcopy(perfmnc_per_indv_epochs_df).pho.partition_df_dict('time_bin_size')[time_bin_size]
+        fig = px.bar(active_df, x='parent_epoch_id', y='percent_correct', facet_row='session_name')
+        fig = fig.update_layout(
+            height=2200,
+            xaxis=dict(showgrid=True, showline=True, mirror=True, linewidth=1, linecolor='black'),
+            yaxis=dict(range=[0,1], dtick=0.1, showgrid=True, gridcolor="black",
+                    showline=True, mirror=True, linewidth=1, linecolor='black'),
+            title='Decoder TrackID-Context decoding correctness',
+        )
+        # fig.update_yaxes(matches='y')
+        fig = fig.update_yaxes(range=[0,1], matches='y', dtick=0.1, showgrid=True, gridcolor="black", showline=True, mirror=True, linewidth=1, linecolor='black')
+
+        session_names = np.unique(active_df['session_name'].to_numpy())
+        num_sessions: int = len(session_names)
+        for i in np.arange(num_sessions):
+            # Update y-axis labels for each facet row
+            fig = fig.update_yaxes(title_text=session_names[i], row=(i+1), col=1, title_font=dict(size=14))
+            fig = fig.add_annotation(xref="paper", yref="y"+str(i+1), 
+                            x=-0.05, y=0.5,  # position on left of the row
+                            text=session_names[i],
+                                # showarrow=False, textangle=-90, font=dict(size=16),
+                            )
+
+        return fig
+
 
 class AcrossSessionHelpers:
     """ contains helper methods for loading and using AcrossSession outputs
