@@ -4269,6 +4269,44 @@ class PerfmncMeasures:
                             )
 
         return fig
+    
+
+    @function_attributes(short_name=None, tags=['plotly', 'figure'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-08-28 17:26', related_items=[])
+    @classmethod
+    def plot_per_session(cls, perfmnc_per_session_df: pd.DataFrame, time_bin_size:float=1.0, worst_only=True):
+        """ 
+        
+        """
+        import plotly.io as pio
+        import plotly.express as px
+
+        active_df = deepcopy(perfmnc_per_session_df).pho.partition_df_dict('time_bin_size')[time_bin_size]
+        if worst_only:
+            fig = px.scatter(perfmnc_per_session_df, x='time_bin_size', y='worse_percent_correct', color='session_name', facet_col='qclu')
+        else:
+            fig = px.bar(active_df, x='parent_epoch_id', y='percent_correct', facet_row='session_name')
+            
+        fig = fig.update_layout(
+            height=2200,
+            xaxis=dict(showgrid=True, showline=True, mirror=True, linewidth=1, linecolor='black'),
+            yaxis=dict(range=[0,1], dtick=0.1, showgrid=True, gridcolor="grey", showline=True, mirror=True, linewidth=1, linecolor='black'),
+            title='Decoder TrackID-Context decoding correctness - Worst Per Session',
+        )
+        # fig.update_yaxes(matches='y')
+        # fig = fig.update_yaxes(range=[0,1], matches='y', dtick=0.1, showgrid=True, gridcolor="black", showline=True, mirror=True, linewidth=1, linecolor='black')
+
+        # session_names = np.unique(active_df['session_name'].to_numpy())
+        # num_sessions: int = len(session_names)
+        # for i in np.arange(num_sessions):
+        #     # Update y-axis labels for each facet row
+        #     fig = fig.update_yaxes(title_text=session_names[i], row=(i+1), col=1, title_font=dict(size=14))
+        #     fig = fig.add_annotation(xref="paper", yref="y"+str(i+1), 
+        #                     x=-0.05, y=0.5,  # position on left of the row
+        #                     text=session_names[i],
+        #                         # showarrow=False, textangle=-90, font=dict(size=16),
+        #                     )
+
+        return fig
 
 
 class AcrossSessionHelpers:
