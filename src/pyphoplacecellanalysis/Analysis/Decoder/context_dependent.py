@@ -1771,7 +1771,7 @@ class GenericDecoderDictDecodedEpochsDictResult(ComputedResult):
 
 
     @function_attributes(short_name=None, tags=['decoding', 'performance'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-08-26 17:59', related_items=[])
-    def determine_percent_correctly_decoded_contexts(self, curr_active_pipeline=None, time_bin_size: float=0.060) -> pd.DataFrame:
+    def determine_percent_correctly_decoded_contexts(self, curr_active_pipeline=None, time_bin_size: float=0.060, export_all_laps_mode: bool=True) -> pd.DataFrame:
         """ 
         from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import determine_percent_correctly_decoded_contexts
         ## find the number of correctly decoded components:
@@ -1782,8 +1782,18 @@ class GenericDecoderDictDecodedEpochsDictResult(ComputedResult):
         from pyphocorehelpers.assertion_helpers import Assert
         from pyphoplacecellanalysis.SpecificResults.AcrossSessionResults import AcrossSessionIdentityDataframeAccessor
         
-        def _subfn_determine_num_correctly_decoded_time_bins(a_decoded_marginal_posterior_df):
+
+        def _subfn_count_correct(a_df):
+            n_correct_pre: int = np.sum(a_df['is_groundtruth_correct'])
+            n_total_pre: int = len(a_df)
+            percent_correct_pre: float = float(n_correct_pre)/float(n_total_pre)
+            return dict(percent_correct=percent_correct_pre, n_correct=n_correct_pre, n_total=n_total_pre)
+
+
+        def _subfn_determine_num_correctly_decoded_time_bins(a_decoded_marginal_posterior_df, export_all_laps_mode: bool=True, a_ctxt: IdentifyingContext=None):
             """find the number of correctly decoded components:
+            
+            Captures: curr_active_pipeline, time_bin_size
             
                 worse_percent_correct, (percent_correct_pre, n_correct_pre, n_total_pre), (percent_correct_post, n_correct_post, n_total_post) = _subfn_determine_num_correctly_decoded_time_bins(a_decoded_marginal_posterior_df=a_decoded_marginal_posterior_df)
             """
@@ -1795,20 +1805,46 @@ class GenericDecoderDictDecodedEpochsDictResult(ComputedResult):
             is_correct_pre_delta = _split_df['pre-delta']['is_most_likely_decoder_Long']
             is_correct_post_delta = np.logical_not(_split_df['post-delta']['is_most_likely_decoder_Long'])
 
+            _split_df['pre-delta']['is_groundtruth_correct'] = is_correct_pre_delta
+            _split_df['post-delta']['is_groundtruth_correct'] = is_correct_post_delta
 
             n_correct_pre: int = np.sum(is_correct_pre_delta)
             n_total_pre: int = len(_split_df['pre-delta'])
             percent_correct_pre: float = float(n_correct_pre)/float(n_total_pre)
-            percent_correct_pre
-
-
+            
             n_correct_post: int = np.sum(is_correct_post_delta)
             n_total_post: int = len(_split_df['post-delta'])
             percent_correct_post: float = float(n_correct_post)/float(n_total_post)
             
             worse_percent_correct: float = min(percent_correct_pre, percent_correct_post)
             
-            return worse_percent_correct, (percent_correct_pre, n_correct_pre, n_total_pre), (percent_correct_post, n_correct_post, n_total_post)
+            across_epochs_record = dict(**a_ctxt.to_dict(), worse_percent_correct=worse_percent_correct, percent_correct_pre=percent_correct_pre, n_correct_pre=n_correct_pre, n_total_pre=n_total_pre,  percent_correct_post=percent_correct_post, n_correct_post=n_correct_post, n_total_post=n_total_post) | dict(record_type='all_epochs')
+
+            records_df: pd.DataFrame = pd.DataFrame.from_records([across_epochs_record])
+            if curr_active_pipeline is not None:
+                records_df = records_df.across_session_identity.add_session_df_columns_from_pipeline(curr_active_pipeline=curr_active_pipeline, time_bin_size=time_bin_size, time_col=None)
+            
+            # if export_all_laps_mode:
+            all_epochs_records = []
+            for pre_post_delta, a_df in _split_df.items():
+                
+                epoch_split_df = a_df.pho.partition_df_dict('parent_epoch_id')
+                for an_epoch_id, an_epoch_df in epoch_split_df.items():
+                    ## for each group of epochs, compute the stats
+                    a_record = dict()
+                    if a_ctxt is not None:
+                        a_record = a_record | a_ctxt.to_dict()
+                    a_record = a_record | dict(pre_post_delta_category=pre_post_delta, parent_epoch_id=an_epoch_id) | _subfn_count_correct(a_df=an_epoch_df) | dict(record_type='epoch')
+                    all_epochs_records.append(a_record)
+
+            all_epochs_records_df: pd.DataFrame = pd.DataFrame.from_records(all_epochs_records)
+            if curr_active_pipeline is not None:
+                all_epochs_records_df = all_epochs_records_df.across_session_identity.add_session_df_columns_from_pipeline(curr_active_pipeline=curr_active_pipeline, time_bin_size=time_bin_size, time_col='t_bin_center')
+
+            all_epochs_records_df = pd.concat((all_epochs_records_df, records_df))
+            
+            return all_epochs_records_df
+        
         
         # ==================================================================================================================================================================================================================================================================================== #
         # BEGIN FUNCTION BODY                                                                                                                                                                                                                                                                  #
@@ -1827,11 +1863,12 @@ class GenericDecoderDictDecodedEpochsDictResult(ComputedResult):
         for a_target_context in _active_target_context_list:
             try:
                 best_matching_context, a_result, a_decoder, a_decoded_marginal_posterior_df = self.get_results_best_matching_context(context_query=a_target_context, debug_print=False)
-                a_num_counts_tuple  = _subfn_determine_num_correctly_decoded_time_bins(a_decoded_marginal_posterior_df=a_decoded_marginal_posterior_df)
-                _output_dict[best_matching_context] = a_num_counts_tuple
-                worse_percent_correct, (percent_correct_pre, n_correct_pre, n_total_pre), (percent_correct_post, n_correct_post, n_total_post) = a_num_counts_tuple
-                a_record = dict(**best_matching_context.to_dict(), worse_percent_correct=worse_percent_correct, percent_correct_pre=percent_correct_pre, n_correct_pre=n_correct_pre, n_total_pre=n_total_pre,  percent_correct_post=percent_correct_post, n_correct_post=n_correct_post, n_total_post=n_total_post)
-                records_df.append(a_record)            
+                an_epochs_records_df  = _subfn_determine_num_correctly_decoded_time_bins(a_decoded_marginal_posterior_df=a_decoded_marginal_posterior_df, export_all_laps_mode=export_all_laps_mode, a_ctxt=best_matching_context)
+                _output_dict[best_matching_context] = an_epochs_records_df
+                # worse_percent_correct, (percent_correct_pre, n_correct_pre, n_total_pre), (percent_correct_post, n_correct_post, n_total_post) = a_num_counts_tuple
+                # a_record = dict(**best_matching_context.to_dict(), worse_percent_correct=worse_percent_correct, percent_correct_pre=percent_correct_pre, n_correct_pre=n_correct_pre, n_total_pre=n_total_pre,  percent_correct_post=percent_correct_post, n_correct_post=n_correct_post, n_total_post=n_total_post)
+                # records_df.append(a_record)
+                records_df.append(an_epochs_records_df)           
 
             except TypeError as e:
                 print(f'WARN: err: {e} for ctxt: {a_target_context}. Skipping.')
@@ -1841,9 +1878,10 @@ class GenericDecoderDictDecodedEpochsDictResult(ComputedResult):
         ## END for a_target_context in ...
         
         ## build output df:
-        records_df: pd.DataFrame = pd.DataFrame.from_records(records_df)
-        if curr_active_pipeline is not None:
-            records_df = records_df.across_session_identity.add_session_df_columns_from_pipeline(curr_active_pipeline=curr_active_pipeline, time_bin_size=time_bin_size, time_col=None)
+        # records_df: pd.DataFrame = pd.DataFrame.from_records(records_df)
+        records_df: pd.DataFrame = pd.concat(records_df)
+        # if curr_active_pipeline is not None:
+        #     records_df = records_df.across_session_identity.add_session_df_columns_from_pipeline(curr_active_pipeline=curr_active_pipeline, time_bin_size=time_bin_size, time_col=None)
         return records_df
     
     # ==================================================================================================================== #
