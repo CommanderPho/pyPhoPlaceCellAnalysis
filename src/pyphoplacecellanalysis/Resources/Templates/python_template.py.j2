@@ -192,6 +192,7 @@ force_recompute_override_computation_kwargs_dict = {{force_recompute_override_co
 should_force_reload_all = {{should_force_reload_all|default('False')}}
 should_freeze_pipeline_updates = {{should_freeze_pipeline_updates|default('False')}}
 should_symlink_output_pickles = {{should_symlink_output_pickles|default('False')}}
+fail_on_exception: bool = {{fail_on_exception|default('False')}} # 2025-08-27 - for some reason `fail_on_exception == True` seems to prevent it from hanging artificially with caught exceptions or something.
 
 {% if should_freeze_pipeline_updates %}
 ## No recomputing at all:
@@ -289,7 +290,7 @@ with VizTracer(
                                                     existing_task_logger=curr_task_logger,
                                                     force_reload = result_handler.force_reload_all,
                                                     post_run_callback_fn=result_handler.on_complete_success_execution_session,
-                                                    fail_on_exception=False,
+                                                    fail_on_exception=fail_on_exception,
                                                     saving_mode=result_handler.saving_mode, override_parameters_flat_keypaths_dict=override_parameters_flat_keypaths_dict, **run_specific_batch_kwargs)
 {% else %}
 run_status, run_errors, run_outputs = run_specific_batch(global_data_root_parent_path=Path(r'{{ global_data_root_parent_path }}').resolve(),
@@ -299,7 +300,7 @@ run_status, run_errors, run_outputs = run_specific_batch(global_data_root_parent
                                                 existing_task_logger=curr_task_logger,
                                                 force_reload = result_handler.force_reload_all,
                                                 post_run_callback_fn=result_handler.on_complete_success_execution_session,
-                                                fail_on_exception=False,
+                                                fail_on_exception=fail_on_exception,
                                                 saving_mode=result_handler.saving_mode, override_parameters_flat_keypaths_dict=override_parameters_flat_keypaths_dict, **run_specific_batch_kwargs)
 {% endif %}
 

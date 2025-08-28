@@ -320,7 +320,7 @@ class ProcessingScriptPhases(Enum):
 @function_attributes(short_name=None, tags=['slurm','jobs','files','batch'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-08-09 19:14', related_items=[])
 def generate_batch_single_session_scripts(global_data_root_parent_path, session_batch_basedirs: Dict[IdentifyingContext, Path], included_session_contexts: Optional[List[IdentifyingContext]], output_directory='output/gen_scripts/', use_separate_run_directories:bool=True,
          create_slurm_scripts:bool=False, create_non_slurm_bash_scripts:bool=False, should_create_vscode_workspace:bool=True, should_use_neptune_logging:bool=True, should_use_viztracer_logging:bool=True, should_generate_run_scripts = True, should_generate_figure_scripts = True, should_generate_run_notebooks: bool = False,
-         job_suffix:Optional[str]=None, should_use_file_redirected_output_logging:bool=False, should_use_largemem:bool=False, # , should_create_powershell_scripts:bool=True
+         job_suffix:Optional[str]=None, should_use_file_redirected_output_logging:bool=False, should_use_largemem:bool=False, fail_on_exception: bool = False, # , should_create_powershell_scripts:bool=True
          separate_execute_and_figure_gen_scripts:bool=True, should_perform_figure_generation_to_file:bool=False, force_recompute_override_computations_includelist: Optional[List[str]]=None, force_recompute_override_computation_kwargs_dict: Optional[Dict[str, Dict]]=None, 
          custom_user_completion_function_override_kwargs_dict: Optional[Dict]=None,
         batch_session_completion_handler_kwargs: Optional[Dict]=None, **renderer_script_generation_kwargs) -> BatchScriptsCollection:
@@ -448,6 +448,7 @@ def generate_batch_single_session_scripts(global_data_root_parent_path, session_
                                                     batch_session_completion_handler_kwargs=(batch_session_completion_handler_kwargs or {}),
                                                     custom_user_completion_function_override_kwargs_dict=(custom_user_completion_function_override_kwargs_dict or {}),
                                                     should_use_neptune_logging=should_use_neptune_logging, should_use_viztracer_logging=should_use_viztracer_logging, should_use_file_redirected_output_logging=should_use_file_redirected_output_logging,
+                                                    fail_on_exception=fail_on_exception,
                                                     **(compute_as_needed_script_generation_kwargs | dict(should_perform_figure_generation_to_file=False)))
             # script_file.write(script_content)
             script_file.write(script_content.encode())
