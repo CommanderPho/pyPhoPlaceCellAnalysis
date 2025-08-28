@@ -4119,6 +4119,57 @@ class ExportValueNameCleaner:
             print(new_name_list) # ['', 'withNormalComputedReplays-qclu_[1, 2, 4, 6, 7, 9]-frateThresh_5.0', 'withNormalComputedReplays-qclu_[1, 2]-frateThresh_5.0', 'withNormalComputedReplays-qclu_[1, 2, 4, 6, 7, 9]-frateThresh_1.0']
         return new_name_list
     
+    @function_attributes(short_name=None, tags=['parse'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-08-28 07:53', related_items=[])
+    @classmethod
+    def parse_comparable_custom_replay_name_to_separate_columns(cls, comparable_custom_replay_name: str = 'withNormalComputedReplays-qclu_[1, 2, 4, 6, 7, 8, 9]-frateThresh_2.0',):
+        """ Parses a '_comparable_custom_replay_name' column with strings like 'withNormalComputedReplays-qclu_[1, 2, 4, 6, 7, 8, 9]-frateThresh_2.0' to separate columns
+        
+        Usage:
+            from pyphoplacecellanalysis.SpecificResults.AcrossSessionResults import ExportValueNameCleaner
+            
+            split_dict = cls.parse_comparable_custom_replay_name_to_separate_columns(comparable_custom_replay_name= 'withNormalComputedReplays-qclu_[1, 2, 4, 6, 7, 8, 9]-frateThresh_2.0')
+            split_dict
+
+            
+            {'replayMethod': 'withNormalComputedReplays',
+            'qclu': '[1, 2, 4, 6, 7, 8, 9]',
+            'frateThresh': '2.0'}
+        
+        """
+        replay_name, *split_parts = comparable_custom_replay_name.split('-')
+        split_dict = {'replayMethod': replay_name}
+        for a_part in split_parts:
+            a_key, a_value = a_part.split('_', maxsplit=1)
+            split_dict[a_key] = a_value
+        return split_dict
+
+
+    @function_attributes(short_name=None, tags=['parse', 'split'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-08-28 07:54', related_items=[])
+    @classmethod
+    def split_custom_replay_name_col_to_replayMethod_qclu_frateThresh_cols(cls, df: pd.DataFrame, custom_replay_col: str = 'custom_replay_name') -> pd.DataFrame:
+        """ Split 'session_name' to the individual columns:
+            adds columns ['replayMethod', 'animal', 'exper_name', 'session_name'] based on 'session_name'
+            
+            Usage: 
+                from pyphoplacecellanalysis.SpecificResults.AcrossSessionResults import ExportValueNameCleaner
+
+                perfmnc_session_df = ExportValueNameCleaner.split_custom_replay_name_col_to_replayMethod_qclu_frateThresh_cols(perfmnc_session_df)
+                perfmnc_session_df
+
+        """
+        _added_columns = []
+        if custom_replay_col in df:
+            # df = df.join(
+            #     df[custom_replay_col].map(cls.parse_comparable_custom_replay_name_to_separate_columns).apply(pd.Series)
+            # ).drop(columns=[custom_replay_col]).convert_dtypes()
+            new_cols = df['custom_replay_name'].map(cls.parse_comparable_custom_replay_name_to_separate_columns).apply(pd.Series)
+            new_cols = new_cols[[c for c in new_cols.columns if c not in df.columns]]
+            df = df.join(new_cols).drop(columns=['custom_replay_name']).convert_dtypes()
+
+        return df
+    
+
+
 
 
 class AcrossSessionHelpers:
