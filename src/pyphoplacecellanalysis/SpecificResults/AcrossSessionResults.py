@@ -4301,15 +4301,17 @@ class PerfmncMeasures:
 
     @function_attributes(short_name=None, tags=['plotly', 'figure'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-08-28 17:26', related_items=[])
     @classmethod
-    def plot_per_indiv(cls, perfmnc_per_indv_epochs_df: pd.DataFrame, time_bin_size:float=1.0):
+    def plot_per_indiv(cls, perfmnc_per_indv_epochs_df: pd.DataFrame, time_bin_size:float=1.0, qclu='[1, 2, 4, 6, 7, 8, 9]'):
         """ 
         
         """
         import plotly.io as pio
         import plotly.express as px
 
-        active_df = deepcopy(perfmnc_per_indv_epochs_df).pho.partition_df_dict('time_bin_size')[time_bin_size]
-        fig = px.bar(active_df, x='parent_epoch_id', y='percent_correct', facet_row='session_name', facet_col='qclu')
+        active_df = deepcopy(perfmnc_per_indv_epochs_df)
+        active_df = active_df.pho.constrain_df_cols(time_bin_size=time_bin_size, qclu=qclu)
+        
+        fig = px.bar(active_df, x='parent_epoch_id', y='percent_correct', facet_row='session_name') # , facet_col='qclu'
         fig = fig.update_layout(
             height=2200,
             xaxis=dict(showgrid=True, showline=True, mirror=True, linewidth=1, linecolor='black'),
@@ -4346,7 +4348,7 @@ class PerfmncMeasures:
         active_df = deepcopy(perfmnc_per_session_df) #.pho.partition_df_dict('time_bin_size')[time_bin_size]
         active_df = active_df.pho.constrain_df_cols(time_bin_size=time_bin_size, qclu=qclu)
         if worst_only:
-            fig = px.scatter(perfmnc_per_session_df, x='time_bin_size', y='worse_percent_correct', color='session_name', facet_col='qclu')
+            fig = px.scatter(perfmnc_per_session_df, x='time_bin_size', y='worse_percent_correct', color='session_name') # , facet_col='qclu'
         else:
             fig = px.bar(active_df, x='parent_epoch_id', y='percent_correct', facet_row='session_name')
             
