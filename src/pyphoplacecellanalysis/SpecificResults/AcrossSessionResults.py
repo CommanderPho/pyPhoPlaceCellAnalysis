@@ -4297,7 +4297,8 @@ class PerfmncMeasures:
         _out_dfs_dict = perfmnc_session_df.pho.partition_df_dict('record_type')
         perfmnc_per_indv_epochs_df = _out_dfs_dict['epoch'].drop(columns=['worse_percent_correct', 'percent_correct_pre', 'n_correct_pre', 'n_total_pre', 'percent_correct_post', 'n_correct_post', 'n_total_post'])
         perfmnc_per_session_df = _out_dfs_dict['all_epochs'].drop(columns=['percent_correct', 'n_correct', 'n_total', 'pre_post_delta_category', 'parent_epoch_id'])
-
+        perfmnc_per_session_df['percent_correct_diff'] = perfmnc_per_session_df['percent_correct_post'] - perfmnc_per_session_df['percent_correct_pre'] # (-1: always short, 0.0: neutral, +1 always long)
+        
         return (perfmnc_per_session_df, perfmnc_per_indv_epochs_df)	
     
 
