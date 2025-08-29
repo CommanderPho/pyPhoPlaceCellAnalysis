@@ -3788,8 +3788,8 @@ def figures_plot_generalized_decode_epochs_dict_and_export_results_completion_fu
                 output_pdf_path: Path = test_display_output_path.with_suffix('.pdf') # relative_data_output_parent_folder.joinpath('all_timeline_tracks_exported_stack.pdf')
                 print(f'\t\t_render_export_all_time_tracks: output_pdf_path: "{output_pdf_path}"')
                 ## Export the wrapped tracks:
-                included_track_dock_identifiers = additional_marginal_overlaying_measured_position_kwargs.pop('included_track_dock_identifiers', None)
-                track_labels = additional_marginal_overlaying_measured_position_kwargs.pop('track_labels', None)
+                included_track_dock_identifiers: Optional[List[str]] = additional_marginal_overlaying_measured_position_kwargs.pop('included_track_dock_identifiers', None)
+                track_labels: Optional[List[str]] = additional_marginal_overlaying_measured_position_kwargs.pop('track_labels', None)
                 saved_output_pdf_path = FigureToImageHelpers.export_wrapped_tracks_to_paged_df(active_2d_plot, output_pdf_path=output_pdf_path, included_track_dock_identifiers=included_track_dock_identifiers, track_labels=track_labels, debug_max_num_pages=25)
                 print(f'\t\t_render_export_all_time_tracks: saved_output_pdf_path: "{saved_output_pdf_path}"')
                 across_session_results_extended_dict['figures_plot_generalized_decode_epochs_dict_and_export_results_completion_function'].update({
@@ -3830,8 +3830,10 @@ def figures_plot_generalized_decode_epochs_dict_and_export_results_completion_fu
 
         except Exception as e:
             print(f'\tfigures_plot_generalized_decode_epochs_dict_and_export_results_completion_function(...): "_render_export_all_time_tracks" failed with error: {e}\n skipping.')
-            # raise
-            pass
+            if fail_on_exception_for_debugging:
+                raise
+            else:
+                pass
         
 
 
