@@ -3437,6 +3437,7 @@ def generalized_decode_epochs_dict_and_export_results_completion_function(self, 
 def figures_plot_generalized_decode_epochs_dict_and_export_results_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict,
                                                                                         included_figures_names=['_display_directional_merged_pf_decoded_stacked_epoch_slices', '_display_generalized_decoded_yellow_blue_marginal_epochs', '_display_decoded_trackID_marginal_hairy_position', '_display_decoded_trackID_weighted_position_posterior_withMultiColorOverlay', '_display_placefield_stable_formation_time_distribution', '_display_measured_vs_decoded_occupancy_distributions', '_display_trial_to_trial_reliability'],
                                                                                         extreme_threshold: float=0.8, opacity_max:float=0.7, thickness_ramping_multiplier:float=35.0,
+                                                                                        fail_on_exception_for_debugging:bool=False,
                                                                                         **additional_marginal_overlaying_measured_position_kwargs) -> dict:
     """ Multi-purpose batch display function that just plots the figures so we don't have to wait for the entire batch_figures_plotting on 2025-04-16 15:22.
     corresponding to by `generalized_decode_epochs_dict_and_export_results_completion_function` 
@@ -3770,9 +3771,6 @@ def figures_plot_generalized_decode_epochs_dict_and_export_results_completion_fu
             spike_raster_window = _out['spike_raster_window']
             assert spike_raster_window is not None, f"failed to get spike_raster_window after trying to display _display_spike_rasters_window."
 
-            all_global_menus_actionsDict, global_flat_action_dict, _all_outputs_dict = _setup_spike_raster_window_for_debugging(spike_raster_window, wants_docked_raster_window_track=True, enable_interval_overview_track=False, allow_replace_hardcoded_main_plots_with_tracks=True)
-
-            # Run after a 0.5 second delay
             def _perform_output_figure_delayed():
                 ## #TODO 2025-08-22 10:25: - [ ] Output to correct path (see above):
                 print(f'\t_perform_output_figure_delayed() running inside timer!')     
@@ -3799,6 +3797,13 @@ def figures_plot_generalized_decode_epochs_dict_and_export_results_completion_fu
                 })
                 print(f'\t_render_export_all_time_tracks: _perform_output_figure_delayed() inside timer -- DONE.')     
 
+
+            all_global_menus_actionsDict, global_flat_action_dict, _all_outputs_dict = _setup_spike_raster_window_for_debugging(spike_raster_window, wants_docked_raster_window_track=True, enable_interval_overview_track=False, allow_replace_hardcoded_main_plots_with_tracks=True,
+                        additional_post_hoc_fcns = dict(output_figure=_perform_output_figure_delayed),
+            )
+
+            # Run after a 0.5 second delay
+
             across_session_results_extended_dict['figures_plot_generalized_decode_epochs_dict_and_export_results_completion_function'].update({
                 '_render_export_all_time_tracks': {'fig_save_path': None},
             })
@@ -3815,8 +3820,8 @@ def figures_plot_generalized_decode_epochs_dict_and_export_results_completion_fu
                 app.processEvents()
                 time.sleep(0.05)  # 50ms per pass
 
-            print(f'_render_export_all_time_tracks: Calling "_perform_output_figure_delayed" after delay')
-            _perform_output_figure_delayed()
+            # print(f'_render_export_all_time_tracks: Calling "_perform_output_figure_delayed" after delay')
+            # _perform_output_figure_delayed()
             print(f'\t\t_render_export_all_time_tracks: done.')
             ## INPUT: `_out` -- _a_trial_by_trial_window
 
