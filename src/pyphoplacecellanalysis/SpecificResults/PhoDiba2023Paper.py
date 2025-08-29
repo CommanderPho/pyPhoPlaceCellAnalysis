@@ -3309,6 +3309,99 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
         self.active_filter_predicate_selector_widget = CheckBoxListWidget(options_list=new_options_dict) ## create widget
         self.active_filter_predicate_selector_widget.observe(self._on_widget_change, names='value') ## observe changes
 
+    @classmethod
+    def _extract_widget_metadata(cls, a_widget) -> Dict:
+        try:
+            return a_widget.metadata.__dict__['default_args'][0]
+        except Exception as e:
+            raise
+
+
+    @classmethod
+    def _build_pho_constrain_df_code_str_from_filter_widget_constrain_dict(cls, filter_widget_constrain_dict: Dict) -> str:
+        code_str: str = f'df = deepcopy(all_sessions_laps_time_bin_df).pho.constrain_df_cols('
+
+        _kwargs_str: str = ', '.join([f'{k}="{v}"' for k, v in filter_widget_constrain_dict.items()])
+
+        code_str = f'{code_str}{_kwargs_str})'
+        return code_str
+
+
+
+
+
+
+    @function_attributes(short_name=None, tags=['programmatic', 'code-generation', 'constrain_df'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-08-29 08:26', related_items=[])
+    def get_df_filter_active_constraint_dict(self) -> Dict:
+        """ Extracts the filter parameters (which can be passed to `df.pho.constrain(**filter_widget_constrain_dict)`) from the active filter config.
+
+
+        Usage:
+
+            from pyphoplacecellanalysis.SpecificResults.PhoDiba2023Paper import DataFrameFilter
+
+            filter_widget_constrain_dict = df_filter.get_df_filter_active_constraint_dict()
+            filter_widget_constrain_dict
+
+            filtered_df = df.pho.constrain(**filter_widget_constrain_dict)
+            
+
+
+        >> {'trained_compute_epochs': 'laps',
+            'decoder_identifier': 'pseudo2D',
+            'masked_time_bin_fill_type': ('dropped',),
+            'replay_name': 'withNormalComputedReplays-qclu_[1, 2, 4, 6, 7, 8, 9]-frateThresh_2.0',
+            'time_bin_size': (0.06,)}
+
+        """
+        from traitlets import Dict as TraitDict  # Import the Dict traitlet
+
+
+        # all_widgets_list = [
+        #         self.replay_name_widget, 
+        #         self.time_bin_size_widget, 
+        #         self.active_filter_predicate_selector_widget,
+        #         self.active_plot_df_name_selector_widget, 
+        #         self.active_plot_variable_name_widget
+        #     ])
+
+        #TODO 2025-08-29 08:24: - [ ] Hardcoded defn of the df col names to assign metadata to the auto-created widgets (which don't have any):
+        all_widgets_dict = {
+                self.replay_name_widget:{'df_col_name':'custom_replay_name'}, 
+                self.time_bin_size_widget:{'df_col_name':'time_bin_size'}, 
+                # self.active_plot_df_name_selector_widget, 
+                # self.active_plot_variable_name_widget
+        }
+        
+        # self.active_filter_predicate_selector_widget,
+        
+        for a_widget, a_widget_metadata_dict in all_widgets_dict.items():
+            ## add_traits (does work)
+            if (not hasattr(a_widget, 'metadata')) or (a_widget.metadata is None):
+                ## adds the metadata if needed
+                a_widget.metadata = TraitDict(a_widget_metadata_dict) 
+        
+        # [self.replay_name_widget.value, self.time_bin_size_widget.value, self.active_plot_df_name_selector_widget.value, self.active_plot_variable_name_widget.value]
+
+
+        filter_widget_constrain_dict = {self._extract_widget_metadata(a_widget)['df_col_name']:a_widget.value for a_widget in self.custom_dynamic_filter_widgets_list}
+        
+        # for a_widget in all_widgets_list:
+        # for a_widget in all_widgets_list:
+        for a_widget, a_widget_metadata_dict in all_widgets_dict.items():   
+
+            a_widget_metadata = self._extract_widget_metadata(a_widget)
+            filter_widget_constrain_dict[a_widget_metadata['df_col_name']] = a_widget.value 
+            # {'trained_compute_epochs': 'laps',
+            # 'decoder_identifier': 'pseudo2D',
+            # 'masked_time_bin_fill_type': ('nan_filled',)}
+
+        return filter_widget_constrain_dict
+    
+
+
+
+        
 
     def display(self):
         """Displays the widgets."""
