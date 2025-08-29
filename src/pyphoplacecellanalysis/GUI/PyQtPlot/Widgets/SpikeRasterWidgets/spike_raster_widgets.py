@@ -1,6 +1,6 @@
 # .SpikeRasterWidgets
 from copy import deepcopy
-from typing import Optional
+from typing import Dict, List, Tuple, Optional, Callable, Union, Any
 import numpy as np
 from pyphoplacecellanalysis.External.pyqtgraph.Qt import QtCore, QtGui, QtWidgets
 from pyphocorehelpers.gui.Qt.widget_positioning_helpers import WidgetPositioningHelpers
@@ -103,9 +103,8 @@ def _post_hoc_layout_resize(active_2d_plot, desired_static_area_height: Optional
             main_content_splitter.setSizes(desired_sizes.tolist())
 
 
-
 @function_attributes(short_name=None, tags=['2024-12-18', 'ACTIVE', 'gui', 'debugging', 'continuous'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-12-18 19:29', related_items=[])
-def _setup_spike_raster_window_for_debugging(spike_raster_window, wants_docked_raster_window_track:bool=False, enable_interval_overview_track:bool=False, allow_replace_hardcoded_main_plots_with_tracks: bool = False, debug_print=False):
+def _setup_spike_raster_window_for_debugging(spike_raster_window, wants_docked_raster_window_track:bool=False, enable_interval_overview_track:bool=False, allow_replace_hardcoded_main_plots_with_tracks: bool = False, debug_print=False, additional_post_hoc_fcns: Dict[str, Any]=None):
     """ Called to setup a specific `spike_raster_window` instance for 2024-12-18 style debugging.
     
     
@@ -129,6 +128,8 @@ def _setup_spike_raster_window_for_debugging(spike_raster_window, wants_docked_r
 
     is_docked_pyqtgraph_plots_mode: bool = spike_raster_window.params.use_docked_pyqtgraph_plots
 
+    if additional_post_hoc_fcns is None:
+        additional_post_hoc_fcns = {}
 
     _all_outputs_dict = {}
     
@@ -271,14 +272,24 @@ def _setup_spike_raster_window_for_debugging(spike_raster_window, wants_docked_r
 
     ]
     # menu_commands = ['actionPseudo2DDecodedEpochsDockedMatplotlibView', 'actionContinuousPseudo2DDecodedMarginalsDockedMatplotlibView'] # , 'AddTimeIntervals.SessionEpochs'
-    
     # Run after a 0.5 second delay
     from PyQt5.QtCore import QTimer
     def trigger_commands():
+        """ capturees: additional_post_hoc_fcns 
+        """
         for a_command in menu_commands:
             # all_global_menus_actionsDict[a_command].trigger()
             global_flat_action_dict[a_command].trigger()
+
+        for a_fn_name, a_fn in additional_post_hoc_fcns.items():
+            print(f'running post-hoc fn: {a_fn_name}...')
+            try:
+                a_fn()
+            except Exception as e:
+                print(f'\terror {e} occurred while running "{a_fn_name}"')
+                raise
     
+
     QTimer.singleShot(800, trigger_commands)
     # ## add the right sidebar
     # visible_intervals_info_widget_container, visible_intervals_ctrl_layout_widget =  spike_raster_window._perform_build_attached_visible_interval_info_widget() # builds the tables
