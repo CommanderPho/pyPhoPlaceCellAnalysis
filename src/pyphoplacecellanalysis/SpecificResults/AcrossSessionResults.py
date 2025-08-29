@@ -4288,6 +4288,8 @@ class PerfmncMeasures:
         drop_column_name = list(perfmnc_session_df.columns)[0]
         perfmnc_session_df = perfmnc_session_df.drop(columns=drop_column_name).reset_index(drop=True) ## drop first column like 'Unnamed: 0'
         perfmnc_session_df = perfmnc_session_df.pho.constrain_df_cols(known_named_decoding_epochs_type='laps') ## HARDCODED
+        perfmnc_session_df = perfmnc_session_df.sort_values(['custom_replay_name', 'time_bin_size', 'session_name', 'parent_epoch_id']).reset_index(drop=True)
+
         ## Split custom_replay_name column to separate columns:
         perfmnc_session_df = ExportValueNameCleaner.split_custom_replay_name_col_to_replayMethod_qclu_frateThresh_cols(perfmnc_session_df)
 
@@ -4307,34 +4309,49 @@ class PerfmncMeasures:
         """
         import plotly.io as pio
         import plotly.express as px
+        
+        extra_plot_cmd_kwargs = dict(
+                                    opacity=0.5,
+                                    # barmode='group',
+        )
 
         active_df = deepcopy(perfmnc_per_indv_epochs_df)
         if qclu is not None:
             active_df = active_df.pho.constrain_df_cols(qclu=qclu)
         if time_bin_size is not None:
             active_df = active_df.pho.constrain_df_cols(time_bin_size=time_bin_size)
+            if isinstance(time_bin_size, (tuple, set, list, NDArray)):
+                ## assume it has length, as in it's a list
+                n_time_bin_sizes: int = len(time_bin_size)
+                if n_time_bin_sizes > 1:
+                    extra_plot_cmd_kwargs['facet_col'] = 'time_bin_size' ## facet on the time bin size
+                    # extra_plot_cmd_kwargs['color'] = 'time_bin_size'
+                    pass
         
-        fig = px.bar(active_df, x='parent_epoch_id', y='percent_correct', facet_row='session_name') # , facet_col='qclu'
+        fig = px.bar(active_df, x='parent_epoch_id', y='percent_correct', facet_row='session_name', **extra_plot_cmd_kwargs) # , facet_col='qclu'
         fig = fig.update_layout(
-            height=2200,
+            height=1600,
             xaxis=dict(showgrid=True, showline=True, mirror=True, linewidth=1, linecolor='black'),
-            yaxis=dict(range=[0,1], dtick=0.1, showgrid=True, gridcolor="black",
-                    showline=True, mirror=True, linewidth=1, linecolor='black'),
+            yaxis=dict(range=[0,1], dtick=0.2, showgrid=True, gridcolor="grey", showline=True, mirror=True, linewidth=1, linecolor='black'),
             title='Decoder TrackID-Context decoding correctness',
         )
         # fig.update_yaxes(matches='y')
-        fig = fig.update_yaxes(range=[0,1], matches='y', dtick=0.1, showgrid=True, gridcolor="black", showline=True, mirror=True, linewidth=1, linecolor='black')
+        fig = fig.update_yaxes(range=[0,1], matches='y', dtick=0.2, showgrid=True, gridcolor="grey", showline=True, mirror=True, linewidth=1, linecolor='black')
 
         session_names = np.unique(active_df['session_name'].to_numpy())
         num_sessions: int = len(session_names)
         for i in np.arange(num_sessions):
             # Update y-axis labels for each facet row
-            fig = fig.update_yaxes(title_text=session_names[i], row=(i+1), col=1, title_font=dict(size=14))
-            fig = fig.add_annotation(xref="paper", yref="y"+str(i+1), 
-                            x=-0.05, y=0.5,  # position on left of the row
-                            text=session_names[i],
-                                # showarrow=False, textangle=-90, font=dict(size=16),
-                            )
+            fig = fig.update_yaxes(title_text=session_names[i], row=(i+1), col=1, title_font=dict(size=10))
+            # fig = fig.add_annotation(xref="paper", yref="y"+str(i+1), 
+            #                 x=-0.05, y=0.5,  # position on left of the row
+            #                 text=session_names[i],
+            #                     # showarrow=False, textangle=-90, font=dict(size=16),
+            #                 )
+            # Change the bar mode
+            # fig = fig.update_layout(barmode='group')
+
+
 
         return fig
     
@@ -4348,19 +4365,31 @@ class PerfmncMeasures:
         import plotly.io as pio
         import plotly.express as px
 
+        extra_plot_cmd_kwargs = dict(
+                                    opacity=0.5,
+                                    # barmode='group',
+        )
+
         active_df = deepcopy(perfmnc_per_session_df) #.pho.partition_df_dict('time_bin_size')[time_bin_size]
         if qclu is not None:
             active_df = active_df.pho.constrain_df_cols(qclu=qclu)
         if time_bin_size is not None:
             active_df = active_df.pho.constrain_df_cols(time_bin_size=time_bin_size)
-
+            if isinstance(time_bin_size, (tuple, set, list, NDArray)):
+                ## assume it has length, as in it's a list
+                n_time_bin_sizes: int = len(time_bin_size)
+                if n_time_bin_sizes > 1:
+                    extra_plot_cmd_kwargs['facet_col'] = 'time_bin_size' ## facet on the time bin size
+                    # extra_plot_cmd_kwargs['color'] = 'time_bin_size'
+                    pass
+                
         if worst_only:
-            fig = px.scatter(active_df, x='time_bin_size', y='worse_percent_correct', color='session_name') # , facet_col='qclu'
+            fig = px.scatter(active_df, x='time_bin_size', y='worse_percent_correct', color='session_name', **extra_plot_cmd_kwargs) # , facet_col='qclu'
         else:
-            fig = px.bar(active_df, x='parent_epoch_id', y='percent_correct', facet_row='session_name')
+            fig = px.bar(active_df, x='parent_epoch_id', y='percent_correct', facet_row='session_name', **extra_plot_cmd_kwargs)
             
         fig = fig.update_layout(
-            height=2200,
+            height=1400,
             xaxis=dict(showgrid=True, showline=True, mirror=True, linewidth=1, linecolor='black'),
             yaxis=dict(range=[0,1], dtick=0.1, showgrid=True, gridcolor="grey", showline=True, mirror=True, linewidth=1, linecolor='black'),
             title='Decoder TrackID-Context decoding correctness - Worst Per Session',
