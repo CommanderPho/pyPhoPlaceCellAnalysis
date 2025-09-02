@@ -85,7 +85,7 @@ class Spike2DRaster(SpecificDockWidgetManipulatingMixin, DynamicDockDisplayAreaO
     Usage:
         from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.SpikeRasterWidgets.Spike2DRaster import Spike2DRaster
         curr_epoch_name = 'maze1'
-        curr_epoch = curr_active_pipeline.filtered_epochs[curr_epoch_name] # <NamedTimerange: {'name': 'maze1', 'start_end_times': array([  22.26      , 1739.15336412])};>
+        curr_epoch = curr_active_pipeline.filtered_epochs[curr_epoch_name] # <NamedTimerange: {'name': 'maze1', 'start_end_times': array([  22.26, 1739.15336412])};>
         curr_sess = curr_active_pipeline.filtered_sessions[curr_epoch_name]
         curr_spikes_df = curr_sess.spikes_df
         spike_raster_plt = Spike2DRaster(curr_spikes_df, window_duration=4.0, window_start_time=30.0)
@@ -2024,6 +2024,36 @@ class Spike2DRaster(SpecificDockWidgetManipulatingMixin, DynamicDockDisplayAreaO
         if self.debug_print:
             print(f'SpikeRaster2D.on_child_crosshair_updated_signal(self: {self}, child_identifier: "{child_identifier}", trace_value: "{trace_value}")')
         self.sigCrosshairsUpdated.emit(self, child_identifier, trace_value)
+
+
+
+    # ==================================================================================================================================================================================================================================================================================== #
+    # Track Exporting to Image/Graphic Helpers                                                                                                                                                                                                                                             #
+    # ==================================================================================================================================================================================================================================================================================== #
+    def _perform_output_figure_delayed(self, custom_fig_man, relative_data_output_parent_folder=None, included_track_dock_identifiers: Optional[List[str]]=None, track_labels: Optional[List[str]]=None, 
+                                        ):
+        """ Exports the tracks out to an image/file/figure
+
+
+        """
+        from pyphoplacecellanalysis.General.Mixins.ExportHelpers import FigureToImageHelpers
+
+        ## #TODO 2025-08-22 10:25: - [ ] Output to correct path (see above):
+        print(f'\t_perform_output_figure_delayed() running inside timer!')     
+        assert custom_fig_man is not None
+        print(f'custom_fig_man is not None! Custom output path will be used!')
+        test_display_output_path = custom_fig_man.get_figure_save_file_path(display_context, make_folder_if_needed=False)
+        print(f'\ttest_display_output_path: "{test_display_output_path}"')
+
+        ## INPUTS: im_posterior_x_stack, track_labels, 
+        output_pdf_path: Path = test_display_output_path.with_suffix('.pdf') # relative_data_output_parent_folder.joinpath('all_timeline_tracks_exported_stack.pdf')
+        print(f'\t\t_render_export_all_time_tracks: output_pdf_path: "{output_pdf_path}"')
+        ## Export the wrapped tracks:
+        saved_output_pdf_path = FigureToImageHelpers.export_wrapped_tracks_to_paged_df(self, output_pdf_path=output_pdf_path, included_track_dock_identifiers=included_track_dock_identifiers, track_labels=track_labels, debug_max_num_pages=25)
+        print(f'\t\t_render_export_all_time_tracks: saved_output_pdf_path: "{saved_output_pdf_path}"')
+        print(f'\t_render_export_all_time_tracks: _perform_output_figure_delayed() inside timer -- DONE.')     
+        return saved_output_pdf_path
+
 
 
 
