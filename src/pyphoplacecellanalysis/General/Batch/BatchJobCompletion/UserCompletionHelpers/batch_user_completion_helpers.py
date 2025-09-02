@@ -3744,6 +3744,7 @@ def figures_plot_generalized_decode_epochs_dict_and_export_results_completion_fu
             import pyphoplacecellanalysis.External.pyqtgraph as pg
             from pyphocorehelpers.gui.Qt.color_helpers import ColormapHelpers
             from pyphoplacecellanalysis.General.Mixins.ExportHelpers import FigureToImageHelpers
+            from pyphoplacecellanalysis.Pho2D.PyQtPlots.Extensions.pyqtgraph_helpers import block_until_render_complete
             from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.SpikeRasterWidgets.spike_raster_widgets import _setup_spike_raster_window_for_debugging
             from PyQt5.QtCore import QTimer
             import time
@@ -3814,11 +3815,17 @@ def figures_plot_generalized_decode_epochs_dict_and_export_results_completion_fu
             print(f"_render_export_all_time_tracks: I got the QApplication: {app}")
 
             ## the above `_setup_spike_raster_window_for_debugging` does some rendering asynchronously, so I need to wait until all of that is finished before moving foward and rendering to output...
-            num_process_wait_cycles: int = 20
-            for i in range(num_process_wait_cycles):
-                print(f'\t\t_render_export_all_time_tracks: process wait loop[{i}/{num_process_wait_cycles}]')
-                app.processEvents()
-                time.sleep(0.05)  # 50ms per pass
+            # num_process_wait_cycles: int = 20
+            # for i in range(num_process_wait_cycles):
+            #     print(f'\t\t_render_export_all_time_tracks: process wait loop[{i}/{num_process_wait_cycles}]')
+            #     app.processEvents()
+            #     time.sleep(0.05)  # 50ms per pass
+
+
+            print(f'waiting until complete....')
+            block_until_render_complete()
+            print(f'\tblock_until_render_complete is done. Continuing execution.')
+
 
             # print(f'_render_export_all_time_tracks: Calling "_perform_output_figure_delayed" after delay')
             # _perform_output_figure_delayed()

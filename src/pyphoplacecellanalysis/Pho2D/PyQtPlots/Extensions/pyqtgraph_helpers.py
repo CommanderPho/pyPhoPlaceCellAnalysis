@@ -286,6 +286,22 @@ def build_scrollable_graphics_layout_widget_with_nested_viewbox_ui(name, window_
 
 
 
+def block_until_render_complete(qapp_name:str='', max_wait_time_sec: int=(60*5)) -> None:
+    """ synchronously blocks until all rendering of the UI is complete. 
+    Usage:
+        from pyphoplacecellanalysis.Pho2D.PyQtPlots.Extensions.pyqtgraph_helpers import block_until_render_complete
+
+        print(f'waiting until complete....')
+        block_until_render_complete()
+        print(f'\tblock_until_render_complete is done. Continuing execution.')
+    
+    """
+    ## INPUTS: out_custom_formats_dict
+    app = pg.mkQApp(name=qapp_name)
+    app.processEvents(pg.QtCore.QEventLoop.ProcessEventsFlag.AllEvents, max_wait_time_sec) ## 5 minutes is max time
+    return
+
+
 # ==================================================================================================================== #
 # Plotting Helpers                                                                                                     #
 # ==================================================================================================================== #
@@ -313,6 +329,8 @@ def build_pyqtgraph_epoch_indicator_regions(win: pg.PlotWidget, t_start:float, t
     # Set the position:
     epoch_linear_region.setRegion([t_start, t_stop]) # adjust scroll control
     return epoch_linear_region, epoch_region_label
+
+
 
 
 

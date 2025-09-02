@@ -125,7 +125,8 @@ def _setup_spike_raster_window_for_debugging(spike_raster_window, wants_docked_r
     import pyphoplacecellanalysis.External.pyqtgraph as pg
     from PyQt5.QtWidgets import QAbstractScrollArea
     from PyQt5.QtWidgets import QSizePolicy
-
+    from pyphoplacecellanalysis.Pho2D.PyQtPlots.Extensions.pyqtgraph_helpers import block_until_render_complete
+    
     is_docked_pyqtgraph_plots_mode: bool = spike_raster_window.params.use_docked_pyqtgraph_plots
 
     if additional_post_hoc_fcns is None:
@@ -305,6 +306,12 @@ def _setup_spike_raster_window_for_debugging(spike_raster_window, wants_docked_r
 
 
     _post_hoc_layout_resize(active_2d_plot=active_2d_plot, desired_static_area_height=144)
+
+    
+
+    print(f'waiting until complete....')
+    block_until_render_complete()
+    print(f'\tblock_until_render_complete is done. Continuing execution.')
 
 
     return all_global_menus_actionsDict, global_flat_action_dict, _all_outputs_dict # , (_raster_tracks_out_dict, _raster_tracks_out_dict, _raster_tracks_out_dict)
