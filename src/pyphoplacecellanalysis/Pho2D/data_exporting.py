@@ -1347,6 +1347,9 @@ class PosteriorExporting:
 
         # active_decoder_names = ['long_LR', 'long_RL', 'short_LR', 'short_RL', 'psuedo2D_ignore']
         active_1D_decoder_names = ['long_LR', 'long_RL', 'short_LR', 'short_RL']
+        active_1D_decoder_name_labels = ['long <', 'long >', 'short <', 'short >']
+        active_1D_decoder_name_to_label_dict = dict(zip(active_1D_decoder_names, active_1D_decoder_name_labels))
+
         pseudo_2D_decoder_name: str = 'psuedo2D_ignore'
 
         # epoch_name_list = ['laps', 'ripple']
@@ -1362,7 +1365,7 @@ class PosteriorExporting:
         # export_format_name_options = ['viridis_shared_norm', 'greyscale_shared_norm', 'greyscale']
         # separator_color=f'#fae2e2'
 
-        def _subfn_try_find_existing_format(out_custom_formats_dict, export_format_name_options = ['greyscale_shared_norm', 'viridis_shared_norm', 'greyscale']) -> Tuple[Optional[str], int]:
+        def _subfn_try_find_existing_format(out_custom_formats_dict, export_format_name_options: List[str] = ['greyscale_shared_norm', 'viridis_shared_norm', 'greyscale']) -> Tuple[Optional[str], int]:
             """ tries to find the existing export name from a list of options 
             """
             active_found_export_format_name: str = None
@@ -1427,12 +1430,12 @@ class PosteriorExporting:
                                     ## Decoder label to the left, and only on the first col
                                     if (col_idx == 0) and (row_idx == 0):
                                         ## note, these aren't really the row/col index because they're kinda hardcoded rn.
-                                        an_active_img = ImageOperationsAndEffects.add_boxed_adjacent_label(an_active_img, a_decoder_name, image_edge='left', font_size=48, text_color="#000000",
+                                        a_decoder_name_label: str = active_1D_decoder_name_to_label_dict[a_decoder_name] ## a_decoder_name: just the name like 'long_LR'
+                                        an_active_img = ImageOperationsAndEffects.add_boxed_adjacent_label(an_active_img, a_decoder_name_label, image_edge='left', font_size=48, text_color="#000000",
                                                                                                             background_color=(255, 255, 255, 0),
                                                                                                             # fixed_label_region_size = [_out_row_stack.width, 62]
                                                                                                             )
                                     
-
                                     _tmp_curr_row_raster_imgs.append(an_active_img)
                                 ## END for decoder_IDX, a_d...
                             ## Build merged row image:
