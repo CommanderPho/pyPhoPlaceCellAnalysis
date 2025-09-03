@@ -4349,6 +4349,10 @@ class PerfmncMeasures:
         # fig.update_yaxes(matches='y')
         fig = fig.update_yaxes(range=[0,1], matches='y', dtick=0.2, showgrid=True, gridcolor="grey", showline=True, mirror=True, linewidth=1, linecolor='black')
 
+        # Add horizontal line at y=0.5
+        fig.add_hline(y=0.5, line_dash="dash", line_color="red", opacity=0.7)
+
+
         session_names = np.unique(active_df['session_name'].to_numpy())
         num_sessions: int = len(session_names)
         for i in np.arange(num_sessions):
