@@ -1328,7 +1328,7 @@ class PosteriorExporting:
 
     @function_attributes(short_name=None, tags=['TEMP', 'export', 'image', 'files', 'merge', 'combine', 'posterior'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-05-30 14:51', related_items=[])
     @classmethod
-    def post_export_build_combined_images(cls, out_custom_formats_dict, custom_merge_layout_dict: Optional[Dict]=None, epoch_name_list = ['laps', 'ripple'], included_epoch_idxs: Optional[List]=None, progress_print:bool=False):
+    def post_export_build_combined_images(cls, out_custom_formats_dict, custom_merge_layout_dict: Optional[Dict]=None, epoch_name_list = ['laps', 'ripple'], included_epoch_idxs: Optional[List]=None, progress_print:bool=False, should_use_raw_rgba_export_image: bool=False):
         """merges the 4 1D decoders and the multi-color pseudo2D to produce a single combined output image for each epoch
 
         Responsible for the `_temp_individual_posteriors/2025-08-13/gor01_one_2006-6-09_1-22-43/ripple/combined/multi` images
@@ -1392,6 +1392,10 @@ class PosteriorExporting:
                 ['greyscale_shared_norm'],
                 # ['psuedo2D_ignore/raw_rgba'], ## Implicitly always appends the pseudo2D_ignore/raw_rgba image at the bottom row
             ]
+            
+
+        if not should_use_raw_rgba_export_image:
+            _label_kwargs = ImagePostRenderFunctionSets._get_export_color_scheme_kwargs(is_prepare_for_publication=True)
         
         for a_decoding_epoch_name in epoch_name_list:
             ## e.g. 'laps' or 'ripple'
@@ -1467,15 +1471,32 @@ class PosteriorExporting:
                         _tmp_curr_merge_layout_raster_imgs = [_out_vstack, ] # combined image with both columns concatenated is back
                         
                         ## get the multicolor iamge last:
-                        try:
-                            a_config = out_custom_formats_dict[f'{a_decoding_epoch_name}.{pseudo_2D_decoder_name}']['raw_rgba'][epoch_IDX] # a HeatmapExportConfig
-                            _tmp_curr_merge_layout_raster_imgs.append(a_config.posterior_saved_image)
-                        except KeyError as e:
-                            # KeyError: "Invalid keys: '['laps', 'long_LR']'"
-                            print(f"\tcould not get multicolor image data for out_custom_formats_dict[f'{a_decoding_epoch_name}.{pseudo_2D_decoder_name}']['raw_rgba'][{epoch_IDX}], key error: {e}\n\tskipping.")    
-                            pass
-                        except Exception as e:
-                            raise
+                        if should_use_raw_rgba_export_image:
+                            try:
+                                a_config = out_custom_formats_dict[f'{a_decoding_epoch_name}.{pseudo_2D_decoder_name}']['raw_rgba'][epoch_IDX] # a HeatmapExportConfig
+                                _tmp_curr_merge_layout_raster_imgs.append(a_config.posterior_saved_image)
+                            except KeyError as e:
+                                # KeyError: "Invalid keys: '['laps', 'long_LR']'"
+                                print(f"\tcould not get multicolor image data for out_custom_formats_dict[f'{a_decoding_epoch_name}.{pseudo_2D_decoder_name}']['raw_rgba'][{epoch_IDX}], key error: {e}\n\tskipping.")    
+                                pass
+                            except Exception as e:
+                                raise
+
+                        else:
+                            ## GET Text
+                            # post_render_image_functions_dict_list: List[Dict[str, Callable]] = _build_image_export_functions_dict(a_decoder_decoded_epochs_result=a_decoder_decoded_epochs_result)
+                            epoch_id_text: str = f"{a_decoding_epoch_name}[{epoch_IDX}] r{row_idx}" # normalization_column_labels[row_idx] # 'global'      
+                            # _out_vstack = ImageOperationsAndEffects.add_boxed_adjacent_label(_out_vstack, epoch_id_text, image_edge='bottom', font_size=48, text_color="#000000",
+                            #                                         background_color=(255, 255, 255, 0),
+                            #                                         fixed_label_region_size = [_out_vstack.width, 62]
+                            #                                         )
+                            ## INPUTS: _label_kwargs
+                            # _label_kwargs = ImagePostRenderFunctionSets._get_export_color_scheme_kwargs(is_prepare_for_publication=True)
+                            _out_vstack = ImageOperationsAndEffects.add_bottom_label(_out_vstack, label_text=epoch_id_text, **_label_kwargs)                            
+                            # create_label_function = ImageOperationsAndEffects.create_fn_builder(ImageOperationsAndEffects.add_bottom_label, **_label_kwargs) #  text_color=(255, 255, 255), background_color=(66, 66, 66), font_size=font_size, fixed_label_region_height=fixed_label_region_height
+                            # create_half_width_rectangle_function = ImageOperationsAndEffects.create_fn_builder(ImageOperationsAndEffects.add_half_width_rectangle, height_fraction = 0.1)   
+                            _tmp_curr_merge_layout_raster_imgs = [_out_vstack, ]
+
 
                         # a_config.posterior_saved_image ## the actual image object
                         a_posterior_saved_path: Path = a_config.posterior_saved_path ## the saved image file
@@ -1485,7 +1506,11 @@ class PosteriorExporting:
                         
                         ## Build merged all rows image:
                         # separator_color=f'#006eff' 
-                        _out_vstack = vertical_image_stack(_tmp_curr_merge_layout_raster_imgs, padding=10, separator_color=separator_color)
+                        if len(_tmp_curr_merge_layout_raster_imgs) > 1:
+                            _out_vstack = vertical_image_stack(_tmp_curr_merge_layout_raster_imgs, padding=10, separator_color=separator_color)
+                        else:
+                            _out_vstack = _tmp_curr_merge_layout_raster_imgs[0] ## just get the only real image
+
                         _out_final_merged_images.append(_out_vstack)
 
                         ## save it
