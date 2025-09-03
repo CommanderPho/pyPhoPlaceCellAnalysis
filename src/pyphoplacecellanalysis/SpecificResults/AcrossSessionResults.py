@@ -3287,7 +3287,7 @@ def _concat_custom_dict_to_df(final_sessions_loaded_df_dict):
     )
 
 
-def _subfn_new_df_process_and_load_exported_file(file_path, loaded_dict: Dict, session_name: str, curr_session_t_delta: float, time_key: str, debug_print:bool=False, **additional_columns) -> bool:
+def _subfn_new_df_process_and_load_exported_file(file_path, loaded_dict: Dict, session_name: str, curr_session_t_delta: float, time_key: str, debug_print:bool=False, allow_CONCAT_to_existing: bool=False, **additional_columns) -> bool:
     try:
         # loaded_dict[session_name] = read_and_process_csv_file(file_path, session_name, curr_session_t_delta, time_key)
         df = pd.read_csv(file_path, na_values=['', 'nan', 'np.nan', '<NA>'], low_memory=False) # `low_memory=False` tells pandas to use more memory to correctly infer data types.
@@ -3304,7 +3304,17 @@ def _subfn_new_df_process_and_load_exported_file(file_path, loaded_dict: Dict, s
         loaded_dict_key = tuple(loaded_dict_key)
 
         ## update dict:
-        loaded_dict[loaded_dict_key] = df ## it's being overwritten here
+        if not allow_CONCAT_to_existing:
+            loaded_dict[loaded_dict_key] = df ## it's being overwritten here
+        else:
+            ## concat to the existing one if it exists, otherwise set it
+            if loaded_dict_key not in loaded_dict:
+                loaded_dict[loaded_dict_key] = df ## set it
+            else:
+                ## get the extant one:
+                exant_df = loaded_dict[loaded_dict_key]
+                loaded_dict[loaded_dict_key] = pd.concat((exant_df, df), axis='index', ignore_index=True)
+
         return True
 
     except Exception as e:
@@ -3467,7 +3477,7 @@ def _new_process_csv_files(parsed_csv_files_df: pd.DataFrame, t_delta_dict: Dict
             elif file_type == 'FAT':
                 # 2025-03-01 - a bulk export .CSV format where all results are stacked vertically and fields duplicated as needed (no attentioned paid to disk
                 # #TODO 2025-04-04 10:11: - [ ] FAT is a legit exception and shouldn't belong in `extended_file_types_list`, as it has both time bin and epoch centered items
-                _is_file_valid = _subfn_new_df_process_and_load_exported_file(path, final_sessions_loaded_laps_time_bin_dict, session_name, curr_session_t_delta, time_key='t_bin_center', **common_additional_columns_dict) ## adds to the time bins 
+                _is_file_valid = _subfn_new_df_process_and_load_exported_file(path, final_sessions_loaded_laps_time_bin_dict, session_name, curr_session_t_delta, time_key='t_bin_center', allow_CONCAT_to_existing=True, **common_additional_columns_dict) ## adds to the time bins 
                 #TODO 2025-04-04 10:12: - [ ] Why does it add to `final_sessions_loaded_laps_time_bin_dict`? this seems wrong
                 
 
