@@ -1413,29 +1413,44 @@ class PosteriorExporting:
                             
                         _tmp_curr_merge_layout_raster_imgs = []
                         for row_idx, a_merge_layout_row in enumerate(custom_merge_layout_dict):
-                            _tmp_curr_row_raster_imgs = []
+                            ## row_idx is actually the column index...
+                            
+                            ## Doing a single row
+                            _tmp_curr_col_raster_imgs = []
                             if progress_print:
                                 print(f'epoch_IDX: {epoch_IDX}')
                         
                             if progress_print:
                                 print(f'\trow_idx: {row_idx}')
                             for col_idx, a_merge_layout_col in enumerate(a_merge_layout_row):
+                                ## col_idx is actually the decoder index and is redundant
+                                
                                 # vertical stack
                                 if progress_print:
                                     print(f'\t\tcol_idx: {col_idx}')
                                 # _tmp_curr_raster_imgs = []
+                                #TODO 2025-09-03 18:58: - [ ] This is excessively nested and iterates incorreclty
                                 for decoder_IDX, a_decoder_name in enumerate(active_1D_decoder_names):
                                     ## get the single decoder image for this format:
                                     # a_config = out_custom_formats_dict[f'{a_decoding_epoch_name}.{a_decoder_name}'][active_found_export_format_name][epoch_IDX] # a HeatmapExportConfig
-                                    a_config = out_custom_formats_dict[f'{a_decoding_epoch_name}.{a_decoder_name}'][a_merge_layout_col][epoch_IDX] # a HeatmapExportConfig
+                                    if progress_print:
+                                        print(f'\t\t\tdecoder[{decoder_IDX}]:', end='\t')
+                                        
+                                    active_config_key: str = f'{a_decoding_epoch_name}.{a_decoder_name}'
+                                    active_config_full_specifier: str = f'{active_config_key}["{a_merge_layout_col}"][epoch_IDX: {epoch_IDX}]'
+                                    a_config = out_custom_formats_dict[active_config_key][a_merge_layout_col][epoch_IDX] # a HeatmapExportConfig
                                     # a_config.posterior_saved_path ## the saved image file
                                     an_active_img = deepcopy(a_config.posterior_saved_image) ## the actual image object
+                                    if progress_print:
+                                        print(f'{active_config_full_specifier}', end=':\t')
+                                        print(f' .size (w, h): original {an_active_img.size}', end='\t')   
+
                                     an_active_img = an_active_img.reduce(factor=(1, 4)) ## scale image down by 1/4 in height but leave the original width
                                     # an_active_img = an_active_img.reduce(factor=(4, 1)) ## scale image down by 1/4 in width but leave the original height
                                     curr_img_size = deepcopy(an_active_img.size)
                                     
                                     if progress_print:
-                                        print(f'\t\t\tdecoder[{decoder_IDX}]: .size - {an_active_img.size}')
+                                        print(f'scaled {an_active_img.size}')
                                         
                                     ## Add overlay text
                                     # an_active_img = ImageOperationsAndEffects.add_overlayed_text(an_active_img, a_decoder_name, font_size=48, text_color="#FF00EACA",
@@ -1454,26 +1469,29 @@ class PosteriorExporting:
                                         
                                     if progress_print:
                                         print(f'\t\t\t\tpre-append img_size: {an_active_img.size}')
-                                    _tmp_curr_row_raster_imgs.append(an_active_img)
+                                    _tmp_curr_col_raster_imgs.append(an_active_img)
                                 ## END for decoder_IDX, a_d...
                             ## Build merged row image:
                             # separator_color=f'#ff0000'
-                            _out_row_stack = vertical_image_stack(_tmp_curr_row_raster_imgs, padding=5, separator_color=separator_color)
+                            _out_single_col_stack = vertical_image_stack(_tmp_curr_col_raster_imgs, padding=5, separator_color=separator_color)
                             
                             # _out_row_stack = horizontal_image_stack(_tmp_curr_row_raster_imgs, padding=5, separator_color=separator_color)
-
+                            if progress_print:
+                                print(f'\t_out_single_col_stack .size - {_out_single_col_stack.size}')
+                                
                             ## Add top normalization labels:
                             # [row_idx]
                             
                             if row_idx < len(normalization_column_labels):
                                 normalization_label_text: str = normalization_column_labels[row_idx] # 'global'      
-                                _out_row_stack = ImageOperationsAndEffects.add_boxed_adjacent_label(_out_row_stack, normalization_label_text, image_edge='top', font_size=48, text_color="#000000",
+                                _out_single_col_stack = ImageOperationsAndEffects.add_boxed_adjacent_label(_out_single_col_stack, normalization_label_text, image_edge='top', font_size=48, text_color="#000000",
                                                                                                     background_color=(255, 255, 255, 0),
-                                                                                                    fixed_label_region_size = [_out_row_stack.width, 62]
+                                                                                                    fixed_label_region_size = [_out_single_col_stack.width, 62]
                                                                                                     )
-
-
-                            _tmp_curr_merge_layout_raster_imgs.append(_out_row_stack)
+                                if progress_print:
+                                    print(f'\t\t post normalization label text added: _out_single_col_stack .size - {_out_single_col_stack.size}')
+                                    
+                            _tmp_curr_merge_layout_raster_imgs.append(_out_single_col_stack)
 
                         ## END for row_idx, a_merge_layout_row in enumerate(custom_merge_layout_dict)
                         
@@ -1482,10 +1500,16 @@ class PosteriorExporting:
                         # separator_color=f'#66ff00' 
                         _out_vstack = horizontal_image_stack(_tmp_curr_merge_layout_raster_imgs, padding=25, separator_color=separator_color) # , separator_color=separator_color
                         # _out_vstack = vertical_image_stack(_tmp_curr_merge_layout_raster_imgs, padding=35, separator_color=separator_color)
-                        _out_vstack = _out_vstack.reduce(factor=(2, 1)) ## scale image down by 1/2 in width but leave the original height
-                        _tmp_curr_merge_layout_raster_imgs = [_out_vstack, ] # combined image with both columns concatenated is back
                         if progress_print:
-                            print(f'_out_vstack.size: {_out_vstack.size}')
+                            print(f'\t_out_vstack - ALL MERGED ROWS .size - {_out_vstack.size} (w, h)', end='\t')
+                                                    
+                        _out_vstack = _out_vstack.reduce(factor=(2, 1)) ## scale image down by 1/2 in width but leave the original height
+                        if progress_print:
+                            print(f'scaled .size - {_out_vstack.size}')
+
+                        _tmp_curr_merge_layout_raster_imgs = [_out_vstack, ] # combined image with both columns concatenated is back
+                        # if progress_print:
+                        #     print(f'_out_vstack.size: {_out_vstack.size}')
                             
                         ## get the multicolor iamge last:
                         if should_use_raw_rgba_export_image:
@@ -1493,7 +1517,7 @@ class PosteriorExporting:
                                 a_config = out_custom_formats_dict[f'{a_decoding_epoch_name}.{pseudo_2D_decoder_name}']['raw_rgba'][epoch_IDX] # a HeatmapExportConfig
                                 _tmp_curr_merge_layout_raster_imgs.append(a_config.posterior_saved_image)
                                 if progress_print:
-                                    print(f'\ta_config.posterior_saved_image.size: {a_config.posterior_saved_image.size}')
+                                    print(f'\t\traw_RGBA a_config.posterior_saved_image.size: {a_config.posterior_saved_image.size}')
                             except KeyError as e:
                                 # KeyError: "Invalid keys: '['laps', 'long_LR']'"
                                 print(f"\tcould not get multicolor image data for out_custom_formats_dict[f'{a_decoding_epoch_name}.{pseudo_2D_decoder_name}']['raw_rgba'][{epoch_IDX}], key error: {e}\n\tskipping.")    
@@ -1511,8 +1535,8 @@ class PosteriorExporting:
                             #                                         background_color=(255, 255, 255, 0),
                             #                                         fixed_label_region_size = [_out_vstack.width, _label_kwargs['fixed_label_region_height']]
                             #                                         )
-                            # _label_kwargs = ImagePostRenderFunctionSets._get_export_color_scheme_kwargs(is_prepare_for_publication=True)
-                            # _out_vstack = ImageOperationsAndEffects.add_bottom_label(_out_vstack, label_text=epoch_id_text, **_label_kwargs)
+                            _label_kwargs = ImagePostRenderFunctionSets._get_export_color_scheme_kwargs(is_prepare_for_publication=True)
+                            _out_vstack = ImageOperationsAndEffects.add_bottom_label(_out_vstack, label_text=epoch_id_text, **_label_kwargs)
                             # create_label_function = ImageOperationsAndEffects.create_fn_builder(ImageOperationsAndEffects.add_bottom_label, **_label_kwargs) #  text_color=(255, 255, 255), background_color=(66, 66, 66), font_size=font_size, fixed_label_region_height=fixed_label_region_height
                             # create_half_width_rectangle_function = ImageOperationsAndEffects.create_fn_builder(ImageOperationsAndEffects.add_half_width_rectangle, height_fraction = 0.1)
                             _tmp_curr_merge_layout_raster_imgs = [_out_vstack, ]
