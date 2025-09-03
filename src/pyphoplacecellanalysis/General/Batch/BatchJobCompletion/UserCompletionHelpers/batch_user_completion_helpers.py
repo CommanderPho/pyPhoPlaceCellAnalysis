@@ -3611,7 +3611,10 @@ def figures_plot_generalized_decode_epochs_dict_and_export_results_completion_fu
             across_session_results_extended_dict['figures_plot_generalized_decode_epochs_dict_and_export_results_completion_function'].update({
                 '_display_decoded_trackID_weighted_position_posterior_withMultiColorOverlay': _out,
             })
-            
+
+            ## try to get kwargs
+            # post_export_build_combined_images_kwargs = dict(included_epoch_idxs=[0, 1], should_use_raw_rgba_export_image=True),
+            post_export_build_combined_kwargs = dict(epoch_name_list=['ripple'], included_epoch_idxs=None, progress_print=True, should_use_raw_rgba_export_image=True) | additional_marginal_overlaying_measured_position_kwargs.pop('post_export_build_combined_images_kwargs', {})
 
             out_custom_formats_dict = _out.get('out_custom_formats_dict', None)
             if out_custom_formats_dict is not None:
@@ -3619,8 +3622,7 @@ def figures_plot_generalized_decode_epochs_dict_and_export_results_completion_fu
                     ['greyscale_shared_norm'],
                     # ['psuedo2D_ignore/raw_rgba'], ## Implicitly always appends the pseudo2D_ignore/raw_rgba image at the bottom row
                 ]
-                _out_final_merged_image_save_paths, _out_final_merged_images = PosteriorExporting.post_export_build_combined_images(out_custom_formats_dict=out_custom_formats_dict, custom_merge_layout_dict=custom_merge_layout_dict,
-                                                                                                                    epoch_name_list=['ripple'], progress_print=True) ## currently skip laps, just do ripples
+                _out_final_merged_image_save_paths, _out_final_merged_images = PosteriorExporting.post_export_build_combined_images(out_custom_formats_dict=out_custom_formats_dict, custom_merge_layout_dict=custom_merge_layout_dict, **post_export_build_combined_kwargs) ## currently skip laps, just do ripples
                 _out['final_merged_image_save_paths'] = deepcopy(_out_final_merged_image_save_paths)
                 
                 # across_session_results_extended_dict['figures_plot_generalized_decode_epochs_dict_and_export_results_completion_function'].update({
