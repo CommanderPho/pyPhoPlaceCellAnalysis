@@ -1334,7 +1334,7 @@ class PosteriorExporting:
 
     @function_attributes(short_name=None, tags=['TEMP', 'export', 'image', 'files', 'merge', 'combine', 'posterior'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-05-30 14:51', related_items=[])
     @classmethod
-    def post_export_build_combined_images(cls, out_custom_formats_dict, custom_merge_layout_dict: Optional[Dict]=None, epoch_name_list = ['laps', 'ripple'], included_epoch_idxs: Optional[List]=None, progress_print:bool=False, debug_print:bool=False, should_use_raw_rgba_export_image: bool=True):
+    def post_export_build_combined_images(cls, out_custom_formats_dict, custom_merge_layout_dict: Optional[Dict]=None, epoch_name_list = ['laps', 'ripple'], included_epoch_idxs: Optional[List]=None, progress_print:bool=True, debug_print:bool=False, should_use_raw_rgba_export_image: bool=False):
         """merges the 4 1D decoders and the multi-color pseudo2D to produce a single combined output image for each epoch
 
         Responsible for the `_temp_individual_posteriors/2025-08-13/gor01_one_2006-6-09_1-22-43/ripple/combined/multi` images
@@ -1547,34 +1547,82 @@ class PosteriorExporting:
                             active_save_posterior_as_image_export_format_kwargs = active_epoch_info.get('active_save_posterior_as_image_export_format_kwargs', None)
                             
                             # active_captured_single_epoch_result.start_t
+
+                            # epoch_id_text: str = f"{active_epoch_info_dict['delta_aligned_start_t']}"
+
+                            # ==================================================================================================================================================================================================================================================================================== #
+                            # From `_build_mergedColorDecoders_image_export_functions_dict` 2025-09-04 08:31                                                                                                                                                                                                       #
+                            # ==================================================================================================================================================================================================================================================================================== #
+                            # Prepare a multi-line, sideways label _______________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
+                            complete_epoch_identifier_str = ''
+                            active_epoch_id: int = active_epoch_info_dict.get('label', None)
+                            if active_epoch_id is not None:
+                                active_epoch_id = int(active_epoch_id)
+                                # complete_epoch_identifier_str = f"{complete_epoch_identifier_str}lbl[{active_epoch_id:03d}]" # 2025-06-03 - 'p_x_given_n[067]'
+                                complete_epoch_identifier_str = f"{complete_epoch_identifier_str}L{active_epoch_id:03d}"
+                            else:
+                                print(f'falling back to plain epoch IDXs because label was not found!')
+                                active_epoch_data_IDX: int = active_captured_single_epoch_result.epoch_data_index
+                                if active_epoch_data_IDX is not None:
+                                    complete_epoch_identifier_str = f'{complete_epoch_identifier_str}IDX{active_epoch_data_IDX:03d}'
+
+                            ## OUTPUTS: complete_epoch_identifier_str
+                            is_post_delta: bool = (active_epoch_info_dict['pre_post_delta_category'] != 'pre-delta')
+
+                            ## get pre/post delta label:
+                            # earliest_t = active_captured_single_epoch_result.time_bin_edges[0] # as in `_build_mergedColorDecoders_image_export_functions_dict`
+                            earliest_t = active_epoch_info_dict['delta_aligned_start_t']
+                            # earliest_t_ms = earliest_t * 1e-3
+                            earliest_t_str: str = "{:08.4f}".format(earliest_t)
+
+                            # earliest_t_str: str = f"{earliest_t:.4f}"
+
+                            curr_x_axis_label_str: str = f''
+                            if not is_post_delta:
+                                #  curr_x_axis_label_str = f'PRE'
+                                    side = 'left'
+                                    epoch_rect_color = '#4169E1'
+
+                            else:
+                                # curr_x_axis_label_str = f'POST'
+                                side = 'right'
+                                epoch_rect_color = '#DC143C'
+
+                            if len(complete_epoch_identifier_str) > 0:
+                                curr_x_axis_label_str = f"{complete_epoch_identifier_str}: {earliest_t_str}" ## add separator if needed for time
+                            else:
+                                curr_x_axis_label_str = f"{earliest_t_str}" # // 2025-06-03 09:10 working
+
+
+
+
                             ## INPUTS: _label_kwargs
                             # _out_vstack = ImageOperationsAndEffects.add_boxed_adjacent_label(_out_vstack, epoch_id_text, image_edge='bottom', font_size=24, text_color="#000000",
                             #                                         background_color=(255, 255, 255, 0),
                             #                                         fixed_label_region_size = [_out_vstack.width, _label_kwargs['fixed_label_region_height']]
                             #                                         )
 
+                            if (debug_print and progress_print):
+                                print(f'\t\t\tactive_epoch_info_dict: {active_epoch_info_dict}')
+                                print(f'\t\t\tcurr_x_axis_label_str: "{curr_x_axis_label_str}"')
 
                             # ==================================================================================================================================================================================================================================================================================== #
                             # Call the post-render functions, which do things like: Add bottom time label, adding colored border, etc                                                                                                                                                                                                                                                                #
                             # ==================================================================================================================================================================================================================================================================================== #    
-                            if curr_post_render_image_functions_dict is not None:
-                                for a_render_fn_name, a_render_fn in curr_post_render_image_functions_dict.items():
-                                    if progress_print:
-                                        print(f'\t\t\tperforming: {a_render_fn_name}')
-                                    _out_vstack = a_render_fn(_out_vstack)
-                                
+                            # if curr_post_render_image_functions_dict is not None:
+                            #     for a_render_fn_name, a_render_fn in curr_post_render_image_functions_dict.items():
+                            #         if (debug_print and progress_print):
+                            #             print(f'\t\t\tperforming: {a_render_fn_name}')
+                            #         _out_vstack = a_render_fn(_out_vstack)
 
                             # _label_kwargs = ImagePostRenderFunctionSets._get_export_color_scheme_kwargs(is_prepare_for_publication=True)
+                            _out_vstack = ImageOperationsAndEffects.add_bottom_label(_out_vstack, label_text=curr_x_axis_label_str, **(_label_kwargs | dict(text_color=epoch_rect_color)))
                             # _out_vstack = ImageOperationsAndEffects.add_bottom_label(_out_vstack, label_text=epoch_id_text, **_label_kwargs)
                             # create_label_function = ImageOperationsAndEffects.create_fn_builder(ImageOperationsAndEffects.add_bottom_label, **_label_kwargs) #  text_color=(255, 255, 255), background_color=(66, 66, 66), font_size=font_size, fixed_label_region_height=fixed_label_region_height
                             # create_half_width_rectangle_function = ImageOperationsAndEffects.create_fn_builder(ImageOperationsAndEffects.add_half_width_rectangle, height_fraction = 0.1)
                             
-
-
-
                             _tmp_curr_merge_layout_raster_imgs = [_out_vstack, ]
-                            pass
-
+                            
 
                         # a_config.posterior_saved_image ## the actual image object
                         a_posterior_saved_path: Path = a_config.posterior_saved_path ## the saved image file
