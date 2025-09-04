@@ -111,6 +111,9 @@ class HeatmapExportConfig:
     ## OUTPUTS:
     posterior_saved_image: Optional[Image.Image] = field(default=None, init=False)
     posterior_saved_path: Optional[Path] = field(default=None, init=False)
+    posterior_epoch_info: Optional[Dict] = field(default=None, init=False)
+    
+
 
     def __attrs_post_init__(self):        
         self.export_grayscale = (self.export_kind.value == HeatmapExportKind.GREYSCALE.value) or ((self.export_kind.value != HeatmapExportKind.COLORMAPPED.value) and (self.colormap is None))
@@ -624,9 +627,17 @@ class PosteriorExporting:
                 assert complete_epoch_identifier_str is not None
                 _posterior_image, posterior_save_path = active_captured_single_epoch_result.save_posterior_as_image(parent_array_as_image_output_folder=export_format_config.export_folder, complete_epoch_identifier_str=complete_epoch_identifier_str, **(kwargs|export_format_config.to_dict()), post_render_image_functions=curr_post_render_image_functions_dict)
             
-                _output_export_format_config = deepcopy(export_format_config)
+                _output_export_format_config: HeatmapExportConfig = deepcopy(export_format_config)
                 _output_export_format_config.posterior_saved_path = posterior_save_path
                 _output_export_format_config.posterior_saved_image = _posterior_image
+                _output_export_format_config.posterior_epoch_info = dict(
+                    active_captured_single_epoch_result=deepcopy(active_captured_single_epoch_result),
+                    epoch_info_dict=deepcopy(curr_epoch_info_dict),
+                    epoch_id_identifier_str=deepcopy(epoch_id_identifier_str),
+                    active_epoch_id=active_epoch_id,
+                    complete_epoch_identifier_str=deepcopy(complete_epoch_identifier_str),
+                    curr_post_render_image_functions_dict=deepcopy(curr_post_render_image_functions_dict),
+                )
                 _save_out_paths.append(posterior_save_path)
                 # _save_out_format_results[export_format_name].append(export_format_config) # save out the modified v
                 _save_out_format_results[export_format_name].append(_output_export_format_config) # save out the modified v
@@ -1430,7 +1441,7 @@ class PosteriorExporting:
                                         
                                     active_config_key: str = f'{a_decoding_epoch_name}.{a_decoder_name}'
                                     active_config_full_specifier: str = f'{active_config_key}["{a_merge_layout_col}"][epoch_IDX: {epoch_IDX}]'
-                                    a_config = out_custom_formats_dict[active_config_key][a_merge_layout_col][epoch_IDX] # a HeatmapExportConfig
+                                    a_config: HeatmapExportConfig = out_custom_formats_dict[active_config_key][a_merge_layout_col][epoch_IDX] # a HeatmapExportConfig
                                     # a_config.posterior_saved_path ## the saved image file
                                     an_active_img = deepcopy(a_config.posterior_saved_image) ## the actual image object
                                     if progress_print:
@@ -1506,7 +1517,7 @@ class PosteriorExporting:
                         ## get the multicolor iamge last:
                         if should_use_raw_rgba_export_image:
                             try:
-                                a_config = out_custom_formats_dict[f'{a_decoding_epoch_name}.{pseudo_2D_decoder_name}']['raw_rgba'][epoch_IDX] # a HeatmapExportConfig
+                                a_config: HeatmapExportConfig = out_custom_formats_dict[f'{a_decoding_epoch_name}.{pseudo_2D_decoder_name}']['raw_rgba'][epoch_IDX] # a HeatmapExportConfig
                                 _tmp_curr_merge_layout_raster_imgs.append(a_config.posterior_saved_image)
                                 if progress_print:
                                     print(f'\t\traw_RGBA a_config.posterior_saved_image.size: {a_config.posterior_saved_image.size}')
@@ -1522,6 +1533,13 @@ class PosteriorExporting:
                             # post_render_image_functions_dict_list: List[Dict[str, Callable]] = _build_image_export_functions_dict(a_decoder_decoded_epochs_result=a_decoder_decoded_epochs_result)
                             epoch_id_text: str = f"{a_decoding_epoch_name}[{epoch_IDX}] r{row_idx}" # normalization_column_labels[row_idx] # 'global'      
 
+                            ## INPUTS: a_config
+                            active_epoch_info: Dict = a_config.posterior_epoch_info
+                            assert active_epoch_info is not None
+                            active_epoch_info_dict = active_epoch_info['epoch_info_dict']
+                            assert active_epoch_info_dict is not None
+
+                                                        
                             ## INPUTS: _label_kwargs
                             # _out_vstack = ImageOperationsAndEffects.add_boxed_adjacent_label(_out_vstack, epoch_id_text, image_edge='bottom', font_size=24, text_color="#000000",
                             #                                         background_color=(255, 255, 255, 0),
