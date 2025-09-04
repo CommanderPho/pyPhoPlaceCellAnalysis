@@ -587,17 +587,9 @@ class PosteriorExporting:
         # assert Assert.require_columns(active_filter_epochs, required_columns=['maze_id'])
         # is_epoch_pre_post_delta = active_filter_epochs['maze_id'].to_numpy()
         
-
         # Build post-image-generation callback functions _____________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
         
-        # fixed_label_region_height: Optional[int] = 520
-
-        # # font_size = 144
-        # # font_size = 96
-        # font_size = 72
-        
         epoch_id_identifier_str: str = 'p_x_given_n'
-
         
         _save_out_paths = []
         _save_out_format_results: Dict[str, List] = {}
