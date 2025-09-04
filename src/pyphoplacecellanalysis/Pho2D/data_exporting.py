@@ -1535,7 +1535,8 @@ class PosteriorExporting:
                             ## GET Text
                             # post_render_image_functions_dict_list: List[Dict[str, Callable]] = _build_image_export_functions_dict(a_decoder_decoded_epochs_result=a_decoder_decoded_epochs_result)
                             epoch_id_text: str = f"{a_decoding_epoch_name}[{epoch_IDX}] r{row_idx}" # normalization_column_labels[row_idx] # 'global'      
-
+                            _label_kwargs = ImagePostRenderFunctionSets._get_export_color_scheme_kwargs(is_prepare_for_publication=True)
+                            
                             ## INPUTS: a_config
                             active_epoch_info: Dict = a_config.posterior_epoch_info
                             assert active_epoch_info is not None
@@ -1551,10 +1552,26 @@ class PosteriorExporting:
                             #                                         background_color=(255, 255, 255, 0),
                             #                                         fixed_label_region_size = [_out_vstack.width, _label_kwargs['fixed_label_region_height']]
                             #                                         )
-                            _label_kwargs = ImagePostRenderFunctionSets._get_export_color_scheme_kwargs(is_prepare_for_publication=True)
-                            _out_vstack = ImageOperationsAndEffects.add_bottom_label(_out_vstack, label_text=epoch_id_text, **_label_kwargs)
+
+
+                            # ==================================================================================================================================================================================================================================================================================== #
+                            # Call the post-render functions, which do things like: Add bottom time label, adding colored border, etc                                                                                                                                                                                                                                                                #
+                            # ==================================================================================================================================================================================================================================================================================== #    
+                            if curr_post_render_image_functions_dict is not None:
+                                for a_render_fn_name, a_render_fn in curr_post_render_image_functions_dict.items():
+                                    if progress_print:
+                                        print(f'\t\t\tperforming: {a_render_fn_name}')
+                                    _out_vstack = a_render_fn(_out_vstack)
+                                
+
+                            # _label_kwargs = ImagePostRenderFunctionSets._get_export_color_scheme_kwargs(is_prepare_for_publication=True)
+                            # _out_vstack = ImageOperationsAndEffects.add_bottom_label(_out_vstack, label_text=epoch_id_text, **_label_kwargs)
                             # create_label_function = ImageOperationsAndEffects.create_fn_builder(ImageOperationsAndEffects.add_bottom_label, **_label_kwargs) #  text_color=(255, 255, 255), background_color=(66, 66, 66), font_size=font_size, fixed_label_region_height=fixed_label_region_height
                             # create_half_width_rectangle_function = ImageOperationsAndEffects.create_fn_builder(ImageOperationsAndEffects.add_half_width_rectangle, height_fraction = 0.1)
+                            
+
+
+
                             _tmp_curr_merge_layout_raster_imgs = [_out_vstack, ]
                             pass
 
