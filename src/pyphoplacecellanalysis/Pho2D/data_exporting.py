@@ -1334,7 +1334,8 @@ class PosteriorExporting:
 
     @function_attributes(short_name=None, tags=['TEMP', 'export', 'image', 'files', 'merge', 'combine', 'posterior'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-05-30 14:51', related_items=[])
     @classmethod
-    def post_export_build_combined_images(cls, out_custom_formats_dict, custom_merge_layout_dict: Optional[Dict]=None, epoch_name_list = ['laps', 'ripple'], included_epoch_idxs: Optional[List]=None, progress_print:bool=True, debug_print:bool=False, should_use_raw_rgba_export_image: bool=False):
+    def post_export_build_combined_images(cls, out_custom_formats_dict, custom_merge_layout_dict: Optional[Dict]=None, epoch_name_list = ['laps', 'ripple'], included_epoch_idxs: Optional[List]=None, progress_print:bool=True, debug_print:bool=False,
+                                           should_use_raw_rgba_export_image: bool=False, should_add_col_row_labels:bool = False):
         """merges the 4 1D decoders and the multi-color pseudo2D to produce a single combined output image for each epoch
 
         Responsible for the `_temp_individual_posteriors/2025-08-13/gor01_one_2006-6-09_1-22-43/ripple/combined/multi` images
@@ -1464,7 +1465,7 @@ class PosteriorExporting:
                                     #                                                                     stroke_width=1, stroke_fill="#000000",
                                     #                                                                      )
                                     ## Decoder label to the left, and only on the first col
-                                    if (col_idx == 0) and (row_idx == 0):
+                                    if should_add_col_row_labels and (col_idx == 0) and (row_idx == 0):
                                         ## note, these aren't really the row/col index because they're kinda hardcoded rn.
                                         a_decoder_name_label: str = active_1D_decoder_name_to_label_dict[a_decoder_name] ## a_decoder_name: just the name like 'long_LR'
                                         an_active_img = ImageOperationsAndEffects.add_boxed_adjacent_label(an_active_img, a_decoder_name_label, image_edge='left', font_size=48, text_color="#000000",
@@ -1488,7 +1489,7 @@ class PosteriorExporting:
                             ## Add top normalization labels:
                             # [row_idx]
                             
-                            if row_idx < len(normalization_column_labels):
+                            if should_add_col_row_labels and (row_idx < len(normalization_column_labels)):
                                 normalization_label_text: str = normalization_column_labels[row_idx] # 'global'      
                                 _out_single_col_stack = ImageOperationsAndEffects.add_boxed_adjacent_label(_out_single_col_stack, normalization_label_text, image_edge='top', font_size=48, text_color="#000000",
                                                                                                     background_color=(255, 255, 255, 0),
@@ -1543,8 +1544,8 @@ class PosteriorExporting:
                             active_epoch_info_dict = active_epoch_info['epoch_info_dict']
                             assert active_epoch_info_dict is not None
                             active_captured_single_epoch_result: SingleEpochDecodedResult = active_epoch_info['active_captured_single_epoch_result']
-                            curr_post_render_image_functions_dict = active_epoch_info['curr_post_render_image_functions_dict'] ## pre-built functions to call
-                            active_save_posterior_as_image_export_format_kwargs = active_epoch_info.get('active_save_posterior_as_image_export_format_kwargs', None)
+                            # curr_post_render_image_functions_dict = active_epoch_info['curr_post_render_image_functions_dict'] ## pre-built functions to call
+                            # active_save_posterior_as_image_export_format_kwargs = active_epoch_info.get('active_save_posterior_as_image_export_format_kwargs', None)
                             
                             # active_captured_single_epoch_result.start_t
 

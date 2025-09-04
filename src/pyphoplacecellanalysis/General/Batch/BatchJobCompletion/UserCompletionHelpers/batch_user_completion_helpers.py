@@ -3614,7 +3614,7 @@ def figures_plot_generalized_decode_epochs_dict_and_export_results_completion_fu
 
             ## try to get kwargs
             # post_export_build_combined_images_kwargs = dict(included_epoch_idxs=[0, 1], should_use_raw_rgba_export_image=True),
-            post_export_build_combined_kwargs = dict(epoch_name_list=['ripple'], included_epoch_idxs=None, progress_print=True, should_use_raw_rgba_export_image=True) | additional_marginal_overlaying_measured_position_kwargs.pop('post_export_build_combined_images_kwargs', {})
+            post_export_build_combined_kwargs = dict(epoch_name_list=['ripple'], included_epoch_idxs=None, progress_print=True, should_use_raw_rgba_export_image=False, should_add_col_row_labels=False) | additional_marginal_overlaying_measured_position_kwargs.pop('post_export_build_combined_images_kwargs', {})
 
             out_custom_formats_dict = _out.get('out_custom_formats_dict', None)
             if out_custom_formats_dict is not None:
