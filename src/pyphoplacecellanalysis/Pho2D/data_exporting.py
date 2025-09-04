@@ -19,7 +19,7 @@ from PIL import Image, ImageOps, ImageFilter # for export_array_as_image
 
 
 from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import DirectionalPseudo2DDecodersResult
-from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import DecodedFilterEpochsResult
+from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import DecodedFilterEpochsResult, SingleEpochDecodedResult
 from neuropy.utils.result_context import IdentifyingContext
 
 from pyphocorehelpers.function_helpers import function_attributes
@@ -625,7 +625,8 @@ class PosteriorExporting:
                     complete_epoch_identifier_str = f"{epoch_id_identifier_str}"
 
                 assert complete_epoch_identifier_str is not None
-                _posterior_image, posterior_save_path = active_captured_single_epoch_result.save_posterior_as_image(parent_array_as_image_output_folder=export_format_config.export_folder, complete_epoch_identifier_str=complete_epoch_identifier_str, **(kwargs|export_format_config.to_dict()), post_render_image_functions=curr_post_render_image_functions_dict)
+                _an_active_export_format_config: Dict = (kwargs|export_format_config.to_dict())
+                _posterior_image, posterior_save_path = active_captured_single_epoch_result.save_posterior_as_image(parent_array_as_image_output_folder=export_format_config.export_folder, complete_epoch_identifier_str=complete_epoch_identifier_str, **_an_active_export_format_config, post_render_image_functions=curr_post_render_image_functions_dict)
             
                 _output_export_format_config: HeatmapExportConfig = deepcopy(export_format_config)
                 _output_export_format_config.posterior_saved_path = posterior_save_path
@@ -637,6 +638,8 @@ class PosteriorExporting:
                     active_epoch_id=active_epoch_id,
                     complete_epoch_identifier_str=deepcopy(complete_epoch_identifier_str),
                     curr_post_render_image_functions_dict=deepcopy(curr_post_render_image_functions_dict),
+                    raw_RGBA_only_parameters = deepcopy(_an_active_export_format_config.get('raw_RGBA_only_parameters', {})),
+                    active_save_posterior_as_image_export_format_kwargs = deepcopy(_an_active_export_format_config), ## all, might not work
                 )
                 _save_out_paths.append(posterior_save_path)
                 # _save_out_format_results[export_format_name].append(export_format_config) # save out the modified v
@@ -1538,8 +1541,11 @@ class PosteriorExporting:
                             assert active_epoch_info is not None
                             active_epoch_info_dict = active_epoch_info['epoch_info_dict']
                             assert active_epoch_info_dict is not None
-
-                                                        
+                            active_captured_single_epoch_result: SingleEpochDecodedResult = active_epoch_info['active_captured_single_epoch_result']
+                            curr_post_render_image_functions_dict = active_epoch_info['curr_post_render_image_functions_dict'] ## pre-built functions to call
+                            active_save_posterior_as_image_export_format_kwargs = active_epoch_info.get('active_save_posterior_as_image_export_format_kwargs', None)
+                            
+                            # active_captured_single_epoch_result.start_t
                             ## INPUTS: _label_kwargs
                             # _out_vstack = ImageOperationsAndEffects.add_boxed_adjacent_label(_out_vstack, epoch_id_text, image_edge='bottom', font_size=24, text_color="#000000",
                             #                                         background_color=(255, 255, 255, 0),
