@@ -306,11 +306,23 @@ class BatchSessionCompletionHandler:
         # BEGIN MAIN FUNCTION BODY
         was_updated = False
         was_updated = was_updated | _subfn_update_session_missing_preprocessing_parameters(curr_active_pipeline.sess)
-        was_updated = was_updated | _subfn_update_session_missing_loaded_track_limits(curr_active_pipeline, always_reload_from_file=False)
 
-        long_epoch_name, short_epoch_name, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
-        for an_epoch_name in [long_epoch_name, short_epoch_name, global_epoch_name]:
-            was_updated = was_updated | _subfn_update_session_missing_preprocessing_parameters(curr_active_pipeline.filtered_sessions[an_epoch_name])
+
+        if (curr_active_pipeline.active_sess_config.format_name not in ['bapun']):
+            was_updated = was_updated | _subfn_update_session_missing_loaded_track_limits(curr_active_pipeline, always_reload_from_file=False)
+
+            long_epoch_name, short_epoch_name, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
+            for an_epoch_name in [long_epoch_name, short_epoch_name, global_epoch_name]:
+                was_updated = was_updated | _subfn_update_session_missing_preprocessing_parameters(curr_active_pipeline.filtered_sessions[an_epoch_name])
+
+        else:
+            ## Non KDIBA format
+            print(f'WARN: `_update_pipeline_missing_preprocessing_parameters(...): non-KDIBA format curr_active_pipeline.active_sess_config.format_name "{curr_active_pipeline.active_sess_config.format_name}" is not currently fully implemented/checked for all parameters. Filtered sessions might ahve wrong params.')
+            for an_epoch_name, a_sess in curr_active_pipeline.filtered_sessions.items():
+                ## override
+                print(f'trying to process for {an_epoch_name}..')
+                was_updated = was_updated | _subfn_update_session_missing_preprocessing_parameters(a_sess)
+
 
         # if was_updated:
         #     print(f'config was updated. Saving pipeline.')
@@ -331,30 +343,40 @@ class BatchSessionCompletionHandler:
         from pyphoplacecellanalysis.General.Model.SpecificComputationParameterTypes import ComputationKWargParameters
         from pyphoplacecellanalysis.General.Batch.BatchJobCompletion.UserCompletionHelpers.batch_user_completion_helpers import PostHocPipelineFixup
         
-        if not LongShortPipelineTests(curr_active_pipeline=curr_active_pipeline).validate():
-            print(f'ERROR!! Pipeline is invalid according to LongShortPipelineTests!!')
-            return False
+        if (curr_active_pipeline.active_sess_config.format_name not in ['bapun']):
+            if not LongShortPipelineTests(curr_active_pipeline=curr_active_pipeline).validate():
+                print(f'ERROR!! Pipeline is invalid according to LongShortPipelineTests!!')
+                return False
         
-        # 2023-05-24 - Adds the previously missing `sess.config.preprocessing_parameters` to each session (filtered and base) in the pipeline.
-        was_updated = cls._update_pipeline_missing_preprocessing_parameters(curr_active_pipeline)
-        print(f'were pipeline preprocessing parameters missing and updated?: {was_updated}')
+            # 2023-05-24 - Adds the previously missing `sess.config.preprocessing_parameters` to each session (filtered and base) in the pipeline.
+            was_updated = cls._update_pipeline_missing_preprocessing_parameters(curr_active_pipeline)
+            print(f'were pipeline preprocessing parameters missing and updated?: {was_updated}')
 
-        ## BUG 2023-05-25 - Found ERROR for a loaded pipeline where for some reason the filtered_contexts[long_epoch_name]'s actual context was the same as the short maze ('...maze2'). Unsure how this happened.
-        was_updated = was_updated or cls._post_fix_filtered_contexts(curr_active_pipeline) #TODO 2024-11-01 19:39: - [ ] This is where things go amiss it seems
+            ## BUG 2023-05-25 - Found ERROR for a loaded pipeline where for some reason the filtered_contexts[long_epoch_name]'s actual context was the same as the short maze ('...maze2'). Unsure how this happened.
+            was_updated = was_updated or cls._post_fix_filtered_contexts(curr_active_pipeline) #TODO 2024-11-01 19:39: - [ ] This is where things go amiss it seems
 
-        long_epoch_name, short_epoch_name, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
-        long_epoch_context, short_epoch_context, global_epoch_context = [curr_active_pipeline.filtered_contexts[a_name] for a_name in (long_epoch_name, short_epoch_name, global_epoch_name)]
-        # assert long_epoch_context.filter_name == long_epoch_name, f"long_epoch_context.filter_name: {long_epoch_context.filter_name} != long_epoch_name: {long_epoch_name}"
-        # if long_epoch_context.filter_name != long_epoch_name:
-        #     print(f"WARNING: filtered_contexts[long_epoch_name]'s actual context name is incorrect. \n\tlong_epoch_context.filter_name: {long_epoch_context.filter_name} != long_epoch_name: {long_epoch_name}\n\tUpdating it. (THIS IS A HACK)")
-        #     # fix it if broken
-        #     # long_epoch_context.filter_name = long_epoch_name
-        #     # was_updated = True
-        #     raise NotImplementedError("2023-11-29 - This shouldn't happen since we previously called `cls._post_fix_filtered_contexts(curr_active_pipeline)`!!")
-        
+            # long_epoch_name, short_epoch_name, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
+            # long_epoch_context, short_epoch_context, global_epoch_context = [curr_active_pipeline.filtered_contexts[a_name] for a_name in (long_epoch_name, short_epoch_name, global_epoch_name)]
+            # assert long_epoch_context.filter_name == long_epoch_name, f"long_epoch_context.filter_name: {long_epoch_context.filter_name} != long_epoch_name: {long_epoch_name}"
+            # if long_epoch_context.filter_name != long_epoch_name:
+            #     print(f"WARNING: filtered_contexts[long_epoch_name]'s actual context name is incorrect. \n\tlong_epoch_context.filter_name: {long_epoch_context.filter_name} != long_epoch_name: {long_epoch_name}\n\tUpdating it. (THIS IS A HACK)")
+            #     # fix it if broken
+            #     # long_epoch_context.filter_name = long_epoch_name
+            #     # was_updated = True
+            #     raise NotImplementedError("2023-11-29 - This shouldn't happen since we previously called `cls._post_fix_filtered_contexts(curr_active_pipeline)`!!")
+            
 
-        ## call `PostHocPipelineFixup.FINAL_UPDATE_ALL(...)`'s fixup function:
-        was_updated = was_updated or PostHocPipelineFixup.FINAL_UPDATE_ALL(curr_active_pipeline, force_recompute=False, is_dry_run=False)
+            ## call `PostHocPipelineFixup.FINAL_UPDATE_ALL(...)`'s fixup function:
+            was_updated = was_updated or PostHocPipelineFixup.FINAL_UPDATE_ALL(curr_active_pipeline, force_recompute=False, is_dry_run=False)
+        else:
+            ## Bapun-type session
+            # 2023-05-24 - Adds the previously missing `sess.config.preprocessing_parameters` to each session (filtered and base) in the pipeline.
+            was_updated = cls._update_pipeline_missing_preprocessing_parameters(curr_active_pipeline)
+            print(f'were pipeline preprocessing parameters missing and updated?: {was_updated}')
+
+            ## BUG 2023-05-25 - Found ERROR for a loaded pipeline where for some reason the filtered_contexts[long_epoch_name]'s actual context was the same as the short maze ('...maze2'). Unsure how this happened.
+            was_updated = was_updated or cls._post_fix_filtered_contexts(curr_active_pipeline) #TODO 2024-11-01 19:39: - [ ] This is where things go amiss it seems
+
 
 
         ## Add `curr_active_pipeline.global_computation_results.computation_config` as needed:

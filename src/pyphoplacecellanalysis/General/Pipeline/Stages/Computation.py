@@ -1654,16 +1654,18 @@ class ComputedPipelineStage(FilterablePipelineStage, LoadedPipelineStage):
         assert len(force_recompute_override_computations_includelist) <= len(include_includelist), f"READ THE NOTE ABOUT force_recompute_override_computations_includelist being a subset of include_includelist in the code above!! include_includelist: {include_includelist}\nforce_recompute_override_computations_includelist: {force_recompute_override_computations_includelist}"
 
         ## Get computed relative entropy measures:
-        _, _, global_epoch_name = self.find_LongShortGlobal_epoch_names()
+        
         # global_epoch_name = curr_active_pipeline.active_completed_computation_result_names[-1] # 'maze'
 
         if included_computation_filter_names is None:
+            _, _, global_epoch_name = self.find_LongShortGlobal_epoch_names()
             included_computation_filter_names = [global_epoch_name] # use only the global epoch: e.g. ['maze']
             if progress_print:
                 print(f'Running batch_extended_computations(...) with global_epoch_name: "{global_epoch_name}"')
         else:
             if progress_print:
                 print(f'Running batch_extended_computations(...) with included_computation_filter_names: "{included_computation_filter_names}"')
+            global_epoch_name = included_computation_filter_names[-1]
 
         
         ## Specify the computations and the requirements to validate them.

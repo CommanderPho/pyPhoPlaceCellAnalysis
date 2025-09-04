@@ -322,7 +322,8 @@ def batch_evaluate_required_computations(curr_active_pipeline, include_includeli
     else:
         if progress_print:
             print(f'Running batch_evaluate_required_computations(...) with included_computation_filter_names: "{included_computation_filter_names}"')
-
+            global_epoch_name = included_computation_filter_names[-1]
+            print(f'\tWARN: using `global_epoch_name = included_computation_filter_names[-1]`: global_epoch_name: "{global_epoch_name}", included_computation_filter_names: {included_computation_filter_names}. NOT CHECKED, hope this is right.')
 
     ## Specify the computations and the requirements to validate them.
 

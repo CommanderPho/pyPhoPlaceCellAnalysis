@@ -921,8 +921,14 @@ class PipelinePickleFileSelectorWidget:
 
         # Pre-load ___________________________________________________________________________________________________________ #
         force_recompute_global = force_reload
+        included_computation_filter_names = None
+        if (curr_active_pipeline.active_sess_config.format_name !='kdiba'):
+            curr_active_pipeline.sess.paradigm.adding_global_epoch_row()
+            # included_computation_filter_names = curr_active_pipeline.active_completed_computation_result_names
+            included_computation_filter_names = ['maze']
+
         needs_computation_output_dict, valid_computed_results_output_list, remaining_include_function_names = batch_evaluate_required_computations(curr_active_pipeline, include_includelist=extended_computations_include_includelist, include_global_functions=True, fail_on_exception=False, progress_print=True,
-                                                            force_recompute=force_recompute_global, force_recompute_override_computations_includelist=force_recompute_override_computations_includelist, debug_print=False)
+                                                            force_recompute=force_recompute_global, force_recompute_override_computations_includelist=force_recompute_override_computations_includelist, included_computation_filter_names=included_computation_filter_names, debug_print=False)
         print(f'Pre-load global computations: needs_computation_output_dict: {[k for k,v in needs_computation_output_dict.items() if (v is not None)]}')
         # valid_computed_results_output_list
 
@@ -949,7 +955,7 @@ class PipelinePickleFileSelectorWidget:
         # Post-Load __________________________________________________________________________________________________________ #
         force_recompute_global = force_reload
         needs_computation_output_dict, valid_computed_results_output_list, remaining_include_function_names = batch_evaluate_required_computations(curr_active_pipeline, include_includelist=extended_computations_include_includelist, include_global_functions=True, fail_on_exception=False, progress_print=True,
-                                                            force_recompute=force_recompute_global, force_recompute_override_computations_includelist=force_recompute_override_computations_includelist, debug_print=False)
+                                                            force_recompute=force_recompute_global, force_recompute_override_computations_includelist=force_recompute_override_computations_includelist, included_computation_filter_names=included_computation_filter_names, debug_print=False)
         print(f'Post-load global computations: needs_computation_output_dict: {[k for k,v in needs_computation_output_dict.items() if (v is not None)]}')
 
         ## fixup missing paths
@@ -963,7 +969,7 @@ class PipelinePickleFileSelectorWidget:
         force_recompute_global = force_reload
         # force_recompute_global = True
         newly_computed_values = batch_extended_computations(curr_active_pipeline, include_includelist=extended_computations_include_includelist, include_global_functions=True, fail_on_exception=False, progress_print=True,
-                                                            force_recompute=force_recompute_global, force_recompute_override_computations_includelist=force_recompute_override_computations_includelist, debug_print=False)
+                                                            force_recompute=force_recompute_global, force_recompute_override_computations_includelist=force_recompute_override_computations_includelist, included_computation_filter_names=included_computation_filter_names,  debug_print=False)
         if (len(newly_computed_values) > 0):
             print(f'newly_computed_values: {newly_computed_values}.')
             if (saving_mode.value != 'skip_saving'):
@@ -986,14 +992,14 @@ class PipelinePickleFileSelectorWidget:
         # Post-compute _______________________________________________________________________________________________________ #
         # Post-hoc verification that the computations worked and that the validators reflect that. The list should be empty now.
         needs_computation_output_dict, valid_computed_results_output_list, remaining_include_function_names = batch_evaluate_required_computations(curr_active_pipeline, include_includelist=extended_computations_include_includelist, include_global_functions=True, fail_on_exception=False, progress_print=True,
-                                                            force_recompute=False, force_recompute_override_computations_includelist=[], debug_print=True)
+                                                            force_recompute=False, force_recompute_override_computations_includelist=[], included_computation_filter_names=included_computation_filter_names, debug_print=True)
         print(f'Post-compute validation: needs_computation_output_dict: {[k for k,v in needs_computation_output_dict.items() if (v is not None)]}')
 
 
         # Post-Load __________________________________________________________________________________________________________ #
         force_recompute_global = force_reload
         needs_computation_output_dict, valid_computed_results_output_list, remaining_include_function_names = batch_evaluate_required_computations(curr_active_pipeline, include_includelist=extended_computations_include_includelist, include_global_functions=True, fail_on_exception=False, progress_print=True,
-                                                            force_recompute=force_recompute_global, force_recompute_override_computations_includelist=force_recompute_override_computations_includelist, debug_print=False)
+                                                            force_recompute=force_recompute_global, force_recompute_override_computations_includelist=force_recompute_override_computations_includelist, included_computation_filter_names=included_computation_filter_names, debug_print=False)
         print(f'Post-load global computations: needs_computation_output_dict: {[k for k,v in needs_computation_output_dict.items() if (v is not None)]}')
 
 
