@@ -2400,6 +2400,14 @@ class PipelineWithComputedPipelineStageMixin:
         return self.stage.find_LongShortDelta_times()
 
 
+    def find_Global_epoch_name(self) -> str:
+        """ Helper function to returns the global epoch name for both KDIBA and other (Bapun)-type sessions, unlike `find_LongShortGlobal_epoch_names` which is KDIBA only. They must exist.
+        Usage:
+            global_epoch_name: str = curr_active_pipeline.find_Global_epoch_name()
+            
+        """
+        return self.stage.find_Global_epoch_name()
+
     def get_output_path(self) -> Path:
         """ returns the appropriate output path to store the outputs for this session. Usually '$session_folder/outputs/' """
         return self.sess.get_output_path()
