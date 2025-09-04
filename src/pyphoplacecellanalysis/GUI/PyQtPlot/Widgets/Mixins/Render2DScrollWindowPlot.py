@@ -5,6 +5,8 @@ from attrs import define, field, fields, asdict, astuple
 
 from pyphocorehelpers.programming_helpers import metadata_attributes
 from pyphocorehelpers.function_helpers import function_attributes
+from neuropy.utils.mixins.time_slicing import TimeColumnAliasesProtocol
+from neuropy.core.flattened_spiketrains import SpikesAccessor
 
 import pyphoplacecellanalysis.External.pyqtgraph as pg
 from pyphoplacecellanalysis.External.pyqtgraph.Qt import QtCore, QtGui, QtWidgets
@@ -310,10 +312,15 @@ class Render2DScrollWindowPlotMixin:
             active_spikes_df = deepcopy(spikes_df).iloc[::downsampling_rate]  # Take every 10th row
         else:
             active_spikes_df = deepcopy(spikes_df)
-            
 
         # All units at once approach:
         active_time_variable_name = active_spikes_df.spikes.time_variable_name
+        if active_time_variable_name != 't': 
+            active_spikes_df = TimeColumnAliasesProtocol.renaming_synonym_columns_if_needed(active_spikes_df, required_columns_synonym_dict={"t":{active_time_variable_name,'t_rel_seconds', 't_seconds'}})
+            active_spikes_df = active_spikes_df.drop(columns=[active_time_variable_name], inplace=False) ## drop the old column    
+            active_time_variable_name = 't' ## get the new one
+            active_spikes_df.spikes.set_time_variable_name('t')        
+
         # Copy only the relevent columns so filtering is easier:
         filtered_spikes_df = active_spikes_df[[active_time_variable_name, 'visualization_raster_y_location',  'visualization_raster_emphasis_state', 'fragile_linear_neuron_IDX']].copy()
         
@@ -439,6 +446,12 @@ def independent_build_spikes_all_spots_from_df(spikes_df: pd.DataFrame, config_f
     # curr_spike_x, curr_spike_y, curr_spike_pens, all_scatterplot_tooltips_kwargs, all_spots, curr_n = cls.build_spikes_data_values_from_df(spikes_df, config_fragile_linear_neuron_IDX_map, is_spike_included=is_spike_included, should_return_data_tooltips_kwargs=should_return_data_tooltips_kwargs, **kwargs)
     # All units at once approach:
     active_time_variable_name = spikes_df.spikes.time_variable_name
+    if active_time_variable_name != 't': 
+        spikes_df = TimeColumnAliasesProtocol.renaming_synonym_columns_if_needed(spikes_df, required_columns_synonym_dict={"t":{active_time_variable_name,'t_rel_seconds', 't_seconds'}})
+        spikes_df = spikes_df.drop(columns=[active_time_variable_name], inplace=False) ## drop the old column    
+        active_time_variable_name = 't' ## get the new one
+        spikes_df.spikes.set_time_variable_name('t')
+        
     # Copy only the relevent columns so filtering is easier:
     filtered_spikes_df = spikes_df[[active_time_variable_name, 'visualization_raster_y_location',  'visualization_raster_emphasis_state', 'fragile_linear_neuron_IDX']].copy()
     
