@@ -697,7 +697,7 @@ class NewSimpleRaster:
 
             # spikes_data = spikes_df[active_datapoint_column_names].to_records(index=False).tolist() # list of tuples
             spikes_data = active_spikes_df[active_datapoint_column_names].to_dict('records') # list of dicts
-            spikes_data = [ScatterItemData(**v) for v in spikes_data] 
+            spikes_data = [ScatterItemData.init_from_df_record(**v) for v in spikes_data] 
             all_scatterplot_tooltips_kwargs = dict(data=spikes_data, tip=_tip_fn)
             assert len(all_scatterplot_tooltips_kwargs['data']) == np.shape(active_spikes_df)[0], f"if specified, all_scatterplot_tooltips_kwargs must be the same length as the number of spikes but np.shape(spikes_df)[0]: {np.shape(active_spikes_df)[0]} and len((all_scatterplot_tooltips_kwargs['data']): {len(all_scatterplot_tooltips_kwargs['data'])}"
         else:

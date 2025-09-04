@@ -7,6 +7,7 @@ from pyphocorehelpers.programming_helpers import metadata_attributes
 from pyphocorehelpers.function_helpers import function_attributes
 from neuropy.utils.mixins.time_slicing import TimeColumnAliasesProtocol
 from neuropy.core.flattened_spiketrains import SpikesAccessor
+from neuropy.utils.mixins.dict_representable import get_dict_subset
 
 import pyphoplacecellanalysis.External.pyqtgraph as pg
 from pyphoplacecellanalysis.External.pyqtgraph.Qt import QtCore, QtGui, QtWidgets
@@ -22,6 +23,18 @@ class ScatterItemData:
     neuron_IDX: int = field(alias='fragile_linear_neuron_IDX')
     visualization_raster_y_location: float = field(default=np.nan)
 
+    @classmethod
+    def init_from_df_record(cls, a_record):
+        if ('t_rel_seconds' not in a_record):
+            for an_alias_name in ('t_seconds', 't'):
+                if (an_alias_name in a_record):
+                    a_record['t_rel_seconds'] = a_record.pop(an_alias_name) ## removes the alias as well
+            
+        a_record = get_dict_subset(a_record, ['t_rel_seconds', 'aclu', 'neuron_IDX', 'visualization_raster_y_location'])
+        print(f'a_record.keys(): {list(a_record.keys())}')
+        return cls(**a_record)
+        
+        
 
 class Render2DScrollWindowPlotMixin:
     """ Adds a LinearRegionItem to the plot that represents the entire data timerange which defines a user-adjustable window into the data. Finally, also adds a plot that shows only the zoomed-in data within the window. 
@@ -276,7 +289,7 @@ class Render2DScrollWindowPlotMixin:
 
         # spikes_data = spikes_df[active_datapoint_column_names].to_records(index=False).tolist() # list of tuples
         spikes_data = spikes_df[active_datapoint_column_names].to_dict('records') # list of dicts
-        spikes_data = [ScatterItemData(**v) for v in spikes_data] 
+        spikes_data = [ScatterItemData.init_from_df_record(**v) for v in spikes_data] 
         
         # spikes_data = [DynamicParameters.init_from_dict(v) for v in spikes_data] # convert to list of DynamicParameters objects
         return dict(data=spikes_data, tip=_tip_fn)
@@ -495,7 +508,7 @@ def independent_build_spikes_all_spots_from_df(spikes_df: pd.DataFrame, config_f
 
         # spikes_data = spikes_df[active_datapoint_column_names].to_records(index=False).tolist() # list of tuples
         spikes_data = spikes_df[active_datapoint_column_names].to_dict('records') # list of dicts
-        spikes_data = [ScatterItemData(**v) for v in spikes_data] 
+        spikes_data = [ScatterItemData.init_from_df_record(**v) for v in spikes_data] 
         all_scatterplot_tooltips_kwargs = dict(data=spikes_data, tip=_tip_fn)
         assert len(all_scatterplot_tooltips_kwargs['data']) == np.shape(spikes_df)[0], f"if specified, all_scatterplot_tooltips_kwargs must be the same length as the number of spikes but np.shape(spikes_df)[0]: {np.shape(spikes_df)[0]} and len((all_scatterplot_tooltips_kwargs['data']): {len(all_scatterplot_tooltips_kwargs['data'])}"
     else:
