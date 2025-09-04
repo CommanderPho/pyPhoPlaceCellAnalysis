@@ -647,7 +647,9 @@ class ComputedPipelineStage(FilterablePipelineStage, LoadedPipelineStage):
             short_results = curr_active_pipeline.computation_results[short_epoch_name]['computed_data']
             global_results = curr_active_pipeline.computation_results[global_epoch_name]['computed_data']
 
+        NOTE: this if for 'kdiba'-type sessions ONLY!
         """
+        
         include_includelist = self.active_completed_computation_result_names # ['maze', 'sprinkle']
         assert (len(include_includelist) >= 3), "Must have at least 3 completed computation results to find the long, short, and global epoch names."
         if (len(include_includelist) > 3):
@@ -701,6 +703,23 @@ class ComputedPipelineStage(FilterablePipelineStage, LoadedPipelineStage):
         t_end = short_epoch_obj.t_stop
         return t_start, t_delta, t_end
 
+    ## Generalizability
+# curr_active_pipeline.filtered_session_names
+    def find_Global_epoch_name(self) -> str:
+        """ Helper function to returns the global epoch name for both KDIBA and other (Bapun)-type sessions, unlike `find_LongShortGlobal_epoch_names` which is KDIBA only. They must exist.
+        Usage:
+            global_epoch_name: str = curr_active_pipeline.find_Global_epoch_name()
+            
+        """
+        if (self.active_sess_config.format_name =='kdiba'):
+            _, _, global_epoch_name = self.find_LongShortGlobal_epoch_names()
+            return global_epoch_name
+        else:
+            ## non-KDIBA session
+            df = self.sess.paradigm.to_dataframe()
+            return df['label'].values[-1] ## last item
+            # df[df['duration'].max()] 
+            ## TODO:
 
 
 
@@ -1666,7 +1685,7 @@ class ComputedPipelineStage(FilterablePipelineStage, LoadedPipelineStage):
             if progress_print:
                 print(f'Running batch_extended_computations(...) with included_computation_filter_names: "{included_computation_filter_names}"')
             global_epoch_name = included_computation_filter_names[-1]
-
+            
         
         ## Specify the computations and the requirements to validate them.
 
