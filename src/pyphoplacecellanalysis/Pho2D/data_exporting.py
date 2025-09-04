@@ -1334,7 +1334,7 @@ class PosteriorExporting:
 
     @function_attributes(short_name=None, tags=['TEMP', 'export', 'image', 'files', 'merge', 'combine', 'posterior'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-05-30 14:51', related_items=[])
     @classmethod
-    def post_export_build_combined_images(cls, out_custom_formats_dict, custom_merge_layout_dict: Optional[Dict]=None, epoch_name_list = ['laps', 'ripple'], included_epoch_idxs: Optional[List]=None, progress_print:bool=False, should_use_raw_rgba_export_image: bool=True):
+    def post_export_build_combined_images(cls, out_custom_formats_dict, custom_merge_layout_dict: Optional[Dict]=None, epoch_name_list = ['laps', 'ripple'], included_epoch_idxs: Optional[List]=None, progress_print:bool=False, debug_print:bool=False, should_use_raw_rgba_export_image: bool=True):
         """merges the 4 1D decoders and the multi-color pseudo2D to produce a single combined output image for each epoch
 
         Responsible for the `_temp_individual_posteriors/2025-08-13/gor01_one_2006-6-09_1-22-43/ripple/combined/multi` images
@@ -1426,20 +1426,20 @@ class PosteriorExporting:
                             if progress_print:
                                 print(f'epoch_IDX: {epoch_IDX}')
                         
-                            if progress_print:
+                            if (debug_print and progress_print):
                                 print(f'\trow_idx: {row_idx}')
                             for col_idx, a_merge_layout_col in enumerate(a_merge_layout_row):
                                 ## col_idx is actually the decoder index and is redundant
                                 
                                 # vertical stack
-                                if progress_print:
+                                if (debug_print and progress_print):
                                     print(f'\t\tcol_idx: {col_idx}')
                                 # _tmp_curr_raster_imgs = []
                                 #TODO 2025-09-03 18:58: - [ ] This is excessively nested and iterates incorreclty
                                 for decoder_IDX, a_decoder_name in enumerate(active_1D_decoder_names):
                                     ## get the single decoder image for this format:
                                     # a_config = out_custom_formats_dict[f'{a_decoding_epoch_name}.{a_decoder_name}'][active_found_export_format_name][epoch_IDX] # a HeatmapExportConfig
-                                    if progress_print:
+                                    if (debug_print and progress_print):
                                         print(f'\t\t\tdecoder[{decoder_IDX}]:', end='\t')
                                         
                                     active_config_key: str = f'{a_decoding_epoch_name}.{a_decoder_name}'
@@ -1447,7 +1447,7 @@ class PosteriorExporting:
                                     a_config: HeatmapExportConfig = out_custom_formats_dict[active_config_key][a_merge_layout_col][epoch_IDX] # a HeatmapExportConfig
                                     # a_config.posterior_saved_path ## the saved image file
                                     an_active_img = deepcopy(a_config.posterior_saved_image) ## the actual image object
-                                    if progress_print:
+                                    if (debug_print and progress_print):
                                         print(f'{active_config_full_specifier}', end=':\t')
                                         print(f' .size (w, h): original {an_active_img.size}', end='\t')   
 
@@ -1455,7 +1455,7 @@ class PosteriorExporting:
                                     # an_active_img = an_active_img.reduce(factor=(4, 1)) ## scale image down by 1/4 in width but leave the original height
                                     curr_img_size = deepcopy(an_active_img.size)
                                     
-                                    if progress_print:
+                                    if (debug_print and progress_print):
                                         print(f'scaled {an_active_img.size}')
                                         
                                     ## Add overlay text
@@ -1473,7 +1473,7 @@ class PosteriorExporting:
                                                                                                             ) ## why is this size unchanged from before adding the label?
                                         curr_img_size = deepcopy(an_active_img.size)
                                         
-                                    if progress_print:
+                                    if (debug_print and progress_print):
                                         print(f'\t\t\t\tpre-append img_size: {an_active_img.size}')
                                     _tmp_curr_col_raster_imgs.append(an_active_img)
                                 ## END for decoder_IDX, a_d...
@@ -1482,7 +1482,7 @@ class PosteriorExporting:
                             _out_single_col_stack = vertical_image_stack(_tmp_curr_col_raster_imgs, padding=5, separator_color=separator_color)
                             
                             # _out_row_stack = horizontal_image_stack(_tmp_curr_row_raster_imgs, padding=5, separator_color=separator_color)
-                            if progress_print:
+                            if (debug_print and progress_print):
                                 print(f'\t_out_single_col_stack .size - {_out_single_col_stack.size}')
                                 
                             ## Add top normalization labels:
@@ -1494,7 +1494,7 @@ class PosteriorExporting:
                                                                                                     background_color=(255, 255, 255, 0),
                                                                                                     fixed_label_region_size = [_out_single_col_stack.width, 62]
                                                                                                     )
-                                if progress_print:
+                                if (debug_print and progress_print):
                                     print(f'\t\t post normalization label text added: _out_single_col_stack .size - {_out_single_col_stack.size}')
                                     
                             _tmp_curr_merge_layout_raster_imgs.append(_out_single_col_stack)
@@ -1506,11 +1506,11 @@ class PosteriorExporting:
                         # separator_color=f'#66ff00' 
                         _out_vstack = horizontal_image_stack(_tmp_curr_merge_layout_raster_imgs, padding=25, separator_color=separator_color) # , separator_color=separator_color
                         # _out_vstack = vertical_image_stack(_tmp_curr_merge_layout_raster_imgs, padding=35, separator_color=separator_color)
-                        if progress_print:
+                        if (debug_print and progress_print):
                             print(f'\t_out_vstack - ALL MERGED ROWS .size - {_out_vstack.size} (w, h)', end='\t')
                                                     
                         _out_vstack = _out_vstack.reduce(factor=(2, 1)) ## scale image down by 1/2 in width but leave the original height
-                        if progress_print:
+                        if (debug_print and progress_print):
                             print(f'scaled .size - {_out_vstack.size}')
 
                         _tmp_curr_merge_layout_raster_imgs = [_out_vstack, ] # combined image with both columns concatenated is back
@@ -1522,7 +1522,7 @@ class PosteriorExporting:
                             try:
                                 a_config: HeatmapExportConfig = out_custom_formats_dict[f'{a_decoding_epoch_name}.{pseudo_2D_decoder_name}']['raw_rgba'][epoch_IDX] # a HeatmapExportConfig
                                 _tmp_curr_merge_layout_raster_imgs.append(a_config.posterior_saved_image)
-                                if progress_print:
+                                if (debug_print and progress_print):
                                     print(f'\t\traw_RGBA a_config.posterior_saved_image.size: {a_config.posterior_saved_image.size}')
                             except KeyError as e:
                                 # KeyError: "Invalid keys: '['laps', 'long_LR']'"
@@ -1588,7 +1588,7 @@ class PosteriorExporting:
                         _out_vstack = vertical_image_stack(_tmp_curr_merge_layout_raster_imgs, padding=10, separator_color=separator_color)
                         # else:
                         #     _out_vstack = _tmp_curr_merge_layout_raster_imgs[0] ## just get the only real image
-                        if progress_print:
+                        if (debug_print and progress_print):
                             print(f'final _out_vstack.size: {_out_vstack.size}')
                         _out_final_merged_images.append(_out_vstack)
 
