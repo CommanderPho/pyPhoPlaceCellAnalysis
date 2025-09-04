@@ -1008,7 +1008,7 @@ class PipelinePickleFileSelectorWidget:
         """ Called to provide the widget with everything needed to actually load the pipeline, which is required before the "Load" button is enabled.
         
         
-        _subfn_load, _subfn_save, _subfn_compute = active_session_pickle_file_widget._build_load_save_callbacks(global_data_root_parent_path=global_data_root_parent_path, active_data_mode_name=active_data_mode_name, basedir=basedir, saving_mode=saving_mode, force_reload=force_reload,
+        _subfn_load, _subfn_save, _subfn_compute, _subfn_compute_new = active_session_pickle_file_widget._build_load_save_callbacks(global_data_root_parent_path=global_data_root_parent_path, active_data_mode_name=active_data_mode_name, basedir=basedir, saving_mode=saving_mode, force_reload=force_reload,
 															 extended_computations_include_includelist=extended_computations_include_includelist, force_recompute_override_computations_includelist=force_recompute_override_computations_includelist)
 
         """
