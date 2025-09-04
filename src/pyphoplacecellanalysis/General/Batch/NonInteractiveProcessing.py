@@ -454,7 +454,8 @@ def batch_extended_computations(curr_active_pipeline, include_includelist=None, 
     else:
         if progress_print:
             print(f'Running batch_extended_computations(...) with included_computation_filter_names: "{included_computation_filter_names}"')
-
+        # global_epoch_name = curr_active_pipeline.find_Global_epoch_name()
+        global_epoch_name = included_computation_filter_names[-1]
     
     ## Specify the computations and the requirements to validate them.
 
