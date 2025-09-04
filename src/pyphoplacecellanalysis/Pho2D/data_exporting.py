@@ -1423,7 +1423,7 @@ class PosteriorExporting:
                             
                             ## Doing a single row
                             _tmp_curr_col_raster_imgs = []
-                            if progress_print:
+                            if (debug_print and progress_print):
                                 print(f'epoch_IDX: {epoch_IDX}')
                         
                             if (debug_print and progress_print):
