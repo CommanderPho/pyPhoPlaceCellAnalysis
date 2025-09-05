@@ -4042,7 +4042,7 @@ class AcrossSessionsVisualizations:
 
     @function_attributes(short_name=None, tags=['sanity-check', 'dropped-t-bins'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-08-28 17:11', related_items=[])
     @classmethod
-    def _sanity_check_dropped_t_bins_per_session(cls, acitve_dropped_df, acitve_ignore_df, should_plot: bool=True):
+    def _sanity_check_dropped_t_bins_per_session(cls, acitve_dropped_df, acitve_ignore_df, should_plot: bool=True, export_suffix: str='Epochs'):
         """ checks that the dropped time bins (due to low firing, too few cells, etc) are approximately the same across sessions)
         
         Usage:
@@ -4057,11 +4057,13 @@ class AcrossSessionsVisualizations:
         import matplotlib.pyplot as plt
 
         def _subfn_plot_portion_over_time(df: pd.DataFrame, count_col_name: str = 'drop_ratio'):
+            """ captures `export_suffix` 
+            """
             # Plot
             # count_col_name: str = 'n_dropped'
             df: pd.DataFrame = deepcopy(df).reset_index()
             
-            curr_title: str = f'Portion of Dropped (bad) Timebins Per Session: {count_col_name}'
+            curr_title: str = f'Portion of Dropped (bad) Timebins Per Session: {count_col_name} for {export_suffix}'
             fig, ax = plt.subplots(figsize=(10,6), num=curr_title, clear=True)
             for cat in df['pre_post_delta_category'].unique():
                 subset = df[df['pre_post_delta_category'] == cat]
