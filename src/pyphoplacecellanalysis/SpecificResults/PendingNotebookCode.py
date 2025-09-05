@@ -120,16 +120,14 @@ from pyphocorehelpers.gui.Qt.color_helpers import ColormapHelpers, ColorFormatCo
 from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.ContainerBased.PhoContainerTool import GenericPyQtGraphContainer
 
 
-def build_combined_time_synchronized_plotters_window(curr_active_pipeline, included_filter_names: List[str]=None, fixed_window_duration = 15.0, controlling_widget=None, context=None, create_new_controlling_widget=True) -> GenericPyQtGraphContainer:
+def build_combined_time_synchronized_Bapun_decoders_window(curr_active_pipeline, included_filter_names: List[str]=None, fixed_window_duration = 15.0, controlling_widget=None, context=None, create_new_controlling_widget=True) -> GenericPyQtGraphContainer:
     """ Builds a single window with time_synchronized (time-dependent placefield) plotters controlled by an internal 2DRasterPlot widget.
     
     Usage:
-    
-        from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import build_combined_time_synchronized_plotters_window
+        from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.ContainerBased.PhoContainerTool import GenericPyQtGraphContainer
+        from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import build_combined_time_synchronized_Bapun_decoders_window
 
-        active_pf_2D_dt.reset()
-        active_pf_2D_dt.update(t=45.0, start_relative_t=True)
-        all_plotters, root_dockAreaWindow, app = build_combined_time_synchronized_plotters_window(active_pf_2D_dt, fixed_window_duration = 15.0)
+        _out_container: GenericPyQtGraphContainer = build_combined_time_synchronized_Bapun_decoders_window(curr_active_pipeline, included_filter_names=['maze1', 'maze2', 'maze'], fixed_window_duration = 15.0)
     """
     from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.SpikeRasterWidgets.Spike2DRaster import Spike2DRaster
     from pyphoplacecellanalysis.Pho2D.PyQtPlots.TimeSynchronizedPlotters.TimeSynchronizedPositionDecoderPlotter import TimeSynchronizedPositionDecoderPlotter
