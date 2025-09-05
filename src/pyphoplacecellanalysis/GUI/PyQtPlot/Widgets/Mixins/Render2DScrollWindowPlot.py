@@ -18,21 +18,36 @@ from pyphoplacecellanalysis.General.Model.Datasources.Datasources import Datafra
 
 @define(frozen=True)
 class ScatterItemData:
-    t: float = field(alias='t_rel_seconds')
+    # t: float = field(alias='t_rel_seconds')
+    # aclu: int = field() # alias='neuron_ID'
+    # neuron_IDX: int = field(alias='fragile_linear_neuron_IDX')
+    # visualization_raster_y_location: float = field(default=np.nan)
+    
+    t: float = field()
     aclu: int = field() # alias='neuron_ID'
-    neuron_IDX: int = field(alias='fragile_linear_neuron_IDX')
+    neuron_IDX: int = field()
     visualization_raster_y_location: float = field(default=np.nan)
 
     @classmethod
-    def init_from_df_record(cls, a_record):
+    def init_from_df_record(cls, **a_record):
         if ('t_rel_seconds' not in a_record):
             for an_alias_name in ('t_seconds', 't'):
                 if (an_alias_name in a_record):
                     a_record['t_rel_seconds'] = a_record.pop(an_alias_name) ## removes the alias as well
             
-        a_record = get_dict_subset(a_record, ['t_rel_seconds', 'aclu', 'neuron_IDX', 'visualization_raster_y_location'])
-        print(f'a_record.keys(): {list(a_record.keys())}')
-        return cls(**a_record)
+        a_record = get_dict_subset(a_record, ['t_rel_seconds', 'aclu', 'neuron_IDX', 'fragile_linear_neuron_IDX', 'visualization_raster_y_location'])
+        # print(f'a_record.keys(): {list(a_record.keys())}')
+        # return cls(t_rel_seconds=a_record.get('t_rel_seconds', a_record.get('t', None)),
+        #             aclu=a_record.get('aclu', None),
+        #             fragile_linear_neuron_IDX=a_record.get('fragile_linear_neuron_IDX', a_record.get('neuron_IDX', None)),
+        #             visualization_raster_y_location=a_record.get('visualization_raster_y_location', np.nan))
+        
+        return cls(a_record.get('t_rel_seconds', a_record.get('t', None)),
+                    a_record.get('aclu', None),
+                    a_record.get('fragile_linear_neuron_IDX', a_record.get('neuron_IDX', None)),
+                    a_record.get('visualization_raster_y_location', np.nan))
+
+        # return cls(**a_record)
         
         
 
