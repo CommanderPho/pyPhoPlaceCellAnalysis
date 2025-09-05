@@ -172,6 +172,10 @@ def batch_load_session(global_data_root_parent_path: Path, active_data_mode_name
     ## For every computation config we build a fake (duplicate) filter config).
     # OVERRIDE WITH TRUE:
     # curr_active_pipeline.sess.config.preprocessing_parameters.epoch_estimation_parameters.laps['use_direction_dependent_laps'] = True # override with True
+    if (curr_active_pipeline.active_sess_config.format_name in ['bapun']) and (curr_active_pipeline.sess.config.preprocessing_parameters.epoch_estimation_parameters.laps.use_direction_dependent_laps == True):
+        print(f'WARN: overriding `curr_active_pipeline.sess.config.preprocessing_parameters.epoch_estimation_parameters.laps.use_direction_dependent_laps = False` for BAPUN-type session.')
+        curr_active_pipeline.sess.config.preprocessing_parameters.epoch_estimation_parameters.laps.use_direction_dependent_laps = False
+    
     lap_estimation_parameters = curr_active_pipeline.sess.config.preprocessing_parameters.epoch_estimation_parameters.laps
     assert lap_estimation_parameters is not None
     use_direction_dependent_laps: bool = lap_estimation_parameters.get('use_direction_dependent_laps', False) # whether to split the laps into left and right directions
