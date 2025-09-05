@@ -115,6 +115,170 @@ from pyphocorehelpers.gui.Qt.color_helpers import ColormapHelpers, ColorFormatCo
 
 
 # ==================================================================================================================================================================================================================================================================================== #
+# 2025-09-05 - Bapun Co/plotting                                                                                                                                                                                                                                                       #
+# ==================================================================================================================================================================================================================================================================================== #
+from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.ContainerBased.PhoContainerTool import GenericPyQtGraphContainer
+
+
+def build_combined_time_synchronized_plotters_window(curr_active_pipeline, included_filter_names: List[str]=None, fixed_window_duration = 15.0, controlling_widget=None, context=None, create_new_controlling_widget=True) -> GenericPyQtGraphContainer:
+    """ Builds a single window with time_synchronized (time-dependent placefield) plotters controlled by an internal 2DRasterPlot widget.
+    
+    Usage:
+    
+        from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import build_combined_time_synchronized_plotters_window
+
+        active_pf_2D_dt.reset()
+        active_pf_2D_dt.update(t=45.0, start_relative_t=True)
+        all_plotters, root_dockAreaWindow, app = build_combined_time_synchronized_plotters_window(active_pf_2D_dt, fixed_window_duration = 15.0)
+    """
+    from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.SpikeRasterWidgets.Spike2DRaster import Spike2DRaster
+    from pyphoplacecellanalysis.Pho2D.PyQtPlots.TimeSynchronizedPlotters.TimeSynchronizedPositionDecoderPlotter import TimeSynchronizedPositionDecoderPlotter
+    from pyphoplacecellanalysis.Pho2D.PyQtPlots.TimeSynchronizedPlotters.TimeSynchronizedOccupancyPlotter import TimeSynchronizedOccupancyPlotter
+    from pyphoplacecellanalysis.Pho2D.PyQtPlots.TimeSynchronizedPlotters.TimeSynchronizedPlacefieldsPlotter import TimeSynchronizedPlacefieldsPlotter
+    from pyphoplacecellanalysis.Pho2D.PyQtPlots.TimeSynchronizedPlotters.TimeSynchronizedPositionDecoderPlotter import TimeSynchronizedPositionDecoderPlotter
+    from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.DockAreaWrapper import DockAreaWrapper
+
+    from pyphoplacecellanalysis.GUI.PyQtPlot.DockingWidgets.DynamicDockDisplayAreaContent import CustomDockDisplayConfig
+    from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError import _temp_debug_two_step_plots_animated_pyqtgraph
+    from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.ContainerBased.PhoContainerTool import GenericPyQtGraphContainer
+    
+
+    if context is not None:
+        ## Finally, add the display function to the active context
+        active_display_fn_identifying_ctx = context.adding_context('combined_time_synchronized_plotters', display_fn_name='combined_time_synchronized_plotters')
+        active_display_fn_identifying_ctx_string = active_display_fn_identifying_ctx.get_description(separator='|') # Get final discription string:
+        title = f'All Time Synchronized Plotters <{active_display_fn_identifying_ctx_string}>'
+    else:
+        title = 'All Time Synchronized Plotters'
+    
+    if included_filter_names is None:
+        included_filter_names = ['sprinkle', 'roam']
+        
+    
+    def _merge_plotters(a_controlling_widget, is_controlling_widget_external=False, debug_print=False, **_out_sync_plotters) -> GenericPyQtGraphContainer:
+        """ implicitly captures title from the outer function """
+        if len(_out_sync_plotters) > 0:
+            # out_Width_Height_Tuple = list(_out_sync_plotters.values())[0].desired_widget_size(desired_page_height = 600.0, debug_print=True)
+            out_Width_Height_Tuple = list(_out_sync_plotters.values())[0].size()
+            out_Width_Height_Tuple = (out_Width_Height_Tuple.width(), out_Width_Height_Tuple.height())
+            if debug_print:
+                print(f'out_Width_Height_Tuple: {out_Width_Height_Tuple}')
+            
+            final_desired_width, final_desired_height = out_Width_Height_Tuple
+            if debug_print:
+                print(f'final_desired_width: {final_desired_width}, final_desired_height: {final_desired_height}')
+        
+        # build a win of type PhoDockAreaContainingWindow
+        root_dockAreaWindow, app = DockAreaWrapper.build_default_dockAreaWindow(title=title, defer_show=True)
+        
+        _display_configs = {}
+        _display_dock_items = {}
+        _display_sync_connections = {}
+        
+        for a_name, a_sync_plotter in _out_sync_plotters.items():
+            _display_configs[a_name] = CustomDockDisplayConfig(showCloseButton=False)
+            _, _display_dock_items[a_name] = root_dockAreaWindow.add_display_dock(f"{a_name}", dockSize=(final_desired_width, final_desired_height), widget=a_sync_plotter, dockAddLocationOpts=['right'], display_config=_display_configs[a_name])
+        # END for a_name, a_sync_plotter in _out_sync_plotter...
+        
+        if a_controlling_widget is not None:
+            if not is_controlling_widget_external:
+                controlling_widget_id: str = 'Controller'
+                a_controlling_widget, _display_dock_items[controlling_widget_id] = root_dockAreaWindow.add_display_dock(identifier=f'{controlling_widget_id}', widget=a_controlling_widget, dockAddLocationOpts=['bottom'])
+                
+        root_dockAreaWindow.show()
+        
+        ## Register the children items as drivables/drivers:
+        # root_dockAreaWindow.connection_man.register_drivable(curr_sync_occupancy_plotter)
+        # root_dockAreaWindow.connection_man.register_drivable(curr_placefields_plotter)
+        # Note needed now that DockAreaWrapper sets up drivables/drivers automatically from widgets
+        root_dockAreaWindow.try_register_any_control_widgets()
+        
+        if a_controlling_widget is not None:
+            root_dockAreaWindow.connection_man.register_driver(a_controlling_widget)
+            # Wire up signals such that time-synchronized plotters are controlled by the RasterPlot2D:
+            for a_name, a_sync_plotter in _out_sync_plotters.items():
+                _display_sync_connections[a_name] = root_dockAreaWindow.connection_man.connect_drivable_to_driver(drivable=a_sync_plotter, driver=a_controlling_widget,
+                                                                custom_connect_function=(lambda driver, drivable: pg.SignalProxy(driver.window_scrolled, delay=0.2, rateLimit=60, slot=drivable.on_window_changed_rate_limited)))
+            # END for a_name, a_sync_plotter in _out_sync_plotter...
+
+        _out_container: GenericPyQtGraphContainer = GenericPyQtGraphContainer(name='build_combined_time_synchronized_plotters_window')       
+        _out_container.ui.root_dockAreaWindow = root_dockAreaWindow
+        _out_container.ui.app = app
+        _out_container.ui.display_sync_connections = _display_sync_connections
+        _out_container.ui.display_dock_items = _display_dock_items
+        _out_container.ui.sync_plotters = _out_sync_plotters
+        _out_container.ui.controlling_widget = controlling_widget
+
+        _out_container.plot_data.display_configs = _display_configs
+        if context is not None:
+            _out_container.plot_data.display_context = context
+        if included_filter_names is not None:
+            _out_container.params.included_filter_names = included_filter_names ## captured
+
+        return _out_container
+    
+    
+
+    # ==================================================================================================================================================================================================================================================================================== #
+    # BEGIN FUNCTION BODY                                                                                                                                                                                                                                                                  #
+    # ==================================================================================================================================================================================================================================================================================== #
+    global_timeline_start_time: float = np.min([curr_active_pipeline.computation_results[a_filter_name].computed_data['pf2D_Decoder'].pf.filtered_spikes_df['t'].min() for a_filter_name in included_filter_names])
+    
+    all_epochs_spikes_df: pd.DataFrame = pd.concat([curr_active_pipeline.computation_results[a_filter_name].computed_data['pf2D_Decoder'].pf.filtered_spikes_df for a_filter_name in included_filter_names], axis='index', verify_integrity=True).drop_duplicates(subset=['t_seconds'], ignore_index=True).sort_values(by='t_seconds', ascending=True).reset_index(drop=True) # deepcopy(active_one_step_decoder.pf.filtered_spikes_df) ## #TODO 2025-09-05 06:00: - [ ] This is not right, it's only the first epoch
+    all_epochs_spikes_df = all_epochs_spikes_df.drop(columns=['visualization_raster_y_location', 'visualization_raster_emphasis_state'], inplace=False)
+    
+    # pg.setConfigOptions(imageAxisOrder='row-major')  # best performance
+    
+    # Build the 2D Raster Plotter using a fixed window duration    
+    if (controlling_widget is None):
+        if create_new_controlling_widget:
+            spike_raster_plt_2d = Spike2DRaster.init_from_independent_data(all_epochs_spikes_df, window_duration=fixed_window_duration, window_start_time=global_timeline_start_time,
+                                                                        neuron_colors=None, neuron_sort_order=None, application_name='TimeSynchronizedPlotterControlSpikeRaster2D',
+                                                                        enable_independent_playback_controller=False, should_show=False, parent=None) # setting , parent=spike_raster_plt_3d makes a single window
+            spike_raster_plt_2d.setWindowTitle('2D Raster Control Window')
+            # Update the 2D Scroll Region to the initial value:
+            spike_raster_plt_2d.update_scroll_window_region(global_timeline_start_time, (global_timeline_start_time + fixed_window_duration), block_signals=False)
+            controlling_widget = spike_raster_plt_2d
+            is_controlling_widget_external = False
+        else:
+            print(f'WARNING: build_combined_time_synchronized_plotters_window(...) called with (controlling_widget == None) and (create_new_controlling_widget == False)')
+            controlling_widget = None # no controlling widget
+            is_controlling_widget_external = True
+    else:
+        # otherwise we have a controlling widget already
+        controlling_widget = controlling_widget
+        is_controlling_widget_external = True # external to window being created        
+        
+
+    ## Build the specific filter results:
+    _out_sync_plotters = {}
+    for a_filter_name in included_filter_names:
+        active_session_configuration_context = curr_active_pipeline.filtered_contexts[a_filter_name]
+        computation_result = curr_active_pipeline.computation_results[a_filter_name]
+
+        # Get the decoders from the computation result:
+        active_one_step_decoder = computation_result.computed_data['pf2D_Decoder']
+        active_two_step_decoder = computation_result.computed_data.get('pf2D_TwoStepDecoder', None)
+
+        time_binned_position_df = computation_result.computed_data.get('extended_stats', {}).get('time_binned_position_df', None)
+
+        active_measured_positions = computation_result.sess.position.to_dataframe()
+
+
+        ## Build the connected position plotter:
+        curr_position_decoder_plotter = TimeSynchronizedPositionDecoderPlotter(active_one_step_decoder=active_one_step_decoder, active_two_step_decoder=active_two_step_decoder)
+        # curr_position_decoder_plotter.show()
+        # _conn = pg.SignalProxy(spike_raster_plt_2d.window_scrolled, delay=0.2, rateLimit=60, slot=curr_position_decoder_plotter.on_window_changed_rate_limited) ## connect to plotter
+        _out_sync_plotters[a_filter_name] = curr_position_decoder_plotter
+    # END for a_filter_name in included_filter_names...
+
+    _out_container = _merge_plotters(controlling_widget, is_controlling_widget_external=is_controlling_widget_external, **_out_sync_plotters)
+    
+    return _out_container # (controlling_widget, curr_sync_occupancy_plotter, curr_placefields_plotter), root_dockAreaWindow, app
+
+
+
+# ==================================================================================================================================================================================================================================================================================== #
 # 2025-08-26 - Final Correct Context Decoding Stabilities:                                                                                                                                                                                                                             #
 # ==================================================================================================================================================================================================================================================================================== #
 @function_attributes(short_name=None, tags=['decoding', 'performance'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-08-26 17:59', related_items=[])
