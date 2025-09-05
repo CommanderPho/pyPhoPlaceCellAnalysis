@@ -120,7 +120,9 @@ class LocalMenus_AddRenderable(QtWidgets.QMainWindow):
         widget.ui.actionAddTimeIntervals_Laps.setEnabled(Laps2DRenderTimeEpochs.is_render_time_epochs_enabled(sess.laps))
         widget.ui.actionAddTimeIntervals_Ripples.setEnabled(Ripples_2DRenderTimeEpochs.is_render_time_epochs_enabled(sess.ripple))
         widget.ui.actionAddTimeIntervals_PBEs.setEnabled(PBE_2DRenderTimeEpochs.is_render_time_epochs_enabled(sess.pbe))
-        widget.ui.actionAddTimeIntervals_NonPBEs.setEnabled(NewNonPBE_2DRenderTimeEpochs.is_render_time_epochs_enabled(sess.non_pbe))
+
+        # is_enabled = hasattr(sess, 'non_pbe')
+        widget.ui.actionAddTimeIntervals_NonPBEs.setEnabled(NewNonPBE_2DRenderTimeEpochs.is_render_time_epochs_enabled(sess.non_pbe)) ## some of these don't exist sadly
         widget.ui.actionAddTimeIntervals_NonPBEEndcaps.setEnabled(NewNonPBEEndcaps_2DRenderTimeEpochs.is_render_time_epochs_enabled(sess.non_pbe_endcaps))
         widget.ui.actionAddTimeIntervals_Replays.setEnabled(Replays_2DRenderTimeEpochs.is_render_time_epochs_enabled(sess.replay))
         widget.ui.actionAddTimeIntervals_Bursts.setEnabled(SpikeBurstIntervals_2DRenderTimeEpochs.is_render_time_epochs_enabled(curr_sess=curr_active_pipeline, active_config_name=active_config_name)) # disable by default        
