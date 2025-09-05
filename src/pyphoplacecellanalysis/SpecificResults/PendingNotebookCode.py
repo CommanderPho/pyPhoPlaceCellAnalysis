@@ -6184,7 +6184,7 @@ class DataSlicingVisualizer(Decoded2DPosteriorTimeSyncMixin):
 # 2025-02-21 - Angular Binning, Transition Matricies, and More                                                         #
 # ==================================================================================================================== #
 
-@function_attributes(short_name=None, tags=['working', 'angular'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-02-21 00:48', related_items=[])
+@function_attributes(short_name=None, tags=['working', 'angular', 'head_dir_angle_binned'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-02-21 00:48', related_items=[])
 def compute_3d_occupancy_map(df, n_x_bins=50, n_y_bins=50, n_dir_bins=8):
     """Creates a 3D occupancy map with fixed dimensions regardless of observed data
     
@@ -6197,6 +6197,29 @@ def compute_3d_occupancy_map(df, n_x_bins=50, n_y_bins=50, n_dir_bins=8):
     Usage:
         from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import compute_3d_occupancy_map
         # 1. Compute the 3D occupancy map
+        
+
+        ## INPUTS: global_pf2D
+
+        xbin_edges = global_pf2D.xbin
+        ybin_edges = global_pf2D.ybin
+        # Create evenly spaced bin edges from 0 to 360
+        n_dir_bins: int = 8
+        angle_dir_bin_edges = np.linspace(0, 360, n_dir_bins + 1)
+
+        n_xbins: int = len(xbin_edges) - 1
+        n_ybins: int = len(ybin_edges) - 1
+        n_dir_bins: int = len(angle_dir_bin_edges) - 1
+
+        print(f'n_xbins: {n_xbins}, n_ybins: {n_ybins}, n_dir_bins: {n_dir_bins}')
+
+        # Use pd.cut with the explicit bin edges
+        global_pos_df['head_dir_angle_binned'] = pd.cut(global_pos_df['approx_head_dir_degrees'], bins=angle_dir_bin_edges, labels=False, include_lowest=True)
+        global_pos_df = global_pos_df.position.adding_binned_position_columns(xbin_edges=xbin_edges, ybin_edges=ybin_edges)
+        global_pos_df = global_pos_df.dropna(axis='index', subset=['binned_x', 'binned_y', 'head_dir_angle_binned'])
+        global_pos_df
+
+        
         # occupancy_map, bin_counts = compute_3d_occupancy_map(global_pos_df)
 
         occupancy_map, bin_counts = compute_3d_occupancy_map(global_pos_df, n_x_bins=n_xbins, n_y_bins=n_ybins, n_dir_bins=n_dir_bins)
