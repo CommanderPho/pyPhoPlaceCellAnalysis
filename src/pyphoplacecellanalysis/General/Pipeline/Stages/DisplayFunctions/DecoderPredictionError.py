@@ -59,7 +59,7 @@ class DefaultDecoderDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Disp
     """ Functions related to visualizing Bayesian Decoder performance. """
 
     @function_attributes(short_name='two_step_decoder_prediction_err_2D', tags=['display', 'two_step_decoder', '2D'], input_requires=["computation_result.computed_data['pf2D_Decoder']"],
-                         output_provides=[], creation_date='2023-03-23 15:49')
+                         output_provides=[], uses=['_temp_debug_two_step_plots_animated_imshow'], creation_date='2023-03-23 15:49')
     def _display_two_step_decoder_prediction_error_2D(computation_result, active_config, enable_saving_to_disk=False, **kwargs):
             """ Plots the prediction error for the two_step decoder at each point in time.
                 Based off of "_temp_debug_two_step_plots_animated_imshow"
@@ -846,7 +846,7 @@ def plot_most_likely_position_comparsions(pho_custom_decoder, position_df, axs=N
 
     
 # MAIN IMPLEMENTATION FUNCTION:
-@function_attributes(short_name=None, tags=['two_step', 'display', 'matplotlib', 'animated', 'slider'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-05-23 14:33', related_items=[],
+@function_attributes(short_name=None, tags=['two_step', 'display', 'matplotlib', 'animated', 'slider', 'good'], input_requires=[], output_provides=[], uses=[], used_by=['_display_two_step_decoder_prediction_error_2D'], creation_date='2024-05-23 14:33', related_items=[],
     validate_computation_test=lambda curr_active_pipeline, computation_filter_name='maze': (curr_active_pipeline.computation_results[computation_filter_name].computed_data['firing_rate_trends'], curr_active_pipeline.computation_results[computation_filter_name].computed_data['extended_stats']['time_binned_position_df']), is_global=False)
 def _temp_debug_two_step_plots_animated_imshow(active_one_step_decoder, active_two_step_decoder, time_binned_position_df: pd.DataFrame, variable_name='p_x_given_n_and_x_prev', override_variable_value=None, update_callback_function=None) -> MatplotlibRenderPlots:
     """Matplotlib-based imshow plot with interactive slider for displaying two-step bayesian decoding results
@@ -872,9 +872,6 @@ def _temp_debug_two_step_plots_animated_imshow(active_one_step_decoder, active_t
         _temp_debug_two_step_plots_animated_imshow(active_one_step_decoder, active_two_step_decoder, active_computed_data.extended_stats.time_binned_position_df, variable_name=plotted_variable_name) # Works
 
     """
-    
-
-
     if override_variable_value is None:
         try:
             variable_value = active_two_step_decoder[variable_name]

@@ -166,3 +166,5 @@ def build_connected_time_synchronized_decoder_plotter(active_one_step_decoder, a
     return curr_position_decoder_plotter, decoder_raster_window_sync_connection
 
         
+
+

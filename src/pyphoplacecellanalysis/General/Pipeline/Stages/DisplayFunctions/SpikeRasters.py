@@ -695,6 +695,9 @@ class NewSimpleRaster:
                 print(f'_tip_fn(...): data_string: {data_string}')
                 return f"spike: (x={x:.3f}, y={y:.2f})\n{data_string}"
 
+
+            # print(f'\t\tactive_datapoint_column_names: {active_datapoint_column_names}')
+            # print(f'\t\tactive_spikes_df.columns: {list(active_spikes_df.columns)}')
             # spikes_data = spikes_df[active_datapoint_column_names].to_records(index=False).tolist() # list of tuples
             spikes_data = active_spikes_df[active_datapoint_column_names].to_dict('records') # list of dicts
             spikes_data = [ScatterItemData.init_from_df_record(**v) for v in spikes_data] 

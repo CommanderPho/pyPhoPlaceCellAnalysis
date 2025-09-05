@@ -109,7 +109,7 @@ def visualize_heatmap_pyqtgraph(data, win=None, show_value_labels=False, title="
     if data.ndim == 1:
         data = np.reshape(data, (1, -1))
 
-    # Create a new PlotWidget if win is not provided
+    # Create a new CustomPlotWidget if win is not provided
     if win is None:
         app = pg.mkQApp()
         # win = pg.PlotWidget()
