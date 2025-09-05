@@ -318,7 +318,9 @@ def batch_evaluate_required_computations(curr_active_pipeline, include_includeli
 
 
     if included_computation_filter_names is None:
-        _, _, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
+        # _, _, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names() # replace "_, _, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()":"global_epoch_name = curr_active_pipeline.find_Global_epoch_name()"
+        global_epoch_name = curr_active_pipeline.find_Global_epoch_name()
+        
         # global_epoch_name = curr_active_pipeline.active_completed_computation_result_names[-1] # 'maze'		
         included_computation_filter_names = [global_epoch_name] # use only the global epoch: e.g. ['maze']
         if progress_print:
@@ -449,7 +451,7 @@ def batch_extended_computations(curr_active_pipeline, include_includelist=None, 
 
 
     if included_computation_filter_names is None:
-        _, _, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
+        global_epoch_name = curr_active_pipeline.find_Global_epoch_name()
         # global_epoch_name = curr_active_pipeline.active_completed_computation_result_names[-1] # 'maze'
         
         included_computation_filter_names = [global_epoch_name] # use only the global epoch: e.g. ['maze']

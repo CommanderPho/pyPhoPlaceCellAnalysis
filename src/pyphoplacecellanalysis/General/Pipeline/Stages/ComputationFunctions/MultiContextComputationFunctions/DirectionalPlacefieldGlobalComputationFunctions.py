@@ -3457,7 +3457,7 @@ class DecoderDecodedEpochsResult(ComputedResult):
         ## INPUTS: decoder_ripple_filter_epochs_decoder_result_dict
 
         # 2024-03-04 - Filter out the epochs based on the criteria:
-        _, _, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
+        global_epoch_name = curr_active_pipeline.find_Global_epoch_name()
         session_name: str = curr_active_pipeline.session_name
         t_start, t_delta, t_end = curr_active_pipeline.find_LongShortDelta_times()
 

@@ -704,7 +704,7 @@ class ComputedPipelineStage(FilterablePipelineStage, LoadedPipelineStage):
         return t_start, t_delta, t_end
 
     ## Generalizability
-# curr_active_pipeline.filtered_session_names
+    # curr_active_pipeline.filtered_session_names
     def find_Global_epoch_name(self) -> str:
         """ Helper function to returns the global epoch name for both KDIBA and other (Bapun)-type sessions, unlike `find_LongShortGlobal_epoch_names` which is KDIBA only. They must exist.
         Usage:

@@ -8486,7 +8486,7 @@ class CellsFirstSpikeTimes(SimpleFieldSizesReprMixin):
 
         """
         # BEGIN FUNCTION BODY ________________________________________________________________________________________________ #
-        # _, _, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
+        # global_epoch_name = curr_active_pipeline.find_Global_epoch_name()
         # global_session = curr_active_pipeline.filtered_sessions[global_epoch_name]
         # Get existing laps from session:
         # global_epoch = curr_active_pipeline.filtered_epochs[global_epoch_name]

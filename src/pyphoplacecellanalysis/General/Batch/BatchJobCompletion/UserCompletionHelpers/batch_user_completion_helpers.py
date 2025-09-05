@@ -693,7 +693,7 @@ def perform_sweep_decoding_time_bin_sizes_marginals_dfs_completion_function(self
         print(f'\tComputation complete. Exporting .CSVs...')
 
         # 2024-03-04 - Filter out the epochs based on the criteria: -- #TODO 2024-07-12 08:30: - [ ] This is nearly certainly going to ruin it
-        _, _, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
+        global_epoch_name = curr_active_pipeline.find_Global_epoch_name()
         filtered_epochs_df, active_spikes_df = filter_and_update_epochs_and_spikes(curr_active_pipeline, global_epoch_name, track_templates, epoch_id_key_name='ripple_epoch_id', no_interval_fill_value=-1)
         filtered_valid_epoch_times = filtered_epochs_df[['start', 'stop']].to_numpy()
 
@@ -925,7 +925,7 @@ def compute_and_export_decoders_epochs_decoding_and_evaluation_dfs_completion_fu
     ## INPUTS: decoder_ripple_filter_epochs_decoder_result_dict
 
     # 2024-03-04 - Filter out the epochs based on the criteria:
-    _, _, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
+    global_epoch_name = curr_active_pipeline.find_Global_epoch_name()
     filtered_epochs_df, active_spikes_df = filter_and_update_epochs_and_spikes(curr_active_pipeline, global_epoch_name, track_templates, epoch_id_key_name='ripple_epoch_id', no_interval_fill_value=-1)
     filtered_valid_epoch_times = filtered_epochs_df[['start', 'stop']].to_numpy()
 
@@ -1056,7 +1056,7 @@ def compute_and_export_session_trial_by_trial_performance_completion_function(se
     print(f'<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<')
     print(f'compute_and_export_session_trial_by_trial_performance_completion_function(curr_session_context: {curr_session_context}, curr_session_basedir: {str(curr_session_basedir)}, ...)')
     
-    _, _, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
+    global_epoch_name = curr_active_pipeline.find_Global_epoch_name()
     # filtered_epochs_df, active_spikes_df = filter_and_update_epochs_and_spikes(curr_active_pipeline, global_epoch_name, track_templates, epoch_id_key_name='ripple_epoch_id', no_interval_fill_value=-1)
     # filtered_valid_epoch_times = filtered_epochs_df[['start', 'stop']].to_numpy()
 
@@ -3757,7 +3757,7 @@ def figures_plot_generalized_decode_epochs_dict_and_export_results_completion_fu
             pg.setConfigOptions(useOpenGL=True)
             pg.setConfigOption('antialias', False)
             # _restore_previous_matplotlib_settings_callback = matplotlib_configuration_update(is_interactive=True, backend='Qt5Agg')
-            _, _, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
+            global_epoch_name = curr_active_pipeline.find_Global_epoch_name()
             global_epoch_context = curr_active_pipeline.filtered_contexts[global_epoch_name]
             
             display_context = curr_active_pipeline.build_display_context_for_session(display_fn_name='export_all_time_tracks')
