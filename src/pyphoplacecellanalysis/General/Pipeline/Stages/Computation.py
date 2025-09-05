@@ -3161,7 +3161,16 @@ class PipelineWithComputedPipelineStageMixin:
                 for k, v in override_parameters_flat_keypaths_dict.items():
                     if k.startswith('preprocessing'):
                         raise NotImplementedError("Updating preprocessing parameters is not yet implemented!")            
-                        preprocessing_parameters: ParametersContainer = deepcopy(self.active_sess_config)
+                        # preprocessing_parameters: ParametersContainer = deepcopy(self.active_sess_config.preprocessing_parameters)
+                        # # strip the preprocessing part
+                        # if k.startswith('preprocessing.'):
+                        #     k = k.removeprefix('preprocessing.')
+                        
+                        # if k.startswith('preprocessing_parameters.'):
+                        #     k = k.removeprefix('preprocessing_parameters.')
+                        # ## shouldn't be that bad, let's do it
+                        # self.active_sess_config.
+
                     else:                
                         # Set a value using keypath (e.g. 'directional_train_test_split.training_data_portion')
                         curr_global_param_typed_parameters.set_by_keypath(k, v)
