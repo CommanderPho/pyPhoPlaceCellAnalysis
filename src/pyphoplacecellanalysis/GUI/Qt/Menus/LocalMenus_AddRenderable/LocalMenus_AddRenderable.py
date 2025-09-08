@@ -75,6 +75,13 @@ class LocalMenus_AddRenderable(QtWidgets.QMainWindow):
         sess = computation_result.sess
         
 
+        def _subfn_is_enabled(curr_sess, key_name: str='laps'):
+            try:
+                pass
+            except Exception as e:
+                raise e
+        
+
         widget = LocalMenus_AddRenderable() # get the UI widget containing the menu items:
         widget.programmatic_actions_dict = benedict() # PhoUIContainer.init_from_dict({})
         renderable_menu = widget.ui.menuAdd_Renderable
@@ -95,13 +102,13 @@ class LocalMenus_AddRenderable(QtWidgets.QMainWindow):
                                     widget.ui.actionAddTimeIntervals_Replays,
                                     widget.ui.actionAddTimeIntervals_Bursts,
                                     widget.ui.actionAddTimeIntervals_Custom]
-        submenu_addTimeIntervalCallbacks: List[Callable] = [lambda evt=None: Laps2DRenderTimeEpochs.add_render_time_epochs(curr_sess=sess.laps, destination_plot=destination_plot),
-                                            lambda evt=None: PBE_2DRenderTimeEpochs.add_render_time_epochs(curr_sess=sess.pbe, destination_plot=destination_plot),
-                                            lambda evt=None: NewNonPBE_2DRenderTimeEpochs.add_render_time_epochs(curr_sess=sess.non_pbe, destination_plot=destination_plot),
-                                            lambda evt=None: NewNonPBEEndcaps_2DRenderTimeEpochs.add_render_time_epochs(curr_sess=sess.non_pbe_endcaps, destination_plot=destination_plot),
-                                            lambda evt=None: SessionEpochs2DRenderTimeEpochs.add_render_time_epochs(curr_sess=sess.epochs, destination_plot=destination_plot),
-                                            lambda evt=None: Ripples_2DRenderTimeEpochs.add_render_time_epochs(curr_sess=sess.ripple, destination_plot=destination_plot),
-                                            lambda evt=None: Replays_2DRenderTimeEpochs.add_render_time_epochs(curr_sess=sess.replay, destination_plot=destination_plot),
+        submenu_addTimeIntervalCallbacks: List[Callable] = [lambda evt=None: hasattr(sess, 'laps') and Laps2DRenderTimeEpochs.add_render_time_epochs(curr_sess=sess.laps, destination_plot=destination_plot),
+                                            lambda evt=None: hasattr(sess, 'pbe') and PBE_2DRenderTimeEpochs.add_render_time_epochs(curr_sess=sess.pbe, destination_plot=destination_plot),
+                                            lambda evt=None: hasattr(sess, 'non_pbe') and NewNonPBE_2DRenderTimeEpochs.add_render_time_epochs(curr_sess=sess.non_pbe, destination_plot=destination_plot),
+                                            lambda evt=None: hasattr(sess, 'non_pbe_endcaps') and NewNonPBEEndcaps_2DRenderTimeEpochs.add_render_time_epochs(curr_sess=sess.non_pbe_endcaps, destination_plot=destination_plot),
+                                            lambda evt=None: hasattr(sess, 'epochs') and SessionEpochs2DRenderTimeEpochs.add_render_time_epochs(curr_sess=sess.epochs, destination_plot=destination_plot),
+                                            lambda evt=None: hasattr(sess, 'ripple') and Ripples_2DRenderTimeEpochs.add_render_time_epochs(curr_sess=sess.ripple, destination_plot=destination_plot),
+                                            lambda evt=None: hasattr(sess, 'replay') and Replays_2DRenderTimeEpochs.add_render_time_epochs(curr_sess=sess.replay, destination_plot=destination_plot),
                                             lambda evt=None: SpikeBurstIntervals_2DRenderTimeEpochs.add_render_time_epochs(curr_sess=curr_active_pipeline, destination_plot=destination_plot, active_config_name=active_config_name),
                                             lambda evt=None: print(f'actionAddTimeIntervals_Custom not yet supported')]
         
@@ -117,14 +124,14 @@ class LocalMenus_AddRenderable(QtWidgets.QMainWindow):
         # widget.ui.actionAddTimeIntervals_Laps.setEnabled(sess.laps is not None)
         # widget.ui.actionAddTimeIntervals_Ripples.setEnabled(sess.ripple is not None)
         # widget.ui.actionAddTimeIntervals_Replays.setEnabled(sess.has_replays)
-        widget.ui.actionAddTimeIntervals_Laps.setEnabled(Laps2DRenderTimeEpochs.is_render_time_epochs_enabled(sess.laps))
-        widget.ui.actionAddTimeIntervals_Ripples.setEnabled(Ripples_2DRenderTimeEpochs.is_render_time_epochs_enabled(sess.ripple))
-        widget.ui.actionAddTimeIntervals_PBEs.setEnabled(PBE_2DRenderTimeEpochs.is_render_time_epochs_enabled(sess.pbe))
+        widget.ui.actionAddTimeIntervals_Laps.setEnabled(hasattr(sess, 'laps') and Laps2DRenderTimeEpochs.is_render_time_epochs_enabled(sess.laps))
+        widget.ui.actionAddTimeIntervals_Ripples.setEnabled(hasattr(sess, 'ripple') and Ripples_2DRenderTimeEpochs.is_render_time_epochs_enabled(sess.ripple))
+        widget.ui.actionAddTimeIntervals_PBEs.setEnabled(hasattr(sess, 'pbe') and PBE_2DRenderTimeEpochs.is_render_time_epochs_enabled(sess.pbe))
 
         # is_enabled = hasattr(sess, 'non_pbe')
-        widget.ui.actionAddTimeIntervals_NonPBEs.setEnabled(NewNonPBE_2DRenderTimeEpochs.is_render_time_epochs_enabled(sess.non_pbe)) ## some of these don't exist sadly
-        widget.ui.actionAddTimeIntervals_NonPBEEndcaps.setEnabled(NewNonPBEEndcaps_2DRenderTimeEpochs.is_render_time_epochs_enabled(sess.non_pbe_endcaps))
-        widget.ui.actionAddTimeIntervals_Replays.setEnabled(Replays_2DRenderTimeEpochs.is_render_time_epochs_enabled(sess.replay))
+        widget.ui.actionAddTimeIntervals_NonPBEs.setEnabled(hasattr(sess, 'non_pbe') and NewNonPBE_2DRenderTimeEpochs.is_render_time_epochs_enabled(sess.non_pbe)) ## some of these don't exist sadly
+        widget.ui.actionAddTimeIntervals_NonPBEEndcaps.setEnabled(hasattr(sess, 'non_pbe_endcaps') and NewNonPBEEndcaps_2DRenderTimeEpochs.is_render_time_epochs_enabled(sess.non_pbe_endcaps))
+        widget.ui.actionAddTimeIntervals_Replays.setEnabled(hasattr(sess, 'replay') and Replays_2DRenderTimeEpochs.is_render_time_epochs_enabled(sess.replay))
         widget.ui.actionAddTimeIntervals_Bursts.setEnabled(SpikeBurstIntervals_2DRenderTimeEpochs.is_render_time_epochs_enabled(curr_sess=curr_active_pipeline, active_config_name=active_config_name)) # disable by default        
 
         # Time Curves: _______________________________________________________________________________________________________ #
