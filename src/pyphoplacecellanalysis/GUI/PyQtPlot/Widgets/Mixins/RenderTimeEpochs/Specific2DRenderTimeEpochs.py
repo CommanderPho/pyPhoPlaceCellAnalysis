@@ -257,7 +257,7 @@ class Laps2DRenderTimeEpochs(General2DRenderTimeEpochs):
         elif isinstance(curr_sess, Epoch):
             active_Epochs = curr_sess
         else:
-            raise NotImplementedError
+            raise NotImplementedError(f'type(curr_sess): {type(curr_sess)}')
         interval_datasource = cls.build_render_time_epochs_datasource(active_epochs_obj=active_Epochs, **kwargs)
         out_rects = destination_plot.add_rendered_intervals(interval_datasource, name=kwargs.setdefault('name', cls.default_datasource_name), debug_print=True)
         
@@ -634,10 +634,14 @@ class SpikeBurstIntervals_2DRenderTimeEpochs(General2DRenderTimeEpochs):
         """ takes the exact same arguments as `add_render_time_epochs(...) but returns True if the call would be valid and False otherwise. """
         from pyphoplacecellanalysis.General.Pipeline.NeuropyPipeline import NeuropyPipeline # for advanced add_render_time_epochs
         if isinstance(curr_sess, NeuropyPipeline):
-            curr_active_pipeline = curr_sess
-            long_epoch_name, short_epoch_name, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
-            active_config_name = kwargs.pop('active_config_name', global_epoch_name)
-
+            try:
+                curr_active_pipeline = curr_sess
+                long_epoch_name, short_epoch_name, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
+                active_config_name = kwargs.pop('active_config_name', global_epoch_name)
+                    
+            except (KeyError, AttributeError, ValueError):
+                return False
+            
             try:
                 active_burst_intervals = curr_active_pipeline.computation_results[active_config_name].computed_data['burst_detection']['burst_intervals'] # this works
                 return (active_burst_intervals is not None)

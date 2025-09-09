@@ -594,7 +594,6 @@ class ComputedPipelineStage(FilterablePipelineStage, LoadedPipelineStage):
 
 
         """
-        
         # inverse_computation_times_key_fn = lambda fn_key: str(fn_key.__name__) # to be used if raw-function references are used.
         inverse_computation_times_key_fn = lambda fn_key: fn_key # Use only the functions name. I think this makes the .computation_times field picklable
         
@@ -649,6 +648,9 @@ class ComputedPipelineStage(FilterablePipelineStage, LoadedPipelineStage):
 
         NOTE: this if for 'kdiba'-type sessions ONLY!
         """
+        curr_sess_format_name: str = self.get_session_format_name()
+        if (curr_sess_format_name.lower() != 'kdiba'):
+            raise ValueError(f'find_LongShortGlobal_epoch_names() is only intended for "kdiba" format sessions with long/short track epochs, but this is of type: "{curr_sess_format_name}".')
         
         include_includelist = self.active_completed_computation_result_names # ['maze', 'sprinkle']
         assert (len(include_includelist) >= 3), "Must have at least 3 completed computation results to find the long, short, and global epoch names."

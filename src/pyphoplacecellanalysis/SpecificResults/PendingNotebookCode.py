@@ -223,7 +223,10 @@ def build_combined_time_synchronized_Bapun_decoders_window(curr_active_pipeline,
     global_timeline_start_time: float = np.min([curr_active_pipeline.computation_results[a_filter_name].computed_data['pf2D_Decoder'].pf.filtered_spikes_df['t'].min() for a_filter_name in included_filter_names])
     
     all_epochs_spikes_df: pd.DataFrame = pd.concat([curr_active_pipeline.computation_results[a_filter_name].computed_data['pf2D_Decoder'].pf.filtered_spikes_df for a_filter_name in included_filter_names], axis='index', verify_integrity=True).drop_duplicates(subset=['t_seconds'], ignore_index=True).sort_values(by='t_seconds', ascending=True).reset_index(drop=True) # deepcopy(active_one_step_decoder.pf.filtered_spikes_df) ## #TODO 2025-09-05 06:00: - [ ] This is not right, it's only the first epoch
-    all_epochs_spikes_df = all_epochs_spikes_df.drop(columns=['visualization_raster_y_location', 'visualization_raster_emphasis_state'], inplace=False)
+    
+    vis_cols_to_drop = [col for col in ['visualization_raster_y_location', 'visualization_raster_emphasis_state'] if col in all_epochs_spikes_df.columns]
+    if len(vis_cols_to_drop) > 0:
+        all_epochs_spikes_df = all_epochs_spikes_df.drop(columns=vis_cols_to_drop, inplace=False)
     
     # pg.setConfigOptions(imageAxisOrder='row-major')  # best performance
     
