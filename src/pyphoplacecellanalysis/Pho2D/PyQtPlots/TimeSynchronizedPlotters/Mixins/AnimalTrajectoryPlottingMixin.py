@@ -10,18 +10,43 @@ class AnimalTrajectoryPlottingMixin:
     """
     
     @property
+    def AnimalTrajectoryPlottingMixin_all_time_pos_df(self):
+        """The AnimalTrajectoryPlottingMixin_all_time_pos_df property."""
+        if getattr(self.params, 'AnimalTrajectoryPlottingMixin_all_time_pos_df', None) is not None:
+            return self.params.AnimalTrajectoryPlottingMixin_all_time_pos_df
+        
+        return self.active_time_dependent_placefields.all_time_filtered_pos_df
+    
+    # @AnimalTrajectoryPlottingMixin_all_time_pos_df.setter
+    # def AnimalTrajectoryPlottingMixin_all_time_pos_df(self, value):
+    #     self.active_time_dependent_placefields.all_time_filtered_pos_df = value
+    
+    @property
+    def AnimalTrajectoryPlottingMixin_filtered_pos_df(self):
+        """The filtered_pos_df property."""
+        if getattr(self.params, 'AnimalTrajectoryPlottingMixin_filtered_pos_df', None) is not None:
+            return self.params.AnimalTrajectoryPlottingMixin_filtered_pos_df        
+        return self.active_time_dependent_placefields.filtered_pos_df
+    
+    # @AnimalTrajectoryPlottingMixin_filtered_pos_df.setter
+    # def AnimalTrajectoryPlottingMixin_filtered_pos_df(self, value):
+    #     self.active_time_dependent_placefields.filtered_pos_df = value
+
+
+    @property
     def curr_recent_trajectory(self):
         """The animal's most recent trajectory preceding self.active_time_dependent_placefields.last_t"""
         # Fixed time ago backward:
         earliest_trajectory_start_time = self.last_t - self.params.recent_position_trajectory_max_seconds_ago # gets the earliest start time for the current trajectory to display
-        return self.active_time_dependent_placefields.all_time_filtered_pos_df.position.time_sliced(earliest_trajectory_start_time, self.last_t)[['t','x','y']] # Get all rows within the most recent time
+        # return self.active_time_dependent_placefields.all_time_filtered_pos_df.position.time_sliced(earliest_trajectory_start_time, self.last_t)[['t','x','y']] # Get all rows within the most recent time
+        return self.AnimalTrajectoryPlottingMixin_all_time_pos_df.position.time_sliced(earliest_trajectory_start_time, self.last_t)[['t','x','y']] # Get all rows within the most recent time
     
     
     @property
     def curr_position(self):
         # .iloc[-1:] gets the last row of a dataframe as another dataframe
-        return self.active_time_dependent_placefields.filtered_pos_df.iloc[-1:][['t','x','y']] # Get only the most recent row
-
+        # return self.active_time_dependent_placefields.filtered_pos_df.iloc[-1:][['t','x','y']] # Get only the most recent row
+        return self.AnimalTrajectoryPlottingMixin_filtered_pos_df.iloc[-1:][['t','x','y']] # Get only the most recent row
 
     @QtCore.Slot()
     def AnimalTrajectoryPlottingMixin_on_init(self):

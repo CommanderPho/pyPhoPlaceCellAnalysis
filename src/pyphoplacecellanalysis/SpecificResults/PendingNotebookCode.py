@@ -133,7 +133,6 @@ def build_combined_time_synchronized_Bapun_decoders_window(curr_active_pipeline,
     from pyphoplacecellanalysis.Pho2D.PyQtPlots.TimeSynchronizedPlotters.TimeSynchronizedPositionDecoderPlotter import TimeSynchronizedPositionDecoderPlotter
     from pyphoplacecellanalysis.Pho2D.PyQtPlots.TimeSynchronizedPlotters.TimeSynchronizedOccupancyPlotter import TimeSynchronizedOccupancyPlotter
     from pyphoplacecellanalysis.Pho2D.PyQtPlots.TimeSynchronizedPlotters.TimeSynchronizedPlacefieldsPlotter import TimeSynchronizedPlacefieldsPlotter
-    from pyphoplacecellanalysis.Pho2D.PyQtPlots.TimeSynchronizedPlotters.TimeSynchronizedPositionDecoderPlotter import TimeSynchronizedPositionDecoderPlotter
     from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.DockAreaWrapper import DockAreaWrapper
 
     from pyphoplacecellanalysis.GUI.PyQtPlot.DockingWidgets.DynamicDockDisplayAreaContent import CustomDockDisplayConfig
@@ -268,6 +267,14 @@ def build_combined_time_synchronized_Bapun_decoders_window(curr_active_pipeline,
 
         ## Build the connected position plotter:
         curr_position_decoder_plotter = TimeSynchronizedPositionDecoderPlotter(active_one_step_decoder=active_one_step_decoder, active_two_step_decoder=active_two_step_decoder)
+        if active_measured_positions is not None:
+            curr_position_decoder_plotter.params.AnimalTrajectoryPlottingMixin_all_time_pos_df = deepcopy(active_measured_positions)
+            curr_position_decoder_plotter.params.AnimalTrajectoryPlottingMixin_filtered_pos_df = deepcopy(active_measured_positions)
+            curr_position_decoder_plotter.AnimalTrajectoryPlottingMixin_on_setup()
+            curr_position_decoder_plotter.AnimalTrajectoryPlottingMixin_on_buildUI()
+            curr_position_decoder_plotter.AnimalTrajectoryPlottingMixin_update_plots()
+            
+        
         # curr_position_decoder_plotter.show()
         # _conn = pg.SignalProxy(spike_raster_plt_2d.window_scrolled, delay=0.2, rateLimit=60, slot=curr_position_decoder_plotter.on_window_changed_rate_limited) ## connect to plotter
         _out_sync_plotters[a_filter_name] = curr_position_decoder_plotter

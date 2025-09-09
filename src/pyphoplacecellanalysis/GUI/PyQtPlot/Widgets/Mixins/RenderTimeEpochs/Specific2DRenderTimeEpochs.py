@@ -170,6 +170,7 @@ class SessionEpochs2DRenderTimeEpochs(General2DRenderTimeEpochs):
     default_datasource_name = 'SessionEpochs'
     @classmethod
     def build_epochs_dataframe_formatter(cls, **kwargs):
+        
         long_short_display_config_manager = LongShortDisplayConfigManager()
         long_epoch_config = long_short_display_config_manager.long_epoch_config #.as_pyqtgraph_kwargs()
         short_epoch_config = long_short_display_config_manager.short_epoch_config #.as_pyqtgraph_kwargs()
@@ -181,16 +182,25 @@ class SessionEpochs2DRenderTimeEpochs(General2DRenderTimeEpochs):
             ## parameters:
             y_location = -1.0
             height = 0.9
-            # pen_color = pg.mkColor('red')
-            # brush_color = pg.mkColor('red')
 
-            ## parameters:
-            # pen_color = [pg.mkColor('red'), pg.mkColor('cyan')]
-            # brush_color = [pg.mkColor('red'), pg.mkColor('cyan')]
-            
-            pen_color = [pg.mkColor(long_epoch_config.pen.color()), pg.mkColor(short_epoch_config.pen.color())]
-            brush_color = [pg.mkColor(long_epoch_config.brush.color()), pg.mkColor(short_epoch_config.brush.color())]
-            
+            if num_intervals == 2:
+                
+                # pen_color = pg.mkColor('red')
+                # brush_color = pg.mkColor('red')
+
+                ## parameters:
+                # pen_color = [pg.mkColor('red'), pg.mkColor('cyan')]
+                # brush_color = [pg.mkColor('red'), pg.mkColor('cyan')]
+                
+                pen_color = [pg.mkColor(long_epoch_config.pen.color()), pg.mkColor(short_epoch_config.pen.color())]
+                brush_color = [pg.mkColor(long_epoch_config.brush.color()), pg.mkColor(short_epoch_config.brush.color())]
+            else:
+                ## Bapun sessions, etc
+                pen_color = [pg.mkColor('#490000') for i in np.arange(num_intervals)]
+                brush_color = [pg.mkColor('#f5161659') for i in np.arange(num_intervals)]
+
+
+            ## For all/general:
             for a_pen_color in pen_color:
                 a_pen_color.setAlphaF(0.8)
 
