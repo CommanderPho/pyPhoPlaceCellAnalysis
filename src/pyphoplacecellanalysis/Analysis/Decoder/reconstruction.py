@@ -445,6 +445,7 @@ class SingleEpochDecodedResult(HDF_SerializationMixin, AttrsBasedClassHelperMixi
 
     marginal_x: DynamicContainer = non_serialized_field()
     marginal_y: Optional[DynamicContainer] = non_serialized_field()
+    marginal_z: Optional[DynamicContainer] = non_serialized_field()
 
     epoch_data_index: Optional[int] = non_serialized_field()
 
@@ -895,6 +896,7 @@ class DecodedFilterEpochsResult(HDF_SerializationMixin, AttrsBasedClassHelperMix
     p_x_given_n_list: list = non_serialized_field(metadata={'shape': ('n_epochs',)})
     marginal_x_list: list = non_serialized_field(metadata={'shape': ('n_epochs',)})
     marginal_y_list: list = non_serialized_field(metadata={'shape': ('n_epochs',)})
+    marginal_z_list: list = non_serialized_field(metadata={'shape': ('n_epochs',)})
     most_likely_position_indicies_list: list = non_serialized_field(metadata={'shape': ('n_epochs',)})
     spkcount: list = non_serialized_field(metadata={'shape': ('n_epochs',)})
     nbins: np.ndarray = serialized_field(metadata={'shape': ('n_epochs',)}) # an array of the number of time bins in each epoch
