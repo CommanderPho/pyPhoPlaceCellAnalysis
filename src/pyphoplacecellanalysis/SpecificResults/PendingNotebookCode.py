@@ -123,6 +123,38 @@ from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import BasePositionD
 from neuropy.utils.mixins.time_slicing import TimeColumnAliasesProtocol
 from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import BasePositionDecoder, BayesianPlacemapPositionDecoder, DecodedFilterEpochsResult, Zhang_Two_Step
 from neuropy.core.epoch import Epoch, ensure_dataframe, ensure_Epoch, EpochsAccessor
+from neuropy.analyses.placefields import Position
+
+
+def post_process_non_kdiba(curr_active_pipeline):
+    """ processes either Bapun or Rachel sessions
+    """    
+
+    ## build a true global session encompassing all epochs
+    # curr_active_pipeline.sess.epochs
+
+    def _subfn_add_approx_head_dir_columns(a_session):
+        # INPUTS: a_session 
+        # global_pos_obj: Position = deepcopy(a_session.position)
+        global_pos_obj: Position = a_session.position # do NOT do a deepcopy, edit in place
+        # global_pos_df: pd.DataFrame = global_pos_obj.compute_higher_order_derivatives().position.compute_smoothed_position_info(N=15)
+        global_pos_df: pd.DataFrame = global_pos_obj.adding_approx_head_dir_columns(N=15, n_dir_angular_bins=8) # ().position.compute_smoothed_position_info(N=15)
+        return global_pos_df
+
+
+
+    # included_epochs = ['roam', 'sprinkle']
+
+    global_pos_df = _subfn_add_approx_head_dir_columns(a_session=curr_active_pipeline.sess)
+
+    included_epochs = curr_active_pipeline.active_completed_computation_result_names
+    print(f'included_epochs: {included_epochs}')
+    for an_epoch_name in included_epochs:
+        a_session = deepcopy(curr_active_pipeline.filtered_sessions[an_epoch_name])
+        # INPUTS: a_session 
+        global_pos_df = _subfn_add_approx_head_dir_columns(a_session=a_session)
+
+
 
 @function_attributes(short_name=None, tags=['IMPORTANT', 'pseduo3D', 'pseudoND', 'context-decoding', 'bapun', 'WORKING'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-09-09 10:50', related_items=[])
 def build_contextual_pf2D_decoder(curr_active_pipeline, epochs_to_create_global_from_names = ['roam', 'sprinkle'], active_laps_decoding_time_bin_size: float = 0.75):

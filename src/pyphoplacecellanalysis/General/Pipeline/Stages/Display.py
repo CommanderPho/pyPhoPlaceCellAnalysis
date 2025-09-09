@@ -457,7 +457,17 @@ class PipelineWithDisplayPipelineStageMixin:
         
     def reload_default_display_functions(self):
         """ reloads/re-registers the default display functions after adding a new one """
-        self.stage.reload_default_display_functions()
+        
+        try:
+            self.stage.reload_default_display_functions()
+        except AttributeError as e:
+            print(f'ERROR: attribute error encountered, sazved pipeline before advancing to the display stage. Attemping to fix.')
+            # self.prepare_for_display()
+            raise NotImplementedError(f'always advance the pipeline to the display stage before pickling!')
+        
+        except Exception as e:
+            raise e
+
 
         # rebuilds the convenience plot object:
         self._plot_object = None
