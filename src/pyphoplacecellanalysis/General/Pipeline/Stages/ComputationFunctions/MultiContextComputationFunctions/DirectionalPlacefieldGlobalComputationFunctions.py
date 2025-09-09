@@ -4096,6 +4096,10 @@ class CustomDecodeEpochsResult(UnpackableMixin):
             except ValueError as e:
                 # AssertionError: curr_array_shape: (57, 3) but this only works with the Pseudo2D (all-directional) decoder with posteriors with .shape[1] == 4, corresponding to ['long_LR', 'long_RL', 'short_LR', 'short_RL'] 
                 pass # skip this for now
+            
+            except AssertionError as e:
+                print(f'WARN: AssertionError: {e} encountered! If this is a "kdiba" type session, this indicates a fatal error!')
+                pass
             except Exception as e:
                 raise
         return a_custom_decoder_decoding_result
