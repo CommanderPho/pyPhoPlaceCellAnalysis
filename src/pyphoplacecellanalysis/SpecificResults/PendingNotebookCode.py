@@ -118,6 +118,74 @@ from pyphocorehelpers.gui.Qt.color_helpers import ColormapHelpers, ColorFormatCo
 # 2025-09-05 - Bapun Co/plotting                                                                                                                                                                                                                                                       #
 # ==================================================================================================================================================================================================================================================================================== #
 from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.ContainerBased.PhoContainerTool import GenericPyQtGraphContainer
+from neuropy.analyses.placefields import PfND
+from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import BasePositionDecoder
+from neuropy.utils.mixins.time_slicing import TimeColumnAliasesProtocol
+from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import BasePositionDecoder, BayesianPlacemapPositionDecoder, DecodedFilterEpochsResult, Zhang_Two_Step
+from neuropy.core.epoch import Epoch, ensure_dataframe, ensure_Epoch, EpochsAccessor
+
+@function_attributes(short_name=None, tags=['IMPORTANT', 'pseduo3D', 'pseudoND', 'context-decoding', 'bapun', 'WORKING'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-09-09 10:50', related_items=[])
+def build_contextual_pf2D_decoder(curr_active_pipeline, epochs_to_create_global_from_names = ['roam', 'sprinkle'], active_laps_decoding_time_bin_size: float = 0.75):
+    """ The generalized context decoder for Bapun session
+    
+    from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import build_contextual_pf2D_decoder
+    
+    contextual_pf2D_dict, contextual_pf2D, contextual_pf2D_Decoder, all_context_filter_epochs_decoder_result = build_contextual_pf2D_decoder(curr_active_pipeline, epochs_to_create_global_from_names = ['roam', 'sprinkle'], active_laps_decoding_time_bin_size=0.75)
+    
+    """
+    pf2D_Decoder_dict = {k:deepcopy(curr_active_pipeline.computation_results[k].computed_data.pf2D_Decoder) for k in epochs_to_create_global_from_names}
+    
+    # epochs_to_decode_names = ['maze_any']
+    epochs_df = ensure_dataframe(curr_active_pipeline.sess.epochs)
+    epochs_df = epochs_df.epochs.adding_concatenated_epoch(epochs_to_create_global_from_names=['pre', 'roam', 'sprinkle', 'post'], created_epoch_name='maze_any')
+    global_only_epoch: Epoch = ensure_Epoch(epochs_df[(epochs_df['label'] == 'maze_any')])
+    # global_only_epoch
+
+    # epochs_to_decode_dict = {k:deepcopy(curr_active_pipeline.filtered_epochs[k]) for k in epochs_to_create_global_from_names}
+    # epochs_to_decode_dict = {k:deepcopy(curr_active_pipeline.filtered_epochs[k]).to_Epoch() for k in epochs_to_create_global_from_names}
+    # epochs_to_decode_dict = {k:deepcopy(curr_active_pipeline.filtered_epochs[k]).to_Epoch() for k in epochs_to_decode_names}
+    epochs_to_decode_dict = {'maze_any': deepcopy(global_only_epoch)}
+    # epochs_to_decode_dict
+
+    ## Combine the non-directional PDFs and renormalize to get the directional PDF:
+    # Inputs: long_LR_pf1D, long_RL_pf1D
+    # long_directional_decoder_dict = dict(zip(long_directional_decoder_names, [deepcopy(long_LR_pf1D), deepcopy(long_RL_pf1D)]))
+    ## INPUTS: pf2D_Decoder_dict
+    contextual_pf2D_dict = {k:deepcopy(v.pf) for k, v in pf2D_Decoder_dict.items()}
+    a_pf = None
+    for k, v in contextual_pf2D_dict.items():
+        if a_pf is None:
+            a_pf = v
+        else:
+            v, did_update_bins = v.conform_to_position_bins(a_pf)
+            print(f'k: {k}: did_update_bins: {did_update_bins}')
+
+    contextual_pf2D: PfND = PfND.build_merged_directional_placefields(contextual_pf2D_dict, debug_print=False)
+    contextual_pf2D_Decoder: BasePositionDecoder = BasePositionDecoder(contextual_pf2D, setup_on_init=True, post_load_on_init=True, debug_print=False)
+    # return (contextual_pf2D_dict, contextual_pf2D, contextual_pf2D_Decoder)
+    ## OUTPUTS: contextual_pf2D_dict, contextual_pf2D, contextual_pf2D_Decoder
+
+
+    ## INPUTS: epochs_to_decode_dict
+    
+
+    # global_spikes_df: pd.DataFrame = get_proper_global_spikes_df(curr_active_pipeline)
+    global_spikes_df: pd.DataFrame = deepcopy(curr_active_pipeline.sess.spikes_df)
+    # get_proper_global_spikes_df(owning_pipeline_reference, minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz, included_qclu_values=included_qclu_values)
+    # global_measured_position_df: pd.DataFrame = deepcopy(curr_active_pipeline.sess.position.to_dataframe()).dropna(subset=['x', 'y']) # computation_result.sess.position.to_dataframe()
+    all_context_filter_epochs_decoder_result: DecodedFilterEpochsResult = contextual_pf2D_Decoder.decode_specific_epochs(spikes_df=deepcopy(global_spikes_df), filter_epochs=ensure_dataframe(epochs_to_decode_dict['maze_any']), decoding_time_bin_size=active_laps_decoding_time_bin_size, debug_print=False)
+    all_context_filter_epochs_decoder_result: SingleEpochDecodedResult = all_context_filter_epochs_decoder_result.get_result_for_epoch(0)
+    all_context_filter_epochs_decoder_result
+    ## OUTPUTS: contextual_pf2D_dict, contextual_pf2D, contextual_pf2D_Decoder, all_context_filter_epochs_decoder_result
+    # 2m 35.5s
+    return contextual_pf2D_dict, contextual_pf2D, contextual_pf2D_Decoder, all_context_filter_epochs_decoder_result
+
+
+
+
+
+
+
 
 
 def build_combined_time_synchronized_Bapun_decoders_window(curr_active_pipeline, included_filter_names: List[str]=None, fixed_window_duration = 15.0, controlling_widget=None, context=None, create_new_controlling_widget=True) -> GenericPyQtGraphContainer:
@@ -252,6 +320,8 @@ def build_combined_time_synchronized_Bapun_decoders_window(curr_active_pipeline,
 
     ## Build the specific filter results:
     _out_sync_plotters = {}
+    
+
     for a_filter_name in included_filter_names:
         active_session_configuration_context = curr_active_pipeline.filtered_contexts[a_filter_name]
         computation_result = curr_active_pipeline.computation_results[a_filter_name]
@@ -263,7 +333,6 @@ def build_combined_time_synchronized_Bapun_decoders_window(curr_active_pipeline,
         time_binned_position_df = computation_result.computed_data.get('extended_stats', {}).get('time_binned_position_df', None)
 
         active_measured_positions = computation_result.sess.position.to_dataframe()
-
 
         ## Build the connected position plotter:
         curr_position_decoder_plotter = TimeSynchronizedPositionDecoderPlotter(active_one_step_decoder=active_one_step_decoder, active_two_step_decoder=active_two_step_decoder)
