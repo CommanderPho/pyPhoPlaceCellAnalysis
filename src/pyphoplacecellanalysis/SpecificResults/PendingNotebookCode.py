@@ -126,8 +126,16 @@ from neuropy.core.epoch import Epoch, ensure_dataframe, ensure_Epoch, EpochsAcce
 from neuropy.analyses.placefields import Position
 
 
+@function_attributes(short_name=None, tags=['rachel', 'bapun'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-09-10 07:01', related_items=[])
 def post_process_non_kdiba(curr_active_pipeline):
     """ processes either Bapun or Rachel sessions
+
+    Usage:
+
+        from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import post_process_non_kdiba
+
+        post_process_non_kdiba(curr_active_pipeline)
+        
     """    
 
     ## build a true global session encompassing all epochs
@@ -157,28 +165,21 @@ def post_process_non_kdiba(curr_active_pipeline):
 
 
 @function_attributes(short_name=None, tags=['IMPORTANT', 'pseduo3D', 'pseudoND', 'context-decoding', 'bapun', 'WORKING'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-09-09 10:50', related_items=[])
-def build_contextual_pf2D_decoder(curr_active_pipeline, epochs_to_create_global_from_names = ['roam', 'sprinkle'], active_laps_decoding_time_bin_size: float = 0.75):
+def build_contextual_pf2D_decoder(curr_active_pipeline, epochs_to_create_global_from_names = ['roam', 'sprinkle']):
     """ The generalized context decoder for Bapun session, which is created out of the specified `epochs_to_create_global_from_names` and then used to decode the 'maze_any' epoch at the specified time bin size.
     
     Usage:
-        from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import build_contextual_pf2D_decoder
+        from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import build_contextual_pf2D_decoder, decode_using_contextual_pf2D_decoder
         
-        contextual_pf2D_dict, contextual_pf2D, contextual_pf2D_Decoder, all_context_filter_epochs_decoder_result = build_contextual_pf2D_decoder(curr_active_pipeline, epochs_to_create_global_from_names = ['roam', 'sprinkle'], active_laps_decoding_time_bin_size=0.75)
-    
+        contextual_pf2D_dict, contextual_pf2D, contextual_pf2D_Decoder = build_contextual_pf2D_decoder(curr_active_pipeline, epochs_to_create_global_from_names = ['roam', 'sprinkle'])
     """
     pf2D_Decoder_dict = {k:deepcopy(curr_active_pipeline.computation_results[k].computed_data.pf2D_Decoder) for k in epochs_to_create_global_from_names}
     
     # epochs_to_decode_names = ['maze_any']
-    epochs_df = ensure_dataframe(curr_active_pipeline.sess.epochs)
-    epochs_df = epochs_df.epochs.adding_concatenated_epoch(epochs_to_create_global_from_names=['pre', 'roam', 'sprinkle', 'post'], created_epoch_name='maze_any')
-    global_only_epoch: Epoch = ensure_Epoch(epochs_df[(epochs_df['label'] == 'maze_any')])
+    # epochs_df = ensure_dataframe(curr_active_pipeline.sess.epochs)
+    # epochs_df = epochs_df.epochs.adding_concatenated_epoch(epochs_to_create_global_from_names=['pre', 'roam', 'sprinkle', 'post'], created_epoch_name='maze_any')
+    # global_only_epoch: Epoch = ensure_Epoch(epochs_df[(epochs_df['label'] == 'maze_any')])
     # global_only_epoch
-
-    # epochs_to_decode_dict = {k:deepcopy(curr_active_pipeline.filtered_epochs[k]) for k in epochs_to_create_global_from_names}
-    # epochs_to_decode_dict = {k:deepcopy(curr_active_pipeline.filtered_epochs[k]).to_Epoch() for k in epochs_to_create_global_from_names}
-    # epochs_to_decode_dict = {k:deepcopy(curr_active_pipeline.filtered_epochs[k]).to_Epoch() for k in epochs_to_decode_names}
-    epochs_to_decode_dict = {'maze_any': deepcopy(global_only_epoch)}
-    # epochs_to_decode_dict
 
     ## Combine the non-directional PDFs and renormalize to get the directional PDF:
     # Inputs: long_LR_pf1D, long_RL_pf1D
@@ -198,9 +199,31 @@ def build_contextual_pf2D_decoder(curr_active_pipeline, epochs_to_create_global_
     # return (contextual_pf2D_dict, contextual_pf2D, contextual_pf2D_Decoder)
     ## OUTPUTS: contextual_pf2D_dict, contextual_pf2D, contextual_pf2D_Decoder
 
+    # 2m 35.5s
+    return contextual_pf2D_dict, contextual_pf2D, contextual_pf2D_Decoder
 
-    ## INPUTS: epochs_to_decode_dict
+
+
+
+@function_attributes(short_name=None, tags=['IMPORTANT', 'pseduo3D', 'pseudoND', 'context-decoding', 'bapun', 'WORKING'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-09-09 10:50', related_items=[])
+def decode_using_contextual_pf2D_decoder(curr_active_pipeline, contextual_pf2D_Decoder: BasePositionDecoder, active_laps_decoding_time_bin_size: float = 0.75):
+    """ The generalized context decoder for Bapun session, which is created out of the specified `epochs_to_create_global_from_names` and then used to decode the 'maze_any' epoch at the specified time bin size.
     
+    Usage:
+        from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import build_contextual_pf2D_decoder, decode_using_contextual_pf2D_decoder
+        ## Build the merged decoder `contextual_pf2D`
+        contextual_pf2D_dict, contextual_pf2D, contextual_pf2D_Decoder = build_contextual_pf2D_decoder(curr_active_pipeline, epochs_to_create_global_from_names = ['roam', 'sprinkle'])
+        ## Use `contextual_pf2D` to decode specific epochs:
+        all_context_filter_epochs_decoder_result, global_only_epoch = decode_using_contextual_pf2D_decoder(curr_active_pipeline, contextual_pf2D_Decoder=contextual_pf2D_Decoder, active_laps_decoding_time_bin_size=0.75)
+
+    """
+    # epochs_to_decode_names = ['maze_any']
+    epochs_df = ensure_dataframe(curr_active_pipeline.sess.epochs)
+    epochs_df = epochs_df.epochs.adding_concatenated_epoch(epochs_to_create_global_from_names=['pre', 'roam', 'sprinkle', 'post'], created_epoch_name='maze_any')
+    global_only_epoch: Epoch = ensure_Epoch(epochs_df[(epochs_df['label'] == 'maze_any')])
+    # global_only_epoch
+
+    epochs_to_decode_dict = {'maze_any': deepcopy(global_only_epoch)}
 
     # global_spikes_df: pd.DataFrame = get_proper_global_spikes_df(curr_active_pipeline)
     global_spikes_df: pd.DataFrame = deepcopy(curr_active_pipeline.sess.spikes_df)
@@ -211,7 +234,9 @@ def build_contextual_pf2D_decoder(curr_active_pipeline, epochs_to_create_global_
     all_context_filter_epochs_decoder_result
     ## OUTPUTS: contextual_pf2D_dict, contextual_pf2D, contextual_pf2D_Decoder, all_context_filter_epochs_decoder_result
     # 2m 35.5s
-    return contextual_pf2D_dict, contextual_pf2D, contextual_pf2D_Decoder, all_context_filter_epochs_decoder_result
+    return all_context_filter_epochs_decoder_result, global_only_epoch
+
+
 
 
 
@@ -6287,6 +6312,349 @@ class DataSlicingVisualizer(Decoded2DPosteriorTimeSyncMixin):
 # ==================================================================================================================== #
 # 2025-02-21 - Angular Binning, Transition Matricies, and More                                                         #
 # ==================================================================================================================== #
+# # ### Plots: Explore Binning Position and Angle
+# # Convert angles to radians
+# angles = np.deg2rad(global_pos_df['approx_head_dir_degrees'])
+
+# # Create circular histogram
+# fig, ax = plt.subplots(subplot_kw={'projection': 'polar'})
+# ax.hist(angles, bins=36, density=True, alpha=0.70)
+
+# # Set labels
+# ax.set_title("Circular Histogram of Head Direction")
+
+# # Show plot
+# plt.show()
+# df = deepcopy(global_pos_df)
+
+# # Normalize time to use as radius
+# radii = (df['t'] - df['t'].min()) / (df['t'].max() - df['t'].min())
+
+# # Create circular scatter plot
+# fig, ax = plt.subplots(subplot_kw={'projection': 'polar'})
+# ax.scatter(angles, radii, alpha=0.20, s=1)
+# # ax.plot(angles, radii, alpha=0.20, s=1)
+# # Set labels
+# ax.set_title("Circular Scatter Plot of Head Direction Over Time")
+
+# # Show plot
+# plt.show()
+
+# # Create circular scatter plot with line connecting points
+# fig, ax = plt.subplots(subplot_kw={'projection': 'polar'})
+
+# # Plot points
+# ax.scatter(angles, radii, alpha=0.75, s=5)  # Smaller point size
+
+# # Connect points with a line
+# ax.plot(angles, radii, alpha=0.5, linewidth=1)
+
+# # Set labels
+# ax.set_title("Circular Scatter Plot of Head Direction Over Time")
+
+# # Show plot
+# plt.show()
+
+
+
+
+# Now I have the columns `global_pos_df[['binned_x', 'binned_y', 'head_dir_angle_binned']]` and I'd like to visualize a heatmap showing:
+# 1. and 
+
+import numpy as np
+from typing import Dict, List, Tuple, Optional
+import pyphoplacecellanalysis.External.pyqtgraph as pg
+from pyphoplacecellanalysis.External.pyqtgraph.Qt import QtCore, QtGui
+from pyphoplacecellanalysis.GUI.PyQtPlot.BinnedImageRenderingWindow import BasicBinnedImageRenderingWindow
+
+class CircularBinnedImageRenderingWindow(BasicBinnedImageRenderingWindow):
+    """Renders circular/angular heatmaps within each spatial bin
+    
+    Usage:
+
+        from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import CircularBinnedImageRenderingWindow
+        
+        # ## INPUTS: occupancy_map, n_xbins, n_ybins n_x_bins=n_xbins, n_y_bins=n_ybins, n_dir_bins=n_dir_bins
+        # Create sample angular distribution data
+        # n_x_bins, n_y_bins = 10, 10
+        # n_angle_bins = 36
+        # angular_matrix = np.random.rand(n_x_bins, n_y_bins, n_angle_bins)
+        angular_matrix = deepcopy(occupancy_map)
+
+        # Create window
+        window = CircularBinnedImageRenderingWindow(
+            angular_matrix=angular_matrix,
+            xbins=np.arange(n_xbins),
+            ybins=np.arange(n_ybins),
+            n_angle_bins=n_dir_bins,
+            name='angular_distribution',
+            title='Angular Distribution per Position Bin'
+        )
+
+        window.render_all_circular_heatmaps()
+
+    """
+    
+    def __init__(self, angular_matrix, xbins=None, ybins=None, n_angle_bins: int=None, **kwargs):
+        """
+        angular_matrix: shape (n_x_bins, n_y_bins, n_angle_bins) containing angular distribution data
+        """
+        assert n_angle_bins is not None
+        pos_only_mat = np.sum(deepcopy(angular_matrix), axis=-1)
+        super().__init__(matrix=pos_only_mat, xbins=xbins, ybins=ybins, **kwargs)
+        self.n_angle_bins = n_angle_bins
+        self.angular_data = deepcopy(angular_matrix)
+        
+    def add_circular_heatmap(self, bin_x: int, bin_y: int, angular_data: np.ndarray) -> None:
+        """Adds a circular heatmap to a specific spatial bin"""
+        # Create circular representation
+        theta = np.linspace(0, 2*np.pi, self.n_angle_bins+1)[:-1]  # Angular positions
+        r = angular_data  # Radial values from angular distribution
+        
+        # Convert to cartesian coordinates
+        x = r * np.cos(theta)
+        y = r * np.sin(theta)
+        
+        # Create polygon for the circular heatmap
+        polygon = QtGui.QPolygonF()
+        for px, py in zip(x, y):
+            polygon.append(QtCore.QPointF(px + bin_x + 0.5, py + bin_y + 0.5))
+            
+        # Create path for smooth rendering
+        path = QtGui.QPainterPath()
+        path.addPolygon(polygon)
+        path.closeSubpath()
+        
+        # Create graphics item
+        item = pg.QtGui.QGraphicsPathItem(path)
+        
+        # Set color based on distribution intensity
+        color = pg.mkColor('w')  # Base color
+        color.setAlphaF(0.7)     # Semi-transparent
+        item.setBrush(pg.mkBrush(color))
+        item.setPen(pg.mkPen(None))  # No border
+        
+        # Add to plot
+        assert len(window.plot_names) > 0 is not None # 'angular_distribution'
+        plot_name: str = window.plot_names[0]
+        assert plot_name in self.plots, f"plot_name: {plot_name} not in self.plots"
+        self.plots[plot_name].mainPlotItem.addItem(item)
+        
+
+    def render_all_circular_heatmaps(self):
+        """Renders circular heatmaps for all spatial bins"""
+        n_x, n_y, _ = self.angular_data.shape
+        
+        for x in range(n_x):
+            for y in range(n_y):
+                angular_dist = self.angular_data[x, y]
+                # Normalize the distribution
+                if np.sum(angular_dist) > 0:
+                    angular_dist = angular_dist / np.max(angular_dist)
+                    self.add_circular_heatmap(x, y, angular_dist)
+
+    def init_UI(self):
+        """Initialize the UI and render circular heatmaps"""
+        super().init_UI()
+        # self.render_all_circular_heatmaps()
+
+
+def plot_spatial_angular_distributions(occupancy_map, subsample_factor=5):
+    """Plot radar charts of angular distributions across spatial positions
+    
+    Args:
+        occupancy_map (np.ndarray): 3D array (x_bins, y_bins, direction_bins)
+        subsample_factor (int): Plot every Nth spatial bin to avoid overcrowding
+
+
+    Usage:    
+        fig, ax = plot_spatial_angular_distributions(occupancy_map, subsample_factor=4)
+        plt.show()
+
+    """
+    n_x, n_y, n_angles = occupancy_map.shape
+    
+    # Create main figure
+    fig, ax = plt.subplots(figsize=(25, 15), clear=True, num='test')
+    
+    # Calculate angles for radar plot (in radians)
+    # theta = np.linspace(0, 2*np.pi, n_angles, endpoint=False)
+    # Calculate bin edges for rose plot
+    bins = np.linspace(0, 2*np.pi, n_angles+1)    
+
+    
+    # Plot radar at each subsampled position
+    for i in range(0, n_x, subsample_factor):
+        for j in range(0, n_y, subsample_factor):
+            # Get angular distribution at this position
+            values = occupancy_map[i,j,:]
+            
+            # Create small axes for this position
+            # radar_ax = fig.add_axes([i/n_x, j/n_y, 1/n_x, 1/n_y], projection='polar')
+            # radar_ax.plot(theta, values)
+            # radar_ax.fill(theta, values, alpha=0.25)
+            
+            # Create small axes for this position
+            _new_radial_ax = fig.add_axes([i/n_x, j/n_y, 1/n_x, 1/n_y], projection='polar')
+            
+            # Create rose plot using hist
+            _new_radial_ax.hist(bins[:-1], bins=bins, weights=values, density=False, histtype='stepfilled')
+
+            # pc = _new_radial_ax.pcolormesh(A, R, hist.T, cmap="magma_r")
+            # fig.colorbar(pc)
+            # _new_radial_ax.grid(True)
+
+            _new_radial_ax.set_xticks([])
+            _new_radial_ax.set_yticks([])
+    
+    return fig, ax
+
+
+import numpy as np
+import matplotlib.pyplot as plt
+
+def radial_histogram(data, bins=12, ax=None):
+    if ax is None:
+        fig = plt.figure()
+        ax = fig.add_subplot(111, projection='polar')
+    counts, edges = np.histogram(data, bins=bins, range=(0, 2*np.pi))
+    widths = np.diff(edges)
+    ax.bar(edges[:-1], counts, width=widths, bottom=0, align='edge', color='blue', alpha=0.5)
+    ax.set_xticks([])
+    ax.set_yticks([])
+    return ax
+
+def plot_spatial_angular_distributions(occupancy_map, subsample_factor=5):
+    """ Usage
+    
+        fig, ax = plot_spatial_angular_distributions(occupancy_map, subsample_factor=2)
+        plt.show()
+    """
+    n_x, n_y, n_angles = occupancy_map.shape
+    fig, ax = plt.subplots(figsize=(25, 15), clear=True, num='test')
+
+    # Draw grid boxes for each x/y bin
+    for i in range(n_x):
+        for j in range(n_y):
+            x0 = i / n_x
+            y0 = j / n_y
+            w_ = 1 / n_x
+            h_ = 1 / n_y
+            rect = plt.Rectangle((x0, y0), w_, h_, fill=False, color='black', lw=1, transform=fig.transFigure)
+            fig.add_artist(rect)
+
+    # Size of each small polar subplot
+    w = 0.6 * (subsample_factor / n_x)
+    h = 0.6 * (subsample_factor / n_y)
+
+    for i in range(0, n_x, subsample_factor):
+        for j in range(0, n_y, subsample_factor):
+            counts = occupancy_map[i, j, :]
+            angles = np.hstack([np.full(int(counts[k]), (2*np.pi*(k + 0.5)) / n_angles) for k in range(n_angles)])
+            pos_x = i / n_x
+            pos_y = j / n_y
+            ax_sub = fig.add_axes([pos_x, pos_y, w, h], projection='polar')
+            radial_histogram(angles, bins=n_angles, ax=ax_sub)
+
+    return fig, ax
+
+
+def plot_directional_occupancy(occupancy_map, direction_bin):
+    """Plot 2D heatmap for a specific head direction bin
+
+    # 2. Visualize a single direction slice
+    direction_bin = 1  # Example: looking at 180 degrees if using 36 bins
+    plot_directional_occupancy(occupancy_map, direction_bin)
+
+    # 3. Get total occupancy across all directions
+    total_spatial_occupancy = np.sum(occupancy_map, axis=2)
+    plt.figure(figsize=(10,8))
+    plt.imshow(total_spatial_occupancy, origin='lower')
+    plt.colorbar(label='Total Count')
+    plt.title('Total Spatial Occupancy')
+
+
+    """
+    plt.figure(figsize=(10,8))
+    plt.imshow(occupancy_map[:,:,direction_bin], origin='lower')
+    plt.colorbar(label='Count')
+    plt.title(f'Occupancy for Direction Bin {direction_bin}')
+    plt.xlabel('X bin')
+    plt.ylabel('Y bin')
+
+
+@function_attributes(short_name=None, tags=['HELPER', 'matplotlib'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-09-10 07:05', related_items=[])
+def draw_radial_lines(rect_width, rect_height, n_bins):
+    """Draws lines from rectangle center to perimeter, creating equal angular divisions
+    
+    
+    Args:
+        rect_width (float): Width of rectangle
+        rect_height (float): Height of rectangle
+        n_bins (int): Number of angular divisions desired
+    
+    Returns:
+        list of tuples: [(x1,y1,x2,y2)] coordinates for each line
+        
+        
+    Usage:
+    
+    
+        plt.figure(num='box_line_test',clear=True)
+        # Draw 8 radial divisions in a 100x80 rectangle
+        lines = draw_radial_lines(100, 80, 8)
+
+        # Plot the lines
+        for x1,y1,x2,y2 in lines:
+            plt.plot([x1,x2], [y1,y2], 'k-')
+        plt.axis('equal')
+        plt.show()
+
+
+    """
+    # Calculate center point
+    center_x = rect_width / 2
+    center_y = rect_height / 2
+    
+    # Calculate angles for each division
+    angles = np.linspace(0, 2*np.pi, n_bins, endpoint=False)
+    
+    lines = []
+    for angle in angles:
+        # Calculate direction vector
+        dx = np.cos(angle)
+        dy = np.sin(angle)
+        
+        # Find intersection with rectangle boundary
+        # Scale factor t = min positive value that hits boundary
+        t_values = []
+        
+        # Check horizontal boundaries
+        if dx != 0:
+            t_values.extend([
+                (0 - center_x) / dx,  # Left boundary
+                (rect_width - center_x) / dx  # Right boundary
+            ])
+            
+        # Check vertical boundaries
+        if dy != 0:
+            t_values.extend([
+                (0 - center_y) / dy,  # Bottom boundary
+                (rect_height - center_y) / dy  # Top boundary
+            ])
+            
+        # Get smallest positive t value
+        t = min(t for t in t_values if t > 0)
+        
+        # Calculate endpoint
+        end_x = center_x + t * dx
+        end_y = center_y + t * dy
+        
+        lines.append((center_x, center_y, end_x, end_y))
+    
+    return lines
+
+
 
 @function_attributes(short_name=None, tags=['working', 'angular', 'head_dir_angle_binned'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-02-21 00:48', related_items=[])
 def compute_3d_occupancy_map(df, n_x_bins=50, n_y_bins=50, n_dir_bins=8):
