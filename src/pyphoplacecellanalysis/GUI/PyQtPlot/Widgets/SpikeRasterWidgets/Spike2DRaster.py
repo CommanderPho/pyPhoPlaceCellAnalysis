@@ -247,7 +247,7 @@ class Spike2DRaster(SpecificDockWidgetManipulatingMixin, DynamicDockDisplayAreaO
         
          # Setup Signals:
         self.temporal_mapping_changed.connect(self.on_adjust_temporal_spatial_mapping)
-        self.spikes_window.timeWindow.window_duration_changed_signal.connect(self.on_adjust_temporal_spatial_mapping)
+        self.spikes_window.timeWindow.window_duration_changed_signal.connect(lambda *wrapped_args, **wrapped_kwargs: self.on_adjust_temporal_spatial_mapping())
         # self.on_window_duration_changed.connect(self.on_adjust_temporal_spatial_mapping)
         self.unit_sort_order_changed_signal.connect(self.on_unit_sort_order_changed)
 
