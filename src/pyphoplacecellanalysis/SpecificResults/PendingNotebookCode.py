@@ -158,11 +158,12 @@ def post_process_non_kdiba(curr_active_pipeline):
 
 @function_attributes(short_name=None, tags=['IMPORTANT', 'pseduo3D', 'pseudoND', 'context-decoding', 'bapun', 'WORKING'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-09-09 10:50', related_items=[])
 def build_contextual_pf2D_decoder(curr_active_pipeline, epochs_to_create_global_from_names = ['roam', 'sprinkle'], active_laps_decoding_time_bin_size: float = 0.75):
-    """ The generalized context decoder for Bapun session
+    """ The generalized context decoder for Bapun session, which is created out of the specified `epochs_to_create_global_from_names` and then used to decode the 'maze_any' epoch at the specified time bin size.
     
-    from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import build_contextual_pf2D_decoder
-    
-    contextual_pf2D_dict, contextual_pf2D, contextual_pf2D_Decoder, all_context_filter_epochs_decoder_result = build_contextual_pf2D_decoder(curr_active_pipeline, epochs_to_create_global_from_names = ['roam', 'sprinkle'], active_laps_decoding_time_bin_size=0.75)
+    Usage:
+        from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import build_contextual_pf2D_decoder
+        
+        contextual_pf2D_dict, contextual_pf2D, contextual_pf2D_Decoder, all_context_filter_epochs_decoder_result = build_contextual_pf2D_decoder(curr_active_pipeline, epochs_to_create_global_from_names = ['roam', 'sprinkle'], active_laps_decoding_time_bin_size=0.75)
     
     """
     pf2D_Decoder_dict = {k:deepcopy(curr_active_pipeline.computation_results[k].computed_data.pf2D_Decoder) for k in epochs_to_create_global_from_names}
@@ -211,12 +212,6 @@ def build_contextual_pf2D_decoder(curr_active_pipeline, epochs_to_create_global_
     ## OUTPUTS: contextual_pf2D_dict, contextual_pf2D, contextual_pf2D_Decoder, all_context_filter_epochs_decoder_result
     # 2m 35.5s
     return contextual_pf2D_dict, contextual_pf2D, contextual_pf2D_Decoder, all_context_filter_epochs_decoder_result
-
-
-
-
-
-
 
 
 
