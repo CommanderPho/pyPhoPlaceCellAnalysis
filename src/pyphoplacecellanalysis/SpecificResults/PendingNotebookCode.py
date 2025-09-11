@@ -240,9 +240,6 @@ def decode_using_contextual_pf2D_decoder(curr_active_pipeline, contextual_pf2D_D
     return all_context_filter_epochs_decoder_result, global_only_epoch
 
 
-
-
-
 def build_combined_time_synchronized_Bapun_decoders_window(curr_active_pipeline, included_filter_names: List[str]=None, fixed_window_duration = 15.0, controlling_widget=None, context=None, create_new_controlling_widget=True) -> GenericPyQtGraphContainer:
     """ Builds a single window with time_synchronized (time-dependent placefield) plotters controlled by an internal 2DRasterPlot widget.
     
@@ -407,6 +404,57 @@ def build_combined_time_synchronized_Bapun_decoders_window(curr_active_pipeline,
     _out_container = _merge_plotters(controlling_widget, is_controlling_widget_external=is_controlling_widget_external, **_out_sync_plotters)
     
     return _out_container # (controlling_widget, curr_sync_occupancy_plotter, curr_placefields_plotter), root_dockAreaWindow, app
+
+from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import DecodedFilterEpochsResult, SingleEpochDecodedResult
+
+@function_attributes(short_name=None, tags=['track', 'decoded-continuous'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-09-10 11:56', related_items=[])
+def _add_context_marginal_to_timeline(active_2d_plot, a_filter_epochs_decoded_result: SingleEpochDecodedResult, name='marginal_ctxt'):
+    """
+        from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import DecodedFilterEpochsResult, SingleEpochDecodedResult
+        from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import _add_context_marginal_to_timeline, _add_context_decoded_epoch_marginals_to_timeline
+        
+        ## Decode PBEs please
+        pbes = deepcopy(curr_active_pipeline.sess.pbe)
+        ripple_decoding_time_bin_size: float = 0.025 # 25ms
+        global_spikes_df: pd.DataFrame = deepcopy(curr_active_pipeline.sess.spikes_df)
+        pbe_decoder_result: DecodedFilterEpochsResult = contextual_pf2D_Decoder.decode_specific_epochs(spikes_df=deepcopy(global_spikes_df), filter_epochs=ensure_dataframe(pbes), decoding_time_bin_size=ripple_decoding_time_bin_size, debug_print=False)
+
+        _out = _add_context_marginal_to_timeline(active_2d_plot, a_filter_epochs_decoded_result=all_context_filter_epochs_decoder_result, name='global context')
+
+    """
+    p_x_given_n = deepcopy(a_filter_epochs_decoded_result.p_x_given_n)
+
+    marginal_z = np.nansum(p_x_given_n, axis=(0, 1)) 
+    marginal_z = marginal_z / np.sum(marginal_z, axis=0, keepdims=True) # sum over all directions for each time_bin (so there's a normalized distribution at each timestep)
+    # print(f'marginal_z.shape: {np.shape(marginal_z)}')
+    _out = active_2d_plot.add_docked_marginal_track(name=name, time_window_centers=deepcopy(a_filter_epochs_decoded_result.time_bin_container.centers), a_1D_posterior=marginal_z, a_variable_name='p_x_given_n')
+    return _out
+
+@function_attributes(short_name=None, tags=['track', 'multi-track', 'decoded-epochs'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-09-10 11:55', related_items=[])
+def _add_context_decoded_epoch_marginals_to_timeline(active_2d_plot, decoded_epochs_result: DecodedFilterEpochsResult, epochs_name: str = 'pbe'):
+    """ 
+    Usage:
+    
+        from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import DecodedFilterEpochsResult, SingleEpochDecodedResult
+        from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import _add_context_marginal_to_timeline, _add_context_decoded_epoch_marginals_to_timeline
+        
+        ## Decode PBEs please
+        pbes = deepcopy(curr_active_pipeline.sess.pbe)
+        ripple_decoding_time_bin_size: float = 0.025 # 25ms
+        global_spikes_df: pd.DataFrame = deepcopy(curr_active_pipeline.sess.spikes_df)
+        pbe_decoder_result: DecodedFilterEpochsResult = contextual_pf2D_Decoder.decode_specific_epochs(spikes_df=deepcopy(global_spikes_df), filter_epochs=ensure_dataframe(pbes), decoding_time_bin_size=ripple_decoding_time_bin_size, debug_print=False)
+
+        _out_pbe_tracks = _add_context_decoded_epoch_marginals_to_timeline(active_2d_plot=active_2d_plot, decoded_epochs_result=pbe_decoder_result)
+
+    """
+    
+    decoded_epochs_track_name: str = f'{epochs_name}[{ripple_decoding_time_bin_size}]'
+
+    slices_posteriors = [np.nansum(a_p_x_given_x, axis=(0, 1)) for a_p_x_given_x in decoded_epochs_result.p_x_given_n_list]
+    slices_posteriors = [(marginal_z / np.sum(marginal_z, axis=0, keepdims=True)) for marginal_z in slices_posteriors]
+
+    _out_epochs_tracks = active_2d_plot.add_docked_decoded_posterior_slices_track(name=decoded_epochs_track_name, slices_time_window_centers=decoded_epochs_result.time_window_centers, slices_posteriors=slices_posteriors, measured_position_df=None)
+    return _out_epochs_tracks
 
 
 
