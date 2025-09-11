@@ -217,19 +217,22 @@ def decode_using_contextual_pf2D_decoder(curr_active_pipeline, contextual_pf2D_D
         all_context_filter_epochs_decoder_result, global_only_epoch = decode_using_contextual_pf2D_decoder(curr_active_pipeline, contextual_pf2D_Decoder=contextual_pf2D_Decoder, active_laps_decoding_time_bin_size=0.75)
 
     """
+    desired_global_created_epoch_name: str = 'maze_any'
     # epochs_to_decode_names = ['maze_any']
     epochs_df = ensure_dataframe(curr_active_pipeline.sess.epochs)
-    epochs_df = epochs_df.epochs.adding_concatenated_epoch(epochs_to_create_global_from_names=['pre', 'roam', 'sprinkle', 'post'], created_epoch_name='maze_any')
-    global_only_epoch: Epoch = ensure_Epoch(epochs_df[(epochs_df['label'] == 'maze_any')])
+    epochs_to_merge_as_global_epoch_names: List[str] = [v for v in epochs_df['label'].to_list() if (v != desired_global_created_epoch_name)]
+    print(f'epochs_to_merge_as_global_epoch_names: {epochs_to_merge_as_global_epoch_names}')
+    epochs_df = epochs_df.epochs.adding_concatenated_epoch(epochs_to_create_global_from_names=epochs_to_merge_as_global_epoch_names, created_epoch_name=desired_global_created_epoch_name)
+    global_only_epoch: Epoch = ensure_Epoch(epochs_df[(epochs_df['label'] == desired_global_created_epoch_name)])
     # global_only_epoch
 
-    epochs_to_decode_dict = {'maze_any': deepcopy(global_only_epoch)}
+    epochs_to_decode_dict = {desired_global_created_epoch_name: deepcopy(global_only_epoch)}
 
     # global_spikes_df: pd.DataFrame = get_proper_global_spikes_df(curr_active_pipeline)
     global_spikes_df: pd.DataFrame = deepcopy(curr_active_pipeline.sess.spikes_df)
     # get_proper_global_spikes_df(owning_pipeline_reference, minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz, included_qclu_values=included_qclu_values)
     # global_measured_position_df: pd.DataFrame = deepcopy(curr_active_pipeline.sess.position.to_dataframe()).dropna(subset=['x', 'y']) # computation_result.sess.position.to_dataframe()
-    all_context_filter_epochs_decoder_result: DecodedFilterEpochsResult = contextual_pf2D_Decoder.decode_specific_epochs(spikes_df=deepcopy(global_spikes_df), filter_epochs=ensure_dataframe(epochs_to_decode_dict['maze_any']), decoding_time_bin_size=active_laps_decoding_time_bin_size, debug_print=False)
+    all_context_filter_epochs_decoder_result: DecodedFilterEpochsResult = contextual_pf2D_Decoder.decode_specific_epochs(spikes_df=deepcopy(global_spikes_df), filter_epochs=ensure_dataframe(epochs_to_decode_dict[desired_global_created_epoch_name]), decoding_time_bin_size=active_laps_decoding_time_bin_size, debug_print=False)
     all_context_filter_epochs_decoder_result: SingleEpochDecodedResult = all_context_filter_epochs_decoder_result.get_result_for_epoch(0)
     all_context_filter_epochs_decoder_result
     ## OUTPUTS: contextual_pf2D_dict, contextual_pf2D, contextual_pf2D_Decoder, all_context_filter_epochs_decoder_result
