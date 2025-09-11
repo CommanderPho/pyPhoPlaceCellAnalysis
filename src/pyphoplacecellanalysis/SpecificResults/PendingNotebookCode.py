@@ -6486,7 +6486,7 @@ class CircularBinnedImageRenderingWindow(BasicBinnedImageRenderingWindow):
         item.setPen(pg.mkPen(None))  # No border
         
         # Add to plot
-        assert len(window.plot_names) > 0 is not None # 'angular_distribution'
+        assert (window.plot_names is not None) and (len(window.plot_names) > 0) # 'angular_distribution'
         plot_name: str = window.plot_names[0]
         assert plot_name in self.plots, f"plot_name: {plot_name} not in self.plots"
         self.plots[plot_name].mainPlotItem.addItem(item)
