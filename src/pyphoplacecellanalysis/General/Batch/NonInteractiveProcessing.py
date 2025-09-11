@@ -210,7 +210,7 @@ def batch_load_session(global_data_root_parent_path: Path, active_data_mode_name
     if (not is_kdiba_session):
         if computation_functions_name_excludelist is None:
             computation_functions_name_excludelist = []
-        if 'lap_direction_determination' is not in computation_functions_name_excludelist:
+        if 'lap_direction_determination' not in computation_functions_name_excludelist:
             computation_functions_name_excludelist.append('lap_direction_determination') ## skip 'lap_direction_determination' computation for non-kdiba sessions
         
 
