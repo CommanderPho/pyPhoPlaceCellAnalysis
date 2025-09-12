@@ -10,7 +10,7 @@ from pyphoplacecellanalysis.External.pyqtgraph.dockarea.DockArea import DockArea
 from pyphoplacecellanalysis.GUI.Qt.MainApplicationWindows.PhoMainAppWindowBase import PhoMainAppWindowBase
 
 from pyphoplacecellanalysis.GUI.PyQtPlot.DockingWidgets.DynamicDockDisplayAreaContent import CustomDockDisplayConfig, DynamicDockDisplayAreaContentMixin
-
+from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.ContainerBased.PhoContainerTool import GenericPyQtGraphContainer
     
 # ==================================================================================================================== #
 class PhoDockAreaContainingWindow(DynamicDockDisplayAreaContentMixin, PhoMainAppWindowBase):
@@ -184,4 +184,96 @@ class DockAreaWrapper(object):
         # dDisplayItem2.hideTitleBar()
         
         return win, app
+
+
+
+
+    @classmethod
+    def wrap_horizontally_with_dockAreaWindow(cls, title='_test_PhoDockAreaWidgetApp', debug_print:bool=False, **widget_dict) -> GenericPyQtGraphContainer:
+        """ Combine The Separate Windows into a common DockArea window:
+        
+        
+        Usage:
+            from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.DockAreaWrapper import DockAreaWrapper
+
+            # active_root_main_widget = ipcDataExplorer.p.parentWidget()
+            active_root_main_widget = ipcDataExplorer.p.window()
+            win, app = DockAreaWrapper.wrap_horizontally_with_dockAreaWindow(active_root_main_widget, placefieldControlsContainerWidget)
+
+        """                
+        # build a win of type PhoDockAreaContainingWindow
+        # win, app = cls.build_default_dockAreaWindow(title=title, defer_show=True)
+        
+        # # curr_main_window_size = main_window.size()
+        # main_win_geom = main_window.window().geometry() # get the QTCore PyRect object
+        # main_x, main_y, main_width, main_height = main_win_geom.getRect() # Note: dx & dy refer to width and height
+        
+        # if auxilary_controls_window is not None:
+        #     second_win_geom = auxilary_controls_window.window().geometry()
+        #     secondary_x, secondary_y, secondary_width, secondary_height = second_win_geom.getRect() # Note: dx & dy refer to width and height
+            
+        #     combined_width = max(main_width, secondary_width)
+        #     combined_height = main_height + secondary_height
+        #     # main_window.size()[0]
+        #     # win.resize(1000,500)
+        #     win.resize(combined_width, combined_height)
+        
+        
+        # # Build Using 
+        # display_config2 = CustomDockDisplayConfig(showCloseButton=False)
+        # _, dDisplayItem2 = win.add_display_dock("Dock2 - Content", dockSize=(main_width, main_height), widget=main_window, dockAddLocationOpts=['bottom'], display_config=display_config2)
+        
+        # if auxilary_controls_window is not None:
+        #     display_config1 = CustomDockDisplayConfig(showCloseButton=False)
+        #     _, dDisplayItem1 = win.add_display_dock("Dock1 - Controls", dockSize=(secondary_width, secondary_height), widget=auxilary_controls_window, dockAddLocationOpts=['top', dDisplayItem2], display_config=display_config1)
+
+        # # _, dDisplayItem1 = win.add_display_dock("Dock1 - Controls", dockSize=(secondary_width, secondary_height), widget=auxilary_controls_window, dockAddLocationOpts=['bottom'])
+        # win.show()
+
+        # if auxilary_controls_window is not None:
+        #     win.area.moveDock(dDisplayItem1, 'top', dDisplayItem2)     ## move d4 to top edge of d2
+    
+        # dDisplayItem1.hideTitleBar()
+        # dDisplayItem2.hideTitleBar()
+        if len(widget_dict) > 0:
+            # out_Width_Height_Tuple = list(_out_sync_plotters.values())[0].desired_widget_size(desired_page_height = 600.0, debug_print=True)
+            out_Width_Height_Tuple = list(widget_dict.values())[0].size()
+            out_Width_Height_Tuple = (out_Width_Height_Tuple.width(), out_Width_Height_Tuple.height())
+            if debug_print:
+                print(f'out_Width_Height_Tuple: {out_Width_Height_Tuple}')
+            
+            final_desired_width, final_desired_height = out_Width_Height_Tuple
+            if debug_print:
+                print(f'final_desired_width: {final_desired_width}, final_desired_height: {final_desired_height}')
+        
+        # build a win of type PhoDockAreaContainingWindow
+        root_dockAreaWindow, app = cls.build_default_dockAreaWindow(title=title, defer_show=True)
+        
+        _display_configs = {}
+        _display_dock_items = {}
+        _display_sync_connections = {}
+        
+        for a_name, a_sync_plotter in widget_dict.items():
+            _display_configs[a_name] = CustomDockDisplayConfig(showCloseButton=False)
+            _, _display_dock_items[a_name] = root_dockAreaWindow.add_display_dock(f"{a_name}", dockSize=(final_desired_width, final_desired_height), widget=a_sync_plotter, dockAddLocationOpts=['right'], display_config=_display_configs[a_name])
+        # END for a_name, a_sync_plotter in _out_sync_plotter...
+
+        root_dockAreaWindow.show()
+        
+
+        _out_container: GenericPyQtGraphContainer = GenericPyQtGraphContainer(name='build_combined_time_synchronized_plotters_window')       
+        _out_container.ui.root_dockAreaWindow = root_dockAreaWindow
+        _out_container.ui.app = app
+        _out_container.ui.display_sync_connections = _display_sync_connections
+        _out_container.ui.display_dock_items = _display_dock_items
+        _out_container.ui.sync_plotters = widget_dict
+        _out_container.plot_data.display_configs = _display_configs
+        # if context is not None:
+        #     _out_container.plot_data.display_context = context
+        # if included_filter_names is not None:
+        #     _out_container.params.included_filter_names = included_filter_names ## captured
+
+        return _out_container
+
+
 
