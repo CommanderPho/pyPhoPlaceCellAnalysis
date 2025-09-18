@@ -172,7 +172,7 @@ def batch_load_session(global_data_root_parent_path: Path, active_data_mode_name
     ## For every computation config we build a fake (duplicate) filter config).
     # OVERRIDE WITH TRUE:
     # curr_active_pipeline.sess.config.preprocessing_parameters.epoch_estimation_parameters.laps['use_direction_dependent_laps'] = True # override with True
-    is_kdiba_session: bool = (curr_active_pipeline.active_sess_config.format_name in ['kdiba'])
+    is_kdiba_session: bool = (curr_active_pipeline.active_sess_config.format_name.lower() in ['kdiba'])
 
     if (not is_kdiba_session) and (curr_active_pipeline.sess.config.preprocessing_parameters.epoch_estimation_parameters.laps.use_direction_dependent_laps == True):
         print(f'WARN: overriding `curr_active_pipeline.sess.config.preprocessing_parameters.epoch_estimation_parameters.laps.use_direction_dependent_laps = False` for BAPUN-type session.')
@@ -210,9 +210,10 @@ def batch_load_session(global_data_root_parent_path: Path, active_data_mode_name
     if (not is_kdiba_session):
         if computation_functions_name_excludelist is None:
             computation_functions_name_excludelist = []
-        if 'lap_direction_determination' not in computation_functions_name_excludelist:
-            computation_functions_name_excludelist.append('lap_direction_determination') ## skip 'lap_direction_determination' computation for non-kdiba sessions
-        
+        # if 'lap_direction_determination' not in computation_functions_name_excludelist:
+        #     computation_functions_name_excludelist.append('lap_direction_determination') ## skip 'lap_direction_determination' computation for non-kdiba sessions
+        if 'lap_direction_determination' in computation_functions_name_includelist:
+            computation_functions_name_includelist = [k for k in computation_functions_name_includelist if (k != 'lap_direction_determination')]
 
     for a_computation_suffix_name, a_computation_config in zip(lap_direction_suffix_list, active_session_computation_configs): # these should NOT be the same length: lap_direction_suffix_list: ['_odd', '_even', '_any']
         # We need to filter and then compute with the appropriate config iteratively.
