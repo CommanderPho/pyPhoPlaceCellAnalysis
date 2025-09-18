@@ -83,7 +83,7 @@ class Spike2DRaster(SpecificDockWidgetManipulatingMixin, DynamicDockDisplayAreaO
     """ Displays a 2D version of a raster plot with the spikes occuring along a plane. 
     
     Usage:
-        from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.SpikeRasterWidgets.Spike2DRaster import Spike2DRaster
+        from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.SpikeRasterWidgets.Spike2DRaster import Spike2DRaster, SynchronizedPlotMode
         curr_epoch_name = 'maze1'
         curr_epoch = curr_active_pipeline.filtered_epochs[curr_epoch_name] # <NamedTimerange: {'name': 'maze1', 'start_end_times': array([  22.26, 1739.15336412])};>
         curr_sess = curr_active_pipeline.filtered_sessions[curr_epoch_name]
