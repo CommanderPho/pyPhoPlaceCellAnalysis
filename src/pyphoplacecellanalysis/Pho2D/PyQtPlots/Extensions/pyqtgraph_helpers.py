@@ -319,11 +319,20 @@ def build_pyqtgraph_epoch_indicator_regions(win: pg.PlotWidget, t_start:float, t
     """
     from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.GraphicsObjects.CustomLinearRegionItem import CustomLinearRegionItem # used in `plot_kourosh_activity_style_figure`
 
+    ## pop the epoch label kwargs first
+    epoch_label_position = kwargs.pop('epoch_label_position', 0.9)
+    epoch_label_rotateAxis = kwargs.pop('epoch_label_rotateAxis', (1,0))
+    epoch_label_anchor = kwargs.pop('epoch_label_anchor', (1, 1))
+
     # Add the linear region overlay:
     epoch_linear_region:CustomLinearRegionItem = CustomLinearRegionItem(**(dict(pen=pg.mkPen('#fff'), brush=pg.mkBrush('#f004'), hoverBrush=pg.mkBrush('#fff4'), hoverPen=pg.mkPen('#f00'))|kwargs), movable=movable, removable=removable) #, clipItem=plots['difference']  bound the LinearRegionItem to the plotted data
     epoch_linear_region.setObjectName(f'epoch[{epoch_label}]')
     epoch_linear_region.setZValue(-3) # put it in the back
-    epoch_region_label:pg.InfLineLabel = pg.InfLineLabel(epoch_linear_region.lines[0], f"{epoch_label}", position=0.95, rotateAxis=(1,0), anchor=(1, 1)) # add the label for the short epoch
+    # epoch_region_label:pg.InfLineLabel = pg.InfLineLabel(epoch_linear_region.lines[0], f"{epoch_label}", position=0.95, rotateAxis=(1,0), anchor=(1, 1)) # add the label for the short epoch
+
+    # epoch_label_position = kwargs.pop('epoch_label_position', 0.9)
+    epoch_region_label:pg.InfLineLabel = pg.InfLineLabel(epoch_linear_region.lines[0], f"{epoch_label}", position=epoch_label_position, rotateAxis=epoch_label_rotateAxis, anchor=epoch_label_anchor) # add the label for the short epoch
+
     # Add the LinearRegionItem to the ViewBox, but tell the ViewBox to exclude this item when doing auto-range calculations.
     win.addItem(epoch_linear_region, ignoreBounds=True)
     # Set the position:

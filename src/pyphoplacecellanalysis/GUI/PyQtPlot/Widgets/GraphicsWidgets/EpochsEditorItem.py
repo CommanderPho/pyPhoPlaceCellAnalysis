@@ -355,12 +355,15 @@ class EpochsEditor:
 
     # INIT METHODS _______________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
     @classmethod
-    def perform_plot_laps_diagnoser(cls, pos_df: pd.DataFrame, curr_laps_df: pd.DataFrame, include_velocity=True, include_accel=True, on_epoch_region_updated_callback=None, on_epoch_region_selection_toggled_callback=None, loaded_track_limits=None, grid_bin_bounds=None):
+    def perform_plot_laps_diagnoser(cls, pos_df: pd.DataFrame, curr_laps_df: pd.DataFrame, include_velocity=True, include_accel=True, on_epoch_region_updated_callback=None, on_epoch_region_selection_toggled_callback=None, loaded_track_limits=None, grid_bin_bounds=None, epoch_label_position=0.5, epoch_label_rotateAxis=(1,0), epoch_label_anchor=(1, 1), **kwargs):
         """
             from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.GraphicsWidgets.EpochsEditorItem import perform_plot_laps_diagnoser
             plots_obj = EpochsEditor.perform_plot_laps_diagnoser(pos_df, curr_laps_df, include_velocity=True, include_accel=True, on_epoch_region_updated_callback=_on_epoch_region_updated)
 
         """
+        # custom_epoch_label_kwargs = dict(epoch_label_position=0.5, epoch_label_rotateAxis=(1,0), epoch_label_anchor=(1, 1))
+        custom_epoch_label_kwargs = dict(epoch_label_position=epoch_label_position, epoch_label_rotateAxis=epoch_label_rotateAxis, epoch_label_anchor=epoch_label_anchor)
+        
         # Add 'lap_color' column to curr_laps_df
         curr_laps_df = cls.add_visualization_columns(curr_laps_df=curr_laps_df)
 
@@ -480,7 +483,7 @@ class EpochsEditor:
                 ## Create a new one:
                 # add alpha
                 epoch_linear_region, epoch_region_label = build_pyqtgraph_epoch_indicator_regions(v1, t_start=a_lap.start, t_stop=a_lap.stop, epoch_label=a_lap.label, movable=True, removable=True, **dict(pen=pg.mkPen(f'{a_lap.lap_color}d6', width=1.0), brush=pg.mkBrush(f"{a_lap.lap_color}42"), hoverBrush=pg.mkBrush(f"{a_lap.lap_color}a8"), hoverPen=pg.mkPen(a_lap.lap_accent_color, width=2.5)), 
-                                                                                                  custom_bound_data=a_lap.Index)                
+                                                                                                  custom_bound_data=a_lap.Index, **custom_epoch_label_kwargs, **kwargs)               
                 lap_epoch_widgets[a_lap.label] = epoch_linear_region
                 lap_epoch_labels[a_lap.label] = epoch_region_label
                 if on_epoch_region_updated_callback is not None:
@@ -511,7 +514,7 @@ class EpochsEditor:
 
 
     @classmethod
-    def init_laps_diagnoser(cls, pos_df: pd.DataFrame, curr_laps_df: pd.DataFrame, include_velocity=True, include_accel=True, on_epoch_region_updated_callback=None, on_epoch_region_selection_toggled_callback=None, loaded_track_limits=None, grid_bin_bounds=None):
+    def init_laps_diagnoser(cls, pos_df: pd.DataFrame, curr_laps_df: pd.DataFrame, include_velocity=True, include_accel=True, on_epoch_region_updated_callback=None, on_epoch_region_selection_toggled_callback=None, loaded_track_limits=None, grid_bin_bounds=None, **kwargs):
         """ 
 
         Usage:
@@ -531,14 +534,14 @@ class EpochsEditor:
         curr_laps_df = cls.add_visualization_columns(curr_laps_df=curr_laps_df)
         _obj = cls(pos_df=pos_df, curr_laps_df=curr_laps_df, on_epoch_region_updated_callback=on_epoch_region_updated_callback, on_epoch_region_selection_toggled_callback=on_epoch_region_selection_toggled_callback, loaded_track_limits=loaded_track_limits)
         _obj.changed_laps_df = _obj.curr_laps_df.iloc[:0,:].copy() # should be in attrs_post_init
-        _obj.plots = cls.perform_plot_laps_diagnoser(pos_df, curr_laps_df, include_velocity=include_velocity, include_accel=include_accel, on_epoch_region_updated_callback=_obj.on_epoch_region_updated, on_epoch_region_selection_toggled_callback=_obj.on_epoch_region_selection_toggled, loaded_track_limits=loaded_track_limits, grid_bin_bounds=grid_bin_bounds)
+        _obj.plots = cls.perform_plot_laps_diagnoser(pos_df, curr_laps_df, include_velocity=include_velocity, include_accel=include_accel, on_epoch_region_updated_callback=_obj.on_epoch_region_updated, on_epoch_region_selection_toggled_callback=_obj.on_epoch_region_selection_toggled, loaded_track_limits=loaded_track_limits, grid_bin_bounds=grid_bin_bounds, **kwargs)
         _obj.connect_double_click_event()  # Connect the double-click event after plots are initialized
         return _obj
 
 
 
     @classmethod
-    def init_from_session(cls, sess, include_velocity=True, include_accel=True, on_epoch_region_updated_callback=None, on_epoch_region_selection_toggled_callback=None, grid_bin_bounds=None):
+    def init_from_session(cls, sess, include_velocity=True, include_accel=True, on_epoch_region_updated_callback=None, on_epoch_region_selection_toggled_callback=None, grid_bin_bounds=None, **kwargs):
         """ initialize from a session object. Does not modify the session. """
         # pos_df = sess.compute_position_laps() # ensures the laps are computed if they need to be:
         position_obj = copy.deepcopy(sess.position)
@@ -550,7 +553,7 @@ class EpochsEditor:
         curr_laps_df = sess.laps.to_dataframe()
         loaded_track_limits = copy.deepcopy(sess.config.loaded_track_limits)
         loaded_track_limits['x_midpoint'] = sess.config.x_midpoint
-        return cls.init_laps_diagnoser(pos_df=pos_df, curr_laps_df=curr_laps_df, include_velocity=include_velocity, include_accel=include_accel, on_epoch_region_updated_callback=on_epoch_region_updated_callback, on_epoch_region_selection_toggled_callback=on_epoch_region_selection_toggled_callback, loaded_track_limits=loaded_track_limits, grid_bin_bounds=grid_bin_bounds)
+        return cls.init_laps_diagnoser(pos_df=pos_df, curr_laps_df=curr_laps_df, include_velocity=include_velocity, include_accel=include_accel, on_epoch_region_updated_callback=on_epoch_region_updated_callback, on_epoch_region_selection_toggled_callback=on_epoch_region_selection_toggled_callback, loaded_track_limits=loaded_track_limits, grid_bin_bounds=grid_bin_bounds, **kwargs)
     
 
 
