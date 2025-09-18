@@ -306,9 +306,10 @@ class BatchSessionCompletionHandler:
         # BEGIN MAIN FUNCTION BODY
         was_updated = False
         was_updated = was_updated | _subfn_update_session_missing_preprocessing_parameters(curr_active_pipeline.sess)
+        
+        is_kdiba_session: bool = (curr_active_pipeline.active_sess_config.format_name.lower() in ['kdiba'])
 
-
-        if (curr_active_pipeline.active_sess_config.format_name not in ['bapun']):
+        if (is_kdiba_session):
             was_updated = was_updated | _subfn_update_session_missing_loaded_track_limits(curr_active_pipeline, always_reload_from_file=False)
 
             long_epoch_name, short_epoch_name, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
@@ -343,7 +344,9 @@ class BatchSessionCompletionHandler:
         from pyphoplacecellanalysis.General.Model.SpecificComputationParameterTypes import ComputationKWargParameters
         from pyphoplacecellanalysis.General.Batch.BatchJobCompletion.UserCompletionHelpers.batch_user_completion_helpers import PostHocPipelineFixup
         
-        if (curr_active_pipeline.active_sess_config.format_name not in ['bapun']):
+        is_kdiba_session: bool = (curr_active_pipeline.active_sess_config.format_name.lower() in ['kdiba'])
+        
+        if (is_kdiba_session):
             if not LongShortPipelineTests(curr_active_pipeline=curr_active_pipeline).validate():
                 print(f'ERROR!! Pipeline is invalid according to LongShortPipelineTests!!')
                 return False
