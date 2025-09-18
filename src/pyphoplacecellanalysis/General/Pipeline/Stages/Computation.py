@@ -460,20 +460,33 @@ class ComputedPipelineStage(FilterablePipelineStage, LoadedPipelineStage):
         # search_mode=FunctionsSearchMode.initFromIsGlobal(are_global)
 
         # Need to exclude any computation functions specified in omitted_computation_functions_dict
-        if computation_functions_name_includelist is not None:
-            active_computation_functions = self.find_registered_computation_functions(computation_functions_name_includelist, search_mode=search_mode, names_list_is_excludelist=False)
-            print(f'due to includelist, including only {len(active_computation_functions)} out of {len(self.registered_computation_function_names)} registered computation functions.')
-
-        elif computation_functions_name_excludelist is not None:
-            active_computation_functions = self.find_registered_computation_functions(computation_functions_name_includelist, search_mode=search_mode, names_list_is_excludelist=True)
-            print(f'due to excludelist, including only {len(active_computation_functions)} out of {len(self.registered_computation_function_names)} registered computation functions.')
-            # TODO: do something about the previous_computation_result?
-        else:
+        if (computation_functions_name_includelist is None) and (computation_functions_name_excludelist is None):
             # Both are None:            
             if are_global:
                 active_computation_functions = self.registered_global_computation_functions
             else:
                 active_computation_functions = self.registered_computation_functions
+        else:           
+            if (computation_functions_name_includelist is not None):
+                if (computation_functions_name_excludelist is not None):
+                    ## pre-filter the include list despite limitations so hopefully it works:
+                    computation_functions_name_includelist = [a_fn_name for a_fn_name in computation_functions_name_includelist if (a_fn_name not in computation_functions_name_excludelist)]
+                    
+                active_computation_functions = self.find_registered_computation_functions(computation_functions_name_includelist, search_mode=search_mode, names_list_is_excludelist=False)
+                if (computation_functions_name_excludelist is not None):
+                    ## also get excluded fns. This is better than pre-filtering the include list because there are several names to match (short, long, etc):
+                    excluded_active_computation_functions = self.find_registered_computation_functions(computation_functions_name_excludelist, search_mode=search_mode, names_list_is_excludelist=True)                    
+                    # resolved_computation_functions_name_includelist = [k for k in computation_functions_name_includelist if k not in computation_functions_name_excludelist]
+                    active_computation_functions = [a_fn for a_fn in active_computation_functions if (a_fn not in excluded_active_computation_functions)]
+                    
+                #END if (computation_functions_name_excludelist is not None)...
+                print(f'due to includelist, including only {len(active_computation_functions)} out of {len(self.registered_computation_function_names)} registered computation functions.')
+            else:
+                ## `computation_functions_name_includelist` is None... this is weird.
+                assert (computation_functions_name_excludelist is not None), f"if both were none, this should have triggered the BOTH condition above."
+                active_computation_functions = self.find_registered_computation_functions(computation_functions_name_includelist, search_mode=search_mode, names_list_is_excludelist=True)
+                print(f'due to excludelist, including only {len(active_computation_functions)} out of {len(self.registered_computation_function_names)} registered computation functions.')
+                # TODO: do something about the previous_computation_result?
 
         # Perform the computations:
         return ComputedPipelineStage._execute_computation_functions(active_computation_functions, previous_computation_result=previous_computation_result, fail_on_exception=fail_on_exception, progress_logger_callback=progress_logger_callback, are_global=are_global, debug_print=debug_print)
