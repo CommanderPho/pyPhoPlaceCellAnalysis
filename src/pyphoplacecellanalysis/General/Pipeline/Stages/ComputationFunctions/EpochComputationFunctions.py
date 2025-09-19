@@ -1939,7 +1939,9 @@ class EpochComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Computati
         print(f'perform_compute_non_PBE_epochs(..., training_data_portion={training_data_portion}, epochs_decoding_time_bin_size: {epochs_decoding_time_bin_size}, frame_divide_bin_size: {frame_divide_bin_size})')
 
 
-        long_epoch_name, short_epoch_name, global_epoch_name = owning_pipeline_reference.find_LongShortGlobal_epoch_names()        
+        # long_epoch_name, short_epoch_name, global_epoch_name = owning_pipeline_reference.find_LongShortGlobal_epoch_names()
+        global_epoch_name = owning_pipeline_reference.find_Global_epoch_name()
+
         try:
             available_MB: int = MemoryManagement.get_available_system_memory_MB() # Get available memory in MegaBytes
             available_GB: int = available_MB / 1024  # Gigabytes

@@ -732,8 +732,9 @@ class ComputedPipelineStage(FilterablePipelineStage, LoadedPipelineStage):
         else:
             ## non-KDIBA session
             df = self.sess.paradigm.to_dataframe()
-            return df['label'].values[-1] ## last item
-            # df[df['duration'].max()] 
+            # return df['label'].values[-1] ## last item
+            global_epoch_name: str = df.iloc[df['duration'].argmax()]['label']
+            return global_epoch_name
             ## TODO:
 
 
