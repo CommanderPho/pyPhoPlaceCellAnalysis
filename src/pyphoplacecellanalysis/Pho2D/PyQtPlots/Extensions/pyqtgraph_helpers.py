@@ -286,6 +286,22 @@ def build_scrollable_graphics_layout_widget_with_nested_viewbox_ui(name, window_
 
 
 
+def block_until_render_complete(qapp_name:str='', max_wait_time_sec: int=(60*5)) -> None:
+    """ synchronously blocks until all rendering of the UI is complete. 
+    Usage:
+        from pyphoplacecellanalysis.Pho2D.PyQtPlots.Extensions.pyqtgraph_helpers import block_until_render_complete
+
+        print(f'waiting until complete....')
+        block_until_render_complete()
+        print(f'\tblock_until_render_complete is done. Continuing execution.')
+    
+    """
+    ## INPUTS: out_custom_formats_dict
+    app = pg.mkQApp(name=qapp_name)
+    app.processEvents(pg.QtCore.QEventLoop.ProcessEventsFlag.AllEvents, max_wait_time_sec) ## 5 minutes is max time
+    return
+
+
 # ==================================================================================================================== #
 # Plotting Helpers                                                                                                     #
 # ==================================================================================================================== #
@@ -303,16 +319,27 @@ def build_pyqtgraph_epoch_indicator_regions(win: pg.PlotWidget, t_start:float, t
     """
     from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.GraphicsObjects.CustomLinearRegionItem import CustomLinearRegionItem # used in `plot_kourosh_activity_style_figure`
 
+    ## pop the epoch label kwargs first
+    epoch_label_position = kwargs.pop('epoch_label_position', 0.9)
+    epoch_label_rotateAxis = kwargs.pop('epoch_label_rotateAxis', (1,0))
+    epoch_label_anchor = kwargs.pop('epoch_label_anchor', (1, 1))
+
     # Add the linear region overlay:
     epoch_linear_region:CustomLinearRegionItem = CustomLinearRegionItem(**(dict(pen=pg.mkPen('#fff'), brush=pg.mkBrush('#f004'), hoverBrush=pg.mkBrush('#fff4'), hoverPen=pg.mkPen('#f00'))|kwargs), movable=movable, removable=removable) #, clipItem=plots['difference']  bound the LinearRegionItem to the plotted data
     epoch_linear_region.setObjectName(f'epoch[{epoch_label}]')
     epoch_linear_region.setZValue(-3) # put it in the back
-    epoch_region_label:pg.InfLineLabel = pg.InfLineLabel(epoch_linear_region.lines[0], f"{epoch_label}", position=0.95, rotateAxis=(1,0), anchor=(1, 1)) # add the label for the short epoch
+    # epoch_region_label:pg.InfLineLabel = pg.InfLineLabel(epoch_linear_region.lines[0], f"{epoch_label}", position=0.95, rotateAxis=(1,0), anchor=(1, 1)) # add the label for the short epoch
+
+    # epoch_label_position = kwargs.pop('epoch_label_position', 0.9)
+    epoch_region_label:pg.InfLineLabel = pg.InfLineLabel(epoch_linear_region.lines[0], f"{epoch_label}", position=epoch_label_position, rotateAxis=epoch_label_rotateAxis, anchor=epoch_label_anchor) # add the label for the short epoch
+
     # Add the LinearRegionItem to the ViewBox, but tell the ViewBox to exclude this item when doing auto-range calculations.
     win.addItem(epoch_linear_region, ignoreBounds=True)
     # Set the position:
     epoch_linear_region.setRegion([t_start, t_stop]) # adjust scroll control
     return epoch_linear_region, epoch_region_label
+
+
 
 
 

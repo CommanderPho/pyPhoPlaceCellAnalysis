@@ -460,20 +460,33 @@ class ComputedPipelineStage(FilterablePipelineStage, LoadedPipelineStage):
         # search_mode=FunctionsSearchMode.initFromIsGlobal(are_global)
 
         # Need to exclude any computation functions specified in omitted_computation_functions_dict
-        if computation_functions_name_includelist is not None:
-            active_computation_functions = self.find_registered_computation_functions(computation_functions_name_includelist, search_mode=search_mode, names_list_is_excludelist=False)
-            print(f'due to includelist, including only {len(active_computation_functions)} out of {len(self.registered_computation_function_names)} registered computation functions.')
-
-        elif computation_functions_name_excludelist is not None:
-            active_computation_functions = self.find_registered_computation_functions(computation_functions_name_includelist, search_mode=search_mode, names_list_is_excludelist=True)
-            print(f'due to excludelist, including only {len(active_computation_functions)} out of {len(self.registered_computation_function_names)} registered computation functions.')
-            # TODO: do something about the previous_computation_result?
-        else:
+        if (computation_functions_name_includelist is None) and (computation_functions_name_excludelist is None):
             # Both are None:            
             if are_global:
                 active_computation_functions = self.registered_global_computation_functions
             else:
                 active_computation_functions = self.registered_computation_functions
+        else:           
+            if (computation_functions_name_includelist is not None):
+                if (computation_functions_name_excludelist is not None):
+                    ## pre-filter the include list despite limitations so hopefully it works:
+                    computation_functions_name_includelist = [a_fn_name for a_fn_name in computation_functions_name_includelist if (a_fn_name not in computation_functions_name_excludelist)]
+                    
+                active_computation_functions = self.find_registered_computation_functions(computation_functions_name_includelist, search_mode=search_mode, names_list_is_excludelist=False)
+                if (computation_functions_name_excludelist is not None):
+                    ## also get excluded fns. This is better than pre-filtering the include list because there are several names to match (short, long, etc):
+                    excluded_active_computation_functions = self.find_registered_computation_functions(computation_functions_name_excludelist, search_mode=search_mode, names_list_is_excludelist=True)                    
+                    # resolved_computation_functions_name_includelist = [k for k in computation_functions_name_includelist if k not in computation_functions_name_excludelist]
+                    active_computation_functions = [a_fn for a_fn in active_computation_functions if (a_fn not in excluded_active_computation_functions)]
+                    
+                #END if (computation_functions_name_excludelist is not None)...
+                print(f'due to includelist, including only {len(active_computation_functions)} out of {len(self.registered_computation_function_names)} registered computation functions.')
+            else:
+                ## `computation_functions_name_includelist` is None... this is weird.
+                assert (computation_functions_name_excludelist is not None), f"if both were none, this should have triggered the BOTH condition above."
+                active_computation_functions = self.find_registered_computation_functions(computation_functions_name_includelist, search_mode=search_mode, names_list_is_excludelist=True)
+                print(f'due to excludelist, including only {len(active_computation_functions)} out of {len(self.registered_computation_function_names)} registered computation functions.')
+                # TODO: do something about the previous_computation_result?
 
         # Perform the computations:
         return ComputedPipelineStage._execute_computation_functions(active_computation_functions, previous_computation_result=previous_computation_result, fail_on_exception=fail_on_exception, progress_logger_callback=progress_logger_callback, are_global=are_global, debug_print=debug_print)
@@ -594,7 +607,6 @@ class ComputedPipelineStage(FilterablePipelineStage, LoadedPipelineStage):
 
 
         """
-        
         # inverse_computation_times_key_fn = lambda fn_key: str(fn_key.__name__) # to be used if raw-function references are used.
         inverse_computation_times_key_fn = lambda fn_key: fn_key # Use only the functions name. I think this makes the .computation_times field picklable
         
@@ -647,7 +659,12 @@ class ComputedPipelineStage(FilterablePipelineStage, LoadedPipelineStage):
             short_results = curr_active_pipeline.computation_results[short_epoch_name]['computed_data']
             global_results = curr_active_pipeline.computation_results[global_epoch_name]['computed_data']
 
+        NOTE: this if for 'kdiba'-type sessions ONLY!
         """
+        curr_sess_format_name: str = self.get_session_format_name()
+        if (curr_sess_format_name.lower() != 'kdiba'):
+            raise ValueError(f'find_LongShortGlobal_epoch_names() is only intended for "kdiba" format sessions with long/short track epochs, but this is of type: "{curr_sess_format_name}".')
+        
         include_includelist = self.active_completed_computation_result_names # ['maze', 'sprinkle']
         assert (len(include_includelist) >= 3), "Must have at least 3 completed computation results to find the long, short, and global epoch names."
         if (len(include_includelist) > 3):
@@ -701,6 +718,23 @@ class ComputedPipelineStage(FilterablePipelineStage, LoadedPipelineStage):
         t_end = short_epoch_obj.t_stop
         return t_start, t_delta, t_end
 
+    ## Generalizability
+    # curr_active_pipeline.filtered_session_names
+    def find_Global_epoch_name(self) -> str:
+        """ Helper function to returns the global epoch name for both KDIBA and other (Bapun)-type sessions, unlike `find_LongShortGlobal_epoch_names` which is KDIBA only. They must exist.
+        Usage:
+            global_epoch_name: str = curr_active_pipeline.find_Global_epoch_name()
+            
+        """
+        if (self.active_sess_config.format_name =='kdiba'):
+            _, _, global_epoch_name = self.find_LongShortGlobal_epoch_names()
+            return global_epoch_name
+        else:
+            ## non-KDIBA session
+            df = self.sess.paradigm.to_dataframe()
+            return df['label'].values[-1] ## last item
+            # df[df['duration'].max()] 
+            ## TODO:
 
 
 
@@ -1654,17 +1688,19 @@ class ComputedPipelineStage(FilterablePipelineStage, LoadedPipelineStage):
         assert len(force_recompute_override_computations_includelist) <= len(include_includelist), f"READ THE NOTE ABOUT force_recompute_override_computations_includelist being a subset of include_includelist in the code above!! include_includelist: {include_includelist}\nforce_recompute_override_computations_includelist: {force_recompute_override_computations_includelist}"
 
         ## Get computed relative entropy measures:
-        _, _, global_epoch_name = self.find_LongShortGlobal_epoch_names()
+        
         # global_epoch_name = curr_active_pipeline.active_completed_computation_result_names[-1] # 'maze'
 
         if included_computation_filter_names is None:
+            _, _, global_epoch_name = self.find_LongShortGlobal_epoch_names()
             included_computation_filter_names = [global_epoch_name] # use only the global epoch: e.g. ['maze']
             if progress_print:
                 print(f'Running batch_extended_computations(...) with global_epoch_name: "{global_epoch_name}"')
         else:
             if progress_print:
                 print(f'Running batch_extended_computations(...) with included_computation_filter_names: "{included_computation_filter_names}"')
-
+            global_epoch_name = included_computation_filter_names[-1]
+            
         
         ## Specify the computations and the requirements to validate them.
 
@@ -2378,6 +2414,14 @@ class PipelineWithComputedPipelineStageMixin:
         """
         return self.stage.find_LongShortDelta_times()
 
+
+    def find_Global_epoch_name(self) -> str:
+        """ Helper function to returns the global epoch name for both KDIBA and other (Bapun)-type sessions, unlike `find_LongShortGlobal_epoch_names` which is KDIBA only. They must exist.
+        Usage:
+            global_epoch_name: str = curr_active_pipeline.find_Global_epoch_name()
+            
+        """
+        return self.stage.find_Global_epoch_name()
 
     def get_output_path(self) -> Path:
         """ returns the appropriate output path to store the outputs for this session. Usually '$session_folder/outputs/' """
@@ -3132,7 +3176,16 @@ class PipelineWithComputedPipelineStageMixin:
                 for k, v in override_parameters_flat_keypaths_dict.items():
                     if k.startswith('preprocessing'):
                         raise NotImplementedError("Updating preprocessing parameters is not yet implemented!")            
-                        preprocessing_parameters: ParametersContainer = deepcopy(self.active_sess_config)
+                        # preprocessing_parameters: ParametersContainer = deepcopy(self.active_sess_config.preprocessing_parameters)
+                        # # strip the preprocessing part
+                        # if k.startswith('preprocessing.'):
+                        #     k = k.removeprefix('preprocessing.')
+                        
+                        # if k.startswith('preprocessing_parameters.'):
+                        #     k = k.removeprefix('preprocessing_parameters.')
+                        # ## shouldn't be that bad, let's do it
+                        # self.active_sess_config.
+
                     else:                
                         # Set a value using keypath (e.g. 'directional_train_test_split.training_data_portion')
                         curr_global_param_typed_parameters.set_by_keypath(k, v)

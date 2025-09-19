@@ -58,6 +58,24 @@ class TimeSynchronizedPositionDecoderPlotter(AnimalTrajectoryPlottingMixin, Time
         # on update, be sure to call self._update_plots()
         self._update_plots()
     
+
+
+    @property
+    def last_t(self) -> float:
+        """for AnimalTrajectoryPlottingMixin"""
+        return (self.last_window_time) or 0.0
+    
+    @property
+    def curr_recent_trajectory(self):
+        """The animal's most recent trajectory preceding self.active_time_dependent_placefields.last_t"""
+        # Fixed time ago backward:
+        earliest_trajectory_start_time = self.last_t - self.params.recent_position_trajectory_max_seconds_ago # gets the earliest start time for the current trajectory to display
+        return self.AnimalTrajectoryPlottingMixin_all_time_pos_df.position.time_sliced(earliest_trajectory_start_time, self.last_t)[['t','x','y']] # Get all rows within the most recent time
+    
+    @property
+    def curr_position(self):
+        return self.AnimalTrajectoryPlottingMixin_filtered_pos_df.iloc[-1:][['t','x','y']] # Get only the most recent row
+
     
     def __init__(self, active_one_step_decoder, active_two_step_decoder, drop_below_threshold: float=0.0000001, posterior_variable_to_render='p_x_given_n', application_name=None, window_name=None, parent=None):
         """_summary_
@@ -303,11 +321,11 @@ class TimeSynchronizedPositionDecoderPlotter(AnimalTrajectoryPlottingMixin, Time
         else:
             self.ui.imv.setImage(image, rect=self.params.image_bounds_extent, axisOrder=self.params.shared_axis_order)
         
-        # self.AnimalTrajectoryPlottingMixin_update_plots()
         
         # self.setWindowTitle(f'{self.windowName} - {image_title} t = {curr_t}')
         self.setWindowTitle(f'TimeSynchronizedPositionDecoderPlotter - {image_title} t = {curr_t}')
     
+        self.AnimalTrajectoryPlottingMixin_update_plots()
 
 # included_epochs = None
 # computation_config = active_session_computation_configs[0]

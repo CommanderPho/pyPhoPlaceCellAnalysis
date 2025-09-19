@@ -1628,7 +1628,10 @@ def copy_session_folder_files_to_target_dir(good_session_concrete_folders, targe
 
 
 @function_attributes(short_name=None, tags=['batch', 'collect', 'figures'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-07-02 15:05', related_items=[])
-def copy_batch_output_figures_to_common_figures_dir(generate_figures_script_paths: List[Path], common_destination: Path = Path(r"K:/scratch/collected_figures").resolve(), previous_gen_scripts_path: Path = Path('C:\\Users\\pho\\repos\\Spike3DWorkEnv\\Spike3D\\output\\gen_scripts'), curr_gen_scripts_path: Optional[Path] = Path(r'K:/scratch/gen_scripts'), batch_export_folder_date:str='2025-07-02', append_session_name_as_suffix: bool = True, append_session_name_as_prefix: bool = False) -> List[Path]:
+def copy_batch_output_figures_to_common_figures_dir(generate_figures_script_paths: List[Path], common_destination: Path = Path(r"K:/scratch/collected_figures").resolve(),
+                                                     previous_gen_scripts_path: Path = Path('C:\\Users\\pho\\repos\\Spike3DWorkEnv\\Spike3D\\output\\gen_scripts'),
+                                                     curr_gen_scripts_path: Optional[Path] = Path(r'K:/scratch/gen_scripts'),
+                                                     batch_export_folder_date:str='2025-07-02', append_session_name_as_suffix: bool = True, append_session_name_as_prefix: bool = False, is_dryrun: bool=False) -> List[Path]:
     """ copies each session's gen_output figures to a common figures folder
 
     Should be used after running the figures phase of batch output to collect the figures from greatlakes.
@@ -1705,15 +1708,16 @@ def copy_batch_output_figures_to_common_figures_dir(generate_figures_script_path
     ## OUTPUTS: gen_scripts_sess_paths, gen_scripts_sess_path_dict
 
     # generate_figures_script_paths
-    gen_scripts_fig_paths = [k.joinpath(f'EXTERNAL/Screenshots/ProgrammaticDisplayFunctionTesting/{batch_export_folder_date}').resolve() for k in gen_scripts_sess_paths]
-    gen_scripts_fig_paths = [v for v in gen_scripts_fig_paths if v.exists()]
+    gen_scripts_fig_search_paths = [k.joinpath(f'EXTERNAL/Screenshots/ProgrammaticDisplayFunctionTesting/{batch_export_folder_date}').resolve() for k in gen_scripts_sess_paths]
+    gen_scripts_fig_paths = [v for v in gen_scripts_fig_search_paths if v.exists()]
+    if len(gen_scripts_fig_paths) == 0:
+        raise ValueError(f'none of the figure search paths were found to exist!\n\tgen_scripts_fig_paths: {gen_scripts_fig_search_paths}\n\n was the specfied batch_export_folder_date: {batch_export_folder_date} corresponding to a date that figures were batch produced?')
     gen_scripts_fig_path_dict = dict(zip(gen_scripts_sess_path_dict.keys(), gen_scripts_fig_paths))
     ## OUTPUTS: gen_scripts_fig_path_dict, gen_scripts_fig_paths
 
     # INPUTS: gen_scripts_fig_paths
     gen_scripts_fig_flat_child_paths = [find_deepest_directory_iterative(gen_scripts_fig_path) for gen_scripts_fig_path in gen_scripts_fig_paths]
     gen_scripts_fig_flat_child_path_dict = dict(zip(gen_scripts_sess_path_dict.keys(), gen_scripts_fig_flat_child_paths))
-
 
     common_destination.mkdir(exist_ok=True)
 
@@ -1730,11 +1734,14 @@ def copy_batch_output_figures_to_common_figures_dir(generate_figures_script_path
 
 
     ## perform the copy
-    # _copied_outputs = [shutil.copy2(f, common_destination.joinpath(f.with_stem(f"{k}_{f.stem}").name)) for k, path in gen_scripts_fig_flat_child_path_dict.items() for f in path.iterdir() if f.is_file()] ## append the session name (k) to each file as a prefix
-    _copied_outputs = [shutil.copy2(f, common_destination.joinpath(f.with_stem(_active_format_fn(k, f.stem)).name)) for k, path in gen_scripts_fig_flat_child_path_dict.items() for f in path.iterdir() if f.is_file()] ## append the session name (k) to each file as a prefix
+    if not is_dryrun:
+        # _copied_outputs = [shutil.copy2(f, common_destination.joinpath(f.with_stem(f"{k}_{f.stem}").name)) for k, path in gen_scripts_fig_flat_child_path_dict.items() for f in path.iterdir() if f.is_file()] ## append the session name (k) to each file as a prefix
+        _copied_outputs = [shutil.copy2(f, common_destination.joinpath(f.with_stem(_active_format_fn(k, f.stem)).name)) for k, path in gen_scripts_fig_flat_child_path_dict.items() for f in path.iterdir() if f.is_file()] ## append the session name (k) to each file as a prefix
 
-
-
+    else:
+        print(f'is_dryrun == True, so files will not actually be copied.')
+        _copied_outputs = [f"'{f.as_posix()}' -> '{common_destination.joinpath(f.with_stem(_active_format_fn(k, f.stem)).name).as_posix()}'" for k, path in gen_scripts_fig_flat_child_path_dict.items() for f in path.iterdir() if f.is_file()] ## append the session name (k) to each file as a prefix
+        print('\n'.join(_copied_outputs))
     # for k, path in gen_scripts_fig_flat_child_path_dict.items():
     #     print(f'k: {k}, path: {path}')
     #     for f in path.iterdir():
@@ -3280,7 +3287,7 @@ def _concat_custom_dict_to_df(final_sessions_loaded_df_dict):
     )
 
 
-def _subfn_new_df_process_and_load_exported_file(file_path, loaded_dict: Dict, session_name: str, curr_session_t_delta: float, time_key: str, debug_print:bool=False, **additional_columns) -> bool:
+def _subfn_new_df_process_and_load_exported_file(file_path, loaded_dict: Dict, session_name: str, curr_session_t_delta: float, time_key: str, debug_print:bool=False, allow_CONCAT_to_existing: bool=False, **additional_columns) -> bool:
     try:
         # loaded_dict[session_name] = read_and_process_csv_file(file_path, session_name, curr_session_t_delta, time_key)
         df = pd.read_csv(file_path, na_values=['', 'nan', 'np.nan', '<NA>'], low_memory=False) # `low_memory=False` tells pandas to use more memory to correctly infer data types.
@@ -3297,7 +3304,17 @@ def _subfn_new_df_process_and_load_exported_file(file_path, loaded_dict: Dict, s
         loaded_dict_key = tuple(loaded_dict_key)
 
         ## update dict:
-        loaded_dict[loaded_dict_key] = df ## it's being overwritten here
+        if not allow_CONCAT_to_existing:
+            loaded_dict[loaded_dict_key] = df ## it's being overwritten here
+        else:
+            ## concat to the existing one if it exists, otherwise set it
+            if loaded_dict_key not in loaded_dict:
+                loaded_dict[loaded_dict_key] = df ## set it
+            else:
+                ## get the extant one:
+                exant_df = loaded_dict[loaded_dict_key]
+                loaded_dict[loaded_dict_key] = pd.concat((exant_df, df), axis='index', ignore_index=True)
+
         return True
 
     except Exception as e:
@@ -3460,7 +3477,7 @@ def _new_process_csv_files(parsed_csv_files_df: pd.DataFrame, t_delta_dict: Dict
             elif file_type == 'FAT':
                 # 2025-03-01 - a bulk export .CSV format where all results are stacked vertically and fields duplicated as needed (no attentioned paid to disk
                 # #TODO 2025-04-04 10:11: - [ ] FAT is a legit exception and shouldn't belong in `extended_file_types_list`, as it has both time bin and epoch centered items
-                _is_file_valid = _subfn_new_df_process_and_load_exported_file(path, final_sessions_loaded_laps_time_bin_dict, session_name, curr_session_t_delta, time_key='t_bin_center', **common_additional_columns_dict) ## adds to the time bins 
+                _is_file_valid = _subfn_new_df_process_and_load_exported_file(path, final_sessions_loaded_laps_time_bin_dict, session_name, curr_session_t_delta, time_key='t_bin_center', allow_CONCAT_to_existing=True, **common_additional_columns_dict) ## adds to the time bins 
                 #TODO 2025-04-04 10:12: - [ ] Why does it add to `final_sessions_loaded_laps_time_bin_dict`? this seems wrong
                 
 
@@ -3722,7 +3739,7 @@ class OldFileArchiver:
 class AcrossSessionsVisualizations:
     """ 
 
-    
+    from pyphoplacecellanalysis.SpecificResults.AcrossSessionResults import AcrossSessionsVisualizations
     publication_figures_output_parent_folder = Path('E:/Dropbox (Personal)/Active/Kamran Diba Lab/Pho-Kamran-Meetings/2025-06-06 - EXPORTS FOR PUBLICATION') # 'Figure 1 - Overview'
         
     """
@@ -4021,7 +4038,72 @@ class AcrossSessionsVisualizations:
         graphics_output_dict = MatplotlibRenderPlots(name='across_sessions_long_and_short_firing_rate_replays_v_laps', figures=(fig_L, fig_S), axes=(ax_L, ax_S), context=(active_display_context_L, active_display_context_S), plot_data={'context': (active_display_context_L, active_display_context_S)}, saved_figures=active_out_figure_paths)
 
         return graphics_output_dict
+    
 
+    @function_attributes(short_name=None, tags=['sanity-check', 'dropped-t-bins'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-08-28 17:11', related_items=[])
+    @classmethod
+    def _sanity_check_dropped_t_bins_per_session(cls, acitve_dropped_df, acitve_ignore_df, should_plot: bool=True, export_suffix: str='Epochs'):
+        """ checks that the dropped time bins (due to low firing, too few cells, etc) are approximately the same across sessions)
+        
+        Usage:
+
+            from pyphoplacecellanalysis.SpecificResults.AcrossSessionResults import AcrossSessionsVisualizations
+
+            ## INPUTS: acitve_dropped_df, acitve_ignore_df
+            acitve_counts_df, (acitve_ignore_counts_df, acitve_dropped_counts_df) = AcrossSessionsVisualizations._sanity_check_dropped_t_bins_per_session(acitve_dropped_df=acitve_dropped_df, acitve_ignore_df=acitve_ignore_df)
+            acitve_counts_df
+
+        """
+        import matplotlib.pyplot as plt
+
+        def _subfn_plot_portion_over_time(df: pd.DataFrame, count_col_name: str = 'drop_ratio'):
+            """ captures `export_suffix` 
+            """
+            # Plot
+            # count_col_name: str = 'n_dropped'
+            df: pd.DataFrame = deepcopy(df).reset_index()
+            
+            curr_title: str = f'Portion of Dropped (bad) Timebins Per Session: {count_col_name} for {export_suffix}'
+            fig, ax = plt.subplots(figsize=(10,6), num=curr_title, clear=True)
+            for cat in df['pre_post_delta_category'].unique():
+                subset = df[df['pre_post_delta_category'] == cat]
+                ax.bar(subset['session_name'], subset[count_col_name], label=cat, alpha=0.5)
+
+            # ax.set_xticklabels(df['session_name'], rotation=90)
+            ax.set_ylabel(count_col_name)
+            ax.legend()
+            plt.title(curr_title)
+            plt.tight_layout()
+            plt.show()
+            return fig, ax
+
+
+        # ==================================================================================================================================================================================================================================================================================== #
+        # BEGIN FUNCTION BODY                                                                                                                                                                                                                                                                  #
+        # ==================================================================================================================================================================================================================================================================================== #
+        ## INPUTS: acitve_dropped_df, acitve_ignore_df
+        n_total_dropped = len(acitve_dropped_df)
+        n_total_ignored = len(acitve_ignore_df)
+        # n_total_either = n_total_dropped + n_total_dropped
+
+        # Performed 1 aggregation grouped on columns: 'session_name', 'time_bin_size', 'pre_post_delta_category'
+        acitve_ignore_counts_df = acitve_ignore_df.groupby(['session_name', 'time_bin_size', 'pre_post_delta_category']).agg(t_bin_center_count=('t_bin_center', 'count')) # .reset_index()
+
+        # Performed 1 aggregation grouped on columns: 'session_name', 'time_bin_size', 'pre_post_delta_category'
+        acitve_dropped_counts_df = acitve_dropped_df.groupby(['session_name', 'time_bin_size', 'pre_post_delta_category']).agg(t_bin_center_count=('t_bin_center', 'count')) #.reset_index()
+
+        ## OUTPUTS: acitve_ignore_counts_df, acitve_dropped_counts_df
+        acitve_counts_df = (acitve_ignore_counts_df - acitve_dropped_counts_df)
+        acitve_counts_df['total_bins'] = deepcopy(acitve_ignore_counts_df['t_bin_center_count'])
+        acitve_counts_df['drop_ratio'] = acitve_counts_df['t_bin_center_count'].astype(float) / acitve_counts_df['total_bins'].astype(float)
+        acitve_counts_df = acitve_counts_df.rename(columns={'t_bin_center_count':'n_dropped'}, inplace=False).reset_index(['pre_post_delta_category'])
+        acitve_counts_df
+        
+        if should_plot:
+            for a_count_col_name in ['n_dropped', 'drop_ratio']:
+                _out = _subfn_plot_portion_over_time(df=acitve_counts_df, count_col_name=a_count_col_name)
+                
+        return acitve_counts_df, (acitve_ignore_counts_df, acitve_dropped_counts_df)
 
 
 class ExportValueNameCleaner:
@@ -4112,6 +4194,238 @@ class ExportValueNameCleaner:
             print(new_name_list) # ['', 'withNormalComputedReplays-qclu_[1, 2, 4, 6, 7, 9]-frateThresh_5.0', 'withNormalComputedReplays-qclu_[1, 2]-frateThresh_5.0', 'withNormalComputedReplays-qclu_[1, 2, 4, 6, 7, 9]-frateThresh_1.0']
         return new_name_list
     
+    @function_attributes(short_name=None, tags=['parse'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-08-28 07:53', related_items=[])
+    @classmethod
+    def parse_comparable_custom_replay_name_to_separate_columns(cls, comparable_custom_replay_name: str = 'withNormalComputedReplays-qclu_[1, 2, 4, 6, 7, 8, 9]-frateThresh_2.0',):
+        """ Parses a '_comparable_custom_replay_name' column with strings like 'withNormalComputedReplays-qclu_[1, 2, 4, 6, 7, 8, 9]-frateThresh_2.0' to separate columns
+        
+        Usage:
+            from pyphoplacecellanalysis.SpecificResults.AcrossSessionResults import ExportValueNameCleaner
+            
+            split_dict = cls.parse_comparable_custom_replay_name_to_separate_columns(comparable_custom_replay_name= 'withNormalComputedReplays-qclu_[1, 2, 4, 6, 7, 8, 9]-frateThresh_2.0')
+            split_dict
+
+            
+            {'replayMethod': 'withNormalComputedReplays',
+            'qclu': '[1, 2, 4, 6, 7, 8, 9]',
+            'frateThresh': '2.0'}
+        
+        """
+        replay_name, *split_parts = comparable_custom_replay_name.split('-')
+        split_dict = {'replayMethod': replay_name}
+        for a_part in split_parts:
+            a_key, a_value = a_part.split('_', maxsplit=1)
+            split_dict[a_key] = a_value
+        return split_dict
+
+
+    @function_attributes(short_name=None, tags=['parse', 'split'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-08-28 07:54', related_items=[])
+    @classmethod
+    def split_custom_replay_name_col_to_replayMethod_qclu_frateThresh_cols(cls, df: pd.DataFrame, custom_replay_col: str = 'custom_replay_name') -> pd.DataFrame:
+        """ Split 'session_name' to the individual columns:
+            adds columns ['replayMethod', 'animal', 'exper_name', 'session_name'] based on 'session_name'
+            
+            Usage: 
+                from pyphoplacecellanalysis.SpecificResults.AcrossSessionResults import ExportValueNameCleaner
+
+                perfmnc_session_df = ExportValueNameCleaner.split_custom_replay_name_col_to_replayMethod_qclu_frateThresh_cols(perfmnc_session_df)
+                perfmnc_session_df
+
+        """
+        _added_columns = []
+        if custom_replay_col in df:
+            # df = df.join(
+            #     df[custom_replay_col].map(cls.parse_comparable_custom_replay_name_to_separate_columns).apply(pd.Series)
+            # ).drop(columns=[custom_replay_col]).convert_dtypes()
+            new_cols = df['custom_replay_name'].map(cls.parse_comparable_custom_replay_name_to_separate_columns).apply(pd.Series)
+            new_cols = new_cols[[c for c in new_cols.columns if c not in df.columns]]
+            df = df.join(new_cols).drop(columns=['custom_replay_name']).convert_dtypes()
+
+        return df
+    
+
+
+
+@metadata_attributes(short_name=None, tags=['perfmnc', 'perfmnc_sesssion', 'specific'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-08-28 08:06', related_items=[])
+class PerfmncMeasures:
+    """ 2025-08-28 - Session-scale lap time bin context-decoding performance (percent of lap time bins that decode to the correct context)
+     
+    Usage:
+
+        from pyphoplacecellanalysis.SpecificResults.AcrossSessionResults import PerfmncMeasures
+        
+        perfmnc_per_session_df, perfmnc_per_indv_epochs_df = PerfmncMeasures.find_and_load_most_recent_parsed_csv_files_df(most_recent_parsed_csv_files_df=most_recent_parsed_csv_files_df)
+        perfmnc_session_df
+
+    """
+    @function_attributes(short_name=None, tags=['perfmnc', 'perfmnc_sesssion'], input_requires=[], output_provides=[], uses=['ExportValueNameCleaner.split_custom_replay_name_col_to_replayMethod_qclu_frateThresh_cols'], used_by=[], creation_date='2025-08-27 00:32', related_items=[])
+    @classmethod
+    def find_and_load_most_recent_parsed_csv_files_df(cls, most_recent_parsed_csv_files_df: pd.DataFrame, debug_print=False, cuttoff_date: Optional[datetime]=None) -> pd.DataFrame:
+        """ 
+        
+        perfmnc_session_df: pd.DataFrame = find_and_load_most_recent_parsed_csv_files_df(most_recent_parsed_csv_files_df=most_recent_parsed_csv_files_df)
+        perfmnc_session_df
+        
+        """
+        from pyphoplacecellanalysis.SpecificResults.AcrossSessionResults import ExportValueNameCleaner
+        
+        ## INPUTS: most_recent_parsed_csv_files_df
+        most_recent_parsed_perfmnc_session_csv_files_df: pd.DataFrame = deepcopy(most_recent_parsed_csv_files_df).pho.constrain_df_cols(file_type='perfmnc_session')
+        if cuttoff_date is not None:
+            most_recent_parsed_perfmnc_session_csv_files_df = most_recent_parsed_perfmnc_session_csv_files_df[most_recent_parsed_perfmnc_session_csv_files_df['export_datetime'] >= cuttoff_date] # , known_named_decoding_epochs_type='pbe'))
+        # Filter rows based on column: 'decoding_time_bin_size_str'
+        # most_recent_parsed_perfmnc_session_csv_files_df = most_recent_parsed_perfmnc_session_csv_files_df[most_recent_parsed_perfmnc_session_csv_files_df['decoding_time_bin_size_str'] == "0.05"] ## NOTE: HARDCODED STRING
+        # most_recent_parsed_perfmnc_session_csv_files_df = most_recent_parsed_perfmnc_session_csv_files_df[most_recent_parsed_perfmnc_session_csv_files_df['known_named_decoding_epochs_type'] == "laps"] # why doesn't this work? `.pho.constrain_df_cols(known_named_decoding_epochs_type='laps')`
+        # Sort by column: 'export_datetime' (descending)
+        most_recent_parsed_perfmnc_session_csv_files_df = most_recent_parsed_perfmnc_session_csv_files_df.sort_values(['export_datetime'], ascending=[False])
+        if debug_print:
+            print(f'================== Most Recent perfmnc_session .csv files:')
+            print(most_recent_parsed_perfmnc_session_csv_files_df)
+
+        ## Add in the `_comparable_custom_replay_name`
+
+        loaded_dfs = []
+        for a_row in most_recent_parsed_perfmnc_session_csv_files_df.itertuples():
+            ## iterate through each row
+            if a_row.path.exists() and a_row.path.is_file():
+                ## load the CSV
+                loaded_df: pd.DataFrame = pd.read_csv(a_row.path)
+                loaded_df['custom_replay_name'] = a_row.custom_replay_name
+                loaded_dfs.append(loaded_df)
+                if debug_print:
+                    print(a_row.path)
+
+
+        perfmnc_session_df: pd.DataFrame = pd.concat(loaded_dfs)
+        drop_column_name = list(perfmnc_session_df.columns)[0]
+        perfmnc_session_df = perfmnc_session_df.drop(columns=drop_column_name).reset_index(drop=True) ## drop first column like 'Unnamed: 0'
+        perfmnc_session_df = perfmnc_session_df.pho.constrain_df_cols(known_named_decoding_epochs_type='laps') ## HARDCODED
+        perfmnc_session_df = perfmnc_session_df.sort_values(['custom_replay_name', 'time_bin_size', 'session_name', 'parent_epoch_id']).reset_index(drop=True)
+
+        ## Split custom_replay_name column to separate columns:
+        perfmnc_session_df = ExportValueNameCleaner.split_custom_replay_name_col_to_replayMethod_qclu_frateThresh_cols(perfmnc_session_df)
+
+        ## split on record type:        
+        _out_dfs_dict = perfmnc_session_df.pho.partition_df_dict('record_type')
+        perfmnc_per_indv_epochs_df = _out_dfs_dict['epoch'].drop(columns=['worse_percent_correct', 'percent_correct_pre', 'n_correct_pre', 'n_total_pre', 'percent_correct_post', 'n_correct_post', 'n_total_post'])
+        perfmnc_per_session_df = _out_dfs_dict['all_epochs'].drop(columns=['percent_correct', 'n_correct', 'n_total', 'pre_post_delta_category', 'parent_epoch_id'])
+        perfmnc_per_session_df['percent_correct_diff'] = perfmnc_per_session_df['percent_correct_post'] - perfmnc_per_session_df['percent_correct_pre'] # (-1: always short, 0.0: neutral, +1 always long)
+        
+        return (perfmnc_per_session_df, perfmnc_per_indv_epochs_df)	
+    
+
+    @function_attributes(short_name=None, tags=['plotly', 'figure'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-08-28 17:26', related_items=[])
+    @classmethod
+    def plot_per_indiv(cls, perfmnc_per_indv_epochs_df: pd.DataFrame, time_bin_size:float=1.0, qclu='[1, 2, 4, 6, 7, 8, 9]'):
+        """ 
+        
+        """
+        import plotly.io as pio
+        import plotly.express as px
+        
+        extra_plot_cmd_kwargs = dict(
+                                    opacity=0.5,
+                                    # barmode='group',
+        )
+
+        active_df = deepcopy(perfmnc_per_indv_epochs_df)
+        if qclu is not None:
+            active_df = active_df.pho.constrain_df_cols(qclu=qclu)
+        if time_bin_size is not None:
+            active_df = active_df.pho.constrain_df_cols(time_bin_size=time_bin_size)
+            if isinstance(time_bin_size, (tuple, set, list, NDArray)):
+                ## assume it has length, as in it's a list
+                n_time_bin_sizes: int = len(time_bin_size)
+                if n_time_bin_sizes > 1:
+                    extra_plot_cmd_kwargs['facet_col'] = 'time_bin_size' ## facet on the time bin size
+                    # extra_plot_cmd_kwargs['color'] = 'time_bin_size'
+                    pass
+        
+        fig = px.bar(active_df, x='parent_epoch_id', y='percent_correct', facet_row='session_name', **extra_plot_cmd_kwargs) # , facet_col='qclu'
+        fig = fig.update_layout(
+            height=1600,
+            xaxis=dict(showgrid=True, showline=True, mirror=True, linewidth=1, linecolor='black'),
+            yaxis=dict(range=[0,1], dtick=0.2, showgrid=True, gridcolor="grey", showline=True, mirror=True, linewidth=1, linecolor='black'),
+            title='Decoder TrackID-Context decoding correctness',
+        )
+        # fig.update_yaxes(matches='y')
+        fig = fig.update_yaxes(range=[0,1], matches='y', dtick=0.2, showgrid=True, gridcolor="grey", showline=True, mirror=True, linewidth=1, linecolor='black')
+
+        # Add horizontal line at y=0.5
+        fig.add_hline(y=0.5, line_dash="dash", line_color="red", opacity=0.7)
+
+
+        session_names = np.unique(active_df['session_name'].to_numpy())
+        num_sessions: int = len(session_names)
+        for i in np.arange(num_sessions):
+            # Update y-axis labels for each facet row
+            fig = fig.update_yaxes(title_text=session_names[i], row=(i+1), col=1, title_font=dict(size=10))
+            # fig = fig.add_annotation(xref="paper", yref="y"+str(i+1), 
+            #                 x=-0.05, y=0.5,  # position on left of the row
+            #                 text=session_names[i],
+            #                     # showarrow=False, textangle=-90, font=dict(size=16),
+            #                 )
+            # Change the bar mode
+            # fig = fig.update_layout(barmode='group')
+
+
+
+        return fig
+    
+
+    @function_attributes(short_name=None, tags=['plotly', 'figure'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-08-28 17:26', related_items=[])
+    @classmethod
+    def plot_per_session(cls, perfmnc_per_session_df: pd.DataFrame, time_bin_size:float=None, qclu='[1, 2, 4, 6, 7, 8, 9]', worst_only=True):
+        """ 
+        
+        """
+        import plotly.io as pio
+        import plotly.express as px
+
+        extra_plot_cmd_kwargs = dict(
+                                    opacity=0.5,
+                                    # barmode='group',
+        )
+
+        active_df = deepcopy(perfmnc_per_session_df) #.pho.partition_df_dict('time_bin_size')[time_bin_size]
+        if qclu is not None:
+            active_df = active_df.pho.constrain_df_cols(qclu=qclu)
+        if time_bin_size is not None:
+            active_df = active_df.pho.constrain_df_cols(time_bin_size=time_bin_size)
+            if isinstance(time_bin_size, (tuple, set, list, NDArray)):
+                ## assume it has length, as in it's a list
+                n_time_bin_sizes: int = len(time_bin_size)
+                if n_time_bin_sizes > 1:
+                    extra_plot_cmd_kwargs['facet_col'] = 'time_bin_size' ## facet on the time bin size
+                    # extra_plot_cmd_kwargs['color'] = 'time_bin_size'
+                    pass
+                
+        if worst_only:
+            fig = px.scatter(active_df, x='time_bin_size', y='worse_percent_correct', color='session_name', **extra_plot_cmd_kwargs) # , facet_col='qclu'
+        else:
+            fig = px.bar(active_df, x='parent_epoch_id', y='percent_correct', facet_row='session_name', **extra_plot_cmd_kwargs)
+            
+        fig = fig.update_layout(
+            height=1400,
+            xaxis=dict(showgrid=True, showline=True, mirror=True, linewidth=1, linecolor='black'),
+            yaxis=dict(range=[0,1], dtick=0.1, showgrid=True, gridcolor="grey", showline=True, mirror=True, linewidth=1, linecolor='black'),
+            title='Decoder TrackID-Context decoding correctness - Worst Per Session',
+        )
+        # fig.update_yaxes(matches='y')
+        # fig = fig.update_yaxes(range=[0,1], matches='y', dtick=0.1, showgrid=True, gridcolor="black", showline=True, mirror=True, linewidth=1, linecolor='black')
+
+        # session_names = np.unique(active_df['session_name'].to_numpy())
+        # num_sessions: int = len(session_names)
+        # for i in np.arange(num_sessions):
+        #     # Update y-axis labels for each facet row
+        #     fig = fig.update_yaxes(title_text=session_names[i], row=(i+1), col=1, title_font=dict(size=14))
+        #     fig = fig.add_annotation(xref="paper", yref="y"+str(i+1), 
+        #                     x=-0.05, y=0.5,  # position on left of the row
+        #                     text=session_names[i],
+        #                         # showarrow=False, textangle=-90, font=dict(size=16),
+        #                     )
+
+        return fig
 
 
 class AcrossSessionHelpers:
@@ -4598,6 +4912,73 @@ class AcrossSessionHelpers:
         return moved_dict
 
 
+    @function_attributes(short_name=None, tags=['IMPORTANT', 'figure', 'plot'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-08-25 15:10', related_items=[])
+    @classmethod
+    def plot_session_delta_relative_start_stop_times(cls, t_delta_df: pd.DataFrame, plot_text_labels: bool = True, plot_delta_t_rel: bool=False):
+        """ Plots the session start/stop times relative to one another so view how well it can align to the t_delta shift
+        
+        from pyphoplacecellanalysis.SpecificResults.AcrossSessionResults import AcrossSessionHelpers
+        
+        fig, ax = AcrossSessionHelpers.plot_session_delta_relative_start_stop_times(t_delta_df=t_delta_df)
+        
+        """
+        import matplotlib.pyplot as plt
+        import matplotlib.patches as patches
+        
+        try:
+            t_delta_df = deepcopy(t_delta_df).reset_index(drop=False, names=['sess_name'])
+        except Exception as e:
+            # raise e
+            pass
+        # t_delta_df = deepcopy(t_delta_df).reset_index(drop=False, names=['sess_name'])
+        t_delta_df['duration'] = t_delta_df['delta_aligned_t_end'] - t_delta_df['delta_aligned_t_start']
+        t_delta_df['delta_aligned_t_mid'] = t_delta_df['delta_aligned_t_start'] + (t_delta_df['delta_aligned_t_end'] - t_delta_df['delta_aligned_t_start'])/2.0
+
+        fig, ax = plt.subplots()
+
+        # prev_y: float = 0.0
+        ## plot the range
+        num_sessions: int = len(t_delta_df)
+        cmap = plt.get_cmap('rainbow', num_sessions)
+        single_session_y_height: float = 1.0/float(num_sessions)
+
+        for i, a_row in enumerate(t_delta_df.itertuples()):
+            ## iterate through each row:
+            y_offset: float = (float(i)/float(num_sessions))
+            ## just plot these to begin
+
+            if plot_delta_t_rel:
+                x0 = a_row.delta_aligned_t_start
+                x1 = a_row.delta_aligned_t_end
+            else:
+                ## plot all realtive to zero
+                x0 = a_row.t_start
+                x1 = a_row.t_end
+                
+            width = x1 - x0
+            
+            # ax.broken_barh([(x0, x1)], (y_offset, single_session_y_height), color=cmap(i)) ## DOES NOT WORK, WAY TOO SMALL
+            rectangle = patches.Rectangle((x0, y_offset), width, single_session_y_height, angle=0, edgecolor='black', facecolor=cmap(i), fill=True)
+            ax.add_patch(rectangle)
+
+            ## Add text centered in at the midpoint with the session naeme
+            if plot_text_labels:
+                ax.text(x0, y_offset, f'{a_row.sess_name}')
+            # prev_y = y_offset
+
+        ## plot the delta x=0 line
+        if plot_delta_t_rel:
+            t_delta = 0
+        else:
+            ## plot all realtive to zero
+            t_delta = a_row.t_delta
+            
+        if plot_delta_t_rel:
+            ax.vlines([0.0], 0, 1.0, colors='black', linestyles='dashed', label='Delta')
+            
+        return fig, ax
+
+
 
 # ==================================================================================================================== #
 # 2024-11-15 - `across_session_identity` dataframe helper                                                              #
@@ -4635,9 +5016,8 @@ class AcrossSessionIdentityDataframeAccessor:
             # Add the maze_id to the active_filter_epochs so we can see how properties change as a function of which track the replay event occured on:
             session_name: str = curr_active_pipeline.session_name
             t_start, t_delta, t_end = curr_active_pipeline.find_LongShortDelta_times()
-            df = DecoderDecodedEpochsResult.add_session_df_columns(df, session_name=session_name, time_bin_size=None, curr_session_t_delta=t_delta, time_col='ripple_start_t')
-            
-            a_ripple_df = DecoderDecodedEpochsResult.add_session_df_columns(a_ripple_df, session_name=session_name, time_bin_size=None, curr_session_t_delta=t_delta, time_col='ripple_start_t')
+            df = df.across_session_identity.add_session_df_columns(session_name=session_name, time_bin_size=None, curr_session_t_delta=t_delta, time_col='ripple_start_t')
+            a_ripple_df = a_ripple_df.across_session_identity.add_session_df_columns(session_name=session_name, time_bin_size=None, curr_session_t_delta=t_delta, time_col='ripple_start_t')
     
         """
         from neuropy.core.epoch import EpochsAccessor
@@ -4662,19 +5042,23 @@ class AcrossSessionIdentityDataframeAccessor:
                 end_time_col_name: str = TimeColumnAliasesProtocol.find_first_extant_suitable_columns_name(df, col_connonical_name='stop', required_columns_synonym_dict={"start":{'begin','start_t','ripple_start_t'}, "stop":['end','stop_t']}, should_raise_exception_on_fail=should_raise_exception_on_fail)
 
             if time_col is not None:
-                df['delta_aligned_start_t'] = df[time_col] - curr_session_t_delta
-                ## Add 'pre_post_delta_category' helper column:
-                df['pre_post_delta_category'] = 'post-delta'
-                df.loc[(df['delta_aligned_start_t'] <= 0.0), 'pre_post_delta_category'] = 'pre-delta'
-                if (t_start is not None) and (t_end is not None) and (end_time_col_name is not None):
-                    try:
-                        df = EpochsAccessor.add_maze_id_if_needed(epochs_df=df, t_start=t_start, t_delta=curr_session_t_delta, t_end=t_end, start_time_col_name=time_col, end_time_col_name=end_time_col_name) # Adds Columns: ['maze_id']
-                    except (AttributeError, KeyError) as e:
-                        print(f'could not add the "maze_id" column to the dataframe (err: {e})\n\tlikely because it lacks valid "t_start" or "t_end" columns. df.columns: {list(df.columns)}. Skipping.')
-                        if should_raise_exception_on_fail:
-                            raise
-                    except Exception as e:
-                        raise e
+                if time_col not in df.columns:
+                    if should_raise_exception_on_fail:
+                        raise ValueError(f'time_col: "{time_col}" not in df.columns: {list(df.columns)}')
+                else:
+                    df['delta_aligned_start_t'] = df[time_col] - curr_session_t_delta
+                    ## Add 'pre_post_delta_category' helper column:
+                    df['pre_post_delta_category'] = 'post-delta'
+                    df.loc[(df['delta_aligned_start_t'] <= 0.0), 'pre_post_delta_category'] = 'pre-delta'
+                    if (t_start is not None) and (t_end is not None) and (end_time_col_name is not None):
+                        try:
+                            df = EpochsAccessor.add_maze_id_if_needed(epochs_df=df, t_start=t_start, t_delta=curr_session_t_delta, t_end=t_end, start_time_col_name=time_col, end_time_col_name=end_time_col_name) # Adds Columns: ['maze_id']
+                        except (AttributeError, KeyError) as e:
+                            print(f'could not add the "maze_id" column to the dataframe (err: {e})\n\tlikely because it lacks valid "t_start" or "t_end" columns. df.columns: {list(df.columns)}. Skipping.')
+                            if should_raise_exception_on_fail:
+                                raise
+                        except Exception as e:
+                            raise e
 
         return df
 
@@ -4700,7 +5084,26 @@ class AcrossSessionIdentityDataframeAccessor:
         return self.perform_add_session_df_columns(df=df, session_name=session_name, time_bin_size=time_bin_size, custom_replay_source=custom_replay_source, t_start=t_start, curr_session_t_delta=curr_session_t_delta, t_end=t_end, time_col=time_col, end_time_col_name=end_time_col_name, **kwargs)
 
 
-    def split_session_key_col_to_fmt_animal_exper_cols(self, session_key_col: str = 'session_name') -> pd.DataFrame:
+
+    def add_session_df_columns_from_pipeline(self, curr_active_pipeline, time_bin_size: float=None, custom_replay_source: Optional[str]=None, time_col: str=None, end_time_col_name: Optional[str]=None, **kwargs) -> pd.DataFrame:
+        """         
+        Added Columns: ['session_name', 'time_bin_size', 'delta_aligned_start_t', 'pre_post_delta_category', 'maze_id']
+
+        Usage:
+            from pyphoplacecellanalysis.SpecificResults.AcrossSessionResults import AcrossSessionIdentityDataframeAccessor
+
+            # Add the maze_id to the active_filter_epochs so we can see how properties change as a function of which track the replay event occured on:
+            df = df.across_session_identity.add_session_df_columns_from_pipeline(curr_active_pipeline=curr_active_pipeline, time_bin_size=None, time_col='ripple_start_t')
+            a_ripple_df = a_ripple_df.across_session_identity.add_session_df_columns_from_pipeline(curr_active_pipeline=curr_active_pipeline, time_bin_size=None, time_col='ripple_start_t')
+    
+        """
+        session_name: str = curr_active_pipeline.session_name
+        t_start, t_delta, t_end = curr_active_pipeline.find_LongShortDelta_times()
+        return self.add_session_df_columns(session_name=session_name, time_bin_size=time_bin_size, custom_replay_source=custom_replay_source, t_start=t_start, curr_session_t_delta=t_delta, t_end=t_end, time_col=time_col, end_time_col_name=end_time_col_name, **kwargs)
+
+
+
+    def split_session_key_col_to_fmt_animal_exper_cols(self, session_key_col: str = 'session_name', separator: str='_') -> pd.DataFrame:
         """ Split 'session_name' to the individual columns:
             adds columns ['format_name', 'animal', 'exper_name', 'session_name'] based on 'session_name'
             
@@ -4709,19 +5112,21 @@ class AcrossSessionIdentityDataframeAccessor:
                 
                 df = df.across_session_identity.split_session_key_col_to_fmt_animal_exper_cols(session_key_col='session_name')
             
+            Usage with Session UIDs:
+                df = df.across_session_identity.split_session_key_col_to_fmt_animal_exper_cols(session_key_col='session_uid', separator='|')
         """
         df: pd.DataFrame = deepcopy(self._obj)
         _added_columns = []
         if session_key_col in df:
             if 'format_name' not in df.columns:
-                df['format_name'] = df[session_key_col].map(lambda x: x.split('_', maxsplit=3)[0]) ## add animal name
+                df['format_name'] = df[session_key_col].map(lambda x: x.split(separator, maxsplit=3)[0]) ## add animal name
             if 'animal' not in df.columns:
-                df['animal'] = df[session_key_col].map(lambda x: x.split('_', maxsplit=3)[1]) ## add animal name
+                df['animal'] = df[session_key_col].map(lambda x: x.split(separator, maxsplit=3)[1]) ## add animal name
                 ## strip the '01' suffix from each
             if 'exper_name' not in df.columns:
-                df['exper_name'] = df[session_key_col].map(lambda x: x.split('_', maxsplit=3)[2]) # not needed
+                df['exper_name'] = df[session_key_col].map(lambda x: x.split(separator, maxsplit=3)[2]) # not needed
             if (('session_name' not in df.columns) and ('session_name' != session_key_col)):
-                df['session_name'] = df[session_key_col].map(lambda x: x.split('_', maxsplit=3)[-1]) # not needed
+                df['session_name'] = df[session_key_col].map(lambda x: x.split(separator, maxsplit=3)[-1]) # not needed
                 
         return df
 
@@ -4740,7 +5145,7 @@ class SingleFatDataframe:
     to_filename_conversion_dict = {'compute_diba_quiescent_style_replay_events':'_withNewComputedReplays', 'diba_evt_file':'_withNewKamranExportedReplays', 'initial_loaded': '_withOldestImportedReplays', 'normal_computed': '_withNormalComputedReplays'}
     
     @classmethod
-    def build_fat_df(cls, dfs_dict: Dict[IdentifyingContext, pd.DataFrame], additional_common_context: Optional[IdentifyingContext]=None) -> pd.DataFrame:
+    def build_fat_df(cls, dfs_dict: Dict[IdentifyingContext, pd.DataFrame], additional_common_context: Optional[IdentifyingContext]=None, allow_missing_time_columns: bool=False) -> pd.DataFrame:
         """ builds a single FAT_df from a dict of identities and their corresponding dfs. Adds all of the index keys as columns, and all of their values a duplicated along all rows of the coresponding df.
         Then stacks them into a single, FAT dataframe.
 
@@ -4756,7 +5161,7 @@ class SingleFatDataframe:
         for a_df_context, a_df in dfs_dict.items():
             ## In a single_FAT frame, we add columns with the context value for all entries in the dataframe.
             for a_ctxt_key, a_ctxt_value in a_df_context.to_dict().items():
-                a_df[a_ctxt_key] = a_ctxt_value
+                a_df[a_ctxt_key] = a_ctxt_value # this is a str, str for working things
                 
             if additional_common_context is not None:
                 for a_ctxt_key, a_ctxt_value in additional_common_context.to_dict().items():
@@ -4778,13 +5183,13 @@ class SingleFatDataframe:
                     a_df[a_ctxt_key] = a_ctxt_value_str ## need to turn this into a flat string ValueError: Length of values (6) does not match length of index (19102)
                 
             # time_col = 'start' # 'ripple_start_t' for ripples, etc
-            extant_time_col: str = TimeColumnAliasesProtocol.find_first_extant_suitable_columns_name(a_df, col_connonical_name='t_bin_center', required_columns_synonym_dict={"t_bin_center":{'lap_start_t','ripple_start_t','start_t','start', 't'}}, should_raise_exception_on_fail=True)
-            if extant_time_col != 't_bin_center':
-                a_df['t_bin_center'] = deepcopy(a_df[extant_time_col])
-            assert 't_bin_center' in a_df
-            # assert np.all(np.logical_not(a_df.isna()))
-            a_df['is_t_bin_center_fake'] = (extant_time_col != 't_bin_center') ## #TODO 2025-03-27 18:31: - [ ] If it's not of t_bin data_grain, it's fake, and just used for temporary calculations
-            
+            extant_time_col: str = TimeColumnAliasesProtocol.find_first_extant_suitable_columns_name(a_df, col_connonical_name='t_bin_center', required_columns_synonym_dict={"t_bin_center":{'lap_start_t','ripple_start_t','start_t','start', 't'}}, should_raise_exception_on_fail=(not allow_missing_time_columns))
+            if extant_time_col is not None:
+                if extant_time_col != 't_bin_center':
+                    a_df['t_bin_center'] = deepcopy(a_df[extant_time_col])
+                assert 't_bin_center' in a_df
+                # assert np.all(np.logical_not(a_df.isna()))
+                a_df['is_t_bin_center_fake'] = (extant_time_col != 't_bin_center') ## #TODO 2025-03-27 18:31: - [ ] If it's not of t_bin data_grain, it's fake, and just used for temporary calculations            
             FAT_df_list.append(a_df)
         # end for a_df_name, a_df
         fat_df: pd.DataFrame = pd.concat(FAT_df_list, ignore_index=True)

@@ -445,6 +445,7 @@ class SingleEpochDecodedResult(HDF_SerializationMixin, AttrsBasedClassHelperMixi
 
     marginal_x: DynamicContainer = non_serialized_field()
     marginal_y: Optional[DynamicContainer] = non_serialized_field()
+    marginal_z: Optional[DynamicContainer] = non_serialized_field()
 
     epoch_data_index: Optional[int] = non_serialized_field()
 
@@ -895,6 +896,7 @@ class DecodedFilterEpochsResult(HDF_SerializationMixin, AttrsBasedClassHelperMix
     p_x_given_n_list: list = non_serialized_field(metadata={'shape': ('n_epochs',)})
     marginal_x_list: list = non_serialized_field(metadata={'shape': ('n_epochs',)})
     marginal_y_list: list = non_serialized_field(metadata={'shape': ('n_epochs',)})
+    marginal_z_list: list = non_serialized_field(metadata={'shape': ('n_epochs',)})
     most_likely_position_indicies_list: list = non_serialized_field(metadata={'shape': ('n_epochs',)})
     spkcount: list = non_serialized_field(metadata={'shape': ('n_epochs',)})
     nbins: np.ndarray = serialized_field(metadata={'shape': ('n_epochs',)}) # an array of the number of time bins in each epoch
@@ -1518,7 +1520,7 @@ class DecodedFilterEpochsResult(HDF_SerializationMixin, AttrsBasedClassHelperMix
     
 
     @function_attributes(short_name=None, tags=['mask', 'unit-spike-counts', 'pure'], input_requires=[], output_provides=[], uses=['spikes_df.spikes.compute_unit_time_binned_spike_counts_and_mask'], used_by=[], creation_date='2025-03-04 01:32', related_items=[])
-    def mask_computed_DecodedFilterEpochsResult_by_required_spike_counts_per_time_bin(self, spikes_df: pd.DataFrame, min_num_spikes_per_bin_to_be_considered_active:int=1, min_num_unique_active_neurons_per_time_bin:int=2, masked_bin_fill_mode:MaskedTimeBinFillType='last_valid') -> Tuple["DecodedFilterEpochsResult", Tuple[NDArray, NDArray]]:
+    def mask_computed_DecodedFilterEpochsResult_by_required_spike_counts_per_time_bin(self, spikes_df: pd.DataFrame, min_num_spikes_per_bin_to_be_considered_active:int=1, min_num_unique_active_neurons_per_time_bin:int=3, masked_bin_fill_mode:MaskedTimeBinFillType='last_valid') -> Tuple["DecodedFilterEpochsResult", Tuple[NDArray, NDArray]]:
         """ Returns a copy of itself, masked by finding periods where there is insufficient firing to decode based on the provided paramters, copies the decoded result and returns a version with positions back-filled from the last bin that did meet the minimum firing criteria
         
         Pure: does not modify self

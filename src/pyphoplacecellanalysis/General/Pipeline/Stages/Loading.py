@@ -298,6 +298,11 @@ class LoadableSessionInput:
         """ returns the context of the unfiltered session (self.sess) """
         return self.sess.get_context()
 
+    def get_session_format_name(self) -> str:
+        """ returns the name of the format (kdiba, bapun, etc) """
+        return self.get_session_context().to_dict().get('format_name', None)
+    
+
     def get_session_unique_aclu_information(self) -> pd.DataFrame:
         """  Get the aclu information for each aclu in the dataframe. Adds the ['aclu', 'shank', 'cluster', 'qclu', 'neuron_type'] columns """
         return self.sess.spikes_df.spikes.extract_unique_neuron_identities()
@@ -607,6 +612,10 @@ class PipelineWithLoadableStage(RegisteredOutputsMixin):
     def get_session_context(self) -> IdentifyingContext:
         """ returns the context of the unfiltered session (self.sess) """
         return self.stage.get_session_context()
+    
+    def get_session_format_name(self) -> str:
+        return self.stage.get_session_format_name()
+    
 
     def get_session_unique_aclu_information(self) -> pd.DataFrame:
         """  Get the aclu information for each aclu in the dataframe. Adds the ['aclu', 'shank', 'cluster', 'qclu', 'neuron_type'] columns """

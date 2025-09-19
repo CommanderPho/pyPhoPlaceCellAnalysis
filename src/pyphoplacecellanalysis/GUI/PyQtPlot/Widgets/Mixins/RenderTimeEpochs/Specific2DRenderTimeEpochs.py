@@ -170,6 +170,7 @@ class SessionEpochs2DRenderTimeEpochs(General2DRenderTimeEpochs):
     default_datasource_name = 'SessionEpochs'
     @classmethod
     def build_epochs_dataframe_formatter(cls, **kwargs):
+        
         long_short_display_config_manager = LongShortDisplayConfigManager()
         long_epoch_config = long_short_display_config_manager.long_epoch_config #.as_pyqtgraph_kwargs()
         short_epoch_config = long_short_display_config_manager.short_epoch_config #.as_pyqtgraph_kwargs()
@@ -181,16 +182,25 @@ class SessionEpochs2DRenderTimeEpochs(General2DRenderTimeEpochs):
             ## parameters:
             y_location = -1.0
             height = 0.9
-            # pen_color = pg.mkColor('red')
-            # brush_color = pg.mkColor('red')
 
-            ## parameters:
-            # pen_color = [pg.mkColor('red'), pg.mkColor('cyan')]
-            # brush_color = [pg.mkColor('red'), pg.mkColor('cyan')]
-            
-            pen_color = [pg.mkColor(long_epoch_config.pen.color()), pg.mkColor(short_epoch_config.pen.color())]
-            brush_color = [pg.mkColor(long_epoch_config.brush.color()), pg.mkColor(short_epoch_config.brush.color())]
-            
+            if num_intervals == 2:
+                
+                # pen_color = pg.mkColor('red')
+                # brush_color = pg.mkColor('red')
+
+                ## parameters:
+                # pen_color = [pg.mkColor('red'), pg.mkColor('cyan')]
+                # brush_color = [pg.mkColor('red'), pg.mkColor('cyan')]
+                
+                pen_color = [pg.mkColor(long_epoch_config.pen.color()), pg.mkColor(short_epoch_config.pen.color())]
+                brush_color = [pg.mkColor(long_epoch_config.brush.color()), pg.mkColor(short_epoch_config.brush.color())]
+            else:
+                ## Bapun sessions, etc
+                pen_color = [pg.mkColor('#490000') for i in np.arange(num_intervals)]
+                brush_color = [pg.mkColor('#f5161659') for i in np.arange(num_intervals)]
+
+
+            ## For all/general:
             for a_pen_color in pen_color:
                 a_pen_color.setAlphaF(0.8)
 
@@ -257,7 +267,7 @@ class Laps2DRenderTimeEpochs(General2DRenderTimeEpochs):
         elif isinstance(curr_sess, Epoch):
             active_Epochs = curr_sess
         else:
-            raise NotImplementedError
+            raise NotImplementedError(f'type(curr_sess): {type(curr_sess)}')
         interval_datasource = cls.build_render_time_epochs_datasource(active_epochs_obj=active_Epochs, **kwargs)
         out_rects = destination_plot.add_rendered_intervals(interval_datasource, name=kwargs.setdefault('name', cls.default_datasource_name), debug_print=True)
         
@@ -634,10 +644,14 @@ class SpikeBurstIntervals_2DRenderTimeEpochs(General2DRenderTimeEpochs):
         """ takes the exact same arguments as `add_render_time_epochs(...) but returns True if the call would be valid and False otherwise. """
         from pyphoplacecellanalysis.General.Pipeline.NeuropyPipeline import NeuropyPipeline # for advanced add_render_time_epochs
         if isinstance(curr_sess, NeuropyPipeline):
-            curr_active_pipeline = curr_sess
-            long_epoch_name, short_epoch_name, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
-            active_config_name = kwargs.pop('active_config_name', global_epoch_name)
-
+            try:
+                curr_active_pipeline = curr_sess
+                long_epoch_name, short_epoch_name, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
+                active_config_name = kwargs.pop('active_config_name', global_epoch_name)
+                    
+            except (KeyError, AttributeError, ValueError):
+                return False
+            
             try:
                 active_burst_intervals = curr_active_pipeline.computation_results[active_config_name].computed_data['burst_detection']['burst_intervals'] # this works
                 return (active_burst_intervals is not None)

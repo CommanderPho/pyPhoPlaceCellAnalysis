@@ -3398,7 +3398,7 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
 
         ## INPUTS: curr_active_pipeline, track_templates, active_spikes_df, active_decoder_decoded_epochs_result_dict: Dict[types.DecoderName, DecodedFilterEpochsResult], known_epochs_type='ripple', title='Long-like post-Delta Ripples Only'
         assert known_epochs_type in ['ripple', 'laps'], f"known_epochs_type: '{known_epochs_type}' should be either 'ripple' or 'laps'"
-        _, _, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
+        global_epoch_name = curr_active_pipeline.find_Global_epoch_name()
         
         active_spikes_df = get_proper_global_spikes_df(curr_active_pipeline)
         # active_filter_epochs_df = deepcopy(decoder_laps_filter_epochs_decoder_result_dict['long_LR'].filter_epochs)

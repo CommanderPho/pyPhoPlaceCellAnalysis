@@ -15,6 +15,8 @@ from pyphocorehelpers.function_helpers import function_attributes
 from neuropy.core.neuron_identities import NeuronIdentityAccessingMixin
 from neuropy.utils.result_context import overwriting_display_context, providing_context
 from neuropy.utils.indexing_helpers import paired_individual_sorting, paired_incremental_sorting, union_of_arrays # `paired_incremental_sort_neurons`
+from neuropy.utils.mixins.time_slicing import TimeColumnAliasesProtocol
+from neuropy.core.flattened_spiketrains import SpikesAccessor
 
 from pyphocorehelpers.indexing_helpers import partition # needed by `_find_example_epochs` to partition the dataframe by aclus
 from pyphocorehelpers.gui.PhoUIContainer import PhoUIContainer
@@ -633,7 +635,7 @@ class NewSimpleRaster:
                 spikes_df['fragile_linear_neuron_IDX']
             Changes.
         Removed `config_fragile_linear_neuron_IDX_map`
-        """
+        """        
         if (downsampling_rate is not None) and (downsampling_rate > 1):
             active_spikes_df = deepcopy(spikes_df).iloc[::downsampling_rate]  # Take every 10th row
         else:
@@ -643,6 +645,14 @@ class NewSimpleRaster:
         # curr_spike_x, curr_spike_y, curr_spike_pens, all_scatterplot_tooltips_kwargs, all_spots, curr_n = cls.build_spikes_data_values_from_df(spikes_df, config_fragile_linear_neuron_IDX_map, is_spike_included=is_spike_included, should_return_data_tooltips_kwargs=should_return_data_tooltips_kwargs, **kwargs)
         # All units at once approach:
         active_time_variable_name = active_spikes_df.spikes.time_variable_name
+        if active_time_variable_name != 't': 
+            active_spikes_df = TimeColumnAliasesProtocol.renaming_synonym_columns_if_needed(active_spikes_df, required_columns_synonym_dict={"t":{active_time_variable_name,'t_rel_seconds', 't_seconds'}})
+            active_spikes_df = active_spikes_df.drop(columns=[active_time_variable_name], inplace=False) ## drop the old column    
+            active_time_variable_name = 't' ## get the new one
+            active_spikes_df.spikes.set_time_variable_name('t')
+            # default_datapoint_column_names = [active_spikes_df.spikes.time_variable_name, 'aclu', 'fragile_linear_neuron_IDX']
+            # active_datapoint_column_names = default_datapoint_column_names
+            
         # Copy only the relevent columns so filtering is easier:
         filtered_spikes_df = active_spikes_df[[active_time_variable_name, 'visualization_raster_y_location',  'visualization_raster_emphasis_state', 'aclu', 'fragile_linear_neuron_IDX']].copy()
         
@@ -685,9 +695,12 @@ class NewSimpleRaster:
                 print(f'_tip_fn(...): data_string: {data_string}')
                 return f"spike: (x={x:.3f}, y={y:.2f})\n{data_string}"
 
+
+            # print(f'\t\tactive_datapoint_column_names: {active_datapoint_column_names}')
+            # print(f'\t\tactive_spikes_df.columns: {list(active_spikes_df.columns)}')
             # spikes_data = spikes_df[active_datapoint_column_names].to_records(index=False).tolist() # list of tuples
             spikes_data = active_spikes_df[active_datapoint_column_names].to_dict('records') # list of dicts
-            spikes_data = [ScatterItemData(**v) for v in spikes_data] 
+            spikes_data = [ScatterItemData.init_from_df_record(**v) for v in spikes_data] 
             all_scatterplot_tooltips_kwargs = dict(data=spikes_data, tip=_tip_fn)
             assert len(all_scatterplot_tooltips_kwargs['data']) == np.shape(active_spikes_df)[0], f"if specified, all_scatterplot_tooltips_kwargs must be the same length as the number of spikes but np.shape(spikes_df)[0]: {np.shape(active_spikes_df)[0]} and len((all_scatterplot_tooltips_kwargs['data']): {len(all_scatterplot_tooltips_kwargs['data'])}"
         else:

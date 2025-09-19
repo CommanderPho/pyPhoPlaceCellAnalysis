@@ -1,6 +1,6 @@
 # .SpikeRasterWidgets
 from copy import deepcopy
-from typing import Optional
+from typing import Dict, List, Tuple, Optional, Callable, Union, Any
 import numpy as np
 from pyphoplacecellanalysis.External.pyqtgraph.Qt import QtCore, QtGui, QtWidgets
 from pyphocorehelpers.gui.Qt.widget_positioning_helpers import WidgetPositioningHelpers
@@ -103,9 +103,8 @@ def _post_hoc_layout_resize(active_2d_plot, desired_static_area_height: Optional
             main_content_splitter.setSizes(desired_sizes.tolist())
 
 
-
 @function_attributes(short_name=None, tags=['2024-12-18', 'ACTIVE', 'gui', 'debugging', 'continuous'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-12-18 19:29', related_items=[])
-def _setup_spike_raster_window_for_debugging(spike_raster_window, wants_docked_raster_window_track:bool=False, enable_interval_overview_track:bool=False, allow_replace_hardcoded_main_plots_with_tracks: bool = False, debug_print=False):
+def _setup_spike_raster_window_for_debugging(spike_raster_window, wants_docked_raster_window_track:bool=False, enable_interval_overview_track:bool=False, allow_replace_hardcoded_main_plots_with_tracks: bool = False, debug_print=False, additional_post_hoc_fcns: Dict[str, Any]=None):
     """ Called to setup a specific `spike_raster_window` instance for 2024-12-18 style debugging.
     
     
@@ -126,9 +125,13 @@ def _setup_spike_raster_window_for_debugging(spike_raster_window, wants_docked_r
     import pyphoplacecellanalysis.External.pyqtgraph as pg
     from PyQt5.QtWidgets import QAbstractScrollArea
     from PyQt5.QtWidgets import QSizePolicy
-
+    from pyphoplacecellanalysis.Pho2D.PyQtPlots.Extensions.pyqtgraph_helpers import block_until_render_complete
+    from PyQt5.QtCore import QTimer
+    
     is_docked_pyqtgraph_plots_mode: bool = spike_raster_window.params.use_docked_pyqtgraph_plots
 
+    if additional_post_hoc_fcns is None:
+        additional_post_hoc_fcns = {}
 
     _all_outputs_dict = {}
     
@@ -230,56 +233,126 @@ def _setup_spike_raster_window_for_debugging(spike_raster_window, wants_docked_r
     # main_graphics_layout_widget.ci.layout.setRowStretchFactor(1, 2)  # Plot2: mid priority
     # main_graphics_layout_widget.ci.layout.setRowStretchFactor(2, 2)  # Plot3: highest priority
     # main_graphics_layout_widget.ci.layout.setRowStretchFactor(3, 2)  # Plot3: highest priority
+    
 
-    _interval_tracks_out_dict = active_2d_plot.prepare_pyqtgraph_intervalPlot_tracks(enable_interval_overview_track=enable_interval_overview_track, should_link_to_main_plot_widget=has_main_raster_plot)
-    _all_outputs_dict['_interval_tracks_out_dict'] = _interval_tracks_out_dict
+    def _subfn_add_additional_plots():
+        """ captures: ALL
+        """
+        if debug_print:
+            print(f'_subfn_add_additional_plots():')
+            
+        _interval_tracks_out_dict = active_2d_plot.prepare_pyqtgraph_intervalPlot_tracks(enable_interval_overview_track=enable_interval_overview_track, should_link_to_main_plot_widget=has_main_raster_plot)
+        _all_outputs_dict['_interval_tracks_out_dict'] = _interval_tracks_out_dict
 
-    # interval_window_dock_config, interval_dock_item, intervals_time_sync_pyqtgraph_widget, intervals_root_graphics_layout_widget, intervals_plot_item = _interval_tracks_out_dict['intervals']
-    # dock_config, interval_overview_dock_item, intervals_overview_time_sync_pyqtgraph_widget, intervals_overview_root_graphics_layout_widget, intervals_overview_plot_item = _interval_tracks_out_dict['interval_overview']
+        if wants_docked_raster_window_track:
+            _raster_tracks_out_dict = active_2d_plot.prepare_pyqtgraph_rasterPlot_track(name_modifier_suffix='raster_window', should_link_to_main_plot_widget=has_main_raster_plot)
+            _all_outputs_dict['_raster_tracks_out_dict'] = _raster_tracks_out_dict
 
-    if wants_docked_raster_window_track:
-        _raster_tracks_out_dict = active_2d_plot.prepare_pyqtgraph_rasterPlot_track(name_modifier_suffix='raster_window', should_link_to_main_plot_widget=has_main_raster_plot)
-        _all_outputs_dict['_raster_tracks_out_dict'] = _raster_tracks_out_dict
-
-
+        if debug_print:
+            print(f'\t_subfn_add_additional_plots() done.')
+        return
 
 
     # Add Renderables ____________________________________________________________________________________________________ #
-    # add_renderables_menu = active_2d_plot.ui.menus.custom_context_menus.add_renderables[0].programmatic_actions_dict
-    menu_commands = ['AddTimeIntervals.Replays', 'AddTimeIntervals.Laps', 'AddTimeIntervals.SessionEpochs', 'AddTimeIntervals.PBEs'] # , 'AddTimeIntervals.SessionEpochs', 'AddTimeIntervals.PBEs', 'AddTimeIntervals.Ripples',
-    for a_command in menu_commands:
-        assert a_command in global_flat_action_dict, f"a_command: '{a_command}' is not present in global_flat_action_dict: {list(global_flat_action_dict.keys())}"
-        # add_renderables_menu[a_command].trigger()
-        global_flat_action_dict[a_command].trigger()
+    def _subfn_trigger_add_intervals_menu_commands():
+        if debug_print:
+            print(f'_subfn_trigger_add_intervals_menu_commands():')
+    
+        # add_renderables_menu = active_2d_plot.ui.menus.custom_context_menus.add_renderables[0].programmatic_actions_dict
+        menu_commands = ['AddTimeIntervals.Replays', 'AddTimeIntervals.Laps', 'AddTimeIntervals.SessionEpochs', 'AddTimeIntervals.PBEs'] # , 'AddTimeIntervals.SessionEpochs', 'AddTimeIntervals.PBEs', 'AddTimeIntervals.Ripples',
+        for a_command in menu_commands:
+            assert a_command in global_flat_action_dict, f"a_command: '{a_command}' is not present in global_flat_action_dict: {list(global_flat_action_dict.keys())}"
+            # add_renderables_menu[a_command].trigger()
+            global_flat_action_dict[a_command].trigger()
 
-    # # active_2d_plot.activeMenuReference
-    # # active_2d_plot.ui.menus # .global_window_menus.docked_widgets.actions_dict
+        # # active_2d_plot.activeMenuReference
+        # # active_2d_plot.ui.menus # .global_window_menus.docked_widgets.actions_dict
+        if debug_print:
+            print(f'\t_subfn_run_additional_post_hoc_fcns() done.')
+        return
 
+
+    def _subfn_trigger_add_time_curve_menu_commands():
+        """ captures: global_flat_action_dict 
+        """
+        if debug_print:
+            print(f'_subfn_trigger_add_time_curve_menu_commands():')
+        menu_commands = [
+            'AddTimeCurves.Position', ## 2025-03-11 02:32 Running this too soon after launching the window causes weird black bars on the top and bottom of the window
+            # 'AddTimeCurves.ThetaPhase',
+            # 'DockedWidgets.LongShortDecodedEpochsDockedMatplotlibView',
+            # 'DockedWidgets.DirectionalDecodedEpochsDockedMatplotlibView',
+            # 'DockedWidgets.TrackTemplatesDecodedEpochsDockedMatplotlibView',
+            # 'DockedWidgets.Pseudo2DDecodedEpochsDockedMatplotlibView', # [/c:/Users/pho/repos/Spike3DWorkEnv/pyPhoPlaceCellAnalysis/src/pyphoplacecellanalysis/GUI/Qt/Menus/SpecificMenus/DockedWidgets_MenuProvider.py:141](vscode://file/c:/Users/pho/repos/Spike3DWorkEnv/pyPhoPlaceCellAnalysis/src/pyphoplacecellanalysis/GUI/Qt/Menus/SpecificMenus/DockedWidgets_MenuProvider.py:141)`'actionPseudo2DDecodedEpochsDockedMatplotlibView': AddNewDecodedPosteriors_MatplotlibPlotCommand`
+            #  'DockedWidgets.ContinuousPseudo2DDecodedMarginalsDockedMatplotlibView',
+
+        ]
+        # menu_commands = ['actionPseudo2DDecodedEpochsDockedMatplotlibView', 'actionContinuousPseudo2DDecodedMarginalsDockedMatplotlibView'] # , 'AddTimeIntervals.SessionEpochs'
+        # Run after a 0.5 second delay
+        
+        for a_command in menu_commands:
+            global_flat_action_dict[a_command].trigger()
+
+        if debug_print:
+            print(f'\t_subfn_trigger_add_time_curve_menu_commands() done.')
+            
+        return
+    
+
+    def _subfn_run_additional_post_hoc_fcns():
+        """ captures: additional_post_hoc_fcns, debug_print
+        """
+        if debug_print:
+            print(f'_subfn_run_additional_post_hoc_fcns():')
+
+        for a_fn_name, a_fn in additional_post_hoc_fcns.items():
+            print(f'\trunning post-hoc fn: {a_fn_name}...')
+            try:
+                a_fn()
+            except Exception as e:
+                print(f'\t\terror {e} occurred while running "{a_fn_name}"')
+                raise
+        if debug_print:
+            print(f'\t_subfn_run_additional_post_hoc_fcns() done.')
+            
+        return
+
+    ## META FCN
+    def _subfn_META_RUN_ALL_BACKGROUND_FCNS():
+        """ captures: _subfn_add_additional_plots, _subfn_trigger_add_intervals_menu_commands, _subfn_trigger_add_time_curve_menu_commands, _subfn_run_additional_post_hoc_fcns, debug_print
+        """
+        if debug_print:
+            print(f'_subfn_META_RUN_ALL_BACKGROUND_FCNS():')
+
+        background_fns_dict = dict(zip(["_subfn_add_additional_plots", "_subfn_trigger_add_intervals_menu_commands", "_subfn_trigger_add_time_curve_menu_commands", "_subfn_run_additional_post_hoc_fcns"], [_subfn_add_additional_plots, _subfn_trigger_add_intervals_menu_commands, _subfn_trigger_add_time_curve_menu_commands, _subfn_run_additional_post_hoc_fcns]))
+        for a_fn_name, a_fn in background_fns_dict.items():
+            print(f'\trunning BACKGROUND fn: {a_fn_name}...')
+            try:
+                # a_fn()
+                QTimer.singleShot(0, a_fn) ## add to queue asynchronously
+                # print(f'waiting until complete....')
+                # block_until_render_complete()
+                # print(f'\tblock_until_render_complete is done. Continuing execution.')
+                        
+            except Exception as e:
+                print(f'\t\terror {e} occurred while running "{a_fn_name}"')
+                raise
+        if debug_print:
+            print(f'\t_subfn_META_RUN_ALL_BACKGROUND_FCNS() done.')
+            
+        return
+    
+
+
+        
+    ### Begin Running Commands Function body
     active_2d_plot.params.enable_non_marginalized_raw_result = False
     active_2d_plot.params.enable_marginal_over_direction = False
     active_2d_plot.params.enable_marginal_over_track_ID = True
 
-
-    menu_commands = [
-        'AddTimeCurves.Position', ## 2025-03-11 02:32 Running this too soon after launching the window causes weird black bars on the top and bottom of the window
-        'AddTimeCurves.ThetaPhase',
-        # 'DockedWidgets.LongShortDecodedEpochsDockedMatplotlibView',
-        # 'DockedWidgets.DirectionalDecodedEpochsDockedMatplotlibView',
-        # 'DockedWidgets.TrackTemplatesDecodedEpochsDockedMatplotlibView',
-        # 'DockedWidgets.Pseudo2DDecodedEpochsDockedMatplotlibView', # [/c:/Users/pho/repos/Spike3DWorkEnv/pyPhoPlaceCellAnalysis/src/pyphoplacecellanalysis/GUI/Qt/Menus/SpecificMenus/DockedWidgets_MenuProvider.py:141](vscode://file/c:/Users/pho/repos/Spike3DWorkEnv/pyPhoPlaceCellAnalysis/src/pyphoplacecellanalysis/GUI/Qt/Menus/SpecificMenus/DockedWidgets_MenuProvider.py:141)`'actionPseudo2DDecodedEpochsDockedMatplotlibView': AddNewDecodedPosteriors_MatplotlibPlotCommand`
-        #  'DockedWidgets.ContinuousPseudo2DDecodedMarginalsDockedMatplotlibView',
-
-    ]
-    # menu_commands = ['actionPseudo2DDecodedEpochsDockedMatplotlibView', 'actionContinuousPseudo2DDecodedMarginalsDockedMatplotlibView'] # , 'AddTimeIntervals.SessionEpochs'
+    # QTimer.singleShot(800, _subfn_META_RUN_ALL_BACKGROUND_FCNS)
+    QTimer.singleShot(20, _subfn_META_RUN_ALL_BACKGROUND_FCNS)
     
-    # Run after a 0.5 second delay
-    from PyQt5.QtCore import QTimer
-    def trigger_commands():
-        for a_command in menu_commands:
-            # all_global_menus_actionsDict[a_command].trigger()
-            global_flat_action_dict[a_command].trigger()
-    
-    QTimer.singleShot(800, trigger_commands)
     # ## add the right sidebar
     # visible_intervals_info_widget_container, visible_intervals_ctrl_layout_widget =  spike_raster_window._perform_build_attached_visible_interval_info_widget() # builds the tables
     
@@ -292,8 +365,12 @@ def _setup_spike_raster_window_for_debugging(spike_raster_window, wants_docked_r
     # grouped_dock_items_dict = active_2d_plot.ui.dynamic_docked_widget_container.get_dockGroup_dock_dict()
     # ## OUTPUTS: nested_dock_items, nested_dynamic_docked_widget_container_widgets
 
-
     _post_hoc_layout_resize(active_2d_plot=active_2d_plot, desired_static_area_height=144)
+
+    
+    print(f'waiting until complete....')
+    block_until_render_complete()
+    print(f'\tblock_until_render_complete is done. Continuing execution.')
 
 
     return all_global_menus_actionsDict, global_flat_action_dict, _all_outputs_dict # , (_raster_tracks_out_dict, _raster_tracks_out_dict, _raster_tracks_out_dict)

@@ -114,7 +114,7 @@ def _plot_helper_add_arrow(line, position=None, position_mode='rel', direction='
     )
 
 @function_attributes(short_name=None, tags=['matplotlib', 'span', 'range-slider'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-02-21 05:25', related_items=[])
-def _plot_helper_add_span_where_ranges(pos_t: np.ndarray, pos_where_even_lap_indicies, pos_where_odd_lap_indicies, curr_ax: plt.axes):
+def _plot_helper_add_span_where_ranges(pos_t: np.ndarray, pos_where_even_lap_indicies, pos_where_odd_lap_indicies, curr_ax: plt.axes, alpha=0.25, **span_where_kwargs):
     """ Span_where implementation: Draws colored spans indicating the lap that is active during a given time interval. 
     
     Usage Example:
@@ -128,10 +128,10 @@ def _plot_helper_add_span_where_ranges(pos_t: np.ndarray, pos_where_even_lap_ind
     curr_span_ymin = curr_ax.get_ylim()[0]
     curr_span_ymax = curr_ax.get_ylim()[1]
     collection = BrokenBarHCollection.span_where(
-        pos_t, ymin=curr_span_ymin, ymax=curr_span_ymax, where=pos_where_even_lap_indicies, facecolor='green', alpha=0.25)
+        pos_t, ymin=curr_span_ymin, ymax=curr_span_ymax, where=pos_where_even_lap_indicies, facecolor='green', alpha=alpha, **span_where_kwargs)
     curr_ax.add_collection(collection)
     collection = BrokenBarHCollection.span_where(
-        pos_t, ymin=curr_span_ymin, ymax=curr_span_ymax, where=pos_where_odd_lap_indicies, facecolor='red', alpha=0.25)
+        pos_t, ymin=curr_span_ymin, ymax=curr_span_ymax, where=pos_where_odd_lap_indicies, facecolor='red', alpha=alpha, **span_where_kwargs)
     curr_ax.add_collection(collection)
     
 def _build_included_mask(mask_shape, crossing_beginings, crossing_endings):
@@ -244,7 +244,8 @@ def plot_laps_2d(sess, legacy_plotting_mode=True, **kwargs):
     # _plot_helper_add_span_where_ranges(pos_df.t.to_numpy(), pos_df_is_even_lap, pos_df_is_odd_lap, out_axes_list[2])
     for an_axis in out_axes_list:
         if legacy_plotting_mode:
-            _plot_helper_add_span_where_ranges(pos_df.t.to_numpy(), pos_df_is_even_lap, pos_df_is_odd_lap, an_axis)
+            span_where_kwargs = kwargs.pop('span_where_kwargs', {})
+            _plot_helper_add_span_where_ranges(pos_df.t.to_numpy(), pos_df_is_even_lap, pos_df_is_odd_lap, an_axis, **span_where_kwargs)
         else:
             _plot_helper_render_laps(pos_df['t'].to_numpy(), pos_df['x'].to_numpy(),
                                 curr_laps_df.loc[(curr_laps_df.lap_dir == 0), 'start_position_index'].to_numpy(),

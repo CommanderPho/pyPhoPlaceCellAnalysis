@@ -172,12 +172,18 @@ def batch_load_session(global_data_root_parent_path: Path, active_data_mode_name
     ## For every computation config we build a fake (duplicate) filter config).
     # OVERRIDE WITH TRUE:
     # curr_active_pipeline.sess.config.preprocessing_parameters.epoch_estimation_parameters.laps['use_direction_dependent_laps'] = True # override with True
+    is_kdiba_session: bool = (curr_active_pipeline.active_sess_config.format_name.lower() in ['kdiba'])
+
+    if (not is_kdiba_session) and (curr_active_pipeline.sess.config.preprocessing_parameters.epoch_estimation_parameters.laps.use_direction_dependent_laps == True):
+        print(f'WARN: overriding `curr_active_pipeline.sess.config.preprocessing_parameters.epoch_estimation_parameters.laps.use_direction_dependent_laps = False` for BAPUN-type session.')
+        curr_active_pipeline.sess.config.preprocessing_parameters.epoch_estimation_parameters.laps.use_direction_dependent_laps = False
+    
     lap_estimation_parameters = curr_active_pipeline.sess.config.preprocessing_parameters.epoch_estimation_parameters.laps
     assert lap_estimation_parameters is not None
     use_direction_dependent_laps: bool = lap_estimation_parameters.get('use_direction_dependent_laps', False) # whether to split the laps into left and right directions
     # use_direction_dependent_laps: bool = lap_estimation_parameters.get('use_direction_dependent_laps', True) # whether to split the laps into left and right directions
     
-    if (use_direction_dependent_laps or (len(active_session_computation_configs) > 3)):
+    if is_kdiba_session and (use_direction_dependent_laps or (len(active_session_computation_configs) > 3)):
         lap_direction_suffix_list = ['_odd', '_even', '_any'] # ['maze1_odd', 'maze1_even', 'maze1_any', 'maze2_odd', 'maze2_even', 'maze2_any', 'maze_odd', 'maze_even', 'maze_any']
         # lap_direction_suffix_list = ['_odd', '_even', ''] # no '_any' prefix, instead reuses the existing names
         # assert len(lap_direction_suffix_list) == len(active_session_computation_configs), f"len(lap_direction_suffix_list): {len(lap_direction_suffix_list)}, len(active_session_computation_configs): {len(active_session_computation_configs)}, "
@@ -201,6 +207,13 @@ def batch_load_session(global_data_root_parent_path: Path, active_data_mode_name
     assert len(lap_direction_suffix_list) == len(active_session_computation_configs)
     updated_active_session_pseudo_filter_configs = {} # empty list, woot!
 
+    if (not is_kdiba_session):
+        if computation_functions_name_excludelist is None:
+            computation_functions_name_excludelist = []
+        # if 'lap_direction_determination' not in computation_functions_name_excludelist:
+        #     computation_functions_name_excludelist.append('lap_direction_determination') ## skip 'lap_direction_determination' computation for non-kdiba sessions
+        if 'lap_direction_determination' in computation_functions_name_includelist:
+            computation_functions_name_includelist = [k for k in computation_functions_name_includelist if (k != 'lap_direction_determination')]
 
     for a_computation_suffix_name, a_computation_config in zip(lap_direction_suffix_list, active_session_computation_configs): # these should NOT be the same length: lap_direction_suffix_list: ['_odd', '_even', '_any']
         # We need to filter and then compute with the appropriate config iteratively.
@@ -314,7 +327,9 @@ def batch_evaluate_required_computations(curr_active_pipeline, include_includeli
 
 
     if included_computation_filter_names is None:
-        _, _, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
+        # _, _, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names() # replace "_, _, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()":"global_epoch_name = curr_active_pipeline.find_Global_epoch_name()"
+        global_epoch_name = curr_active_pipeline.find_Global_epoch_name()
+        
         # global_epoch_name = curr_active_pipeline.active_completed_computation_result_names[-1] # 'maze'		
         included_computation_filter_names = [global_epoch_name] # use only the global epoch: e.g. ['maze']
         if progress_print:
@@ -322,7 +337,8 @@ def batch_evaluate_required_computations(curr_active_pipeline, include_includeli
     else:
         if progress_print:
             print(f'Running batch_evaluate_required_computations(...) with included_computation_filter_names: "{included_computation_filter_names}"')
-
+            global_epoch_name = included_computation_filter_names[-1]
+            print(f'\tWARN: using `global_epoch_name = included_computation_filter_names[-1]`: global_epoch_name: "{global_epoch_name}", included_computation_filter_names: {included_computation_filter_names}. NOT CHECKED, hope this is right.')
 
     ## Specify the computations and the requirements to validate them.
 
@@ -444,7 +460,7 @@ def batch_extended_computations(curr_active_pipeline, include_includelist=None, 
 
 
     if included_computation_filter_names is None:
-        _, _, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
+        global_epoch_name = curr_active_pipeline.find_Global_epoch_name()
         # global_epoch_name = curr_active_pipeline.active_completed_computation_result_names[-1] # 'maze'
         
         included_computation_filter_names = [global_epoch_name] # use only the global epoch: e.g. ['maze']
@@ -453,7 +469,8 @@ def batch_extended_computations(curr_active_pipeline, include_includelist=None, 
     else:
         if progress_print:
             print(f'Running batch_extended_computations(...) with included_computation_filter_names: "{included_computation_filter_names}"')
-
+        # global_epoch_name = curr_active_pipeline.find_Global_epoch_name()
+        global_epoch_name = included_computation_filter_names[-1]
     
     ## Specify the computations and the requirements to validate them.
 

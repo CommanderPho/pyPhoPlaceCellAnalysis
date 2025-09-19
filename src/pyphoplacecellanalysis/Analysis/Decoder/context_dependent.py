@@ -258,17 +258,20 @@ class GenericDecoderDictDecodedEpochsDictResult(ComputedResult):
             self.filter_epochs_to_decode_dict[a_new_identifier] = deepcopy(an_epoch)
             self.filter_epochs_specific_decoded_result[a_new_identifier] = deepcopy(a_general_decoder_dict_decoded_epochs_dict_result.filter_epochs_pseudo2D_continuous_specific_decoded_result[a_known_epoch_name])
             ## Marginal dataframes:
-            for a_known_t_bin_fill_type, a_posterior_df in a_general_decoder_dict_decoded_epochs_dict_result.filter_epochs_decoded_filter_epoch_track_marginal_posterior_df_dict[a_known_epoch_name].items():
-                a_new_joint_identifier = IdentifyingContext(**_shared_context_fragment, known_named_decoding_epochs_type=a_known_epoch_name, masked_time_bin_fill_type=a_known_t_bin_fill_type)
-                if flat_contexts:
-                    self.filter_epochs_to_decode_dict[a_new_joint_identifier] = deepcopy(an_epoch)
-                    self.filter_epochs_specific_decoded_result[a_new_joint_identifier] = deepcopy(a_general_decoder_dict_decoded_epochs_dict_result.filter_epochs_pseudo2D_continuous_specific_decoded_result[a_known_epoch_name])
-                    ## #TODO 2025-03-21 09:19: - [ ] unused contexts now in 
-                    # del self.filter_epochs_to_decode_dict[a_new_identifier]
-                    # del self.filter_epochs_specific_decoded_result[a_new_identifier]
-                    
-                self.filter_epochs_decoded_track_marginal_posterior_df_dict[a_new_joint_identifier] = deepcopy(a_posterior_df)
-
+            if a_known_epoch_name in a_general_decoder_dict_decoded_epochs_dict_result.filter_epochs_decoded_filter_epoch_track_marginal_posterior_df_dict:
+                for a_known_t_bin_fill_type, a_posterior_df in a_general_decoder_dict_decoded_epochs_dict_result.filter_epochs_decoded_filter_epoch_track_marginal_posterior_df_dict[a_known_epoch_name].items():
+                    a_new_joint_identifier = IdentifyingContext(**_shared_context_fragment, known_named_decoding_epochs_type=a_known_epoch_name, masked_time_bin_fill_type=a_known_t_bin_fill_type)
+                    if flat_contexts:
+                        self.filter_epochs_to_decode_dict[a_new_joint_identifier] = deepcopy(an_epoch)
+                        self.filter_epochs_specific_decoded_result[a_new_joint_identifier] = deepcopy(a_general_decoder_dict_decoded_epochs_dict_result.filter_epochs_pseudo2D_continuous_specific_decoded_result[a_known_epoch_name])
+                        ## #TODO 2025-03-21 09:19: - [ ] unused contexts now in 
+                        # del self.filter_epochs_to_decode_dict[a_new_identifier]
+                        # del self.filter_epochs_specific_decoded_result[a_new_identifier]
+                        
+                    self.filter_epochs_decoded_track_marginal_posterior_df_dict[a_new_joint_identifier] = deepcopy(a_posterior_df)
+                ## END for a_known_t_bin_fill_type, a_posterior_df in a_general_...
+                
+        ## END for a_known_epoch_name, an_epoch in a_general_decoder_dict_dec...
         return self
     
 
@@ -512,7 +515,20 @@ class GenericDecoderDictDecodedEpochsDictResult(ComputedResult):
                 a_dropping_masked_pseudo2D_continuous_specific_decoded_result, _dropping_mask_index_tuple = a_decoder_epochs_filter_epochs_decoder_result.mask_computed_DecodedFilterEpochsResult_by_required_spike_counts_per_time_bin(spikes_df=deepcopy(spikes_df), masked_bin_fill_mode=masked_bin_fill_mode) ## Masks the low-firing bins so they don't confound the analysis.
                 ## Computes marginals for `dropping_masked_laps_pseudo2D_continuous_specific_decoded_result` -- The loss of the 'most_likely_positions_1D' must be happening here -- confirmed previous step does not cause loss in the `a_decoded_marginals_df` variable at least while the next step does.
                 a_dropping_masked_decoded_marginal_posterior_df = DirectionalPseudo2DDecodersResult.perform_compute_specific_marginals(a_result=a_dropping_masked_pseudo2D_continuous_specific_decoded_result, marginal_context=a_masked_updated_context)
-                
+
+                ## I guess I need to merge in the columns? Why is this so lame?
+                if a_dropping_masked_pseudo2D_continuous_specific_decoded_result.most_likely_positions_list is not None:
+                    try:
+                        epoch_extracted_most_likely_positions_1D = deepcopy(a_dropping_masked_pseudo2D_continuous_specific_decoded_result.most_likely_positions_list)
+                        time_bin_extracted_most_likely_positions_1D_column = np.concatenate([np.atleast_1d(an_epoch_extracted_most_likely_positions_1D[:, 0]) for i, an_epoch_extracted_most_likely_positions_1D in enumerate(epoch_extracted_most_likely_positions_1D)]) 
+                        assert len(time_bin_extracted_most_likely_positions_1D_column) == len(a_dropping_masked_decoded_marginal_posterior_df), f"len(time_bin_extracted_most_likely_positions_1D_column): {len(time_bin_extracted_most_likely_positions_1D_column)}, len(a_dropping_masked_decoded_marginal_posterior_df): {len(a_dropping_masked_decoded_marginal_posterior_df)}"
+                        a_dropping_masked_decoded_marginal_posterior_df['most_likely_positions_1D'] = time_bin_extracted_most_likely_positions_1D_column
+                        print(f'2025-08-13 19:18 Adding "most_likely_positions_1D" column to `a_dropping_masked_decoded_marginal_posterior_df`.')
+                    except (AssertionError, ValueError, AttributeError) as e:
+                        print(f'2025-08-13 19:18 ERROR: Adding "most_likely_positions_1D" column to `a_dropping_masked_decoded_marginal_posterior_df` failed with error: {e}.')  # AssertionError: len(time_bin_extracted_most_likely_positions_1D_column): 9578, len(a_dropping_masked_decoded_marginal_posterior_df): 84
+                    except Exception as e:
+                        raise e
+                    
                 _was_update_success = self.updating_results_for_context(new_context=a_masked_updated_context, a_result=deepcopy(a_dropping_masked_pseudo2D_continuous_specific_decoded_result), a_decoder=deepcopy(all_directional_pf1D_Decoder), a_decoded_marginal_posterior_df=deepcopy(a_dropping_masked_decoded_marginal_posterior_df)) ## update using the result
                 if not _was_update_success:
                     print(f'update failed for masked context: {a_masked_updated_context}')
@@ -1201,7 +1217,6 @@ class GenericDecoderDictDecodedEpochsDictResult(ComputedResult):
         a_new_fully_generic_result = a_new_fully_generic_result.computing_for_global_epoch(curr_active_pipeline=curr_active_pipeline, debug_print=debug_print)       
 
 
-
         # ==================================================================================================================== #
         # Phase 2.55 - Add non-PBE decoders to the .decoders dict                                                              #
         # ==================================================================================================================== #
@@ -1250,21 +1265,28 @@ class GenericDecoderDictDecodedEpochsDictResult(ComputedResult):
             masked_contexts_dict = {}
 
             for a_base_context in base_contexts_list:
-
                 a_best_matching_context, a_result, a_decoder, a_decoded_marginal_posterior_df = a_new_fully_generic_result.get_results_matching_contexts(a_base_context, return_multiple_matches=False)
-                ## `a_decoder` is None for some reason?`
-                ## INPUTS: a_result, masked_bin_fill_mode
-                a_masked_updated_context: IdentifyingContext = deepcopy(a_best_matching_context).overwriting_context(masked_time_bin_fill_type=a_masked_bin_fill_mode, data_grain='per_time_bin')
-                masked_contexts_dict[a_base_context] = a_masked_updated_context
-                if debug_print:
-                    print(f'a_masked_updated_context: {a_masked_updated_context}')
-                
-                ## MASKED with NaNs (no backfill):
-                a_dropping_masked_pseudo2D_continuous_specific_decoded_result, _dropping_mask_index_tuple = a_result.mask_computed_DecodedFilterEpochsResult_by_required_spike_counts_per_time_bin(spikes_df=deepcopy(spikes_df), masked_bin_fill_mode=a_masked_bin_fill_mode) ## Masks the low-firing bins so they don't confound the analysis.
-                ## Computes marginals for `dropping_masked_laps_pseudo2D_continuous_specific_decoded_result`
-                a_dropping_masked_decoded_marginal_posterior_df = DirectionalPseudo2DDecodersResult.perform_compute_specific_marginals(a_result=a_dropping_masked_pseudo2D_continuous_specific_decoded_result, marginal_context=a_masked_updated_context)
-                a_new_fully_generic_result.updating_results_for_context(new_context=a_masked_updated_context, a_result=deepcopy(a_dropping_masked_pseudo2D_continuous_specific_decoded_result), a_decoder=deepcopy(a_decoder), a_decoded_marginal_posterior_df=deepcopy(a_dropping_masked_decoded_marginal_posterior_df)) ## update using the result
-                
+                if (a_best_matching_context is not None) and (a_result is not None):
+                    ## `a_decoder` is None for some reason?`
+                    ## INPUTS: a_result, masked_bin_fill_mode
+                    a_masked_updated_context: IdentifyingContext = deepcopy(a_best_matching_context).overwriting_context(masked_time_bin_fill_type=a_masked_bin_fill_mode, data_grain='per_time_bin')
+                    masked_contexts_dict[a_base_context] = a_masked_updated_context
+                    if debug_print:
+                        print(f'a_masked_updated_context: {a_masked_updated_context}')
+                    
+                    if (a_result is not None) and (a_result.num_filter_epochs > 0):
+                        ## MASKED with NaNs (no backfill):
+                        a_dropping_masked_pseudo2D_continuous_specific_decoded_result, _dropping_mask_index_tuple = a_result.mask_computed_DecodedFilterEpochsResult_by_required_spike_counts_per_time_bin(spikes_df=deepcopy(spikes_df), masked_bin_fill_mode=a_masked_bin_fill_mode) ## Masks the low-firing bins so they don't confound the analysis.
+                        ## Computes marginals for `dropping_masked_laps_pseudo2D_continuous_specific_decoded_result`
+                        if (a_dropping_masked_pseudo2D_continuous_specific_decoded_result is not None) and (a_dropping_masked_pseudo2D_continuous_specific_decoded_result.num_filter_epochs > 0):
+                            try:
+                                a_dropping_masked_decoded_marginal_posterior_df = DirectionalPseudo2DDecodersResult.perform_compute_specific_marginals(a_result=a_dropping_masked_pseudo2D_continuous_specific_decoded_result, marginal_context=a_masked_updated_context)
+                                a_new_fully_generic_result.updating_results_for_context(new_context=a_masked_updated_context, a_result=deepcopy(a_dropping_masked_pseudo2D_continuous_specific_decoded_result), a_decoder=deepcopy(a_decoder), a_decoded_marginal_posterior_df=deepcopy(a_dropping_masked_decoded_marginal_posterior_df)) ## update using the result
+                            except ValueError as e:
+                                print(f'\t\tWARN: for a_base_context: {a_base_context} encountered error e: {e}')
+                            except Exception as e:
+                                raise
+
             ## OUTPUTS: masked_contexts_dict
 
             
@@ -1658,6 +1680,210 @@ class GenericDecoderDictDecodedEpochsDictResult(ComputedResult):
         return flat_context_list, flat_result_context_dict, flat_decoder_context_dict, decoded_marginal_posterior_df_context_dict
 
 
+
+    @function_attributes(short_name=None, tags=['decoding', 'performance'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-08-26 17:59', related_items=[])
+    @classmethod
+    def _perform_determine_percent_correctly_decoded_contexts(cls, curr_active_pipeline, time_bin_size: float=0.060) -> pd.DataFrame:
+        """ 
+        from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import determine_percent_correctly_decoded_contexts
+        ## find the number of correctly decoded components:
+        records_df: pd.DataFrame = determine_percent_correctly_decoded_contexts(curr_active_pipeline, time_bin_size=time_bin_size)
+        records_df
+        
+        """
+        from pyphocorehelpers.assertion_helpers import Assert
+        from pyphoplacecellanalysis.SpecificResults.AcrossSessionResults import AcrossSessionIdentityDataframeAccessor
+        from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.EpochComputationFunctions import EpochComputationsComputationsContainer
+        
+        def _subfn_determine_num_correctly_decoded_time_bins(a_decoded_marginal_posterior_df):
+            """find the number of correctly decoded components:
+            
+                worse_percent_correct, (percent_correct_pre, n_correct_pre, n_total_pre), (percent_correct_post, n_correct_post, n_total_post) = _subfn_determine_num_correctly_decoded_time_bins(a_decoded_marginal_posterior_df=a_decoded_marginal_posterior_df)
+            """
+            Assert.require_columns(a_decoded_marginal_posterior_df, required_columns=['P_Long', 'pre_post_delta_category'])
+            a_decoded_marginal_posterior_df['is_most_likely_decoder_Long'] = (a_decoded_marginal_posterior_df['P_Long'] > 0.5)
+
+            _split_df = a_decoded_marginal_posterior_df.pho.partition_df_dict('pre_post_delta_category')
+
+            is_correct_pre_delta = _split_df['pre-delta']['is_most_likely_decoder_Long']
+            is_correct_post_delta = np.logical_not(_split_df['post-delta']['is_most_likely_decoder_Long'])
+
+
+            n_correct_pre: int = np.sum(is_correct_pre_delta)
+            n_total_pre: int = len(_split_df['pre-delta'])
+            percent_correct_pre: float = float(n_correct_pre)/float(n_total_pre)
+            percent_correct_pre
+
+
+            n_correct_post: int = np.sum(is_correct_post_delta)
+            n_total_post: int = len(_split_df['post-delta'])
+            percent_correct_post: float = float(n_correct_post)/float(n_total_post)
+            
+            worse_percent_correct: float = min(percent_correct_pre, percent_correct_post)
+            
+            return worse_percent_correct, (percent_correct_pre, n_correct_pre, n_total_pre), (percent_correct_post, n_correct_post, n_total_post)
+        
+        # ==================================================================================================================================================================================================================================================================================== #
+        # BEGIN FUNCTION BODY                                                                                                                                                                                                                                                                  #
+        # ==================================================================================================================================================================================================================================================================================== #
+        valid_EpochComputations_result: EpochComputationsComputationsContainer = curr_active_pipeline.global_computation_results.computed_data['EpochComputations']
+        a_new_fully_generic_result: GenericDecoderDictDecodedEpochsDictResult = valid_EpochComputations_result.a_generic_decoder_dict_decoded_epochs_dict_result
+
+        # a_target_context: IdentifyingContext = IdentifyingContext(trained_compute_epochs='laps', pfND_ndim=1, time_bin_size=0.050, known_named_decoding_epochs_type='pbe', masked_time_bin_fill_type='ignore') # , decoder_identifier='long_LR'
+        # a_target_context: IdentifyingContext = IdentifyingContext(trained_compute_epochs='laps', pfND_ndim=1, time_bin_size=0.025, known_named_decoding_epochs_type='pbe', masked_time_bin_fill_type='ignore', data_grain='per_epoch') # , time_bin_size=0.050, known_named_decoding_epochs_type='pbe', masked_time_bin_fill_type='ignore', decoder_identifier='long_LR'
+
+        # a_target_context: IdentifyingContext = IdentifyingContext(trained_compute_epochs='laps', pfND_ndim=1, time_bin_size=0.025, known_named_decoding_epochs_type='laps', masked_time_bin_fill_type='ignore', data_grain='per_epoch') ## Laps
+        # any_matching_contexts_list, result_context_dict, decoder_context_dict, decoded_marginal_posterior_df_context_dict = a_new_fully_generic_result.get_results_matching_contexts(context_query=a_target_context)
+
+        # common_constraint_dict = dict(trained_compute_epochs='laps', pfND_ndim=1, time_bin_size=0.025, masked_time_bin_fill_type='ignore')
+        # common_constraint_dict = dict(trained_compute_epochs='laps', time_bin_size=0.060, masked_time_bin_fill_type='nan_filled') # , pfND_ndim=1
+        common_constraint_dict = dict(trained_compute_epochs='laps', time_bin_size=time_bin_size, masked_time_bin_fill_type='dropped')
+
+        _output_dict = {}
+        ## Laps context:
+        a_Laps_target_context: IdentifyingContext = IdentifyingContext(known_named_decoding_epochs_type='laps', data_grain='per_time_bin', **common_constraint_dict)
+        ## Global context:
+        a_global_target_context: IdentifyingContext = IdentifyingContext(known_named_decoding_epochs_type='global', data_grain='per_time_bin', **common_constraint_dict)
+        ## PBEs context:
+        a_PBEs_target_context: IdentifyingContext = IdentifyingContext(known_named_decoding_epochs_type='pbe', **common_constraint_dict, data_grain='per_time_bin') 
+        _active_target_context_list = [a_Laps_target_context, a_global_target_context, a_PBEs_target_context]
+        records_df = []
+        for a_target_context in _active_target_context_list:
+            try:
+                best_matching_context, a_result, a_decoder, a_decoded_marginal_posterior_df = a_new_fully_generic_result.get_results_best_matching_context(context_query=a_target_context, debug_print=False)
+                a_num_counts_tuple  = _subfn_determine_num_correctly_decoded_time_bins(a_decoded_marginal_posterior_df=a_decoded_marginal_posterior_df)
+                _output_dict[best_matching_context] = a_num_counts_tuple
+                worse_percent_correct, (percent_correct_pre, n_correct_pre, n_total_pre), (percent_correct_post, n_correct_post, n_total_post) = a_num_counts_tuple
+                a_record = dict(**best_matching_context.to_dict(), worse_percent_correct=worse_percent_correct, percent_correct_pre=percent_correct_pre, n_correct_pre=n_correct_pre, n_total_pre=n_total_pre,  percent_correct_post=percent_correct_post, n_correct_post=n_correct_post, n_total_post=n_total_post)
+                records_df.append(a_record)            
+
+            except TypeError as e:
+                print(f'WARN: err: {e} for ctxt: {a_target_context}. Skipping.')
+                pass
+            except Exception as e:
+                raise
+        ## END for a_target_context in ...
+        
+        ## build output df:
+        records_df: pd.DataFrame = pd.DataFrame.from_records(records_df)
+        records_df = records_df.across_session_identity.add_session_df_columns_from_pipeline(curr_active_pipeline=curr_active_pipeline, time_bin_size=time_bin_size, time_col=None)
+        return records_df
+
+
+    @function_attributes(short_name=None, tags=['decoding', 'performance'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-08-26 17:59', related_items=[])
+    def determine_percent_correctly_decoded_contexts(self, curr_active_pipeline=None, time_bin_size: float=0.060, export_all_laps_mode: bool=True) -> pd.DataFrame:
+        """ 
+        from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import determine_percent_correctly_decoded_contexts
+        ## find the number of correctly decoded components:
+        records_df: pd.DataFrame = self.determine_percent_correctly_decoded_contexts(curr_active_pipeline, time_bin_size=time_bin_size)
+        records_df
+        
+        """
+        from pyphocorehelpers.assertion_helpers import Assert
+        from pyphoplacecellanalysis.SpecificResults.AcrossSessionResults import AcrossSessionIdentityDataframeAccessor
+        
+
+        def _subfn_count_correct(a_df):
+            n_correct_pre: int = np.sum(a_df['is_groundtruth_correct'])
+            n_total_pre: int = len(a_df)
+            percent_correct_pre: float = float(n_correct_pre)/float(n_total_pre)
+            return dict(percent_correct=percent_correct_pre, n_correct=n_correct_pre, n_total=n_total_pre)
+
+
+        def _subfn_determine_num_correctly_decoded_time_bins(a_decoded_marginal_posterior_df, export_all_laps_mode: bool=True, a_ctxt: IdentifyingContext=None):
+            """find the number of correctly decoded components:
+            
+            Captures: curr_active_pipeline, time_bin_size
+            
+                worse_percent_correct, (percent_correct_pre, n_correct_pre, n_total_pre), (percent_correct_post, n_correct_post, n_total_post) = _subfn_determine_num_correctly_decoded_time_bins(a_decoded_marginal_posterior_df=a_decoded_marginal_posterior_df)
+            """
+            Assert.require_columns(a_decoded_marginal_posterior_df, required_columns=['P_Long', 'pre_post_delta_category'])
+            a_decoded_marginal_posterior_df['is_most_likely_decoder_Long'] = (a_decoded_marginal_posterior_df['P_Long'] > 0.5)
+
+            _split_df = a_decoded_marginal_posterior_df.pho.partition_df_dict('pre_post_delta_category')
+
+            is_correct_pre_delta = _split_df['pre-delta']['is_most_likely_decoder_Long']
+            is_correct_post_delta = np.logical_not(_split_df['post-delta']['is_most_likely_decoder_Long'])
+
+            _split_df['pre-delta']['is_groundtruth_correct'] = is_correct_pre_delta
+            _split_df['post-delta']['is_groundtruth_correct'] = is_correct_post_delta
+
+            n_correct_pre: int = np.sum(is_correct_pre_delta)
+            n_total_pre: int = len(_split_df['pre-delta'])
+            percent_correct_pre: float = float(n_correct_pre)/float(n_total_pre)
+            
+            n_correct_post: int = np.sum(is_correct_post_delta)
+            n_total_post: int = len(_split_df['post-delta'])
+            percent_correct_post: float = float(n_correct_post)/float(n_total_post)
+            
+            worse_percent_correct: float = min(percent_correct_pre, percent_correct_post)
+            
+            across_epochs_record = dict(**a_ctxt.to_dict(), worse_percent_correct=worse_percent_correct, percent_correct_pre=percent_correct_pre, n_correct_pre=n_correct_pre, n_total_pre=n_total_pre,  percent_correct_post=percent_correct_post, n_correct_post=n_correct_post, n_total_post=n_total_post) | dict(record_type='all_epochs')
+
+            records_df: pd.DataFrame = pd.DataFrame.from_records([across_epochs_record])
+            if curr_active_pipeline is not None:
+                records_df = records_df.across_session_identity.add_session_df_columns_from_pipeline(curr_active_pipeline=curr_active_pipeline, time_bin_size=time_bin_size, time_col=None)
+            
+            # if export_all_laps_mode:
+            all_epochs_records = []
+            for pre_post_delta, a_df in _split_df.items():
+                
+                epoch_split_df = a_df.pho.partition_df_dict('parent_epoch_id')
+                for an_epoch_id, an_epoch_df in epoch_split_df.items():
+                    ## for each group of epochs, compute the stats
+                    a_record = dict()
+                    if a_ctxt is not None:
+                        a_record = a_record | a_ctxt.to_dict()
+                    a_record = a_record | dict(pre_post_delta_category=pre_post_delta, parent_epoch_id=an_epoch_id) | _subfn_count_correct(a_df=an_epoch_df) | dict(record_type='epoch')
+                    all_epochs_records.append(a_record)
+
+            all_epochs_records_df: pd.DataFrame = pd.DataFrame.from_records(all_epochs_records)
+            if curr_active_pipeline is not None:
+                all_epochs_records_df = all_epochs_records_df.across_session_identity.add_session_df_columns_from_pipeline(curr_active_pipeline=curr_active_pipeline, time_bin_size=time_bin_size, time_col='t_bin_center')
+
+            all_epochs_records_df = pd.concat((all_epochs_records_df, records_df))
+            
+            return all_epochs_records_df
+        
+        
+        # ==================================================================================================================================================================================================================================================================================== #
+        # BEGIN FUNCTION BODY                                                                                                                                                                                                                                                                  #
+        # ==================================================================================================================================================================================================================================================================================== #
+        common_constraint_dict = dict(trained_compute_epochs='laps', time_bin_size=time_bin_size, masked_time_bin_fill_type='dropped')
+
+        _output_dict = {}
+        ## Laps context:
+        a_Laps_target_context: IdentifyingContext = IdentifyingContext(known_named_decoding_epochs_type='laps', data_grain='per_time_bin', **common_constraint_dict)
+        ## Global context:
+        a_global_target_context: IdentifyingContext = IdentifyingContext(known_named_decoding_epochs_type='global', data_grain='per_time_bin', **common_constraint_dict)
+        ## PBEs context:
+        a_PBEs_target_context: IdentifyingContext = IdentifyingContext(known_named_decoding_epochs_type='pbe', **common_constraint_dict, data_grain='per_time_bin') 
+        _active_target_context_list = [a_Laps_target_context, a_global_target_context, a_PBEs_target_context]
+        records_df = []
+        for a_target_context in _active_target_context_list:
+            try:
+                best_matching_context, a_result, a_decoder, a_decoded_marginal_posterior_df = self.get_results_best_matching_context(context_query=a_target_context, debug_print=False)
+                an_epochs_records_df  = _subfn_determine_num_correctly_decoded_time_bins(a_decoded_marginal_posterior_df=a_decoded_marginal_posterior_df, export_all_laps_mode=export_all_laps_mode, a_ctxt=best_matching_context)
+                _output_dict[best_matching_context] = an_epochs_records_df
+                # worse_percent_correct, (percent_correct_pre, n_correct_pre, n_total_pre), (percent_correct_post, n_correct_post, n_total_post) = a_num_counts_tuple
+                # a_record = dict(**best_matching_context.to_dict(), worse_percent_correct=worse_percent_correct, percent_correct_pre=percent_correct_pre, n_correct_pre=n_correct_pre, n_total_pre=n_total_pre,  percent_correct_post=percent_correct_post, n_correct_post=n_correct_post, n_total_post=n_total_post)
+                # records_df.append(a_record)
+                records_df.append(an_epochs_records_df)           
+
+            except TypeError as e:
+                print(f'WARN: err: {e} for ctxt: {a_target_context}. Skipping.')
+                pass
+            except Exception as e:
+                raise
+        ## END for a_target_context in ...
+        
+        ## build output df:
+        # records_df: pd.DataFrame = pd.DataFrame.from_records(records_df)
+        records_df: pd.DataFrame = pd.concat(records_df)
+        # if curr_active_pipeline is not None:
+        #     records_df = records_df.across_session_identity.add_session_df_columns_from_pipeline(curr_active_pipeline=curr_active_pipeline, time_bin_size=time_bin_size, time_col=None)
+        return records_df
+    
     # ==================================================================================================================== #
     # Updating and Adding                                                                                                  #
     # ==================================================================================================================== #
@@ -1699,7 +1925,7 @@ class GenericDecoderDictDecodedEpochsDictResult(ComputedResult):
     @classmethod
     def _perform_export_dfs_dict_to_csvs(cls, extracted_dfs_dict: Dict[IdentifyingContext, pd.DataFrame], parent_output_path: Path, active_context: IdentifyingContext, session_name: str, tbin_values_dict: Dict[str, float],
                                     t_start: Optional[float]=None, curr_session_t_delta: Optional[float]=None, t_end: Optional[float]=None,
-                                    user_annotation_selections=None, valid_epochs_selections=None, custom_export_df_to_csv_fn=None, use_single_FAT_df: bool=True):
+                                    user_annotation_selections=None, valid_epochs_selections=None, custom_export_df_to_csv_fn=None, use_single_FAT_df: bool=True, an_override_df_identifier:Optional[str]=None, allow_missing_time_columns:bool=False):
         """ Classmethod: export as separate .csv files. 
 
         from pyphoplacecellanalysis.SpecificResults.AcrossSessionResults import SingleFatDataframe
@@ -1766,7 +1992,7 @@ class GenericDecoderDictDecodedEpochsDictResult(ComputedResult):
         from pyphocorehelpers.assertion_helpers import Assert
 
         assert parent_output_path.exists(), f"'{parent_output_path}' does not exist!"
-        output_date_str: str = get_now_rounded_time_str(rounded_minutes=10)
+        # output_date_str: str = get_now_rounded_time_str(rounded_minutes=10)
         
         # active_context.custom_suffix = '_withNormalComputedReplays-qclu_[1, 2, 4, 6, 7, 9]-frateThresh_1.0' # '_withNormalComputedReplays-qclu_[1, 2, 4, 6, 7, 9]-frateThresh_1.0normal_computed-frateThresh_1.0-qclu_[1, 2, 4, 6, 7, 9]'
         
@@ -1809,20 +2035,33 @@ class GenericDecoderDictDecodedEpochsDictResult(ComputedResult):
         #         return out_path     
         #     custom_export_df_to_csv_fn = _subfn_export_df_to_csv
 
-        def _subfn_pre_process_and_export_df(export_df: pd.DataFrame, a_df_identifier: Union[str, IdentifyingContext]):
+        def _subfn_pre_process_and_export_df(export_df: pd.DataFrame, a_df_identifier: Union[str, IdentifyingContext], was_override: bool=True):
             """ sets up all the important metadata and then calls `custom_export_df_to_csv_fn(....)` to actually export the CSV
             
             captures: t_start, t_delta, t_end, tbin_values_dict, time_col_name_dict, user_annotation_selections, valid_epochs_selections, custom_export_df_to_csv_fn
             """
+
             if isinstance(a_df_identifier, str):
                 an_epochs_source_name: str = a_df_identifier.split(sep='_', maxsplit=1)[0] # get the first part of the variable names that indicates whether it's for "laps" or "ripple"
             else:
                 ## probably an IdentifyingContext
                 an_epochs_source_name: str = a_df_identifier.known_named_decoding_epochs_type
 
-            a_tbin_size: float = float(tbin_values_dict[an_epochs_source_name])
-            a_time_col_name: str = time_col_name_dict.get(an_epochs_source_name, 't_bin_center')
-            
+
+            if was_override:
+                a_tbin_size: float = tbin_values_dict.get(a_df_identifier, None)
+                if a_tbin_size is None:
+                    a_tbin_size: float = tbin_values_dict.get(an_epochs_source_name, None)
+                a_time_col_name: str = time_col_name_dict.get(a_df_identifier, None)
+                if a_time_col_name is None:
+                    a_time_col_name: str = time_col_name_dict.get(an_epochs_source_name, 't_bin_center')
+            else:
+                a_tbin_size: float = tbin_values_dict.get(an_epochs_source_name, None)
+                a_time_col_name: str = time_col_name_dict.get(an_epochs_source_name, 't_bin_center')
+
+            if a_tbin_size is not None:
+                a_tbin_size = float(a_tbin_size)
+
             ## Add t_bin column method
             export_df = export_df.across_session_identity.add_session_df_columns(session_name=session_name, time_bin_size=a_tbin_size, t_start=t_start, curr_session_t_delta=curr_session_t_delta, t_end=t_end, time_col=a_time_col_name) ## #TODO 2025-04-05 18:12: - [ ] what about qclu? FrHz?
             a_tbin_size_str: str = f"{round(a_tbin_size, ndigits=5)}"
@@ -1896,12 +2135,21 @@ class GenericDecoderDictDecodedEpochsDictResult(ComputedResult):
         export_files_dict = {}
         
         if use_single_FAT_df:
-            single_FAT_df: pd.DataFrame = SingleFatDataframe.build_fat_df(dfs_dict=extracted_dfs_dict, additional_common_context=active_context)
+            single_FAT_df: pd.DataFrame = SingleFatDataframe.build_fat_df(dfs_dict=extracted_dfs_dict, additional_common_context=active_context, allow_missing_time_columns=allow_missing_time_columns)
             export_files_dict['FAT'] =  _subfn_pre_process_and_export_df(export_df=single_FAT_df, a_df_identifier="FAT")
             
         else:
             for a_df_identifier, a_df in extracted_dfs_dict.items():
-                export_files_dict[a_df_identifier] =  _subfn_pre_process_and_export_df(export_df=a_df, a_df_identifier=a_df_identifier) ## I bet `a_df_identifier` is an IdentifyingContext here, but a string in the above FAT case.
+                was_override = False
+                if an_override_df_identifier is not None:
+                    an_active_df_identifier = an_override_df_identifier ## use the override
+                    was_override = True
+                    # export_files_dict[an_override_df_identifier] =  _subfn_pre_process_and_export_df(export_df=a_df, a_df_identifier=an_active_df_identifier, was_override=was_override)
+                else:
+                    an_active_df_identifier = a_df_identifier
+                    # export_files_dict[a_df_identifier] =  _subfn_pre_process_and_export_df(export_df=a_df, a_df_identifier=an_active_df_identifier, was_override=was_override)
+                    
+                export_files_dict[an_active_df_identifier] =  _subfn_pre_process_and_export_df(export_df=a_df, a_df_identifier=an_active_df_identifier, was_override=was_override) ## I bet `a_df_identifier` is an IdentifyingContext here, but a string in the above FAT case.
             # end for a_df_name, a_df
         # END if use_single_FAT_df
         
@@ -1909,7 +2157,8 @@ class GenericDecoderDictDecodedEpochsDictResult(ComputedResult):
     
 
     @function_attributes(short_name=None, tags=['export', 'CSV', 'main'], input_requires=['self.filter_epochs_decoded_track_marginal_posterior_df_dict'], output_provides=[], uses=['self.filter_epochs_decoded_track_marginal_posterior_df_dict', '_perform_export_dfs_dict_to_csvs'], used_by=[], creation_date='2025-03-13 08:58', related_items=[])
-    def export_csvs(self, parent_output_path: Path, active_context: IdentifyingContext, decoding_time_bin_size: float, session_name: str, curr_session_t_delta: Optional[float]=None, user_annotation_selections=None, valid_epochs_selections=None, custom_export_df_to_csv_fn=None, export_df_variable_names=None, use_single_FAT_df=True, tbin_values_dict: Optional[Dict[str, float]]=None, should_export_complete_all_scores_df:bool=True):
+    def export_csvs(self, parent_output_path: Path, active_context: IdentifyingContext, decoding_time_bin_size: float, session_name: str, curr_session_t_delta: Optional[float]=None, user_annotation_selections=None, valid_epochs_selections=None, custom_export_df_to_csv_fn=None, export_df_variable_names=None, use_single_FAT_df=True, tbin_values_dict: Optional[Dict[str, float]]=None,
+                     should_export_complete_all_scores_df:bool=True, should_export_session_correct_decoded_time_bin_performance_df:bool=True):
         """ export as a single_FAT .csv file or optionally (not yet implemented) separate .csv files.    
 
 
@@ -1953,7 +2202,7 @@ class GenericDecoderDictDecodedEpochsDictResult(ComputedResult):
         export_files_dict = {}
         
         if tbin_values_dict is None:
-            tbin_values_dict = {'laps': decoding_time_bin_size, 'pbe': decoding_time_bin_size, 'non_pbe': decoding_time_bin_size, 'FAT': decoding_time_bin_size}
+            tbin_values_dict = {'laps': decoding_time_bin_size, 'pbe': decoding_time_bin_size, 'non_pbe': decoding_time_bin_size, 'FAT': decoding_time_bin_size, 'perfmnc_session': decoding_time_bin_size}
 
         ## to restrict to specific variables
         # _df_variables_names = ['laps_weighted_corr_merged_df', 'ripple_weighted_corr_merged_df', 'laps_simple_pf_pearson_merged_df', 'ripple_simple_pf_pearson_merged_df']
@@ -1976,8 +2225,24 @@ class GenericDecoderDictDecodedEpochsDictResult(ComputedResult):
         #         print(f'WARN: adding the time_bin_size columns: {self.ripple_decoding_time_bin_size}')
         #         extracted_merged_scores_df['time_bin_size'] = self.ripple_decoding_time_bin_size
 
-        #     export_df_dict = {'ripple_all_scores_merged_df': extracted_merged_scores_df}
+        #     export_df_dict = {IdentifyingContext(fn_name='ripple_all_scores_merged_df'): extracted_merged_scores_df}
         #     export_files_dict = export_files_dict | self.perform_export_dfs_dict_to_csvs(extracted_dfs_dict=export_df_dict, parent_output_path=parent_output_path, active_context=active_context, session_name=session_name, curr_session_t_delta=curr_session_t_delta, user_annotation_selections=None, valid_epochs_selections=None, custom_export_df_to_csv_fn=custom_export_df_to_csv_fn)
+
+        if should_export_session_correct_decoded_time_bin_performance_df:
+            print(f'should_export_session_correct_decoded_time_bin_performance_df is True so trying to export...')
+            try:
+                # from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import determine_percent_correctly_decoded_contexts
+                ## find the number of correctly decoded components:
+                # session_correct_decoded_time_bin_performance_df: pd.DataFrame = determine_percent_correctly_decoded_contexts(curr_active_pipeline, time_bin_size=decoding_time_bin_size)
+                session_correct_decoded_time_bin_performance_df: pd.DataFrame = self.determine_percent_correctly_decoded_contexts(curr_active_pipeline=None, time_bin_size=decoding_time_bin_size)
+                export_df_dict = {IdentifyingContext(fn_name='session_correct_decoded_time_bin_performance_df', known_named_decoding_epochs_type='perfmnc_session'): session_correct_decoded_time_bin_performance_df}
+                export_files_dict = export_files_dict | self._perform_export_dfs_dict_to_csvs(extracted_dfs_dict=export_df_dict, parent_output_path=parent_output_path, tbin_values_dict=tbin_values_dict,
+                                                                                              active_context=active_context, session_name=session_name, curr_session_t_delta=curr_session_t_delta, user_annotation_selections=None, valid_epochs_selections=None, custom_export_df_to_csv_fn=custom_export_df_to_csv_fn,
+                                                                                          use_single_FAT_df=False, an_override_df_identifier='perfmnc_session',
+                                                                                          allow_missing_time_columns=True)
+            except Exception as e:
+                print(f'\tshould_export_session_correct_decoded_time_bin_performance_df exporting failed withe error: {e}')
+                raise
 
         return export_files_dict
 
@@ -2032,6 +2297,50 @@ class GenericDecoderDictDecodedEpochsDictResult(ComputedResult):
         # across_session_results_extended_dict['generalized_decode_epochs_dict_and_export_results_completion_function']['csv_save_paths_dict'] = deepcopy(csv_save_paths_dict)
         print(f'csv_save_paths_dict: {csv_save_paths_dict}\n')
         return csv_save_paths_dict
+
+
+
+    @function_attributes(short_name=None, tags=['export', 'pkl', 'pure'], input_requires=[], output_provides=[], uses=['export_csvs'], used_by=[], creation_date='2025-08-21 00:00', related_items=[])
+    def export_pkl(self, active_export_parent_output_path: Path, owning_pipeline_reference):
+        """ Exports to pkl, pure
+                
+        active_export_parent_output_path = self.collected_outputs_path.resolve()
+        Assert.path_exists(parent_output_path)
+        pkl_save_path = a_new_fully_generic_result.export_pkl(active_export_parent_output_path=active_export_parent_output_path, owning_pipeline_reference=owning_pipeline_reference)
+        pkl_save_path
+        
+        """ 
+        from pyphocorehelpers.assertion_helpers import Assert
+        from pyphoplacecellanalysis.General.Pipeline.NeuropyPipeline import _get_custom_suffix_for_filename_from_computation_metadata
+        from pyphocorehelpers.Filesystem.path_helpers import sanitize_filename_for_Windows
+        ## Unpack from pipeline:
+        ## Export to CSVs:
+        
+        Assert.path_exists(active_export_parent_output_path)
+
+        ## INPUTS: collected_outputs_path
+
+        complete_session_context, (session_context, additional_session_context) = owning_pipeline_reference.get_complete_session_context()
+
+        data_identifier_str: str = f'(a_new_fully_generic_result)'
+        output_date_str: str = get_now_rounded_time_str(rounded_minutes=10)
+        out_path, out_filename, out_basename = owning_pipeline_reference.build_complete_session_identifier_filename_string(output_date_str=output_date_str, data_identifier_str=data_identifier_str, parent_output_path=active_export_parent_output_path, out_extension='.pkl')
+        print(f'pipeline built-in exporter: out_path: "{out_path.as_posix()}"')
+        
+        ## build output path:
+        custom_suffix: str = _get_custom_suffix_for_filename_from_computation_metadata(use_concise_formatting=True, **additional_session_context.to_dict()).removeprefix('-')
+        full_custom_suffix: str = '_'.join([session_context.get_description(separator='_'), custom_suffix]) # 'kdiba_gor01_two_2006-6-12_16-53-46__withNormalComputedReplays-qclu_1246789-frateThresh_2.0'
+        original_proposed_filename: str = f'{output_date_str}_{full_custom_suffix}_{data_identifier_str}.pkl'
+        good_filename: str = sanitize_filename_for_Windows(original_proposed_filename)
+        out_path = active_export_parent_output_path.joinpath(good_filename).resolve()
+        # a_new_fully_generic_result.to_hdf(test_a_new_fully_generic_result_path, key=complete_session_context.get_description_as_session_global_uid(), enable_hdf_testing_mode=True, OVERRIDE_ALLOW_GLOBAL_NESTED_EXPANSION=True)
+        print(f'\ttrying to export pkl to pkl_save_path: "{out_path.as_posix()}"...')
+        self.save(pkl_output_path=out_path)
+    
+        # across_session_results_extended_dict['generalized_decode_epochs_dict_and_export_results_completion_function']['csv_save_paths_dict'] = deepcopy(csv_save_paths_dict)
+        print(f'pkl_save_path: {out_path}\n')
+        return out_path
+    
 
 
     def __repr__(self):

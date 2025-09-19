@@ -1,4 +1,5 @@
 from copy import deepcopy
+from datetime import time
 import shutil
 from typing import Dict, List, Tuple, Optional, Callable, Union, Any
 from neuropy.analyses import Epoch
@@ -136,8 +137,7 @@ def perform_sweep_decoding_time_bin_sizes_marginals_dfs_completion_function(self
     from neuropy.core.epoch import TimeColumnAliasesProtocol, ensure_dataframe
     from neuropy.utils.mixins.binning_helpers import find_minimum_time_bin_duration
     from pyphocorehelpers.print_helpers import get_now_day_str, get_now_rounded_time_str
-    from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import _check_result_laps_epochs_df_performance
-    from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import DirectionalPseudo2DDecodersResult
+    from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import LapDecodingGroundTruth, DirectionalPseudo2DDecodersResult
     from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import DecodedFilterEpochsResult
     from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import DecoderDecodedEpochsResult
     from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import EpochFilteringMode
@@ -570,7 +570,7 @@ def perform_sweep_decoding_time_bin_sizes_marginals_dfs_completion_function(self
         # get the current lap object and determine the percentage correct:
         if should_output_lap_decoding_performance_info:
             result_laps_epochs_df: pd.DataFrame = _update_result_laps(a_result=an_alt_dir_Pseudo2D_decoders_result, laps_df=laps_df)
-            (is_decoded_track_correct, is_decoded_dir_correct, are_both_decoded_properties_correct), (percent_laps_track_identity_estimated_correctly, percent_laps_direction_estimated_correctly, percent_laps_estimated_correctly) = _check_result_laps_epochs_df_performance(result_laps_epochs_df)
+            (is_decoded_track_correct, is_decoded_dir_correct, are_both_decoded_properties_correct), (percent_laps_track_identity_estimated_correctly, percent_laps_direction_estimated_correctly, percent_laps_estimated_correctly) = LapDecodingGroundTruth._check_result_laps_epochs_df_performance(result_laps_epochs_df)
             output_laps_decoding_accuracy_results_dict[laps_decoding_time_bin_size] = (percent_laps_track_identity_estimated_correctly, percent_laps_direction_estimated_correctly, percent_laps_estimated_correctly)
 
 
@@ -693,7 +693,7 @@ def perform_sweep_decoding_time_bin_sizes_marginals_dfs_completion_function(self
         print(f'\tComputation complete. Exporting .CSVs...')
 
         # 2024-03-04 - Filter out the epochs based on the criteria: -- #TODO 2024-07-12 08:30: - [ ] This is nearly certainly going to ruin it
-        _, _, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
+        global_epoch_name = curr_active_pipeline.find_Global_epoch_name()
         filtered_epochs_df, active_spikes_df = filter_and_update_epochs_and_spikes(curr_active_pipeline, global_epoch_name, track_templates, epoch_id_key_name='ripple_epoch_id', no_interval_fill_value=-1)
         filtered_valid_epoch_times = filtered_epochs_df[['start', 'stop']].to_numpy()
 
@@ -925,7 +925,7 @@ def compute_and_export_decoders_epochs_decoding_and_evaluation_dfs_completion_fu
     ## INPUTS: decoder_ripple_filter_epochs_decoder_result_dict
 
     # 2024-03-04 - Filter out the epochs based on the criteria:
-    _, _, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
+    global_epoch_name = curr_active_pipeline.find_Global_epoch_name()
     filtered_epochs_df, active_spikes_df = filter_and_update_epochs_and_spikes(curr_active_pipeline, global_epoch_name, track_templates, epoch_id_key_name='ripple_epoch_id', no_interval_fill_value=-1)
     filtered_valid_epoch_times = filtered_epochs_df[['start', 'stop']].to_numpy()
 
@@ -1056,7 +1056,7 @@ def compute_and_export_session_trial_by_trial_performance_completion_function(se
     print(f'<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<')
     print(f'compute_and_export_session_trial_by_trial_performance_completion_function(curr_session_context: {curr_session_context}, curr_session_basedir: {str(curr_session_basedir)}, ...)')
     
-    _, _, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
+    global_epoch_name = curr_active_pipeline.find_Global_epoch_name()
     # filtered_epochs_df, active_spikes_df = filter_and_update_epochs_and_spikes(curr_active_pipeline, global_epoch_name, track_templates, epoch_id_key_name='ripple_epoch_id', no_interval_fill_value=-1)
     # filtered_valid_epoch_times = filtered_epochs_df[['start', 'stop']].to_numpy()
 
@@ -2789,7 +2789,8 @@ def kdiba_session_post_fixup_completion_function(self, global_data_root_parent_p
 
 
 @function_attributes(short_name=None, tags=['hdf5', 'h5'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-01-01 00:00', related_items=[])
-def export_session_h5_file_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict) -> dict:
+def export_session_h5_file_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict,
+                                                should_write_pipeline_h5: bool=False, should_write_posterior_h5: bool=True) -> dict:
     """  Export the pipeline's HDF5 as 'pipeline_results.h5'
     from pyphoplacecellanalysis.General.Batch.BatchJobCompletion.UserCompletionHelpers.batch_user_completion_helpers import kdiba_session_post_fixup_completion_function
     
@@ -2807,6 +2808,10 @@ def export_session_h5_file_completion_function(self, global_data_root_parent_pat
     from datetime import timedelta, datetime
     from pyphocorehelpers.Filesystem.metadata_helpers import FilesystemMetadata
     from pyphocorehelpers.exception_helpers import ExceptionPrintingContext, CapturedException
+    from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import DecodedFilterEpochsResult, SingleEpochDecodedResult
+    from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import DecoderDecodedEpochsResult
+    from pyphoplacecellanalysis.Pho2D.data_exporting import PosteriorExporting
+    from pyphoplacecellanalysis.General.Mixins.ExportHelpers import ContextToPathMode
 
     print(f'<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<')
     print(f'export_session_h5_file_completion_function(curr_session_context: {curr_session_context}, curr_session_basedir: {str(curr_session_basedir)}, ...)')
@@ -2818,22 +2823,76 @@ def export_session_h5_file_completion_function(self, global_data_root_parent_pat
     hdf5_output_path: Path = None
     was_write_good: bool = False
     
-    try:
-        custom_save_filepaths_dict, custom_suffix = curr_active_pipeline.custom_save_pipeline_as(enable_save_pipeline_pkl=False, enable_save_global_computations_pkl=False, enable_save_h5=True)
-        was_write_good = True
-        hdf5_output_path = custom_save_filepaths_dict['pipeline_h5']
-        print(f'\tpipeline hdf5_output_path: "{hdf5_output_path}"')
 
-    except Exception as e:
-        exception_info = sys.exc_info()
-        err = CapturedException(e, exception_info)
-        print(f"\tERROR: encountered exception {err} while trying to build the session HDF output for {curr_session_context}")
-        if self.fail_on_exception:
-            raise err.exc
+    active_export_parent_output_path: Path = self.collected_outputs_path.resolve()
+    # Assert.path_exists(active_export_parent_output_path)
+    callback_outputs = {}
 
-    callback_outputs = {
-     'hdf5_output_path': hdf5_output_path, 'e':err, #'t_end': t_end   
-    }
+
+    if should_write_pipeline_h5:
+        try:
+            custom_save_filepaths_dict, custom_suffix = curr_active_pipeline.custom_save_pipeline_as(enable_save_pipeline_pkl=False, enable_save_global_computations_pkl=False, enable_save_h5=True)
+            was_write_good = True
+            hdf5_output_path = custom_save_filepaths_dict['pipeline_h5']
+            print(f'\tpipeline hdf5_output_path: "{hdf5_output_path}"')
+
+        except Exception as e:
+            exception_info = sys.exc_info()
+            err = CapturedException(e, exception_info)
+            print(f"\tERROR: encountered exception {err} while trying to build the session HDF output for {curr_session_context}")
+            if self.fail_on_exception:
+                raise err.exc
+            
+        callback_outputs.update(**{
+            'hdf5_output_path': hdf5_output_path, #'t_end': t_end   
+        })
+    # END if should_write_pipeline_h5
+
+    if should_write_posterior_h5:
+        try:
+            ## Get needed results
+            rank_order_results = curr_active_pipeline.global_computation_results.computed_data.get('RankOrder', None)
+            if rank_order_results is not None:
+                minimum_inclusion_fr_Hz: float = rank_order_results.minimum_inclusion_fr_Hz
+                included_qclu_values: List[int] = rank_order_results.included_qclu_values
+            else:        
+                ## get from parameters:
+                minimum_inclusion_fr_Hz: float = curr_active_pipeline.global_computation_results.computation_config.rank_order_shuffle_analysis.minimum_inclusion_fr_Hz
+                included_qclu_values: List[int] = curr_active_pipeline.global_computation_results.computation_config.rank_order_shuffle_analysis.included_qclu_values
+                
+            # DirectionalMergedDecoders: Get the result after computation:
+            directional_laps_results = curr_active_pipeline.global_computation_results.computed_data['DirectionalLaps'] # : "DirectionalLapsResult"
+            track_templates = directional_laps_results.get_templates(minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz, included_qclu_values=included_qclu_values) # non-shared-only -- !! Is minimum_inclusion_fr_Hz=None the issue/difference? : "TrackTemplates"
+            directional_decoders_epochs_decode_result: DecoderDecodedEpochsResult = curr_active_pipeline.global_computation_results.computed_data['DirectionalDecodersEpochsEvaluations']
+            directional_decoders_epochs_decode_result.add_all_extra_epoch_columns(curr_active_pipeline, track_templates=track_templates, required_min_percentage_of_active_cells=0.33333333, debug_print=False)
+
+            ## Get save paths
+            # posteriors_save_path = Path('output/newest_all_decoded_epoch_posteriors.h5').resolve()
+            _parent_save_context: IdentifyingContext = curr_active_pipeline.build_display_context_for_session('save_decoded_posteriors_to_HDF5')
+            # output_man = curr_active_pipeline.get_output_manager(context_to_path_mode=ContextToPathMode.GLOBAL_UNIQUE, override_output_parent_path=active_export_parent_output_path)
+            # print(f'_parent_save_context: {_parent_save_context}')
+            # posteriors_save_path: Path = output_man.get_figure_save_file_path(final_context=_parent_save_context).with_suffix('.h5')
+            posteriors_save_path: Path = PosteriorExporting.build_custom_export_to_h5_path(curr_active_pipeline, output_date_str=None, data_identifier_str='(decoded_posteriors)', a_tbin_size=directional_decoders_epochs_decode_result.ripple_decoding_time_bin_size, parent_output_path=active_export_parent_output_path)
+            print(f'posteriors_save_path: "{posteriors_save_path}')
+
+            # pos_bin_size: float = directional_decoders_epochs_decode_result.pos_bin_size
+            # ripple_decoding_time_bin_size: float = directional_decoders_epochs_decode_result.ripple_decoding_time_bin_size
+            # laps_decoding_time_bin_size: float = directional_decoders_epochs_decode_result.laps_decoding_time_bin_size
+            decoder_laps_filter_epochs_decoder_result_dict: Dict[str, DecodedFilterEpochsResult] = directional_decoders_epochs_decode_result.decoder_laps_filter_epochs_decoder_result_dict
+            decoder_ripple_filter_epochs_decoder_result_dict: Dict[str, DecodedFilterEpochsResult] = directional_decoders_epochs_decode_result.decoder_ripple_filter_epochs_decoder_result_dict
+
+            out_contexts = PosteriorExporting.perform_save_all_decoded_posteriors_to_HDF5(decoder_laps_filter_epochs_decoder_result_dict, decoder_ripple_filter_epochs_decoder_result_dict, _save_context=_parent_save_context, save_path=posteriors_save_path)
+            callback_outputs['posteriors_h5'] = posteriors_save_path
+            print(f'\tposteriors_save_path: "{posteriors_save_path}"')
+
+        except Exception as e:
+            exception_info = sys.exc_info()
+            err = CapturedException(e, exception_info)
+            print(f"\tERROR: encountered exception {err} while trying to build the session POSTERIORS HDF output for {curr_session_context}")
+            if self.fail_on_exception:
+                raise err.exc
+    # END if should_write_posterior_h5
+
     across_session_results_extended_dict['export_session_h5_file_completion_function'] = callback_outputs
 
     if was_write_good:
@@ -3164,7 +3223,7 @@ def compute_and_export_session_extended_placefield_peak_information_completion_f
 
 
 @function_attributes(short_name=None, tags=['posterior', 'marginal', 'CSV', 'non-PBE', 'epochs', 'decoding'], input_requires=[], output_provides=[], uses=['GenericDecoderDictDecodedEpochsDictResult', 'pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.EpochComputationFunctions.EpochComputationFunctions.perform_compute_non_PBE_epochs'], used_by=[], creation_date='2025-03-09 16:35', related_items=['figures_plot_generalized_decode_epochs_dict_and_export_results_completion_function'])
-def generalized_decode_epochs_dict_and_export_results_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict, epochs_decoding_time_bin_size:float=0.025, force_recompute:bool=True, debug_print:bool=True) -> dict:
+def generalized_decode_epochs_dict_and_export_results_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict, epochs_decoding_time_bin_size:float=0.025, force_recompute:bool=True, debug_print:bool=True, export_pkl: bool=True) -> dict:
     """ Aims to generally:
     1. Build a dict of decoders (usually 1D) built on several different subsets of input epochs (long_LR_laps-only, long_laps-only, long_non_PBE-only, ...etc
     2. Use these decoders and the neural data to decode posteriors for a variety of parameters (e.g. cell types, epochs-to-be-decoded, time_bin_sizes, etc)
@@ -3253,7 +3312,7 @@ def generalized_decode_epochs_dict_and_export_results_completion_function(self, 
 
         ## Next wave of computations
         extended_computations_include_includelist = ['split_to_directional_laps', 'non_PBE_epochs_results', 'generalized_specific_epochs_decoding',] # do only specified
-        computation_kwargs_dict = {'non_PBE_epochs_results': dict(epochs_decoding_time_bin_size=epochs_decoding_time_bin_size, drop_previous_result_and_compute_fresh=False), }
+        computation_kwargs_dict = {'non_PBE_epochs_results': dict(epochs_decoding_time_bin_size=epochs_decoding_time_bin_size, drop_previous_result_and_compute_fresh=False, compute_2D=False), }
 
         # force_recompute_override_computations_includelist = deepcopy(extended_computations_include_includelist)
         force_recompute_override_computations_includelist = []
@@ -3332,6 +3391,38 @@ def generalized_decode_epochs_dict_and_export_results_completion_function(self, 
     csv_save_paths_dict = a_new_fully_generic_result.default_export_all_CSVs(active_export_parent_output_path=active_export_parent_output_path, owning_pipeline_reference=curr_active_pipeline, decoding_time_bin_size=decoding_time_bin_size)
     across_session_results_extended_dict['generalized_decode_epochs_dict_and_export_results_completion_function']['csv_save_paths_dict'] = deepcopy(csv_save_paths_dict)
     print(f'csv_save_paths_dict: {csv_save_paths_dict}\n')
+
+
+
+    if export_pkl:
+        from pyphoplacecellanalysis.General.Pipeline.NeuropyPipeline import _get_custom_suffix_for_filename_from_computation_metadata
+        from pyphocorehelpers.Filesystem.path_helpers import sanitize_filename_for_Windows
+        
+        try:
+            active_export_parent_output_path = self.collected_outputs_path.resolve()
+            Assert.path_exists(active_export_parent_output_path)
+            
+            # ## build output path:
+            # complete_session_context, (session_context, additional_session_context) = curr_active_pipeline.get_complete_session_context()
+            # custom_suffix: str = _get_custom_suffix_for_filename_from_computation_metadata(use_concise_formatting=True, **additional_session_context.to_dict()).removeprefix('-')
+            # full_custom_suffix: str = '_'.join([session_context.get_description(separator='_'), custom_suffix]) # 'kdiba_gor01_two_2006-6-12_16-53-46__withNormalComputedReplays-qclu_1246789-frateThresh_2.0'
+            # original_proposed_filename: str = f'2025-08-21_{full_custom_suffix}_a_new_fully_generic_result.pkl'
+            # good_filename: str = sanitize_filename_for_Windows(original_proposed_filename)
+            # pkl_save_path = active_export_parent_output_path.joinpath(good_filename).resolve()
+            # # a_new_fully_generic_result.to_hdf(test_a_new_fully_generic_result_path, key=complete_session_context.get_description_as_session_global_uid(), enable_hdf_testing_mode=True, OVERRIDE_ALLOW_GLOBAL_NESTED_EXPANSION=True)
+            # print(f'\ttrying to export pkl to pkl_save_path: "{pkl_save_path.as_posix()}"...')
+            # a_new_fully_generic_result.save(pkl_output_path=pkl_save_path)
+            
+            pkl_save_path = a_new_fully_generic_result.export_pkl(active_export_parent_output_path=active_export_parent_output_path, owning_pipeline_reference=curr_active_pipeline)
+            
+            across_session_results_extended_dict['generalized_decode_epochs_dict_and_export_results_completion_function']['pkl_save_path'] = deepcopy(pkl_save_path)
+            print(f'pkl_save_path: {pkl_save_path}\n')
+            
+        except Exception as e:
+            raise e
+
+
+
     print('\t\tdone.')
 
     # print(f'>>\t done with {curr_session_context}')
@@ -3342,18 +3433,17 @@ def generalized_decode_epochs_dict_and_export_results_completion_function(self, 
 
 
 
-@function_attributes(short_name=None, tags=['figure', 'posterior', 'hairly-plot'], input_requires=[], output_provides=[], uses=['_display_generalized_decoded_yellow_blue_marginal_epochs', '_display_decoded_trackID_marginal_hairy_position', '_display_decoded_trackID_weighted_position_posterior_withMultiColorOverlay'], used_by=[], creation_date='2025-05-16 15:17', related_items=['generalized_decode_epochs_dict_and_export_results_completion_function'])
+@function_attributes(short_name=None, tags=['figure', 'batch', 'fig-export', 'hairly-plot'], input_requires=[], output_provides=[], uses=['_display_generalized_decoded_yellow_blue_marginal_epochs', '_display_decoded_trackID_marginal_hairy_position', '_display_decoded_trackID_weighted_position_posterior_withMultiColorOverlay'], used_by=[], creation_date='2025-05-16 15:17', related_items=['generalized_decode_epochs_dict_and_export_results_completion_function'])
 def figures_plot_generalized_decode_epochs_dict_and_export_results_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict,
-                                                                                        included_figures_names=['_display_directional_merged_pf_decoded_stacked_epoch_slices', '_display_generalized_decoded_yellow_blue_marginal_epochs', '_display_decoded_trackID_marginal_hairy_position', '_display_decoded_trackID_weighted_position_posterior_withMultiColorOverlay'],
+                                                                                        included_figures_names=['_display_directional_merged_pf_decoded_stacked_epoch_slices', '_display_generalized_decoded_yellow_blue_marginal_epochs', '_display_decoded_trackID_marginal_hairy_position', '_display_decoded_trackID_weighted_position_posterior_withMultiColorOverlay', '_display_placefield_stable_formation_time_distribution', '_display_measured_vs_decoded_occupancy_distributions', '_display_trial_to_trial_reliability'],
                                                                                         extreme_threshold: float=0.8, opacity_max:float=0.7, thickness_ramping_multiplier:float=35.0,
+                                                                                        fail_on_exception_for_debugging:bool=False,
                                                                                         **additional_marginal_overlaying_measured_position_kwargs) -> dict:
     """ Multi-purpose batch display function that just plots the figures so we don't have to wait for the entire batch_figures_plotting on 2025-04-16 15:22.
     corresponding to by `generalized_decode_epochs_dict_and_export_results_completion_function` 
     
     This is the global across-session marginal over trackID
     
-    
-
     ## Getting outputs    
         _flattened_paths_dict = {} ## Outputs:
 
@@ -3375,7 +3465,8 @@ def figures_plot_generalized_decode_epochs_dict_and_export_results_completion_fu
     from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.EpochComputationFunctions import EpochComputationDisplayFunctions
     from benedict import benedict
     from pyphoplacecellanalysis.Pho2D.data_exporting import PosteriorExporting
-
+    from pyphocorehelpers.plotting.media_output_helpers import PDFHelpers
+    from pyphoplacecellanalysis.SpecificResults.AcrossSessionResults import Assert
 
     # 'trackID_weighted_position_posterior'
     if across_session_results_extended_dict is None:
@@ -3520,7 +3611,10 @@ def figures_plot_generalized_decode_epochs_dict_and_export_results_completion_fu
             across_session_results_extended_dict['figures_plot_generalized_decode_epochs_dict_and_export_results_completion_function'].update({
                 '_display_decoded_trackID_weighted_position_posterior_withMultiColorOverlay': _out,
             })
-            
+
+            ## try to get kwargs
+            # post_export_build_combined_images_kwargs = dict(included_epoch_idxs=[0, 1], should_use_raw_rgba_export_image=True),
+            post_export_build_combined_kwargs = dict(epoch_name_list=['ripple'], included_epoch_idxs=None, progress_print=True, should_use_raw_rgba_export_image=False, should_add_col_row_labels=False) | additional_marginal_overlaying_measured_position_kwargs.pop('post_export_build_combined_images_kwargs', {})
 
             out_custom_formats_dict = _out.get('out_custom_formats_dict', None)
             if out_custom_formats_dict is not None:
@@ -3528,9 +3622,9 @@ def figures_plot_generalized_decode_epochs_dict_and_export_results_completion_fu
                     ['greyscale_shared_norm'],
                     # ['psuedo2D_ignore/raw_rgba'], ## Implicitly always appends the pseudo2D_ignore/raw_rgba image at the bottom row
                 ]
-                _out_final_merged_image_save_paths, _out_final_merged_images = PosteriorExporting.post_export_build_combined_images(out_custom_formats_dict=out_custom_formats_dict, custom_merge_layout_dict=custom_merge_layout_dict,
-                                                                                                                    epoch_name_list=['ripple'], progress_print=True) ## currently skip laps, just do ripples
+                _out_final_merged_image_save_paths, _out_final_merged_images = PosteriorExporting.post_export_build_combined_images(out_custom_formats_dict=out_custom_formats_dict, custom_merge_layout_dict=custom_merge_layout_dict, **post_export_build_combined_kwargs) ## currently skip laps, just do ripples
                 _out['final_merged_image_save_paths'] = deepcopy(_out_final_merged_image_save_paths)
+                
                 # across_session_results_extended_dict['figures_plot_generalized_decode_epochs_dict_and_export_results_completion_function'].update({
                 #     '_display_decoded_trackID_weighted_position_posterior_withMultiColorOverlay': _out,
                 # })
@@ -3538,6 +3632,219 @@ def figures_plot_generalized_decode_epochs_dict_and_export_results_completion_fu
         except Exception as e:
             print(f'\tfigures_plot_generalized_decode_epochs_dict_and_export_results_completion_function(...): "_display_decoded_trackID_weighted_position_posterior_withMultiColorOverlay" failed with error: {e}\n skipping.')
             raise
+
+
+
+    # ==================================================================================================================================================================================================================================================================================== #
+    # `_display_placefield_stable_formation_time_distribution`                                                                                                                                                                                                                             #
+    # ==================================================================================================================================================================================================================================================================================== #
+    if ('_display_placefield_stable_formation_time_distribution' in included_figures_names) or ('pf_stable_formation_time' in included_figures_names):
+        print(f'\t trying "_display_placefield_stable_formation_time_distribution"')
+        try:
+            display_context = curr_active_pipeline.build_display_context_for_session(display_fn_name='pf_stable_formation_time')
+            _out = curr_active_pipeline.display('_display_placefield_stable_formation_time_distribution', display_context, defer_render=True, save_figure=True,
+                                                # override_fig_man=custom_fig_man, 
+                                                parent_output_folder=custom_figure_output_path,
+                                            )
+            
+            across_session_results_extended_dict['figures_plot_generalized_decode_epochs_dict_and_export_results_completion_function'].update({
+                '_display_placefield_stable_formation_time_distribution': _out,
+            })
+            
+
+        except Exception as e:
+            print(f'\tfigures_plot_generalized_decode_epochs_dict_and_export_results_completion_function(...): "_display_placefield_stable_formation_time_distribution" failed with error: {e}\n skipping.')
+            raise
+
+
+    # ==================================================================================================================================================================================================================================================================================== #
+    # `_display_measured_vs_decoded_occupancy_distributions`                                                                                                                                                                                                                             #
+    # ==================================================================================================================================================================================================================================================================================== #
+    if ('_display_measured_vs_decoded_occupancy_distributions' in included_figures_names) or ('meas_v_decoded_occupancy' in included_figures_names):
+        print(f'\t trying "_display_measured_vs_decoded_occupancy_distributions"')
+        try:
+            display_context = curr_active_pipeline.build_display_context_for_session(display_fn_name='meas_v_decoded_occupancy')
+            _out = curr_active_pipeline.display('_display_measured_vs_decoded_occupancy_distributions', display_context, defer_render=True, save_figure=True,
+                                                override_fig_man=custom_fig_man,
+                                                # parent_output_folder=custom_figure_output_path,
+                                                #  size=[6.5, 2], dpi=100,
+                                                size=[3.5, 2], dpi=100,
+                                                prepare_for_publication=False,
+                                                # prepare_for_publication=True,
+                                            )
+            
+            ## INPUT: `_out`
+            fig_5_save_paths = _out['save_paths']
+            figure5_final_out_path: Path = fig_5_save_paths[0]
+            curr_stem = figure5_final_out_path.stem.strip('_laps_Laps') # 'meas_v_decoded_occupancy_0•05_2•0_[1, 2, 4, 6, 7, 8, 9]_laps_Laps'
+            curr_stem = f"{curr_stem}_MERGED" # 'meas_v_decoded_occupancy_0•05_2•0_[1, 2, 4, 6, 7, 8, 9]'
+            figure5_final_out_path = figure5_final_out_path.with_stem(curr_stem) # 'ProgrammaticDisplayFunctionTesting/2025-08-21/kdiba/gor01/two/2006-6-12_16-53-46/meas_v_decoded_occupancy_0•05_2•0_[1, 2, 4, 6, 7, 8, 9]_MERGED.pdf'
+            PDFHelpers.concatenate_pdfs_vertically(fig_5_save_paths, figure5_final_out_path)
+            _out['figure5_final_out_path'] = figure5_final_out_path
+
+            across_session_results_extended_dict['figures_plot_generalized_decode_epochs_dict_and_export_results_completion_function'].update({
+                '_display_measured_vs_decoded_occupancy_distributions': _out,
+            })
+            
+
+        except Exception as e:
+            print(f'\tfigures_plot_generalized_decode_epochs_dict_and_export_results_completion_function(...): "_display_measured_vs_decoded_occupancy_distributions" failed with error: {e}\n skipping.')
+            raise
+
+
+
+    # ==================================================================================================================================================================================================================================================================================== #
+    # `_display_trial_to_trial_reliability`                                                                                                                                                                                                                             #
+    # ==================================================================================================================================================================================================================================================================================== #
+    
+
+    if ('_display_trial_to_trial_reliability' in included_figures_names) or ('trial_to_trial_reliability' in included_figures_names):
+        print(f'\t trying "_display_trial_to_trial_reliability"')
+        try:
+            import pyphoplacecellanalysis.External.pyqtgraph as pg
+            from pyphocorehelpers.gui.Qt.color_helpers import ColormapHelpers
+            from pyphoplacecellanalysis.External.pyqtgraph_extensions.graphicsItems.LabelItem.ClickableLabelItem import SelectableLabelItem
+            from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.ContainerBased.TrialByTrialActivityWindow import TrialByTrialActivityWindow
+            from pyphoplacecellanalysis.General.Mixins.ExportHelpers import export_pyqtgraph_plot
+
+            cmap = ColormapHelpers.create_transparent_colormap(cmap_name='Reds', lower_bound_alpha=0.01, should_return_LinearSegmentedColormap=False)
+            
+            pg.setConfigOption('antialias', False)
+            display_context = curr_active_pipeline.build_display_context_for_session(display_fn_name='trial_to_trial_reliability')
+            _out = curr_active_pipeline.display('_display_trial_to_trial_reliability', display_context, defer_render=True, save_figure=True,
+                                                # override_fig_man=custom_fig_man,
+                                                # parent_output_folder=custom_figure_output_path,
+                                                cmap=cmap, is_publication_ready_figure=True,
+                                            )
+            
+            ## INPUT: `_out` -- _a_trial_by_trial_window
+
+            saved_figure_path: Path = _out.plots_data.saved_figure_paths
+
+            # trial_to_trial_reliability_save_path = Path('data').joinpath('trial_to_trial_reliability.svg').resolve()
+            # export_pyqtgraph_plot(_out['_display_trial_to_trial_reliability'].plots['root_render_widget'], savepath=trial_to_trial_reliability_save_path) # works
+
+            across_session_results_extended_dict['figures_plot_generalized_decode_epochs_dict_and_export_results_completion_function'].update({
+                '_display_trial_to_trial_reliability': {'fig_save_path': saved_figure_path},
+            })
+            
+
+        except Exception as e:
+            print(f'\tfigures_plot_generalized_decode_epochs_dict_and_export_results_completion_function(...): "_display_trial_to_trial_reliability" failed with error: {e}\n skipping.')
+            raise
+        
+
+
+
+    # ==================================================================================================================================================================================================================================================================================== #
+    # `_render_export_all_time_tracks`                                                                                                                                                                                                                             #
+    # ==================================================================================================================================================================================================================================================================================== #
+    
+    if ('_render_export_all_time_tracks' in included_figures_names) or ('export_all_time_tracks' in included_figures_names):
+        print(f'\t trying "_render_export_all_time_tracks"')
+        try:
+            import pyphoplacecellanalysis.External.pyqtgraph as pg
+            from pyphocorehelpers.gui.Qt.color_helpers import ColormapHelpers
+            from pyphoplacecellanalysis.General.Mixins.ExportHelpers import FigureToImageHelpers
+            from pyphoplacecellanalysis.Pho2D.PyQtPlots.Extensions.pyqtgraph_helpers import block_until_render_complete
+            from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.SpikeRasterWidgets.spike_raster_widgets import _setup_spike_raster_window_for_debugging
+            from PyQt5.QtCore import QTimer
+            import time
+            
+            app = pg.mkQApp('render_export_all_time_tracks')
+            
+            # For PlotWidget
+            pg.setConfigOptions(useOpenGL=True)
+            pg.setConfigOption('antialias', False)
+            # _restore_previous_matplotlib_settings_callback = matplotlib_configuration_update(is_interactive=True, backend='Qt5Agg')
+            global_epoch_name = curr_active_pipeline.find_Global_epoch_name()
+            global_epoch_context = curr_active_pipeline.filtered_contexts[global_epoch_name]
+            
+            display_context = curr_active_pipeline.build_display_context_for_session(display_fn_name='export_all_time_tracks')
+
+            #  Create a new `SpikeRaster2D` instance using `_display_spike_raster_pyqtplot_2D` and capture its outputs:
+            _out = curr_active_pipeline.display(display_function='_display_spike_rasters_window',
+                                                 active_session_configuration_context=global_epoch_context,
+                                                #  active_session_configuration_context=IdentifyingContext(format_name='kdiba',animal='vvp01',exper_name='two',session_name='2006-4-10_12-58-3',filter_name='maze_any',lap_dir='any'),
+                                                 ) # _display_spike_rasters_window
+
+            active_2d_plot = _out['spike_raster_plt_2d']
+            assert active_2d_plot is not None, f"failed to get active_2d_plot after trying to display _display_spike_rasters_window."
+                
+            spike_raster_window = _out['spike_raster_window']
+            assert spike_raster_window is not None, f"failed to get spike_raster_window after trying to display _display_spike_rasters_window."
+
+            def _perform_output_figure_delayed():
+                ## #TODO 2025-08-22 10:25: - [ ] Output to correct path (see above):
+                print(f'\t_perform_output_figure_delayed() running inside timer!')     
+                if custom_fig_man is not None:
+                    print(f'custom_fig_man is not None! Custom output path will be used!')
+                    test_display_output_path = custom_fig_man.get_figure_save_file_path(display_context, make_folder_if_needed=False)
+                    print(f'\ttest_display_output_path: "{test_display_output_path}"')
+                else:
+                    raise NotImplementedError(f'needs displayman!')
+
+                relative_data_output_parent_folder = Path('data').resolve()
+                Assert.path_exists(relative_data_output_parent_folder)
+
+                ## INPUTS: im_posterior_x_stack, track_labels, 
+                output_pdf_path: Path = test_display_output_path.with_suffix('.pdf') # relative_data_output_parent_folder.joinpath('all_timeline_tracks_exported_stack.pdf')
+                print(f'\t\t_render_export_all_time_tracks: output_pdf_path: "{output_pdf_path}"')
+                ## Export the wrapped tracks:
+                included_track_dock_identifiers: Optional[List[str]] = additional_marginal_overlaying_measured_position_kwargs.pop('included_track_dock_identifiers', None)
+                track_labels: Optional[List[str]] = additional_marginal_overlaying_measured_position_kwargs.pop('track_labels', None)
+                saved_output_pdf_path = FigureToImageHelpers.export_wrapped_tracks_to_paged_df(active_2d_plot, output_pdf_path=output_pdf_path, included_track_dock_identifiers=included_track_dock_identifiers, track_labels=track_labels, debug_max_num_pages=25)
+                print(f'\t\t_render_export_all_time_tracks: saved_output_pdf_path: "{saved_output_pdf_path}"')
+                across_session_results_extended_dict['figures_plot_generalized_decode_epochs_dict_and_export_results_completion_function'].update({
+                    '_render_export_all_time_tracks': {'fig_save_path': saved_output_pdf_path},
+                })
+                print(f'\t_render_export_all_time_tracks: _perform_output_figure_delayed() inside timer -- DONE.')     
+
+
+            all_global_menus_actionsDict, global_flat_action_dict, _all_outputs_dict = _setup_spike_raster_window_for_debugging(spike_raster_window, wants_docked_raster_window_track=True, enable_interval_overview_track=False, allow_replace_hardcoded_main_plots_with_tracks=True,
+                        additional_post_hoc_fcns = dict(output_figure=_perform_output_figure_delayed),
+            )
+
+            # Run after a 0.5 second delay
+
+            across_session_results_extended_dict['figures_plot_generalized_decode_epochs_dict_and_export_results_completion_function'].update({
+                '_render_export_all_time_tracks': {'fig_save_path': None},
+            })
+            
+            print(f'_render_export_all_time_tracks: WAITING to call `_perform_output_figure_delayed`...')
+            # QTimer.singleShot(1800, _perform_output_figure_delayed) # 1.8 sec
+
+            print(f"_render_export_all_time_tracks: I got the QApplication: {app}")
+
+            ## the above `_setup_spike_raster_window_for_debugging` does some rendering asynchronously, so I need to wait until all of that is finished before moving foward and rendering to output...
+            # num_process_wait_cycles: int = 20
+            # for i in range(num_process_wait_cycles):
+            #     print(f'\t\t_render_export_all_time_tracks: process wait loop[{i}/{num_process_wait_cycles}]')
+            #     app.processEvents()
+            #     time.sleep(0.05)  # 50ms per pass
+
+
+            print(f'waiting until complete....')
+            block_until_render_complete()
+            print(f'\tblock_until_render_complete is done. Continuing execution.')
+
+
+            # print(f'_render_export_all_time_tracks: Calling "_perform_output_figure_delayed" after delay')
+            # _perform_output_figure_delayed()
+            print(f'\t\t_render_export_all_time_tracks: done.')
+            ## INPUT: `_out` -- _a_trial_by_trial_window
+
+            # export_all_time_tracks_save_path = Path('data').joinpath('export_all_time_tracks.svg').resolve()
+            # export_pyqtgraph_plot(_out['_render_export_all_time_tracks'].plots['root_render_widget'], savepath=export_all_time_tracks_save_path) # works
+
+        except Exception as e:
+            print(f'\tfigures_plot_generalized_decode_epochs_dict_and_export_results_completion_function(...): "_render_export_all_time_tracks" failed with error: {e}\n skipping.')
+            if fail_on_exception_for_debugging:
+                raise
+            else:
+                pass
+        
+
 
 
     print(f'>>\t done with {curr_session_context}')

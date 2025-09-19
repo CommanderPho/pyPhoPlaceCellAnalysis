@@ -129,10 +129,6 @@ def build_pf1D_heatmap_with_labels_and_peaks(pf1D_decoder, visible_aclus, plot_i
 
     return curr_img, out_colors_heatmap_image_matrix
 
-
-
-
-
 @define(slots=False, eq=False)
 class BaseTemplateDebuggingMixin:
     """ TemplateDebugger displays a 1D heatmap colored by cell for the tuning curves of PfND.
@@ -287,16 +283,33 @@ class BaseTemplateDebuggingMixin:
 
             heatmap_base_color = pg.mkColor(a_color_vector)
             row_data = curr_curves[cell_i, :]
-            out_colors_row = DataSeriesColorHelpers.qColorsList_to_NDarray([build_adjusted_color(heatmap_base_color, value_scale=v) for v in row_data], is_255_array=False).T
+
+            if np.ndim(row_data) < 2:
+                out_colors_row = DataSeriesColorHelpers.qColorsList_to_NDarray([build_adjusted_color(heatmap_base_color, value_scale=v) for v in row_data], is_255_array=False).T
+            else:
+                out_colors_row = [DataSeriesColorHelpers.qColorsList_to_NDarray([build_adjusted_color(heatmap_base_color, value_scale=v) for v in col_data], is_255_array=False).T for col_data in row_data]
+                out_colors_row = np.vstack(out_colors_row)
+                
             _temp_curr_out_colors_heatmap_image.append(out_colors_row)
 
             # pf_peak_indicator_lines ____________________________________________________________________________________________ #
-            x_offset = curr_pf_peak_locations[cell_i]
-            y_offset = float(cell_i)
-            line = QtGui.QGraphicsLineItem(x_offset, y_offset, x_offset, (y_offset + line_height))
-            line.setPen(pg.mkPen('white', width=2))
-            curr_win.addItem(line)
-            _out_ui.order_location_lines[aclu] = line
+            if _out_params.should_plot_peaks:
+                if _out_params.is_horizontal:
+                    x_offset = curr_pf_peak_locations[cell_i]   # peak is along x
+                    y_offset = float(cell_i)                    # row index
+                    line = QtGui.QGraphicsLineItem(x_offset, y_offset, x_offset, y_offset + line_height)
+                else:
+                    x_offset = float(cell_i)                    # column index
+                    y_offset = curr_pf_peak_locations[cell_i]   # peak is along y
+                    if not isinstance(y_offset, float):
+                        assert len(y_offset) == 2, f"len(y_offset): {len(y_offset)} was expected to be 2"
+                        y_offset = y_offset[0] ## get the first point
+                    line = QtGui.QGraphicsLineItem(x_offset, y_offset, x_offset + line_height, y_offset)
+
+                line.setPen(pg.mkPen('white', width=2))
+                curr_win.addItem(line)
+                _out_ui.order_location_lines[aclu] = line
+
 
         ## END for cell_i, aclu in enumerate(_out_data.sorted_neuron_IDs)...
         out_colors_heatmap_image_matrix = np.stack(_temp_curr_out_colors_heatmap_image, axis=0)
@@ -331,7 +344,8 @@ class BaseTemplateDebuggingMixin:
 
 
     def update_base_decoder_debugger_data(self, included_neuron_ids, solo_emphasized_aclus: Optional[List]=None, solo_override_num_spikes_weights: Optional[Dict]=None, solo_override_alpha_weights: Optional[Dict]=None):
-        """Updates the visualization with new neuron selections"""
+        """Updates the visualization with new neuron selections
+        """
         self.params.solo_emphasized_aclus = solo_emphasized_aclus
         self.params.solo_override_alpha_weights = solo_override_alpha_weights
 
@@ -376,16 +390,40 @@ class BaseTemplateDebuggingMixin:
 
                 heatmap_base_color = pg.mkColor(a_color_vector)
                 row_data = _out_data.sorted_pf_tuning_curves[cell_i, :]
-                out_colors_row = DataSeriesColorHelpers.qColorsList_to_NDarray([build_adjusted_color(heatmap_base_color, value_scale=(v * value_scale_multiplier), saturation_scale=saturation_scale, alpha_scale=alpha_scale_multiplier) for v in row_data], is_255_array=False).T
+
+                if np.ndim(row_data) < 2:
+                    out_colors_row = DataSeriesColorHelpers.qColorsList_to_NDarray([build_adjusted_color(heatmap_base_color, value_scale=(v * value_scale_multiplier), saturation_scale=saturation_scale, alpha_scale=alpha_scale_multiplier) for v in row_data], is_255_array=False).T
+                else:
+                    out_colors_row = [DataSeriesColorHelpers.qColorsList_to_NDarray([build_adjusted_color(heatmap_base_color, value_scale=(v * value_scale_multiplier), saturation_scale=saturation_scale, alpha_scale=alpha_scale_multiplier) for v in col_data], is_255_array=False).T for col_data in row_data]
+                    out_colors_row = np.vstack(out_colors_row)
+
+
+
+                # out_colors_row = DataSeriesColorHelpers.qColorsList_to_NDarray([build_adjusted_color(heatmap_base_color, value_scale=(v * value_scale_multiplier), saturation_scale=saturation_scale, alpha_scale=alpha_scale_multiplier) for v in row_data], is_255_array=False).T
                 _temp_curr_out_colors_heatmap_image.append(out_colors_row)
 
                 # pf_peak_indicator_lines ____________________________________________________________________________________________ #
-                x_offset = _out_data.sorted_pf_peak_locations[cell_i]
-                y_offset = float(cell_i)
-                line = QtGui.QGraphicsLineItem(x_offset, y_offset, x_offset, (y_offset + 1.0))
-                line.setPen(pg.mkPen(build_adjusted_color(pg.mkColor(a_color_vector), value_scale=value_scale_multiplier, saturation_scale=saturation_scale, alpha_scale=alpha_scale_multiplier), width=(2*spike_scale_size)))
-                curr_win.addItem(line)
-                self.ui.order_location_lines[aclu] = line
+                if self.params.should_plot_peaks:
+                    #     self.params.is_horizontal = True
+                    if self.params.is_horizontal:
+                        x_offset = _out_data.sorted_pf_peak_locations[cell_i]
+                        y_offset = float(cell_i)
+                        if not isinstance(y_offset, float):
+                            assert len(y_offset) == 2, f"len(y_offset): {len(y_offset)} was expected to be 2"
+                            y_offset = y_offset[0] ## get the first point
+                        line = QtGui.QGraphicsLineItem(x_offset, y_offset, x_offset, y_offset + 1.0)
+                    else:
+                        x_offset = float(cell_i)
+                        y_offset = _out_data.sorted_pf_peak_locations[cell_i]
+                        if not isinstance(y_offset, float):
+                            assert len(y_offset) == 2, f"len(y_offset): {len(y_offset)} was expected to be 2"
+                            y_offset = y_offset[0] ## get the first point
+
+                        line = QtGui.QGraphicsLineItem(x_offset, y_offset, x_offset + 1.0, y_offset)
+                    
+                    line.setPen(pg.mkPen(build_adjusted_color(pg.mkColor(a_color_vector), value_scale=value_scale_multiplier, saturation_scale=saturation_scale, alpha_scale=alpha_scale_multiplier), width=(2*spike_scale_size)))
+                    curr_win.addItem(line)
+                    self.ui.order_location_lines[aclu] = line
             # END for cell_i, aclu in enumerate(_out_data.sorted_neuron_IDs)...
             
             out_colors_heatmap_image_matrix = np.stack(_temp_curr_out_colors_heatmap_image, axis=0)
@@ -399,7 +437,7 @@ class BaseTemplateDebuggingMixin:
 
 
     @classmethod
-    def init_from_decoder(cls, a_decoder: BasePositionDecoder, included_all_neuron_ids=None, win=None, plot_item=None, solo_override_alpha_weights=None, title_str: str='test', **kwargs):
+    def init_from_decoder(cls, a_decoder: BasePositionDecoder, included_all_neuron_ids=None, win=None, plot_item=None, solo_override_alpha_weights=None, title_str: str='test', is_horizontal: bool=True, should_plot_peaks: bool=False, **kwargs):
         fignum = kwargs.pop('fignum', None)
         if fignum is not None:
             print(f'WARNING: fignum will be ignored but it was specified as fignum="{fignum}"!')
@@ -424,7 +462,7 @@ class BaseTemplateDebuggingMixin:
         _out_plots = RenderPlots(name=figure_name, pf1D_heatmaps=None)
         _out_params = VisualizationParameters(name=figure_name, enable_cell_colored_heatmap_rows=enable_cell_colored_heatmap_rows, use_shared_aclus_only_templates=use_shared_aclus_only_templates,
                                              debug_print=debug_print, debug_draw=debug_draw, included_any_context_neuron_ids=included_all_neuron_ids,
-                                             solo_emphasized_aclus=None, solo_override_alpha_weights=solo_override_alpha_weights, title_str=title_str, **kwargs)
+                                             solo_emphasized_aclus=None, solo_override_alpha_weights=solo_override_alpha_weights, title_str=title_str, is_horizontal=is_horizontal, should_plot_peaks=should_plot_peaks, **kwargs)
 
 
         if ((win is None) and (plot_item is None)):

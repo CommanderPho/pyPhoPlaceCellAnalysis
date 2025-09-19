@@ -5,6 +5,9 @@ from attrs import define, field, fields, asdict, astuple
 
 from pyphocorehelpers.programming_helpers import metadata_attributes
 from pyphocorehelpers.function_helpers import function_attributes
+from neuropy.utils.mixins.time_slicing import TimeColumnAliasesProtocol
+from neuropy.core.flattened_spiketrains import SpikesAccessor
+from neuropy.utils.mixins.dict_representable import get_dict_subset
 
 import pyphoplacecellanalysis.External.pyqtgraph as pg
 from pyphoplacecellanalysis.External.pyqtgraph.Qt import QtCore, QtGui, QtWidgets
@@ -15,11 +18,38 @@ from pyphoplacecellanalysis.General.Model.Datasources.Datasources import Datafra
 
 @define(frozen=True)
 class ScatterItemData:
-    t: float = field(alias='t_rel_seconds')
+    # t: float = field(alias='t_rel_seconds')
+    # aclu: int = field() # alias='neuron_ID'
+    # neuron_IDX: int = field(alias='fragile_linear_neuron_IDX')
+    # visualization_raster_y_location: float = field(default=np.nan)
+    
+    t: float = field()
     aclu: int = field() # alias='neuron_ID'
-    neuron_IDX: int = field(alias='fragile_linear_neuron_IDX')
+    neuron_IDX: int = field()
     visualization_raster_y_location: float = field(default=np.nan)
 
+    @classmethod
+    def init_from_df_record(cls, **a_record):
+        if ('t_rel_seconds' not in a_record):
+            for an_alias_name in ('t_seconds', 't'):
+                if (an_alias_name in a_record):
+                    a_record['t_rel_seconds'] = a_record.pop(an_alias_name) ## removes the alias as well
+            
+        a_record = get_dict_subset(a_record, ['t_rel_seconds', 'aclu', 'neuron_IDX', 'fragile_linear_neuron_IDX', 'visualization_raster_y_location'])
+        # print(f'a_record.keys(): {list(a_record.keys())}')
+        # return cls(t_rel_seconds=a_record.get('t_rel_seconds', a_record.get('t', None)),
+        #             aclu=a_record.get('aclu', None),
+        #             fragile_linear_neuron_IDX=a_record.get('fragile_linear_neuron_IDX', a_record.get('neuron_IDX', None)),
+        #             visualization_raster_y_location=a_record.get('visualization_raster_y_location', np.nan))
+        
+        return cls(a_record.get('t_rel_seconds', a_record.get('t', None)),
+                    a_record.get('aclu', None),
+                    a_record.get('fragile_linear_neuron_IDX', a_record.get('neuron_IDX', None)),
+                    a_record.get('visualization_raster_y_location', np.nan))
+
+        # return cls(**a_record)
+        
+        
 
 class Render2DScrollWindowPlotMixin:
     """ Adds a LinearRegionItem to the plot that represents the entire data timerange which defines a user-adjustable window into the data. Finally, also adds a plot that shows only the zoomed-in data within the window. 
@@ -274,7 +304,7 @@ class Render2DScrollWindowPlotMixin:
 
         # spikes_data = spikes_df[active_datapoint_column_names].to_records(index=False).tolist() # list of tuples
         spikes_data = spikes_df[active_datapoint_column_names].to_dict('records') # list of dicts
-        spikes_data = [ScatterItemData(**v) for v in spikes_data] 
+        spikes_data = [ScatterItemData.init_from_df_record(**v) for v in spikes_data] 
         
         # spikes_data = [DynamicParameters.init_from_dict(v) for v in spikes_data] # convert to list of DynamicParameters objects
         return dict(data=spikes_data, tip=_tip_fn)
@@ -310,10 +340,15 @@ class Render2DScrollWindowPlotMixin:
             active_spikes_df = deepcopy(spikes_df).iloc[::downsampling_rate]  # Take every 10th row
         else:
             active_spikes_df = deepcopy(spikes_df)
-            
 
         # All units at once approach:
         active_time_variable_name = active_spikes_df.spikes.time_variable_name
+        if active_time_variable_name != 't': 
+            active_spikes_df = TimeColumnAliasesProtocol.renaming_synonym_columns_if_needed(active_spikes_df, required_columns_synonym_dict={"t":{active_time_variable_name,'t_rel_seconds', 't_seconds'}})
+            active_spikes_df = active_spikes_df.drop(columns=[active_time_variable_name], inplace=False) ## drop the old column    
+            active_time_variable_name = 't' ## get the new one
+            active_spikes_df.spikes.set_time_variable_name('t')        
+
         # Copy only the relevent columns so filtering is easier:
         filtered_spikes_df = active_spikes_df[[active_time_variable_name, 'visualization_raster_y_location',  'visualization_raster_emphasis_state', 'fragile_linear_neuron_IDX']].copy()
         
@@ -439,6 +474,12 @@ def independent_build_spikes_all_spots_from_df(spikes_df: pd.DataFrame, config_f
     # curr_spike_x, curr_spike_y, curr_spike_pens, all_scatterplot_tooltips_kwargs, all_spots, curr_n = cls.build_spikes_data_values_from_df(spikes_df, config_fragile_linear_neuron_IDX_map, is_spike_included=is_spike_included, should_return_data_tooltips_kwargs=should_return_data_tooltips_kwargs, **kwargs)
     # All units at once approach:
     active_time_variable_name = spikes_df.spikes.time_variable_name
+    if active_time_variable_name != 't': 
+        spikes_df = TimeColumnAliasesProtocol.renaming_synonym_columns_if_needed(spikes_df, required_columns_synonym_dict={"t":{active_time_variable_name,'t_rel_seconds', 't_seconds'}})
+        spikes_df = spikes_df.drop(columns=[active_time_variable_name], inplace=False) ## drop the old column    
+        active_time_variable_name = 't' ## get the new one
+        spikes_df.spikes.set_time_variable_name('t')
+        
     # Copy only the relevent columns so filtering is easier:
     filtered_spikes_df = spikes_df[[active_time_variable_name, 'visualization_raster_y_location',  'visualization_raster_emphasis_state', 'fragile_linear_neuron_IDX']].copy()
     
@@ -482,7 +523,7 @@ def independent_build_spikes_all_spots_from_df(spikes_df: pd.DataFrame, config_f
 
         # spikes_data = spikes_df[active_datapoint_column_names].to_records(index=False).tolist() # list of tuples
         spikes_data = spikes_df[active_datapoint_column_names].to_dict('records') # list of dicts
-        spikes_data = [ScatterItemData(**v) for v in spikes_data] 
+        spikes_data = [ScatterItemData.init_from_df_record(**v) for v in spikes_data] 
         all_scatterplot_tooltips_kwargs = dict(data=spikes_data, tip=_tip_fn)
         assert len(all_scatterplot_tooltips_kwargs['data']) == np.shape(spikes_df)[0], f"if specified, all_scatterplot_tooltips_kwargs must be the same length as the number of spikes but np.shape(spikes_df)[0]: {np.shape(spikes_df)[0]} and len((all_scatterplot_tooltips_kwargs['data']): {len(all_scatterplot_tooltips_kwargs['data'])}"
     else:
