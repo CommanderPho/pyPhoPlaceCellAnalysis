@@ -131,13 +131,24 @@ from neuropy.core.epoch import Epoch, EpochsAccessor, ensure_dataframe, ensure_E
 
 
 @function_attributes(short_name=None, tags=['bapun'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-09-19 17:50', related_items=[])
-def final_process_bapun_all_comps(curr_active_pipeline):
+def final_process_bapun_all_comps(curr_active_pipeline, posthoc_save: bool=True):
+    """ 
+    from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import final_process_bapun_all_comps
+    curr_active_pipeline = final_process_bapun_all_comps(curr_active_pipeline=curr_active_pipeline, posthoc_save=True)
+    
+    """
+    
     from pyphoplacecellanalysis.General.Pipeline.NeuropyPipeline import NeuropyPipeline
     from pyphoplacecellanalysis.General.Batch.NonInteractiveProcessing import batch_extended_computations
 
 
     active_data_mode_name = 'bapun'
     # active_data_mode_name = 'rachel'
+
+    known_data_session_type_properties_dict = DataSessionFormatRegistryHolder.get_registry_known_data_session_type_dict(override_parameters_flat_keypaths_dict=override_parameters_flat_keypaths_dict)
+    active_data_session_types_registered_classes_dict = DataSessionFormatRegistryHolder.get_registry_data_session_type_class_name_dict()
+
+
     print(f'active_data_session_types_registered_classes_dict: {active_data_session_types_registered_classes_dict}')
     active_data_mode_registered_class = active_data_session_types_registered_classes_dict[active_data_mode_name]
     active_data_mode_type_properties = known_data_session_type_properties_dict[active_data_mode_name]
@@ -195,39 +206,40 @@ def final_process_bapun_all_comps(curr_active_pipeline):
 
     # curr_active_pipeline.update_parameters(override_parameters_flat_keypaths_dict=override_parameters_flat_keypaths_dict) # should already be updated, but try it again anyway.
 
+
     # ==================================================================================================================================================================================================================================================================================== #
     # Update computation_epochs to be only the maze ones                                                                                                                                                                                                                                   #
     # ==================================================================================================================================================================================================================================================================================== #
-    activity_only_epoch_names: List[str] = ['maze1', 'maze2', 'maze_GLOBAL']
-    ## activity_only_epochs_df:
-    
-    epochs_df = ensure_dataframe(deepcopy(curr_active_pipeline.sess.epochs))
-    activity_only_epochs_df: pd.DataFrame = epochs_df[epochs_df['label'].isin(activity_only_epoch_names)]
+    # activity_only_epoch_names: List[str] = ['maze1', 'maze2', 'maze_GLOBAL']
 
-    ## OUTPUTS: activity_only_epochs_df
-    activity_only_epoch: Epoch = ensure_Epoch(activity_only_epochs_df, metadata=curr_active_pipeline.sess.epochs.metadata)
+    ## activity_only_epochs_df:
+    epochs_df = ensure_dataframe(deepcopy(curr_active_pipeline.sess.epochs))
+    # activity_only_epochs_df: pd.DataFrame = epochs_df[epochs_df['label'].isin(['maze1', 'maze2', 'maze_GLOBAL'])]
+
+    activity_only_epochs_df: pd.DataFrame = epochs_df[epochs_df['label'].isin(['maze1', 'maze2'])].epochs.get_non_overlapping_df()
+    activity_only_epochs: Epoch = ensure_Epoch(activity_only_epochs_df, metadata=curr_active_pipeline.sess.epochs.metadata)
+
+    ## GLobal only ('maze_GLOBAL')
+    epochs_df = ensure_dataframe(deepcopy(curr_active_pipeline.sess.epochs))
+    global_activity_only_epochs_df: pd.DataFrame = epochs_df[epochs_df['label'].isin(['maze_GLOBAL'])].epochs.get_non_overlapping_df()
+    global_activity_only_epoch: Epoch = ensure_Epoch(global_activity_only_epochs_df, metadata=curr_active_pipeline.sess.epochs.metadata)
+
+    ## OUTPUTS: activity_only_epochs, global_activity_only_epoch
+
     ## OUTPUTS: activity_only_epoch
 
-    # active_session_computation_configs[0].pf_params.computation_epochs = deepcopy(curr_active_pipeline.filtered_sessions['maze'].epochs)
-    # active_session_computation_configs[0].pf_params.computation_epochs = deepcopy(curr_active_pipeline.sess.epochs)
-    # active_session_computation_configs[0].pf_params.computation_epochs = deepcopy(curr_active_pipeline.sess.epochs) ## prev
-    active_session_computation_configs[0].pf_params.computation_epochs = deepcopy(activity_only_epoch)
+    ## Need 2 diff active_session_computation_configs:
+    active_session_computation_configs[0].pf_params.computation_epochs = deepcopy(activity_only_epochs)
 
+    global_only_sess_comp_config = deepcopy(active_session_computation_configs[0])
+    global_only_sess_comp_config.pf_params.computation_epochs = deepcopy(global_activity_only_epoch)
+    if len(active_session_computation_configs) < 2:
+        active_session_computation_configs.append(global_only_sess_comp_config)
+    else:
+        active_session_computation_configs[1] = global_only_sess_comp_config
 
-    # active_session_computation_configs[0].pf_params.computation_epochs = deepcopy(bapun_epochs)
-    # active_session_computation_configs[1].pf_params.computation_epochs = deepcopy(curr_active_pipeline.filtered_sessions['maze'].epochs.to_dataframe())
-    active_session_computation_configs
-    # active_session_computation_configs[0].pf_params.computation_epochs
-
-    #    start   stop     label  duration
-    # 0      0   7407       pre      7407
-    # 1   7423  11483      maze      4060
-    # 3  10186  11483  sprinkle      1297
-    # 2  11497  25987      post     14490
-
-    # [4 rows x 4 columns]
-
-
+    
+    ## UPDATES: active_session_computation_configs
 
     ## Set linearization mode to umap so it doesn't consume all the memory when trying to linearize position:
     active_session_computation_configs[0].pf_params.linearization_method = "umap"
@@ -236,12 +248,12 @@ def final_process_bapun_all_comps(curr_active_pipeline):
         ## forcibly compute the linearized position so it doesn't fallback to "isomap" method which eats all the memory
         a_pos_df: pd.DataFrame = a_sess.position.compute_linearized_position(method='umap')
         
-
-
     # ==================================================================================================================================================================================================================================================================================== #
     # Ready to compute                                                                                                                                                                                                                                                                     #
     # ==================================================================================================================================================================================================================================================================================== #
+
     curr_active_pipeline.reload_default_computation_functions()
+        
     active_computation_functions_name_includelist = ['pf_computation',
                                                     'pfdt_computation',
                                                     'position_decoding',
@@ -249,14 +261,36 @@ def final_process_bapun_all_comps(curr_active_pipeline):
                                                     #  'extended_pf_peak_information',
                                                     ] # 'ratemap_peaks_prominence2d'
 
-    # curr_active_pipeline.perform_computations(active_session_computation_configs[0], computation_functions_name_excludelist=['_perform_spike_burst_detection_computation', '_perform_velocity_vs_pf_density_computation', '_perform_velocity_vs_pf_simplified_count_density_computation']) # SpikeAnalysisComputations._perform_spike_burst_detection_computation
-    curr_active_pipeline.perform_computations(active_session_computation_configs[0], computation_functions_name_includelist=active_computation_functions_name_includelist, enabled_filter_names=activity_only_epoch_names, overwrite_extant_results=True, fail_on_exception=False, debug_print=True) # SpikeAnalysisComputations._perform_spike_burst_detection_computation
-
-    # curr_active_pipeline.perform_computations(active_session_computation_configs[0], computation_functions_name_includelist=active_computation_functions_name_includelist, enabled_filter_names=['roam', 'sprinkle'], overwrite_extant_results=True, fail_on_exception=False, debug_print=True)
-    # curr_active_pipeline.perform_computations(active_session_computation_configs[0], computation_functions_name_includelist=active_computation_functions_name_includelist, enabled_filter_names=['pre', 'post'], overwrite_extant_results=True, fail_on_exception=False, debug_print=True)
 
 
+    for i, a_config in enumerate(active_session_computation_configs):
+        active_epoch_names: List[str] = a_config.pf_params.computation_epochs.labels.tolist() ## should be same as config
+        print(f'i: {i}, active_epoch_names: {active_epoch_names}') # (activity_only_epoch_names)
 
+        # curr_active_pipeline.perform_computations(active_session_computation_configs[0], computation_functions_name_excludelist=['_perform_spike_burst_detection_computation', '_perform_velocity_vs_pf_density_computation', '_perform_velocity_vs_pf_simplified_count_density_computation']) # SpikeAnalysisComputations._perform_spike_burst_detection_computation
+        # curr_active_pipeline.perform_computations(active_session_computation_configs[0], computation_functions_name_includelist=active_computation_functions_name_includelist, enabled_filter_names=activity_only_epoch_names, overwrite_extant_results=True, fail_on_exception=False, debug_print=True) # SpikeAnalysisComputations._perform_spike_burst_detection_computation
+        curr_active_pipeline.perform_computations(a_config, computation_functions_name_includelist=active_computation_functions_name_includelist, enabled_filter_names=active_epoch_names, overwrite_extant_results=True, fail_on_exception=False, debug_print=True) # SpikeAnalysisComputations._perform_spike_burst_detection_computation
+
+
+    # ==================================================================================================================================================================================================================================================================================== #
+    # COMPUTE DONE                                                                                                                                                                                                                                                                         #
+    # ==================================================================================================================================================================================================================================================================================== #
+    print(f'\tcompute done!')
+    
+    # curr_active_pipeline.computation_results['maze'].accumulated_errors
+    curr_active_pipeline.clear_all_failed_computations()
+
+    curr_active_pipeline.prepare_for_display(root_output_dir=r'Output', should_smooth_maze=True) # TODO: pass a display config
+    # curr_active_pipeline.prepare_for_display(root_output_dir=r'W:\Data\Output', should_smooth_maze=True) # TODO: pass a display config
+    
+
+    if posthoc_save:
+        print(f'attempting to save the pipeline...')
+        _out = curr_active_pipeline.save_pipeline(saving_mode=PipelineSavingScheme.TEMP_THEN_OVERWRITE)
+        _out = curr_active_pipeline.save_global_computation_results()#save_pipeline(saving_mode=PipelineSavingScheme.TEMP_THEN_OVERWRITE, active_pickle_filename='loadedSessPickle_2025-02-27.pkl')
+        print(f'done.')
+        
+    return curr_active_pipeline
 
 
 
