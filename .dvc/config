@@ -1,4 +1,5 @@
 [core]
-    remote = diba_shared_gdrive
-['remote "diba_shared_gdrive"']
-    url = gdrive://1DyUM5aOhE5kIKzc7OOkVyBltYjUbJ7tX/dvcstore
+    remote = pho_shared_gdrive
+['remote "pho_shared_gdrive"']
+    url = gdrive://12HkM5dUehnfkxKEmG_-iYGghObSaEL0H/dvcstore
+
