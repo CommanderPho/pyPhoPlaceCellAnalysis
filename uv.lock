@@ -1129,18 +1129,6 @@ wheels = [
 ]
 
 [[package]]
-name = "deprecated"
-version = "1.2.18"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "wrapt" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/98/97/06afe62762c9a8a86af0cfb7bfdab22a43ad17138b07af5b1a58442690a2/deprecated-1.2.18.tar.gz", hash = "sha256:422b6f6d859da6f2ef57857761bfb392480502a64c3028ca9bbe86085d72115d", size = 2928744, upload-time = "2025-01-27T10:46:25.7Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/6e/c6/ac0b6c1e2d138f1002bcf799d330bd6d85084fece321e662a14223794041/Deprecated-1.2.18-py2.py3-none-any.whl", hash = "sha256:bd5011788200372a32418f888e326a09ff80d0214bd961147cfed01b5c018eec", size = 9998, upload-time = "2025-01-27T10:46:09.186Z" },
-]
-
-[[package]]
 name = "dictdiffer"
 version = "0.9.0"
 source = { registry = "https://pypi.org/simple" }
@@ -5068,10 +5056,10 @@ gui = [
     { name = "pyqt-responsive-label", specifier = ">=0.0.3,<0.0.4" },
     { name = "pyqt5", specifier = "==5.15.7" },
     { name = "pyqt5-qt5", specifier = ">=5.15.2,<6" },
-    { name = "pyvista", specifier = "==0.36.*" },
+    { name = "pyvista", specifier = ">=0.43.0,<0.44" },
     { name = "pyvistaqt", specifier = ">=0.9.0,<0.10" },
     { name = "qtawesome", specifier = ">=1.2.2,<2" },
-    { name = "vedo", git = "https://github.com/CommanderPho/vedo.git?rev=release%2Fpho-working" },
+    { name = "vedo", git = "https://github.com/CommanderPho/vedo.git?rev=feature%2Fmerge-upstream" },
 ]
 remote = [
     { name = "neuropy", git = "https://github.com/CommanderPho/NeuroPy.git?rev=feature%2Fsafe-advance" },
@@ -5403,19 +5391,20 @@ wheels = [
 
 [[package]]
 name = "pyvista"
-version = "0.36.1"
+version = "0.43.10"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "appdirs" },
-    { name = "imageio" },
+    { name = "matplotlib", version = "3.9.4", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.10'" },
+    { name = "matplotlib", version = "3.10.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.10'" },
     { name = "numpy" },
     { name = "pillow" },
+    { name = "pooch" },
     { name = "scooby" },
     { name = "vtk" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/5c/d7/0677702147c8951a0d2e4fde98a2bc88cf5e722dd59552479303823d01e0/pyvista-0.36.1.tar.gz", hash = "sha256:b84460a9a33967d2e9a03555907d7883ff7c21ee957e4b95c096d796f6841bf9", size = 1425598, upload-time = "2022-08-01T16:30:12.716Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/b3/bf/68ac5e45b7803272381015d77f3f02ade209ade837ecf206a5308a2d15bc/pyvista-0.43.10.tar.gz", hash = "sha256:925b3539d4c53727ae3cd8f31544fb8811f73a99040f75a36211ed5f26d20e8c", size = 1853906, upload-time = "2024-06-17T19:35:20.302Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/c8/b9/ac42903830f365fbaa026867b2ef10e7ed10e6cefd83a4d32b74043480c7/pyvista-0.36.1-py3-none-any.whl", hash = "sha256:6166fcdd16515e93d24acad490d121e6a251501dc929b178a0e06bab133c415e", size = 1453181, upload-time = "2022-08-01T16:30:10.506Z" },
+    { url = "https://files.pythonhosted.org/packages/f1/32/274c8d597e068023deedc9bba4ba2645ccc6727aadc29c8e4225862923d2/pyvista-0.43.10-py3-none-any.whl", hash = "sha256:8eca6d039a2b1ae779189aa4109db5228ef3b3f65d873e95cbbecf161d83ae9b", size = 1899661, upload-time = "2024-06-17T19:35:13.353Z" },
 ]
 
 [[package]]
@@ -6826,11 +6815,12 @@ wheels = [
 
 [[package]]
 name = "vedo"
-version = "2022.1.0.dev3"
-source = { git = "https://github.com/CommanderPho/vedo.git?rev=release%2Fpho-working#a0784a47d1b1a92f71b81f153c12856ccf7ec242" }
+version = "2025.5.4+dev10"
+source = { git = "https://github.com/CommanderPho/vedo.git?rev=feature%2Fmerge-upstream#99e4a3d7700b28380565af12b684eecbe6fc1713" }
 dependencies = [
-    { name = "deprecated" },
     { name = "numpy" },
+    { name = "pygments" },
+    { name = "typing-extensions" },
     { name = "vtk" },
 ]
 

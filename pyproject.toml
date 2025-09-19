@@ -59,7 +59,7 @@ gui = [
     "pyqt5-qt5>=5.15.2,<6",
     "pyqt-custom-titlebar-window>=0.0.50,<0.0.51",
     "qtawesome>=1.2.2,<2",
-    "pyvista==0.36.*",
+    "pyvista>=0.43.0,<0.44",  # Supports newer VTK versions
     "pyvistaqt>=0.9.0,<0.10",
     "loguru>=0.6.0,<0.7",
     "pyopengl>=3.1.6,<4",
@@ -85,7 +85,7 @@ default-groups = [
 [tool.uv.sources]
 ansi2html = { git = "https://github.com/CommanderPho/ansi2html.git", rev = "main" }
 mpl-multitab = { git = "https://github.com/CommanderPho/mpl-multitab.git", rev = "pho_compat" }
-vedo = { git = "https://github.com/CommanderPho/vedo.git", rev = "release/pho-working" }
+vedo = { git = "https://github.com/CommanderPho/vedo.git", rev = "feature/merge-upstream" }
 neuropy = { git = "https://github.com/CommanderPho/NeuroPy.git", rev = "feature/safe-advance" }
 pyphocorehelpers = { git = "https://github.com/CommanderPho/pyPhoCoreHelpers.git" }
 pybursts = { git = "https://github.com/CommanderPho/pybursts.git", rev = "master" }
