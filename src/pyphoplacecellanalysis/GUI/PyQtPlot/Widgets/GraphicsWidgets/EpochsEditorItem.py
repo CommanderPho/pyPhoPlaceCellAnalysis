@@ -354,6 +354,7 @@ class EpochsEditor:
 
 
     # INIT METHODS _______________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
+    @function_attributes(short_name=None, tags=['epochs'], input_requires=[], output_provides=[], uses=['build_pyqtgraph_epoch_indicator_regions'], used_by=[], creation_date='2025-09-19 08:43', related_items=[])
     @classmethod
     def perform_plot_laps_diagnoser(cls, pos_df: pd.DataFrame, curr_laps_df: pd.DataFrame, include_velocity=True, include_accel=True, on_epoch_region_updated_callback=None, on_epoch_region_selection_toggled_callback=None, loaded_track_limits=None, grid_bin_bounds=None, epoch_label_position=0.5, epoch_label_rotateAxis=(1,0), epoch_label_anchor=(1, 1), **kwargs):
         """
@@ -474,6 +475,10 @@ class EpochsEditor:
         # win.graphicsItem().setLabel(axis='left', text='Recorded Position Data')
         # win.graphicsItem().setLabel(axis='bottom', text='time')
 
+
+        movable = kwargs.pop('movable', True)
+        removable = kwargs.pop('removable', True)
+        
         lap_epoch_widgets = {}
         lap_epoch_labels = {}
 
@@ -482,7 +487,7 @@ class EpochsEditor:
             if epoch_linear_region is None:
                 ## Create a new one:
                 # add alpha
-                epoch_linear_region, epoch_region_label = build_pyqtgraph_epoch_indicator_regions(v1, t_start=a_lap.start, t_stop=a_lap.stop, epoch_label=a_lap.label, movable=True, removable=True, **dict(pen=pg.mkPen(f'{a_lap.lap_color}d6', width=1.0), brush=pg.mkBrush(f"{a_lap.lap_color}42"), hoverBrush=pg.mkBrush(f"{a_lap.lap_color}a8"), hoverPen=pg.mkPen(a_lap.lap_accent_color, width=2.5)), 
+                epoch_linear_region, epoch_region_label = build_pyqtgraph_epoch_indicator_regions(v1, t_start=a_lap.start, t_stop=a_lap.stop, epoch_label=a_lap.label, movable=movable, removable=removable, **dict(pen=pg.mkPen(f'{a_lap.lap_color}d6', width=1.0), brush=pg.mkBrush(f"{a_lap.lap_color}42"), hoverBrush=pg.mkBrush(f"{a_lap.lap_color}a8"), hoverPen=pg.mkPen(a_lap.lap_accent_color, width=2.5)), 
                                                                                                   custom_bound_data=a_lap.Index, **custom_epoch_label_kwargs, **kwargs)               
                 lap_epoch_widgets[a_lap.label] = epoch_linear_region
                 lap_epoch_labels[a_lap.label] = epoch_region_label
