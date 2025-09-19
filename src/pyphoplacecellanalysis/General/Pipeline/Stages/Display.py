@@ -204,6 +204,7 @@ def add_neuron_identity_info_if_needed(computation_result, active_config):
     except (AttributeError, KeyError, TypeError):
         # add the attributes 
         active_config.plotting_config.pf_neuron_identities, active_config.plotting_config.pf_sort_ind, active_config.plotting_config.pf_colors, active_config.plotting_config.pf_colormap, active_config.plotting_config.pf_listed_colormap = get_neuron_identities(computation_result.computed_data['pf2D'])
+
     except Exception as e:
         # other exception
         print(f'Unexpected exception e: {e}')
