@@ -922,7 +922,7 @@ class PipelinePickleFileSelectorWidget:
         # Pre-load ___________________________________________________________________________________________________________ #
         force_recompute_global = force_reload
         included_computation_filter_names = None
-        if (curr_active_pipeline.active_sess_config.format_name !='kdiba'):
+        if (curr_active_pipeline.active_sess_config.format_name.lower() !='kdiba'):
             curr_active_pipeline.sess.paradigm.adding_global_epoch_row()
             # included_computation_filter_names = curr_active_pipeline.active_completed_computation_result_names
             included_computation_filter_names = ['maze']
@@ -1033,14 +1033,15 @@ class PipelinePickleFileSelectorWidget:
             # Update the global variable before doing the global part:
             update_global_variable_fn('curr_active_pipeline', curr_active_pipeline)
             update_global_variable_fn('custom_suffix', custom_suffix)
-            update_global_variable_fn('proposed_load_pkl_path', proposed_load_pkl_path)            
+            update_global_variable_fn('proposed_load_pkl_path', proposed_load_pkl_path)
+            print(f'on_load_local(...) complete. workspace variables updated: curr_active_pipeline, custom_suffix, proposed_load_pkl_path')       
             curr_active_pipeline = self.on_load_global(curr_active_pipeline=curr_active_pipeline, basedir=basedir, extended_computations_include_includelist=extended_computations_include_includelist, force_recompute_override_computations_includelist=force_recompute_override_computations_includelist,
                                         skip_global_load=False, force_reload=False, override_global_computation_results_pickle_path=self.active_global_pkl)
             # Update the global variable after loading global
             update_global_variable_fn('curr_active_pipeline', curr_active_pipeline)
             update_global_variable_fn('custom_suffix', custom_suffix)
             update_global_variable_fn('proposed_load_pkl_path', proposed_load_pkl_path)
-            
+            print(f'on_load_global(...) complete. workspace variables updated: curr_active_pipeline, custom_suffix, proposed_load_pkl_path')
 
         def _subfn_save():
             """ captures: everything in calling context! """
