@@ -87,7 +87,7 @@ ansi2html = { git = "https://github.com/CommanderPho/ansi2html.git", rev = "main
 mpl-multitab = { git = "https://github.com/CommanderPho/mpl-multitab.git", rev = "pho_compat" }
 vedo = { git = "https://github.com/CommanderPho/vedo.git", rev = "feature/merge-upstream" }
 neuropy = { git = "https://github.com/CommanderPho/NeuroPy.git", rev = "feature/safe-advance" }
-pyphocorehelpers = { git = "https://github.com/CommanderPho/pyPhoCoreHelpers.git" }
+pyphocorehelpers = { git = "https://github.com/CommanderPho/pyPhoCoreHelpers.git", rev = "develop" }
 pybursts = { git = "https://github.com/CommanderPho/pybursts.git", rev = "master" }
 
 [build-system]
