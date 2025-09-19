@@ -124,6 +124,140 @@ from neuropy.utils.mixins.time_slicing import TimeColumnAliasesProtocol
 from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import BasePositionDecoder, BayesianPlacemapPositionDecoder, DecodedFilterEpochsResult, Zhang_Two_Step
 from neuropy.core.epoch import Epoch, ensure_dataframe, ensure_Epoch, EpochsAccessor
 from neuropy.analyses.placefields import Position
+from neuropy.core.session.SessionSelectionAndFiltering import build_custom_epochs_filters
+from neuropy.core.session.Formats.BaseDataSessionFormats import DataSessionFormatRegistryHolder, DataSessionFormatBaseRegisteredClass
+from neuropy.core.session.Formats.Specific.BapunDataSessionFormat import BapunDataSessionFormatRegisteredClass
+from neuropy.core.epoch import Epoch, EpochsAccessor, ensure_dataframe, ensure_Epoch
+
+
+@function_attributes(short_name=None, tags=['bapun'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-09-19 17:50', related_items=[])
+def final_process_bapun_all_comps(curr_active_pipeline):
+    from pyphoplacecellanalysis.General.Pipeline.NeuropyPipeline import NeuropyPipeline
+    from pyphoplacecellanalysis.General.Batch.NonInteractiveProcessing import batch_extended_computations
+
+
+    active_data_mode_name = 'bapun'
+    # active_data_mode_name = 'rachel'
+    print(f'active_data_session_types_registered_classes_dict: {active_data_session_types_registered_classes_dict}')
+    active_data_mode_registered_class = active_data_session_types_registered_classes_dict[active_data_mode_name]
+    active_data_mode_type_properties = known_data_session_type_properties_dict[active_data_mode_name]
+
+    # basedir = Path('/media/halechr/MAX/Data/Rachel/Cho_241117_Session2').resolve()
+    ## INPUTS: basedir 
+
+
+    session_epochs: Epoch = BapunDataSessionFormatRegisteredClass.session_fixup_epochs(sess=curr_active_pipeline.sess)
+    session_epochs
+
+    curr_epoch_names: List[str] = curr_active_pipeline.sess.epochs.to_dataframe()['label'].to_list()
+    print(f'curr_epoch_names: {curr_epoch_names}')
+
+    # epoch_name_includelist = ['pre', 'maze1', 'post1', 'maze2', 'post2']
+    # epoch_name_includelist = ['pre', 'roam', 'sprinkle', 'post']
+    # epoch_name_includelist = ['roam', 'sprinkle']
+
+    # active_session_filter_configurations = build_custom_epochs_filters(curr_active_pipeline.sess, epoch_name_includelist=['pre', 'maze1', 'post1', 'maze2', 'post2']) ## ALL possible epochs
+
+    # active_session_filter_configurations = build_custom_epochs_filters(curr_active_pipeline.sess, epoch_name_includelist=['maze1', 'maze2', 'maze_GLOBAL']) ## ALL possible epochs
+    active_session_filter_configurations = build_custom_epochs_filters(curr_active_pipeline.sess, epoch_name_includelist=['maze1', 'maze2', 'maze_GLOBAL']) ## ALL possible epochs
+
+    # active_session_filter_configurations = active_data_mode_registered_class.build_default_filter_functions(sess=curr_active_pipeline.sess)
+    # active_session_filter_configurations = build_custom_epochs_filters(curr_active_pipeline.sess, epoch_name_includelist=['pre', 'roam', 'maze', 'sprinkle', 'post']) ## ALL possible epochs
+    # active_session_filter_configurations = build_custom_epochs_filters(curr_active_pipeline.sess, epoch_name_includelist=['pre', 'roam', 'sprinkle', 'post']) ## ALL possible epochs
+
+
+    # active_session_filter_configurations = active_data_mode_registered_class.build_default_filter_functions(sess=curr_active_pipeline.sess, epoch_name_includelist=epoch_name_includelist) # build_filters_pyramidal_epochs(sess=curr_kdiba_pipeline.sess)
+    # active_session_filter_configurations = build_custom_epochs_filters(curr_active_pipeline.sess, epoch_name_includelist=['maze','sprinkle'])
+    # active_session_filter_configurations = build_custom_epochs_filters(curr_active_pipeline.sess, epoch_name_includelist=['maze', 'sprinkle'])
+    # active_session_filter_configurations = build_custom_epochs_filters(curr_active_pipeline.sess, epoch_name_includelist=['roam', 'sprinkle']) # , 'maze'
+
+    # active_session_filter_configurations = active_data_mode_registered_class.build_filters_pyramidal_epochs(curr_active_pipeline.sess, epoch_name_includelist=['maze','sprinkle'])
+    # active_session_filter_configurations
+
+    curr_active_pipeline.filter_sessions(active_session_filter_configurations)
+
+    # ==================================================================================================================================================================================================================================================================================== #
+    # COMPUTATION CONFIGS                                                                                                                                                                                                                                                                  #
+    # ==================================================================================================================================================================================================================================================================================== #
+    active_session_computation_configs = active_data_mode_registered_class.build_default_computation_configs(sess=curr_active_pipeline.sess, time_bin_size=0.5)
+
+    # grid_bin_bounds=(((-83.33747881216672, 110.15967332926644), (-94.89955475226206, 97.07387994733473)))
+
+
+    bapun_open_field_grid_bin_bounds = (((-120.0, 120.0), (-120.0, 120.0)))
+    curr_active_pipeline.get_all_parameters()
+    # curr_active_pipeline.update_parameters(grid_bin_bounds = (((-120.0, 120.0), (-120.0, 120.0))))
+    curr_active_pipeline.sess.config.grid_bin_bounds = (((-120.0, 120.0), (-120.0, 120.0)))
+
+    # override_parameters_flat_keypaths_dict = {'grid_bin_bounds': (((-120.0, 120.0), (-120.0, 120.0))), # 'rank_order_shuffle_analysis.minimum_inclusion_fr_Hz': minimum_inclusion_fr_Hz,
+    # 										#   'sess.config.preprocessing_parameters.laps.use_direction_dependent_laps': False, # lap_estimation_parameters
+    #                                         }
+
+    # curr_active_pipeline.update_parameters(override_parameters_flat_keypaths_dict=override_parameters_flat_keypaths_dict) # should already be updated, but try it again anyway.
+
+    # ==================================================================================================================================================================================================================================================================================== #
+    # Update computation_epochs to be only the maze ones                                                                                                                                                                                                                                   #
+    # ==================================================================================================================================================================================================================================================================================== #
+    activity_only_epoch_names: List[str] = ['maze1', 'maze2', 'maze_GLOBAL']
+    ## activity_only_epochs_df:
+    
+    epochs_df = ensure_dataframe(deepcopy(curr_active_pipeline.sess.epochs))
+    activity_only_epochs_df: pd.DataFrame = epochs_df[epochs_df['label'].isin(activity_only_epoch_names)]
+
+    ## OUTPUTS: activity_only_epochs_df
+    activity_only_epoch: Epoch = ensure_Epoch(activity_only_epochs_df, metadata=curr_active_pipeline.sess.epochs.metadata)
+    ## OUTPUTS: activity_only_epoch
+
+    # active_session_computation_configs[0].pf_params.computation_epochs = deepcopy(curr_active_pipeline.filtered_sessions['maze'].epochs)
+    # active_session_computation_configs[0].pf_params.computation_epochs = deepcopy(curr_active_pipeline.sess.epochs)
+    # active_session_computation_configs[0].pf_params.computation_epochs = deepcopy(curr_active_pipeline.sess.epochs) ## prev
+    active_session_computation_configs[0].pf_params.computation_epochs = deepcopy(activity_only_epoch)
+
+
+    # active_session_computation_configs[0].pf_params.computation_epochs = deepcopy(bapun_epochs)
+    # active_session_computation_configs[1].pf_params.computation_epochs = deepcopy(curr_active_pipeline.filtered_sessions['maze'].epochs.to_dataframe())
+    active_session_computation_configs
+    # active_session_computation_configs[0].pf_params.computation_epochs
+
+    #    start   stop     label  duration
+    # 0      0   7407       pre      7407
+    # 1   7423  11483      maze      4060
+    # 3  10186  11483  sprinkle      1297
+    # 2  11497  25987      post     14490
+
+    # [4 rows x 4 columns]
+
+
+
+    ## Set linearization mode to umap so it doesn't consume all the memory when trying to linearize position:
+    active_session_computation_configs[0].pf_params.linearization_method = "umap"
+
+    for an_epoch_name, a_sess in curr_active_pipeline.filtered_sessions.items():
+        ## forcibly compute the linearized position so it doesn't fallback to "isomap" method which eats all the memory
+        a_pos_df: pd.DataFrame = a_sess.position.compute_linearized_position(method='umap')
+        
+
+
+    # ==================================================================================================================================================================================================================================================================================== #
+    # Ready to compute                                                                                                                                                                                                                                                                     #
+    # ==================================================================================================================================================================================================================================================================================== #
+    curr_active_pipeline.reload_default_computation_functions()
+    active_computation_functions_name_includelist = ['pf_computation',
+                                                    'pfdt_computation',
+                                                    'position_decoding',
+                                                    #  'position_decoding_two_step',
+                                                    #  'extended_pf_peak_information',
+                                                    ] # 'ratemap_peaks_prominence2d'
+
+    # curr_active_pipeline.perform_computations(active_session_computation_configs[0], computation_functions_name_excludelist=['_perform_spike_burst_detection_computation', '_perform_velocity_vs_pf_density_computation', '_perform_velocity_vs_pf_simplified_count_density_computation']) # SpikeAnalysisComputations._perform_spike_burst_detection_computation
+    curr_active_pipeline.perform_computations(active_session_computation_configs[0], computation_functions_name_includelist=active_computation_functions_name_includelist, enabled_filter_names=activity_only_epoch_names, overwrite_extant_results=True, fail_on_exception=False, debug_print=True) # SpikeAnalysisComputations._perform_spike_burst_detection_computation
+
+    # curr_active_pipeline.perform_computations(active_session_computation_configs[0], computation_functions_name_includelist=active_computation_functions_name_includelist, enabled_filter_names=['roam', 'sprinkle'], overwrite_extant_results=True, fail_on_exception=False, debug_print=True)
+    # curr_active_pipeline.perform_computations(active_session_computation_configs[0], computation_functions_name_includelist=active_computation_functions_name_includelist, enabled_filter_names=['pre', 'post'], overwrite_extant_results=True, fail_on_exception=False, debug_print=True)
+
+
+
+
 
 
 @function_attributes(short_name=None, tags=['rachel', 'bapun'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-09-10 07:01', related_items=[])
