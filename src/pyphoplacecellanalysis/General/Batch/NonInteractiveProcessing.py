@@ -81,6 +81,9 @@ def batch_load_session(global_data_root_parent_path: Path, active_data_mode_name
     Returns:
         _type_: _description_
     """
+    # Update the global variable before doing the global part:
+    update_global_variable_fn = kwargs.pop('update_global_variable_fn', None)    
+
     saving_mode = PipelineSavingScheme.init(saving_mode)
     epoch_name_includelist = kwargs.get('epoch_name_includelist', ['maze1','maze2','maze'])
     debug_print = kwargs.get('debug_print', False)
@@ -105,6 +108,10 @@ def batch_load_session(global_data_root_parent_path: Path, active_data_mode_name
     
     was_loaded_from_file: bool =  curr_active_pipeline.has_associated_pickle # True if pipeline was loaded from an existing file, False if it was created fresh
     
+
+    if update_global_variable_fn:
+        update_global_variable_fn('curr_active_pipeline', curr_active_pipeline)
+        
     # Get the previous configs:
     # curr_active_pipeline.filtered_sessions
     # ['filtered_session_names', 'filtered_contexts', 'filtered_epochs', 'filtered_sessions']
@@ -121,6 +128,9 @@ def batch_load_session(global_data_root_parent_path: Path, active_data_mode_name
 
     ## TODO 2023-05-16 - set `curr_active_pipeline.active_configs[a_name].computation_config.pf_params.computation_epochs = curr_laps_obj` equivalent
     ## TODO 2023-05-16 - determine appropriate binning from `compute_short_long_constrained_decoders` so it's automatically from the long
+
+    if update_global_variable_fn:
+        update_global_variable_fn('curr_active_pipeline', curr_active_pipeline)
 
     if active_session_computation_configs is None:
         """
@@ -215,6 +225,10 @@ def batch_load_session(global_data_root_parent_path: Path, active_data_mode_name
         if 'lap_direction_determination' in computation_functions_name_includelist:
             computation_functions_name_includelist = [k for k in computation_functions_name_includelist if (k != 'lap_direction_determination')]
 
+
+    if update_global_variable_fn:
+        update_global_variable_fn('curr_active_pipeline', curr_active_pipeline)
+
     for a_computation_suffix_name, a_computation_config in zip(lap_direction_suffix_list, active_session_computation_configs): # these should NOT be the same length: lap_direction_suffix_list: ['_odd', '_even', '_any']
         # We need to filter and then compute with the appropriate config iteratively.
         for a_filter_config_name, a_filter_config_fn in active_session_filter_configurations.items():
@@ -245,11 +259,15 @@ def batch_load_session(global_data_root_parent_path: Path, active_data_mode_name
             curr_active_pipeline.update_parameters(override_parameters_flat_keypaths_dict=override_parameters_flat_keypaths_dict) 
     ## END for a_computation_suffix_name, a_computation_config in zip(lap_direct...
 
-
+    if update_global_variable_fn:
+        update_global_variable_fn('curr_active_pipeline', curr_active_pipeline)
+        
     if not skip_extended_batch_computations:
         batch_extended_computations(curr_active_pipeline, include_global_functions=False, fail_on_exception=fail_on_exception, progress_print=True, debug_print=False)
     # curr_active_pipeline.perform_computations(active_session_computation_configs[0], computation_functions_name_excludelist=['_perform_spike_burst_detection_computation'], debug_print=False, fail_on_exception=False) # includelist: ['_perform_baseline_placefield_computation']
 
+    if update_global_variable_fn:
+        update_global_variable_fn('curr_active_pipeline', curr_active_pipeline)
 
     try:
         curr_active_pipeline.prepare_for_display(root_output_dir=global_data_root_parent_path.joinpath('Output'), should_smooth_maze=True) # TODO: pass a display config
@@ -257,15 +275,23 @@ def batch_load_session(global_data_root_parent_path: Path, active_data_mode_name
         exception_info = sys.exc_info()
         an_error = CapturedException(e, exception_info, curr_active_pipeline)
         print(f'WARNING: Failed to do `curr_active_pipeline.prepare_for_display(...)` with error: {an_error}')
+        if update_global_variable_fn:
+            update_global_variable_fn('curr_active_pipeline', curr_active_pipeline)        
         if fail_on_exception:
             raise
 
+
+    if update_global_variable_fn:
+        update_global_variable_fn('curr_active_pipeline', curr_active_pipeline)
+        
     try:
         curr_active_pipeline.save_pipeline(saving_mode=saving_mode, active_pickle_filename=active_pickle_filename, override_pickle_path=kwargs.get('override_pickle_path', None))
     except Exception as e:
         exception_info = sys.exc_info()
         an_error = CapturedException(e, exception_info, curr_active_pipeline)
         print(f'WARNING: Failed to save pipeline via `curr_active_pipeline.save_pipeline(...)` with error: {an_error}')
+        if update_global_variable_fn:
+            update_global_variable_fn('curr_active_pipeline', curr_active_pipeline)
         if fail_on_exception:
             raise
 
