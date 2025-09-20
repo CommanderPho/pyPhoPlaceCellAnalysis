@@ -858,7 +858,8 @@ class PipelinePickleFileSelectorWidget:
             curr_active_pipeline: NeuropyPipeline = batch_load_session(global_data_root_parent_path, active_data_mode_name, basedir, epoch_name_includelist=epoch_name_includelist,
                                                     computation_functions_name_includelist=active_computation_functions_name_includelist,
                                                     saving_mode=saving_mode, force_reload=force_reload,
-                                                    skip_extended_batch_computations=True, debug_print=False, fail_on_exception=True, active_pickle_filename=proposed_load_pkl_path) # , active_pickle_filename = 'loadedSessPickle_withParameters.pkl'
+                                                    skip_extended_batch_computations=True, debug_print=False, fail_on_exception=True, active_pickle_filename=proposed_load_pkl_path,
+                                                    update_global_variable_fn=self.on_update_global_variable_callback) # , active_pickle_filename = 'loadedSessPickle_withParameters.pkl'
 
         ## Post Compute Validate 2023-05-16:
         was_updated = BatchSessionCompletionHandler.post_compute_validate(curr_active_pipeline) ## TODO: need to potentially re-save if was_updated. This will fail because constained versions not ran yet.

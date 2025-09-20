@@ -131,7 +131,7 @@ from neuropy.core.epoch import Epoch, EpochsAccessor, ensure_dataframe, ensure_E
 
 
 @function_attributes(short_name=None, tags=['bapun'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-09-19 17:50', related_items=[])
-def final_process_bapun_all_comps(curr_active_pipeline, posthoc_save: bool=True):
+def final_process_bapun_all_comps(curr_active_pipeline, posthoc_save: bool=True, override_parameters_flat_keypaths_dict=None):
     """ 
     from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import final_process_bapun_all_comps
     curr_active_pipeline = final_process_bapun_all_comps(curr_active_pipeline=curr_active_pipeline, posthoc_save=True)
@@ -269,7 +269,7 @@ def final_process_bapun_all_comps(curr_active_pipeline, posthoc_save: bool=True)
 
         # curr_active_pipeline.perform_computations(active_session_computation_configs[0], computation_functions_name_excludelist=['_perform_spike_burst_detection_computation', '_perform_velocity_vs_pf_density_computation', '_perform_velocity_vs_pf_simplified_count_density_computation']) # SpikeAnalysisComputations._perform_spike_burst_detection_computation
         # curr_active_pipeline.perform_computations(active_session_computation_configs[0], computation_functions_name_includelist=active_computation_functions_name_includelist, enabled_filter_names=activity_only_epoch_names, overwrite_extant_results=True, fail_on_exception=False, debug_print=True) # SpikeAnalysisComputations._perform_spike_burst_detection_computation
-        curr_active_pipeline.perform_computations(a_config, computation_functions_name_includelist=active_computation_functions_name_includelist, enabled_filter_names=active_epoch_names, overwrite_extant_results=True, fail_on_exception=False, debug_print=True) # SpikeAnalysisComputations._perform_spike_burst_detection_computation
+        curr_active_pipeline.perform_computations(a_config, computation_functions_name_includelist=active_computation_functions_name_includelist, enabled_filter_names=active_epoch_names, overwrite_extant_results=False, fail_on_exception=False, debug_print=True) # SpikeAnalysisComputations._perform_spike_burst_detection_computation
 
 
     # ==================================================================================================================================================================================================================================================================================== #
