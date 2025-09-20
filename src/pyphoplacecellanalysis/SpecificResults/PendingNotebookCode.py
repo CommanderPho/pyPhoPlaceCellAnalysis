@@ -284,6 +284,69 @@ def final_process_bapun_all_comps(curr_active_pipeline, posthoc_save: bool=True)
     # curr_active_pipeline.prepare_for_display(root_output_dir=r'W:\Data\Output', should_smooth_maze=True) # TODO: pass a display config
     
 
+
+    # ==================================================================================================================================================================================================================================================================================== #
+    # Post-post processing                                                                                                                                                                                                                                                                 #
+    # ==================================================================================================================================================================================================================================================================================== #
+
+    from neuropy.analyses.placefields import Position
+    from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import post_process_non_kdiba
+
+    post_process_non_kdiba(curr_active_pipeline)
+        
+    ## Add global epoch
+    maze_epochs_obj = ensure_Epoch(deepcopy(curr_active_pipeline.sess.epochs).to_dataframe())
+    if "maze_GLOBAL" not in maze_epochs_obj.labels.tolist():
+        _bak_Epoch = deepcopy(curr_active_pipeline.sess.epochs)
+        curr_active_pipeline.sess.epochs_bak = _bak_Epoch
+        maze_epochs_obj.adding_global_epoch_row(global_epoch_name='maze_GLOBAL', first_included_epoch_name=None, last_included_epoch_name=None)
+        maze_epochs_obj
+        # maze_epochs_obj
+        # curr_active_pipeline.sess.epochs = deepcopy(maze_epochs_obj)
+        
+
+        # _bak_Epoch.metadata
+        # curr_active_pipeline.sess.epochs.epochs.
+    else:
+        print(f'skipped adding global Epoch as we already had one!')
+        pass
+
+
+    ### Compute if missing (require result):
+    from pyphoplacecellanalysis.Analysis.Decoder.context_dependent import GenericDecoderDictDecodedEpochsDictResult
+    from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.EpochComputationFunctions import EpochComputationFunctions, EpochComputationsComputationsContainer
+
+    curr_active_pipeline.reload_default_computation_functions()
+    enabled_filter_names=None
+    valid_EpochComputations_result: EpochComputationsComputationsContainer = curr_active_pipeline.global_computation_results.computed_data.get('EpochComputations', None)
+    a_new_fully_generic_result = None
+    if valid_EpochComputations_result is not None:
+        a_new_fully_generic_result: GenericDecoderDictDecodedEpochsDictResult = valid_EpochComputations_result.a_generic_decoder_dict_decoded_epochs_dict_result
+
+    if a_new_fully_generic_result is None:
+        # if `KeyError: 'TrialByTrialActivity'` recompute
+        print(f'EpochComputations is not computed, computing it...')
+        curr_active_pipeline.perform_specific_computation(computation_functions_name_includelist=['non_PBE_epochs_results', 'generalized_specific_epochs_decoding'], enabled_filter_names=curr_active_pipeline.active_config_names, fail_on_exception=True, debug_print=False)    
+        valid_EpochComputations_result = curr_active_pipeline.global_computation_results.computed_data.get('EpochComputations', None) ## try again to get the result
+        assert valid_EpochComputations_result is not None, f"valid_EpochComputations_result is None even after forcing recomputation!!"
+        a_new_fully_generic_result = valid_EpochComputations_result.a_generic_decoder_dict_decoded_epochs_dict_result
+        print(f'\t done.')
+        
+
+
+    # ACTUALLY BUILD THE PSEUDO 2D: ______________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
+    from neuropy.core.epoch import Epoch, ensure_dataframe, ensure_Epoch, EpochsAccessor
+    from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import build_contextual_pf2D_decoder, decode_using_contextual_pf2D_decoder
+
+    ## Build the merged decoder `contextual_pf2D`
+    epochs_to_create_global_from_names = ['maze1', 'maze2', 'maze_GLOBAL']
+    # epochs_to_create_global_from_names = ['roam', 'sprinkle']
+    contextual_pf2D_dict, contextual_pf2D, contextual_pf2D_Decoder = build_contextual_pf2D_decoder(curr_active_pipeline, epochs_to_create_global_from_names=epochs_to_create_global_from_names)
+
+    all_context_filter_epochs_decoder_result, global_only_epoch = decode_using_contextual_pf2D_decoder(curr_active_pipeline, contextual_pf2D_Decoder=contextual_pf2D_Decoder, active_laps_decoding_time_bin_size=0.75)
+    # 10m 2s
+
+
     if posthoc_save:
         print(f'attempting to save the pipeline...')
         _out = curr_active_pipeline.save_pipeline(saving_mode=PipelineSavingScheme.TEMP_THEN_OVERWRITE)
