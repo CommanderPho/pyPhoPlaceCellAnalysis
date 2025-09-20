@@ -36,9 +36,9 @@ from typing import Dict, List, Tuple, Optional, Callable, Union, Any
 # curr_active_pipeline.registered_global_computation_function_docs_dict
 # curr_active_pipeline.registered_merged_computation_function_dict
 
-@metadata_attributes(short_name=None, tags=['template', 'jninja2', 'parameters', 'code-gen'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-10-07 14:20', related_items=[])
+@metadata_attributes(short_name=None, tags=['PROGRAMMING-HELPER', 'template', 'jninja2', 'parameters', 'code-gen'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-10-07 14:20', related_items=[])
 class GlobalComputationParametersAttrsClassTemplating:
-    """ Generates Special Classes to hold the parameters for global computation functions
+    """ *PROGRAMMING HELPER* Generates Special Classes to hold the parameters for global computation functions
     
     Used to programmatically generate:
         `General/Model/SpecificComputationParameterTypes.py` classes - on 2024-10-07
@@ -198,11 +198,6 @@ class GlobalComputationParametersAttrsClassTemplating:
             should_include_explicit_param_Params_fields=container_class_should_include_explicit_param_Params_fields
         )
 
-
-
-
-
-
         attrs_container_class_defn_str = '\n'.join(line for line in attrs_container_class_defn_str.split('\n') if line.strip())
         # print(f'attrs_container_class_defn_str\n{attrs_container_class_defn_str}\n\n')
 
@@ -234,6 +229,7 @@ class GlobalComputationParametersAttrsClassTemplating:
         
 
 
+    @function_attributes(short_name=None, tags=['MAIN'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-09-20 19:12', related_items=[])
     @classmethod
     def main_generate_params_classes(cls, curr_active_pipeline, print_defns=False):
         """ Main function called with a `curr_active_pipeline` to explicitly generate the boilerplate parameters classes

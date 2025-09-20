@@ -125,6 +125,9 @@ from neuropy.utils.mixins.AttrsClassHelpers import AttrsWithParamParameterizedHe
 class BaseGlobalComputationParameters(BaseAttrsParameterizedParameters):
 # class BaseGlobalComputationParameters(BaseConfig, BasePlotDataParams):
     """ Base class
+    
+    #TODO 2025-09-20 19:39: - [ ] REFINEMENT: Nearly all fields are duplicated verbatim from `BaseAttrsParameterizedParameters`, seemingly for no reason. Can I remove it or maybe it has something to do with parameter fields being Class properties?
+    
     """
     # Overriding defaults from parent
     # name = param.String(default='BaseGlobalComputationParameters', doc='Name of the global computations')
@@ -564,7 +567,7 @@ class ratemap_peaks_prominence2d_Parameters(HDF_SerializationMixin, AttrsBasedCl
 @AttrsWithParamParameterizedHelpers.attrs_to_parameters_container
 @define(slots=False)
 class ComputationKWargParameters(BaseContainerAttrsParameterizedParametersToDictWidgetMixin, HDF_SerializationMixin, AttrsBasedClassHelperMixin, BaseGlobalComputationParameters):
-    """ The base class for computation parameter types. 
+    """ The main container class for computation parameter types. 
     
     Usage:
         from pyphoplacecellanalysis.General.Model.SpecificComputationParameterTypes import ComputationKWargParameters, merged_directional_placefields_Parameters, rank_order_shuffle_analysis_Parameters, directional_decoders_decode_continuous_Parameters, directional_decoders_evaluate_epochs_Parameters, directional_train_test_split_Parameters, long_short_decoding_analyses_Parameters, long_short_rate_remapping_Parameters, long_short_inst_spike_rate_groups_Parameters, wcorr_shuffle_analysis_Parameters, perform_specific_epochs_decoding_Parameters, DEP_ratemap_peaks_Parameters, ratemap_peaks_prominence2d_Parameters
