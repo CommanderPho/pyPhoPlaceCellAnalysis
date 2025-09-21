@@ -74,7 +74,7 @@ def safeSaveData(pkl_path: Union[str, Path], db: Any, should_append:bool=False, 
         try:
             with open(pkl_path, file_mode) as dbfile: 
                 # source, destination
-                pickle.dump(db, dbfile)
+                pickle.dump(db, dbfile) # _pickle.PicklingError: Can't pickle <enum 'PipelineSavingScheme'>: it's not the same object as pyphoplacecellanalysis.General.Pipeline.NeuropyPipeline.PipelineSavingScheme
                 dbfile.close()
             # Pickling succeeded
 

@@ -127,7 +127,7 @@ from neuropy.analyses.placefields import Position
 from neuropy.core.session.SessionSelectionAndFiltering import build_custom_epochs_filters
 from neuropy.core.session.Formats.BaseDataSessionFormats import DataSessionFormatRegistryHolder, DataSessionFormatBaseRegisteredClass
 from neuropy.core.session.Formats.Specific.BapunDataSessionFormat import BapunDataSessionFormatRegisteredClass
-from neuropy.core.epoch import Epoch, EpochsAccessor, ensure_dataframe, ensure_Epoch
+
 
 
 @function_attributes(short_name=None, tags=['bapun'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-09-19 17:50', related_items=[])
@@ -140,6 +140,13 @@ def final_process_bapun_all_comps(curr_active_pipeline, posthoc_save: bool=True,
     
     from pyphoplacecellanalysis.General.Pipeline.NeuropyPipeline import NeuropyPipeline
     from pyphoplacecellanalysis.General.Batch.NonInteractiveProcessing import batch_extended_computations
+    from neuropy.core.session.Formats.BaseDataSessionFormats import HardcodedProcessingParameters
+    from neuropy.core.session.Formats.Specific.BapunDataSessionFormat import BapunDataSessionFormatRegisteredClass
+    from neuropy.core.epoch import Epoch, ensure_dataframe, ensure_Epoch, EpochsAccessor
+    from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import build_contextual_pf2D_decoder, decode_using_contextual_pf2D_decoder
+
+    hardcoded_params: HardcodedProcessingParameters = BapunDataSessionFormatRegisteredClass._get_session_specific_parameters(session_context=curr_active_pipeline.get_session_context())
+    hardcoded_params
 
 
     active_data_mode_name = 'bapun'
@@ -149,6 +156,9 @@ def final_process_bapun_all_comps(curr_active_pipeline, posthoc_save: bool=True,
     active_data_session_types_registered_classes_dict = DataSessionFormatRegistryHolder.get_registry_data_session_type_class_name_dict()
 
 
+    print(f'hardcoded_params.decoder_building_session_names: {hardcoded_params.decoder_building_session_names}')
+    print(f'hardcoded_params.non_global_activity_session_names: {hardcoded_params.non_global_activity_session_names}')
+    
     print(f'active_data_session_types_registered_classes_dict: {active_data_session_types_registered_classes_dict}')
     active_data_mode_registered_class = active_data_session_types_registered_classes_dict[active_data_mode_name]
     active_data_mode_type_properties = known_data_session_type_properties_dict[active_data_mode_name]
@@ -170,7 +180,7 @@ def final_process_bapun_all_comps(curr_active_pipeline, posthoc_save: bool=True,
     # active_session_filter_configurations = build_custom_epochs_filters(curr_active_pipeline.sess, epoch_name_includelist=['pre', 'maze1', 'post1', 'maze2', 'post2']) ## ALL possible epochs
 
     # active_session_filter_configurations = build_custom_epochs_filters(curr_active_pipeline.sess, epoch_name_includelist=['maze1', 'maze2', 'maze_GLOBAL']) ## ALL possible epochs
-    active_session_filter_configurations = build_custom_epochs_filters(curr_active_pipeline.sess, epoch_name_includelist=['maze1', 'maze2', 'maze_GLOBAL']) ## ALL possible epochs
+    active_session_filter_configurations = build_custom_epochs_filters(curr_active_pipeline.sess, epoch_name_includelist=hardcoded_params.decoder_building_session_names) ## ALL possible epochs
 
     # active_session_filter_configurations = active_data_mode_registered_class.build_default_filter_functions(sess=curr_active_pipeline.sess)
     # active_session_filter_configurations = build_custom_epochs_filters(curr_active_pipeline.sess, epoch_name_includelist=['pre', 'roam', 'maze', 'sprinkle', 'post']) ## ALL possible epochs
@@ -214,16 +224,16 @@ def final_process_bapun_all_comps(curr_active_pipeline, posthoc_save: bool=True,
 
     ## activity_only_epochs_df:
     epochs_df = ensure_dataframe(deepcopy(curr_active_pipeline.sess.epochs))
-    # activity_only_epochs_df: pd.DataFrame = epochs_df[epochs_df['label'].isin(['maze1', 'maze2', 'maze_GLOBAL'])]
 
-    activity_only_epochs_df: pd.DataFrame = epochs_df[epochs_df['label'].isin(['maze1', 'maze2'])].epochs.get_non_overlapping_df()
+    activity_only_epochs_df: pd.DataFrame = epochs_df[epochs_df['label'].isin(hardcoded_params.non_global_activity_session_names)].epochs.get_non_overlapping_df()
     activity_only_epochs: Epoch = ensure_Epoch(activity_only_epochs_df, metadata=curr_active_pipeline.sess.epochs.metadata)
 
     ## GLobal only ('maze_GLOBAL')
     epochs_df = ensure_dataframe(deepcopy(curr_active_pipeline.sess.epochs))
-    global_activity_only_epochs_df: pd.DataFrame = epochs_df[epochs_df['label'].isin(['maze_GLOBAL'])].epochs.get_non_overlapping_df()
+    global_activity_only_epochs_df: pd.DataFrame = epochs_df[epochs_df['label'].isin([hardcoded_params.global_session_name])].epochs.get_non_overlapping_df()
     global_activity_only_epoch: Epoch = ensure_Epoch(global_activity_only_epochs_df, metadata=curr_active_pipeline.sess.epochs.metadata)
 
+    
     ## OUTPUTS: activity_only_epochs, global_activity_only_epoch
 
     ## OUTPUTS: activity_only_epoch
@@ -299,7 +309,7 @@ def final_process_bapun_all_comps(curr_active_pipeline, posthoc_save: bool=True,
     if "maze_GLOBAL" not in maze_epochs_obj.labels.tolist():
         _bak_Epoch = deepcopy(curr_active_pipeline.sess.epochs)
         curr_active_pipeline.sess.epochs_bak = _bak_Epoch
-        maze_epochs_obj.adding_global_epoch_row(global_epoch_name='maze_GLOBAL', first_included_epoch_name=None, last_included_epoch_name=None)
+        maze_epochs_obj.adding_global_epoch_row(global_epoch_name=hardcoded_params.global_session_name, first_included_epoch_name=None, last_included_epoch_name=None)
         maze_epochs_obj
         # maze_epochs_obj
         # curr_active_pipeline.sess.epochs = deepcopy(maze_epochs_obj)
@@ -317,41 +327,52 @@ def final_process_bapun_all_comps(curr_active_pipeline, posthoc_save: bool=True,
     from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.EpochComputationFunctions import EpochComputationFunctions, EpochComputationsComputationsContainer
 
     curr_active_pipeline.reload_default_computation_functions()
-    enabled_filter_names=None
-    valid_EpochComputations_result: EpochComputationsComputationsContainer = curr_active_pipeline.global_computation_results.computed_data.get('EpochComputations', None)
-    a_new_fully_generic_result = None
-    if valid_EpochComputations_result is not None:
-        a_new_fully_generic_result: GenericDecoderDictDecodedEpochsDictResult = valid_EpochComputations_result.a_generic_decoder_dict_decoded_epochs_dict_result
 
-    if a_new_fully_generic_result is None:
-        # if `KeyError: 'TrialByTrialActivity'` recompute
-        print(f'EpochComputations is not computed, computing it...')
-        curr_active_pipeline.perform_specific_computation(computation_functions_name_includelist=['non_PBE_epochs_results', 'generalized_specific_epochs_decoding'], enabled_filter_names=curr_active_pipeline.active_config_names, fail_on_exception=True, debug_print=False)    
-        valid_EpochComputations_result = curr_active_pipeline.global_computation_results.computed_data.get('EpochComputations', None) ## try again to get the result
-        assert valid_EpochComputations_result is not None, f"valid_EpochComputations_result is None even after forcing recomputation!!"
-        a_new_fully_generic_result = valid_EpochComputations_result.a_generic_decoder_dict_decoded_epochs_dict_result
-        print(f'\t done.')
-        
+
+    # try:
+    #     enabled_filter_names=None
+    #     valid_EpochComputations_result: EpochComputationsComputationsContainer = curr_active_pipeline.global_computation_results.computed_data.get('EpochComputations', None)
+    #     a_new_fully_generic_result = None
+    #     if valid_EpochComputations_result is not None:
+    #         a_new_fully_generic_result: GenericDecoderDictDecodedEpochsDictResult = valid_EpochComputations_result.a_generic_decoder_dict_decoded_epochs_dict_result
+
+    #     if a_new_fully_generic_result is None:
+    #         # if `KeyError: 'TrialByTrialActivity'` recompute
+    #         print(f'EpochComputations is not computed, computing it...')
+    #         curr_active_pipeline.perform_specific_computation(computation_functions_name_includelist=['non_PBE_epochs_results', 'generalized_specific_epochs_decoding'], enabled_filter_names=curr_active_pipeline.active_config_names, fail_on_exception=True, debug_print=False)    
+    #         valid_EpochComputations_result = curr_active_pipeline.global_computation_results.computed_data.get('EpochComputations', None) ## try again to get the result
+    #         assert valid_EpochComputations_result is not None, f"valid_EpochComputations_result is None even after forcing recomputation!!"
+    #         a_new_fully_generic_result = valid_EpochComputations_result.a_generic_decoder_dict_decoded_epochs_dict_result
+    #         print(f'\t done.')
+                
+    # except MemoryError as e:
+    #     print(f'memory error: {e}. Skipping.')
+    #     pass
+
+    # except Exception as e:
+    #     raise e
 
 
     # ACTUALLY BUILD THE PSEUDO 2D: ______________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
-    from neuropy.core.epoch import Epoch, ensure_dataframe, ensure_Epoch, EpochsAccessor
-    from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import build_contextual_pf2D_decoder, decode_using_contextual_pf2D_decoder
 
     ## Build the merged decoder `contextual_pf2D`
-    epochs_to_create_global_from_names = ['maze1', 'maze2', 'maze_GLOBAL']
+    epochs_to_create_global_from_names = hardcoded_params.non_global_activity_session_names # ['maze1', 'maze2'
     # epochs_to_create_global_from_names = ['roam', 'sprinkle']
     contextual_pf2D_dict, contextual_pf2D, contextual_pf2D_Decoder = build_contextual_pf2D_decoder(curr_active_pipeline, epochs_to_create_global_from_names=epochs_to_create_global_from_names)
-
     all_context_filter_epochs_decoder_result, global_only_epoch = decode_using_contextual_pf2D_decoder(curr_active_pipeline, contextual_pf2D_Decoder=contextual_pf2D_Decoder, active_laps_decoding_time_bin_size=0.75)
     # 10m 2s
 
-
     if posthoc_save:
-        print(f'attempting to save the pipeline...')
-        _out = curr_active_pipeline.save_pipeline(saving_mode=PipelineSavingScheme.TEMP_THEN_OVERWRITE)
-        _out = curr_active_pipeline.save_global_computation_results()#save_pipeline(saving_mode=PipelineSavingScheme.TEMP_THEN_OVERWRITE, active_pickle_filename='loadedSessPickle_2025-02-27.pkl')
-        print(f'done.')
+        try:
+            print(f'attempting to save the pipeline...')
+            _out = curr_active_pipeline.save_pipeline(saving_mode=PipelineSavingScheme.TEMP_THEN_OVERWRITE)
+            _out = curr_active_pipeline.save_global_computation_results()#save_pipeline(saving_mode=PipelineSavingScheme.TEMP_THEN_OVERWRITE, active_pickle_filename='loadedSessPickle_2025-02-27.pkl')
+            print(f'\tdone.')
+
+        except Exception as e:
+            print(f'pickling failed sadly with error {e}. Continuing.') 
+            # raise e
+            pass
         
     return curr_active_pipeline
 
