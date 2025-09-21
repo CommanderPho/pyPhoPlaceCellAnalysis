@@ -496,23 +496,26 @@ def decode_using_contextual_pf2D_decoder(curr_active_pipeline, contextual_pf2D_D
     # get_proper_global_spikes_df(owning_pipeline_reference, minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz, included_qclu_values=included_qclu_values)
     # global_measured_position_df: pd.DataFrame = deepcopy(curr_active_pipeline.sess.position.to_dataframe()).dropna(subset=['x', 'y']) # computation_result.sess.position.to_dataframe()
     all_context_filter_epochs_decoder_result: DecodedFilterEpochsResult = contextual_pf2D_Decoder.decode_specific_epochs(spikes_df=deepcopy(global_spikes_df), filter_epochs=ensure_dataframe(epochs_to_decode_dict[desired_global_created_epoch_name]), decoding_time_bin_size=active_laps_decoding_time_bin_size, debug_print=False)
-    # for a_p_x_given_n in all_context_filter_epochs_decoder_result.p_x_given_n:
-    
+
+    all_context_filter_epochs_decoder_result.marginal_z_list = [DynamicContainer(p_x_given_n=None, most_likely_positions_2D=None) for i in np.arange(all_context_filter_epochs_decoder_result.num_filter_epochs)]
+    # for a_p_x_given_n in all_context_filter_epochs_decoder_result.p_x_given_n_list:
+    #     ## ADD CORRECT CONTEXT DECODING MARGINALS:
+    #     # n_x_bins, n_y_bins, n_contexts, n_t_bins = np.shape(a_p_x_given_n) # (41, 63, 2, 51974)
+    #     marginal_z = np.nansum(a_p_x_given_n, axis=(0, 1)) 
+    #     marginal_z = marginal_z / np.sum(marginal_z, axis=0, keepdims=True) # sum over all directions for each time_bin (so there's a normalized distribution at each timestep)
+    #     all_context_filter_epochs_decoder_result.marginal_z = DynamicContainer(p_x_given_n=marginal_z, most_likely_positions_2D=None)
+
     all_context_filter_epochs_decoder_result: SingleEpochDecodedResult = all_context_filter_epochs_decoder_result.get_result_for_epoch(0)
-    all_context_filter_epochs_decoder_result
     ## OUTPUTS: contextual_pf2D_dict, contextual_pf2D, contextual_pf2D_Decoder, all_context_filter_epochs_decoder_result
     # 2m 35.5s
 
     ## ADD CORRECT CONTEXT DECODING MARGINALS:
-
     ## INPUTS: all_context_filter_epochs_decoder_result
     # all_context_filter_epochs_decoder_result.marginal_z
     p_x_given_n = all_context_filter_epochs_decoder_result.p_x_given_n
     n_x_bins, n_y_bins, n_contexts, n_t_bins = np.shape(p_x_given_n) # (41, 63, 2, 51974)
-
     marginal_z = np.nansum(p_x_given_n, axis=(0, 1)) 
     marginal_z = marginal_z / np.sum(marginal_z, axis=0, keepdims=True) # sum over all directions for each time_bin (so there's a normalized distribution at each timestep)
-    # marginal_z
     # print(f'marginal_z.shape: {np.shape(marginal_z)}')
 
     # most_likely_context_idx = np.argmax(marginal_z, axis=0)
@@ -622,7 +625,7 @@ def build_combined_time_synchronized_Bapun_decoders_window(curr_active_pipeline,
         included_filter_names = ['sprinkle', 'roam']
         
     
-    def _merge_plotters(a_controlling_widget, is_controlling_widget_external=False, debug_print=False, **_out_sync_plotters) -> GenericPyQtGraphContainer:
+    def _subfn_merge_plotters(a_controlling_widget, is_controlling_widget_external=False, debug_print=False, **_out_sync_plotters) -> GenericPyQtGraphContainer:
         """ implicitly captures title from the outer function """
         if len(_out_sync_plotters) > 0:
             # out_Width_Height_Tuple = list(_out_sync_plotters.values())[0].desired_widget_size(desired_page_height = 600.0, debug_print=True)
@@ -736,7 +739,7 @@ def build_combined_time_synchronized_Bapun_decoders_window(curr_active_pipeline,
         all_context_filter_epochs_decoder_result: SingleEpochDecodedResult = continuously_decoded_pseudo2D_decoder_dict[a_time_bin_size] ## ALWAYS GET THE MOST RECENT
         marginal_z: NDArray = all_context_filter_epochs_decoder_result.marginal_z.p_x_given_n
 
-        individual_decoder_decoding_results = {k:v for k, v in directional_decoders_decode_result.continuously_decoded_result_cache_dict[1.0].items() if k != 'pseudo2D'} ## NOT USED HERE:
+        # individual_decoder_decoding_results = {k:v for k, v in directional_decoders_decode_result.continuously_decoded_result_cache_dict[a_time_bin_size].items() if k != 'pseudo2D'} ## NOT USED HERE:
 
         # one_step_decoder_dummy_dict = {}
         # for k, v in individual_decoder_decoding_results.items():
@@ -744,10 +747,11 @@ def build_combined_time_synchronized_Bapun_decoders_window(curr_active_pipeline,
 
         ## HACK post-hoc: build correct 2D results from 3D only:
         one_step_decoder_dummy_dict = {}
-        for i, (k, v) in enumerate(individual_decoder_decoding_results.items()):
+        # for i, (k, v) in enumerate(individual_decoder_decoding_results.items()):
+        for i, a_filter_name in enumerate(included_filter_names):
             a_single_decoder_p_x_given_n = np.squeeze(all_context_filter_epochs_decoder_result.p_x_given_n[:, :, i, :])
             a_single_decoder_p_x_given_n = a_single_decoder_p_x_given_n / np.nansum(a_single_decoder_p_x_given_n, axis=(0, 1), keepdims=True)
-            one_step_decoder_dummy_dict[k] = DummyOneStepDecoder(xbin=deepcopy(pseudo3D_decoder.xbin), ybin=deepcopy(pseudo3D_decoder.ybin), time_window_centers=deepcopy(all_context_filter_epochs_decoder_result.time_bin_container.centers),
+            one_step_decoder_dummy_dict[a_filter_name] = DummyOneStepDecoder(xbin=deepcopy(pseudo3D_decoder.xbin), ybin=deepcopy(pseudo3D_decoder.ybin), time_window_centers=deepcopy(all_context_filter_epochs_decoder_result.time_bin_container.centers),
                                                                   p_x_given_n=deepcopy(a_single_decoder_p_x_given_n))
 
 
@@ -758,6 +762,7 @@ def build_combined_time_synchronized_Bapun_decoders_window(curr_active_pipeline,
         all_context_filter_epochs_decoder_result = None
         marginal_z = None
 
+    # Loop over mazes/epochs: ____________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
     for a_filter_name in included_filter_names:
         active_session_configuration_context = curr_active_pipeline.filtered_contexts[a_filter_name]
         computation_result = curr_active_pipeline.computation_results[a_filter_name]
@@ -791,7 +796,7 @@ def build_combined_time_synchronized_Bapun_decoders_window(curr_active_pipeline,
         _out_sync_plotters[a_filter_name] = curr_position_decoder_plotter
     # END for a_filter_name in included_filter_names...
 
-    _out_container = _merge_plotters(controlling_widget, is_controlling_widget_external=is_controlling_widget_external, **_out_sync_plotters)
+    _out_container = _subfn_merge_plotters(controlling_widget, is_controlling_widget_external=is_controlling_widget_external, **_out_sync_plotters)
     
 
     if (all_context_filter_epochs_decoder_result is not None) and (controlling_widget is not None):
