@@ -945,6 +945,21 @@ class DecodedFilterEpochsResult(HDF_SerializationMixin, AttrsBasedClassHelperMix
         fields_to_single_epoch_fields_dict = dict(zip(['most_likely_positions_list', 'p_x_given_n_list', 'marginal_x_list', 'marginal_y_list', 'marginal_z_list', 'most_likely_position_indicies_list', 'nbins', 'time_bin_containers', 'time_bin_edges'],
             ['most_likely_positions', 'p_x_given_n', 'marginal_x', 'marginal_y', 'marginal_z', 'most_likely_position_indicies', 'nbins', 'time_bin_container', 'time_bin_edges'])) # maps list names to single-epoch specific field names
         
+        for field_name in single_epoch_field_names:
+            if (not hasattr(self, field_name)) or (getattr(self, field_name, None) is None):
+                print(f'WARNING: missing field_name: {field_name}. Setting and continuing.')
+                if field_name in ['marginal_z_list']: 
+                    setattr(self, field_name, [None for i in np.arange(self.num_filter_epochs)])
+                else:                  
+                    setattr(self, field_name, [None for i in np.arange(self.num_filter_epochs)])
+                
+            valid_attr_value = getattr(self, field_name)            
+            # print(f'len(valid_attr_value): {len(valid_attr_value)}')
+            assert active_epoch_idx < len(valid_attr_value), f"for field_name: {field_name}\n\tactive_epoch_idx: {active_epoch_idx} len(valid_attr_value): {len(valid_attr_value)}"
+            
+        # END for field_name in single_epoch_field_names...
+
+
         values_dict = {fields_to_single_epoch_fields_dict[field_name]:getattr(self, field_name)[active_epoch_idx] for field_name in single_epoch_field_names}
         # a_posterior = self.p_x_given_n_list[active_epoch_idx].copy()
         active_epoch_info_tuple = tuple(ensure_dataframe(self.active_filter_epochs).itertuples(name='EpochTuple'))[active_epoch_idx] # just dumb-indexes into the epochs array
