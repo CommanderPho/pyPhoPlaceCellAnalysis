@@ -1,7 +1,18 @@
 # AnimalTrajectoryPlottingMixin
 import numpy as np
+import pandas as pd
+
 import pyphoplacecellanalysis.External.pyqtgraph as pg
 from qtpy import QtCore, QtWidgets
+
+def downsample_evenly(df: pd.DataFrame, max_samples: int) -> pd.DataFrame:
+    if max_samples is None:
+        return df ## unchanged
+    if len(df) <= max_samples:
+        return df
+    idx = np.linspace(0, len(df) - 1, max_samples, dtype=int)
+    return df.iloc[idx]
+
 
 class AnimalTrajectoryPlottingMixin:
     """ Implementors render a trajectory through space
@@ -10,7 +21,7 @@ class AnimalTrajectoryPlottingMixin:
     """
     
     @property
-    def AnimalTrajectoryPlottingMixin_all_time_pos_df(self):
+    def AnimalTrajectoryPlottingMixin_all_time_pos_df(self) -> pd.DataFrame:
         """The AnimalTrajectoryPlottingMixin_all_time_pos_df property."""
         if getattr(self.params, 'AnimalTrajectoryPlottingMixin_all_time_pos_df', None) is not None:
             return self.params.AnimalTrajectoryPlottingMixin_all_time_pos_df
@@ -22,7 +33,7 @@ class AnimalTrajectoryPlottingMixin:
     #     self.active_time_dependent_placefields.all_time_filtered_pos_df = value
     
     @property
-    def AnimalTrajectoryPlottingMixin_filtered_pos_df(self):
+    def AnimalTrajectoryPlottingMixin_filtered_pos_df(self) -> pd.DataFrame:
         """The filtered_pos_df property."""
         if getattr(self.params, 'AnimalTrajectoryPlottingMixin_filtered_pos_df', None) is not None:
             return self.params.AnimalTrajectoryPlottingMixin_filtered_pos_df        
@@ -34,12 +45,18 @@ class AnimalTrajectoryPlottingMixin:
 
 
     @property
-    def curr_recent_trajectory(self):
+    def curr_recent_trajectory(self) -> pd.DataFrame:
         """The animal's most recent trajectory preceding self.active_time_dependent_placefields.last_t"""
         # Fixed time ago backward:
         earliest_trajectory_start_time = self.last_t - self.params.recent_position_trajectory_max_seconds_ago # gets the earliest start time for the current trajectory to display
+        earliest_traj_df: pd.DataFrame = self.AnimalTrajectoryPlottingMixin_all_time_pos_df.position.time_sliced(earliest_trajectory_start_time, self.last_t)[['t','x','y']] # Get all rows within the most recent time
+        
+        if self.params.recent_position_trajectory_max_num_plotted_samples is not None:        
+            ## downsample the trajectory evenly:
+            earliest_traj_df = downsample_evenly(df=earliest_traj_df, max_samples=self.params.recent_position_trajectory_max_num_plotted_samples)
+
         # return self.active_time_dependent_placefields.all_time_filtered_pos_df.position.time_sliced(earliest_trajectory_start_time, self.last_t)[['t','x','y']] # Get all rows within the most recent time
-        return self.AnimalTrajectoryPlottingMixin_all_time_pos_df.position.time_sliced(earliest_trajectory_start_time, self.last_t)[['t','x','y']] # Get all rows within the most recent time
+        return earliest_traj_df
     
     
     @property
@@ -57,6 +74,8 @@ class AnimalTrajectoryPlottingMixin:
     def AnimalTrajectoryPlottingMixin_on_setup(self):
         """ perfrom setup/creation of widget/graphical/data objects. Only the core objects are expected to exist on the implementor (root widget, etc) """
         self.params.recent_position_trajectory_max_seconds_ago = 7.0
+        # self.params.recent_position_trajectory_max_num_plotted_samples = 10 ## at most 10 lagging position samples, otherwise the line is painted way too thick and opaque
+        self.params.recent_position_trajectory_max_num_plotted_samples = 10 ## at most 10 lagging position samples, otherwise the line is painted way too thick and opaque
         
         self.params.trajectory_path_current_position_marker_size = 25.0
         # self.params.trajectory_path_marker_max_fill_opacity = 255
@@ -111,7 +130,7 @@ class AnimalTrajectoryPlottingMixin:
         ## Build Current Visual Settings:
         if curr_num_points > 0:
             # Fixed size for all points:
-            curr_desired_sizes = np.full((curr_num_points,), 20.0) # build an array of all ones of the same size as the number of points in the current path
+            curr_desired_sizes = np.full((curr_num_points,), 10.0) # build an array of all ones of the same size as the number of points in the current path
             # Decaying size over time
             # decay_sizes = (curr_trajectory_rows['t'].to_numpy() - curr_occupancy_plotter.last_t) + curr_occupancy_plotter.params.recent_position_trajectory_max_seconds_ago
             # curr_desired_sizes = decay_sizes
@@ -120,7 +139,7 @@ class AnimalTrajectoryPlottingMixin:
             # curr_desired_sizes = np.interp(curr_desired_sizes, [0, curr_occupancy_plotter.params.recent_position_trajectory_max_seconds_ago], [0,20]) # map onto a size range from 0-20
 
             # Fading Color over time:
-            desired_symbol_brushes = [pg.mkBrush(255, 255, 255, np.interp(i, [0,(curr_num_points-1)], [0, self.params.trajectory_path_marker_max_fill_opacity])) for i in np.arange(curr_num_points-1)] # -1 for the special last symbol
+            desired_symbol_brushes = [pg.mkBrush(255, 255, 255, np.interp(i, [0, (curr_num_points-1)], [0, self.params.trajectory_path_marker_max_fill_opacity])) for i in np.arange(curr_num_points-1)] # -1 for the special last symbol
             # Fixed Color for all but the last point
             # fading_brush_color = pg.mkBrush(50, 50, 50, 100) # pg.mkBrush(R, G, B, A)
             # desired_symbol_brushes = [fading_brush_color] * (curr_num_points - 1) # -1 for the special last symbol
@@ -128,6 +147,10 @@ class AnimalTrajectoryPlottingMixin:
             ### Current Symbol:
             curr_desired_sizes[-1] = self.params.trajectory_path_current_position_marker_size # only current point is big
             desired_symbol_brushes.append(self.params.trajectory_path_current_position_marker_brush)
+
+            if self.params.debug_print:
+                print(f'curr_desired_sizes: {curr_desired_sizes}')
+                print(f'desired_symbol_brushes: {desired_symbol_brushes}')
 
             self.ui.trajectory_curve.setData(x=curr_trajectory_rows.x.to_numpy(), y=curr_trajectory_rows.y.to_numpy(), symbolSize=list(curr_desired_sizes), symbolBrush=desired_symbol_brushes) 
         else:
