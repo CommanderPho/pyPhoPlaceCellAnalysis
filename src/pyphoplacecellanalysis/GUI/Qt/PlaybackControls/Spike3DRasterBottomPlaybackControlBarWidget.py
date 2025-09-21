@@ -904,8 +904,7 @@ class Spike3DRasterBottomPlaybackControlBar(ComboBoxCtrlOwningMixin, QWidget):
     # ==================================================================================================================== #
     # eventFilter                                                                                                          #
     # ==================================================================================================================== #
-
-
+    
     def eventFilter(self, source, event):
         """Handle focus events to change styles dynamically."""
         if source == self.ui.jumpToHourMinSecTimeEdit:
