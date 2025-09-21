@@ -132,7 +132,7 @@ from neuropy.utils.mixins.AttrsClassHelpers import serialized_attribute_field, s
 from pyphoplacecellanalysis.General.Model.ComputationResults import ComputedResult
 from pyphoplacecellanalysis.SpecificResults.AcrossSessionResults import AcrossSessionIdentityDataframeAccessor
 from neuropy.core.flattened_spiketrains import SpikesAccessor
-
+from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import DecodedFilterEpochsResult, SingleEpochDecodedResult
 
 @function_attributes(short_name=None, tags=['bapun'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-09-19 17:50', related_items=[])
 def final_process_bapun_all_comps(curr_active_pipeline, posthoc_save: bool=True, override_parameters_flat_keypaths_dict=None):
@@ -503,6 +503,42 @@ class DecodeSpecificEpochsResultWithDecodingInfo(ComputedResult):
         ## Actually instead of returning, I think it should call super like so:
         # super().to_hdf(self, file_path, key, **kwargs)
 
+
+    @classmethod
+    def init_by_decoding(cls, decoding_context: IdentifyingContext, decoder: BasePositionDecoder, spikes_df: pd.DataFrame, filter_epochs: Epoch, decoding_time_bin_size: float, debug_print=False, **kwargs):
+        """ Internally wraps `decoder.decode_specific_epochs(...)` to decode the specified epochs
+        
+        Usage:
+                from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import DecodedFilterEpochsResult, SingleEpochDecodedResult
+                from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import DecodeSpecificEpochsResultWithDecodingInfo
+
+                ## INPUTS: contextual_pf2D_Decoder, curr_active_pipeline
+                ## Decode PBEs please
+                pbes = deepcopy(curr_active_pipeline.sess.pbe)
+                # ripple_decoding_time_bin_size: float = 0.025 # 25ms
+                ripple_decoding_time_bin_size: float = 0.060 # 25ms
+                global_spikes_df: pd.DataFrame = deepcopy(curr_active_pipeline.sess.spikes_df)
+                pbes_full_result: DecodeSpecificEpochsResultWithDecodingInfo = DecodeSpecificEpochsResultWithDecodingInfo.init_by_decoding(decoding_context=IdentifyingContext(epoch_name='pbe'),
+                                                                                                                                        decoder=contextual_pf2D_Decoder, spikes_df=deepcopy(global_spikes_df), filter_epochs=ensure_dataframe(pbes), decoding_time_bin_size=ripple_decoding_time_bin_size)
+
+
+                ## 18m at 60ms
+
+                ## OUTPUTS: pbes_full_result
+
+                
+                pbes_full_result_pkl_output_path: Path = curr_active_pipeline.get_output_path().joinpath('custom_pbes_full_result.pkl')
+                pbes_full_result.save(pkl_output_path=pbes_full_result_pkl_output_path)
+                print(f'pbes_full_result_pkl_output_path: "{pbes_full_result_pkl_output_path.as_posix()}"')
+
+
+
+
+        """
+        filter_epochs = ensure_dataframe(filter_epochs)
+        global_spikes_df: pd.DataFrame = deepcopy(spikes_df)
+        decoder_result: DecodedFilterEpochsResult = decoder.decode_specific_epochs(spikes_df=deepcopy(global_spikes_df), filter_epochs=filter_epochs, decoding_time_bin_size=decoding_time_bin_size, debug_print=debug_print, **kwargs)
+        return cls(decoding_context=decoding_context, decoder=deepcopy(decoder), decoder_result=decoder_result, decoded_epochs=filter_epochs, spikes_df=global_spikes_df)
 
 
 @function_attributes(short_name=None, tags=['IMPORTANT', 'pseduo3D', 'pseudoND', 'context-decoding', 'bapun', 'WORKING'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-09-09 10:50', related_items=[])
