@@ -938,9 +938,12 @@ class DecodedFilterEpochsResult(HDF_SerializationMixin, AttrsBasedClassHelperMix
         NOTE: active_epoch_idx is the "dumb-index" not a smarter epoch id or label or anything like that. See self.get_result_for_epoch_at_time(...) for smarter access.
         
         """
-        single_epoch_field_names = ['most_likely_positions_list', 'p_x_given_n_list', 'marginal_x_list', 'marginal_y_list', 'most_likely_position_indicies_list', 'nbins', 'time_bin_containers', 'time_bin_edges'] # a_decoder_decoded_epochs_result._test_find_fields_by_shape_metadata()
-        fields_to_single_epoch_fields_dict = dict(zip(['most_likely_positions_list', 'p_x_given_n_list', 'marginal_x_list', 'marginal_y_list', 'most_likely_position_indicies_list', 'nbins', 'time_bin_containers', 'time_bin_edges'],
-            ['most_likely_positions', 'p_x_given_n', 'marginal_x', 'marginal_y', 'most_likely_position_indicies', 'nbins', 'time_bin_container', 'time_bin_edges'])) # maps list names to single-epoch specific field names
+        if active_epoch_idx >= len(self.active_filter_epochs):
+            raise ValueError(f"Requested epoch {active_epoch_idx}, but only {len(self.active_filter_epochs)} available.")
+
+        single_epoch_field_names = ['most_likely_positions_list', 'p_x_given_n_list', 'marginal_x_list', 'marginal_y_list', 'marginal_z_list', 'most_likely_position_indicies_list', 'nbins', 'time_bin_containers', 'time_bin_edges'] # a_decoder_decoded_epochs_result._test_find_fields_by_shape_metadata()
+        fields_to_single_epoch_fields_dict = dict(zip(['most_likely_positions_list', 'p_x_given_n_list', 'marginal_x_list', 'marginal_y_list', 'marginal_z_list', 'most_likely_position_indicies_list', 'nbins', 'time_bin_containers', 'time_bin_edges'],
+            ['most_likely_positions', 'p_x_given_n', 'marginal_x', 'marginal_y', 'marginal_z', 'most_likely_position_indicies', 'nbins', 'time_bin_container', 'time_bin_edges'])) # maps list names to single-epoch specific field names
         
         values_dict = {fields_to_single_epoch_fields_dict[field_name]:getattr(self, field_name)[active_epoch_idx] for field_name in single_epoch_field_names}
         # a_posterior = self.p_x_given_n_list[active_epoch_idx].copy()
@@ -1194,6 +1197,7 @@ class DecodedFilterEpochsResult(HDF_SerializationMixin, AttrsBasedClassHelperMix
         subset.p_x_given_n_list = [subset.p_x_given_n_list[i] for i in old_fashioned_indicies]
         subset.marginal_x_list = [subset.marginal_x_list[i] for i in old_fashioned_indicies]
         subset.marginal_y_list = [subset.marginal_y_list[i] for i in old_fashioned_indicies]
+        subset.marginal_z_list = [subset.marginal_z_list[i] for i in old_fashioned_indicies]
         subset.most_likely_position_indicies_list = [subset.most_likely_position_indicies_list[i] for i in old_fashioned_indicies]
         subset.spkcount = [subset.spkcount[i] for i in old_fashioned_indicies]
         if len(old_fashioned_indicies) > 0:
@@ -1217,7 +1221,7 @@ class DecodedFilterEpochsResult(HDF_SerializationMixin, AttrsBasedClassHelperMix
         """validates a `DecodedFilterEpochsResult` object -- ensuring that all lists are of consistent sizes and that within the lists all the time bins have the correct properties
         """
         def _subfn_check_all_epoch_lists_same_length(a_train_decoded_results):
-            single_epoch_field_names = ['most_likely_positions_list', 'p_x_given_n_list', 'marginal_x_list', 'marginal_y_list', 'most_likely_position_indicies_list', 'nbins', 'time_bin_containers', 'time_bin_edges'] # DecodedFilterEpochsResult._test_find_fields_by_shape_metadata(desired_keys_subset=desired_keys_subset)
+            single_epoch_field_names = ['most_likely_positions_list', 'p_x_given_n_list', 'marginal_x_list', 'marginal_y_list', 'marginal_z_list', 'most_likely_position_indicies_list', 'nbins', 'time_bin_containers', 'time_bin_edges'] # DecodedFilterEpochsResult._test_find_fields_by_shape_metadata(desired_keys_subset=desired_keys_subset)
             list_field_length_dict: Dict[str, int] = {field_name:len(getattr(a_train_decoded_results, field_name)) for field_name in single_epoch_field_names}
             assert np.allclose(np.array(list(list_field_length_dict.values())), a_train_decoded_results.num_filter_epochs), f"np.array(list(list_field_length_dict.values())): {np.array(list(list_field_length_dict.values()))} differs from a_train_decoded_results.num_filter_epochs: {a_train_decoded_results.num_filter_epochs}"
 
@@ -1694,6 +1698,9 @@ class DecodedFilterEpochsResult(HDF_SerializationMixin, AttrsBasedClassHelperMix
                 a_decoded_result.marginal_x_list[i] = curr_unit_marginal_x
             if curr_unit_marginal_y is not None:
                 a_decoded_result.marginal_y_list[i] = curr_unit_marginal_y
+            if curr_unit_marginal_z is not None:
+                a_decoded_result.marginal_z_list[i] = curr_unit_marginal_z          
+
 
             ## END if np.any(is_time_bin_active)
             is_time_bin_active_list.append(is_time_bin_active)
@@ -2322,7 +2329,7 @@ class BasePositionDecoder(HDFMixin, AttrsBasedClassHelperMixin, ContinuousPeakLo
             filter_epochs_decoder_result = cls._build_decode_specific_epochs_result_shell(neuron_IDs=active_decoder.neuron_IDs, spikes_df=spikes_df, filter_epochs=filter_epochs, decoding_time_bin_size=decoding_time_bin_size, use_single_time_bin_per_epoch=use_single_time_bin_per_epoch, debug_print=debug_print)
 
         """
-        filter_epochs_decoder_result = DynamicContainer(most_likely_positions_list=[], p_x_given_n_list=[], marginal_x_list=[], marginal_y_list=[], most_likely_position_indicies_list=[])
+        filter_epochs_decoder_result = DynamicContainer(most_likely_positions_list=[], p_x_given_n_list=[], marginal_x_list=[], marginal_y_list=[], marginal_z_list=[], most_likely_position_indicies_list=[])
         
         if isinstance(filter_epochs, pd.DataFrame):
             filter_epochs_df = filter_epochs
@@ -2377,7 +2384,8 @@ class BasePositionDecoder(HDFMixin, AttrsBasedClassHelperMixin, ContinuousPeakLo
         
         filter_epochs_decoder_result.marginal_x_list = []
         filter_epochs_decoder_result.marginal_y_list = []
-
+        filter_epochs_decoder_result.marginal_z_list = []
+        
         return filter_epochs_decoder_result
 
     @classmethod
@@ -2490,6 +2498,12 @@ class BasePositionDecoder(HDFMixin, AttrsBasedClassHelperMixin, ContinuousPeakLo
                 if filter_epochs_decoder_result.marginal_y_list[invalid_idx] is not None:
                     filter_epochs_decoder_result.marginal_y_list[invalid_idx].most_likely_positions_1D = filter_epochs_decoder_result.marginal_y_list[invalid_idx].most_likely_positions_1D[good_indicies]
                     filter_epochs_decoder_result.marginal_y_list[invalid_idx].p_x_given_n = filter_epochs_decoder_result.marginal_y_list[invalid_idx].p_x_given_n[:, good_indicies]
+                    
+
+                ## marginal_z_list
+                if filter_epochs_decoder_result.marginal_z_list[invalid_idx] is not None:
+                    filter_epochs_decoder_result.marginal_z_list[invalid_idx].most_likely_positions_1D = filter_epochs_decoder_result.marginal_z_list[invalid_idx].most_likely_positions_1D[good_indicies]
+                    filter_epochs_decoder_result.marginal_z_list[invalid_idx].p_x_given_n = filter_epochs_decoder_result.marginal_z_list[invalid_idx].p_x_given_n[:, good_indicies]
                 
 
                 ndim = np.ndim(filter_epochs_decoder_result.p_x_given_n_list[invalid_idx]) # np.shape(filter_epochs_decoder_result.p_x_given_n_list[invalid_idx]) (57, 4, 16)
@@ -3070,6 +3084,34 @@ class BayesianPlacemapPositionDecoder(SerializedAttributesAllowBlockSpecifyingCl
         return new_obj
 
     
+    def add_precomputed_decoded_result(self, decoded_result: SingleEpochDecodedResult):
+        """ post-hoc adds the result computed 
+        """        
+        self.flat_p_x_given_n = decoded_result.flat_p_x_given_n
+        self.p_x_given_n = deepcopy(decoded_result.p_x_given_n)
+        self.most_likely_position_flat_indicies = None
+        self.most_likely_position_indicies = deepcopy(decoded_result.most_likely_position_indicies)
+        self.most_likely_positions = deepcopy(decoded_result.most_likely_positions)
+        
+        if decoded_result.marginal_x is not None:
+            self.marginal.x = deepcopy(decoded_result.marginal_x)
+            self.marginal.x.p_x_given_n_and_x_prev = None
+            self.marginal.x.two_step_most_likely_positions_1D = None
+            
+        if decoded_result.marginal_y is not None:
+            self.marginal.y = deepcopy(decoded_result.marginal_y)
+            self.marginal.y.p_x_given_n_and_x_prev = None
+            self.marginal.y.two_step_most_likely_positions_1D = None
+            
+
+        if decoded_result.marginal_z is not None:
+            self.marginal.z = deepcopy(decoded_result.marginal_z)
+            self.marginal.z.p_x_given_n_and_x_prev = None
+            self.marginal.z.two_step_most_likely_positions_1D = None
+            
+        self.revised_most_likely_positions = None 
+        
+
     # ==================================================================================================================== #
     # Methods                                                                                                              #
     # ==================================================================================================================== #
