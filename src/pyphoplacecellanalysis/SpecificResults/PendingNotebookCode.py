@@ -127,7 +127,11 @@ from neuropy.analyses.placefields import Position
 from neuropy.core.session.SessionSelectionAndFiltering import build_custom_epochs_filters
 from neuropy.core.session.Formats.BaseDataSessionFormats import DataSessionFormatRegistryHolder, DataSessionFormatBaseRegisteredClass
 from neuropy.core.session.Formats.Specific.BapunDataSessionFormat import BapunDataSessionFormatRegisteredClass
-
+from neuropy.utils.mixins.HDF5_representable import HDF_Converter, HDF_SerializationMixin, HDF_DeserializationMixin
+from neuropy.utils.mixins.AttrsClassHelpers import serialized_attribute_field, serialized_field, non_serialized_field
+from pyphoplacecellanalysis.General.Model.ComputationResults import ComputedResult
+from pyphoplacecellanalysis.SpecificResults.AcrossSessionResults import AcrossSessionIdentityDataframeAccessor
+from neuropy.core.flattened_spiketrains import SpikesAccessor
 
 
 @function_attributes(short_name=None, tags=['bapun'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-09-19 17:50', related_items=[])
@@ -418,6 +422,89 @@ def post_process_non_kdiba(curr_active_pipeline):
 
 
 
+# pbe_decoder_result: DecodedFilterEpochsResult
+# pbe_decoder_result.decoding_time_bin_size
+# pbe_decoder_result.filter_epochs
+
+@define(slots=False, repr=False)
+class DecodeSpecificEpochsResultWithDecodingInfo(ComputedResult):
+    """ solves the age-old problem of passing the decoded epoch results around but missing the decoder info (such as the .xbin, .ybin) or the spikes/epochs used to decode all as might be needed for plotting or use elsewhere
+
+    from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import DecodeSpecificEpochsResultWithDecodingInfo
+    
+    pbes_full_result: DecodeSpecificEpochsResultWithDecodingInfo = DecodeSpecificEpochsResultWithDecodingInfo(decoding_context=IdentifyingContext(epoch_name='pbe'),
+                                            decoder=contextual_pf2D_Decoder, 
+                                            decoder_result=pbe_decoder_result, decoded_epochs=ensure_Epoch(pbes),
+                                            spikes_df=global_spikes_df)
+
+
+    # pbes_full_result
+    """
+    _VersionedResultMixin_version: str = "2025.09.21_0" # to be updated in your IMPLEMENTOR to indicate its version
+    
+    decoding_context: IdentifyingContext = serialized_attribute_field(default=None) # serialized_attribute_field(default=None, is_computable=False, repr=True)
+    decoder: BasePositionDecoder = serialized_field(default=None)
+    decoder_result: DecodedFilterEpochsResult = serialized_field(default=None)
+    decoded_epochs: Epoch = serialized_field(default=None)
+    spikes_df: pd.DataFrame = serialized_field(default=None)
+
+    def to_hdf(self, file_path, key: str, **kwargs):
+        """ Saves the object to key in the hdf5 file specified by file_path
+        
+        Built from `build_processed_session_to_hdf(...)` on 2023-08-02
+        
+        """        # f.create_dataset(f'{key}/neuron_ids', data=a_sess.neuron_ids)
+        from pyphoplacecellanalysis.SpecificResults.AcrossSessionResults import AcrossSessionsResults # for build_neuron_identity_table_to_hdf
+        from pyphoplacecellanalysis.SpecificResults.AcrossSessionResults import AcrossSessionIdentityDataframeAccessor
+        from neuropy.core.flattened_spiketrains import SpikesAccessor
+
+        # f.create_dataset(f'{key}/shank_ids', data=self.shank_ids)            
+        session_context = self.decoding_context 
+        session_group_key: str = "/" + session_context.get_description(separator="/", include_property_names=False) # 'kdiba/gor01/one/2006-6-08_14-26-15'
+        session_uid: str = session_context.get_description(separator="|", include_property_names=False)
+        # print(f'session_group_key: {session_group_key}')
+
+        # self.decoder.to_hdf(file_path=file_path, key=f"{session_group_key}/decoder")
+        self.decoder_result.to_hdf(file_path=file_path, key=f"{session_group_key}/decoder_result")
+        self.decoded_epochs.to_hdf(file_path=file_path, key=f"{session_group_key}/decoded_epochs")
+        # self.spikes_df.to_hdf(file_path=file_path, key=f"{session_group_key}/spikes_df")
+        
+        # AcrossSessionsResults.build_neuron_identity_table_to_hdf(file_path, key=session_group_key, spikes_df=self.spikes_df, session_uid=session_uid)
+
+
+        # ## Global Computations
+        # self._export_global_computations_to_hdf(file_path, key=key)
+
+        # # Filtered Session Results:
+        # for an_epoch_name, an_epoch_context in self.filtered_contexts.items():
+        #     filter_context_key:str = "/" + an_epoch_context.get_description(separator="/", include_property_names=False) # '/kdiba/gor01/one/2006-6-08_14-26-15/maze1'
+        #     # print(f'\tfilter_context_key: {filter_context_key}')
+        #     with tb.open_file(file_path, mode='a') as f:
+        #         a_filter_group = f.create_group(session_group_key, an_epoch_name, title='the result of a filter function applied to the session.', createparents=True)
+
+        #     filtered_session = self.filtered_sessions[an_epoch_name]
+        #     filtered_session.to_hdf(file_path=file_path, key=f"{filter_context_key}/sess")
+
+        #     a_results = self.computation_results[an_epoch_name]
+        #     a_computed_data = a_results['computed_data']
+        #     a_computed_data.pf1D.to_hdf(file_path=file_path, key=f"{filter_context_key}/pf1D") # damn this will be called with the `tb` still having the thingy open
+        #     a_computed_data.pf2D.to_hdf(file_path=file_path, key=f"{filter_context_key}/pf2D")
+        #     ## TODO: encode the rest of the computed_data
+
+        #     try:
+        #         a_computed_data.pf1D_dt.to_hdf(file_path=file_path, key=f"{filter_context_key}/pf1D_dt") # damn this will be called with the `tb` still having the thingy open
+        #         a_computed_data.pf2D_dt.to_hdf(file_path=file_path, key=f"{filter_context_key}/pf2D_dt")
+        #     except BaseException:
+        #         print(f'could not output time-dependent placefields to .h5. Skipping.')
+        #         pass
+
+        # Done, in future could potentially return the properties that it couldn't serialize so the defaults can be tried on them.
+        # or maybe returns groups? a_filter_group
+        ## Actually instead of returning, I think it should call super like so:
+        # super().to_hdf(self, file_path, key, **kwargs)
+
+
+
 @function_attributes(short_name=None, tags=['IMPORTANT', 'pseduo3D', 'pseudoND', 'context-decoding', 'bapun', 'WORKING'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-09-09 10:50', related_items=[])
 def build_contextual_pf2D_decoder(curr_active_pipeline, epochs_to_create_global_from_names = ['roam', 'sprinkle']):
     """ The generalized context decoder for Bapun session, which is created out of the specified `epochs_to_create_global_from_names` and then used to decode the 'maze_any' epoch at the specified time bin size.
@@ -556,7 +643,7 @@ def _add_context_marginal_to_timeline(active_2d_plot, a_filter_epochs_decoded_re
     marginal_z = np.nansum(p_x_given_n, axis=(0, 1)) 
     marginal_z = marginal_z / np.sum(marginal_z, axis=0, keepdims=True) # sum over all directions for each time_bin (so there's a normalized distribution at each timestep)
     # print(f'marginal_z.shape: {np.shape(marginal_z)}')
-    _out = active_2d_plot.add_docked_marginal_track(name=name, time_window_centers=deepcopy(a_filter_epochs_decoded_result.time_bin_container.centers), a_1D_posterior=marginal_z, a_variable_name='p_x_given_n')
+    _out = active_2d_plot.add_docked_marginal_track(name=name, time_window_centers=deepcopy(a_filter_epochs_decoded_result.time_bin_container.centers), a_1D_posterior=marginal_z, a_variable_name='p_x_given_n', posterior_heatmap_imshow_kwargs=dict())
     
     return _out # identifier_name, widget, matplotlib_fig, matplotlib_fig_axes, dock_item = _out
 
@@ -580,7 +667,7 @@ def _add_context_decoded_epoch_marginals_to_timeline(active_2d_plot, decoded_epo
     slices_posteriors = [np.nansum(a_p_x_given_x, axis=(0, 1)) for a_p_x_given_x in decoded_epochs_result.p_x_given_n_list]
     slices_posteriors = [(marginal_z / np.sum(marginal_z, axis=0, keepdims=True)) for marginal_z in slices_posteriors]
 
-    _out_epochs_tracks = active_2d_plot.add_docked_decoded_posterior_slices_track(name=name, slices_time_window_centers=decoded_epochs_result.time_window_centers, slices_posteriors=slices_posteriors, measured_position_df=None)
+    _out_epochs_tracks = active_2d_plot.add_docked_decoded_posterior_slices_track(name=name, slices_time_window_centers=decoded_epochs_result.time_window_centers, slices_posteriors=slices_posteriors, measured_position_df=None, posterior_heatmap_imshow_kwargs=dict())
     return _out_epochs_tracks
 
 

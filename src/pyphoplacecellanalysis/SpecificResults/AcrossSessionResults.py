@@ -5098,7 +5098,13 @@ class AcrossSessionIdentityDataframeAccessor:
     
         """
         session_name: str = curr_active_pipeline.session_name
-        t_start, t_delta, t_end = curr_active_pipeline.find_LongShortDelta_times()
+        if (curr_active_pipeline.active_sess_config.format_name =='kdiba'):
+            t_start, t_delta, t_end = curr_active_pipeline.find_LongShortDelta_times()
+        else:
+            # t_start, t_delta, t_end = curr_active_pipeline.find_LongShortDelta_times()
+            # global_epoch_name: str = curr_active_pipeline.find_Global_epoch_name()
+            t_start, t_delta, t_end = None, None, None
+
         return self.add_session_df_columns(session_name=session_name, time_bin_size=time_bin_size, custom_replay_source=custom_replay_source, t_start=t_start, curr_session_t_delta=t_delta, t_end=t_end, time_col=time_col, end_time_col_name=end_time_col_name, **kwargs)
 
 
