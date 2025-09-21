@@ -144,7 +144,13 @@ def final_process_bapun_all_comps(curr_active_pipeline, posthoc_save: bool=True,
     from neuropy.core.session.Formats.Specific.BapunDataSessionFormat import BapunDataSessionFormatRegisteredClass
     from neuropy.core.epoch import Epoch, ensure_dataframe, ensure_Epoch, EpochsAccessor
     from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import build_contextual_pf2D_decoder, decode_using_contextual_pf2D_decoder
+    from pyphoplacecellanalysis.Analysis.Decoder.context_dependent import GenericDecoderDictDecodedEpochsDictResult
+    from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.EpochComputationFunctions import EpochComputationFunctions, EpochComputationsComputationsContainer
 
+
+    from neuropy.analyses.placefields import Position
+    from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import post_process_non_kdiba
+    
     hardcoded_params: HardcodedProcessingParameters = BapunDataSessionFormatRegisteredClass._get_session_specific_parameters(session_context=curr_active_pipeline.get_session_context())
     hardcoded_params
 
@@ -299,8 +305,6 @@ def final_process_bapun_all_comps(curr_active_pipeline, posthoc_save: bool=True,
     # Post-post processing                                                                                                                                                                                                                                                                 #
     # ==================================================================================================================================================================================================================================================================================== #
 
-    from neuropy.analyses.placefields import Position
-    from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import post_process_non_kdiba
 
     post_process_non_kdiba(curr_active_pipeline)
         
@@ -323,8 +327,6 @@ def final_process_bapun_all_comps(curr_active_pipeline, posthoc_save: bool=True,
 
 
     ### Compute if missing (require result):
-    from pyphoplacecellanalysis.Analysis.Decoder.context_dependent import GenericDecoderDictDecodedEpochsDictResult
-    from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.EpochComputationFunctions import EpochComputationFunctions, EpochComputationsComputationsContainer
 
     curr_active_pipeline.reload_default_computation_functions()
 
@@ -353,13 +355,13 @@ def final_process_bapun_all_comps(curr_active_pipeline, posthoc_save: bool=True,
     #     raise e
 
 
-    # ACTUALLY BUILD THE PSEUDO 2D: ______________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
+    # # ACTUALLY BUILD THE PSEUDO 2D: ______________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
 
-    ## Build the merged decoder `contextual_pf2D`
-    epochs_to_create_global_from_names = hardcoded_params.non_global_activity_session_names # ['maze1', 'maze2'
-    # epochs_to_create_global_from_names = ['roam', 'sprinkle']
-    contextual_pf2D_dict, contextual_pf2D, contextual_pf2D_Decoder = build_contextual_pf2D_decoder(curr_active_pipeline, epochs_to_create_global_from_names=epochs_to_create_global_from_names)
-    all_context_filter_epochs_decoder_result, global_only_epoch = decode_using_contextual_pf2D_decoder(curr_active_pipeline, contextual_pf2D_Decoder=contextual_pf2D_Decoder, active_laps_decoding_time_bin_size=0.75)
+    # ## Build the merged decoder `contextual_pf2D`
+    # epochs_to_create_global_from_names = hardcoded_params.non_global_activity_session_names # ['maze1', 'maze2'
+    # # epochs_to_create_global_from_names = ['roam', 'sprinkle']
+    # contextual_pf2D_dict, contextual_pf2D, contextual_pf2D_Decoder = build_contextual_pf2D_decoder(curr_active_pipeline, epochs_to_create_global_from_names=epochs_to_create_global_from_names)
+    # all_context_filter_epochs_decoder_result, global_only_epoch = decode_using_contextual_pf2D_decoder(curr_active_pipeline, contextual_pf2D_Decoder=contextual_pf2D_Decoder, active_laps_decoding_time_bin_size=0.75)
     # 10m 2s
 
     if posthoc_save:
@@ -452,24 +454,33 @@ def build_contextual_pf2D_decoder(curr_active_pipeline, epochs_to_create_global_
     ## OUTPUTS: contextual_pf2D_dict, contextual_pf2D, contextual_pf2D_Decoder
 
     # 2m 35.5s
-    return contextual_pf2D_dict, contextual_pf2D, contextual_pf2D_Decoder
+    return pf2D_Decoder_dict, contextual_pf2D, contextual_pf2D_Decoder
 
 
 
 
 @function_attributes(short_name=None, tags=['IMPORTANT', 'pseduo3D', 'pseudoND', 'context-decoding', 'bapun', 'WORKING'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-09-09 10:50', related_items=[])
-def decode_using_contextual_pf2D_decoder(curr_active_pipeline, contextual_pf2D_Decoder: BasePositionDecoder, active_laps_decoding_time_bin_size: float = 0.75):
+def decode_using_contextual_pf2D_decoder(curr_active_pipeline, contextual_pf2D_Decoder: BasePositionDecoder, desired_global_created_epoch_name: str = 'maze_GLOBAL', active_laps_decoding_time_bin_size: float = 0.75):
     """ The generalized context decoder for Bapun session, which is created out of the specified `epochs_to_create_global_from_names` and then used to decode the 'maze_any' epoch at the specified time bin size.
     
     Usage:
-        from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import build_contextual_pf2D_decoder, decode_using_contextual_pf2D_decoder
+        from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import DirectionalDecodersContinuouslyDecodedResult
+
         ## Build the merged decoder `contextual_pf2D`
         contextual_pf2D_dict, contextual_pf2D, contextual_pf2D_Decoder = build_contextual_pf2D_decoder(curr_active_pipeline, epochs_to_create_global_from_names = ['roam', 'sprinkle'])
         ## Use `contextual_pf2D` to decode specific epochs:
         all_context_filter_epochs_decoder_result, global_only_epoch = decode_using_contextual_pf2D_decoder(curr_active_pipeline, contextual_pf2D_Decoder=contextual_pf2D_Decoder, active_laps_decoding_time_bin_size=0.75)
 
+
+        
+        ## Build global result object
+        global_spikes_df: pd.DataFrame = deepcopy(curr_active_pipeline.sess.spikes_df)
+        directional_decoders_decode_result: DirectionalDecodersContinuouslyDecodedResult = DirectionalDecodersContinuouslyDecodedResult(pf1D_Decoder_dict=contextual_pf2D_dict, pseudo2D_decoder=contextual_pf2D_Decoder, spikes_df=global_spikes_df, continuously_decoded_result_cache_dict={active_laps_decoding_time_bin_size:all_context_filter_epochs_decoder_result})
+        curr_active_pipeline.global_computation_results.computed_data['DirectionalDecodersDecoded'] = directional_decoders_decode_result
+
     """
-    desired_global_created_epoch_name: str = 'maze_any'
+    
+    
     # epochs_to_decode_names = ['maze_any']
     epochs_df = ensure_dataframe(curr_active_pipeline.sess.epochs)
     epochs_to_merge_as_global_epoch_names: List[str] = [v for v in epochs_df['label'].to_list() if (v != desired_global_created_epoch_name)]
@@ -485,14 +496,101 @@ def decode_using_contextual_pf2D_decoder(curr_active_pipeline, contextual_pf2D_D
     # get_proper_global_spikes_df(owning_pipeline_reference, minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz, included_qclu_values=included_qclu_values)
     # global_measured_position_df: pd.DataFrame = deepcopy(curr_active_pipeline.sess.position.to_dataframe()).dropna(subset=['x', 'y']) # computation_result.sess.position.to_dataframe()
     all_context_filter_epochs_decoder_result: DecodedFilterEpochsResult = contextual_pf2D_Decoder.decode_specific_epochs(spikes_df=deepcopy(global_spikes_df), filter_epochs=ensure_dataframe(epochs_to_decode_dict[desired_global_created_epoch_name]), decoding_time_bin_size=active_laps_decoding_time_bin_size, debug_print=False)
+    # for a_p_x_given_n in all_context_filter_epochs_decoder_result.p_x_given_n:
+    
     all_context_filter_epochs_decoder_result: SingleEpochDecodedResult = all_context_filter_epochs_decoder_result.get_result_for_epoch(0)
     all_context_filter_epochs_decoder_result
     ## OUTPUTS: contextual_pf2D_dict, contextual_pf2D, contextual_pf2D_Decoder, all_context_filter_epochs_decoder_result
     # 2m 35.5s
+
+    ## ADD CORRECT CONTEXT DECODING MARGINALS:
+
+    ## INPUTS: all_context_filter_epochs_decoder_result
+    # all_context_filter_epochs_decoder_result.marginal_z
+    p_x_given_n = all_context_filter_epochs_decoder_result.p_x_given_n
+    n_x_bins, n_y_bins, n_contexts, n_t_bins = np.shape(p_x_given_n) # (41, 63, 2, 51974)
+
+    marginal_z = np.nansum(p_x_given_n, axis=(0, 1)) 
+    marginal_z = marginal_z / np.sum(marginal_z, axis=0, keepdims=True) # sum over all directions for each time_bin (so there's a normalized distribution at each timestep)
+    # marginal_z
+    # print(f'marginal_z.shape: {np.shape(marginal_z)}')
+
+    # most_likely_context_idx = np.argmax(marginal_z, axis=0)
+    # n_x_bins, n_y_bins, n_contexts, n_t_bins = np.shape(p_x_given_n) # (41, 63, 2, 51974)
+
+    # most_liekly_context_only_p_x_given_n = np.array([np.squeeze(p_x_given_n[:, :, a_most_likely_ctxt, t]) for t, a_most_likely_ctxt in enumerate(most_likely_context_idx)])
+    # np.shape(most_liekly_context_only_p_x_given_n)
+    # most_liekly_context_only_p_x_given_n = np.where(most_likely_context_idx, np.squeeze(p_x_given_n[:, :, 1, :]), np.squeeze(p_x_given_n[:, :, 0, :]))
+    # np.shape(most_liekly_context_only_p_x_given_n) # (41, 63, 51974)
+    ## ASSIGN IT to .marginal_z
+    all_context_filter_epochs_decoder_result.marginal_z = DynamicContainer(p_x_given_n=marginal_z, most_likely_positions_2D=None)
+
+
     return all_context_filter_epochs_decoder_result, global_only_epoch
 
 
-def build_combined_time_synchronized_Bapun_decoders_window(curr_active_pipeline, included_filter_names: List[str]=None, fixed_window_duration = 15.0, controlling_widget=None, context=None, create_new_controlling_widget=True) -> GenericPyQtGraphContainer:
+
+from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import DecodedFilterEpochsResult, SingleEpochDecodedResult
+
+
+@function_attributes(short_name=None, tags=['track', 'decoded-continuous'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-09-10 11:56', related_items=[])
+def _add_context_marginal_to_timeline(active_2d_plot, a_filter_epochs_decoded_result: SingleEpochDecodedResult, name='marginal_ctxt'):
+    """
+        from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import DecodedFilterEpochsResult, SingleEpochDecodedResult
+        from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import _add_context_marginal_to_timeline, _add_context_decoded_epoch_marginals_to_timeline
+        
+        ## Decode PBEs please
+        pbes = deepcopy(curr_active_pipeline.sess.pbe)
+        ripple_decoding_time_bin_size: float = 0.025 # 25ms
+        global_spikes_df: pd.DataFrame = deepcopy(curr_active_pipeline.sess.spikes_df)
+        pbe_decoder_result: DecodedFilterEpochsResult = contextual_pf2D_Decoder.decode_specific_epochs(spikes_df=deepcopy(global_spikes_df), filter_epochs=ensure_dataframe(pbes), decoding_time_bin_size=ripple_decoding_time_bin_size, debug_print=False)
+
+        _out = _add_context_marginal_to_timeline(active_2d_plot, a_filter_epochs_decoded_result=all_context_filter_epochs_decoder_result, name='global context')
+
+    """
+    p_x_given_n = deepcopy(a_filter_epochs_decoded_result.p_x_given_n)
+
+    marginal_z = np.nansum(p_x_given_n, axis=(0, 1)) 
+    marginal_z = marginal_z / np.sum(marginal_z, axis=0, keepdims=True) # sum over all directions for each time_bin (so there's a normalized distribution at each timestep)
+    # print(f'marginal_z.shape: {np.shape(marginal_z)}')
+    _out = active_2d_plot.add_docked_marginal_track(name=name, time_window_centers=deepcopy(a_filter_epochs_decoded_result.time_bin_container.centers), a_1D_posterior=marginal_z, a_variable_name='p_x_given_n')
+    return _out
+
+@function_attributes(short_name=None, tags=['track', 'multi-track', 'decoded-epochs'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-09-10 11:55', related_items=[])
+def _add_context_decoded_epoch_marginals_to_timeline(active_2d_plot, decoded_epochs_result: DecodedFilterEpochsResult, name: str = f'epochs_name[time_bin_size]'):
+    """ 
+    Usage:
+    
+        from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import DecodedFilterEpochsResult, SingleEpochDecodedResult
+        from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import _add_context_marginal_to_timeline, _add_context_decoded_epoch_marginals_to_timeline
+        
+        ## Decode PBEs please
+        pbes = deepcopy(curr_active_pipeline.sess.pbe)
+        ripple_decoding_time_bin_size: float = 0.025 # 25ms
+        global_spikes_df: pd.DataFrame = deepcopy(curr_active_pipeline.sess.spikes_df)
+        pbe_decoder_result: DecodedFilterEpochsResult = contextual_pf2D_Decoder.decode_specific_epochs(spikes_df=deepcopy(global_spikes_df), filter_epochs=ensure_dataframe(pbes), decoding_time_bin_size=ripple_decoding_time_bin_size, debug_print=False)
+
+        _out_pbe_tracks = _add_context_decoded_epoch_marginals_to_timeline(active_2d_plot=active_2d_plot, decoded_epochs_result=pbe_decoder_result)
+
+    """
+    slices_posteriors = [np.nansum(a_p_x_given_x, axis=(0, 1)) for a_p_x_given_x in decoded_epochs_result.p_x_given_n_list]
+    slices_posteriors = [(marginal_z / np.sum(marginal_z, axis=0, keepdims=True)) for marginal_z in slices_posteriors]
+
+    _out_epochs_tracks = active_2d_plot.add_docked_decoded_posterior_slices_track(name=name, slices_time_window_centers=decoded_epochs_result.time_window_centers, slices_posteriors=slices_posteriors, measured_position_df=None)
+    return _out_epochs_tracks
+
+
+
+@define()
+class DummyOneStepDecoder:
+    xbin: NDArray = field()
+    ybin: NDArray = field()
+    p_x_given_n: NDArray = field()
+    time_window_centers: NDArray = field()
+    
+
+def build_combined_time_synchronized_Bapun_decoders_window(curr_active_pipeline, included_filter_names: List[str]=None, fixed_window_duration = 15.0, controlling_widget=None, context=None, create_new_controlling_widget=True,
+                                                           directional_decoders_decode_result: Optional[DirectionalDecodersContinuouslyDecodedResult]=None) -> GenericPyQtGraphContainer:
     """ Builds a single window with time_synchronized (time-dependent placefield) plotters controlled by an internal 2DRasterPlot widget.
     
     Usage:
@@ -618,7 +716,7 @@ def build_combined_time_synchronized_Bapun_decoders_window(curr_active_pipeline,
             is_controlling_widget_external = True
     else:
         # otherwise we have a controlling widget already
-        controlling_widget = controlling_widget
+        # controlling_widget = controlling_widget
         is_controlling_widget_external = True # external to window being created        
         
 
@@ -626,16 +724,56 @@ def build_combined_time_synchronized_Bapun_decoders_window(curr_active_pipeline,
     _out_sync_plotters = {}
     
 
+
+    if directional_decoders_decode_result is not None:
+        pf2D_Decoder_dict: Dict[str, BasePositionDecoder] = directional_decoders_decode_result.pf1D_Decoder_dict
+        pseudo3D_decoder: BasePositionDecoder = directional_decoders_decode_result.pseudo2D_decoder
+        # all_directional_pf1D_Decoder_dict: Dict[str, BasePositionDecoder] = directional_decoders_decode_result.pf1D_Decoder_dict
+        continuously_decoded_result_cache_dict = directional_decoders_decode_result.continuously_decoded_result_cache_dict
+        continuously_decoded_pseudo2D_decoder_dict = directional_decoders_decode_result.continuously_decoded_pseudo2D_decoder_dict
+        ## Unpacking a result:
+        a_time_bin_size: float = list(continuously_decoded_pseudo2D_decoder_dict.keys())[-1] ## ALWAYS GET THE MOST RECENT
+        all_context_filter_epochs_decoder_result: SingleEpochDecodedResult = continuously_decoded_pseudo2D_decoder_dict[a_time_bin_size] ## ALWAYS GET THE MOST RECENT
+        marginal_z: NDArray = all_context_filter_epochs_decoder_result.marginal_z.p_x_given_n
+
+        individual_decoder_decoding_results = {k:v for k, v in directional_decoders_decode_result.continuously_decoded_result_cache_dict[1.0].items() if k != 'pseudo2D'} ## NOT USED HERE:
+
+        # one_step_decoder_dummy_dict = {}
+        # for k, v in individual_decoder_decoding_results.items():
+        #     one_step_decoder_dummy_dict[k] = DummyOneStepDecoder(xbin=deepcopy(pseudo3D_decoder.xbin), ybin=deepcopy(pseudo3D_decoder.ybin), time_window_centers=deepcopy(all_context_filter_epochs_decoder_result.time_bin_container.centers), p_x_given_n=deepcopy(v.p_x_given_n))
+
+        ## HACK post-hoc: build correct 2D results from 3D only:
+        one_step_decoder_dummy_dict = {}
+        for i, (k, v) in enumerate(individual_decoder_decoding_results.items()):
+            a_single_decoder_p_x_given_n = np.squeeze(all_context_filter_epochs_decoder_result.p_x_given_n[:, :, i, :])
+            a_single_decoder_p_x_given_n = a_single_decoder_p_x_given_n / np.nansum(a_single_decoder_p_x_given_n, axis=(0, 1), keepdims=True)
+            one_step_decoder_dummy_dict[k] = DummyOneStepDecoder(xbin=deepcopy(pseudo3D_decoder.xbin), ybin=deepcopy(pseudo3D_decoder.ybin), time_window_centers=deepcopy(all_context_filter_epochs_decoder_result.time_bin_container.centers),
+                                                                  p_x_given_n=deepcopy(a_single_decoder_p_x_given_n))
+
+
+
+        # one_step_decoder_dummy_dict
+
+    else:
+        all_context_filter_epochs_decoder_result = None
+        marginal_z = None
+
     for a_filter_name in included_filter_names:
         active_session_configuration_context = curr_active_pipeline.filtered_contexts[a_filter_name]
         computation_result = curr_active_pipeline.computation_results[a_filter_name]
 
-        # Get the decoders from the computation result:
-        active_one_step_decoder = computation_result.computed_data['pf2D_Decoder']
-        active_two_step_decoder = computation_result.computed_data.get('pf2D_TwoStepDecoder', None)
+        if all_context_filter_epochs_decoder_result is None:
+            # Get the decoders from the computation result:
+            active_one_step_decoder = computation_result.computed_data['pf2D_Decoder']
+            active_two_step_decoder = computation_result.computed_data.get('pf2D_TwoStepDecoder', None)
+            
+        else:
+            ## Use the decoded positions
+            active_one_step_decoder = one_step_decoder_dummy_dict[a_filter_name] ## is this all that's needed?
+            active_two_step_decoder = None
 
-        time_binned_position_df = computation_result.computed_data.get('extended_stats', {}).get('time_binned_position_df', None)
 
+        # time_binned_position_df = computation_result.computed_data.get('extended_stats', {}).get('time_binned_position_df', None)
         active_measured_positions = computation_result.sess.position.to_dataframe()
 
         ## Build the connected position plotter:
@@ -655,58 +793,15 @@ def build_combined_time_synchronized_Bapun_decoders_window(curr_active_pipeline,
 
     _out_container = _merge_plotters(controlling_widget, is_controlling_widget_external=is_controlling_widget_external, **_out_sync_plotters)
     
+
+    if (all_context_filter_epochs_decoder_result is not None) and (controlling_widget is not None):
+        ## Add a context likelihood track as well
+        _out = _add_context_marginal_to_timeline(controlling_widget, a_filter_epochs_decoded_result=all_context_filter_epochs_decoder_result, name='global context')
+
+
     return _out_container # (controlling_widget, curr_sync_occupancy_plotter, curr_placefields_plotter), root_dockAreaWindow, app
 
-from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import DecodedFilterEpochsResult, SingleEpochDecodedResult
 
-@function_attributes(short_name=None, tags=['track', 'decoded-continuous'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-09-10 11:56', related_items=[])
-def _add_context_marginal_to_timeline(active_2d_plot, a_filter_epochs_decoded_result: SingleEpochDecodedResult, name='marginal_ctxt'):
-    """
-        from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import DecodedFilterEpochsResult, SingleEpochDecodedResult
-        from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import _add_context_marginal_to_timeline, _add_context_decoded_epoch_marginals_to_timeline
-        
-        ## Decode PBEs please
-        pbes = deepcopy(curr_active_pipeline.sess.pbe)
-        ripple_decoding_time_bin_size: float = 0.025 # 25ms
-        global_spikes_df: pd.DataFrame = deepcopy(curr_active_pipeline.sess.spikes_df)
-        pbe_decoder_result: DecodedFilterEpochsResult = contextual_pf2D_Decoder.decode_specific_epochs(spikes_df=deepcopy(global_spikes_df), filter_epochs=ensure_dataframe(pbes), decoding_time_bin_size=ripple_decoding_time_bin_size, debug_print=False)
-
-        _out = _add_context_marginal_to_timeline(active_2d_plot, a_filter_epochs_decoded_result=all_context_filter_epochs_decoder_result, name='global context')
-
-    """
-    p_x_given_n = deepcopy(a_filter_epochs_decoded_result.p_x_given_n)
-
-    marginal_z = np.nansum(p_x_given_n, axis=(0, 1)) 
-    marginal_z = marginal_z / np.sum(marginal_z, axis=0, keepdims=True) # sum over all directions for each time_bin (so there's a normalized distribution at each timestep)
-    # print(f'marginal_z.shape: {np.shape(marginal_z)}')
-    _out = active_2d_plot.add_docked_marginal_track(name=name, time_window_centers=deepcopy(a_filter_epochs_decoded_result.time_bin_container.centers), a_1D_posterior=marginal_z, a_variable_name='p_x_given_n')
-    return _out
-
-@function_attributes(short_name=None, tags=['track', 'multi-track', 'decoded-epochs'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-09-10 11:55', related_items=[])
-def _add_context_decoded_epoch_marginals_to_timeline(active_2d_plot, decoded_epochs_result: DecodedFilterEpochsResult, epochs_name: str = 'pbe'):
-    """ 
-    Usage:
-    
-        from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import DecodedFilterEpochsResult, SingleEpochDecodedResult
-        from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import _add_context_marginal_to_timeline, _add_context_decoded_epoch_marginals_to_timeline
-        
-        ## Decode PBEs please
-        pbes = deepcopy(curr_active_pipeline.sess.pbe)
-        ripple_decoding_time_bin_size: float = 0.025 # 25ms
-        global_spikes_df: pd.DataFrame = deepcopy(curr_active_pipeline.sess.spikes_df)
-        pbe_decoder_result: DecodedFilterEpochsResult = contextual_pf2D_Decoder.decode_specific_epochs(spikes_df=deepcopy(global_spikes_df), filter_epochs=ensure_dataframe(pbes), decoding_time_bin_size=ripple_decoding_time_bin_size, debug_print=False)
-
-        _out_pbe_tracks = _add_context_decoded_epoch_marginals_to_timeline(active_2d_plot=active_2d_plot, decoded_epochs_result=pbe_decoder_result)
-
-    """
-    
-    decoded_epochs_track_name: str = f'{epochs_name}[{ripple_decoding_time_bin_size}]'
-
-    slices_posteriors = [np.nansum(a_p_x_given_x, axis=(0, 1)) for a_p_x_given_x in decoded_epochs_result.p_x_given_n_list]
-    slices_posteriors = [(marginal_z / np.sum(marginal_z, axis=0, keepdims=True)) for marginal_z in slices_posteriors]
-
-    _out_epochs_tracks = active_2d_plot.add_docked_decoded_posterior_slices_track(name=decoded_epochs_track_name, slices_time_window_centers=decoded_epochs_result.time_window_centers, slices_posteriors=slices_posteriors, measured_position_df=None)
-    return _out_epochs_tracks
 
 
 
