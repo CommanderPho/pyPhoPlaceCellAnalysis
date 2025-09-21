@@ -87,6 +87,8 @@ class AnimalTrajectoryPlottingMixin:
         self.params.recent_position_trajectory_path_shadow_pen = None
         
         ### Marker Settings:
+        
+        self.params.recent_position_trajectory_symbol_brush = pg.mkBrush(50,50,50,100)
         # self.params.recent_position_trajectory_symbol_pen = pg.mkPen({'color': [255, 255, 255, 10], 'width': 1}) # White
         self.params.recent_position_trajectory_symbol_pen = pg.mkPen({'color': [20, 20, 20, 255], 'width': 1}) # Black
         self.params.trajectory_path_current_position_marker_brush = pg.mkBrush(0, 255, 0, 200)
@@ -99,7 +101,7 @@ class AnimalTrajectoryPlottingMixin:
         ## Optional Animal Trajectory Path Plot:            
         # Note that pg.PlotDataItem is a combination of pg.PlotCurveItem and pg.ScatterPlotItem
         self.ui.trajectory_curve = pg.PlotDataItem(pen=self.params.recent_position_trajectory_path_pen, shadowPen=self.params.recent_position_trajectory_path_shadow_pen,
-                                                   symbol='o', symbolBrush=(50,50,50), pxMode=True, symbolSize=6.0, symbolPen=self.params.recent_position_trajectory_symbol_pen,
+                                                   symbol='o', symbolBrush=self.params.recent_position_trajectory_symbol_brush, pxMode=True, symbolSize=6.0, symbolPen=self.params.recent_position_trajectory_symbol_pen,
                                                    antialias=True, name='recent trajectory') #downsample=20, downsampleMethod='peak', autoDownsample=True, skipFiniteCheck=True, clipToView=True
         
         # curr_occupancy_plotter.ui.trajectory_curve = pg.PlotCurveItem(pen=({'color': 'white', 'width': 3}), skipFiniteCheck=True)
