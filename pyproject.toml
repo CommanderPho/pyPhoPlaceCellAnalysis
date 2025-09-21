@@ -42,6 +42,7 @@ dependencies = [
     "wheel",
     "cython",
     "neuropy>=0.2.0",
+    "pyphocorehelpers",
 ]
 
 [dependency-groups]
@@ -86,6 +87,7 @@ ansi2html = { git = "https://github.com/CommanderPho/ansi2html.git", rev = "main
 mpl-multitab = { git = "https://github.com/CommanderPho/mpl-multitab.git", rev = "pho_compat" }
 neuropy = { git = "https://github.com/CommanderPho/NeuroPy.git", rev = "feature/safe-advance" }
 pybursts = { git = "https://github.com/CommanderPho/pybursts.git", rev = "master" }
+pyphocorehelpers = { git = "https://github.com/CommanderPho/pyPhoCoreHelpers.git", rev = "develop"}
 
 [build-system]
 requires = ["hatchling"]
