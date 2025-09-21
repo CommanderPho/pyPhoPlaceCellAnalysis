@@ -120,7 +120,7 @@ class AnimalTrajectoryPlottingMixin:
             # curr_desired_sizes = np.interp(curr_desired_sizes, [0, curr_occupancy_plotter.params.recent_position_trajectory_max_seconds_ago], [0,20]) # map onto a size range from 0-20
 
             # Fading Color over time:
-            desired_symbol_brushes = [pg.mkBrush(255, 255, 255, np.interp(i, [0,(curr_num_points-1)], [0,self.params.trajectory_path_marker_max_fill_opacity])) for i in np.arange(curr_num_points-1)] # -1 for the special last symbol
+            desired_symbol_brushes = [pg.mkBrush(255, 255, 255, np.interp(i, [0,(curr_num_points-1)], [0, self.params.trajectory_path_marker_max_fill_opacity])) for i in np.arange(curr_num_points-1)] # -1 for the special last symbol
             # Fixed Color for all but the last point
             # fading_brush_color = pg.mkBrush(50, 50, 50, 100) # pg.mkBrush(R, G, B, A)
             # desired_symbol_brushes = [fading_brush_color] * (curr_num_points - 1) # -1 for the special last symbol
