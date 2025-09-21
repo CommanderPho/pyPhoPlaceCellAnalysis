@@ -148,9 +148,9 @@ class AnimalTrajectoryPlottingMixin:
             curr_desired_sizes[-1] = self.params.trajectory_path_current_position_marker_size # only current point is big
             desired_symbol_brushes.append(self.params.trajectory_path_current_position_marker_brush)
 
-            if self.params.debug_print:
-                print(f'curr_desired_sizes: {curr_desired_sizes}')
-                print(f'desired_symbol_brushes: {desired_symbol_brushes}')
+            # if self.params.debug_print:
+            #     print(f'curr_desired_sizes: {curr_desired_sizes}')
+            #     print(f'desired_symbol_brushes: {desired_symbol_brushes}')
 
             self.ui.trajectory_curve.setData(x=curr_trajectory_rows.x.to_numpy(), y=curr_trajectory_rows.y.to_numpy(), symbolSize=list(curr_desired_sizes), symbolBrush=desired_symbol_brushes) 
         else:

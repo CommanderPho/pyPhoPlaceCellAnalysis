@@ -441,6 +441,9 @@ class SpecificDockWidgetManipulatingMixin(BaseDynamicInstanceConformingMixin):
         if extended_dock_title_info is not None:
             identifier_name += extended_dock_title_info ## add extra info like the time_bin_size in ms
         print(f'identifier_name: {identifier_name}')
+        
+        posterior_heatmap_imshow_kwargs = kwargs.pop('posterior_heatmap_imshow_kwargs', dict()) # 'posterior_heatmap_imshow_kwargs' must be removed from kwargs before call to `self.add_new_matplotlib_render_plot_widget(..., **kwargs)`
+        
         widget, matplotlib_fig, matplotlib_fig_axes, dock_item = self.add_new_matplotlib_render_plot_widget(name=identifier_name, dockSize=(25, 200), display_config=a_dock_config, **kwargs)
         an_ax = matplotlib_fig_axes[0]
 
