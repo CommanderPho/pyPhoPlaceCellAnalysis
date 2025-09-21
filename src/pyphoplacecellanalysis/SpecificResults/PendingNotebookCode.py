@@ -557,7 +557,8 @@ def _add_context_marginal_to_timeline(active_2d_plot, a_filter_epochs_decoded_re
     marginal_z = marginal_z / np.sum(marginal_z, axis=0, keepdims=True) # sum over all directions for each time_bin (so there's a normalized distribution at each timestep)
     # print(f'marginal_z.shape: {np.shape(marginal_z)}')
     _out = active_2d_plot.add_docked_marginal_track(name=name, time_window_centers=deepcopy(a_filter_epochs_decoded_result.time_bin_container.centers), a_1D_posterior=marginal_z, a_variable_name='p_x_given_n')
-    return _out
+    
+    return _out # identifier_name, widget, matplotlib_fig, matplotlib_fig_axes, dock_item = _out
 
 @function_attributes(short_name=None, tags=['track', 'multi-track', 'decoded-epochs'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-09-10 11:55', related_items=[])
 def _add_context_decoded_epoch_marginals_to_timeline(active_2d_plot, decoded_epochs_result: DecodedFilterEpochsResult, name: str = f'epochs_name[time_bin_size]'):
@@ -626,6 +627,7 @@ def build_combined_time_synchronized_Bapun_decoders_window(curr_active_pipeline,
         _out_container: GenericPyQtGraphContainer = build_combined_time_synchronized_Bapun_decoders_window(curr_active_pipeline, included_filter_names=['maze1', 'maze2', 'maze'], fixed_window_duration = 15.0)
     """
     from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.SpikeRasterWidgets.Spike2DRaster import Spike2DRaster
+    from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.SpikeRasterWidgets.Spike2DRaster import SynchronizedPlotMode
     from pyphoplacecellanalysis.Pho2D.PyQtPlots.TimeSynchronizedPlotters.TimeSynchronizedPositionDecoderPlotter import TimeSynchronizedPositionDecoderPlotter
     from pyphoplacecellanalysis.Pho2D.PyQtPlots.TimeSynchronizedPlotters.TimeSynchronizedOccupancyPlotter import TimeSynchronizedOccupancyPlotter
     from pyphoplacecellanalysis.Pho2D.PyQtPlots.TimeSynchronizedPlotters.TimeSynchronizedPlacefieldsPlotter import TimeSynchronizedPlacefieldsPlotter
@@ -840,7 +842,10 @@ def build_combined_time_synchronized_Bapun_decoders_window(curr_active_pipeline,
 
     if (all_context_filter_epochs_decoder_result is not None) and (controlling_widget is not None):
         ## Add a context likelihood track as well
-        _out = _add_context_marginal_to_timeline(controlling_widget, a_filter_epochs_decoded_result=all_context_filter_epochs_decoder_result, name='global context')
+        _out_global_context_tuple = _add_context_marginal_to_timeline(controlling_widget, a_filter_epochs_decoded_result=all_context_filter_epochs_decoder_result, name='global context')
+        _out_global_context_overview_tuple = _add_context_marginal_to_timeline(controlling_widget, a_filter_epochs_decoded_result=all_context_filter_epochs_decoder_result, name='global context (overview)')        
+        controlling_widget.sync_matplotlib_render_plot_widget(identifier='global context (overview)', sync_mode=SynchronizedPlotMode.TO_GLOBAL_DATA)
+        _out_container.plots.context_marginal_tracks = {'global_context': _out_global_context_tuple, 'global context (overview)': _out_global_context_overview_tuple}
 
 
     return _out_container # (controlling_widget, curr_sync_occupancy_plotter, curr_placefields_plotter), root_dockAreaWindow, app
