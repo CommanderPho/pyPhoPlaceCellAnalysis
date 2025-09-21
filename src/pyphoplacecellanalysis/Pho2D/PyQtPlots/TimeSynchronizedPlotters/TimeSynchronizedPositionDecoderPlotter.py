@@ -77,7 +77,7 @@ class TimeSynchronizedPositionDecoderPlotter(AnimalTrajectoryPlottingMixin, Time
         return self.AnimalTrajectoryPlottingMixin_filtered_pos_df.iloc[-1:][['t','x','y']] # Get only the most recent row
 
     
-    def __init__(self, active_one_step_decoder, active_two_step_decoder, drop_below_threshold: float=0.0000001, posterior_variable_to_render='p_x_given_n', application_name=None, window_name=None, parent=None):
+    def __init__(self, active_one_step_decoder, active_two_step_decoder, drop_below_threshold: float=0.0000001, posterior_variable_to_render='p_x_given_n', application_name=None, window_name=None, parent=None, **param_kwargs):
         """_summary_
         
         ## allows toggling between the various computed occupancies: such as raw counts,  normalized location, and seconds_occupancy
@@ -93,6 +93,8 @@ class TimeSynchronizedPositionDecoderPlotter(AnimalTrajectoryPlottingMixin, Time
         
         self.setup()
         self.params.debug_print = True # self.enable_debug_print
+        self.params.needs_background_image = param_kwargs.pop('needs_background_image', False) # creates `self.ui.bg_imv` IFF this is true. Useful for creating the track shapes.
+        
         if self.params.debug_print:
             print(f'TimeSynchronizedPositionDecoderPlotter: params.debug_print is True, so debugging info will be printed!')
         self.params.posterior_variable_to_render = posterior_variable_to_render
@@ -124,18 +126,27 @@ class TimeSynchronizedPositionDecoderPlotter(AnimalTrajectoryPlottingMixin, Time
     def _buildGraphics(self):
         ## More Involved Mode:
         self.ui.root_graphics_layout_widget = pg.GraphicsLayoutWidget()
+
         # self.ui.root_view = self.ui.root_graphics_layout_widget.addViewBox()
         ## lock the aspect ratio so pixels are always square
         # self.ui.root_view.setAspectLocked(True)
+        
+        ## Background-only image item
+        if self.params.needs_background_image:
+            self.ui.bg_imv = pg.ImageItem()
+            # self.ui.root_view.addItem(self.ui.bg_imv)
 
         ## Create image item
-        
         self.ui.imv = pg.ImageItem(border='w')
         # self.ui.root_view.addItem(self.ui.imv)
         # self.ui.root_view.setRange(QtCore.QRectF(*self.params.image_bounds_extent))
 
         self.ui.root_plot = self.ui.root_graphics_layout_widget.addPlot(row=0, col=0, title=f'PositionDecoder -  t = {self.last_window_time}') # , name=f'PositionDecoder'
         self.ui.root_plot.setObjectName('PositionDecoder')
+
+        if self.params.needs_background_image:
+            self.ui.root_plot.addItem(self.ui.bg_imv, defaultPadding=0.0)  # add ImageItem to PlotItem
+            
         self.ui.root_plot.addItem(self.ui.imv, defaultPadding=0.0)  # add ImageItem to PlotItem
         self.ui.root_plot.showAxes(True)
         self.ui.root_plot.hideButtons() # Hides the auto-scale button

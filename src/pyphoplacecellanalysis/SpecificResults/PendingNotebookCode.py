@@ -591,6 +591,29 @@ class DummyOneStepDecoder:
     p_x_given_n: NDArray = field()
     time_window_centers: NDArray = field()
     
+@function_attributes(short_name=None, tags=['helper'], input_requires=[], output_provides=[], uses=[], used_by=['build_combined_time_synchronized_Bapun_decoders_window'], creation_date='2025-09-21 08:00', related_items=[])
+def add_static_occupancy_maze_backgrounds(curr_active_pipeline, sync_plotters):
+    """ 
+    Adds the occupancy in the background (statically) to enable visualizing the decoded positions. Just the shape of the maze.
+    
+    Since they are static, only need to be called once
+    """
+    for a_plotter_name, a_plotter in sync_plotters.items():
+
+        active_pf_2D = curr_active_pipeline.computation_results[a_plotter_name].computed_data['pf2D']
+        image = deepcopy(active_pf_2D.occupancy)
+
+        if a_plotter.params.drop_below_threshold is not None:
+            # image[np.where(occupancy < self.params.drop_below_threshold)] = np.nan # null out the occupancy
+            image[np.where(image < a_plotter.params.drop_below_threshold)] = np.nan # null out the occupancy
+
+        # self.ui.imv.setImage(image, xvals=self.active_time_dependent_placefields.xbin)
+        if a_plotter.params.shared_axis_order is None:
+            a_plotter.ui.bg_imv.setImage(image, rect=a_plotter.params.image_bounds_extent)
+        else:
+            a_plotter.ui.bg_imv.setImage(image, rect=a_plotter.params.image_bounds_extent, axisOrder=a_plotter.params.shared_axis_order)
+
+
 
 def build_combined_time_synchronized_Bapun_decoders_window(curr_active_pipeline, included_filter_names: List[str]=None, fixed_window_duration = 15.0, controlling_widget=None, context=None, create_new_controlling_widget=True,
                                                            directional_decoders_decode_result: Optional[DirectionalDecodersContinuouslyDecodedResult]=None) -> GenericPyQtGraphContainer:
@@ -782,7 +805,7 @@ def build_combined_time_synchronized_Bapun_decoders_window(curr_active_pipeline,
         active_measured_positions = computation_result.sess.position.to_dataframe()
 
         ## Build the connected position plotter:
-        curr_position_decoder_plotter = TimeSynchronizedPositionDecoderPlotter(active_one_step_decoder=active_one_step_decoder, active_two_step_decoder=active_two_step_decoder)
+        curr_position_decoder_plotter = TimeSynchronizedPositionDecoderPlotter(active_one_step_decoder=active_one_step_decoder, active_two_step_decoder=active_two_step_decoder, needs_background_image=True)
         if active_measured_positions is not None:
             curr_position_decoder_plotter.params.AnimalTrajectoryPlottingMixin_all_time_pos_df = deepcopy(active_measured_positions)
             curr_position_decoder_plotter.params.AnimalTrajectoryPlottingMixin_filtered_pos_df = deepcopy(active_measured_positions)
@@ -790,7 +813,23 @@ def build_combined_time_synchronized_Bapun_decoders_window(curr_active_pipeline,
             curr_position_decoder_plotter.AnimalTrajectoryPlottingMixin_on_buildUI()
             curr_position_decoder_plotter.AnimalTrajectoryPlottingMixin_update_plots()
             
-        
+
+        ## Add the static occupancy maze backgrounds:\
+        ### Adds the occupancy in the background (statically) to enable visualizing the decoded positions. Just the shape of the maze.
+        ### Since they are static, only need to be called once
+        active_pf_2D = curr_active_pipeline.computation_results[a_filter_name].computed_data['pf2D']
+        image = deepcopy(active_pf_2D.occupancy)
+
+        if curr_position_decoder_plotter.params.drop_below_threshold is not None:
+            # image[np.where(occupancy < self.params.drop_below_threshold)] = np.nan # null out the occupancy
+            image[np.where(image < curr_position_decoder_plotter.params.drop_below_threshold)] = np.nan # null out the occupancy
+
+        # self.ui.imv.setImage(image, xvals=self.active_time_dependent_placefields.xbin)
+        if curr_position_decoder_plotter.params.shared_axis_order is None:
+            curr_position_decoder_plotter.ui.bg_imv.setImage(image, rect=curr_position_decoder_plotter.params.image_bounds_extent)
+        else:
+            curr_position_decoder_plotter.ui.bg_imv.setImage(image, rect=curr_position_decoder_plotter.params.image_bounds_extent, axisOrder=curr_position_decoder_plotter.params.shared_axis_order)
+            
         # curr_position_decoder_plotter.show()
         # _conn = pg.SignalProxy(spike_raster_plt_2d.window_scrolled, delay=0.2, rateLimit=60, slot=curr_position_decoder_plotter.on_window_changed_rate_limited) ## connect to plotter
         _out_sync_plotters[a_filter_name] = curr_position_decoder_plotter
