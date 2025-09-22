@@ -11,7 +11,9 @@ from pyphoplacecellanalysis.GUI.Qt.MainApplicationWindows.PhoMainAppWindowBase i
 
 from pyphoplacecellanalysis.GUI.PyQtPlot.DockingWidgets.DynamicDockDisplayAreaContent import CustomDockDisplayConfig, DynamicDockDisplayAreaContentMixin
 from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.ContainerBased.PhoContainerTool import GenericPyQtGraphContainer
-    
+from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.helpers import ScrollableRasterViewOwnerMixin
+
+
 # ==================================================================================================================== #
 class PhoDockAreaContainingWindow(DynamicDockDisplayAreaContentMixin, PhoMainAppWindowBase):
     """ a custom PhoMainAppWindowBase (QMainWindow) subclass that contains a DockArea as its central view.

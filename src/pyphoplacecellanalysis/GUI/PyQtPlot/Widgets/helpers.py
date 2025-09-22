@@ -8,7 +8,10 @@ import pyphoplacecellanalysis.External.pyqtgraph.graphicsItems as graphicsItems
 from pyphoplacecellanalysis.External.pyqtgraph.graphicsItems.PlotItem import PlotItem #, PlotCurveItem
 from pyphoplacecellanalysis.External.pyqtgraph.graphicsItems.ScatterPlotItem import ScatterPlotItem #, PlotCurveItem
 from pyphoplacecellanalysis.External.pyqtgraph.graphicsItems.GraphicsLayout import GraphicsLayout
-from qtpy import QtGui
+from qtpy import QtCore, QtWidgets, QtGui
+
+# from pyphocorehelpers.gui.Qt.ExceptionPrintingSlot import pyqtExceptionPrintingSlot
+
 
 # """ 
 
@@ -254,5 +257,331 @@ def _helper_make_scatterplot_clickable(main_scatter_plot, enable_hover:bool=Fals
 
     return lastClicked, clickedPen, (main_scatter_hovered_connection, main_scatter_clicked_connection)
 
+
+
+
+class ScrollableRasterViewOwnerMixin:
+    """ 
+
+        from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.helpers import ScrollableRasterViewOwnerMixin
+
+    """
+    # ==================================================================================================================== #
+    # Events                                                                                                               #
+    # ==================================================================================================================== #
+        
+    @property
+    def should_debug_print_interaction_events(self) -> bool:
+        """The should_debug_print_interaction_events property."""
+        if not hasattr(self.params, 'should_debug_print_interaction_events'):
+            self.params.should_debug_print_interaction_events = False ## default value setting
+        return self.params.should_debug_print_interaction_events
+    @should_debug_print_interaction_events.setter
+    def should_debug_print_interaction_events(self, value: bool):
+        self.params.should_debug_print_interaction_events = value
+
+    # @QtCore.Property(int) # Note that this ia *pyqt*Property, meaning it's available to pyqt
+    # def scheduledAnimationSteps(self):
+    #     """The scheduledAnimationSteps property."""
+    #     return self._scheduledAnimationSteps
+    # @scheduledAnimationSteps.setter
+    # def scheduledAnimationSteps(self, value):
+    #     if self._scheduledAnimationSteps != value:
+    #         # Only update if the value has changed from the previous one:
+    #         self._scheduledAnimationSteps = value
+    #         # TODO: maybe use a rate-limited signal that's emitted instead so this isn't called too often during interpolation?
+    #         # self.shift_animation_frame_val(self._scheduledAnimationSteps) # TODO: this isn't quite right
+            
+    @property
+    def animation_delegate(self):
+        """The animation_delegate property."""
+        active_2d_plot = self.ui.controlling_widget # Spike2DRaster
+        return active_2d_plot
+    
+    @property
+    def animation_active_time_window(self):
+        """The animation_active_time_window property."""
+        return self.animation_delegate.animation_active_time_window
+    @animation_active_time_window.setter
+    def animation_active_time_window(self, value):
+        self.animation_delegate.animation_active_time_window = value
+
+    @property
+    def animation_playback_direction_multiplier(self):
+        """The animation_playback_direction_multiplier property."""
+        return self.params.animation_playback_direction_multiplier
+    @animation_playback_direction_multiplier.setter
+    def animation_playback_direction_multiplier(self, value):
+        self.params.animation_playback_direction_multiplier = value
+
+    @property
+    def animation_time_step(self):
+        """The animation_time_step property."""
+        return self.params.animation_time_step
+    @animation_time_step.setter
+    def animation_time_step(self, value):
+        self.params.animation_time_step = value
+    
+
+    def _setup_ScrollableRasterViewOwnerMixin(self):
+        """ MUST BE CALLED ON STARTUP
+        
+        """
+        self.params.should_debug_print_interaction_events = False
+        
+        ## Scrolling Properties:
+        self._scheduledAnimationSteps = 0
+        self.params.scrollStepMultiplier = 30.0 # The multiplier by which each scroll step is multiplied. Decrease this value to increase scrolling precision (making the same rotation of the mousewheel scroll less in time).
+        self.params.animation_playback_direction_multiplier = 1.0
+        self.params.animation_time_step = 2.0
+        
+        self.enable_smooth_scrolling_animation = False # UNTESTED
+
+        # if self.enable_smooth_scrolling_animation:
+        #     ## Add the QPropertyAnimation for smooth scrolling, but do not start it:
+        #     self.ui.scrollAnim = QtCore.QPropertyAnimation(self, b"numScheduledScalings") # the animation will act on the self.numScheduledScalings pyqtProperty
+        #     # self.ui.scrollAnim.setEndValue(0) # Update the end value
+        #     self.ui.scrollAnim.setDuration(250) # set duration in milliseconds
+            
+        #     ## QTimeLine-style smooth scrolling:
+        #     self.ui.scrollAnimTimeline = QtCore.QTimeLine(250, parent=self) # Make a new QTimeLine with a 250ms animation duration
+        #     self.ui.scrollAnimTimeline.setUpdateInterval(20)
+        #     self.ui.scrollAnimTimeline.setCurveShape(QtCore.QTimeLine.CurveShape.LinearCurve)
+        #     self.ui.scrollAnimTimeline.setFrameRange(0, 100)
+        #     self.ui.scrollAnimTimeline.frameChanged.connect(self.onScrollingTimelineFired)
+        #     # self.ui.scrollAnimTimeline.valueChanged.connect(self.onScrollingTimelineFired)
+        #     self.ui.scrollAnimTimeline.finished.connect(self.onScrollingTimelineAnimationFinished)
+        #     # self.ui.scrollAnimTimeline.start() # Do not start it
+
+        # else:
+        self.ui.scrollAnim = None
+        self.ui.scrollAnimTimeline = None
+
+
+    ###################################
+    #### EVENT HANDLERS
+    ##################################
+    
+
+    # @pyqtExceptionPrintingSlot(float)
+    def update_animation(self, next_start_timestamp: float):
+        """ Actually updates the animation given the next_start_timestep
+            extracted from Spike3DRasterWindowWidget.shift_animation_frame_val(...)
+        """
+        if self.should_debug_print_interaction_events:
+            print(f'ScrollableRasterViewOwnerMixin.update_animation(next_start_timestamp: {next_start_timestamp})')
+        # self.animation_active_time_window.update_window_start(next_start_timestamp) # calls update_window_start, so any subscribers should be notified.
+        next_end_timestamp = next_start_timestamp + self.animation_active_time_window.window_duration
+        
+        # Update the windows once before showing the UI:
+        self.animation_delegate.update_scroll_window_region(next_start_timestamp, next_end_timestamp, block_signals=True) # self.spike_raster_plt_2d.window_scrolled should be emitted        
+        # signal emit:
+        self.animation_delegate.window_scrolled.emit(next_start_timestamp, next_end_timestamp)
+        # update_scroll_window_region
+        # self.ui.spike_raster_plt_3d.spikes_window.update_window_start_end(self.ui.spike_raster_plt_2d.spikes_window.active_time_window[0], self.ui.spike_raster_plt_2d.spikes_window.active_time_window[1])
+        # self.bottom_playback_control_bar_widget.on_window_changed(next_start_timestamp, next_end_timestamp) ## direct
+        
+
+    # @pyqtExceptionPrintingSlot(int)
+    def shift_animation_frame_val(self, shift_frames: int):
+        if self.should_debug_print_interaction_events:
+            print(f'ScrollableRasterViewOwnerMixin.shift_animation_frame_val(shift_frames: {shift_frames})')
+        next_start_timestamp = self.animation_active_time_window.active_window_start_time + (self.animation_playback_direction_multiplier * self.animation_time_step * float(shift_frames)) # Equivalent to self.compute_frame_shifted_start_timestamp(shift_frames)
+        self.update_animation(next_start_timestamp)
+        
+
+
+    # def onScrollingTimelineAnimationFinished(self):
+    #     """ used for the QTimeline version of the smooth scrolling animation """
+    #     print(f'onScrollingTimelineAnimationFinished()')
+    #     print(f'\t self._scheduledAnimationSteps: {self._scheduledAnimationSteps}')
+    #     self.scheduledAnimationSteps = 0 # updated method that actually zeros out the scheduled scalings        
+    #     print('\t zeroing out.')
+    #     # if self._scheduledAnimationSteps > 0:
+    #     #     self._scheduledAnimationSteps -= 1
+    #     # else:
+    #     #     self._scheduledAnimationSteps += 1
+        
+
+    # def onScrollingTimelineFired(self, x):
+    #     """ used for the QTimeline version of the smooth scrolling animation 
+        
+    #     # OLD VERSION: x appears to be a float between 0.0-1.0 by default that indicates how far along in the animation it is
+        
+    #     x is an int indicating the number of frames for the timeline that were set with between 0.0-1.0 by default that indicates how far along in the animation it is
+        
+    #     """
+    #     print(f'onScrollingTimelineFired(x: {x})')
+    #     # self.shift_animation_frame_val(x)        
+    #     curr_shifted_next_start_time = self.compute_frame_shifted_start_timestamp(x)
+    #     print(f'\t curr_shifted_next_start_time: {curr_shifted_next_start_time}')
+    #     self.update_animation(curr_shifted_next_start_time)
+    #     self._scheduledAnimationSteps = self._scheduledAnimationSteps - x # subtract off the frames that have been shifted
+
+
+    # @function_attributes(short_name=None, tags=['TODO', 'ACTIVE', 'programmatic', 'scrolling', 'time'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-12-18 12:09', related_items=[])
+    # def programmatically_scroll_to_time(self, new_time):
+    #     numSteps: int = 3
+    #     updatedNumScheduledScalings = self._scheduledAnimationSteps + numSteps
+    #     if (updatedNumScheduledScalings * numSteps < 0):
+    #         updatedNumScheduledScalings = numSteps # if user moved the wheel in another direction, we reset previously scheduled scalings
+        
+    #     if self.enable_smooth_scrolling_animation:
+    #         ## QTimeline version:
+    #         self._scheduledAnimationSteps = updatedNumScheduledScalings # Set the updated number of scalings:
+    #         self.ui.scrollAnimTimeline.setEndFrame(self._scheduledAnimationSteps)
+    #         self.ui.scrollAnimTimeline.start() # Start the timeline's animation event
+    #     else:
+    #         # No animation, just update directly ("old way")
+    #         self._scheduledAnimationSteps = updatedNumScheduledScalings
+    #         self.shift_animation_frame_val(self._scheduledAnimationSteps)
+    #         self._scheduledAnimationSteps = 0 # New method: zero it out instead of having it compound
+
+
+    # self.spikes_window.windowed_data_window_duration_changed_signal.connect(self.on_windowed_data_window_duration_changed)
+    # self.spikes_window.windowed_data_window_updated_signal.connect(self.on_windowed_data_window_changed)
+    
+    def eventFilter(self, watched, event):
+        """  has to be installed on an item like:
+            self.grid = pg.GraphicsLayoutWidget()
+            self.top_left = self.grid.addViewBox(row=1, col=1)
+            self.top_left.installEventFilter(self)
+        
+        """
+        from pyphocorehelpers.gui.Qt.qevent_lookup_helpers import QEventLookupHelpers # used for ScrollableRasterViewOwnerMixin
+
+        # print(f'ScrollableRasterViewOwnerMixin.eventFilter(self, watched, event)')
+        delta = None
+        if (event.type() == QtCore.QEvent.GraphicsSceneWheel):
+            # QtCore.QEvent.GraphicsSceneWheel
+            """             
+            event.delta(): (gives values like +/- 120, 240, etc) # Returns the distance that the wheel is rotated, in eighths (1/8s) of a degree. A positive value indicates that the wheel was rotated forwards away from the user; a negative value indicates that the wheel was rotated backwards toward the user.
+                Most mouse types work in steps of 15 degrees, in which case the delta value is a multiple of 120 (== 15 * 8).
+
+            event.orientation(): 1 for alternative scroll wheel dir and 2 for primary scroll wheel dir
+            
+            """
+            if self.should_debug_print_interaction_events:
+                print(f'ScrollableRasterViewOwnerMixin.eventFilter(...)\n\t detected event.type() == QtCore.QEvent.GraphicsSceneWheel')
+                print(f'\twatched: {watched}\n\tevent: {event}')
+                print(f'\tevent.delta(): {event.delta()}')
+                print(f'\tevent.orientation(): {event.orientation()}')
+                # print(f'\tevent.phase(): {event.phase()}')
+                # print(f'\tevent.pixelDelta(): {event.pixelDelta()}')
+                
+            delta = event.delta()
+        
+        
+        elif (event.type() == QtCore.QEvent.Wheel): # the second case (QtGui.QWheelEvent) doesn't even exist I don't think. IDK why ChatGPT said to use it.
+            """ the event is an instance of `QtGui.QWheelEvent`, but the event's .type() is NEVER QtGui.QWheelEvent, that's not even a possible type. """
+            if self.should_debug_print_interaction_events:
+                print(f'ScrollableRasterViewOwnerMixin.eventFilter(...)\n\t detected event.type() == QtCore.QEvent.Wheel')
+                print(f'\twatched: {watched}\n\tevent: {event}')
+                print(f'\tevent.angleDelta(): {event.angleDelta()}')
+                
+            delta = event.angleDelta().x()
+            if delta == 0:
+                delta = event.angleDelta().y()
+            
+        else:
+            delta = None
+            if self.should_debug_print_interaction_events:
+                print(f'\t unhandled event {QEventLookupHelpers.get_event_string(event)}')
+                
+        if (delta is not None) and (abs(delta) > 0):
+            ## do the scroll
+            if self.should_debug_print_interaction_events:
+                print(f'\tperofmring scroll with delta: {delta}')
+
+            numDegrees = delta / 8
+            numSteps = numDegrees / 15 # see QWheelEvent documentation
+            numSteps = int(round(float(self.params.scrollStepMultiplier) * float(numSteps)))
+                       
+            updatedNumScheduledScalings = self._scheduledAnimationSteps + numSteps
+            if (updatedNumScheduledScalings * numSteps < 0):
+                updatedNumScheduledScalings = numSteps # if user moved the wheel in another direction, we reset previously scheduled scalings
+            
+            # if self.enable_smooth_scrolling_animation:
+            #     # ## pyqt Property Animation Method:            
+            #     # self.ui.scrollAnim.setEndValue(updatedNumScheduledScalings) # Update the end value
+            #     # self.ui.scrollAnim.start() # start the animation
+                
+            #     ## QTimeline version:
+            #     self._scheduledAnimationSteps = updatedNumScheduledScalings # Set the updated number of scalings:
+            #     self.ui.scrollAnimTimeline.setEndFrame(self._scheduledAnimationSteps)
+            #     self.ui.scrollAnimTimeline.start() # Start the timeline's animation event
+            # else:
+            # No animation, just update directly ("old way")
+            self._scheduledAnimationSteps = updatedNumScheduledScalings
+            self.shift_animation_frame_val(self._scheduledAnimationSteps)
+            self._scheduledAnimationSteps = 0 # New method: zero it out instead of having it compound
+
+            return True
+        # END if (delta is not None) a....
+        else:
+            # Unknown event type
+            if self.should_debug_print_interaction_events:
+                print(f'\t unhandled event {QEventLookupHelpers.get_event_string(event)}')
+
+
+        # if source == self.ui.jumpToHourMinSecTimeEdit:
+        #     if event.type() == event.FocusIn:
+        #         self.set_jump_time_white_style()
+        #     elif event.type() == event.FocusOut:
+        #         self.set_jump_time_light_grey_style()
+                
+        # elif source == self.time_edit and event.type() == event.KeyPress:
+        #     # """Handle Enter key to finalize and lose focus."""
+        #     if event.key() in (Qt.Key_Return, Qt.Key_Enter):
+        #         self.time_edit.clearFocus()  # Finalize and lose focus
+        #         return True  # Mark event as handled
+            
+        # elif (source == self.ui.doubleSpinBox_ActiveWindowStartTime) or (source == self.ui.doubleSpinBox_ActiveWindowEndTime):
+        #     if event.type() == event.KeyPress:
+        #         # """Handle Enter key to finalize and lose focus."""
+        #         if event.key() in (Qt.Key_Return, Qt.Key_Enter):
+        #             source.clearFocus()  # Finalize and lose focus
+        #             return True  # Mark event as handled
+        #         else: 
+        #             ## other key presses, such as type numbers and such
+        #             pass
+
+        # if self.params.debug_print:
+        #     print(f'Spike3DRasterBottomPlaybackControlBar.eventFilter(source: {source}, event: {event})')
+
+        # If not a particularlly handled case, do the default thing.
+        return super().eventFilter(watched, event)
+
+
+    def wheelEvent(self, event):
+        super(ScrollableRasterViewOwnerMixin, self).wheelEvent(event)
+        if self.should_debug_print_interaction_events:
+            print(f'ScrollableRasterViewOwnerMixin.wheelEvent(...)')
+            # self.x = self.x + event.delta()/120
+            # print self.x
+            # self.label.setText("Total Steps: "+QString.number(self.x))        
+            print(f'\t wheelEvent(event: {event}')
+    
+
+    ########################################################
+    ## For Key Press Events:
+    ########################################################
+
+    ##-----------------------------------------
+    def keyPressEvent(self, event):
+        if self.should_debug_print_interaction_events:
+            print(f'pressed from ScrollableRasterViewOwnerMixin.keyPressEvent(event): {event.key()}')
+            print(f'\t event.modifiers(): {event.modifiers()}')
+            # e.Modifiers()
+            print('event received @ ScrollableRasterViewOwnerMixin')
+        super(ScrollableRasterViewOwnerMixin, self).keyPressEvent(event)
+        if self.should_debug_print_interaction_events:
+            if event.key() == QtCore.Qt.Key_Space:
+                print(f'\t detected event: {event.key()}')
+            elif event.key() == QtCore.Qt.Key_0:
+                print(f'\t detected event: {event.key()}')
+            else:
+                print(f'\t undetected event')
+        # self.keyPressed.emit(event)
 
 

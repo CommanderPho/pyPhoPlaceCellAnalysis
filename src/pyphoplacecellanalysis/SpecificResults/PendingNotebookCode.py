@@ -759,7 +759,14 @@ def build_combined_time_synchronized_Bapun_decoders_window(curr_active_pipeline,
     from pyphoplacecellanalysis.GUI.PyQtPlot.DockingWidgets.DynamicDockDisplayAreaContent import CustomDockDisplayConfig
     from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError import _temp_debug_two_step_plots_animated_pyqtgraph
     from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.ContainerBased.PhoContainerTool import GenericPyQtGraphContainer
-    
+    from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.SpikeRasterWidgets.Spike2DRaster import Spike2DRaster, SynchronizedPlotMode
+    from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.DockAreaWrapper import PhoDockAreaContainingWindow
+    from PyQt5.QtGui import QPainter
+    from qtpy import QtWidgets, QtGui
+    import pyphoplacecellanalysis.External.pyqtgraph as pg
+    from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.Mixins.RenderTimeEpochs.Specific2DRenderTimeEpochs import General2DRenderTimeEpochs
+    from pyphoplacecellanalysis.External.pyqtgraph.dockarea.Dock import Dock
+
 
     if context is not None:
         ## Finally, add the display function to the active context
@@ -836,6 +843,151 @@ def build_combined_time_synchronized_Bapun_decoders_window(curr_active_pipeline,
         return _out_container
     
     
+    def _subfn_prepare_plotters_visually(sync_plotters):
+        """ make overlay of top plot render using a multiplicitive composition mode
+        """
+        ## Disable debug print to speed up animation
+        for a_plotter_name, a_plotter in sync_plotters.items():
+            # a_plotter.params.debug_print = False
+            # a_plotter.params.trajectory_path_marker_max_fill_opacity  = 20 # out of 255
+            # # a_plotter.params.trajectory_path_marker_max_fill_opacity  = 100 # out of 255
+            # # a_plotter.params.trajectory_path_marker_max_fill_opacity  = 100 # out of 255
+            # # a_plotter.ui.trajectory_curve
+            
+            # # a_plotter.params.trajectory_path_marker_max_fill_opacity
+            # a_plotter.params.trajectory_path_current_position_marker_brush
+            # # a_plotter.ui.trajectory_curve.setSymbolBrush(
+            # a_plotter.params.trajectory_path_current_position_marker_brush.color().setAlphaF(0.2)
+            a_plotter.params.recent_position_trajectory_max_seconds_ago = 1.5
+            a_plotter.params.recent_position_trajectory_max_num_plotted_samples = 5
+            
+            a_plotter.ui.imv.setCompositionMode(QPainter.CompositionMode_Plus) ## Set this mode so that the heatmap overlays the occupancy map
+            
+
+            # ### Path Settings:
+            # self.params.recent_position_trajectory_path_pen = pg.mkPen({'color': [255, 255, 255, 10], 'width': 1}) # White
+            # # path_shadow_pen = pg.mkPen({'color': [0, 0, 0, 100], 'width': 20})
+            # self.params.recent_position_trajectory_path_shadow_pen = None
+            
+            # ### Marker Settings:
+            # a_plotter.params.recent_position_trajectory_symbol_brush = pg.mkBrush(50,50,50,100)
+            a_plotter.params.recent_position_trajectory_symbol_brush = pg.mkBrush(50,50,50)
+            # a_plotter.params.recent_position_trajectory_symbol_pen = pg.mkPen({'color': [255, 255, 255, 10], 'width': 1}) # White
+            # self.params.recent_position_trajectory_symbol_pen = pg.mkPen({'color': [20, 20, 20, 255], 'width': 1}) # Black
+            a_plotter.params.recent_position_trajectory_symbol_pen = pg.mkPen({'color': [255, 0, 0, 100], 'width': 0.2}) # Red
+            
+            # a_plotter.params.trajectory_path_current_position_marker_brush = pg.mkBrush(0, 255, 0, 200)
+
+            ## Perform updates:
+            traj_curve: pg.PlotDataItem = a_plotter.ui.trajectory_curve
+
+            traj_curve.setSymbolPen(a_plotter.params.recent_position_trajectory_symbol_pen)
+            traj_curve.setSymbolBrush(a_plotter.params.recent_position_trajectory_symbol_brush)
+
+
+            QtWidgets.QApplication.processEvents()
+            # win.repaint()
+            
+
+
+
+    def _subfn_add_session_epoch_intervals(active_2d_plot, curr_active_pipeline, **kwargs):
+        """ 
+        captures: active_2d_plot
+        
+        """
+        def _updated_custom_interval_dataframe_visualization_columns_general_epoch(active_df, **kwargs):  
+            num_intervals = np.shape(active_df)[0]  
+            ## parameters:  
+            y_location = 0.0  
+            height = 40.5  
+            # pen_color = pg.mkColor('white')  
+            pen_color = [pg.intColor(i, hues=num_intervals) for i in np.arange(num_intervals)]
+            brush_color = [pg.intColor(i, hues=num_intervals) for i in np.arange(num_intervals)]
+            for a_pen_color in pen_color:
+                a_pen_color.setAlphaF(0.8)
+
+            for a_brush_color in brush_color:
+                a_brush_color.setAlphaF(0.5)
+
+            ## Update the dataframe's visualization columns:  
+            active_df = General2DRenderTimeEpochs._update_df_visualization_columns(active_df, y_location=y_location, height=height, pen_color=pen_color, brush_color=brush_color, **kwargs)  
+            return active_df
+
+
+        # SessionEpochs2DRenderTimeEpochs.add_render_time_epochs(curr_sess=curr_active_pipeline.sess.epochs, destination_plot=active_2d_plot)
+
+        ## Set intervals to only draw of the first 3 plots
+        active_2d_plot.params.custom_interval_rendering_plots = active_2d_plot.params.custom_interval_rendering_plots[:3] ## only get the first 3 plots, updates `active_2d_plot.interval_rendering_plots`
+
+        ## Add the paradigm session epochs:
+        active_paradigm_epochs_ds = ensure_dataframe(curr_active_pipeline.sess.epochs)
+        _out = active_2d_plot.add_rendered_intervals(active_paradigm_epochs_ds, 'SessionEpochs', child_plots=[])
+        active_paradigm_epochs_ds = active_2d_plot.interval_datasources.SessionEpochs
+        active_paradigm_epochs_ds.update_visualization_properties(_updated_custom_interval_dataframe_visualization_columns_general_epoch)
+
+        ## Add the PBE intervals:
+        active_pbe_ds = ensure_dataframe(curr_active_pipeline.sess.pbe)
+        _out_pbes = active_2d_plot.add_rendered_intervals(active_pbe_ds, 'PBEs')
+
+        ## Layout the two sets of intervals:
+        _out_stacked_epoch_layout_dict = active_2d_plot.apply_relative_epoch_layout(rendered_interval_keys_to_adjust=['SessionEpochs', 'PBEs'], desired_interval_heights=[1.0, 0.5], desired_intra_interval_padding=0.1, interval_stack_location='below', debug_print=True)
+        ## OUTPUTS: _out_pbes, _out_stacked_epoch_layout_dict
+        
+
+    def _subfn_add_pbes_full_result_marginals(active_2d_plot, pbes_full_result, **kwargs):
+        """ 
+        captures: active_2d_plot
+        """
+        ## Add the PBEs decoded result:
+        from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import _add_context_marginal_to_timeline, _add_context_decoded_epoch_marginals_to_timeline
+
+        ## Add the decoded PBE marginal contexts:
+        pbe_track_identifier: str = f"pbe[{pbes_full_result.decoder_result.decoding_time_bin_size}]"
+        # pbes_full_result.decoder_result.filter_epochs
+        if 't_rel_seconds' not in active_2d_plot.spikes_df:
+            active_2d_plot.spikes_df['t_rel_seconds'] = active_2d_plot.spikes_df['t_seconds'] # KeyError: 't_rel_seconds'
+            
+        _out_pbe_tracks = _add_context_decoded_epoch_marginals_to_timeline(active_2d_plot=active_2d_plot, decoded_epochs_result=pbes_full_result.decoder_result, name=pbe_track_identifier)
+        # identifier_name, widget, matplotlib_fig, matplotlib_fig_axes, dock_item = _out_pbe_tracks
+        active_2d_plot.sync_matplotlib_render_plot_widget(identifier=pbe_track_identifier, sync_mode=SynchronizedPlotMode.TO_WINDOW)
+
+        pbe_overview_track_identifier: str = f"{pbe_track_identifier} (Overview)"
+        _out_pbe_overview_tracks = _add_context_decoded_epoch_marginals_to_timeline(active_2d_plot=active_2d_plot, decoded_epochs_result=pbes_full_result.decoder_result, name=pbe_overview_track_identifier)
+        active_2d_plot.sync_matplotlib_render_plot_widget(identifier=pbe_overview_track_identifier, sync_mode=SynchronizedPlotMode.TO_GLOBAL_DATA)
+        return (_out_pbe_tracks, _out_pbe_overview_tracks)
+
+
+    def _subfn_build_overview_and_windowed_dockgroups(active_2d_plot, debug_print:bool=False, **kwargs):
+        """ divides the docks into two separate groups, the ones that show the overview of the whole recording session at the top and those that show the active window down below
+        
+        #TODO 2025-09-22 07:39: - [ ] NOT QUITE FINISHED. Several tracks are left in the "None" group
+        
+        Usage:
+            grouped_dock_items_dict = build_overview_and_windowed_dockgroups(active_2d_plot)
+            grouped_dock_items_dict
+
+        """
+        flat_dockitems_list = active_2d_plot.get_flat_dockitems_list() ## get the non-grouped dockitems
+        grouped_dock_items_dict: Dict[str, List[Dock]] = {}
+        # ungrouped_dock_items_list: List[Dock] = []
+        for a_dock in flat_dockitems_list:
+            ## have a dock
+            if debug_print:
+                print(f'a_dock.name: {a_dock.name()}')
+            if 'overview' in a_dock.name().lower():
+                if 'overview' not in a_dock.config.dock_group_names:
+                    a_dock.config.dock_group_names.append('overview')
+            else:
+                ## otherwise call it "windowed"
+                if 'windowed' not in a_dock.config.dock_group_names:
+                    a_dock.config.dock_group_names.append('windowed') 
+
+
+        return active_2d_plot.ui.dynamic_docked_widget_container.get_dockGroup_dock_dict()
+
+
+
 
     # ==================================================================================================================================================================================================================================================================================== #
     # BEGIN FUNCTION BODY                                                                                                                                                                                                                                                                  #
@@ -969,6 +1121,43 @@ def build_combined_time_synchronized_Bapun_decoders_window(curr_active_pipeline,
         _out_global_context_overview_tuple = _add_context_marginal_to_timeline(controlling_widget, a_filter_epochs_decoded_result=all_context_filter_epochs_decoder_result, name='global context (overview)')        
         controlling_widget.sync_matplotlib_render_plot_widget(identifier='global context (overview)', sync_mode=SynchronizedPlotMode.TO_GLOBAL_DATA)
         _out_container.plots.context_marginal_tracks = {'global_context': _out_global_context_tuple, 'global context (overview)': _out_global_context_overview_tuple}
+
+
+
+
+    active_2d_plot: Spike2DRaster = _out_container.ui.controlling_widget
+    sync_plotters: Dict[str, TimeSynchronizedPositionDecoderPlotter] = _out_container.ui.sync_plotters
+    win: PhoDockAreaContainingWindow = _out_container.ui.root_dockAreaWindow
+
+
+    _subfn_prepare_plotters_visually(_out_sync_plotters)
+
+    # add_pbes_full_result_marginals(active_2d_plot, pbes_full_result)
+    # add_session_epoch_intervals(active_2d_plot, curr_active_pipeline)
+
+    ## Assign the update functions so results can be updated later if we don't have results now:
+    _out_container.add_session_epoch_intervals = lambda curr_active_pipeline, **kwargs: _subfn_add_session_epoch_intervals(active_2d_plot=_out_container.ui.controlling_widget, curr_active_pipeline=curr_active_pipeline, **kwargs)
+    _out_container.add_pbes_full_result_marginals = lambda pbes_full_result, **kwargs: _subfn_add_pbes_full_result_marginals(active_2d_plot=_out_container.ui.controlling_widget, pbes_full_result=pbes_full_result, **kwargs)
+    _out_container.build_overview_and_windowed_dockgroups = lambda debug_print=False, **kwargs: _subfn_build_overview_and_windowed_dockgroups(active_2d_plot=_out_container.ui.controlling_widget, debug_print=debug_print, **kwargs)
+
+    ## Execute those of the marginals that we can do already:
+    _out_container.add_session_epoch_intervals(curr_active_pipeline=curr_active_pipeline) ## this will work
+
+    """ unpacking
+        
+        active_2d_plot: Spike2DRaster = _out_container_new.ui.controlling_widget
+        sync_plotters: Dict[str, TimeSynchronizedPositionDecoderPlotter] = _out_container_new.ui.sync_plotters
+        win: PhoDockAreaContainingWindow = _out_container_new.ui.root_dockAreaWindow
+        
+        _out_container.add_session_epoch_intervals(curr_active_pipeline=curr_active_pipeline)
+        _out_pbe_tracks, _out_pbe_overview_tracks = _out_container.add_pbes_full_result_marginals(pbes_full_result=pbes_full_result)
+        
+
+        grouped_dock_items_dict = _out_container.build_overview_and_windowed_dockgroups()
+        grouped_dock_items_dict
+
+
+    """
 
 
     return _out_container # (controlling_widget, curr_sync_occupancy_plotter, curr_placefields_plotter), root_dockAreaWindow, app
