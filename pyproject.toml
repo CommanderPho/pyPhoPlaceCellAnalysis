@@ -1,6 +1,6 @@
 [project]
 name = "pyphoplacecellanalysis"
-version = "0.3.0"
+version = "0.3.1"
 description = ""
 authors = [{ name = "Pho Hale", email = "halechr@umich.edu" }]
 requires-python = ">=3.9,<3.12"
@@ -34,7 +34,6 @@ dependencies = [
     "jupyter-bokeh>=3.0.7,<4",
     "pyqt-builder>=1.15.3,<2",
     "pyqt5-qt5==5.15.2",
-    "pycscope>=1.2.1,<2",
     "scikit-learn~=1.5",
     "opencv-contrib-python>=4.10.0.84,<5",
     "qtawesome>=1.4.0",
@@ -42,7 +41,6 @@ dependencies = [
     "wheel",
     "cython",
     "neuropy>=0.2.0",
-    "pyphocorehelpers",
 ]
 
 [dependency-groups]
@@ -85,9 +83,8 @@ default-groups = [
 [tool.uv.sources]
 ansi2html = { git = "https://github.com/CommanderPho/ansi2html.git", rev = "main" }
 mpl-multitab = { git = "https://github.com/CommanderPho/mpl-multitab.git", rev = "pho_compat" }
-neuropy = { git = "https://github.com/CommanderPho/NeuroPy.git", rev = "feature/safe-advance" }
+neuropy = { path = "../NeuroPy", editable=true }
 pybursts = { git = "https://github.com/CommanderPho/pybursts.git", rev = "master" }
-pyphocorehelpers = { git = "https://github.com/CommanderPho/pyPhoCoreHelpers.git", rev = "develop"}
 
 [build-system]
 requires = ["hatchling"]
