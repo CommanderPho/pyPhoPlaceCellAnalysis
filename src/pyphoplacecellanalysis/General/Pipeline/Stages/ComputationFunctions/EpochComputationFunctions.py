@@ -1805,7 +1805,8 @@ class EpochComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Computati
         requires_global_keys=[], provides_global_keys=['EpochComputations'],
         validate_computation_test=validate_has_non_PBE_epoch_results, is_global=True)
     def perform_compute_non_PBE_epochs(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, debug_print=False, training_data_portion: float=(5.0/6.0), epochs_decoding_time_bin_size: float = 0.050, frame_divide_bin_size:float=10.0,
-                                        compute_1D: bool = True, compute_2D: bool = True, drop_previous_result_and_compute_fresh:bool=False, skip_training_test_split: bool = True, debug_print_memory_breakdown: bool=False):
+                                        compute_1D: bool = True, compute_2D: bool = True, drop_previous_result_and_compute_fresh:bool=False, skip_training_test_split: bool = True, debug_print_memory_breakdown: bool=False,
+                                        IGNORE_MEMORY_ERROR_FOR_DEBUGGING: bool=False):
         """ Performs the computation of non-PBE epochs for the session and all filtered epochs. Stacks things up hardcore yeah.
 
         Requires:
@@ -1873,7 +1874,11 @@ class EpochComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Computati
                 for k, v in itemized_mem_breakdown_GB.items():
                     print(f"\t{k}: {v:.3f}")
                         
-                raise MemoryError(f"Estimated Insufficient Memory: Operation would require {total_required_memory_GB:.2f} GB (have {available_GB:.2f} GB available.")
+                memory_error_msg: str = f"Estimated Insufficient Memory: Operation would require {total_required_memory_GB:.2f} GB (have {available_GB:.2f} GB available."
+                if IGNORE_MEMORY_ERROR_FOR_DEBUGGING:
+                    print(f'WARNING: IGNORE_MEMORY_ERROR_FOR_DEBUGGING == True so the MemoryError exception will be suppressed, and computation will unwisely continue! memory_error_msg: {memory_error_msg}')
+                else:
+                    raise MemoryError(memory_error_msg)
                 # return global_computation_results
                 
             # ==================================================================================================================== #
