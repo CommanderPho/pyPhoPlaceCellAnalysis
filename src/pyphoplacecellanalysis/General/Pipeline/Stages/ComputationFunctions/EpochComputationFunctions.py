@@ -60,109 +60,6 @@ from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiCo
 import pyphoplacecellanalysis.General.type_aliases as types
 
 
-# ### For _perform_recursive_latent_placefield_decoding
-# from neuropy.utils import position_util
-# from neuropy.core import Position
-# from neuropy.analyses.placefields import perform_compute_placefields
-
-"""-------------- Specific Computation Functions to be registered --------------"""
-""" 2025-02-20 08:55 Renamed 'subdivide' -> 'frame_divide', 'subdivision' -> 'frame_division' throughout my recent non-PBE-related functions for clearity. 
-
-# ==================================================================================================================== #
-# In EpochComputationFunctions.py:                                                                                     #
-# ==================================================================================================================== #
-# Direct variable renames:
-subdivided_epochs_results -> frame_divided_epochs_results
-subdivided_epochs_df -> frame_divided_epochs_df
-global_subivided_epochs_obj -> global_frame_divided_epochs_obj
-global_subivided_epochs_df -> global_frame_divided_epochs_df
-subdivided_epochs_specific_decoded_results_dict -> frame_divided_epochs_specific_decoded_results_dict
-
-# Function/parameter renames:
-subdivide_bin_size -> frame_divide_bin_size
-min_subdivision_resolution -> min_frame_division_resolution
-actual_subdivision_step_size -> actual_frame_division_step_size
-num_subdivisions -> num_frame_divisions
-
-# ==================================================================================================================== #
-# In decoder_plotting_mixins.py:                                                                                       #
-# ==================================================================================================================== #
-subdivide_bin_size -> frame_divide_bin_size
-
-"""
-
-# [/c:/Users/pho/repos/Spike3DWorkEnv/NeuroPy/neuropy/core/session/Formats/Specific/KDibaOldDataSessionFormat.py:142](vscode://file/c:/Users/pho/repos/Spike3DWorkEnv/NeuroPy/neuropy/core/session/Formats/Specific/KDibaOldDataSessionFormat.py:142)
-# ```python
-#     @classmethod
-#     def POSTLOAD_estimate_laps_and_replays(cls, sess):
-#         """ a POSTLOAD function: after loading, estimates the laps and replays objects (replacing those loaded). """
-#         print(f'POSTLOAD_estimate_laps_and_replays()...')
-        
-#         # 2023-05-16 - Laps conformance function (TODO 2023-05-16 - factor out?)
-#         # lap_estimation_parameters = DynamicContainer(N=20, should_backup_extant_laps_obj=True) # Passed as arguments to `sess.replace_session_laps_with_estimates(...)`
-
-#         lap_estimation_parameters = sess.config.preprocessing_parameters.epoch_estimation_parameters.laps
-#         assert lap_estimation_parameters is not None
-
-#         use_direction_dependent_laps: bool = lap_estimation_parameters.pop('use_direction_dependent_laps', True)
-#         sess.replace_session_laps_with_estimates(**lap_estimation_parameters, should_plot_laps_2d=False) # , time_variable_name=None
-#         ## add `use_direction_dependent_laps` back in:
-#         lap_estimation_parameters.use_direction_dependent_laps = use_direction_dependent_laps
-
-#         ## Apply the laps as the limiting computation epochs:
-#         # computation_config.pf_params.computation_epochs = sess.laps.as_epoch_obj().get_non_overlapping().filtered_by_duration(1.0, 30.0)
-#         if use_direction_dependent_laps:
-#             print(f'.POSTLOAD_estimate_laps_and_replays(...): WARN: {use_direction_dependent_laps}')
-#             # TODO: I think this is okay here.
-
-
-#         # Get the non-lap periods using PortionInterval's complement method:
-#         non_running_periods = Epoch.from_PortionInterval(sess.laps.as_epoch_obj().to_PortionInterval().complement()) # TODO 2023-05-24- Truncate to session .t_start, .t_stop as currently includes infinity, but it works fine.
-        
-
-#         # ## TODO 2023-05-19 - FIX SLOPPY PBE HANDLING
-#         PBE_estimation_parameters = sess.config.preprocessing_parameters.epoch_estimation_parameters.PBEs
-#         assert PBE_estimation_parameters is not None
-#         PBE_estimation_parameters.require_intersecting_epoch = non_running_periods # 2023-10-06 - Require PBEs to occur during the non-running periods, REQUIRED BY KAMRAN contrary to my idea of what PBE is.
-        
-#         new_pbe_epochs = sess.compute_pbe_epochs(sess, active_parameters=PBE_estimation_parameters)
-#         sess.pbe = new_pbe_epochs
-#         updated_spk_df = sess.compute_spikes_PBEs()
-
-#         # 2023-05-16 - Replace loaded replays (which are bad) with estimated ones:
-        
-        
-        
-#         # num_pre = session.replay.
-#         replay_estimation_parameters = sess.config.preprocessing_parameters.epoch_estimation_parameters.replays
-#         assert replay_estimation_parameters is not None
-#         ## Update the parameters with the session-specific values that couldn't be determined until after the session was loaded:
-#         replay_estimation_parameters.require_intersecting_epoch = non_running_periods
-#         replay_estimation_parameters.min_inclusion_fr_active_thresh = 1.0
-#         replay_estimation_parameters.min_num_unique_aclu_inclusions = 5
-#         sess.replace_session_replays_with_estimates(**replay_estimation_parameters)
-        
-#         # ### Get both laps and existing replays as PortionIntervals to check for overlaps:
-#         # replays = sess.replay.epochs.to_PortionInterval()
-#         # laps = sess.laps.as_epoch_obj().to_PortionInterval() #.epochs.to_PortionInterval()
-#         # non_lap_replays = Epoch.from_PortionInterval(replays.difference(laps)) ## Exclude anything that occcurs during the laps themselves.
-#         # sess.replay = non_lap_replays.to_dataframe() # Update the session's replay epochs from those that don't intersect the laps.
-
-#         # print(f'len(replays): {len(replays)}, len(laps): {len(laps)}, len(non_lap_replays): {non_lap_replays.n_epochs}')
-        
-
-#         # TODO 2023-05-22: Write the parameters somewhere:
-#         replays = sess.replay.epochs.to_PortionInterval()
-
-#         ## This is the inverse approach of the new method, which loads the parameters from `sess.config.preprocessing_parameters`
-#         # sess.config.preprocessing_parameters = DynamicContainer(epoch_estimation_parameters=DynamicContainer.init_from_dict({
-#         #     'laps': lap_estimation_parameters,
-#         #     'PBEs': PBE_estimation_parameters,
-#         #     'replays': replay_estimation_parameters
-#         # }))
-
-#         return sess
-# ```
 
 
 @metadata_attributes(short_name=None, tags=['global', 'decode', 'result', 'extracted'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-06-30 07:39', related_items=[])
@@ -500,7 +397,6 @@ class ComputeGlobalEpochBase(ComputedResult):
 
 
 
-
 @metadata_attributes(short_name=None, tags=[''], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-06-30 07:41', related_items=[])
 @custom_define(slots=False, eq=False)
 class DecodingResultND(UnpackableMixin, ComputedResult):
@@ -638,8 +534,6 @@ class Compute_NonPBE_Epochs(ComputedResult):
     
     single_global_epoch_df: pd.DataFrame = serialized_field()
     global_epoch_only_non_PBE_epoch_df: pd.DataFrame = serialized_field()
-    # a_new_global_training_df: pd.DataFrame = serialized_field()
-    # a_new_global_test_df: pd.DataFrame = serialized_field()
 
     skip_training_test_split: bool = serialized_attribute_field(default=False)
 
@@ -721,7 +615,7 @@ class Compute_NonPBE_Epochs(ComputedResult):
 
 
 
-    @function_attributes(short_name=None, tags=['epochs', 'non-PBE', 'session', 'metadata'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-01-28 04:10', related_items=[]) 
+    @function_attributes(short_name=None, tags=['epochs', 'non-PBE', 'session', 'metadata', 'hardcoded-LS'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-01-28 04:10', related_items=[]) 
     @classmethod
     def _adding_global_non_PBE_epochs_to_sess(cls, sess, t_start: float, t_delta: float, t_end: float, training_data_portion: float = 5.0/6.0) -> Tuple[Dict[types.DecoderName, pd.DataFrame], Dict[types.DecoderName, pd.DataFrame]]:
         """ Builds a dictionary of train/test-split epochs for ['long', 'short', 'global'] periods
@@ -816,7 +710,7 @@ class Compute_NonPBE_Epochs(ComputedResult):
 
 
 
-    @function_attributes(short_name=None, tags=['epochs', 'non-PBE', 'pipeline'], input_requires=[], output_provides=[], uses=['cls._adding_global_non_PBE_epochs_to_sess(...)'], used_by=[], creation_date='2025-01-28 04:10', related_items=[]) 
+    @function_attributes(short_name=None, tags=['epochs', 'non-PBE', 'pipeline', 'hardcoded-LS'], input_requires=[], output_provides=[], uses=['cls._adding_global_non_PBE_epochs_to_sess(...)'], used_by=[], creation_date='2025-01-28 04:10', related_items=[]) 
     @classmethod
     def _adding_global_non_PBE_epochs(cls, curr_active_pipeline, training_data_portion: float = 5.0/6.0) -> Tuple[Dict[types.DecoderName, pd.DataFrame], Dict[types.DecoderName, pd.DataFrame]]:
         """ Builds a dictionary of train/test-split epochs for ['long', 'short', 'global'] periods
@@ -901,7 +795,7 @@ class Compute_NonPBE_Epochs(ComputedResult):
         pass
         
     
-
+    @function_attributes(short_name=None, tags=['hardcoded-LS'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-09-23 06:06', related_items=[])
     @classmethod
     def init_from_pipeline(cls, curr_active_pipeline, training_data_portion: float = 5.0/6.0, skip_training_test_split: bool=True):
         a_new_training_df_dict, a_new_test_df_dict, (global_epoch_only_non_PBE_epoch_df, a_new_global_training_df, a_new_global_test_df) = cls._adding_global_non_PBE_epochs(curr_active_pipeline, training_data_portion=training_data_portion)
@@ -1431,7 +1325,7 @@ class EpochComputationsComputationsContainer(ComputedResult):
         return non_PBE_all_directional_pf1D_Decoder, pseudo2D_continuous_specific_decoded_result, continuous_decoded_results_dict, non_PBE_marginal_over_track_ID, (time_bin_containers, time_window_centers, track_marginal_posterior_df)
 
 
-    @function_attributes(short_name=None, tags=['posteriors'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-03-09 05:21', related_items=[])
+    @function_attributes(short_name=None, tags=['posteriors', 'hardcoded-LS'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-03-09 05:21', related_items=[])
     @classmethod
     def _build_output_decoded_posteriors(cls, non_PBE_all_directional_pf1D_Decoder: BasePositionDecoder, filter_epochs_to_decode_dict: Dict[KnownNamedDecodingEpochsType, Epoch], unique_decoder_names: List[str], spikes_df: pd.DataFrame, epochs_decoding_time_bin_size: float,
                                         session_name: str, t_start: float, t_delta: float, t_end: float, enable_fail_on_empty_exception: bool = False) -> GeneralDecoderDictDecodedEpochsDictResult:
@@ -1573,7 +1467,6 @@ class EpochComputationsComputationsContainer(ComputedResult):
                                                          filter_epochs_decoded_filter_epoch_track_marginal_posterior_df_dict=filter_epochs_decoded_filter_epoch_track_marginal_posterior_df_dict)
 
 
-
     # ==================================================================================================================== #
     # NEW Context-General Method 2025-04-05 10:12                                                                          #
     # ==================================================================================================================== #
@@ -1693,8 +1586,6 @@ class EpochComputationsComputationsContainer(ComputedResult):
         
         return (filter_epochs_to_decoded_dict, filter_epochs_pseudo2D_continuous_specific_decoded_result, filter_epochs_decoder_dict, filter_epochs_decoded_filter_epoch_track_marginal_posterior_df_dict) ## return a plain tuple of dicts
     
-
-
     # ==================================================================================================================== #
     # Plotting Methods                                                                                                     #
     # ==================================================================================================================== #
