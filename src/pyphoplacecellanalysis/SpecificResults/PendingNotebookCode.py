@@ -154,7 +154,8 @@ def final_process_bapun_all_comps(curr_active_pipeline, posthoc_save: bool=True,
 
     from neuropy.analyses.placefields import Position
     from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import post_process_non_kdiba
-    
+    from neuropy.analyses.laps import estimate_session_laps
+
     hardcoded_params: HardcodedProcessingParameters = BapunDataSessionFormatRegisteredClass._get_session_specific_parameters(session_context=curr_active_pipeline.get_session_context())
     hardcoded_params
 
@@ -183,6 +184,21 @@ def final_process_bapun_all_comps(curr_active_pipeline, posthoc_save: bool=True,
     curr_epoch_names: List[str] = curr_active_pipeline.sess.epochs.to_dataframe()['label'].to_list()
     print(f'curr_epoch_names: {curr_epoch_names}')
 
+    ## Build umap position so it will go to filtered
+
+    active_maze_epoch_names = deepcopy(hardcoded_params.non_global_activity_session_names) # ['maze1', 'maze2'] or ['roam', 'sprinkle']
+    active_maze_epochs_df: pd.DataFrame = curr_active_pipeline.sess.paradigm.to_dataframe() # ['label']
+    active_maze_epochs_df = active_maze_epochs_df[active_maze_epochs_df['label'].isin(active_maze_epoch_names)]
+
+    sess = curr_active_pipeline.sess.position.compute_linearized_position(method='umap')
+    sess = estimate_session_laps(curr_active_pipeline.sess, should_plot_laps_2d=False) ## unfiltered session 
+    laps_obj = curr_active_pipeline.sess.laps # Laps
+    laps_df: pd.DataFrame = laps_obj.to_dataframe()
+    # laps_df = laps_df.epochs.adding_maze_id_if_needed(t_start=t_start, t_delta=t_delta, t_end=t_end)
+    laps_df = laps_df.epochs.adding_maze_id_if_needed(active_maze_epochs_df=active_maze_epochs_df)
+    curr_active_pipeline.sess.laps._df = laps_df
+
+
     # epoch_name_includelist = ['pre', 'maze1', 'post1', 'maze2', 'post2']
     # epoch_name_includelist = ['pre', 'roam', 'sprinkle', 'post']
     # epoch_name_includelist = ['roam', 'sprinkle']
@@ -191,20 +207,6 @@ def final_process_bapun_all_comps(curr_active_pipeline, posthoc_save: bool=True,
 
     # active_session_filter_configurations = build_custom_epochs_filters(curr_active_pipeline.sess, epoch_name_includelist=['maze1', 'maze2', 'maze_GLOBAL']) ## ALL possible epochs
     active_session_filter_configurations = build_custom_epochs_filters(curr_active_pipeline.sess, epoch_name_includelist=hardcoded_params.decoder_building_session_names) ## ALL possible epochs
-
-    # active_session_filter_configurations = active_data_mode_registered_class.build_default_filter_functions(sess=curr_active_pipeline.sess)
-    # active_session_filter_configurations = build_custom_epochs_filters(curr_active_pipeline.sess, epoch_name_includelist=['pre', 'roam', 'maze', 'sprinkle', 'post']) ## ALL possible epochs
-    # active_session_filter_configurations = build_custom_epochs_filters(curr_active_pipeline.sess, epoch_name_includelist=['pre', 'roam', 'sprinkle', 'post']) ## ALL possible epochs
-
-
-    # active_session_filter_configurations = active_data_mode_registered_class.build_default_filter_functions(sess=curr_active_pipeline.sess, epoch_name_includelist=epoch_name_includelist) # build_filters_pyramidal_epochs(sess=curr_kdiba_pipeline.sess)
-    # active_session_filter_configurations = build_custom_epochs_filters(curr_active_pipeline.sess, epoch_name_includelist=['maze','sprinkle'])
-    # active_session_filter_configurations = build_custom_epochs_filters(curr_active_pipeline.sess, epoch_name_includelist=['maze', 'sprinkle'])
-    # active_session_filter_configurations = build_custom_epochs_filters(curr_active_pipeline.sess, epoch_name_includelist=['roam', 'sprinkle']) # , 'maze'
-
-    # active_session_filter_configurations = active_data_mode_registered_class.build_filters_pyramidal_epochs(curr_active_pipeline.sess, epoch_name_includelist=['maze','sprinkle'])
-    # active_session_filter_configurations
-
     curr_active_pipeline.filter_sessions(active_session_filter_configurations)
 
     # ==================================================================================================================================================================================================================================================================================== #
@@ -263,11 +265,18 @@ def final_process_bapun_all_comps(curr_active_pipeline, posthoc_save: bool=True,
 
     ## Set linearization mode to umap so it doesn't consume all the memory when trying to linearize position:
     active_session_computation_configs[0].pf_params.linearization_method = "umap"
+    sess = curr_active_pipeline.sess.position.compute_linearized_position(method='umap')
 
     for an_epoch_name, a_sess in curr_active_pipeline.filtered_sessions.items():
         ## forcibly compute the linearized position so it doesn't fallback to "isomap" method which eats all the memory
         a_pos_df: pd.DataFrame = a_sess.position.compute_linearized_position(method='umap')
         
+
+    sess = estimate_session_laps(curr_active_pipeline.sess, should_plot_laps_2d=False) ## unfiltered session 
+
+    for k, a_sess in curr_active_pipeline.filtered_sessions.items():
+        a_sess = estimate_session_laps(a_sess, should_plot_laps_2d=False)
+
     # ==================================================================================================================================================================================================================================================================================== #
     # Ready to compute                                                                                                                                                                                                                                                                     #
     # ==================================================================================================================================================================================================================================================================================== #
