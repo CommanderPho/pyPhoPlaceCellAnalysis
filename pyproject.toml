@@ -38,10 +38,6 @@ dependencies = [
     "opencv-contrib-python>=4.10.0.84,<5",
     "qtawesome>=1.4.0",
     "importlib-resources>=6.5.2",
-    "wheel",
-    "cython",
-    "neuropy>=0.2.0",
-    "pyphocorehelpers",
 ]
 
 [dependency-groups]
@@ -62,14 +58,18 @@ gui = [
     "pyqt5-qt5>=5.15.2,<6",
     "pyqt-custom-titlebar-window>=0.0.50,<0.0.51",
     "qtawesome>=1.2.2,<2",
+    "pyvista>=0.43.0,<0.44",  # Supports newer VTK versions
+    "pyvistaqt>=0.9.0,<0.10",
     "loguru>=0.6.0,<0.7",
     "pyopengl>=3.1.6,<4",
     "mpl-multitab",
     "patchworklib>=0.5.2,<0.6",
+    "vedo",
     "pyqt-responsive-label>=0.0.3,<0.0.4",
 ]
 remote = [
     "neuropy",
+    "pyphocorehelpers",
 ]
 testing = ["mplcursors>=0.5.2,<0.6"]
 
@@ -84,7 +84,7 @@ default-groups = [
 [tool.uv.sources]
 ansi2html = { git = "https://github.com/CommanderPho/ansi2html.git", rev = "main" }
 mpl-multitab = { git = "https://github.com/CommanderPho/mpl-multitab.git", rev = "pho_compat" }
-neuropy = { path = "../NeuroPy", editable=true }
+vedo = { git = "https://github.com/CommanderPho/vedo.git", rev = "feature/merge-upstream" }
 pybursts = { git = "https://github.com/CommanderPho/pybursts.git", rev = "master" }
 pyphocorehelpers = { path = "../pyPhoCoreHelpers", editable = true }
 
