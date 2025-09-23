@@ -135,7 +135,7 @@ from neuropy.core.flattened_spiketrains import SpikesAccessor
 from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import DecodedFilterEpochsResult, SingleEpochDecodedResult
 
 @function_attributes(short_name=None, tags=['bapun'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-09-19 17:50', related_items=[])
-def final_process_bapun_all_comps(curr_active_pipeline, posthoc_save: bool=True, override_parameters_flat_keypaths_dict=None):
+def final_process_bapun_all_comps(curr_active_pipeline, posthoc_save: bool=True, override_parameters_flat_keypaths_dict=None, time_bin_size=0.5):
     """ 
     from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import final_process_bapun_all_comps
     curr_active_pipeline = final_process_bapun_all_comps(curr_active_pipeline=curr_active_pipeline, posthoc_save=True)
@@ -210,7 +210,7 @@ def final_process_bapun_all_comps(curr_active_pipeline, posthoc_save: bool=True,
     # ==================================================================================================================================================================================================================================================================================== #
     # COMPUTATION CONFIGS                                                                                                                                                                                                                                                                  #
     # ==================================================================================================================================================================================================================================================================================== #
-    active_session_computation_configs = active_data_mode_registered_class.build_default_computation_configs(sess=curr_active_pipeline.sess, time_bin_size=0.5)
+    active_session_computation_configs = active_data_mode_registered_class.build_default_computation_configs(sess=curr_active_pipeline.sess, time_bin_size=time_bin_size)
 
     # grid_bin_bounds=(((-83.33747881216672, 110.15967332926644), (-94.89955475226206, 97.07387994733473)))
 
@@ -1039,6 +1039,8 @@ def build_combined_time_synchronized_Bapun_decoders_window(curr_active_pipeline,
         all_context_filter_epochs_decoder_result: SingleEpochDecodedResult = continuously_decoded_pseudo2D_decoder_dict[a_time_bin_size] ## ALWAYS GET THE MOST RECENT
         marginal_z: NDArray = all_context_filter_epochs_decoder_result.marginal_z.p_x_given_n
 
+
+
         # individual_decoder_decoding_results = {k:v for k, v in directional_decoders_decode_result.continuously_decoded_result_cache_dict[a_time_bin_size].items() if k != 'pseudo2D'} ## NOT USED HERE:
 
         # one_step_decoder_dummy_dict = {}
@@ -1054,6 +1056,8 @@ def build_combined_time_synchronized_Bapun_decoders_window(curr_active_pipeline,
             one_step_decoder_dummy_dict[a_filter_name] = DummyOneStepDecoder(xbin=deepcopy(pseudo3D_decoder.xbin), ybin=deepcopy(pseudo3D_decoder.ybin), time_window_centers=deepcopy(all_context_filter_epochs_decoder_result.time_bin_container.centers),
                                                                   p_x_given_n=deepcopy(a_single_decoder_p_x_given_n))
 
+
+            # _out_container.plot
 
 
         # one_step_decoder_dummy_dict
@@ -1113,7 +1117,15 @@ def build_combined_time_synchronized_Bapun_decoders_window(curr_active_pipeline,
     # END for a_filter_name in included_filter_names...
 
     _out_container = _subfn_merge_plotters(controlling_widget, is_controlling_widget_external=is_controlling_widget_external, **_out_sync_plotters)
+    if directional_decoders_decode_result is not None:
+        _out_container.plot_data.directional_decoders_decode_result = directional_decoders_decode_result
     
+
+    for a_filter_name in included_filter_names:
+        _out_container.plot_data.directional_decoders_decode_result = directional_decoders_decode_result
+        # _out_container.plot_data.directional_decoders_decode_result = directional_decoders_decode_result
+        # _out_container.plot_data.directional_decoders_decode_result = directional_decoders_decode_result
+        
 
     if (all_context_filter_epochs_decoder_result is not None) and (controlling_widget is not None):
         ## Add a context likelihood track as well

@@ -84,8 +84,6 @@ min_subdivision_resolution -> min_frame_division_resolution
 actual_subdivision_step_size -> actual_frame_division_step_size
 num_subdivisions -> num_frame_divisions
 
-
-
 # ==================================================================================================================== #
 # In decoder_plotting_mixins.py:                                                                                       #
 # ==================================================================================================================== #
