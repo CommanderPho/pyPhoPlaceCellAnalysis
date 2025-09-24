@@ -222,7 +222,7 @@ class ComputeGlobalEpochBase(ComputedResult):
         single_global_epoch = ensure_Epoch(single_global_epoch)
 
         # Build frame_divided epochs first since they're needed for both 1D and 2D
-        (global_frame_divided_epochs_obj, global_frame_divided_epochs_df), global_pos_df = cls.build_frame_divided_epochs(curr_active_pipeline, frame_divide_bin_size=frame_divide_bin_size)
+        (global_frame_divided_epochs_obj, global_frame_divided_epochs_df), global_pos_df = cls.build_frame_divided_epochs(curr_active_pipeline, frame_divide_bin_size=frame_divide_bin_size, single_global_epoch=single_global_epoch)
 
         results1D, results2D = None, None
 
@@ -253,7 +253,7 @@ class ComputeGlobalEpochBase(ComputedResult):
 
     @classmethod
     @function_attributes(short_name=None, tags=['frame_division', 'pure'], input_requires=[], output_provides=[], uses=['subdivide_epochs'], used_by=['cls.compute_all(...)'], creation_date='2025-02-11 00:00', related_items=[])
-    def build_frame_divided_epochs(cls, curr_active_pipeline, frame_divide_bin_size: Optional[float] = 1.0):
+    def build_frame_divided_epochs(cls, curr_active_pipeline, single_global_epoch: Epoch, frame_divide_bin_size: Optional[float] = 1.0):
         """ Splits the epochs into fixed-size "frames"
         
         frame_divide_bin_size = 1.0 # Specify the size of each sub-epoch in seconds
@@ -272,13 +272,13 @@ class ComputeGlobalEpochBase(ComputedResult):
         ## OUTPUTS: test_epoch_specific_decoded_results_dict, continuous_specific_decoded_results_dict
 
         ## INPUTS: new_decoder_dict
-        long_epoch_name, short_epoch_name, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
-        t_start, t_delta, t_end = curr_active_pipeline.find_LongShortDelta_times()
-        # Build an Epoch object containing a single epoch, corresponding to the global epoch for the entire session:
-        single_global_epoch_df: pd.DataFrame = pd.DataFrame({'start': [t_start], 'stop': [t_end], 'label': [0]})
-        # single_global_epoch_df['label'] = single_global_epoch_df.index.to_numpy()
-        single_global_epoch: Epoch = Epoch(single_global_epoch_df)
+        global_epoch_name: str = curr_active_pipeline.find_Global_epoch_name()
 
+        # t_start, t_delta, t_end = curr_active_pipeline.find_LongShortDelta_times()
+        # Build an Epoch object containing a single epoch, corresponding to the global epoch for the entire session:
+        # single_global_epoch_df: pd.DataFrame = pd.DataFrame({'start': [t_start], 'stop': [t_end], 'label': [0]})
+        # single_global_epoch: Epoch = Epoch(single_global_epoch_df)
+# 
         ## Common:
         global_session = curr_active_pipeline.filtered_sessions[global_epoch_name]
         global_pos_obj: "Position" = deepcopy(global_session.position)
@@ -617,7 +617,7 @@ class Compute_NonPBE_Epochs(ComputedResult):
 
     @function_attributes(short_name=None, tags=['epochs', 'non-PBE', 'session', 'metadata', 'hardcoded-LS'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-01-28 04:10', related_items=[]) 
     @classmethod
-    def _adding_global_non_PBE_epochs_to_sess(cls, sess, t_start: float, t_delta: float, t_end: float, training_data_portion: float = 5.0/6.0) -> Tuple[Dict[types.DecoderName, pd.DataFrame], Dict[types.DecoderName, pd.DataFrame]]:
+    def _adding_global_non_PBE_epochs_to_sess(cls, sess, t_start:Optional[float]=None, t_delta:Optional[float]=None, t_end:Optional[float]=None, active_maze_epochs_df: Optional[pd.DataFrame]=None, training_data_portion: float = 5.0/6.0) -> Tuple[Dict[types.DecoderName, pd.DataFrame], Dict[types.DecoderName, pd.DataFrame]]:
         """ Builds a dictionary of train/test-split epochs for ['long', 'short', 'global'] periods
         
         from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import _adding_global_non_PBE_epochs
@@ -637,16 +637,27 @@ class Compute_NonPBE_Epochs(ComputedResult):
             
         
         """
-        maze_id_to_maze_name_map = {-1:'none', 0:'long', 1:'short'}
+        adding_maze_id_if_needed_kwargs = dict(t_start=t_start, t_delta=t_delta, t_end=t_end, active_maze_epochs_df=active_maze_epochs_df)
+        if active_maze_epochs_df is None:
+            global_epoch_name: str = 'maze'
+            maze_id_to_maze_name_map = {-1:'none', 0:'long', 1:'short'}
+        else:
+            global_epoch_name: str = 'maze_GLOBAL'
+            
+            maze_id_to_maze_name_map = {'':'none'}
+            maze_id_to_maze_name_map.update(dict(zip(active_maze_epochs_df['label'].to_list(), active_maze_epochs_df['label'].to_list()))) # maps to itself: {'':'none', 'maze1':'maze1', 'maze2':'maze2'}
+            print(f'maze_id_to_maze_name_map: {maze_id_to_maze_name_map}')
+            
         epoch_overlap_prevention_kwargs = dict(additive_factor=-0.008, final_output_minimum_epoch_duration=0.040) # passed to `*df.epochs.modify_each_epoch_by(...)`
         
         PBE_df: pd.DataFrame = ensure_dataframe(deepcopy(sess.pbe))
         laps_df = ensure_dataframe(deepcopy(sess.laps))
         
+        
 
         ## Build up a new epoch
-        epochs_df: pd.DataFrame = deepcopy(sess.epochs).epochs.adding_global_epoch_row()
-        global_epoch_only_df: pd.DataFrame = epochs_df.epochs.label_slice('maze')
+        epochs_df: pd.DataFrame = deepcopy(sess.epochs).epochs.adding_global_epoch_row(global_epoch_name=global_epoch_name)
+        global_epoch_only_df: pd.DataFrame = epochs_df.epochs.label_slice(global_epoch_name)
         
         # t_start, t_stop = epochs_df.epochs.t_start, epochs_df.epochs.t_stop
         global_epoch_only_non_PBE_epoch_df: pd.DataFrame = global_epoch_only_df.epochs.subtracting(PBE_df)
@@ -656,7 +667,7 @@ class Compute_NonPBE_Epochs(ComputedResult):
         a_new_global_epoch_only_non_pbe_endcaps_df: pd.DataFrame = deepcopy(global_epoch_only_non_PBE_epoch_df).epochs.subtracting(laps_df)
         a_new_global_epoch_only_non_pbe_endcaps_df = a_new_global_epoch_only_non_pbe_endcaps_df.epochs.modify_each_epoch_by(**epoch_overlap_prevention_kwargs) # minimum length to consider is 50ms, contract each epoch inward by -8ms (4ms on each side)
         a_new_global_epoch_only_non_pbe_endcaps_df = a_new_global_epoch_only_non_pbe_endcaps_df.epochs.adding_or_updating_metadata(track_identity='global', interval_datasource_name=f'global_EndcapsNonPBE') # train_test_period='train', training_data_portion=training_data_portion, 
-        a_new_global_epoch_only_non_pbe_endcaps_df = a_new_global_epoch_only_non_pbe_endcaps_df.epochs.adding_maze_id_if_needed(t_start=t_start, t_delta=t_delta, t_end=t_end)
+        a_new_global_epoch_only_non_pbe_endcaps_df = a_new_global_epoch_only_non_pbe_endcaps_df.epochs.adding_maze_id_if_needed(**adding_maze_id_if_needed_kwargs)
         a_new_global_epoch_only_non_pbe_endcaps_df['maze_name'] = a_new_global_epoch_only_non_pbe_endcaps_df['maze_id'].map(maze_id_to_maze_name_map)
 
 
@@ -675,8 +686,8 @@ class Compute_NonPBE_Epochs(ComputedResult):
         
         ## Add the maze_id column to the epochs:
         
-        a_new_global_training_df = a_new_global_training_df.epochs.adding_maze_id_if_needed(t_start=t_start, t_delta=t_delta, t_end=t_end)
-        a_new_global_test_df = a_new_global_test_df.epochs.adding_maze_id_if_needed(t_start=t_start, t_delta=t_delta, t_end=t_end)
+        a_new_global_training_df = a_new_global_training_df.epochs.adding_maze_id_if_needed(**adding_maze_id_if_needed_kwargs)
+        a_new_global_test_df = a_new_global_test_df.epochs.adding_maze_id_if_needed(**adding_maze_id_if_needed_kwargs)
 
         
         a_new_global_training_df['maze_name'] = a_new_global_training_df['maze_id'].map(maze_id_to_maze_name_map)
@@ -748,8 +759,16 @@ class Compute_NonPBE_Epochs(ComputedResult):
         # a_new_global_training_df = a_new_global_training_df.epochs.adding_or_updating_metadata(track_identity='global', train_test_period='train', training_data_portion=training_data_portion, interval_datasource_name=f'global_NonPBE_TRAIN')
         # a_new_global_test_df = a_new_global_test_df.epochs.adding_or_updating_metadata(track_identity='global', train_test_period='test', training_data_portion=training_data_portion, interval_datasource_name=f'global_NonPBE_TEST')
         
-        # ## Add the maze_id column to the epochs:
-        t_start, t_delta, t_end = curr_active_pipeline.find_LongShortDelta_times()
+        if hasattr(curr_active_pipeline.sess, 'active_maze_epochs_df'):
+            active_maze_epochs_df = ensure_dataframe(deepcopy(curr_active_pipeline.sess.active_maze_epochs_df))
+            t_start = None
+            t_delta = None 
+            t_end = None 
+        else:
+            
+            # ## Add the maze_id column to the epochs:
+            t_start, t_delta, t_end = curr_active_pipeline.find_LongShortDelta_times()
+            active_maze_epochs_df = None
         # a_new_global_training_df = a_new_global_training_df.epochs.adding_maze_id_if_needed(t_start=t_start, t_delta=t_delta, t_end=t_end)
         # a_new_global_test_df = a_new_global_test_df.epochs.adding_maze_id_if_needed(t_start=t_start, t_delta=t_delta, t_end=t_end)
 
@@ -783,7 +802,7 @@ class Compute_NonPBE_Epochs(ComputedResult):
         ## OUTPUTS: training_data_portion, a_new_training_df, a_new_test_df, a_new_training_df_dict, a_new_test_df_dict
         # return a_new_training_df_dict, a_new_test_df_dict, (global_epoch_only_non_PBE_epoch_df, a_new_global_training_df, a_new_global_test_df)
 
-        return cls._adding_global_non_PBE_epochs_to_sess(sess=curr_active_pipeline.sess, t_start=t_start, t_delta=t_delta, t_end=t_end, training_data_portion=training_data_portion)
+        return cls._adding_global_non_PBE_epochs_to_sess(sess=curr_active_pipeline.sess, t_start=t_start, t_delta=t_delta, t_end=t_end, active_maze_epochs_df=active_maze_epochs_df, training_data_portion=training_data_portion)
     
 
     @function_attributes(short_name=None, tags=['UNFINISHED', 'UNUSED'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-02-20 09:32', related_items=[])
@@ -799,10 +818,16 @@ class Compute_NonPBE_Epochs(ComputedResult):
     @classmethod
     def init_from_pipeline(cls, curr_active_pipeline, training_data_portion: float = 5.0/6.0, skip_training_test_split: bool=True):
         a_new_training_df_dict, a_new_test_df_dict, (global_epoch_only_non_PBE_epoch_df, a_new_global_training_df, a_new_global_test_df) = cls._adding_global_non_PBE_epochs(curr_active_pipeline, training_data_portion=training_data_portion)
-        
-        t_start, t_delta, t_end = curr_active_pipeline.find_LongShortDelta_times()
+
         # Build an Epoch object containing a single epoch, corresponding to the global epoch for the entire session:
-        single_global_epoch_df: pd.DataFrame = pd.DataFrame({'start': [t_start], 'stop': [t_end], 'label': [0]})
+        global_epoch_name: str = curr_active_pipeline.find_Global_epoch_name()
+        if 'maze_GLOBAL' in curr_active_pipeline.filtered_epochs:
+            single_global_epoch_df: pd.DataFrame = ensure_dataframe(curr_active_pipeline.filtered_epochs[global_epoch_name].to_Epoch())
+        else:
+            t_start, t_delta, t_end = curr_active_pipeline.find_LongShortDelta_times()
+            single_global_epoch_df: pd.DataFrame = pd.DataFrame({'start': [t_start], 'stop': [t_end], 'label': [0]})
+        
+
         # single_global_epoch_df['label'] = single_global_epoch_df.index.to_numpy()
         # single_global_epoch: Epoch = Epoch(self.single_global_epoch_df)
         
