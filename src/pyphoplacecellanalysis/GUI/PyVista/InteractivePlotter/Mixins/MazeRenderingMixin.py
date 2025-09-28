@@ -121,6 +121,57 @@ class InteractivePyvistaPlotter_MazeRenderingMixin:
             self.plots_data['maze_bg']
             
         """
+        if self.params.get('should_use_linear_track_geometry', False):
+            ## try to use the cleaner linear track models for the kdiba data
+            try:
+                #TODO 2023-09-13 14:23: - [ ] 2023-09-13 - A superior version for the linear track that uses actually known maze geometry and the user-provided `grid_bin_bounds` used to compute:
+                ## Add the 3D Maze Shape
+                assert self.grid_bin_bounds is not None, f"could not get the grid_bin_bounds from self.params.active_epoch_placefields.config.grid_bin_bounds"
+
+                # assert self.active_config.computation_config.pf_params.grid_bin_bounds is not None, f"could not get the grid_bin_bounds from self.params.active_epoch_placefields.config.grid_bin_bounds"
+                # a_track_dims = LinearTrackDimensions3D()
+                # a_track_dims, ideal_maze_pdata = LinearTrackDimensions3D.init_from_grid_bin_bounds(self.active_config.computation_config.pf_params.grid_bin_bounds, return_geoemtry=True)
+                # grid_bin_bounds = deepcopy(self.active_config.computation_config.pf_params.grid_bin_bounds)
+                grid_bin_bounds = deepcopy(self.grid_bin_bounds)
+
+                long_track_dims = LinearTrackDimensions3D(track_length=170.0)
+                short_track_dims = LinearTrackDimensions3D(track_length=100.0)
+
+                long_track_pdata = long_track_dims.build_maze_geometry(position_offset=None, grid_bin_bounds=grid_bin_bounds)
+                short_track_pdata = short_track_dims.build_maze_geometry(position_offset=None, grid_bin_bounds=grid_bin_bounds)
+
+                def _subfn_perform_plot_mazes(a_plotter, a_plotter_id_prefix: str=''):
+                    long_maze_bg_key: str = f"long_maze_bg"
+                    short_maze_bg_key: str = f"short_maze_bg"
+                    if (a_plotter_id_prefix is not None) and (len(a_plotter_id_prefix) > 0):
+                        long_maze_bg_key: str = '_'.join([a_plotter_id_prefix, long_maze_bg_key])
+                        short_maze_bg_key: str = '_'.join([a_plotter_id_prefix, short_maze_bg_key])
+
+                    self.plots[long_maze_bg_key] = perform_plot_flat_arena(a_plotter, long_track_pdata, name=long_maze_bg_key, label='long_idealized_maze', color=color) # [0.3, 0.3, 0.3]
+                    self.plots[short_maze_bg_key] = perform_plot_flat_arena(a_plotter, short_track_pdata, name=short_maze_bg_key, label='short_idealized_maze', color=color) # [0.3, 0.3, 0.3]
+
+                self.plots_data['long_maze_bg'] = {'track_dims': long_track_dims, 'maze_pdata': long_track_pdata}
+                self.plots_data['short_maze_bg'] = {'track_dims': short_track_dims, 'maze_pdata': short_track_pdata}
+
+
+                is_multiplotter: bool = (hasattr(self.p, '__getitem__') and hasattr(self.p, '_nrows') and hasattr(self.p, '_ncols'))
+                if is_multiplotter:
+                    for row in range(self.p._nrows):
+                        for col in range(self.p._ncols):
+                            p = self.p[row, col]
+                            _subfn_perform_plot_mazes(a_plotter=p, a_plotter_id_prefix=f"p[{row}][{col}]")
+
+                else:
+                    p = self.p
+                    _subfn_perform_plot_mazes(a_plotter=p)
+                    
+            except (TypeError, ValueError, AttributeError) as e:
+                print(f'failed to plot linear track with error {e}. Setting `self.params.should_use_linear_track_geometry = False` and skipping this form of maze plotting.')
+                self.params.should_use_linear_track_geometry = False
+            except Exception as e:
+                raise e
+
+
         if not self.params.get('should_use_linear_track_geometry', False):
             # linear track geometry is not used to build the arena model, meaning for linear tracks it won't look as good as the geometry version.
             ## The track shape will be approximated from the positions and the positions of the spikes:
@@ -128,53 +179,7 @@ class InteractivePyvistaPlotter_MazeRenderingMixin:
             self.plots_data['maze_bg'] = {'track_dims': None, 'maze_pdata': None}
             return self.plots['maze_bg'], self.plots_data['maze_bg']
         
-        else:
-            #TODO 2023-09-13 14:23: - [ ] 2023-09-13 - A superior version for the linear track that uses actually known maze geometry and the user-provided `grid_bin_bounds` used to compute:
-            ## Add the 3D Maze Shape
 
-            assert self.grid_bin_bounds is not None, f"could not get the grid_bin_bounds from self.params.active_epoch_placefields.config.grid_bin_bounds"
-
-            # assert self.active_config.computation_config.pf_params.grid_bin_bounds is not None, f"could not get the grid_bin_bounds from self.params.active_epoch_placefields.config.grid_bin_bounds"
-            # a_track_dims = LinearTrackDimensions3D()
-            # a_track_dims, ideal_maze_pdata = LinearTrackDimensions3D.init_from_grid_bin_bounds(self.active_config.computation_config.pf_params.grid_bin_bounds, return_geoemtry=True)
-            # grid_bin_bounds = deepcopy(self.active_config.computation_config.pf_params.grid_bin_bounds)
-            grid_bin_bounds = deepcopy(self.grid_bin_bounds)
-
-            long_track_dims = LinearTrackDimensions3D(track_length=170.0)
-            short_track_dims = LinearTrackDimensions3D(track_length=100.0)
-
-            long_track_pdata = long_track_dims.build_maze_geometry(position_offset=None, grid_bin_bounds=grid_bin_bounds)
-            short_track_pdata = short_track_dims.build_maze_geometry(position_offset=None, grid_bin_bounds=grid_bin_bounds)
-
-            def _subfn_perform_plot_mazes(a_plotter, a_plotter_id_prefix: str=''):
-                long_maze_bg_key: str = f"long_maze_bg"
-                short_maze_bg_key: str = f"short_maze_bg"
-                if (a_plotter_id_prefix is not None) and (len(a_plotter_id_prefix) > 0):
-                    long_maze_bg_key: str = '_'.join([a_plotter_id_prefix, long_maze_bg_key])
-                    short_maze_bg_key: str = '_'.join([a_plotter_id_prefix, short_maze_bg_key])
-
-                self.plots[long_maze_bg_key] = perform_plot_flat_arena(a_plotter, long_track_pdata, name=long_maze_bg_key, label='long_idealized_maze', color=color) # [0.3, 0.3, 0.3]
-                self.plots[short_maze_bg_key] = perform_plot_flat_arena(a_plotter, short_track_pdata, name=short_maze_bg_key, label='short_idealized_maze', color=color) # [0.3, 0.3, 0.3]
-
-            self.plots_data['long_maze_bg'] = {'track_dims': long_track_dims, 'maze_pdata': long_track_pdata}
-            self.plots_data['short_maze_bg'] = {'track_dims': short_track_dims, 'maze_pdata': short_track_pdata}
-
-
-            is_multiplotter: bool = (hasattr(self.p, '__getitem__') and hasattr(self.p, '_nrows') and hasattr(self.p, '_ncols'))
-            if is_multiplotter:
-                for row in range(self.p._nrows):
-                    for col in range(self.p._ncols):
-                        p = self.p[row, col]
-                        _subfn_perform_plot_mazes(a_plotter=p, a_plotter_id_prefix=f"p[{row}][{col}]")
-
-            else:
-                p = self.p
-                _subfn_perform_plot_mazes(a_plotter=p)
-
-            # keys = ['long_maze_bg', 'short_maze_bg']
-            # self.plots['maze_bg'] = perform_plot_flat_arena(self.p, ideal_maze_pdata, name='maze_bg', label='idealized_maze', color=color) # [0.3, 0.3, 0.3]
-            # self.plots_data['maze_bg'] = {'track_dims': a_track_dims, 'maze_pdata': ideal_maze_pdata}
-            # return (self.plots['short_maze_bg'], self.plots_data['short_maze_bg']), (self.plots['long_maze_bg'], self.plots_data['long_maze_bg'])
     
 
     def perform_remove_maze_actor(self) -> bool:
