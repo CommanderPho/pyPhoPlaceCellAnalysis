@@ -12,7 +12,7 @@ __all__ = ['SelectableTextItem']
 
 class SelectableTextItem(SelectableItemMixin, pg.TextItem):
     """ 
-    from pyphoplacecellanalysis.External.pyqtgraph_extensions.graphicsItems.SelectableTextItem import SelectableTextItem
+    from pyphoplacecellanalysis.External.pyqtgraph_extensions.graphicsItems.TextItem.SelectableTextItem import SelectableTextItem
     
     
     """
@@ -91,6 +91,43 @@ class SelectableTextItem(SelectableItemMixin, pg.TextItem):
 
     #         # Restore the painter's state
     #         p.restore()
+            
+    def updateTextPos(self):
+        # update text position to obey anchor
+        r = self.textItem.boundingRect()
+        tl = self.textItem.mapToParent(r.topLeft())
+        br = self.textItem.mapToParent(r.bottomRight())
+        offset = (br - tl) * self.anchor
+        self.textItem.setPos(-offset)
+
+        
+    def boundingRect(self):
+        return self.textItem.mapRectToParent(self.textItem.boundingRect())
+
+    def viewTransformChanged(self):
+        # called whenever view transform has changed.
+        # Do this here to avoid double-updates when view changes.
+        self.updateTransform()
+        
+    def paint(self, p, *args):
+        # this is not ideal because it requires the transform to be updated at every draw.
+        # ideally, we would have a sceneTransformChanged event to react to..
+        s = self.scene()
+        ls = self._lastScene
+        if s is not ls:
+            if ls is not None:
+                ls.sigPrepareForPaint.disconnect(self.updateTransform)
+            self._lastScene = s
+            if s is not None:
+                s.sigPrepareForPaint.connect(self.updateTransform)
+            self.updateTransform()
+            p.setTransform(self.sceneTransform())
+        
+        if self.border.style() != QtCore.Qt.PenStyle.NoPen or self.fill.style() != QtCore.Qt.BrushStyle.NoBrush:
+            p.setPen(self.border)
+            p.setBrush(self.fill)
+            p.setRenderHint(p.RenderHint.Antialiasing, True)
+            p.drawPolygon(self.textItem.mapToParent(self.textItem.boundingRect()))
             
 
 # if __name__ == "__main__":

@@ -50,7 +50,7 @@ from pyphoplacecellanalysis.Resources.icon_helpers import try_get_icon
 from pyphoplacecellanalysis.External.pyqtgraph import QtGui
 from pyphoplacecellanalysis.Pho2D.PyQtPlots.Extensions.pyqtgraph_helpers import pyqtplot_build_image_bounds_extent, pyqtplot_plot_image
 from pyphoplacecellanalysis.External.pyqtgraph_extensions.PlotWidget.CustomPlotWidget import CustomPlotWidget
-from pyphoplacecellanalysis.External.pyqtgraph_extensions.graphicsItems.SelectableTextItem import SelectableTextItem
+from pyphoplacecellanalysis.External.pyqtgraph_extensions.graphicsItems.TextItem.SelectableTextItem import SelectableTextItem
 
 from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import BasePositionDecoder
 
