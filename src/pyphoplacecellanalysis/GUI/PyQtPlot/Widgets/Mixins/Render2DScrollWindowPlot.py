@@ -14,10 +14,10 @@ from pyphoplacecellanalysis.External.pyqtgraph.Qt import QtCore, QtGui, QtWidget
 from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.GraphicsObjects.CustomLinearRegionItem import CustomLinearRegionItem
 
 from pyphoplacecellanalysis.General.Model.Datasources.Datasources import DataframeDatasource
-
+from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.Mixins.ReprPrintableWidgetMixin import ReprPrintableItemMixin
 
 @define(frozen=True)
-class ScatterItemData:
+class ScatterItemData(ReprPrintableItemMixin):
     # t: float = field(alias='t_rel_seconds')
     # aclu: int = field() # alias='neuron_ID'
     # neuron_IDX: int = field(alias='fragile_linear_neuron_IDX')

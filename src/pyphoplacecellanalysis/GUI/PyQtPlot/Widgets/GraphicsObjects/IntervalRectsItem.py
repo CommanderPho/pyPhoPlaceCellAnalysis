@@ -4,16 +4,21 @@ Demonstrate creation of a custom graphic (a candlestick plot)
 """
 import copy
 from typing import Callable, Tuple
+from neuropy.core.user_annotations import function_attributes
 import numpy as np
 import pyphoplacecellanalysis.External.pyqtgraph as pg
 from pyphoplacecellanalysis.External.pyqtgraph import QtCore, QtGui, QtWidgets
 from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.helpers import RectangleRenderTupleHelpers
 from pyphoplacecellanalysis.External.pyqtgraph.graphicsItems.LegendItem import ItemSample, LegendItem # for custom legend
+from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.Mixins.ReprPrintableWidgetMixin import ReprPrintableItemMixin
+from pyphoplacecellanalysis.External.pyqtgraph_extensions.graphicsItems.TextItem.AlignableTextItem import CustomRectBoundedTextItem
+from pyphoplacecellanalysis.External.pyqtgraph_extensions.graphicsItems.TextItem.AlignableTextItem import RectLabel
 
 ## Create a subclass of GraphicsObject.
 ## The only required methods are paint() and boundingRect() 
 ## (see QGraphicsItem documentation)
-class IntervalRectsItem(pg.GraphicsObject):
+# @function_attributes(short_name=None, tags=['GraphicsObject', 'item', 'renderable'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-09-28 16:36', related_items=[])
+class IntervalRectsItem(ReprPrintableItemMixin, pg.GraphicsObject):
     """ Created to render the 2D Intervals as rectangles in a pyqtgraph 
     
         Based on pyqtgraph's CandlestickItem example
@@ -64,9 +69,13 @@ class IntervalRectsItem(pg.GraphicsObject):
     hoverExit = QtCore.pyqtSignal()
     clicked = QtCore.pyqtSignal()
     ## data must have fields: start_t, series_vertical_offset, duration_t, series_height, pen, brush
+    # sigDragged = QtCore.Signal(object)
+    # sigPositionChangeFinished = QtCore.Signal(object)
+    # sigPositionChanged = QtCore.Signal(object)
+    # sigClicked = QtCore.Signal(object, object)
+    
 
-
-    def __init__(self, data, format_tooltip_fn=None):
+    def __init__(self, data, format_tooltip_fn=None, format_label_fn=None):
         # menu creation is deferred because it is expensive and often
         # the user will never see the menu anyway.
         self.menu = None
@@ -80,8 +89,26 @@ class IntervalRectsItem(pg.GraphicsObject):
         self._current_hovered_item_tooltip_format_fn = None
         if format_tooltip_fn is None:
             format_tooltip_fn = self._default_format_tooltip_for_rect_data
-        self._current_hovered_item_tooltip_format_fn = format_tooltip_fn
+        if format_label_fn is None:
+            format_label_fn = self._default_format_tooltip_for_rect_data            
 
+        self._current_hovered_item_tooltip_format_fn = format_tooltip_fn
+        self._item_label_format_fn = format_label_fn
+
+        self._labels = []
+        if self._item_label_format_fn is not None:
+            ## Build labels
+            for rect_index in np.arange(len(self.data)):
+                rect_data_tuple = self.data[rect_index]
+                (start_t, series_vertical_offset, duration_t, series_height, pen, brush) = rect_data_tuple
+                label_text: str = self._item_label_format_fn(rect_index=rect_index, rect_data_tuple=rect_data_tuple)
+                a_rect = QtCore.QRectF(start_t, series_vertical_offset, duration_t, series_height)  # QRectF: (left, top, width, height)
+                print(f'rect_index: {rect_index}, a_rect: {a_rect}, label_text: "{label_text}"')
+                # a_text_item: RectLabel = RectLabel(text=label_text, rect=a_rect)
+                a_text_item: CustomRectBoundedTextItem = CustomRectBoundedTextItem(rect=a_rect, text=label_text, parent=self)                
+                self._labels.append(a_text_item)
+                print(f'\tadded label: {a_text_item}')
+                a_text_item.updatePosition()
 
     def generatePicture(self):
         ## pre-computing a QPicture object allows paint() to run much more quickly, 
@@ -122,6 +149,15 @@ class IntervalRectsItem(pg.GraphicsObject):
     @format_item_tooltip_fn.setter
     def format_item_tooltip_fn(self, value: Callable):
         self._current_hovered_item_tooltip_format_fn = value
+
+
+    @property
+    def item_label_format_fn(self):
+        """The item_label_format_fn property."""
+        return self._item_label_format_fn
+    @item_label_format_fn.setter
+    def item_label_format_fn(self, value):
+        self._item_label_format_fn = value
 
     ## Copy Constructors:
     def __copy__(self):
@@ -370,7 +406,7 @@ class IntervalRectsItem(pg.GraphicsObject):
         
 
 
-class CustomLegendItemSample(ItemSample):
+class CustomLegendItemSample(ReprPrintableItemMixin, ItemSample):
     """ A ItemSample that can render a legend item for `IntervalRectsItem`
     from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.GraphicsObjects.IntervalRectsItem import CustomLegendItemSample
     
@@ -542,12 +578,12 @@ def main2():
     legend = LegendItem(offset=(100, -10))  # Adjust the x-offset as needed
     legend.setParentItem(plt.graphicsItem())
     legend.addItem(CustomLegendItemSample(item), 'Custom Rects')
-
+    return plt, item, legend
 
 if __name__ == '__main__':
     
     # (start_t, duration_t, start_alt_axis, alt_axis_size, pen_color, brush_color)
     # main()
-    main2()
+    plt, item, legend = main2()
     pg.exec()
     

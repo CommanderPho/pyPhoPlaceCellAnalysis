@@ -7,12 +7,12 @@ import numpy as np
 import pyphoplacecellanalysis.External.pyqtgraph as pg
 from pyphoplacecellanalysis.External.pyqtgraph import QtCore, QtGui, QtWidgets
 from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.helpers import RectangleRenderTupleHelpers
-
+from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.Mixins.ReprPrintableWidgetMixin import ReprPrintableItemMixin
 
 ## Create a subclass of GraphicsObject.
 ## The only required methods are paint() and boundingRect() 
 ## (see QGraphicsItem documentation)
-class CustomIntervalRectsItem(pg.GraphicsObject):
+class CustomIntervalRectsItem(ReprPrintableItemMixin, pg.GraphicsObject):
     """ Created to render the 2D Intervals as rectangles in a pyqtgraph, but does it in a more interactive and less graphically efficient way that presevers interactions with the child epochs
     
         Based on pyqtgraph's CandlestickItem example

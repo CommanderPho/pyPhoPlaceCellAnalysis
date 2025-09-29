@@ -13,7 +13,7 @@ import pyphoplacecellanalysis.External.pyqtgraph as pg
 
 from pyphoplacecellanalysis.General.Model.Datasources.IntervalDatasource import IntervalsDatasource
 from pyphoplacecellanalysis.General.Model.Configs.LongShortDisplayConfig import LongShortDisplayConfigManager # for getting colors of session epochs
-
+from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.Mixins.ReprPrintableWidgetMixin import ReprPrintableItemMixin
 
 """ 
 A general epochs_dataframe_formatter takes a dataframe and adds the required columns
@@ -21,7 +21,7 @@ A general epochs_dataframe_formatter takes a dataframe and adds the required col
 """
 
 @define(slots=False)
-class General2DRenderTimeEpochs(object):
+class General2DRenderTimeEpochs(ReprPrintableItemMixin, object):
     """Subclasses render specific epochs as intervals."""
     default_datasource_name: str = 'GeneralEpochs' # class variable
     # default_datasource_name: str = field(default='GeneralEpochs')

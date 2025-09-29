@@ -34,7 +34,7 @@ from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.Mixins.RenderTimeEpochs.Render2
 from pyphoplacecellanalysis.General.Model.Datasources.IntervalDatasource import IntervalsDatasource
 from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.Mixins.RenderTimeEpochs.Specific2DRenderTimeEpochs import General2DRenderTimeEpochs # required for `update_interval_visualization_properties(...)`
 from pyphocorehelpers.gui.Qt.ExceptionPrintingSlot import pyqtExceptionPrintingSlot
-
+from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.Mixins.ReprPrintableWidgetMixin import ReprPrintableItemMixin
 
 
 
@@ -62,8 +62,8 @@ class RenderedEpochsItemsContainer(iPythonKeyCompletingMixin, DynamicParameters)
 
 
 @metadata_attributes(short_name=None, tags=['live-window', 'intervals'], input_requires=[], output_provides=[], uses=[], used_by=['EpochRenderingMixin'], creation_date='2025-01-06 15:09', related_items=[])
-class LiveWindowEventIntervalMonitoringMixin:
-    """ 
+class LiveWindowEventIntervalMonitoringMixin(ReprPrintableItemMixin):
+    """ Implementors recieve signals when the live viewport window changes, indicating that one of their items is entering/exciting the viewport
     
     sets:
         self._active_window_visible_intervals_dict

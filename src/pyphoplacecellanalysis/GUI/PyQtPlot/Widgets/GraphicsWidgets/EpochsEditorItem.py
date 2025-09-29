@@ -19,11 +19,11 @@ from pyphoplacecellanalysis.Pho2D.PyQtPlots.Extensions.pyqtgraph_helpers import 
 from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.GraphicsObjects.CustomLinearRegionItem import CustomLinearRegionItem
 from pyphoplacecellanalysis.Pho2D.PyQtPlots.Extensions.pyqtgraph_helpers import build_pyqtgraph_epoch_indicator_regions
 from pyphoplacecellanalysis.General.Model.Configs.LongShortDisplayConfig import DisplayColorsEnum
-
+from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.Mixins.ReprPrintableWidgetMixin import ReprPrintableItemMixin
 
 __all__ = ['EpochsEditor']
 
-class CustomViewBox(pg.ViewBox):
+class CustomViewBox(ReprPrintableItemMixin, pg.ViewBox):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setMouseEnabled(x=True, y=False)

@@ -1,8 +1,8 @@
 from pyphoplacecellanalysis.External.pyqtgraph.Qt import QtCore, QtGui
 from pyphoplacecellanalysis.External.pyqtgraph.graphicsItems.InfiniteLine import InfiniteLine
+from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.Mixins.ReprPrintableWidgetMixin import ReprPrintableItemMixin
 
-
-class CustomInfiniteLine(InfiniteLine):
+class CustomInfiniteLine(ReprPrintableItemMixin, InfiniteLine):
     """ A custom pg.InfiniteLine subclass with custom requirements to hold a customizable modifier key or mouse button to access hover/drag functionality.
     
     =============================== ===================================================

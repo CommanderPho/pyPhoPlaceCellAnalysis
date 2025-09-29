@@ -2,11 +2,11 @@ from OpenGL.GL import *  # noqa
 import pyphoplacecellanalysis.External.pyqtgraph.opengl as gl
 from pyphoplacecellanalysis.External.pyqtgraph.Qt import QtCore, QtGui
 from pyphoplacecellanalysis.External.pyqtgraph.opengl.GLGraphicsItem import GLGraphicsItem
-
+from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.Mixins.ReprPrintableWidgetMixin import ReprPrintableItemMixin
 
 __all__ = ['GLDebugAxisItem']
 
-class GLDebugAxisItem(GLGraphicsItem):
+class GLDebugAxisItem(ReprPrintableItemMixin, GLGraphicsItem):
     """
     **Bases:** :class:`GLGraphicsItem <pyqtgraph.opengl.GLGraphicsItem>`
 		

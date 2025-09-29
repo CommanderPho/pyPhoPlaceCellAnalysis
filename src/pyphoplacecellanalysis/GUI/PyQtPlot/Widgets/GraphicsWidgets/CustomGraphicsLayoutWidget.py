@@ -3,11 +3,11 @@ import pyphoplacecellanalysis.External.pyqtgraph as pg
 from pyphoplacecellanalysis.External.pyqtgraph import QtCore, QtGui, QtWidgets
 from pyphocorehelpers.programming_helpers import metadata_attributes
 from pyphocorehelpers.function_helpers import function_attributes
-
+from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.Mixins.ReprPrintableWidgetMixin import ReprPrintableItemMixin
 from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.Mixins.DraggableGraphicsWidgetMixin import MouseInteractionCriteria, DraggableGraphicsWidgetMixin
 
 
-class CustomGraphicsLayoutWidget(DraggableGraphicsWidgetMixin, pg.GraphicsLayoutWidget):
+class CustomGraphicsLayoutWidget(ReprPrintableItemMixin, DraggableGraphicsWidgetMixin, pg.GraphicsLayoutWidget):
     """ can forward events to a child 
     
     from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.GraphicsWidgets.CustomGraphicsLayoutWidget import CustomGraphicsLayoutWidget
@@ -131,7 +131,7 @@ class CustomGraphicsLayoutWidget(DraggableGraphicsWidgetMixin, pg.GraphicsLayout
 
 
 @metadata_attributes(short_name=None, tags=['scroll', 'ui', 'viewbox', 'gui'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-01-07 01:50', related_items=[])
-class CustomViewBox(pg.ViewBox):
+class CustomViewBox(ReprPrintableItemMixin, pg.ViewBox):
     """ A custom pg.ViewBox subclass that supports forwarding drag events in the plot to a specific graphic (such as a `CustomLinearRegionItem`)
     
         from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.GraphicsWidgets.CustomGraphicsLayoutWidget import CustomViewBox
@@ -147,6 +147,22 @@ class CustomViewBox(pg.ViewBox):
         self._last_drag_start_point = None
         self._last_drag_step_point = None
         
+
+    def __repr__(self):
+        out_str: str = "CustomViewBox"
+        out_str_list = []
+        try:
+            view_range_str = f"viewRange: [[xmin, xmax], [ymin, ymax]]: {self.viewRange()}"
+            out_str_list.append(view_range_str)                    
+        except Exception as e:
+            raise e
+
+        if len(out_str_list) > 0:
+            out_str = f"{out_str}[" + ', '.join(out_str_list) + ']'
+            
+        return out_str
+        # return super().__repr__()
+
 
     ## reimplement right-click to zoom out
     def mouseClickEvent(self, ev):
