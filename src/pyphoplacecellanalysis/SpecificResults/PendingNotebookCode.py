@@ -447,6 +447,12 @@ def build_non_kdiba_directional_decoders(curr_active_pipeline, epochs_decoding_t
     active_maze_epochs_df: pd.DataFrame = ensure_dataframe(curr_active_pipeline.sess.active_maze_epochs_df)
     epoch_names: List[str] = active_maze_epochs_df['label'].to_list()
     filtered_results_dict = {an_epoch_name:curr_active_pipeline.computation_results[an_epoch_name].computed_data for an_epoch_name in epoch_names}
+    
+    ## extract laps object:
+    laps = deepcopy(curr_active_pipeline.sess.laps)
+    laps_df: pd.DataFrame = deepcopy(laps.to_dataframe())
+    laps_df
+
     # if pfND_ndim == 1:
     #     ## Uses 1D Placefields
     #     print(f'Uses 1D Placefields')
