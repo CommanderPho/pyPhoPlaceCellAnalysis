@@ -23,7 +23,7 @@ class CustomGridLayout(QtWidgets.QVBoxLayout):
         else:
             while row >= horLaysNr:
                 lyt = QtWidgets.QHBoxLayout()
-                lyt.setAlignment((QtCore.Qt.AlignLeft)
+                lyt.setAlignment(QtCore.Qt.AlignLeft)
                 self.addLayout(lyt)
                 horLaysNr = self.count()
             ###
@@ -36,7 +36,7 @@ class CustomGridLayout(QtWidgets.QVBoxLayout):
 
     def insertRow(self, row):
         lyt = QtWidgets.QHBoxLayout()
-        lyt.setAlignment((QtCore.Qt.AlignLeft)
+        lyt.setAlignment(QtCore.Qt.AlignLeft)
         self.insertLayout(row, lyt)
 
     ''''''
