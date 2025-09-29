@@ -82,7 +82,7 @@ class OutputsSpecifier:
 
 import pyphoplacecellanalysis.External.pyqtgraph as pg
 from pyphoplacecellanalysis.External.pyqtgraph.widgets.GraphicsView import GraphicsView
-from plotly.basedatatypes import BaseFigure as PlotlyBaseFigure ## for plotly figure detection
+
 
 # ==================================================================================================================== #
 # GRAPHICS/FIGURES EXPORTING                                                                                           #
@@ -1292,7 +1292,7 @@ def write_to_file(a_fig, active_identifying_ctx: IdentifyingContext, final_fig_s
     """
     import PIL
     from PIL import Image # Pillow Images
-    
+    from plotly.basedatatypes import BaseFigure as PlotlyBaseFigure ## for plotly figure detection
 
     # period_replacement_char: str = '-'
     # period_replacement_char: str = '➗'

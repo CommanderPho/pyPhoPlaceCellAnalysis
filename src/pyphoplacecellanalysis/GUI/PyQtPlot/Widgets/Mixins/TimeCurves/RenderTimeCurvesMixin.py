@@ -284,7 +284,7 @@ class PyQtGraphSpecificTimeCurvesMixin(TimeCurvesViewMixin):
             self.add_3D_time_curves_baseline_grid_mesh() # from Render3DTimeCurvesBaseGridMixin
 
 
-from vedo import Spline, RoundedLine, Tube, Points
+
 
 
 ########## Vedo Specific TimeCurvesMixin (specializes TimeCurvesViewMixin):
@@ -310,6 +310,8 @@ class VedoSpecificTimeCurvesMixin(TimeCurvesViewMixin):
         self.plots.time_curves.clear()
         
     def _build_or_update_time_curves_plot(self, plot_name, points, **kwargs):
+        from vedo import Spline, RoundedLine, Tube, Points
+                
         # build the plot arguments (color, line thickness, etc)        
         plot_args = ({'color_name':'white','line_width':0.5,'z_scaling_factor':1.0} | kwargs)
         
