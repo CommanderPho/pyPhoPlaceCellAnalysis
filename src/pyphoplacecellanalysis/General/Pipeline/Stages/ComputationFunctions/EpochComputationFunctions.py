@@ -25,7 +25,7 @@ import shutil ## for deleting directories
 # NeuroPy (Diba Lab Python Repo) Loading
 from neuropy.utils.mixins.binning_helpers import build_df_discretized_binned_position_columns
 from neuropy.utils.dynamic_container import DynamicContainer # for _perform_two_step_position_decoding_computation
-from neuropy.utils.efficient_interval_search import get_non_overlapping_epochs # used in _subfn_compute_decoded_epochs to get only the valid (non-overlapping) epochs
+from neuropy.utils.efficient_interval_search import OverlappingIntervalsFallbackBehavior, get_non_overlapping_epochs # used in _subfn_compute_decoded_epochs to get only the valid (non-overlapping) epochs
 from neuropy.core.epoch import Epoch, TimeColumnAliasesProtocol, subdivide_epochs, ensure_dataframe, ensure_Epoch
 from neuropy.analyses.placefields import HDF_SerializationMixin, PfND
 
@@ -130,27 +130,55 @@ class ComputeGlobalEpochBase(ComputedResult):
         # epochs_decoding_time_bin_size: float = 0.250 # 250ms
 
         skip_training_test_split: bool = (a_new_training_df_dict is None) or (a_new_testing_epoch_obj_dict is None)
+        curr_sess_format_name: str = curr_active_pipeline.get_session_format_name()
+        is_kdiba_sess: bool = (curr_sess_format_name.lower() == 'kdiba')
+        
+        non_directional_names_to_default_epoch_names_map: Dict = {}
+        original_pfs_dict: Dict[types.DecoderName, PfND] = {}
+    
+        if is_kdiba_sess:
+            long_epoch_name, short_epoch_name, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
+            long_epoch_context, short_epoch_context, global_epoch_context = [curr_active_pipeline.filtered_contexts[a_name] for a_name in (long_epoch_name, short_epoch_name, global_epoch_name)]
+            long_session, short_session, global_session = [curr_active_pipeline.filtered_sessions[an_epoch_name] for an_epoch_name in [long_epoch_name, short_epoch_name, global_epoch_name]]
+            long_results, short_results, global_results = [curr_active_pipeline.computation_results[an_epoch_name].computed_data for an_epoch_name in [long_epoch_name, short_epoch_name, global_epoch_name]]
+            long_computation_config, short_computation_config, global_computation_config = [curr_active_pipeline.computation_results[an_epoch_name].computation_config for an_epoch_name in [long_epoch_name, short_epoch_name, global_epoch_name]]
 
-        long_epoch_name, short_epoch_name, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
-        long_epoch_context, short_epoch_context, global_epoch_context = [curr_active_pipeline.filtered_contexts[a_name] for a_name in (long_epoch_name, short_epoch_name, global_epoch_name)]
-        long_session, short_session, global_session = [curr_active_pipeline.filtered_sessions[an_epoch_name] for an_epoch_name in [long_epoch_name, short_epoch_name, global_epoch_name]]
-        long_results, short_results, global_results = [curr_active_pipeline.computation_results[an_epoch_name].computed_data for an_epoch_name in [long_epoch_name, short_epoch_name, global_epoch_name]]
-        long_computation_config, short_computation_config, global_computation_config = [curr_active_pipeline.computation_results[an_epoch_name].computation_config for an_epoch_name in [long_epoch_name, short_epoch_name, global_epoch_name]]
-
-        if pfND_ndim == 1:
-            ## Uses 1D Placefields
-            print(f'Uses 1D Placefields')
-            long_pfND, short_pfND, global_pfND = long_results.pf1D, short_results.pf1D, global_results.pf1D
-        else:
-            ## Uses 2D Placefields
-            print(f'Uses 2D Placefields')
-            long_pfND, short_pfND, global_pfND = long_results.pf2D, short_results.pf2D, global_results.pf2D
-            # long_pfND_decoder, short_pfND_decoder, global_pfND_decoder = long_results.pf2D_Decoder, short_results.pf2D_Decoder, global_results.pf2D_Decoder
+            if pfND_ndim == 1:
+                ## Uses 1D Placefields
+                print(f'Uses 1D Placefields')
+                long_pfND, short_pfND, global_pfND = long_results.pf1D, short_results.pf1D, global_results.pf1D
+            else:
+                ## Uses 2D Placefields
+                print(f'Uses 2D Placefields')
+                long_pfND, short_pfND, global_pfND = long_results.pf2D, short_results.pf2D, global_results.pf2D
+                # long_pfND_decoder, short_pfND_decoder, global_pfND_decoder = long_results.pf2D_Decoder, short_results.pf2D_Decoder, global_results.pf2D_Decoder
 
 
-        non_directional_names_to_default_epoch_names_map = dict(zip(['long', 'short', 'global'], [long_epoch_name, short_epoch_name, global_epoch_name]))
+            non_directional_names_to_default_epoch_names_map = dict(zip(['long', 'short', 'global'], [long_epoch_name, short_epoch_name, global_epoch_name]))
 
-        original_pfs_dict: Dict[types.DecoderName, PfND] = {'long': deepcopy(long_pfND), 'short': deepcopy(short_pfND), 'global': deepcopy(global_pfND)} ## Uses ND Placefields
+            original_pfs_dict = {'long': deepcopy(long_pfND), 'short': deepcopy(short_pfND), 'global': deepcopy(global_pfND)} ## Uses ND Placefields
+
+
+        else:    
+            active_maze_epochs_df: pd.DataFrame = ensure_dataframe(curr_active_pipeline.sess.active_maze_epochs_df)
+            epoch_names: List[str] = active_maze_epochs_df['label'].to_list()
+            filtered_results_dict = {an_epoch_name:curr_active_pipeline.computation_results[an_epoch_name].computed_data for an_epoch_name in epoch_names}
+            if pfND_ndim == 1:
+                ## Uses 1D Placefields
+                print(f'Uses 1D Placefields')
+                original_pfs_dict = {k:deepcopy(v.pf1D) for k, v in filtered_results_dict.items()}
+                
+            else:
+                ## Uses 2D Placefields
+                print(f'Uses 2D Placefields')
+                original_pfs_dict = {k:deepcopy(v.pf2D) for k, v in filtered_results_dict.items()}
+
+
+            non_directional_names_to_default_epoch_names_map = dict(zip(epoch_names, epoch_names))
+
+
+        ## OUTPUTS: original_pfs_dict, non_directional_names_to_default_epoch_names_map
+        
 
         # t_start, t_delta, t_end = curr_active_pipeline.find_LongShortDelta_times()
         # Build an Epoch object containing a single epoch, corresponding to the global epoch for the entire session:
@@ -312,7 +340,7 @@ class ComputeGlobalEpochBase(ComputedResult):
 
             ## Extract Measured Position:
             ## INPUTS: global_pos_df
-            global_pos_df.time_point_event.adding_epochs_identity_column(epochs_df=global_frame_divided_epochs_df, epoch_id_key_name='global_frame_division_idx', epoch_label_column_name='label', drop_non_epoch_events=True, should_replace_existing_column=True) # , override_time_variable_name='t_rel_seconds'
+            global_pos_df.time_point_event.adding_epochs_identity_column(epochs_df=global_frame_divided_epochs_df, epoch_id_key_name='global_frame_division_idx', epoch_label_column_name='label', drop_non_epoch_events=True, should_replace_existing_column=True, overlap_behavior=OverlappingIntervalsFallbackBehavior.FALLBACK_TO_SLOW_SEARCH) # , override_time_variable_name='t_rel_seconds'
 
             ## Adds the ['frame_division_epoch_start_t'] columns to `stacked_flat_global_pos_df` so we can figure out the appropriate offsets
             frame_divided_epochs_properties_df: pd.DataFrame = deepcopy(global_frame_divided_epochs_df)
