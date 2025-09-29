@@ -241,12 +241,14 @@ def final_process_bapun_all_comps(curr_active_pipeline, posthoc_save: bool=True,
 
     activity_only_epochs_df: pd.DataFrame = epochs_df[epochs_df['label'].isin(hardcoded_params.non_global_activity_session_names)].epochs.get_non_overlapping_df()
     activity_only_epochs: Epoch = ensure_Epoch(activity_only_epochs_df, metadata=curr_active_pipeline.sess.epochs.metadata)
+    curr_active_pipeline.sess.activity_only_epochs = deepcopy(activity_only_epochs)
+
 
     ## GLobal only ('maze_GLOBAL')
     epochs_df = ensure_dataframe(deepcopy(curr_active_pipeline.sess.epochs))
     global_activity_only_epochs_df: pd.DataFrame = epochs_df[epochs_df['label'].isin([hardcoded_params.global_session_name])].epochs.get_non_overlapping_df()
     global_activity_only_epoch: Epoch = ensure_Epoch(global_activity_only_epochs_df, metadata=curr_active_pipeline.sess.epochs.metadata)
-
+    curr_active_pipeline.sess.global_activity_only_epoch = deepcopy(global_activity_only_epoch)
     
     ## OUTPUTS: activity_only_epochs, global_activity_only_epoch
 
