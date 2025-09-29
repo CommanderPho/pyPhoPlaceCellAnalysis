@@ -6139,7 +6139,10 @@ def get_proper_global_spikes_df(owning_pipeline_reference, minimum_inclusion_fr_
 
     """
     # Get proper global_spikes_df:
-    long_epoch_name, short_epoch_name, global_epoch_name = owning_pipeline_reference.find_LongShortGlobal_epoch_names()
+    # long_epoch_name, short_epoch_name, global_epoch_name = owning_pipeline_reference.find_LongShortGlobal_epoch_names()
+    global_epoch_name = owning_pipeline_reference.find_Global_epoch_name()
+    is_kdiba_session: bool = owning_pipeline_reference.is_kdiba_session()
+    
     rank_order_results = owning_pipeline_reference.global_computation_results.computed_data.get('RankOrder', None) # "RankOrderComputationsContainer"
     if rank_order_results is not None:
         if minimum_inclusion_fr_Hz is None:	
@@ -6153,10 +6156,17 @@ def get_proper_global_spikes_df(owning_pipeline_reference, minimum_inclusion_fr_
         if included_qclu_values is None:
             included_qclu_values: List[int] = owning_pipeline_reference.global_computation_results.computation_config.rank_order_shuffle_analysis.included_qclu_values
     
-    directional_laps_results: DirectionalLapsResult = owning_pipeline_reference.global_computation_results.computed_data['DirectionalLaps']
-    track_templates: TrackTemplates = directional_laps_results.get_templates(minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz, included_qclu_values=included_qclu_values) # non-shared-only -- !! Is minimum_inclusion_fr_Hz=None the issue/difference?
-    any_list_neuron_IDs = track_templates.any_decoder_neuron_IDs # neuron_IDs as they appear in any list
-    global_spikes_df = deepcopy(owning_pipeline_reference.filtered_sessions[global_epoch_name].spikes_df).spikes.sliced_by_neuron_id(any_list_neuron_IDs) # Cut spikes_df down to only the neuron_IDs that appear at least in one decoder:        
+
+    if is_kdiba_session:
+        directional_laps_results: DirectionalLapsResult = owning_pipeline_reference.global_computation_results.computed_data['DirectionalLaps']
+        track_templates: TrackTemplates = directional_laps_results.get_templates(minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz, included_qclu_values=included_qclu_values) # non-shared-only -- !! Is minimum_inclusion_fr_Hz=None the issue/difference?
+        any_list_neuron_IDs = track_templates.any_decoder_neuron_IDs # neuron_IDs as they appear in any list
+    else:
+        any_list_neuron_IDs = None
+    
+    global_spikes_df = deepcopy(owning_pipeline_reference.filtered_sessions[global_epoch_name].spikes_df) 
+    if any_list_neuron_IDs is not None:
+        global_spikes_df = global_spikes_df.spikes.sliced_by_neuron_id(any_list_neuron_IDs) # Cut spikes_df down to only the neuron_IDs that appear at least in one decoder:  
     return global_spikes_df
 
 
