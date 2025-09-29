@@ -1285,7 +1285,7 @@ class EpochComputationsComputationsContainer(ComputedResult):
     # Marginalization Methods                                                                                              #
     # ==================================================================================================================== #
     # From `General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions._build_merged_directional_placefields`
-    def _build_merged_joint_placefields_and_decode(self, spikes_df: pd.DataFrame, filter_epochs:Optional[Epoch]=None, debug_print=False):
+    def _build_merged_joint_placefields_and_decode(self, spikes_df: pd.DataFrame, unique_decoder_names: List[str], filter_epochs:Optional[Epoch]=None, debug_print=False):
         """ Merges the computed directional placefields into a Pseudo2D decoder, with the pseudo last axis corresponding to the decoder index.
 
         NOTE: this builds a **decoder** not just placefields, which is why it depends on the time_bin_sizes (which will later be used for decoding)		
@@ -1323,7 +1323,7 @@ class EpochComputationsComputationsContainer(ComputedResult):
 
         ## INPUTS: results1D, results1D.continuous_results, a_new_NonPBE_Epochs_obj: Compute_NonPBE_Epochs
 
-        unique_decoder_names: List[str] = ['long', 'short']
+        
         # results1D.pfs
         # results1D.decoders # BasePositionDecoder
 
@@ -1467,7 +1467,8 @@ class EpochComputationsComputationsContainer(ComputedResult):
                 # Add the maze_id to the active_filter_epochs so we can see how properties change as a function of which track the replay event occured on:
                 for k in list(decoded_filter_epoch_track_marginal_posterior_df_dict.keys()):
                     a_df = decoded_filter_epoch_track_marginal_posterior_df_dict[k]
-                    a_df['delta_aligned_start_t'] = a_df['t'] - t_delta ## subtract off t_delta    
+                    if t_delta is not None:
+                        a_df['delta_aligned_start_t'] = a_df['t'] - t_delta ## subtract off t_delta    
                     a_df = a_df.across_session_identity.add_session_df_columns(session_name=session_name, time_bin_size=epochs_decoding_time_bin_size, curr_session_t_delta=t_delta, time_col='t')
                     decoded_filter_epoch_track_marginal_posterior_df_dict[k] = a_df
                     
@@ -1878,13 +1879,15 @@ class EpochComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Computati
 
         """
         from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import EpochFilteringMode, _compute_proper_filter_epochs
+        from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.EpochComputationFunctions import EpochComputationsComputationsContainer
         
         print(f'perform_compute_non_PBE_epochs(..., training_data_portion={training_data_portion}, epochs_decoding_time_bin_size: {epochs_decoding_time_bin_size}, frame_divide_bin_size: {frame_divide_bin_size})')
 
 
         # long_epoch_name, short_epoch_name, global_epoch_name = owning_pipeline_reference.find_LongShortGlobal_epoch_names()
         global_epoch_name = owning_pipeline_reference.find_Global_epoch_name()
-
+        is_kdiba_session: bool = owning_pipeline_reference.is_kdiba_session()
+        
         try:
             available_MB: int = MemoryManagement.get_available_system_memory_MB() # Get available memory in MegaBytes
             available_GB: int = available_MB / 1024  # Gigabytes
@@ -1984,13 +1987,30 @@ class EpochComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Computati
             # 2025-03-09 - Compute the Decoded Marginals for the known epochs (laps, ripples, etc)                                 #
             # ==================================================================================================================== #
             ## Common/shared for all decoded epochs:
-            unique_decoder_names = ['long', 'short']
-            non_PBE_all_directional_pf1D_Decoder, pseudo2D_continuous_specific_decoded_result, continuous_decoded_results_dict, non_PBE_marginal_over_track_ID, (time_bin_containers, time_window_centers, track_marginal_posterior_df) = global_computation_results.computed_data['EpochComputations']._build_merged_joint_placefields_and_decode(spikes_df=deepcopy(get_proper_global_spikes_df(owning_pipeline_reference))) # , filter_epochs=deepcopy(global_any_laps_epochs_obj)
+            if is_kdiba_session:
+                unique_decoder_names = ['long', 'short']
+            else:
+                active_maze_epochs_df: pd.DataFrame = ensure_dataframe(owning_pipeline_reference.sess.active_maze_epochs_df)
+                epoch_names: List[str] = active_maze_epochs_df['label'].to_list()
+                unique_decoder_names = epoch_names
 
+
+            try:
+                non_PBE_all_directional_pf1D_Decoder, pseudo2D_continuous_specific_decoded_result, continuous_decoded_results_dict, non_PBE_marginal_over_track_ID, (time_bin_containers, time_window_centers, track_marginal_posterior_df) = global_computation_results.computed_data['EpochComputations']._build_merged_joint_placefields_and_decode(spikes_df=deepcopy(get_proper_global_spikes_df(owning_pipeline_reference)),
+                                                                                                                                                                                                                                                                                                                                                   unique_decoder_names = unique_decoder_names,
+                                                                                                                                                                                                                                                                                                                                                   ) # , filter_epochs=deepcopy(global_any_laps_epochs_obj)
+                
+            except (ValueError, AssertionError, KeyError, AttributeError) as e:
+                print(f'error {e}')
+                non_PBE_all_directional_pf1D_Decoder = None
+                                
+            except Exception as e:
+                raise e
+            
             global_session = owning_pipeline_reference.filtered_sessions[global_epoch_name]
             
             ## from dict of filter_epochs to decode:
-            global_replays_df: pd.DataFrame = TimeColumnAliasesProtocol.renaming_synonym_columns_if_needed(deepcopy(global_session.replay))
+            # global_replays_df: pd.DataFrame = TimeColumnAliasesProtocol.renaming_synonym_columns_if_needed(deepcopy(global_session.replay))
             global_any_laps_epochs_obj = owning_pipeline_reference.computation_results[global_epoch_name].computation_config.pf_params.computation_epochs # global_session.get
             # filter_epochs_to_decode_dict: Dict[KnownNamedDecodingEpochsType, Epoch] = {'laps': ensure_Epoch(deepcopy(global_any_laps_epochs_obj)),
             #                                                                         'pbe': ensure_Epoch(deepcopy(global_session.pbe.get_non_overlapping())),
@@ -2007,19 +2027,27 @@ class EpochComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Computati
 
             ## Perform the decoding and masking as needed for invalid bins:
             session_name: str = owning_pipeline_reference.session_name
-            t_start, t_delta, t_end = owning_pipeline_reference.find_LongShortDelta_times()
 
-            # filter_epochs_pseudo2D_continuous_specific_decoded_result, filter_epochs_decoded_filter_epoch_track_marginal_posterior_df_dict
-            a_general_decoder_dict_decoded_epochs_dict_result: GeneralDecoderDictDecodedEpochsDictResult = EpochComputationsComputationsContainer._build_output_decoded_posteriors(non_PBE_all_directional_pf1D_Decoder=non_PBE_all_directional_pf1D_Decoder, # pseudo2D_continuous_specific_decoded_result=pseudo2D_continuous_specific_decoded_result,
-                filter_epochs_to_decode_dict=filter_epochs_to_decode_dict,
-                unique_decoder_names=unique_decoder_names, spikes_df=deepcopy(get_proper_global_spikes_df(owning_pipeline_reference)), epochs_decoding_time_bin_size=epochs_decoding_time_bin_size,
-                session_name=session_name, t_start=t_start, t_delta=t_delta, t_end=t_end,
-            )
+            if is_kdiba_session:
+                t_start, t_delta, t_end = owning_pipeline_reference.find_LongShortDelta_times()
+            else:
+                t_start, t_delta, t_end = None, None, None
             
+            if non_PBE_all_directional_pf1D_Decoder:
+                # filter_epochs_pseudo2D_continuous_specific_decoded_result, filter_epochs_decoded_filter_epoch_track_marginal_posterior_df_dict
+                a_general_decoder_dict_decoded_epochs_dict_result: GeneralDecoderDictDecodedEpochsDictResult = EpochComputationsComputationsContainer._build_output_decoded_posteriors(non_PBE_all_directional_pf1D_Decoder=non_PBE_all_directional_pf1D_Decoder, # pseudo2D_continuous_specific_decoded_result=pseudo2D_continuous_specific_decoded_result,
+                    filter_epochs_to_decode_dict=filter_epochs_to_decode_dict,
+                    unique_decoder_names=unique_decoder_names, spikes_df=deepcopy(get_proper_global_spikes_df(owning_pipeline_reference)), epochs_decoding_time_bin_size=epochs_decoding_time_bin_size,
+                    session_name=session_name, t_start=t_start, t_delta=t_delta, t_end=t_end,
+                )
+                
+            else:
+                a_general_decoder_dict_decoded_epochs_dict_result: GeneralDecoderDictDecodedEpochsDictResult = GeneralDecoderDictDecodedEpochsDictResult(filter_epochs_to_decode_dict=filter_epochs_to_decode_dict, filter_epochs_pseudo2D_continuous_specific_decoded_result=None, filter_epochs_decoded_filter_epoch_track_marginal_posterior_df_dict=None)
+                
+            ## OUTPUTS: filter_epochs_pseudo2D_continuous_specific_decoded_result, filter_epochs_decoded_filter_epoch_track_marginal_posterior_df_dict
             ## update the result object, adding the decoded result if needed
             global_computation_results.computed_data['EpochComputations'].a_general_decoder_dict_decoded_epochs_dict_result = a_general_decoder_dict_decoded_epochs_dict_result
-
-            ## OUTPUTS: filter_epochs_pseudo2D_continuous_specific_decoded_result, filter_epochs_decoded_filter_epoch_track_marginal_posterior_df_dict
+            
             # 58sec
 
         except MemoryError as mem_err:
