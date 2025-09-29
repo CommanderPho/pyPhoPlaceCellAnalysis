@@ -133,6 +133,10 @@ from pyphoplacecellanalysis.General.Model.ComputationResults import ComputedResu
 from pyphoplacecellanalysis.SpecificResults.AcrossSessionResults import AcrossSessionIdentityDataframeAccessor
 from neuropy.core.flattened_spiketrains import SpikesAccessor
 from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import DecodedFilterEpochsResult, SingleEpochDecodedResult
+from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import BaseDirectionalLapsResult
+from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import BasePositionDecoder, DecodedFilterEpochsResult, SingleEpochDecodedResult
+from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import DirectionalDecodersContinuouslyDecodedResult
+from neuropy.core.laps import LapsAccessor
 
 @function_attributes(short_name=None, tags=['bapun'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-09-19 17:50', related_items=[])
 def final_process_bapun_all_comps(curr_active_pipeline, posthoc_save: bool=True, override_parameters_flat_keypaths_dict=None, time_bin_size=0.5):
@@ -200,6 +204,7 @@ def final_process_bapun_all_comps(curr_active_pipeline, posthoc_save: bool=True,
     print(f'estimating the maze_id to laps...')
     laps_df = laps_df.epochs.adding_maze_id_if_needed(active_maze_epochs_df=active_maze_epochs_df)
     curr_active_pipeline.sess.laps._df = laps_df
+    lap_only_linear_pos_df, lap_only_pos_df, (lap_dir_2D_dict, lap_dir_1D_dict) = LapsAccessor.non_kdiba_laps_determine_directions(sess=curr_active_pipeline.sess)
 
     # epoch_name_includelist = ['pre', 'maze1', 'post1', 'maze2', 'post2']
     # epoch_name_includelist = ['pre', 'roam', 'sprinkle', 'post']
@@ -276,6 +281,9 @@ def final_process_bapun_all_comps(curr_active_pipeline, posthoc_save: bool=True,
         
     for k, a_sess in curr_active_pipeline.filtered_sessions.items():
         a_sess = estimate_session_laps(a_sess, should_plot_laps_2d=False)
+
+
+    
 
     # ==================================================================================================================================================================================================================================================================================== #
     # Ready to compute                                                                                                                                                                                                                                                                     #
@@ -391,6 +399,124 @@ def final_process_bapun_all_comps(curr_active_pipeline, posthoc_save: bool=True,
         
     return curr_active_pipeline
 
+@function_attributes(short_name=None, tags=['bapun', 'pending', 'pseudo2D'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-09-29 10:48', related_items=[])
+def build_non_kdiba_directional_decoders(curr_active_pipeline, epochs_decoding_time_bin_size: float = 1.0):
+    """ builds directional decoders for non-kdiba sessions
+    
+    Usage:
+        from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import build_non_kdiba_directional_decoders
+
+        epochs_decoding_time_bin_size = 1.0
+        new_decoder_dict, continuous_specific_decoded_results_dict, (contextual_pf2D_Decoder, contextual_pf2D_dict) = build_non_kdiba_directional_decoders(curr_active_pipeline, epochs_decoding_time_bin_size=epochs_decoding_time_bin_size)
+
+    """
+    def _subfn_build_merged(pfND_Decoder_dict):
+        contextual_pfND_dict = {k:deepcopy(v.pf) for k, v in pfND_Decoder_dict.items()}
+        a_pf = None
+        for k, v in contextual_pfND_dict.items():
+            if a_pf is None:
+                a_pf = v
+            else:
+                v, did_update_bins = v.conform_to_position_bins(a_pf)
+                print(f'k: {k}: did_update_bins: {did_update_bins}')
+                    
+        # pfND_Decoder_LR_dict = {k:v for k, v in pfND_Decoder_dict.items() if (k.lap_dir == 'LR')}
+        # pfND_Decoder_RL_dict = {k:v for k, v in pfND_Decoder_dict.items() if (k.lap_dir == 'RL')}
+
+        contextual_pfND: PfND = PfND.build_merged_directional_placefields(contextual_pfND_dict, debug_print=False)
+        contextual_pfND_Decoder: BasePositionDecoder = BasePositionDecoder(contextual_pfND, setup_on_init=True, post_load_on_init=True, debug_print=False)
+        return contextual_pfND_Decoder, contextual_pfND_dict
+
+
+    global_epoch_name = curr_active_pipeline.find_Global_epoch_name()
+    # active_sess = curr_active_pipeline.filtered_sessions[global_epoch_name]
+
+    ## GLobal only ('maze_GLOBAL')
+    epochs_df = ensure_dataframe(deepcopy(curr_active_pipeline.sess.epochs))
+    global_activity_only_epochs_df: pd.DataFrame = epochs_df[epochs_df['label'].isin([global_epoch_name])].epochs.get_non_overlapping_df()
+    global_activity_only_epoch: Epoch = ensure_Epoch(global_activity_only_epochs_df, metadata=curr_active_pipeline.sess.epochs.metadata)
+    curr_active_pipeline.sess.global_activity_only_epoch = deepcopy(global_activity_only_epoch)
+
+    ## Build a `DirectionalLapsResult` (a `ComputedResult`) container object to hold the result:
+    # directional_laps_result = BaseDirectionalLapsResult(is_global=True, result_version=DirectionalLapsResult._VersionedResultMixin_version)
+    # directional_laps_result.directional_lap_specific_configs = {an_epoch_name:curr_active_pipeline.computation_results[an_epoch_name].computation_config for an_epoch_name in (long_LR_name, long_RL_name, short_LR_name, short_RL_name)} # directional_lap_specific_configs
+    # directional_laps_result.split_directional_laps_dict = {an_epoch_name:curr_active_pipeline.computation_results[an_epoch_name].computation_config.pf_params.computation_epochs for an_epoch_name in (long_LR_name, long_RL_name, short_LR_name, short_RL_name)}  # split_directional_laps_dict
+    # directional_laps_result.split_directional_laps_contexts_dict = {a_name:curr_active_pipeline.filtered_contexts[a_name] for a_name in (long_LR_name, long_RL_name, short_LR_name, short_RL_name)} # split_directional_laps_contexts_dict
+    # # directional_laps_result.split_directional_laps_config_names = [long_LR_name, long_RL_name, short_LR_name, short_RL_name] # split_directional_laps_config_names
+
+    active_maze_epochs_df: pd.DataFrame = ensure_dataframe(curr_active_pipeline.sess.active_maze_epochs_df)
+    epoch_names: List[str] = active_maze_epochs_df['label'].to_list()
+    filtered_results_dict = {an_epoch_name:curr_active_pipeline.computation_results[an_epoch_name].computed_data for an_epoch_name in epoch_names}
+    # if pfND_ndim == 1:
+    #     ## Uses 1D Placefields
+    #     print(f'Uses 1D Placefields')
+    #     original_pfs_dict = {k:deepcopy(v.pf1D) for k, v in filtered_results_dict.items()}
+        
+    # else:
+    #     ## Uses 2D Placefields
+    #     print(f'Uses 2D Placefields')
+    #     original_pfs_dict = {k:deepcopy(v.pf2D) for k, v in filtered_results_dict.items()}
+        
+    # new_decoder_dict: Dict[types.DecoderName, BasePositionDecoder] = {}
+    new_decoder_dict: Dict[IdentifyingContext, BasePositionDecoder] = {}
+
+    directional_lap_epochs = {}
+    for an_epoch_name, a_sess in curr_active_pipeline.filtered_sessions.items():
+        if an_epoch_name in epoch_names:
+            # lap_only_linear_pos_df, lap_only_pos_df, (lap_dir_2D_dict, lap_dir_1D_dict) = non_kdiba_laps_determine_directions(sess=a_sess)
+            # lap_only_linear_pos_df
+            # a_sess.laps
+            a_laps_df = laps_df.epochs.time_slice(a_sess.t_start, a_sess.t_stop)
+            a_dir_laps_df_dict = a_laps_df.pho.partition_df_dict('is_LR_dir')
+            # a_LR_laps_df, a_RL_laps_df = 
+            for is_LR_dir, a_directional_laps_df in a_dir_laps_df_dict.items():
+                if is_LR_dir:
+                    dir_suffix: str = 'LR'
+                else:
+                    dir_suffix: str = 'RL'
+                dir_epoch_name: str = f'{an_epoch_name}_{dir_suffix}'
+                directional_lap_epochs[dir_epoch_name] = deepcopy(a_directional_laps_df)
+                
+                for an_ndim in (1, 2):
+                    a_ctxt: IdentifyingContext = IdentifyingContext(decoder_name=dir_epoch_name, epoch_name=an_epoch_name, lap_dir=dir_suffix, ndim=an_ndim)
+                    if an_ndim == 1:
+                        ## Uses 1D Placefields
+                        # print(f'Uses 1D Placefields')
+                        # original_pfs_dict = {k:deepcopy(v.pf1D) for k, v in filtered_results_dict.items()}
+                        a_pfs = deepcopy(filtered_results_dict[an_epoch_name].pf1D)
+                    else:
+                        ## Uses 2D Placefields
+                        # print(f'Uses 2D Placefields')
+                        # original_pfs_dict = {k:deepcopy(v.pf2D) for k, v in filtered_results_dict.items()}
+                        a_pfs = deepcopy(filtered_results_dict[an_epoch_name].pf2D)
+                        
+                    # a_pfs = original_pfs_dict[an_epoch_name]
+                    
+                    # new_decoder_dict[dir_epoch_name] = BasePositionDecoder(pf=a_pfs).replacing_computation_epochs(epochs=ensure_Epoch(a_directional_laps_df))
+                    new_decoder_dict[a_ctxt] = BasePositionDecoder(pf=a_pfs).replacing_computation_epochs(epochs=ensure_Epoch(a_directional_laps_df))
+
+    ## END for an_epoch_name, a_sess in curr_active_pipeline.filtered_sessions.items()...
+              
+    # new_decoder_dict: Dict[types.DecoderName, BasePositionDecoder] = {a_name:BasePositionDecoder(pf=a_pfs).replacing_computation_epochs(epochs=ensure_Epoch(a_laps_df)) for a_name, a_laps_df in directional_lap_epochs.items()} ## build new simple decoders
+    # frame_divided_epochs_specific_decoded_results1D_dict = {a_name:a_new_decoder.decode_specific_epochs(spikes_df=deepcopy(get_proper_global_spikes_df(curr_active_pipeline)), filter_epochs=deepcopy(global_frame_divided_epochs_obj), decoding_time_bin_size=epochs_decoding_time_bin_size, debug_print=False) for a_name, a_new_decoder in new_decoder1D_dict.items()}
+
+    ## OUTPUTS: new_decoder_dict, directional_lap_epochs
+    single_global_epoch = deepcopy(curr_active_pipeline.sess.global_activity_only_epoch)
+    ## Do Continuous Decoding (for all time (`single_global_epoch`), using the decoder from each epoch) -- slowest dict comp
+    continuous_specific_decoded_results_dict: Dict[IdentifyingContext, DecodedFilterEpochsResult] = {a_name:a_new_decoder.decode_specific_epochs(spikes_df=deepcopy(get_proper_global_spikes_df(curr_active_pipeline)), filter_epochs=deepcopy(single_global_epoch), decoding_time_bin_size=epochs_decoding_time_bin_size, debug_print=False) for a_name, a_new_decoder in new_decoder_dict.items()}
+
+    pf1D_Decoder_dict = {k:deepcopy(v) for k, v in new_decoder_dict.items() if k.ndim == 1}
+    pf2D_Decoder_dict = {k:deepcopy(v) for k, v in new_decoder_dict.items() if k.ndim == 2}
+
+
+    contextual_pf2D_Decoder, contextual_pf2D_dict = _subfn_build_merged(pfND_Decoder_dict=pf2D_Decoder_dict)
+    # contextual_pf1D_Decoder, contextual_pf1D_dict = build_merged(pfND_Decoder_dict=pf1D_Decoder_dict)
+    ## Use `contextual_pf2D` to decode specific epochs:
+    all_context_filter_epochs_decoder_result, global_only_epoch = decode_using_contextual_pf2D_decoder(curr_active_pipeline, contextual_pf2D_Decoder=contextual_pf2D_Decoder, active_laps_decoding_time_bin_size=epochs_decoding_time_bin_size)
+    continuous_specific_decoded_results_dict[IdentifyingContext(decoder_name='pseudo3D', epoch_name=global_epoch_name, ndim=3)] = all_context_filter_epochs_decoder_result
+
+    # curr_active_pipeline.computation_results[an_epoch_name].computation_config.pf_params.computation_epochs = deepcopy(curr_active_pipeline.computation_results[an_epoch_name].computation_config.pf_params.computation_epochs.time_slice(long_epoch_obj.t_start, long_epoch_obj.t_stop)) ## #TODO 2025-07-15 13:07: - [ ] Why not laps for the pf_params?
+    return new_decoder_dict, continuous_specific_decoded_results_dict, (contextual_pf2D_Decoder, contextual_pf2D_dict)
 
 
 @function_attributes(short_name=None, tags=['rachel', 'bapun'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-09-10 07:01', related_items=[])
@@ -596,6 +722,7 @@ def decode_using_contextual_pf2D_decoder(curr_active_pipeline, contextual_pf2D_D
     """ The generalized context decoder for Bapun session, which is created out of the specified `epochs_to_create_global_from_names` and then used to decode the 'maze_any' epoch at the specified time bin size.
     
     Usage:
+        from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import decode_using_contextual_pf2D_decoder
         from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import DirectionalDecodersContinuouslyDecodedResult
 
         ## Build the merged decoder `contextual_pf2D`
