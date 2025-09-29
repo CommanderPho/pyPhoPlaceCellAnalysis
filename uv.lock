@@ -4117,7 +4117,7 @@ wheels = [
 
 [[package]]
 name = "neuropy"
-version = "0.2.4"
+version = "0.2.5"
 source = { editable = "../NeuroPy" }
 dependencies = [
     { name = "cupy-cuda12x" },
@@ -5561,7 +5561,7 @@ wheels = [
 
 [[package]]
 name = "pyphocorehelpers"
-version = "0.4.4"
+version = "0.4.5"
 source = { editable = "../pyPhoCoreHelpers" }
 dependencies = [
     { name = "ansi2html" },
@@ -5621,7 +5621,7 @@ viz = [
 
 [[package]]
 name = "pyphoplacecellanalysis"
-version = "0.3.4"
+version = "0.3.5"
 source = { editable = "." }
 dependencies = [
     { name = "attrs" },
