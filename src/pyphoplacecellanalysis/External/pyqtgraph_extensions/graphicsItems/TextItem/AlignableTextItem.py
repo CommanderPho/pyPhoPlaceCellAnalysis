@@ -10,25 +10,25 @@ from pyphoplacecellanalysis.External.pyqtgraph_extensions.mixins.SelectableItemM
 
 __all__ = ['CustomRectBoundedTextItem']
 
-class RectLabel(pg.GraphicsObject):
-    def __init__(self, text, rect, font=None):
-        super().__init__()
-        self.rect = QtCore.QRectF(rect)
-        self.textItem = QtWidgets.QGraphicsTextItem(text, parent=self)
-        # self.textItem = pg.TextItem(text=text)
-        self.textItem.setParentItem(self)
-        if font:
-            self.textItem.setFont(font)
-        self.textItem.setTextWidth(self.rect.width())
-        self.textItem.setPos(self.rect.topLeft())
+# class RectLabel(pg.GraphicsObject):
+#     def __init__(self, text, rect, font=None):
+#         super().__init__()
+#         self.rect = QtCore.QRectF(rect)
+#         self.textItem = QtWidgets.QGraphicsTextItem(text, parent=self)
+#         # self.textItem = pg.TextItem(text=text)
+#         self.textItem.setParentItem(self)
+#         if font:
+#             self.textItem.setFont(font)
+#         self.textItem.setTextWidth(self.rect.width())
+#         self.textItem.setPos(self.rect.topLeft())
 
-    def boundingRect(self):
-        return self.rect
+#     def boundingRect(self):
+#         return self.rect
 
-    def paint(self, p, *args):
-        # optional: draw rect for debugging
-        p.setPen(pg.mkPen('r'))
-        p.drawRect(self.rect)
+#     def paint(self, p, *args):
+#         # optional: draw rect for debugging
+#         p.setPen(pg.mkPen('r'))
+#         p.drawRect(self.rect)
         
 
 

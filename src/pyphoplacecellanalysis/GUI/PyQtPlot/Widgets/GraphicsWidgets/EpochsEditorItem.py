@@ -311,6 +311,7 @@ class EpochsEditor:
         
 
 
+
     @classmethod
     def add_visualization_columns(cls, curr_laps_df: pd.DataFrame) -> pd.DataFrame:
         """ adds 'lap_color', 'lap_accent_color' columns to the laps_df for use in visualization 
