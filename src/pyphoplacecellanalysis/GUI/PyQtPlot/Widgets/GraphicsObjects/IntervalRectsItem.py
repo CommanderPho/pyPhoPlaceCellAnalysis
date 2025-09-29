@@ -12,7 +12,6 @@ from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.helpers import RectangleRenderT
 from pyphoplacecellanalysis.External.pyqtgraph.graphicsItems.LegendItem import ItemSample, LegendItem # for custom legend
 from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.Mixins.ReprPrintableWidgetMixin import ReprPrintableItemMixin
 from pyphoplacecellanalysis.External.pyqtgraph_extensions.graphicsItems.TextItem.AlignableTextItem import CustomRectBoundedTextItem
-from pyphoplacecellanalysis.External.pyqtgraph_extensions.graphicsItems.TextItem.AlignableTextItem import RectLabel
 
 ## Create a subclass of GraphicsObject.
 ## The only required methods are paint() and boundingRect() 
@@ -75,7 +74,7 @@ class IntervalRectsItem(ReprPrintableItemMixin, pg.GraphicsObject):
     # sigClicked = QtCore.Signal(object, object)
     
 
-    def __init__(self, data, format_tooltip_fn=None, format_label_fn=None):
+    def __init__(self, data, format_tooltip_fn=None, format_label_fn=None, debug_print=False):
         # menu creation is deferred because it is expensive and often
         # the user will never see the menu anyway.
         self.menu = None
@@ -103,11 +102,13 @@ class IntervalRectsItem(ReprPrintableItemMixin, pg.GraphicsObject):
                 (start_t, series_vertical_offset, duration_t, series_height, pen, brush) = rect_data_tuple
                 label_text: str = self._item_label_format_fn(rect_index=rect_index, rect_data_tuple=rect_data_tuple)
                 a_rect = QtCore.QRectF(start_t, series_vertical_offset, duration_t, series_height)  # QRectF: (left, top, width, height)
-                print(f'rect_index: {rect_index}, a_rect: {a_rect}, label_text: "{label_text}"')
+                if debug_print:
+                    print(f'rect_index: {rect_index}, a_rect: {a_rect}, label_text: "{label_text}"')
                 # a_text_item: RectLabel = RectLabel(text=label_text, rect=a_rect)
                 a_text_item: CustomRectBoundedTextItem = CustomRectBoundedTextItem(rect=a_rect, text=label_text, parent=self)                
                 self._labels.append(a_text_item)
-                print(f'\tadded label: {a_text_item}')
+                if debug_print:
+                    print(f'\tadded label: {a_text_item}')
                 a_text_item.updatePosition()
 
     def generatePicture(self):
