@@ -738,6 +738,17 @@ class ComputedPipelineStage(FilterablePipelineStage, LoadedPipelineStage):
             ## TODO:
 
 
+    def is_kdiba_session(self) -> bool:
+        """ Helper function to returns the global epoch name for both KDIBA and other (Bapun)-type sessions, unlike `find_LongShortGlobal_epoch_names` which is KDIBA only. They must exist.
+        Usage:
+            is_kdiba_session: bool = curr_active_pipeline.is_kdiba_session()
+            
+        """
+        return (self.active_sess_config.format_name.lower() =='kdiba')
+
+
+
+
 
     def get_failed_computations(self, enabled_filter_names=None) -> Dict[str, Dict[str, CapturedException]]: #types.FilterContextName, Dict[types.ComputationFunctionName: CapturedException]]:
         """ gets a dictionary of the computation functions that previously failed and resulted in accumulated_errors in the previous_computation_result
@@ -2423,6 +2434,16 @@ class PipelineWithComputedPipelineStageMixin:
             
         """
         return self.stage.find_Global_epoch_name()
+
+
+    def is_kdiba_session(self) -> bool:
+        """ Helper function to returns the global epoch name for both KDIBA and other (Bapun)-type sessions, unlike `find_LongShortGlobal_epoch_names` which is KDIBA only. They must exist.
+        Usage:
+            is_kdiba_session: bool = curr_active_pipeline.is_kdiba_session()
+            
+        """
+        return self.stage.is_kdiba_session()
+
 
     def get_output_path(self) -> Path:
         """ returns the appropriate output path to store the outputs for this session. Usually '$session_folder/outputs/' """
