@@ -2,7 +2,7 @@ from copy import deepcopy
 from datetime import time
 import shutil
 from typing import Dict, List, Tuple, Optional, Callable, Union, Any
-from neuropy.core.epoch import Epoch, TimeColumnAliasesProtocol, ensure_dataframe
+from neuropy.core.epoch import Epoch, ensure_Epoch, TimeColumnAliasesProtocol, ensure_dataframe
 from typing_extensions import TypeAlias
 import nptyping as ND
 from nptyping import NDArray

@@ -1,8 +1,8 @@
 from copy import deepcopy
 import shutil
 from typing import Dict, List, Tuple, Optional, Callable, Union, Any, NewType
-from neuropy.analyses import Epoch
-from neuropy.core.epoch import ensure_dataframe
+
+from neuropy.core.epoch import Epoch, ensure_Epoch, TimeColumnAliasesProtocol, ensure_dataframe
 from typing_extensions import TypeAlias
 from nptyping import NDArray
 import neuropy.utils.type_aliases as types
