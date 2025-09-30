@@ -3617,7 +3617,8 @@ def figures_plot_generalized_decode_epochs_dict_and_export_results_completion_fu
 
             out_custom_formats_dict = _out.get('out_custom_formats_dict', None)
             if out_custom_formats_dict is not None:
-                custom_merge_layout_dict = [['greyscale'],
+                custom_merge_layout_dict = [
+                    # ['greyscale'],
                     ['greyscale_shared_norm'],
                     # ['psuedo2D_ignore/raw_rgba'], ## Implicitly always appends the pseudo2D_ignore/raw_rgba image at the bottom row
                 ]
