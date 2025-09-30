@@ -41,7 +41,7 @@ dependencies = [
     "importlib-resources>=6.5.2",
     "wheel",
     "cython",
-    "neuropy>=0.2.0",
+    "neuropy",
     "pyphocorehelpers",
 ]
 
@@ -85,9 +85,9 @@ default-groups = [
 [tool.uv.sources]
 ansi2html = { git = "https://github.com/CommanderPho/ansi2html.git", rev = "main" }
 mpl-multitab = { git = "https://github.com/CommanderPho/mpl-multitab.git", rev = "pho_compat" }
-neuropy = { git = "https://github.com/CommanderPho/NeuroPy.git", rev = "release/pho-diba-2025-paper" }
 pybursts = { git = "https://github.com/CommanderPho/pybursts.git", rev = "master" }
-pyphocorehelpers = { git = "https://github.com/CommanderPho/pyPhoCoreHelpers.git", rev = "release/pho-diba-2025-paper"}
+neuropy = { path = "../NeuroPy", editable = true }
+pyphocorehelpers = { path = "../pyPhoCoreHelpers", editable = true }
 
 [build-system]
 requires = ["hatchling"]
