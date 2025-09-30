@@ -3263,6 +3263,8 @@ def generalized_decode_epochs_dict_and_export_results_completion_function(self, 
     from pyphoplacecellanalysis.Analysis.Decoder.context_dependent import GenericDecoderDictDecodedEpochsDictResult #, KnownNamedDecoderTrainedComputeEpochsType, KnownNamedDecodingEpochsType, MaskedTimeBinFillType, DataTimeGrain, GenericResultTupleIndexType
     from pyphocorehelpers.assertion_helpers import Assert
     from pyphoplacecellanalysis.General.Batch.NonInteractiveProcessing import batch_evaluate_required_computations, batch_extended_computations
+    from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.EpochComputationFunctions import Compute_NonPBE_Epochs
+
 
     # ==================================================================================================================== #
     # BEGIN FUNCTION BODY                                                                                                  #
@@ -3274,6 +3276,8 @@ def generalized_decode_epochs_dict_and_export_results_completion_function(self, 
     # ==================================================================================================================== #
     # New 2025-03-11 Generic Result:                                                                                       #
     # ==================================================================================================================== #
+    ## recompute to avoid missing .non_pbe_epochs issues
+    did_any_non_pbe_epochs_change, curr_active_pipeline.stage.sess, curr_active_pipeline.stage.filtered_sessions = Compute_NonPBE_Epochs.update_session_non_pbe_epochs(curr_active_pipeline.sess, filtered_sessions=curr_active_pipeline.filtered_sessions)
 
     if ('generalized_decode_epochs_dict_and_export_results_completion_function' in across_session_results_extended_dict) and force_recompute:
         ## drop the existing
