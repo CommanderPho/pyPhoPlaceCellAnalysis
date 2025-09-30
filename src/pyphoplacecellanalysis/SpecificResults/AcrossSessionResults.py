@@ -3863,6 +3863,9 @@ class AcrossSessionsVisualizations:
     def across_sessions_firing_rate_index_figure(cls, long_short_fr_indicies_analysis_results: pd.DataFrame, num_sessions:int, save_figure=True, include_axes_lines:bool=True, **kwargs):
         """ 2023-08-24 - Across Sessions Aggregate Figure - Supposed to be the equivalent for Figure 3.
 
+        Uses: 'active_set_membership_from_user_annotations' to color points
+        
+
         Usage:
             from pyphoplacecellanalysis.SpecificResults.AcrossSessionResults import AcrossSessionTables
             from pyphoplacecellanalysis.SpecificResults.AcrossSessionResults import AcrossSessionsVisualizations
