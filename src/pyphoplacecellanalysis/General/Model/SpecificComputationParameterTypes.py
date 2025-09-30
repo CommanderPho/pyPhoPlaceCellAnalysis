@@ -669,7 +669,7 @@ class ComputationKWargParameters(BaseContainerAttrsParameterizedParametersToDict
             a_type = None
             final_key: str = k.removeprefix('_')
             try:
-                a_type = params_class_type_dict[final_key] # KeyError: 'directional_decoders_epoch_heuristic_scoring'
+                a_type = params_class_type_dict[final_key] # KeyError: 'directional_decoders_epoch_heuristic_scoring' || KeyError: 'non_PBE_epochs_results' == 'perform_compute_non_PBE_epochs'
                 _out_param_typed_parameters_dict[final_key] = a_type(**v_dict)
             
             except Exception as e:

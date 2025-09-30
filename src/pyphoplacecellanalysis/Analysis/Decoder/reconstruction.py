@@ -13,9 +13,8 @@ from typing import Any, Dict, List, Tuple, Union, Optional
 import pyphoplacecellanalysis.General.type_aliases as types
 from attrs import define, field, Factory
 from datetime import datetime
-from neuropy.analyses import Epoch
 from neuropy.core import Ratemap # for BasePositionDecoder
-from neuropy.core.epoch import ensure_dataframe
+from neuropy.core.epoch import Epoch, ensure_Epoch, ensure_dataframe
 import nptyping as ND
 from nptyping import NDArray # for DecodedFilterEpochsResult
 # import pathlib

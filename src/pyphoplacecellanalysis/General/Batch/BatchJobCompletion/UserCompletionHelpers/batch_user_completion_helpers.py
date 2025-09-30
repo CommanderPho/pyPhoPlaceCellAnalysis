@@ -2,8 +2,7 @@ from copy import deepcopy
 from datetime import time
 import shutil
 from typing import Dict, List, Tuple, Optional, Callable, Union, Any
-from neuropy.analyses import Epoch
-from neuropy.core.epoch import TimeColumnAliasesProtocol, ensure_dataframe
+from neuropy.core.epoch import Epoch, ensure_Epoch, TimeColumnAliasesProtocol, ensure_dataframe
 from typing_extensions import TypeAlias
 import nptyping as ND
 from nptyping import NDArray
@@ -3287,6 +3286,8 @@ def generalized_decode_epochs_dict_and_export_results_completion_function(self, 
     # valid_EpochComputations_result: EpochComputationsComputationsContainer = curr_active_pipeline.global_computation_results.computed_data['EpochComputations']
     fail_on_exception = True
     EpochComputations_result_needs_full_recompute: bool = False
+    # override_fail_on_exception: bool = False
+    override_fail_on_exception: bool = True
 
     valid_EpochComputations_result: EpochComputationsComputationsContainer = curr_active_pipeline.global_computation_results.computed_data.get('EpochComputations', None)
     if valid_EpochComputations_result is None:
@@ -3312,23 +3313,24 @@ def generalized_decode_epochs_dict_and_export_results_completion_function(self, 
 
         ## Next wave of computations
         extended_computations_include_includelist = ['split_to_directional_laps', 'non_PBE_epochs_results', 'generalized_specific_epochs_decoding',] # do only specified
-        computation_kwargs_dict = {'non_PBE_epochs_results': dict(epochs_decoding_time_bin_size=epochs_decoding_time_bin_size, drop_previous_result_and_compute_fresh=False, compute_2D=False), }
+        # computation_kwargs_dict = {'non_PBE_epochs_results': dict(epochs_decoding_time_bin_size=epochs_decoding_time_bin_size, drop_previous_result_and_compute_fresh=False, compute_2D=False), }
+        computation_kwargs_dict = {'non_PBE_epochs_results': dict(epochs_decoding_time_bin_size=epochs_decoding_time_bin_size, drop_previous_result_and_compute_fresh=True, compute_2D=False), }
 
         # force_recompute_override_computations_includelist = deepcopy(extended_computations_include_includelist)
         force_recompute_override_computations_includelist = []
-        needs_computation_output_dict, valid_computed_results_output_list, remaining_include_function_names = batch_evaluate_required_computations(curr_active_pipeline, include_includelist=extended_computations_include_includelist, include_global_functions=True, fail_on_exception=False, progress_print=True,
+        needs_computation_output_dict, valid_computed_results_output_list, remaining_include_function_names = batch_evaluate_required_computations(curr_active_pipeline, include_includelist=extended_computations_include_includelist, include_global_functions=True, fail_on_exception=override_fail_on_exception, progress_print=True,
                                                             force_recompute=force_recompute, force_recompute_override_computations_includelist=force_recompute_override_computations_includelist, debug_print=False)
 
         if debug_print:
             print(f'\tPost-load global computations: needs_computation_output_dict: {[k for k,v in needs_computation_output_dict.items() if (v is not None)]}')
 
         # Post-hoc verification that the computations worked and that the validators reflect that. The list should be empty now.
-        newly_computed_values = batch_extended_computations(curr_active_pipeline, include_includelist=extended_computations_include_includelist, include_global_functions=True, fail_on_exception=False, progress_print=True,
+        newly_computed_values = batch_extended_computations(curr_active_pipeline, include_includelist=extended_computations_include_includelist, include_global_functions=True, fail_on_exception=override_fail_on_exception, progress_print=True,
                                                             force_recompute=force_recompute, force_recompute_override_computations_includelist=force_recompute_override_computations_includelist, 
                                                             computation_kwargs_dict=computation_kwargs_dict,
                                                             debug_print=False)
 
-        needs_computation_output_dict, valid_computed_results_output_list, remaining_include_function_names = batch_evaluate_required_computations(curr_active_pipeline, include_includelist=extended_computations_include_includelist, include_global_functions=True, fail_on_exception=False, progress_print=True,
+        needs_computation_output_dict, valid_computed_results_output_list, remaining_include_function_names = batch_evaluate_required_computations(curr_active_pipeline, include_includelist=extended_computations_include_includelist, include_global_functions=True, fail_on_exception=override_fail_on_exception, progress_print=True,
                                                             force_recompute=force_recompute, force_recompute_override_computations_includelist=force_recompute_override_computations_includelist, debug_print=False)
         if debug_print:
             print(f'\tPost-load global computations: needs_computation_output_dict: {[k for k,v in needs_computation_output_dict.items() if (v is not None)]}')
