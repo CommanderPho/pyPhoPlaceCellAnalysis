@@ -945,9 +945,10 @@ class DecodedFilterEpochsResult(HDF_SerializationMixin, AttrsBasedClassHelperMix
             ['most_likely_positions', 'p_x_given_n', 'marginal_x', 'marginal_y', 'marginal_z', 'most_likely_position_indicies', 'nbins', 'time_bin_container', 'time_bin_edges'])) # maps list names to single-epoch specific field names
         
         for field_name in single_epoch_field_names:
-            if (not hasattr(self, field_name)) or (getattr(self, field_name, None) is None):
-                print(f'WARNING: missing field_name: {field_name}. Setting and continuing.')
-                if field_name in ['marginal_z_list']: 
+            if (not hasattr(self, field_name)) or (getattr(self, field_name, None) is None) or (field_name in ['marginal_z_list']):
+                # print(f'WARNING: missing field_name: {field_name}. Setting and continuing.')
+                if (field_name in ['marginal_z_list']) or (active_epoch_idx >= len(getattr(self, field_name, []))): 
+                    ## these fields aren't done yet!
                     setattr(self, field_name, [None for i in np.arange(self.num_filter_epochs)])
                 else:                  
                     setattr(self, field_name, [None for i in np.arange(self.num_filter_epochs)])
