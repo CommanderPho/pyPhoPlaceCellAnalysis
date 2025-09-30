@@ -1004,22 +1004,6 @@ class GenericDecoderDictDecodedEpochsDictResult(ComputedResult):
         # # pseudo2D_continuous_specific_decoded_result: DecodedFilterEpochsResult = pseudo2D_continuous_specific_decoded_result
         # assert len(pseudo2D_continuous_specific_decoded_result.p_x_given_n_list) == 1
 
-        # # NOTE: non_marginalized_raw_result is a marginal_over_track_ID since there are only two elements
-        # non_PBE_marginal_over_track_IDs_list, non_PBE_marginal_over_track_ID_posterior_df = DirectionalPseudo2DDecodersResult.build_generalized_non_marginalized_raw_posteriors(pseudo2D_continuous_specific_decoded_result, unique_decoder_names=unique_decoder_names)
-        # non_PBE_marginal_over_track_ID = non_PBE_marginal_over_track_IDs_list[0]['p_x_given_n']
-        # time_bin_containers = pseudo2D_continuous_specific_decoded_result.time_bin_containers[0]
-        # time_window_centers = time_bin_containers.centers
-        # # p_x_given_n.shape # (62, 4, 209389)
-
-        # ## Build into a marginal df like `all_sessions_laps_df` - uses `time_window_centers`, pseudo2D_continuous_specific_decoded_result, non_PBE_marginal_over_track_ID:
-        # track_marginal_posterior_df : pd.DataFrame = deepcopy(non_PBE_marginal_over_track_ID_posterior_df) # pd.DataFrame({'t':deepcopy(time_window_centers), 'P_Long': np.squeeze(non_PBE_marginal_over_track_ID[0, :]), 'P_Short': np.squeeze(non_PBE_marginal_over_track_ID[1, :]), 'time_bin_size': pseudo2D_continuous_specific_decoded_result.decoding_time_bin_size})
-        
-        # if 'time_bin_size' not in track_marginal_posterior_df.columns:
-        #     track_marginal_posterior_df['time_bin_size'] = pseudo2D_continuous_specific_decoded_result.decoding_time_bin_size ## add time_bin_size column if needed
-
-        # # track_marginal_posterior_df['delta_aligned_start_t'] = track_marginal_posterior_df['t'] - t_delta ## subtract off t_delta
-        
-
         # ## END EXPAND `pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.EpochComputationFunctions.EpochComputationsComputationsContainer._build_merged_joint_placefields_and_decode`
         # # ======================================================================================================================================================================================================================================== #
 
