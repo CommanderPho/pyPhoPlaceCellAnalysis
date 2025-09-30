@@ -1211,7 +1211,7 @@ class DecodedFilterEpochsResult(HDF_SerializationMixin, AttrsBasedClassHelperMix
         subset.p_x_given_n_list = [subset.p_x_given_n_list[i] for i in old_fashioned_indicies]
         subset.marginal_x_list = [subset.marginal_x_list[i] for i in old_fashioned_indicies]
         subset.marginal_y_list = [subset.marginal_y_list[i] for i in old_fashioned_indicies]
-        subset.marginal_z_list = [subset.marginal_z_list[i] for i in old_fashioned_indicies]
+        # subset.marginal_z_list = [subset.marginal_z_list[i] for i in old_fashioned_indicies]
         subset.most_likely_position_indicies_list = [subset.most_likely_position_indicies_list[i] for i in old_fashioned_indicies]
         subset.spkcount = [subset.spkcount[i] for i in old_fashioned_indicies]
         if len(old_fashioned_indicies) > 0:
@@ -1712,9 +1712,10 @@ class DecodedFilterEpochsResult(HDF_SerializationMixin, AttrsBasedClassHelperMix
                 a_decoded_result.marginal_x_list[i] = curr_unit_marginal_x
             if curr_unit_marginal_y is not None:
                 a_decoded_result.marginal_y_list[i] = curr_unit_marginal_y
-            if curr_unit_marginal_z is not None:
-                a_decoded_result.marginal_z_list[i] = curr_unit_marginal_z          
-
+                
+            # a_decoded_result.marginal_z_list[i] = None
+            # if curr_unit_marginal_z is not None:
+            #     a_decoded_result.marginal_z_list[i] = curr_unit_marginal_z          
 
             ## END if np.any(is_time_bin_active)
             is_time_bin_active_list.append(is_time_bin_active)
