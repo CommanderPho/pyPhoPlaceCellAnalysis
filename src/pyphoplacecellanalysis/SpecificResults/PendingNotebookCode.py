@@ -196,7 +196,7 @@ def final_process_non_kdiba_all_comps(curr_active_pipeline, active_data_mode_nam
     # active_data_mode_type_properties
 
 
-    hardcoded_params: HardcodedProcessingParameters = BapunDataSessionFormatRegisteredClass._get_session_specific_parameters(session_context=curr_active_pipeline.get_session_context())
+    hardcoded_params: HardcodedProcessingParameters = active_data_mode_registered_class._get_session_specific_parameters(session_context=curr_active_pipeline.get_session_context())
 
 
     known_data_session_type_properties_dict = DataSessionFormatRegistryHolder.get_registry_known_data_session_type_dict(override_parameters_flat_keypaths_dict=override_parameters_flat_keypaths_dict)
