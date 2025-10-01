@@ -192,10 +192,6 @@ def final_process_non_kdiba_all_comps(curr_active_pipeline, active_data_mode_nam
 
 
     active_data_mode_registered_class, active_data_mode_type_properties = curr_active_pipeline.sess.config.get_format_data_session_type_class_info()
-    # active_data_mode_registered_class
-    # active_data_mode_type_properties
-
-
     hardcoded_params: HardcodedProcessingParameters = active_data_mode_registered_class._get_session_specific_parameters(session_context=curr_active_pipeline.get_session_context())
 
 
