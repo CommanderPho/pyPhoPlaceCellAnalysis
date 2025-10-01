@@ -748,7 +748,7 @@ def build_contextual_pf2D_decoder(curr_active_pipeline, epochs_to_create_global_
         if a_pf is None:
             a_pf = v
         else:
-            v, did_update_bins = v.conform_to_position_bins(a_pf)
+            v, did_update_bins = v.conform_to_position_bins(a_pf, force_recompute=True)
             print(f'k: {k}: did_update_bins: {did_update_bins}')
 
     contextual_pf2D: PfND = PfND.build_merged_directional_placefields(contextual_pf2D_dict, debug_print=False)
