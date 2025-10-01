@@ -138,7 +138,6 @@ from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import BasePositionD
 from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import DirectionalDecodersContinuouslyDecodedResult
 from neuropy.core.laps import LapsAccessor
 
-@function_attributes(short_name=None, tags=['bapun'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-09-19 17:50', related_items=[])
 def final_process_bapun_all_comps(curr_active_pipeline, posthoc_save: bool=True, override_parameters_flat_keypaths_dict=None, time_bin_size=0.5):
     """ 
     from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import final_process_bapun_all_comps
@@ -166,6 +165,39 @@ def final_process_bapun_all_comps(curr_active_pipeline, posthoc_save: bool=True,
 
     active_data_mode_name = 'bapun'
     # active_data_mode_name = 'rachel'
+    return final_process_non_kdiba_all_comps(curr_active_pipeline, active_data_mode_name='bapun', posthoc_save=posthoc_save, override_parameters_flat_keypaths_dict=override_parameters_flat_keypaths_dict, time_bin_size=time_bin_size)
+
+    
+@function_attributes(short_name=None, tags=['bapun'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-09-19 17:50', related_items=[])
+def final_process_non_kdiba_all_comps(curr_active_pipeline, active_data_mode_name: str = 'bapun', posthoc_save: bool=True, override_parameters_flat_keypaths_dict=None, time_bin_size=0.5):
+    """ 
+    from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import final_process_bapun_all_comps
+    curr_active_pipeline = final_process_bapun_all_comps(curr_active_pipeline=curr_active_pipeline, posthoc_save=True)
+    
+    """
+    
+    from pyphoplacecellanalysis.General.Pipeline.NeuropyPipeline import NeuropyPipeline
+    from pyphoplacecellanalysis.General.Batch.NonInteractiveProcessing import batch_extended_computations
+    from neuropy.core.session.Formats.BaseDataSessionFormats import HardcodedProcessingParameters
+    
+    from neuropy.core.epoch import Epoch, ensure_dataframe, ensure_Epoch, EpochsAccessor
+    from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import build_contextual_pf2D_decoder, decode_using_contextual_pf2D_decoder
+    from pyphoplacecellanalysis.Analysis.Decoder.context_dependent import GenericDecoderDictDecodedEpochsDictResult
+    from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.EpochComputationFunctions import EpochComputationFunctions, EpochComputationsComputationsContainer
+
+
+    from neuropy.analyses.placefields import Position
+    from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import post_process_non_kdiba
+    from neuropy.analyses.laps import estimate_session_laps
+
+
+    active_data_mode_registered_class, active_data_mode_type_properties = curr_active_pipeline.sess.config.get_format_data_session_type_class_info()
+    # active_data_mode_registered_class
+    # active_data_mode_type_properties
+
+
+    hardcoded_params: HardcodedProcessingParameters = BapunDataSessionFormatRegisteredClass._get_session_specific_parameters(session_context=curr_active_pipeline.get_session_context())
+
 
     known_data_session_type_properties_dict = DataSessionFormatRegistryHolder.get_registry_known_data_session_type_dict(override_parameters_flat_keypaths_dict=override_parameters_flat_keypaths_dict)
     active_data_session_types_registered_classes_dict = DataSessionFormatRegistryHolder.get_registry_data_session_type_class_name_dict()
@@ -223,11 +255,10 @@ def final_process_bapun_all_comps(curr_active_pipeline, posthoc_save: bool=True,
 
     # grid_bin_bounds=(((-83.33747881216672, 110.15967332926644), (-94.89955475226206, 97.07387994733473)))
 
-
-    bapun_open_field_grid_bin_bounds = (((-120.0, 120.0), (-120.0, 120.0)))
-    curr_active_pipeline.get_all_parameters()
-    # curr_active_pipeline.update_parameters(grid_bin_bounds = (((-120.0, 120.0), (-120.0, 120.0))))
-    curr_active_pipeline.sess.config.grid_bin_bounds = (((-120.0, 120.0), (-120.0, 120.0)))
+    if hardcoded_params.grid_bin_bounds is not None:
+        print(f'\thardcoded_params.grid_bin_bounds: {hardcoded_params.grid_bin_bounds}')
+        # curr_active_pipeline.update_parameters(grid_bin_bounds = hardcoded_params.grid_bin_bounds)
+        curr_active_pipeline.sess.config.grid_bin_bounds = hardcoded_params.grid_bin_bounds # (((-120.0, 120.0), (-120.0, 120.0)))
 
     # override_parameters_flat_keypaths_dict = {'grid_bin_bounds': (((-120.0, 120.0), (-120.0, 120.0))), # 'rank_order_shuffle_analysis.minimum_inclusion_fr_Hz': minimum_inclusion_fr_Hz,
     # 										#   'sess.config.preprocessing_parameters.laps.use_direction_dependent_laps': False, # lap_estimation_parameters
@@ -398,6 +429,7 @@ def final_process_bapun_all_comps(curr_active_pipeline, posthoc_save: bool=True,
             pass
         
     return curr_active_pipeline
+
 
 @function_attributes(short_name=None, tags=['bapun', 'pending', 'pseudo2D'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-09-29 10:48', related_items=[])
 def build_non_kdiba_directional_decoders(curr_active_pipeline, epochs_decoding_time_bin_size: float = 1.0):
