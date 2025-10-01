@@ -138,6 +138,51 @@ from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import BasePositionD
 from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import DirectionalDecodersContinuouslyDecodedResult
 from neuropy.core.laps import LapsAccessor
 
+
+class GridBinBoundsHelpers:
+    """
+    from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import GridBinBoundsHelpers
+
+    """
+    @classmethod
+    def get_grid_bin_bounds(cls, a_pf2D_Decoder_dict):
+        """Determine global grid_bin_bounds:
+            from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import GridBinBoundsHelpers
+            
+            grid_bin_bounds, grid_bin_bounds_df, pf2D_Decoder_pos_bins_dict = GridBinBoundsHelpers.get_grid_bin_bounds(a_pf2D_Decoder_dict= )
+            grid_bin_bounds_df
+            pf2D_Decoder_pos_bins_dict
+        """
+        pf2D_Decoder_pos_bins_dict = {k:(deepcopy(v.xbin), deepcopy(v.ybin)) for k, v in a_pf2D_Decoder_dict.items()}
+        grid_bin_bounds_df = [np.array((v[0][0], v[0][-1], v[1][0], v[1][-1])) for k, v in pf2D_Decoder_pos_bins_dict.items()]
+        grid_bin_bounds_df: pd.DataFrame = pd.DataFrame(np.vstack(grid_bin_bounds_df), columns=['x_min', 'x_max', 'y_min', 'y_max'])
+        grid_bin_bounds_df['maze_id'] = list(pf2D_Decoder_pos_bins_dict.keys())
+        
+        # grid_bin_bounds[['xmin', 'ymin']]
+        _temp_bounds = grid_bin_bounds_df[['x_min', 'y_min']].min(axis='index').to_dict()
+        _temp_bounds.update(grid_bin_bounds_df[['x_max', 'y_max']].max(axis='index').to_dict())
+
+        global_grid_bin_bounds = ((_temp_bounds['x_min'], _temp_bounds['x_max']), (_temp_bounds['y_min'], _temp_bounds['y_max'])) ## put them in right order
+        return global_grid_bin_bounds, grid_bin_bounds_df, pf2D_Decoder_pos_bins_dict
+
+    @classmethod
+    def determine_global_bounding_grid_bin_bounds(cls, curr_active_pipeline, included_epoch_names=None):
+        """Determine global grid_bin_bounds:
+            from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import GridBinBoundsHelpers
+            
+            ## OUTPUTS: grid_bin_bounds
+            grid_bin_bounds, grid_bin_bounds_df = GridBinBoundsHelpers.determine_global_bounding_grid_bin_bounds(curr_active_pipeline=curr_active_pipeline, included_epoch_names=epochs_to_create_global_from_names)
+            grid_bin_bounds_df
+            grid_bin_bounds
+        """
+        if included_epoch_names is None:
+            included_epoch_names = list(curr_active_pipeline.computation_results.keys())
+        a_pf2D_Decoder_dict =  {k:deepcopy(curr_active_pipeline.computation_results[k].computed_data.pf2D_Decoder) for k in included_epoch_names}
+        global_grid_bin_bounds, grid_bin_bounds_df, pf2D_Decoder_pos_bins_dict = cls.get_grid_bin_bounds(a_pf2D_Decoder_dict=a_pf2D_Decoder_dict)
+        return global_grid_bin_bounds, grid_bin_bounds_df
+
+
+
 def final_process_bapun_all_comps(curr_active_pipeline, posthoc_save: bool=True, override_parameters_flat_keypaths_dict=None, time_bin_size=0.5):
     """ 
     from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import final_process_bapun_all_comps
