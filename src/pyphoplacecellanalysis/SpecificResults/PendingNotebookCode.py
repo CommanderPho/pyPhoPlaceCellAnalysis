@@ -586,12 +586,23 @@ def post_process_non_kdiba(curr_active_pipeline):
 
     global_pos_df = _subfn_add_approx_head_dir_columns(a_session=curr_active_pipeline.sess)
 
-    included_epochs = curr_active_pipeline.active_completed_computation_result_names
-    print(f'included_epochs: {included_epochs}')
-    for an_epoch_name in included_epochs:
-        a_session = deepcopy(curr_active_pipeline.filtered_sessions[an_epoch_name])
-        # INPUTS: a_session 
-        global_pos_df = _subfn_add_approx_head_dir_columns(a_session=a_session)
+    try:
+        
+        for a_name, a_session in curr_active_pipeline.filtered_sessions.items():
+            a_pos_df = _subfn_add_approx_head_dir_columns(a_session=a_session)
+
+
+        # included_epochs = curr_active_pipeline.active_completed_computation_result_names
+        # print(f'included_epochs: {included_epochs}')
+        # for an_epoch_name in included_epochs:
+        #     a_session = deepcopy(curr_active_pipeline.filtered_sessions[an_epoch_name])
+        #     # INPUTS: a_session 
+        #     global_pos_df = _subfn_add_approx_head_dir_columns(a_session=a_session)
+
+    except (AttributeError, ValueError) as e:
+        print(f'could not add head_dir_columns to the computed session, maybe because it is not yet computed? Error {e}. skipping.')
+    except Exception as e:
+        raise e
 
 
 
