@@ -8850,10 +8850,12 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
     @function_attributes(short_name='directional_decoded_stacked_epoch_slices', tags=['export', 'heatmaps', 'posterior', 'directional_merged_decoder_decoded_epochs','directional','marginal','NON-VISUAL','NO-DISPLAY'],
                           input_requires=['RankOrder', 'DirectionalLaps', 'DirectionalMergedDecoders', 'DirectionalDecodersEpochsEvaluations'], output_provides=[], uses=['PosteriorExporting.perform_export_all_decoded_posteriors_as_images'], used_by=[], creation_date='2024-09-27 17:08', related_items=[], is_global=True)
     def _display_directional_merged_pf_decoded_stacked_epoch_slices(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, save_figure=True, included_any_context_neuron_ids=None,
-                                                                    custom_export_formats: Dict[str, "HeatmapExportConfig"]=None, parent_output_folder: Optional[Path] = None, desired_height:int=1200, **kwargs):
+                                                                    custom_export_formats: Dict[str, "HeatmapExportConfig"]=None, parent_output_folder: Optional[Path] = None, desired_height:int=1200, skip_lap_exports: bool=True, **kwargs):
         """ Exports all decoded epoch posteriors separately to a folder. NON-VISUAL, never displays.
          Effectively the entire stack of decoded epochs for both the long and short, including their Radon transformed lines if that information is available.
 
+         # !!! NON-VISUAL, never displays. ________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
+         
 
         # '_display_directional_merged_pf_decoded_stacked_epoch_slices' or  directional_decoded_stacked_epoch_slices
         curr_active_pipeline.reload_default_display_functions()
@@ -8901,8 +8903,11 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
 
         pos_bin_size: float = directional_decoders_epochs_decode_result.pos_bin_size
         ripple_decoding_time_bin_size: float = directional_decoders_epochs_decode_result.ripple_decoding_time_bin_size
+        
         laps_decoding_time_bin_size: float = directional_decoders_epochs_decode_result.laps_decoding_time_bin_size
         decoder_laps_filter_epochs_decoder_result_dict: Dict[str, DecodedFilterEpochsResult] = directional_decoders_epochs_decode_result.decoder_laps_filter_epochs_decoder_result_dict
+        
+
         decoder_ripple_filter_epochs_decoder_result_dict: Dict[str, DecodedFilterEpochsResult] = directional_decoders_epochs_decode_result.decoder_ripple_filter_epochs_decoder_result_dict
 
         print(f'pos_bin_size: {pos_bin_size}')
@@ -8915,7 +8920,9 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
         #TODO 2025-05-30 07:52: - [ ] This assumes `ripple_decoding_time_bin_size == laps_decoding_time_bin_size`
         complete_session_context, (session_context, additional_session_context) = owning_pipeline_reference.get_complete_session_context()
 
-        assert (ripple_decoding_time_bin_size == laps_decoding_time_bin_size), f"ripple_decoding_time_bin_size: {ripple_decoding_time_bin_size} != laps_decoding_time_bin_size: {laps_decoding_time_bin_size}" #TODO 2025-07-10 15:32: - [ ] Why does it matter that they aren't equal?
+        if (not skip_lap_exports):
+            assert (ripple_decoding_time_bin_size == laps_decoding_time_bin_size), f"ripple_decoding_time_bin_size: {ripple_decoding_time_bin_size} != laps_decoding_time_bin_size: {laps_decoding_time_bin_size}" #TODO 2025-07-10 15:32: - [ ] Why does it matter that they aren't equal?
+
         active_context = kwargs.pop('active_context', None)
         if active_context is not None:
             # Update the existing context:
@@ -8933,7 +8940,12 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
         session_name: str = owning_pipeline_reference.session_name
         t_start, t_delta, t_end = owning_pipeline_reference.find_LongShortDelta_times()
 
-        decoder_laps_filter_epochs_decoder_result_dict = {k:DecodedFilterEpochsResult.perform_add_additional_epochs_columns(a_result=a_result, session_name=session_name, t_start=t_start, t_delta=t_delta, t_end=t_end) for k, a_result in decoder_laps_filter_epochs_decoder_result_dict.items()}
+        
+        if (not skip_lap_exports):
+            decoder_laps_filter_epochs_decoder_result_dict = {k:DecodedFilterEpochsResult.perform_add_additional_epochs_columns(a_result=a_result, session_name=session_name, t_start=t_start, t_delta=t_delta, t_end=t_end) for k, a_result in decoder_laps_filter_epochs_decoder_result_dict.items()}
+        else:
+            decoder_laps_filter_epochs_decoder_result_dict = {}
+
         decoder_ripple_filter_epochs_decoder_result_dict = {k:DecodedFilterEpochsResult.perform_add_additional_epochs_columns(a_result=a_result, session_name=session_name, t_start=t_start, t_delta=t_delta, t_end=t_end) for k, a_result in decoder_ripple_filter_epochs_decoder_result_dict.items()}
 
         # parent_output_folder: Path = kwargs.pop('parent_output_folder', None)
@@ -8984,6 +8996,7 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
 
             custom_export_formats: Dict[str, HeatmapExportConfig] = {
                 'greyscale': HeatmapExportConfig.init_greyscale(**common_export_config_kwargs),
+                'greyscale_shared_norm': HeatmapExportConfig.init_greyscale(vmin=0.0, vmax=1.0, **common_export_config_kwargs),
                 'color': HeatmapExportConfig(colormap='Oranges', **common_export_config_kwargs), # #TODO 2025-05-30 03:45: - [ ] previous config
                 # 'color': HeatmapExportConfig(colormap=additional_cmaps['long_LR']),
                 # 'color': HeatmapExportConfig(colormap=cmap1, desired_height=200),
@@ -8991,7 +9004,10 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
 
         out_paths, out_custom_formats_dict = PosteriorExporting.perform_export_all_decoded_posteriors_as_images(decoder_laps_filter_epochs_decoder_result_dict=decoder_laps_filter_epochs_decoder_result_dict, decoder_ripple_filter_epochs_decoder_result_dict=decoder_ripple_filter_epochs_decoder_result_dict,
                                                                                                                  _save_context=_parent_save_context, parent_output_folder=_specific_session_output_folder,
-                                                                                                                  desired_height=desired_height, custom_export_formats=custom_export_formats)
+                                                                                                                  desired_height=desired_height, custom_export_formats=custom_export_formats, combined_img_padding=6,
+                                                                                                                    #  combined_img_separator_color=(255, 255, 255, 255),
+                                                                                                                    combined_img_separator_color=(200, 46, 33, 10),
+                                                                                                                )
         # out_paths
         print(_specific_session_output_folder)
 

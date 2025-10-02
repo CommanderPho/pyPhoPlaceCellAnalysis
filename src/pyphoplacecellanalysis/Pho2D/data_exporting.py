@@ -626,7 +626,8 @@ class PosteriorExporting:
 
                 assert complete_epoch_identifier_str is not None
                 _an_active_export_format_config: Dict = (kwargs|export_format_config.to_dict())
-                _posterior_image, posterior_save_path = active_captured_single_epoch_result.save_posterior_as_image(parent_array_as_image_output_folder=export_format_config.export_folder, complete_epoch_identifier_str=complete_epoch_identifier_str, **_an_active_export_format_config, post_render_image_functions=curr_post_render_image_functions_dict)
+                _posterior_image, posterior_save_path = active_captured_single_epoch_result.save_posterior_as_image(parent_array_as_image_output_folder=export_format_config.export_folder, complete_epoch_identifier_str=complete_epoch_identifier_str,
+                                                                                                                     **_an_active_export_format_config, post_render_image_functions=curr_post_render_image_functions_dict)
             
                 _output_export_format_config: HeatmapExportConfig = deepcopy(export_format_config)
                 _output_export_format_config.posterior_saved_path = posterior_save_path
@@ -1395,7 +1396,8 @@ class PosteriorExporting:
 
 
         if custom_merge_layout_dict is None:
-            custom_merge_layout_dict = [['greyscale'],
+            custom_merge_layout_dict = [
+                # ['greyscale'],
                 ['greyscale_shared_norm'],
                 # ['psuedo2D_ignore/raw_rgba'], ## Implicitly always appends the pseudo2D_ignore/raw_rgba image at the bottom row
             ]
