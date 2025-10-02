@@ -28,7 +28,7 @@ from pyphoplacecellanalysis.GUI.PyVista.InteractivePlotter.PhoInteractivePlotter
 from pyphoplacecellanalysis.Pho3D.PyVista.gui import customize_default_pyvista_theme, print_controls_helper_text
 from pyphoplacecellanalysis.Pho3D.PyVista.spikeAndPositions import build_active_spikes_plot_data, perform_plot_flat_arena, spike_geom_box, spike_geom_cone
 from pyphoplacecellanalysis.GUI.PyVista.InteractivePlotter.InteractiveDataExplorerBase import InteractiveDataExplorerBase
-from pyphoplacecellanalysis.GUI.PyVista.InteractivePlotter.InteractiveSliderWrapper import InteractiveSliderWrapper 
+from pyphoplacecellanalysis.GUI.PyVista.InteractivePlotter.InteractiveSliderWrapper import InteractiveSliderWrapper
 from pyphoplacecellanalysis.PhoPositionalData.plotting.visualization_window import VisualizationWindow # Used to build "Windows" into the data points such as the window defining the fixed time period preceeding the current time where spikes had recently fired, etc.
 
 
@@ -51,7 +51,9 @@ class InteractivePlaceCellDataExplorer(GlobalConnectionManagerAccessingMixin, In
     
     def __init__(self, active_config, active_session, extant_plotter=None, **kwargs):
         # super().__init__(active_config, active_session, extant_plotter)
-        super(InteractivePlaceCellDataExplorer, self).__init__(active_config, active_session, extant_plotter, data_explorer_name='CellSpikePositionDataExplorer', **kwargs)
+        # super(InteractivePlaceCellDataExplorer, self).__init__(active_config, active_session, extant_plotter, data_explorer_name='CellSpikePositionDataExplorer', **kwargs)
+        super().__init__(active_config, active_session, extant_plotter, data_explorer_name='CellSpikePositionDataExplorer', **kwargs)
+
         self._setup()
         
         app = pg.mkQApp() # <PyQt5.QtWidgets.QApplication at 0x1d44a4891f0>
@@ -427,13 +429,15 @@ class InteractivePlaceCellDataExplorer(GlobalConnectionManagerAccessingMixin, In
             self.p = InteractivePlaceCellDataExplorer.build_new_plotter_if_needed(pActivePlotter, shape=self.active_config.plotting_config.subplots_shape, title=self.data_explorer_name)
 
         ## Make sure self.GlobalConnectionManagerAccessingMixin_on_destroy() is called to un-register self
-        # TODO: does this work when self.p is a regular pv.Plotter (and not a background plotter)? What about a MultiPlotter?
-        self.p.app_window.signal_close.connect(self.GlobalConnectionManagerAccessingMixin_on_destroy)
+        if (not self.active_config.video_output_config.active_is_video_output_mode):
+            # TODO: does this work when self.p is a regular pv.Plotter (and not a background plotter)? What about a MultiPlotter?
+            self.p.app_window.signal_close.connect(self.GlobalConnectionManagerAccessingMixin_on_destroy) # AttributeError: 'Plotter' object has no attribute 'app_window', for vid mode it has self.p.ren_win
         # self.p.closeEvent
         # self.signal_close.connect(self.plotter.close)        
         # self.p._before_close_callback = 
         
-        
+        # self.p._BasePlotter__before_close_callback.connect(self.GlobalConnectionManagerAccessingMixin_on_destroy)
+
         # p.background_color = 'black'
 
         if (not self.active_config.video_output_config.active_is_video_output_mode):
@@ -485,12 +489,17 @@ class InteractivePlaceCellDataExplorer(GlobalConnectionManagerAccessingMixin, In
         # apply_close_overhead_zoomed_camera_view(self.p)
         # apply_close_perspective_camera_view(self.p)
         self.p.render() # manually render when needed
+        if not hasattr(self.active_config.video_output_config, 'framerate'):
+            ## create the propery as default if needed
+            self.active_config.video_output_config.framerate = 60 # 60fps
+            
+        video_framerate = self.active_config.video_output_config.framerate
 
         if self.active_config.video_output_config.active_is_video_output_mode:
             self.active_config.video_output_config.active_video_output_parent_dir.mkdir(parents=True, exist_ok=True) # makes the directory if it isn't already there
             print('Writing video to {}...'.format(self.active_config.video_output_config.active_video_output_fullpath))
             self.p.show(auto_close=False)
-            make_mp4_from_plotter(self.p, self.active_config.video_output_config.active_frame_range, self.on_slider_update_mesh, filename=self.active_config.video_output_config.active_video_output_fullpath, framerate=60) # 60fps
+            make_mp4_from_plotter(self.p, self.active_config.video_output_config.active_frame_range, self.on_slider_update_mesh, filename=self.active_config.video_output_config.active_video_output_fullpath, framerate=video_framerate) # 60fps
             self.p.close()
             self.p = None
 
