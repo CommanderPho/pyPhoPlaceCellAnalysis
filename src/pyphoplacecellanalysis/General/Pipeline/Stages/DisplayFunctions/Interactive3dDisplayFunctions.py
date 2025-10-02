@@ -136,8 +136,15 @@ class Interactive3dDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Displ
         pActiveInteractivePlaceSpikesPlotter = ipspikesDataExplorer.plot(pActivePlotter=pActiveInteractivePlaceSpikesPlotter)
         # Add Connection Controls to the window:
         
-        # Setup Connections Menu:
-        root_window, menuConnections, actions_dict = ConnectionControlsMenuMixin.try_add_connections_menu(ipspikesDataExplorer.p.app_window) # none of these properties need to be saved directly, as they're accessible via ipspikesDataExplorer.p.app_window.window()
+        # Setup Connections Menu: 
+        try:
+            root_window, menuConnections, actions_dict = ConnectionControlsMenuMixin.try_add_connections_menu(ipspikesDataExplorer.p.app_window) # none of these properties need to be saved directly, as they're accessible via ipspikesDataExplorer.p.app_window.window()
+        except (AttributeError, KeyError) as e:
+            print(f'WARN: could not connect to menu signals because we are not using a Qt-backed widget (non-interactive video output mode). Error {e}. Continuing.')
+            pass
+        except Exception as e:
+            raise e
+        
         
         
         return {'ipspikesDataExplorer': ipspikesDataExplorer, 'plotter': pActiveInteractivePlaceSpikesPlotter}
