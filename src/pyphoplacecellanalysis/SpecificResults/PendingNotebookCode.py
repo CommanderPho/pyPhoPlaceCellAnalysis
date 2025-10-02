@@ -210,7 +210,7 @@ def final_process_bapun_all_comps(curr_active_pipeline, posthoc_save: bool=True,
 
     active_data_mode_name = 'bapun'
     # active_data_mode_name = 'rachel'
-    return final_process_non_kdiba_all_comps(curr_active_pipeline, active_data_mode_name='bapun', posthoc_save=posthoc_save, override_parameters_flat_keypaths_dict=override_parameters_flat_keypaths_dict, time_bin_size=time_bin_size)
+    return final_process_non_kdiba_all_comps(curr_active_pipeline, active_data_mode_name=active_data_mode_name, posthoc_save=posthoc_save, override_parameters_flat_keypaths_dict=override_parameters_flat_keypaths_dict, time_bin_size=time_bin_size)
 
     
 @function_attributes(short_name=None, tags=['bapun'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-09-19 17:50', related_items=[])
@@ -220,10 +220,11 @@ def final_process_non_kdiba_all_comps(curr_active_pipeline, active_data_mode_nam
     curr_active_pipeline = final_process_bapun_all_comps(curr_active_pipeline=curr_active_pipeline, posthoc_save=True)
     
     """
-    
+    from neuropy.core.session.Formats.BaseDataSessionFormats import HardcodedProcessingParameters
+    from neuropy.core.session.Formats.Specific.BapunDataSessionFormat import BapunDataSessionFormatRegisteredClass
+    from neuropy.core.session.Formats.Specific.RachelDataSessionFormat import RachelDataSessionFormat
     from pyphoplacecellanalysis.General.Pipeline.NeuropyPipeline import NeuropyPipeline
     from pyphoplacecellanalysis.General.Batch.NonInteractiveProcessing import batch_extended_computations
-    from neuropy.core.session.Formats.BaseDataSessionFormats import HardcodedProcessingParameters
     
     from neuropy.core.epoch import Epoch, ensure_dataframe, ensure_Epoch, EpochsAccessor
     from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import build_contextual_pf2D_decoder, decode_using_contextual_pf2D_decoder
@@ -237,8 +238,13 @@ def final_process_non_kdiba_all_comps(curr_active_pipeline, active_data_mode_nam
 
 
     active_data_mode_registered_class, active_data_mode_type_properties = curr_active_pipeline.sess.config.get_format_data_session_type_class_info()
-    hardcoded_params: HardcodedProcessingParameters = active_data_mode_registered_class._get_session_specific_parameters(session_context=curr_active_pipeline.get_session_context())
 
+    if (active_data_mode_name == 'bapun'):
+        hardcoded_params: HardcodedProcessingParameters = BapunDataSessionFormatRegisteredClass._get_session_specific_parameters(session_context=curr_active_pipeline.get_session_context())
+    elif (active_data_mode_name == 'rachel'):
+        hardcoded_params: HardcodedProcessingParameters = RachelDataSessionFormat._get_session_specific_parameters(session_context=curr_active_pipeline.get_session_context())
+    else:
+        hardcoded_params: HardcodedProcessingParameters = active_data_mode_registered_class._get_session_specific_parameters(session_context=curr_active_pipeline.get_session_context())
 
     known_data_session_type_properties_dict = DataSessionFormatRegistryHolder.get_registry_known_data_session_type_dict(override_parameters_flat_keypaths_dict=override_parameters_flat_keypaths_dict)
     active_data_session_types_registered_classes_dict = DataSessionFormatRegistryHolder.get_registry_data_session_type_class_name_dict()
@@ -249,7 +255,7 @@ def final_process_non_kdiba_all_comps(curr_active_pipeline, active_data_mode_nam
     
     print(f'active_data_session_types_registered_classes_dict: {active_data_session_types_registered_classes_dict}')
     active_data_mode_registered_class = active_data_session_types_registered_classes_dict[active_data_mode_name]
-    active_data_mode_type_properties = known_data_session_type_properties_dict[active_data_mode_name]
+    # active_data_mode_type_properties = known_data_session_type_properties_dict[active_data_mode_name]
 
     # basedir = Path('/media/halechr/MAX/Data/Rachel/Cho_241117_Session2').resolve()
     ## INPUTS: basedir 
