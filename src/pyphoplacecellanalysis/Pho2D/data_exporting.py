@@ -1562,7 +1562,9 @@ class PosteriorExporting:
                             if active_epoch_id is not None:
                                 active_epoch_id = int(active_epoch_id)
                                 # complete_epoch_identifier_str = f"{complete_epoch_identifier_str}lbl[{active_epoch_id:03d}]" # 2025-06-03 - 'p_x_given_n[067]'
-                                complete_epoch_identifier_str = f"{complete_epoch_identifier_str}L{active_epoch_id:03d}"
+                                if len(complete_epoch_identifier_str) > 0:
+                                    complete_epoch_identifier_str = f"{complete_epoch_identifier_str}LBL"
+                                complete_epoch_identifier_str = f"{complete_epoch_identifier_str}{active_epoch_id:03d}"
                             else:
                                 print(f'falling back to plain epoch IDXs because label was not found!')
                                 active_epoch_data_IDX: int = active_captured_single_epoch_result.epoch_data_index
@@ -1576,7 +1578,9 @@ class PosteriorExporting:
                             # earliest_t = active_captured_single_epoch_result.time_bin_edges[0] # as in `_build_mergedColorDecoders_image_export_functions_dict`
                             earliest_t = active_epoch_info_dict['delta_aligned_start_t']
                             # earliest_t_ms = earliest_t * 1e-3
-                            earliest_t_str: str = "{:08.4f}".format(earliest_t)
+                            # earliest_t_str: str = "{:08.4f}".format(earliest_t) # #TODO 2025-10-06 14:37: - [ ] Too much precision: "L136: -391.5318"
+                            earliest_t_str: str = "{:06.2f}".format(earliest_t) # #TODO 2025-10-06 14:37: modified to hopefully get a string like "L136: -391.53"
+
 
                             # earliest_t_str: str = f"{earliest_t:.4f}"
 
@@ -1595,9 +1599,6 @@ class PosteriorExporting:
                                 curr_x_axis_label_str = f"{complete_epoch_identifier_str}: {earliest_t_str}" ## add separator if needed for time
                             else:
                                 curr_x_axis_label_str = f"{earliest_t_str}" # // 2025-06-03 09:10 working
-
-
-
 
                             ## INPUTS: _label_kwargs
                             # _out_vstack = ImageOperationsAndEffects.add_boxed_adjacent_label(_out_vstack, epoch_id_text, image_edge='bottom', font_size=24, text_color="#000000",
