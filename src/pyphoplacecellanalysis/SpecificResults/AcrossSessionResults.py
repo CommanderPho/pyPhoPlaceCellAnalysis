@@ -3888,9 +3888,9 @@ class AcrossSessionsVisualizations:
         # get number of points above vs. below the diagnonal
         is_above_diagonal = (y_frs_index > x_frs_index)
         num_above_diagonal = np.sum(is_above_diagonal)
-        is_below_count = np.sum(y_frs_index < x_frs_index)
+        num_below_diagonal = np.sum(y_frs_index < x_frs_index)
         total_num_points: int = np.shape(y_frs_index)[0]
-        percent_below_diagonal = float(is_below_count) / float(total_num_points)
+        percent_below_diagonal = float(num_below_diagonal) / float(total_num_points)
         percent_above_diagonal = float(num_above_diagonal) / float(total_num_points)
         
         print(f'num_above_diagonal/total_num_points: {num_above_diagonal}/{total_num_points}')

@@ -1405,16 +1405,31 @@ def pho_stats_perform_diagonal_line_binomial_test(long_short_fr_indicies_analysi
     long_short_fr_indicies_analysis_table = long_short_fr_indicies_analysis_table.dropna(subset=[x_col_name, y_col_name, *extra_required_columns])
 
     ## Find the values above/below the main y=x diagonal:
-    x_minus_y_diff = (long_short_fr_indicies_analysis_table[x_col_name] - long_short_fr_indicies_analysis_table[y_col_name])
-    assert np.sum(np.logical_not(np.isfinite(x_minus_y_diff))) == 0, f"ERROR: contains {np.sum(np.logical_not(np.isfinite(x_minus_y_diff)))} non-finite values"
-    ## Find the counts for each:
-    n_total = len(x_minus_y_diff) # 856
-    n_below_diagonal = np.sum((0.0 > x_minus_y_diff)) # 365
-    n_above_diagonal = np.sum((0.0 < x_minus_y_diff)) # 487
-    n_exact_on_diagonal = np.sum((0.0 == x_minus_y_diff))
-    print(f'n_total: {n_total}, n_above_diagonal: {n_above_diagonal}, n_exact_on_diagonal: {n_exact_on_diagonal}, n_below_diagonal: {n_below_diagonal}')
-    assert (n_above_diagonal + n_below_diagonal + n_exact_on_diagonal) == n_total, f"they don't add up!" 
-    binom_test_chance_result = stats.binomtest(n_above_diagonal, n=n_total, p=0.5) # p=0.5 random assignment on each trial, n=n_total trials
+    # x_minus_y_diff = (long_short_fr_indicies_analysis_table[x_col_name] - long_short_fr_indicies_analysis_table[y_col_name])
+    x_minus_y_diff = (long_short_fr_indicies_analysis_table[x_col_name] - long_short_fr_indicies_analysis_table[y_col_name])    
+    
+    x_frs_index = long_short_fr_indicies_analysis_table[x_col_name].to_numpy()
+    y_frs_index = long_short_fr_indicies_analysis_table[y_col_name].to_numpy()
+    
+    
+
+    # get number of points above vs. below the diagnonal
+    is_above_diagonal = (y_frs_index > x_frs_index)
+    num_above_diagonal: int = np.sum(is_above_diagonal)
+    num_below_diagonal: int = np.sum(y_frs_index < x_frs_index)
+    n_exact_on_diagonal: int = np.sum(y_frs_index == x_frs_index)
+    num_total_points: int = np.shape(y_frs_index)[0]
+    percent_below_diagonal: float = float(num_below_diagonal) / float(num_total_points)
+    percent_above_diagonal: float = float(num_above_diagonal) / float(num_total_points)    
+    # assert np.sum(np.logical_not(np.isfinite(x_minus_y_diff))) == 0, f"ERROR: contains {np.sum(np.logical_not(np.isfinite(x_minus_y_diff)))} non-finite values"
+    # ## Find the counts for each:
+    # num_total_points = len(x_minus_y_diff) # 856
+    # num_below_diagonal = np.sum((0.0 > x_minus_y_diff)) # 365
+    # num_above_diagonal = np.sum((0.0 < x_minus_y_diff)) # 487
+    # n_exact_on_diagonal = np.sum((0.0 == x_minus_y_diff))
+    print(f'n_total: {num_total_points}, n_above_diagonal: {num_above_diagonal}, n_exact_on_diagonal: {n_exact_on_diagonal}, n_below_diagonal: {num_below_diagonal}')
+    assert (num_above_diagonal + num_below_diagonal + n_exact_on_diagonal) == num_total_points, f"they don't add up!" 
+    binom_test_chance_result = stats.binomtest(num_above_diagonal, n=num_total_points, p=0.5) # p=0.5 random assignment on each trial, n=n_total trials
     return binom_test_chance_result
 
 
