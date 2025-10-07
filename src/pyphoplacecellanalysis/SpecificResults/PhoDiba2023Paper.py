@@ -47,6 +47,7 @@ from pyphoplacecellanalysis.Pho2D.stacked_epoch_slices import interactive_good_e
 
 import pyphoplacecellanalysis.External.pyqtgraph as pg # pyqtgraph
 import matplotlib.pyplot as plt
+from pyphocorehelpers.DataStructure.RenderPlots.MatplotLibRenderPlots import FigureCollector
 
 from pyphoplacecellanalysis.SpecificResults.fourthYearPresentation import fig_surprise_results, fig_remapping_cells
 from pyphocorehelpers.indexing_helpers import list_of_dicts_to_dict_of_lists
@@ -1031,76 +1032,94 @@ class PaperFigureTwo(SerializedAttributesAllowBlockSpecifyingClass):
         
         prepare_for_publication: if True, no context footer is added
         """
-        if title_modifier:
-            title = title_modifier(title)
-
-        # fig, ax, bars, scatter_plots, title_text_obj, footer_text_obj, plot_data = cls.create_bar_plot(x_labels, y_values, scatter_props, active_context, ylabel, title)
-        text_formatter = FormattedFigureText()
-        x = np.arange(len(x_labels))
-        width = 0.3
-
-        fig, ax = plt.subplots()
-        text_formatter.setup_margins(fig)
-
-        bars = ax.bar(x, [np.mean(yi) for yi in y_values], yerr=[np.std(yi) for yi in y_values], capsize=5, width=width, tick_label=x_labels, color=(0, 0, 0, 0), edgecolor=cls.get_bar_colors())
-
-        scatter_plots = []
-        x_values_list = []
+        from pyphoplacecellanalysis.SpecificResults.PhoDiba2023Paper import PhoPublicationFigureHelper
         
-        if hasattr(cls, 'scatter_props_fn'):
-            # get individual scatter_props_Fn
-            _output = cls.scatter_props_fn(active_context)
-            print(f'_output: {_output}')
-
-
-        for i in range(len(x)):
-            x_values = (x[i] + np.random.random(y_values[i].size) * width - width / 2)
-            scatter_props_kwargs: Dict = list_of_dicts_to_dict_of_lists(scatter_props[i])
-            had_custom_marker_handling = False
-            user_markers = scatter_props_kwargs.get('marker', None)
-            if user_markers is not None:
-                # if marker is just a scalar we can do the normal (flat) ax.scatter(...) command. Otherwise we have to loop.
-                if isinstance(user_markers, (list, tuple, np.ndarray)):
-                    ## have to loop. 
-                    user_markers = scatter_props_kwargs.pop('marker') # remove from `scatter_props_kwargs`
-                    scatter_plot = [] # scatter plot is just going to be a list here, hope that's okay.
-                    for point_index, a_marker in enumerate(user_markers):
-                        a_sub_scatter_plot = ax.scatter(x_values[point_index], y_values[i][point_index], color=cls.get_bar_colors()[i], marker=user_markers[point_index], **scatter_props_kwargs) # the np.random part is to spread the points out along the x-axis within their bar so they're visible and don't overlap.
-                        scatter_plot.append(a_sub_scatter_plot)
-                    had_custom_marker_handling = True # indicate that this was handled in this manner
-
-            if not had_custom_marker_handling:
-                # No special marker or just a scalar specific marker value, no need to loop
-                scatter_plot = ax.scatter(x_values, y_values[i], color=cls.get_bar_colors()[i], **scatter_props_kwargs) # the np.random part is to spread the points out along the x-axis within their bar so they're visible and don't overlap.
-    
-            scatter_plots.append(scatter_plot)
-            x_values_list.append(x_values)
+        display_context = kwargs.pop('display_context', active_context)
+        num = None # 'Fig2'        
+        figsize = kwargs.pop('figsize', (3.2, 2.5))
+        dpi = kwargs.pop('dpi', 220) # 220?
+        
+        with mpl.rc_context(PhoPublicationFigureHelper.rc_context_kwargs(prepare_for_publication=prepare_for_publication) | {'figure.figsize': figsize, 'figure.dpi': dpi}):
             
-        ax.set_xlabel('Neuron Track Dominance Classification')
-        ax.set_ylabel(ylabel)
-        # Hide the right and top spines (box components)
-        ax.spines[['right', 'top']].set_visible(False)
-        
-        title_text_obj = flexitext(text_formatter.left_margin, text_formatter.top_margin,
-                                cls._build_formatted_title_string(epochs_name=title, prepare_for_publication=prepare_for_publication), va="bottom", xycoords="figure fraction")
-        text_objects = {'title': title_text_obj}
-        
-        if (not prepare_for_publication):
-            footer_text_obj = flexitext(text_formatter.left_margin * 0.1, text_formatter.bottom_margin * 0.25,
-                                        text_formatter._build_footer_string(active_context=active_context), va="top", xycoords="figure fraction") ## How did that get added? and when?
-            text_objects['footer'] = footer_text_obj
+            # Create a FigureCollector instance
+            with FigureCollector(name='fig2', base_context=display_context) as collector:
+                
+                if title_modifier:
+                    title = title_modifier(title)
+
+                # fig, ax, bars, scatter_plots, title_text_obj, footer_text_obj, plot_data = cls.create_bar_plot(x_labels, y_values, scatter_props, active_context, ylabel, title)
+                text_formatter = FormattedFigureText()
+                x = np.arange(len(x_labels))
+                width = 0.3
+
+                # fig, ax = plt.subplots()
+                # subplots
+                # fig, ax = collector.subplots(figsize=figsize, dpi=dpi, constrained_layout=True, clear=True) # fignum=num, fig=kwargs.pop('fig', None), fig_idx=kwargs.pop('fig_idx', 0), **kwargs, 
+                fig_kw = dict(num=num, constrained_layout=True, clear=True, figsize=figsize, dpi=dpi) # , extant_fig=kwargs.pop('fig', None), fig_idx=kwargs.pop('fig_idx', 0)
+                # fig, ax = collector.subplots(fig_kw=fig_kw) # **kwargs, 
+                fig, ax = collector.subplots(**fig_kw) # **kwargs, 
+                
+                text_formatter.setup_margins(fig)
+
+                bars = ax.bar(x, [np.mean(yi) for yi in y_values], yerr=[np.std(yi) for yi in y_values], capsize=5, width=width, tick_label=x_labels, color=(0, 0, 0, 0), edgecolor=cls.get_bar_colors())
+
+                scatter_plots = []
+                x_values_list = []
+                
+                if hasattr(cls, 'scatter_props_fn'):
+                    # get individual scatter_props_Fn
+                    _output = cls.scatter_props_fn(active_context)
+                    print(f'_output: {_output}')
+
+
+                for i in range(len(x)):
+                    x_values = (x[i] + np.random.random(y_values[i].size) * width - width / 2)
+                    scatter_props_kwargs: Dict = list_of_dicts_to_dict_of_lists(scatter_props[i])
+                    had_custom_marker_handling = False
+                    user_markers = scatter_props_kwargs.get('marker', None)
+                    if user_markers is not None:
+                        # if marker is just a scalar we can do the normal (flat) ax.scatter(...) command. Otherwise we have to loop.
+                        if isinstance(user_markers, (list, tuple, np.ndarray)):
+                            ## have to loop. 
+                            user_markers = scatter_props_kwargs.pop('marker') # remove from `scatter_props_kwargs`
+                            scatter_plot = [] # scatter plot is just going to be a list here, hope that's okay.
+                            for point_index, a_marker in enumerate(user_markers):
+                                a_sub_scatter_plot = ax.scatter(x_values[point_index], y_values[i][point_index], color=cls.get_bar_colors()[i], marker=user_markers[point_index], **scatter_props_kwargs) # the np.random part is to spread the points out along the x-axis within their bar so they're visible and don't overlap.
+                                scatter_plot.append(a_sub_scatter_plot)
+                            had_custom_marker_handling = True # indicate that this was handled in this manner
+
+                    if not had_custom_marker_handling:
+                        # No special marker or just a scalar specific marker value, no need to loop
+                        scatter_plot = ax.scatter(x_values, y_values[i], color=cls.get_bar_colors()[i], **scatter_props_kwargs) # the np.random part is to spread the points out along the x-axis within their bar so they're visible and don't overlap.
             
+                    scatter_plots.append(scatter_plot)
+                    x_values_list.append(x_values)
+                    
+                ax.set_xlabel('Neuron Track Dominance Classification')
+                ax.set_ylabel(ylabel)
+                # Hide the right and top spines (box components)
+                ax.spines[['right', 'top']].set_visible(False)
+                
+                title_text_obj = flexitext(text_formatter.left_margin, text_formatter.top_margin,
+                                        cls._build_formatted_title_string(epochs_name=title, prepare_for_publication=prepare_for_publication), va="bottom", xycoords="figure fraction")
+                text_objects = {'title': title_text_obj}
+                
+                if (not prepare_for_publication):
+                    footer_text_obj = flexitext(text_formatter.left_margin * 0.1, text_formatter.bottom_margin * 0.25,
+                                                text_formatter._build_footer_string(active_context=active_context), va="top", xycoords="figure fraction") ## How did that get added? and when?
+                    text_objects['footer'] = footer_text_obj
+                    
 
-        ax.set_xticks(x)
-        ax.set_xticklabels(x_labels)
+                ax.set_xticks(x)
+                ax.set_xticklabels(x_labels)
 
-        plot_data = (x_values_list, y_values)
-        
-        if not defer_show:
-            plt.show()
+                plot_data = (x_values_list, y_values)
+                
+                if not defer_show:
+                    plt.show()
 
         return MatplotlibRenderPlots(name=fig_name, figures=[fig], axes=[ax], context=active_context,
-                                    plot_objects={'bars': bars, 'scatter_plots': scatter_plots, 'text_objects': text_objects},
+                                    plot_objects={'collector': collector, 'bars': bars, 'scatter_plots': scatter_plots, 'text_objects': text_objects},
                                     plot_data=plot_data)
 
 
