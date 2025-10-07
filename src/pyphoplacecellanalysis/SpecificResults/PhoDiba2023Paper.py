@@ -669,7 +669,7 @@ def PAPER_FIGURE_figure_1_full(curr_active_pipeline, defer_show=False, save_figu
 # Shows the LxC/SxC metrics and firing rate indicies
 
 @function_attributes(short_name=None, tags=['significance_bars', 'fig2', 'statistics'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-07-29 18:12', related_items=[])
-def add_significance_bars(ax, p_value, x1, x2, y, significance_level:float=0.05, y_offset: float = 0.5, text_additional_y_offset:float=0.01):
+def add_significance_bars(ax, p_value, x1, x2, y, significance_level:float=0.05, y_offset: float = 0.2, text_additional_y_offset:float=0.01):
     """Add significance bars to a boxplot.
 
 
@@ -684,7 +684,9 @@ def add_significance_bars(ax, p_value, x1, x2, y, significance_level:float=0.05,
     """
       # Offset for the bar above y
     _out_ann = {}
-    _out_ann['bar'] = ax.plot([x1, x1, x2, x2], [y, (y + y_offset), (y + y_offset), y], color='black')
+    x_pts = [x1, x1, x2, x2]
+    y_pts = [y, (y + y_offset), (y + y_offset), y]
+    _out_ann['bar'] = ax.plot(x_pts, y_pts, color='black')
     
     # Annotate with asterisks based on p-value
     sig_astrisks_str: str = 'N.S.'
@@ -1114,9 +1116,12 @@ class PaperFigureTwo(SerializedAttributesAllowBlockSpecifyingClass):
         var_name:str = 'Laps'
         active_context = active_context.adding_context_if_missing(variable=var_name) # title='Laps'
         # Laps_fr_label: str = '\\theta'
-        Laps_fr_label: str = '\\text{Laps}'
+        # Laps_fr_label: str = '\\text{Laps}'
 
-        x_labels = [f'$L d C$\t${Laps_fr_label}' + '_{' + delta_minus_str + '}$', f'$L d C$\t${Laps_fr_label}' + '_{' + delta_plus_str + '}$', f'$S d C$\t${Laps_fr_label}' + '_{' + delta_minus_str + '}$', f'$S d C$\t${Laps_fr_label}' + '_{' + delta_plus_str + '}$']
+        # x_labels = [f'$L d C$\t${Laps_fr_label}' + '_{' + delta_minus_str + '}$', f'$L d C$\t${Laps_fr_label}' + '_{' + delta_plus_str + '}$', f'$S d C$\t${Laps_fr_label}' + '_{' + delta_minus_str + '}$', f'$S d C$\t${Laps_fr_label}' + '_{' + delta_plus_str + '}$']
+        x_labels = ['$\\text{LdC}' + ' \\ {' + delta_minus_str + '}$', '$\\text{LdC}' + ' \\ {' + delta_plus_str + '}$', '$\\text{SdC}' + ' \\ {' + delta_minus_str + '}$', '$\\text{SdC}' + ' \\ {' + delta_plus_str + '}$']
+
+
         all_data_points = np.array([v.values for v in Fig2_Laps_FR])
         # all_scatter_props =  Fig2_Laps_FR[0].LxC_scatter_props + Fig2_Laps_FR[1].LxC_scatter_props + Fig2_Laps_FR[2].SxC_scatter_props + Fig2_Laps_FR[3].SxC_scatter_props # the LxC_scatter_props and SxC_scatter_props are actually the same for all entries in this list, but get em like this anyway. 
 
@@ -1147,9 +1152,10 @@ class PaperFigureTwo(SerializedAttributesAllowBlockSpecifyingClass):
         pbe_y_axis_label: str = kwargs.get('pbe_y_axis_label', 'PBE-averaged Firing Rates (Hz)')
 
         # PBE_fr_label: str = 'R'
-        PBE_fr_label: str = '\\text{PBE}'
+        # PBE_fr_label: str = '\\text{PBE}'
+        # x_labels = [f'$L d C$\t${PBE_fr_label}' + '_{' + delta_minus_str + '}$', f'$L d C$\t${PBE_fr_label}' + '_{' + delta_plus_str + '}$', f'$S d C$\t${PBE_fr_label}' + '_{' + delta_minus_str + '}$', f'$S d C$\t${PBE_fr_label}' + '_{' +  delta_plus_str + '}$']
+        x_labels = ['$\\text{LdC}' + ' \\ {' + delta_minus_str + '}$', '$\\text{LdC}' + ' \\ {' + delta_plus_str + '}$', '$\\text{SdC}' + ' \\ {' + delta_minus_str + '}$', '$\\text{SdC}' + ' \\ {' + delta_plus_str + '}$']
 
-        x_labels = [f'$L d C$\t${PBE_fr_label}' + '_{' + delta_minus_str + '}$', f'$L d C$\t${PBE_fr_label}' + '_{' + delta_plus_str + '}$', f'$S d C$\t${PBE_fr_label}' + '_{' + delta_minus_str + '}$', f'$S d C$\t${PBE_fr_label}' + '_{' +  delta_plus_str + '}$']
         assert len(Fig2_Replay_FR) == 4
         all_data_points = np.array([v.values for v in Fig2_Replay_FR])
         # all_scatter_props = Fig2_Replay_FR[0].LxC_scatter_props + Fig2_Replay_FR[1].LxC_scatter_props + Fig2_Replay_FR[2].SxC_scatter_props + Fig2_Replay_FR[3].SxC_scatter_props # the LxC_scatter_props and SxC_scatter_props are actually the same for all entries in this list, but get em like this anyway. 
@@ -1202,13 +1208,26 @@ class PaperFigureTwo(SerializedAttributesAllowBlockSpecifyingClass):
 
         if enable_stats_overlays:
             ## Compute and add the bar graph stats and significance bars
+            signifiance_bracket_height_ratio: float = 0.1
+            
             ## Add stats from t-tests (check?)
             ## INPUTS: across_session_inst_fr_computation_shell_obj
             LxC_Laps_T_result, SxC_Laps_T_result, LxC_Replay_T_result, SxC_Replay_T_result = pho_stats_bar_graph_t_tests(self.computation_result)
             
             ## get the max datapoint so we can position the signifiance indicator bars above them:
             max_laps_y: float = float(np.nanmax(np.concatenate([v.values for v in self.computation_result.Fig2_Laps_FR])))
+            range_laps_y: float = float(np.ptp(np.concatenate([v.values for v in self.computation_result.Fig2_Laps_FR])))
+            
             max_PBEs_y: float = float(np.nanmax(np.concatenate([v.values for v in self.computation_result.Fig2_Replay_FR])))
+            range_PBEs_y: float = float(np.ptp(np.concatenate([v.values for v in self.computation_result.Fig2_Replay_FR])))
+            
+            y_offset_laps: float = np.abs(range_laps_y * signifiance_bracket_height_ratio)
+            y_offset_PBEs: float = np.abs(range_PBEs_y * signifiance_bracket_height_ratio)
+
+            print(f'y_offset_laps: {y_offset_laps}, range_laps_y: {range_laps_y}, max_laps_y: {max_laps_y}')
+            
+
+            print(f'y_offset_PBEs: {y_offset_PBEs}, range_PBEs_y: {range_PBEs_y}, max_PBEs_y: {max_PBEs_y}')
             
             # 'Fig2_Laps_FR'
 
@@ -1226,9 +1245,9 @@ class PaperFigureTwo(SerializedAttributesAllowBlockSpecifyingClass):
             # ax = _fig_2_output_dict['theta'].ax
             ax = _fig_2_theta_out.ax
             # ax = _fig_2_theta_out.axes[0] # one shared axis per figure
-            _out_ann_AB = add_significance_bars(ax, LxC_Laps_T_result.pvalue, x1=0, x2=1, y=max_laps_y)
+            _out_ann_AB = add_significance_bars(ax, LxC_Laps_T_result.pvalue, x1=0, x2=1, y=max_laps_y, y_offset=y_offset_laps)
             # _out_ann_BC = add_significance_bars(ax, SxC_Laps_T_result.pvalue, 1, 2, 6)
-            _out_ann_CD = add_significance_bars(ax, SxC_Laps_T_result.pvalue, x1=2, x2=3, y=max_laps_y)
+            _out_ann_CD = add_significance_bars(ax, SxC_Laps_T_result.pvalue, x1=2, x2=3, y=max_laps_y, y_offset=y_offset_laps)
 
             # _out_ann_BD = add_significance_bars(ax, SxC_Laps_T_result.pvalue, 0.5, 2.5, 8)
 
@@ -1238,9 +1257,9 @@ class PaperFigureTwo(SerializedAttributesAllowBlockSpecifyingClass):
             # Add significance bars between groups
             # ax = _fig_2_output_dict['replay'].ax
             ax = _fig_2_replay_out.ax
-            _out_ann_AB = add_significance_bars(ax, LxC_Replay_T_result.pvalue, x1=0, x2=1, y=max_PBEs_y)
+            _out_ann_AB = add_significance_bars(ax, LxC_Replay_T_result.pvalue, x1=0, x2=1, y=max_PBEs_y, y_offset=y_offset_PBEs)
             # _out_ann_BC = add_significance_bars(ax, SxC_Laps_T_result.pvalue, 1, 2, 6)
-            _out_ann_CD = add_significance_bars(ax, SxC_Replay_T_result.pvalue, x1=2, x2=3, y=max_PBEs_y)
+            _out_ann_CD = add_significance_bars(ax, SxC_Replay_T_result.pvalue, x1=2, x2=3, y=max_PBEs_y, y_offset=y_offset_PBEs)
 
 
 
