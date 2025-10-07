@@ -31,6 +31,7 @@ from pyphocorehelpers.indexing_helpers import Paginator
 from pyphocorehelpers.print_helpers import generate_html_string # used for `plot_long_short_surprise_difference_plot`
 
 from pyphocorehelpers.DataStructure.general_parameter_containers import VisualizationParameters, RenderPlotsData, RenderPlots
+
 from pyphocorehelpers.gui.PhoUIContainer import PhoUIContainer # for context_nested_docks/single_context_nested_docks
 
 from pyphocorehelpers.mixins.member_enumerating import AllFunctionEnumeratingMixin
@@ -2146,14 +2147,16 @@ def _plot_long_short_firing_rate_indicies(x_frs_index, y_frs_index, active_conte
         
     """
     import matplotlib
+    from pyphocorehelpers.DataStructure.RenderPlots.MatplotLibRenderPlots import MatplotlibRenderPlots
     from pyphoplacecellanalysis.SpecificResults.PhoDiba2023Paper import PhoPublicationFigureHelper
     # from matplotlib.backends.backend_pgf import FigureCanvasPgf
     # matplotlib.backend_bases.register_backend('pdf', FigureCanvasPgf)
 
+    purple_color = "#7900b3"
+    
     # matplotlib.use('ps')
     # from matplotlib import rc
     
-
     # Laps_fr_label: str = '\\theta'
     Laps_fr_label: str = '\\text{Laps}'
 
@@ -2254,6 +2257,9 @@ def _plot_long_short_firing_rate_indicies(x_frs_index, y_frs_index, active_conte
         fig, ax = plt.subplots(**fig_kwargs)
         ax_dict = None 
         
+
+
+
     xlabel_kwargs = {}
     ylabel_kwargs = {}
     if is_centered:
@@ -2263,6 +2269,8 @@ def _plot_long_short_firing_rate_indicies(x_frs_index, y_frs_index, active_conte
     scatter_plot = ax.scatter(x_frs_index.values, y_frs_index.values, c=point_colors, **scatter_params) # , s=10, alpha=0.5
     ax.set_xlabel(xlabel_str, **x_y_axes_label_kwargs, **xlabel_kwargs)
     ax.set_ylabel(ylabel_str, **x_y_axes_label_kwargs, **ylabel_kwargs)
+
+    graphics_output_dict: MatplotlibRenderPlots = MatplotlibRenderPlots(name='across_sessions_firing_rate_index_figure', figures=(fig, ), axes=tuple(fig.axes), ax_dict=ax_dict, plot_data={'scatter_plot': scatter_plot}, context=active_context, saved_figures=[])
 
     ## Non-flexitext version:
     # plt.title('long ($L$)|short($S$) firing rate indices')
@@ -2287,6 +2295,7 @@ def _plot_long_short_firing_rate_indicies(x_frs_index, y_frs_index, active_conte
         flexitext(text_formatter.left_margin, text_formatter.top_margin, '<size:22><color:royalblue, weight:bold>long ($L$)</>|<color:crimson, weight:bold>short($S$)</> <weight:bold>firing rate indices</></>', va="bottom", xycoords="figure fraction")
         ## Only include the footer label when not for publication
         footer_text_obj = flexitext((text_formatter.left_margin*0.1), (text_formatter.bottom_margin*0.25), text_formatter._build_footer_string(active_context=active_context), va="top", xycoords="figure fraction")
+        graphics_output_dict.plot_data['footer_text_obj'] = footer_text_obj
     else:  
         ## Publication Mode
         ## Smaller fonts for publication -- Originally 18, now 9
@@ -2315,8 +2324,9 @@ def _plot_long_short_firing_rate_indicies(x_frs_index, y_frs_index, active_conte
         
         # Fit linear regression using numpy.polyfit
         _lin_reg = pho_stats_linear_regression(list(x_frs_index.to_numpy()), list(y_frs_index.to_numpy()))
-        _out_regression_line_artist = _lin_reg.plot(ax=ax)
-        
+        _out_regression_line_artist = _lin_reg.plot(ax=ax, color=purple_color)
+        graphics_output_dict.plot_data['_lin_reg'] = _lin_reg
+        graphics_output_dict.plot_data['_out_regression_line_artist'] = _out_regression_line_artist
 
     # Set the x and y axes to standard limits for easy visual comparison across sessions
     ax.set_xlim([-1.1, 1.1])
@@ -2338,22 +2348,33 @@ def _plot_long_short_firing_rate_indicies(x_frs_index, y_frs_index, active_conte
         _boundary_line_kwargs = dict(linestyle='-', )
         _line_kwargs = dict(zorder=-1000)
 
-        ax.axvline(x=0.0, color='grey', linestyle='-', **_line_kwargs)  # Vertical line at x = 0
-        ax.axhline(y=0.0, color='grey', linestyle='-', **_line_kwargs)  # Horizontal line at y = 0
+        x_equals_0_line = ax.axvline(x=0.0, color='grey', linestyle='-', **_line_kwargs)  # Vertical line at x = 0
+        y_equals_0_line = ax.axhline(y=0.0, color='grey', linestyle='-', **_line_kwargs)  # Horizontal line at y = 0
+
+        ## initialize `graphics_output_dict.plot_data['axes_lines']`
+        graphics_output_dict.plot_data['axes_lines'] = {'x_equals_0_line': x_equals_0_line, 'y_equals_0_line': y_equals_0_line,
+                                                       }
+
 
         if enable_axes_colored_guide_lines:
             long_color = 'royalblue'
             short_color = 'crimson'
 
-            ax.axvline(x=-1.0, color=long_color, **_boundary_line_kwargs, **_line_kwargs)  # Vertical line at x = -1
-            ax.axvline(x=1.0, color=short_color, **_boundary_line_kwargs, **_line_kwargs)  # Vertical line at x = +1
+            x_minus_1_line = ax.axvline(x=-1.0, color=long_color, **_boundary_line_kwargs, **_line_kwargs)  # Vertical line at x = -1
+            x_plus_1_line = ax.axvline(x=1.0, color=short_color, **_boundary_line_kwargs, **_line_kwargs)  # Vertical line at x = +1
 
-            ax.axhline(y=-1.0, color=long_color, **_boundary_line_kwargs, **_line_kwargs)  # Horizontal line at y = -1
-            ax.axhline(y=1.0, color=short_color, **_boundary_line_kwargs, **_line_kwargs)  # Horizontal line at y = +1
+            y_minus_1_line = ax.axhline(y=-1.0, color=long_color, **_boundary_line_kwargs, **_line_kwargs)  # Horizontal line at y = -1
+            y_plus_1_line = ax.axhline(y=1.0, color=short_color, **_boundary_line_kwargs, **_line_kwargs)  # Horizontal line at y = +1
+
+            graphics_output_dict.plot_data['axes_lines'].update({'x_minus_1_line': x_minus_1_line, 'x_plus_1_line': x_plus_1_line,
+                                                    'y_minus_1_line': y_minus_1_line, 'y_plus_1_line': y_plus_1_line,
+            })
 
         # Add y=x diagonal line:
-        ax.plot(ax.get_xlim(), ax.get_ylim(), **diagonal_y_equals_x_line_kwargs)
-
+        y_equals_x_line_artist = ax.plot(ax.get_xlim(), ax.get_ylim(), **diagonal_y_equals_x_line_kwargs)
+        graphics_output_dict.plot_data['axes_lines'].update({'y_equals_x_line_artist': y_equals_x_line_artist,
+        })
+        
         # Assuming you have an existing axis 'ax'
         # ax.margins(x=0.01, y=0.01)  # Adds 10% margin on x-axis and 20% margin on y-axis
         # Set precise axis limits
@@ -2364,110 +2385,7 @@ def _plot_long_short_firing_rate_indicies(x_frs_index, y_frs_index, active_conte
     if enable_histograms:
         ## plot the left and top marginal histograms
         from mpl_toolkits.axes_grid1 import make_axes_locatable
-
-        def _subfn_build_diagonal_histogram(x_frs_index, y_frs_index, ax_histdiagonal, binwidth:float=0.075):
-            """ 2024-09-30 - Plots the tiny histogram along the y=x diagonal line:
-            
-            """
-            def nearest_point_on_line(P, A, B):
-                """
-                Finds the nearest point on an infinite line defined by A and B to point P.
-
-                Args:
-                    P (np.array): The point (e.g., np.array([x, y])).
-                    A (np.array): The first point defining the line.
-                    B (np.array): The second point defining the line.
-
-                Returns:
-                    np.array: The nearest point on the line to P.
-                """    
-                P, A, B = [np.array(v) if (isinstance(v, (Tuple, List))) else v for v in (P, A, B)]
-                AP = P - A
-                AB = B - A
-                # Calculate the projection scalar 't'
-                t = np.dot(AP, AB) / np.dot(AB, AB)
-                # Calculate the nearest point on the line
-                nearest_point = A + t * AB
-                # Calculate the minimum distance between the point and the line
-                is_above_yx_line = (P[1] > P[0])
-                displacement_to_nearest_point = np.squeeze(np.sqrt(np.power((nearest_point[0] - P[0]), 2) + np.power((nearest_point[1] - P[1]), 2)))
-                if (not is_above_yx_line):
-                    displacement_to_nearest_point = -1.0 * displacement_to_nearest_point
-
-                return nearest_point, displacement_to_nearest_point
-
-
-            # x_frs_index_prime = (x_frs_index * (np.sqrt(2)/2.0)) - (y_frs_index * (-np.sqrt(2)/2.0))
-            # y_frs_index_prime = (x_frs_index * (-np.sqrt(2)/2.0)) + (y_frs_index * (np.sqrt(2)/2.0))
-            
-
-            # ## Add the 'x_frs_index_rot' and 'y_frs_index_rot' columns by applying a rotation by +90 degrees:
-            # # x_frs_index_rot = (x_frs_index + long_short_fr_indicies_analysis_table['y_frs_index'].copy())/np.sqrt(2)
-            # y_frs_index_rot = (y_frs_index - x_frs_index)/np.sqrt(2)
-
-            # # x = long_short_fr_indicies_analysis_table['x_frs_index_rot'].values
-            # y = y_frs_index_rot # we only actually need the rotated y-axis values
-
-
-            ## INPUT 1D values:
-            ## INPUTS: y
-            
-            rotated_point_distances = np.array([nearest_point_on_line(P=(x, y), A=(-1, -1), B=(1, 1))[-1] for (x, y) in zip(x_frs_index, y_frs_index)])
-
-            sgns = np.sign(rotated_point_distances)
-            total_n_points: int = len(rotated_point_distances)
-            point_counts = pd.Series(sgns).value_counts(sort=False).to_dict()
-            value_to_diagonal_pos_dict = {-1: 'n_below_diagonal', 1: 'n_above_diagonal'} 
-            point_counts_totals = {'total_n_points': total_n_points} | {value_to_diagonal_pos_dict[k]:v for k, v in point_counts.items()}
-            
-            # print(f'total_n_points: {total_n_points}, point_counts: {point_counts}') 
-            print(point_counts_totals)           
-
-            y = rotated_point_distances
-            # now determine nice limits by hand:
-            
-            # xymax = max(np.max(np.abs(x)), np.max(np.abs(y)))
-            xymax = np.nanmax(np.abs(y))
-            lim = (int(xymax/binwidth) + 1)*binwidth
-            
-            xlims = [-lim, (lim + binwidth)]
-            # ylims = [np.nanmin(y), np.nanmax(y)]
-            bins = np.arange(xlims[0], xlims[1], binwidth)
-            # ax_histdiagonal.hist(x, bins=bins, color='black')
-            # diagonal_hist_artist_tuple = ax_histdiagonal.hist(y, bins=bins, orientation='horizontal', color='black')
-            diagonal_hist_artist_tuple = ax_histdiagonal.hist(y, bins=bins, orientation='vertical', color='black')
-            max_num_bins = np.max(diagonal_hist_artist_tuple[0])
-            ylims = [0.0, float(max_num_bins)] ## determine the max number of bars dynamically from the histogram outputs
-            
-            # Set the tick marks and labels as desired
-            # ax_histdiagonal.set_xticks([])
-            ax_histdiagonal.set_yticks([])
-
-            ax_histdiagonal.spines[['left', 'bottom', 'right', 'top']].set_visible(False)
-
-            # make some labels invisible
-            # ax_histdiagonal.xaxis.set_tick_params(labelbottom=False)
-            # ax_histdiagonal.yaxis.set_tick_params(labelleft=False)
-
-            # Set no tick labels for both axes
-            ax_histdiagonal.set_xticklabels([])  # No x-axis tick labels
-            # ax_histdiagonal.set_yticklabels([])  # No y-axis tick labels
-
-            # Optional: Completely disable ticks if you want to remove tick marks as well
-            # ax_histdiagonal.tick_params(axis='both', which='both', length=0)  # Hide all ticks
-            ax_histdiagonal.tick_params(axis='y', which='both', length=0)  # Hide all y-axis ticks
-            
-            # Vertical x=0.0 line
-            midline_artist = ax_histdiagonal.axvline(x=0, ymin=0, ymax=ylims[1], color='gray', linestyle='--')
-            
-            # Enable x-axis tick labels
-            ax_histdiagonal.spines[['bottom']].set_visible(True) # enable bottom bar
-            # ax_histdiagonal.spines[['left', 'bottom', 'right', 'top']].set_visible(False)
-            ax_histdiagonal.set_xticks([-np.sqrt(2), 0, np.sqrt(2)])
-            ax_histdiagonal.set_xticklabels(["$-\sqrt{2}$", 0, "$\sqrt{2}$"])  
-
-            return ((diagonal_hist_artist_tuple, midline_artist), (xlims, ylims), point_counts_totals)
-
+        from pyphoplacecellanalysis.Pho2D.statistics_plotting_helpers import _subfn_build_diagonal_histogram
 
         # Set aspect of the main Axes.
         # ax.set_aspect(1.)
@@ -2518,8 +2436,13 @@ def _plot_long_short_firing_rate_indicies(x_frs_index, y_frs_index, active_conte
         lim = (int(xymax/binwidth) + 1)*binwidth
 
         bins = np.arange(-lim, lim + binwidth, binwidth)
-        ax_histx.hist(x, bins=bins, color='black')
-        ax_histy.hist(y, bins=bins, orientation='horizontal', color='black')
+        histx_artist = ax_histx.hist(x, bins=bins, color='black')
+        histy_artist = ax_histy.hist(y, bins=bins, orientation='horizontal', color='black')
+
+        graphics_output_dict.plot_data['hist'] = {'binwidth': binwidth, 'x': x, 'y': y, 'xymax': xymax, 'lim': lim, 'bins': bins,
+                                                  'histx_artist': histx_artist, 'histy_artist': histy_artist,
+        }
+    
 
         if enable_diagonal_histogram:
             print(f'===== from diagonal histogram method: ')
@@ -2536,6 +2459,11 @@ def _plot_long_short_firing_rate_indicies(x_frs_index, y_frs_index, active_conte
             print(f'percent_below_diagonal: {percent_below_diagonal * 100}%')
             print(f'percent_above_diagonal: {percent_above_diagonal * 100}%')
             
+            graphics_output_dict.plot_data['diagonal_hist'] = {
+                'binwidth': binwidth, 'x_frs_index': x_frs_index.values, 'y_frs_index': y_frs_index.values, 'xlims': xlims, 'ylims': ylims, 'diagonal_point_counts_totals': diagonal_point_counts_totals,
+                'diagonal_hist_artist_tuple': diagonal_hist_artist_tuple, 'midline_artist': midline_artist,
+             } 
+
 
         # Set the tick marks and labels as desired
         ax_histx.set_yticks([])
@@ -2562,9 +2490,12 @@ def _plot_long_short_firing_rate_indicies(x_frs_index, y_frs_index, active_conte
     ax.set_xticklabels(["-1.0", "0.0", "+1.0"])  # No x-axis tick labels
     ax.set_yticklabels(["-1.0", "0.0", "+1.0"])  # No y-axis tick labels
 
-
-    return fig, ax, scatter_plot
-
+    # if ax_dict is not None:
+    #     return fig, ax_dict, scatter_plot
+    # else:
+    #     return fig, ax, scatter_plot
+    
+    return graphics_output_dict
 
 # ==================================================================================================================== #
 # 2023-04-19 Surprise                                                                                                  #

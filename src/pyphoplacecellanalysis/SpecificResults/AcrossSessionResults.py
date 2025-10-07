@@ -3961,7 +3961,9 @@ class AcrossSessionsVisualizations:
         _plot_long_short_firing_rate_indicies_kwargs = override_dict(dict(debug_print=True, is_centered=False, enable_hover_labels=False, enable_tiny_point_labels=False, facecolor='w', include_axes_lines=include_axes_lines), kwargs) | kwargs
         
         
-        fig, ax, scatter_plot = _plot_long_short_firing_rate_indicies(x_frs_index, y_frs_index, final_context, **_plot_long_short_firing_rate_indicies_kwargs, **scatter_plot_kwargs) #, **kwargs  markeredgewidth=1.5,
+        # fig, ax_dict, scatter_plot = _plot_long_short_firing_rate_indicies(x_frs_index, y_frs_index, final_context, **_plot_long_short_firing_rate_indicies_kwargs, **scatter_plot_kwargs) #, **kwargs  markeredgewidth=1.5,
+        graphics_output_dict = _plot_long_short_firing_rate_indicies(x_frs_index, y_frs_index, final_context, **_plot_long_short_firing_rate_indicies_kwargs, **scatter_plot_kwargs) #, **kwargs  markeredgewidth=1.5,
+        fig = graphics_output_dict.fig
         
         def _perform_write_to_file_callback():
             active_out_figure_path, *args_L = cls.output_figure(final_context, fig, **save_figure_kwargs)
@@ -3972,7 +3974,9 @@ class AcrossSessionsVisualizations:
         else:
             active_out_figure_paths = []
 
-        graphics_output_dict = MatplotlibRenderPlots(name='across_sessions_firing_rate_index_figure', figures=(fig, ), axes=tuple(fig.axes), plot_data={'scatter_plot': scatter_plot}, context=final_context, saved_figures=active_out_figure_paths)
+        # graphics_output_dict = MatplotlibRenderPlots(name='across_sessions_firing_rate_index_figure', figures=(fig, ), axes=tuple(fig.axes), ax_dict=ax_dict, plot_data={'scatter_plot': scatter_plot}, context=final_context, saved_figures=active_out_figure_paths)
+        graphics_output_dict['saved_figures'].extend(active_out_figure_paths)
+        
         # graphics_output_dict['plot_data'] = {'sort_indicies': (long_sort_ind, short_sort_ind), 'colors':(long_neurons_colors_array, short_neurons_colors_array)}
         return graphics_output_dict
 

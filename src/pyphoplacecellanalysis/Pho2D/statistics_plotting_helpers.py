@@ -756,3 +756,109 @@ def plot_pre_scatter_post_matplotlib(data_results_df: pd.DataFrame, data_type: s
     return _fig_container # MatplotlibRenderPlots(name='plot_stacked_histograms', figures=[fig], axes=ax_dict, context=a_context)
 
 
+
+@function_attributes(short_name=None, tags=['diagonal-histogram', 'diagonal'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-10-07 11:08', related_items=[])
+def _subfn_build_diagonal_histogram(x_frs_index, y_frs_index, ax_histdiagonal, binwidth:float=0.075):
+    """ 2024-09-30 - Plots the tiny histogram along the y=x diagonal line:
+    
+    from pyphoplacecellanalysis.Pho2D.statistics_plotting_helpers import _subfn_build_diagonal_histogram
+    
+    """
+    def nearest_point_on_line(P, A, B):
+        """
+        Finds the nearest point on an infinite line defined by A and B to point P.
+
+        Args:
+            P (np.array): The point (e.g., np.array([x, y])).
+            A (np.array): The first point defining the line.
+            B (np.array): The second point defining the line.
+
+        Returns:
+            np.array: The nearest point on the line to P.
+        """    
+        P, A, B = [np.array(v) if (isinstance(v, (Tuple, List))) else v for v in (P, A, B)]
+        AP = P - A
+        AB = B - A
+        # Calculate the projection scalar 't'
+        t = np.dot(AP, AB) / np.dot(AB, AB)
+        # Calculate the nearest point on the line
+        nearest_point = A + t * AB
+        # Calculate the minimum distance between the point and the line
+        is_above_yx_line = (P[1] > P[0])
+        displacement_to_nearest_point = np.squeeze(np.sqrt(np.power((nearest_point[0] - P[0]), 2) + np.power((nearest_point[1] - P[1]), 2)))
+        if (not is_above_yx_line):
+            displacement_to_nearest_point = -1.0 * displacement_to_nearest_point
+
+        return nearest_point, displacement_to_nearest_point
+
+
+    # x_frs_index_prime = (x_frs_index * (np.sqrt(2)/2.0)) - (y_frs_index * (-np.sqrt(2)/2.0))
+    # y_frs_index_prime = (x_frs_index * (-np.sqrt(2)/2.0)) + (y_frs_index * (np.sqrt(2)/2.0))
+    
+
+    # ## Add the 'x_frs_index_rot' and 'y_frs_index_rot' columns by applying a rotation by +90 degrees:
+    # # x_frs_index_rot = (x_frs_index + long_short_fr_indicies_analysis_table['y_frs_index'].copy())/np.sqrt(2)
+    # y_frs_index_rot = (y_frs_index - x_frs_index)/np.sqrt(2)
+
+    # # x = long_short_fr_indicies_analysis_table['x_frs_index_rot'].values
+    # y = y_frs_index_rot # we only actually need the rotated y-axis values
+
+
+    ## INPUT 1D values:
+    ## INPUTS: y
+    
+    rotated_point_distances = np.array([nearest_point_on_line(P=(x, y), A=(-1, -1), B=(1, 1))[-1] for (x, y) in zip(x_frs_index, y_frs_index)])
+
+    sgns = np.sign(rotated_point_distances)
+    total_n_points: int = len(rotated_point_distances)
+    point_counts = pd.Series(sgns).value_counts(sort=False).to_dict()
+    value_to_diagonal_pos_dict = {-1: 'n_below_diagonal', 1: 'n_above_diagonal'} 
+    point_counts_totals = {'total_n_points': total_n_points} | {value_to_diagonal_pos_dict[k]:v for k, v in point_counts.items()}
+    
+    # print(f'total_n_points: {total_n_points}, point_counts: {point_counts}') 
+    print(point_counts_totals)           
+
+    y = rotated_point_distances
+    # now determine nice limits by hand:
+    
+    # xymax = max(np.max(np.abs(x)), np.max(np.abs(y)))
+    xymax = np.nanmax(np.abs(y))
+    lim = (int(xymax/binwidth) + 1)*binwidth
+    
+    xlims = [-lim, (lim + binwidth)]
+    # ylims = [np.nanmin(y), np.nanmax(y)]
+    bins = np.arange(xlims[0], xlims[1], binwidth)
+    # ax_histdiagonal.hist(x, bins=bins, color='black')
+    # diagonal_hist_artist_tuple = ax_histdiagonal.hist(y, bins=bins, orientation='horizontal', color='black')
+    diagonal_hist_artist_tuple = ax_histdiagonal.hist(y, bins=bins, orientation='vertical', color='black')
+    max_num_bins = np.max(diagonal_hist_artist_tuple[0])
+    ylims = [0.0, float(max_num_bins)] ## determine the max number of bars dynamically from the histogram outputs
+    
+    # Set the tick marks and labels as desired
+    # ax_histdiagonal.set_xticks([])
+    ax_histdiagonal.set_yticks([])
+
+    ax_histdiagonal.spines[['left', 'bottom', 'right', 'top']].set_visible(False)
+
+    # make some labels invisible
+    # ax_histdiagonal.xaxis.set_tick_params(labelbottom=False)
+    # ax_histdiagonal.yaxis.set_tick_params(labelleft=False)
+
+    # Set no tick labels for both axes
+    ax_histdiagonal.set_xticklabels([])  # No x-axis tick labels
+    # ax_histdiagonal.set_yticklabels([])  # No y-axis tick labels
+
+    # Optional: Completely disable ticks if you want to remove tick marks as well
+    # ax_histdiagonal.tick_params(axis='both', which='both', length=0)  # Hide all ticks
+    ax_histdiagonal.tick_params(axis='y', which='both', length=0)  # Hide all y-axis ticks
+    
+    # Vertical x=0.0 line
+    midline_artist = ax_histdiagonal.axvline(x=0, ymin=0, ymax=ylims[1], color='gray', linestyle='--')
+    
+    # Enable x-axis tick labels
+    ax_histdiagonal.spines[['bottom']].set_visible(True) # enable bottom bar
+    # ax_histdiagonal.spines[['left', 'bottom', 'right', 'top']].set_visible(False)
+    ax_histdiagonal.set_xticks([-np.sqrt(2), 0, np.sqrt(2)])
+    ax_histdiagonal.set_xticklabels(["$-\sqrt{2}$", 0, "$\sqrt{2}$"])  
+
+    return ((diagonal_hist_artist_tuple, midline_artist), (xlims, ylims), point_counts_totals)
