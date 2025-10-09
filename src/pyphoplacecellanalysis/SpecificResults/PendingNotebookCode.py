@@ -114,6 +114,90 @@ from pyphoplacecellanalysis.General.Model.Configs.LongShortDisplayConfig import 
 from pyphocorehelpers.gui.Qt.color_helpers import ColormapHelpers, ColorFormatConverter, debug_print_color, build_adjusted_color
 
 
+
+
+
+
+
+
+# ==================================================================================================================================================================================================================================================================================== #
+# 2025-10-09 - PhoDibaPaper2025 Figure Finalization                                                                                                                                                                                                                                    #
+# ==================================================================================================================================================================================================================================================================================== #
+
+from pyphocorehelpers.DataStructure.RenderPlots.MatplotLibRenderPlots import FigureCollector
+from pyphoplacecellanalysis.SpecificResults.PhoDiba2023Paper import PhoPublicationFigureHelper
+from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.ContainerBased.PhoContainerTool import GenericMatplotlibContainer
+
+
+
+class HistDistributionPlotterTest:
+    """ 
+        from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import HistDistributionPlotterTest
+
+        ## INPUTS: bin_values
+        # hist_data_array_dict = deepcopy(hist_counts_dict)
+        hist_data_array_dict = deepcopy(hist_densities_dict)
+        bin_values = _laps_histogram_out.plots_data.hist['epochs_pre_delta'][a_time_bin_size]['bin_values']
+        bin_edges = _laps_histogram_out.plots_data.hist['epochs_pre_delta'][a_time_bin_size]['bin_edges']
+        # hist_range_min_max = _laps_histogram_out.plots_data.hist['epochs_pre_delta'][a_time_bin_size]['hist_range_min_max']
+        # n_bins: int = _laps_histogram_out.plots_data.hist['epochs_pre_delta'][a_time_bin_size]['n_bins']
+        hist_range_min_max = (bin_values[0], bin_values[-1])
+        n_bins: int = len(bin_values)
+
+        use_density: bool = False
+        plotter = HistDistributionPlotterTest()
+
+        collector = plotter.plot_hists(hist_data_array_dict, bin_values)
+        collector
+    """
+    def plot_hists(self, hist_data_array_dict, bin_values):
+
+        with mpl.rc_context(PhoPublicationFigureHelper.rc_context_kwargs(prepare_for_publication=True, **{'figure.figsize': (6.5, 2), 'figure.dpi': '220',})):
+        # with mpl.rc_context(PhoPublicationFigureHelper.rc_context_kwargs(prepare_for_publication=False, **{})):
+
+            # Create a FigureCollector instance
+            with FigureCollector(name='test_Fig4_stats', base_context=IdentifyingContext()) as collector:
+
+                fig = collector.build_or_reuse_figure(fignum='test_Fig4_stats', clear=True) 
+                _fig_container: GenericMatplotlibContainer = GenericMatplotlibContainer(name='plot_pre_scatter_post_matplotlib')
+                _fig_container.fig = fig
+                fig, ax_dict = collector.subplot_mosaic(
+                    [
+                        ["a", 'b'],
+                        ['c','d'],        
+                    ],
+                    # set the height ratios between the rows
+                    sharex=True, sharey=True,
+                    width_ratios = [1, 1],
+                    gridspec_kw=dict(wspace=0, hspace=0.15), # `wspace=0`` is responsible for sticking the pf and the activity axes together with no spacing
+                    extant_fig=fig,
+                ) 
+                _fig_container.ax_dict = ax_dict
+                fig.suptitle('test_Fig4_stats')
+
+                # histogram_kwargs = dict(orientation="horizontal", bins=11)
+                histogram_kwargs = dict(orientation="vertical", bins=n_bins, range=hist_range_min_max)
+                histogram_kwargs.update(dict(color='blue', ))
+                # val = np.linspace(0, 1.0, 11)
+                
+                for k, v in hist_data_array_dict.items():
+                    # ax_dict[k].hist(v, bins=histogram_kwargs['bins'], range=hist_range_min_max, density=use_density, alpha=0.5, label=f"{k}", **{k: v for k, v in histogram_kwargs.items() if k not in ['bins', 'range', 'density']})
+                    # ax_dict[k].hist(bin_values, weights=v, alpha=0.5, label=f"{k}", **{k: v for k, v in histogram_kwargs.items() if k not in ['bins', 'range', 'density']})
+                    ax_dict[k].stairs(v, bin_edges, alpha=0.5, fill=True, hatch='//', label=f"{k}", **{k: v for k, v in histogram_kwargs.items() if k not in ['bins', 'range', 'density']})
+                    ax_dict[k].stairs(v, bin_edges, alpha=0.9, fill=False, label=f"{k}", **{k: v for k, v in histogram_kwargs.items() if k not in ['bins', 'range', 'density']}) ## for edges
+
+                    # ax_dict[k].set_ylabel(k)
+                    ax_dict[k].set_title(k)
+                    # val, weight = zip(*[(k, v) for k,v in counted_data.items()])
+
+                    # plt.hist(val, weights=weight)
+                    # ax_dict[k]
+
+        return collector
+
+
+
+
 # ==================================================================================================================================================================================================================================================================================== #
 # 2025-09-05 - Bapun Co/plotting                                                                                                                                                                                                                                                       #
 # ==================================================================================================================================================================================================================================================================================== #

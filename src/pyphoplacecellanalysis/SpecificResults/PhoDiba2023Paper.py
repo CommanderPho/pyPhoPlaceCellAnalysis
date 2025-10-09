@@ -2117,11 +2117,18 @@ def _perform_matplotlib_SINGLE_SERIES_pre_post_scatter(grainularity_desc: str, e
 
     # Add scatterplot if requested
     scatter_fig = None
+    
+    epoch_identifer: str = 'EPOCHS'
+    data_context: IdentifyingContext = epochs_df.attrs.get('data_context', None)
+    if data_context is not None:
+        # epoch_identifer: str = data_context.to_dict()['title_prefix']
+        epoch_identifer: str = data_context.to_dict()['epochs_name']
+        
 
     # You can use it like this:
     num_unique_sessions: int = epochs_df.session_name.nunique(dropna=True) # number of unique sessions, ignoring the NA entries
     num_unique_time_bins: int = epochs_df.time_bin_size.nunique(dropna=True)
-    _epochs_histogram_out = plot_pre_scatter_post_matplotlib(epochs_df, data_type=f'PBEs ({grainularity_desc})', session_spec=f'{num_unique_sessions} Sessions', time_bin_duration_str=f"{num_unique_time_bins} tbin sizes", time_bin_column_name=time_column, scatter_kwargs=scatter_kwargs, **common_stacked_hist_kwargs)
+    _epochs_histogram_out = plot_pre_scatter_post_matplotlib(epochs_df, data_type=f'{epoch_identifer} ({grainularity_desc})', session_spec=f'{num_unique_sessions} Sessions', time_bin_duration_str=f"{num_unique_time_bins} tbin sizes", time_bin_column_name=time_column, scatter_kwargs=scatter_kwargs, **common_stacked_hist_kwargs)
     _epochs_flexitext_dict = _subfn_update_stacked_post_plot(_epochs_histogram_out)
     # fig_to_clipboard(_ripple_histogram_out.figures[0], bbox_inches='tight')
 
@@ -4359,9 +4366,12 @@ class PhoPublicationFigureHelper:
             with mpl.rc_context(PhoPublicationFigureHelper.rc_context_kwargs(prepare_for_publication=prepare_for_publication) | {'figure.figsize': (10, 4), 'figure.dpi': '220'})
             
         """
-        _out_rcparams = {'savefig.transparent': True, 'ps.fonttype': 42, 'pdf.fonttype': 42,  }
+        _out_rcparams = {'savefig.transparent': True, 'ps.fonttype': 42, 'pdf.fonttype': 42, }
         _out_rcparams =( _out_rcparams | kwargs)
         if prepare_for_publication:
             ## OVERRIDE in the case of publications:
-            _out_rcparams.update({'font.family': 'Arial', 'xtick.labelsize': 5, 'ytick.labelsize': 5, "axes.spines.right": False, "axes.spines.top": False, 'axes.linewidth': 0.8})
+            _out_rcparams.update({'font.family': 'Arial', 'xtick.labelsize': 5, 'ytick.labelsize': 5, "axes.spines.right": False, "axes.spines.top": False,
+                # "axes.spines.left": False, "axes.spines.bottom": False,
+                'figure.frameon': False, 'axes.linewidth': 0.8,
+            })
         return _out_rcparams # 'figure.dpi': '220', 

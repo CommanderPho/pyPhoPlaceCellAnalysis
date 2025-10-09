@@ -32,6 +32,21 @@ from matplotlib import cm, pyplot as plt
 from matplotlib.gridspec import GridSpec
 
 
+def simple_hist_counts(df_tbs: pd.DataFrame, stats_variable_name:str='P_Long', n_bins: int = 11, hist_range_min_max: Tuple=(0.0, 1.0), use_density: bool = False) -> NDArray:
+    """ Computes the numeric histogram compatible with plotting via matplotlib
+    
+    bin_values: NDArray = np.linspace(*hist_range_min_max, n_bins)
+    _shuffled_pre_post_delta_counts_dict = {k:simple_hist_counts(df) for k, df in _shuffled_pre_post_delta_partition_df_dict.items()}
+    shuffle_result_distributions.append(shuffle_result_distributions)
+    
+    """
+    assert stats_variable_name in df_tbs, f"stats_variable_name: '{stats_variable_name}' missing from df. {list(df_tbs.columns)}"
+    # Compute histogram bins and counts using numpy to match pandas .hist() behavior
+    counts, bin_edges = np.histogram(df_tbs[stats_variable_name].dropna(), bins=n_bins, range=hist_range_min_max, density=use_density)
+    return counts
+
+
+
 @function_attributes(short_name=None, tags=['z-score'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-05-30 17:10', related_items=[])
 def plot_histogram_for_z_scores(z_scores, title_suffix: str=""):
     # Conduct hypothesis test (two-tailed test)
@@ -103,7 +118,7 @@ from pyphocorehelpers.indexing_helpers import partition, partition_df, partition
 import scipy.stats as stats
 
 @function_attributes(short_name=None, tags=['stats', 'tests'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-05-30 17:14', related_items=[])
-def _perform_stats_tests(valid_ripple_df, n_shuffles:int=10000, stats_level_of_significance_alpha: float = 0.05, stats_variable_name:str='short_best_wcorr'):
+def _perform_stats_tests(valid_epochs_df, n_shuffles:int=10000, stats_level_of_significance_alpha: float = 0.05, stats_variable_name:str='short_best_wcorr'):
     """
     Splits the passed df into pre and post delta periods
     Take the difference between the pre and post delta means
@@ -113,14 +128,18 @@ def _perform_stats_tests(valid_ripple_df, n_shuffles:int=10000, stats_level_of_s
         from pyphoplacecellanalysis.Pho2D.statistics_plotting_helpers import _perform_stats_tests
 
 
-        shuffle_results, p_value, f_value, (dof1, dof2), (variance1, variance2) = _perform_stats_tests(valid_ripple_df, stats_variable_name='short_best_wcorr')
+        shuffle_results, shuffle_result_distributions, p_value, f_value, (dof1, dof2), (variance1, variance2) = _perform_stats_tests(valid_ripple_df, stats_variable_name='short_best_wcorr')
+
+        ## Unpacking:
+        actual_pre_post_delta_counts_dict = shuffle_result_extras['distributions']['real']
+        _shuffled_pre_post_delta_counts_dict_list = actual_pre_post_delta_counts_dict = shuffle_result_extras['distributions']['shuffle']
 
     """
     ## INPUTS: stats_variable_name, valid_ripple_df
 
 
     # ['pre-delta', 'post-delta']
-    analysis_df = deepcopy(valid_ripple_df[["delta_aligned_start_t", "pre_post_delta_category", stats_variable_name]]).dropna(subset=["pre_post_delta_category", stats_variable_name])
+    analysis_df = deepcopy(valid_epochs_df[["delta_aligned_start_t", "pre_post_delta_category", stats_variable_name]]).dropna(subset=["pre_post_delta_category", stats_variable_name])
     # partition_df(analysis_df, partitionColumn='pre_post_delta_category')
 
     # _partition_values, (_pre_delta_df, _post_delta_df) = partition(analysis_df, partitionColumn='pre_post_delta_category') # use `valid_ripple_df` instead of the original dataframe to only get those which are valid.
@@ -131,6 +150,9 @@ def _perform_stats_tests(valid_ripple_df, n_shuffles:int=10000, stats_level_of_s
     actual_diff_means = np.nanmean(_post_delta_df[stats_variable_name].to_numpy()) - np.nanmean(_pre_delta_df[stats_variable_name].to_numpy())
     print(f'stats_variable_name: "{stats_variable_name}" -- actual_diff_means: {actual_diff_means}')
 
+    actual_pre_post_delta_counts_dict = {k:simple_hist_counts(df, stats_variable_name=stats_variable_name) for k, df in _pre_post_delta_partition_df_dict.items()}
+
+
     # _pre_delta_df
     # _post_delta_df
     
@@ -139,6 +161,8 @@ def _perform_stats_tests(valid_ripple_df, n_shuffles:int=10000, stats_level_of_s
     ## INPUTS: analysis_df, n_shuffles
 
     shuffle_results = []
+    shuffle_result_extras = dict(distributions={'real': actual_pre_post_delta_counts_dict, 'shuffle': []})
+
     ## INPUT: n_shuffles, analysis_df, stats_variable_name
     shuffled_analysis_df = deepcopy(analysis_df)
     for i in np.arange(n_shuffles):
@@ -149,6 +173,8 @@ def _perform_stats_tests(valid_ripple_df, n_shuffles:int=10000, stats_level_of_s
         _shuffled_post_delta_df = _shuffled_pre_post_delta_partition_df_dict['post-delta']
 
         _diff_mean = np.nanmean(_shuffled_post_delta_df[stats_variable_name].to_numpy()) - np.nanmean(_shuffled_pre_delta_df[stats_variable_name].to_numpy())
+        _shuffled_pre_post_delta_counts_dict = {k:simple_hist_counts(df, stats_variable_name=stats_variable_name) for k, df in _shuffled_pre_post_delta_partition_df_dict.items()}
+        shuffle_result_extras['distributions']['shuffle'].append(_shuffled_pre_post_delta_counts_dict)
         shuffle_results.append(_diff_mean)
 
     shuffle_results = np.array(shuffle_results)
@@ -205,7 +231,7 @@ def _perform_stats_tests(valid_ripple_df, n_shuffles:int=10000, stats_level_of_s
     print("F-statistic:", f_value)
     print("p-value:", p_value)
 
-    return shuffle_results, p_value, f_value, (dof1, dof2), (variance1, variance2) 
+    return shuffle_results, shuffle_result_extras, p_value, f_value, (dof1, dof2), (variance1, variance2) 
 
 
     # Statistics=351933.00, p=0.00
@@ -681,6 +707,13 @@ def plot_pre_scatter_post_matplotlib(data_results_df: pd.DataFrame, data_type: s
 
 
             histogram_kwargs = dict(orientation="horizontal", bins=11)
+            n_bins: int = histogram_kwargs.get('bins', 11)
+            hist_range_min_max = histogram_kwargs.get('range', (0.0, 1.0))
+            use_density: bool = histogram_kwargs.get('density', False)
+            bin_values: NDArray = np.linspace(*hist_range_min_max, n_bins)
+
+            _fig_container.plots_data.hist = {"epochs_pre_delta": {}, 'epochs_post_delta': {}, 'bins': 11}
+            _fig_container.plots.hist = {"epochs_pre_delta": {}, 'epochs_post_delta': {}}
             
             assert column_name in data_results_df, f"column_name: {column_name} missing from df. {list(data_results_df.columns)}"
             time_bin_sizes: int = data_results_df['time_bin_size'].unique()
@@ -692,12 +725,22 @@ def plot_pre_scatter_post_matplotlib(data_results_df: pd.DataFrame, data_type: s
             # get the pre-delta epochs
             pre_delta_df = data_results_df[data_results_df['delta_aligned_start_t'] <= 0]
             post_delta_df = data_results_df[data_results_df['delta_aligned_start_t'] > 0]
+            _fig_container.plots_data.hist['epochs_pre_delta']['df'] = pre_delta_df
+            _fig_container.plots_data.hist['epochs_post_delta']['df'] = post_delta_df
             
             # plot pre-delta histogram:
             for time_bin_size in time_bin_sizes:
                 df_tbs = pre_delta_df[pre_delta_df['time_bin_size']==time_bin_size]
-                df_tbs[column_name].hist(ax=ax_dict['epochs_pre_delta'], alpha=0.5, label=str(time_bin_size), **histogram_kwargs) 
-                
+                # _fig_container.plots.hist['epochs_pre_delta'][time_bin_size] = df_tbs[column_name].hist(ax=ax_dict['epochs_pre_delta'], alpha=0.5, label=str(time_bin_size), **histogram_kwargs)     
+                data = df_tbs[column_name].dropna()
+                # Compute histogram bins and counts using numpy to match pandas .hist() behavior
+                counts, bin_edges = np.histogram(data, bins=n_bins, range=hist_range_min_max, density=use_density)
+
+                # Store both the raw data and the computed histogram
+                _fig_container.plots_data.hist['epochs_pre_delta'][time_bin_size] = {'df': df_tbs, 'counts': counts, 'bin_values': bin_values, 'bin_edges': bin_edges}
+                # Plot histogram on existing axes (same as before)
+                # _fig_container.plots.hist['epochs_pre_delta'][time_bin_size] = ax_dict['epochs_pre_delta'].hist(data, bins=n_bins, range=hist_range_min_max, density=use_density, alpha=0.5, label=str(time_bin_size), **{k: v for k, v in histogram_kwargs.items() if k not in ['bins', 'range', 'density']})
+                _fig_container.plots.hist['epochs_pre_delta'][time_bin_size] = ax_dict['epochs_pre_delta'].hist(bin_values, weights=counts, alpha=0.5, label=f"{str(time_bin_size)}", **{k: v for k, v in histogram_kwargs.items() if k not in ['bins', 'range', 'density']})
 
             ax_dict['epochs_pre_delta'].set_ylabel(f"{column_name}") # only set on the leftmost subplot
             ax_dict['epochs_pre_delta'].set_title(f'pre-$\Delta$ {title_indicator}')
@@ -735,9 +778,23 @@ def plot_pre_scatter_post_matplotlib(data_results_df: pd.DataFrame, data_type: s
 
             # plot post-delta histogram:
             time_bin_sizes: int = post_delta_df['time_bin_size'].unique()
+            
             for time_bin_size in time_bin_sizes:
                 df_tbs = post_delta_df[post_delta_df['time_bin_size']==time_bin_size]
-                df_tbs[column_name].hist(ax=ax_dict['epochs_post_delta'], label=str(time_bin_size), **histogram_kwargs) 
+                # _fig_container.plots_data.hist['epochs_post_delta'][time_bin_size] = {'df': df_tbs}
+                # out_hist = df_tbs[column_name].hist(ax=ax_dict['epochs_post_delta'], label=str(time_bin_size), **histogram_kwargs)
+                data = df_tbs[column_name].dropna()
+                # Compute histogram bins and counts using numpy to match pandas .hist() behavior
+                counts, bin_edges = np.histogram(data, bins=n_bins, range=hist_range_min_max, density=use_density)
+
+                # Store both the raw data and the computed histogram
+                _fig_container.plots_data.hist['epochs_post_delta'][time_bin_size] = {'df': df_tbs, 'counts': counts, 'bin_values': bin_values, 'bin_edges': bin_edges}
+                # Plot histogram on existing axes (same as before)
+                # _fig_container.plots.hist['epochs_post_delta'][time_bin_size] = ax_dict['epochs_post_delta'].hist(data, bins=bins, range=range_, density=density, alpha=0.5, label=str(time_bin_size), **{k: v for k, v in histogram_kwargs.items() if k not in ['bins', 'range', 'density']})
+                _fig_container.plots.hist['epochs_post_delta'][time_bin_size] = ax_dict['epochs_post_delta'].hist(bin_values, weights=counts, alpha=0.5, label=f"{str(time_bin_size)}", **{k: v for k, v in histogram_kwargs.items() if k not in ['bins', 'range', 'density']})
+                               
+
+                # _fig_container.plots.hist['epochs_post_delta'][time_bin_size] = out_hist
             
             ax_dict['epochs_post_delta'].set_title(f'post-$\Delta$ {title_indicator}')
             if len(time_bin_sizes) > 1:
@@ -758,7 +815,7 @@ def plot_pre_scatter_post_matplotlib(data_results_df: pd.DataFrame, data_type: s
 
 
 @function_attributes(short_name=None, tags=['diagonal-histogram', 'diagonal'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-10-07 11:08', related_items=[])
-def _subfn_build_diagonal_histogram(x_frs_index, y_frs_index, ax_histdiagonal, binwidth:float=0.075):
+def _subfn_build_diagonal_histogram(x_frs_index, y_frs_index, ax_histdiagonal, binwidth:float=0.075, hist_kwargs=None):
     """ 2024-09-30 - Plots the tiny histogram along the y=x diagonal line:
     
     from pyphoplacecellanalysis.Pho2D.statistics_plotting_helpers import _subfn_build_diagonal_histogram
@@ -806,6 +863,11 @@ def _subfn_build_diagonal_histogram(x_frs_index, y_frs_index, ax_histdiagonal, b
 
     ## INPUT 1D values:
     ## INPUTS: y
+    if hist_kwargs is None:
+        hist_kwargs = {}
+        
+    hist_kwargs = dict(color='black') | hist_kwargs
+
     
     rotated_point_distances = np.array([nearest_point_on_line(P=(x, y), A=(-1, -1), B=(1, 1))[-1] for (x, y) in zip(x_frs_index, y_frs_index)])
 
@@ -830,7 +892,7 @@ def _subfn_build_diagonal_histogram(x_frs_index, y_frs_index, ax_histdiagonal, b
     bins = np.arange(xlims[0], xlims[1], binwidth)
     # ax_histdiagonal.hist(x, bins=bins, color='black')
     # diagonal_hist_artist_tuple = ax_histdiagonal.hist(y, bins=bins, orientation='horizontal', color='black')
-    diagonal_hist_artist_tuple = ax_histdiagonal.hist(y, bins=bins, orientation='vertical', color='black')
+    diagonal_hist_artist_tuple = ax_histdiagonal.hist(y, bins=bins, orientation='vertical', **hist_kwargs)
     max_num_bins = np.max(diagonal_hist_artist_tuple[0])
     ylims = [0.0, float(max_num_bins)] ## determine the max number of bars dynamically from the histogram outputs
     
