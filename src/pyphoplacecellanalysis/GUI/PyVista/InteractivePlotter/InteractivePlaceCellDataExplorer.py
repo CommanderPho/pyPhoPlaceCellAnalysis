@@ -424,7 +424,9 @@ class InteractivePlaceCellDataExplorer(GlobalConnectionManagerAccessingMixin, In
         # Only Create a new BackgroundPlotter if it's needed:
         if (self.active_config.video_output_config.active_is_video_output_mode):
             ## Video mode should use a regular plotter object
-            self.p = pv.Plotter(notebook=False, shape=self.active_config.plotting_config.subplots_shape, window_size=([1280, 720]), off_screen=True) # , line_smoothing=True, polygon_smoothing=True, multi_samples=8
+            # window_size = [1280, 720]
+            window_size = [1920, 1080]
+            self.p = pv.Plotter(notebook=False, shape=self.active_config.plotting_config.subplots_shape, window_size=(window_size), off_screen=True) # , line_smoothing=True, polygon_smoothing=True, multi_samples=8
         else:
             self.p = InteractivePlaceCellDataExplorer.build_new_plotter_if_needed(pActivePlotter, shape=self.active_config.plotting_config.subplots_shape, title=self.data_explorer_name)
 

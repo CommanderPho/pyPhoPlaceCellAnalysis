@@ -55,7 +55,7 @@ def compute_active_frame_range(desired_start_stop_indicies: Tuple[int, int], des
 
 
 ## Save out to MP4 Movie
-def make_mp4_from_plotter(active_plotter, active_frame_range, update_callback, filename='sphere-shrinking.mp4', framerate=30):
+def make_mp4_from_plotter(active_plotter, active_frame_range, update_callback, filename='sphere-shrinking.mp4', framerate=30, quality=9, **kwargs):
     # Open a movie file
     print('active_frame_range: {}'.format(active_frame_range))
     try:
@@ -68,7 +68,7 @@ def make_mp4_from_plotter(active_plotter, active_frame_range, update_callback, f
         else:
             print('ERROR: active_plotter is not a Plotter or a BackgroundPlotter! Is it valid?')
             
-        active_plotter.open_movie(filename, framerate=framerate)
+        active_plotter.open_movie(filename, framerate=framerate, quality=quality, **kwargs)
         # Run through each frame
         active_plotter.write_frame()  # write initial data
         total_number_frames = np.size(active_frame_range)
