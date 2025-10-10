@@ -150,7 +150,16 @@ class HistDistributionPlotterTest:
         collector = plotter.plot_hists(hist_data_array_dict, bin_values)
         collector
     """
-    def plot_hists(self, hist_data_array_dict, bin_values):
+    def plot_hists(self, hist_data_array_dict: Dict, bin_values: NDArray, bin_edges: NDArray, **kwargs):
+        """ 
+        
+        , n_bins: int
+        
+        """
+        
+        n_bins: int = kwargs.pop('n_bins', (len(bin_edges)-1))
+        hist_range_min_max = kwargs.pop('hist_range_min_max', (bin_values[0], bin_values[-1]))
+
 
         with mpl.rc_context(PhoPublicationFigureHelper.rc_context_kwargs(prepare_for_publication=True, **{'figure.figsize': (6.5, 2), 'figure.dpi': '220',})):
         # with mpl.rc_context(PhoPublicationFigureHelper.rc_context_kwargs(prepare_for_publication=False, **{})):

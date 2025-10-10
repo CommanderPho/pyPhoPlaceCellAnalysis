@@ -712,7 +712,7 @@ def plot_pre_scatter_post_matplotlib(data_results_df: pd.DataFrame, data_type: s
             use_density: bool = histogram_kwargs.get('density', False)
             bin_values: NDArray = np.linspace(*hist_range_min_max, n_bins)
 
-            _fig_container.plots_data.hist = {"epochs_pre_delta": {}, 'epochs_post_delta': {}, 'bins': 11}
+            _fig_container.plots_data.hist = {"epochs_pre_delta": {}, 'epochs_post_delta': {}, 'bins': n_bins}
             _fig_container.plots.hist = {"epochs_pre_delta": {}, 'epochs_post_delta': {}}
             
             assert column_name in data_results_df, f"column_name: {column_name} missing from df. {list(data_results_df.columns)}"
@@ -723,16 +723,18 @@ def plot_pre_scatter_post_matplotlib(data_results_df: pd.DataFrame, data_type: s
                 time_bin_sizes = data_results_df['time_bin_size'].unique() # drop the NaN timebin size
 
             # get the pre-delta epochs
-            pre_delta_df = data_results_df[data_results_df['delta_aligned_start_t'] <= 0]
-            post_delta_df = data_results_df[data_results_df['delta_aligned_start_t'] > 0]
+            pre_delta_df: pd.DataFrame = data_results_df[data_results_df['delta_aligned_start_t'] <= 0]
+            post_delta_df: pd.DataFrame = data_results_df[data_results_df['delta_aligned_start_t'] > 0]
             _fig_container.plots_data.hist['epochs_pre_delta']['df'] = pre_delta_df
             _fig_container.plots_data.hist['epochs_post_delta']['df'] = post_delta_df
             
             # plot pre-delta histogram:
             for time_bin_size in time_bin_sizes:
-                df_tbs = pre_delta_df[pre_delta_df['time_bin_size']==time_bin_size]
+                df_tbs: pd.DataFrame = pre_delta_df[pre_delta_df['time_bin_size']==time_bin_size]
+                df_tbs = df_tbs.dropna(subset=[column_name], how='any', inplace=False)
                 # _fig_container.plots.hist['epochs_pre_delta'][time_bin_size] = df_tbs[column_name].hist(ax=ax_dict['epochs_pre_delta'], alpha=0.5, label=str(time_bin_size), **histogram_kwargs)     
                 data = df_tbs[column_name].dropna()
+                
                 # Compute histogram bins and counts using numpy to match pandas .hist() behavior
                 counts, bin_edges = np.histogram(data, bins=n_bins, range=hist_range_min_max, density=use_density)
 
@@ -772,6 +774,7 @@ def plot_pre_scatter_post_matplotlib(data_results_df: pd.DataFrame, data_type: s
             time_bin_sizes: int = data_results_df['time_bin_size'].unique()
             for time_bin_size in time_bin_sizes:
                 df_tbs = data_results_df[data_results_df['time_bin_size']==time_bin_size]
+                # df_tbs = df_tbs.dropna(subset=[column_name], how='any', inplace=False)
                 df_tbs.plot.scatter(x=time_bin_column_name, y=column_name, ax=ax_dict['scatter'], alpha=0.5, label=str(time_bin_size), **scatter_kwargs) 
                 # sns.scatterplot(data=df_tbs, x='t', y='P_Short', hue=color_mapping, size=8, ax=ax_dict['scatter'])
             ax_dict['scatter'].set_title(f'Scatter over Time {title_indicator}')
@@ -781,6 +784,7 @@ def plot_pre_scatter_post_matplotlib(data_results_df: pd.DataFrame, data_type: s
             
             for time_bin_size in time_bin_sizes:
                 df_tbs = post_delta_df[post_delta_df['time_bin_size']==time_bin_size]
+                df_tbs = df_tbs.dropna(subset=[column_name], how='any', inplace=False)
                 # _fig_container.plots_data.hist['epochs_post_delta'][time_bin_size] = {'df': df_tbs}
                 # out_hist = df_tbs[column_name].hist(ax=ax_dict['epochs_post_delta'], label=str(time_bin_size), **histogram_kwargs)
                 data = df_tbs[column_name].dropna()
