@@ -115,8 +115,202 @@ from pyphocorehelpers.gui.Qt.color_helpers import ColormapHelpers, ColorFormatCo
 
 
 
+import random
+import numpy as np
+import pandas as pd
+from scipy.special import rel_entr
+from scipy import stats
+from scipy.stats import chisquare, chi2_contingency
 
 
+
+def plot_fisher_z(sim_diffs, num_bootstrap_samples, curr_num_draws):
+    fig_title: str = f'fisherZ (from Teams) bootstrap: num_bootstrap_samples: {num_bootstrap_samples}, num_draws: {curr_num_draws}'
+    fig, ax = plt.subplots(num=fig_title, clear=True)
+    ax.hist(sim_diffs, bins=25)
+    plt.title(fig_title)
+    plt.xlabel('fisherZ(post) - fisherZ(pre)')
+    plt.ylabel('counts')
+    plt.axvline(0.0, color='red', alpha=0.7)
+    return fig, ax
+
+def plot_earthmovers(sim_diffs, num_bootstrap_samples):
+    fig_title: str = f'EarthMovers bootstrap: num_bootstrap_samples: {num_bootstrap_samples}, num_draws: realistic'
+    fig, ax = plt.subplots(num=fig_title, clear=True)
+    ax.hist(sim_diffs, bins=25)
+    plt.title(fig_title)
+    plt.xlabel('EarthMovers(post) - EarthMovers(pre)')
+    plt.ylabel('counts')
+    plt.axvline(0.0, color='red', alpha=0.7)
+    return fig, ax
+
+def plot_kldivergence(sim_diffs, num_bootstrap_samples):
+    fig_title: str = f'KLDiv bootstrap: num_bootstrap_samples: {num_bootstrap_samples}, num_draws: realistic'
+    fig, ax = plt.subplots(num=fig_title, clear=True)
+    ax.hist(sim_diffs, bins=25)
+    plt.title(fig_title)
+    plt.xlabel('KLDiv(post) - KLDiv(pre)')
+    plt.ylabel('counts')
+    plt.axvline(0.0, color='red', alpha=0.7)
+    return fig, ax
+
+
+@function_attributes(short_name=None, tags=['fig4', 'stats', 'hist', 'final'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-10-10 14:13', related_items=[])
+def fig4_hist_stats_pho(num_bootstrap_samples: int = 10000, confidence_level: float = 0.95):
+    """ fig4_hist_stats_pho to compare the histograms
+    
+    'a': PreLaps, 'b': PostLabs, 'c': PrePBEs, 'd': PostPBEs
+    metrics_to_compute = ['EARTHMOVERS', 'KLDIV']
+    
+    """
+
+    def _subfn_simulate_draws(num_red: int, num_blue: int, num_draws: int):
+        """Simulates drawing balls with replacement from a bag, returns a boolean NDArayy with n_draws items.
+        red: 1, blue: 0
+        
+        """
+        bag = ['red'] * num_red + ['blue'] * num_blue
+        draws = random.choices(bag, k=num_draws)
+        # Convert simulation results to a numerical format (e.g., 1 for red, 0 for blue)
+        draw_binary_outcome_vector = np.array([1 if draw == 'red' else 0 for draw in draws])
+        return draw_binary_outcome_vector
+
+    def bootstrap_mean_ci(num_red: int, num_blue: int, num_bootstrap_samples: int, confidence_level: float=0.95):
+        """Calculates bootstrap confidence intervals for the mean."""
+        num_draws: int = num_bootstrap_samples
+        samples = []
+        means = []
+        # n = len(data)
+        for _ in range(num_bootstrap_samples):
+            # sample = np.random.choice(data, size=n, replace=True)
+            # sample = [1 if draw == 'red' else 0 for draw in random.choices((['red'] * num_red + ['blue'] * num_blue), k=num_draws)]
+            sample = _subfn_simulate_draws(num_red=num_red, num_blue=num_blue, num_draws=num_draws)
+            samples.append(sample)
+            means.append(np.mean(sample))
+
+        alpha = 1.0 - confidence_level
+        lower_bound = np.percentile(means, alpha / 2 * 100)
+        upper_bound = np.percentile(means, (1 - alpha / 2) * 100)
+
+        return np.mean(means), np.std(means), lower_bound, upper_bound, samples
+
+
+    def compute_fisher_z(total_n_per_bag: Dict, an_observed_n_red_sample: Dict, a_simulated_prob_by_bag: Dict, k1: str, k2: str):
+        """ captures: nothing 
+        k1, k2: bag_name strings to be compared
+        """
+        n1 = total_n_per_bag[k1]
+        n2 = total_n_per_bag[k2]
+        an_X1 = an_observed_n_red_sample[k1]
+        an_X2 = an_observed_n_red_sample[k2]
+        p1 = a_simulated_prob_by_bag[k1]
+        p2 = a_simulated_prob_by_bag[k2]
+        
+        a_pooled_prob: bool = (an_X1 + an_X2) / (n1 + n2) # booled over the Laps/PBEs for a given result
+        a_z: float = (p1 - p2) / np.sqrt( a_pooled_prob * (1.0 - a_pooled_prob) * ((1.0/n1) + (1.0/n2)) )
+        return a_z, a_pooled_prob, (n1, n2), (an_X1, an_X2), (p1, p2)
+
+
+
+    # ==================================================================================================================================================================================================================================================================================== #
+    # BEGIN FUNCTION BODY                                                                                                                                                                                                                                                                  #
+    # ==================================================================================================================================================================================================================================================================================== #
+    bags = {
+        'a': np.array([9558, 312], dtype=int),
+        'b': np.array([1514, 3767], dtype=int),
+        'c': np.array([1616, 282], dtype=int),
+        'd': np.array([906, 721], dtype=int)
+    }
+    
+    metrics_to_compute = ['EARTHMOVERS', 'KLDIV']
+    
+    # num_draws: int = 1024
+    # num_draws: int = 10000
+
+    ## INPUTS: bags, confidence_level, num_simulations
+    alpha: float = 1.0 - confidence_level
+    simulated_samples_by_bag = {}
+    simulated_counts_by_bag = {}
+    # simulation_results_by_bag = {}
+    simulation_results: List[Dict] = []
+    total_n_per_bag: Dict = {bag_name:np.sum(ball_counts) for bag_name, ball_counts in bags.items()}
+
+    # Main Bootstrap loop ________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
+    for _ in range(num_bootstrap_samples):
+        
+        an_observed_n_red_sample = {}
+
+        for bag_name, ball_counts in bags.items():
+            if bag_name not in simulated_samples_by_bag:
+                simulated_samples_by_bag[bag_name] = []
+                simulated_counts_by_bag[bag_name] = []
+                
+            num_red, num_blue = ball_counts
+            
+            # ## override curr_num_draws
+            # curr_num_draws = 1024
+            # total_n_per_bag[bag_name] = curr_num_draws
+            
+            ## typical (non-overriden) curr_num_draws:
+            curr_num_draws = num_red + num_blue
+            
+            sample = _subfn_simulate_draws(num_red=num_red, num_blue=num_blue, num_draws=curr_num_draws)
+            # sample = simulate_draws(num_red=num_red, num_blue=num_blue, num_draws=num_draws)
+            simulated_samples_by_bag[bag_name].append(sample)
+            ## Get the counts from the sample:
+            obs_num_red: int = np.sum(sample)
+            obs_num_blue: int = curr_num_draws - obs_num_red
+            
+            an_observed_n_red_sample[bag_name] = obs_num_red
+            simulated_counts_by_bag[bag_name].append((obs_num_red, obs_num_blue))
+            
+        ## END for bag_name, ball...
+        
+        ## Get most recent sample of pre-delta: ('a', 'c') and do the test
+        a_simulation_result = {}
+
+        a_simulated_prob_by_bag = {k:(v[-1][0] / np.sum(v[-1])) for k, v in simulated_counts_by_bag.items()}  ## -1 refers to only the last sample, [0] refers to the top extrema
+        a_simulated_prob_dist_by_bag = {k:(v[-1] / np.sum(v[-1])) for k, v in simulated_counts_by_bag.items()}  ## -1 refers to only the last sample, [0] refers to the top extrema
+        
+
+        ## INPUTS: total_n_per_bag, an_observed_n_red_sample, a_simulated_prob_by_bag, k1, k2
+        a_simulation_result.update(**a_simulated_prob_by_bag)
+        # a_simulation_result['p_pooled'] = # a_z, a_pooled_prob, (n1, n2), (an_X1, an_X2), (p1, p2)
+        # a_simulation_result['pre_delta'] = compute_fisher_z(total_n_per_bag=total_n_per_bag, an_observed_n_red_sample=an_observed_n_red_sample, a_simulated_prob_by_bag=a_simulated_prob_by_bag, k1='a', k2='c')
+        # a_simulation_result['post_delta'] = compute_fisher_z(total_n_per_bag=total_n_per_bag, an_observed_n_red_sample=an_observed_n_red_sample, a_simulated_prob_by_bag=a_simulated_prob_by_bag, k1='b', k2='d')
+        # a_simulation_result['diff'] = np.abs(a_simulation_result['post_delta'][0]) - np.abs(a_simulation_result['pre_delta'][0]) ## [0] is inexing into the tuple (a_z, a_pooled_prob, (n1, n2), (an_X1, an_X2), (p1, p2))
+
+        metrics_to_compute = ['EARTHMOVERS', 'KLDIV']
+        
+        ## EARTHMOVERS
+        a_simulation_result['KLDIV_pre_delta'] = stats.wasserstein_distance(a_simulated_prob_dist_by_bag['a'], a_simulated_prob_dist_by_bag['c']) 
+        a_simulation_result['KLDIV_post_delta'] = stats.wasserstein_distance(a_simulated_prob_dist_by_bag['b'], a_simulated_prob_dist_by_bag['d'])
+        
+        ## KL Divergence
+        a_simulation_result['EARTHMOVERS_pre_delta'] = np.sum(rel_entr(a_simulated_prob_dist_by_bag['a'], a_simulated_prob_dist_by_bag['c'])) 
+        a_simulation_result['EARTHMOVERS_post_delta'] = np.sum(rel_entr(a_simulated_prob_dist_by_bag['b'], a_simulated_prob_dist_by_bag['d']))
+        
+        ## Broken EARTHMOVERS: ValueError: Value and weight array-likes for the same empirical distribution must be of the same size.
+        # a_simulation_result['pre_delta'] = stats.wasserstein_distance(simulated_samples_by_bag['a'][-1], simulated_samples_by_bag['c'][-1], a_simulated_prob_dist_by_bag['a'], a_simulated_prob_dist_by_bag['c']) # compute_fisher_z(total_n_per_bag=total_n_per_bag, an_observed_n_red_sample=an_observed_n_red_sample, a_simulated_prob_by_bag=a_simulated_prob_by_bag, k1='a', k2='c')
+        # a_simulation_result['post_delta'] = stats.wasserstein_distance(simulated_samples_by_bag['b'][-1], simulated_samples_by_bag['d'][-1], a_simulated_prob_dist_by_bag['b'], a_simulated_prob_dist_by_bag['d'])
+        
+        # simulated_samples_by_bag[bag_name]
+        
+        # a_simulation_result['diff'] = np.abs(a_simulation_result['post_delta']) - np.abs(a_simulation_result['pre_delta']) ## [0] is inexing into the tuple (a_z, a_pooled_prob, (n1, n2), (an_X1, an_X2), (p1, p2))
+        a_simulation_result['EARTHMOVERS_diff'] = a_simulation_result['EARTHMOVERS_post_delta'] - a_simulation_result['EARTHMOVERS_pre_delta'] ## [0] is inexing into the tuple (a_z, a_pooled_prob, (n1, n2), (an_X1, an_X2), (p1, p2))
+        a_simulation_result['KLDIV_diff'] = a_simulation_result['KLDIV_post_delta'] - a_simulation_result['KLDIV_pre_delta'] ## [0] is inexing into the tuple (a_z, a_pooled_prob, (n1, n2), (an_X1, an_X2), (p1, p2))
+        
+        simulation_results.append(a_simulation_result)
+
+    # metric_diff_names = [f'{k}_diff' for k in metrics_to_compute]
+    sim_diffs_dict = {k:np.array([a_sim[f'{k}_diff'] for a_sim in simulation_results]) for k in metrics_to_compute}
+    # sim_diffs = np.array([a_sim['diff'] for a_sim in simulation_results])
+    ## OUTPUTS: simulation_results, sim_diffs
+    # np.shape(sim_diffs)
+    # sim_diffs
+
+    simulation_results_df: pd.DataFrame = pd.DataFrame(simulation_results)
+    return sim_diffs_dict, simulation_results_df
 
 
 
