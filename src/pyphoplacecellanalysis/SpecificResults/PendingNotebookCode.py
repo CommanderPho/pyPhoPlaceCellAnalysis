@@ -122,11 +122,20 @@ from scipy.special import rel_entr
 from scipy import stats
 from scipy.stats import chisquare, chi2_contingency
 
+from typing import NewType
+
+SeriesLetter = NewType('SeriesLetter', str) # a letter in ['a', 'b', 'c', 'd'] coresponding to one of the four configurations
+AnimalName = NewType('AnimalName', str) # an animal name in ['gor01', 'vvp01', ''] coresponding to one of the three animals
 
 
-def plot_fisher_z(sim_diffs, num_bootstrap_samples, curr_num_draws):
-    fig_title: str = f'fisherZ (from Teams) bootstrap: num_bootstrap_samples: {num_bootstrap_samples}, num_draws: {curr_num_draws}'
-    fig, ax = plt.subplots(num=fig_title, clear=True)
+def plot_fisher_z(sim_diffs, num_bootstrap_samples, curr_num_draws, extra_title: str='', ax=None):
+    fig_title: str = f'{extra_title}fisherZ (from Teams) bootstrap: num_bootstrap_samples: {num_bootstrap_samples}, num_draws: {curr_num_draws}'
+    if ax is None:
+        fig, ax = plt.subplots(num=fig_title, clear=True)
+    else:
+        plt.sca(ax)
+        fig = ax.get_figure()
+        
     ax.hist(sim_diffs, bins=25)
     plt.title(fig_title)
     plt.xlabel('fisherZ(post) - fisherZ(pre)')
@@ -134,9 +143,14 @@ def plot_fisher_z(sim_diffs, num_bootstrap_samples, curr_num_draws):
     plt.axvline(0.0, color='red', alpha=0.7)
     return fig, ax
 
-def plot_earthmovers(sim_diffs, num_bootstrap_samples):
-    fig_title: str = f'EarthMovers bootstrap: num_bootstrap_samples: {num_bootstrap_samples}, num_draws: realistic'
-    fig, ax = plt.subplots(num=fig_title, clear=True)
+def plot_earthmovers(sim_diffs, num_bootstrap_samples, extra_title: str='', ax=None):
+    fig_title: str = f'{extra_title}EarthMovers bootstrap: num_bootstrap_samples: {num_bootstrap_samples}, num_draws: realistic'
+    if ax is None:
+        fig, ax = plt.subplots(num=fig_title, clear=True)
+    else:
+        plt.sca(ax)
+        fig = ax.get_figure()
+        
     ax.hist(sim_diffs, bins=25)
     plt.title(fig_title)
     plt.xlabel('EarthMovers(post) - EarthMovers(pre)')
@@ -144,9 +158,14 @@ def plot_earthmovers(sim_diffs, num_bootstrap_samples):
     plt.axvline(0.0, color='red', alpha=0.7)
     return fig, ax
 
-def plot_kldivergence(sim_diffs, num_bootstrap_samples):
-    fig_title: str = f'KLDiv bootstrap: num_bootstrap_samples: {num_bootstrap_samples}, num_draws: realistic'
-    fig, ax = plt.subplots(num=fig_title, clear=True)
+def plot_kldivergence(sim_diffs, num_bootstrap_samples, extra_title: str='', ax=None):
+    fig_title: str = f'{extra_title}KLDiv bootstrap: num_bootstrap_samples: {num_bootstrap_samples}, num_draws: realistic'
+    if ax is None:
+        fig, ax = plt.subplots(num=fig_title, clear=True)
+    else:
+        plt.sca(ax)
+        fig = ax.get_figure()
+
     ax.hist(sim_diffs, bins=25)
     plt.title(fig_title)
     plt.xlabel('KLDiv(post) - KLDiv(pre)')
@@ -155,12 +174,95 @@ def plot_kldivergence(sim_diffs, num_bootstrap_samples):
     return fig, ax
 
 
+# @function_attributes(short_name=None, tags=['PENDING', 'count', 'extrema'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-10-16 13:04', related_items=[])
+# def compute_hist_variables(df: pd.DataFrame, column_name: str = 'P_Short', n_bins: int = 11, hist_range_min_max = (0.0, 1.0), use_density: bool = False, **kwargs):
+#     """ computes the counts, extrema counts, ratios, densities, etc for the dataframe passed. """
+#     bin_values: NDArray = np.linspace(*hist_range_min_max, n_bins)
+#     ## ensure only a single time_bin_size is in here so we're not multi-counting
+#     # df_tbs: pd.DataFrame = pre_delta_df[pre_delta_df['time_bin_size']==time_bin_size]
+#     unique_time_bin_sizes = np.unique(df['time_bin_size'].to_numpy())
+#     assert len(unique_time_bin_sizes) == 1, f"unique_time_bin_sizes: {unique_time_bin_sizes} should only contain one time_bin_size to get accurate counts!"
+
+#     ## clean up NaNs before plotting
+#     df = df.dropna(subset=[column_name], how='any', inplace=False)
+#     # _fig_container.plots.hist['epochs_pre_delta'][time_bin_size] = df_tbs[column_name].hist(ax=ax_dict['epochs_pre_delta'], alpha=0.5, label=str(time_bin_size), **histogram_kwargs)     
+#     data = df[column_name].dropna()
+
+#     # Compute histogram bins and counts using numpy to match pandas .hist() behavior
+#     counts, bin_edges = np.histogram(data, bins=n_bins, range=hist_range_min_max, density=use_density)
+
+#     # hist_count_extremas_only_dict = {k:np.array([v[0], v[-1]]) for k, v in hist_counts_dict.items()}
+#     # hist_count_extrema_ratios = {k:(float(v[0])/float(v[-1])) for k, v in hist_counts_dict.items()}
+#     # hist_densities_dict = {k:(v.astype(float)/np.sum(v)) for k, v in hist_counts_dict.items()}
+    
+#     count_extremas_only = np.array([counts[0], counts[-1]])
+#     count_extrema_ratios = (float(counts[0])/float(counts[-1]))
+#     densities = (counts.astype(float)/np.sum(counts))
+    
+#     ## OUTPUTS: hist_counts_dict, hist_densities_dict, hist_count_extremas_only_dict, hist_count_extrema_ratios
+#     return counts, bin_edges, bin_values, count_extremas_only, count_extrema_ratios, densities
+
+
+
+@function_attributes(short_name=None, tags=['PENDING', 'count', 'extrema'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-10-16 13:04', related_items=[])
+def compute_hist_variables(hist_samples_df_dict: Dict[SeriesLetter, pd.DataFrame], column_name: str = 'P_Short', n_bins: int = 11, hist_range_min_max = (0.0, 1.0), use_density: bool = False, enable_safety_checks:bool=True, *kwargs):
+    """ computes the counts, extrema counts, ratios, densities, etc for the dataframe passed. """
+    bin_values: NDArray = np.linspace(*hist_range_min_max, n_bins)
+    
+    if enable_safety_checks:
+        hist_counts_dict = {}
+        
+        for k, df in hist_samples_df_dict.items():
+            ## ensure only a single time_bin_size is in here so we're not multi-counting
+            # df_tbs: pd.DataFrame = pre_delta_df[pre_delta_df['time_bin_size']==time_bin_size]
+            unique_time_bin_sizes = np.unique(df['time_bin_size'].to_numpy())
+            assert len(unique_time_bin_sizes) == 1, f"unique_time_bin_sizes: {unique_time_bin_sizes} should only contain one time_bin_size to get accurate counts!"
+
+            ## clean up NaNs before plotting
+            df = df.dropna(subset=[column_name], how='any', inplace=False)
+            # _fig_container.plots.hist['epochs_pre_delta'][time_bin_size] = df_tbs[column_name].hist(ax=ax_dict['epochs_pre_delta'], alpha=0.5, label=str(time_bin_size), **histogram_kwargs)     
+            data = df[column_name].dropna()
+
+            # Compute histogram bins and counts using numpy to match pandas .hist() behavior
+            counts, bin_edges = np.histogram(data, bins=n_bins, range=hist_range_min_max, density=use_density)
+            hist_counts_dict[k] = counts ## add the counts to the dict
+
+    else:
+        ## compute all inline, assumes only one time_bin_size, etc
+        bin_edges = None
+        hist_counts_dict = {k:np.histogram(df.dropna(subset=[column_name], how='any', inplace=False)[column_name].dropna(), bins=n_bins, range=hist_range_min_max, density=use_density)[0] for k, df in hist_samples_df_dict.items()}
+
+    hist_count_extremas_only_dict = {k:np.array([v[0], v[-1]]) for k, v in hist_counts_dict.items()}
+    hist_count_extrema_ratios = {k:(float(v[0])/float(v[-1])) for k, v in hist_counts_dict.items()}
+    hist_densities_dict = {k:(v.astype(float)/np.sum(v)) for k, v in hist_counts_dict.items()}
+    
+    # count_extremas_only = np.array([counts[0], counts[-1]])
+    # count_extrema_ratios = (float(counts[0])/float(counts[-1]))
+    # densities = (counts.astype(float)/np.sum(counts))
+    
+    ## OUTPUTS: hist_counts_dict, hist_densities_dict, hist_count_extremas_only_dict, hist_count_extrema_ratios
+    return hist_counts_dict, hist_count_extremas_only_dict, hist_count_extrema_ratios, hist_densities_dict, (bin_edges, bin_values)
+
+
+
+
+
+
 @function_attributes(short_name=None, tags=['fig4', 'stats', 'hist', 'final'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-10-10 14:13', related_items=[])
-def fig4_hist_stats_pho(num_bootstrap_samples: int = 10000, confidence_level: float = 0.95):
+def fig4_hist_stats_pho(bags: Dict, num_bootstrap_samples: int = 10000, confidence_level: float = 0.95):
     """ fig4_hist_stats_pho to compare the histograms
+    
+    ### 2025-10-10 - Fresh start with binomial resampling
     
     'a': PreLaps, 'b': PostLabs, 'c': PrePBEs, 'd': PostPBEs
     metrics_to_compute = ['EARTHMOVERS', 'KLDIV']
+    
+    bags = {
+        'a': np.array([9558, 312], dtype=int),
+        'b': np.array([1514, 3767], dtype=int),
+        'c': np.array([1616, 282], dtype=int),
+        'd': np.array([906, 721], dtype=int)
+    }
     
     """
 
@@ -175,7 +277,7 @@ def fig4_hist_stats_pho(num_bootstrap_samples: int = 10000, confidence_level: fl
         draw_binary_outcome_vector = np.array([1 if draw == 'red' else 0 for draw in draws])
         return draw_binary_outcome_vector
 
-    def bootstrap_mean_ci(num_red: int, num_blue: int, num_bootstrap_samples: int, confidence_level: float=0.95):
+    def _subfn_bootstrap_mean_ci(num_red: int, num_blue: int, num_bootstrap_samples: int, confidence_level: float=0.95):
         """Calculates bootstrap confidence intervals for the mean."""
         num_draws: int = num_bootstrap_samples
         samples = []
@@ -195,7 +297,7 @@ def fig4_hist_stats_pho(num_bootstrap_samples: int = 10000, confidence_level: fl
         return np.mean(means), np.std(means), lower_bound, upper_bound, samples
 
 
-    def compute_fisher_z(total_n_per_bag: Dict, an_observed_n_red_sample: Dict, a_simulated_prob_by_bag: Dict, k1: str, k2: str):
+    def _subfn_compute_fisher_z(total_n_per_bag: Dict, an_observed_n_red_sample: Dict, a_simulated_prob_by_bag: Dict, k1: str, k2: str):
         """ captures: nothing 
         k1, k2: bag_name strings to be compared
         """
@@ -215,12 +317,7 @@ def fig4_hist_stats_pho(num_bootstrap_samples: int = 10000, confidence_level: fl
     # ==================================================================================================================================================================================================================================================================================== #
     # BEGIN FUNCTION BODY                                                                                                                                                                                                                                                                  #
     # ==================================================================================================================================================================================================================================================================================== #
-    bags = {
-        'a': np.array([9558, 312], dtype=int),
-        'b': np.array([1514, 3767], dtype=int),
-        'c': np.array([1616, 282], dtype=int),
-        'd': np.array([906, 721], dtype=int)
-    }
+
     
     metrics_to_compute = ['EARTHMOVERS', 'KLDIV']
     
