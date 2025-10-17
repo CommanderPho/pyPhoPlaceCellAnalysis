@@ -4250,7 +4250,7 @@ class ExportValueNameCleaner:
 
 
 
-@metadata_attributes(short_name=None, tags=['perfmnc', 'perfmnc_sesssion', 'specific'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-08-28 08:06', related_items=[])
+@metadata_attributes(short_name=None, tags=['perfmnc', 'perfmnc_session', 'specific'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-08-28 08:06', related_items=[])
 class PerfmncMeasures:
     """ 2025-08-28 - Session-scale lap time bin context-decoding performance (percent of lap time bins that decode to the correct context)
      
@@ -4262,10 +4262,12 @@ class PerfmncMeasures:
         perfmnc_session_df
 
     """
-    @function_attributes(short_name=None, tags=['perfmnc', 'perfmnc_sesssion'], input_requires=[], output_provides=[], uses=['ExportValueNameCleaner.split_custom_replay_name_col_to_replayMethod_qclu_frateThresh_cols'], used_by=[], creation_date='2025-08-27 00:32', related_items=[])
+    @function_attributes(short_name=None, tags=['perfmnc', 'perfmnc_session'], input_requires=[], output_provides=[], uses=['ExportValueNameCleaner.split_custom_replay_name_col_to_replayMethod_qclu_frateThresh_cols'], used_by=[], creation_date='2025-08-27 00:32', related_items=[])
     @classmethod
     def find_and_load_most_recent_parsed_csv_files_df(cls, most_recent_parsed_csv_files_df: pd.DataFrame, debug_print=False, cuttoff_date: Optional[datetime]=None) -> pd.DataFrame:
-        """ 
+        """ Finds the exported .csv files produced by `pyphoplacecellanalysis.Analysis.Decoder.context_dependent.GenericDecoderDictDecodedEpochsDictResult.export_csvs(...)` when `should_export_session_correct_decoded_time_bin_performance_df == True`
+        
+        Usage:
         
         perfmnc_session_df: pd.DataFrame = find_and_load_most_recent_parsed_csv_files_df(most_recent_parsed_csv_files_df=most_recent_parsed_csv_files_df)
         perfmnc_session_df

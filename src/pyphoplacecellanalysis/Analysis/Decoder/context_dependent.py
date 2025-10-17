@@ -1811,7 +1811,7 @@ class GenericDecoderDictDecodedEpochsDictResult(ComputedResult):
             # if export_all_laps_mode:
             all_epochs_records = []
             for pre_post_delta, a_df in _split_df.items():
-                
+                ## split by lap (parent_epoch_id)
                 epoch_split_df = a_df.pho.partition_df_dict('parent_epoch_id')
                 for an_epoch_id, an_epoch_df in epoch_split_df.items():
                     ## for each group of epochs, compute the stats
@@ -1833,7 +1833,7 @@ class GenericDecoderDictDecodedEpochsDictResult(ComputedResult):
         # ==================================================================================================================================================================================================================================================================================== #
         # BEGIN FUNCTION BODY                                                                                                                                                                                                                                                                  #
         # ==================================================================================================================================================================================================================================================================================== #
-        common_constraint_dict = dict(trained_compute_epochs='laps', time_bin_size=time_bin_size, masked_time_bin_fill_type='dropped')
+        common_constraint_dict = dict(trained_compute_epochs='laps', time_bin_size=time_bin_size, masked_time_bin_fill_type='dropped') ## important to use 'dropped' so the low-quality bins aren't included in either correct or counts
 
         _output_dict = {}
         ## Laps context:
@@ -1841,7 +1841,7 @@ class GenericDecoderDictDecodedEpochsDictResult(ComputedResult):
         ## Global context:
         a_global_target_context: IdentifyingContext = IdentifyingContext(known_named_decoding_epochs_type='global', data_grain='per_time_bin', **common_constraint_dict)
         ## PBEs context:
-        a_PBEs_target_context: IdentifyingContext = IdentifyingContext(known_named_decoding_epochs_type='pbe', **common_constraint_dict, data_grain='per_time_bin') 
+        a_PBEs_target_context: IdentifyingContext = IdentifyingContext(known_named_decoding_epochs_type='pbe', data_grain='per_time_bin', **common_constraint_dict) 
         _active_target_context_list = [a_Laps_target_context, a_global_target_context, a_PBEs_target_context]
         records_df = []
         for a_target_context in _active_target_context_list:

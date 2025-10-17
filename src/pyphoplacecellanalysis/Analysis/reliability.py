@@ -21,7 +21,7 @@ import matplotlib.pyplot as plt
 
 
 
-def _compute_single_lap_reliability(curr_lap_filtered_spikes_df, variable_extents_array, min_subdivision_resolution:float = 0.01, spike_blurring:float = 80.0, span_width:int=None, debug_print=False):
+def _compute_single_lap_reliability(curr_lap_filtered_spikes_df: pd.DataFrame, variable_extents_array, min_subdivision_resolution:float = 0.01, spike_blurring:float = 80.0, span_width:int=None, debug_print=False):
     """ """
     # for now, just do x (first variable)
     curr_variable_extents = variable_extents_array[0]
@@ -61,7 +61,7 @@ def _compute_single_lap_reliability(curr_lap_filtered_spikes_df, variable_extent
     return out_indicies, out_digitized_position_bins, out_within_lap_spikes_overlap
 
 @function_attributes(short_name=None, tags=['original'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2022-01-01 00:00', related_items=[])
-def compute_lap_to_lap_reliability(active_pf, filtered_spikes_df, lap_ids, cellind, min_subdivision_resolution:float = 0.01, plot_results=False, plot_horizontal=True, debug_print=True):
+def compute_lap_to_lap_reliability(active_pf, filtered_spikes_df: pd.DataFrame, lap_ids: NDArray, cellind: int, min_subdivision_resolution:float = 0.01, plot_results=False, plot_horizontal=True, debug_print=True):
     """ Computes the reliability of a placecell from lap-to-lap
     
     Example:    
