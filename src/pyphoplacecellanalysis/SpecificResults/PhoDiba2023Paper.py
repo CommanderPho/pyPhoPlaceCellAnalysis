@@ -2000,7 +2000,7 @@ def main_complete_figure_generations(curr_active_pipeline, enable_default_neptun
 # Plotting Helpers 2024-10-29                                                                                          #
 # ==================================================================================================================== #
 @function_attributes(short_name=None, tags=['ACTIVE'], input_requires=[], output_provides=[], uses=['plot_pre_scatter_post_matplotlib'], used_by=[], creation_date='2025-08-11 13:36', related_items=[])
-def _perform_matplotlib_SINGLE_SERIES_pre_post_scatter(grainularity_desc: str, epochs_df: pd.DataFrame, is_dark_mode: bool=False, legend_groups_to_solo=None, legend_groups_to_hide: Optional[List[str]]=None, time_column: str='t_start', value_column: str='P_Short'):
+def _perform_matplotlib_SINGLE_SERIES_pre_post_scatter(grainularity_desc: str, epochs_df: pd.DataFrame, is_dark_mode: bool=False, legend_groups_to_solo=None, legend_groups_to_hide: Optional[List[str]]=None, time_column: str='t_start', value_column: str='P_Short', context_prefix=None):
     """ plots the stacked histograms for both laps and ripples, with optional scatterplot showing values over time
     
     Aims to replace the plotly version `_perform_plot_pre_post_delta_scatter` by implementing the same figure in MATPLOTLIB for easier export to publication
@@ -2128,7 +2128,14 @@ def _perform_matplotlib_SINGLE_SERIES_pre_post_scatter(grainularity_desc: str, e
     # You can use it like this:
     num_unique_sessions: int = epochs_df.session_name.nunique(dropna=True) # number of unique sessions, ignoring the NA entries
     num_unique_time_bins: int = epochs_df.time_bin_size.nunique(dropna=True)
-    _epochs_histogram_out = plot_pre_scatter_post_matplotlib(epochs_df, data_type=f'{epoch_identifer} ({grainularity_desc})', session_spec=f'{num_unique_sessions} Sessions', time_bin_duration_str=f"{num_unique_time_bins} tbin sizes", time_bin_column_name=time_column, scatter_kwargs=scatter_kwargs, **common_stacked_hist_kwargs)
+    
+    if context_prefix is not None:
+        data_type = f'{context_prefix}'
+    else:
+        data_type = ''
+    data_type = f'{data_type}{epoch_identifer} ({grainularity_desc})'
+    
+    _epochs_histogram_out = plot_pre_scatter_post_matplotlib(epochs_df, data_type=data_type, session_spec=f'{num_unique_sessions} Sessions', time_bin_duration_str=f"{num_unique_time_bins} tbin sizes", time_bin_column_name=time_column, scatter_kwargs=scatter_kwargs, **common_stacked_hist_kwargs)
     _epochs_flexitext_dict = _subfn_update_stacked_post_plot(_epochs_histogram_out)
     # fig_to_clipboard(_ripple_histogram_out.figures[0], bbox_inches='tight')
 

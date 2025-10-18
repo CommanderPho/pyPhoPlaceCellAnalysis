@@ -4274,7 +4274,10 @@ class PerfmncMeasures:
         
         """
         from pyphoplacecellanalysis.SpecificResults.AcrossSessionResults import ExportValueNameCleaner
+        from neuropy.core.user_annotations import UserAnnotationsManager
         
+        session_shortname_to_full_name_dict: Dict[str, str] = {a_ctxt.session_name:a_ctxt.get_description(subset_includelist=a_ctxt._get_session_context_keys(), separator='_') for a_ctxt in UserAnnotationsManager.get_all_known_sessions()} 
+
         ## INPUTS: most_recent_parsed_csv_files_df
         most_recent_parsed_perfmnc_session_csv_files_df: pd.DataFrame = deepcopy(most_recent_parsed_csv_files_df).pho.constrain_df_cols(file_type='perfmnc_session')
         if cuttoff_date is not None:
@@ -4310,13 +4313,18 @@ class PerfmncMeasures:
 
         ## Split custom_replay_name column to separate columns:
         perfmnc_session_df = ExportValueNameCleaner.split_custom_replay_name_col_to_replayMethod_qclu_frateThresh_cols(perfmnc_session_df)
+        perfmnc_session_df['animal'] = perfmnc_session_df['session_name'].map(lambda x: session_shortname_to_full_name_dict[x].split('_')[1])
 
         ## split on record type:        
         _out_dfs_dict = perfmnc_session_df.pho.partition_df_dict('record_type')
         perfmnc_per_indv_epochs_df = _out_dfs_dict['epoch'].drop(columns=['worse_percent_correct', 'percent_correct_pre', 'n_correct_pre', 'n_total_pre', 'percent_correct_post', 'n_correct_post', 'n_total_post'])
         perfmnc_per_session_df = _out_dfs_dict['all_epochs'].drop(columns=['percent_correct', 'n_correct', 'n_total', 'pre_post_delta_category', 'parent_epoch_id'])
         perfmnc_per_session_df['percent_correct_diff'] = perfmnc_per_session_df['percent_correct_post'] - perfmnc_per_session_df['percent_correct_pre'] # (-1: always short, 0.0: neutral, +1 always long)
-        
+
+        ## Add extra columns:        
+        # perfmnc_per_indv_epochs_df['animal'] = perfmnc_per_indv_epochs_df['session_name'].map(lambda x: session_shortname_to_full_name_dict[x].split('_')[1])
+        # perfmnc_per_indv_epochs_df
+
         return (perfmnc_per_session_df, perfmnc_per_indv_epochs_df)	
     
 
@@ -4330,8 +4338,11 @@ class PerfmncMeasures:
         import plotly.express as px
         
         extra_plot_cmd_kwargs = dict(
-                                    opacity=0.5,
+                                    # opacity=0.9,
                                     # barmode='group',
+                                    # range_y = [0,1],
+                                    # facet_col='animal',
+                                    # color='time_bin_size',
         )
 
         active_df = deepcopy(perfmnc_per_indv_epochs_df)
@@ -4347,7 +4358,11 @@ class PerfmncMeasures:
                     # extra_plot_cmd_kwargs['color'] = 'time_bin_size'
                     pass
         
-        fig = px.bar(active_df, x='parent_epoch_id', y='percent_correct', facet_row='session_name', **extra_plot_cmd_kwargs) # , facet_col='qclu'
+        # fig = px.bar(active_df, x='parent_epoch_id', y='percent_correct', facet_row='session_name', **extra_plot_cmd_kwargs) # , facet_col='qclu'
+        fig = px.scatter(active_df, x='parent_epoch_id', y='percent_correct', facet_row='session_name', **extra_plot_cmd_kwargs)
+        # fig = px.box(active_df, x='parent_epoch_id', y='percent_correct', facet_row='session_name', **extra_plot_cmd_kwargs)
+        # fig = fig.update_yaxes(matches='y', range=[0,1])
+        # fig = fig.update_layout(facet_row_spacing=0.02)
         fig = fig.update_layout(
             height=1600,
             xaxis=dict(showgrid=True, showline=True, mirror=True, linewidth=1, linecolor='black'),
@@ -4356,16 +4371,32 @@ class PerfmncMeasures:
         )
         # fig.update_yaxes(matches='y')
         fig = fig.update_yaxes(range=[0,1], matches='y', dtick=0.2, showgrid=True, gridcolor="grey", showline=True, mirror=True, linewidth=1, linecolor='black')
+        fig = fig.for_each_yaxis(lambda yaxis: yaxis.update(range=[0,1]))
 
         # Add horizontal line at y=0.5
         fig.add_hline(y=0.5, line_dash="dash", line_color="red", opacity=0.7)
 
 
         session_names = np.unique(active_df['session_name'].to_numpy())
+        if 'animal' in perfmnc_per_indv_epochs_df.columns:
+            session_animal_names = np.unique(active_df.apply(lambda x: '<br>'.join(x[['animal', 'session_name']].astype(str)), axis=1).to_numpy()) # .map(lambda x: x.str.join('\n'))
+            assert len(session_animal_names) == len(session_names)
+        else:
+            session_animal_names = None
+
         num_sessions: int = len(session_names)
         for i in np.arange(num_sessions):
             # Update y-axis labels for each facet row
-            fig = fig.update_yaxes(title_text=session_names[i], row=(i+1), col=1, title_font=dict(size=10))
+            
+            if session_animal_names is not None:
+                title_text: str = session_animal_names[i]
+            else:
+                title_text: str = session_names[i]
+                
+            # if 'animal' in perfmnc_per_indv_epochs_df.columns:
+            #     title_text = f"{title_text}"
+            
+            fig = fig.update_yaxes(range=[0,1], title_text=title_text, row=(i+1), col=1, title_font=dict(size=10))
             # fig = fig.add_annotation(xref="paper", yref="y"+str(i+1), 
             #                 x=-0.05, y=0.5,  # position on left of the row
             #                 text=session_names[i],
