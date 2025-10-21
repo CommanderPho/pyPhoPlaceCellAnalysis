@@ -1,6 +1,8 @@
 from __future__ import annotations # prevents having to specify types for typehinting as strings
 from typing import TYPE_CHECKING
 
+from matplotlib.collections import PathCollection
+
 if TYPE_CHECKING:
     ## typehinting only imports here
     from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.EpochComputationFunctions import DecodingResultND
@@ -44,6 +46,8 @@ from pyphoplacecellanalysis.PhoPositionalData.plotting.laps import LapsVisualiza
 
 import matplotlib.pyplot as plt
 from matplotlib.colors import LinearSegmentedColormap
+from matplotlib.patches import FancyArrowPatch
+
 
 from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import BasePositionDecoder, DecodedFilterEpochsResult
 
@@ -1480,9 +1484,9 @@ class DecodedTrajectoryMatplotlibPlotter(DecodedTrajectoryPlotter):
     # ==================================================================================================================== #
     
     # fig, axs, laps_pages = plot_lap_trajectories_2d(curr_active_pipeline.sess, curr_num_subplots=22, active_page_index=0)
-    @function_attributes(short_name=None, tags=['matplotlib', 'helper', 'gradient', 'curve', 'line'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-06-18 06:22', related_items=[])
+    @function_attributes(short_name=None, tags=['matplotlib', 'helper', 'gradient', 'curve', 'line'], input_requires=[], output_provides=[], uses=[], used_by=['plot_lap_trajectories_2d'], creation_date='2025-06-18 06:22', related_items=[])
     @classmethod
-    def _helper_add_gradient_line(cls, ax, t, x, y, add_markers=False, time_cmap='viridis', **LineCollection_kwargs):
+    def _helper_add_gradient_line(cls, ax, t, x, y, add_markers=False, s=20.0, time_cmap='viridis', **LineCollection_kwargs):
         """ Adds a gradient line representing a timeseries of (x, y) positions.
 
         add_markers (bool): if True, draws points at each (x, y) position colored the same as the underlying line.
@@ -1515,10 +1519,100 @@ class DecodedTrajectoryMatplotlibPlotter(DecodedTrajectoryPlotter):
             colors_arr = time_cmap(norm(t)) # line.get_colors() # (17, 4) -- this is not working!
             # segments_arr = line.get_segments() # (16, 2, 2)
             # len(a_most_likely_positions) # 17
-            _out_markers = ax.scatter(x=x, y=y, s=50, c=colors_arr, marker='D')
+            _out_markers: PathCollection = ax.scatter(x=x, y=y, s=s, c=colors_arr, marker='D')
             return line, _out_markers
         else:
             return line, None
+        
+
+    @function_attributes(short_name=None, tags=['matplotlib', 'helper', 'gradient', 'curve', 'line'], input_requires=[], output_provides=[], uses=[], used_by=['plot_lap_trajectories_2d'], creation_date='2025-10-21 06:29', related_items=[])
+    @classmethod
+    def _helper_add_markers_to_line(cls, ax, t, x, y, time_cmap='viridis', s=50, marker='D', **scatter_kwargs) -> PathCollection:
+        """ Adds a gradient line representing a timeseries of (x, y) positions.
+
+        add_markers (bool): if True, draws points at each (x, y) position colored the same as the underlying line.
+        
+        
+        cls._helper_add_markers_to_line(ax=axs[curr_row][curr_col]],
+            t=np.linspace(curr_lap_time_range[0], curr_lap_time_range[-1], len(laps_position_traces[curr_lap_id][0,:]))
+            x=laps_position_traces[curr_lap_id][0,:],
+            y=laps_position_traces[curr_lap_id][1,:]
+        )
+
+        """
+        # Create a continuous norm to map from data points to colors
+        assert len(t) == len(x), f"len(t): {len(t)} != len(x): {len(x)}"
+        norm = plt.Normalize(t.min(), t.max())
+        if isinstance(time_cmap, str):
+            time_cmap = plt.get_cmap(time_cmap)  # Choose a colormap
+        # Builds scatterplot markers (points) along the path
+        colors_arr = time_cmap(norm(t)) # line.get_colors() # (17, 4) -- this is not working!
+
+        _out_markers: PathCollection = ax.scatter(x=x, y=y, s=s, c=colors_arr, marker=marker, **scatter_kwargs)
+        return _out_markers
+
+    @function_attributes(short_name=None, tags=['matplotlib', 'helper', 'gradient', 'curve', 'line'], input_requires=[], output_provides=[], uses=[], used_by=['plot_lap_trajectories_2d'], creation_date='2025-10-21 07:40', related_items=[])
+    @classmethod
+    def _helper_add_concentrated_arrows_to_line(cls, ax, t, x, y, speed=None, time_cmap='viridis', arrow_skip: int=20,
+                                                mutation_scale_multiplier = 40, mutation_scale_constant = 10, arrow_length_multiplier = 0.2, arrow_length_constant = 0.05, arrow_lw = 0.5,
+                                                ) -> List[FancyArrowPatch]:
+        """ Adds a gradient line representing a timeseries of (x, y) positions.
+
+        add_markers (bool): if True, draws points at each (x, y) position colored the same as the underlying line.
+        
+        
+        cls._helper_add_markers_to_line(ax=axs[curr_row][curr_col]],
+            t=np.linspace(curr_lap_time_range[0], curr_lap_time_range[-1], len(laps_position_traces[curr_lap_id][0,:]))
+            x=laps_position_traces[curr_lap_id][0,:],
+            y=laps_position_traces[curr_lap_id][1,:]
+        )
+
+        """
+        # Create a continuous norm to map from data points to colors
+        assert len(t) == len(x), f"len(t): {len(t)} != len(x): {len(x)}"
+        # norm = plt.Normalize(t.min(), t.max())
+        if isinstance(time_cmap, str):
+            time_cmap = plt.get_cmap(time_cmap)  # Choose a colormap
+        # # Builds scatterplot markers (points) along the path
+        if speed is None:
+            ## compute the total magnitude of speed but computing the vector displacement distance between successive timepoints:
+            ## TODO: speed
+            # displacement between successive positions
+            dx = np.diff(x)
+            dy = np.diff(y)
+            dist = np.sqrt(dx**2 + dy**2)
+            dt = np.diff(t)
+            # instantaneous speed magnitude
+            speed = np.concatenate([[0], dist / dt])
+            
+        assert len(t) == len(speed), f"len(t): {len(t)} != len(speed): {len(speed)}"
+        # colors_arr = time_cmap(norm(t)) # line.get_colors() # (17, 4) -- this is not working!
+        _out_markers = {}
+        # --- Add Arrows along the path ---
+        # how many points to skip between arrows
+        for i in range(0, len(x)-arrow_skip, arrow_skip):
+            x0, y0 = x[i], y[i]
+            x1, y1 = x[i+1], y[i+1]
+            dx, dy = x1 - x0, y1 - y0
+            spd = speed[i]
+            spd_percent_max = (spd / np.max(speed))
+            # scale arrow size by speed
+            arrow_length = arrow_length_constant + (arrow_length_multiplier * spd_percent_max)
+            mutation_scale = mutation_scale_constant + (mutation_scale_multiplier * spd_percent_max)
+            
+            arrow = FancyArrowPatch(
+                (x0, y0),
+                (x0 + dx * arrow_length, y0 + dy * arrow_length),
+                arrowstyle='-|>', mutation_scale=mutation_scale,
+                color=time_cmap(spd_percent_max),
+                lw=arrow_lw
+            )
+            _out_markers[i] = arrow
+            ax.add_patch(arrow)
+        ## END for for i in range(0, len(x)-arrow_skip, arrow_skip)...
+        
+        return _out_markers
+    
 
     @function_attributes(short_name=None, tags=['AI', 'posterior', 'helper'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-02-11 12:00', related_items=[])
     @classmethod

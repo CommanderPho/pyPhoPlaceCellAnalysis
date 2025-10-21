@@ -22,6 +22,7 @@ from pyphocorehelpers.gui.PyVista.PhoCustomVtkWidgets import PhoWidgetHelper
 from pyphocorehelpers.DataStructure.RenderPlots.MatplotLibRenderPlots import MatplotlibRenderPlots
 from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.ContainerBased.PhoContainerTool import GenericMatplotlibContainer
 
+
 """ 
 
 NOTE: This is a GOOD, general class that offers both 2D (matplot) and 3D (pyvista) functionality
@@ -122,6 +123,10 @@ def _plot_helper_add_arrow(line, position=None, position_mode='rel', direction='
         arrowprops=dict(arrowstyle="->", color=color),
         size=size
     )
+
+
+
+
 
 @function_attributes(short_name=None, tags=['matplotlib', 'span', 'range-slider'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-02-21 05:25', related_items=[])
 def _plot_helper_add_span_where_ranges(pos_t: np.ndarray, pos_where_even_lap_indicies, pos_where_odd_lap_indicies, curr_ax: plt.axes, alpha=0.25, **span_where_kwargs):
@@ -454,7 +459,7 @@ def plot_lap_trajectories_3d(sess, curr_num_subplots=1, active_page_index=0, inc
     return p, laps_pages
 
 @function_attributes(short_name=None, tags=['lap','trajectories','2D','matplotlib','plotting','paginated'], input_requires=[], output_provides=[], uses=['_plot_helper_add_arrow'], used_by=[], creation_date='2023-05-09 05:13', related_items=['plot_lap_trajectories_3d'])
-def plot_lap_trajectories_2d(sess, curr_num_subplots=5, active_page_index=0, fixed_columns = 2, fig_size_inches=(18.5, 26.5), use_time_gradient_line=True, debug_print=False):
+def plot_lap_trajectories_2d(sess, curr_num_subplots=5, active_page_index=0, fixed_columns = 2, fig_size_inches=(18.5, 26.5), use_time_gradient_line=True, arrow_concentration_kwargs=None, debug_print=False):
     """ Plots a MatplotLib 2D Figure with each lap being shown in one of its subplots
      
     Great plotting for laps.
@@ -467,7 +472,15 @@ def plot_lap_trajectories_2d(sess, curr_num_subplots=5, active_page_index=0, fix
         out3: GenericMatplotlibContainer = plot_lap_trajectories_2d(a_sess, curr_num_subplots=20, active_page_index=0, fixed_columns = 4, use_time_gradient_line=False)
         p3, axs, laps_pages3 = out3.fig, out3.axes, out3.plots_data.laps_pages ## unpack like
 
-    """
+    """    
+    from pyphoplacecellanalysis.PhoPositionalData.plotting.mixins.decoder_plotting_mixins import DecodedTrajectoryMatplotlibPlotter
+    
+    arrow_concentration_kwargs = dict(
+        arrow_skip = 50, time_cmap='viridis',
+        mutation_scale_multiplier = 20, mutation_scale_constant = 1, arrow_length_multiplier = 0.2, arrow_length_constant = 0.05, arrow_lw = 0.5,
+    ) | (arrow_concentration_kwargs or {})
+    print(f'arrow_concentration_kwargs: {arrow_concentration_kwargs}')
+
     def _subfn_chunks(iterable, size=10):
         iterator = iter(iterable)
         for first in iterator:    # stops when iterator is depleted
@@ -499,10 +512,6 @@ def plot_lap_trajectories_2d(sess, curr_num_subplots=5, active_page_index=0, fix
         if use_time_gradient_line:
             _out_objs['line_collections'] = {}
             
-
-
-
-
         for a_linear_index in linear_plotter_indicies:
             curr_lap_id = active_page_laps_ids[a_linear_index]
             curr_row = row_column_indicies[0][a_linear_index]
@@ -515,24 +524,40 @@ def plot_lap_trajectories_2d(sess, curr_num_subplots=5, active_page_index=0, fix
             if use_time_gradient_line:
                 # Create a continuous norm to map from data points to colors
                 curr_lap_timeseries = np.linspace(curr_lap_time_range[0], curr_lap_time_range[-1], len(laps_position_traces[curr_lap_id][0,:]))
-                norm = plt.Normalize(curr_lap_timeseries.min(), curr_lap_timeseries.max())
-                # needs to be (numlines) x (points per line) x 2 (for x and y)
-                points = np.array([laps_position_traces[curr_lap_id][0,:], laps_position_traces[curr_lap_id][1,:]]).T.reshape(-1, 1, 2)
-                segments = np.concatenate([points[:-1], points[1:]], axis=1)
-                lc = LineCollection(segments, cmap='viridis', norm=norm)
-                # Set the values used for colormapping
-                lc.set_array(curr_lap_timeseries)
-                lc.set_linewidth(2)
-                lc.set_alpha(0.85)
-                line = axs[curr_row][curr_col].add_collection(lc)
-                # add_arrow(line)
-                _out_objs['line_collections'][a_linear_index] = lc
-                _out_objs['line_artists'][a_linear_index] = line
+                # norm = plt.Normalize(curr_lap_timeseries.min(), curr_lap_timeseries.max())
 
-                ## Add overlay arrows/markers:    
-                _out_objs['line_markers'][a_linear_index]['start'] = _plot_helper_add_arrow(line, position=0, position_mode='index', direction='right', size=20, color='green') # start
-                _out_objs['line_markers'][a_linear_index]['middle'] = _plot_helper_add_arrow(line, position=None, position_mode='index', direction='right', size=20, color='yellow') # middle
-                _out_objs['line_markers'][a_linear_index]['end'] = _plot_helper_add_arrow(line, position=curr_lap_num_points, position_mode='index', direction='right', size=20, color='red') # end
+                line, _out_markers = DecodedTrajectoryMatplotlibPlotter._helper_add_gradient_line(ax=axs[curr_row][curr_col], 
+                    t=curr_lap_timeseries, # np.linspace(curr_lap_time_range[0], curr_lap_time_range[-1], len(laps_position_traces[curr_lap_id][0,:]))
+                    x=laps_position_traces[curr_lap_id][0,:],
+                    y=laps_position_traces[curr_lap_id][1,:], add_markers=False, time_cmap='viridis', #norm=norm,
+                )
+
+                _out_markers = DecodedTrajectoryMatplotlibPlotter._helper_add_concentrated_arrows_to_line(ax=axs[curr_row][curr_col], 
+                    t=curr_lap_timeseries, # np.linspace(curr_lap_time_range[0], curr_lap_time_range[-1], len(laps_position_traces[curr_lap_id][0,:]))
+                    x=laps_position_traces[curr_lap_id][0,:],
+                    y=laps_position_traces[curr_lap_id][1,:], 
+                    speed=None,
+                    **arrow_concentration_kwargs
+                )
+
+                # # needs to be (numlines) x (points per line) x 2 (for x and y)
+                # points = np.array([laps_position_traces[curr_lap_id][0,:], laps_position_traces[curr_lap_id][1,:]]).T.reshape(-1, 1, 2)
+                # segments = np.concatenate([points[:-1], points[1:]], axis=1)
+                # lc = LineCollection(segments, cmap='viridis', norm=norm)
+                # # Set the values used for colormapping
+                # lc.set_array(curr_lap_timeseries)
+                # lc.set_linewidth(2)
+                # lc.set_alpha(0.85)
+                # line = axs[curr_row][curr_col].add_collection(lc)
+                # add_arrow(line)
+                # _out_objs['line_collections'][a_linear_index] = lc
+                _out_objs['line_artists'][a_linear_index] = line
+                _out_objs['line_markers'][a_linear_index] = _out_markers
+
+                # ## Add overlay arrows/markers:    
+                # _out_objs['line_markers'][a_linear_index]['start'] = _plot_helper_add_arrow(line, position=0, position_mode='index', direction='right', size=20, color='green') # start
+                # _out_objs['line_markers'][a_linear_index]['middle'] = _plot_helper_add_arrow(line, position=None, position_mode='index', direction='right', size=20, color='yellow') # middle
+                # _out_objs['line_markers'][a_linear_index]['end'] = _plot_helper_add_arrow(line, position=curr_lap_num_points, position_mode='index', direction='right', size=20, color='red') # end
                 
             else:
                 line = axs[curr_row][curr_col].plot(laps_position_traces[curr_lap_id][0,:], laps_position_traces[curr_lap_id][1,:], c='k', alpha=0.85)
