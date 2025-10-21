@@ -277,7 +277,7 @@ def final_process_non_kdiba_all_comps(curr_active_pipeline, active_data_mode_nam
     print(f'computing linearized position for session using method="umap"...')
     sess = curr_active_pipeline.sess.position.compute_linearized_position(method='umap')
     print(f'estimating the laps from the linear position...')
-    sess = estimate_session_laps(curr_active_pipeline.sess, should_plot_laps_2d=False) ## unfiltered session 
+    sess = estimate_session_laps(curr_active_pipeline.sess, should_plot_laps_2d=False, **(hardcoded_params.lap_estimation_parameters or {})) ## unfiltered session 
     laps_obj = curr_active_pipeline.sess.laps # Laps
     laps_df: pd.DataFrame = laps_obj.to_dataframe()
     print(f'estimating the maze_id to laps...')
