@@ -19,6 +19,8 @@ from pyphocorehelpers.function_helpers import function_attributes
 from pyphoplacecellanalysis.Pho3D.PyVista.spikeAndPositions import _build_flat_arena_data, perform_plot_flat_arena
 from pyphoplacecellanalysis.GUI.PyVista.InteractivePlotter.Mixins.LapsVisualizationMixin import LapsVisualizationMixin
 from pyphocorehelpers.gui.PyVista.PhoCustomVtkWidgets import PhoWidgetHelper
+from pyphocorehelpers.DataStructure.RenderPlots.MatplotLibRenderPlots import MatplotlibRenderPlots
+from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.ContainerBased.PhoContainerTool import GenericMatplotlibContainer
 
 """ 
 
@@ -66,9 +68,17 @@ def _plot_helper_add_arrow(line, position=None, position_mode='rel', direction='
     if color is None:
         color = line.get_color()
 
-    xdata = line.get_xdata()
-    ydata = line.get_ydata()
-    num_points = len(xdata)
+    if isinstance(line, LineCollection):
+        # --- Extract x/y data back ---
+        segments = line.get_segments()  # list of (N, 2) arrays
+        xdata = np.concatenate([seg[:, 0] for seg in segments])
+        ydata = np.concatenate([seg[:, 1] for seg in segments])
+    else:
+        xdata = line.get_xdata()
+        ydata = line.get_ydata()
+        
+
+    num_points: int = len(xdata)
     
     if position is None:
         position = xdata.mean()
@@ -400,6 +410,10 @@ def plot_lap_trajectories_3d(sess, curr_num_subplots=1, active_page_index=0, inc
     # get the lap IDs from the included_lap_idxs
     included_lap_IDs = sess.laps.lap_id[included_lap_idxs]
     # ensure that only lap_ids included in this session are used:
+    
+    if 'lap' not in sess.spikes_df.columns:
+        spikes_df = sess.spikes_df.spikes.adding_lap_identity_column(laps_epoch_df=sess.laps.to_dataframe(), epoch_id_key_name='lap')
+
     possible_included_lap_ids = np.unique(sess.spikes_df.lap.values)
     is_lap_id_possible = np.isin(included_lap_IDs, possible_included_lap_ids)
     if debug_print:
@@ -439,12 +453,19 @@ def plot_lap_trajectories_3d(sess, curr_num_subplots=1, active_page_index=0, inc
     
     return p, laps_pages
 
-@function_attributes(short_name=None, tags=['lap','trajectories','2D','matplotlib','plotting','paginated'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-05-09 05:13', related_items=['plot_lap_trajectories_3d'])
-def plot_lap_trajectories_2d(sess, curr_num_subplots=5, active_page_index=0):
+@function_attributes(short_name=None, tags=['lap','trajectories','2D','matplotlib','plotting','paginated'], input_requires=[], output_provides=[], uses=['_plot_helper_add_arrow'], used_by=[], creation_date='2023-05-09 05:13', related_items=['plot_lap_trajectories_3d'])
+def plot_lap_trajectories_2d(sess, curr_num_subplots=5, active_page_index=0, fixed_columns = 2, fig_size_inches=(18.5, 26.5), use_time_gradient_line=True, debug_print=False):
     """ Plots a MatplotLib 2D Figure with each lap being shown in one of its subplots
      
     Great plotting for laps.
     Plots in a paginated manner.
+    
+    Usage:
+        from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.ContainerBased.PhoContainerTool import GenericMatplotlibContainer
+        from pyphoplacecellanalysis.PhoPositionalData.plotting.laps import plot_lap_trajectories_2d
+
+        out3: GenericMatplotlibContainer = plot_lap_trajectories_2d(a_sess, curr_num_subplots=20, active_page_index=0, fixed_columns = 4, use_time_gradient_line=False)
+        p3, axs, laps_pages3 = out3.fig, out3.axes, out3.plots_data.laps_pages ## unpack like
 
     """
     def _subfn_chunks(iterable, size=10):
@@ -457,12 +478,14 @@ def plot_lap_trajectories_2d(sess, curr_num_subplots=5, active_page_index=0):
             yield chunk()         # in outer generator, yield next chunk
         
     def _subfn_build_laps_multiplotter(nfields, linear_plot_data=None):
+        """ captures: fixed_columns
+        """
         linear_plotter_indicies = np.arange(nfields)
-        fixed_columns = 2
         needed_rows = int(np.ceil(nfields / fixed_columns))
         row_column_indicies = np.unravel_index(linear_plotter_indicies, (needed_rows, fixed_columns)) # inverse is: np.ravel_multi_index(row_column_indicies, (needed_rows, fixed_columns))
         mp, axs = plt.subplots(needed_rows, fixed_columns, sharex=True, sharey=True) #ndarray (5,2)
-        mp.set_size_inches(18.5, 26.5)
+        if fig_size_inches is not None:
+            mp.set_size_inches(fig_size_inches[0], fig_size_inches[1])
         for a_linear_index in linear_plotter_indicies:
             curr_row = row_column_indicies[0][a_linear_index]
             curr_col = row_column_indicies[1][a_linear_index]
@@ -470,8 +493,16 @@ def plot_lap_trajectories_2d(sess, curr_num_subplots=5, active_page_index=0):
             
         return mp, axs, linear_plotter_indicies, row_column_indicies
     
-    def _subfn_add_specific_lap_trajectory(p, axs, linear_plotter_indicies, row_column_indicies, active_page_laps_ids, laps_position_traces, lap_time_ranges, use_time_gradient_line=True):
-        # Add the lap trajectory:                            
+    def _subfn_add_specific_lap_trajectory(p, axs, linear_plotter_indicies, row_column_indicies, active_page_laps_ids, laps_position_traces, lap_time_ranges, use_time_gradient_line: bool=True):
+        # Add the lap trajectory:
+        _out_objs = {'line_artists': {}, 'line_markers': {}}
+        if use_time_gradient_line:
+            _out_objs['line_collections'] = {}
+            
+
+
+
+
         for a_linear_index in linear_plotter_indicies:
             curr_lap_id = active_page_laps_ids[a_linear_index]
             curr_row = row_column_indicies[0][a_linear_index]
@@ -479,6 +510,8 @@ def plot_lap_trajectories_2d(sess, curr_num_subplots=5, active_page_index=0):
             curr_lap_time_range = lap_time_ranges[curr_lap_id]
             curr_lap_label_text = 'Lap[{}]: t({:.2f}, {:.2f})'.format(curr_lap_id, curr_lap_time_range[0], curr_lap_time_range[1])
             curr_lap_num_points = len(laps_position_traces[curr_lap_id][0,:])
+            
+            _out_objs['line_markers'][a_linear_index] = {}
             if use_time_gradient_line:
                 # Create a continuous norm to map from data points to colors
                 curr_lap_timeseries = np.linspace(curr_lap_time_range[0], curr_lap_time_range[-1], len(laps_position_traces[curr_lap_id][0,:]))
@@ -493,17 +526,35 @@ def plot_lap_trajectories_2d(sess, curr_num_subplots=5, active_page_index=0):
                 lc.set_alpha(0.85)
                 line = axs[curr_row][curr_col].add_collection(lc)
                 # add_arrow(line)
+                _out_objs['line_collections'][a_linear_index] = lc
+                _out_objs['line_artists'][a_linear_index] = line
+
+                ## Add overlay arrows/markers:    
+                _out_objs['line_markers'][a_linear_index]['start'] = _plot_helper_add_arrow(line, position=0, position_mode='index', direction='right', size=20, color='green') # start
+                _out_objs['line_markers'][a_linear_index]['middle'] = _plot_helper_add_arrow(line, position=None, position_mode='index', direction='right', size=20, color='yellow') # middle
+                _out_objs['line_markers'][a_linear_index]['end'] = _plot_helper_add_arrow(line, position=curr_lap_num_points, position_mode='index', direction='right', size=20, color='red') # end
+                
             else:
                 line = axs[curr_row][curr_col].plot(laps_position_traces[curr_lap_id][0,:], laps_position_traces[curr_lap_id][1,:], c='k', alpha=0.85)
                 # curr_lap_endpoint = curr_lap_position_traces[curr_lap_id][:,-1].T
-                _plot_helper_add_arrow(line[0], position=0, position_mode='index', direction='right', size=20, color='green') # start
-                _plot_helper_add_arrow(line[0], position=None, position_mode='index', direction='right', size=20, color='yellow') # middle
-                _plot_helper_add_arrow(line[0], position=curr_lap_num_points, position_mode='index', direction='right', size=20, color='red') # end
+                _out_objs['line_markers'][a_linear_index]['start'] = _plot_helper_add_arrow(line[0], position=0, position_mode='index', direction='right', size=20, color='green') # start
+                _out_objs['line_markers'][a_linear_index]['middle'] = _plot_helper_add_arrow(line[0], position=None, position_mode='index', direction='right', size=20, color='yellow') # middle
+                _out_objs['line_markers'][a_linear_index]['end'] = _plot_helper_add_arrow(line[0], position=curr_lap_num_points, position_mode='index', direction='right', size=20, color='red') # end
                 # add_arrow(line[0], position=curr_lap_endpoint, position_mode='abs', direction='right', size=50, color='blue')
                 # add_arrow(line[0], position=None, position_mode='rel', direction='right', size=50, color='blue')
+                _out_objs['line_artists'][a_linear_index] = line
+                
+
+            
+
+            
+
             # add lap text label
             axs[curr_row][curr_col].text(250, 126, curr_lap_label_text, horizontalalignment='right', size=12)
             # PhoWidgetHelper.perform_add_text(p[curr_row, curr_col], curr_lap_label_text, name='lblLapIdIndicator')
+        ## END for a_linear_index in linear_plotter_indicies...
+        return _out_objs
+
 
     # BEGIN FUNCTION BODY ________________________________________________________________________________________________ #
 
@@ -524,6 +575,107 @@ def plot_lap_trajectories_2d(sess, curr_num_subplots=5, active_page_index=0):
     # generate the pages
     laps_pages = [list(chunk) for chunk in _subfn_chunks(sess.laps.lap_id, curr_num_subplots)]
     active_page_laps_ids = laps_pages[active_page_index]
-    _subfn_add_specific_lap_trajectory(p, axs, linear_plotter_indicies, row_column_indicies, active_page_laps_ids, lap_position_traces, lap_time_ranges, use_time_gradient_line=True)
-    plt.ylim((125, 152))
-    return p, axs, laps_pages
+    _out_objs = _subfn_add_specific_lap_trajectory(p, axs, linear_plotter_indicies, row_column_indicies, active_page_laps_ids, lap_position_traces, lap_time_ranges, use_time_gradient_line=use_time_gradient_line)
+    # plt.ylim((125, 152))
+    
+    # return p, axs, laps_pages, _out_objs
+    return GenericMatplotlibContainer.init_from_matplotlib_objects(name='plot_lap_trajectories_2d', figures=[p], axes=axs, context=None, plots={'artists': _out_objs}, plots_data={'laps_pages': laps_pages})
+    # return MatplotlibRenderPlots(name='plot_lap_trajectories_2d', figures=[p], axes=axs, context=None, plot_data={'laps_pages': laps_pages, 'artists': _out_objs})
+
+
+@function_attributes(short_name=None, tags=['lap','trajectories','3D','napari','plotting','stack'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-10-21 00:00', related_items=['plot_lap_trajectories_3d'])
+def plot_lap_trajectories_3d_napari(sess, included_lap_idxs=None, lap_start_z=0.0, lap_id_dependent_z_offset=1.0, existing_viewer=None, show=True, debug_print=False):
+    """Renders a Napari 3D viewer with a stacked set of lap trajectories as a Tracks layer.
+
+    Each lap trajectory is offset along Z by lap_id_dependent_z_offset to form a vertical stack.
+
+    Returns: (viewer, tracks_layer, included_lap_ids)
+
+    Usage:
+        from pyphoplacecellanalysis.PhoPositionalData.plotting.laps import plot_lap_trajectories_3d_napari
+        viewer, layer, lap_ids = plot_lap_trajectories_3d_napari(curr_active_pipeline.sess, lap_id_dependent_z_offset=1.0)
+        # viewer will be shown if show=True
+    """
+    # Local import to avoid altering global imports
+    try:
+        import napari
+    except Exception as e:
+        raise ImportError("Napari is required for plot_lap_trajectories_3d_napari") from e
+
+    # Compute per-lap position data
+    curr_position_df, lap_specific_position_dfs = LapsVisualizationMixin._compute_laps_specific_position_dfs(sess)
+
+    # Determine which laps to include
+    if included_lap_idxs is None:
+        included_lap_idxs = np.arange(len(sess.laps.lap_id))
+    else:
+        included_lap_idxs = np.array(included_lap_idxs)
+
+    included_lap_IDs = sess.laps.lap_id[included_lap_idxs]
+
+    # Ensure laps exist in spikes_df if available (mirrors 3D pyvista function)
+    if hasattr(sess, 'spikes_df') and (sess.spikes_df is not None):
+        if 'lap' not in sess.spikes_df.columns:
+            _ = sess.spikes_df.spikes.adding_lap_identity_column(laps_epoch_df=sess.laps.to_dataframe(), epoch_id_key_name='lap')
+        possible_included_lap_ids = np.unique(sess.spikes_df.lap.values)
+        is_lap_id_possible = np.isin(included_lap_IDs, possible_included_lap_ids)
+        included_lap_IDs = included_lap_IDs[is_lap_id_possible]
+        included_lap_idxs = included_lap_idxs[is_lap_id_possible]
+
+    assert len(included_lap_IDs) > 0, "No valid lap IDs to render."
+
+    # Build Tracks layer data: columns = [track_id, t, z, y, x]
+    tracks_rows = []
+    for stack_idx, lap_idx in enumerate(included_lap_idxs):
+        lap_id = sess.laps.lap_id[lap_idx]
+        lap_df = lap_specific_position_dfs[lap_idx]
+        # Use true time for ordering if available
+        t_vals = lap_df['t'].to_numpy()
+        x_vals = lap_df['x'].to_numpy()
+        y_vals = lap_df['y'].to_numpy()
+        # Constant Z offset per lap to stack
+        z_offset = lap_start_z + (lap_id_dependent_z_offset * float(stack_idx))
+        if debug_print:
+            print(f"Lap {lap_id}: {len(t_vals)} points, z={z_offset}")
+        # Assemble rows for this lap
+        # Napari expects float IDs; ensure safe casting for large ints
+        track_id_val = int(lap_id)
+        track_rows = np.column_stack([
+            np.full_like(t_vals, track_id_val, dtype=int),  # track_id
+            t_vals.astype(float),                              # time
+            np.full_like(t_vals, z_offset, dtype=float),       # z
+            y_vals.astype(float),                              # y
+            x_vals.astype(float)                               # x
+        ])
+        tracks_rows.append(track_rows)
+
+    tracks_data = np.vstack(tracks_rows)
+
+    # Create or reuse viewer
+    viewer = existing_viewer if existing_viewer is not None else napari.Viewer(ndisplay=3)
+
+    # Add Tracks layer; color by track_id for per-lap colors
+    properties = {
+        'track_id': tracks_data[:, 0].astype(int)
+    }
+    tracks_layer = viewer.add_tracks(
+        tracks_data,
+        properties=properties,
+        name='lap_trajectories',
+        tail_length=0,
+        colormap='turbo',
+        color_by='track_id',
+        blending='translucent'
+    )
+
+    # Basic 3D view tweaks
+    try:
+        viewer.axes.visible = True
+        viewer.camera.center = (0.0, 0.0, 0.0)
+    except Exception:
+        pass
+
+    if show and existing_viewer is None:
+        napari.run()
+
+    return viewer, tracks_layer, list(included_lap_IDs)

@@ -52,7 +52,7 @@ class GenericMatplotlibContainer(PhoBaseContainerTool):
     
     """
     name: str = field(default='plot')
-    plots: RenderPlots = field(default=Factory(PyqtgraphRenderPlots, 'plotter'), repr=keys_only_repr)
+    plots: RenderPlots = field(default=Factory(MatplotlibRenderPlots, 'plotter'), repr=keys_only_repr)
     plots_data: RenderPlotsData = field(default=Factory(RenderPlotsData, 'plotter'), repr=False)
     ui: PhoUIContainer = field(default=Factory(PhoUIContainer, 'plotter'), repr=False)
     params: VisualizationParameters = field(default=Factory(VisualizationParameters, 'plotter'), repr=keys_only_repr)
@@ -101,6 +101,20 @@ class GenericMatplotlibContainer(PhoBaseContainerTool):
     @ax.setter
     def ax(self, value):
         self.plots.ax = value
+        
+
+    @classmethod
+    def init_from_matplotlib_objects(cls, name='MatplotlibRenderPlots', figures=[], axes=[], context=None, plots: Optional[Dict]=None, plots_data: Optional[Dict]=None, **kwargs) -> "GenericMatplotlibContainer":
+        if plots is None:
+            plots = {}
+        if plots_data is None:
+            plots_data = {}
+            
+        plots = MatplotlibRenderPlots(name=name, figures=figures, axes=axes, context=context, **plots)
+        plots_data = RenderPlotsData(name=name, **plots_data)
+        _obj = cls(name=name, plots=plots, plots_data=plots_data, **kwargs)
+        
+        return _obj
         
 
 

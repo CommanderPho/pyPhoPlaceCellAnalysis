@@ -6783,7 +6783,7 @@ def plot_attached_BinByBinDecodingDebugger(spike_raster_window, curr_active_pipe
 
 
 
-@function_attributes(short_name=None, tags=['mixin', 'sync', 'QT'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-02-24 17:07', related_items=[])
+@function_attributes(short_name=None, tags=['mixin', 'sync', 'QT', '2D'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-02-24 17:07', related_items=[])
 class Decoded2DPosteriorTimeSyncMixin:
     """ Implementors recieve simple time updates from another plot """
     
@@ -7370,6 +7370,7 @@ import pyphoplacecellanalysis.External.pyqtgraph as pg
 from pyphoplacecellanalysis.External.pyqtgraph.Qt import QtCore, QtGui
 from pyphoplacecellanalysis.GUI.PyQtPlot.BinnedImageRenderingWindow import BasicBinnedImageRenderingWindow
 
+@metadata_attributes(short_name=None, tags=['angular', 'directional', '2D', '3D', 'bapun', 'head-direction'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-10-21 06:14', related_items=[])
 class CircularBinnedImageRenderingWindow(BasicBinnedImageRenderingWindow):
     """Renders circular/angular heatmaps within each spatial bin
     
@@ -7438,8 +7439,8 @@ class CircularBinnedImageRenderingWindow(BasicBinnedImageRenderingWindow):
         item.setPen(pg.mkPen(None))  # No border
         
         # Add to plot
-        assert (window.plot_names is not None) and (len(window.plot_names) > 0) # 'angular_distribution'
-        plot_name: str = window.plot_names[0]
+        assert (self.plot_names is not None) and (len(self.plot_names) > 0) # 'angular_distribution'
+        plot_name: str = self.plot_names[0]
         assert plot_name in self.plots, f"plot_name: {plot_name} not in self.plots"
         self.plots[plot_name].mainPlotItem.addItem(item)
         
@@ -7462,6 +7463,7 @@ class CircularBinnedImageRenderingWindow(BasicBinnedImageRenderingWindow):
         # self.render_all_circular_heatmaps()
 
 
+@function_attributes(short_name=None, tags=['angular', 'directiona', '2D', '3D', 'bapun'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-10-21 06:15', related_items=[])
 def plot_spatial_angular_distributions(occupancy_map, subsample_factor=5):
     """Plot radar charts of angular distributions across spatial positions
     
@@ -7478,7 +7480,7 @@ def plot_spatial_angular_distributions(occupancy_map, subsample_factor=5):
     n_x, n_y, n_angles = occupancy_map.shape
     
     # Create main figure
-    fig, ax = plt.subplots(figsize=(25, 15), clear=True, num='test')
+    fig, ax = plt.subplots(figsize=(25, 15), clear=True, num='plot_spatial_angular_distributions')
     
     # Calculate angles for radar plot (in radians)
     # theta = np.linspace(0, 2*np.pi, n_angles, endpoint=False)
@@ -7527,14 +7529,14 @@ def radial_histogram(data, bins=12, ax=None):
     ax.set_yticks([])
     return ax
 
-def plot_spatial_angular_distributions(occupancy_map, subsample_factor=5):
+def plot_spatial_angular_distributions_alt(occupancy_map, subsample_factor=5):
     """ Usage
     
         fig, ax = plot_spatial_angular_distributions(occupancy_map, subsample_factor=2)
         plt.show()
     """
     n_x, n_y, n_angles = occupancy_map.shape
-    fig, ax = plt.subplots(figsize=(25, 15), clear=True, num='test')
+    fig, ax = plt.subplots(figsize=(25, 15), clear=True, num='plot_spatial_angular_distributions_alt')
 
     # Draw grid boxes for each x/y bin
     for i in range(n_x):
