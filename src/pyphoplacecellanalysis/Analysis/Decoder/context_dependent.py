@@ -1757,7 +1757,7 @@ class GenericDecoderDictDecodedEpochsDictResult(ComputedResult):
 
 
     @function_attributes(short_name=None, tags=['decoding', 'performance'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-08-26 17:59', related_items=[])
-    def determine_percent_correctly_decoded_contexts_and_pos_error(self, curr_active_pipeline=None, time_bin_size: float=0.060, export_all_laps_mode: bool=True) -> pd.DataFrame:
+    def determine_percent_correctly_decoded_contexts_and_pos_error(self, curr_active_pipeline=None, time_bin_size: float=0.060, export_all_laps_mode: bool=True, should_fail_on_exception=True) -> pd.DataFrame:
         """ 
         from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import determine_percent_correctly_decoded_contexts
         ## find the number of correctly decoded components:
@@ -1883,14 +1883,18 @@ class GenericDecoderDictDecodedEpochsDictResult(ComputedResult):
                     records_df.append(an_epochs_records_df)
                         
                 else:
-                    print(f'WARN: returned a_result: {a_result} or a_decoded_marginal_posterior_df: {a_decoded_marginal_posterior_df} was None for ctxt:\n\t ctxt: {a_target_context}. Skipping.')
+                    print(f'WARN:ctxt: {a_target_context} returned a_result: {a_result} or a_decoded_marginal_posterior_df: {a_decoded_marginal_posterior_df} was None. Skipping.')
                 
                 
-            except (TypeError, AttributeError) as e:
-                print(f'WARN: err: {e} for ctxt: {a_target_context}. Skipping.')
+            except (TypeError, AttributeError, ValueError) as e:
+                print(f'WARN: for ctxt: {a_target_context} -- err: {e}. Skipping.')
                 pass
             except Exception as e:
-                raise
+                if should_fail_on_exception:
+                    raise
+                else:
+                    print(f'ERROR: <UNHANDLED EXCEPTION> for ctxt: {a_target_context} err: {e}. Skipping and continuing because should_fail_on_exception == False.')
+                    
         ## END for a_target_context in ...
         
         ## build output df:
