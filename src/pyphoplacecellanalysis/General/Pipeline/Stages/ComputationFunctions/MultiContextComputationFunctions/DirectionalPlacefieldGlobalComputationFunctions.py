@@ -6845,7 +6845,7 @@ def _helper_add_interpolated_position_columns_to_decoded_result_df(a_result: Dec
 
     ## add in measured position columns
     global_measured_position_df: pd.DataFrame = deepcopy(global_measured_position_df) # computation_result.sess.position.to_dataframe()
-    global_all_directional_decoder_result: CustomDecodeEpochsResult = CustomDecodeEpochsResult.init_from_single_decoder_decoding_result_and_measured_pos_df(a_result, global_measured_position_df=global_measured_position_df)
+    a_decoder_comparison_result: CustomDecodeEpochsResult = CustomDecodeEpochsResult.init_from_single_decoder_decoding_result_and_measured_pos_df(a_result, global_measured_position_df=global_measured_position_df)
 
     xbin_edges = deepcopy(a_decoder.xbin)
     # ybin_edges = deepcopy(a_decoder.ybin)
@@ -6854,11 +6854,11 @@ def _helper_add_interpolated_position_columns_to_decoded_result_df(a_result: Dec
     active_computation_config = deepcopy(a_decoder.pf.config)
     # grid_bin_bounds = deepcopy(a_decoder.pf.config.grid_bin_bounds)
 
-    measured_positions_df: pd.DataFrame = deepcopy(global_all_directional_decoder_result.measured_decoded_position_comparion.measured_positions_dfs_list[0])
+    measured_positions_df: pd.DataFrame = deepcopy(a_decoder_comparison_result.measured_decoded_position_comparion.measured_positions_dfs_list[0])
     measured_positions_df = measured_positions_df.position.adding_binned_position_columns(xbin_edges=xbin_edges, ybin_edges=ybin_edges, active_computation_config=active_computation_config)
     measured_positions_df = measured_positions_df.rename(columns={'x':'x_meas', 'y':'y_meas', 'binned_x':'binned_x_meas', 'binned_y':'binned_y_meas'}, inplace=False).drop(columns=['t'], inplace=False) ## measured
 
-    decoded_positions_df: pd.DataFrame = deepcopy(global_all_directional_decoder_result.measured_decoded_position_comparion.decoded_positions_df_list[0])
+    decoded_positions_df: pd.DataFrame = deepcopy(a_decoder_comparison_result.measured_decoded_position_comparion.decoded_positions_df_list[0])
     decoded_positions_df = decoded_positions_df.position.adding_binned_position_columns(xbin_edges=xbin_edges, ybin_edges=ybin_edges, active_computation_config=active_computation_config)
     decoded_positions_df = decoded_positions_df.rename(columns={'x':'x_decoded_most_likely', 'binned_x':'binned_x_decoded_most_likely'}, inplace=False).drop(columns=['t'], inplace=False) ## decoded most likely
 
@@ -6872,7 +6872,7 @@ def _helper_add_interpolated_position_columns_to_decoded_result_df(a_result: Dec
     a_decoded_marginal_posterior_df = PandasHelpers.adding_additional_df_columns(original_df=a_decoded_marginal_posterior_df,
                                                                                 additional_cols_df=decoded_positions_df,
                                                                                 )
-    return a_decoded_marginal_posterior_df
+    return a_decoded_marginal_posterior_df, a_decoder_comparison_result
 
 
 

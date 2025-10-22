@@ -1848,16 +1848,23 @@ class GenericDecoderDictDecodedEpochsDictResult(ComputedResult):
         for a_target_context in _active_target_context_list:
             try:
                 best_matching_context, a_result, a_decoder, a_decoded_marginal_posterior_df = self.get_results_best_matching_context(context_query=a_target_context, debug_print=False)
-                
+                a_result: DecodedFilterEpochsResult = a_result
                 #TODO 2025-10-22 08:18: - [ ] Add position decoding performance
                 ## I'm thinking it should be the probability of the measured position given the correct context (so using the 1D non-context-dependent posterior).
                 # More diffuse (less confident) results should get less reward, but it seems most important to be right and not confidently wrong.
-                a_result
+                type(a_result)
                 assert curr_active_pipeline is not None, f"Need for the new 2025-10-22 position perforance results"
                 
                 global_measured_position_df: pd.DataFrame = deepcopy(curr_active_pipeline.sess.position.to_dataframe())
-                a_decoded_marginal_posterior_df: pd.DataFrame = _helper_add_interpolated_position_columns_to_decoded_result_df(a_result=a_result, a_decoder=a_decoder, a_decoded_marginal_posterior_df=a_decoded_marginal_posterior_df,
-																											  global_measured_position_df=global_measured_position_df)
+                a_decoded_marginal_posterior_df, a_decoder_comparison_result = _helper_add_interpolated_position_columns_to_decoded_result_df(a_result=a_result, a_decoder=a_decoder, a_decoded_marginal_posterior_df=a_decoded_marginal_posterior_df, global_measured_position_df=global_measured_position_df)
+
+                for an_epoch_idx in np.arange(a_result.num_filter_epochs):
+                    an_epoch_result: SingleEpochDecodedResult = a_result.get_result_for_epoch(an_epoch_idx)
+                    an_epoch_result.p_x_given_n
+
+                    
+
+                
 
                 global_decoded_result: SingleEpochDecodedResult = a_result.get_result_for_epoch(0)
                 p_x_given_n: NDArray[ND.Shape["N_POS_BINS, 4, N_TIME_BINS"], np.floating] = deepcopy(global_decoded_result.p_x_given_n) # .shape # (59, 4, 69488)
@@ -2164,8 +2171,8 @@ class GenericDecoderDictDecodedEpochsDictResult(ComputedResult):
     
 
     @function_attributes(short_name=None, tags=['export', 'CSV', 'main'], input_requires=['self.filter_epochs_decoded_track_marginal_posterior_df_dict'], output_provides=[], uses=['self.filter_epochs_decoded_track_marginal_posterior_df_dict', '_perform_export_dfs_dict_to_csvs'], used_by=[], creation_date='2025-03-13 08:58', related_items=[])
-    def export_csvs(self, parent_output_path: Path, active_context: IdentifyingContext, decoding_time_bin_size: float, session_name: str, curr_session_t_delta: Optional[float]=None, user_annotation_selections=None, valid_epochs_selections=None, custom_export_df_to_csv_fn=None, export_df_variable_names=None, use_single_FAT_df=True, tbin_values_dict: Optional[Dict[str, float]]=None,
-                     should_export_complete_all_scores_df:bool=True, should_export_session_correct_decoded_time_bin_performance_df:bool=True):
+    def export_csvs(self, parent_output_path: Path, active_context: IdentifyingContext, decoding_time_bin_size: float, session_name: str, curr_active_pipeline=None, curr_session_t_delta: Optional[float]=None, user_annotation_selections=None, valid_epochs_selections=None, custom_export_df_to_csv_fn=None, export_df_variable_names=None, use_single_FAT_df=True, tbin_values_dict: Optional[Dict[str, float]]=None,
+                     should_export_complete_all_scores_df:bool=True, should_export_session_correct_decoded_time_bin_performance_df:bool=True, **kwargs):
         """ export as a single_FAT .csv file or optionally (not yet implemented) separate .csv files.    
 
 
@@ -2241,7 +2248,7 @@ class GenericDecoderDictDecodedEpochsDictResult(ComputedResult):
                 # from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import determine_percent_correctly_decoded_contexts
                 ## find the number of correctly decoded components:
                 # session_correct_decoded_time_bin_performance_df: pd.DataFrame = determine_percent_correctly_decoded_contexts(curr_active_pipeline, time_bin_size=decoding_time_bin_size)
-                session_correct_decoded_time_bin_performance_df: pd.DataFrame = self.determine_percent_correctly_decoded_contexts_and_pos_error(curr_active_pipeline=None, time_bin_size=decoding_time_bin_size)
+                session_correct_decoded_time_bin_performance_df: pd.DataFrame = self.determine_percent_correctly_decoded_contexts_and_pos_error(curr_active_pipeline=curr_active_pipeline, time_bin_size=decoding_time_bin_size)
                 export_df_dict = {IdentifyingContext(fn_name='session_correct_decoded_time_bin_performance_df', known_named_decoding_epochs_type='perfmnc_session'): session_correct_decoded_time_bin_performance_df}
                 export_files_dict = export_files_dict | self._perform_export_dfs_dict_to_csvs(extracted_dfs_dict=export_df_dict, parent_output_path=parent_output_path, tbin_values_dict=tbin_values_dict,
                                                                                               active_context=active_context, session_name=session_name, curr_session_t_delta=curr_session_t_delta, user_annotation_selections=None, valid_epochs_selections=None, custom_export_df_to_csv_fn=custom_export_df_to_csv_fn,
@@ -2295,7 +2302,7 @@ class GenericDecoderDictDecodedEpochsDictResult(ComputedResult):
 
         # csv_save_paths_dict = GenericDecoderDictDecodedEpochsDictResult._perform_export_dfs_dict_to_csvs(extracted_dfs_dict=a_new_fully_generic_result.filter_epochs_decoded_track_marginal_posterior_df_dict,
         csv_save_paths_dict = self.export_csvs(parent_output_path=active_export_parent_output_path.resolve(),
-                                                    active_context=active_context, session_name=session_name, #curr_active_pipeline=owning_pipeline_reference,
+                                                    active_context=active_context, session_name=session_name, curr_active_pipeline=owning_pipeline_reference, #curr_active_pipeline=owning_pipeline_reference,
                                                     custom_export_df_to_csv_fn=custom_export_df_to_csv_fn,
                                                     decoding_time_bin_size=decoding_time_bin_size,
                                                     curr_session_t_delta=t_delta
