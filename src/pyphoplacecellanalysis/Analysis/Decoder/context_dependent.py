@@ -1899,7 +1899,11 @@ class GenericDecoderDictDecodedEpochsDictResult(ComputedResult):
         
         ## build output df:
         # records_df: pd.DataFrame = pd.DataFrame.from_records(records_df)
-        records_df: pd.DataFrame = pd.concat(records_df)
+        if len(records_df) > 0:
+            records_df: pd.DataFrame = pd.concat(records_df)
+        else:
+            return pd.DataFrame()
+        
         # if curr_active_pipeline is not None:
         #     records_df = records_df.across_session_identity.add_session_df_columns_from_pipeline(curr_active_pipeline=curr_active_pipeline, time_bin_size=time_bin_size, time_col=None)
         return records_df
