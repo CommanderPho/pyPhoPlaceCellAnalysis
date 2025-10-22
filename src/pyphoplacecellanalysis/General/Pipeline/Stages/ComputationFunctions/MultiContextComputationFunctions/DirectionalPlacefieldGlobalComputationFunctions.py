@@ -6877,9 +6877,9 @@ def _helper_add_interpolated_position_columns_to_decoded_result_df(a_result: Dec
         # an_epoch_result.nbins 84
         # np.shape(p_x_given_n): (4, 84) - (n_t_bins, n_pos_bins)
         
-        measured_positions_df: pd.DataFrame = deepcopy(a_decoder_comparison_result.measured_decoded_position_comparion.measured_positions_dfs_list[an_epoch_idx])
-        measured_positions_df = measured_positions_df.position.adding_binned_position_columns(xbin_edges=xbin_edges, ybin_edges=ybin_edges, active_computation_config=active_computation_config)
-        measured_positions_df = measured_positions_df.rename(columns={'x':'x_meas', 'y':'y_meas', 'binned_x':'binned_x_meas', 'binned_y':'binned_y_meas'}, inplace=False).drop(columns=['t'], inplace=False) ## measured
+        a_measured_positions_df: pd.DataFrame = deepcopy(a_decoder_comparison_result.measured_decoded_position_comparion.measured_positions_dfs_list[an_epoch_idx])
+        a_measured_positions_df = a_measured_positions_df.position.adding_binned_position_columns(xbin_edges=xbin_edges, ybin_edges=ybin_edges, active_computation_config=active_computation_config)
+        a_measured_positions_df = a_measured_positions_df.rename(columns={'x':'x_meas', 'y':'y_meas', 'binned_x':'binned_x_meas', 'binned_y':'binned_y_meas'}, inplace=False).drop(columns=['t'], inplace=False) ## measured
 
         # decoded_positions_df: pd.DataFrame = deepcopy(a_decoder_comparison_result.measured_decoded_position_comparion.decoded_positions_df_list[an_epoch_idx])
         # decoded_positions_df = decoded_positions_df.position.adding_binned_position_columns(xbin_edges=xbin_edges, ybin_edges=ybin_edges, active_computation_config=active_computation_config)
@@ -6889,7 +6889,7 @@ def _helper_add_interpolated_position_columns_to_decoded_result_df(a_result: Dec
         # np.shape(a_measured_binned_position) # (84, 2)
 
         ## 1D:
-        a_measured_binned_position = measured_positions_df['binned_x_meas'].to_numpy() ## 
+        a_measured_binned_position = a_measured_positions_df['binned_x_meas'].to_numpy() ## 
         np.shape(a_measured_binned_position) # (84, 2)
 
         pos_marginalized_p_x_given_n = np.nansum(p_x_given_n, axis=0) ## collapse across first dimension
@@ -6900,14 +6900,16 @@ def _helper_add_interpolated_position_columns_to_decoded_result_df(a_result: Dec
     
 
 
-    ## Add directly to `a_decoded_marginal_posterior_df` (concatenating columns to existing rows)
-    a_decoded_marginal_posterior_df = PandasHelpers.adding_additional_df_columns(original_df=a_decoded_marginal_posterior_df,
-                                                                                additional_cols_df=measured_positions_df,
-                                                                                )
+    # ## Add directly to `a_decoded_marginal_posterior_df` (concatenating columns to existing rows)
+    # a_decoded_marginal_posterior_df = PandasHelpers.adding_additional_df_columns(original_df=a_decoded_marginal_posterior_df,
+    #                                                                             additional_cols_df=measured_positions_df,
+    #                                                                             )
 
-    a_decoded_marginal_posterior_df = PandasHelpers.adding_additional_df_columns(original_df=a_decoded_marginal_posterior_df,
-                                                                                additional_cols_df=decoded_positions_df,
-                                                                                )
+    # a_decoded_marginal_posterior_df = PandasHelpers.adding_additional_df_columns(original_df=a_decoded_marginal_posterior_df,
+    #                                                                             additional_cols_df=decoded_positions_df,
+    #                                                                             )
+
+
     return a_decoded_marginal_posterior_df, a_decoder_comparison_result
 
 
