@@ -4079,7 +4079,7 @@ class CustomDecodeEpochsResult(UnpackableMixin):
     
 
     @classmethod
-    def init_from_single_decoder_decoding_result_and_measured_pos_df(cls, a_decoder_decoding_result: DecodedFilterEpochsResult, global_measured_position_df: pd.DataFrame, pfND_Decoder: Optional[BasePositionDecoder]=None, debug_print:bool=False) -> "CustomDecodeEpochsResult":
+    def init_from_single_decoder_decoding_result_and_measured_pos_df(cls, a_decoder_decoding_result: DecodedFilterEpochsResult, global_measured_position_df: pd.DataFrame, pfND_Decoder: Optional[BasePositionDecoder]=None, should_drop_epochs_with_no_valid_timebins: bool = True, debug_print:bool=False) -> "CustomDecodeEpochsResult":
         """ compare the decoded most-likely-positions and the measured positions interpolated to the same time bins.
         
          all_directional_laps_filter_epochs_decoder_custom_result: CustomDecodeEpochsResult = CustomDecodeEpochsResult.init_from_single_decoder_decoding_result_and_measured_pos_df(a_decoder_decoding_result=deepcopy(all_directional_laps_filter_epochs_decoder_result), global_measured_position_df=deepcopy(curr_active_pipeline.sess.position.to_dataframe()).dropna(subset=['lap']))
@@ -4089,6 +4089,7 @@ class CustomDecodeEpochsResult(UnpackableMixin):
         a_custom_decoder_decoding_result = cls(measured_decoded_position_comparion=cls.build_single_measured_decoded_position_comparison(a_decoder_decoding_result=a_decoder_decoding_result, global_measured_position_df=global_measured_position_df),
                                                                                                  decoder_result=a_decoder_decoding_result,
                                                                                                  epochs_bin_by_bin_performance_analysis_df=None,
+                                                                                                 should_drop_epochs_with_no_valid_timebins = should_drop_epochs_with_no_valid_timebins,
         )
         if pfND_Decoder is not None:
             try:
@@ -4179,6 +4180,7 @@ class CustomDecodeEpochsResult(UnpackableMixin):
 
         # return measured_positions_dfs_list, decoded_positions_df_list, decoded_measured_diff_df
         return MeasuredDecodedPositionComparison(measured_positions_dfs_list, decoded_positions_df_list, decoded_measured_diff_df)
+
 
     @classmethod
     def build_measured_decoded_position_comparison(cls, test_laps_decoder_results_dict: Dict[str, DecodedFilterEpochsResult], global_measured_position_df: pd.DataFrame):
@@ -6842,10 +6844,12 @@ def _helper_add_interpolated_position_columns_to_decoded_result_df(a_result: Dec
     
     """
     from neuropy.utils.indexing_helpers import PandasHelpers
+    from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import SingleEpochDecodedResult
+    from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import CustomDecodeEpochsResult
 
     ## add in measured position columns
     global_measured_position_df: pd.DataFrame = deepcopy(global_measured_position_df) # computation_result.sess.position.to_dataframe()
-    a_decoder_comparison_result: CustomDecodeEpochsResult = CustomDecodeEpochsResult.init_from_single_decoder_decoding_result_and_measured_pos_df(a_result, global_measured_position_df=global_measured_position_df)
+    a_decoder_comparison_result: CustomDecodeEpochsResult = CustomDecodeEpochsResult.init_from_single_decoder_decoding_result_and_measured_pos_df(a_result, global_measured_position_df=global_measured_position_df, should_drop_epochs_with_no_valid_timebins=False)
 
     xbin_edges = deepcopy(a_decoder.xbin)
     # ybin_edges = deepcopy(a_decoder.ybin)
@@ -6854,15 +6858,47 @@ def _helper_add_interpolated_position_columns_to_decoded_result_df(a_result: Dec
     active_computation_config = deepcopy(a_decoder.pf.config)
     # grid_bin_bounds = deepcopy(a_decoder.pf.config.grid_bin_bounds)
 
-    measured_positions_df: pd.DataFrame = deepcopy(a_decoder_comparison_result.measured_decoded_position_comparion.measured_positions_dfs_list[0])
-    measured_positions_df = measured_positions_df.position.adding_binned_position_columns(xbin_edges=xbin_edges, ybin_edges=ybin_edges, active_computation_config=active_computation_config)
-    measured_positions_df = measured_positions_df.rename(columns={'x':'x_meas', 'y':'y_meas', 'binned_x':'binned_x_meas', 'binned_y':'binned_y_meas'}, inplace=False).drop(columns=['t'], inplace=False) ## measured
+    # measured_positions_df: pd.DataFrame = deepcopy(a_decoder_comparison_result.measured_decoded_position_comparion.measured_positions_dfs_list[0])
+    # measured_positions_df = measured_positions_df.position.adding_binned_position_columns(xbin_edges=xbin_edges, ybin_edges=ybin_edges, active_computation_config=active_computation_config)
+    # measured_positions_df = measured_positions_df.rename(columns={'x':'x_meas', 'y':'y_meas', 'binned_x':'binned_x_meas', 'binned_y':'binned_y_meas'}, inplace=False).drop(columns=['t'], inplace=False) ## measured
 
-    decoded_positions_df: pd.DataFrame = deepcopy(a_decoder_comparison_result.measured_decoded_position_comparion.decoded_positions_df_list[0])
-    decoded_positions_df = decoded_positions_df.position.adding_binned_position_columns(xbin_edges=xbin_edges, ybin_edges=ybin_edges, active_computation_config=active_computation_config)
-    decoded_positions_df = decoded_positions_df.rename(columns={'x':'x_decoded_most_likely', 'binned_x':'binned_x_decoded_most_likely'}, inplace=False).drop(columns=['t'], inplace=False) ## decoded most likely
+    # decoded_positions_df: pd.DataFrame = deepcopy(a_decoder_comparison_result.measured_decoded_position_comparion.decoded_positions_df_list[0])
+    # decoded_positions_df = decoded_positions_df.position.adding_binned_position_columns(xbin_edges=xbin_edges, ybin_edges=ybin_edges, active_computation_config=active_computation_config)
+    # decoded_positions_df = decoded_positions_df.rename(columns={'x':'x_decoded_most_likely', 'binned_x':'binned_x_decoded_most_likely'}, inplace=False).drop(columns=['t'], inplace=False) ## decoded most likely
 
     ## OUTPUTS: measured_positions_df, decoded_positions_df
+    
+    ## compute 2025-10-22 - posterior-based method
+    measured_position_probs_list = []
+    an_epoch_idx = 0
+    for an_epoch_idx in np.arange(a_result.num_filter_epochs):
+        an_epoch_result: SingleEpochDecodedResult = a_result.get_result_for_epoch(an_epoch_idx)
+        p_x_given_n = an_epoch_result.p_x_given_n[an_epoch_idx]
+        # an_epoch_result.nbins 84
+        # np.shape(p_x_given_n): (4, 84) - (n_t_bins, n_pos_bins)
+        
+        measured_positions_df: pd.DataFrame = deepcopy(a_decoder_comparison_result.measured_decoded_position_comparion.measured_positions_dfs_list[an_epoch_idx])
+        measured_positions_df = measured_positions_df.position.adding_binned_position_columns(xbin_edges=xbin_edges, ybin_edges=ybin_edges, active_computation_config=active_computation_config)
+        measured_positions_df = measured_positions_df.rename(columns={'x':'x_meas', 'y':'y_meas', 'binned_x':'binned_x_meas', 'binned_y':'binned_y_meas'}, inplace=False).drop(columns=['t'], inplace=False) ## measured
+
+        # decoded_positions_df: pd.DataFrame = deepcopy(a_decoder_comparison_result.measured_decoded_position_comparion.decoded_positions_df_list[an_epoch_idx])
+        # decoded_positions_df = decoded_positions_df.position.adding_binned_position_columns(xbin_edges=xbin_edges, ybin_edges=ybin_edges, active_computation_config=active_computation_config)
+        # decoded_positions_df = decoded_positions_df.rename(columns={'x':'x_decoded_most_likely', 'binned_x':'binned_x_decoded_most_likely'}, inplace=False).drop(columns=['t'], inplace=False) ## decoded most likely
+
+        # a_measured_binned_position = measured_positions_df[['binned_x_meas', 'binned_y_meas']].to_numpy() ## 2D
+        # np.shape(a_measured_binned_position) # (84, 2)
+
+        ## 1D:
+        a_measured_binned_position = measured_positions_df['binned_x_meas'].to_numpy() ## 
+        np.shape(a_measured_binned_position) # (84, 2)
+
+        pos_marginalized_p_x_given_n = np.nansum(p_x_given_n, axis=0) ## collapse across first dimension
+        measured_pos_probabilities: NDArray[ND.Shape["N_TIME_BINS"], Any] = pos_marginalized_p_x_given_n[a_measured_binned_position] # (84,)
+        measured_position_probs_list.append(measured_pos_probabilities)
+        
+
+    
+
 
     ## Add directly to `a_decoded_marginal_posterior_df` (concatenating columns to existing rows)
     a_decoded_marginal_posterior_df = PandasHelpers.adding_additional_df_columns(original_df=a_decoded_marginal_posterior_df,
