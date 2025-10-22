@@ -20,6 +20,7 @@ from pyphocorehelpers.function_helpers import function_attributes
 
 
 from attrs import make_class
+from neuropy.utils.mixins.instance_class_reloadable import InstanceClassReloadableMixin
 
 
 SimpleBatchComputationDummy = make_class('SimpleBatchComputationDummy', attrs=['BATCH_DATE_TO_USE', 'collected_outputs_path', 'fail_on_exception'])
@@ -3264,6 +3265,7 @@ def generalized_decode_epochs_dict_and_export_results_completion_function(self, 
     from pyphocorehelpers.assertion_helpers import Assert
     from pyphoplacecellanalysis.General.Batch.NonInteractiveProcessing import batch_evaluate_required_computations, batch_extended_computations
     from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.EpochComputationFunctions import Compute_NonPBE_Epochs
+    from neuropy.utils.mixins.indexing_helpers import get_dict_subset
 
 
     # ==================================================================================================================== #
@@ -3343,7 +3345,6 @@ def generalized_decode_epochs_dict_and_export_results_completion_function(self, 
         assert valid_EpochComputations_result is not None, f"valid_EpochComputations_result is still None ever after attempted recomputation!!"
 
 
-
     a_new_fully_generic_result: GenericDecoderDictDecodedEpochsDictResult = valid_EpochComputations_result.a_generic_decoder_dict_decoded_epochs_dict_result
 
     if (a_new_fully_generic_result is None):
@@ -3394,6 +3395,10 @@ def generalized_decode_epochs_dict_and_export_results_completion_function(self, 
 
     active_export_parent_output_path = self.collected_outputs_path.resolve()
     Assert.path_exists(active_export_parent_output_path)
+
+    a_new_fully_generic_result = GenericDecoderDictDecodedEpochsDictResult(**get_dict_subset(a_new_fully_generic_result.__getstate__(), subset_excludelist=['_VersionedResultMixin_version'])) # GenericDecoderDictDecodedEpochsDictResult InstanceClassReloadableMixin._reload_class(a_new_fully_generic_result, an_updated_class=GenericDecoderDictDecodedEpochsDictResult)
+    
+
     csv_save_paths_dict = a_new_fully_generic_result.default_export_all_CSVs(active_export_parent_output_path=active_export_parent_output_path, owning_pipeline_reference=curr_active_pipeline, decoding_time_bin_size=decoding_time_bin_size)
     across_session_results_extended_dict['generalized_decode_epochs_dict_and_export_results_completion_function']['csv_save_paths_dict'] = deepcopy(csv_save_paths_dict)
     print(f'csv_save_paths_dict: {csv_save_paths_dict}\n')
