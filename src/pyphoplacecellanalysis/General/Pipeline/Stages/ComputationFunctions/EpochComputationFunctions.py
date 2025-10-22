@@ -743,16 +743,19 @@ class Compute_NonPBE_Epochs(ComputedResult):
             
         
         """
+        # global_maze_name: str = 'maze'
+        global_maze_name: str = 'maze_GLOBAL' ## #NOTE 2025-10-22 08:42: this is the name of the global epoch TO BE ADDED to the epochs below (with `.epochs.adding_global_epoch_row(global_epoch_name=global_maze_name)`), not its existing name.
+        
         maze_id_to_maze_name_map = {-1:'none', 0:'long', 1:'short'}
         epoch_overlap_prevention_kwargs = dict(additive_factor=-0.008, final_output_minimum_epoch_duration=0.040) # passed to `*df.epochs.modify_each_epoch_by(...)`
         
         PBE_df: pd.DataFrame = ensure_dataframe(deepcopy(sess.pbe))
         laps_df = ensure_dataframe(deepcopy(sess.laps))
         
-
         ## Build up a new epoch
-        epochs_df: pd.DataFrame = deepcopy(sess.epochs).epochs.adding_global_epoch_row()
-        global_epoch_only_df: pd.DataFrame = epochs_df.epochs.label_slice('maze')
+        epochs_df: pd.DataFrame = deepcopy(sess.epochs).epochs.adding_global_epoch_row(global_epoch_name=global_maze_name)
+        assert (global_maze_name in epochs_df['label'].to_list()), f"How can this be? We just added it! global_maze_name: '{global_maze_name}', epochs_df['label'].to_list(): {epochs_df['label'].to_list()}"
+        global_epoch_only_df: pd.DataFrame = epochs_df.epochs.label_slice(global_maze_name)
         
         # t_start, t_stop = epochs_df.epochs.t_start, epochs_df.epochs.t_stop
         global_epoch_only_non_PBE_epoch_df: pd.DataFrame = global_epoch_only_df.epochs.subtracting(PBE_df)
