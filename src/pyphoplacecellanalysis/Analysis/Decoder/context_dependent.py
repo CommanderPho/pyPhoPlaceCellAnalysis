@@ -7,6 +7,7 @@ from copy import deepcopy
 from pathlib import Path
 from typing import Dict, List, Tuple, Optional, Callable, Union, Any, Iterable
 from typing_extensions import TypeAlias
+import nptyping as ND
 from numpy.typing import NDArray  # Correct import for NDArray
 from typing import NewType
 import neuropy.utils.type_aliases as types
@@ -33,7 +34,7 @@ from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import DecodedFilter
 from pyphoplacecellanalysis.General.Model.ComputationResults import ComputedResult
 from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import DirectionalDecodersContinuouslyDecodedResult, DecodedFilterEpochsResult, DirectionalPseudo2DDecodersResult, EpochFilteringMode, _compute_proper_filter_epochs
 from pyphocorehelpers.indexing_helpers import partition_df_dict, partition_df
-from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import get_proper_global_spikes_df
+from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import get_proper_global_spikes_df, _helper_add_interpolated_position_columns_to_decoded_result_df
 
 # import scipy.stats
 # from scipy import ndimage
@@ -1755,7 +1756,7 @@ class GenericDecoderDictDecodedEpochsDictResult(ComputedResult):
 
 
     @function_attributes(short_name=None, tags=['decoding', 'performance'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-08-26 17:59', related_items=[])
-    def determine_percent_correctly_decoded_contexts(self, curr_active_pipeline=None, time_bin_size: float=0.060, export_all_laps_mode: bool=True) -> pd.DataFrame:
+    def determine_percent_correctly_decoded_contexts_and_pos_error(self, curr_active_pipeline=None, time_bin_size: float=0.060, export_all_laps_mode: bool=True) -> pd.DataFrame:
         """ 
         from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import determine_percent_correctly_decoded_contexts
         ## find the number of correctly decoded components:
@@ -1847,6 +1848,28 @@ class GenericDecoderDictDecodedEpochsDictResult(ComputedResult):
         for a_target_context in _active_target_context_list:
             try:
                 best_matching_context, a_result, a_decoder, a_decoded_marginal_posterior_df = self.get_results_best_matching_context(context_query=a_target_context, debug_print=False)
+                
+                #TODO 2025-10-22 08:18: - [ ] Add position decoding performance
+                ## I'm thinking it should be the probability of the measured position given the correct context (so using the 1D non-context-dependent posterior).
+                # More diffuse (less confident) results should get less reward, but it seems most important to be right and not confidently wrong.
+                a_result
+                assert curr_active_pipeline is not None, f"Need for the new 2025-10-22 position perforance results"
+                
+                global_measured_position_df: pd.DataFrame = deepcopy(curr_active_pipeline.sess.position.to_dataframe())
+                a_decoded_marginal_posterior_df: pd.DataFrame = _helper_add_interpolated_position_columns_to_decoded_result_df(a_result=a_result, a_decoder=a_decoder, a_decoded_marginal_posterior_df=a_decoded_marginal_posterior_df,
+																											  global_measured_position_df=global_measured_position_df)
+
+                global_decoded_result: SingleEpochDecodedResult = a_result.get_result_for_epoch(0)
+                p_x_given_n: NDArray[ND.Shape["N_POS_BINS, 4, N_TIME_BINS"], np.floating] = deepcopy(global_decoded_result.p_x_given_n) # .shape # (59, 4, 69488)
+                time_bin_centers: NDArray[ND.Shape["N_TIME_BINS"], np.floating] = deepcopy(global_decoded_result.time_bin_container.centers)
+                xbin: NDArray[ND.Shape["N_POS_BINS"], np.floating] = deepcopy(a_decoder.xbin)
+
+                # a_result
+
+
+
+
+                # Pre-2025-10-22 Context Decoding Only Performance ___________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
                 an_epochs_records_df  = _subfn_determine_num_correctly_decoded_time_bins(a_decoded_marginal_posterior_df=a_decoded_marginal_posterior_df, export_all_laps_mode=export_all_laps_mode, a_ctxt=best_matching_context)
                 _output_dict[best_matching_context] = an_epochs_records_df
                 # worse_percent_correct, (percent_correct_pre, n_correct_pre, n_total_pre), (percent_correct_post, n_correct_post, n_total_post) = a_num_counts_tuple
@@ -2218,7 +2241,7 @@ class GenericDecoderDictDecodedEpochsDictResult(ComputedResult):
                 # from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import determine_percent_correctly_decoded_contexts
                 ## find the number of correctly decoded components:
                 # session_correct_decoded_time_bin_performance_df: pd.DataFrame = determine_percent_correctly_decoded_contexts(curr_active_pipeline, time_bin_size=decoding_time_bin_size)
-                session_correct_decoded_time_bin_performance_df: pd.DataFrame = self.determine_percent_correctly_decoded_contexts(curr_active_pipeline=None, time_bin_size=decoding_time_bin_size)
+                session_correct_decoded_time_bin_performance_df: pd.DataFrame = self.determine_percent_correctly_decoded_contexts_and_pos_error(curr_active_pipeline=None, time_bin_size=decoding_time_bin_size)
                 export_df_dict = {IdentifyingContext(fn_name='session_correct_decoded_time_bin_performance_df', known_named_decoding_epochs_type='perfmnc_session'): session_correct_decoded_time_bin_performance_df}
                 export_files_dict = export_files_dict | self._perform_export_dfs_dict_to_csvs(extracted_dfs_dict=export_df_dict, parent_output_path=parent_output_path, tbin_values_dict=tbin_values_dict,
                                                                                               active_context=active_context, session_name=session_name, curr_session_t_delta=curr_session_t_delta, user_annotation_selections=None, valid_epochs_selections=None, custom_export_df_to_csv_fn=custom_export_df_to_csv_fn,
