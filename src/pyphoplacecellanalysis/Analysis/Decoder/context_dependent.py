@@ -1886,9 +1886,15 @@ class GenericDecoderDictDecodedEpochsDictResult(ComputedResult):
                     print(f'WARN:ctxt: {a_target_context} returned a_result: {a_result} or a_decoded_marginal_posterior_df: {a_decoded_marginal_posterior_df} was None. Skipping.')
                 
                 
-            except (TypeError, AttributeError, ValueError) as e:
+            except TypeError as e:
                 print(f'WARN: for ctxt: {a_target_context} -- err: {e}. Skipping.')
                 pass
+            except (AttributeError, ValueError) as e:
+                if should_fail_on_exception:
+                    raise
+                else:
+                    print(f'WARN: for ctxt: {a_target_context} -- err: {e}. Skipping.')
+                    
             except Exception as e:
                 if should_fail_on_exception:
                     raise
