@@ -1852,6 +1852,7 @@ class GenericDecoderDictDecodedEpochsDictResult(ComputedResult):
         a_PBEs_target_context: IdentifyingContext = IdentifyingContext(known_named_decoding_epochs_type='pbe', data_grain='per_time_bin', **common_constraint_dict) 
         _active_target_context_list = [a_Laps_target_context, a_global_target_context, a_PBEs_target_context]
         records_df = []
+        a_decoder_comparison_result_list = []
         for a_target_context in _active_target_context_list:
             try:
                 best_matching_context, a_result, a_decoder, a_decoded_marginal_posterior_df = self.get_results_best_matching_context(context_query=a_target_context, debug_print=False)
@@ -1865,10 +1866,35 @@ class GenericDecoderDictDecodedEpochsDictResult(ComputedResult):
                     
                     global_measured_position_df: pd.DataFrame = deepcopy(curr_active_pipeline.sess.position.to_dataframe())
                     a_decoded_marginal_posterior_df, a_decoder_comparison_result = _helper_add_interpolated_position_columns_to_decoded_result_df(a_result=a_result, a_decoder=a_decoder, a_decoded_marginal_posterior_df=a_decoded_marginal_posterior_df, global_measured_position_df=global_measured_position_df)
+                    ## #TODO 2025-10-23 06:46: - [ ] Do something with `a_decoder_comparison_result`, store it or something
+                    a_decoder_comparison_result_list.append(a_decoder_comparison_result)
 
+
+                    
+                    ## are flattened across all time bins                                                
+                    measured_post_probs_list: List[float] = flatten(a_decoder_comparison_result.measured_decoded_position_comparion.measured_post_prob_df)
+                    # measured_post_prob_df
+                    assert len(a_decoded_marginal_posterior_df) == len(measured_post_probs_list), f"len(a_decoded_marginal_posterior_df): {len(a_decoded_marginal_posterior_df)} == len(measured_post_probs_list): {len(measured_post_probs_list)}"
+                    ## just add in the rows
+                    a_decoded_marginal_posterior_df['pefmnc_measured_post_prob'] = measured_post_probs_list
+                    
+
+                    
+                        
                     # a_result
                     # Pre-2025-10-22 Context Decoding Only Performance ___________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
                     an_epochs_records_df  = _subfn_determine_num_correctly_decoded_time_bins(a_decoded_marginal_posterior_df=a_decoded_marginal_posterior_df, export_all_laps_mode=export_all_laps_mode, a_ctxt=best_matching_context)
+                    
+
+                    ## Add the `per_epoch` values to `an_epochs_records_df`
+                    measured_post_probs_epochs_list: List[List[float]] = deepcopy(a_decoder_comparison_result.measured_decoded_position_comparion.measured_post_prob_df) ## one list for each epoch:
+                    measured_post_probs_medians_per_epoch: NDArray = np.array([np.median(an_epoch_meas_post_probs_list) for i, an_epoch_meas_post_probs_list in enumerate(measured_post_probs_epochs_list)]) ## one per epoch
+                    measured_post_probs_median_all_epochs: float = np.median(measured_post_probs_list)
+                    
+                    _measured_post_probs_medians_per_epoch_including_all_epochs_list: NDArray = np.concatenate([measured_post_probs_medians_per_epoch, [measured_post_probs_median_all_epochs]])
+                    assert len(an_epochs_records_df) == len(_measured_post_probs_medians_per_epoch_including_all_epochs_list), f"len(an_epochs_records_df): {len(an_epochs_records_df)} == len(_measured_post_probs_medians_per_epoch_including_all_epochs_list): {len(_measured_post_probs_medians_per_epoch_including_all_epochs_list)}"
+                    an_epochs_records_df['pefmnc_measured_post_prob_median'] = _measured_post_probs_medians_per_epoch_including_all_epochs_list
+
                     _output_dict[best_matching_context] = an_epochs_records_df
                     # worse_percent_correct, (percent_correct_pre, n_correct_pre, n_total_pre), (percent_correct_post, n_correct_post, n_total_post) = a_num_counts_tuple
                     # a_record = dict(**best_matching_context.to_dict(), worse_percent_correct=worse_percent_correct, percent_correct_pre=percent_correct_pre, n_correct_pre=n_correct_pre, n_total_pre=n_total_pre,  percent_correct_post=percent_correct_post, n_correct_post=n_correct_post, n_total_post=n_total_post)

@@ -4178,7 +4178,7 @@ class CustomDecodeEpochsResult(UnpackableMixin):
                 test_decoded_measured_diff_cm: float = np.sqrt(test_decoded_measured_diff)
 
             decoded_measured_diff_df.append((center_epoch_time, test_decoded_measured_diff, test_decoded_measured_diff_cm))
-            decoded_measured_diff_df['meas_pos_probability'] = np.nan # Initialize to NaN, this is to be added 2025-10-23 to be filled with the probability for the actual groundtruth measured position (how much the posterior overlaps with that bin).
+            # decoded_measured_diff_df['meas_pos_probability'] = np.nan # Initialize to NaN, this is to be added 2025-10-23 to be filled with the probability for the actual groundtruth measured position (how much the posterior overlaps with that bin).
 
             ## END FOR
         decoded_measured_diff_df: pd.DataFrame = pd.DataFrame(decoded_measured_diff_df, columns=['t', 'sq_err', 'err_cm']) # convert list of tuples to a single df
@@ -6902,10 +6902,18 @@ def _helper_add_interpolated_position_columns_to_decoded_result_df(a_result: Dec
 
         a_measured_positions_df = a_measured_positions_df.rename(columns={'x':'x_meas', 'y':'y_meas', 'binned_x':'binned_x_meas', 'binned_y':'binned_y_meas'}, inplace=False).drop(columns=['t'], inplace=False) ## measured
 
-
-        # decoded_positions_df: pd.DataFrame = deepcopy(a_decoder_comparison_result.measured_decoded_position_comparion.decoded_positions_df_list[an_epoch_idx])
-        # decoded_positions_df = decoded_positions_df.position.adding_binned_position_columns(xbin_edges=xbin_edges, ybin_edges=ybin_edges, active_computation_config=active_computation_config)
-        # decoded_positions_df = decoded_positions_df.rename(columns={'x':'x_decoded_most_likely', 'binned_x':'binned_x_decoded_most_likely'}, inplace=False).drop(columns=['t'], inplace=False) ## decoded most likely
+        # Adding Interpolated df (older) _____________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
+        try:
+            ## Add directly to `a_decoded_marginal_posterior_df` (concatenating columns to existing rows)
+            if (a_decoded_marginal_posterior_df is not None):
+                a_decoded_marginal_posterior_df = PandasHelpers.adding_additional_df_columns(original_df=a_decoded_marginal_posterior_df,
+                                                                                            additional_cols_df=a_measured_positions_df,
+                                                                                            )
+        except Exception as e:
+            print(f'WARN: epoch[{an_epoch_idx}]: failed to do optional decoded_position interpolated columns (for `a_measured_positions_df`) for result df with error {e}\n\tskipping (this is okay 2025-10-23)')
+            pass
+        
+        
 
         # a_measured_binned_position = measured_positions_df[['binned_x_meas', 'binned_y_meas']].to_numpy() ## 2D
         # np.shape(a_measured_binned_position) # (84, 2)
@@ -6940,6 +6948,26 @@ def _helper_add_interpolated_position_columns_to_decoded_result_df(a_result: Dec
         a_measured_positions_df['measured_pos_probabilities'] = measured_pos_probabilities
         
         a_decoder_comparison_result.measured_decoded_position_comparion.measured_positions_dfs_list[an_epoch_idx] = a_measured_positions_df ## apply back to input
+        
+
+        # Adding Interpolated df (older) _____________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
+        try:
+
+            a_decoded_positions_df: pd.DataFrame = deepcopy(a_decoder_comparison_result.measured_decoded_position_comparion.decoded_positions_df_list[an_epoch_idx])
+            a_decoded_positions_df = a_decoded_positions_df.position.adding_binned_position_columns(xbin_edges=xbin_edges, ybin_edges=ybin_edges, active_computation_config=active_computation_config)
+            a_decoded_positions_df = a_decoded_positions_df.rename(columns={'x':'x_decoded_most_likely', 'binned_x':'binned_x_decoded_most_likely'}, inplace=False).drop(columns=['t'], inplace=False) ## decoded most likely
+
+            if (a_decoded_positions_df is not None):
+                a_decoded_marginal_posterior_df = PandasHelpers.adding_additional_df_columns(original_df=a_decoded_marginal_posterior_df,
+                                                                                            additional_cols_df=a_decoded_positions_df,
+                                                                                            )
+            
+        except Exception as e:
+            print(f'WARN: epoch[{an_epoch_idx}]: failed to do optional decoded_position interpolated columns (for `a_decoded_positions_df`) for result df with error {e}\n\tskipping (this is okay 2025-10-23)')
+            pass
+
+    
+
     ## END for an_epoch_idx in np.arange(a_result.num_filter_epochs)....
 
     ## assign the final result to the class:
