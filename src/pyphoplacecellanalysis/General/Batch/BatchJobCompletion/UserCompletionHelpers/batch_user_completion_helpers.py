@@ -3223,7 +3223,8 @@ def compute_and_export_session_extended_placefield_peak_information_completion_f
 
 
 @function_attributes(short_name=None, tags=['posterior', 'marginal', 'CSV', 'non-PBE', 'epochs', 'decoding'], input_requires=[], output_provides=[], uses=['GenericDecoderDictDecodedEpochsDictResult', 'pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.EpochComputationFunctions.EpochComputationFunctions.perform_compute_non_PBE_epochs'], used_by=[], creation_date='2025-03-09 16:35', related_items=['figures_plot_generalized_decode_epochs_dict_and_export_results_completion_function'])
-def generalized_decode_epochs_dict_and_export_results_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict, epochs_decoding_time_bin_size:float=0.025, force_recompute:bool=True, debug_print:bool=True, export_pkl: bool=True) -> dict:
+def generalized_decode_epochs_dict_and_export_results_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict, epochs_decoding_time_bin_size:float=0.025,
+                                                                           force_recompute:bool=True, debug_print:bool=True, export_pkl: bool=True, override_fail_on_exception: bool = True) -> dict:
     """ Aims to generally:
     1. Build a dict of decoders (usually 1D) built on several different subsets of input epochs (long_LR_laps-only, long_laps-only, long_non_PBE-only, ...etc
     2. Use these decoders and the neural data to decode posteriors for a variety of parameters (e.g. cell types, epochs-to-be-decoded, time_bin_sizes, etc)
@@ -3293,7 +3294,7 @@ def generalized_decode_epochs_dict_and_export_results_completion_function(self, 
     fail_on_exception = True
     EpochComputations_result_needs_full_recompute: bool = False
     # override_fail_on_exception: bool = False
-    override_fail_on_exception: bool = True
+    
 
     valid_EpochComputations_result: EpochComputationsComputationsContainer = curr_active_pipeline.global_computation_results.computed_data.get('EpochComputations', None)
     if valid_EpochComputations_result is None:
