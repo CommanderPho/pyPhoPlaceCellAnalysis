@@ -1861,15 +1861,12 @@ class GenericDecoderDictDecodedEpochsDictResult(ComputedResult):
                     #TODO 2025-10-22 08:18: - [ ] Add position decoding performance
                     ## I'm thinking it should be the probability of the measured position given the correct context (so using the 1D non-context-dependent posterior).
                     # More diffuse (less confident) results should get less reward, but it seems most important to be right and not confidently wrong.
-                    type(a_result)
                     assert curr_active_pipeline is not None, f"Need for the new 2025-10-22 position perforance results"
                     
                     global_measured_position_df: pd.DataFrame = deepcopy(curr_active_pipeline.sess.position.to_dataframe())
                     a_decoded_marginal_posterior_df, a_decoder_comparison_result = _helper_add_interpolated_position_columns_to_decoded_result_df(a_result=a_result, a_decoder=a_decoder, a_decoded_marginal_posterior_df=a_decoded_marginal_posterior_df, global_measured_position_df=global_measured_position_df)
                     ## #TODO 2025-10-23 06:46: - [ ] Do something with `a_decoder_comparison_result`, store it or something
                     a_decoder_comparison_result_list.append(a_decoder_comparison_result)
-
-
                     
                     ## are flattened across all time bins                                                
                     measured_post_probs_list: List[float] = flatten(a_decoder_comparison_result.measured_decoded_position_comparion.measured_post_prob_df)
@@ -1878,14 +1875,9 @@ class GenericDecoderDictDecodedEpochsDictResult(ComputedResult):
                     ## just add in the rows
                     a_decoded_marginal_posterior_df['pefmnc_measured_post_prob'] = measured_post_probs_list
                     
-
-                    
-                        
-                    # a_result
                     # Pre-2025-10-22 Context Decoding Only Performance ___________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
                     an_epochs_records_df  = _subfn_determine_num_correctly_decoded_time_bins(a_decoded_marginal_posterior_df=a_decoded_marginal_posterior_df, export_all_laps_mode=export_all_laps_mode, a_ctxt=best_matching_context)
                     
-
                     ## Add the `per_epoch` values to `an_epochs_records_df`
                     measured_post_probs_epochs_list: List[List[float]] = deepcopy(a_decoder_comparison_result.measured_decoded_position_comparion.measured_post_prob_df) ## one list for each epoch:
                     measured_post_probs_medians_per_epoch: NDArray = np.array([np.median(an_epoch_meas_post_probs_list) for i, an_epoch_meas_post_probs_list in enumerate(measured_post_probs_epochs_list)]) ## one per epoch
