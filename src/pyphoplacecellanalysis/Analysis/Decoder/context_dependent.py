@@ -1860,19 +1860,6 @@ class GenericDecoderDictDecodedEpochsDictResult(ComputedResult):
                     global_measured_position_df: pd.DataFrame = deepcopy(curr_active_pipeline.sess.position.to_dataframe())
                     a_decoded_marginal_posterior_df, a_decoder_comparison_result = _helper_add_interpolated_position_columns_to_decoded_result_df(a_result=a_result, a_decoder=a_decoder, a_decoded_marginal_posterior_df=a_decoded_marginal_posterior_df, global_measured_position_df=global_measured_position_df)
 
-                    for an_epoch_idx in np.arange(a_result.num_filter_epochs):
-                        an_epoch_result: SingleEpochDecodedResult = a_result.get_result_for_epoch(an_epoch_idx)
-                        an_epoch_result.p_x_given_n
-
-                        
-
-                    
-
-                    global_decoded_result: SingleEpochDecodedResult = a_result.get_result_for_epoch(0)
-                    p_x_given_n: NDArray[ND.Shape["N_POS_BINS, 4, N_TIME_BINS"], np.floating] = deepcopy(global_decoded_result.p_x_given_n) # .shape # (59, 4, 69488)
-                    time_bin_centers: NDArray[ND.Shape["N_TIME_BINS"], np.floating] = deepcopy(global_decoded_result.time_bin_container.centers)
-                    xbin: NDArray[ND.Shape["N_POS_BINS"], np.floating] = deepcopy(a_decoder.xbin)
-
                     # a_result
                     # Pre-2025-10-22 Context Decoding Only Performance ___________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
                     an_epochs_records_df  = _subfn_determine_num_correctly_decoded_time_bins(a_decoded_marginal_posterior_df=a_decoded_marginal_posterior_df, export_all_laps_mode=export_all_laps_mode, a_ctxt=best_matching_context)
@@ -2033,37 +2020,9 @@ class GenericDecoderDictDecodedEpochsDictResult(ComputedResult):
         # ================================================================================================================================================================================ #
         # BEGIN SUBN BLOCK                                                                                                                                                                 #
         # ================================================================================================================================================================================ #
-        # Export CSVs:
-
-        # def _subfn_custom_export_df_to_csv(export_df: pd.DataFrame, data_identifier_str: str = f'(laps_marginals_df)', parent_output_path: Path=None):
-        #     """ captures CURR_BATCH_DATE_TO_USE, `curr_active_pipeline`
-        #     """
-        #     output_date_str: str = deepcopy(CURR_BATCH_DATE_TO_USE)
-        #     if (output_date_str is None) or (len(output_date_str) < 1):
-        #         output_date_str = get_now_rounded_time_str(rounded_minutes=10)
-        #     out_path, out_filename, out_basename = curr_active_pipeline.build_complete_session_identifier_filename_string(output_date_str=output_date_str, data_identifier_str=data_identifier_str, parent_output_path=parent_output_path, out_extension='.csv')
-        #     export_df.to_csv(out_path)
-        #     return out_path 
-        
-
-        # custom_export_df_to_csv_fn = _subfn_custom_export_df_to_csv
         
         assert custom_export_df_to_csv_fn is not None, f"2025-04-05 - the default `_subfn_export_df_to_csv(...)` implementation provided below produces unparsable filenames, so require one passed for now."
-        # if custom_export_df_to_csv_fn is None:
-        #     def _subfn_export_df_to_csv(export_df: pd.DataFrame, data_identifier_str: str = f'(single_FAT)', parent_output_path: Path=None):
-        #         """ captures `active_context`, 'output_date_str' !! #TODO 2025-04-05 18:25: - [ ] session_identifier_str: seems a little long: 'kdiba_gor01_one_2006-6-09_1-22-43_normal_computed_[1, 2, 4, 6, 7, 9]_5.0' --- `data_identifier_str` is REALLY long tho: '(trained_compute_epochs:non_pbe|known_named_decoding_epochs_type:laps|masked_time_bin_fill_type:ignore)_tbin-0.025'
-        #         """
-        #         # parent_output_path: Path = Path('output').resolve()
-        #         # active_context = curr_active_pipeline.get_session_context()
-        #         session_identifier_str: str = active_context.get_description() # 'kdiba_gor01_two_2006-6-12_16-53-46__withNormalComputedReplays-qclu_[1, 2, 4, 6, 7, 9]-frateThresh_1.0normal_computed-frateThresh_1.0-qclu_[1, 2, 4, 6, 7, 9]'
-        #         # session_identifier_str: str = active_context.get_description(subset_excludelist=['custom_suffix']) # no this is just the session
-        #         assert output_date_str is not None
-        #         out_basename = '-'.join([output_date_str, session_identifier_str, data_identifier_str]) # '2024-11-15_0200PM-kdiba_gor01_one_2006-6-09_1-22-43__withNormalComputedReplays_qclu_[1, 2, 4, 6, 7, 9]_frateThresh_5.0-(ripple_WCorrShuffle_df)_tbin-0.025'
-        #         out_filename = f"{out_basename}.csv"
-        #         out_path = parent_output_path.joinpath(out_filename).resolve()
-        #         export_df.to_csv(out_path)
-        #         return out_path     
-        #     custom_export_df_to_csv_fn = _subfn_export_df_to_csv
+
 
         def _subfn_pre_process_and_export_df(export_df: pd.DataFrame, a_df_identifier: Union[str, IdentifyingContext], was_override: bool=True):
             """ sets up all the important metadata and then calls `custom_export_df_to_csv_fn(....)` to actually export the CSV
