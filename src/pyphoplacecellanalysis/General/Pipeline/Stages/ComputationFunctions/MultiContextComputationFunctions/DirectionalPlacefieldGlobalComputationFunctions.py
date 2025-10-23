@@ -4059,6 +4059,10 @@ class MeasuredDecodedPositionComparison(UnpackableMixin, object):
     measured_positions_dfs_list: List[pd.DataFrame] = field()
     decoded_positions_df_list: List[pd.DataFrame] = field()
     decoded_measured_diff_df: pd.DataFrame = field()
+    measured_post_prob_df: Optional[pd.DataFrame] = field(default=None)
+    
+
+
     
 @define(slots=False)
 class CustomDecodeEpochsResult(UnpackableMixin):
@@ -4179,7 +4183,7 @@ class CustomDecodeEpochsResult(UnpackableMixin):
         decoded_measured_diff_df: pd.DataFrame = pd.DataFrame(decoded_measured_diff_df, columns=['t', 'sq_err', 'err_cm']) # convert list of tuples to a single df
 
         # return measured_positions_dfs_list, decoded_positions_df_list, decoded_measured_diff_df
-        return MeasuredDecodedPositionComparison(measured_positions_dfs_list, decoded_positions_df_list, decoded_measured_diff_df)
+        return MeasuredDecodedPositionComparison(measured_positions_dfs_list, decoded_positions_df_list, decoded_measured_diff_df, None)
 
 
     @classmethod
