@@ -6874,15 +6874,22 @@ def _helper_add_interpolated_position_columns_to_decoded_result_df(a_result: Dec
     
     ## compute 2025-10-22 - posterior-based method
     measured_position_probs_list = []
+    
+    a_decoder_comparison_result.measured_decoded_position_comparion.measured_post_prob_df = [] ## set to a list to start
+    
+    
     an_epoch_idx = 0
     for an_epoch_idx in np.arange(a_result.num_filter_epochs):
         an_epoch_result: SingleEpochDecodedResult = a_result.get_result_for_epoch(an_epoch_idx)
-        p_x_given_n = an_epoch_result.p_x_given_n[an_epoch_idx]
+        p_x_given_n = an_epoch_result.p_x_given_n
+                
         # an_epoch_result.nbins 84
         # np.shape(p_x_given_n): (4, 84) - (n_t_bins, n_pos_bins)
         
         a_measured_positions_df: pd.DataFrame = deepcopy(a_decoder_comparison_result.measured_decoded_position_comparion.measured_positions_dfs_list[an_epoch_idx])
-        a_measured_positions_df = a_measured_positions_df.position.adding_binned_position_columns(xbin_edges=xbin_edges, ybin_edges=ybin_edges, active_computation_config=active_computation_config)
+        if 'binned_x_meas' not in a_measured_positions_df:
+            a_measured_positions_df = a_measured_positions_df.position.adding_binned_position_columns(xbin_edges=xbin_edges, ybin_edges=ybin_edges, active_computation_config=active_computation_config)
+
         a_measured_positions_df = a_measured_positions_df.rename(columns={'x':'x_meas', 'y':'y_meas', 'binned_x':'binned_x_meas', 'binned_y':'binned_y_meas'}, inplace=False).drop(columns=['t'], inplace=False) ## measured
 
         # decoded_positions_df: pd.DataFrame = deepcopy(a_decoder_comparison_result.measured_decoded_position_comparion.decoded_positions_df_list[an_epoch_idx])
@@ -6896,12 +6903,18 @@ def _helper_add_interpolated_position_columns_to_decoded_result_df(a_result: Dec
         a_measured_binned_position = a_measured_positions_df['binned_x_meas'].to_numpy() ## 
         np.shape(a_measured_binned_position) # (84, 2)
 
-        pos_marginalized_p_x_given_n = np.nansum(p_x_given_n, axis=0) ## collapse across first dimension
+        pos_marginalized_p_x_given_n = np.nansum(p_x_given_n, axis=0) / np.nansum(p_x_given_n) ## collapse across first dimension
         measured_pos_probabilities: NDArray[ND.Shape["N_TIME_BINS"], Any] = pos_marginalized_p_x_given_n[a_measured_binned_position] # (84,)
         measured_position_probs_list.append(measured_pos_probabilities)
         
+        a_measured_positions_df['measured_pos_probabilities'] = measured_pos_probabilities
+        
 
-    
+        a_decoder_comparison_result.measured_decoded_position_comparion.measured_positions_dfs_list[an_epoch_idx] = a_measured_positions_df ## apply back to input
+
+
+    ## assign the final result to the class:
+    a_decoder_comparison_result.measured_decoded_position_comparion.measured_post_prob_df = deepcopy(measured_position_probs_list)
 
 
     # ## Add directly to `a_decoded_marginal_posterior_df` (concatenating columns to existing rows)
