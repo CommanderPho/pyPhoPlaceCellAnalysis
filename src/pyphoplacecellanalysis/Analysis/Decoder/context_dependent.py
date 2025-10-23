@@ -927,7 +927,7 @@ class GenericDecoderDictDecodedEpochsDictResult(ComputedResult):
 
 
     @function_attributes(short_name=None, tags=['compute', 'continuous', 'epoch', 'global'], input_requires=[], output_provides=[], uses=['.perform_decoding', '.updating_results_for_context'], used_by=[], creation_date='2025-03-21 00:00', related_items=[])
-    def computing_for_global_epoch(self, curr_active_pipeline, debug_print=True):
+    def computing_for_global_epoch(self, curr_active_pipeline, debug_print=True, fail_on_exception: bool=False):
         """ Performs continuous decoding and computations for only the global epoch.
 
         Computes what are often (misleadinging) called "continuous" epoch computations, meaning they are computed uninterrupted across all time instead of start/ending at specific epochs (like laps or PBEs).
@@ -1023,55 +1023,61 @@ class GenericDecoderDictDecodedEpochsDictResult(ComputedResult):
 
 
         ## get the base decoder we'll use for decoding
-        print(f'trying to compute for known_named_decoding_epochs_type="non_pbe_endcaps"...')
-        # a_base_context = IdentifyingContext(trained_compute_epochs='laps', pfND_ndim=1, decoder_identifier='pseudo2D', time_bin_size=time_bin_size, data_grain='per_time_bin') # , known_named_decoding_epochs_type='laps', masked_time_bin_fill_type='ignore'
-        # a_best_matching_context, a_result, a_decoder, a_decoded_marginal_posterior_df = self.get_results_matching_contexts(a_base_context, return_multiple_matches=False)
-        new_desired_decode_epochs_name = 'non_pbe_endcaps'
-        assert hasattr(global_session, new_desired_decode_epochs_name), f"must already have the valid non_pbe_endcaps for the global_session. known_named_decoding_epochs_type: '{new_desired_decode_epochs_name}'"
-        new_desired_decode_epochs: Epoch = ensure_Epoch(deepcopy(getattr(global_session, new_desired_decode_epochs_name))) # .non_pbe_endcaps
-        
-        filter_epochs_to_decode_dict = {
-            # deepcopy(a_best_matching_context).overwriting_context(known_named_decoding_epochs_type='laps'):deepcopy(laps_df),
-            # deepcopy(a_best_matching_context).overwriting_context(known_named_decoding_epochs_type='pbes'):deepcopy(non_pbe_df),
-            deepcopy(a_laps_trained_decoder_ctxt).overwriting_context(known_named_decoding_epochs_type=new_desired_decode_epochs_name):deepcopy(new_desired_decode_epochs),
-        }
-        # self = self.perform_decoding(an_all_directional_pf1D_Decoder=deepcopy(a_laps_trained_decoder), filter_epochs_to_decode_dict=filter_epochs_to_decode_dict,
-        #                                     spikes_df=deepcopy(get_proper_global_spikes_df(curr_active_pipeline)), epochs_decoding_time_bin_size=time_bin_size,
-        #                                     session_name=session_name,
-        #                                     t_start=t_start, t_delta=t_delta, t_end=t_end,
-        #                                 )
-        _final_out_newly_added_context_tuples_dict = self.perform_decoding(an_all_directional_pf1D_Decoder=deepcopy(a_laps_trained_decoder), filter_epochs_to_decode_dict=filter_epochs_to_decode_dict,
-                                                    spikes_df=deepcopy(get_proper_global_spikes_df(curr_active_pipeline)), epochs_decoding_time_bin_size=time_bin_size,
-                                                    session_name=session_name,
-                                                    t_start=t_start, t_delta=t_delta, t_end=t_end,
-                                                )
+        try:
+            print(f'trying to compute for known_named_decoding_epochs_type="non_pbe_endcaps"...')
+            ## INPUTS: a_laps_trained_decoder_ctxt, a_laps_trained_decoder, global_session, curr_active_pipeline
+            new_desired_decode_epochs_name = 'non_pbe_endcaps'
+            assert hasattr(global_session, new_desired_decode_epochs_name), f"must already have the valid non_pbe_endcaps for the global_session. known_named_decoding_epochs_type: '{new_desired_decode_epochs_name}'"
+            new_desired_decode_epochs: Epoch = ensure_Epoch(deepcopy(getattr(global_session, new_desired_decode_epochs_name))) # .non_pbe_endcaps
+            
+            filter_epochs_to_decode_dict = {
+                deepcopy(a_laps_trained_decoder_ctxt).overwriting_context(known_named_decoding_epochs_type=new_desired_decode_epochs_name):deepcopy(new_desired_decode_epochs),
+            }
+            _final_out_newly_added_context_tuples_dict = self.perform_decoding(an_all_directional_pf1D_Decoder=deepcopy(a_laps_trained_decoder), filter_epochs_to_decode_dict=filter_epochs_to_decode_dict,
+                                                        spikes_df=deepcopy(get_proper_global_spikes_df(curr_active_pipeline)), epochs_decoding_time_bin_size=time_bin_size,
+                                                        session_name=session_name,
+                                                        t_start=t_start, t_delta=t_delta, t_end=t_end,
+                                                    )
 
-        ## OUTPUTS: a_new_fully_generic_result
-
+            ## OUTPUTS: a_new_fully_generic_result
+            
+        except Exception as e:
+            if fail_on_exception:
+                raise e
+            else:
+                print(f'while computing new_desired_decode_epochs_name: "{new_desired_decode_epochs_name}"\n encountered error {e}\n\tfail_on_exception == False so continuing, but typically would have failed.')
 
 
 
         # 'trained_compute_epochs' ________________________________________________________________________________________________________ #
-        new_desired_trained_compute_epochs_name: str = 'non_pbe' # initial_context_dict.pop('trained_compute_epochs', 'laps') # ['laps', 'pbe', 'non_pbe']
-        # final_output_context_dict['trained_compute_epochs'] = new_desired_trained_compute_epochs_name
-        
-        a_new_context = a_laps_trained_decoder_ctxt.overwriting_context(trained_compute_epochs=new_desired_trained_compute_epochs_name)
-        if debug_print:
-            print(f'\ta_new_context: {a_new_context}')
+        try:
+            new_desired_trained_compute_epochs_name: str = 'non_pbe' # initial_context_dict.pop('trained_compute_epochs', 'laps') # ['laps', 'pbe', 'non_pbe']
+            # final_output_context_dict['trained_compute_epochs'] = new_desired_trained_compute_epochs_name
             
+            a_new_context = a_laps_trained_decoder_ctxt.overwriting_context(trained_compute_epochs=new_desired_trained_compute_epochs_name)
+            if debug_print:
+                print(f'\ta_new_context: {a_new_context}')
+                
 
-        # assert hasattr(curr_active_pipeline.filtered_sessions[non_directional_names_to_default_epoch_names_map[global_epoch_name]], trained_compute_epochs_name), f"trained_compute_epochs_name: '{trained_compute_epochs_name}'"
-        assert hasattr(global_session, new_desired_trained_compute_epochs_name), f"trained_compute_epochs_name: '{new_desired_trained_compute_epochs_name}'"
-        #TODO 2025-03-11 09:10: - [X] Get proper compute epochs from the context
-        trained_compute_epochs: Epoch = ensure_Epoch(deepcopy(getattr(global_session, new_desired_trained_compute_epochs_name))) # .non_pbe
-        # new_decoder_dict: Dict[types.DecoderName, BasePositionDecoder] = {a_name:BasePositionDecoder(pf=a_pfs).replacing_computation_epochs(epochs=trained_compute_epochs) for a_name, a_pfs in original_pfs_dict.items()} ## build new simple decoders
-        a_new_decoder: BasePositionDecoder = deepcopy(a_laps_trained_decoder) #TODO 2025-03-26 12:51: - [ ] This is WRONG as is. # .replacing_computation_epochs(epochs=trained_compute_epochs) ## build new simple decoders BasePositionDecoder(pf=deepcopy(a_laps_trained_decoder.pf))
-        ## #TODO 2025-03-26 12:48: - [ ] `a_laps_trained_decoder.pf.position` is None... how does that happen?
-        ## add the new decoder
-        self.decoders[a_new_context] = a_new_decoder
+            # assert hasattr(curr_active_pipeline.filtered_sessions[non_directional_names_to_default_epoch_names_map[global_epoch_name]], trained_compute_epochs_name), f"trained_compute_epochs_name: '{trained_compute_epochs_name}'"
+            assert hasattr(global_session, new_desired_trained_compute_epochs_name), f"trained_compute_epochs_name: '{new_desired_trained_compute_epochs_name}'"
+            #TODO 2025-03-11 09:10: - [X] Get proper compute epochs from the context
+            trained_compute_epochs: Epoch = ensure_Epoch(deepcopy(getattr(global_session, new_desired_trained_compute_epochs_name))) # .non_pbe
+            # new_decoder_dict: Dict[types.DecoderName, BasePositionDecoder] = {a_name:BasePositionDecoder(pf=a_pfs).replacing_computation_epochs(epochs=trained_compute_epochs) for a_name, a_pfs in original_pfs_dict.items()} ## build new simple decoders
+            a_new_decoder: BasePositionDecoder = deepcopy(a_laps_trained_decoder) #TODO 2025-03-26 12:51: - [ ] This is WRONG as is. # .replacing_computation_epochs(epochs=trained_compute_epochs) ## build new simple decoders BasePositionDecoder(pf=deepcopy(a_laps_trained_decoder.pf))
+            ## #TODO 2025-03-26 12:48: - [ ] `a_laps_trained_decoder.pf.position` is None... how does that happen?
+            ## add the new decoder
+            self.decoders[a_new_context] = a_new_decoder
         
-        #TODO 2025-03-26 10:49: - [ ] Decoding using the decoder
+            #TODO 2025-03-26 10:49: - [ ] Decoding using the decoder
 
+            
+        except Exception as e:
+            if fail_on_exception:
+                raise e
+            else:
+                print(f'while computing new_desired_decode_epochs_name: "{new_desired_trained_compute_epochs_name}"\n encountered error {e}\n\tfail_on_exception == False so continuing, but typically would have failed.')
+                
 
         # final_output_context: IdentifyingContext = IdentifyingContext(**final_output_context_dict)
         
@@ -1873,7 +1879,7 @@ class GenericDecoderDictDecodedEpochsDictResult(ComputedResult):
                     print(f'WARN:ctxt: {a_target_context} returned a_result: {a_result} or a_decoded_marginal_posterior_df: {a_decoded_marginal_posterior_df} was None. Skipping.')
                 
                 
-            except TypeError as e:
+            except (TypeError, AttributeError, ValueError) as e:
                 print(f'WARN: for ctxt: {a_target_context} -- err: {e}. Skipping.')
                 pass
             except (AttributeError, ValueError) as e:
