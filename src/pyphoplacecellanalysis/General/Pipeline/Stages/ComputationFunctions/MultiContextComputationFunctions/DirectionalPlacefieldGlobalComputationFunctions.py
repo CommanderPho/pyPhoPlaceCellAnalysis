@@ -6881,7 +6881,7 @@ def _helper_add_interpolated_position_columns_to_decoded_result_df(a_result: Dec
     a_decoder_comparison_result.measured_decoded_position_comparion.measured_post_prob_df = [] ## set to a list to start
     
     
-    an_epoch_idx = 0
+    # an_epoch_idx = 0
     for an_epoch_idx in np.arange(a_result.num_filter_epochs):
         an_epoch_result: SingleEpochDecodedResult = a_result.get_result_for_epoch(an_epoch_idx)
         p_x_given_n: NDArray[ND.Shape["N_POS_BINS, 4, N_TIME_BINS"], np.floating] = deepcopy(an_epoch_result.p_x_given_n)

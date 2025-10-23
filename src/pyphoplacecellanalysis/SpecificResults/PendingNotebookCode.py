@@ -8625,6 +8625,8 @@ from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiCo
 class EstimationCorrectnessPlots:
     """ Compares ground truth to the decoded positions during laps
 
+    from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import EstimationCorrectnessPlots
+    
     EstimationCorrectnessPlots.plot_estimation_correctness_vertical_stack(
         _out_subset_decode_dfs_dict, 'binned_x_meas', 'estimation_correctness_track_ID'
     )

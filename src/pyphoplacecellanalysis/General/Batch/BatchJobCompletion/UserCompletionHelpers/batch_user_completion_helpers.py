@@ -3397,6 +3397,7 @@ def generalized_decode_epochs_dict_and_export_results_completion_function(self, 
     active_export_parent_output_path = self.collected_outputs_path.resolve()
     Assert.path_exists(active_export_parent_output_path)
 
+    ## This is just update the `a_new_fully_generic_result` object instance to the latest version of its class (`GenericDecoderDictDecodedEpochsDictResult`), a hack I did 2025-10-23 when it wasn't updating.
     a_new_fully_generic_result = GenericDecoderDictDecodedEpochsDictResult(**get_dict_subset(a_new_fully_generic_result.__getstate__(), subset_excludelist=['_VersionedResultMixin_version'])) # GenericDecoderDictDecodedEpochsDictResult InstanceClassReloadableMixin._reload_class(a_new_fully_generic_result, an_updated_class=GenericDecoderDictDecodedEpochsDictResult)
     
 
