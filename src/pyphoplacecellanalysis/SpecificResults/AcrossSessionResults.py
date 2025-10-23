@@ -4262,7 +4262,7 @@ class PerfmncMeasures:
         perfmnc_session_df
 
     """
-    @function_attributes(short_name=None, tags=['perfmnc', 'perfmnc_session'], input_requires=[], output_provides=[], uses=['ExportValueNameCleaner.split_custom_replay_name_col_to_replayMethod_qclu_frateThresh_cols'], used_by=[], creation_date='2025-08-27 00:32', related_items=[])
+    @function_attributes(short_name=None, tags=['perfmnc', 'perfmnc_session'], input_requires=[], output_provides=[], uses=['cls.post_load_fixup_df', 'ExportValueNameCleaner.split_custom_replay_name_col_to_replayMethod_qclu_frateThresh_cols'], used_by=[], creation_date='2025-08-27 00:32', related_items=[])
     @classmethod
     def find_and_load_most_recent_parsed_csv_files_df(cls, most_recent_parsed_csv_files_df: pd.DataFrame, debug_print=False, cuttoff_date: Optional[datetime]=None) -> pd.DataFrame:
         """ Finds the exported .csv files produced by `pyphoplacecellanalysis.Analysis.Decoder.context_dependent.GenericDecoderDictDecodedEpochsDictResult.export_csvs(...)` when `should_export_session_correct_decoded_time_bin_performance_df == True`
@@ -4273,11 +4273,6 @@ class PerfmncMeasures:
         perfmnc_session_df
         
         """
-        from pyphoplacecellanalysis.SpecificResults.AcrossSessionResults import ExportValueNameCleaner
-        from neuropy.core.user_annotations import UserAnnotationsManager
-        
-        session_shortname_to_full_name_dict: Dict[str, str] = {a_ctxt.session_name:a_ctxt.get_description(subset_includelist=a_ctxt._get_session_context_keys(), separator='_') for a_ctxt in UserAnnotationsManager.get_all_known_sessions()} 
-
         ## INPUTS: most_recent_parsed_csv_files_df
         most_recent_parsed_perfmnc_session_csv_files_df: pd.DataFrame = deepcopy(most_recent_parsed_csv_files_df).pho.constrain_df_cols(file_type='perfmnc_session')
         if cuttoff_date is not None:
@@ -4306,10 +4301,30 @@ class PerfmncMeasures:
 
 
         perfmnc_session_df: pd.DataFrame = pd.concat(loaded_dfs)
+        (perfmnc_per_session_df, perfmnc_per_indv_epochs_df) = cls.post_load_fixup_df(perfmnc_session_df=perfmnc_session_df)
+
+        return (perfmnc_per_session_df, perfmnc_per_indv_epochs_df)	
+    
+
+
+    @function_attributes(short_name=None, tags=['fixup'], input_requires=[], output_provides=[], uses=[], used_by=['cls.find_and_load_most_recent_parsed_csv_files_df'], creation_date='2025-10-23 08:28', related_items=[])
+    @classmethod
+    def post_load_fixup_df(cls, perfmnc_session_df: pd.DataFrame):
+        """ 
+        from pyphoplacecellanalysis.SpecificResults.AcrossSessionResults import PerfmncMeasures
+        
+        (perfmnc_per_session_df, perfmnc_per_indv_epochs_df) = PerfmncMeasures.post_load_fixup_df(perfmnc_session_df=perfmnc_session_df)
+        
+        """
+        from pyphoplacecellanalysis.SpecificResults.AcrossSessionResults import ExportValueNameCleaner
+        from neuropy.core.user_annotations import UserAnnotationsManager
+        
+        session_shortname_to_full_name_dict: Dict[str, str] = {a_ctxt.session_name:a_ctxt.get_description(subset_includelist=a_ctxt._get_session_context_keys(), separator='_') for a_ctxt in UserAnnotationsManager.get_all_known_sessions()} 
+        
         drop_column_name = list(perfmnc_session_df.columns)[0]
         perfmnc_session_df = perfmnc_session_df.drop(columns=drop_column_name).reset_index(drop=True) ## drop first column like 'Unnamed: 0'
         perfmnc_session_df = perfmnc_session_df.pho.constrain_df_cols(known_named_decoding_epochs_type='laps') ## HARDCODED
-        perfmnc_session_df = perfmnc_session_df.sort_values(['custom_replay_name', 'time_bin_size', 'session_name', 'parent_epoch_id']).reset_index(drop=True)
+        perfmnc_session_df = perfmnc_session_df.sort_values([col for col in ['custom_replay_name', 'time_bin_size', 'session_name', 'parent_epoch_id'] if col in perfmnc_session_df]).reset_index(drop=True)
 
         ## Split custom_replay_name column to separate columns:
         perfmnc_session_df = ExportValueNameCleaner.split_custom_replay_name_col_to_replayMethod_qclu_frateThresh_cols(perfmnc_session_df)
@@ -4317,20 +4332,20 @@ class PerfmncMeasures:
 
         ## split on record type:        
         _out_dfs_dict = perfmnc_session_df.pho.partition_df_dict('record_type')
-        perfmnc_per_indv_epochs_df = _out_dfs_dict['epoch'].drop(columns=['worse_percent_correct', 'percent_correct_pre', 'n_correct_pre', 'n_total_pre', 'percent_correct_post', 'n_correct_post', 'n_total_post'])
+        perfmnc_per_indv_epochs_df = _out_dfs_dict['epoch'].drop(columns=['worse_percent_correct', 'percent_correct_pre', 'n_correct_pre', 'n_total_pre', 'percent_correct_post', 'n_correct_post', 'n_total_post']) # 'pefmnc_measured_post_prob_median', 'pefmnc_measured_post_prob', 'pefmnc_measured_post_prob_median', ''
         perfmnc_per_session_df = _out_dfs_dict['all_epochs'].drop(columns=['percent_correct', 'n_correct', 'n_total', 'pre_post_delta_category', 'parent_epoch_id'])
         perfmnc_per_session_df['percent_correct_diff'] = perfmnc_per_session_df['percent_correct_post'] - perfmnc_per_session_df['percent_correct_pre'] # (-1: always short, 0.0: neutral, +1 always long)
 
         ## Add extra columns:        
         # perfmnc_per_indv_epochs_df['animal'] = perfmnc_per_indv_epochs_df['session_name'].map(lambda x: session_shortname_to_full_name_dict[x].split('_')[1])
         # perfmnc_per_indv_epochs_df
+        return (perfmnc_per_session_df, perfmnc_per_indv_epochs_df)
 
-        return (perfmnc_per_session_df, perfmnc_per_indv_epochs_df)	
-    
+
 
     @function_attributes(short_name=None, tags=['plotly', 'figure'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-08-28 17:26', related_items=[])
     @classmethod
-    def plot_per_indiv(cls, perfmnc_per_indv_epochs_df: pd.DataFrame, time_bin_size:float=1.0, qclu='[1, 2, 4, 6, 7, 8, 9]'):
+    def plot_per_indiv(cls, perfmnc_per_indv_epochs_df: pd.DataFrame, time_bin_size:float=1.0, qclu='[1, 2, 4, 6, 7, 8, 9]', correct_score_col_name: str = 'percent_correct'):
         """ 
         
         """
@@ -4359,7 +4374,7 @@ class PerfmncMeasures:
                     pass
         
         # fig = px.bar(active_df, x='parent_epoch_id', y='percent_correct', facet_row='session_name', **extra_plot_cmd_kwargs) # , facet_col='qclu'
-        fig = px.scatter(active_df, x='parent_epoch_id', y='percent_correct', facet_row='session_name', **extra_plot_cmd_kwargs)
+        fig = px.scatter(active_df, x='parent_epoch_id', y=correct_score_col_name, facet_row='session_name', **extra_plot_cmd_kwargs)
         # fig = px.box(active_df, x='parent_epoch_id', y='percent_correct', facet_row='session_name', **extra_plot_cmd_kwargs)
         # fig = fig.update_yaxes(matches='y', range=[0,1])
         # fig = fig.update_layout(facet_row_spacing=0.02)
@@ -4412,8 +4427,13 @@ class PerfmncMeasures:
 
     @function_attributes(short_name=None, tags=['plotly', 'figure'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-08-28 17:26', related_items=[])
     @classmethod
-    def plot_per_session(cls, perfmnc_per_session_df: pd.DataFrame, time_bin_size:float=None, qclu='[1, 2, 4, 6, 7, 8, 9]', worst_only=True):
+    def plot_per_session(cls, perfmnc_per_session_df: pd.DataFrame, time_bin_size:float=None, qclu='[1, 2, 4, 6, 7, 8, 9]', x_col_name=None, correct_score_col_name: str = 'worse_percent_correct'):
         """ 
+        
+        , correct_score_col_name: str = 'worse_percent_correct'
+        , correct_score_col_name: str = 'percent_correct'
+        , correct_score_col_name: str = 'pefmnc_measured_post_prob_median'/'pefmnc_measured_post_prob'
+        
         
         """
         import plotly.io as pio
@@ -4436,12 +4456,18 @@ class PerfmncMeasures:
                     extra_plot_cmd_kwargs['facet_col'] = 'time_bin_size' ## facet on the time bin size
                     # extra_plot_cmd_kwargs['color'] = 'time_bin_size'
                     pass
-                
-        if worst_only:
-            fig = px.scatter(active_df, x='time_bin_size', y='worse_percent_correct', color='session_name', **extra_plot_cmd_kwargs) # , facet_col='qclu'
+              
+
+        if (correct_score_col_name in ('percent_correct', 'pefmnc_measured_post_prob_median', 'pefmnc_measured_post_prob' )):
+            if x_col_name is None:
+                x_col_name = 'parent_epoch_id'            
+
+            fig = px.bar(active_df, x=x_col_name, y=correct_score_col_name, facet_row='session_name', **extra_plot_cmd_kwargs)
         else:
-            fig = px.bar(active_df, x='parent_epoch_id', y='percent_correct', facet_row='session_name', **extra_plot_cmd_kwargs)
-            
+            if x_col_name is None:
+                x_col_name = 'time_bin_size'
+            fig = px.scatter(active_df, x=x_col_name, y=correct_score_col_name, color='session_name', **extra_plot_cmd_kwargs) # , facet_col='qclu'
+
         fig = fig.update_layout(
             height=1400,
             xaxis=dict(showgrid=True, showline=True, mirror=True, linewidth=1, linecolor='black'),
