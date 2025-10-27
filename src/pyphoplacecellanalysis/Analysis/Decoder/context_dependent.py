@@ -1897,8 +1897,6 @@ class GenericDecoderDictDecodedEpochsDictResult(ComputedResult):
                     measured_post_probs_var_all_epochs: float = np.nanvar(measured_post_probs_list)
                     an_epochs_records_df['pefmnc_measured_post_prob_var'] = np.concatenate([measured_post_probs_vars_per_epoch, [measured_post_probs_var_all_epochs]])
                     
-                    
-
                     _output_dict[best_matching_context] = an_epochs_records_df
                     # worse_percent_correct, (percent_correct_pre, n_correct_pre, n_total_pre), (percent_correct_post, n_correct_post, n_total_post) = a_num_counts_tuple
                     # a_record = dict(**best_matching_context.to_dict(), worse_percent_correct=worse_percent_correct, percent_correct_pre=percent_correct_pre, n_correct_pre=n_correct_pre, n_total_pre=n_total_pre,  percent_correct_post=percent_correct_post, n_correct_post=n_correct_post, n_total_post=n_total_post)
