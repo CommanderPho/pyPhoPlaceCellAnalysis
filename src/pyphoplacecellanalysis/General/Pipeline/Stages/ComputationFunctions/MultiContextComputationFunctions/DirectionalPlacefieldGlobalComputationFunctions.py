@@ -4153,13 +4153,20 @@ class CustomDecodeEpochsResult(UnpackableMixin):
             test_decoded_positions_df = pd.DataFrame({'t':a_valid_sample_times, 'x':a_valid_decoded_positions, 'x_meas': a_valid_interpolated_measured_x})
             center_epoch_time = np.mean(a_sample_times)
             # test_decoded_positions_df['is_timebin_valid_for_both'] = timebin_is_valid_for_both
-            test_decoded_positions_df['sq_err'] = test_decoded_positions_df[['x', 'x_meas']].itertuples(index=False).map(lambda a_row: mean_squared_error(a_row.x, a_row.x_meas))
+            sq_err_out_list = []
+            # test_decoded_positions_df['sq_err'] = np.nan
+            for a_row in test_decoded_positions_df[['x', 'x_meas']].itertuples(index=False):
+                sq_err_out_list.append(mean_squared_error([a_row.x], [a_row.x_meas]))
+            ## END for a_row in test_decoded_positions_...
+            
+            test_decoded_positions_df['sq_err'] = np.array(sq_err_out_list)
+
+            # test_decoded_positions_df['sq_err'] = test_decoded_positions_df[['x', 'x_meas']].itertuples(index=False).map(lambda a_row: mean_squared_error(a_row.x, a_row.x_meas))
             test_decoded_positions_df['err_cm'] = np.sqrt(test_decoded_positions_df['sq_err'])
 
             decoded_positions_df_list.append(test_decoded_positions_df)
             # compute the diff error:
             # mean_squared_error(y_true, y_pred)
-            
 
             if (num_valid_timebins == 0):
                 print(f'WARN: encountered epoch[{epoch_idx}] with no valid timebins.')
@@ -6860,6 +6867,8 @@ def _helper_add_interpolated_position_columns_to_decoded_result_df(a_result: Dec
     ## add in measured position columns
     global_measured_position_df: pd.DataFrame = deepcopy(global_measured_position_df) # computation_result.sess.position.to_dataframe()
     a_decoder_comparison_result: CustomDecodeEpochsResult = CustomDecodeEpochsResult.init_from_single_decoder_decoding_result_and_measured_pos_df(a_result, global_measured_position_df=global_measured_position_df)
+    decoded_measured_diff_df: pd.DataFrame = deepcopy(a_decoder_comparison_result.measured_decoded_position_comparion.decoded_measured_diff_df) # n_epochs rows
+    
 
     xbin_edges = deepcopy(a_decoder.xbin)
     # ybin_edges = deepcopy(a_decoder.ybin)
@@ -6984,7 +6993,8 @@ def _helper_add_interpolated_position_columns_to_decoded_result_df(a_result: Dec
     # a_decoded_marginal_posterior_df = PandasHelpers.adding_additional_df_columns(original_df=a_decoded_marginal_posterior_df,
     #                                                                             additional_cols_df=decoded_positions_df,
     #                                                                             )
-
+    # len(a_decoded_marginal_posterior_df) == len(decoded_measured_diff_df)
+    # Assert.same_length(a_decoded_marginal_posterior_df, decoded_measured_diff_df)
 
     return a_decoded_marginal_posterior_df, a_decoder_comparison_result
 

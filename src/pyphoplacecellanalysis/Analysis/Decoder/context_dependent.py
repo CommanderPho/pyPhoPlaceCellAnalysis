@@ -1770,10 +1770,13 @@ class GenericDecoderDictDecodedEpochsDictResult(ComputedResult):
         records_df: pd.DataFrame = self.determine_percent_correctly_decoded_contexts_and_pos_error(curr_active_pipeline, time_bin_size=time_bin_size)
         records_df
         
+        
+        Adds columns: ['pefmnc_measured_post_prob_median', 'pefmnc_measured_post_prob_mean', 'pefmnc_measured_post_prob_var', 'pefmnc_err_cm']
+        
         """
         from pyphocorehelpers.assertion_helpers import Assert
         from pyphoplacecellanalysis.SpecificResults.AcrossSessionResults import AcrossSessionIdentityDataframeAccessor
-        
+        from sklearn.metrics import mean_squared_error
 
         def _subfn_count_correct(a_df):
             n_correct_pre: int = np.sum(a_df['is_groundtruth_correct'])
@@ -1878,6 +1881,8 @@ class GenericDecoderDictDecodedEpochsDictResult(ComputedResult):
                     # Pre-2025-10-22 Context Decoding Only Performance ___________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
                     an_epochs_records_df  = _subfn_determine_num_correctly_decoded_time_bins(a_decoded_marginal_posterior_df=a_decoded_marginal_posterior_df, export_all_laps_mode=export_all_laps_mode, a_ctxt=best_matching_context)
                     
+                    decoded_measured_diff_df: pd.DataFrame = deepcopy(a_decoder_comparison_result.measured_decoded_position_comparion.decoded_measured_diff_df)
+
                     ## Add the `per_epoch` values to `an_epochs_records_df`
                     measured_post_probs_epochs_list: List[List[float]] = deepcopy(a_decoder_comparison_result.measured_decoded_position_comparion.measured_post_prob_df) ## one list for each epoch:
                     measured_post_probs_medians_per_epoch: NDArray = np.array([np.nanmedian(an_epoch_meas_post_probs_list) for i, an_epoch_meas_post_probs_list in enumerate(measured_post_probs_epochs_list)]) ## one per epoch
@@ -1896,6 +1901,16 @@ class GenericDecoderDictDecodedEpochsDictResult(ComputedResult):
                     measured_post_probs_vars_per_epoch: NDArray = np.array([np.nanvar(an_epoch_meas_post_probs_list) for i, an_epoch_meas_post_probs_list in enumerate(measured_post_probs_epochs_list)]) ## one per epoch
                     measured_post_probs_var_all_epochs: float = np.nanvar(measured_post_probs_list)
                     an_epochs_records_df['pefmnc_measured_post_prob_var'] = np.concatenate([measured_post_probs_vars_per_epoch, [measured_post_probs_var_all_epochs]])
+                    
+
+                    # Assert.same_length(an_epochs_records_df, decoded_measured_diff_df)
+                    Assert.len_equals(decoded_measured_diff_df, required_length=(len(an_epochs_records_df) - 1))
+                    # an_epochs_records_df['sq_err'] = decoded_measured_diff_df['sq_err']
+                    # an_epochs_records_df['err_cm'] = decoded_measured_diff_df['err_cm']
+                    err_cm = decoded_measured_diff_df['err_cm'].to_numpy()
+                    err_cm_all_epochs: float = np.sqrt(np.sum(np.power(err_cm, 2)))
+                    an_epochs_records_df['pefmnc_err_cm'] = np.concatenate([err_cm, [err_cm_all_epochs]])
+                    
                     
                     _output_dict[best_matching_context] = an_epochs_records_df
                     # worse_percent_correct, (percent_correct_pre, n_correct_pre, n_total_pre), (percent_correct_post, n_correct_post, n_total_post) = a_num_counts_tuple
