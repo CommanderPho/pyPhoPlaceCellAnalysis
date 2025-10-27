@@ -4150,8 +4150,11 @@ class CustomDecodeEpochsResult(UnpackableMixin):
             # test_decoded_positions_df = pd.DataFrame({'t':a_sample_times, 'x':decoded_positions, 'is_timebin_valid_for_both': timebin_is_valid_for_both})
 
             ## only get valid bins: do we need all bins?
-            test_decoded_positions_df = pd.DataFrame({'t':a_valid_sample_times, 'x':a_valid_decoded_positions})
+            test_decoded_positions_df = pd.DataFrame({'t':a_valid_sample_times, 'x':a_valid_decoded_positions, 'x_meas': a_valid_interpolated_measured_x})
             center_epoch_time = np.mean(a_sample_times)
+            # test_decoded_positions_df['is_timebin_valid_for_both'] = timebin_is_valid_for_both
+            test_decoded_positions_df['sq_err'] = test_decoded_positions_df[['x', 'x_meas']].itertuples(index=False).map(lambda a_row: mean_squared_error(a_row.x, a_row.x_meas))
+            test_decoded_positions_df['err_cm'] = np.sqrt(test_decoded_positions_df['sq_err'])
 
             decoded_positions_df_list.append(test_decoded_positions_df)
             # compute the diff error:
