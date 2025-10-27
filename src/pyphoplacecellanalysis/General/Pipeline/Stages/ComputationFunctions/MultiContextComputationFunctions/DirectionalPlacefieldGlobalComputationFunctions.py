@@ -6913,7 +6913,7 @@ def _helper_add_interpolated_position_columns_to_decoded_result_df(a_result: Dec
                                                                                             additional_cols_df=a_measured_positions_df,
                                                                                             )
         except Exception as e:
-            print(f'WARN: epoch[{an_epoch_idx}]: failed to do optional decoded_position interpolated columns (for `a_measured_positions_df`) for result df with error {e}\n\tskipping (this is okay 2025-10-23)')
+            print(f'WARN: epoch[{an_epoch_idx}]: failed to do optional position interpolated columns (for `a_measured_positions_df`) for result df with error {e}\n\tskipping (this is okay 2025-10-23)')
             pass
         
         
@@ -6965,7 +6965,7 @@ def _helper_add_interpolated_position_columns_to_decoded_result_df(a_result: Dec
                                                                                             )
             
         except Exception as e:
-            print(f'WARN: epoch[{an_epoch_idx}]: failed to do optional decoded_position interpolated columns (for `a_decoded_positions_df`) for result df with error {e}\n\tskipping (this is okay 2025-10-23)')
+            print(f'WARN: epoch[{an_epoch_idx}]: failed to do optional position interpolated columns (for `a_decoded_positions_df`) for result df with error {e}\n\tskipping (this is okay 2025-10-23)')
             pass
 
     
