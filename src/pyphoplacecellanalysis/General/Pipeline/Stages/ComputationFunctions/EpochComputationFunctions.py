@@ -3287,22 +3287,19 @@ class KnownFilterEpochs(ExtendedEnum):
                 ## Lap-Epochs Decoding:
                 laps_copy = deepcopy(sess.laps)
                 active_filter_epochs = laps_copy.as_epoch_obj() # epoch object
-                if not isinstance(active_filter_epochs, pd.DataFrame):
-                    active_filter_epochs = active_filter_epochs.to_dataframe()
+                active_filter_epochs = ensure_dataframe(active_filter_epochs)
                 active_filter_epochs = post_process_epochs_fn(active_filter_epochs)
 
             elif filter_epochs.name == cls.PBE.name:
                 ## PBEs-Epochs Decoding:
                 active_filter_epochs = deepcopy(sess.pbe) # epoch object
-                if not isinstance(active_filter_epochs, pd.DataFrame):
-                    active_filter_epochs = active_filter_epochs.to_dataframe()
+                active_filter_epochs = ensure_dataframe(active_filter_epochs)
                 active_filter_epochs = post_process_epochs_fn(active_filter_epochs)
             
             elif filter_epochs.name == cls.RIPPLE.name:
                 ## Ripple-Epochs Decoding:
                 active_filter_epochs = deepcopy(sess.ripple) # epoch object
-                if not isinstance(active_filter_epochs, pd.DataFrame):
-                    active_filter_epochs = active_filter_epochs.to_dataframe()
+                active_filter_epochs = ensure_dataframe(active_filter_epochs)
                 # note we need to make sure we have a valid label to start because `.epochs.get_non_overlapping_df()` requires one.
                 active_filter_epochs['label'] = active_filter_epochs.index.to_numpy() # integer ripple indexing
                 active_filter_epochs = post_process_epochs_fn(active_filter_epochs)
@@ -3310,8 +3307,7 @@ class KnownFilterEpochs(ExtendedEnum):
                 
             elif filter_epochs.name == cls.REPLAY.name:
                 active_filter_epochs = deepcopy(sess.replay) # epoch object
-                if not isinstance(active_filter_epochs, pd.DataFrame):
-                    active_filter_epochs = active_filter_epochs.to_dataframe()
+                active_filter_epochs = ensure_dataframe(active_filter_epochs)
                 active_filter_epochs = post_process_epochs_fn(active_filter_epochs)
                 if min_epoch_included_duration is not None:
                     active_filter_epochs = active_filter_epochs[active_filter_epochs.duration >= min_epoch_included_duration] # only include those epochs which are greater than or equal to two decoding time bins
@@ -3319,8 +3315,7 @@ class KnownFilterEpochs(ExtendedEnum):
             elif filter_epochs.name == cls.NON_PBE.name:
                 ## non-PBEs-Epochs Decoding:
                 active_filter_epochs = deepcopy(sess.non_pbe) # epoch object
-                if not isinstance(active_filter_epochs, pd.DataFrame):
-                    active_filter_epochs = active_filter_epochs.to_dataframe()
+                active_filter_epochs = ensure_dataframe(active_filter_epochs)
                 active_filter_epochs = post_process_epochs_fn(active_filter_epochs)
 
             else:
@@ -3362,7 +3357,8 @@ class KnownFilterEpochs(ExtendedEnum):
     def process_functionList(cls, sess, filter_epochs, min_epoch_included_duration, default_figure_name='stacked_epoch_slices_matplotlib_subplots'):
         # min_epoch_included_duration = decoding_time_bin_size * float(2) # 0.06666
         # min_epoch_included_duration = 0.06666
-
+        epoch_description_list = None
+        
         if isinstance(filter_epochs, str):
             print(f'filter_epochs string: "{filter_epochs}"')
             filter_epochs = cls.init(value=filter_epochs) # init an enum object from the string
@@ -3373,8 +3369,7 @@ class KnownFilterEpochs(ExtendedEnum):
                 ## Lap-Epochs Decoding:
                 laps_copy = deepcopy(sess.laps)
                 active_filter_epochs = laps_copy.as_epoch_obj() # epoch object
-                if not isinstance(active_filter_epochs, pd.DataFrame):
-                    active_filter_epochs = active_filter_epochs.to_dataframe()
+                active_filter_epochs = ensure_dataframe(active_filter_epochs)
                 # pre_exclude_n_epochs = active_filter_epochs.n_epochs
                 active_filter_epochs = active_filter_epochs.epochs.get_non_overlapping_df()
                 # post_exclude_n_epochs = active_filter_epochs.n_epochs                    
@@ -3387,23 +3382,20 @@ class KnownFilterEpochs(ExtendedEnum):
             elif filter_epochs.name == KnownFilterEpochs.PBE.name:
                 ## PBEs-Epochs Decoding:
                 active_filter_epochs = deepcopy(sess.pbe) # epoch object
-                if not isinstance(active_filter_epochs, pd.DataFrame):
-                    active_filter_epochs = active_filter_epochs.to_dataframe()
+                active_filter_epochs = ensure_dataframe(active_filter_epochs)
                 active_filter_epochs = active_filter_epochs.epochs.get_non_overlapping_df()
             
             elif filter_epochs.name == KnownFilterEpochs.RIPPLE.name:
                 ## Ripple-Epochs Decoding:
                 active_filter_epochs = deepcopy(sess.ripple) # epoch object
-                if not isinstance(active_filter_epochs, pd.DataFrame):
-                    active_filter_epochs = active_filter_epochs.to_dataframe()
+                active_filter_epochs = ensure_dataframe(active_filter_epochs)
                 active_filter_epochs = active_filter_epochs.epochs.get_non_overlapping_df()
                 active_filter_epochs['label'] = active_filter_epochs.index.to_numpy() # integer ripple indexing
                 epoch_description_list = [f'ripple[{epoch_tuple.label}]' for epoch_tuple in active_filter_epochs[['label']].itertuples()] # SHORT
                 
             elif filter_epochs.name == KnownFilterEpochs.REPLAY.name:
                 active_filter_epochs = deepcopy(sess.replay) # epoch object
-                if not isinstance(active_filter_epochs, pd.DataFrame):
-                    active_filter_epochs = active_filter_epochs.to_dataframe()
+                active_filter_epochs = ensure_dataframe(active_filter_epochs)
                 active_filter_epochs = active_filter_epochs.epochs.get_non_overlapping_df()
                 if min_epoch_included_duration is not None:
                     active_filter_epochs = active_filter_epochs[active_filter_epochs.duration >= min_epoch_included_duration] # only include those epochs which are greater than or equal to two decoding time bins
@@ -3412,8 +3404,7 @@ class KnownFilterEpochs(ExtendedEnum):
 
             elif filter_epochs.name == KnownFilterEpochs.NON_PBE.name:
                 active_filter_epochs = deepcopy(sess.non_pbe) # epoch object
-                if not isinstance(active_filter_epochs, pd.DataFrame):
-                    active_filter_epochs = active_filter_epochs.to_dataframe()
+                active_filter_epochs = ensure_dataframe(active_filter_epochs)
                 active_filter_epochs = active_filter_epochs.epochs.get_non_overlapping_df()
                 if min_epoch_included_duration is not None:
                     active_filter_epochs = active_filter_epochs[active_filter_epochs.duration >= min_epoch_included_duration] # only include those epochs which are greater than or equal to two decoding time bins
@@ -3432,7 +3423,12 @@ class KnownFilterEpochs(ExtendedEnum):
             # Use it raw, hope it's right
             active_filter_epochs = filter_epochs
             default_figure_name = f'{default_figure_name}_CUSTOM'
-            epoch_description_list = [f'{default_figure_name} {epoch_tuple.label}' for epoch_tuple in active_filter_epochs.to_dataframe()[['label']].itertuples()]
+            epoch_description_list = [f'{default_figure_name} {epoch_tuple.label}' for epoch_tuple in ensure_dataframe(active_filter_epochs)[['label']].itertuples()]
+            
+
+        if (active_filter_epochs is not None) and (epoch_description_list is None):
+            epoch_description_list = [f'{default_figure_name} {epoch_tuple.label}' for epoch_tuple in ensure_dataframe(active_filter_epochs)[['label']].itertuples()]
+            
 
         return active_filter_epochs, default_figure_name, epoch_description_list
 

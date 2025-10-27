@@ -106,14 +106,22 @@ class DefaultDecoderDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Disp
     
         # print(f'_display_plot_marginal_1D_most_likely_position_comparisons(...): active_config: {active_config}, kwargs: {kwargs}')
         
-        active_decoder = computation_result.computed_data['pf2D_Decoder']
         if variable_name == 'x':
+            active_decoder = computation_result.computed_data['pf2D_Decoder']
+            active_marginals = active_decoder.marginal.x
+            active_bins = active_decoder.xbin
+        elif variable_name == 'y':
+            active_decoder = computation_result.computed_data['pf2D_Decoder']
+            active_marginals = active_decoder.marginal.y
+            active_bins = active_decoder.ybin
+
+        elif variable_name == 'lin_pos':
+            active_decoder = computation_result.computed_data['pf1D_Decoder']
             active_marginals = active_decoder.marginal.x
             active_bins = active_decoder.xbin
         else:
-            active_marginals = active_decoder.marginal.y
-            active_bins = active_decoder.ybin
-        
+            raise NotImplementedError(f'Unknown variable name: {variable_name}.')
+
         if most_likely_positions_mode == 'standard':
             active_most_likely_positions = active_marginals.most_likely_positions_1D # Raw decoded positions
         elif most_likely_positions_mode == 'corrected':
@@ -221,8 +229,16 @@ class DefaultDecoderDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Disp
         epochs_filtering_mode =  kwargs.pop('epochs_filtering_mode', EpochFilteringMode.DropShorter)
         decoder_ndim: int = kwargs.pop('decoder_ndim', 2)
         decoding_time_bin_size: float = kwargs.pop('decoding_time_bin_size', None)
-        if decoding_time_bin_size is None:
+        if decoder_ndim == 1:
+            active_decoder = computation_result.computed_data['pf1D_Decoder']
+            
+        elif (decoder_ndim == 2):
             active_decoder = computation_result.computed_data['pf2D_Decoder']
+        else:
+            raise NotImplementedError(f'decoder_ndim: {decoder_ndim} not handled!')            
+
+
+        if decoding_time_bin_size is None:
             if active_decoder is not None:
                 decoding_time_bin_size = active_decoder.time_bin_size ## get from existing decoder
 
@@ -235,6 +251,9 @@ class DefaultDecoderDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Disp
         ## Finally, add the display function to the active context
         active_display_fn_identifying_ctx = active_context.adding_context('display_fn', display_fn_name='display_plot_decoded_epoch_slices')
 
+        ## get search tuple
+        final_result_search_tuple = (filter_epochs, decoding_time_bin_size, decoder_ndim) # the correct key in `computation_result.computed_data['specific_epochs_decoding']`
+        
 
         ## NEW GET DATA
         print(f'decoding_time_bin_size: {decoding_time_bin_size}')
@@ -266,17 +285,18 @@ class DefaultDecoderDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Disp
     
 
         # filter_epochs_decoder_result, active_filter_epochs, default_figure_name = computation_result.computed_data['specific_epochs_decoding'][('Ripples', decoding_time_bin_size)]
-        filter_epochs_decoder_result, active_filter_epochs, default_figure_name = computation_result.computed_data['specific_epochs_decoding'][('replay', decoding_time_bin_size, decoder_ndim)]
+        # filter_epochs_decoder_result, active_filter_epochs, default_figure_name = computation_result.computed_data['specific_epochs_decoding'][('replay', decoding_time_bin_size, decoder_ndim)]
+        filter_epochs_decoder_result, active_filter_epochs, default_figure_name = computation_result.computed_data['specific_epochs_decoding'][final_result_search_tuple]
+
         active_filter_epochs = ensure_Epoch(active_filter_epochs)
         print(f'n_epochs: {active_filter_epochs.n_epochs}')
 
         ## Actual plotting portion:
-        # Workaround Requirements:
-        active_decoder = computation_result.computed_data['pf2D_Decoder']
-        out_plot_tuple = plot_decoded_epoch_slices(active_filter_epochs, filter_epochs_decoder_result, global_pos_df=computation_result.sess.position.to_dataframe(), xbin=active_decoder.xbin,
-                                                                **{'name':default_figure_name, 'debug_test_max_num_slices':1024, 'enable_flat_line_drawing':False, 'debug_print': False})
-        params, plots_data, plots, ui = out_plot_tuple
-
+        # # Workaround Requirements:
+        # active_decoder = computation_result.computed_data['pf2D_Decoder']
+        # out_plot_tuple = plot_decoded_epoch_slices(active_filter_epochs, filter_epochs_decoder_result, global_pos_df=computation_result.sess.position.to_dataframe(), xbin=active_decoder.xbin,
+        #                                                         **{'name':default_figure_name, 'debug_test_max_num_slices':1024, 'enable_flat_line_drawing':False, 'debug_print': False})
+        # params, plots_data, plots, ui = out_plot_tuple
 
 
         ## Actual plotting portion:
