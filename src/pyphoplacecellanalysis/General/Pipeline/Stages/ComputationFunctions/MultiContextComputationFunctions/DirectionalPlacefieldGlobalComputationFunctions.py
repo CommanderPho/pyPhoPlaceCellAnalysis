@@ -6952,7 +6952,6 @@ def _helper_add_interpolated_position_columns_to_decoded_result_df(a_result: Dec
 
         # Adding Interpolated df (older) _____________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
         try:
-
             a_decoded_positions_df: pd.DataFrame = deepcopy(a_decoder_comparison_result.measured_decoded_position_comparion.decoded_positions_df_list[an_epoch_idx])
             a_decoded_positions_df = a_decoded_positions_df.position.adding_binned_position_columns(xbin_edges=xbin_edges, ybin_edges=ybin_edges, active_computation_config=active_computation_config)
             a_decoded_positions_df = a_decoded_positions_df.rename(columns={'x':'x_decoded_most_likely', 'binned_x':'binned_x_decoded_most_likely'}, inplace=False).drop(columns=['t'], inplace=False) ## decoded most likely

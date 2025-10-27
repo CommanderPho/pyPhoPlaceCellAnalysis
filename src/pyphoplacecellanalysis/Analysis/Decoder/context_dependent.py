@@ -1880,12 +1880,24 @@ class GenericDecoderDictDecodedEpochsDictResult(ComputedResult):
                     
                     ## Add the `per_epoch` values to `an_epochs_records_df`
                     measured_post_probs_epochs_list: List[List[float]] = deepcopy(a_decoder_comparison_result.measured_decoded_position_comparion.measured_post_prob_df) ## one list for each epoch:
-                    measured_post_probs_medians_per_epoch: NDArray = np.array([np.median(an_epoch_meas_post_probs_list) for i, an_epoch_meas_post_probs_list in enumerate(measured_post_probs_epochs_list)]) ## one per epoch
-                    measured_post_probs_median_all_epochs: float = np.median(measured_post_probs_list)
+                    measured_post_probs_medians_per_epoch: NDArray = np.array([np.nanmedian(an_epoch_meas_post_probs_list) for i, an_epoch_meas_post_probs_list in enumerate(measured_post_probs_epochs_list)]) ## one per epoch
+                    measured_post_probs_median_all_epochs: float = np.nanmedian(measured_post_probs_list)
                     
                     _measured_post_probs_medians_per_epoch_including_all_epochs_list: NDArray = np.concatenate([measured_post_probs_medians_per_epoch, [measured_post_probs_median_all_epochs]])
                     assert len(an_epochs_records_df) == len(_measured_post_probs_medians_per_epoch_including_all_epochs_list), f"len(an_epochs_records_df): {len(an_epochs_records_df)} == len(_measured_post_probs_medians_per_epoch_including_all_epochs_list): {len(_measured_post_probs_medians_per_epoch_including_all_epochs_list)}"
                     an_epochs_records_df['pefmnc_measured_post_prob_median'] = _measured_post_probs_medians_per_epoch_including_all_epochs_list
+                    
+                    ## Add the `per_epoch` values to `an_epochs_records_df`
+                    ## INPUTS: measured_post_probs_epochs_list: List[List[float]]
+                    measured_post_probs_means_per_epoch: NDArray = np.array([np.nanmean(an_epoch_meas_post_probs_list) for i, an_epoch_meas_post_probs_list in enumerate(measured_post_probs_epochs_list)]) ## one per epoch
+                    measured_post_probs_mean_all_epochs: float = np.nanmean(measured_post_probs_list)
+                    an_epochs_records_df['pefmnc_measured_post_prob_mean'] = np.concatenate([measured_post_probs_means_per_epoch, [measured_post_probs_mean_all_epochs]])
+                    
+                    measured_post_probs_vars_per_epoch: NDArray = np.array([np.nanvar(an_epoch_meas_post_probs_list) for i, an_epoch_meas_post_probs_list in enumerate(measured_post_probs_epochs_list)]) ## one per epoch
+                    measured_post_probs_var_all_epochs: float = np.nanvar(measured_post_probs_list)
+                    an_epochs_records_df['pefmnc_measured_post_prob_var'] = np.concatenate([measured_post_probs_vars_per_epoch, [measured_post_probs_var_all_epochs]])
+                    
+                    
 
                     _output_dict[best_matching_context] = an_epochs_records_df
                     # worse_percent_correct, (percent_correct_pre, n_correct_pre, n_total_pre), (percent_correct_post, n_correct_post, n_total_post) = a_num_counts_tuple
