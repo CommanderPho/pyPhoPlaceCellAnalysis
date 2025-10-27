@@ -6839,7 +6839,7 @@ def _perform_compute_custom_epoch_decoding(curr_active_pipeline, directional_mer
         return decoder_laps_filter_epochs_decoder_result_dict, decoder_ripple_filter_epochs_decoder_result_dict
 
 
-@function_attributes(short_name=None, tags=['add_position_columns', 'decoded_df'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-05-03 17:14', related_items=[])
+@function_attributes(short_name=None, tags=['add_position_columns', 'decoded_df'], input_requires=[], output_provides=[], uses=['CustomDecodeEpochsResult'], used_by=[], creation_date='2025-05-03 17:14', related_items=[])
 def _helper_add_interpolated_position_columns_to_decoded_result_df(a_result: DecodedFilterEpochsResult, a_decoder: BasePositionDecoder, a_decoded_marginal_posterior_df: pd.DataFrame, global_measured_position_df: pd.DataFrame):
     """ adds the measured positions as columns in the decoded epochs/epoch_time_bins df
     
