@@ -560,7 +560,7 @@ def plot_1D_most_likely_position_comparsions(measured_position_df, time_window_c
 # A version of `plot_1D_most_likely_position_comparsions` that plots several images on the same axis: ____________________________________________________ #
 @function_attributes(short_name=None, tags=['decoder', 'plot', '1D', 'matplotlib', 'slices'], input_requires=[], output_provides=[], uses=[], used_by=['plot_most_likely_position_comparsions', 'AddNewLongShortDecodedEpochSlices_MatplotlibPlotCommand', 'AddNewTrackTemplatesDecodedEpochSlicesRows_MatplotlibPlotCommand'], creation_date='2023-10-17 12:25', related_items=['plot_1D_most_likely_position_comparsions'])
 def plot_slices_1D_most_likely_position_comparsions(measured_position_df, slices_time_window_centers, xbin, ax=None, slices_posteriors=None, slices_active_most_likely_positions_1D=None, slices_additional_plots_data=None, enable_flat_line_drawing=False, variable_name = 'x', debug_print=False, 
-                                             skip_plotting_measured_positions=False, skip_plotting_most_likely_positions=False, posterior_heatmap_imshow_kwargs=None, use_original_bounds=True):
+                                             skip_plotting_measured_positions=False, skip_plotting_most_likely_positions=False, posterior_heatmap_imshow_kwargs=None, use_original_bounds=True, return_created_artists:bool=False):
     """ renders a single 2D subplot in MATPLOTLIB for a 1D position axes: the computed posterior for the position from the Bayesian decoder and overlays the animal's actual position over the top.
     
     Animal's actual position is rendered as a red line with no markers 
@@ -592,6 +592,8 @@ def plot_slices_1D_most_likely_position_comparsions(measured_position_df, slices
         !! WARNING: it also make the plot not update on calls to .draw() and not appear at all on non-interactive backends!
     """
     from neuropy.utils.matplotlib_helpers import get_heatmap_cmap
+
+    _return_out_artists_dict = {}
 
     # # Get the colormap to use and set the bad color
     # cmap = mpl.colormaps.get_cmap('viridis')  # viridis is the default colormap for imshow
@@ -650,6 +652,7 @@ def plot_slices_1D_most_likely_position_comparsions(measured_position_df, slices
         else:
             line_measured_position = None
 
+        _return_out_artists_dict['line_measured_position'] = line_measured_position
         ax.set_title(variable_name)
     
         # Posterior distribution heatmap:
@@ -663,6 +666,10 @@ def plot_slices_1D_most_likely_position_comparsions(measured_position_df, slices
             out_img_list = [_subfn_try_plot_posterior_image(ax, time_window_centers=a_centers, posterior=a_posterior, xbin=xbin, enable_set_axis_limits=False, use_original_bounds=use_original_bounds, **main_plot_kwargs) for a_centers, a_posterior in zip(slices_time_window_centers, slices_posteriors)]
             ax.set_ylim((ymin, ymax)) ## only need to do once, when we are done
         # END if slices_posteriors is not None
+        else:
+            out_img_list = None
+
+        _return_out_artists_dict['im_posterior_x'] = out_img_list
 
         if slices_additional_plots_data is not None:
             raise NotImplementedError('slices_additional_plots_data functionality is not yet implemented as of 2023-10-17')
@@ -674,7 +681,6 @@ def plot_slices_1D_most_likely_position_comparsions(measured_position_df, slices
             if enable_flat_line_drawing:
                 # Enable drawing flat lines for each time bin interval instead of just displaying the single point in the middle:
                 #   build separate points for the start and end of each bin interval, and the repeat every element of the x and y values to line them up.
-
 
                 if isinstance(slices_active_most_likely_positions_1D, NDArray) and isinstance(slices_time_window_centers, NDArray):
                     ## a simple NDArray, not a List[NDArray]
@@ -752,13 +758,21 @@ def plot_slices_1D_most_likely_position_comparsions(measured_position_df, slices
 
             else:
                 line_most_likely_position = None
-                
+
+
+            _return_out_artists_dict['line_most_likely_position'] = line_most_likely_position
 
 
         # END if slices_ac....
-        
-        return fig, ax, out_img_list
     
+    ## END with plt.ion()....
+    if not return_created_artists:
+        return fig, ax, out_img_list
+    else:
+        return fig, ax, _return_out_artists_dict
+
+
+
 
 def _batch_update_posterior_image(long_results_obj, xbin, ax): # time_window_centers, posterior
     # Get the colormap to use and set the bad color
@@ -1251,6 +1265,16 @@ def _helper_update_decoded_single_epoch_slice_plot(curr_ax, params, plots_data, 
                                                         )
     if _temp_fig is not None:
         plots.fig = _temp_fig
+
+
+    if _return_out_artists_dict is not None:
+        if (not plots.has_attr('axes_artist_list')) or (getattr(plots, 'axes_artist_list', None) is None):
+            ## initialize
+            plots.axes_artist_list = {}
+
+        # if i not in plots.axes_artist_list:
+        #     plots.axes_artist_list = {}
+        plots.axes_artist_list[i] = _return_out_artists_dict
     
 
     # inferred_time_range = (curr_time_bins[0], curr_time_bins[-1])
