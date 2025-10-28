@@ -480,15 +480,23 @@ def programmatic_display_to_PDF(curr_active_pipeline, curr_display_function_name
 
     #TODO 2023-07-06 15:33: - [ ] Currently required for only one display function: `_display_1d_placefield_validations`
     # raise PendingDeprecationWarning
+    override_fig_man: Optional[FileOutputManager] = kwargs.pop('override_fig_man', None)
+        
 
     ## Get the output path (active_session_figures_out_path) for this session (and all of its filtered_contexts as well):
     active_identifying_session_ctx = curr_active_pipeline.sess.get_context() # 'bapun_RatN_Day4_2019-10-15_11-30-06'
-    figures_parent_out_path = create_daily_programmatic_display_function_testing_folder_if_needed()
-    active_session_figures_out_path = session_context_to_relative_path(figures_parent_out_path, active_identifying_session_ctx)
+    
+    if override_fig_man is not None:
+        print(f'override_fig_man is not None! Custom output path will be used!')
+        active_session_figures_out_path = override_fig_man.get_figure_save_file_path(active_identifying_session_ctx, make_folder_if_needed=True)
+        # print(f'\tfigures_parent_out_path: "{figures_parent_out_path}"')
+    else:
+        figures_parent_out_path = create_daily_programmatic_display_function_testing_folder_if_needed()
+        active_session_figures_out_path = session_context_to_relative_path(figures_parent_out_path, active_identifying_session_ctx)
+    
     if debug_print:
         print(f'curr_session_parent_out_path: {active_session_figures_out_path}')
     active_session_figures_out_path.mkdir(parents=True, exist_ok=True) # make folder if needed
-
 
     with plt.ioff():
         ## Disables showing the figure by default from within the context manager.
@@ -512,8 +520,10 @@ def programmatic_display_to_PDF(curr_active_pipeline, curr_display_function_name
             if debug_print:
                 print(f'active_identifying_ctx_string: "{active_identifying_ctx_string}"')
 
+
             ## Build PDF Output Info
             active_pdf_metadata, active_pdf_save_filename = build_pdf_metadata_from_display_context(final_context, subset_includelist=subset_includelist, subset_excludelist=subset_excludelist)
+            active_pdf_save_filename = sanitize_filename_for_Windows(active_pdf_save_filename)
             active_pdf_save_path = active_session_figures_out_path.joinpath(active_pdf_save_filename) # build the final output pdf path from the pdf_parent_out_path (which is the daily folder)
 
             ## BEGIN DISPLAY/SAVE
@@ -1142,7 +1152,8 @@ class FigureToImageHelpers:
 @function_attributes(short_name=None, tags=['PDF', 'export', 'output', 'matplotlib', 'display', 'file', 'active'], input_requires=[], output_provides=[], uses=['extract_figures_from_display_function_output'], used_by=[], creation_date='2023-06-08 11:55', related_items=[])
 def programmatic_render_to_file(curr_active_pipeline, curr_display_function_name='_display_plot_decoded_epoch_slices', subset_includelist=None, subset_excludelist=None, write_vector_format=False, write_png=True, debug_print=False, **kwargs):
     """ Loops through the individual epochs in a session (e.g. ['maze1', 'maze2', 'maze']) analagous to the structure of `programmatic_display_to_PDF` and programmatically calls `perform_write_to_file` with the appropriate parameters.
-    Newer Programmatic .png and .pdf outputs
+    Newer Programmatic .png and .pdf outputs (newer than `programmatic_display_to_PDF`)
+    
     curr_display_function_name = '_display_plot_decoded_epoch_slices' 
 
     Looks it this is done for EACH filtered context (in the loop below) whereas the original just did a single specific context
