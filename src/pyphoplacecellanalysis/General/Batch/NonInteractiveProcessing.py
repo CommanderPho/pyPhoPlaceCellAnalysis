@@ -772,7 +772,8 @@ class BatchPlotting:
                                         # variable_name='x',
                                         # size=(30, 15),
                                         scrollable_figure=False,
-                                        params_kwargs={'build_fn':'insets_view', },
+                                        should_use_MatplotlibTimeSynchronizedWidget=False,
+                                        params_kwargs={'build_fn':'insets_view', 'should_use_MatplotlibTimeSynchronizedWidget': False},
                                         **_batch_figure_kwargs, save_figure=save_figure,
                                     ) # _display_plot_decoded_epoch_slices #  🟢✅ Now seems to be working and saving to PDF!! Still using matplotlib.use('Qt5Agg') mode and plots still appear.
 
@@ -780,7 +781,7 @@ class BatchPlotting:
             # _out = curr_active_pipeline.display('_display_plot_decoded_epoch_slices', curr_active_pipeline.get_session_context(),
             #             build_fn='basic_view', constrained_layout=True, 
             #             # build_fn='insets_view', constrained_layout=None, layout='none', # , constrained_layout=False constrained_layout=None, layout='none', # , constrained_layout=None, layout='none' extrodinarily fast
-            #             skip_plotting_measured_positions=True, skip_plotting_most_likely_positions=True, **_batch_figure_kwargs, save_figure=save_figure)
+            #             skip_plotting_measured_positions=True, skip_plotting_most_likely_positions=True, should_use_MatplotlibTimeSynchronizedWidget=False, **_batch_figure_kwargs, save_figure=save_figure)
             
         except Exception as e:
             print(f'batch_extended_programmatic_figures(...): "_display_plot_decoded_epoch_slices" failed with error: {e}\n skipping.')
