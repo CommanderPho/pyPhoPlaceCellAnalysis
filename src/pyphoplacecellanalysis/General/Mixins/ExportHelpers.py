@@ -429,6 +429,8 @@ import matplotlib.pyplot as plt
 from matplotlib.backends import backend_pdf # Needed for
 # from pyphoplacecellanalysis.General.Mixins.ExportHelpers import create_daily_programmatic_display_function_testing_folder_if_needed, build_pdf_metadata_from_display_context
 from pyphocorehelpers.DataStructure.RenderPlots.MatplotLibRenderPlots import MatplotlibRenderPlots # required for extract_figures_from_display_function_output
+from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.ContainerBased.PhoContainerTool import GenericMatplotlibContainer
+
 
 @function_attributes(short_name=None, tags=[], input_requires=[], output_provides=[], uses=['MatplotlibRenderPlots'], used_by=['programmatic_render_to_file'], creation_date='2023-06-08 12:15')
 def extract_figures_from_display_function_output(out_display_var, out_fig_list:List=None, debug_print=False)->List:
@@ -447,6 +449,10 @@ def extract_figures_from_display_function_output(out_display_var, out_fig_list:L
         out_fig = ui.mw.getFigure() # TODO: Only works for MatplotlibWidget wrapped figures
         out_fig_list.append(out_fig)
     elif isinstance(out_display_var, MatplotlibRenderPlots):
+        # Newest style plots: 2022-12-09
+        out_fig_list.extend(out_display_var.figures)
+        
+    elif isinstance(out_display_var, GenericMatplotlibContainer):
         # Newest style plots: 2022-12-09
         out_fig_list.extend(out_display_var.figures)
 
