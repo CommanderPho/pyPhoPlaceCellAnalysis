@@ -223,6 +223,13 @@ def plot_laps_2d(sess, legacy_plotting_mode=True, **kwargs):
     pos_df = position_obj.to_dataframe()
     
     curr_laps_df = sess.laps.to_dataframe()
+    
+    if 'start_position_index' not in curr_laps_df.columns:
+        from neuropy.analyses.laps import _subfn_perform_compute_laps_pos_indicies
+        curr_laps_df = _subfn_perform_compute_laps_pos_indicies(laps_df=curr_laps_df, pos_df=pos_df, time_variable_name='t')
+        assert 'start_position_index' in curr_laps_df.columns, f"not there even after explicit add!?!\ncurr_laps_df: {curr_laps_df}\npos_df: {pos_df}"
+        
+
     fig, out_axes_list = plot_position_curves_figure(position_obj, **(override_dict(dict(include_velocity=True, include_accel=False, figsize=(24, 10), axes_list=None), kwargs))) #include_velocity=True, include_accel=True, figsize=(24, 10))
 
     ## Draw on top of the existing position curves with the lap colors:
