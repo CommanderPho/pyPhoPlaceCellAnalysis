@@ -366,9 +366,12 @@ def fig4_hist_stats_pho(bags: Dict, num_bootstrap_samples: int = 10000, confiden
         ## Get most recent sample of pre-delta: ('a', 'c') and do the test
         a_simulation_result = {}
 
-        a_simulated_prob_by_bag = {k:(v[-1][0] / np.sum(v[-1])) for k, v in simulated_counts_by_bag.items()}  ## -1 refers to only the last sample, [0] refers to the top extrema
-        a_simulated_prob_dist_by_bag = {k:(v[-1] / np.sum(v[-1])) for k, v in simulated_counts_by_bag.items()}  ## -1 refers to only the last sample, [0] refers to the top extrema
-        
+        # a_simulated_prob_by_bag = {k:(v[-1][0] / np.sum(v[-1])) for k, v in simulated_counts_by_bag.items()}  ## -1 refers to only the last sample, [0] refers to the top extrema
+        # a_simulated_prob_dist_by_bag = {k:(v[-1] / np.sum(v[-1])) for k, v in simulated_counts_by_bag.items()}  ## -1 refers to only the last sample, [0] refers to the top extrema
+
+
+        a_simulated_prob_by_bag = {k:(np.asarray(v[-1], dtype=float)[0] / np.sum(np.asarray(v[-1], dtype=float))) for k, v in simulated_counts_by_bag.items()}  ## -1 refers to only the last sample, [0] refers to the top extrema
+        a_simulated_prob_dist_by_bag = {k:(np.asarray(v[-1], dtype=float) / np.sum(np.asarray(v[-1], dtype=float))) for k, v in simulated_counts_by_bag.items()}  ## -1 refers to only the last sample, [0] refers to the top extrema
 
         ## INPUTS: total_n_per_bag, an_observed_n_red_sample, a_simulated_prob_by_bag, k1, k2
         a_simulation_result.update(**a_simulated_prob_by_bag)
