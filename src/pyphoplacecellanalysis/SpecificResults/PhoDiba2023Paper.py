@@ -1883,7 +1883,11 @@ def main_complete_figure_generations(curr_active_pipeline, enable_default_neptun
     # Perform `batch_perform_all_plots`                                                                                    #
     # ==================================================================================================================== #
     if enable_default_neptune_plots:
+        print(f'neptune plots are ENABLED: performing `batch_perform_all_plots(...)')
+
         neptuner = batch_perform_all_plots(curr_active_pipeline, enable_neptune=True)
+    else:
+        print(f'neptune plots are disabled because `enable_default_neptune_plots == False`. Skipping.')
 
     # ==================================================================================================================== #
     # Extract Relevent Specific Data Needed for Figure Display                                                             #
