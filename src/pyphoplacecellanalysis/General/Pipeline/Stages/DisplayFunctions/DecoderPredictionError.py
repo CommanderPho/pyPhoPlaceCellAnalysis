@@ -302,7 +302,10 @@ class DefaultDecoderDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Disp
 
         ## Actual plotting portion:
         out_plot_tuple = plot_decoded_epoch_slices(active_filter_epochs, filter_epochs_decoder_result, global_pos_df=computation_result.sess.position.to_dataframe(), xbin=active_decoder.xbin, included_epoch_indicies=included_epoch_indicies,
-                                                                **overriding_dict_with(lhs_dict={'name':default_figure_name, 'debug_test_max_num_slices':256, 'enable_flat_line_drawing':False, 'debug_print': False}, **kwargs))
+                                                                **overriding_dict_with(lhs_dict={'name':default_figure_name, 'debug_test_max_num_slices':256, 'enable_flat_line_drawing':False, 'debug_print': False,
+                                                                                                'should_use_MatplotlibTimeSynchronizedWidget': True, 'scrollable_figure': True,
+                                                                                                'single_plot_fixed_height': 100.0, 'active_marginal_fn': None, 'params_kwargs': None,
+                                                                                                }, **kwargs))
         params, plots_data, plots, ui = out_plot_tuple
         
 
@@ -1365,7 +1368,7 @@ def plot_decoded_epoch_slices(filter_epochs, filter_epochs_decoder_result, globa
     # PROCESS:
         `_subfn_update_decoded_epoch_slices` actually plots the data!
 
-
+        
 
     Parameters:
         variable_name: str - the name of the column in the global_pos_df that contains the variable to plot. 
