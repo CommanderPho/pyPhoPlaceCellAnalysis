@@ -747,8 +747,46 @@ class BatchPlotting:
         except Exception as e:
             print(f'batch_extended_programmatic_figures(...): calling programmatic_render_to_file for either "_display_2d_placefield_result_plot_ratemaps_2D" or "_display_2d_placefield_occupancy" failed with error: {e}\n skipping.')
             
+
+
         #TODO 2023-06-14 05:30: - [ ] Refactor these (the global placefields) into a form compatible with the local ones using some sort of shortcut method like `programmatic_render_to_file`
         save_figure = (write_vector_format or write_png)
+        
+
+        # _display_plot_decoded_epoch_slices ______________________________________________________________________ #
+        # plots the stack of decoded laps with their maginal posterior, measured position, and most-likely position
+        try:
+            # # Interactive-mode parameters:
+            # _interactive_mode_kwargs = dict(should_use_MatplotlibTimeSynchronizedWidget=True, scrollable_figure=True, defer_render=False)
+            # _restore_previous_matplotlib_settings_callback = matplotlib_configuration_update(is_interactive=True, backend='Qt5Agg')
+            # _curr_interaction_mode_kwargs = _interactive_mode_kwargs # interactive mode
+            decoding_time_bin_size: float = 0.075 # 75ms
+            # params_kwargs = {'build_fn':'insets_view', }
+            _out = programmatic_render_to_file(curr_active_pipeline, curr_display_function_name='_display_plot_decoded_epoch_slices', write_vector_format=write_vector_format, write_png=write_png, debug_print=debug_print, 
+                                        filter_epochs='lap',
+                                    #    filter_epochs='pbe',
+                                        decoding_time_bin_size = decoding_time_bin_size,
+                                        decoder_ndim = 1,
+                                        variable_name='lin_pos',
+                                        # decoding_time_bin_size=0.075,
+                                        # variable_name='x',
+                                        # size=(30, 15),
+                                        scrollable_figure=False,
+                                        params_kwargs={'build_fn':'insets_view', },
+                                        **_batch_figure_kwargs, save_figure=save_figure,
+                                    ) # _display_plot_decoded_epoch_slices #  🟢✅ Now seems to be working and saving to PDF!! Still using matplotlib.use('Qt5Agg') mode and plots still appear.
+
+
+            # _out = curr_active_pipeline.display('_display_plot_decoded_epoch_slices', curr_active_pipeline.get_session_context(),
+            #             build_fn='basic_view', constrained_layout=True, 
+            #             # build_fn='insets_view', constrained_layout=None, layout='none', # , constrained_layout=False constrained_layout=None, layout='none', # , constrained_layout=None, layout='none' extrodinarily fast
+            #             skip_plotting_measured_positions=True, skip_plotting_most_likely_positions=True, **_batch_figure_kwargs, save_figure=save_figure)
+            
+        except Exception as e:
+            print(f'batch_extended_programmatic_figures(...): "_display_plot_decoded_epoch_slices" failed with error: {e}\n skipping.')
+
+
+
 
         # Plot long|short firing rate index:
         try:
