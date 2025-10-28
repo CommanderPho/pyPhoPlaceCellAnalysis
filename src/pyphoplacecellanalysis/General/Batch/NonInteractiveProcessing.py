@@ -725,15 +725,28 @@ class BatchPlotting:
 
 
         # active_identifying_session_ctx = curr_active_pipeline.sess.get_context() # 'bapun_RatN_Day4_2019-10-15_11-30-06'
-        programmatic_render_to_file(curr_active_pipeline, curr_display_function_name='_display_1d_placefields', write_vector_format=write_vector_format, write_png=write_png, **_batch_figure_kwargs, debug_print=debug_print) # 🟢✅ Now seems to be working and saving to PDF!! Still using matplotlib.use('Qt5Agg') mode and plots still appear.
         
-        # '_display_1d_placefield_validations' can't use `programmatic_render_to_file` yet and must rely on `programmatic_display_to_PDF` because it doesn't get a new session for each figure and it overwrites itself a bunch
-        programmatic_display_to_PDF(curr_active_pipeline, curr_display_function_name='_display_1d_placefield_validations', **_batch_figure_kwargs, debug_print=debug_print) # , filter_name=active_config_name 🟢✅ Now seems to be working and saving to PDF!! Still using matplotlib.use('Qt5Agg') mode and plots still appear. Moderate visual improvements can still be made (titles overlap and stuff). Works with %%capture
-        # programmatic_render_to_file(curr_active_pipeline, curr_display_function_name='_display_1d_placefield_validations', write_vector_format=write_vector_format, write_png=write_png, debug_print=debug_print) #  UNTESTED 2023-05-29 
-        
-        programmatic_render_to_file(curr_active_pipeline, curr_display_function_name='_display_2d_placefield_result_plot_ratemaps_2D', write_vector_format=write_vector_format, write_png=write_png, **_batch_figure_kwargs, debug_print=debug_print, bg_rendering_mode=BackgroundRenderingOptions.EMPTY) #  🟢✅ Now seems to be working and saving to PDF!! Still using matplotlib.use('Qt5Agg') mode and plots still appear.
-        programmatic_render_to_file(curr_active_pipeline, curr_display_function_name='_display_2d_placefield_occupancy', write_vector_format=write_vector_format, write_png=write_png, **_batch_figure_kwargs, debug_print=debug_print) #  🟢✅ 2023-05-25
+
+        try:
+            programmatic_render_to_file(curr_active_pipeline, curr_display_function_name='_display_1d_placefields', write_vector_format=write_vector_format, write_png=write_png, **_batch_figure_kwargs, debug_print=debug_print) # 🟢✅ Now seems to be working and saving to PDF!! Still using matplotlib.use('Qt5Agg') mode and plots still appear.
+        except Exception as e:
+            print(f'batch_extended_programmatic_figures(...): calling programmatic_render_to_file(...) for "_display_1d_placefields" failed with error: {e}\n skipping.')
+            
+
+        try:
+            # '_display_1d_placefield_validations' can't use `programmatic_render_to_file` yet and must rely on `programmatic_display_to_PDF` because it doesn't get a new session for each figure and it overwrites itself a bunch
+            programmatic_display_to_PDF(curr_active_pipeline, curr_display_function_name='_display_1d_placefield_validations', **_batch_figure_kwargs, debug_print=debug_print) # , filter_name=active_config_name 🟢✅ Now seems to be working and saving to PDF!! Still using matplotlib.use('Qt5Agg') mode and plots still appear. Moderate visual improvements can still be made (titles overlap and stuff). Works with %%capture
+            # programmatic_render_to_file(curr_active_pipeline, curr_display_function_name='_display_1d_placefield_validations', write_vector_format=write_vector_format, write_png=write_png, debug_print=debug_print) #  UNTESTED 2023-05-29 
+        except Exception as e:
+            print(f'batch_extended_programmatic_figures(...): calling programmatic_render_to_file(...) for "_display_1d_placefield_validations" failed with error: {e}\n skipping.')
+            
     
+        try:
+            programmatic_render_to_file(curr_active_pipeline, curr_display_function_name='_display_2d_placefield_result_plot_ratemaps_2D', write_vector_format=write_vector_format, write_png=write_png, **_batch_figure_kwargs, debug_print=debug_print, bg_rendering_mode=BackgroundRenderingOptions.EMPTY) #  🟢✅ Now seems to be working and saving to PDF!! Still using matplotlib.use('Qt5Agg') mode and plots still appear.
+            programmatic_render_to_file(curr_active_pipeline, curr_display_function_name='_display_2d_placefield_occupancy', write_vector_format=write_vector_format, write_png=write_png, **_batch_figure_kwargs, debug_print=debug_print) #  🟢✅ 2023-05-25
+        except Exception as e:
+            print(f'batch_extended_programmatic_figures(...): calling programmatic_render_to_file for either "_display_2d_placefield_result_plot_ratemaps_2D" or "_display_2d_placefield_occupancy" failed with error: {e}\n skipping.')
+            
         #TODO 2023-06-14 05:30: - [ ] Refactor these (the global placefields) into a form compatible with the local ones using some sort of shortcut method like `programmatic_render_to_file`
         save_figure = (write_vector_format or write_png)
 
