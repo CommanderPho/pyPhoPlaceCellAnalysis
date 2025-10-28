@@ -328,7 +328,13 @@ class DefaultDecoderDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Disp
         # final_context = active_display_fn_identifying_ctx
 
         ## Use the context to appropriately set the window title for the plot:
-        ui.mw.setWindowTitle(f'{active_identifying_ctx_string}')
+        # params.should_use_MatplotlibTimeSynchronizedWidget
+        if (not ui.has_attr('mw')) or (getattr(ui, 'mw', None) is None):
+            # no windowing widget, skip
+            pass
+        else:
+            ## set window title:
+            ui.mw.setWindowTitle(f'{active_identifying_ctx_string}')
 
         _out_container: GenericMatplotlibContainer = GenericMatplotlibContainer(plots=plots, plots_data=plots_data, ui=ui, params=params, name=active_identifying_ctx_string)
         _out_container.plots_data.context = deepcopy(final_context)
