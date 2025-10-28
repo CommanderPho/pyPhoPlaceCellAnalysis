@@ -61,7 +61,10 @@ class GenericMatplotlibContainer(PhoBaseContainerTool):
     @property
     def figures(self):
         """The figures property."""
-        return self.plots.figures
+        if self.plots.figures is None:
+            return [self.plots.fig]
+        else:
+            return self.plots.figures
     @figures.setter
     def figures(self, value):
         self.plots.figures = value

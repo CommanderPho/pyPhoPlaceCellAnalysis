@@ -3448,7 +3448,7 @@ def generalized_decode_epochs_dict_and_export_results_completion_function(self, 
 
 @function_attributes(short_name=None, tags=['figure', 'batch', 'fig-export', 'hairly-plot'], input_requires=[], output_provides=[], uses=['_display_generalized_decoded_yellow_blue_marginal_epochs', '_display_decoded_trackID_marginal_hairy_position', '_display_decoded_trackID_weighted_position_posterior_withMultiColorOverlay'], used_by=[], creation_date='2025-05-16 15:17', related_items=['generalized_decode_epochs_dict_and_export_results_completion_function'])
 def figures_plot_generalized_decode_epochs_dict_and_export_results_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict,
-                                                                                        included_figures_names=['_display_directional_merged_pf_decoded_stacked_epoch_slices', '_display_generalized_decoded_yellow_blue_marginal_epochs', '_display_decoded_trackID_marginal_hairy_position', '_display_decoded_trackID_weighted_position_posterior_withMultiColorOverlay', '_display_placefield_stable_formation_time_distribution', '_display_measured_vs_decoded_occupancy_distributions', '_display_trial_to_trial_reliability'],
+                                                                                        included_figures_names=['_display_directional_merged_pf_decoded_stacked_epoch_slices', '_display_plot_decoded_epoch_slices', '_display_generalized_decoded_yellow_blue_marginal_epochs', '_display_decoded_trackID_marginal_hairy_position', '_display_decoded_trackID_weighted_position_posterior_withMultiColorOverlay', '_display_placefield_stable_formation_time_distribution', '_display_measured_vs_decoded_occupancy_distributions', '_display_trial_to_trial_reliability'],
                                                                                         extreme_threshold: float=0.8, opacity_max:float=0.7, thickness_ramping_multiplier:float=35.0,
                                                                                         fail_on_exception_for_debugging:bool=False,
                                                                                         **additional_marginal_overlaying_measured_position_kwargs) -> dict:
@@ -3474,7 +3474,7 @@ def figures_plot_generalized_decode_epochs_dict_and_export_results_completion_fu
 
 
     """
-    from pyphoplacecellanalysis.General.Mixins.ExportHelpers import FileOutputManager, FigureOutputLocation, ContextToPathMode	
+    from pyphoplacecellanalysis.General.Mixins.ExportHelpers import FileOutputManager, FigureOutputLocation, ContextToPathMode, extract_figures_from_display_function_output
     from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.EpochComputationFunctions import EpochComputationDisplayFunctions
     from benedict import benedict
     from pyphoplacecellanalysis.Pho2D.data_exporting import PosteriorExporting
@@ -3520,6 +3520,7 @@ def figures_plot_generalized_decode_epochs_dict_and_export_results_completion_fu
             print(f'\t trying "_display_directional_merged_pf_decoded_stacked_epoch_slices"')
             a_params_kwargs = {}
             display_context = curr_active_pipeline.build_display_context_for_session(display_fn_name='directional_decoded_stacked_epoch_slices')
+            # display_context = curr_active_pipeline.build_display_context_for_filtered_session(filtered_session_name=curr_active_pipeline.find_Global_epoch_name(), display_fn_name='decoded_epoch_slices')
             _out = curr_active_pipeline.display('_display_directional_merged_pf_decoded_stacked_epoch_slices', display_context, defer_render=True, save_figure=True,
                                                 # override_fig_man=custom_fig_man, 
                                                 parent_output_folder=custom_figure_output_path,
@@ -3540,7 +3541,61 @@ def figures_plot_generalized_decode_epochs_dict_and_export_results_completion_fu
         
 
 
+    # ==================================================================================================================================================================================================================================================================================== #
+    # '_display_plot_decoded_epoch_slices'                                                                                                                                                                                                         #
+    # ==================================================================================================================================================================================================================================================================================== #
+    ## this is the export of the separate 1D decoder posteriors to images
+    if ('_display_plot_decoded_epoch_slices' in included_figures_names) or ('decoded_epoch_slices' in included_figures_names):
 
+        try:
+            print(f'\t trying "_display_plot_decoded_epoch_slices"')
+
+            decoding_time_bin_size: float = 0.075 # 75ms
+            a_params_kwargs = {'build_fn':'insets_view', 'should_use_MatplotlibTimeSynchronizedWidget': False, 'scrollable_figure': False, }
+
+            # display_context = curr_active_pipeline.build_display_context_for_session(display_fn_name='decoded_epoch_slices')
+            display_context = curr_active_pipeline.build_display_context_for_filtered_session(filtered_session_name=curr_active_pipeline.find_Global_epoch_name(), display_fn_name='decoded_epoch_slices')
+            
+            _out = curr_active_pipeline.display('_display_plot_decoded_epoch_slices', display_context, defer_render=True, save_figure=True,
+                                                # override_fig_man=custom_fig_man, 
+                                                filter_epochs='lap',
+                                            #    filter_epochs='pbe',
+                                                decoding_time_bin_size = decoding_time_bin_size,
+                                                decoder_ndim = 1,
+                                                variable_name='lin_pos',
+                                                # variable_name='x',
+                                                size=(30, 15),
+                                                scrollable_figure=False, should_use_MatplotlibTimeSynchronizedWidget=False,
+                                                params_kwargs=a_params_kwargs,
+                                                parent_output_folder=custom_figure_output_path,
+                                            )
+            
+            # Extract the figures:
+            # out_fig_list = extract_figures_from_display_function_output(out_display_var=_out, out_fig_list=[]) # I think out_fig_list needs to be [] so it doesn't accumulate figures over the filtered_context?
+            out_fig_list = [_out.plots.fig]
+            extracted_context = _out.context
+            print(f'extracted_context: {extracted_context}')
+            _all_out_fig_paths = []
+            for fig in out_fig_list:
+                active_out_figure_paths = curr_active_pipeline.output_figure(extracted_context, fig, write_vector_format=False, write_png=True, override_fig_man=custom_fig_man, debug_print=True)                 
+                _all_out_fig_paths.extend(active_out_figure_paths)
+                
+
+            # _out = {k:benedict(v) if (k in keys_to_convert_to_benedict) else v for k, v in _out.items()}
+            _out = {
+                'extracted_context': extracted_context,
+                'export_paths': _all_out_fig_paths, 
+            }
+            
+            across_session_results_extended_dict['figures_plot_generalized_decode_epochs_dict_and_export_results_completion_function'].update({
+                '_display_plot_decoded_epoch_slices': _out,
+            })
+            
+
+        except Exception as e:
+            print(f'\tfigures_plot_generalized_decode_epochs_dict_and_export_results_completion_function(...): "_display_plot_decoded_epoch_slices" failed with error: {e}\n skipping.')
+            raise
+        
 
     # ==================================================================================================================================================================================================================================================================================== #
     # '_display_generalized_decoded_yellow_blue_marginal_epochs'                                                                                                                                                                                                                           #

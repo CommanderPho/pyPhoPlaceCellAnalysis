@@ -306,9 +306,6 @@ class DefaultDecoderDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Disp
         params, plots_data, plots, ui = out_plot_tuple
         
 
-
-        
-        
         ## Build the final context:
         
         # Add in the desired display variable:
