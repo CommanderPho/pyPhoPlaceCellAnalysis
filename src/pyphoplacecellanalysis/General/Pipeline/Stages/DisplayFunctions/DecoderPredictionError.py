@@ -258,47 +258,14 @@ class DefaultDecoderDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Disp
 
         ## NEW GET DATA
         print(f'decoding_time_bin_size: {decoding_time_bin_size}')
-        # computation_result = DefaultComputationFunctions._perform_specific_epochs_decoding(computation_result, curr_active_pipeline.active_configs[config_name], filter_epochs='ripple', decoding_time_bin_size=decoding_time_bin_size)
         computation_result = DefaultComputationFunctions._perform_specific_epochs_decoding(computation_result, active_config, decoder_ndim=decoder_ndim, filter_epochs=filter_epochs, decoding_time_bin_size=decoding_time_bin_size)
-
-        # # external-function way:
-        # # decoder_laps_filter_epochs_decoder_result_dict[a_name], decoder_ripple_filter_epochs_decoder_result_dict[a_name] = _compute_lap_and_ripple_epochs_decoding_for_decoder(a_decoder, curr_active_pipeline, desired_laps_decoding_time_bin_size=laps_decoding_time_bin_size, desired_ripple_decoding_time_bin_size=ripple_decoding_time_bin_size, epochs_filtering_mode=EpochFilteringMode.DropShorter)
-        # ## Decode Ripples:
-        # if decoding_time_bin_size is not None:
-        #     global_replays = TimeColumnAliasesProtocol.renaming_synonym_columns_if_needed(deepcopy(curr_active_pipeline.filtered_sessions[global_epoch_name].replay))
-        #     global_replays, ripple_decoding_time_bin_size = _compute_proper_filter_epochs(epochs_df=global_replays, desired_decoding_time_bin_size=decoding_time_bin_size, minimum_event_duration=(2.0 * decoding_time_bin_size), mode=epochs_filtering_mode) # `ripple_decoding_time_bin_size` is set here! It takes a minimum value
-        #     if use_single_time_bin_per_epoch:
-        #         ripple_decoding_time_bin_size = None
-
-        #     a_directional_ripple_filter_epochs_decoder_result: DecodedFilterEpochsResult = active_decoder.decode_specific_epochs(deepcopy(curr_active_pipeline.sess.spikes_df), filter_epochs=global_replays,
-        #                                                                                                                           decoding_time_bin_size=ripple_decoding_time_bin_size, use_single_time_bin_per_epoch=use_single_time_bin_per_epoch, debug_print=False)
-        #     # ## new `_compute_arbitrary_epochs_decoding_for_decoder` way (but untested)
-        #     # a_directional_ripple_filter_epochs_decoder_result: DecodedFilterEpochsResult = _compute_arbitrary_epochs_decoding_for_decoder(a_directional_pf1D_Decoder, deepcopy(curr_active_pipeline.sess.spikes_df), global_replays, ripple_decoding_time_bin_size, use_single_time_bin_per_epoch, epochs_filtering_mode)
-
-        # else:
-        #     a_directional_ripple_filter_epochs_decoder_result = None
-        #     # ripple_radon_transform_df = None
-        # ## OUTPUTS: a_directional_ripple_filter_epochs_decoder_result
-
-        # # returns a `DecodedFilterEpochsResult`
-        # all_directional_ripple_filter_epochs_decoder_result = active_decoder.decode_specific_epochs(spikes_df=deepcopy(get_proper_global_spikes_df(owning_pipeline_reference)), filter_epochs=replay_epochs_df, ## #TODO 2024-12-19 12:03: - [ ] Fix here
-        #                                                                                                                                                                                 decoding_time_bin_size=ripple_decoding_time_bin_size, use_single_time_bin_per_epoch=use_single_time_bin_per_epoch, debug_print=False)
     
-
         # filter_epochs_decoder_result, active_filter_epochs, default_figure_name = computation_result.computed_data['specific_epochs_decoding'][('Ripples', decoding_time_bin_size)]
         # filter_epochs_decoder_result, active_filter_epochs, default_figure_name = computation_result.computed_data['specific_epochs_decoding'][('replay', decoding_time_bin_size, decoder_ndim)]
         filter_epochs_decoder_result, active_filter_epochs, default_figure_name = computation_result.computed_data['specific_epochs_decoding'][final_result_search_tuple]
 
         active_filter_epochs = ensure_Epoch(active_filter_epochs)
         print(f'n_epochs: {active_filter_epochs.n_epochs}')
-
-        ## Actual plotting portion:
-        # # Workaround Requirements:
-        # active_decoder = computation_result.computed_data['pf2D_Decoder']
-        # out_plot_tuple = plot_decoded_epoch_slices(active_filter_epochs, filter_epochs_decoder_result, global_pos_df=computation_result.sess.position.to_dataframe(), xbin=active_decoder.xbin,
-        #                                                         **{'name':default_figure_name, 'debug_test_max_num_slices':1024, 'enable_flat_line_drawing':False, 'debug_print': False})
-        # params, plots_data, plots, ui = out_plot_tuple
-
 
         ## Actual plotting portion:
         out_plot_tuple = plot_decoded_epoch_slices(active_filter_epochs, filter_epochs_decoder_result, global_pos_df=computation_result.sess.position.to_dataframe(), xbin=active_decoder.xbin, included_epoch_indicies=included_epoch_indicies,
