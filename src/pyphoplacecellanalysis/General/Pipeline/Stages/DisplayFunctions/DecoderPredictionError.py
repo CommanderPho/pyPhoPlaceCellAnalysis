@@ -1482,8 +1482,8 @@ def plot_decoded_epoch_slices(filter_epochs, filter_epochs_decoder_result, globa
         params.posterior_heatmap_imshow_kwargs = {}
 
     # Get the colormap to use and set the bad color
-    cmap = params.posterior_heatmap_imshow_kwargs.get('cmap', get_heatmap_cmap(cmap='viridis', bad_color='black', under_color='white', over_color='red'))
-    # cmap = posterior_heatmap_imshow_kwargs.get('cmap', get_heatmap_cmap(cmap='Oranges', bad_color='black', under_color='white', over_color='red'))
+    # cmap = params.posterior_heatmap_imshow_kwargs.get('cmap', get_heatmap_cmap(cmap='viridis', bad_color='black', under_color='white', over_color='red'))
+    cmap = params.posterior_heatmap_imshow_kwargs.get('cmap', get_heatmap_cmap(cmap='Oranges', bad_color='black', under_color='white', over_color='red'))
     params.posterior_heatmap_imshow_kwargs.update(**deepcopy(dict(cmap=cmap)))
 
     ## applying params_kwargs has been moved into the two `stacked_epoch_slices_matplotlib_build_fn` function calls so they can use the params immediately. Not sure if it's supposed to overwrite with user defaults. Actually why not, this might break less.
