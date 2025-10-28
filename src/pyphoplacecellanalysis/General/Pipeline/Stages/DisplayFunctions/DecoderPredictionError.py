@@ -222,7 +222,8 @@ class DefaultDecoderDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Disp
         from neuropy.utils.mixins.binning_helpers import find_minimum_time_bin_duration
         from neuropy.core.epoch import TimeColumnAliasesProtocol        
         from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import _compute_proper_filter_epochs, EpochFilteringMode, get_proper_global_spikes_df
-        
+        from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.ContainerBased.PhoContainerTool import GenericMatplotlibContainer, MatplotlibRenderPlots
+
         assert active_context is not None
         
         use_single_time_bin_per_epoch = kwargs.pop('use_single_time_bin_per_epoch', False)
@@ -312,7 +313,7 @@ class DefaultDecoderDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Disp
         
         # Add in the desired display variable:
         active_identifying_ctx = active_display_fn_identifying_ctx.adding_context('filter_epochs', filter_epochs=filter_epochs) # filter_epochs: 'ripple'
-        active_identifying_ctx_string = active_identifying_ctx.get_description(separator='|') # Get final discription string
+        active_identifying_ctx_string: str = active_identifying_ctx.get_description(separator='|') # Get final discription string
         if kwargs.get('debug_print', False):
             print(f'active_identifying_ctx_string: "{active_identifying_ctx_string}"')
         
@@ -329,7 +330,10 @@ class DefaultDecoderDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Disp
         ## Use the context to appropriately set the window title for the plot:
         ui.mw.setWindowTitle(f'{active_identifying_ctx_string}')
 
-        return {final_context: dict(params=params, plots_data=plots_data, plots=plots, ui=ui)}
+        _out_container: GenericMatplotlibContainer = GenericMatplotlibContainer(plots=plots, plots_data=plots_data, ui=ui, params=params, name=active_identifying_ctx_string)
+
+        # return {final_context: dict(params=params, plots_data=plots_data, plots=plots, ui=ui)}
+        return {final_context: _out_container}
         
     
 
