@@ -331,9 +331,11 @@ class DefaultDecoderDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Disp
         ui.mw.setWindowTitle(f'{active_identifying_ctx_string}')
 
         _out_container: GenericMatplotlibContainer = GenericMatplotlibContainer(plots=plots, plots_data=plots_data, ui=ui, params=params, name=active_identifying_ctx_string)
+        _out_container.plots_data.context = deepcopy(final_context)
+        _out_container.context = _out_container.plots_data.context
 
         # return {final_context: dict(params=params, plots_data=plots_data, plots=plots, ui=ui)}
-        return {final_context: _out_container}
+        return _out_container
         
     
 
