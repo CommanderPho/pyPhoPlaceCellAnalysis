@@ -1301,7 +1301,7 @@ def _subfn_update_decoded_epoch_slices(params, plots_data, plots, ui, debug_prin
     # plots_data.active_marginal_fn = lambda filter_epochs_decoder_result: filter_epochs_decoder_result.marginal_x_list
     # plots_data.active_marginal_fn = lambda filter_epochs_decoder_result: filter_epochs_decoder_result.marginal_y_list
     should_render_time_bins: bool = params.setdefault('should_draw_time_bin_boundaries', True)
-    time_bin_edges_display_kwargs = params.setdefault('time_bin_edges_display_kwargs', dict(color='grey', alpha=0.5, linewidth=1.5))
+    time_bin_edges_display_kwargs = params.setdefault('time_bin_edges_display_kwargs', dict(color='grey', alpha=0.25, linewidth=1.0))
 
     if plots_data.active_marginal_fn is not None:
         active_marginal_list = plots_data.active_marginal_fn(plots_data.filter_epochs_decoder_result)
@@ -1408,6 +1408,8 @@ def plot_decoded_epoch_slices(filter_epochs, filter_epochs_decoder_result, globa
                                                                 enable_flat_line_drawing=enable_flat_line_drawing, debug_test_max_num_slices=debug_test_max_num_slices, name='stacked_epoch_slices_matplotlib_subplots_RIPPLES', debug_print=debug_print)
 
     """
+    from neuropy.utils.matplotlib_helpers import get_heatmap_cmap
+
     ## Build Epochs:
     epochs_df = ensure_dataframe(filter_epochs)
     num_original_epochs: int = len(epochs_df)
@@ -1474,6 +1476,15 @@ def plot_decoded_epoch_slices(filter_epochs, filter_epochs_decoder_result, globa
     params.enable_flat_line_drawing = enable_flat_line_drawing
     params.skip_plotting_measured_positions = kwargs.pop('skip_plotting_measured_positions', False)
     params.skip_plotting_most_likely_positions = kwargs.pop('skip_plotting_most_likely_positions', False)
+    params.posterior_heatmap_imshow_kwargs = kwargs.pop('posterior_heatmap_imshow_kwargs', {})
+
+    if params.posterior_heatmap_imshow_kwargs is None:
+        params.posterior_heatmap_imshow_kwargs = {}
+
+    # Get the colormap to use and set the bad color
+    cmap = params.posterior_heatmap_imshow_kwargs.get('cmap', get_heatmap_cmap(cmap='viridis', bad_color='black', under_color='white', over_color='red'))
+    # cmap = posterior_heatmap_imshow_kwargs.get('cmap', get_heatmap_cmap(cmap='Oranges', bad_color='black', under_color='white', over_color='red'))
+    params.posterior_heatmap_imshow_kwargs.update(**deepcopy(dict(cmap=cmap)))
 
     ## applying params_kwargs has been moved into the two `stacked_epoch_slices_matplotlib_build_fn` function calls so they can use the params immediately. Not sure if it's supposed to overwrite with user defaults. Actually why not, this might break less.
     if params_kwargs is not None:
