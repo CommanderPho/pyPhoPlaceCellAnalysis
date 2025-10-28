@@ -379,13 +379,21 @@ def fig4_hist_stats_pho(bags: Dict, num_bootstrap_samples: int = 10000, confiden
 
         metrics_to_compute = ['EARTHMOVERS', 'KLDIV']
         
+        def _subfn_KL_DIV(p, q, epsilon: float = 1e-10):
+            """ stabilized KLDivergence by adding a small epsilon.
+            """
+            p, q = p + epsilon, q + epsilon
+            p /= p.sum(); q /= q.sum()
+            return np.sum(rel_entr(p, q))
+
+
         ## EARTHMOVERS
-        a_simulation_result['KLDIV_pre_delta'] = stats.wasserstein_distance(a_simulated_prob_dist_by_bag['a'], a_simulated_prob_dist_by_bag['c']) 
-        a_simulation_result['KLDIV_post_delta'] = stats.wasserstein_distance(a_simulated_prob_dist_by_bag['b'], a_simulated_prob_dist_by_bag['d'])
+        a_simulation_result['KLDIV_pre_delta'] = _subfn_KL_DIV(a_simulated_prob_dist_by_bag['a'], a_simulated_prob_dist_by_bag['c'])
+        a_simulation_result['KLDIV_post_delta'] = _subfn_KL_DIV(a_simulated_prob_dist_by_bag['b'], a_simulated_prob_dist_by_bag['d'])
         
         ## KL Divergence
-        a_simulation_result['EARTHMOVERS_pre_delta'] = np.sum(rel_entr(a_simulated_prob_dist_by_bag['a'], a_simulated_prob_dist_by_bag['c'])) 
-        a_simulation_result['EARTHMOVERS_post_delta'] = np.sum(rel_entr(a_simulated_prob_dist_by_bag['b'], a_simulated_prob_dist_by_bag['d']))
+        a_simulation_result['EARTHMOVERS_pre_delta'] = stats.wasserstein_distance(a_simulated_prob_dist_by_bag['a'], a_simulated_prob_dist_by_bag['c'])
+        a_simulation_result['EARTHMOVERS_post_delta'] = stats.wasserstein_distance(a_simulated_prob_dist_by_bag['b'], a_simulated_prob_dist_by_bag['d'])
         
         ## Broken EARTHMOVERS: ValueError: Value and weight array-likes for the same empirical distribution must be of the same size.
         # a_simulation_result['pre_delta'] = stats.wasserstein_distance(simulated_samples_by_bag['a'][-1], simulated_samples_by_bag['c'][-1], a_simulated_prob_dist_by_bag['a'], a_simulated_prob_dist_by_bag['c']) # compute_fisher_z(total_n_per_bag=total_n_per_bag, an_observed_n_red_sample=an_observed_n_red_sample, a_simulated_prob_by_bag=a_simulated_prob_by_bag, k1='a', k2='c')
