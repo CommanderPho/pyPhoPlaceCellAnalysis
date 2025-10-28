@@ -271,15 +271,20 @@ def fig4_hist_stats_pho(bags: Dict, num_bootstrap_samples: int = 10000, confiden
         red: 1, blue: 0
         
         """
-        bag = ['red'] * num_red + ['blue'] * num_blue
-        draws = random.choices(bag, k=num_draws)
-        # Convert simulation results to a numerical format (e.g., 1 for red, 0 for blue)
-        draw_binary_outcome_vector = np.array([1 if draw == 'red' else 0 for draw in draws])
-        return draw_binary_outcome_vector
+        # bag = ['red'] * num_red + ['blue'] * num_blue
+        # draws = random.choices(bag, k=num_draws)
+        # # Convert simulation results to a numerical format (e.g., 1 for red, 0 for blue)
+        # draw_binary_outcome_vector = np.array([1 if draw == 'red' else 0 for draw in draws])
+        # return draw_binary_outcome_vector
+        p_red = num_red / (num_red + num_blue)
+        return np.random.binomial(1, p_red, size=num_draws)
+
 
     def _subfn_bootstrap_mean_ci(num_red: int, num_blue: int, num_bootstrap_samples: int, confidence_level: float=0.95):
         """Calculates bootstrap confidence intervals for the mean."""
-        num_draws: int = num_bootstrap_samples
+        # num_draws: int = num_bootstrap_samples
+        num_draws: int = num_red + num_blue
+
         samples = []
         means = []
         # n = len(data)
