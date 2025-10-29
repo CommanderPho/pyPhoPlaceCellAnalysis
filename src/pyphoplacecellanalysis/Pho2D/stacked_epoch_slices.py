@@ -468,9 +468,10 @@ def stacked_epoch_slices_matplotlib_build_view(epoch_slices, name='stacked_epoch
                                                   constrained_layout=False,  # turn off constrained layout
         )
         ui.mw = None
-        # plots.fig.subplots_adjust(hspace=0.01)
+        params.hspace = 0.02
+        # plots.fig.subplots_adjust(hspace=params.hspace)
         plots.fig.subplots_adjust(
-            hspace=0.02,    # no vertical space between subplots
+            hspace=params.hspace,    # no vertical space between subplots
             top=0.97,      # leave a bit for the title
             bottom=0.03,
             left=0.08,
@@ -526,11 +527,11 @@ def stacked_epoch_slices_matplotlib_build_view(epoch_slices, name='stacked_epoch
     else:    
         ## resize
         print(f'resizing figure to resasonable size...')
-        all_plots_height_px: float = params.all_plots_height
+        all_plots_v_padding: float = (params.hspace * float(params.active_num_slices - 1))        
+        all_plots_height_px: float = (params.all_plots_height + all_plots_v_padding)
         # a_size_px = _out.ui.mw.size() # PyQt5.QtCore.QSize(468, 312) # (W, H)
         a_size_inches = plots.fig.get_size_inches() # array([6.23611, 113.889]) # (W, H)
-        a_size_inches
-
+        
         # all_plots_height_px * x = a_size_inches[-1]
         a_px_to_in_height_conversion_factor: float = a_size_inches[-1] / all_plots_height_px
         a_px_to_in_height_conversion_factor
@@ -545,7 +546,7 @@ def stacked_epoch_slices_matplotlib_build_view(epoch_slices, name='stacked_epoch
         plots.fig.set_size_inches((a_size_inches[0], params.all_plots_height_inches))
         # plots.fig.subplots_adjust(hspace=0.0)
         plots.fig.subplots_adjust(
-            hspace=0.02,    # no vertical space between subplots
+            hspace=params.hspace,    # no vertical space between subplots
             top=0.97,      # leave a bit for the title
             bottom=0.03,
             left=0.08,
