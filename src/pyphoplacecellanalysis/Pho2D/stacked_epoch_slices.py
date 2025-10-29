@@ -409,6 +409,7 @@ def _pagination_helper_plot_single_epoch_slice(curr_ax, params, plots_data, plot
     secax_y = plots.secondary_yaxes.get(curr_ax, None) # get the existing one or create one
     if secax_y is None:
         secax_y = curr_ax.secondary_yaxis('right', functions=None)
+        secax_y.set_in_layout(False)
         plots.secondary_yaxes[curr_ax] = secax_y # set the secondary axis for this curr_ax
         
     assert secax_y is not None
@@ -462,14 +463,34 @@ def stacked_epoch_slices_matplotlib_build_view(epoch_slices, name='stacked_epoch
     ## Create the main figure and plot axes:
     if not params.should_use_MatplotlibTimeSynchronizedWidget:
         ## Basic Matplotlib Version:
-        plots.fig, plots.parent_ax = plt.subplots(num=plots.figure_id, ncols=1, nrows=1, figsize=(15,15), clear=True, sharex=False, sharey=False, constrained_layout=True)
+        plots.fig, plots.parent_ax = plt.subplots(num=plots.figure_id, ncols=1, nrows=1, figsize=(15,45), clear=True, sharex=False, sharey=False, 
+                                                #   constrained_layout=True, 
+                                                  constrained_layout=False,  # turn off constrained layout
+        )
         ui.mw = None
+        # plots.fig.subplots_adjust(hspace=0.01)
+        plots.fig.subplots_adjust(
+            hspace=0.02,    # no vertical space between subplots
+            top=0.97,      # leave a bit for the title
+            bottom=0.03,
+            left=0.08,
+            right=0.92
+        )
+        
     else:
         ## MatplotlibTimeSynchronizedWidget-embedded Version:
         ui.mw = MatplotlibTimeSynchronizedWidget(size=size, dpi=dpi, constrained_layout=constrained_layout, scrollable_figure=scrollable_figure, scrollAreaContents_MinimumHeight=params.all_plots_height, name=name, plot_function_name=plot_function_name, **kwargs)
         plots.fig = ui.mw.getFigure()
 
-    plots.fig.suptitle(plots.name)
+
+    try:
+        plots.fig.suptitle(plots.name)
+    except AttributeError as e:
+        print(f'ERR: could not set uptitle on fig because it is empty. Err: {e}')
+        pass
+    except Exception as e:
+        raise
+    
 
     ## Begin to support a separate column for showing labels
     subplots_kwargs = dict()
@@ -489,6 +510,10 @@ def stacked_epoch_slices_matplotlib_build_view(epoch_slices, name='stacked_epoch
         print(f'type(plots.axs): {type(plots.axs)}: {plots.axs}')
         plots.axs = [plots.axs]
 
+    if not params.should_use_MatplotlibTimeSynchronizedWidget:
+        # Tighten vertical spacing
+        plots.fig.subplots_adjust(hspace=min(0.05, 1.0 / max(1, params.active_num_slices)))
+
     for a_slice_idx, curr_ax in enumerate(plots.axs):
         _pagination_helper_plot_single_epoch_slice(curr_ax, params, plots_data, plots, ui, a_slice_idx=a_slice_idx, is_first_setup=True, debug_print=debug_print)
 
@@ -497,6 +522,38 @@ def stacked_epoch_slices_matplotlib_build_view(epoch_slices, name='stacked_epoch
         ui.mw.draw() #TODO 2023-07-06 15:08: - [ ] TODO: PERFORMANCE - uneeded-draw
         # ui.mw.ui.scrollAreaContentsWidget.setMinimumHeight(params.all_plots_height)
         ui.mw.show()
+
+    else:    
+        ## resize
+        print(f'resizing figure to resasonable size...')
+        all_plots_height_px: float = params.all_plots_height
+        # a_size_px = _out.ui.mw.size() # PyQt5.QtCore.QSize(468, 312) # (W, H)
+        a_size_inches = plots.fig.get_size_inches() # array([6.23611, 113.889]) # (W, H)
+        a_size_inches
+
+        # all_plots_height_px * x = a_size_inches[-1]
+        a_px_to_in_height_conversion_factor: float = a_size_inches[-1] / all_plots_height_px
+        a_px_to_in_height_conversion_factor
+
+        params.px_to_in_height_conversion_factor = a_px_to_in_height_conversion_factor
+        
+        all_plots_height_inches: float = all_plots_height_px  * a_px_to_in_height_conversion_factor
+        print(f"all_plots_height_inches: {all_plots_height_inches}")
+
+        params.all_plots_height_inches = all_plots_height_inches
+        ## set size:
+        plots.fig.set_size_inches((a_size_inches[0], params.all_plots_height_inches))
+        # plots.fig.subplots_adjust(hspace=0.0)
+        plots.fig.subplots_adjust(
+            hspace=0.02,    # no vertical space between subplots
+            top=0.97,      # leave a bit for the title
+            bottom=0.03,
+            left=0.08,
+            right=0.92
+        )
+
+        print(f'\tdone.')
+
         
     # It seems that the title must not be updated until after ui.mw.show() is called.
     return params, plots_data, plots, ui

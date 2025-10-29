@@ -3551,7 +3551,8 @@ def figures_plot_generalized_decode_epochs_dict_and_export_results_completion_fu
             print(f'\t trying "_display_plot_decoded_epoch_slices"')
 
             decoding_time_bin_size: float = 0.075 # 75ms
-            a_params_kwargs = {'build_fn':'insets_view', 'should_use_MatplotlibTimeSynchronizedWidget': False, 'scrollable_figure': False, }
+            a_params_kwargs = {'build_fn':'basic_view', 'should_use_MatplotlibTimeSynchronizedWidget': False, 'scrollable_figure': False, }
+            # a_params_kwargs = {'build_fn':'insets_view', 'should_use_MatplotlibTimeSynchronizedWidget': False, 'scrollable_figure': False, }
 
             # display_context = curr_active_pipeline.build_display_context_for_session(display_fn_name='decoded_epoch_slices')
             display_context = curr_active_pipeline.build_display_context_for_filtered_session(filtered_session_name=curr_active_pipeline.find_Global_epoch_name(), display_fn_name='decoded_epoch_slices')
@@ -3565,7 +3566,9 @@ def figures_plot_generalized_decode_epochs_dict_and_export_results_completion_fu
                                                 variable_name='lin_pos',
                                                 # variable_name='x',
                                                 size=(30, 15),
-                                                scrollable_figure=False, should_use_MatplotlibTimeSynchronizedWidget=False,
+                                                single_plot_fixed_height = 100.0,
+                                                # scrollable_figure=False, should_use_MatplotlibTimeSynchronizedWidget=False,
+                                                **a_params_kwargs,
                                                 params_kwargs=a_params_kwargs,
                                                 parent_output_folder=custom_figure_output_path,
                                             )
