@@ -115,6 +115,93 @@ from pyphocorehelpers.gui.Qt.color_helpers import ColormapHelpers, ColorFormatCo
 
 
 
+# ==================================================================================================================================================================================================================================================================================== #
+# 2025-10-31 Find all potentially good KDIBA SESSIONS:                                                                                                                                                                                                                                 #
+# ==================================================================================================================================================================================================================================================================================== #
+import pandas as pd 
+from pathlib import Path
+from neuropy.utils.result_context import IdentifyingContext
+
+
+# @function_attributes(short_name=None, tags=['kdiba', 'fixup', 'sessions'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-10-31 18:33', related_items=[])
+def process_good_bad_sess_table(a_csv_path: Path, a_sess_good_bad_name: str ='good'):
+    """ processing MATLAB's output files to determine good/bad sessions
+
+    Usage:
+
+        sessions_table_paths_dict = {'bad': Path("C:/Users/pho/repos/matlab-to-neuropy-exporter/output/2025-10-31_bad_sessions_table.csv"),
+                'good': Path("C:/Users/pho/repos/matlab-to-neuropy-exporter/output/2025-10-31_good_sessions_table.csv"),
+        }
+
+
+        should_print: bool = True
+        for a_sess_good_bad_name, a_path in sessions_table_paths_dict.items():
+
+            sess_table, out_init_str = process_good_bad_sess_table(a_csv_path=a_path, a_sess_good_bad_name=a_sess_good_bad_name)
+            if should_print:
+                print(f'========================== {a_sess_good_bad_name} =======================')
+                print(f'{out_init_str}')    
+
+
+
+    """
+    sess_table: pd.DataFrame = pd.read_csv(a_csv_path)
+
+    
+    session_path_col_name: str = {'good': 'session_export_path', 'bad': 'session_folder'}[a_sess_good_bad_name]
+
+    loc_0 = sess_table.columns.get_loc(session_path_col_name)
+    sess_table_split = sess_table[session_path_col_name].str.split(pat='\\', expand=True).add_prefix('session_export_path_')
+    sess_table = pd.concat([sess_table.iloc[:, :loc_0], sess_table_split, sess_table.iloc[:, loc_0:]], axis=1)
+    sess_table = sess_table.drop(columns=[session_path_col_name])
+
+    # Drop columns: 'session_export_path_0', 'session_export_path_1'
+    sess_table = sess_table.drop(columns=['session_export_path_0', 'session_export_path_1'])
+
+    # Rename column 'session_export_path_3' to 'animal'
+    sess_table = sess_table.rename(columns={'session_export_path_3': 'animal'})
+
+    # Rename column 'session_export_path_5' to 'session_name'
+    if 'session_name' not in sess_table.columns:
+        sess_table = sess_table.rename(columns={'session_export_path_5': 'session_name'})
+    else:
+        sess_table = sess_table.drop(columns=['session_export_path_5'])
+        pass ## we already have this column
+    
+
+    # Rename column 'session_export_path_4' to 'exper_name'
+    sess_table = sess_table.rename(columns={'session_export_path_4': 'exper_name'})
+
+    # Rename column 'session_export_path_2' to 'format_name'
+    sess_table = sess_table.rename(columns={'session_export_path_2': 'format_name'})
+
+    # Convert text to lowercase in columns: 'format_name', 'animal', 'exper_name'
+    sess_table['format_name'] = sess_table['format_name'].str.lower()
+    sess_table['animal'] = sess_table['animal'].str.lower()
+    sess_table['exper_name'] = sess_table['exper_name'].str.lower()
+
+
+    # Select columns: 'format_name', 'animal' and 2 other columns
+    sess_table = sess_table.loc[:, ['format_name', 'animal', 'exper_name', 'session_name']].drop_duplicates(subset=['session_name'], ignore_index=True, inplace=False)
+    # Sort by columns: 'format_name' (ascending), 'animal' (ascending) and 2 other columns
+    sess_table = sess_table.sort_values(['format_name', 'animal', 'session_name', 'exper_name'])
+
+    out_contexts = []
+    for a_row in sess_table.itertuples(index=False, name='ContextRow'):
+        out_contexts.append(IdentifyingContext(**a_row._asdict()))
+        
+    out_init_str: str = ',\n'.join([ctx.get_initialization_code_string() for ctx in out_contexts])
+
+    return sess_table, out_init_str
+
+
+
+
+
+# ==================================================================================================================================================================================================================================================================================== #
+# 2025-10-25 - Previous stuff regarding bootstrapping                                                                                                                                                                                                                                  #
+# ==================================================================================================================================================================================================================================================================================== #
+
 import random
 import numpy as np
 import pandas as pd
