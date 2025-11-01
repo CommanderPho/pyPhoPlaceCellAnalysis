@@ -1732,16 +1732,20 @@ def copy_batch_output_figures_to_common_figures_dir(generate_figures_script_path
         # _active_format_fn = _active_format_fn
         _active_format_fn = _append_as_suffix_fn
 
+    _proposed_copied_outputs = [f"'{f.as_posix()}' -> '{common_destination.joinpath(f.with_stem(_active_format_fn(k, f.stem)).name).as_posix()}'" for k, path in gen_scripts_fig_flat_child_path_dict.items() for f in path.iterdir() if f.is_file()] ## append the session name (k) to each file as a prefix
 
     ## perform the copy
     if not is_dryrun:
         # _copied_outputs = [shutil.copy2(f, common_destination.joinpath(f.with_stem(f"{k}_{f.stem}").name)) for k, path in gen_scripts_fig_flat_child_path_dict.items() for f in path.iterdir() if f.is_file()] ## append the session name (k) to each file as a prefix
         _copied_outputs = [shutil.copy2(f, common_destination.joinpath(f.with_stem(_active_format_fn(k, f.stem)).name)) for k, path in gen_scripts_fig_flat_child_path_dict.items() for f in path.iterdir() if f.is_file()] ## append the session name (k) to each file as a prefix
-
+        
     else:
         print(f'is_dryrun == True, so files will not actually be copied.')
-        _copied_outputs = [f"'{f.as_posix()}' -> '{common_destination.joinpath(f.with_stem(_active_format_fn(k, f.stem)).name).as_posix()}'" for k, path in gen_scripts_fig_flat_child_path_dict.items() for f in path.iterdir() if f.is_file()] ## append the session name (k) to each file as a prefix
-        print('\n'.join(_copied_outputs))
+        _copied_outputs = _proposed_copied_outputs
+
+    ## either way print the proposed outputs because they're formatted better
+    print('\n'.join(_proposed_copied_outputs))
+    
     # for k, path in gen_scripts_fig_flat_child_path_dict.items():
     #     print(f'k: {k}, path: {path}')
     #     for f in path.iterdir():
