@@ -3734,6 +3734,8 @@ def figures_plot_generalized_decode_epochs_dict_and_export_results_completion_fu
     # ==================================================================================================================================================================================================================================================================================== #
     if ('_display_measured_vs_decoded_occupancy_distributions' in included_figures_names) or ('meas_v_decoded_occupancy' in included_figures_names):
         print(f'\t trying "_display_measured_vs_decoded_occupancy_distributions"')
+        should_delete_intermediate_images: bool = True
+        was_final_image_write_success: bool = False
         try:
             display_context = curr_active_pipeline.build_display_context_for_session(display_fn_name='meas_v_decoded_occupancy')
             _out = curr_active_pipeline.display('_display_measured_vs_decoded_occupancy_distributions', display_context, defer_render=True, save_figure=True,
@@ -3749,11 +3751,21 @@ def figures_plot_generalized_decode_epochs_dict_and_export_results_completion_fu
             fig_5_save_paths = _out['save_paths']
             figure5_final_out_path: Path = fig_5_save_paths[0]
             curr_stem = figure5_final_out_path.stem.strip('_laps_Laps') # 'meas_v_decoded_occupancy_0•05_2•0_[1, 2, 4, 6, 7, 8, 9]_laps_Laps'
-            curr_stem = f"{curr_stem}_MERGED" # 'meas_v_decoded_occupancy_0•05_2•0_[1, 2, 4, 6, 7, 8, 9]'
-            figure5_final_out_path = figure5_final_out_path.with_stem(curr_stem) # 'ProgrammaticDisplayFunctionTesting/2025-08-21/kdiba/gor01/two/2006-6-12_16-53-46/meas_v_decoded_occupancy_0•05_2•0_[1, 2, 4, 6, 7, 8, 9]_MERGED.pdf'
-            PDFHelpers.concatenate_pdfs_vertically(fig_5_save_paths, figure5_final_out_path)
-            _out['figure5_final_out_path'] = figure5_final_out_path
+            
 
+            try:
+                curr_stem = f"{curr_stem}_MERGED" # 'meas_v_decoded_occupancy_0•05_2•0_[1, 2, 4, 6, 7, 8, 9]'
+                figure5_final_out_path = figure5_final_out_path.with_stem(curr_stem) # 'ProgrammaticDisplayFunctionTesting/2025-08-21/kdiba/gor01/two/2006-6-12_16-53-46/meas_v_decoded_occupancy_0•05_2•0_[1, 2, 4, 6, 7, 8, 9]_MERGED.pdf'
+                PDFHelpers.concatenate_pdfs_vertically(fig_5_save_paths, figure5_final_out_path)
+                _out['figure5_final_out_path'] = figure5_final_out_path
+                was_final_image_write_success = True
+            except Exception as e:
+                was_final_image_write_success = False
+                raise
+            if was_final_image_write_success and should_delete_intermediate_images:
+                for an_img_path in fig_5_save_paths:
+                    an_img_path.unlink()
+            
             across_session_results_extended_dict['figures_plot_generalized_decode_epochs_dict_and_export_results_completion_function'].update({
                 '_display_measured_vs_decoded_occupancy_distributions': _out,
             })
