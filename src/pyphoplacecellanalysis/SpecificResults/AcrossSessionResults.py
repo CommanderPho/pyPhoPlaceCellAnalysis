@@ -4268,7 +4268,7 @@ class PerfmncMeasures:
     """
     @function_attributes(short_name=None, tags=['perfmnc', 'perfmnc_session'], input_requires=[], output_provides=[], uses=['cls.post_load_fixup_df', 'ExportValueNameCleaner.split_custom_replay_name_col_to_replayMethod_qclu_frateThresh_cols'], used_by=[], creation_date='2025-08-27 00:32', related_items=[])
     @classmethod
-    def find_and_load_most_recent_parsed_csv_files_df(cls, most_recent_parsed_csv_files_df: pd.DataFrame, debug_print=False, cuttoff_date: Optional[datetime]=None) -> pd.DataFrame:
+    def find_and_load_most_recent_parsed_csv_files_df(cls, most_recent_parsed_csv_files_df: pd.DataFrame, debug_print=False, cuttoff_date: Optional[datetime]=None, should_delete_broken_CSVs: bool=False) -> pd.DataFrame:
         """ Finds the exported .csv files produced by `pyphoplacecellanalysis.Analysis.Decoder.context_dependent.GenericDecoderDictDecodedEpochsDictResult.export_csvs(...)` when `should_export_session_correct_decoded_time_bin_performance_df == True`
         
         Usage:
@@ -4277,6 +4277,7 @@ class PerfmncMeasures:
         perfmnc_session_df
         
         """
+        invalid_CSV_paths = []
         ## INPUTS: most_recent_parsed_csv_files_df
         most_recent_parsed_perfmnc_session_csv_files_df: pd.DataFrame = deepcopy(most_recent_parsed_csv_files_df).pho.constrain_df_cols(file_type='perfmnc_session')
         if cuttoff_date is not None:
@@ -4298,14 +4299,36 @@ class PerfmncMeasures:
             if a_row.path.exists() and a_row.path.is_file():
                 ## load the CSV
                 loaded_df: pd.DataFrame = pd.read_csv(a_row.path)
-                loaded_df['custom_replay_name'] = a_row.custom_replay_name
-                loaded_dfs.append(loaded_df)
+                if len(loaded_df) > 0:
+                    loaded_df['custom_replay_name'] = a_row.custom_replay_name
+                    loaded_dfs.append(loaded_df)
+                else:
+                    # invalid .csv, it should just be deleted
+                    print(f'WARN: CSV a_row.path: "{a_row.path}" has ZERO ROWS. It is INVALID and will thus be DELETED.')
+                    invalid_CSV_paths.append(a_row.path)
+                    
                 if debug_print:
                     print(a_row.path)
 
 
         perfmnc_session_df: pd.DataFrame = pd.concat(loaded_dfs)
         (perfmnc_per_session_df, perfmnc_per_indv_epochs_df) = cls.post_load_fixup_df(perfmnc_session_df=perfmnc_session_df)
+
+        if should_delete_broken_CSVs:
+            ## do the dlete
+            print(f'WARN: DELETING {len(invalid_CSV_paths)} invalid CSV paths (empty files).\ninvalid_CSV_paths: {invalid_CSV_paths}...')
+            for a_path in invalid_CSV_paths:
+                try:
+                    if isinstance(a_path, str):
+                        a_path = Path(a_path)
+                    a_path.unlink(missing_ok=False)
+                    
+                except Exception as e:
+                    print(f'ERR: encountered exception e: {e} while trying to delete "{a_path}"')
+                    raise      
+
+        else:
+            print(f'should_delete_broken_CSVs is False, so not deleting, but invalid_CSV_paths: {invalid_CSV_paths}.')
 
         return (perfmnc_per_session_df, perfmnc_per_indv_epochs_df)	
     
