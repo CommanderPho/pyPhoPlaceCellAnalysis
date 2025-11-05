@@ -3825,7 +3825,7 @@ class MeasuredVsDecodedOccupancy:
                 # np.shape(a_timebins_p_x_given_n)
                 # ax = ax_dict[a_pre_post_delta_name]  # Get the appropriate subplot axis
                 active_ax_dict = {ax_name:v for ax_name, v in ax_dict.items() if (ax_name.split('_', maxsplit=1)[0] == a_pre_post_delta_name)}
-                fig, ax_dict = cls.plot_meas_vs_decoded_occupancy(timebins_p_x_given_n=a_timebins_p_x_given_n, track_templates=track_templates, fig=fig, ax_dict=active_ax_dict, a_pre_post_delta_name=a_pre_post_delta_name, should_max_normalize=should_max_normalize, debug_print=debug_print, skip_plotting_measured=skip_plotting_measured, include_time_bin_only_values=include_only_track_body_time_bins, **kwargs)
+                fig, active_ax_dict = cls.plot_meas_vs_decoded_occupancy(timebins_p_x_given_n=a_timebins_p_x_given_n, track_templates=track_templates, fig=fig, ax_dict=active_ax_dict, a_pre_post_delta_name=a_pre_post_delta_name, should_max_normalize=should_max_normalize, debug_print=debug_print, skip_plotting_measured=skip_plotting_measured, include_time_bin_only_values=include_only_track_body_time_bins, **kwargs)
                 # ax.set_title(f'{figure_title} - {a_pre_post_delta_name}')  # Set subplot title
                 
                 if include_only_track_body_time_bins:
