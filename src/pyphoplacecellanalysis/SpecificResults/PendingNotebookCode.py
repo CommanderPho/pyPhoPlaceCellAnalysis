@@ -3832,26 +3832,35 @@ class MeasuredVsDecodedOccupancy:
                     active_a_decoded_marginal_posterior_df: pd.DataFrame = deepcopy(pre_post_delta_result_splits_dict[a_pre_post_delta_name])
                     active_a_decoded_marginal_posterior_df = deepcopy(active_a_decoded_marginal_posterior_df[active_a_decoded_marginal_posterior_df['is_track_body']])
 
-                    # decoded_col_name: str = 'binned_x_decoded_most_likely'
-                    # meas_col_name: str = 'binned_x_meas'
+                    decoded_col_name: str = 'binned_x_decoded_most_likely'
+                    meas_col_name: str = 'binned_x_meas'
 
-                    decoded_col_name: str = 'x_decoded_most_likely'
-                    meas_col_name: str = 'x_meas'
+                    # decoded_col_name: str = 'x_decoded_most_likely'
+                    # meas_col_name: str = 'x_meas'
                     
                     track_body_only_kwargs = dict(alpha=0.9)
                     legend_series_names = ['decoded', 'measured']
                     for i, (ax_name, ax) in enumerate(ax_dict.items()):
                         
                         if decoded_col_name in active_a_decoded_marginal_posterior_df:
-                            a_decoded_occupancy = active_a_decoded_marginal_posterior_df[decoded_col_name].to_numpy()
+                            # a_decoded_occupancy = active_a_decoded_marginal_posterior_df[decoded_col_name].to_numpy()
+                            xbin_bin_ids = np.arange(len(track_templates.get_decoders_dict()['long_LR'].xbin_centers)) + 1
+                            a_decoded_occupancy_dict = {a_xbin_idx:active_a_decoded_marginal_posterior_df[decoded_col_name].value_counts().to_dict().get(a_xbin_idx, 0) for a_xbin_idx in xbin_bin_ids}
+                            a_decoded_occupancy = np.array(list(a_decoded_occupancy_dict.values()))                            
                             occupancy_fig, occupancy_ax = perform_plot_occupancy(a_decoded_occupancy, xbin_centers=None, ybin_centers=None, fig=fig, ax=ax, plot_pos_bin_axes=False, label='decoded_trackBodyOnly', should_max_normalize=should_max_normalize, **track_body_only_kwargs)
                             legend_series_names.append('decoded_trackBodyOnly')
                             
-                        if meas_col_name in active_a_decoded_marginal_posterior_df:
-                            a_measured_occupancy = active_a_decoded_marginal_posterior_df[meas_col_name].to_numpy()
-                            occupancy_fig, occupancy_ax = perform_plot_occupancy(a_measured_occupancy, xbin_centers=None, ybin_centers=None, fig=fig, ax=ax, plot_pos_bin_axes=False, label='measured_trackBodyOnly', should_max_normalize=should_max_normalize, **track_body_only_kwargs)
-                            legend_series_names.append('measured_trackBodyOnly')
-                                          
+                        if not skip_plotting_measured:
+                            if meas_col_name in active_a_decoded_marginal_posterior_df:
+                                a_measured_occupancy = active_a_decoded_marginal_posterior_df[meas_col_name].to_numpy()
+                                ## we have all the bin_ids in the above vector, and to get the occupancy we need to count them up:
+                                # active_a_decoded_marginal_posterior_df[meas_col_name].value_counts().to_dict()
+                                xbin_bin_ids = np.arange(len(track_templates.get_decoders_dict()['long_LR'].xbin_centers)) + 1
+                                a_measured_occupancy_dict = {a_xbin_idx:active_a_decoded_marginal_posterior_df[meas_col_name].value_counts().to_dict().get(a_xbin_idx, 0) for a_xbin_idx in xbin_bin_ids}
+                                a_measured_occupancy = np.array(list(a_measured_occupancy_dict.values()))
+                                occupancy_fig, occupancy_ax = perform_plot_occupancy(a_measured_occupancy, xbin_centers=None, ybin_centers=None, fig=fig, ax=ax, plot_pos_bin_axes=False, label='measured_trackBodyOnly', should_max_normalize=should_max_normalize, **track_body_only_kwargs)
+                                legend_series_names.append('measured_trackBodyOnly')
+                                            
                     ## END for i, (ax_name, ax) in enumerate(ax_di...
                     plt.legend(legend_series_names)
             ## END for a_pre_post_delta_name, a_timebins_p_x_given_n in pre_post_delta_timebins_...
@@ -3878,7 +3887,7 @@ class MeasuredVsDecodedOccupancy:
         a_result: DecodedFilterEpochsResult
         
         """
-        from neuropy.plotting.placemaps import plot_placefield_occupancy, perform_plot_occupancy
+        from neuropy.plotting.placemaps import perform_plot_occupancy
         
         ## Measured
         decoders_dict: Dict[types.DecoderName, BasePositionDecoder] = track_templates.get_decoders_dict()
