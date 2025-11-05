@@ -6969,15 +6969,14 @@ def _helper_add_interpolated_position_columns_to_decoded_result_df(a_result: Dec
 
         # Adding Interpolated df (older) _____________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
         try:
-            with Assert.temporarily_warn_only():
-                a_decoded_positions_df: pd.DataFrame = deepcopy(a_decoder_comparison_result.measured_decoded_position_comparion.decoded_positions_df_list[an_epoch_idx])
-                a_decoded_positions_df = a_decoded_positions_df.position.adding_binned_position_columns(xbin_edges=xbin_edges, ybin_edges=ybin_edges, active_computation_config=active_computation_config)
-                a_decoded_positions_df = a_decoded_positions_df.rename(columns={'x':'x_decoded_most_likely', 'binned_x':'binned_x_decoded_most_likely'}, inplace=False).drop(columns=['t'], inplace=False) ## decoded most likely
+            a_decoded_positions_df: pd.DataFrame = deepcopy(a_decoder_comparison_result.measured_decoded_position_comparion.decoded_positions_df_list[an_epoch_idx])
+            a_decoded_positions_df = a_decoded_positions_df.position.adding_binned_position_columns(xbin_edges=xbin_edges, ybin_edges=ybin_edges, active_computation_config=active_computation_config)
+            a_decoded_positions_df = a_decoded_positions_df.rename(columns={'x':'x_decoded_most_likely', 'binned_x':'binned_x_decoded_most_likely'}, inplace=False).drop(columns=['t'], inplace=False) ## decoded most likely
 
-                if (a_decoded_positions_df is not None) and (len(a_decoded_positions_df) == len(a_decoded_marginal_posterior_df)):
-                    # Assert.same_length(a_decoded_positions_df, a_decoded_marginal_posterior_df)
-                    a_decoded_marginal_posterior_df = PandasHelpers.adding_additional_df_columns(original_df=a_decoded_marginal_posterior_df, additional_cols_df=a_decoded_positions_df)
-            
+            if (a_decoded_positions_df is not None) and (len(a_decoded_positions_df) == len(a_decoded_marginal_posterior_df)):
+                # Assert.same_length(a_decoded_positions_df, a_decoded_marginal_posterior_df)
+                a_decoded_marginal_posterior_df = PandasHelpers.adding_additional_df_columns(original_df=a_decoded_marginal_posterior_df, additional_cols_df=a_decoded_positions_df)
+        
         except (Exception, AssertionError) as e:
             print(f'WARN: epoch[{an_epoch_idx}]: failed to do optional position interpolated columns (for `a_decoded_positions_df`) for result df with error {e}\n\tskipping (this is okay 2025-10-23)')
             if fail_on_exception:
@@ -6991,40 +6990,38 @@ def _helper_add_interpolated_position_columns_to_decoded_result_df(a_result: Dec
 
     ## are flattened across all time bins
 
-    # ## Add directly to `a_decoded_marginal_posterior_df` (concatenating columns to existing rows)
-    try:
-        with Assert.temporarily_warn_only():
-            measured_post_probs_list: List[float] = flatten(a_decoder_comparison_result.measured_decoded_position_comparion.measured_post_prob_df)
-            a_measured_positions_df: pd.DataFrame = pd.DataFrame(dict(x=measured_post_probs_list))
-            Assert.same_length(a_measured_positions_df, a_decoded_marginal_posterior_df)
-            if 'binned_x_meas' not in a_measured_positions_df:
-                a_measured_positions_df = PositionComputedDataMixin.perform_add_binned_position_columns(pos_df=a_measured_positions_df, xbin_edges=xbin_edges, ybin_edges=ybin_edges, active_computation_config=active_computation_config)
-            a_measured_positions_df = a_measured_positions_df.rename(columns={'x':'x_meas', 'y':'y_meas', 'binned_x':'binned_x_meas', 'binned_y':'binned_y_meas'}, inplace=False).drop(columns=['t'], inplace=False, errors='ignore') ## measured
+    # # ## Add directly to `a_decoded_marginal_posterior_df` (concatenating columns to existing rows)
+    # try:
+    #     measured_post_probs_list: List[float] = flatten(a_decoder_comparison_result.measured_decoded_position_comparion.measured_post_prob_df)
+    #     a_measured_positions_df: pd.DataFrame = pd.DataFrame(dict(x=measured_post_probs_list))
+    #     Assert.same_length(a_measured_positions_df, a_decoded_marginal_posterior_df)
+    #     if 'binned_x_meas' not in a_measured_positions_df:
+    #         a_measured_positions_df = PositionComputedDataMixin.perform_add_binned_position_columns(pos_df=a_measured_positions_df, xbin_edges=xbin_edges, ybin_edges=ybin_edges, active_computation_config=active_computation_config)
+    #     a_measured_positions_df = a_measured_positions_df.rename(columns={'x':'x_meas', 'y':'y_meas', 'binned_x':'binned_x_meas', 'binned_y':'binned_y_meas'}, inplace=False).drop(columns=['t'], inplace=False, errors='ignore') ## measured
+        
+    #     if (a_measured_positions_df is not None) and (len(a_measured_positions_df) == len(a_decoded_marginal_posterior_df)):
+    #         a_decoded_marginal_posterior_df = PandasHelpers.adding_additional_df_columns(original_df=a_decoded_marginal_posterior_df, additional_cols_df=a_measured_positions_df)
+    #         Assert.require_columns(a_decoded_marginal_posterior_df, required_columns=['binned_x_meas'])
             
-            if (a_measured_positions_df is not None) and (len(a_measured_positions_df) == len(a_decoded_marginal_posterior_df)):
-                a_decoded_marginal_posterior_df = PandasHelpers.adding_additional_df_columns(original_df=a_decoded_marginal_posterior_df, additional_cols_df=a_measured_positions_df)
-                Assert.require_columns(a_decoded_marginal_posterior_df, required_columns=['binned_x_meas'])
-                
-    except (Exception, AssertionError) as e:
-        print(f'EXCEPTION: {e}. Skipping.')
-        if fail_on_exception:
-            raise
+    # except (Exception, AssertionError) as e:
+    #     print(f'EXCEPTION: {e}. Skipping.')
+    #     if fail_on_exception:
+    #         raise
 
-    try:
-        with Assert.temporarily_warn_only():
-            a_decoded_positions_df: pd.DataFrame = pd.concat(a_decoder_comparison_result.measured_decoded_position_comparion.decoded_positions_df_list)
-            Assert.same_length(a_decoded_positions_df, a_decoded_marginal_posterior_df)
-            a_decoded_positions_df = a_decoded_positions_df.position.adding_binned_position_columns(xbin_edges=xbin_edges, ybin_edges=ybin_edges, active_computation_config=active_computation_config)
-            a_decoded_positions_df = a_decoded_positions_df.rename(columns={'x':'x_decoded_most_likely', 'binned_x':'binned_x_decoded_most_likely'}, inplace=False).drop(columns=['t'], inplace=False) ## decoded most likely
+    # try:
+    #     a_decoded_positions_df: pd.DataFrame = pd.concat(a_decoder_comparison_result.measured_decoded_position_comparion.decoded_positions_df_list)
+    #     Assert.same_length(a_decoded_positions_df, a_decoded_marginal_posterior_df)
+    #     a_decoded_positions_df = a_decoded_positions_df.position.adding_binned_position_columns(xbin_edges=xbin_edges, ybin_edges=ybin_edges, active_computation_config=active_computation_config)
+    #     a_decoded_positions_df = a_decoded_positions_df.rename(columns={'x':'x_decoded_most_likely', 'binned_x':'binned_x_decoded_most_likely'}, inplace=False).drop(columns=['t'], inplace=False) ## decoded most likely
 
-            if (a_decoded_positions_df is not None) and (len(a_decoded_positions_df) == len(a_decoded_marginal_posterior_df)):
-                a_decoded_marginal_posterior_df = PandasHelpers.adding_additional_df_columns(original_df=a_decoded_marginal_posterior_df, additional_cols_df=a_decoded_positions_df)
-                Assert.require_columns(a_decoded_marginal_posterior_df, required_columns=['binned_x_decoded_most_likely', 'binned_x_meas'])
-            
-    except (Exception, AssertionError) as e:
-        print(f'EXCEPTION: {e}. Skipping.')
-        if fail_on_exception:
-            raise
+    #     if (a_decoded_positions_df is not None) and (len(a_decoded_positions_df) == len(a_decoded_marginal_posterior_df)):
+    #         a_decoded_marginal_posterior_df = PandasHelpers.adding_additional_df_columns(original_df=a_decoded_marginal_posterior_df, additional_cols_df=a_decoded_positions_df)
+    #         Assert.require_columns(a_decoded_marginal_posterior_df, required_columns=['binned_x_decoded_most_likely', 'binned_x_meas'])
+        
+    # except (Exception, AssertionError) as e:
+    #     print(f'EXCEPTION: {e}. Skipping.')
+    #     if fail_on_exception:
+    #         raise
 
         
 

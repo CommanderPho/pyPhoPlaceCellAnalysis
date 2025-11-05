@@ -3854,7 +3854,7 @@ class MeasuredVsDecodedOccupancy:
                                           
                     ## END for i, (ax_name, ax) in enumerate(ax_di...
                     plt.legend(legend_series_names)
-
+            ## END for a_pre_post_delta_name, a_timebins_p_x_given_n in pre_post_delta_timebins_...
 
             plt.suptitle(f'{figure_title}')  # Set overall figure title
             return fig, ax_dict
