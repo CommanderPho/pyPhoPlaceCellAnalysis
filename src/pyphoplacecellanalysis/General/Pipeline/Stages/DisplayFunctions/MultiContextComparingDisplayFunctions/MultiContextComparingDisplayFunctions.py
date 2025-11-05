@@ -488,7 +488,8 @@ class MultiContextComparingDisplayFunctions(AllFunctionEnumeratingMixin, metacla
 
 
     @function_attributes(short_name='meas_v_decoded_occupancy', tags=['context-decoder-comparison', 'MeasuredVsDecodedOccupancy', 'decoded_position', 'directional'], conforms_to=['output_registering', 'figure_saving'], input_requires=[], output_provides=[], requires_global_keys=["global_computation_results.computed_data['EpochComputations']"], uses=['MeasuredVsDecodedOccupancy', '_helper_add_interpolated_position_columns_to_decoded_result_df', 'MeasuredVsDecodedOccupancy.analyze_and_plot_meas_vs_decoded_occupancy', 'FigureCollector'], used_by=[], creation_date='2025-05-16 00:00', related_items=[], is_global=True)
-    def _display_measured_vs_decoded_occupancy_distributions(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, save_figure=True, size=[6.5, 2], dpi=100, constrained_layout=True, override_fig_man: Optional[FileOutputManager]=None, prepare_for_publication: bool=False, **kwargs):
+    def _display_measured_vs_decoded_occupancy_distributions(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, save_figure=True, size=[6.5, 2], dpi=100, constrained_layout=True, override_fig_man: Optional[FileOutputManager]=None, 
+                                                             prepare_for_publication: bool=False, include_only_track_body_time_bins: bool=False, **kwargs):
             """ Plots the measured vs. decoded occupancy (position) for each of the four decoders for both Pre-delta and Post-delta.
             
             Usage:
@@ -514,7 +515,44 @@ class MultiContextComparingDisplayFunctions(AllFunctionEnumeratingMixin, metacla
             from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import DirectionalLapsResult, TrackTemplates
             from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import MeasuredVsDecodedOccupancy
             from pyphoplacecellanalysis.SpecificResults.PhoDiba2023Paper import PhoPublicationFigureHelper
+            from pyphoplacecellanalysis.Pho2D.track_shape_drawing import LinearTrackInstance
 
+            loaded_track_limits = {'long_xlim': np.array([59.0774, 228.69]),
+            'long_unit_xlim': np.array([0.205294, 0.794698]),
+            'short_xlim': np.array([94.0156, 193.757]),
+            'short_unit_xlim': np.array([0.326704, 0.673304]),
+            'long_ylim': np.array([138.164, 146.12]),
+            'long_unit_ylim': np.array([0.48012, 0.507766]),
+            'short_ylim': np.array([138.021, 146.263]),
+            'short_unit_ylim': np.array([0.479622, 0.508264])
+            }
+
+            long_track_inst, short_track_inst = LinearTrackInstance.init_LS_tracks_from_loaded_track_limits(loaded_track_limits=loaded_track_limits)
+
+            track_inst_dict = {'long': long_track_inst, 'short': short_track_inst}
+
+            def _subfn_add_decoded_marginal_important_columns(a_result, a_decoder, a_decoded_marginal_posterior_df: pd.DataFrame, global_measured_position_df: pd.DataFrame) -> pd.DataFrame:
+                """ captures: track_inst_dict
+                """
+                a_decoded_marginal_posterior_df, a_decoder_comparison_result = _helper_add_interpolated_position_columns_to_decoded_result_df(a_result=a_result, a_decoder=a_decoder, a_decoded_marginal_posterior_df=a_decoded_marginal_posterior_df, global_measured_position_df=global_measured_position_df)
+                # ['binned_x_meas', 'binned_x_decoded_most_likely']
+                
+                # 2025-11-05 - non-end-cap only filter: ______________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
+                print(f'Adding "most_likely_positions_1D" related track body/endcap columns...')
+                for track_length_name, a_track_inst in track_inst_dict.items():
+                    print(f'\t\ttrack_length_name: "{track_length_name}":')
+                    # track_length_name: str = 'long'
+                    _a_most_likely_positions_from_most_likely_decoder_classification_df: pd.DataFrame = a_track_inst.build_x_position_classification_df(x_arr=a_decoded_marginal_posterior_df['most_likely_positions_1D']) ## TODO: this is using long/short
+                    a_decoded_marginal_posterior_df[f'is_decoded_pos_{track_length_name}_track_body'] = np.logical_and(np.logical_not(_a_most_likely_positions_from_most_likely_decoder_classification_df['is_endcap']), _a_most_likely_positions_from_most_likely_decoder_classification_df['is_on_maze'])
+                    
+                a_decoded_marginal_posterior_df = LinearTrackInstance.add_is_track_body_long_smart(a_df=a_decoded_marginal_posterior_df)                    
+                ## adds ['is_decoded_pos_long_track_body', 'is_decoded_pos_short_track_body', 'is_decoded_pos_either_track_body'] columns to each df
+                return a_decoded_marginal_posterior_df
+            
+
+            # ==================================================================================================================================================================================================================================================================================== #
+            # BEGIN FUNCTION BODY                                                                                                                                                                                                                                                                  #
+            # ==================================================================================================================================================================================================================================================================================== #
             display_fn_name: str = 'meas_v_decoded_occupancy' # same as "short_name"
 
             export_dpi_multiplier: float = kwargs.pop('export_dpi_multiplier', 2.0)
@@ -584,8 +622,11 @@ class MultiContextComparingDisplayFunctions(AllFunctionEnumeratingMixin, metacla
 
             # perform_write_to_file_callback = kwargs.pop('perform_write_to_file_callback', (lambda final_context, fig: owning_pipeline_reference.output_figure(final_context, fig)))
 
+            
             global_measured_position_df: pd.DataFrame = deepcopy(owning_pipeline_reference.sess.position.to_dataframe())
-            a_decoded_marginal_posterior_df, a_decoder_comparison_result = _helper_add_interpolated_position_columns_to_decoded_result_df(a_result=a_result, a_decoder=a_decoder, a_decoded_marginal_posterior_df=a_decoded_marginal_posterior_df, global_measured_position_df=global_measured_position_df)
+            a_decoded_marginal_posterior_df = _subfn_add_decoded_marginal_important_columns(a_result=a_result, a_decoder=a_decoder, a_decoded_marginal_posterior_df=a_decoded_marginal_posterior_df, global_measured_position_df=global_measured_position_df)
+            # ['binned_x_meas', 'binned_x_decoded_most_likely']            
+            ## adds ['is_decoded_pos_long_track_body', 'is_decoded_pos_short_track_body', 'is_decoded_pos_either_track_body'] columns to each df
 
 
             # ==================================================================================================================================================================================================================================================================================== #
@@ -697,8 +738,9 @@ class MultiContextComparingDisplayFunctions(AllFunctionEnumeratingMixin, metacla
                     known_named_decoding_epochs_type = 'laps'
                     a_target_context: IdentifyingContext = IdentifyingContext(known_named_decoding_epochs_type=known_named_decoding_epochs_type, data_grain='per_time_bin', **common_constraint_dict) ## Laps , data_grain='per_epoch'
                     best_matching_context, a_result, a_decoder, a_decoded_marginal_posterior_df = a_new_fully_generic_result.get_results_best_matching_context(context_query=a_target_context)
+                    a_decoded_marginal_posterior_df = _subfn_add_decoded_marginal_important_columns(a_result=a_result, a_decoder=a_decoder, a_decoded_marginal_posterior_df=a_decoded_marginal_posterior_df, global_measured_position_df=global_measured_position_df)
                     an_active_display_context = active_display_context.overwriting_context(known_named_decoding_epochs_type=known_named_decoding_epochs_type, figure_title=figure_title)
-                    fig, ax_dict = MeasuredVsDecodedOccupancy.analyze_and_plot_meas_vs_decoded_occupancy(best_matching_context, a_result, a_decoder, a_decoded_marginal_posterior_df, track_templates, figure_title=figure_title, skip_plotting_measured=False)
+                    fig, ax_dict = MeasuredVsDecodedOccupancy.analyze_and_plot_meas_vs_decoded_occupancy(best_matching_context, a_result, a_decoder, a_decoded_marginal_posterior_df, track_templates, figure_title=figure_title, skip_plotting_measured=False, include_only_track_body_time_bins=include_only_track_body_time_bins)
                     _graphics_output_dict = _subfn_apply_formatting_footer_and_etc(fig, ax_dict, figure_title=figure_title, subtitle_string=None, an_active_display_context=an_active_display_context)
                     collector.post_hoc_append(figs=[fig,], axes=ax_dict, contexts=[an_active_display_context])
                     graphics_output_dict['save_paths'][an_active_display_context] = deepcopy(_graphics_output_dict['save_paths'])
@@ -708,8 +750,9 @@ class MultiContextComparingDisplayFunctions(AllFunctionEnumeratingMixin, metacla
                     known_named_decoding_epochs_type='global'
                     a_target_context: IdentifyingContext = IdentifyingContext(known_named_decoding_epochs_type=known_named_decoding_epochs_type, data_grain='per_time_bin', **common_constraint_dict) ## Laps , data_grain='per_epoch'
                     best_matching_context, a_result, a_decoder, a_decoded_marginal_posterior_df = a_new_fully_generic_result.get_results_best_matching_context(context_query=a_target_context)
+                    a_decoded_marginal_posterior_df = _subfn_add_decoded_marginal_important_columns(a_result=a_result, a_decoder=a_decoder, a_decoded_marginal_posterior_df=a_decoded_marginal_posterior_df, global_measured_position_df=global_measured_position_df)
                     an_active_display_context = active_display_context.overwriting_context(known_named_decoding_epochs_type=known_named_decoding_epochs_type, figure_title=figure_title)
-                    fig, ax_dict = MeasuredVsDecodedOccupancy.analyze_and_plot_meas_vs_decoded_occupancy(best_matching_context, a_result, a_decoder, a_decoded_marginal_posterior_df, track_templates, figure_title=figure_title, skip_plotting_measured=False)
+                    fig, ax_dict = MeasuredVsDecodedOccupancy.analyze_and_plot_meas_vs_decoded_occupancy(best_matching_context, a_result, a_decoder, a_decoded_marginal_posterior_df, track_templates, figure_title=figure_title, skip_plotting_measured=False, include_only_track_body_time_bins=include_only_track_body_time_bins)
                     _graphics_output_dict = _subfn_apply_formatting_footer_and_etc(fig, ax_dict, figure_title=figure_title, subtitle_string=None, an_active_display_context=an_active_display_context)
                     collector.post_hoc_append(figs=[fig,], axes=ax_dict, contexts=[an_active_display_context])
                     graphics_output_dict['save_paths'][an_active_display_context] = deepcopy(_graphics_output_dict['save_paths'])
@@ -719,8 +762,9 @@ class MultiContextComparingDisplayFunctions(AllFunctionEnumeratingMixin, metacla
                     known_named_decoding_epochs_type='pbe'
                     a_target_context: IdentifyingContext = IdentifyingContext(known_named_decoding_epochs_type=known_named_decoding_epochs_type, data_grain='per_time_bin', **common_constraint_dict) ## Laps , data_grain='per_epoch'
                     best_matching_context, a_result, a_decoder, a_decoded_marginal_posterior_df = a_new_fully_generic_result.get_results_best_matching_context(context_query=a_target_context)
+                    a_decoded_marginal_posterior_df = _subfn_add_decoded_marginal_important_columns(a_result=a_result, a_decoder=a_decoder, a_decoded_marginal_posterior_df=a_decoded_marginal_posterior_df, global_measured_position_df=global_measured_position_df)
                     an_active_display_context = active_display_context.overwriting_context(known_named_decoding_epochs_type=known_named_decoding_epochs_type, figure_title=figure_title)
-                    fig, ax_dict = MeasuredVsDecodedOccupancy.analyze_and_plot_meas_vs_decoded_occupancy(best_matching_context, a_result, a_decoder, a_decoded_marginal_posterior_df, track_templates, figure_title=figure_title, skip_plotting_measured=True)
+                    fig, ax_dict = MeasuredVsDecodedOccupancy.analyze_and_plot_meas_vs_decoded_occupancy(best_matching_context, a_result, a_decoder, a_decoded_marginal_posterior_df, track_templates, figure_title=figure_title, skip_plotting_measured=True, include_only_track_body_time_bins=include_only_track_body_time_bins)
                     _graphics_output_dict = _subfn_apply_formatting_footer_and_etc(fig, ax_dict, figure_title=figure_title, subtitle_string=None, an_active_display_context=an_active_display_context, should_include_footer=True)
                     collector.post_hoc_append(figs=[fig,], axes=ax_dict, contexts=[an_active_display_context])
                     graphics_output_dict['save_paths'][an_active_display_context] = deepcopy(_graphics_output_dict['save_paths'])

@@ -841,9 +841,6 @@ class LinearTrackInstance:
         return (long_track_inst, short_track_inst)
 
 
-
-
-
     def classify_point(self, test_point) -> "TrackPositionClassification":
         return classify_test_point(test_point, self.rects)
     
@@ -875,6 +872,48 @@ class LinearTrackInstance:
         is_pos_bin_on_maze = [self.classify_x_position(x).is_on_maze for x in x_arr]
 
         return pd.DataFrame({'x': deepcopy(x_arr), 'is_endcap': is_pos_bin_endcap, 'is_on_maze': is_pos_bin_on_maze})
+
+    @function_attributes(short_name=None, tags=['track_body', 'endcap', 'smart'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-11-04 14:03', related_items=[])
+    @classmethod
+    def add_is_track_body_long_smart(cls, a_df: pd.DataFrame) -> pd.DataFrame:
+        """ ## Adds the correct/intellegent a_df['is_track_body'] column:
+
+            Build whether it's long or not:
+
+            a_df['is_most_likely_decoder_Long']
+            ## If it's long, 
+            a_df['is_track_body'] should be True IFF a_df['is_decoded_pos_long_track_body']
+            ## Else, it's short, so 
+            a_df['is_track_body'] should be True IFF a_df['is_decoded_pos_short_track_body']
+            # a_df['is_track_body']
+
+            
+        Usage:
+            print(f'Adding "most_likely_positions_1D" related track body/endcap columns...')
+            for track_length_name, a_track_inst in track_inst_dict.items():
+                print(f'\t\ttrack_length_name: "{track_length_name}":')
+                # track_length_name: str = 'long'
+                _a_most_likely_positions_from_most_likely_decoder_classification_df: pd.DataFrame = a_track_inst.build_x_position_classification_df(x_arr=a_decoded_marginal_posterior_df['most_likely_positions_1D']) ## TODO: this is using long/short
+                a_decoded_marginal_posterior_df[f'is_decoded_pos_{track_length_name}_track_body'] = np.logical_and(np.logical_not(_a_most_likely_positions_from_most_likely_decoder_classification_df['is_endcap']), _a_most_likely_positions_from_most_likely_decoder_classification_df['is_on_maze'])
+                
+            a_decoded_marginal_posterior_df = LinearTrackInstance.add_is_track_body_long_smart(a_df=a_decoded_marginal_posterior_df)
+
+        """
+        assert 'P_Short' in a_df.columns
+        assert 'is_decoded_pos_long_track_body' in a_df.columns
+        assert 'is_decoded_pos_short_track_body' in a_df.columns
+
+        a_df['is_most_likely_decoder_Long'] = a_df['P_Short'].apply(lambda x: (x < 0.5))
+
+        # Choose the correct "track body" column depending on long/short
+        a_df['is_track_body'] = np.where(
+            a_df['is_most_likely_decoder_Long'],
+            a_df['is_decoded_pos_long_track_body'],
+            a_df['is_decoded_pos_short_track_body']
+        )
+        return a_df
+
+
 
 
     def plot_rects(self, plot_item, matplotlib_rect_kwargs_override=None, rotate_to_vertical:bool=False):

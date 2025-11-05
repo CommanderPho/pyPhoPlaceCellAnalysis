@@ -116,6 +116,111 @@ from pyphocorehelpers.gui.Qt.color_helpers import ColormapHelpers, ColorFormatCo
 
 
 # ==================================================================================================================================================================================================================================================================================== #
+# 2025-11-05 - Factor out by-animal code                                                                                                                                                                                                                                               #
+# ==================================================================================================================================================================================================================================================================================== #
+
+from pyphocorehelpers.plotting.figure_management import PhoActiveFigureManager2D, capture_new_figures_decorator, CaptureNewFiguresContextManager
+from pyphocorehelpers.DataStructure.RenderPlots.MatplotLibRenderPlots import FigureCollector
+from neuropy.utils.matplotlib_helpers import FormattedFigureText
+from pyphoplacecellanalysis.SpecificResults.PhoDiba2023Paper import PhoPublicationFigureHelper
+from pyphocorehelpers.plotting.figure_management import PhoActiveFigureManager2D
+from pyphocorehelpers.plotting.media_output_helpers import figure_to_pil_image, image_grid
+import matplotlib
+import matplotlib.pyplot as plt
+# from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import SeriesLetter, AnimalName
+from pyphoplacecellanalysis.SpecificResults.PhoDiba2023Paper import _perform_dual_hist_plot, _perform_matplotlib_pre_post_scatter, _perform_matplotlib_SINGLE_SERIES_pre_post_scatter
+from pyphocorehelpers.plotting.media_output_helpers import figure_to_pil_image, vertical_image_stack, horizontal_image_stack, image_grid
+
+
+# fig_man = PhoActiveFigureManager2D(name=f'fig_man') # Initialize a new figure manager
+def plot_by_animal_split_histogram_figure(active_all_sessions_laps_time_bin_df: pd.DataFrame, active_all_sessions_ripple_time_bin_df: pd.DataFrame,
+                                           hist_animal_split_samples_df_dict, a_time_bin_size: float = 0.075):
+  """ 
+  
+  Temporarily produces a separate figure for each animal (laps/PBEs) and then merges them to a single figure and closes the temporaries.
+  
+  
+  from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import plot_by_animal_split_histogram_figure
+  """
+  matplotlib.use('Qt5Agg')
+
+  display_context = IdentifyingContext(name=f'fig4_hist_validations')
+  constrained_layout = True
+  ## Debug plot separate for each animals
+  new_figs_dict = {}
+  collector = None
+  with mpl.rc_context(PhoPublicationFigureHelper.rc_context_kwargs({'figure.constrained_layout.use': (constrained_layout or False), 'figure.frameon': False, })): # 'figure.dpi': str(dpi), 'figure.figsize': (12.4, 4.8), , 'figure.figsize': size
+    # Create a FigureCollector instance
+    with FigureCollector(name='fig4_by_animal_sess_validation', base_context=display_context) as collector:
+          
+      with CaptureNewFiguresContextManager() as fig_capturer:
+          # code that generates figures
+          _laps_histogram_out_by_animal = {}
+          _ripple_histogram_out_by_animal = {}
+
+          # _common_kwargs = dict(time_column='t_bin_center', legend_groups_to_solo=[0.025], legend_groups_to_hide=None,)
+          _common_kwargs = dict(
+                  # time_column='t_bin_center',
+                  time_column='delta_aligned_start_t',
+                  legend_groups_to_solo=[0.075], legend_groups_to_hide=None,
+                              #   subplot_by_column='session_name',
+          )
+
+
+          for an_animal_name, a_hist_samples_df_dict in hist_animal_split_samples_df_dict.items():
+              hist_counts_dict, hist_count_extremas_only_dict, hist_count_extrema_ratios, hist_densities_dict, (bin_edges, bin_values) = compute_hist_variables(hist_samples_df_dict=a_hist_samples_df_dict)
+              # animal_bags[an_animal_name] = deepcopy(hist_count_extremas_only_dict)
+              _laps_histogram_out_by_animal[an_animal_name] = _perform_matplotlib_SINGLE_SERIES_pre_post_scatter(grainularity_desc='by-time-bin',
+                                            epochs_df=deepcopy(active_all_sessions_laps_time_bin_df).pho.constrain_df_cols(trained_compute_epochs="laps", decoder_identifier="pseudo2D", masked_time_bin_fill_type='dropped', custom_replay_name="withNormalComputedReplays-qclu_[1, 2, 4, 6, 7, 8, 9]-frateThresh_2.0", animal=an_animal_name), # , time_bin_size=a_time_bin_size
+                                                                              **_common_kwargs, context_prefix = f'{an_animal_name} - ',
+                                                                              )
+              plt.suptitle(f'Animal: {an_animal_name}')    
+              collector.post_hoc_append_container(a_container=_laps_histogram_out_by_animal[an_animal_name])
+              
+              _ripple_histogram_out_by_animal[an_animal_name] = _perform_matplotlib_SINGLE_SERIES_pre_post_scatter(grainularity_desc='by-time-bin',
+                                                                                  epochs_df=deepcopy(active_all_sessions_ripple_time_bin_df).pho.constrain_df_cols(trained_compute_epochs="laps", decoder_identifier="pseudo2D", masked_time_bin_fill_type='dropped', custom_replay_name="withNormalComputedReplays-qclu_[1, 2, 4, 6, 7, 8, 9]-frateThresh_2.0", animal=an_animal_name), # , time_bin_size=a_time_bin_size
+                                                                                  **_common_kwargs, context_prefix = f'{an_animal_name} - ',
+                                                                                  )
+              plt.suptitle(f'Animal: {an_animal_name}')
+              # collector.post_hoc_append(figs=[a_container.fig], axes=(a_container.ax_dict or a_container.axes), contexts=[(a_container.plots.context or None)])
+              collector.post_hoc_append_container(a_container=_ripple_histogram_out_by_animal[an_animal_name]) # new_figs_dict
+              
+      ## END with CaptureNewFiguresContextManager() as fig_capturer.....
+
+      new_figs_dict = fig_capturer.new_fig_dict
+      # new_figs_dict
+      # collector.post_hoc_append(figs=new_figs_dict.values()) # new_figs_dict
+      
+
+  new_figs_dict
+  # collector
+  # join to single figure: new_figs_dict _______________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
+
+  # 1) Collect open figures
+  figs = new_figs_dict # PhoActiveFigureManager2D().figures_dict  # {fignum: Figure}
+
+  # 2) Convert to images (pick order you want)
+  pil_images = [figure_to_pil_image(a_fig=f) for _, f in sorted(figs.items())]
+
+  # 3) Compose into a grid (or use horizontal_image_stack/vertical_image_stack)
+  combined_img = vertical_image_stack(pil_images)  # one row; or arrange into rows
+
+  # 4) Show in a new Matplotlib figure
+  new_fig = plt.figure(constrained_layout=True, num='AcrossAnimalsFigures')
+  ax = new_fig.add_subplot(111)
+  ax.imshow(combined_img)
+  ax.axis('off')
+  plt.show()
+
+  ## Close old open images
+  for k, a_fig in figs.items():
+      plt.close(a_fig)
+      
+  return combined_img, collector
+
+
+
+# ==================================================================================================================================================================================================================================================================================== #
 # 2025-10-31 Find all potentially good KDIBA SESSIONS:                                                                                                                                                                                                                                 #
 # ==================================================================================================================================================================================================================================================================================== #
 import pandas as pd 
@@ -3636,7 +3741,7 @@ class MeasuredVsDecodedOccupancy:
     """
     @function_attributes(short_name=None, tags=['MAIN'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-05-15 19:57', related_items=[])
     @classmethod
-    def analyze_and_plot_meas_vs_decoded_occupancy(cls, best_matching_context, a_result, a_decoder, a_decoded_marginal_posterior_df, track_templates, figure_title='Laps', plot_in_same_figure:bool=True, should_max_normalize: bool=False, skip_plotting_measured: bool=False, debug_print=False, **kwargs):
+    def analyze_and_plot_meas_vs_decoded_occupancy(cls, best_matching_context, a_result, a_decoder, a_decoded_marginal_posterior_df, track_templates, figure_title='Laps', plot_in_same_figure:bool=True, should_max_normalize: bool=False, skip_plotting_measured: bool=False, debug_print=False, include_only_track_body_time_bins: bool=False, **kwargs):
         """ analyze and plot
 
         
@@ -3680,7 +3785,7 @@ class MeasuredVsDecodedOccupancy:
         # a_decoded_marginal_posterior_df['is_post_delta'] = a_decoded_marginal_posterior_df['is_post_delta'].astype(int)
         a_decoded_marginal_posterior_df
 
-        # pre_post_delta_result_splits_dict = a_decoded_marginal_posterior_df.pho.partition_df_dict('pre_post_delta_id')
+        pre_post_delta_result_splits_dict = a_decoded_marginal_posterior_df.pho.partition_df_dict('pre_post_delta_id')
 
         n_timebins, flat_time_bin_containers, timebins_p_x_given_n = a_result.flatten() # (59, 4, 69488)
         # timebins_p_x_given_n.shape
@@ -3720,8 +3825,36 @@ class MeasuredVsDecodedOccupancy:
                 # np.shape(a_timebins_p_x_given_n)
                 # ax = ax_dict[a_pre_post_delta_name]  # Get the appropriate subplot axis
                 active_ax_dict = {ax_name:v for ax_name, v in ax_dict.items() if (ax_name.split('_', maxsplit=1)[0] == a_pre_post_delta_name)}
-                cls.plot_meas_vs_decoded_occupancy(timebins_p_x_given_n=a_timebins_p_x_given_n, track_templates=track_templates, fig=fig, ax_dict=active_ax_dict, a_pre_post_delta_name=a_pre_post_delta_name, should_max_normalize=should_max_normalize, debug_print=debug_print, skip_plotting_measured=skip_plotting_measured, **kwargs)
+                fig, ax_dict = cls.plot_meas_vs_decoded_occupancy(timebins_p_x_given_n=a_timebins_p_x_given_n, track_templates=track_templates, fig=fig, ax_dict=active_ax_dict, a_pre_post_delta_name=a_pre_post_delta_name, should_max_normalize=should_max_normalize, debug_print=debug_print, skip_plotting_measured=skip_plotting_measured, include_time_bin_only_values=include_only_track_body_time_bins, **kwargs)
                 # ax.set_title(f'{figure_title} - {a_pre_post_delta_name}')  # Set subplot title
+                
+                if include_only_track_body_time_bins:
+                    active_a_decoded_marginal_posterior_df: pd.DataFrame = deepcopy(pre_post_delta_result_splits_dict[a_pre_post_delta_name])
+                    active_a_decoded_marginal_posterior_df = deepcopy(active_a_decoded_marginal_posterior_df[active_a_decoded_marginal_posterior_df['is_track_body']])
+
+                    # decoded_col_name: str = 'binned_x_decoded_most_likely'
+                    # meas_col_name: str = 'binned_x_meas'
+
+                    decoded_col_name: str = 'x_decoded_most_likely'
+                    meas_col_name: str = 'x_meas'
+                    
+                    track_body_only_kwargs = dict(alpha=0.9)
+                    legend_series_names = ['decoded', 'measured']
+                    for i, (ax_name, ax) in enumerate(ax_dict.items()):
+                        
+                        if decoded_col_name in active_a_decoded_marginal_posterior_df:
+                            a_decoded_occupancy = active_a_decoded_marginal_posterior_df[decoded_col_name].to_numpy()
+                            occupancy_fig, occupancy_ax = perform_plot_occupancy(a_decoded_occupancy, xbin_centers=None, ybin_centers=None, fig=fig, ax=ax, plot_pos_bin_axes=False, label='decoded_trackBodyOnly', should_max_normalize=should_max_normalize, **track_body_only_kwargs)
+                            legend_series_names.append('decoded_trackBodyOnly')
+                            
+                        if meas_col_name in active_a_decoded_marginal_posterior_df:
+                            a_measured_occupancy = active_a_decoded_marginal_posterior_df[meas_col_name].to_numpy()
+                            occupancy_fig, occupancy_ax = perform_plot_occupancy(a_measured_occupancy, xbin_centers=None, ybin_centers=None, fig=fig, ax=ax, plot_pos_bin_axes=False, label='measured_trackBodyOnly', should_max_normalize=should_max_normalize, **track_body_only_kwargs)
+                            legend_series_names.append('measured_trackBodyOnly')
+                                          
+                    ## END for i, (ax_name, ax) in enumerate(ax_di...
+                    plt.legend(legend_series_names)
+
 
             plt.suptitle(f'{figure_title}')  # Set overall figure title
             return fig, ax_dict
@@ -3740,7 +3873,7 @@ class MeasuredVsDecodedOccupancy:
 
 
     @classmethod
-    def plot_meas_vs_decoded_occupancy(cls, timebins_p_x_given_n: NDArray, track_templates, num='plot_meas_vs_decoded_occupancy', fig=None, ax_dict=None, should_max_normalize: bool=False, a_pre_post_delta_name=None, debug_print=False, skip_plotting_measured: bool=False, **kwargs):
+    def plot_meas_vs_decoded_occupancy(cls, timebins_p_x_given_n: NDArray, track_templates, num='plot_meas_vs_decoded_occupancy', fig=None, ax_dict=None, should_max_normalize: bool=False, a_pre_post_delta_name=None, debug_print=False, skip_plotting_measured: bool=False, include_only_track_body_time_bins: bool=True, **kwargs):
         """ from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import plot_meas_vs_decoded_occupancy
         a_result: DecodedFilterEpochsResult
         
@@ -3757,7 +3890,7 @@ class MeasuredVsDecodedOccupancy:
 
         timebins_p_x_given_n = np.nan_to_num(timebins_p_x_given_n)
         timebins_p_x_given_n_occupancy = np.nansum(timebins_p_x_given_n, axis=2) # (n_pos, n_decoders)
-        timebins_p_x_given_n_occupancy.shape
+
 
         ## sum over all positions to get the scalar per decoder
         scalar_likelihood_per_decoder = np.nansum(timebins_p_x_given_n_occupancy, axis=0) # (n_decoders,)
@@ -3819,7 +3952,15 @@ class MeasuredVsDecodedOccupancy:
             if is_measured_result_curr_period:
                 ## only plot measured for the correct measured period:
                 occupancy_fig, occupancy_ax = perform_plot_occupancy(measured_occupancy, xbin_centers=None, ybin_centers=None, fig=fig, ax=ax, plot_pos_bin_axes=False, label='measured', should_max_normalize=should_max_normalize, **measured_kwargs)
+
+
+            # if include_time_bin_only_values:
+            #     active_a_decoded_marginal_posterior_df: pd.DataFrame = deepcopy(a_decoded_marginal_posterior_df[a_decoded_marginal_posterior_df['is_track_body']])
+                
+
+
             ax.set_title(ax_title)
+        ## END for i, (ax_name, ax) in enumerate(ax_di...
 
         plt.legend(['decoded', 'measured'])
         # occupancy_fig.show()
