@@ -2799,9 +2799,9 @@ class EpochComputationDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Di
             #                                       enabled_filter_names=None, fail_on_exception=True, debug_print=False)
             
 
-            owning_pipeline_reference.resolve_and_execute_full_required_computation_plan(computation_functions_name_includelist=['directional_decoders_decode_continuous'],
-                                                  computation_kwargs_list=[{'time_bin_size': time_bin_size, 'should_disable_cache':False}], 
-                                                  enabled_filter_names=None, fail_on_exception=True, debug_print=False)
+            # owning_pipeline_reference.resolve_and_execute_full_required_computation_plan(computation_functions_name_includelist=['directional_decoders_decode_continuous'],
+            #                                       computation_kwargs_list=[{'time_bin_size': time_bin_size, 'should_disable_cache':False}], 
+            #                                       enabled_filter_names=None, fail_on_exception=True, debug_print=False)
 
 
             DAY_DATE_STR: str = date.today().strftime("%Y-%m-%d")
@@ -2836,13 +2836,30 @@ class EpochComputationDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Di
             print(f'\tepochs_decoding_time_bin_size: {epochs_decoding_time_bin_size}')
             assert epochs_decoding_time_bin_size == valid_EpochComputations_result.epochs_decoding_time_bin_size, f"\tERROR: nonPBE_results.epochs_decoding_time_bin_size: {valid_EpochComputations_result.epochs_decoding_time_bin_size} != epochs_decoding_time_bin_size: {epochs_decoding_time_bin_size}"
             a_new_fully_generic_result: GenericDecoderDictDecodedEpochsDictResult = valid_EpochComputations_result.a_generic_decoder_dict_decoded_epochs_dict_result ## get existing
+
+            does_time_bin_size_differ: bool = (time_bin_size != epochs_decoding_time_bin_size)
             
+            compute_kwargs = {'drop_previous_result_and_compute_fresh': False, 'force_recompute': False}
+            
+            if does_time_bin_size_differ:
+                print(f'TIME BIN SIZE DIFFERS:\n\ttime_bin_size: {time_bin_size}, epochs_decoding_time_bin_size: {epochs_decoding_time_bin_size}')            
+                a_new_fully_generic_result = None ## set to None, thorw it out!
+                epochs_decoding_time_bin_size = time_bin_size
+                compute_kwargs = {'drop_previous_result_and_compute_fresh': True, 'force_recompute': True}
+
+
+
             if a_new_fully_generic_result is None:
                 ## need to recompute 'generalized_specific_epochs_decoding'
                 owning_pipeline_reference.perform_specific_computation(computation_functions_name_includelist=['generalized_specific_epochs_decoding'],
-                                        computation_kwargs_list=[{'epochs_decoding_time_bin_size': time_bin_size, 'drop_previous_result_and_compute_fresh':False, 'force_recompute': False}], 
+                                        computation_kwargs_list=[{'epochs_decoding_time_bin_size': time_bin_size, **compute_kwargs}], 
                                         enabled_filter_names=None, fail_on_exception=True, debug_print=False)
 
+                valid_EpochComputations_result: EpochComputationsComputationsContainer = owning_pipeline_reference.global_computation_results.computed_data['EpochComputations'] # owning_pipeline_reference.global_computation_results.computed_data['EpochComputations']
+                assert valid_EpochComputations_result is not None
+                epochs_decoding_time_bin_size: float = valid_EpochComputations_result.epochs_decoding_time_bin_size ## just get the standard size. Currently assuming all things are the same size!
+                print(f'\tepochs_decoding_time_bin_size: {epochs_decoding_time_bin_size}')
+                assert epochs_decoding_time_bin_size == valid_EpochComputations_result.epochs_decoding_time_bin_size, f"\tERROR: nonPBE_results.epochs_decoding_time_bin_size: {valid_EpochComputations_result.epochs_decoding_time_bin_size} != epochs_decoding_time_bin_size: {epochs_decoding_time_bin_size}"
                 a_new_fully_generic_result: GenericDecoderDictDecodedEpochsDictResult = valid_EpochComputations_result.a_generic_decoder_dict_decoded_epochs_dict_result ## get existing
 
             
@@ -2854,7 +2871,8 @@ class EpochComputationDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Di
             best_matching_context, a_result, a_decoder, a_decoded_marginal_posterior_df = a_new_fully_generic_result.get_results_best_matching_context(context_query=a_target_context, debug_print=False)
             epochs_decoding_time_bin_size: float = best_matching_context.get('time_bin_size', None)
             assert epochs_decoding_time_bin_size is not None
-
+            # assert (epochs_decoding_time_bin_size == time_bin_size)
+            
             ## OUTPUTS: a_decoded_marginal_posterior_df
 
             complete_session_context, (session_context, additional_session_context) = owning_pipeline_reference.get_complete_session_context()

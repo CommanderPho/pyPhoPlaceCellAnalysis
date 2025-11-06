@@ -25,6 +25,9 @@ import ipywidgets as widgets
 from IPython.display import display, Javascript
 import base64
 
+
+
+
 # from pyphoplacecellanalysis.Pho2D.plotly.Extensions.plotly_helpers import add_copy_button
 @function_attributes(short_name=None, tags=['plotly', 'interactive', 'clipboard', 'save', 'metadata', 'USEFUL'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-10-25 07:30', related_items=[])
 def add_copy_save_action_buttons(fig: go.Figure, output_widget=None):
@@ -1026,6 +1029,12 @@ def _helper_build_figure(data_results_df: pd.DataFrame, histogram_bins:int=25, e
 
     elif (main_plot_mode == 'separate_row_per_session'):
         # main_plot_mode: str = 'separate_row_per_session'
+        vertical_spacing: float = 0.04
+        # vertical_spacing: float = min(0.03, 1.0 / (num_unique_sessions - 1) - 1e-4)
+        row_height = 200  # pixels per session
+        required_figure_height = row_height * num_unique_sessions
+
+        print(f'ROW SPACING: vertical_spacing: {vertical_spacing}')
         # , subplot_titles=("Plot 1", "Plot 2")
         # column_titles = ["Pre-delta", f"{scatter_title} - Across Sessions ({num_unique_sessions} Sessions) - {num_unique_time_bins} Time Bin Sizes", "Post-delta"]
         column_titles = ["Pre-delta", f"{scatter_title}", "Post-delta"]
@@ -1035,13 +1044,13 @@ def _helper_build_figure(data_results_df: pd.DataFrame, histogram_bins:int=25, e
             subplot_titles.extend(["Pre-delta", f"{a_row_title}", "Post-delta"])
         # subplot_titles = [["Pre-delta", f"{a_row_title}", "Post-delta"] for a_row_title in session_titles].flatten()
 
-        sp_make_subplots_kwargs = {'rows': num_unique_sessions, 'cols': 3, 'column_widths': [0.1, 0.8, 0.1], 'horizontal_spacing': 0.01, 'vertical_spacing': 0.04, 'shared_yaxes': True,
+        sp_make_subplots_kwargs = {'rows': num_unique_sessions, 'cols': 3, 'column_widths': [0.1, 0.8, 0.1], 'horizontal_spacing': 0.01, 'vertical_spacing': vertical_spacing, 'shared_yaxes': True,
                                     'column_titles': column_titles,
                                     'row_titles': session_titles,
                                     'subplot_titles': subplot_titles,
                                     }
         px_scatter_kwargs = {'x': 'delta_aligned_start_t', 'y': variable_name, 'color': 'time_bin_size', 'range_y': [0.0, 1.0],
-                            'height': (num_unique_sessions*200), 'width': 1024,
+                            'height': required_figure_height, 'width': 1024,
                             'labels': {'session_name': 'Session', 'time_bin_size': 'tbin_size'}}  | (px_scatter_kwargs or {})
         # px_histogram_kwargs = {'nbins': histogram_bins, 'barmode': barmode, 'opacity': 0.5, 'range_y': [0.0, 1.0], 'histnorm': 'probability'}
     else:
@@ -1204,6 +1213,7 @@ def _helper_build_figure(data_results_df: pd.DataFrame, histogram_bins:int=25, e
     figure_context = IdentifyingContext(**figure_context_dict)
 
     return fig, figure_context
+
 
 @function_attributes(short_name=None, tags=['plotly', 'blue_yellow'], input_requires=[], output_provides=[], uses=['plotly_plot_1D_most_likely_position_comparsions'], used_by=[], creation_date='2024-02-06 06:04', related_items=[])
 def plot_blue_yellow_points(a_df, specific_point_list):
