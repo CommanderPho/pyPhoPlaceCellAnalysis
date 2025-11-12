@@ -293,6 +293,7 @@ def perform_sweep_decoding_time_bin_sizes_marginals_dfs_completion_function(self
             from pyphoplacecellanalysis.General.Batch.BatchJobCompletion.UserCompletionHelpers.batch_user_completion_helpers import perform_sweep_decoding_time_bin_sizes_marginals_dfs_completion_function, _try_all_templates_decode
 
         """
+        from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import _compute_proper_filter_epochs, EpochFilteringMode
 
         ripple_decoding_time_bin_size = None
         if desired_shared_decoding_time_bin_size is not None:
@@ -337,16 +338,30 @@ def perform_sweep_decoding_time_bin_sizes_marginals_dfs_completion_function(self
             ripple_decoding_time_bin_size: float = desired_ripple_decoding_time_bin_size # allow direct use            
             ## Drop those less than the time bin duration
             print(f'DropShorterMode:')
-            pre_drop_n_epochs = len(replay_epochs_df)
-            if minimum_event_duration is not None:                
-                replay_epochs_df = replay_epochs_df[replay_epochs_df['duration'] > minimum_event_duration]
-                post_drop_n_epochs = len(replay_epochs_df)
-                n_dropped_epochs = post_drop_n_epochs - pre_drop_n_epochs
+            pre_drop_n_epochs: int = len(replay_epochs_df)
+            ## START BLOCK - 2025-11-12 - for consistency with `_compute_lap_and_ripple_epochs_decoding_for_decoder`'s filtering methods, convert to use `_compute_proper_filter_epochs` instead of naive filtering:
+            if minimum_event_duration is None:
+                minimum_event_duration = (2.0 * desired_ripple_decoding_time_bin_size) ## REQUIRED FOR same filter as other usage
+            else:
+                # assert (minimum_event_duration >= (2.0 * desired_ripple_decoding_time_bin_size)), f"2025-11-12 -minimum_event_duration: {minimum_event_duration} < (2.0 * desired_ripple_decoding_time_bin_size): {2.0 * desired_ripple_decoding_time_bin_size}"
+                if minimum_event_duration < (2.0 * desired_ripple_decoding_time_bin_size):
+                    print(f'WARN: 2025-11-12 -minimum_event_duration: {minimum_event_duration} < (2.0 * desired_ripple_decoding_time_bin_size): {2.0 * desired_ripple_decoding_time_bin_size}.\n\tOVERRIDING TO (2.0 * desired_ripple_decoding_time_bin_size): {2.0 * desired_ripple_decoding_time_bin_size} FOR CONSISTANCY WITH OTHER FILTERS.')
+                    minimum_event_duration = (2.0 * desired_ripple_decoding_time_bin_size)
+
+
+            replay_epochs_df = TimeColumnAliasesProtocol.renaming_synonym_columns_if_needed(deepcopy(replay_epochs_df))
+            replay_epochs_df, ripple_decoding_time_bin_size = _compute_proper_filter_epochs(epochs_df=replay_epochs_df, desired_decoding_time_bin_size=desired_ripple_decoding_time_bin_size, minimum_event_duration=minimum_event_duration, mode=EpochFilteringMode.DropShorter) # `ripple_decoding_time_bin_size` is set here! It takes a minimum value
+            if use_single_time_bin_per_epoch:
+                ripple_decoding_time_bin_size = None
+            ## END BLOCK    
+            post_drop_n_epochs: int = len(replay_epochs_df)
+            n_dropped_epochs: int = post_drop_n_epochs - pre_drop_n_epochs
+            
+            if minimum_event_duration is not None:
+                # replay_epochs_df = replay_epochs_df[replay_epochs_df['duration'] > minimum_event_duration]
                 print(f'\tminimum_event_duration present (minimum_event_duration={minimum_event_duration}).\n\tdropping {n_dropped_epochs} that are shorter than our minimum_event_duration of {minimum_event_duration}.', end='\t')
             else:
-                replay_epochs_df = replay_epochs_df[replay_epochs_df['duration'] > desired_ripple_decoding_time_bin_size]
-                post_drop_n_epochs = len(replay_epochs_df)
-                n_dropped_epochs = post_drop_n_epochs - pre_drop_n_epochs
+                # replay_epochs_df = replay_epochs_df[replay_epochs_df['duration'] > desired_ripple_decoding_time_bin_size]
                 print(f'\tdropping {n_dropped_epochs} that are shorter than our ripple decoding time bin size of {desired_ripple_decoding_time_bin_size}', end='\t') 
 
             print(f'{post_drop_n_epochs} remain.')
