@@ -6507,7 +6507,7 @@ def _subfn_compute_complete_df_metrics(directional_merged_decoders_result: "Dire
 
     ## Convert from a Dict (decoder_laps_df_dict) to a merged dataframe with columns suffixed with the decoder name:
     laps_metric_merged_df = _build_merged_score_metric_df(decoder_laps_df_dict, columns=active_df_columns)
-    ripple_metric_merged_df = _build_merged_score_metric_df(decoder_ripple_df_dict, columns=active_df_columns)
+    ripple_metric_merged_df = _build_merged_score_metric_df(decoder_ripple_df_dict, columns=active_df_columns) # {'long_LR': 394, 'long_RL': 394, 'short_LR': 394, 'short_RL': 394}
     ## OUTPUTS: laps_metric_merged_df, ripple_metric_merged_df
     ## copy over the optional ['start'] epoch_start_t column for better alignment:
     for a_merged_df, a_dict in zip((laps_metric_merged_df, ripple_metric_merged_df), (decoder_laps_df_dict, decoder_ripple_df_dict)):
@@ -6520,18 +6520,18 @@ def _subfn_compute_complete_df_metrics(directional_merged_decoders_result: "Dire
     ## why is this even needed? The `directional_merged_decoders_result.laps_all_epoch_bins_marginals_df` come in with the marginals but not the original non-marginalized P_decoder values. 
     ## Get the 1D decoder probabilities explicitly and add them as columns to the dfs:
     _laps_all_epoch_bins_marginals_df =  _compute_nonmarginalized_decoder_prob(deepcopy(directional_merged_decoders_result.laps_all_epoch_bins_marginals_df)) # incomming df has columns: ['P_LR', 'P_RL', 'P_Long', 'P_Short', 'lap_idx', 'lap_start_t']
-    _ripple_all_epoch_bins_marginals_df =  _compute_nonmarginalized_decoder_prob(deepcopy(directional_merged_decoders_result.ripple_all_epoch_bins_marginals_df)) # incomming ['P_LR', 'P_RL', 'P_Long', 'P_Short', 'ripple_idx', 'ripple_start_t']
+    _ripple_all_epoch_bins_marginals_df =  _compute_nonmarginalized_decoder_prob(deepcopy(directional_merged_decoders_result.ripple_all_epoch_bins_marginals_df)) # incomming ['P_LR', 'P_RL', 'P_Long', 'P_Short', 'ripple_idx', 'ripple_start_t'] - #TODO 2025-11-12 07:06: - [ ] len(.ripple_all_ep.._marginals_df): 337 - small
     
     ## Merge in the RadonTransform df:
     # _mergev_laps_metric_merged_df: pd.DataFrame = deepcopy(_laps_all_epoch_bins_marginals_df).join(deepcopy(laps_metric_merged_df)) #TODO 2025-01-02 13:12: - [ ] !!PITFALL!! `df.join(...)` always seems to mess things up, is this where the problems are happening?
     # _mergev_ripple_metric_merged_df: pd.DataFrame = deepcopy(_ripple_all_epoch_bins_marginals_df).join(deepcopy(ripple_metric_merged_df)) # has ['ripple_idx', 'ripple_start_t'] to join on
     _mergev_laps_metric_merged_df: pd.DataFrame = deepcopy(_laps_all_epoch_bins_marginals_df).join(deepcopy(laps_metric_merged_df).set_index('start'), on='epoch_start_t', how='inner', validate="1:1") #TODO 2025-01-02 13:12: - [ ] !!PITFALL!! `df.join(...)` always seems to mess things up, is this where the problems are happening?
     _mergev_ripple_metric_merged_df: pd.DataFrame = deepcopy(_ripple_all_epoch_bins_marginals_df).join(deepcopy(ripple_metric_merged_df).set_index('start'), on='epoch_start_t', how='inner', validate="1:1") # has ['ripple_idx', 'ripple_start_t'] to join on
-    # deepcopy(_laps_all_epoch_bins_marginals_df).set_index('epoch_start_t').join(deepcopy(laps_metric_merged_df).set_index('start')) ## Alternative?
+    # deepcopy(_laps_all_epoch_bins_marginals_df).set_index('epoch_start_t').join(deepcopy(laps_metric_merged_df).set_index('start')) ## Alternative? -- #TODO 2025-11-12 08:21: - [ ] The length is the minimum length of the two dfs: len(_mergev_ripple_metric_merged_df) := min(len(_ripple_all_epoch_bins_marginals_df), len(ripple_metric_merged_df))
     
     # from neuropy.utils.indexing_helpers import PandasHelpers
     laps_metric_merged_df = PandasHelpers.adding_additional_df_columns(original_df=_laps_all_epoch_bins_marginals_df, additional_cols_df=laps_metric_merged_df) # update the filter_epochs with the new columns
-    ripple_metric_merged_df = PandasHelpers.adding_additional_df_columns(original_df=_ripple_all_epoch_bins_marginals_df, additional_cols_df=ripple_metric_merged_df)
+    ripple_metric_merged_df = PandasHelpers.adding_additional_df_columns(original_df=_ripple_all_epoch_bins_marginals_df, additional_cols_df=ripple_metric_merged_df, require_same_num_rows=False) ## #TODO 2025-11-12 06:54: - [ ] Have more `_ripple_all_epoch_bins_marginals_df` than `ripple_metric_merged_df`, do have start times for both -- ?? is `_ripple_all_epoch_bins_marginals_df` being filtered?
 
     # assert _mergev_laps_metric_merged_df.equals(laps_metric_merged_df) # == does NOT work at all, and it doesn't even make sense. (_mergev_laps_metric_merged_df == laps_metric_merged_df)
     # assert _mergev_ripple_metric_merged_df.equals(ripple_metric_merged_df) # == does NOT work at all, and it doesn't even make sense.  (_mergev_ripple_metric_merged_df == ripple_metric_merged_df)
@@ -6539,6 +6539,9 @@ def _subfn_compute_complete_df_metrics(directional_merged_decoders_result: "Dire
     assert len(_mergev_laps_metric_merged_df) == len(laps_metric_merged_df) # this DOES make more sense -- they might at least have the same number of rows
     assert len(_mergev_ripple_metric_merged_df) == len(ripple_metric_merged_df) # this DOES make more sense -- they might at least have the same number of rows
 
+    ripple_metric_merged_df['is_valid'] = np.isin(ripple_metric_merged_df['start'].to_numpy(), _ripple_all_epoch_bins_marginals_df['epoch_start_t'].to_numpy())
+    
+    
     ## Extract the individual decoder probability into the .active_epochs:
     shared_index_column_names = ['ripple_idx', 'ripple_start_t']
     per_decoder_df_columns = ['P_decoder']
