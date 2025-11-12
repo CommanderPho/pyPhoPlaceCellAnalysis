@@ -131,6 +131,94 @@ import matplotlib.pyplot as plt
 from pyphoplacecellanalysis.SpecificResults.PhoDiba2023Paper import _perform_dual_hist_plot, _perform_matplotlib_pre_post_scatter, _perform_matplotlib_SINGLE_SERIES_pre_post_scatter
 from pyphocorehelpers.plotting.media_output_helpers import figure_to_pil_image, vertical_image_stack, horizontal_image_stack, image_grid
 
+@function_attributes(short_name=None, tags=['session', 'matplotlib'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-11-06 08:09', related_items=[])
+def plot_by_session_split_histogram_figure(active_all_sessions_laps_time_bin_df: pd.DataFrame, active_all_sessions_ripple_time_bin_df: pd.DataFrame,
+                                           hist_animal_split_samples_df_dict, a_time_bin_size: float = 0.075):
+  """ 
+  
+  Temporarily produces a separate figure for each animal (laps/PBEs) and then merges them to a single figure and closes the temporaries.
+  
+  
+  from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import plot_by_animal_split_histogram_figure
+  """
+  matplotlib.use('Qt5Agg')
+
+  display_context = IdentifyingContext(name=f'fig4_hist_validations')
+  constrained_layout = True
+  ## Debug plot separate for each animals
+  new_figs_dict = {}
+  collector = None
+  with mpl.rc_context(PhoPublicationFigureHelper.rc_context_kwargs({'figure.constrained_layout.use': (constrained_layout or False), 'figure.frameon': False, })): # 'figure.dpi': str(dpi), 'figure.figsize': (12.4, 4.8), , 'figure.figsize': size
+    # Create a FigureCollector instance
+    with FigureCollector(name='fig4_by_animal_sess_validation', base_context=display_context) as collector:
+          
+      with CaptureNewFiguresContextManager() as fig_capturer:
+          # code that generates figures
+          _laps_histogram_out_by_animal = {}
+          _ripple_histogram_out_by_animal = {}
+
+          # _common_kwargs = dict(time_column='t_bin_center', legend_groups_to_solo=[0.025], legend_groups_to_hide=None,)
+          _common_kwargs = dict(
+                  # time_column='t_bin_center',
+                  time_column='delta_aligned_start_t',
+                  legend_groups_to_solo=[a_time_bin_size], legend_groups_to_hide=None,
+                              #   subplot_by_column='session_name', 
+          )
+
+
+          for an_animal_name, a_hist_samples_df_dict in hist_animal_split_samples_df_dict.items():
+              hist_counts_dict, hist_count_extremas_only_dict, hist_count_extrema_ratios, hist_densities_dict, (bin_edges, bin_values) = compute_hist_variables(hist_samples_df_dict=a_hist_samples_df_dict)
+              # animal_bags[an_animal_name] = deepcopy(hist_count_extremas_only_dict)
+              _laps_histogram_out_by_animal[an_animal_name] = _perform_matplotlib_SINGLE_SERIES_pre_post_scatter(grainularity_desc='by-time-bin',
+                                            epochs_df=deepcopy(active_all_sessions_laps_time_bin_df).pho.constrain_df_cols(trained_compute_epochs="laps", decoder_identifier="pseudo2D", masked_time_bin_fill_type='dropped', custom_replay_name="withNormalComputedReplays-qclu_[1, 2, 4, 6, 7, 8, 9]-frateThresh_2.0", animal=an_animal_name), # , time_bin_size=a_time_bin_size
+                                                                              **_common_kwargs, context_prefix = f'{an_animal_name} - ',
+                                                                              )
+              plt.suptitle(f'Session: {an_animal_name}')    
+              collector.post_hoc_append_container(a_container=_laps_histogram_out_by_animal[an_animal_name])
+              
+              _ripple_histogram_out_by_animal[an_animal_name] = _perform_matplotlib_SINGLE_SERIES_pre_post_scatter(grainularity_desc='by-time-bin',
+                                                                                  epochs_df=deepcopy(active_all_sessions_ripple_time_bin_df).pho.constrain_df_cols(trained_compute_epochs="laps", decoder_identifier="pseudo2D", masked_time_bin_fill_type='dropped', custom_replay_name="withNormalComputedReplays-qclu_[1, 2, 4, 6, 7, 8, 9]-frateThresh_2.0", animal=an_animal_name), # , time_bin_size=a_time_bin_size
+                                                                                  **_common_kwargs, context_prefix = f'{an_animal_name} - ',
+                                                                                  )
+              plt.suptitle(f'Session: {an_animal_name}')
+              # collector.post_hoc_append(figs=[a_container.fig], axes=(a_container.ax_dict or a_container.axes), contexts=[(a_container.plots.context or None)])
+              collector.post_hoc_append_container(a_container=_ripple_histogram_out_by_animal[an_animal_name]) # new_figs_dict
+              
+      ## END with CaptureNewFiguresContextManager() as fig_capturer.....
+
+      new_figs_dict = fig_capturer.new_fig_dict
+      # new_figs_dict
+      # collector.post_hoc_append(figs=new_figs_dict.values()) # new_figs_dict
+      
+
+  new_figs_dict
+  # collector
+  # join to single figure: new_figs_dict _______________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
+
+  # 1) Collect open figures
+  figs = new_figs_dict # PhoActiveFigureManager2D().figures_dict  # {fignum: Figure}
+
+  # 2) Convert to images (pick order you want)
+  pil_images = [figure_to_pil_image(a_fig=f) for _, f in sorted(figs.items())]
+
+  # 3) Compose into a grid (or use horizontal_image_stack/vertical_image_stack)
+  combined_img = vertical_image_stack(pil_images)  # one row; or arrange into rows
+
+  # 4) Show in a new Matplotlib figure
+  new_fig = plt.figure(constrained_layout=True, num='AcrossSessionFigures')
+  ax = new_fig.add_subplot(111)
+  ax.imshow(combined_img)
+  ax.axis('off')
+  plt.show()
+
+  ## Close old open images
+  for k, a_fig in figs.items():
+      plt.close(a_fig)
+      
+  return combined_img, collector
+
+
+
 
 # fig_man = PhoActiveFigureManager2D(name=f'fig_man') # Initialize a new figure manager
 def plot_by_animal_split_histogram_figure(active_all_sessions_laps_time_bin_df: pd.DataFrame, active_all_sessions_ripple_time_bin_df: pd.DataFrame,
