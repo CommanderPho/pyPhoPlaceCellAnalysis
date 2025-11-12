@@ -734,6 +734,9 @@ class Spike3DRasterBottomPlaybackControlBar(ComboBoxCtrlOwningMixin, QWidget):
 
     def on_active_window_start_time_editing_finished(self):
         """Editing of the time has finished """
+        # Ensure the current text is interpreted and committed to the underlying value
+        self.ui.doubleSpinBox_ActiveWindowStartTime.interpretText()
+        self.ui.doubleSpinBox_ActiveWindowEndTime.interpretText()
         start_t_seconds: float = float(self.ui.doubleSpinBox_ActiveWindowStartTime.value())
         end_t_seconds: float = float(self.ui.doubleSpinBox_ActiveWindowEndTime.value())
         self.log_print(f'start_t_seconds: {start_t_seconds}, end_t_seconds: {end_t_seconds}')
@@ -745,6 +748,9 @@ class Spike3DRasterBottomPlaybackControlBar(ComboBoxCtrlOwningMixin, QWidget):
 
     def on_active_window_end_time_editing_finished(self):
         """Editing of the time has finished """
+        # Ensure the current text is interpreted and committed to the underlying value
+        self.ui.doubleSpinBox_ActiveWindowStartTime.interpretText()
+        self.ui.doubleSpinBox_ActiveWindowEndTime.interpretText()
         start_t_seconds: float = float(self.ui.doubleSpinBox_ActiveWindowStartTime.value())
         end_t_seconds: float = float(self.ui.doubleSpinBox_ActiveWindowEndTime.value())
         self.log_print(f'start_t_seconds: {start_t_seconds}, end_t_seconds: {end_t_seconds}')
@@ -923,6 +929,8 @@ class Spike3DRasterBottomPlaybackControlBar(ComboBoxCtrlOwningMixin, QWidget):
             if event.type() == event.KeyPress:
                 # """Handle Enter key to finalize and lose focus."""
                 if event.key() in (Qt.Key_Return, Qt.Key_Enter):
+                    # Commit the typed text to the spinbox value before finishing
+                    source.interpretText()
                     source.clearFocus()  # Finalize and lose focus
                     return True  # Mark event as handled
                 else: 
