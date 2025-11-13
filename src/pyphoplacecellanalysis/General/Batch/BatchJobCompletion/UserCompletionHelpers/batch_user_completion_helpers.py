@@ -523,7 +523,7 @@ def perform_sweep_decoding_time_bin_sizes_marginals_dfs_completion_function(self
     laps_obj.update_lap_dir_from_net_displacement(pos_input=curr_active_pipeline.sess.position)
     laps_obj.update_maze_id_if_needed(t_start=t_start, t_delta=t_delta, t_end=t_end)
     laps_df = laps_obj.to_dataframe()
-    assert 'maze_id' in laps_df.columns, f"laps_df is still missing the 'maze_id' column after calling `laps_obj.update_maze_id_if_needed(...)`. laps_df.columns: {print(list(laps_df.columns))}"
+    assert 'maze_id' in laps_df.columns, f"laps_df is still missing the 'maze_id' column after calling `laps_obj.update_maze_id_if_needed(...)`. laps_df.columns: {str(list(laps_df.columns))}"
 
     # # BEGIN BLOCK ________________________________________________________________________________________________________ #
 
