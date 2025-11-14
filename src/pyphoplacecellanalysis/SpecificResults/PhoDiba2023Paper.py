@@ -2336,6 +2336,7 @@ import matplotlib.pyplot as plt
 import pandas as pd
 from typing import Optional, Sequence, Any, Tuple, Dict
 
+
 class MatplotlibPrePostScatterFlexibleFigures:
     """ 
 
@@ -2379,10 +2380,13 @@ class MatplotlibPrePostScatterFlexibleFigures:
                 pre_t = pre_df[pre_df["time_bin_size"] == tbin]
             data = pre_t[value_column].dropna()
             counts, bin_edges = np.histogram(data, bins=bins, range=rng, density=False)
+            # constant bin height in y (so all bars have same vertical thickness)
+            bin_height = (bin_edges[1] - bin_edges[0]) if len(bin_edges) > 1 else 1.0
             centers = 0.5 * (bin_edges[:-1] + bin_edges[1:])
             ax_pre.barh(
                 centers,
                 counts,
+                height=bin_height,
                 alpha=0.5,
                 label=str(tbin),
                 **{k: v for k, v in histogram_kwargs.items() if k not in ["bins", "range", "density"]},
@@ -2427,10 +2431,12 @@ class MatplotlibPrePostScatterFlexibleFigures:
                 post_t = post_df[post_df["time_bin_size"] == tbin]
             data = post_t[value_column].dropna()
             counts, bin_edges = np.histogram(data, bins=bins, range=rng, density=False)
+            bin_height = (bin_edges[1] - bin_edges[0]) if len(bin_edges) > 1 else 1.0
             centers = 0.5 * (bin_edges[:-1] + bin_edges[1:])
             ax_post.barh(
                 centers,
                 counts,
+                height=bin_height,
                 alpha=0.5,
                 label=str(tbin),
                 **{k: v for k, v in histogram_kwargs.items() if k not in ["bins", "range", "density"]},
@@ -2509,12 +2515,16 @@ class MatplotlibPrePostScatterFlexibleFigures:
         fig_width = figsize_per_cell[0] * n_cols
         fig_height = figsize_per_cell[1] * n_rows
 
+        # Match Plotly's relative column widths [0.10, 0.80, 0.10] for pre/scatter/post
+        per_triplet_widths = [0.10, 0.80, 0.10]
+        width_ratios = per_triplet_widths * n_cols  # repeat pattern for each facet column
+
         fig, ax_dict = plt.subplot_mosaic(
             mosaic,
             figsize=(fig_width, fig_height),
             sharex=False,
             sharey=True,
-            gridspec_kw=dict(wspace=0.15, hspace=0.3),
+            gridspec_kw=dict(wspace=0.02, hspace=0.3, width_ratios=width_ratios),
         )
 
         # Loop over facets and draw each panel
