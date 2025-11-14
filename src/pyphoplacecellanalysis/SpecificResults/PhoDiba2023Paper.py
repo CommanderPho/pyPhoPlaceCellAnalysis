@@ -2338,21 +2338,38 @@ from typing import Optional, Sequence, Any, Tuple, Dict
 
 
 class MatplotlibPrePostScatterFlexibleFigures:
-    """ 
+    """ Aims to provide the same ease of plotting as plotly but actually be stable and not crash the kerenel
 
+        Tries to replace (but is independent of `_perform_matplotlib_SINGLE_SERIES_pre_post_scatter`
+        
+        
         from pyphoplacecellanalysis.SpecificResults.PhoDiba2023Paper import MatplotlibPrePostScatterFlexibleFigures
 
     """
     @classmethod    
-    def _plot_single_pre_post_scatter_panel(cls, df: pd.DataFrame, value_column: str, time_column: str, ax_pre, ax_scatter, ax_post, title_suffix: str = "", hist_range: Tuple[float, float] = (0.0, 1.0), n_bins: int = 11, y_baseline_level: float = 0.5, y_ylims: Tuple[float, float] = (0.0, 1.0), scatter_kwargs: Optional[Dict[str, Any]] = None, histogram_kwargs: Optional[Dict[str, Any]] = None):
-        """Draws the 'pre histogram – scatter – post histogram' triplet into pre-defined axes."""
+    def _plot_single_pre_post_scatter_panel(cls, df: pd.DataFrame, value_column: str, time_column: str, ax_pre, ax_scatter, ax_post, title_suffix: str = "", hist_range: Tuple[float, float] = (0.0, 1.0), n_bins: int = 11, y_baseline_level: float = 0.5, y_ylims: Tuple[float, float] = (0.0, 1.0), scatter_kwargs: Optional[Dict[str, Any]] = None, histogram_kwargs: Optional[Dict[str, Any]] = None, baseline_kwargs: Optional[Dict[str, Any]] = None, is_dark_mode: bool = False):
+        """Draws the 'pre histogram – scatter – post histogram' triplet into pre-defined axes.
 
+        Visual style is matched to `_perform_matplotlib_SINGLE_SERIES_pre_post_scatter` /
+        `plot_pre_scatter_post_matplotlib` (horizontal stacked histograms, shared y-axis,
+        baseline line at ``y_baseline_level`` and publication-style defaults).
+        """
+
+        # Default scatter/histogram styling to match `plot_pre_scatter_post_matplotlib`
         if scatter_kwargs is None:
             scatter_kwargs = {}
-        # Slightly smaller default marker size so points don't overwhelm the panel
-        scatter_kwargs.setdefault("s", 10)
+        scatter_kwargs = ({"c": "black", "s": 8} | scatter_kwargs)
+
         if histogram_kwargs is None:
             histogram_kwargs = {}
+        histogram_kwargs = ({"orientation": "horizontal"} | histogram_kwargs)
+
+        # Baseline styling consistent with `_perform_matplotlib_SINGLE_SERIES_pre_post_scatter`
+        if baseline_kwargs is None:
+            if is_dark_mode:
+                baseline_kwargs = dict(color=(0.8, 0.8, 0.8, 0.75), linewidth=2)
+            else:
+                baseline_kwargs = dict(color=(0.2, 0.2, 0.2, 0.75), linewidth=2)
 
         # Ensure required columns
         assert value_column in df.columns, f"{value_column} missing from df"
@@ -2381,7 +2398,9 @@ class MatplotlibPrePostScatterFlexibleFigures:
             else:
                 pre_t = pre_df[pre_df["time_bin_size"] == tbin]
             data = pre_t[value_column].dropna()
-            counts, bin_edges = np.histogram(data, bins=bins, range=rng, density=False)
+            counts, bin_edges = np.histogram(
+                data, bins=bins, range=rng, density=False
+            )
             # constant bin height in y (so all bars have same vertical thickness)
             bin_height = (bin_edges[1] - bin_edges[0]) if len(bin_edges) > 1 else 1.0
             centers = 0.5 * (bin_edges[:-1] + bin_edges[1:])
@@ -2398,14 +2417,13 @@ class MatplotlibPrePostScatterFlexibleFigures:
         ax_pre.set_title(f"pre-Δ{title_suffix}")
         if len(time_bin_sizes) > 1:
             ax_pre.legend()
-        # Thinner baseline so it matches default axis aesthetics better
-        ax_pre.axhline(y_baseline_level, color=(0.2, 0.2, 0.2, 0.75), linewidth=1.0)
+        ax_pre.axhline(y_baseline_level, **baseline_kwargs)
         ax_pre.set_ylim(*y_ylims)
         ax_pre.spines["top"].set_visible(False)
         ax_pre.spines["right"].set_visible(False)
 
         # --- Scatter ---
-        # color/group by time_bin_size
+        # color/group by time_bin_size (grouped by time_bin_size, colored via scatter_kwargs)
         for tbin in time_bin_sizes:
             if tbin is None:
                 df_t = df
@@ -2421,7 +2439,7 @@ class MatplotlibPrePostScatterFlexibleFigures:
                 **scatter_kwargs,
             )
         ax_scatter.set_title(f"Scatter{title_suffix}")
-        ax_scatter.axhline(y_baseline_level, color=(0.2, 0.2, 0.2, 0.75), linewidth=1.0)
+        ax_scatter.axhline(y_baseline_level, **baseline_kwargs)
         ax_scatter.set_ylim(*y_ylims)
         ax_scatter.spines["top"].set_visible(False)
         ax_scatter.spines["right"].set_visible(False)
@@ -2433,7 +2451,9 @@ class MatplotlibPrePostScatterFlexibleFigures:
             else:
                 post_t = post_df[post_df["time_bin_size"] == tbin]
             data = post_t[value_column].dropna()
-            counts, bin_edges = np.histogram(data, bins=bins, range=rng, density=False)
+            counts, bin_edges = np.histogram(
+                data, bins=bins, range=rng, density=False
+            )
             bin_height = (bin_edges[1] - bin_edges[0]) if len(bin_edges) > 1 else 1.0
             centers = 0.5 * (bin_edges[:-1] + bin_edges[1:])
             ax_post.barh(
@@ -2448,7 +2468,7 @@ class MatplotlibPrePostScatterFlexibleFigures:
         ax_post.set_title(f"post-Δ{title_suffix}")
         if len(time_bin_sizes) > 1:
             ax_post.legend()
-        ax_post.axhline(y_baseline_level, color=(0.2, 0.2, 0.2, 0.75), linewidth=1.0)
+        ax_post.axhline(y_baseline_level, **baseline_kwargs)
         ax_post.set_ylim(*y_ylims)
         ax_post.spines["top"].set_visible(False)
         ax_post.spines["right"].set_visible(False)
@@ -2525,13 +2545,22 @@ class MatplotlibPrePostScatterFlexibleFigures:
         per_triplet_widths = [0.10, 0.80, 0.10]
         width_ratios = per_triplet_widths * n_cols  # repeat pattern for each facet column
 
-        fig, ax_dict = plt.subplot_mosaic(
-            mosaic,
-            figsize=(fig_width, fig_height),
-            sharex=False,
-            sharey=True,
-            gridspec_kw=dict(wspace=0.02, hspace=0.3, width_ratios=width_ratios),
-        )
+        # Match the publication-style rcParams used in `_perform_matplotlib_SINGLE_SERIES_pre_post_scatter`
+        from pyphoplacecellanalysis.SpecificResults.PhoDiba2023Paper import PhoPublicationFigureHelper
+
+        with mpl.rc_context(
+            PhoPublicationFigureHelper.rc_context_kwargs(
+                prepare_for_publication=True,
+                **{"figure.figsize": (fig_width, fig_height), "figure.dpi": 220},
+            )
+        ):
+            fig, ax_dict = plt.subplot_mosaic(
+                mosaic,
+                figsize=(fig_width, fig_height),
+                sharex=False,
+                sharey=True,
+                gridspec_kw=dict(wspace=0.02, hspace=0.3, width_ratios=width_ratios),
+            )
 
         # Loop over facets and draw each panel
         for i, r in enumerate(row_levels):
