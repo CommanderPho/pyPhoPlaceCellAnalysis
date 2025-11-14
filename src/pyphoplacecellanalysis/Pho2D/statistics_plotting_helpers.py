@@ -602,8 +602,8 @@ def plot_stacked_histograms(data_results_df: pd.DataFrame, data_type: str, sessi
 
 @function_attributes(short_name='plot_pre_scatter_post_matplotlib', tags=['matplotlib', 'scatter', 'NEW', 'histogram', 'stacked', 'multi-session', 'plot', 'figure', 'good'], input_requires=[], output_provides=[], uses=[], used_by=['_perform_matplotlib_pre_post_scatter'], creation_date='2025-07-29 20:47', related_items=[])
 def plot_pre_scatter_post_matplotlib(data_results_df: pd.DataFrame, data_type: str, session_spec: str, time_bin_duration_str: str, column_name:str='P_Long', time_bin_column_name:str='delta_aligned_start_t', **kwargs):
-    """ Not used by anything else yet, and doesn't require backward compatibility.
-    
+    """ Used by only `_perform_matplotlib_SINGLE_SERIES_pre_post_scatter` 
+     
         Aimrs to replace the Plotly function: `_perform_plot_pre_post_delta_scatter` with the same functionality. Plots a colorful stacked histogram for each of the many time-bin sizes flanking a scatter showing the value changing over time.
     
         Generalizing `plot_stacked_histograms`, which just plots the two end histograms, this also plots a central scatter plot showing the value over time like the Plotly version does.
