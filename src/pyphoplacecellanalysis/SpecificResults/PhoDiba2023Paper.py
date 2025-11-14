@@ -2335,6 +2335,11 @@ import numpy as np
 import matplotlib.pyplot as plt
 import pandas as pd
 from typing import Optional, Sequence, Any, Tuple, Dict
+from pyphocorehelpers.DataStructure.RenderPlots.MatplotLibRenderPlots import FigureCollector
+from pyphocorehelpers.DataStructure.RenderPlots.MatplotLibRenderPlots import MatplotlibRenderPlots # plot_histogram #TODO 2024-01-02 12:41: - [ ] Is this where the Qt5 Import dependency Pickle complains about is coming from?
+from pyphoplacecellanalysis.SpecificResults.AcrossSessionResults import AcrossSessionsVisualizations
+from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.ContainerBased.PhoContainerTool import GenericMatplotlibContainer
+
 
 
 class MatplotlibPrePostScatterFlexibleFigures:
@@ -2347,7 +2352,7 @@ class MatplotlibPrePostScatterFlexibleFigures:
 
     """
     @classmethod    
-    def _plot_single_pre_post_scatter_panel(cls, df: pd.DataFrame, value_column: str, time_column: str, ax_pre, ax_scatter, ax_post, title_suffix: str = "", hist_range: Tuple[float, float] = (0.0, 1.0), n_bins: int = 11, y_baseline_level: float = 0.5, y_ylims: Tuple[float, float] = (0.0, 1.0), scatter_kwargs: Optional[Dict[str, Any]] = None, histogram_kwargs: Optional[Dict[str, Any]] = None, baseline_kwargs: Optional[Dict[str, Any]] = None, is_dark_mode: bool = False):
+    def _plot_single_pre_post_scatter_panel(cls, df: pd.DataFrame, value_column: str, time_column: str, ax_pre, ax_scatter, ax_post, title_suffix: str = "", hist_range: Tuple[float, float] = (0.0, 1.0), n_bins: int = 11, y_baseline_level: float = 0.5, y_ylims: Tuple[float, float] = (0.0, 1.0), scatter_kwargs: Optional[Dict[str, Any]] = None, histogram_kwargs: Optional[Dict[str, Any]] = None, baseline_kwargs: Optional[Dict[str, Any]] = None, is_dark_mode: bool = False, display_context: IdentifyingContext = None):
         """Draws the 'pre histogram – scatter – post histogram' triplet into pre-defined axes.
 
         Visual style is matched to `_perform_matplotlib_SINGLE_SERIES_pre_post_scatter` /
@@ -2414,7 +2419,7 @@ class MatplotlibPrePostScatterFlexibleFigures:
             )
 
         ax_pre.set_ylabel(value_column)
-        ax_pre.set_title(f"pre-Δ{title_suffix}")
+        ax_pre.set_title(f"pre-Δ")
         if len(time_bin_sizes) > 1:
             ax_pre.legend()
         ax_pre.axhline(y_baseline_level, **baseline_kwargs)
@@ -2438,7 +2443,10 @@ class MatplotlibPrePostScatterFlexibleFigures:
                 label=lbl,
                 **scatter_kwargs,
             )
-        ax_scatter.set_title(f"Scatter{title_suffix}")
+        if title_suffix is not None and len(title_suffix) > 0:
+            ax_scatter.set_title(f"{title_suffix}")
+        else:
+            ax_scatter.set_title("")
         ax_scatter.axhline(y_baseline_level, **baseline_kwargs)
         ax_scatter.set_ylim(*y_ylims)
         ax_scatter.spines["top"].set_visible(False)
@@ -2465,7 +2473,7 @@ class MatplotlibPrePostScatterFlexibleFigures:
                 **{k: v for k, v in histogram_kwargs.items() if k not in ["bins", "range", "density"]},
             )
 
-        ax_post.set_title(f"post-Δ{title_suffix}")
+        ax_post.set_title(f"post-Δ")
         if len(time_bin_sizes) > 1:
             ax_post.legend()
         ax_post.axhline(y_baseline_level, **baseline_kwargs)
@@ -2473,8 +2481,10 @@ class MatplotlibPrePostScatterFlexibleFigures:
         ax_post.spines["top"].set_visible(False)
         ax_post.spines["right"].set_visible(False)
 
+
+
     @classmethod
-    def plot_facet_pre_post_scatter_panel(cls, epochs_df: pd.DataFrame, grainularity_desc: str, value_column: str = "P_Short", time_column: str = "delta_aligned_start_t", facet_row: Optional[str] = None, facet_col: Optional[str] = None, facet_row_order: Optional[Sequence[Any]] = None, facet_col_order: Optional[Sequence[Any]] = None, figsize_per_cell: Tuple[float, float] = (6.5, 2.0), **panel_kwargs):
+    def plot_facet_pre_post_scatter_panel(cls, epochs_df: pd.DataFrame, grainularity_desc: str, value_column: str = "P_Short", time_column: str = "delta_aligned_start_t", facet_row: Optional[str] = None, facet_col: Optional[str] = None, facet_row_order: Optional[Sequence[Any]] = None, facet_col_order: Optional[Sequence[Any]] = None, figsize_per_cell: Tuple[float, float] = (6.5, 2.0), context_prefix=None, **kwargs):
         """Matplotlib 'facet_row' / 'facet_col' analogue for the pre–scatter–post figure.
 
         Each facet cell is a 1×3 triplet: [pre_hist, scatter, post_hist].
@@ -2498,7 +2508,31 @@ class MatplotlibPrePostScatterFlexibleFigures:
                 n_bins=11,
             )
         """
+        from flexitext import flexitext
+        from neuropy.utils.matplotlib_helpers import MatplotlibFigureExtractors, FormattedFigureText ## flexitext version
+        
+        # layout = kwargs.pop('layout', 'none')
+        # defer_show = kwargs.pop('defer_show', False)
+        # figsize = kwargs.pop('figsize', (6.5, 2))
+        # a_context: IdentifyingContext = IdentifyingContext(data_type=data_type, session_spec=session_spec, time_bin_duration_str=time_bin_duration_str, column_name=column_name)
+        
+        # descriptor_str: str = '|'.join([data_type, session_spec, time_bin_duration_str])
+        # figure_identifier: str = f"{descriptor_str}_PrePostDelta"
+        # a_context = a_context.adding_context_if_missing(descriptor_str=descriptor_str, figure_identifier=figure_identifier)
+        # if data_type.find('epoch') != -1: # data_type.endswith('epoch'):
+        #     title_indicator: str = 'epochs'
+        # else:
+        #     assert data_type.find('time-bin') != -1, f"data_type: {data_type} does not contain either expected grainularity descriptor (epochs or time-bin)"   
+        #     # assert data_type.endswith('time-bin'), f"data_type: {data_type}"    
+        #     title_indicator: str = 'time bins'
 
+        # a_context = a_context.adding_context_if_missing(title_indicator=title_indicator)
+        
+        a_context: IdentifyingContext = IdentifyingContext() ## empty
+        display_context = kwargs.pop('display_context', IdentifyingContext(display_fn='plot_facet_pre_post_scatter_panel'))
+        display_context = display_context.adding_context_if_missing(**a_context.to_dict())
+        
+        ## BEGIN FUNCTION BODY:
         df = epochs_df.copy()
 
         # Determine facet levels
@@ -2546,87 +2580,169 @@ class MatplotlibPrePostScatterFlexibleFigures:
         width_ratios = per_triplet_widths * n_cols  # repeat pattern for each facet column
 
         # Match the publication-style rcParams used in `_perform_matplotlib_SINGLE_SERIES_pre_post_scatter`
-        from pyphoplacecellanalysis.SpecificResults.PhoDiba2023Paper import PhoPublicationFigureHelper
+        def _subfn_update_stacked_post_plot(histogram_out: GenericMatplotlibContainer):
+            """ TODO 2025-11-14 00:00: - [ ] NOT QUITE WORKING YET
+            
+            """
+            # for k, ax in histogram_out.axes.items():
+            # for k, ax in histogram_out.ax_dict.items():
+            #     ## this works for scatter as well
+            #     _tmp_line = ax.axhline(y_baseline_level, **baseline_kwargs) # draw baseline line (horizontally)
+            #     ax.set_ylim(*y_ylims)
+                
+            ## add flexitext text:
+            # a_fig = histogram_out.figures[0]
+            a_fig = histogram_out.fig
+            extracted_fig_titles_dict = MatplotlibFigureExtractors.extract_titles(fig=a_fig)
+            suptitle: str = extracted_fig_titles_dict.get('suptitle', None) # 'Laps (by-time-bin)|2 Sessions|5 tbin sizes'
+            subtitle_string = None
 
-        with mpl.rc_context(
-            PhoPublicationFigureHelper.rc_context_kwargs(
-                prepare_for_publication=True,
-                **{"figure.figsize": (fig_width, fig_height), "figure.dpi": 220},
-            )
-        ):
-            fig, ax_dict = plt.subplot_mosaic(
-                mosaic,
-                figsize=(fig_width, fig_height),
-                sharex=False,
-                sharey=True,
-                gridspec_kw=dict(wspace=0.02, hspace=0.3, width_ratios=width_ratios),
-            )
+            # Clear the normal text:
+            a_fig.suptitle('')
+            # for k, ax in a_histogram_out.axes.items():
+            # 	ax.set_title('')
 
-        # Loop over facets and draw each panel
-        for i, r in enumerate(row_levels):
-            for j, c in enumerate(col_levels):
-                pre_key, scat_key, post_key = key_map[(i, j)]
-                ax_pre = ax_dict[pre_key]
-                ax_scatter = ax_dict[scat_key]
-                ax_post = ax_dict[post_key]
+            text_formatter = FormattedFigureText.init_from_margins() # top_margin=0.8
+            text_formatter.setup_margins(a_fig)
+            # active_config = deepcopy(self.config)
+            # active_config.float_precision = 1
 
-                facet_df = df
-                facet_label_parts = []
-                if r is not None and facet_row is not None:
-                    facet_df = facet_df[facet_df[facet_row] == r]
-                    facet_label_parts.append(f"{facet_row}={r}")
-                if c is not None and facet_col is not None:
-                    facet_df = facet_df[facet_df[facet_col] == c]
-                    facet_label_parts.append(f"{facet_col}={c}")
+            # subtitle_string = '\n'.join([f'{active_config.str_for_display(is_2D)}'])
+            full_title_str: str = f'<size:22><weight:bold>{suptitle}</></>'
+            if (subtitle_string is not None) and (len(subtitle_string) > 0):
+                full_title_str += f'\n<size:10>{subtitle_string}</>'
 
-                if facet_df.empty:
-                    ax_pre.set_visible(False)
-                    ax_scatter.set_visible(False)
-                    ax_post.set_visible(False)
-                    continue
+            # header_text_obj = flexitext(text_formatter.left_margin, text_formatter.top_margin, full_title_str, va="bottom", xycoords="figure fraction") # 0.90
+            header_text_obj = flexitext(text_formatter.left_margin, 0.89, full_title_str, va="bottom", xycoords="figure fraction")
+            return {'header_text_obj': header_text_obj}
 
-                title_suffix = ""
-                if facet_label_parts:
-                    title_suffix = " | " + ", ".join(facet_label_parts)
 
-                cls._plot_single_pre_post_scatter_panel(
-                    facet_df,
-                    value_column=value_column,
-                    time_column=time_column,
-                    ax_pre=ax_pre,
-                    ax_scatter=ax_scatter,
-                    ax_post=ax_post,
-                    title_suffix=title_suffix,
-                    **panel_kwargs,
+
+
+        # ==================================================================================================================================================================================================================================================================================== #
+        # Plotting                                                                                                                                                                                                                                                                             #
+        # ==================================================================================================================================================================================================================================================================================== #
+        def perform_write_to_file_callback(ctxt, fig):
+            """ captures: Nothing
+            """
+            return (ctxt, AcrossSessionsVisualizations.output_figure(final_context=display_context, fig=fig, write_vector_format=True, write_png=False))
+
+        #TODO 2025-08-28 08:23: - [ ] `perform_write_to_file_callback` never used??
+
+        with mpl.rc_context(PhoPublicationFigureHelper.rc_context_kwargs(prepare_for_publication=True, **{"figure.figsize": (fig_width, fig_height), "figure.dpi": 220})):
+        # with mpl.rc_context(PhoPublicationFigureHelper.rc_context_kwargs(prepare_for_publication=False, **{})):
+
+            # Create a FigureCollector instance
+            with FigureCollector(name='plot_pre_scatter_post_matplotlib', base_context=display_context) as collector:
+
+                _fig_container: GenericMatplotlibContainer = GenericMatplotlibContainer(name='plot_pre_scatter_post_matplotlib')
+                fig, ax_dict = plt.subplot_mosaic(
+                    mosaic,
+                    figsize=(fig_width, fig_height),
+                    sharex=False,
+                    sharey=True,
+                    gridspec_kw=dict(wspace=0.02, hspace=0.3, width_ratios=width_ratios),
                 )
+                _fig_container.fig = fig
+                _fig_container.ax_dict = ax_dict
 
-                # Leftmost column can get a y‑label; others can drop it to reduce clutter
-                if j > 0:
-                    ax_pre.set_ylabel("")
-                    ax_scatter.set_ylabel("")
-                    ax_post.set_ylabel("")
+                # Loop over facets and draw each panel
+                for i, r in enumerate(row_levels):
+                    for j, c in enumerate(col_levels):
+                        pre_key, scat_key, post_key = key_map[(i, j)]
+                        ax_pre = ax_dict[pre_key]
+                        ax_scatter = ax_dict[scat_key]
+                        ax_post = ax_dict[post_key]
 
-        # Axis labels to match Plotly layout
-        # Histograms: x-axis is number of events, scatter: time axis label
-        for ax in ax_dict.values():
-            ax.grid(False)
+                        facet_df = df
+                        facet_label_parts = []
+                        if r is not None and facet_row is not None:
+                            facet_df = facet_df[facet_df[facet_row] == r]
+                            facet_label_parts.append(f"{facet_row}={r}")
+                        if c is not None and facet_col is not None:
+                            facet_df = facet_df[facet_df[facet_col] == c]
+                            facet_label_parts.append(f"{facet_col}={c}")
 
-        # We know keys are like r0_c0_pre / _scatter / _post etc.
-        for key, ax in ax_dict.items():
-            if key.endswith("_pre") or key.endswith("_post"):
-                ax.set_xlabel("# Events")
-            elif key.endswith("_scatter"):
-                ax.set_xlabel("Delta-aligned Event Time (seconds)")
+                        if facet_df.empty:
+                            ax_pre.set_visible(False)
+                            ax_scatter.set_visible(False)
+                            ax_post.set_visible(False)
+                            continue
 
-        # Place the suptitle high enough and leave extra top/bottom margin so titles and labels aren't clipped
-        fig.suptitle(f"{grainularity_desc} – faceted pre/post Δ", y=0.97)
-        # left, bottom, right, top in figure fraction
-        # fig.tight_layout(rect=[0.06, 0.245, 0.975, 0.81]) # left, bottom, right, top
-        # left=0.06, bottom=0.245, right=0.975, top=0.81, 
+                        title_suffix = ""
+                        if facet_label_parts:
+                            title_suffix = " | " + ", ".join(facet_label_parts)
 
-        fig.subplots_adjust(left=0.06, bottom=0.245, right=0.975, top=0.81, wspace=0.02, hspace=0.3)
 
-        return fig, ax_dict
+                        epoch_identifer: str = 'EPOCHS'
+                        data_context: IdentifyingContext = epochs_df.attrs.get('data_context', None) ## do I need to check individual `facet_df`? I don't think so
+                        if data_context is not None:
+                            # epoch_identifer: str = data_context.to_dict()['title_prefix']
+                            epoch_identifer: str = data_context.to_dict()['epochs_name']
+                            
+
+                        # You can use it like this:
+                        num_unique_sessions: int = epochs_df.session_name.nunique(dropna=True) # number of unique sessions, ignoring the NA entries
+                        num_unique_time_bins: int = epochs_df.time_bin_size.nunique(dropna=True)
+                        
+                        if context_prefix is not None:
+                            data_type = f'{context_prefix}'
+                        else:
+                            data_type = ''
+                        data_type = f'{data_type}{epoch_identifer} ({grainularity_desc})'
+                        
+                        # data_context instead of display_context?
+                        display_context = display_context.adding_context_if_missing(data_type=data_type, session_spec=f'{num_unique_sessions} Sessions', time_bin_duration_str=f"{num_unique_time_bins} tbin sizes") # data_type=data_type, session_spec=f'{num_unique_sessions} Sessions', time_bin_duration_str=f"{num_unique_time_bins} tbin sizes", 
+
+                        cls._plot_single_pre_post_scatter_panel(
+                            df=facet_df,
+                            value_column=value_column,
+                            time_column=time_column,
+                            ax_pre=ax_pre,
+                            ax_scatter=ax_scatter,
+                            ax_post=ax_post,
+                            title_suffix=title_suffix,
+                            # display_context=display_context,
+                            **kwargs,
+                        )
+
+                        # Leftmost column can get a y‑label; others can drop it to reduce clutter
+                        if j > 0:
+                            ax_pre.set_ylabel("")
+                            ax_scatter.set_ylabel("")
+                            ax_post.set_ylabel("")
+
+                        ## setup suptitle as flexitext:
+                        # _epochs_flexitext_dict = _subfn_update_stacked_post_plot(_fig_container)
+
+
+                # Axis labels to match Plotly layout
+                # Histograms: x-axis is number of events, scatter: time axis label
+                for ax in ax_dict.values():
+                    ax.grid(False)
+
+                # We know keys are like r0_c0_pre / _scatter / _post etc.
+                for key, ax in ax_dict.items():
+                    if key.endswith("_pre") or key.endswith("_post"):
+                        ax.set_xlabel("# Events")
+                    elif key.endswith("_scatter"):
+                        ax.set_xlabel("Delta-aligned Event Time (seconds)")
+
+                # Place the suptitle high enough and leave extra top/bottom margin so titles and labels aren't clipped
+                fig.suptitle(f"{grainularity_desc}", y=0.97) # faceted pre/post Δ
+                # left, bottom, right, top in figure fraction
+                # fig.tight_layout(rect=[0.06, 0.245, 0.975, 0.81]) # left, bottom, right, top
+                # left=0.06, bottom=0.245, right=0.975, top=0.81, 
+
+                fig.subplots_adjust(left=0.06, bottom=0.245, right=0.975, top=0.81, wspace=0.02, hspace=0.3)
+
+                collector.post_hoc_append(figs=[fig], axes=[ax_dict], contexts=[display_context]) ## probably should be one context per axes yeah?
+            ## END with FigureCollector(name='...
+        ## END with mpl.rc_con...
+
+
+        # return fig, ax_dict
+        return _fig_container
 
 
     @function_attributes(short_name=None, tags=['facet', 'multi-figure', 'matplotlib'], input_requires=[], output_provides=[], uses=['facet_pre_scatter_post_matplotlib'], used_by=[], creation_date='2025-11-14 00:00', related_items=[])
@@ -2687,14 +2803,14 @@ class MatplotlibPrePostScatterFlexibleFigures:
             # Use the grainularity and the figure index as additional qualifiers
             sub_grain_desc = f"{per_fig_title} | {grainularity_desc} | {figure_idx}={idx_value}"
 
-            fig, ax_dict = cls.plot_facet_pre_post_scatter_panel(
+            _fig_container = cls.plot_facet_pre_post_scatter_panel(
                 epochs_df=df_subset,
                 grainularity_desc=sub_grain_desc,
                 value_column=value_column,
                 time_column=time_column,
                 **facet_kwargs,
             )
-            out[idx_value] = (fig, ax_dict)
+            out[idx_value] = _fig_container
 
         return out
 
