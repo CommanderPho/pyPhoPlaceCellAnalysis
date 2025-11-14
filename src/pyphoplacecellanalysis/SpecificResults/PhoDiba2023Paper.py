@@ -2589,9 +2589,11 @@ class MatplotlibPrePostScatterFlexibleFigures:
             elif key.endswith("_scatter"):
                 ax.set_xlabel("Delta-aligned Event Time (seconds)")
 
-        # Place the suptitle high enough and leave room so it doesn't overlap axes
-        fig.suptitle(f"{grainularity_desc} – faceted pre/post Δ", y=0.98)
-        fig.tight_layout(rect=[0.0, 0.0, 1.0, 0.95])
+        # Place the suptitle high enough and leave extra top/bottom margin so titles and labels aren't clipped
+        fig.suptitle(f"{grainularity_desc} – faceted pre/post Δ", y=0.97)
+        # left, bottom, right, top in figure fraction
+        fig.tight_layout(rect=[0.06, 0.245, 0.975, 0.81]) # left, bottom, right, top
+        # left=0.06, bottom=0.245, right=0.975, top=0.81, 
         return fig, ax_dict
 
 
