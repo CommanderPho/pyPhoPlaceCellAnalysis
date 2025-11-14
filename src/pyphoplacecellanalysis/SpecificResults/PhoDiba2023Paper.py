@@ -2344,7 +2344,7 @@ class MatplotlibPrePostScatterFlexibleFigures:
 
     """
     @classmethod    
-    def _plot_single_pre_scatter_post_panel(cls, df: pd.DataFrame, value_column: str, time_column: str, ax_pre, ax_scatter, ax_post, title_suffix: str = "", hist_range: Tuple[float, float] = (0.0, 1.0), n_bins: int = 11, y_baseline_level: float = 0.5, y_ylims: Tuple[float, float] = (0.0, 1.0), scatter_kwargs: Optional[Dict[str, Any]] = None, histogram_kwargs: Optional[Dict[str, Any]] = None):
+    def _plot_single_pre_post_scatter_panel(cls, df: pd.DataFrame, value_column: str, time_column: str, ax_pre, ax_scatter, ax_post, title_suffix: str = "", hist_range: Tuple[float, float] = (0.0, 1.0), n_bins: int = 11, y_baseline_level: float = 0.5, y_ylims: Tuple[float, float] = (0.0, 1.0), scatter_kwargs: Optional[Dict[str, Any]] = None, histogram_kwargs: Optional[Dict[str, Any]] = None):
         """Draws the 'pre histogram – scatter – post histogram' triplet into pre-defined axes."""
 
         if scatter_kwargs is None:
@@ -2454,7 +2454,7 @@ class MatplotlibPrePostScatterFlexibleFigures:
         ax_post.spines["right"].set_visible(False)
 
     @classmethod
-    def facet_pre_scatter_post_matplotlib(cls, epochs_df: pd.DataFrame, grainularity_desc: str, value_column: str = "P_Short", time_column: str = "delta_aligned_start_t", facet_row: Optional[str] = None, facet_col: Optional[str] = None, facet_row_order: Optional[Sequence[Any]] = None, facet_col_order: Optional[Sequence[Any]] = None, figsize_per_cell: Tuple[float, float] = (6.5, 2.0), **panel_kwargs):
+    def plot_facet_pre_post_scatter_panel(cls, epochs_df: pd.DataFrame, grainularity_desc: str, value_column: str = "P_Short", time_column: str = "delta_aligned_start_t", facet_row: Optional[str] = None, facet_col: Optional[str] = None, facet_row_order: Optional[Sequence[Any]] = None, facet_col_order: Optional[Sequence[Any]] = None, figsize_per_cell: Tuple[float, float] = (6.5, 2.0), **panel_kwargs):
         """Matplotlib 'facet_row' / 'facet_col' analogue for the pre–scatter–post figure.
 
         Each facet cell is a 1×3 triplet: [pre_hist, scatter, post_hist].
@@ -2462,21 +2462,21 @@ class MatplotlibPrePostScatterFlexibleFigures:
 
         Usage:
 
-            from pyphoplacecellanalysis.SpecificResults.PhoDiba2023Paper import facet_pre_scatter_post_matplotlib
+            from pyphoplacecellanalysis.SpecificResults.PhoDiba2023Paper import facet_pre_post_scatter_panel
 
-            fig, ax_dict = facet_pre_scatter_post_matplotlib(
-                epochs_df=epochs_df,
-                grainularity_desc=grainularity_desc,
-                value_column=value_column,
-                time_column=time_column,     # e.g. 'delta_aligned_start_t'
-                facet_row="animal",          # or None
-                facet_col="replay_name",     # or None
+            fig, ax_dict = MatplotlibPrePostScatterFlexibleFigures.plot_facet_pre_post_scatter_panel(
+                epochs_df=deepcopy(active_all_sessions_laps_time_bin_df).pho.constrain_df_cols(trained_compute_epochs="laps", decoder_identifier="pseudo2D", masked_time_bin_fill_type='dropped', custom_replay_name="withNormalComputedReplays-qclu_[1, 2, 4, 6, 7, 8, 9]-frateThresh_2.0"), # , time_bin_size=a_time_bin_size	
+                grainularity_desc='by-time-bin',
+                value_column='P_Short',
+                time_column='delta_aligned_start_t',
+                facet_row="session_name",          # or None
+                # facet_col="animal",     # or None
+                # color='animal',
                 # panel-level tweaks:
                 y_baseline_level=0.5,
                 y_ylims=(0.0, 1.0),
                 n_bins=11,
             )
-
         """
 
         df = epochs_df.copy()
@@ -2560,7 +2560,7 @@ class MatplotlibPrePostScatterFlexibleFigures:
                 if facet_label_parts:
                     title_suffix = " | " + ", ".join(facet_label_parts)
 
-                cls._plot_single_pre_scatter_post_panel(
+                cls._plot_single_pre_post_scatter_panel(
                     facet_df,
                     value_column=value_column,
                     time_column=time_column,
@@ -2597,7 +2597,7 @@ class MatplotlibPrePostScatterFlexibleFigures:
 
     @function_attributes(short_name=None, tags=['facet', 'multi-figure', 'matplotlib'], input_requires=[], output_provides=[], uses=['facet_pre_scatter_post_matplotlib'], used_by=[], creation_date='2025-11-14 00:00', related_items=[])
     @classmethod
-    def facet_pre_scatter_post_matplotlib_by(cls, epochs_df: pd.DataFrame, grainularity_desc: str, figure_idx: str, value_column: str = "P_Short", time_column: str = "delta_aligned_start_t", figure_idx_order: Optional[Sequence[Any]] = None, **facet_kwargs) -> Dict[Any, Tuple[plt.Figure, Dict[str, Any]]]:
+    def plot_pre_post_scatter_flexible(cls, data_context: IdentifyingContext, epochs_df: pd.DataFrame, grainularity_desc: str, figure_idx: str, value_column: str = "P_Short", time_column: str = "delta_aligned_start_t", figure_idx_order: Optional[Sequence[Any]] = None, is_publication_ready_figure: bool=False, **facet_kwargs) -> Dict[Any, Tuple[plt.Figure, Dict[str, Any]]]:
         """Wrapper around `facet_pre_scatter_post_matplotlib` that produces one figure per unique `figure_idx` value.
 
         Each figure still uses faceting (facet_row / facet_col) over the remaining variables.
@@ -2606,7 +2606,7 @@ class MatplotlibPrePostScatterFlexibleFigures:
 
             from pyphoplacecellanalysis.SpecificResults.PhoDiba2023Paper import MatplotlibPrePostScatterFlexibleFigures
 
-            figs_by_session = MatplotlibPrePostScatterFlexibleFigures.facet_pre_scatter_post_matplotlib_by(
+            figs_by_session = MatplotlibPrePostScatterFlexibleFigures.plot_pre_post_scatter_flexible(
                 epochs_df=deepcopy(active_all_sessions_laps_time_bin_df).pho.constrain_df_cols(trained_compute_epochs="laps", decoder_identifier="pseudo2D", masked_time_bin_fill_type='dropped', custom_replay_name="withNormalComputedReplays-qclu_[1, 2, 4, 6, 7, 8, 9]-frateThresh_2.0"), # , time_bin_size=a_time_bin_size	,
                 grainularity_desc='by-time-bin',
                 figure_idx='session_name',
@@ -2618,12 +2618,16 @@ class MatplotlibPrePostScatterFlexibleFigures:
                 y_ylims=(0.0, 1.0),
                 n_bins=11,
             )
-
             # figs_by_session is a dict mapping session_name -> (fig, ax_dict)
 
         """
         df = epochs_df.copy()
         assert figure_idx in df.columns, f"figure_idx '{figure_idx}' not found in dataframe columns: {list(df.columns)}"
+
+        # Build a base context we can use to generate per-figure titles.
+        # This mirrors how the Plotly implementation builds its scatter title:
+        #    f\"{dataframe_name} - {title_prefix} - {num_events} - '{value_column}'\"
+        base_context = data_context.adding_context_if_missing()
 
         # Determine order of figure index levels
         if figure_idx_order is not None:
@@ -2637,10 +2641,19 @@ class MatplotlibPrePostScatterFlexibleFigures:
             if df_subset.empty:
                 continue
 
-            # Append figure_idx information to the grainularity description for clarity
-            sub_grain_desc = f"{grainularity_desc} | {figure_idx}={idx_value}"
+            # Overwrite n_events for this specific subset so the title reflects its size
+            per_fig_context = base_context.overwriting_context(n_events=len(df_subset))
+            per_fig_title_prefix: str = per_fig_context.get_description(
+                subset_includelist=['dataframe_name', 'title_prefix', 'n_events'],
+                separator=' - '
+            )
+            # Final per-figure title string, analogous to the Plotly px_scatter title
+            per_fig_title: str = f"{per_fig_title_prefix} - '{value_column}'"
 
-            fig, ax_dict = cls.facet_pre_scatter_post_matplotlib(
+            # Use the grainularity and the figure index as additional qualifiers
+            sub_grain_desc = f"{per_fig_title} | {grainularity_desc} | {figure_idx}={idx_value}"
+
+            fig, ax_dict = cls.plot_facet_pre_post_scatter_panel(
                 epochs_df=df_subset,
                 grainularity_desc=sub_grain_desc,
                 value_column=value_column,
@@ -2672,7 +2685,7 @@ def _perform_dual_hist_plot(grainularity_desc: str, laps_df: pd.DataFrame, rippl
 
 
 @function_attributes(short_name=None, tags=['MAIN', 'CRITICAL', 'FINAL', 'plotly', 'scatter', 'histogram', 'publication'], input_requires=[], output_provides=[], uses=['plotly_pre_post_delta_scatter'], used_by=[], creation_date='2024-10-23 20:04', related_items=['_perform_matplotlib_pre_post_scatter'])
-def _perform_plot_pre_post_delta_scatter(data_context: IdentifyingContext, concatenated_ripple_df: pd.DataFrame, time_delta_tuple: Tuple[float, float, float], fig_size_kwargs: Dict, save_plotly: Callable, is_dark_mode: bool=False, enable_custom_widget_buttons:bool=True,
+def _perform_plot_pre_post_delta_scatter(data_context: IdentifyingContext, epochs_df: pd.DataFrame, time_delta_tuple: Tuple[float, float, float], fig_size_kwargs: Dict, save_plotly: Callable, is_dark_mode: bool=False, enable_custom_widget_buttons:bool=True,
                                           extant_figure=None, custom_output_widget=None, legend_groups_to_hide: Optional[List[str]]=None, should_save: bool = True, variable_name = 'P_Short', y_baseline_level: float = 0.5, additional_fig_layout_kwargs: Dict=None, is_publication_ready_figure: bool=False, histogram_bins: int = 11, **kwargs):
     """ plots the stacked histograms for both laps and ripples
     2025-07-29 - Created ALTERNATIVE <MATPLOTLIB> function: `_perform_matplotlib_pre_post_scatter` for publication to avoid the Plotly exporting headaches
@@ -2704,7 +2717,7 @@ def _perform_plot_pre_post_delta_scatter(data_context: IdentifyingContext, conca
     is_dark_mode, template = PlotlyHelpers.get_plotly_template(is_dark_mode=is_dark_mode)
     
     if data_context is None:
-        data_context = concatenated_ripple_df.attrs.get('data_context', None)
+        data_context = epochs_df.attrs.get('data_context', None)
         assert data_context is not None, f"could not get context from dataframe's df.attrs.data_context either."
 
     if additional_fig_layout_kwargs is None:
@@ -2712,7 +2725,7 @@ def _perform_plot_pre_post_delta_scatter(data_context: IdentifyingContext, conca
 
     num_sessions = 1
 
-    num_events: int = len(concatenated_ripple_df)
+    num_events: int = len(epochs_df)
     # print(f'num_events: {num_events}')
     data_context.overwriting_context(n_events=num_events) # adds 'n_events' context
     # .025 .03 .044 .05 .058
@@ -2741,14 +2754,14 @@ def _perform_plot_pre_post_delta_scatter(data_context: IdentifyingContext, conca
     
     # Controls scatterplot point size
     if not is_publication_ready_figure:
-        if 'dummy_column_for_size' not in concatenated_ripple_df.columns:
-            concatenated_ripple_df['dummy_column_for_size'] = 2.0
+        if 'dummy_column_for_size' not in epochs_df.columns:
+            epochs_df['dummy_column_for_size'] = 2.0
                         
         px_scatter_kwargs['size'] = "dummy_column_for_size"
         px_scatter_kwargs.setdefault('size_max', 5) # don't override tho
         
     else:
-        concatenated_ripple_df['dummy_column_for_size'] = 0.5
+        epochs_df['dummy_column_for_size'] = 0.5
         px_scatter_kwargs['size'] = "dummy_column_for_size"
         px_scatter_kwargs.setdefault('size_max', 1) # don't override tho
         # px_scatter_kwargs
@@ -2796,7 +2809,7 @@ def _perform_plot_pre_post_delta_scatter(data_context: IdentifyingContext, conca
     else:
         print(f'WARN: figure_footer_text is provided and not None, figure_footer_text: "{figure_footer_text}". Overriding.')
 
-    new_fig, new_fig_context = plotly_pre_post_delta_scatter(data_results_df=concatenated_ripple_df, data_context=data_context,
+    new_fig, new_fig_context = plotly_pre_post_delta_scatter(data_results_df=epochs_df, data_context=data_context,
                                                               extant_figure=extant_figure,
                             out_scatter_fig=None, histogram_bins=histogram_bins,
                             px_scatter_kwargs=px_scatter_kwargs, histogram_variable_name=variable_name, hist_kwargs=hist_kwargs, forced_range_y=None,
