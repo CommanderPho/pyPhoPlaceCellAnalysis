@@ -2349,6 +2349,8 @@ class MatplotlibPrePostScatterFlexibleFigures:
 
         if scatter_kwargs is None:
             scatter_kwargs = {}
+        # Slightly smaller default marker size so points don't overwhelm the panel
+        scatter_kwargs.setdefault("s", 10)
         if histogram_kwargs is None:
             histogram_kwargs = {}
 
@@ -2396,7 +2398,8 @@ class MatplotlibPrePostScatterFlexibleFigures:
         ax_pre.set_title(f"pre-Δ{title_suffix}")
         if len(time_bin_sizes) > 1:
             ax_pre.legend()
-        ax_pre.axhline(y_baseline_level, color=(0.2, 0.2, 0.2, 0.75), linewidth=2)
+        # Thinner baseline so it matches default axis aesthetics better
+        ax_pre.axhline(y_baseline_level, color=(0.2, 0.2, 0.2, 0.75), linewidth=1.0)
         ax_pre.set_ylim(*y_ylims)
         ax_pre.spines["top"].set_visible(False)
         ax_pre.spines["right"].set_visible(False)
@@ -2418,7 +2421,7 @@ class MatplotlibPrePostScatterFlexibleFigures:
                 **scatter_kwargs,
             )
         ax_scatter.set_title(f"Scatter{title_suffix}")
-        ax_scatter.axhline(y_baseline_level, color=(0.2, 0.2, 0.2, 0.75), linewidth=2)
+        ax_scatter.axhline(y_baseline_level, color=(0.2, 0.2, 0.2, 0.75), linewidth=1.0)
         ax_scatter.set_ylim(*y_ylims)
         ax_scatter.spines["top"].set_visible(False)
         ax_scatter.spines["right"].set_visible(False)
@@ -2445,7 +2448,7 @@ class MatplotlibPrePostScatterFlexibleFigures:
         ax_post.set_title(f"post-Δ{title_suffix}")
         if len(time_bin_sizes) > 1:
             ax_post.legend()
-        ax_post.axhline(y_baseline_level, color=(0.2, 0.2, 0.2, 0.75), linewidth=2)
+        ax_post.axhline(y_baseline_level, color=(0.2, 0.2, 0.2, 0.75), linewidth=1.0)
         ax_post.set_ylim(*y_ylims)
         ax_post.spines["top"].set_visible(False)
         ax_post.spines["right"].set_visible(False)
@@ -2571,7 +2574,9 @@ class MatplotlibPrePostScatterFlexibleFigures:
                     ax_scatter.set_ylabel("")
                     ax_post.set_ylabel("")
 
-        fig.suptitle(f"{grainularity_desc} – faceted pre/post Δ", y=0.99)
+        # Place the suptitle high enough and leave room so it doesn't overlap axes
+        fig.suptitle(f"{grainularity_desc} – faceted pre/post Δ", y=0.98)
+        fig.tight_layout(rect=[0.0, 0.0, 1.0, 0.95])
         return fig, ax_dict
 
 
