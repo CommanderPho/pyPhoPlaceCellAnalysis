@@ -2621,8 +2621,11 @@ class MatplotlibPrePostScatterFlexibleFigures:
         # Place the suptitle high enough and leave extra top/bottom margin so titles and labels aren't clipped
         fig.suptitle(f"{grainularity_desc} – faceted pre/post Δ", y=0.97)
         # left, bottom, right, top in figure fraction
-        fig.tight_layout(rect=[0.06, 0.245, 0.975, 0.81]) # left, bottom, right, top
+        # fig.tight_layout(rect=[0.06, 0.245, 0.975, 0.81]) # left, bottom, right, top
         # left=0.06, bottom=0.245, right=0.975, top=0.81, 
+
+        fig.subplots_adjust(left=0.06, bottom=0.245, right=0.975, top=0.81, wspace=0.02, hspace=0.3)
+
         return fig, ax_dict
 
 
