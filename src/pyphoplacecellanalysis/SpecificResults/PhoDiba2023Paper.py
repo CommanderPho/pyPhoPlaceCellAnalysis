@@ -2515,8 +2515,11 @@ class MatplotlibPrePostScatterFlexibleFigures:
                 key_map[(i, j)] = (pre_key, scat_key, post_key)
             mosaic.append(row_keys)
 
-        fig_width = figsize_per_cell[0] * n_cols
-        fig_height = figsize_per_cell[1] * n_rows
+        # Scale base per-cell size to get a slightly larger overall figure
+        width_scale: float = 1.35
+        height_scale: float = 1.10
+        fig_width = width_scale * figsize_per_cell[0] * n_cols
+        fig_height = height_scale * figsize_per_cell[1] * n_rows
 
         # Match Plotly's relative column widths [0.10, 0.80, 0.10] for pre/scatter/post
         per_triplet_widths = [0.10, 0.80, 0.10]
@@ -2573,6 +2576,18 @@ class MatplotlibPrePostScatterFlexibleFigures:
                     ax_pre.set_ylabel("")
                     ax_scatter.set_ylabel("")
                     ax_post.set_ylabel("")
+
+        # Axis labels to match Plotly layout
+        # Histograms: x-axis is number of events, scatter: time axis label
+        for ax in ax_dict.values():
+            ax.grid(False)
+
+        # We know keys are like r0_c0_pre / _scatter / _post etc.
+        for key, ax in ax_dict.items():
+            if key.endswith("_pre") or key.endswith("_post"):
+                ax.set_xlabel("# Events")
+            elif key.endswith("_scatter"):
+                ax.set_xlabel("Delta-aligned Event Time (seconds)")
 
         # Place the suptitle high enough and leave room so it doesn't overlap axes
         fig.suptitle(f"{grainularity_desc} – faceted pre/post Δ", y=0.98)
