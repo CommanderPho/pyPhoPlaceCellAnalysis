@@ -2330,6 +2330,237 @@ def _perform_matplotlib_pre_post_scatter(grainularity_desc: str, laps_df: pd.Dat
     return _laps_histogram_out, _ripple_histogram_out
 
 
+
+import numpy as np
+import matplotlib.pyplot as plt
+import pandas as pd
+from typing import Optional, Sequence, Any, Tuple, Dict
+
+def _plot_single_pre_scatter_post_panel(df: pd.DataFrame, value_column: str, time_column: str, ax_pre, ax_scatter, ax_post, title_suffix: str = "", hist_range: Tuple[float, float] = (0.0, 1.0), n_bins: int = 11, y_baseline_level: float = 0.5, y_ylims: Tuple[float, float] = (0.0, 1.0), scatter_kwargs: Optional[Dict[str, Any]] = None, histogram_kwargs: Optional[Dict[str, Any]] = None):
+    """Draws the 'pre histogram – scatter – post histogram' triplet into pre-defined axes."""
+
+    if scatter_kwargs is None:
+        scatter_kwargs = {}
+    if histogram_kwargs is None:
+        histogram_kwargs = {}
+
+    # Ensure required columns
+    assert value_column in df.columns, f"{value_column} missing from df"
+    assert time_column in df.columns, f"{time_column} missing from df"
+    assert "time_bin_size" in df.columns, "'time_bin_size' missing from df"
+
+    # Split pre/post
+    pre_df = df[df[time_column] <= 0]
+    post_df = df[df[time_column] > 0]
+
+    # Common histogram config
+    rng = hist_range
+    bins = n_bins
+
+    # Unique time bin sizes
+    time_bin_sizes = (
+        df["time_bin_size"].dropna().unique()
+        if "time_bin_size" in df.columns
+        else [None]
+    )
+
+    # --- Pre histogram ---
+    for tbin in time_bin_sizes:
+        if tbin is None:
+            pre_t = pre_df
+        else:
+            pre_t = pre_df[pre_df["time_bin_size"] == tbin]
+        data = pre_t[value_column].dropna()
+        counts, bin_edges = np.histogram(data, bins=bins, range=rng, density=False)
+        centers = 0.5 * (bin_edges[:-1] + bin_edges[1:])
+        ax_pre.barh(
+            centers,
+            counts,
+            alpha=0.5,
+            label=str(tbin),
+            **{k: v for k, v in histogram_kwargs.items() if k not in ["bins", "range", "density"]},
+        )
+
+    ax_pre.set_ylabel(value_column)
+    ax_pre.set_title(f"pre-Δ{title_suffix}")
+    if len(time_bin_sizes) > 1:
+        ax_pre.legend()
+    ax_pre.axhline(y_baseline_level, color=(0.2, 0.2, 0.2, 0.75), linewidth=2)
+    ax_pre.set_ylim(*y_ylims)
+    ax_pre.spines["top"].set_visible(False)
+    ax_pre.spines["right"].set_visible(False)
+
+    # --- Scatter ---
+    # color/group by time_bin_size
+    for tbin in time_bin_sizes:
+        if tbin is None:
+            df_t = df
+            lbl = None
+        else:
+            df_t = df[df["time_bin_size"] == tbin]
+            lbl = str(tbin)
+        ax_scatter.scatter(
+            df_t[time_column],
+            df_t[value_column],
+            alpha=0.5,
+            label=lbl,
+            **scatter_kwargs,
+        )
+    ax_scatter.set_title(f"Scatter{title_suffix}")
+    ax_scatter.axhline(y_baseline_level, color=(0.2, 0.2, 0.2, 0.75), linewidth=2)
+    ax_scatter.set_ylim(*y_ylims)
+    ax_scatter.spines["top"].set_visible(False)
+    ax_scatter.spines["right"].set_visible(False)
+
+    # --- Post histogram ---
+    for tbin in time_bin_sizes:
+        if tbin is None:
+            post_t = post_df
+        else:
+            post_t = post_df[post_df["time_bin_size"] == tbin]
+        data = post_t[value_column].dropna()
+        counts, bin_edges = np.histogram(data, bins=bins, range=rng, density=False)
+        centers = 0.5 * (bin_edges[:-1] + bin_edges[1:])
+        ax_post.barh(
+            centers,
+            counts,
+            alpha=0.5,
+            label=str(tbin),
+            **{k: v for k, v in histogram_kwargs.items() if k not in ["bins", "range", "density"]},
+        )
+
+    ax_post.set_title(f"post-Δ{title_suffix}")
+    if len(time_bin_sizes) > 1:
+        ax_post.legend()
+    ax_post.axhline(y_baseline_level, color=(0.2, 0.2, 0.2, 0.75), linewidth=2)
+    ax_post.set_ylim(*y_ylims)
+    ax_post.spines["top"].set_visible(False)
+    ax_post.spines["right"].set_visible(False)
+
+def facet_pre_scatter_post_matplotlib(epochs_df: pd.DataFrame, grainularity_desc: str, value_column: str = "P_Short", time_column: str = "delta_aligned_start_t", facet_row: Optional[str] = None, facet_col: Optional[str] = None, facet_row_order: Optional[Sequence[Any]] = None, facet_col_order: Optional[Sequence[Any]] = None, figsize_per_cell: Tuple[float, float] = (6.5, 2.0), **panel_kwargs):
+    """Matplotlib 'facet_row' / 'facet_col' analogue for the pre–scatter–post figure.
+
+    Each facet cell is a 1×3 triplet: [pre_hist, scatter, post_hist].
+
+
+    Usage:
+
+        from pyphoplacecellanalysis.SpecificResults.PhoDiba2023Paper import facet_pre_scatter_post_matplotlib
+
+        fig, ax_dict = facet_pre_scatter_post_matplotlib(
+            epochs_df=epochs_df,
+            grainularity_desc=grainularity_desc,
+            value_column=value_column,
+            time_column=time_column,     # e.g. 'delta_aligned_start_t'
+            facet_row="animal",          # or None
+            facet_col="replay_name",     # or None
+            # panel-level tweaks:
+            y_baseline_level=0.5,
+            y_ylims=(0.0, 1.0),
+            n_bins=11,
+        )
+
+    """
+
+    df = epochs_df.copy()
+
+    # Determine facet levels
+    if facet_row is None:
+        row_levels = [None]
+    else:
+        if facet_row_order is not None:
+            row_levels = list(facet_row_order)
+        else:
+            row_levels = list(df[facet_row].dropna().unique())
+
+    if facet_col is None:
+        col_levels = [None]
+    else:
+        if facet_col_order is not None:
+            col_levels = list(facet_col_order)
+        else:
+            col_levels = list(df[facet_col].dropna().unique())
+
+    n_rows = len(row_levels)
+    n_cols = len(col_levels)
+
+    # Build subplot_mosaic spec: each facet cell contributes 3 columns
+    mosaic = []
+    key_map: Dict[Tuple[int, int], Tuple[str, str, str]] = {}
+    for i, r in enumerate(row_levels):
+        row_keys = []
+        for j, c in enumerate(col_levels):
+            facet_id = f"r{i}_c{j}"
+            pre_key = f"{facet_id}_pre"
+            scat_key = f"{facet_id}_scatter"
+            post_key = f"{facet_id}_post"
+            row_keys.extend([pre_key, scat_key, post_key])
+            key_map[(i, j)] = (pre_key, scat_key, post_key)
+        mosaic.append(row_keys)
+
+    fig_width = figsize_per_cell[0] * n_cols
+    fig_height = figsize_per_cell[1] * n_rows
+
+    fig, ax_dict = plt.subplot_mosaic(
+        mosaic,
+        figsize=(fig_width, fig_height),
+        sharex=False,
+        sharey=True,
+        gridspec_kw=dict(wspace=0.15, hspace=0.3),
+    )
+
+    # Loop over facets and draw each panel
+    for i, r in enumerate(row_levels):
+        for j, c in enumerate(col_levels):
+            pre_key, scat_key, post_key = key_map[(i, j)]
+            ax_pre = ax_dict[pre_key]
+            ax_scatter = ax_dict[scat_key]
+            ax_post = ax_dict[post_key]
+
+            facet_df = df
+            facet_label_parts = []
+            if r is not None and facet_row is not None:
+                facet_df = facet_df[facet_df[facet_row] == r]
+                facet_label_parts.append(f"{facet_row}={r}")
+            if c is not None and facet_col is not None:
+                facet_df = facet_df[facet_df[facet_col] == c]
+                facet_label_parts.append(f"{facet_col}={c}")
+
+            if facet_df.empty:
+                ax_pre.set_visible(False)
+                ax_scatter.set_visible(False)
+                ax_post.set_visible(False)
+                continue
+
+            title_suffix = ""
+            if facet_label_parts:
+                title_suffix = " | " + ", ".join(facet_label_parts)
+
+            _plot_single_pre_scatter_post_panel(
+                facet_df,
+                value_column=value_column,
+                time_column=time_column,
+                ax_pre=ax_pre,
+                ax_scatter=ax_scatter,
+                ax_post=ax_post,
+                title_suffix=title_suffix,
+                **panel_kwargs,
+            )
+
+            # Leftmost column can get a y‑label; others can drop it to reduce clutter
+            if j > 0:
+                ax_pre.set_ylabel("")
+                ax_scatter.set_ylabel("")
+                ax_post.set_ylabel("")
+
+    fig.suptitle(f"{grainularity_desc} – faceted pre/post Δ", y=0.99)
+    return fig, ax_dict
+
+# ==================================================================================================================================================================================================================================================================================== #
+# Pre-matplotlib version, Plotly Version                                                                                                                                                                                                                                               #
+# ==================================================================================================================================================================================================================================================================================== #
+
+
 # Backward compatibility alias
 def _perform_dual_hist_plot(grainularity_desc: str, laps_df: pd.DataFrame, ripple_df: pd.DataFrame, is_dark_mode: bool=False, legend_groups_to_solo=None, legend_groups_to_hide: Optional[List[str]]=None):
     """Backward compatibility wrapper for _perform_matplotlib_pre_post_scatter without scatterplot"""
