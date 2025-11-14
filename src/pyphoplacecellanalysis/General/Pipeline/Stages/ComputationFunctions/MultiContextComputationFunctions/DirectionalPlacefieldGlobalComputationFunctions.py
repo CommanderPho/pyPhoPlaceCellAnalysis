@@ -6567,6 +6567,9 @@ def _subfn_compute_complete_df_metrics(directional_merged_decoders_result: "Dire
         # Example Suppressing Exception:
         with ExceptionPrintingContext(suppress=suppress_exceptions):
             decoder_laps_filter_epochs_decoder_result_dict[a_name] = _update_decoder_result_active_filter_epoch_columns(a_result_obj=decoder_laps_filter_epochs_decoder_result_dict[a_name], a_score_result_df=a_laps_decoder_prob_df, columns=per_decoder_df_columns)
+            
+
+
         with ExceptionPrintingContext(suppress=suppress_exceptions):
             decoder_ripple_filter_epochs_decoder_result_dict[a_name] = _update_decoder_result_active_filter_epoch_columns(a_result_obj=decoder_ripple_filter_epochs_decoder_result_dict[a_name], a_score_result_df=a_ripple_decoder_prob_df, columns=per_decoder_df_columns, index_column_names=['start']) # ripple_additional_column_names
 
@@ -6719,7 +6722,9 @@ def _compute_all_df_score_metrics(directional_merged_decoders_result: "Direction
                                                                                                                                                                                                                                                                             a_directional_laps_filter_epochs_decoder_result=decoder_laps_filter_epochs_decoder_result_dict[a_name],
                                                                                                                                                                                                                                                                             a_directional_ripple_filter_epochs_decoder_result=decoder_ripple_filter_epochs_decoder_result_dict[a_name],
                                                                                                                                                                                                                                                                             nlines=8192, margin=4.0,
-                                                                                                                                                                                                                                                                            n_jobs=6)
+                                                                                                                                                                                                                                                                            # n_jobs=6,
+                                                                                                                                                                                                                                                                            n_jobs=1,
+                                                                                                                                                                                                                                                                            )
             
         # 6m 19.7s - nlines=8192, margin=16, n_jobs=1
         # 17m 57.6s - nlines=24000, margin=16, n_jobs=1
