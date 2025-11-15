@@ -2511,6 +2511,11 @@ class MatplotlibPrePostScatterFlexibleFigures:
         from flexitext import flexitext
         from neuropy.utils.matplotlib_helpers import MatplotlibFigureExtractors, FormattedFigureText ## flexitext version
         
+
+        correct_rect = dict(left=0.06, bottom=0.06, right=0.975, top=0.95)
+
+        correct_margins = dict(left_margin=0.06, bottom_margin=0.06, right_margin=0.975, top_margin=0.95)
+
         # layout = kwargs.pop('layout', 'none')
         # defer_show = kwargs.pop('defer_show', False)
         # figsize = kwargs.pop('figsize', (6.5, 2))
@@ -2580,7 +2585,7 @@ class MatplotlibPrePostScatterFlexibleFigures:
         width_ratios = per_triplet_widths * n_cols  # repeat pattern for each facet column
 
         # Match the publication-style rcParams used in `_perform_matplotlib_SINGLE_SERIES_pre_post_scatter`
-        def _subfn_update_stacked_post_plot(histogram_out: GenericMatplotlibContainer):
+        def _subfn_update_stacked_post_plot(histogram_out: GenericMatplotlibContainer, suptitle: Optional[str] = None, subtitle_string: Optional[str] = None):
             """ TODO 2025-11-14 00:00: - [ ] NOT QUITE WORKING YET
             
             """
@@ -2593,17 +2598,22 @@ class MatplotlibPrePostScatterFlexibleFigures:
             ## add flexitext text:
             # a_fig = histogram_out.figures[0]
             a_fig = histogram_out.fig
-            extracted_fig_titles_dict = MatplotlibFigureExtractors.extract_titles(fig=a_fig)
-            suptitle: str = extracted_fig_titles_dict.get('suptitle', None) # 'Laps (by-time-bin)|2 Sessions|5 tbin sizes'
-            subtitle_string = None
+            
+            if suptitle is None:
+                extracted_fig_titles_dict = MatplotlibFigureExtractors.extract_titles(fig=a_fig)
+                suptitle: str = extracted_fig_titles_dict.get('suptitle', None) # 'Laps (by-time-bin)|2 Sessions|5 tbin sizes'
+                
+            
 
             # Clear the normal text:
             a_fig.suptitle('')
             # for k, ax in a_histogram_out.axes.items():
             # 	ax.set_title('')
+            
+            
 
-            text_formatter = FormattedFigureText.init_from_margins() # top_margin=0.8
-            text_formatter.setup_margins(a_fig)
+            text_formatter = FormattedFigureText.init_from_margins(**correct_margins) # top_margin=0.8
+            text_formatter.setup_margins(a_fig, **correct_margins)
             # active_config = deepcopy(self.config)
             # active_config.float_precision = 1
 
@@ -2613,7 +2623,7 @@ class MatplotlibPrePostScatterFlexibleFigures:
                 full_title_str += f'\n<size:10>{subtitle_string}</>'
 
             # header_text_obj = flexitext(text_formatter.left_margin, text_formatter.top_margin, full_title_str, va="bottom", xycoords="figure fraction") # 0.90
-            header_text_obj = flexitext(text_formatter.left_margin, 0.89, full_title_str, va="bottom", xycoords="figure fraction")
+            header_text_obj = flexitext(text_formatter.left_margin, 0.97, full_title_str, va="bottom", xycoords="figure fraction")
             return {'header_text_obj': header_text_obj}
 
 
@@ -2634,6 +2644,8 @@ class MatplotlibPrePostScatterFlexibleFigures:
 
             # Create a FigureCollector instance
             with FigureCollector(name='plot_pre_scatter_post_matplotlib', base_context=display_context) as collector:
+
+                # print(f'EVIL display_context: {display_context.to_dict()}')
 
                 _fig_container: GenericMatplotlibContainer = GenericMatplotlibContainer(name='plot_pre_scatter_post_matplotlib')
                 fig, ax_dict = plt.subplot_mosaic(
@@ -2689,10 +2701,16 @@ class MatplotlibPrePostScatterFlexibleFigures:
                             data_type = f'{context_prefix}'
                         else:
                             data_type = ''
-                        data_type = f'{data_type}{epoch_identifer} ({grainularity_desc})'
+                        # data_type = f'{data_type}{epoch_identifer} ({grainularity_desc})'
                         
+
+                        # data_type = f'{epoch_identifer} ({grainularity_desc})'
+                        data_type = f'{grainularity_desc}'
+                        # print(f'data_type: {data_type}')
+
                         # data_context instead of display_context?
                         display_context = display_context.adding_context_if_missing(data_type=data_type, session_spec=f'{num_unique_sessions} Sessions', time_bin_duration_str=f"{num_unique_time_bins} tbin sizes") # data_type=data_type, session_spec=f'{num_unique_sessions} Sessions', time_bin_duration_str=f"{num_unique_time_bins} tbin sizes", 
+                        # print(f'display_context: {display_context.to_dict()}')
 
                         cls._plot_single_pre_post_scatter_panel(
                             df=facet_df,
@@ -2713,7 +2731,10 @@ class MatplotlibPrePostScatterFlexibleFigures:
                             ax_post.set_ylabel("")
 
                         ## setup suptitle as flexitext:
-                        # _epochs_flexitext_dict = _subfn_update_stacked_post_plot(_fig_container)
+                        context_title_str: str = display_context.get_description(separator="|", subset_excludelist=['display_fn', ])
+                        # print(f'context_title_str: {context_title_str}')
+                        
+                        _epochs_flexitext_dict = _subfn_update_stacked_post_plot(_fig_container, suptitle=context_title_str, subtitle_string=None)
 
 
                 # Axis labels to match Plotly layout
@@ -2729,13 +2750,14 @@ class MatplotlibPrePostScatterFlexibleFigures:
                         ax.set_xlabel("Delta-aligned Event Time (seconds)")
 
                 # Place the suptitle high enough and leave extra top/bottom margin so titles and labels aren't clipped
-                fig.suptitle(f"{grainularity_desc}", y=0.97) # faceted pre/post Δ
+                # fig.suptitle(f"{grainularity_desc}", y=0.97) # faceted pre/post Δ
                 # left, bottom, right, top in figure fraction
                 # fig.tight_layout(rect=[0.06, 0.245, 0.975, 0.81]) # left, bottom, right, top
                 # left=0.06, bottom=0.245, right=0.975, top=0.81, 
 
-                fig.subplots_adjust(left=0.06, bottom=0.245, right=0.975, top=0.81, wspace=0.02, hspace=0.3)
-
+                # fig.subplots_adjust(left=0.06, bottom=0.245, right=0.975, top=0.81, wspace=0.02, hspace=0.3)
+                fig.subplots_adjust(**correct_rect, wspace=0.02, hspace=0.3)
+                
                 collector.post_hoc_append(figs=[fig], axes=[ax_dict], contexts=[display_context]) ## probably should be one context per axes yeah?
             ## END with FigureCollector(name='...
         ## END with mpl.rc_con...
@@ -2801,7 +2823,8 @@ class MatplotlibPrePostScatterFlexibleFigures:
             per_fig_title: str = f"{per_fig_title_prefix} - '{value_column}'"
 
             # Use the grainularity and the figure index as additional qualifiers
-            sub_grain_desc = f"{per_fig_title} | {grainularity_desc} | {figure_idx}={idx_value}"
+            # sub_grain_desc = f"{per_fig_title} | {grainularity_desc} | {figure_idx}={idx_value}"
+            sub_grain_desc = f"{idx_value}: {per_fig_context.to_dict()['epochs_name']} ({grainularity_desc})"
 
             _fig_container = cls.plot_facet_pre_post_scatter_panel(
                 epochs_df=df_subset,
