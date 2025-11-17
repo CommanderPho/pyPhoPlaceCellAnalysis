@@ -1750,10 +1750,6 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
         self.set_right_sidebar_visibility(True)
         
 
-# DockAreaDocksTree
-
-
-
     @function_attributes(short_name=None, tags=['menus', 'actions'], input_requires=[], output_provides=[], uses=['PhoMenuHelper.build_all_programmatic_menu_command_dict'], used_by=[], creation_date='2024-12-18 16:29', related_items=[])
     def build_all_menus_actions_dict(self, wants_flat_actions_dict: bool=True, **kwargs) -> Tuple[Dict, Dict[str, QtWidgets.QAction]]:
         """ gets absolutely all of the possible actions (from the menus, both global and context) and returns them 
@@ -2080,7 +2076,7 @@ if __name__ == "__main__":
 
     # args = parser.parse_args()
     
-    pkl_path = Path('W:/Data/KDIBA/gor01/one/2006-6-09_1-22-43/loadedSessPickle.pkl')
+    pkl_path = Path('L:/Data/KDIBA/gor01/one/2006-6-09_1-22-43/loadedSessPickle.pkl')
     # pkl_path = Path('W:/Data/KDIBA/vvp01/one/2006-4-09_17-29-30/loadedSessPickle.pkl')
     # pkl_path = Path('W:/Data/KDIBA/vvp01/one/2006-4-09_17-29-30/loadedSessPickle.pkl')
     # pkl_path = Path('W:/Data/KDIBA/vvp01/two/2006-4-10_12-58-3/loadedSessPickle.pkl')

@@ -932,10 +932,16 @@ def _add_context_decoded_epoch_marginals_to_timeline(active_2d_plot, decoded_epo
         _out_pbe_tracks = _add_context_decoded_epoch_marginals_to_timeline(active_2d_plot=active_2d_plot, decoded_epochs_result=pbe_decoder_result)
 
     """
-    slices_posteriors = [np.nansum(a_p_x_given_x, axis=(0, 1)) for a_p_x_given_x in decoded_epochs_result.p_x_given_n_list]
-    slices_posteriors = [(marginal_z / np.sum(marginal_z, axis=0, keepdims=True)) for marginal_z in slices_posteriors]
+    if isinstance(decoded_epochs_result, DecodedFilterEpochsResult):
+        slices_posteriors = [np.nansum(a_p_x_given_x, axis=(0, 1)) for a_p_x_given_x in decoded_epochs_result.p_x_given_n_list]
+        slices_posteriors = [(marginal_z / np.sum(marginal_z, axis=0, keepdims=True)) for marginal_z in slices_posteriors]
+        slices_time_window_centers = decoded_epochs_result.time_window_centers
+    else:
+        slices_posteriors = [np.nansum(a_p_x_given_x, axis=(0, 1)) for a_p_x_given_x in [decoded_epochs_result.p_x_given_n]]
+        slices_posteriors = [(marginal_z / np.sum(marginal_z, axis=0, keepdims=True)) for marginal_z in slices_posteriors]
+        slices_time_window_centers = [deepcopy(decoded_epochs_result.time_bin_container.centers)]
 
-    _out_epochs_tracks = active_2d_plot.add_docked_decoded_posterior_slices_track(name=name, slices_time_window_centers=decoded_epochs_result.time_window_centers, slices_posteriors=slices_posteriors, measured_position_df=None, posterior_heatmap_imshow_kwargs=dict())
+    _out_epochs_tracks = active_2d_plot.add_docked_decoded_posterior_slices_track(name=name, slices_time_window_centers=slices_time_window_centers, slices_posteriors=slices_posteriors, measured_position_df=None, posterior_heatmap_imshow_kwargs=dict())
     return _out_epochs_tracks
 
 

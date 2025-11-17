@@ -304,7 +304,7 @@ class ComputeGlobalEpochBase(ComputedResult):
         # Build an Epoch object containing a single epoch, corresponding to the global epoch for the entire session:
         # single_global_epoch_df: pd.DataFrame = pd.DataFrame({'start': [t_start], 'stop': [t_end], 'label': [0]})
         # single_global_epoch: Epoch = Epoch(single_global_epoch_df)
-# 
+ 
         ## Common:
         global_session = curr_active_pipeline.filtered_sessions[global_epoch_name]
         global_pos_obj: "Position" = deepcopy(global_session.position)

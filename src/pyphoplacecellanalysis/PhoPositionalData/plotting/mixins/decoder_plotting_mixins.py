@@ -1947,11 +1947,13 @@ class DecodedTrajectoryMatplotlibPlotter(DecodedTrajectoryPlotter):
 
         
         """
+        # try:
 
         if use_theoretical_tracks_instead:
             from pyphoplacecellanalysis.Pho2D.track_shape_drawing import LinearTrackInstance, _perform_plot_matplotlib_2D_tracks
             long_track_inst, short_track_inst = LinearTrackInstance.init_tracks_from_session_config(deepcopy(sess.config))
 
+        # except 
 
         def _subfn_chunks(iterable, size=10):
             iterator = iter(iterable)
