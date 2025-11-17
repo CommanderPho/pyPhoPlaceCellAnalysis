@@ -2337,8 +2337,10 @@ import pandas as pd
 from typing import Optional, Sequence, Any, Tuple, Dict
 from pyphocorehelpers.DataStructure.RenderPlots.MatplotLibRenderPlots import FigureCollector
 from pyphocorehelpers.DataStructure.RenderPlots.MatplotLibRenderPlots import MatplotlibRenderPlots # plot_histogram #TODO 2024-01-02 12:41: - [ ] Is this where the Qt5 Import dependency Pickle complains about is coming from?
-from pyphoplacecellanalysis.SpecificResults.AcrossSessionResults import AcrossSessionsVisualizations
+
 from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.ContainerBased.PhoContainerTool import GenericMatplotlibContainer
+from pyphoplacecellanalysis.Pho2D.plotly.Extensions.plotly_helpers import plotly_pre_post_delta_scatter
+from pyphocorehelpers.Filesystem.path_helpers import sanitize_filename_for_Windows
 
 
 
@@ -2609,8 +2611,6 @@ class MatplotlibPrePostScatterFlexibleFigures:
             a_fig.suptitle('')
             # for k, ax in a_histogram_out.axes.items():
             # 	ax.set_title('')
-            
-            
 
             text_formatter = FormattedFigureText.init_from_margins(**correct_margins) # top_margin=0.8
             text_formatter.setup_margins(a_fig, **correct_margins)
@@ -2635,6 +2635,8 @@ class MatplotlibPrePostScatterFlexibleFigures:
         def perform_write_to_file_callback(ctxt, fig):
             """ captures: Nothing
             """
+            from pyphoplacecellanalysis.SpecificResults.AcrossSessionResults import AcrossSessionsVisualizations
+            
             return (ctxt, AcrossSessionsVisualizations.output_figure(final_context=display_context, fig=fig, write_vector_format=True, write_png=False))
 
         #TODO 2025-08-28 08:23: - [ ] `perform_write_to_file_callback` never used??
@@ -3037,9 +3039,6 @@ def _perform_plot_pre_post_delta_scatter(data_context: IdentifyingContext, epoch
 # ==================================================================================================================== #
 # SpecificPrePostDeltaScatter                                                                                          #
 # ==================================================================================================================== #
-
-from pyphoplacecellanalysis.Pho2D.plotly.Extensions.plotly_helpers import plotly_pre_post_delta_scatter
-from pyphocorehelpers.Filesystem.path_helpers import sanitize_filename_for_Windows
 
 
 @metadata_attributes(short_name=None, tags=['plotly', 'scatter', 'notebook', 'figure', 'outputs'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-10-08 15:10', related_items=[])
