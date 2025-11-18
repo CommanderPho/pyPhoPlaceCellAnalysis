@@ -89,7 +89,9 @@ class IntervalRectsItem(ReprPrintableItemMixin, pg.GraphicsObject):
         if format_tooltip_fn is None:
             format_tooltip_fn = self._default_format_tooltip_for_rect_data
         if format_label_fn is None:
-            format_label_fn = self._default_format_tooltip_for_rect_data            
+            # format_label_fn = self._default_format_tooltip_for_rect_data            
+            pass ## no labels when not explicitly set
+
 
         self._current_hovered_item_tooltip_format_fn = format_tooltip_fn
         self._item_label_format_fn = format_label_fn
