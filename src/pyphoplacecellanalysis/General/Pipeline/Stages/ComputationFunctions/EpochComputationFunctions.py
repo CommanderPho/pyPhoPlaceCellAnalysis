@@ -92,7 +92,23 @@ class ComputeGlobalEpochBase(ComputedResult):
 
     @classmethod
     def init_from_pipeline(cls, curr_active_pipeline):
-        t_start, t_delta, t_end = curr_active_pipeline.find_LongShortDelta_times()
+        """ extract the global epoch from the pipeline
+        """
+        try:
+            t_start, t_delta, t_end = curr_active_pipeline.find_LongShortDelta_times()
+        except ValueError as e:
+            ## non-kdiba session
+            a_global_epoch_name: str = curr_active_pipeline.find_Global_epoch_name()
+            epochs_df = ensure_dataframe(curr_active_pipeline.sess.epochs)
+            a_global_epoch_only = epochs_df[epochs_df['label'] == a_global_epoch_name]
+            t_start = a_global_epoch_only['start'].to_numpy().item()
+            t_end = a_global_epoch_only['stop'].to_numpy().item()
+            t_start, t_end
+
+        except Exception as e:
+            raise e
+
+
         # Build an Epoch object containing a single epoch, corresponding to the global epoch for the entire session:
         single_global_epoch_df: pd.DataFrame = pd.DataFrame({'start': [t_start], 'stop': [t_end], 'label': [0]})
         # single_global_epoch_df['label'] = single_global_epoch_df.index.to_numpy()
