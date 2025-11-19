@@ -284,7 +284,7 @@ def plot_laps_2d(sess, legacy_plotting_mode=True, **kwargs):
 
 
 @function_attributes(short_name=None, tags=['lap','trajectories','3D','pyvista','qt','multiplotter','plotting','paginated'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-05-09 05:13', related_items=['plot_lap_trajectories_2d'])
-def plot_lap_trajectories_3d(sess, curr_num_subplots=1, active_page_index=0, included_lap_idxs=None, maximum_fixed_columns:int=5, single_combined_plot=True, lap_start_z = 0.0, lap_id_dependent_z_offset = 1.0, plot_stacked_arena_guides=False, existing_plotter=None, debug_print=False):
+def plot_lap_trajectories_3d(sess, curr_num_subplots=1, active_page_index=0, included_lap_idxs=None, maximum_fixed_columns:int=5, single_combined_plot=True, lap_start_z = 0.0, lap_id_dependent_z_offset = 1.0, plot_stacked_arena_guides=False, existing_plotter=None, debug_print=False, **kwargs):
     """ Plots a PyVista Qt Multiplotter with either:
         1. several overhead 3D views, each showing a specific lap over the maze in one of its subplots
         2. a single 3D view with all of the laps displayed in a vertical stack
@@ -375,6 +375,8 @@ def plot_lap_trajectories_3d(sess, curr_num_subplots=1, active_page_index=0, inc
 
     
     def _add_specific_lap_trajectory(p, linear_plotter_indicies, row_column_indicies, active_page_laps_ids, curr_lap_position_traces, curr_lap_time_range, single_combined_plot: bool, lap_start_z: float, lap_id_dependent_z_offset: float):
+        """ captures kwargs
+        """
         # Add the lap trajectory:
         for a_linear_index in linear_plotter_indicies:
             curr_row = row_column_indicies[0][a_linear_index]
@@ -384,12 +386,12 @@ def plot_lap_trajectories_3d(sess, curr_num_subplots=1, active_page_index=0, inc
                 # print(f'curr_lap_id: {curr_lap_id}')
                 for curr_lap_idx, curr_lap_id in enumerate(active_page_laps_ids):
                     LapsVisualizationMixin.plot_lap_trajectory_path_spline(p[curr_row, curr_col], curr_lap_position_traces[curr_lap_idx], curr_lap_id, 
-                                                                           lap_start_z=lap_start_z, lap_id_dependent_z_offset=lap_id_dependent_z_offset)
+                                                                           lap_start_z=lap_start_z, lap_id_dependent_z_offset=lap_id_dependent_z_offset, **kwargs)
                     # curr_lap_label_text = 'Lap[{}]: t({:.2f}, {:.2f})'.format(curr_lap_id, curr_lap_time_range[curr_lap_id][0], curr_lap_time_range[curr_lap_id][1]) 
                     # PhoWidgetHelper.perform_add_text(p[curr_row, curr_col], curr_lap_label_text, name='lblLapIdIndicator')
             else:
                 curr_lap_id = active_page_laps_ids[a_linear_index]
-                LapsVisualizationMixin.plot_lap_trajectory_path_spline(p[curr_row, curr_col], curr_lap_position_traces[curr_lap_id], a_linear_index)
+                LapsVisualizationMixin.plot_lap_trajectory_path_spline(p[curr_row, curr_col], curr_lap_position_traces[curr_lap_id], a_linear_index, **kwargs)
                 curr_lap_label_text = 'Lap[{}]: t({:.2f}, {:.2f})'.format(curr_lap_id, curr_lap_time_range[curr_lap_id][0], curr_lap_time_range[curr_lap_id][1]) 
                 PhoWidgetHelper.perform_add_text(p[curr_row, curr_col], curr_lap_label_text, name='lblLapIdIndicator')
 

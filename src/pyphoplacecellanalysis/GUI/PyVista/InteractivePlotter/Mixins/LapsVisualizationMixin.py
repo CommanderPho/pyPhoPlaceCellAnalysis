@@ -95,7 +95,7 @@ class LapsVisualizationMixin:
     #     p.add_mesh(tube, name=plot_name, render_lines_as_tubes=True, show_scalar_bar=False, color='red')
 
     @staticmethod
-    def plot_lap_trajectory_path_spline(p, curr_lap_position_traces, curr_lap_id, lap_start_z=0.9, lap_id_dependent_z_offset=0.45, name=None, **kwargs):
+    def plot_lap_trajectory_path_spline(p, curr_lap_position_traces, curr_lap_id, lap_start_z=0.9, lap_id_dependent_z_offset=0.45, name=None, color_by_speed=True, **kwargs):
         """[summary]
 
         Args:
@@ -103,10 +103,32 @@ class LapsVisualizationMixin:
             curr_lap_position_traces ([type]): a (3, N) position
             curr_lap_id ([type]): [description]
             lap_id_dependent_z_offset (float, optional): [description]. Defaults to 0.45.
+            color_by_speed (bool, optional): If True, colors the spline by speed. If False, colors by time (index). Defaults to True.
         """
         num_lap_samples = np.shape(curr_lap_position_traces)[1]
         lap_fixed_z = np.full_like(curr_lap_position_traces[0,:], lap_start_z + (lap_id_dependent_z_offset * curr_lap_id))
         curr_lap_points = np.column_stack((curr_lap_position_traces[0,:], curr_lap_position_traces[1,:], lap_fixed_z))
+        
+        line = LapsVisualizationMixin.lines_from_points(curr_lap_points)
+
+        if color_by_speed:
+            # Compute Speed along the path
+            # 1. Calculate differences between consecutive points (dx, dy)
+            dx = np.diff(curr_lap_position_traces[0, :])
+            dy = np.diff(curr_lap_position_traces[1, :])
+            
+            # 2. Compute Euclidean distance (speed proxy, assuming constant sampling rate)
+            # If sampling rate is not constant, you would divide this by dt (time delta)
+            speed = np.sqrt(dx**2 + dy**2)
+            
+            # 3. Pad the array to match the number of points (diff reduces length by 1)
+            # We repeat the last speed value to maintain shape
+            speed = np.hstack((speed, speed[-1]))
+            line["scalars"] = speed
+        else:
+            # Color by time (index) as per original implementation
+            line["scalars"] = np.arange(line.n_points)
+        
         # if name is None:
         #     plot_name = 'lap_location_trail_spline[{}]'.format(int(curr_lap_id))
         # else:
@@ -114,10 +136,12 @@ class LapsVisualizationMixin:
         
         trail_fade_values = np.linspace(0.0, 0.6, num_lap_samples)
         size_values = np.linspace(0.2, 0.6, num_lap_samples) # fade from a scale of 0.2 to 0.6
-        line = LapsVisualizationMixin.lines_from_points(curr_lap_points)
-        line["scalars"] = np.arange(line.n_points)
+        
         tube = line.tube(radius=0.2)
         # tube.plot(smooth_shading=True)
         color_map_name = 'bmy' # old
         color_map_name = 'cividis' # 2023-05-09 and newer
+        
+        # Note: 'show_scalar_bar': False is set, so you won't see the legend unless changed to True
         p.add_mesh(tube, **({'name': 'lap_location_trail_spline[{}]'.format(int(curr_lap_id)), 'render_lines_as_tubes': False, 'show_scalar_bar': False, 'cmap': color_map_name, 'lighting': False, 'render': False} | kwargs))
+
