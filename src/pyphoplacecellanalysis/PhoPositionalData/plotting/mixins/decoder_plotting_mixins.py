@@ -149,6 +149,8 @@ class SingleArtistMultiEpochBatchHelpers:
     stacked_flat_global_pos_df: pd.DataFrame = field(default=None, init=False)
 
     has_data_been_built: bool = field(default=False)
+    active_epoch_name: str = field(default='global')
+    
 
     @property
     def num_filter_epochs(self) -> int:
@@ -162,11 +164,11 @@ class SingleArtistMultiEpochBatchHelpers:
 
     @property
     def a_result2D(self) -> DecodedFilterEpochsResult:
-        return self.results2D.frame_divided_epochs_results['global']
+        return self.results2D.frame_divided_epochs_results[self.active_epoch_name]
 
     @property
     def a_new_global2D_decoder(self) -> BasePositionDecoder:
-        return self.results2D.decoders['global']
+        return self.results2D.decoders[self.active_epoch_name]
 
     @property
     def desired_start_time_seconds(self) -> float:
@@ -703,7 +705,17 @@ class SingleArtistMultiEpochBatchHelpers:
                                                        ) #deepcopy(extra_dict) # RenderPlotsData(name='_perform_add_decoded_posterior_and_trajectory', image_extent=deepcopy(image_extent))
 
 
-        plots_data.track_shape_patch_collection_artists = self.add_track_shapes(global_session=global_session, override_ax=override_ax, defer_draw=True, debug_print=debug_print) ## does not seem to successfully synchronize to window
+
+
+        try:
+            plots_data.track_shape_patch_collection_artists = self.add_track_shapes(global_session=global_session, override_ax=override_ax, defer_draw=True, debug_print=debug_print) ## does not seem to successfully synchronize to window
+        except KeyError as e:
+            # KeyError: 'long_xlim', for non kdiba tracks
+            print(f'WARN: non-kdiba track, cannot draw analytical track shape due to exception e: {e}')
+        except Exception as e:
+            raise e
+
+
         # track_shape_patch_collection_artists = batch_plot_helper.add_track_shapes(global_session=global_session, override_ax=track_shapes_dock_track_ax) ## does not seem to successfully synchronize to window
         plots_data.curr_artist_dict, plots_data.image_extent, plots_data = self.add_position_posteriors(posterior_masking_value=posterior_masking_value, override_ax=override_ax, debug_print=debug_print, defer_draw=True, extant_plot_data=plots_data)
 
@@ -1453,7 +1465,7 @@ class DecodedTrajectoryMatplotlibPlotter(DecodedTrajectoryPlotter):
             #     print(f'\t(not self.time_bin_slider.disabled)!!')
             #     self.time_bin_slider.value = 0 # reset to 0
             #     time_bin_index = self.time_bin_slider.value
-            self.plot_epoch(an_epoch_idx=index, time_bin_index=time_bin_index, include_most_likely_pos_line=include_most_likely_pos_line)
+            self.plot_epoch(an_epoch_idx=index, override_plot_linear_idx=0, time_bin_index=time_bin_index, include_most_likely_pos_line=include_most_likely_pos_line)
 
         # def update_time_bin_idx(index):
         #     print(f'update_time_bin_idx(index: {index}) called')
@@ -1472,7 +1484,7 @@ class DecodedTrajectoryMatplotlibPlotter(DecodedTrajectoryPlotter):
         # self.time_bin_slider = integer_slider(update_time_bin_idx, 'time bin:', 0, (self.curr_n_time_bins-1), 0)
         # self.checkbox = checkbox_widget(on_checkbox_change, 'Disable time bin slider', True)
 
-        self.plot_epoch(an_epoch_idx=an_epoch_idx, time_bin_index=None, include_most_likely_pos_line=include_most_likely_pos_line)
+        self.plot_epoch(an_epoch_idx=an_epoch_idx, override_plot_linear_idx=0, time_bin_index=None, include_most_likely_pos_line=include_most_likely_pos_line)
 
         display(self.epoch_slider)
         # display(self.checkbox)
