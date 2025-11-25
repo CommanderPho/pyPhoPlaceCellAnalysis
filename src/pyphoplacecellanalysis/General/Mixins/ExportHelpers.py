@@ -2,7 +2,7 @@ from copy import deepcopy
 from datetime import datetime
 from enum import Enum # for getting the current date to set the ouptut folder name
 from pathlib import Path
-from typing import Any, Callable, List, Optional, Union, Dict
+from typing import Any, Callable, List, Optional, Tuple, Union, Dict
 from neuropy.core.user_annotations import metadata_attributes
 import pandas as pd
 import numpy as np
@@ -896,8 +896,6 @@ class FigureToImageHelpers:
 
         found_widgets = [active_2d_plot.find_dock_item_tuple(an_id)[-1] for an_id in included_track_dock_identifiers]
 
-        # found_pyqtgraph_stack = []
-        # found_matplotlib_stack = []
         found_heterogeneous_stack = []
 
         track_heights = []
@@ -917,7 +915,9 @@ class FigureToImageHelpers:
                     assert fig is not None
                     axes_images = [im for ax in fig.axes for im in ax.get_images() if isinstance(im, mimage.AxesImage)]
                     assert len(axes_images) > 0
-                    assert len(axes_images) == 1, f"TODO - only allow the first (single) AxesImage to be added."
+                    # assert len(axes_images) == 1, f"TODO - only allow the first (single) AxesImage to be added. len(axes_images): {len(axes_images)}"
+                    if len(axes_images) > 1:
+                        print(f'WARN: TODO - only allow the first (single) AxesImage to be added. len(axes_images): {len(axes_images)}\n\tONLY THE FIRST WILL BE USED!')
                     found_ax_img = axes_images[0] ## Only add the first
                 except Exception as e:
                     found_ax_img = None
@@ -1120,7 +1120,8 @@ class FigureToImageHelpers:
     @function_attributes(short_name=None, tags=['tracks', 'MAIN', 'save', 'export', 'pdf', 'multi-page-pdf', 'timeline'], input_requires=[], output_provides=[], uses=['_helper_extract_renderables_from_track_widgets', 'perform_export_wrapped_tracks_to_paged_pdf'], used_by=[], creation_date='2025-08-22 08:13', related_items=[])
     @classmethod
     def export_wrapped_tracks_to_paged_df(cls, active_2d_plot, output_pdf_path: str, included_track_dock_identifiers: Optional[List]=None, **kwargs):
-        """ 
+        """ Exports the entire timeline (all tracks) out to a multi-paged PDF
+        
         Usage:
 
             saved_output_pdf_path = FigureToImageHelpers.export_wrapped_tracks_to_paged_df(active_2d_plot, output_pdf_path=output_pdf_path)
@@ -1750,4 +1751,73 @@ def _test_save_pipeline_data_to_h5(curr_active_pipeline, finalized_output_cache_
 
 
 
+@metadata_attributes(short_name=None, tags=['video', 'timeline', 'tracks', 'export', 'mp4'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-11-24 17:40', related_items=[])
+class TimelineVideoExporter:
+    """ export the timeline out to a video file. Actually just programmatically advances the timeline as if a video were being output, but you have to use an external screen recorder to write the frames to video.
+    
+    
+    from pyphoplacecellanalysis.General.Mixins.ExportHelpers import TimelineVideoExporter
+    
+    
+    """
 
+    @classmethod
+    def main(cls, active_2d_plot, sync_plotters, win, desired_playback_duration: float = 8 * 60.0, session_start_t: float = 11023.018433333335, desired_framerate: float = 2.0):
+        from PyQt5 import QtWidgets, QtGui, QtCore
+        import pyphoplacecellanalysis.External.pyqtgraph as pg
+        from pyqtgraph.exporters import ImageExporter
+        from PIL import Image
+        from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.GraphicsWidgets.CustomGraphicsLayoutWidget import CustomGraphicsLayoutWidget
+
+        ## "playback" refers to output video:
+        
+        # "session" refers to the actual recording session:
+        desired_session_time_range_duration: float = (16.0 * 60.0) # 1m
+        # session_start_t: float = 23170.37047485091 #20740.63578640229 # 11631.186907154472 # 11451.186907154472 # 11391.186907154472 # 7665.232126354053 # active_2d_plot.total_data_start_time + 4.0 * 60.0 # 4 minutes into start of recording ## Day 5
+        # session_start_t: float = 11023.018433333335 # 10843.018433333334 # active_2d_plot.total_data_start_time + 4.0 * 60.0 # 4 minutes into start of recording
+        # session_start_t: float = 23170.37047485091 #20740.63578640229 # 11631.186907154472 # 11451.186907154472 # 11391.186907154472 # active_2d_plot.total_data_start_time + 4.0 * 60.0 # 4 minutes into start of recording ## day 4
+        desired_session_time_range: Tuple[float, float] = (session_start_t, (session_start_t + desired_session_time_range_duration))
+
+        playback_speed_factor: float = (desired_playback_duration / desired_session_time_range_duration)
+
+        print(f'playback_speed_factor: {playback_speed_factor}')
+        time_window_duration: float = active_2d_plot.active_window_duration
+        print(f'time_window_duration: {time_window_duration}')
+
+        ## INPUTS: _out_container, active_2d_plot, _out_container, sync_plotters, 
+        
+        desired_frame_duration_sec: float = 1.0/desired_framerate
+        print(f'desired_frame_duration_sec: {desired_frame_duration_sec}')
+
+        # ## All Frames from entire recording (too long)
+        # total_duration: float = active_2d_plot.total_data_duration
+        # desired_num_total_frames: int = int(np.ceil((total_duration * desired_framerate)))
+        # frame_start_indicies = np.linspace(active_2d_plot.total_data_start_time,  active_2d_plot.total_data_end_time, num=desired_num_total_frames)
+
+        ## Plot only for the range of interest:
+        desired_num_total_frames: int = int(np.ceil((desired_session_time_range_duration * desired_framerate)))
+        frame_start_indicies = np.linspace(desired_session_time_range[0], desired_session_time_range[1], num=desired_num_total_frames)
+        frame_end_indices = frame_start_indicies + desired_frame_duration_sec
+
+        print(f'desired_num_total_frames: {desired_num_total_frames}')
+
+        # ## Disable debug print to speed up animation
+        for a_plotter_name, a_plotter in sync_plotters.items():
+            a_plotter.params.debug_print = False
+            
+
+        # next_end_timestamp = next_start_timestamp + self.animation_active_time_window.window_duration
+
+        def _frame_update(frame_start_t, frame_end_t):
+            active_2d_plot.update_scroll_window_region(frame_start_t, frame_end_t, block_signals=True)
+            active_2d_plot.window_scrolled.emit(frame_start_t, frame_end_t)
+            QtWidgets.QApplication.processEvents()
+            win.repaint()
+
+
+        _frame_update(desired_session_time_range[0], (desired_session_time_range[0]+time_window_duration))
+
+
+        for i, (frame_start_t, frame_end_t) in enumerate(zip(frame_start_indicies, frame_end_indices)):
+            print(f'frame[{i}]: ({frame_start_t}, {frame_end_t}):')
+            _frame_update(frame_start_t, (frame_start_t + time_window_duration))
