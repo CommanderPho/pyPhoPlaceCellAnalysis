@@ -367,6 +367,7 @@ class TimeSynchronizedPositionDecoderPlotter(AnimalTrajectoryPlottingMixin, Time
         from pyphoplacecellanalysis.External.pyqtgraph import functions as fn
         from pathlib import Path
         import cv2
+        import sys
         
         # Get time window centers
         time_window_centers = self.time_window_centers
@@ -430,22 +431,31 @@ class TimeSynchronizedPositionDecoderPlotter(AnimalTrajectoryPlottingMixin, Time
             # Capture frame
             qimage = exporter.export(toBytes=True)
             
-            # Convert QImage to numpy array (shape: height, width, channels)
-            # QImage is ARGB32, so we get (H, W, 4) array with channels [A, R, G, B]
+            # Convert QImage to numpy array
+            # ImageExporter returns ARGB32 format, which has endianness-dependent byte order
+            # On little-endian: bytes are [B, G, R, A] in memory
+            # On big-endian: bytes are [A, R, G, B] in memory
             img_array = fn.ndarray_from_qimage(qimage)
             
-            # Convert ARGB to RGB (remove alpha channel)
-            # img_array is (H, W, 4) with ARGB format: [A, R, G, B]
+            # Handle ARGB32 format conversion based on byte order
             if img_array.shape[2] == 4:
-                # Extract RGB channels (skip alpha channel at index 0)
-                # Channels are [A, R, G, B], so we take [1, 2, 3] for RGB
-                rgb_array = img_array[:, :, [1, 2, 3]]  # Extract R, G, B channels
+                # ARGB32 format - extract RGB channels based on byte order
+                if sys.byteorder == 'little':
+                    # Little-endian: channels are [B, G, R, A] in memory
+                    # Extract [B, G, R] which is already BGR for OpenCV
+                    bgr_array = img_array[:, :, [0, 1, 2]]  # B, G, R
+                else:
+                    # Big-endian: channels are [A, R, G, B] in memory
+                    # Extract [R, G, B] and convert to BGR
+                    rgb_array = img_array[:, :, [1, 2, 3]]  # R, G, B
+                    bgr_array = rgb_array[:, :, [2, 1, 0]]  # Convert to BGR
             elif img_array.shape[2] == 3:
-                rgb_array = img_array
+                # Already RGB format, convert to BGR for OpenCV
+                bgr_array = img_array[:, :, [2, 1, 0]]  # Convert RGB to BGR
             else:
                 raise ValueError(f"Unexpected image format with {img_array.shape[2]} channels")
             
-            frames.append(rgb_array)
+            frames.append(bgr_array)
         
         # Restore original debug print setting
         self.params.debug_print = original_debug_print
@@ -481,9 +491,8 @@ class TimeSynchronizedPositionDecoderPlotter(AnimalTrajectoryPlottingMixin, Time
             if progress_print and (i % progress_print_every_n_frames == 0 or i == n_frames - 1):
                 print(f'Writing frame {i+1}/{n_frames} to video')
             
-            # Convert RGB to BGR for OpenCV
-            frame_bgr = cv2.cvtColor(frames_array[i], cv2.COLOR_RGB2BGR)
-            out.write(frame_bgr)
+            # Frames are already in BGR format, write directly
+            out.write(frames_array[i])
         
         # Close video writer
         out.release()
