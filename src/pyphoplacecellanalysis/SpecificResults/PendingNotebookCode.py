@@ -1109,7 +1109,7 @@ def build_combined_time_synchronized_Bapun_decoders_window(curr_active_pipeline,
             
             # ### Marker Settings:
             # a_plotter.params.recent_position_trajectory_symbol_brush = pg.mkBrush(50,50,50,100)
-            a_plotter.params.recent_position_trajectory_symbol_brush = pg.mkBrush(50,50,50)
+            a_plotter.params.recent_position_trajectory_symbol_brush = pg.mkBrush(50, 50, 50)
             # a_plotter.params.recent_position_trajectory_symbol_pen = pg.mkPen({'color': [255, 255, 255, 10], 'width': 1}) # White
             # self.params.recent_position_trajectory_symbol_pen = pg.mkPen({'color': [20, 20, 20, 255], 'width': 1}) # Black
             a_plotter.params.recent_position_trajectory_symbol_pen = pg.mkPen({'color': [255, 0, 0, 100], 'width': 0.2}) # Red

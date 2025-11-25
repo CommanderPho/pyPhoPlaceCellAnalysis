@@ -272,7 +272,7 @@ class SpikeRasterBase(LoggingBaseClassLoggerOwningMixin, UnitSortableMixin, Data
         # return self._logger
     
 
-        
+
     def __init__(self, params=None, spikes_window=None, playback_controller=None, neuron_colors=None, neuron_sort_order=None, application_name=None, should_show=True, **kwargs):
         """ 
         
@@ -288,7 +288,6 @@ class SpikeRasterBase(LoggingBaseClassLoggerOwningMixin, UnitSortableMixin, Data
         # Helper container variables
         self.params = params
         self._spikes_window = spikes_window
-        
         
         if application_name is not None:
             self.applicationName = application_name # set instance application name if it isn't None. Otherwise just use the class value.
@@ -614,8 +613,7 @@ class SpikeRasterBase(LoggingBaseClassLoggerOwningMixin, UnitSortableMixin, Data
             
         else:
             pass
-            
-            
+                        
     # def key_handler(self, event):
     #     print("MainVideoPlayerWindow key handler: {0}".format(str(event.key())))
     #     if event.key() == QtCore.Qt.Key_Escape and self.is_full_screen:
@@ -632,10 +630,6 @@ class SpikeRasterBase(LoggingBaseClassLoggerOwningMixin, UnitSortableMixin, Data
         print(f'SpikeRasterBase.wheel_handler(event.angleDelta().y(): {event.angleDelta().y()})')
         # self.modify_volume(1 if event.angleDelta().y() > 0 else -1)
         # self.set_media_position(1 if event.angleDelta().y() > 0 else -1)
-
-
-
-
 
     @pyqtExceptionPrintingSlot()
     def on_spikes_df_changed(self):
@@ -685,4 +679,3 @@ class SpikeRasterBase(LoggingBaseClassLoggerOwningMixin, UnitSortableMixin, Data
     
 
         
-# hih

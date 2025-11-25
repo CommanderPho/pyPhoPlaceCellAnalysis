@@ -245,7 +245,7 @@ class Spike2DRaster(SpecificDockWidgetManipulatingMixin, DynamicDockDisplayAreaO
         ### No plots will actually be added until self.add_3D_time_curves(plot_dataframe) is called with a valid dataframe.
         self.TimeCurvesViewMixin_on_init()
         
-         # Setup Signals:
+        # Setup Signals:
         self.temporal_mapping_changed.connect(self.on_adjust_temporal_spatial_mapping)
         self.spikes_window.timeWindow.window_duration_changed_signal.connect(lambda *wrapped_args, **wrapped_kwargs: self.on_adjust_temporal_spatial_mapping())
         # self.on_window_duration_changed.connect(self.on_adjust_temporal_spatial_mapping)
@@ -1373,7 +1373,6 @@ class Spike2DRaster(SpecificDockWidgetManipulatingMixin, DynamicDockDisplayAreaO
             a_time_sync_pyqtgraph_widget, root_graphics_layout_widget, plot_item, dDisplayItem = self.add_new_embedded_pyqtgraph_render_plot_widget(name=name, dockSize=(500,50))
             target_graphics_layout_widget = root_graphics_layout_widget
         else:
-            # main_graphics_layout_widget = self.ui.main_graphics_layout_widget # GraphicsLayoutWidget
             target_graphics_layout_widget = self.ui.active_window_container_layout # GraphicsLayoutWidget
             
         # self.ui.active_window_container_layout.
@@ -1387,20 +1386,12 @@ class Spike2DRaster(SpecificDockWidgetManipulatingMixin, DynamicDockDisplayAreaO
         # new_curves_separate_plot.showAxis('bottom')
         
         # Setup axes bounds for the bottom windowed plot:
-        # background_static_scroll_window_plot.setLabel('bottom', 'Time', units='s')
-        # new_curves_separate_plot.setMouseEnabled(x=False, y=False)
         new_curves_separate_plot.setMouseEnabled(x=False, y=True) ## unusual
-        # new_curves_separate_plot.disableAutoRange('xy')
-        # background_static_scroll_window_plot.enableAutoRange(x=False, y=False)
-        # new_curves_separate_plot.setAutoVisible(x=False, y=False)
-        # new_curves_separate_plot.setAutoPan(x=False, y=False)
         
         # Setup range for plot:
         earliest_t, latest_t = self.spikes_window.total_df_start_end_times
         new_curves_separate_plot.setXRange(earliest_t, latest_t, padding=0)
-        # new_curves_separate_plot.setYRange(np.nanmin(curr_spike_y), np.nanmax(curr_spike_y), padding=0)
-        
-        
+                
         # # setup the new_curves_separate_plot to have a linked X-axis to the other scroll plot:
         main_plot_widget = self.plots.main_plot_widget # PlotItem
         new_curves_separate_plot.setXLink(main_plot_widget) # works to synchronize the main zoomed plot (current window) with the epoch_rect_separate_plot (rectangles plotter)
@@ -1427,10 +1418,7 @@ class Spike2DRaster(SpecificDockWidgetManipulatingMixin, DynamicDockDisplayAreaO
             active_time_sync_pyqtgraph_plot_item_to_layout_map = {active_matplotlib_view_widget.getRootPlotItem():active_matplotlib_view_widget.getRootGraphicsLayoutWidget() for identifier, active_matplotlib_view_widget in active_time_sync_pyqtgraph_widgets.items()}
             assert separate_plot_item in active_time_sync_pyqtgraph_plot_item_to_layout_map, f"active_time_sync_pyqtgraph_plot_item_to_layout_map: {active_time_sync_pyqtgraph_plot_item_to_layout_map}, separate_plot_item: {separate_plot_item}, active_time_sync_pyqtgraph_widgets: {active_time_sync_pyqtgraph_widgets}"
             target_graphics_layout_widget = active_time_sync_pyqtgraph_plot_item_to_layout_map[separate_plot_item]
-            assert target_graphics_layout_widget is not None            
-            # raise NotImplementedError(f'Not finished, how do I find the embedding widget from the plot item?')
-            # a_time_sync_pyqtgraph_widget, root_graphics_layout_widget, plot_item = self.add_new_embedded_pyqtgraph_render_plot_widget(name=name, dockSize=(500,50))
-            # target_graphics_layout_widget = root_graphics_layout_widget
+            assert target_graphics_layout_widget is not None
         else:
             # main_graphics_layout_widget = self.ui.main_graphics_layout_widget # GraphicsLayoutWidget
             target_graphics_layout_widget = self.ui.active_window_container_layout # GraphicsLayoutWidget
