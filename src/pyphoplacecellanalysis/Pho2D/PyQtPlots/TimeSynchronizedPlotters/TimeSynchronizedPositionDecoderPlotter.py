@@ -338,6 +338,162 @@ class TimeSynchronizedPositionDecoderPlotter(AnimalTrajectoryPlottingMixin, Time
     
         self.AnimalTrajectoryPlottingMixin_update_plots()
 
+
+    @function_attributes(short_name=None, tags=['video', 'export', 'mp4', 'avi', 'output'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-11-24 23:09', related_items=[])
+    def export_video(self, output_path: str, start_t: Optional[float] = None, end_t: Optional[float] = None, fps: float = 30.0, width: Optional[int] = None, height: Optional[int] = None, progress_print: bool = True, debug_print: bool = False):
+        """Efficiently export a video from the TimeSynchronizedPositionDecoderPlotter instance.
+        
+        This method iterates through time points, updates the plotter, captures frames using
+        pyqtgraph's ImageExporter, and saves them as a video using OpenCV.
+        
+        Args:
+            output_path: Path to save the output video file (e.g., 'output/videos/decoder_video.avi')
+            start_t: Start time for video export. If None, uses the first available time window center.
+            end_t: End time for video export. If None, uses the last available time window center.
+            fps: Frames per second for the output video (default: 30.0)
+            width: Width of exported frames in pixels. If None, uses current widget width.
+            height: Height of exported frames in pixels. If None, uses current widget height.
+            progress_print: Whether to print progress messages (default: True)
+            debug_print: Whether to print debug information (default: False)
+            
+        Returns:
+            Path: Path to the saved video file
+            
+        Usage:
+            plotter = TimeSynchronizedPositionDecoderPlotter(...)
+            video_path = plotter.export_video('output/videos/decoder.avi', start_t=100.0, end_t=200.0, fps=30.0)
+        """
+        from pyphoplacecellanalysis.External.pyqtgraph.exporters.ImageExporter import ImageExporter
+        from pyphoplacecellanalysis.External.pyqtgraph import functions as fn
+        from pathlib import Path
+        import cv2
+        
+        # Get time window centers
+        time_window_centers = self.time_window_centers
+        if len(time_window_centers) == 0:
+            raise ValueError("No time window centers available for video export")
+        
+        # Determine time range
+        if start_t is None:
+            start_t = float(time_window_centers[0])
+        if end_t is None:
+            end_t = float(time_window_centers[-1])
+        
+        # Find valid time indices
+        start_idx = np.searchsorted(time_window_centers, start_t, side='left')
+        end_idx = np.searchsorted(time_window_centers, end_t, side='right')
+        
+        if start_idx >= end_idx:
+            raise ValueError(f"Invalid time range: start_t={start_t}, end_t={end_t}. No valid frames found.")
+        
+        # Get frame indices
+        frame_indices: NDArray = np.arange(start_idx, end_idx)
+        n_frames: int = len(frame_indices)
+        
+        if progress_print:
+            print(f'Exporting video: {n_frames} frames from t={time_window_centers[start_idx]:.2f} to t={time_window_centers[end_idx-1]:.2f}')
+        
+        # Get widget dimensions
+        if width is None or height is None:
+            widget_size = self.ui.root_graphics_layout_widget.size()
+            if width is None:
+                width = widget_size.width()
+            if height is None:
+                height = widget_size.height()
+        
+        # Disable debug printing during export for performance
+        original_debug_print = self.params.debug_print
+        self.params.debug_print = debug_print
+        
+        # Create ImageExporter for the root plot
+        exporter = ImageExporter(self.ui.root_plot)
+        exporter.parameters()['width'] = width
+        exporter.parameters()['height'] = height
+        exporter.parameters()['antialias'] = True
+        
+        # Process events to ensure widget is rendered
+        QtWidgets.QApplication.processEvents()
+        
+        # Capture frames
+        frames = []
+        for i, frame_idx in enumerate(frame_indices):
+            if progress_print and (i % max(1, n_frames // 20) == 0 or i == n_frames - 1):
+                print(f'Capturing frame {i+1}/{n_frames} (t={time_window_centers[frame_idx]:.2f})')
+            
+            # Update plotter to current time
+            t = time_window_centers[frame_idx]
+            self.update(t, defer_render=False)
+            
+            # Process events to ensure rendering
+            QtWidgets.QApplication.processEvents()
+            
+            # Capture frame
+            qimage = exporter.export(toBytes=True)
+            
+            # Convert QImage to numpy array (shape: height, width, channels)
+            # QImage is ARGB32, so we get (H, W, 4) array with channels [A, R, G, B]
+            img_array = fn.ndarray_from_qimage(qimage)
+            
+            # Convert ARGB to RGB (remove alpha channel)
+            # img_array is (H, W, 4) with ARGB format: [A, R, G, B]
+            if img_array.shape[2] == 4:
+                # Extract RGB channels (skip alpha channel at index 0)
+                # Channels are [A, R, G, B], so we take [1, 2, 3] for RGB
+                rgb_array = img_array[:, :, [1, 2, 3]]  # Extract R, G, B channels
+            elif img_array.shape[2] == 3:
+                rgb_array = img_array
+            else:
+                raise ValueError(f"Unexpected image format with {img_array.shape[2]} channels")
+            
+            frames.append(rgb_array)
+        
+        # Restore original debug print setting
+        self.params.debug_print = original_debug_print
+        
+        if progress_print:
+            print(f'Converting {len(frames)} frames to video...')
+        
+        # Convert frames list to numpy array: (n_frames, height, width, channels)
+        frames_array = np.stack(frames, axis=0)
+        
+        # Save video using OpenCV directly (since save_array_as_video expects grayscale)
+        import cv2
+        video_filepath = Path(output_path).resolve()
+        video_parent_path = video_filepath.parent
+        if not video_parent_path.exists():
+            if progress_print:
+                print(f'Creating output directory: {video_parent_path}')
+            video_parent_path.mkdir(parents=True, exist_ok=True)
+        
+        # Get dimensions
+        n_frames, height, width, n_channels = frames_array.shape
+        
+        # Initialize video writer (OpenCV uses BGR, so we need to convert from RGB)
+        fourcc = cv2.VideoWriter_fourcc('M','J','P','G')  # MJPEG codec (fast, good quality)
+        out = cv2.VideoWriter(str(video_filepath), fourcc, fps, (width, height), isColor=True)
+        
+        if not out.isOpened():
+            raise RuntimeError(f"Failed to open video writer for {video_filepath}")
+        
+        # Write frames
+        progress_print_every_n_frames = max(1, n_frames // 20)
+        for i in range(n_frames):
+            if progress_print and (i % progress_print_every_n_frames == 0 or i == n_frames - 1):
+                print(f'Writing frame {i+1}/{n_frames} to video')
+            
+            # Convert RGB to BGR for OpenCV
+            frame_bgr = cv2.cvtColor(frames_array[i], cv2.COLOR_RGB2BGR)
+            out.write(frame_bgr)
+        
+        # Close video writer
+        out.release()
+        
+        if progress_print:
+            print(f'Video exported successfully to: {video_filepath}')
+        
+        return video_filepath
+
+
 # included_epochs = None
 # computation_config = active_session_computation_configs[0]
 # active_time_dependent_placefields2D = PfND_TimeDependent(deepcopy(sess.spikes_df.copy()), deepcopy(sess.position), epochs=included_epochs,
