@@ -20,9 +20,11 @@ from pyphoplacecellanalysis.Pho2D.PyQtPlots.TimeSynchronizedPlotters.TimeSynchro
 from pyphoplacecellanalysis.Pho2D.PyQtPlots.Extensions.pyqtgraph_helpers import pyqtplot_build_image_bounds_extent
 
 from pyphoplacecellanalysis.Pho2D.PyQtPlots.TimeSynchronizedPlotters.Mixins.AnimalTrajectoryPlottingMixin import AnimalTrajectoryPlottingMixin
+from attrs import define, field, Factory
+from pyphoplacecellanalysis.Pho2D.PyQtPlots.TimeSynchronizedPlotters.Mixins.UserEditableROIMixin import UserEditableROIMixin, Rois
 
 
-class TimeSynchronizedPositionDecoderPlotter(AnimalTrajectoryPlottingMixin, TimeSynchronizedPlotterBase):
+class TimeSynchronizedPositionDecoderPlotter(UserEditableROIMixin, AnimalTrajectoryPlottingMixin, TimeSynchronizedPlotterBase):
     """ Plots the decoded position posteriors at a given moment in time. 
     Uses pyqtgraph to render the decoded posteriors
     Its inherited `self.on_window_changed_rate_limited(...)` is called to perform updates
@@ -183,6 +185,7 @@ class TimeSynchronizedPositionDecoderPlotter(AnimalTrajectoryPlottingMixin, Time
         self.ui.imv.setColorMap(self.params.cmap)
         ## Set initial view bounds
         # self.ui.root_view.setRange(QtCore.QRectF(0, 0, 600, 600))
+        self.enable_user_editable_rois(parent_plot_item=self.ui.root_plot)
 
     
     @function_attributes(short_name=None, tags=['track_shapes'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-02-17 11:31', related_items=[])
@@ -341,7 +344,7 @@ class TimeSynchronizedPositionDecoderPlotter(AnimalTrajectoryPlottingMixin, Time
 
     @function_attributes(short_name=None, tags=['video', 'export', 'mp4', 'avi', 'output'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-11-24 23:09', related_items=[])
     def export_video(self, output_path: str, start_t: Optional[float] = None, end_t: Optional[float] = None, fps: float = 30.0, width: Optional[int] = None, height: Optional[int] = None, progress_print: bool = True, debug_print: bool = False):
-        """Efficiently export a video from the TimeSynchronizedPositionDecoderPlotter instance.
+        """Efficiently export a video from the TimeSynchronizedPositionDecoderPlotter instance (faster than real-time playback)
         
         This method iterates through time points, updates the plotter, captures frames using
         pyqtgraph's ImageExporter, and saves them as a video using OpenCV.
@@ -510,3 +513,6 @@ class TimeSynchronizedPositionDecoderPlotter(AnimalTrajectoryPlottingMixin, Time
 #                                   grid_bin=computation_config.grid_bin, smooth=computation_config.smooth)
 # curr_occupancy_plotter = TimeSynchronizedPositionDecoderPlotter(active_time_dependent_placefields2D)
 # curr_occupancy_plotter.show()
+
+
+
