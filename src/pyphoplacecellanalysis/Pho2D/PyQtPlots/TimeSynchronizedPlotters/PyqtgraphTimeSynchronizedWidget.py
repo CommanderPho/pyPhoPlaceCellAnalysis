@@ -121,7 +121,9 @@ class PyqtgraphTimeSynchronizedWidget(CrosshairsTracingMixin, PlottingBackendSpe
         
         self.buildUI()
         self._update_plots()
-        
+
+
+
     def setup(self):
         assert hasattr(self.ui, 'connections')
         

@@ -210,7 +210,7 @@ def final_process_bapun_all_comps(curr_active_pipeline, posthoc_save: bool=True,
     return final_process_non_kdiba_all_comps(curr_active_pipeline, active_data_mode_name=active_data_mode_name, posthoc_save=posthoc_save, override_parameters_flat_keypaths_dict=override_parameters_flat_keypaths_dict, time_bin_size=time_bin_size)
 
     
-@function_attributes(short_name=None, tags=['bapun'], input_requires=[], output_provides=[], uses=['post_process_non_kdiba'], used_by=[], creation_date='2025-09-19 17:50', related_items=[])
+@function_attributes(short_name=None, tags=['bapun'], input_requires=[], output_provides=[], uses=['post_process_non_kdiba', 'LapsAccessor.non_kdiba_laps_determine_directions'], used_by=[], creation_date='2025-09-19 17:50', related_items=[])
 def final_process_non_kdiba_all_comps(curr_active_pipeline, active_data_mode_name: str = 'bapun', posthoc_save: bool=True, override_parameters_flat_keypaths_dict=None, time_bin_size=0.5):
     """ 
     from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import final_process_bapun_all_comps
