@@ -18,11 +18,6 @@ from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.Mixins.ReprPrintableWidgetMixin
 
 @define(frozen=True)
 class ScatterItemData(ReprPrintableItemMixin):
-    # t: float = field(alias='t_rel_seconds')
-    # aclu: int = field() # alias='neuron_ID'
-    # neuron_IDX: int = field(alias='fragile_linear_neuron_IDX')
-    # visualization_raster_y_location: float = field(default=np.nan)
-    
     t: float = field()
     aclu: int = field() # alias='neuron_ID'
     neuron_IDX: int = field()
@@ -36,11 +31,6 @@ class ScatterItemData(ReprPrintableItemMixin):
                     a_record['t_rel_seconds'] = a_record.pop(an_alias_name) ## removes the alias as well
             
         a_record = get_dict_subset(a_record, ['t_rel_seconds', 'aclu', 'neuron_IDX', 'fragile_linear_neuron_IDX', 'visualization_raster_y_location'])
-        # print(f'a_record.keys(): {list(a_record.keys())}')
-        # return cls(t_rel_seconds=a_record.get('t_rel_seconds', a_record.get('t', None)),
-        #             aclu=a_record.get('aclu', None),
-        #             fragile_linear_neuron_IDX=a_record.get('fragile_linear_neuron_IDX', a_record.get('neuron_IDX', None)),
-        #             visualization_raster_y_location=a_record.get('visualization_raster_y_location', np.nan))
         
         return cls(a_record.get('t_rel_seconds', a_record.get('t', None)),
                     a_record.get('aclu', None),
@@ -122,7 +112,6 @@ class Render2DScrollWindowPlotMixin:
         curr_spike_x, _, curr_spike_pens, _all_scatterplot_tooltips_kwargs, self.plots_data.all_spots_downsampled, curr_n = self._build_all_spikes_data_values(should_return_data_tooltips_kwargs=False, downsampling_rate=scroll_window_plot_downsampling_rate) # downsampled all_spots
         curr_spike_x, curr_spike_y, curr_spike_pens, _all_scatterplot_tooltips_kwargs, self.plots_data.all_spots, curr_n = self._build_all_spikes_data_values(should_return_data_tooltips_kwargs=False, downsampling_rate=1) ## all spots
 
-
         self.plots.preview_overview_scatter_plot = pg.ScatterPlotItem(name='spikeRasterOverviewWindowScatterPlotItem', pxMode=True, symbol=vtick, size=5, pen={'color': 'w', 'width': 1}, hoverable=False, )
         self.plots.preview_overview_scatter_plot.setObjectName('preview_overview_scatter_plot') # this seems necissary, the 'name' parameter in addPlot(...) seems to only change some internal property related to the legend AND drastically slows down the plotting
         self.plots.preview_overview_scatter_plot.opts['useCache'] = True
@@ -138,7 +127,15 @@ class Render2DScrollWindowPlotMixin:
         background_static_scroll_window_plot.addItem(self.ui.scroll_window_region, ignoreBounds=True)
         self.ui.scroll_window_region.sigRegionChanged.connect(self._Render2DScrollWindowPlot_on_linear_region_item_update)
 
-        
+        # Enable drag-to-replace functionality
+        # This allows users to Ctrl+drag to define a new scroll window region
+        if hasattr(self, 'enable_drag_to_replace_region'):
+            self.enable_drag_to_replace_region(
+                modifier_key=QtCore.Qt.ControlModifier,  # Hold Ctrl while dragging
+                button=QtCore.Qt.LeftButton
+            )
+
+
         # Setup axes bounds for the bottom windowed plot:
         background_static_scroll_window_plot.hideAxis('left')
         background_static_scroll_window_plot.hideAxis('bottom')
@@ -452,6 +449,135 @@ class Render2DScrollWindowPlotMixin:
             _conn = None
             
         return scroll_window_region, _conn
+
+
+
+
+    
+    def enable_drag_to_replace_region(self, modifier_key=QtCore.Qt.ControlModifier, button=QtCore.Qt.LeftButton):
+        """Enable drag-to-replace the scroll window region.
+        
+        When the user drags with the modifier key held, it will replace the existing
+        scroll window region with a new one defined by the drag.
+        
+        Args:
+            modifier_key: Qt modifier key that must be held (e.g., QtCore.Qt.ControlModifier)
+            button: Mouse button to use (e.g., QtCore.Qt.LeftButton)
+        """
+        if not hasattr(self, 'plots') or not hasattr(self.plots, 'background_static_scroll_window_plot'):
+            raise AttributeError("Must have plots.background_static_scroll_window_plot initialized first")
+        
+        plot = self.plots.background_static_scroll_window_plot
+        viewbox = plot.getViewBox()
+        
+        # Store settings
+        self._region_replace_modifier = modifier_key
+        self._region_replace_button = button
+        
+        # Store preview state
+        self._preview_region = None
+        self._drag_start_pos = None
+        self._replacing_region = False
+        
+        # Enable mouse interaction on the ViewBox for drag detection
+        # We need x=True to detect horizontal drags, but we'll handle it ourselves
+        viewbox.setMouseEnabled(x=True, y=False)
+        
+        # Override the ViewBox's mouseDragEvent
+        original_mouseDragEvent = viewbox.mouseDragEvent
+        
+        def custom_mouseDragEvent(ev):
+            # Check if we should replace the region
+            should_replace = (
+                (ev.modifiers() & self._region_replace_modifier) and
+                (ev.button() == self._region_replace_button)
+            )
+            
+            if should_replace:
+                # Check if we're not clicking on the existing scroll region
+                if ev.isStart():
+                    click_pos = ev.buttonDownScenePos()
+                    clicked_item = plot.scene().itemAt(click_pos, QtGui.QTransform())
+                    
+                    # Check if we clicked on the scroll window region
+                    is_on_scroll_region = False
+                    while clicked_item is not None:
+                        if clicked_item == self.ui.scroll_window_region or isinstance(clicked_item, CustomLinearRegionItem):
+                            # Check if it's specifically the scroll window region
+                            if clicked_item == self.ui.scroll_window_region:
+                                is_on_scroll_region = True
+                            break
+                        clicked_item = clicked_item.parentItem()
+                    
+                    if not is_on_scroll_region:
+                        self._replacing_region = True
+                        self._drag_start_pos = viewbox.mapSceneToView(ev.buttonDownScenePos())
+                        ev.accept()
+                        return
+                
+                if self._replacing_region:
+                    ev.accept()
+                    current_pos = viewbox.mapSceneToView(ev.scenePos())
+                    
+                    if ev.isStart():
+                        # Create preview region
+                        start_x = min(self._drag_start_pos.x(), current_pos.x())
+                        end_x = max(self._drag_start_pos.x(), current_pos.x())
+                        
+                        if self._preview_region is None:
+                            # Create a temporary preview region with different styling
+                            self._preview_region = CustomLinearRegionItem(
+                                values=(start_x, end_x),
+                                orientation='vertical',
+                                pen=pg.mkPen('#00ff00', width=2, style=QtCore.Qt.DashLine),
+                                brush=pg.mkBrush('#00ff0040'),
+                                hoverBrush=pg.mkBrush('#00ff0080'),
+                                hoverPen=pg.mkPen('#00ff00', width=2),
+                                movable=False,
+                                clipItem=self.plots.preview_overview_scatter_plot
+                            )
+                            self._preview_region.setZValue(15)  # Above scroll region
+                            plot.addItem(self._preview_region, ignoreBounds=True)
+                        else:
+                            self._preview_region.setRegion((start_x, end_x))
+                    
+                    elif ev.isFinish():
+                        # Replace the existing scroll window region
+                        start_x = min(self._drag_start_pos.x(), current_pos.x())
+                        end_x = max(self._drag_start_pos.x(), current_pos.x())
+                        
+                        # Remove preview
+                        if self._preview_region is not None:
+                            plot.removeItem(self._preview_region)
+                            self._preview_region = None
+                        
+                        # Only replace if region has meaningful size
+                        if abs(end_x - start_x) > 0.01:
+                            # Update the existing scroll window region
+                            self.ui.scroll_window_region.setRegion([start_x, end_x])
+                            # This will trigger sigRegionChanged, which calls _Render2DScrollWindowPlot_on_linear_region_item_update
+                            # which emits window_scrolled signal
+                        
+                        self._replacing_region = False
+                        self._drag_start_pos = None
+                        return
+                    else:
+                        # Update preview during drag
+                        if self._preview_region is not None:
+                            start_x = min(self._drag_start_pos.x(), current_pos.x())
+                            end_x = max(self._drag_start_pos.x(), current_pos.x())
+                            self._preview_region.setRegion((start_x, end_x))
+                        return
+            
+            # Call original implementation for normal drags (panning, etc.)
+            # But prevent panning if mouse is disabled
+            if not plot.getMouseEnabled()[0]:  # Check x-axis mouse enabled
+                ev.ignore()
+            else:
+                original_mouseDragEvent(ev)
+        
+        # Replace the ViewBox's mouseDragEvent
+        viewbox.mouseDragEvent = custom_mouseDragEvent
 
 
 
