@@ -183,8 +183,9 @@ class GridBinBoundsHelpers:
 
 
 
-def final_process_bapun_all_comps(curr_active_pipeline, posthoc_save: bool=True, override_parameters_flat_keypaths_dict=None, time_bin_size=0.5):
-    """ 
+def final_process_bapun_all_comps(curr_active_pipeline, posthoc_save: bool=True, override_parameters_flat_keypaths_dict=None, active_data_mode_name = 'bapun', time_bin_size=0.5):
+    """ Main non-kdiba processing/computation function (for Bapun/Rachel/etc sessions)
+    
     from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import final_process_bapun_all_comps
     curr_active_pipeline = final_process_bapun_all_comps(curr_active_pipeline=curr_active_pipeline, posthoc_save=True)
     
@@ -199,16 +200,12 @@ def final_process_bapun_all_comps(curr_active_pipeline, posthoc_save: bool=True,
     from pyphoplacecellanalysis.Analysis.Decoder.context_dependent import GenericDecoderDictDecodedEpochsDictResult
     from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.EpochComputationFunctions import EpochComputationFunctions, EpochComputationsComputationsContainer
 
-
     from neuropy.analyses.placefields import Position
     from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import post_process_non_kdiba
     from neuropy.analyses.laps import estimate_session_laps
 
     hardcoded_params: HardcodedProcessingParameters = BapunDataSessionFormatRegisteredClass._get_session_specific_parameters(session_context=curr_active_pipeline.get_session_context())
-    hardcoded_params
-
-
-    active_data_mode_name = 'bapun'
+    
     # active_data_mode_name = 'rachel'
     return final_process_non_kdiba_all_comps(curr_active_pipeline, active_data_mode_name=active_data_mode_name, posthoc_save=posthoc_save, override_parameters_flat_keypaths_dict=override_parameters_flat_keypaths_dict, time_bin_size=time_bin_size)
 
@@ -248,7 +245,6 @@ def final_process_non_kdiba_all_comps(curr_active_pipeline, active_data_mode_nam
 
     known_data_session_type_properties_dict = DataSessionFormatRegistryHolder.get_registry_known_data_session_type_dict(override_parameters_flat_keypaths_dict=override_parameters_flat_keypaths_dict)
     active_data_session_types_registered_classes_dict = DataSessionFormatRegistryHolder.get_registry_data_session_type_class_name_dict()
-
 
     print(f'hardcoded_params.decoder_building_session_names: {hardcoded_params.decoder_building_session_names}')
     print(f'hardcoded_params.non_global_activity_session_names: {hardcoded_params.non_global_activity_session_names}')
