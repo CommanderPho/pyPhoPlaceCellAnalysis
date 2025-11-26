@@ -1769,86 +1769,75 @@ class DecodedTrajectoryMatplotlibPlotter(DecodedTrajectoryPlotter):
                 heatmaps.append(a_heatmap)
         return heatmaps, ordinate_first_image_extent, plots_data
 
-    @function_attributes(short_name=None, tags=['AI', 'posterior', 'helper', 'contours', 'HDR'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-02-26 13:00', related_items=[])
+
+    @function_attributes(short_name=None, tags=['BROKEN', 'NOTFULLYWORKING', 'AI', 'posterior', 'helper', 'contours', 'HDR'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-02-26 13:00', related_items=[])
     @classmethod
-    def _helper_add_hdr_contours(cls, an_ax, xbin_centers, a_p_x_given_n, a_time_bin_centers=None, ybin_centers=None, rotate_to_vertical:bool=False, debug_print:bool=False,
-                            posterior_masking_value: float = 0.0025, full_posterior_opacity: float = 1.0,
-                            custom_image_extent=None, time_cmap = 'viridis', should_perform_reshape: bool=True, extant_plot_data: Optional[RenderPlotsData]=None,
-                            contour_level_fractions: List[float] = [0.5]):
+    def _helper_add_hdr_contours(cls, an_ax, xbin_centers, a_p_x_given_n, a_time_bin_centers=None, ybin_centers=None, 
+                                 rotate_to_vertical:bool=False, debug_print:bool=False,
+                                 posterior_masking_value: float = 0.0025, full_posterior_opacity: float = 1.0,
+                                 custom_image_extent=None, time_cmap = 'viridis', should_perform_reshape: bool=True, 
+                                 extant_plot_data: Optional[RenderPlotsData]=None,
+                                 contour_level_fractions: List[float] = [0.5], filled: bool = False, smoothing_sigma: float = 1.0):
         """
-        Drop-in replacement for _helper_add_heatmap that renders Highest Density Region (HDR) contours 
-        colored by time, instead of a solid heatmap.
+        Drop-in replacement for _helper_add_heatmap that renders Highest Density Region (HDR) contours.
         
-        New Args:
-            contour_level_fractions: List[float]. Fractions of the frame's peak probability to contour. 
-                                     e.g. [0.5] draws the "Full Width Half Max" boundary.
-                                     e.g. [0.95] draws the region containing the top 5% of probability mass.
+        Args:
+            filled (bool): If True, uses contourf (shading). If False, uses contour (outlines).
+            smoothing_sigma (float): Standard deviation for Gaussian kernel. 
+                                     > 0.5 is recommended to prevent "vertex explosion" crashes.
         """
+        from scipy.ndimage import gaussian_filter
+        import matplotlib.cm as cm
+        import warnings
+
         # ========================================================== #
-        # 1. PREAMBLE: Setup Data Structures (Copied from Original)  #
+        # 1. SETUP & RESHAPING                                       #
         # ========================================================== #
-        
-        # Reshape the posterior if necessary.
         if should_perform_reshape:
             posterior = deepcopy(a_p_x_given_n).T
         else:
             posterior = deepcopy(a_p_x_given_n)
         
-        # Create masked array (though contours handle zeros well, masking is good for calculation)
-        masked_posterior = np.ma.masked_less(posterior, posterior_masking_value)
+        # Determine Dimensionality
         is_2D: bool = (np.ndim(posterior) >= 3)
         
+        # Setup Axes/Values
         x_values = deepcopy(xbin_centers)
         extra_dict = {'is_2D': is_2D}
         
         if not is_2D:
-            # 1D: Build fake y-axis values from current axes limits.
+            # 1D Fallback Setup
             y_min, y_max = an_ax.get_ylim()
             fake_y_width = (y_max - y_min)
-            fake_y_center: float = y_min + (fake_y_width / 2.0)
-            fake_y_lower_bound: float = fake_y_center - fake_y_width
-            fake_y_upper_bound: float = fake_y_center + fake_y_width
-            fake_y_num_samples: int = len(a_time_bin_centers)
-            fake_y_arr = np.linspace(fake_y_lower_bound, fake_y_upper_bound, fake_y_num_samples)
-            extra_dict.update({
-                'fake_y_center': fake_y_center, 'fake_y_lower_bound': fake_y_lower_bound,
-                'fake_y_upper_bound': fake_y_upper_bound, 'fake_y_arr': fake_y_arr,
-            })
-            y_values = np.linspace(fake_y_lower_bound, fake_y_upper_bound, fake_y_num_samples)
-            extra_dict['y_values'] = y_values
+            fake_y_center = y_min + (fake_y_width / 2.0)
+            fake_y_lower = fake_y_center - fake_y_width
+            fake_y_upper = fake_y_center + fake_y_width
+            fake_y_num = len(a_time_bin_centers) if a_time_bin_centers is not None else posterior.shape[1]
+            y_values = np.linspace(fake_y_lower, fake_y_upper, fake_y_num)
+            extra_dict.update({'fake_y_center': fake_y_center, 'y_values': y_values})
         else:
-            # 2D: use provided ybin_centers.
+            # 2D Setup
             assert ybin_centers is not None, "For 2D posterior, ybin_centers must be provided."
             y_values = deepcopy(ybin_centers)
             extra_dict['y_values'] = y_values
         
-        # Adjust for vertical orientation if requested.
+        # Handle Rotation
         if rotate_to_vertical:
             ordinate_first_image_extent = (y_values.min(), y_values.max(), x_values.min(), x_values.max())
-            # Swap x and y arrays for the grid generation
             x_values, y_values = y_values, x_values
-            
-            # Swap array axes for data
-            # Note: masked_posterior is (Time, X, Y) or (Time, Y, X) depending on reshape
-            # We treat the last two dims as spatial.
-            masked_posterior = np.swapaxes(masked_posterior, -2, -1)
+            # Swap data axes (Time, X, Y) -> (Time, Y, X)
+            posterior = np.swapaxes(posterior, -2, -1)
         else:
             ordinate_first_image_extent = (x_values.min(), x_values.max(), y_values.min(), y_values.max())
         
         if custom_image_extent is not None:
             ordinate_first_image_extent = deepcopy(custom_image_extent)
 
-        extra_dict['x_values'] = x_values
-        extra_dict['y_values'] = y_values
-
-        masked_shape = np.shape(masked_posterior)
-        if a_time_bin_centers is not None:
-            n_time_bins: int = len(a_time_bin_centers)
-        else:
-            n_time_bins: int = masked_shape[0]
-
+        masked_posterior = np.ma.masked_less(posterior, posterior_masking_value)
+        n_time_bins = masked_posterior.shape[0]
         extra_dict['n_time_bins'] = n_time_bins
         
+        # Plot Data Container
         if extant_plot_data is None:
             plots_data = RenderPlotsData(name='_helper_add_hdr_contours', ordinate_first_image_extent=deepcopy(ordinate_first_image_extent), **extra_dict)
         else:
@@ -1857,67 +1846,71 @@ class DecodedTrajectoryMatplotlibPlotter(DecodedTrajectoryPlotter):
             plots_data.update(**extra_dict)
 
         # ========================================================== #
-        # 2. RENDER LOGIC: HDR CONTOURS                              #
+        # 2. RENDERING                                               #
         # ========================================================== #
+        artists_list = [] 
         
-        artists_list = [] # Replaces 'heatmaps'
-        
-        # Prepare Colormap
         if isinstance(time_cmap, str):
-            import matplotlib.cm as cm
             cmap_obj = cm.get_cmap(time_cmap)
         else:
             cmap_obj = time_cmap
 
-        # 1D Case: Fallback to standard heatmap logic (Contours don't make sense on 1D unless it's a t-vs-x contour plot)
+        # --- 1D CASE: Standard Heatmap Fallback ---
         if not is_2D:
              a_heatmap = an_ax.imshow(masked_posterior, aspect='auto', cmap=cmap_obj, alpha=full_posterior_opacity,
                                      extent=ordinate_first_image_extent, origin='lower', interpolation='none')
              artists_list.append(a_heatmap)
              
-        # 2D Case: Time-Colored Contours
+        # --- 2D CASE: HDR Contours ---
         else:
-            # Generate Grid for Contour Plotting
-            # imshow (origin='lower') treats dim[-2] as Y (rows) and dim[-1] as X (cols).
-            # x_values corresponds to cols, y_values to rows.
             XX, YY = np.meshgrid(x_values, y_values) 
             
-            # Iterate through time bins (Oldest -> Newest)
             for t in range(n_time_bins):
-                
-                # Extract frame
-                # Data shape is (Time, Y, X) effectively due to how imshow/transpose works usually
-                # We need to ensure frame_data matches XX, YY shapes.
+                # 1. Extract Frame
                 frame_data = np.squeeze(masked_posterior[t, :, :])
                 
-                # Check for empty frame or NaNs
+                # 2. Skip if empty
                 if np.all(np.ma.getdata(frame_data) < posterior_masking_value) or np.all(np.isnan(frame_data)):
                     continue
-
-                # Calculate Color for this time step
-                time_progress = t / max(1, (n_time_bins - 1))
-                rgba_color = cmap_obj(time_progress)
                 
-                # Define Contour Levels relative to the Peak of this frame
-                # (Relative peak allows us to see the shape even if total probability drops in a specific bin)
+                # 3. Gaussian Smoothing (CRITICAL for stability)
+                # Fills masked values with 0.0 before smoothing to avoid NaN propagation
+                if smoothing_sigma > 0:
+                    frame_data_filled = np.ma.filled(frame_data, 0.0)
+                    frame_data = gaussian_filter(frame_data_filled, sigma=smoothing_sigma)
+                
                 frame_max = np.nanmax(frame_data)
-                if frame_max <= 0: continue
+                if frame_max <= 1e-9: continue
+
+                # 4. Color Calculation
+                time_progress = t / max(1, (n_time_bins - 1))
+                # Force tuple cast to prevent Matplotlib cycling error
+                rgba_color = tuple(cmap_obj(time_progress)) 
                 
+                # 5. Level Calculation
                 current_levels = [frac * frame_max for frac in contour_level_fractions]
                 
-                # Plot Contour
-                # We use specific levels, solid color, and thin lines
+                # 6. Plotting
                 try:
-                    cset = an_ax.contour(XX, YY, frame_data, 
-                                         levels=current_levels, 
-                                         colors=[rgba_color], 
-                                         linewidths=1.5, 
-                                         alpha=full_posterior_opacity)
+                    if filled:
+                        # Filled (Shaded polygons)
+                        # Add a cap slightly above max to ensure the center is filled
+                        fill_levels = current_levels + [frame_max * 1.05] 
+                        cset = an_ax.contourf(XX, YY, frame_data, 
+                                            levels=fill_levels, 
+                                            colors=[rgba_color], 
+                                            alpha=full_posterior_opacity)
+                    else:
+                        # Outlines (Lines)
+                        cset = an_ax.contour(XX, YY, frame_data, 
+                                            levels=current_levels, 
+                                            colors=[rgba_color], 
+                                            linewidths=1.5, 
+                                            alpha=full_posterior_opacity)
                     
                     artists_list.append(cset)
                     
                 except ValueError as e:
-                    # Occurs if data is constant or levels are outside data range
                     if debug_print: print(f"Skipping contour for t={t}: {e}")
                     continue
 
