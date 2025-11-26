@@ -398,10 +398,7 @@ def final_process_non_kdiba_all_comps(curr_active_pipeline, active_data_mode_nam
 
     from neuropy.utils.position_util import ShapelyMaze, ShapelyMazeCollection
 
-
-
-
-    linearization_method: str = 'umap'
+    # linearization_method: str = 'umap'
 
     linearization_method: str = 'shapely'
     all_session_mazes: ShapelyMazeCollection = ShapelyMazeCollection(shapelyMazes = {
