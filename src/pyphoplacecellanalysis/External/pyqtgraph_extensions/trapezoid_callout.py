@@ -217,28 +217,34 @@ class TrapezoidTestingMainWindow(QMainWindow):
         )
 
         # Connect signals to trigger repaints
-        self.region.sigRegionChanged.connect(self.overlay.update)
+        # Use deferred update to ensure scene transforms are fully updated before redrawing
+        self.region.sigRegionChanged.connect(self._schedule_overlay_update)
 
         # Important: Repaint when the user manually resizes the docks/window
         # We use a timer to hook into the resize event of the main loop easily,
         # or you can override resizeEvent
-        self.region.sigRegionChanged.connect(self.update_zoom)
+        self.region.sigRegionChangeFinished.connect(self.update_zoom)
 
 
     def resizeEvent(self, event):
         # Resize the overlay to match the window size
         # if not self.use_SpacerDock_approach:
         self.overlay.resize(self.area.size())
-        self.overlay.update()
+        self._schedule_overlay_update()
             
         super().resizeEvent(event)
+
+
+    def _schedule_overlay_update(self):
+        """Defer overlay update to next event loop iteration to ensure scene transforms are current."""
+        QTimer.singleShot(0, self.overlay.update)
 
 
     def update_zoom(self):
         # Your logic to update the data in the bottom plot
         # ...
         # if not self.use_SpacerDock_approach:
-        self.overlay.update()
+        self._schedule_overlay_update()
 
 
 
