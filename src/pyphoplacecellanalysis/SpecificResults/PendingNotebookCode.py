@@ -114,6 +114,169 @@ from pyphoplacecellanalysis.General.Model.Configs.LongShortDisplayConfig import 
 from pyphocorehelpers.gui.Qt.color_helpers import ColormapHelpers, ColorFormatConverter, debug_print_color, build_adjusted_color
 
 
+
+
+
+
+
+# ==================================================================================================================================================================================================================================================================================== #
+# 2025-11-25 - Bapun 2-maze (N-shaped and U-shaped) Proper Linearization                                                                                                                                                                                                               #
+# ==================================================================================================================================================================================================================================================================================== #
+
+from attrs import define, field, Factory
+import numpy as np
+from shapely.geometry import LineString, Point
+from pyphoplacecellanalysis.Pho2D.PyQtPlots.TimeSynchronizedPlotters.TimeSynchronizedPositionDecoderPlotter import Rois
+
+@function_attributes(short_name=None, tags=['track', 'bapun' 'WORKING'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-11-25 18:52', related_items=[])
+def bapun_proper_linearize_tracks(curr_active_pipeline):
+    """ 2025-11-25 - PROPERLY linerizes the 'N' and 'U' Bapun mazes (the UMAP didn't look good, and the ISOMAP exhausted memory). 
+
+    2025-11-26 - This has been factored into `Position` as a standard `linearization_method: str = 'shapely'` -- might be able to be removed.
+
+    Usage:
+        from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import bapun_proper_linearize_tracks
+
+        pos_df_dict, maze_track_line_dict = bapun_proper_linearize_tracks(curr_active_pipeline)
+
+    """
+
+
+    def shapely_linearize_trajectory(df: pd.DataFrame, track_line):
+        """
+        Linearize trajectory points by projecting them onto a Shapely LineString.
+
+        Args:
+            df (pd.DataFrame): DataFrame with 'x' and 'y' columns.
+            track_line (LineString): Shapely LineString representing the maze path.
+
+        Returns:
+            pd.Series: Linearized positions (distance along the track_line).
+        """
+        # Create Point objects from 'x' and 'y' columns
+        # Using .apply() with a lambda function for potentially better performance than a list comprehension on large DFs
+        points = df.apply(lambda row: Point(row['x'], row['y']), axis=1)
+
+        # Project each point onto the LineString and get the distance along it
+        linear_positions = [track_line.project(p) for p in points]
+        return pd.Series(linear_positions, index=df.index)
+
+
+    # ==================================================================================================================================================================================================================================================================================== #
+    # BEGIN FUNCTION BODY                                                                                                                                                                                                                                                                  #
+    # ==================================================================================================================================================================================================================================================================================== #
+    # Define the skeletons (re-using the coordinates identified earlier)
+    nodes_n = [
+        (-66.31, 88.82),  # TL
+        (-64.57, -54.62), # BL
+        (25.0, 65.0),  # TR
+        (73.88, -59.85)   # BR
+    ]
+
+    nodes_u = [
+        (-48.62, 63.79),  # Top-Left
+        (-33.99, -41.77), # Bot-Left
+        (3.32, -49.23),   # Bot-Mid
+        (37.16, -34.00),  # Bot-Right
+        (52.74, 76.34)    # Top-Right
+    ]
+
+    # Create Shapely LineString objects for each maze
+    maze1_track_line = LineString(nodes_n)
+    maze2_track_line = LineString(nodes_u)
+
+    maze_track_line_dict = {'maze1': maze1_track_line, 'maze2': maze2_track_line}
+
+    # a_maze_key: str = 'maze2'
+    # a_plotter: TimeSynchronizedPositionDecoderPlotter = sync_plotters[a_maze_key]
+
+    # sync_plotter_rois = {}
+    pos_df_dict = {}
+    main_session = getattr(curr_active_pipeline, 'sess', None)
+    main_position = getattr(main_session, 'position', None) if main_session is not None else None
+    main_lin_pos_series = None
+    if main_position is not None:
+        if 'lin_pos' in main_position.df.columns:
+            main_lin_pos_series = main_position.df['lin_pos'].copy()
+        else:
+            main_lin_pos_series = pd.Series(np.nan, index=main_position.df.index, dtype=float)
+
+    # for a_maze_key, a_plotter in sync_plotters.items():
+    for a_maze_key, a_sess in curr_active_pipeline.filtered_sessions.items():
+        # an_rois_obj: Rois = Rois.add_Bapun_maze_ROIs(vb=a_plotter.ui.root_plot.getViewBox(), maze_name=a_maze_key)
+        # sync_plotter_rois[a_maze_key] = an_rois_obj
+        # a_sess = curr_active_pipeline.filtered_sessions[a_maze_key]
+        a_pos = a_sess.position
+        a_pos_df: pd.DataFrame = a_pos.compute_speed_info()
+
+        ## Apply both linearizations:
+        # Apply linearization to df1
+        print("Applying Shapely linearization to Maze 1...")
+        a_pos_df['shapely_linearized_position_maze1'] = shapely_linearize_trajectory(a_pos_df, maze1_track_line)
+        # Apply linearization to df2
+        print("Applying Shapely linearization to Maze 2...")
+        a_pos_df['shapely_linearized_position_maze2'] = shapely_linearize_trajectory(a_pos_df, maze2_track_line)
+
+        if a_maze_key not in maze_track_line_dict:
+            ## have to do it piecewise by maze times. Assume that the epoch being passed is the global one, during which 'maze1' occurs for some time period (t0, t1), then some non-maze period, then maze2 for another time period (t2, t3), followed by potentially another non-maze period.
+            ## we can only assign linearized positions during the maze periods, and all other times must be np.nan (as they are ill-defined):
+            piecewise_lin_pos = pd.Series(np.nan, index=a_pos_df.index, dtype=float)
+
+            for track_maze_key in maze_track_line_dict.keys():
+                source_col_name = f'shapely_linearized_position_{track_maze_key}'
+                if source_col_name not in a_pos_df.columns:
+                    continue
+
+                track_session = curr_active_pipeline.filtered_sessions.get(track_maze_key, None)
+                if track_session is None or track_session.position is None:
+                    continue
+
+                track_index = track_session.position.df.index
+                shared_index = piecewise_lin_pos.index.intersection(track_index)
+                if shared_index.empty:
+                    continue
+
+                piecewise_lin_pos.loc[shared_index] = a_pos_df.loc[shared_index, source_col_name]
+
+            a_pos.linear_pos = piecewise_lin_pos
+            a_pos_df['lin_pos'] = piecewise_lin_pos  # also update the dataframe copy
+            if main_lin_pos_series is not None:
+                shared_index = main_lin_pos_series.index.intersection(piecewise_lin_pos.index)
+                if not shared_index.empty:
+                    main_lin_pos_series.loc[shared_index] = piecewise_lin_pos.loc[shared_index]
+        
+        else:
+
+            ## use the current period's track to linearize the positions, but also keep the positions linearized by both mazes:
+            curr_track_line = maze_track_line_dict[a_maze_key]
+            curr_lin_pos_series = shapely_linearize_trajectory(a_pos_df, curr_track_line)
+            a_pos.linear_pos = curr_lin_pos_series  # updates the Position-managed lin_pos column
+            a_pos_df['lin_pos'] = curr_lin_pos_series  # also update the dataframe copy
+            if main_lin_pos_series is not None:
+                shared_index = main_lin_pos_series.index.intersection(curr_lin_pos_series.index)
+                if not shared_index.empty:
+                    main_lin_pos_series.loc[shared_index] = curr_lin_pos_series.loc[shared_index]
+
+        # a_pos.lin_pos
+        # all_roi_crossings = an_rois_obj.find_all_roi_crossings(x_data=a_pos.x, y_data=a_pos.y)
+        # sync_plotter_roi_crossings[a_maze_key] = all_roi_crossings
+        
+        # a_plotter is your TimeSynchronizedPositionDecoderPlotter that has enable_user_editable_rois already called
+        # managed_rois: Rois = a_plotter._user_rois_manager   # returns List[pg.ROI]
+        # sync_plotter_rois[a_maze_key] = managed_rois
+        # managed_rois.print_maze_rois()
+        pos_df_dict[a_maze_key] = a_pos_df
+
+    if (main_position is not None) and (main_lin_pos_series is not None):
+        main_position.linear_pos = main_lin_pos_series
+        
+    return pos_df_dict, maze_track_line_dict
+
+
+
+
+
+
 # ==================================================================================================================================================================================================================================================================================== #
 # 2025-09-05 - Bapun Co/plotting                                                                                                                                                                                                                                                       #
 # ==================================================================================================================================================================================================================================================================================== #
@@ -211,7 +374,7 @@ def final_process_bapun_all_comps(curr_active_pipeline, posthoc_save: bool=True,
 
     
 @function_attributes(short_name=None, tags=['bapun'], input_requires=[], output_provides=[], uses=['post_process_non_kdiba', 'LapsAccessor.non_kdiba_laps_determine_directions'], used_by=[], creation_date='2025-09-19 17:50', related_items=[])
-def final_process_non_kdiba_all_comps(curr_active_pipeline, active_data_mode_name: str = 'bapun', posthoc_save: bool=True, override_parameters_flat_keypaths_dict=None, time_bin_size=0.5):
+def final_process_non_kdiba_all_comps(curr_active_pipeline, active_data_mode_name: str = 'bapun', posthoc_save: bool=True, override_parameters_flat_keypaths_dict=None, time_bin_size=0.5, linearization_method: str = 'shapely'):
     """ 
     from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import final_process_bapun_all_comps
     curr_active_pipeline = final_process_bapun_all_comps(curr_active_pipeline=curr_active_pipeline, posthoc_save=True)
@@ -232,6 +395,39 @@ def final_process_non_kdiba_all_comps(curr_active_pipeline, active_data_mode_nam
     from neuropy.analyses.placefields import Position
     from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import post_process_non_kdiba
     from neuropy.analyses.laps import estimate_session_laps
+
+    from neuropy.utils.position_util import ShapelyMaze, ShapelyMazeCollection
+
+
+
+
+    linearization_method: str = 'umap'
+
+    linearization_method: str = 'shapely'
+    all_session_mazes: ShapelyMazeCollection = ShapelyMazeCollection(shapelyMazes = {
+        # Define the skeletons (re-using the coordinates identified earlier)
+        # "N"-shaped maze
+        'maze1': ShapelyMaze(nodes = [
+            (-66.31, 88.82),  # TL
+            (-64.57, -54.62), # BL
+            (25.0, 65.0),  # TR
+            (73.88, -59.85)   # BR
+        ]),
+        # "U"-shaped maze
+        'maze2': ShapelyMaze(nodes = [
+            (-48.62, 63.79),  # Top-Left
+            (-33.99, -41.77), # Bot-Left
+            (3.32, -49.23),   # Bot-Mid
+            (37.16, -34.00),  # Bot-Right
+            (52.74, 76.34)    # Top-Right
+        ]),
+    },
+        valid_epochs =  {'maze1': (11070.0, 13970.0), 'maze2': (20756.0, 24004.0)}, # 'maze_GLOBAL': (0.0, 42305.0), 
+    )    
+
+    ## define lienarization kwargs:
+    linearization_kwargs = dict(method=linearization_method, all_session_mazes=all_session_mazes)
+
 
 
     active_data_mode_registered_class, active_data_mode_type_properties = curr_active_pipeline.sess.config.get_format_data_session_type_class_info()
@@ -270,8 +466,8 @@ def final_process_non_kdiba_all_comps(curr_active_pipeline, active_data_mode_nam
     active_maze_epochs_df = active_maze_epochs_df[active_maze_epochs_df['label'].isin(active_maze_epoch_names)]
     curr_active_pipeline.sess.active_maze_epochs_df = ensure_Epoch(deepcopy(active_maze_epochs_df)) ## Set the dataframe's `curr_active_pipeline.sess.active_maze_epochs_df` property
 
-    print(f'computing linearized position for session using method="umap"...')
-    sess = curr_active_pipeline.sess.position.compute_linearized_position(method='umap')
+    print(f'computing linearized position for session using method="{linearization_method}"...')
+    sess = curr_active_pipeline.sess.position.compute_linearized_position(**linearization_kwargs)
     print(f'estimating the laps from the linear position...')
     sess = estimate_session_laps(curr_active_pipeline.sess, should_plot_laps_2d=False, **(hardcoded_params.lap_estimation_parameters or {})) ## unfiltered session 
     laps_obj = curr_active_pipeline.sess.laps # Laps
@@ -347,11 +543,11 @@ def final_process_non_kdiba_all_comps(curr_active_pipeline, active_data_mode_nam
     ## UPDATES: active_session_computation_configs
 
     ## Set linearization mode to umap so it doesn't consume all the memory when trying to linearize position:
-    active_session_computation_configs[0].pf_params.linearization_method = "umap"
+    active_session_computation_configs[0].pf_params.linearization_method = linearization_method # "umap"
 
     for an_epoch_name, a_sess in curr_active_pipeline.filtered_sessions.items():
         ## forcibly compute the linearized position so it doesn't fallback to "isomap" method which eats all the memory
-        a_pos_df: pd.DataFrame = a_sess.position.compute_linearized_position(method='umap')
+        a_pos_df: pd.DataFrame = a_sess.position.compute_linearized_position(**linearization_kwargs)
         
     for k, a_sess in curr_active_pipeline.filtered_sessions.items():
         a_sess = estimate_session_laps(a_sess, should_plot_laps_2d=False)
