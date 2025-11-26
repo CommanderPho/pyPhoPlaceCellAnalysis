@@ -5,6 +5,7 @@ from PyQt5.QtGui import QPainter, QColor, QPolygonF, QBrush, QPen
 import pyqtgraph as pg
 from pyqtgraph.dockarea import DockArea, Dock
 
+
 class TrapezoidOverlay(QWidget):
     """ a callout that illustrates a specific dock item is a subset of the above (parent) dock item
 
@@ -24,6 +25,7 @@ class TrapezoidOverlay(QWidget):
         # Color configuration
         self.fill_color = QColor(0, 255, 255, 30)  # Cyan with low alpha
         self.border_color = QColor(0, 255, 255, 80)
+
 
     def paintEvent(self, event):
         if not (self.source_plot and self.region and self.target_plot):
@@ -116,9 +118,57 @@ class TrapezoidOverlay(QWidget):
 
 
 
+class SpacerDock(Dock):
+    """
+    A custom Dock designed to act as a fixed-height visual separator.
+    It has no title bar and contains a transparent (or colored) widget.
+    """
+    def __init__(self, height=50, name="Spacer", color=None):
+        """
+        Args:
+            height (int): The vertical size of the gap in pixels.
+            name (str): Unique name for the dock (required by pg.Dock).
+            color (str, optional): Hex code (e.g., "#000") if you want a visible background.
+                                   Defaults to None (transparent/theme background).
+        """
+        # Initialize the Dock with specific flags to strip functionality
+        # size=(1, height) sets the initial relative size hint
+        super().__init__(name, size=(1, height), autoOrientation=False)
+
+        # 1. Hide the Title Bar (removes the name and the drag handle)
+        self.hideTitleBar()
+
+        # 2. Create the internal "Shim" widget
+        self.shim = QWidget()
+        
+        # 3. Enforce the Spacer Height
+        # Setting fixed height on the internal widget forces the Dock 
+        # to respect this size, preventing it from collapsing or expanding.
+        self.shim.setFixedHeight(height)
+
+        # 4. Optional Styling
+        if color:
+            self.shim.setStyleSheet(f"background-color: {color}; border: none;")
+        else:
+            # Transparent/No-border style
+            self.shim.setStyleSheet("background-color: transparent; border: none;")
+
+        # 5. Add the shim to the Dock
+        self.addWidget(self.shim)
+
+    def set_height(self, height):
+        """Dynamically change the spacer height."""
+        self.shim.setFixedHeight(height)
+        
+
+
 class TrapezoidTestingMainWindow(QMainWindow):
-    def __init__(self):
+    """ just a concrete test window to display the effect of the trapezoid stuff
+    """
+    def __init__(self, use_SpacerDock_approach: bool=True):
         super().__init__()
+        self.use_SpacerDock_approach = use_SpacerDock_approach
+        
         self.resize(1000, 600)
         self.setStyleSheet("background-color: #222;")
 
@@ -137,6 +187,16 @@ class TrapezoidTestingMainWindow(QMainWindow):
         self.region = pg.LinearRegionItem([2, 4])
         self.region.setBrush(QColor(0, 255, 255, 50)) 
         self.w1.addItem(self.region)
+        
+        if use_SpacerDock_approach:
+            # 2. INSERT THE SPACER
+            # This creates a 60px gap that cannot be resized by the user
+            spacer_dock = SpacerDock(height=60, name="my_spacer")
+            self.area.addDock(spacer_dock, 'bottom', self.d1)
+            active_bottom_dock = spacer_dock
+        else:
+            active_bottom_dock = self.d1
+
 
         # --- Bottom Dock (Zoomed) ---
         self.d2 = Dock("Zoomed View", size=(1000, 400))
@@ -145,6 +205,7 @@ class TrapezoidTestingMainWindow(QMainWindow):
         self.w2.plot([2, 4, 3, 6, 2], pen='y') # Dummy zoomed data
         self.d2.addWidget(self.w2)
 
+        # if not use_SpacerDock_approach:     
         # --- The Overlay Logic ---
         # We must parent the overlay to the central widget (DockArea) 
         # so it covers all docks.
@@ -157,22 +218,29 @@ class TrapezoidTestingMainWindow(QMainWindow):
 
         # Connect signals to trigger repaints
         self.region.sigRegionChanged.connect(self.overlay.update)
-        
+
         # Important: Repaint when the user manually resizes the docks/window
         # We use a timer to hook into the resize event of the main loop easily,
         # or you can override resizeEvent
         self.region.sigRegionChanged.connect(self.update_zoom)
 
+
     def resizeEvent(self, event):
         # Resize the overlay to match the window size
+        # if not self.use_SpacerDock_approach:
         self.overlay.resize(self.area.size())
         self.overlay.update()
+            
         super().resizeEvent(event)
+
 
     def update_zoom(self):
         # Your logic to update the data in the bottom plot
         # ...
+        # if not self.use_SpacerDock_approach:
         self.overlay.update()
+
+
 
 if __name__ == '__main__':
     app = QApplication(sys.argv)
