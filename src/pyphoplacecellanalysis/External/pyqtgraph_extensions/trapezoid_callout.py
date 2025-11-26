@@ -9,18 +9,18 @@ from pyqtgraph.dockarea import DockArea, Dock
 class TrapezoidOverlay(QWidget):
     """ a callout that illustrates a specific dock item is a subset of the above (parent) dock item
 
-    from pyphoplacecellanalysis.External.pyqtgraph_extensions.trapezoid_callout import TrapezoidOverlay
+    from pyphoplacecellanalysis.External.pyqtgraph_extensions.trapezoid_callout import TrapezoidOverlay, SpacerDock
 
     """
-    def __init__(self, parent=None, source_plot=None, region_item=None, target_plot=None):
+    def __init__(self, parent=None, overview_widget=None, overview_zoomed_region_item=None, zoomed_widget=None):
         super().__init__(parent)
         # Make this widget transparent to mouse clicks and background
         self.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
         
-        self.source_plot = source_plot  # The top PlotWidget
-        self.region = region_item       # The LinearRegionItem (selection box)
-        self.target_plot = target_plot  # The bottom PlotWidget (zoomed view)
+        self.source_plot = overview_widget  # The top PlotWidget
+        self.region = overview_zoomed_region_item       # The LinearRegionItem (selection box)
+        self.target_plot = zoomed_widget  # The bottom PlotWidget (zoomed view)
         
         # Color configuration
         self.fill_color = QColor(0, 255, 255, 30)  # Cyan with low alpha
@@ -125,9 +125,6 @@ class TrapezoidOverlay(QWidget):
         painter.setPen(QPen(self.border_color, 1))
         painter.drawPolygon(polygon)
 
-
-
-
 class SpacerDock(Dock):
     """
     A custom Dock designed to act as a fixed-height visual separator.
@@ -191,9 +188,9 @@ class TrapezoidTestingMainWindow(QMainWindow):
             # --- Zoomed View on Top ---
             self.d2 = Dock("Zoomed View", size=(1000, 400))
             self.area.addDock(self.d2, 'top')
-            self.w2 = pg.PlotWidget(title="Detailed View")
-            self.w2.plot([2, 4, 3, 6, 2], pen='y')  # Dummy zoomed data
-            self.d2.addWidget(self.w2)
+            self.w2_zoomed = pg.PlotWidget(title="Detailed View")
+            self.w2_zoomed.plot([2, 4, 3, 6, 2], pen='y')  # Dummy zoomed data
+            self.d2.addWidget(self.w2_zoomed)
 
             if use_SpacerDock_approach:
                 spacer_dock = SpacerDock(height=60, name="my_spacer")
@@ -202,16 +199,16 @@ class TrapezoidTestingMainWindow(QMainWindow):
             # --- Overview on Bottom ---
             self.d1 = Dock("Overview", size=(1000, 200))
             self.area.addDock(self.d1, 'bottom')
-            self.w1 = pg.PlotWidget(title="Overview")
-            self.w1.plot([1, 5, 2, 4, 3, 6, 2, 5, 8, 3, 1], pen='w')
-            self.d1.addWidget(self.w1)
+            self.w1_overview = pg.PlotWidget(title="Overview")
+            self.w1_overview.plot([1, 5, 2, 4, 3, 6, 2, 5, 8, 3, 1], pen='w')
+            self.d1.addWidget(self.w1_overview)
         else:
             # --- Overview on Top (original behavior) ---
             self.d1 = Dock("Overview", size=(1000, 200))
             self.area.addDock(self.d1, 'top')
-            self.w1 = pg.PlotWidget(title="Overview")
-            self.w1.plot([1, 5, 2, 4, 3, 6, 2, 5, 8, 3, 1], pen='w')
-            self.d1.addWidget(self.w1)
+            self.w1_overview = pg.PlotWidget(title="Overview")
+            self.w1_overview.plot([1, 5, 2, 4, 3, 6, 2, 5, 8, 3, 1], pen='w')
+            self.d1.addWidget(self.w1_overview)
             
             if use_SpacerDock_approach:
                 spacer_dock = SpacerDock(height=60, name="my_spacer")
@@ -220,14 +217,14 @@ class TrapezoidTestingMainWindow(QMainWindow):
             # --- Zoomed View on Bottom ---
             self.d2 = Dock("Zoomed View", size=(1000, 400))
             self.area.addDock(self.d2, 'bottom')
-            self.w2 = pg.PlotWidget(title="Detailed View")
-            self.w2.plot([2, 4, 3, 6, 2], pen='y')  # Dummy zoomed data
-            self.d2.addWidget(self.w2)
+            self.w2_zoomed = pg.PlotWidget(title="Detailed View")
+            self.w2_zoomed.plot([2, 4, 3, 6, 2], pen='y')  # Dummy zoomed data
+            self.d2.addWidget(self.w2_zoomed)
 
         # Add the Region Selection (The "Window") to overview plot
         self.region = pg.LinearRegionItem([2, 4])
         self.region.setBrush(QColor(0, 255, 255, 50)) 
-        self.w1.addItem(self.region)
+        self.w1_overview.addItem(self.region)
 
         # if not use_SpacerDock_approach:     
         # --- The Overlay Logic ---
@@ -235,9 +232,9 @@ class TrapezoidTestingMainWindow(QMainWindow):
         # so it covers all docks.
         self.overlay = TrapezoidOverlay(
             parent=self.area, 
-            source_plot=self.w1, 
-            region_item=self.region, 
-            target_plot=self.w2
+            overview_widget=self.w1_overview, 
+            overview_zoomed_region_item=self.region, 
+            zoomed_widget=self.w2_zoomed
         )
 
         # Connect signals to trigger repaints
