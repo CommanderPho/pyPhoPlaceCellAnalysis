@@ -1081,7 +1081,9 @@ class FigureToImageHelpers:
                             if isinstance(img, QImage):
                                 w, h = img.width(), img.height()
                                 ptr = img.bits(); ptr.setsize(img.byteCount())
+                                # QImage from pyqtgraph is typically in BGRA byte order; convert to RGB for matplotlib
                                 arr = np.array(ptr).reshape(h, w, 4)[:, :, :3]
+                                arr = arr[:, :, ::-1]  # BGR -> RGB
                             else:
                                 arr = np.array(img)
                             ax.imshow(arr, extent=[start, end, info['extent'][2], info['extent'][3]], aspect='auto', origin='upper')
