@@ -38,7 +38,7 @@ class TrapezoidOverlay(QWidget):
 
         if should_inset_for_visibility:
 
-            # --- 1. Get Source Coordinates (Top Plot) ---
+            # --- 1. Get Source Coordinates (Overview Plot with Region) ---
             vb_source = self.source_plot.plotItem.vb
 
             # Get the bounding rect of the ViewBox (the grid area) in scene coordinates
@@ -49,24 +49,34 @@ class TrapezoidOverlay(QWidget):
             p1_x = vb_source.mapViewToScene(QPointF(x_min, 0)).x()
             p2_x = vb_source.mapViewToScene(QPointF(x_max, 0)).x()
 
-            # USE THIS Y: The bottom of the ViewBox (grid), not the Widget
-            source_y_anchor = source_view_rect.bottom() 
+            # --- 2. Get Target Coordinates (Zoomed Plot) ---
+            vb_target = self.target_plot.plotItem.vb
+            target_view_rect = vb_target.mapRectToScene(vb_target.boundingRect())
+
+            # --- 3. Determine relative position of target vs source ---
+            # Compare global Y positions to determine if target is above or below source
+            source_center_global = self.source_plot.mapToGlobal(self.source_plot.rect().center())
+            target_center_global = self.target_plot.mapToGlobal(self.target_plot.rect().center())
+            target_is_above = target_center_global.y() < source_center_global.y()
+
+            if target_is_above:
+                # Target (zoomed) is ABOVE source (overview)
+                source_y_anchor = source_view_rect.top()  # Source anchor: top of ViewBox
+                target_anchor_point_left = target_view_rect.bottomLeft()  # Target anchor: bottom of ViewBox
+                target_anchor_point_right = target_view_rect.bottomRight()
+            else:
+                # Target (zoomed) is BELOW source (overview) - original behavior
+                source_y_anchor = source_view_rect.bottom()  # Source anchor: bottom of ViewBox
+                target_anchor_point_left = target_view_rect.topLeft()  # Target anchor: top of ViewBox
+                target_anchor_point_right = target_view_rect.topRight()
 
             # Convert to Global Screen coordinates
             top_left_global = self.source_plot.mapToGlobal(self.source_plot.mapFromScene(QPointF(p1_x, source_y_anchor)))
             top_right_global = self.source_plot.mapToGlobal(self.source_plot.mapFromScene(QPointF(p2_x, source_y_anchor)))
 
-
-            # --- 2. Get Target Coordinates (Bottom Plot) ---
-            vb_target = self.target_plot.plotItem.vb
-            target_view_rect = vb_target.mapRectToScene(vb_target.boundingRect())
-
-            # USE THIS Y: The top of the ViewBox (grid)
-            target_y_anchor = target_view_rect.top()
-
             # Use the ViewBox width for the corners
-            bottom_left_global = self.target_plot.mapToGlobal(self.target_plot.mapFromScene(target_view_rect.topLeft()))
-            bottom_right_global = self.target_plot.mapToGlobal(self.target_plot.mapFromScene(target_view_rect.topRight()))
+            bottom_left_global = self.target_plot.mapToGlobal(self.target_plot.mapFromScene(target_anchor_point_left))
+            bottom_right_global = self.target_plot.mapToGlobal(self.target_plot.mapFromScene(target_anchor_point_right))
 
 
         else:
@@ -165,9 +175,10 @@ class SpacerDock(Dock):
 class TrapezoidTestingMainWindow(QMainWindow):
     """ just a concrete test window to display the effect of the trapezoid stuff
     """
-    def __init__(self, use_SpacerDock_approach: bool=True):
+    def __init__(self, use_SpacerDock_approach: bool=True, zoomed_above: bool=False):
         super().__init__()
         self.use_SpacerDock_approach = use_SpacerDock_approach
+        self.zoomed_above = zoomed_above
         
         self.resize(1000, 600)
         self.setStyleSheet("background-color: #222;")
@@ -176,34 +187,47 @@ class TrapezoidTestingMainWindow(QMainWindow):
         self.area = DockArea()
         self.setCentralWidget(self.area)
 
-        # --- Top Dock (Overview) ---
-        self.d1 = Dock("Overview", size=(1000, 200))
-        self.area.addDock(self.d1, 'top')
-        self.w1 = pg.PlotWidget(title="Overview")
-        self.w1.plot([1, 5, 2, 4, 3, 6, 2, 5, 8, 3, 1], pen='w')
-        self.d1.addWidget(self.w1)
-        
-        # Add the Region Selection (The "Window")
+        if zoomed_above:
+            # --- Zoomed View on Top ---
+            self.d2 = Dock("Zoomed View", size=(1000, 400))
+            self.area.addDock(self.d2, 'top')
+            self.w2 = pg.PlotWidget(title="Detailed View")
+            self.w2.plot([2, 4, 3, 6, 2], pen='y')  # Dummy zoomed data
+            self.d2.addWidget(self.w2)
+
+            if use_SpacerDock_approach:
+                spacer_dock = SpacerDock(height=60, name="my_spacer")
+                self.area.addDock(spacer_dock, 'bottom', self.d2)
+
+            # --- Overview on Bottom ---
+            self.d1 = Dock("Overview", size=(1000, 200))
+            self.area.addDock(self.d1, 'bottom')
+            self.w1 = pg.PlotWidget(title="Overview")
+            self.w1.plot([1, 5, 2, 4, 3, 6, 2, 5, 8, 3, 1], pen='w')
+            self.d1.addWidget(self.w1)
+        else:
+            # --- Overview on Top (original behavior) ---
+            self.d1 = Dock("Overview", size=(1000, 200))
+            self.area.addDock(self.d1, 'top')
+            self.w1 = pg.PlotWidget(title="Overview")
+            self.w1.plot([1, 5, 2, 4, 3, 6, 2, 5, 8, 3, 1], pen='w')
+            self.d1.addWidget(self.w1)
+            
+            if use_SpacerDock_approach:
+                spacer_dock = SpacerDock(height=60, name="my_spacer")
+                self.area.addDock(spacer_dock, 'bottom', self.d1)
+
+            # --- Zoomed View on Bottom ---
+            self.d2 = Dock("Zoomed View", size=(1000, 400))
+            self.area.addDock(self.d2, 'bottom')
+            self.w2 = pg.PlotWidget(title="Detailed View")
+            self.w2.plot([2, 4, 3, 6, 2], pen='y')  # Dummy zoomed data
+            self.d2.addWidget(self.w2)
+
+        # Add the Region Selection (The "Window") to overview plot
         self.region = pg.LinearRegionItem([2, 4])
         self.region.setBrush(QColor(0, 255, 255, 50)) 
         self.w1.addItem(self.region)
-        
-        if use_SpacerDock_approach:
-            # 2. INSERT THE SPACER
-            # This creates a 60px gap that cannot be resized by the user
-            spacer_dock = SpacerDock(height=60, name="my_spacer")
-            self.area.addDock(spacer_dock, 'bottom', self.d1)
-            active_bottom_dock = spacer_dock
-        else:
-            active_bottom_dock = self.d1
-
-
-        # --- Bottom Dock (Zoomed) ---
-        self.d2 = Dock("Zoomed View", size=(1000, 400))
-        self.area.addDock(self.d2, 'bottom')
-        self.w2 = pg.PlotWidget(title="Detailed View")
-        self.w2.plot([2, 4, 3, 6, 2], pen='y') # Dummy zoomed data
-        self.d2.addWidget(self.w2)
 
         # if not use_SpacerDock_approach:     
         # --- The Overlay Logic ---
