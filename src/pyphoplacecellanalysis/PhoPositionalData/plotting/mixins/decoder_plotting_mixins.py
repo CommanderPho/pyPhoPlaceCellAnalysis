@@ -495,6 +495,9 @@ class SingleArtistMultiEpochBatchHelpers:
         
         curr_artist_dict, image_extent, plots_data = batch_plot_helper.add_position_posteriors(posterior_masking_value=0.0025, debug_print=True, defer_draw=False)
         """
+        # _active_plot_fn = DecodedTrajectoryMatplotlibPlotter._helper_add_heatmap
+        _active_plot_fn = DecodedTrajectoryMatplotlibPlotter._helper_add_hdr_contours        
+
         if override_ax is None:
             active_ax = self.active_ax
         else:
@@ -533,7 +536,7 @@ class SingleArtistMultiEpochBatchHelpers:
         #                                                                     include_most_likely_pos_line=None, time_bin_index=None, rotate_to_vertical=True, should_perform_reshape=False, should_post_hoc_fit_to_image_extent=False, debug_print=True) # , allow_time_slider=True
 
         # Delegate the posterior plotting functionality.
-        curr_artist_dict['prev_heatmaps'], image_extent, plots_data = DecodedTrajectoryMatplotlibPlotter._helper_add_heatmap(active_ax,
+        curr_artist_dict['prev_heatmaps'], image_extent, plots_data = _active_plot_fn(active_ax,
                                                         xbin_centers=a_xbin_centers, ybin_centers=a_ybin_centers, a_time_bin_centers=None, a_p_x_given_n=a_p_x_given_n,
                                                         posterior_masking_value=posterior_masking_value, rotate_to_vertical=False, debug_print=True, should_perform_reshape=False, custom_image_extent=custom_image_extent, extant_plot_data=kwargs.get('extant_plot_data', None))
 
@@ -1228,6 +1231,10 @@ def multi_DecodedTrajectoryMatplotlibPlotter_side_by_side(a_result2D: DecodedFil
     return a_decoded_traj_plotter, (fig, axs, decoded_epochs_pages)
 
 
+from neuropy.utils.mixins.AttrsClassHelpers import keys_only_repr
+from pyphocorehelpers.DataStructure.general_parameter_containers import VisualizationParameters, RenderPlotsData, RenderPlots # PyqtgraphRenderPlots
+
+
 @define(slots=False)
 class DecodedTrajectoryPlotter(EpochTimebinningIndexingDatasource):
     """ Abstract Base Class for something that plots a decoded 1D or 2D trajectory. 
@@ -1239,6 +1246,8 @@ class DecodedTrajectoryPlotter(EpochTimebinningIndexingDatasource):
     ybin_centers: Optional[NDArray] = field(default=None)
     xbin: NDArray = field(default=None)
     ybin: Optional[NDArray] = field(default=None)
+    params: VisualizationParameters = field(init=False, repr=keys_only_repr)
+    
 
     @property
     def num_filter_epochs(self) -> int:
@@ -1313,7 +1322,7 @@ class DecodedTrajectoryMatplotlibPlotter(DecodedTrajectoryPlotter):
     
     # measured_position_df: Optional[pd.DataFrame] = field(default=None)
     rotate_to_vertical: bool = field(default=False, metadata={'desc': 'if False, the track is rendered horizontally along its length, otherwise it is rendered vectically'})
-    
+    cmap: Any = field(default='viridis') 
     
     ## Current Visibility State
     curr_epoch_idx: int = field(default=0)
@@ -1329,6 +1338,12 @@ class DecodedTrajectoryMatplotlibPlotter(DecodedTrajectoryPlotter):
         """ if True, all the time bins within the curr_epoch_idx are plotted, otherwise, only the time bin specified by curr_time_bin_idx is used."""
         return (self.curr_time_bin_idx is not None)
 
+    def __attrs_post_init__(self):
+        # self.params =
+        # if self.cmap is not None:
+        #     self.params.cmap = deepcopy(self.cmap)
+        pass
+        
 
     ## MAIN PLOT FUNCTION:
     @function_attributes(short_name=None, tags=['main', 'plot', 'posterior', 'epoch', 'line', 'trajectory'], input_requires=[], output_provides=[], uses=['self._perform_add_decoded_posterior_and_trajectory'], used_by=['plot_epoch_with_slider_widget'], creation_date='2025-01-29 15:52', related_items=[])
@@ -1409,7 +1424,9 @@ class DecodedTrajectoryMatplotlibPlotter(DecodedTrajectoryPlotter):
         curr_artist_dict['prev_heatmaps'], (a_meas_pos_line, a_line), (_meas_pos_out_markers, _out_markers), plots_data = self._perform_add_decoded_posterior_and_trajectory(an_ax, xbin_centers=self.xbin_centers, a_p_x_given_n=a_p_x_given_n,
                                                                             a_time_bin_centers=a_time_bin_centers, a_most_likely_positions=a_most_likely_positions, a_measured_pos_df=a_measured_pos_df, ybin_centers=self.ybin_centers,
                                                                             include_most_likely_pos_line=include_most_likely_pos_line, time_bin_index=time_bin_index, rotate_to_vertical=self.rotate_to_vertical, should_perform_reshape=True, should_post_hoc_fit_to_image_extent=should_post_hoc_fit_to_image_extent,
-                                                                            posterior_masking_value=posterior_masking_value, debug_print=debug_print) # , allow_time_slider=True
+                                                                            posterior_masking_value=posterior_masking_value, 
+                                                                            time_cmap=deepcopy(self.cmap),
+                                                                            debug_print=debug_print) # , allow_time_slider=True
 
 
         ## update the plot_data
@@ -1630,7 +1647,7 @@ class DecodedTrajectoryMatplotlibPlotter(DecodedTrajectoryPlotter):
     @classmethod
     def _helper_add_heatmap(cls, an_ax, xbin_centers, a_p_x_given_n, a_time_bin_centers=None, ybin_centers=None, rotate_to_vertical:bool=False, debug_print:bool=False,
                             posterior_masking_value: float = 0.0025, full_posterior_opacity: float = 1.0,
-                            custom_image_extent=None, cmap = 'viridis', should_perform_reshape: bool=True, extant_plot_data: Optional[RenderPlotsData]=None):
+                            custom_image_extent=None, time_cmap = 'viridis', should_perform_reshape: bool=True, extant_plot_data: Optional[RenderPlotsData]=None):
         """
         Helper that handles all the posterior heatmap plotting (for both 1D and 2D cases).
         
@@ -1737,7 +1754,7 @@ class DecodedTrajectoryMatplotlibPlotter(DecodedTrajectoryPlotter):
         heatmaps = []
         # For simplicity, we assume non-single-time-bin mode (as asserted in the calling function).
         if not is_2D:
-            a_heatmap = an_ax.imshow(masked_posterior, aspect='auto', cmap=cmap, alpha=full_posterior_opacity,
+            a_heatmap = an_ax.imshow(masked_posterior, aspect='auto', cmap=time_cmap, alpha=full_posterior_opacity,
                                        extent=ordinate_first_image_extent, origin='lower', interpolation='none')
             heatmaps.append(a_heatmap)
         else:
@@ -1746,11 +1763,165 @@ class DecodedTrajectoryMatplotlibPlotter(DecodedTrajectoryPlotter):
             # Give a minimum opacity per time step.
             time_step_opacity: float = max(full_posterior_opacity/float(n_time_bins), 0.2)
             for i in np.arange(n_time_bins):
-                a_heatmap = an_ax.imshow(np.squeeze(masked_posterior[i, :, :]), aspect='auto', cmap=cmap, alpha=time_step_opacity,
+                a_heatmap = an_ax.imshow(np.squeeze(masked_posterior[i, :, :]), aspect='auto', cmap=time_cmap, alpha=time_step_opacity,
                                            extent=ordinate_first_image_extent, origin='lower', interpolation='none',
                                            vmin=vmin_global, vmax=vmax_global)
                 heatmaps.append(a_heatmap)
         return heatmaps, ordinate_first_image_extent, plots_data
+
+    @function_attributes(short_name=None, tags=['AI', 'posterior', 'helper', 'contours', 'HDR'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-02-26 13:00', related_items=[])
+    @classmethod
+    def _helper_add_hdr_contours(cls, an_ax, xbin_centers, a_p_x_given_n, a_time_bin_centers=None, ybin_centers=None, rotate_to_vertical:bool=False, debug_print:bool=False,
+                            posterior_masking_value: float = 0.0025, full_posterior_opacity: float = 1.0,
+                            custom_image_extent=None, time_cmap = 'viridis', should_perform_reshape: bool=True, extant_plot_data: Optional[RenderPlotsData]=None,
+                            contour_level_fractions: List[float] = [0.5]):
+        """
+        Drop-in replacement for _helper_add_heatmap that renders Highest Density Region (HDR) contours 
+        colored by time, instead of a solid heatmap.
+        
+        New Args:
+            contour_level_fractions: List[float]. Fractions of the frame's peak probability to contour. 
+                                     e.g. [0.5] draws the "Full Width Half Max" boundary.
+                                     e.g. [0.95] draws the region containing the top 5% of probability mass.
+        """
+        # ========================================================== #
+        # 1. PREAMBLE: Setup Data Structures (Copied from Original)  #
+        # ========================================================== #
+        
+        # Reshape the posterior if necessary.
+        if should_perform_reshape:
+            posterior = deepcopy(a_p_x_given_n).T
+        else:
+            posterior = deepcopy(a_p_x_given_n)
+        
+        # Create masked array (though contours handle zeros well, masking is good for calculation)
+        masked_posterior = np.ma.masked_less(posterior, posterior_masking_value)
+        is_2D: bool = (np.ndim(posterior) >= 3)
+        
+        x_values = deepcopy(xbin_centers)
+        extra_dict = {'is_2D': is_2D}
+        
+        if not is_2D:
+            # 1D: Build fake y-axis values from current axes limits.
+            y_min, y_max = an_ax.get_ylim()
+            fake_y_width = (y_max - y_min)
+            fake_y_center: float = y_min + (fake_y_width / 2.0)
+            fake_y_lower_bound: float = fake_y_center - fake_y_width
+            fake_y_upper_bound: float = fake_y_center + fake_y_width
+            fake_y_num_samples: int = len(a_time_bin_centers)
+            fake_y_arr = np.linspace(fake_y_lower_bound, fake_y_upper_bound, fake_y_num_samples)
+            extra_dict.update({
+                'fake_y_center': fake_y_center, 'fake_y_lower_bound': fake_y_lower_bound,
+                'fake_y_upper_bound': fake_y_upper_bound, 'fake_y_arr': fake_y_arr,
+            })
+            y_values = np.linspace(fake_y_lower_bound, fake_y_upper_bound, fake_y_num_samples)
+            extra_dict['y_values'] = y_values
+        else:
+            # 2D: use provided ybin_centers.
+            assert ybin_centers is not None, "For 2D posterior, ybin_centers must be provided."
+            y_values = deepcopy(ybin_centers)
+            extra_dict['y_values'] = y_values
+        
+        # Adjust for vertical orientation if requested.
+        if rotate_to_vertical:
+            ordinate_first_image_extent = (y_values.min(), y_values.max(), x_values.min(), x_values.max())
+            # Swap x and y arrays for the grid generation
+            x_values, y_values = y_values, x_values
+            
+            # Swap array axes for data
+            # Note: masked_posterior is (Time, X, Y) or (Time, Y, X) depending on reshape
+            # We treat the last two dims as spatial.
+            masked_posterior = np.swapaxes(masked_posterior, -2, -1)
+        else:
+            ordinate_first_image_extent = (x_values.min(), x_values.max(), y_values.min(), y_values.max())
+        
+        if custom_image_extent is not None:
+            ordinate_first_image_extent = deepcopy(custom_image_extent)
+
+        extra_dict['x_values'] = x_values
+        extra_dict['y_values'] = y_values
+
+        masked_shape = np.shape(masked_posterior)
+        if a_time_bin_centers is not None:
+            n_time_bins: int = len(a_time_bin_centers)
+        else:
+            n_time_bins: int = masked_shape[0]
+
+        extra_dict['n_time_bins'] = n_time_bins
+        
+        if extant_plot_data is None:
+            plots_data = RenderPlotsData(name='_helper_add_hdr_contours', ordinate_first_image_extent=deepcopy(ordinate_first_image_extent), **extra_dict)
+        else:
+            plots_data = extant_plot_data
+            plots_data['ordinate_first_image_extent'] = deepcopy(ordinate_first_image_extent)
+            plots_data.update(**extra_dict)
+
+        # ========================================================== #
+        # 2. RENDER LOGIC: HDR CONTOURS                              #
+        # ========================================================== #
+        
+        artists_list = [] # Replaces 'heatmaps'
+        
+        # Prepare Colormap
+        if isinstance(time_cmap, str):
+            import matplotlib.cm as cm
+            cmap_obj = cm.get_cmap(time_cmap)
+        else:
+            cmap_obj = time_cmap
+
+        # 1D Case: Fallback to standard heatmap logic (Contours don't make sense on 1D unless it's a t-vs-x contour plot)
+        if not is_2D:
+             a_heatmap = an_ax.imshow(masked_posterior, aspect='auto', cmap=cmap_obj, alpha=full_posterior_opacity,
+                                     extent=ordinate_first_image_extent, origin='lower', interpolation='none')
+             artists_list.append(a_heatmap)
+             
+        # 2D Case: Time-Colored Contours
+        else:
+            # Generate Grid for Contour Plotting
+            # imshow (origin='lower') treats dim[-2] as Y (rows) and dim[-1] as X (cols).
+            # x_values corresponds to cols, y_values to rows.
+            XX, YY = np.meshgrid(x_values, y_values) 
+            
+            # Iterate through time bins (Oldest -> Newest)
+            for t in range(n_time_bins):
+                
+                # Extract frame
+                # Data shape is (Time, Y, X) effectively due to how imshow/transpose works usually
+                # We need to ensure frame_data matches XX, YY shapes.
+                frame_data = np.squeeze(masked_posterior[t, :, :])
+                
+                # Check for empty frame or NaNs
+                if np.all(np.ma.getdata(frame_data) < posterior_masking_value) or np.all(np.isnan(frame_data)):
+                    continue
+
+                # Calculate Color for this time step
+                time_progress = t / max(1, (n_time_bins - 1))
+                rgba_color = cmap_obj(time_progress)
+                
+                # Define Contour Levels relative to the Peak of this frame
+                # (Relative peak allows us to see the shape even if total probability drops in a specific bin)
+                frame_max = np.nanmax(frame_data)
+                if frame_max <= 0: continue
+                
+                current_levels = [frac * frame_max for frac in contour_level_fractions]
+                
+                # Plot Contour
+                # We use specific levels, solid color, and thin lines
+                try:
+                    cset = an_ax.contour(XX, YY, frame_data, 
+                                         levels=current_levels, 
+                                         colors=[rgba_color], 
+                                         linewidths=1.5, 
+                                         alpha=full_posterior_opacity)
+                    
+                    artists_list.append(cset)
+                    
+                except ValueError as e:
+                    # Occurs if data is constant or levels are outside data range
+                    if debug_print: print(f"Skipping contour for t={t}: {e}")
+                    continue
+
+        return artists_list, ordinate_first_image_extent, plots_data
 
 
     # ==================================================================================================================== #
@@ -1818,7 +1989,8 @@ class DecodedTrajectoryMatplotlibPlotter(DecodedTrajectoryPlotter):
     @function_attributes(short_name=None, tags=['plot'], input_requires=[], output_provides=[], uses=['cls._helper_add_heatmap', 'cls._perform_plot_measured_position_line_helper'], used_by=['.plot_epoch'], creation_date='2025-01-29 15:53', related_items=[])
     @classmethod
     def _perform_add_decoded_posterior_and_trajectory(cls, an_ax, xbin_centers, a_p_x_given_n, a_time_bin_centers, a_most_likely_positions, ybin_centers=None, a_measured_pos_df: Optional[pd.DataFrame]=None,
-                                                        include_most_likely_pos_line: Optional[bool]=None, time_bin_index: Optional[int]=None, rotate_to_vertical:bool=False, debug_print=False, posterior_masking_value: float = 0.0025, should_perform_reshape: bool=True, should_post_hoc_fit_to_image_extent: bool=False): # posterior_masking_value: float = 0.01 -- 1D
+                                                        include_most_likely_pos_line: Optional[bool]=None, time_bin_index: Optional[int]=None, rotate_to_vertical:bool=False, debug_print=False, posterior_masking_value: float = 0.0025, should_perform_reshape: bool=True, should_post_hoc_fit_to_image_extent: bool=False,
+                                                        time_cmap='viridis'): # posterior_masking_value: float = 0.01 -- 1D
         """ Plots the 1D or 2D posterior and most likely position trajectory over the top of an axes created with `fig, axs, laps_pages = plot_decoded_trajectories_2d(curr_active_pipeline.sess, curr_num_subplots=8, active_page_index=0, plot_actual_lap_lines=False)`
         
         np.shape(a_time_bin_centers) # 1D & 2D: (12,)
@@ -1850,11 +2022,15 @@ class DecodedTrajectoryMatplotlibPlotter(DecodedTrajectoryPlotter):
         # ==================================================================================================================== #
         # Plot the posterior heatmap                                                                                           #
         # ==================================================================================================================== #
+        # _active_plot_fn = cls._helper_add_heatmap
+        _active_plot_fn = cls._helper_add_hdr_contours
+        
         # Delegate the posterior plotting functionality.
-        heatmaps, image_extent, extra_dict = cls._helper_add_heatmap(
+        heatmaps, image_extent, extra_dict = _active_plot_fn(
             an_ax, xbin_centers, a_p_x_given_n, a_time_bin_centers, ybin_centers=ybin_centers,
             rotate_to_vertical=rotate_to_vertical, debug_print=debug_print, 
-            posterior_masking_value=posterior_masking_value, should_perform_reshape=should_perform_reshape)
+            posterior_masking_value=posterior_masking_value, should_perform_reshape=should_perform_reshape,
+            time_cmap=time_cmap)
         
         is_2D: bool = extra_dict['is_2D']
         if debug_print:
@@ -1936,8 +2112,8 @@ class DecodedTrajectoryMatplotlibPlotter(DecodedTrajectoryPlotter):
 
 
 
-    @function_attributes(short_name=None, tags=['plot'], input_requires=[], output_provides=[], uses=[], used_by=['multi_DecodedTrajectoryMatplotlibPlotter_side_by_side'], creation_date='2025-06-30 12:58', related_items=[])
-    def plot_decoded_trajectories_2d(self, sess, curr_num_subplots=10, active_page_index=0, plot_actual_lap_lines:bool=False, fixed_columns: int = 2, use_theoretical_tracks_instead: bool = True, existing_ax=None, axes_inset_locators_list=None):
+    @function_attributes(short_name=None, tags=['main', 'plot'], input_requires=[], output_provides=[], uses=[], used_by=['multi_DecodedTrajectoryMatplotlibPlotter_side_by_side'], creation_date='2025-06-30 12:58', related_items=[])
+    def plot_decoded_trajectories_2d(self, sess, curr_num_subplots=10, active_page_index=0, plot_actual_lap_lines:bool=False, fixed_columns: int = 2, use_theoretical_tracks_instead: bool = True, existing_ax=None, axes_inset_locators_list=None, cmap=None, **kwargs):
         """ Plots a MatplotLib 2D Figure with each lap being shown in one of its subplots
         
         Called to setup the graph.
@@ -1960,7 +2136,10 @@ class DecodedTrajectoryMatplotlibPlotter(DecodedTrajectoryPlotter):
         
         """
         # try:
-
+        if cmap is None:
+            cmap = 'viridis'
+        
+    
         if use_theoretical_tracks_instead:
             from pyphoplacecellanalysis.Pho2D.track_shape_drawing import LinearTrackInstance, _perform_plot_matplotlib_2D_tracks
             long_track_inst, short_track_inst = LinearTrackInstance.init_tracks_from_session_config(deepcopy(sess.config))
@@ -2042,6 +2221,8 @@ class DecodedTrajectoryMatplotlibPlotter(DecodedTrajectoryPlotter):
             return fig, axs, linear_plotter_indicies, row_column_indicies, background_track_shadings
         
         def _subfn_add_specific_lap_trajectory(p, axs, linear_plotter_indicies, row_column_indicies, active_page_laps_ids, lap_position_traces, lap_time_ranges, use_time_gradient_line=True):
+            """ captures: cmap 
+            """
             # Add the lap trajectory:
             for a_linear_index in linear_plotter_indicies:
                 curr_lap_id = active_page_laps_ids[a_linear_index]
@@ -2057,7 +2238,7 @@ class DecodedTrajectoryMatplotlibPlotter(DecodedTrajectoryPlotter):
                     # needs to be (numlines) x (points per line) x 2 (for x and y)
                     points = np.array([lap_position_traces[curr_lap_id][0,:], lap_position_traces[curr_lap_id][1,:]]).T.reshape(-1, 1, 2)
                     segments = np.concatenate([points[:-1], points[1:]], axis=1)
-                    lc = LineCollection(segments, cmap='viridis', norm=norm)
+                    lc = LineCollection(segments, cmap=cmap, norm=norm)
                     # Set the values used for colormapping
                     lc.set_array(curr_lap_timeseries)
                     lc.set_linewidth(2)
