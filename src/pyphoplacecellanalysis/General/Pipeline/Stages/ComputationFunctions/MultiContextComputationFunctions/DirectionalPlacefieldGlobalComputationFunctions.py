@@ -8126,7 +8126,7 @@ class DirectionalPlacefieldGlobalComputationFunctions(AllFunctionEnumeratingMixi
 
         """
         from neuropy.utils.mixins.binning_helpers import find_minimum_time_bin_duration
-        from neuropy.core.epoch import Epoch
+        from neuropy.core.epoch import Epoch, ensure_dataframe, ensure_Epoch, EpochsAccessor
         from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import BasePositionDecoder, BayesianPlacemapPositionDecoder
                 
         # directional_decoders_decode_result = global_computation_results.computed_data.get('DirectionalDecodersDecoded', DirectionalDecodersContinuouslyDecodedResult(pf1D_Decoder_dict=all_directional_pf1D_Decoder_dict, continuously_decoded_result_cache_dict=continuously_decoded_result_cache_dict))
@@ -8142,12 +8142,49 @@ class DirectionalPlacefieldGlobalComputationFunctions(AllFunctionEnumeratingMixi
             directional_decoders_decode_result = None # set to None
 
         did_update_computations: bool = False
-        ## Currently used for both cases to decode:
-        t_start, t_delta, t_end = owning_pipeline_reference.find_LongShortDelta_times()
-        # Build an Epoch object containing a single epoch, corresponding to the global epoch for the entire session:
-        single_global_epoch_df: pd.DataFrame = pd.DataFrame({'start': [t_start], 'stop': [t_end], 'label': [0]})
+
+        active_data_mode_name: str = owning_pipeline_reference.active_sess_config.format_name.lower()
+
+        is_kdiba_session: bool = owning_pipeline_reference.is_kdiba_session()
+        if is_kdiba_session:
+            ## Currently used for both cases to decode:
+            t_start, t_delta, t_end = owning_pipeline_reference.find_LongShortDelta_times()
+            # Build an Epoch object containing a single epoch, corresponding to the global epoch for the entire session:
+            single_global_epoch_df: pd.DataFrame = pd.DataFrame({'start': [t_start], 'stop': [t_end], 'label': [0]})
+            single_global_epoch: Epoch = ensure_Epoch(single_global_epoch_df)
+
+        else:
+            active_data_mode_registered_class, active_data_mode_type_properties = owning_pipeline_reference.sess.config.get_format_data_session_type_class_info()
+
+            if (active_data_mode_name == 'bapun'):
+                from neuropy.core.session.Formats.Specific.BapunDataSessionFormat import BapunDataSessionFormatRegisteredClass
+                hardcoded_params: HardcodedProcessingParameters = BapunDataSessionFormatRegisteredClass._get_session_specific_parameters(session_context=owning_pipeline_reference.get_session_context())
+            elif (active_data_mode_name == 'rachel'):
+                from neuropy.core.session.Formats.Specific.RachelDataSessionFormat import RachelDataSessionFormatRegisteredClass
+                hardcoded_params: HardcodedProcessingParameters = RachelDataSessionFormat._get_session_specific_parameters(session_context=owning_pipeline_reference.get_session_context())
+            else:
+                hardcoded_params: HardcodedProcessingParameters = active_data_mode_registered_class._get_session_specific_parameters(session_context=owning_pipeline_reference.get_session_context())
+
+            global_epoch_name: str = owning_pipeline_reference.find_Global_epoch_name()
+            
+            ## activity_only_epochs_df:
+            epochs_df = ensure_dataframe(deepcopy(owning_pipeline_reference.sess.epochs))
+
+            activity_only_epochs_df: pd.DataFrame = epochs_df[epochs_df['label'].isin(hardcoded_params.non_global_activity_session_names)].epochs.get_non_overlapping_df()
+            activity_only_epochs: Epoch = ensure_Epoch(activity_only_epochs_df, metadata=owning_pipeline_reference.sess.epochs.metadata)
+            owning_pipeline_reference.sess.activity_only_epochs = deepcopy(activity_only_epochs)
+
+            ## GLobal only ('maze_GLOBAL')
+            epochs_df = ensure_dataframe(deepcopy(owning_pipeline_reference.sess.epochs))
+            global_activity_only_epochs_df: pd.DataFrame = epochs_df[epochs_df['label'].isin([hardcoded_params.global_session_name])].epochs.get_non_overlapping_df()
+            global_activity_only_epoch: Epoch = ensure_Epoch(global_activity_only_epochs_df, metadata=owning_pipeline_reference.sess.epochs.metadata)
+            owning_pipeline_reference.sess.global_activity_only_epoch = deepcopy(global_activity_only_epoch)
+            single_global_epoch: Epoch = global_activity_only_epoch
+
+
+        ## OUTPUTS: single_global_epoch
         # single_global_epoch_df['label'] = single_global_epoch_df.index.to_numpy()
-        single_global_epoch: Epoch = Epoch(single_global_epoch_df)
+        # single_global_epoch: Epoch = Epoch(single_global_epoch_df)
         
         if (not had_existing_DirectionalDecodersDecoded_result):
             # Build a new result _________________________________________________________________________________________________ #
