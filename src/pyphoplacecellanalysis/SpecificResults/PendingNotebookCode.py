@@ -400,7 +400,7 @@ def final_process_non_kdiba_all_comps(curr_active_pipeline, active_data_mode_nam
 
     # linearization_method: str = 'umap'
 
-    linearization_method: str = 'shapely'
+    # linearization_method: str = 'shapely'
     all_session_mazes: ShapelyMazeCollection = ShapelyMazeCollection(shapelyMazes = {
         # Define the skeletons (re-using the coordinates identified earlier)
         # "N"-shaped maze
