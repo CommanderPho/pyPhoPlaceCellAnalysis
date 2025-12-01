@@ -1071,7 +1071,7 @@ class FigureToImageHelpers:
                             exporter = ImageExporter(pi)
                             # exporter.parameters()['width'] = int(figsize[0]*dpi)
                             # exporter.parameters()['height'] = int(((figsize[1]/len(page_chunks))*dpi)/len(tracks))
-                            exporter.parameters()['width'] = int((end - start) * dpi)
+                            exporter.parameters()['width'] = int((end - start) * dpi) # AI suggests I should be using `figsize[0] * dpi` - I don't think this is right.
                             exporter.parameters()['height'] = int((info['extent'][3] - info['extent'][2]) * dpi)
                             if debug_print:
                                 print(f"\texporter.parameters(): w: {exporter.parameters()['width']}, h: {exporter.parameters()['height']}")
