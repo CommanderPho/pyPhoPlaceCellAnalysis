@@ -3171,11 +3171,32 @@ class PipelineWithComputedPipelineStageMixin:
     def update_parameters(self, override_parameters_flat_keypaths_dict: Dict[str, Any]=None) -> None:
         """ updates any of the user-parameters by keypaths for the pipeline
         
+        Supports updating both preprocessing parameters and computation parameters.
+        
+        Preprocessing parameters:
+            - Keypaths should start with 'preprocessing.' or 'preprocessing_parameters.'
+            - Examples: 'preprocessing.epoch_estimation_parameters.replays.epochs_source'
+            - WARNING: Changing preprocessing parameters may invalidate filtered sessions and computation results.
+            - Consider re-filtering and re-computing after updating preprocessing parameters.
+        
+        Computation parameters:
+            - Keypaths should reference computation function parameters
+            - Examples: 'rank_order_shuffle_analysis.included_qclu_values', 'directional_train_test_split.training_data_portion'
+        
         Example:
         
-            override_parameters_flat_keypaths_dict = {'rank_order_shuffle_analysis.included_qclu_values': included_qclu_values, 'rank_order_shuffle_analysis.minimum_inclusion_fr_Hz': minimum_inclusion_fr_Hz}
+            # Update computation parameters
+            override_parameters_flat_keypaths_dict = {
+                'rank_order_shuffle_analysis.included_qclu_values': [1, 2, 4, 9],
+                'rank_order_shuffle_analysis.minimum_inclusion_fr_Hz': 5.0
+            }
+            curr_active_pipeline.update_parameters(override_parameters_flat_keypaths_dict=override_parameters_flat_keypaths_dict)
             
-            curr_active_pipeline.update_parameters(override_parameters_flat_keypaths_dict=override_parameters_flat_keypaths_dict) # should already be updated, but try it again anyway.
+            # Update preprocessing parameters
+            override_parameters_flat_keypaths_dict = {
+                'preprocessing.epoch_estimation_parameters.replays.epochs_source': 'normal_computed'
+            }
+            curr_active_pipeline.update_parameters(override_parameters_flat_keypaths_dict=override_parameters_flat_keypaths_dict)
 
         """
         from neuropy.core.parameters import ParametersContainer
@@ -3183,7 +3204,55 @@ class PipelineWithComputedPipelineStageMixin:
 
         if override_parameters_flat_keypaths_dict is None:
             return
-        else:
+        
+        # Separate preprocessing and computation parameters
+        preprocessing_params = {}
+        computation_params = {}
+        
+        for k, v in override_parameters_flat_keypaths_dict.items():
+            if k.startswith('preprocessing'):
+                preprocessing_params[k] = v
+            else:
+                computation_params[k] = v
+        
+        # Handle preprocessing parameters (can be updated at any stage)
+        if len(preprocessing_params) > 0:
+            # Get the preprocessing_parameters container (which has set_by_keypath)
+            preprocessing_params_container = self.active_sess_config.preprocessing_parameters
+            
+            # Warn about potential invalidation if at computed stage
+            if self.is_computed:
+                num_filtered_sessions = len(self.filtered_sessions) if hasattr(self, 'filtered_sessions') and self.filtered_sessions else 0
+                num_computation_results = len(self.computation_results) if hasattr(self, 'computation_results') and self.computation_results else 0
+                print(f'WARNING: Updating preprocessing parameters will affect the base session configuration.')
+                if num_filtered_sessions > 0 or num_computation_results > 0:
+                    print(f'  - This may invalidate {num_filtered_sessions} filtered sessions and {num_computation_results} computation results.')
+                    print(f'  - Consider re-filtering and re-computing after updating preprocessing parameters.')
+            
+            # Update each preprocessing parameter
+            for k, v in preprocessing_params.items():
+                # Strip the prefix to get the actual keypath relative to preprocessing_parameters
+                if k.startswith('preprocessing.'):
+                    keypath = k.removeprefix('preprocessing.')
+                elif k.startswith('preprocessing_parameters.'):
+                    keypath = k.removeprefix('preprocessing_parameters.')
+                else:
+                    # Assume the keypath starts directly with the parameter name
+                    keypath = k
+                
+                try:
+                    # Update using keypath on preprocessing_parameters (e.g. 'epoch_estimation_parameters.replays.epochs_source')
+                    preprocessing_params_container.set_by_keypath(keypath, v)
+                    print(f'Updated preprocessing parameter: {k} -> {keypath} = {v}')
+                except AttributeError as e:
+                    print(f'ERROR: Failed to update preprocessing parameter "{k}" (keypath: "{keypath}"): {e}')
+                    raise
+                except Exception as e:
+                    print(f'ERROR: Unexpected error updating preprocessing parameter "{k}": {e}')
+                    raise
+        
+        # Handle computation parameters (only if at computed stage)
+        if len(computation_params) > 0:
             if self.is_computed:
                 ## Add `curr_active_pipeline.global_computation_results.computation_config` as needed:
                 if self.global_computation_results.computation_config is None:
@@ -3193,29 +3262,18 @@ class PipelineWithComputedPipelineStageMixin:
                     print(f'\tdone. Pipeline needs resave!')
                 else:
                     curr_global_param_typed_parameters: ComputationKWargParameters = self.global_computation_results.computation_config
-                    
-
-                for k, v in override_parameters_flat_keypaths_dict.items():
-                    if k.startswith('preprocessing'):
-                        raise NotImplementedError("Updating preprocessing parameters is not yet implemented!")            
-                        # preprocessing_parameters: ParametersContainer = deepcopy(self.active_sess_config.preprocessing_parameters)
-                        # # strip the preprocessing part
-                        # if k.startswith('preprocessing.'):
-                        #     k = k.removeprefix('preprocessing.')
-                        
-                        # if k.startswith('preprocessing_parameters.'):
-                        #     k = k.removeprefix('preprocessing_parameters.')
-                        # ## shouldn't be that bad, let's do it
-                        # self.active_sess_config.
-
-                    else:                
-                        # Set a value using keypath (e.g. 'directional_train_test_split.training_data_portion')
-                        curr_global_param_typed_parameters.set_by_keypath(k, v)
+                
+                # Update each computation parameter
+                for k, v in computation_params.items():
+                    # Set a value using keypath (e.g. 'directional_train_test_split.training_data_portion')
+                    curr_global_param_typed_parameters.set_by_keypath(k, v)
 
                 self.global_computation_results.computation_config = curr_global_param_typed_parameters
                 # return self.global_computation_results.computation_config # return the updated parameters
             else:
                 print(f'WARN: PipelineWithComputedPipelineStageMixin.update_parameters(...): too early to set the computation_config override_parameters, not yet at the computation stage!!')
+                print(f'  - Computation parameters can only be updated after the pipeline reaches the computed stage.')
+                print(f'  - Preprocessing parameters can be updated at any stage.')
                 pass
 
 
