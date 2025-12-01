@@ -85,6 +85,7 @@ class DockDisplayConfig(object):
     showGroupButton: bool = field(default=False)
     showOrientationButton: bool = field(default=False)
     showTimelineSyncModeButton: bool = field(default=True)
+    showOptionsButton: bool = field(default=False)  # Will be set dynamically when widget provides options
     # showCustomButtons: Dict[str, bool] = field(default=Factory(dict))
     
     
@@ -247,6 +248,8 @@ class Dock(QtWidgets.QWidget, DockDrop):
             self.label.sigToggleOrientationClicked.connect(self.on_orientation_btn_toggled)
         if display_config.showTimelineSyncModeButton:
             self.label.sigToggleTimelineSyncModeClicked.connect(self.on_sync_mode_btn_toggled)
+        if display_config.showOptionsButton:
+            self.label.sigOptionsClicked.connect(self.on_options_btn_clicked)
             
 
         # Add this line to connect the new rename signal
@@ -519,6 +522,19 @@ class Dock(QtWidgets.QWidget, DockDrop):
         self.currentRow = max(row+1, self.currentRow)
         self.widgets.append(widget)
         self.layout.addWidget(widget, row, col, rowspan, colspan)
+        
+        # Check if widget provides options and update button visibility
+        if self._hasOptionsPanel():
+            self.config.showOptionsButton = True
+            if self.label:
+                self.label.updateButtonsFromConfig()
+            # Connect signal (disconnect first to avoid duplicates)
+            try:
+                self.label.sigOptionsClicked.disconnect(self.on_options_btn_clicked)
+            except (TypeError, RuntimeError):
+                pass  # Not connected yet, that's fine
+            self.label.sigOptionsClicked.connect(self.on_options_btn_clicked)
+        
         self.raiseOverlay()
         
     def startDrag(self):
@@ -627,6 +643,79 @@ class Dock(QtWidgets.QWidget, DockDrop):
         self.label.timelineSyncModeButton.setIcon(icon)
         self.sigToggleTimelineSyncModeClicked.emit(self, is_checked)
 
+    def _checkWidgetForOptions(self, widget):
+        """Check if a widget provides an options panel.
+        
+        Returns:
+            Optional[QtWidgets.QWidget]: The options panel widget if found, None otherwise.
+            
+        A widget can provide options in two ways:
+        1. Implement a method: getOptionsPanel() -> Optional[QWidget]
+        2. Provide an attribute: optionsPanel: Optional[QWidget]
+        """
+        # Check for method
+        if hasattr(widget, 'getOptionsPanel') and callable(getattr(widget, 'getOptionsPanel')):
+            try:
+                options_panel = widget.getOptionsPanel()
+                if options_panel is not None and isinstance(options_panel, QtWidgets.QWidget):
+                    return options_panel
+            except Exception as e:
+                # Silently ignore errors in getOptionsPanel
+                pass
+        # Check for attribute
+        if hasattr(widget, 'optionsPanel'):
+            options_panel = widget.optionsPanel
+            if options_panel is not None and isinstance(options_panel, QtWidgets.QWidget):
+                return options_panel
+        return None
+
+    def _hasOptionsPanel(self):
+        """Check if any widget in this dock provides an options panel.
+        
+        Returns:
+            bool: True if at least one widget provides an options panel.
+        """
+        for widget in self.widgets:
+            if self._checkWidgetForOptions(widget) is not None:
+                return True
+        return False
+
+    def _getOptionsPanel(self):
+        """Get the first available options panel from widgets.
+        
+        Returns:
+            Optional[QtWidgets.QWidget]: The first options panel found, or None.
+        """
+        for widget in self.widgets:
+            options_panel = self._checkWidgetForOptions(widget)
+            if options_panel is not None:
+                return options_panel
+        return None
+
+    def on_options_btn_clicked(self):
+        """Open the options dialog when Options button is clicked."""
+        options_panel = self._getOptionsPanel()
+        if options_panel is None:
+            return
+        
+        # Create dialog
+        dialog = QtWidgets.QDialog(self)
+        dialog.setWindowTitle(f"Options - {self.title()}")
+        dialog.setModal(False)  # Non-modal so user can interact with dock
+        
+        layout = QtWidgets.QVBoxLayout()
+        layout.addWidget(options_panel)
+        
+        # Add OK/Close button
+        button_box = QtWidgets.QDialogButtonBox(QtWidgets.QDialogButtonBox.StandardButton.Ok | QtWidgets.QDialogButtonBox.StandardButton.Cancel)
+        button_box.accepted.connect(dialog.accept)
+        button_box.rejected.connect(dialog.reject)
+        layout.addWidget(button_box)
+        
+        dialog.setLayout(layout)
+        dialog.resize(400, 300)  # Default size, can be customized
+        dialog.show()
+
         
 
     # ==================================================================================================================== #
@@ -696,11 +785,17 @@ class Dock(QtWidgets.QWidget, DockDrop):
         showOrientationAction.toggled.connect(lambda checked: self.updateButtonVisibility('orientation', checked))
         
 
-        # Orientation button toggle
+        # Timeline Sync Mode button toggle
         showTimelineSyncModeButtonAction = buttonVisibilityMenu.addAction("Timeline Sync Mode button")
         showTimelineSyncModeButtonAction.setCheckable(True)
         showTimelineSyncModeButtonAction.setChecked(self.config.showTimelineSyncModeButton)
         showTimelineSyncModeButtonAction.toggled.connect(lambda checked: self.updateButtonVisibility('timeline_sync_mode', checked))
+        
+        # Options button toggle
+        showOptionsAction = buttonVisibilityMenu.addAction("Options button")
+        showOptionsAction.setCheckable(True)
+        showOptionsAction.setChecked(self.config.showOptionsButton)
+        showOptionsAction.toggled.connect(lambda checked: self.updateButtonVisibility('options', checked))
         
         # Add visibility options
         collapseAction = menu.addAction("Toggle content visibility")
@@ -757,7 +852,9 @@ class Dock(QtWidgets.QWidget, DockDrop):
         elif button_type == 'orientation':
             self.config.showOrientationButton = visible
         elif button_type == 'timeline_sync_mode':
-            self.config.showTimelineSyncModeButton = visible            
+            self.config.showTimelineSyncModeButton = visible
+        elif button_type == 'options':
+            self.config.showOptionsButton = visible
 
         # Update the buttons in the UI
         self.label.updateButtonsFromConfig()
@@ -850,6 +947,7 @@ class DockLabel(VerticalLabel):
     sigGroupClicked = QtCore.Signal()
     sigToggleOrientationClicked = QtCore.Signal(bool)
     sigToggleTimelineSyncModeClicked = QtCore.Signal(bool)
+    sigOptionsClicked = QtCore.Signal()
     
 
     sigContextMenuRequested = QtCore.Signal(object, object)  # Emits dock label and QPoint
@@ -874,6 +972,7 @@ class DockLabel(VerticalLabel):
         self.collapseButton = None
         self.groupButton = None
         self.orientationButton = None
+        self.optionsButton = None
         
         # Create all possible buttons (always create them)
         MIN_BUTTON_SIZE = 12
@@ -922,6 +1021,14 @@ class DockLabel(VerticalLabel):
         self.timelineSyncModeButton.setFixedSize(MIN_BUTTON_SIZE, MIN_BUTTON_SIZE)
         self.timelineSyncModeButton.setToolTip("Change Track's Timeline Sync Mode")
 
+        # Create options button (will be shown/hidden dynamically based on widget options)
+        self.optionsButton = QtWidgets.QToolButton(self)
+        self.optionsButton.clicked.connect(self.sigOptionsClicked)
+        self.optionsButton.setIcon(QtWidgets.QApplication.style().standardIcon(QtWidgets.QStyle.StandardPixmap.SP_FileDialogInfoView))
+        self.optionsButton.setMinimumSize(MIN_BUTTON_SIZE, MIN_BUTTON_SIZE)
+        self.optionsButton.setFixedSize(MIN_BUTTON_SIZE, MIN_BUTTON_SIZE)
+        self.optionsButton.setToolTip("Open options panel")
+        self.optionsButton.setVisible(False)  # Hidden by default, shown when widget provides options
         
         # Set initial visibility based on config
         self.updateButtonsFromConfig()
@@ -939,13 +1046,15 @@ class DockLabel(VerticalLabel):
         self.groupButton.setVisible(self.config.showGroupButton)
         self.orientationButton.setVisible(self.config.showOrientationButton)
         self.timelineSyncModeButton.setVisible(self.config.showTimelineSyncModeButton)
+        self.optionsButton.setVisible(self.config.showOptionsButton)
         
         # Update count of buttons
         self.num_total_title_bar_buttons = (int(self.config.showCloseButton) + 
                                         int(self.config.showCollapseButton) + 
                                         int(self.config.showGroupButton) +
                                         int(self.config.showOrientationButton) +
-                                        int(self.config.showTimelineSyncModeButton))
+                                        int(self.config.showTimelineSyncModeButton) +
+                                        int(self.config.showOptionsButton))
         
         # Force a resize to update button positions
         self.updateGeometry()
@@ -1018,7 +1127,7 @@ class DockLabel(VerticalLabel):
         current_y = 0  # Track vertical positioning for buttons in vertical layout
 
         # Calculate button sizes and positions
-        if self.closeButton or self.collapseButton or self.orientationButton or self.groupButton or self.timelineSyncModeButton:
+        if self.closeButton or self.collapseButton or self.orientationButton or self.groupButton or self.timelineSyncModeButton or self.optionsButton:
             if self.orientation == 'vertical':
                 ## sideways mode with bar on left
                 button_size = ev.size().width()
@@ -1102,6 +1211,21 @@ class DockLabel(VerticalLabel):
                 self.timelineSyncModeButton.move(button_x, 0)
                 current_x += button_size
         ## END if self.timelineSyncModeButton...   
+
+        # Position optionsButton if it exists
+        if self.optionsButton:
+            self.optionsButton.setFixedSize(QtCore.QSize(button_size, button_size))
+            if self.orientation == 'vertical':
+                ## sideways mode with bar on left
+                self.optionsButton.move(0, current_y)
+                current_y += button_size
+            else:
+                ## regular mode with bar on top
+                # button_x = ((ev.size().width() - button_size) - current_x) ## right aligned
+                button_x = current_x ## left aligned
+                self.optionsButton.move(button_x, 0)
+                current_x += button_size
+        ## END if self.optionsButton...   
 
         
         ## See how much space is left for the text label after subtracting away the buttons:
