@@ -536,3 +536,32 @@ class PyQtGraphCrosshairs:
 
 # #p1.scene().sigMouseMoved.connect(mouseMoved)
 
+
+def try_find_child_viewbox(parent_widget) -> Optional[pg.ViewBox]:
+    """ tries to find the first child pg.ViewBox
+    
+    from pyphoplacecellanalysis.Pho2D.PyQtPlots.Extensions.pyqtgraph_helpers import try_find_child_viewbox
+    assert viewbox is not None, f"ERROR: _subfn_append_custom_menu_to_PyQtGraph_based_widget_context_menu(...): we could not find the viewbox that contains the default pyqtgraph menu."
+
+    
+    """
+    viewbox = None
+    # viewbox = parent_widget.vb if hasattr(parent_widget, 'vb') else parent_widget
+    if viewbox is None:
+        viewbox = parent_widget.vb if hasattr(parent_widget, 'vb') else None
+
+    if viewbox is None:
+        ## try to get the root plotItem first, and then get the viewbox from that:
+        try:
+            plot_item = parent_widget.getRootPlotItem()
+            if plot_item is not None:
+                viewbox = plot_item.vb if hasattr(plot_item, 'vb') else None
+        except Exception as e:
+            # raise e
+            print(f'could not get plot item from parent_widget: {parent_widget} with error : {e}')
+            pass
+
+
+    return viewbox
+
+    
