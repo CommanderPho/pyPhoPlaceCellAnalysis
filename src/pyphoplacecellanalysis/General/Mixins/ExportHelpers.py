@@ -11,6 +11,7 @@ from attrs import define, field, Factory, fields
 from neuropy.utils.result_context import IdentifyingContext
 
 from pyphocorehelpers.DataStructure.dynamic_parameters import DynamicParameters
+from pyphocorehelpers.assertion_helpers import Assert
 from pyphocorehelpers.function_helpers import function_attributes
 from pyphocorehelpers.Filesystem.path_helpers import file_uri_from_path, find_first_extant_path, sanitize_filename_for_Windows
 from neuropy.utils.mixins.AttrsClassHelpers import AttrsBasedClassHelperMixin, custom_define, serialized_field, serialized_attribute_field, non_serialized_field
@@ -945,10 +946,18 @@ class FigureToImageHelpers:
         from matplotlib.artist import Artist
         import matplotlib.pyplot as plt
         import io
-        from matplotlib.backends.backend_agg import FigureCanvasAgg
         
+        if included_track_dock_identifiers is None:
+            ## all tracks:
+            included_track_dock_identifiers = active_2d_plot.dock_manager_widget.get_leaf_only_flat_dock_identifiers_list()
+
+        found_track_widgets = [active_2d_plot.find_dock_item_tuple(an_id)[-1] for an_id in included_track_dock_identifiers]
+        track_heights = np.array([a_widget.height() for a_widget in found_track_widgets])
+        normalized_track_heights = track_heights / np.sum(track_heights)
+
+
         # Unpack keyword arguments with defaults (kwargs with default values as individual assignments)
-        tracks = kwargs.pop('tracks', None)
+        # found_track_widgets = kwargs.pop('tracks', None)
         x_extent = kwargs.pop('x_extent', None)
         chunk_width = kwargs.pop('chunk_width', None)
         output_pdf_path = kwargs.pop('output_pdf_path', None)
@@ -963,10 +972,9 @@ class FigureToImageHelpers:
         # found_heterogeneous_stack, normalized_track_heights, included_track_dock_identifiers = cls._helper_extract_renderables_from_track_widgets(active_2d_plot, included_track_dock_identifiers=included_track_dock_identifiers)
 
         # If argument assignment was previously done in call, do it explicitly now:
-        tracks = found_heterogeneous_stack
+        # found_track_widgets = found_heterogeneous_stack
         x_extent = (active_2d_plot.total_data_start_time, active_2d_plot.total_data_end_time)
         chunk_width = active_2d_plot.active_window_duration
-
 
 
         # Styling like matplotlib version
@@ -974,19 +982,19 @@ class FigureToImageHelpers:
         time_label_formatting_kwargs = dict(fontsize=10, color='black')
         multi_track_label_formatting_kwargs = dict(fontsize=9, color='black')
 
-        if not isinstance(tracks, (list, tuple)):
-            tracks = [tracks]
+        if not isinstance(found_track_widgets, (list, tuple)):
+            found_track_widgets = [found_track_widgets]
 
-        if track_labels is not None and len(track_labels) != len(tracks):
-            print(f"Warning: track_labels length ({len(track_labels)}) != tracks length ({len(tracks)}). Ignoring labels.")
+        if track_labels is not None and len(track_labels) != len(found_track_widgets):
+            print(f"Warning: track_labels length ({len(track_labels)}) != tracks length ({len(found_track_widgets)}). Ignoring labels.")
             track_labels = None
         has_labels = track_labels is not None
 
         if normalized_track_heights is None:
             raise NotImplementedError(f'normalized_track_heights is now required! The previous implementation did not work.')
 
-        if normalized_track_heights is not None and len(normalized_track_heights) != len(tracks):
-            print(f"Warning: track_heights length ({len(normalized_track_heights)}) != tracks length ({len(tracks)}). Ignoring track_heights.")
+        if normalized_track_heights is not None and len(normalized_track_heights) != len(found_track_widgets):
+            print(f"Warning: track_heights length ({len(normalized_track_heights)}) != tracks length ({len(found_track_widgets)}). Ignoring track_heights.")
             normalized_track_heights = None
         has_track_heights = normalized_track_heights is not None
         if normalized_track_heights is not None:
@@ -1001,7 +1009,7 @@ class FigureToImageHelpers:
         # Collect metadata dictionary for stacking
         export_infos = []
         y_offset = 0
-        for track_IDX, t in enumerate(tracks):
+        for track_IDX, t in enumerate(found_track_widgets):
 
             if isinstance(t, mimage.AxesImage):
                 # ## Data units version:
@@ -1047,7 +1055,12 @@ class FigureToImageHelpers:
             ## must spit out `h`
             y_offset += h
 
-        total_y_min, total_y_max = 0, y_offset
+        y_offsets = np.cumsum(np.concatenate([[0], track_heights])) ## this better be correct
+        Assert.same_length(y_offsets, found_track_widgets)
+        export_infos = [dict(extent=[x_min, x_max, y_offsets[track_IDX], (y_offsets[track_IDX]+(track_heights[track_IDX] - 0.0))], y_height=(track_heights[track_IDX] - 0.0)) for track_IDX, t in enumerate(found_track_widgets)]
+        total_y_min = 0.0
+        total_y_max = y_offsets[-1]
+
 
         if debug_print:
             print(f'export_infos: {export_infos}')
@@ -1070,9 +1083,16 @@ class FigureToImageHelpers:
                     axes = [axes]
 
                 first_chunk = True
-                for ax, (start, end) in zip(axes, page_chunks):
+                for ax, (start, end) in zip(axes, page_chunks): 
+                    ## one temp axes to draw into:
+
                     # render each track
+                    y_offset = 0
+                    for track_IDX, t in enumerate(found_track_widgets):
+
+                    # for info in export_infos:
                     for info in export_infos:
+
                         if debug_print:
                             print(f'info["extent"]: {info["extent"]}')
 
@@ -1081,6 +1101,7 @@ class FigureToImageHelpers:
                                 arr = info['obj'].get_array()
                                 cmap = info['obj'].get_cmap()
                                 ax.imshow(arr, extent=[info['extent'][0], info['extent'][1], info['extent'][2], info['extent'][3]], aspect='auto', cmap=cmap, origin=info['obj'].origin)
+
                             elif info['subkind'] == "Axes":
                                 ## Copy the general matplotlib Axes object to the temporary render axes:
                                 source_ax = info['obj']
