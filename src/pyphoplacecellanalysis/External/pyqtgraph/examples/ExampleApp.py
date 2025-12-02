@@ -399,8 +399,8 @@ class ExampleLoader(QtWidgets.QMainWindow):
             if isinstance(vv, Namespace):
                 vv = vv.filename
             filename = os.path.join(path, vv)
-            contents = self.getExampleContent(filename).lower()
-            if text in contents:
+            contents = self.getExampleContent(filename)
+            if contents and text in contents.lower():
                 titles.append(kk)
         self.showExamplesByTitle(titles)
 
@@ -506,15 +506,19 @@ class ExampleLoader(QtWidgets.QMainWindow):
             proc.stdin.close()
         else:
             fn = self.currentFile()
-            if fn is None:
+            if fn is None or not os.path.isfile(fn):
+                QtWidgets.QMessageBox.warning(self, "File Not Found", f"File not found: {fn if fn else 'No file selected'}")
                 return
             subprocess.Popen([sys.executable, fn], cwd=path, env=env)
 
     def showFile(self):
         fn = self.currentFile()
-        text = self.getExampleContent(fn)
+        text = self.getExampleContent(fn) or ""
         self.ui.codeView.setPlainText(text)
-        self.ui.loadedFileLabel.setText(fn)
+        if fn:
+            self.ui.loadedFileLabel.setText(fn)
+        else:
+            self.ui.loadedFileLabel.setText("No file selected")
         self.codeBtn.hide()
         self.saveBtn.hide()
         
@@ -523,12 +527,17 @@ class ExampleLoader(QtWidgets.QMainWindow):
     def getExampleContent(self, filename):
         if filename is None:
             self.ui.codeView.clear()
-            return
+            return ""
         if os.path.isdir(filename):
             filename = os.path.join(filename, '__main__.py')
-        with open(filename, "r") as currentFile:
-            text = currentFile.read()
-        return text
+        if not os.path.isfile(filename):
+            return ""
+        try:
+            with open(filename, "r") as currentFile:
+                text = currentFile.read()
+            return text
+        except (FileNotFoundError, IOError, OSError):
+            return ""
 
     def codeEdited(self):
         self.codeBtn.show()
