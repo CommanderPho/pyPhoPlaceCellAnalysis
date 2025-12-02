@@ -1452,6 +1452,11 @@ class Spike2DRaster(SpecificDockWidgetManipulatingMixin, DynamicDockDisplayAreaO
         
         emit an event so the parent can call `self.update_scrolling_event_filters()` to add the new item
         
+        Usage:
+            from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.SpikeRasterWidgets.Spike2DRaster import SynchronizedPlotMode
+        
+            widget, fig, ax, dDisplayItem = active_2d_plot.add_new_matplotlib_render_plot_widget(name='mpl_position_curves', sync_mode=SynchronizedPlotMode.TO_WINDOW)
+        
         """
         
         
