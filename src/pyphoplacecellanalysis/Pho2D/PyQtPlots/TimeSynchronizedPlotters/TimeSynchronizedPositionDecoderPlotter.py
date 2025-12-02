@@ -445,22 +445,6 @@ class TimeSynchronizedPositionDecoderPlotter(UserEditableROIMixin, AnimalTraject
         # Process events to ensure widget is rendered
         QtWidgets.QApplication.processEvents()
         
-        # Set up output path and directory before capturing
-        video_filepath = Path(output_path).resolve()
-        video_parent_path = video_filepath.parent
-        if not video_parent_path.exists():
-            if progress_print:
-                print(f'Creating output directory: {video_parent_path}')
-            video_parent_path.mkdir(parents=True, exist_ok=True)
-        
-        # Initialize video writer with MJPEG codec (fast, good quality)
-        fourcc = cv2.VideoWriter_fourcc('M','J','P','G')
-        out = cv2.VideoWriter(str(video_filepath), fourcc, fps, (width, height), isColor=True)
-        
-        if not out.isOpened():
-            self.params.debug_print = original_debug_print  # Restore before raising
-            raise RuntimeError(f"Failed to open video writer for {video_filepath}")
-        
         # Helper to convert QImage to BGR array for OpenCV
         def qimage_to_bgr(qimage):
             img_array = fn.ndarray_from_qimage(qimage)
@@ -480,10 +464,43 @@ class TimeSynchronizedPositionDecoderPlotter(UserEditableROIMixin, AnimalTraject
             else:
                 raise ValueError(f"Unexpected image format with {img_array.shape[2]} channels")
         
-        # Streaming capture and write: process one frame at a time to minimize memory usage
+        # Capture first frame to get actual output dimensions (may differ from requested)
+        first_frame_idx = frame_indices[0]
+        self.update(time_window_centers[first_frame_idx], defer_render=False)
+        QtWidgets.QApplication.processEvents()
+        first_qimage = exporter.export(toBytes=True)
+        first_bgr = qimage_to_bgr(first_qimage)
+        actual_height, actual_width = first_bgr.shape[:2]
+        
+        # Set up output path and directory
+        video_filepath = Path(output_path).resolve()
+        video_parent_path = video_filepath.parent
+        if not video_parent_path.exists():
+            if progress_print:
+                print(f'Creating output directory: {video_parent_path}')
+            video_parent_path.mkdir(parents=True, exist_ok=True)
+        
+        # Initialize video writer with actual frame dimensions
+        fourcc = cv2.VideoWriter_fourcc('M','J','P','G')
+        out = cv2.VideoWriter(str(video_filepath), fourcc, fps, (actual_width, actual_height), isColor=True)
+        
+        if not out.isOpened():
+            self.params.debug_print = original_debug_print  # Restore before raising
+            raise RuntimeError(f"Failed to open video writer for {video_filepath}")
+        
+        # Write the first frame we already captured
+        out.write(first_bgr)
+        
+        # Streaming capture and write: process remaining frames one at a time
         progress_print_every_n_frames = max(1, n_frames // 20)
         try:
             for i, frame_idx in enumerate(frame_indices):
+                if i == 0:
+                    # First frame already written
+                    if progress_print:
+                        print(f'Processing frame {i+1}/{n_frames} (t={time_window_centers[frame_idx]:.2f})')
+                    continue
+                    
                 if progress_print and (i % progress_print_every_n_frames == 0 or i == n_frames - 1):
                     print(f'Processing frame {i+1}/{n_frames} (t={time_window_centers[frame_idx]:.2f})')
                 
