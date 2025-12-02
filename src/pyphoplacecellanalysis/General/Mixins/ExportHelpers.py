@@ -1039,6 +1039,9 @@ class FigureToImageHelpers:
                 first_chunk = True
                 for ax, (start, end) in zip(axes, page_chunks): 
                     ## one temp axes to draw into:
+                    active_2d_plot.Render2DScrollWindowPlot_on_window_update(start, end)
+                    active_2d_plot.TimeCurvesViewMixin_on_window_update(new_start=start, new_end=end) ## the passed times don't actually do anything, but it does trigger the curve updates
+
                     # render each track
                     for track_IDX, (t, info) in enumerate(zip(found_track_widgets, export_infos)):
                         # for info in export_infos:
