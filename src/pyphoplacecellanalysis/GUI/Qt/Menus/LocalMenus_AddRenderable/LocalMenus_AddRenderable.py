@@ -16,6 +16,7 @@ from pyphocorehelpers.gui.PhoUIContainer import PhoUIContainer
 from pyphoplacecellanalysis.GUI.Qt.Menus.PhoMenuHelper import PhoMenuHelper
 from pyphoplacecellanalysis.Resources import GuiResources, ActionIcons
 from pyphoplacecellanalysis.GUI.Qt.Menus.LocalMenus_AddRenderable.Uic_AUTOGEN_LocalMenus_AddRenderable import Ui_LocalMenus_AddRenderable
+from pyphoplacecellanalysis.Pho2D.PyQtPlots.Extensions.pyqtgraph_helpers import try_find_child_viewbox
 
 from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.Mixins.RenderTimeEpochs.Specific2DRenderTimeEpochs import General2DRenderTimeEpochs, Replays_2DRenderTimeEpochs, Ripples_2DRenderTimeEpochs, SessionEpochs2DRenderTimeEpochs, PBE_2DRenderTimeEpochs, Laps2DRenderTimeEpochs, SpikeBurstIntervals_2DRenderTimeEpochs, NewNonPBE_2DRenderTimeEpochs, NewNonPBEEndcaps_2DRenderTimeEpochs # Time Intervals/Epochs
 from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.Mixins.TimeCurves.SpecificTimeCurves import GeneralRenderTimeCurves, PositionRenderTimeCurves, VelocityRenderTimeCurves, ConfigurableRenderTimeCurves, MUA_RenderTimeCurves, RelativeEntropySurpriseRenderTimeCurves, ThetaPhaseRenderTimeCurves ## Time Curves
@@ -260,17 +261,76 @@ class LocalMenus_AddRenderable(QtWidgets.QMainWindow):
         # @function_attributes(short_name=None, tags=['pyqtgraph'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-06-13 07:40', related_items=[])
         def _subfn_append_custom_menu_to_PyQtGraph_based_widget_context_menu(parent_widget, additional_menu, debug_print=False):
             """ For PyQtGraph-based widgets with an existing context menu (the default one by PyQtGraph)
+
+            TODO: currently overrides only the default, doesn't build additional menus additively like I'd want it to
+            
             """
             # plot_options_context_menu = parent_widget.getContextMenus(None) # This gets the "Plot Options" menu
             # top_level_parent_context_menu = parent_context_menus.parent()
-            top_level_parent_context_menu = parent_widget.vb.menu # ViewBoxMenu
-            if top_level_parent_context_menu is not None:
-                active_parent_menu = top_level_parent_context_menu
-                active_parent_menu.addSeparator()
-                active_parent_menu.addMenu(additional_menu)
-                if debug_print:
-                    print(f'parent_context_menus.actions: {[an_action.text() for an_action in active_parent_menu.actions()]}') # parent_context_menus.actions: ['Transforms', 'Downsample', 'Average', 'Alpha', 'Grid', 'Points']
+            
 
+            # top_level_parent_context_menu = parent_widget.vb.menu # ViewBoxMenu
+            # if top_level_parent_context_menu is not None:
+            #     active_parent_menu = top_level_parent_context_menu
+            #     active_parent_menu.addSeparator()
+            #     active_parent_menu.addMenu(additional_menu)
+            #     if debug_print:
+            #         print(f'parent_context_menus.actions: {[an_action.text() for an_action in active_parent_menu.actions()]}') # parent_context_menus.actions: ['Transforms', 'Downsample', 'Average', 'Alpha', 'Grid', 'Points']
+
+
+            # ==================================================================================================================================================================================================================================================================================== #
+            # Complete                                                                                                                                                                                                                                                                             #
+            # ==================================================================================================================================================================================================================================================================================== #
+            # root_graphics_layout_widget = widget.getRootGraphicsLayoutWidget()
+            # root_graphics_layout_widget
+            # plot_item = widget.getRootPlotItem()
+            # plot_item
+
+            viewbox = try_find_child_viewbox(parent_widget=parent_widget)
+            assert viewbox is not None, f"ERROR: _subfn_append_custom_menu_to_PyQtGraph_based_widget_context_menu(...): we could not find the viewbox that contains the default pyqtgraph menu."
+            
+            # Store reference to the custom menu
+            viewbox._pho_custom_context_menu = additional_menu
+            
+            # Store the original raiseContextMenu method if it exists
+            if not hasattr(viewbox, '_pho_original_raiseContextMenu'):
+                viewbox._pho_original_raiseContextMenu = viewbox.raiseContextMenu
+            
+            def _combined_raiseContextMenu(ev):
+                """Override raiseContextMenu to combine default PyQtGraph menu with custom menu
+
+                """
+                if not viewbox.menuEnabled():
+                    return
+                
+                # Create a new combined menu
+                combined_menu = QtWidgets.QMenu()
+                
+                # Get the default PyQtGraph ViewBox menu
+                default_menu = viewbox.getMenu()
+                # default_menu = viewbox.menu # ViewBoxMenu
+                if default_menu is not None:
+                    # Copy all actions from the default menu
+                    for action in default_menu.actions():
+                        combined_menu.addAction(action)
+                    num_default_actions: int = len(default_menu.actions())
+                    if num_default_actions > 0:
+                        # Add separator before custom menu
+                        combined_menu.addSeparator()
+                
+                # Add the custom menu items
+                combined_menu.addMenu(additional_menu)
+                
+                # Show the combined menu
+                pos = ev.screenPos() if hasattr(ev, 'screenPos') else viewbox.mapToGlobal(ev.pos())
+                combined_menu.exec_(pos)
+            
+            # Override the raiseContextMenu method
+            viewbox.raiseContextMenu = _combined_raiseContextMenu
+            
+            if debug_print:
+                print(f'PyQtGraph ViewBox context menu override installed. Default menu actions: {[an_action.text() for an_action in (viewbox.getMenu().actions() if viewbox.getMenu() else [])]}')
+                
 
 
         # BEGIN FUNCTION BODY ________________________________________________________________________________________________ #
