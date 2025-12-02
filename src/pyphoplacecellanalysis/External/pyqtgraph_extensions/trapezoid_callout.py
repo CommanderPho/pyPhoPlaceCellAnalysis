@@ -1,6 +1,6 @@
 import sys
 from PyQt5.QtWidgets import QApplication, QMainWindow, QWidget, QVBoxLayout
-from PyQt5.QtCore import Qt, QPointF, QTimer
+from PyQt5.QtCore import Qt, QPointF, QTimer, QEvent
 from PyQt5.QtGui import QPainter, QColor, QPolygonF, QBrush, QPen
 import pyqtgraph as pg
 from pyqtgraph.dockarea import DockArea, Dock

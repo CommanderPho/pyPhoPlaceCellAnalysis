@@ -390,12 +390,39 @@ class TimeSynchronizedPositionDecoderPlotter(UserEditableROIMixin, AnimalTraject
         if start_idx >= end_idx:
             raise ValueError(f"Invalid time range: start_t={start_t}, end_t={end_t}. No valid frames found.")
         
-        # Get frame indices
-        frame_indices: NDArray = np.arange(start_idx, end_idx)
+        # Subsample frame indices based on fps to reduce processing
+        # Calculate desired time step between frames (in seconds)
+        desired_time_step = 1.0 / fps if fps > 0 else float('inf')
+        
+        # Get all candidate frame indices
+        all_frame_indices = np.arange(start_idx, end_idx)
+        all_frame_times = time_window_centers[all_frame_indices]
+        
+        # Subsample frames based on desired time step
+        if desired_time_step < float('inf') and len(all_frame_indices) > 1:
+            # Start with the first frame
+            subsampled_indices = [all_frame_indices[0]]
+            last_selected_time = all_frame_times[0]
+            
+            # Select frames that are at least desired_time_step apart
+            for i in range(1, len(all_frame_indices)):
+                current_time = all_frame_times[i]
+                time_since_last = current_time - last_selected_time
+                
+                if time_since_last >= desired_time_step:
+                    subsampled_indices.append(all_frame_indices[i])
+                    last_selected_time = current_time
+            
+            frame_indices = np.array(subsampled_indices)
+        else:
+            # If fps is 0 or invalid, use all frames
+            frame_indices = all_frame_indices
+        
         n_frames: int = len(frame_indices)
         
         if progress_print:
-            print(f'Exporting video: {n_frames} frames from t={time_window_centers[start_idx]:.2f} to t={time_window_centers[end_idx-1]:.2f}')
+            total_available_frames = len(all_frame_indices)
+            print(f'Exporting video: {n_frames} frames (from {total_available_frames} available) from t={time_window_centers[start_idx]:.2f} to t={time_window_centers[end_idx-1]:.2f} at {fps} fps')
         
         # Get widget dimensions
         if width is None or height is None:
