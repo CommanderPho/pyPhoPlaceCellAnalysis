@@ -5,7 +5,9 @@ import pandas as pd
 from qtpy import QtCore, QtWidgets
 
 # from neuropy.analyses.time_dependent_placefields import PfND_TimeDependent
-
+from typing import TypeAlias
+from nptyping import NDArray, ND
+import numpy as np
 import pyphoplacecellanalysis.External.pyqtgraph as pg
 # from pyphoplacecellanalysis.External.pyqtgraph.Qt import QtCore, QtGui
 from pyphocorehelpers.DataStructure.general_parameter_containers import VisualizationParameters, RenderPlotsData, RenderPlots
@@ -16,12 +18,14 @@ from pyphoplacecellanalysis.Pho2D.PyQtPlots.TimeSynchronizedPlotters.TimeSynchro
 from pyphoplacecellanalysis.Pho2D.PyQtPlots.Extensions.pyqtgraph_helpers import pyqtplot_build_image_bounds_extent
 from pyphocorehelpers.programming_helpers import metadata_attributes
 from pyphocorehelpers.function_helpers import function_attributes
-from pyphocorehelpers.plotting.mixins.plotting_backend_mixin import PlottingBackendSpecifyingMixin, PlottingBackendType
+from pyphocorehelpers.plotting.mixins.plotting_backend_mixin import PlottingBackendSpecifyingMixin, PlottingBackendType, PlotImageExportableMixin
 from pyphoplacecellanalysis.Pho2D.PyQtPlots.TimeSynchronizedPlotters.Mixins.CrosshairsTracingMixin import CrosshairsTracingMixin
+from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.GraphicsWidgets.CustomGraphicsLayoutWidget import CustomViewBox, CustomGraphicsLayoutWidget
+
 
 
 @metadata_attributes(short_name=None, tags=['pyqtgraph'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-12-31 03:42', related_items=['MatplotlibTimeSynchronizedWidget'])
-class PyqtgraphTimeSynchronizedWidget(CrosshairsTracingMixin, PlottingBackendSpecifyingMixin, TimeSynchronizedPlotterBase):
+class PyqtgraphTimeSynchronizedWidget(CrosshairsTracingMixin, PlotImageExportableMixin, PlottingBackendSpecifyingMixin, TimeSynchronizedPlotterBase):
     """ Plots the decoded position at a given moment in time. 
 
     Simple pyqtgraph-based alternative to `MatplotlibTimeSynchronizedWidget`
@@ -160,7 +164,7 @@ class PyqtgraphTimeSynchronizedWidget(CrosshairsTracingMixin, PlottingBackendSpe
 
     def _buildGraphics(self):
         """ called by self.buildUI() which usually is not overriden. """
-        from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.GraphicsWidgets.CustomGraphicsLayoutWidget import CustomViewBox, CustomGraphicsLayoutWidget
+        
 
         ## More Involved Mode:
         # self.ui.root_graphics_layout_widget = pg.GraphicsLayoutWidget()
@@ -308,6 +312,9 @@ class PyqtgraphTimeSynchronizedWidget(CrosshairsTracingMixin, PlottingBackendSpe
     
     def getRootPlotItem(self) -> pg.PlotItem:
         return self.ui.root_plot
+    
+    def getRootViewBox(self) -> CustomViewBox:
+        return self.ui.root_plot_viewBox
     
     # ==================================================================================================================== #
     # Misc Functionality                                                                                                   #
@@ -538,3 +545,88 @@ class PyqtgraphTimeSynchronizedWidget(CrosshairsTracingMixin, PlottingBackendSpe
 #                                   grid_bin=computation_config.grid_bin, smooth=computation_config.smooth)
 # curr_occupancy_plotter = PyqtgraphTimeSynchronizedWidget(active_time_dependent_placefields2D)
 # curr_occupancy_plotter.show()
+
+
+    # ==================================================================================================================================================================================================================================================================================== #
+    # PlotImageExportableMixin Conformances                                                                                                                                                                                                                                                #
+    # ==================================================================================================================================================================================================================================================================================== #
+
+    def export_as_img_arr(self, start=None, end=None, dpi=150,
+                          info=None,
+                        #    y_offset = 0, y_min = 0.0,
+                        **kwargs,
+        ) -> NDArray:
+        """ 
+        
+        """
+        from pyphoplacecellanalysis.External.pyqtgraph.exporters.ImageExporter import ImageExporter
+        from PyQt5.QtGui import QImage
+
+        debug_print = kwargs.pop('debug_print', False)
+        
+        # pyqtgraph-backed tracks
+        
+        # # ## Data units version: for 3 tracks, we get [[-4.4, 0.4], [-4.0, 45.5], [0, 1]]
+        # # y_min, y_max = t.getViewBox().viewRange()[1]
+        # # h = y_max - y_min
+        # # extent = [x_min, x_max, y_offset, y_offset+h]
+
+        # ## Figure units version:
+        # #t.get_extent() is like [-2.84147705365001e-15, 1458.5500000000002, 0.0, 287.7697841726619] and in data units
+        # y_min = 0.0
+        # y_max = track_heights[track_IDX] ## these are in data units, like [0.0, 287.7697841726619] and so the same for many tracks
+        # h = y_max - y_min ## in data units
+        # extent = [x_min, x_max, y_offset, (y_offset+h)]
+
+        # t = self.active_plot_target
+        # info = dict(kind="pg", subkind="PlotItem", obj=t, extent=extent, y_height=h)
+        
+        # ## have info obj:
+        # pi = info['obj']
+        # vb = pi.getViewBox()
+        # orig_x, orig_y = vb.viewRange()
+        
+        # # Temporarily break X-link if present (e.g., for new_curves_separate_plot)
+        # # This prevents the linked plot from overriding the X range change during export
+        # orig_x_link = vb.linkedView(pg.ViewBox.XAxis)  # Get current X-axis link
+        # if orig_x_link is not None:
+        #     pi.setXLink(None)  # Temporarily unlink
+        
+        # pi.setXRange(start, end, padding=0) ## set to this chunk
+        # pi.setYRange(*orig_y, padding=0)
+
+
+        exporter = ImageExporter(self.active_plot_target)
+        if (start is not None) or (end is not None):
+            # exporter.parameters()['width'] = int(figsize[0]*dpi)
+            # exporter.parameters()['height'] = int(((figsize[1]/len(page_chunks))*dpi)/len(tracks))
+            exporter.parameters()['width'] = int((end - start) * dpi) # AI suggests I should be using `figsize[0] * dpi` - I don't think this is right.
+        if (info is not None):
+            exporter.parameters()['height'] = int((info['extent'][3] - info['extent'][2]) * dpi)
+            
+
+        if debug_print:
+            print(f"\texporter.parameters(): w: {exporter.parameters()['width']}, h: {exporter.parameters()['height']}")
+        # exporter.parameters()['width'] = int(figsize[0]*dpi)
+        # exporter.parameters()['height'] = int((figsize[1]/len(page_chunks))*dpi/len(tracks))
+        img = exporter.export(toBytes=True)
+        if isinstance(img, QImage):
+            w, h = img.width(), img.height()
+            ptr = img.bits(); ptr.setsize(img.byteCount())
+            # QImage from pyqtgraph is typically in BGRA byte order.
+            raw = np.array(ptr).reshape(h, w, 4).astype(np.float32) / 255.0
+            b = raw[:, :, 0]
+            g = raw[:, :, 1]
+            r = raw[:, :, 2]
+            a = raw[:, :, 3]
+            rgb = np.stack([r, g, b], axis=-1)
+            # Composite over white background so grid and image blend as on-screen
+            bg = np.ones_like(rgb)
+            comp = rgb * a[..., None] + bg * (1.0 - a[..., None])
+            arr = (comp * 255).astype(np.uint8)
+        else:
+            arr = np.array(img)
+
+        return arr
+
+

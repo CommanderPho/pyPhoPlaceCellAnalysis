@@ -1,5 +1,7 @@
 from copy import deepcopy
 from typing import List, Optional
+from typing import TypeAlias
+from nptyping import NDArray, ND
 import numpy as np
 
 import matplotlib
@@ -22,13 +24,13 @@ from pyphocorehelpers.programming_helpers import metadata_attributes
 from pyphocorehelpers.function_helpers import function_attributes
 
 from pyphocorehelpers.gui.Qt.widgets.toast_notification_widget import ToastWidget, ToastShowingWidgetMixin
-from pyphocorehelpers.plotting.mixins.plotting_backend_mixin import PlottingBackendSpecifyingMixin, PlottingBackendType
+from pyphocorehelpers.plotting.mixins.plotting_backend_mixin import PlottingBackendSpecifyingMixin, PlottingBackendType, PlotImageExportableMixin
 from pyphoplacecellanalysis.Pho2D.PyQtPlots.TimeSynchronizedPlotters.Mixins.CrosshairsTracingMixin import CrosshairsTracingMixin
 
 __all__ = ['CustomMatplotlibWidget']
 
 @metadata_attributes(short_name=None, tags=['matplotlib'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-05-08 14:20')
-class CustomMatplotlibWidget(CrosshairsTracingMixin, ToastShowingWidgetMixin, PlottingBackendSpecifyingMixin, QtWidgets.QWidget):
+class CustomMatplotlibWidget(CrosshairsTracingMixin, ToastShowingWidgetMixin, PlotImageExportableMixin, PlottingBackendSpecifyingMixin, QtWidgets.QWidget):
     """
     Implements a Matplotlib figure inside a QWidget.
     Use getFigure() and redraw() to interact with matplotlib.
@@ -705,3 +707,40 @@ class CustomMatplotlibWidget(CrosshairsTracingMixin, ToastShowingWidgetMixin, Pl
         else:
             print(f'\tno change!')
             
+
+    # ==================================================================================================================================================================================================================================================================================== #
+    # PlotImageExportableMixin Conformances                                                                                                                                                                                                                                                #
+    # ==================================================================================================================================================================================================================================================================================== #
+
+    def export_as_img_arr(self, start=None, end=None, dpi=150,
+                          info=None,
+                        #    y_offset = 0, y_min = 0.0,
+                        **kwargs,
+        ) -> NDArray:
+        """ get the figure as an image array for exporting
+        
+        """
+        from PIL import Image
+        
+        debug_print = kwargs.pop('debug_print', False)
+        
+        # # Output the image to bytes
+        # output = io.BytesIO()
+        # image.convert('RGB').save(output, img_format)
+        # data = output.getvalue()
+        # output.close()
+        
+        canvas = self.ui.canvas
+
+        canvas.draw()  # Ensure the canvas has been drawn once before copying the figure        
+        buf = io.BytesIO()
+        canvas.print_png(buf)
+        buf.seek(0)
+        img = Image.open(buf)
+        # Send the image to the clipboard
+        img.convert('RGB').save(buf, 'png') ## is this needed?
+        data = buf.getvalue() ## is this the only wway to get the NDArray data?
+        buf.close()
+        print(f'data: {data}') ## #TODO 2025-12-02 14:52: - [ ] is the NDArray data in the same format as the PyQtGraph ImageExporter case?
+        return data
+
