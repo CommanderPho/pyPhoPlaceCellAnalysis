@@ -889,6 +889,8 @@ class FigureToImageHelpers:
         from pyphoplacecellanalysis.Pho2D.PyQtPlots.TimeSynchronizedPlotters.PyqtgraphTimeSynchronizedWidget import PyqtgraphTimeSynchronizedWidget
         from pyphoplacecellanalysis.Pho2D.matplotlib.MatplotlibTimeSynchronizedWidget import MatplotlibTimeSynchronizedWidget
         import matplotlib.image as mimage
+        from matplotlib.axes import Axes
+        from matplotlib.artist import Artist
 
         if included_track_dock_identifiers is None:
             ## all tracks:
@@ -906,26 +908,42 @@ class FigureToImageHelpers:
                 # found_pyqtgraph_stack.append(root_plot_item)
                 found_heterogeneous_stack.append(root_plot_item)
             elif isinstance(a_widget, MatplotlibTimeSynchronizedWidget):
-                found_ax_img = None
+                found_renderable = None
                 try:
-                    found_ax_img = a_widget.plots.im_posterior_x
+                    found_renderable = a_widget.plots.im_posterior_x
                 except KeyError as e:
                     ## try to discover the axes images directly
                     fig = a_widget.plots.fig # plt.gcf()
                     assert fig is not None
-                    axes_images = [im for ax in fig.axes for im in ax.get_images() if isinstance(im, mimage.AxesImage)] # #TODO 2025-12-02 04:31: - [ ] Doesn't handle basic (non-image) matplotlib axes with artists created by ax.plot(...), ax.scatter(...), etc.
-                    assert len(axes_images) > 0
-                    # assert len(axes_images) == 1, f"TODO - only allow the first (single) AxesImage to be added. len(axes_images): {len(axes_images)}"
-                    if len(axes_images) > 1:
-                        print(f'WARN: TODO - only allow the first (single) AxesImage to be added. len(axes_images): {len(axes_images)}\n\tONLY THE FIRST WILL BE USED!')
-                    found_ax_img = axes_images[0] ## Only add the first
+                    axes_images = [im for ax in fig.axes for im in ax.get_images() if isinstance(im, mimage.AxesImage)]
+                    
+                    if len(axes_images) > 0:
+                        # Found AxesImage objects
+                        # assert len(axes_images) == 1, f"TODO - only allow the first (single) AxesImage to be added. len(axes_images): {len(axes_images)}"
+                        if len(axes_images) > 1:
+                            print(f'WARN: TODO - only allow the first (single) AxesImage to be added. len(axes_images): {len(axes_images)}\n\tONLY THE FIRST WILL BE USED!')
+                        found_renderable = axes_images[0] ## Only add the first
+                    else:
+                        # No AxesImage found, look for Axes objects with plot artists (lines, patches, collections, etc.)
+                        # Check for axes that have actual plot data: lines, patches, collections, or containers
+                        axes_with_plot_data = [ax for ax in fig.axes 
+                                               if isinstance(ax, Axes) and 
+                                               (len(ax.lines) > 0 or len(ax.patches) > 0 or 
+                                                len(ax.collections) > 0 or len(ax.containers) > 0)]
+                        
+                        if len(axes_with_plot_data) > 0:
+                            if len(axes_with_plot_data) > 1:
+                                print(f'WARN: Multiple axes found without AxesImage. len(axes_with_plot_data): {len(axes_with_plot_data)}\n\tONLY THE FIRST WILL BE USED!')
+                            found_renderable = axes_with_plot_data[0] ## Only add the first
+                        else:
+                            raise ValueError(f'No AxesImage or Axes with plot data found in MatplotlibTimeSynchronizedWidget. fig.axes: {fig.axes}')
                 except Exception as e:
-                    found_ax_img = None
+                    found_renderable = None
                     raise e
 
-                if found_ax_img is not None:
-                    # found_matplotlib_stack.append(found_ax_img)
-                    found_heterogeneous_stack.append(found_ax_img)
+                if found_renderable is not None:
+                    # found_matplotlib_stack.append(found_renderable)
+                    found_heterogeneous_stack.append(found_renderable)
             else:
                 raise NotImplementedError(f'unexpected widget type: {type(a_widget), a_widget: {a_widget}}')
 
@@ -1024,11 +1042,11 @@ class FigureToImageHelpers:
             elif isinstance(t, (Axes, Artist)):
                 ## matplotlib general axes or Artist
                 ## Figure units version:
-                #t.get_extent() is like [-2.84147705365001e-15, 1458.5500000000002, 0.0, 287.7697841726619] and in data units
+                # For Axes objects, use x_min and x_max from the function parameters (similar to pyqtgraph PlotItems)
                 y_min = 0.0
                 y_max = track_heights[track_IDX] ## these are in data units, like [0.0, 287.7697841726619] and so the same for many tracks
                 h = y_max - y_min ## in data units
-                extent = [t.get_extent()[0], t.get_extent()[1], y_offset, (y_offset+h)]
+                extent = [x_min, x_max, y_offset, (y_offset+h)]
                 export_infos.append(dict(kind="mpl", subkind="Axes", obj=t, extent=extent, y_height=h))
                 
 
