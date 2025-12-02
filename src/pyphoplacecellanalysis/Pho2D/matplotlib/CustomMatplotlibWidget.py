@@ -1,7 +1,7 @@
 from copy import deepcopy
 from typing import List, Optional
-from typing import TypeAlias
-from nptyping import NDArray, ND
+import nptyping as ND
+from nptyping import NDArray
 import numpy as np
 
 import matplotlib

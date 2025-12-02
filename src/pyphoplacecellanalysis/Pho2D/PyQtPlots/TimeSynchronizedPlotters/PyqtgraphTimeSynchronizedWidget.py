@@ -5,8 +5,8 @@ import pandas as pd
 from qtpy import QtCore, QtWidgets
 
 # from neuropy.analyses.time_dependent_placefields import PfND_TimeDependent
-from typing import TypeAlias
-from nptyping import NDArray, ND
+import nptyping as ND
+from nptyping import NDArray
 import numpy as np
 import pyphoplacecellanalysis.External.pyqtgraph as pg
 # from pyphoplacecellanalysis.External.pyqtgraph.Qt import QtCore, QtGui

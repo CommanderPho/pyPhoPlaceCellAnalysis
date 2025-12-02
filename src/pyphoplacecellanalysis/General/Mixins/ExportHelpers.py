@@ -960,7 +960,7 @@ class FigureToImageHelpers:
         # found_track_widgets = kwargs.pop('tracks', None)
         x_extent = kwargs.pop('x_extent', None)
         chunk_width = kwargs.pop('chunk_width', None)
-        output_pdf_path = kwargs.pop('output_pdf_path', None)
+        # output_pdf_path = kwargs.pop('output_pdf_path', None)
         rows_per_page = kwargs.pop('rows_per_page', 5)
         figsize = kwargs.pop('figsize', (8, 11))
         dpi = kwargs.pop('dpi', 150)
@@ -1007,53 +1007,6 @@ class FigureToImageHelpers:
         x_min, x_max = x_extent
 
         # Collect metadata dictionary for stacking
-        # export_infos = []
-        # y_offset = 0
-        # for track_IDX, t in enumerate(found_track_widgets):
-
-        #     if isinstance(t, mimage.AxesImage):
-        #         # ## Data units version:
-        #         # #t.get_extent() is like [-2.84147705365001e-15, 1458.5500000000002, 0.0, 287.7697841726619] and in data units
-        #         # y_min, y_max = t.get_extent()[2:4] ## these are in data units, like [0.0, 287.7697841726619] and so the same for many tracks
-        #         # h = y_max - y_min ## in data units
-        #         # extent = [t.get_extent()[0], t.get_extent()[1], y_offset, (y_offset+h)]
-
-        #         ## Figure units version:
-        #         #t.get_extent() is like [-2.84147705365001e-15, 1458.5500000000002, 0.0, 287.7697841726619] and in data units
-        #         y_min = 0.0
-        #         y_max = track_heights[track_IDX] ## these are in data units, like [0.0, 287.7697841726619] and so the same for many tracks
-        #         h = y_max - y_min ## in data units
-        #         extent = [t.get_extent()[0], t.get_extent()[1], y_offset, (y_offset+h)]
-        #         export_infos.append(dict(kind="mpl", subkind="AxesImage", obj=t, extent=extent, y_height=h))
-                
-        #     elif isinstance(t, (Axes, Artist)):
-        #         ## matplotlib general axes or Artist
-        #         ## Figure units version:
-        #         # For Axes objects, use x_min and x_max from the function parameters (similar to pyqtgraph PlotItems)
-        #         y_min = 0.0
-        #         y_max = track_heights[track_IDX] ## these are in data units, like [0.0, 287.7697841726619] and so the same for many tracks
-        #         h = y_max - y_min ## in data units
-        #         extent = [x_min, x_max, y_offset, (y_offset+h)]
-        #         export_infos.append(dict(kind="mpl", subkind="Axes", obj=t, extent=extent, y_height=h))
-                
-
-        #     else:  # assume pg.PlotItem
-        #         # ## Data units version: for 3 tracks, we get [[-4.4, 0.4], [-4.0, 45.5], [0, 1]]
-        #         # y_min, y_max = t.getViewBox().viewRange()[1]
-        #         # h = y_max - y_min
-        #         # extent = [x_min, x_max, y_offset, y_offset+h]
-
-        #         ## Figure units version:
-        #         #t.get_extent() is like [-2.84147705365001e-15, 1458.5500000000002, 0.0, 287.7697841726619] and in data units
-        #         y_min = 0.0
-        #         y_max = track_heights[track_IDX] ## these are in data units, like [0.0, 287.7697841726619] and so the same for many tracks
-        #         h = y_max - y_min ## in data units
-        #         extent = [x_min, x_max, y_offset, (y_offset+h)]
-
-        #         export_infos.append(dict(kind="pg", subkind="PlotItem", obj=t, extent=extent, y_height=h))
-
-        #     ## must spit out `h`
-        #     y_offset += h
 
         y_offsets = np.cumsum(np.concatenate([[0], track_heights])) ## this better be correct
         # Assert.same_length(y_offsets, found_track_widgets)
