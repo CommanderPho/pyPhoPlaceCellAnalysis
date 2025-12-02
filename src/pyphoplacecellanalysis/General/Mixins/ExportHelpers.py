@@ -964,7 +964,7 @@ class FigureToImageHelpers:
         rows_per_page = kwargs.pop('rows_per_page', 5)
         figsize = kwargs.pop('figsize', (8, 11))
         dpi = kwargs.pop('dpi', 150)
-        normalized_track_heights = kwargs.pop('normalized_track_heights', None)
+        # normalized_track_heights = kwargs.pop('normalized_track_heights', None)
         debug_max_num_pages = kwargs.pop('debug_max_num_pages', 5)
         track_labels = kwargs.pop('track_labels', None)
         debug_print = kwargs.pop('debug_print', False)
@@ -1056,7 +1056,9 @@ class FigureToImageHelpers:
         #     y_offset += h
 
         y_offsets = np.cumsum(np.concatenate([[0], track_heights])) ## this better be correct
-        Assert.same_length(y_offsets, found_track_widgets)
+        # Assert.same_length(y_offsets, found_track_widgets)
+        Assert.len_equals(y_offsets, required_length=(len(found_track_widgets)+1)) # same_length(y_offsets, found_track_widgets)
+
         export_infos = [dict(extent=[x_min, x_max, y_offsets[track_IDX], (y_offsets[track_IDX]+(track_heights[track_IDX] - 0.0))], y_height=(track_heights[track_IDX] - 0.0)) for track_IDX, t in enumerate(found_track_widgets)]
         total_y_min = 0.0
         total_y_max = y_offsets[-1]
@@ -1088,7 +1090,7 @@ class FigureToImageHelpers:
                     for track_IDX, (t, info) in enumerate(zip(found_track_widgets, export_infos)):
                         # for info in export_infos:
                         if debug_print:
-                            print(f'info["extent"]: {info["extent"]}')
+                            print(f'track_IDX: {track_IDX} \t info["extent"]: {info["extent"]}')
 
 
                         arr = t.export_as_img_arr(start=start, end=end, dpi=dpi, info=info)
@@ -1119,7 +1121,15 @@ class FigureToImageHelpers:
                     first_chunk = False
 
                 pdf.savefig(fig)
-                plt.close(fig)
+                try:
+                    plt.close(fig)
+                except ValueError as e:
+                    print(f'failed to close temp figure with error e: {e}.')
+                    pass
+                except Exception as e:
+                    print(f'ERROR: unhandled exception {e} while trying to close temp fig.')
+                    raise
+                
             ## END for page_chunks in pages...
         ## END with backend_pdf.PdfPages(output_pdf_path) as pdf:...
         
