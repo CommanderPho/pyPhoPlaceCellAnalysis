@@ -913,7 +913,7 @@ class FigureToImageHelpers:
                     ## try to discover the axes images directly
                     fig = a_widget.plots.fig # plt.gcf()
                     assert fig is not None
-                    axes_images = [im for ax in fig.axes for im in ax.get_images() if isinstance(im, mimage.AxesImage)]
+                    axes_images = [im for ax in fig.axes for im in ax.get_images() if isinstance(im, mimage.AxesImage)] # #TODO 2025-12-02 04:31: - [ ] Doesn't handle basic (non-image) matplotlib axes with artists created by ax.plot(...), ax.scatter(...), etc.
                     assert len(axes_images) > 0
                     # assert len(axes_images) == 1, f"TODO - only allow the first (single) AxesImage to be added. len(axes_images): {len(axes_images)}"
                     if len(axes_images) > 1:
@@ -993,7 +993,7 @@ class FigureToImageHelpers:
 
         x_min, x_max = x_extent
 
-        # Collect metadata for stacking
+        # Collect metadata dictionary for stacking
         export_infos = []
         y_offset = 0
         for track_IDX, t in enumerate(tracks):
@@ -1035,14 +1035,14 @@ class FigureToImageHelpers:
         if debug_print:
             print(f'export_infos: {export_infos}')
 
-        # Chunking
+        # Chunking/building output images:
         chunks = []
         start = x_min
         while start < x_max:
             end = min(start+chunk_width, x_max)
             chunks.append((start, end))
             start = end
-        pages = [chunks[i:i+rows_per_page] for i in range(0, len(chunks), rows_per_page)]
+        pages = [chunks[i:(i+rows_per_page)] for i in range(0, len(chunks), rows_per_page)]
         if debug_max_num_pages is not None:
             pages = pages[:debug_max_num_pages]
 
@@ -1094,7 +1094,10 @@ class FigureToImageHelpers:
                                 arr = (comp * 255).astype(np.uint8)
                             else:
                                 arr = np.array(img)
-                            ax.imshow(arr, extent=[start, end, info['extent'][2], info['extent'][3]], aspect='auto', origin='upper')
+                                
+                            ## render the image into the temporary matplotlib ax using `ax.imshow(...)`
+                            ax.imshow(arr, extent=[start, end, info['extent'][2], info['extent'][3]], aspect='auto', origin='upper') 
+                            # ax.imshow(arr, extent=[info['extent'][0], info['extent'][1], info['extent'][2], info['extent'][3]], aspect='auto', origin='upper') ## tried this, and it's markedly wrong
                             pi.setXRange(*orig_x, padding=0)
                             pi.setYRange(*orig_y, padding=0)
 
@@ -1123,6 +1126,9 @@ class FigureToImageHelpers:
 
                 pdf.savefig(fig)
                 plt.close(fig)
+            ## END for page_chunks in pages...
+        ## END with backend_pdf.PdfPages(output_pdf_path) as pdf:...
+        
         print(f"PDF saved to {output_pdf_path}")
         return output_pdf_path
 
