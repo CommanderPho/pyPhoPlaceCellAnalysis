@@ -1007,60 +1007,59 @@ class FigureToImageHelpers:
         x_min, x_max = x_extent
 
         # Collect metadata dictionary for stacking
-        export_infos = []
-        y_offset = 0
-        for track_IDX, t in enumerate(found_track_widgets):
+        # export_infos = []
+        # y_offset = 0
+        # for track_IDX, t in enumerate(found_track_widgets):
 
-            if isinstance(t, mimage.AxesImage):
-                # ## Data units version:
-                # #t.get_extent() is like [-2.84147705365001e-15, 1458.5500000000002, 0.0, 287.7697841726619] and in data units
-                # y_min, y_max = t.get_extent()[2:4] ## these are in data units, like [0.0, 287.7697841726619] and so the same for many tracks
-                # h = y_max - y_min ## in data units
-                # extent = [t.get_extent()[0], t.get_extent()[1], y_offset, (y_offset+h)]
+        #     if isinstance(t, mimage.AxesImage):
+        #         # ## Data units version:
+        #         # #t.get_extent() is like [-2.84147705365001e-15, 1458.5500000000002, 0.0, 287.7697841726619] and in data units
+        #         # y_min, y_max = t.get_extent()[2:4] ## these are in data units, like [0.0, 287.7697841726619] and so the same for many tracks
+        #         # h = y_max - y_min ## in data units
+        #         # extent = [t.get_extent()[0], t.get_extent()[1], y_offset, (y_offset+h)]
 
-                ## Figure units version:
-                #t.get_extent() is like [-2.84147705365001e-15, 1458.5500000000002, 0.0, 287.7697841726619] and in data units
-                y_min = 0.0
-                y_max = track_heights[track_IDX] ## these are in data units, like [0.0, 287.7697841726619] and so the same for many tracks
-                h = y_max - y_min ## in data units
-                extent = [t.get_extent()[0], t.get_extent()[1], y_offset, (y_offset+h)]
-                export_infos.append(dict(kind="mpl", subkind="AxesImage", obj=t, extent=extent, y_height=h))
+        #         ## Figure units version:
+        #         #t.get_extent() is like [-2.84147705365001e-15, 1458.5500000000002, 0.0, 287.7697841726619] and in data units
+        #         y_min = 0.0
+        #         y_max = track_heights[track_IDX] ## these are in data units, like [0.0, 287.7697841726619] and so the same for many tracks
+        #         h = y_max - y_min ## in data units
+        #         extent = [t.get_extent()[0], t.get_extent()[1], y_offset, (y_offset+h)]
+        #         export_infos.append(dict(kind="mpl", subkind="AxesImage", obj=t, extent=extent, y_height=h))
                 
-            elif isinstance(t, (Axes, Artist)):
-                ## matplotlib general axes or Artist
-                ## Figure units version:
-                # For Axes objects, use x_min and x_max from the function parameters (similar to pyqtgraph PlotItems)
-                y_min = 0.0
-                y_max = track_heights[track_IDX] ## these are in data units, like [0.0, 287.7697841726619] and so the same for many tracks
-                h = y_max - y_min ## in data units
-                extent = [x_min, x_max, y_offset, (y_offset+h)]
-                export_infos.append(dict(kind="mpl", subkind="Axes", obj=t, extent=extent, y_height=h))
+        #     elif isinstance(t, (Axes, Artist)):
+        #         ## matplotlib general axes or Artist
+        #         ## Figure units version:
+        #         # For Axes objects, use x_min and x_max from the function parameters (similar to pyqtgraph PlotItems)
+        #         y_min = 0.0
+        #         y_max = track_heights[track_IDX] ## these are in data units, like [0.0, 287.7697841726619] and so the same for many tracks
+        #         h = y_max - y_min ## in data units
+        #         extent = [x_min, x_max, y_offset, (y_offset+h)]
+        #         export_infos.append(dict(kind="mpl", subkind="Axes", obj=t, extent=extent, y_height=h))
                 
 
-            else:  # assume pg.PlotItem
-                # ## Data units version: for 3 tracks, we get [[-4.4, 0.4], [-4.0, 45.5], [0, 1]]
-                # y_min, y_max = t.getViewBox().viewRange()[1]
-                # h = y_max - y_min
-                # extent = [x_min, x_max, y_offset, y_offset+h]
+        #     else:  # assume pg.PlotItem
+        #         # ## Data units version: for 3 tracks, we get [[-4.4, 0.4], [-4.0, 45.5], [0, 1]]
+        #         # y_min, y_max = t.getViewBox().viewRange()[1]
+        #         # h = y_max - y_min
+        #         # extent = [x_min, x_max, y_offset, y_offset+h]
 
-                ## Figure units version:
-                #t.get_extent() is like [-2.84147705365001e-15, 1458.5500000000002, 0.0, 287.7697841726619] and in data units
-                y_min = 0.0
-                y_max = track_heights[track_IDX] ## these are in data units, like [0.0, 287.7697841726619] and so the same for many tracks
-                h = y_max - y_min ## in data units
-                extent = [x_min, x_max, y_offset, (y_offset+h)]
+        #         ## Figure units version:
+        #         #t.get_extent() is like [-2.84147705365001e-15, 1458.5500000000002, 0.0, 287.7697841726619] and in data units
+        #         y_min = 0.0
+        #         y_max = track_heights[track_IDX] ## these are in data units, like [0.0, 287.7697841726619] and so the same for many tracks
+        #         h = y_max - y_min ## in data units
+        #         extent = [x_min, x_max, y_offset, (y_offset+h)]
 
-                export_infos.append(dict(kind="pg", subkind="PlotItem", obj=t, extent=extent, y_height=h))
+        #         export_infos.append(dict(kind="pg", subkind="PlotItem", obj=t, extent=extent, y_height=h))
 
-            ## must spit out `h`
-            y_offset += h
+        #     ## must spit out `h`
+        #     y_offset += h
 
         y_offsets = np.cumsum(np.concatenate([[0], track_heights])) ## this better be correct
         Assert.same_length(y_offsets, found_track_widgets)
         export_infos = [dict(extent=[x_min, x_max, y_offsets[track_IDX], (y_offsets[track_IDX]+(track_heights[track_IDX] - 0.0))], y_height=(track_heights[track_IDX] - 0.0)) for track_IDX, t in enumerate(found_track_widgets)]
         total_y_min = 0.0
         total_y_max = y_offsets[-1]
-
 
         if debug_print:
             print(f'export_infos: {export_infos}')
@@ -1085,127 +1084,16 @@ class FigureToImageHelpers:
                 first_chunk = True
                 for ax, (start, end) in zip(axes, page_chunks): 
                     ## one temp axes to draw into:
-
                     # render each track
-                    y_offset = 0
-                    for track_IDX, t in enumerate(found_track_widgets):
-
-                    # for info in export_infos:
-                    for info in export_infos:
-
+                    for track_IDX, (t, info) in enumerate(zip(found_track_widgets, export_infos)):
+                        # for info in export_infos:
                         if debug_print:
                             print(f'info["extent"]: {info["extent"]}')
 
-                        if info['kind'] == "mpl":
-                            if info['subkind'] == "AxesImage":
-                                arr = info['obj'].get_array()
-                                cmap = info['obj'].get_cmap()
-                                ax.imshow(arr, extent=[info['extent'][0], info['extent'][1], info['extent'][2], info['extent'][3]], aspect='auto', cmap=cmap, origin=info['obj'].origin)
 
-                            elif info['subkind'] == "Axes":
-                                ## Copy the general matplotlib Axes object to the temporary render axes:
-                                source_ax = info['obj']
-                                
-                                # Get original limits
-                                orig_xlim = source_ax.get_xlim()
-                                orig_ylim = source_ax.get_ylim()
-                                
-                                # Temporarily set X limits to chunk range
-                                source_ax.set_xlim(start, end)
-                                
-                                # Get the source figure and ensure it's drawn
-                                source_fig = source_ax.figure
-                                source_fig.canvas.draw()
-                                
-                                # Get the axes bbox in display coordinates
-                                bbox = source_ax.get_tightbbox(source_fig.canvas.renderer)
-                                
-                                # Convert bbox to inches for rendering
-                                # bbox is in display coordinates (pixels at source_fig.dpi), convert to inches
-                                bbox_inches = bbox.transformed(source_fig.dpi_scale_trans.inverted())
-                                
-                                # Calculate the output size in pixels when rendered at the specified DPI
-                                output_width_pixels = bbox_inches.width * dpi
-                                output_height_pixels = bbox_inches.height * dpi
-                                
-                                # Check if dimensions exceed the maximum (2^16 - 1 = 65535)
-                                max_dimension = 65535
-                                if output_width_pixels > max_dimension or output_height_pixels > max_dimension:
-                                    # Calculate scale factor to fit within limits
-                                    scale = min(max_dimension / output_width_pixels, max_dimension / output_height_pixels)
-                                    # Adjust DPI to achieve the desired size
-                                    effective_dpi = int(dpi * scale)
-                                else:
-                                    effective_dpi = dpi
-                                
-                                # Create a buffer to render to
-                                buf = io.BytesIO()
-                                
-                                # Render source figure with bbox_inches and adjusted DPI
-                                source_fig.savefig(buf, format='png', dpi=effective_dpi, bbox_inches=bbox_inches, pad_inches=0, facecolor='white')
-                                
-                                # Read the image array
-                                buf.seek(0)
-                                img_arr = mimage.imread(buf)
-                                buf.close()
-                                
-                                # Restore original limits
-                                source_ax.set_xlim(*orig_xlim)
-                                source_ax.set_ylim(*orig_ylim)
-                                
-                                # Display the rendered image in the target axes
-                                ax.imshow(img_arr, extent=[start, end, info['extent'][2], info['extent'][3]], aspect='auto', origin='upper')
-                            
-                        else:  
-                            # pyqtgraph-backed tracks
-                            pi = info['obj']
-                            vb = pi.getViewBox()
-                            orig_x, orig_y = vb.viewRange()
-                            
-                            # Temporarily break X-link if present (e.g., for new_curves_separate_plot)
-                            # This prevents the linked plot from overriding the X range change during export
-                            orig_x_link = vb.linkedView(pg.ViewBox.XAxis)  # Get current X-axis link
-                            if orig_x_link is not None:
-                                pi.setXLink(None)  # Temporarily unlink
-                            
-                            pi.setXRange(start, end, padding=0) ## set to this chunk
-                            pi.setYRange(*orig_y, padding=0)
-                            exporter = ImageExporter(pi)
-                            # exporter.parameters()['width'] = int(figsize[0]*dpi)
-                            # exporter.parameters()['height'] = int(((figsize[1]/len(page_chunks))*dpi)/len(tracks))
-                            exporter.parameters()['width'] = int((end - start) * dpi) # AI suggests I should be using `figsize[0] * dpi` - I don't think this is right.
-                            exporter.parameters()['height'] = int((info['extent'][3] - info['extent'][2]) * dpi)
-                            if debug_print:
-                                print(f"\texporter.parameters(): w: {exporter.parameters()['width']}, h: {exporter.parameters()['height']}")
-                            # exporter.parameters()['width'] = int(figsize[0]*dpi)
-                            # exporter.parameters()['height'] = int((figsize[1]/len(page_chunks))*dpi/len(tracks))
-                            img = exporter.export(toBytes=True)
-                            if isinstance(img, QImage):
-                                w, h = img.width(), img.height()
-                                ptr = img.bits(); ptr.setsize(img.byteCount())
-                                # QImage from pyqtgraph is typically in BGRA byte order.
-                                raw = np.array(ptr).reshape(h, w, 4).astype(np.float32) / 255.0
-                                b = raw[:, :, 0]
-                                g = raw[:, :, 1]
-                                r = raw[:, :, 2]
-                                a = raw[:, :, 3]
-                                rgb = np.stack([r, g, b], axis=-1)
-                                # Composite over white background so grid and image blend as on-screen
-                                bg = np.ones_like(rgb)
-                                comp = rgb * a[..., None] + bg * (1.0 - a[..., None])
-                                arr = (comp * 255).astype(np.uint8)
-                            else:
-                                arr = np.array(img)
-                                
-                            ## render the image into the temporary matplotlib ax using `ax.imshow(...)`
-                            ax.imshow(arr, extent=[start, end, info['extent'][2], info['extent'][3]], aspect='auto', origin='upper') 
-                            # ax.imshow(arr, extent=[info['extent'][0], info['extent'][1], info['extent'][2], info['extent'][3]], aspect='auto', origin='upper') ## tried this, and it's markedly wrong
-                            
-                            ## restore previous ranges and X-link
-                            pi.setXRange(*orig_x, padding=0)
-                            pi.setYRange(*orig_y, padding=0)
-                            if orig_x_link is not None:
-                                pi.setXLink(orig_x_link)  # Restore X-link
+                        arr = t.export_as_img_arr(start=start, end=end, dpi=dpi, info=info)
+                        ## render the image into the temporary matplotlib ax using `ax.imshow(...)`
+                        ax.imshow(arr, extent=[start, end, info['extent'][2], info['extent'][3]], aspect='auto', origin='upper') 
 
                     # separators between tracks
                     if len(export_infos) > 1:
