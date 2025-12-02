@@ -445,59 +445,7 @@ class TimeSynchronizedPositionDecoderPlotter(UserEditableROIMixin, AnimalTraject
         # Process events to ensure widget is rendered
         QtWidgets.QApplication.processEvents()
         
-        # Capture frames
-        frames = []
-        for i, frame_idx in enumerate(frame_indices):
-            if progress_print and (i % max(1, n_frames // 20) == 0 or i == n_frames - 1):
-                print(f'Capturing frame {i+1}/{n_frames} (t={time_window_centers[frame_idx]:.2f})')
-            
-            # Update plotter to current time
-            t = time_window_centers[frame_idx]
-            self.update(t, defer_render=False)
-            
-            # Process events to ensure rendering
-            QtWidgets.QApplication.processEvents()
-            
-            # Capture frame
-            qimage = exporter.export(toBytes=True)
-            
-            # Convert QImage to numpy array
-            # ImageExporter returns ARGB32 format, which has endianness-dependent byte order
-            # On little-endian: bytes are [B, G, R, A] in memory
-            # On big-endian: bytes are [A, R, G, B] in memory
-            img_array = fn.ndarray_from_qimage(qimage)
-            
-            # Handle ARGB32 format conversion based on byte order
-            if img_array.shape[2] == 4:
-                # ARGB32 format - extract RGB channels based on byte order
-                if sys.byteorder == 'little':
-                    # Little-endian: channels are [B, G, R, A] in memory
-                    # Extract [B, G, R] which is already BGR for OpenCV
-                    bgr_array = img_array[:, :, [0, 1, 2]]  # B, G, R
-                else:
-                    # Big-endian: channels are [A, R, G, B] in memory
-                    # Extract [R, G, B] and convert to BGR
-                    rgb_array = img_array[:, :, [1, 2, 3]]  # R, G, B
-                    bgr_array = rgb_array[:, :, [2, 1, 0]]  # Convert to BGR
-            elif img_array.shape[2] == 3:
-                # Already RGB format, convert to BGR for OpenCV
-                bgr_array = img_array[:, :, [2, 1, 0]]  # Convert RGB to BGR
-            else:
-                raise ValueError(f"Unexpected image format with {img_array.shape[2]} channels")
-            
-            frames.append(bgr_array)
-        
-        # Restore original debug print setting
-        self.params.debug_print = original_debug_print
-        
-        if progress_print:
-            print(f'Converting {len(frames)} frames to video...')
-        
-        # Convert frames list to numpy array: (n_frames, height, width, channels)
-        frames_array = np.stack(frames, axis=0)
-        
-        # Save video using OpenCV directly (since save_array_as_video expects grayscale)
-        import cv2
+        # Set up output path and directory before capturing
         video_filepath = Path(output_path).resolve()
         video_parent_path = video_filepath.parent
         if not video_parent_path.exists():
@@ -505,27 +453,55 @@ class TimeSynchronizedPositionDecoderPlotter(UserEditableROIMixin, AnimalTraject
                 print(f'Creating output directory: {video_parent_path}')
             video_parent_path.mkdir(parents=True, exist_ok=True)
         
-        # Get dimensions
-        n_frames, height, width, n_channels = frames_array.shape
-        
-        # Initialize video writer (OpenCV uses BGR, so we need to convert from RGB)
-        fourcc = cv2.VideoWriter_fourcc('M','J','P','G')  # MJPEG codec (fast, good quality)
+        # Initialize video writer with MJPEG codec (fast, good quality)
+        fourcc = cv2.VideoWriter_fourcc('M','J','P','G')
         out = cv2.VideoWriter(str(video_filepath), fourcc, fps, (width, height), isColor=True)
         
         if not out.isOpened():
+            self.params.debug_print = original_debug_print  # Restore before raising
             raise RuntimeError(f"Failed to open video writer for {video_filepath}")
         
-        # Write frames
-        progress_print_every_n_frames = max(1, n_frames // 20)
-        for i in range(n_frames):
-            if progress_print and (i % progress_print_every_n_frames == 0 or i == n_frames - 1):
-                print(f'Writing frame {i+1}/{n_frames} to video')
-            
-            # Frames are already in BGR format, write directly
-            out.write(frames_array[i])
+        # Helper to convert QImage to BGR array for OpenCV
+        def qimage_to_bgr(qimage):
+            img_array = fn.ndarray_from_qimage(qimage)
+            # Handle ARGB32 format conversion based on byte order
+            if img_array.shape[2] == 4:
+                # ARGB32 format - extract RGB channels based on byte order
+                if sys.byteorder == 'little':
+                    # Little-endian: channels are [B, G, R, A] in memory
+                    return img_array[:, :, [0, 1, 2]]  # B, G, R
+                else:
+                    # Big-endian: channels are [A, R, G, B] in memory
+                    rgb_array = img_array[:, :, [1, 2, 3]]  # R, G, B
+                    return rgb_array[:, :, [2, 1, 0]]  # Convert to BGR
+            elif img_array.shape[2] == 3:
+                # Already RGB format, convert to BGR for OpenCV
+                return img_array[:, :, [2, 1, 0]]
+            else:
+                raise ValueError(f"Unexpected image format with {img_array.shape[2]} channels")
         
-        # Close video writer
-        out.release()
+        # Streaming capture and write: process one frame at a time to minimize memory usage
+        progress_print_every_n_frames = max(1, n_frames // 20)
+        try:
+            for i, frame_idx in enumerate(frame_indices):
+                if progress_print and (i % progress_print_every_n_frames == 0 or i == n_frames - 1):
+                    print(f'Processing frame {i+1}/{n_frames} (t={time_window_centers[frame_idx]:.2f})')
+                
+                # Update plotter to current time
+                t = time_window_centers[frame_idx]
+                self.update(t, defer_render=False)
+                
+                # Process events to ensure rendering
+                QtWidgets.QApplication.processEvents()
+                
+                # Capture frame and write directly to video
+                qimage = exporter.export(toBytes=True)
+                bgr_array = qimage_to_bgr(qimage)
+                out.write(bgr_array)
+        finally:
+            # Always close video writer and restore debug print setting
+            out.release()
+            self.params.debug_print = original_debug_print
         
         if progress_print:
             print(f'Video exported successfully to: {video_filepath}')
