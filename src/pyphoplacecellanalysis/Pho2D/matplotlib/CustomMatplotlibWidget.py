@@ -731,16 +731,30 @@ class CustomMatplotlibWidget(CrosshairsTracingMixin, ToastShowingWidgetMixin, Pl
         # output.close()
         
         canvas = self.ui.canvas
-
         canvas.draw()  # Ensure the canvas has been drawn once before copying the figure        
         buf = io.BytesIO()
         canvas.print_png(buf)
         buf.seek(0)
         img = Image.open(buf)
-        # Send the image to the clipboard
-        img.convert('RGB').save(buf, 'png') ## is this needed?
-        data = buf.getvalue() ## is this the only wway to get the NDArray data?
-        buf.close()
-        print(f'data: {data}') ## #TODO 2025-12-02 14:52: - [ ] is the NDArray data in the same format as the PyQtGraph ImageExporter case?
-        return data
+        
+        # Match pyqtgraph implementation: handle alpha channel and composite over white background
+        if img.mode in ('RGBA', 'LA'):
+            # Extract RGB and alpha channels
+            img_rgba = img.convert('RGBA')
+            raw = np.array(img_rgba).astype(np.float32) / 255.0
+            r = raw[:, :, 0]
+            g = raw[:, :, 1]
+            b = raw[:, :, 2]
+            a = raw[:, :, 3]
+            rgb = np.stack([r, g, b], axis=-1)
+            # Composite over white background so grid and image blend as on-screen
+            bg = np.ones_like(rgb)
+            comp = rgb * a[..., None] + bg * (1.0 - a[..., None])
+            arr = (comp * 255).astype(np.uint8)
+        else:
+            # No alpha channel, just convert to RGB
+            img_rgb = img.convert('RGB')
+            arr = np.array(img_rgb).astype(np.uint8)
+        
+        return arr
 
