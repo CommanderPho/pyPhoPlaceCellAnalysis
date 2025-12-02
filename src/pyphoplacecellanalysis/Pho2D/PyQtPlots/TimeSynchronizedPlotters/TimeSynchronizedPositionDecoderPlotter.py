@@ -419,6 +419,8 @@ class TimeSynchronizedPositionDecoderPlotter(UserEditableROIMixin, AnimalTraject
             frame_indices = all_frame_indices
         
         n_frames: int = len(frame_indices)
+        if n_frames == 0:
+            raise ValueError(f"No frames to export after subsampling at {fps} fps")
         
         if progress_print:
             total_available_frames = len(all_frame_indices)
@@ -436,16 +438,7 @@ class TimeSynchronizedPositionDecoderPlotter(UserEditableROIMixin, AnimalTraject
         original_debug_print = self.params.debug_print
         self.params.debug_print = debug_print
         
-        # Create ImageExporter for the root plot
-        exporter = ImageExporter(self.ui.root_plot)
-        exporter.parameters()['width'] = width
-        exporter.parameters()['height'] = height
-        exporter.parameters()['antialias'] = True
-        
-        # Process events to ensure widget is rendered
-        QtWidgets.QApplication.processEvents()
-        
-        # Helper to convert QImage to BGR array for OpenCV
+        # Helper to convert QImage to BGR array for OpenCV (contiguous uint8 for compatibility)
         def qimage_to_bgr(qimage):
             img_array = fn.ndarray_from_qimage(qimage)
             # Handle ARGB32 format conversion based on byte order
@@ -453,47 +446,59 @@ class TimeSynchronizedPositionDecoderPlotter(UserEditableROIMixin, AnimalTraject
                 # ARGB32 format - extract RGB channels based on byte order
                 if sys.byteorder == 'little':
                     # Little-endian: channels are [B, G, R, A] in memory
-                    return img_array[:, :, [0, 1, 2]]  # B, G, R
+                    bgr = img_array[:, :, :3]  # B, G, R (first 3 channels)
                 else:
                     # Big-endian: channels are [A, R, G, B] in memory
-                    rgb_array = img_array[:, :, [1, 2, 3]]  # R, G, B
-                    return rgb_array[:, :, [2, 1, 0]]  # Convert to BGR
+                    bgr = img_array[:, :, [3, 2, 1]]  # B, G, R from indices 3,2,1
             elif img_array.shape[2] == 3:
                 # Already RGB format, convert to BGR for OpenCV
-                return img_array[:, :, [2, 1, 0]]
+                bgr = img_array[:, :, ::-1]
             else:
                 raise ValueError(f"Unexpected image format with {img_array.shape[2]} channels")
+            # Ensure contiguous uint8 array for OpenCV compatibility
+            return np.ascontiguousarray(bgr, dtype=np.uint8)
         
-        # Capture first frame to get actual output dimensions (may differ from requested)
-        first_frame_idx = frame_indices[0]
-        self.update(time_window_centers[first_frame_idx], defer_render=False)
-        QtWidgets.QApplication.processEvents()
-        first_qimage = exporter.export(toBytes=True)
-        first_bgr = qimage_to_bgr(first_qimage)
-        actual_height, actual_width = first_bgr.shape[:2]
-        
-        # Set up output path and directory
-        video_filepath = Path(output_path).resolve()
-        video_parent_path = video_filepath.parent
-        if not video_parent_path.exists():
-            if progress_print:
-                print(f'Creating output directory: {video_parent_path}')
-            video_parent_path.mkdir(parents=True, exist_ok=True)
-        
-        # Initialize video writer with actual frame dimensions
-        fourcc = cv2.VideoWriter_fourcc('M','J','P','G')
-        out = cv2.VideoWriter(str(video_filepath), fourcc, fps, (actual_width, actual_height), isColor=True)
-        
-        if not out.isOpened():
-            self.params.debug_print = original_debug_print  # Restore before raising
-            raise RuntimeError(f"Failed to open video writer for {video_filepath}")
-        
-        # Write the first frame we already captured
-        out.write(first_bgr)
-        
-        # Streaming capture and write: process remaining frames one at a time
-        progress_print_every_n_frames = max(1, n_frames // 20)
+        out = None  # Initialize to None for proper cleanup
         try:
+            # Create ImageExporter for the root plot
+            exporter = ImageExporter(self.ui.root_plot)
+            exporter.parameters()['width'] = width
+            exporter.parameters()['height'] = height
+            exporter.parameters()['antialias'] = True
+            
+            # Process events to ensure widget is rendered
+            QtWidgets.QApplication.processEvents()
+            
+            # Capture first frame to get actual output dimensions (may differ from requested)
+            first_frame_idx = frame_indices[0]
+            self.update(time_window_centers[first_frame_idx], defer_render=False)
+            QtWidgets.QApplication.processEvents()
+            first_qimage = exporter.export(toBytes=True)
+            first_bgr = qimage_to_bgr(first_qimage)
+            actual_height, actual_width = first_bgr.shape[:2]
+            del first_qimage  # Free memory
+            
+            # Set up output path and directory
+            video_filepath = Path(output_path).resolve()
+            video_parent_path = video_filepath.parent
+            if not video_parent_path.exists():
+                if progress_print:
+                    print(f'Creating output directory: {video_parent_path}')
+                video_parent_path.mkdir(parents=True, exist_ok=True)
+            
+            # Initialize video writer with actual frame dimensions
+            fourcc = cv2.VideoWriter_fourcc('M','J','P','G')
+            out = cv2.VideoWriter(str(video_filepath), fourcc, fps, (actual_width, actual_height), isColor=True)
+            
+            if not out.isOpened():
+                raise RuntimeError(f"Failed to open video writer for {video_filepath}")
+            
+            # Write the first frame we already captured
+            out.write(first_bgr)
+            del first_bgr  # Free memory
+            
+            # Streaming capture and write: process remaining frames one at a time
+            progress_print_every_n_frames = max(1, n_frames // 20)
             for i, frame_idx in enumerate(frame_indices):
                 if i == 0:
                     # First frame already written
@@ -516,8 +521,9 @@ class TimeSynchronizedPositionDecoderPlotter(UserEditableROIMixin, AnimalTraject
                 bgr_array = qimage_to_bgr(qimage)
                 out.write(bgr_array)
         finally:
-            # Always close video writer and restore debug print setting
-            out.release()
+            # Always close video writer (if opened) and restore debug print setting
+            if out is not None:
+                out.release()
             self.params.debug_print = original_debug_print
         
         if progress_print:
