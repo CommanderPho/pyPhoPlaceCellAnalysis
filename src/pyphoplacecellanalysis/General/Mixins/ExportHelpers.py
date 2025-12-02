@@ -958,9 +958,17 @@ class FigureToImageHelpers:
         Each "page" has a fixed number of rows `rows_per_page`. 
 
         """
+        import pyphoplacecellanalysis.External.pyqtgraph as pg
         from pyphoplacecellanalysis.External.pyqtgraph.exporters.ImageExporter import ImageExporter
         from PyQt5.QtGui import QImage
         import matplotlib.image as mimage
+        from matplotlib.axes import Axes
+        from matplotlib.artist import Artist
+        import matplotlib.pyplot as plt
+        import io
+        from matplotlib.backends.backend_agg import FigureCanvasAgg
+        
+        
 
 
         # Styling like matplotlib version
@@ -1011,7 +1019,19 @@ class FigureToImageHelpers:
                 y_max = track_heights[track_IDX] ## these are in data units, like [0.0, 287.7697841726619] and so the same for many tracks
                 h = y_max - y_min ## in data units
                 extent = [t.get_extent()[0], t.get_extent()[1], y_offset, (y_offset+h)]
-                export_infos.append(dict(kind="mpl", obj=t, extent=extent, y_height=h))
+                export_infos.append(dict(kind="mpl", subkind="AxesImage", obj=t, extent=extent, y_height=h))
+                
+            elif isinstance(t, (Axes, Artist)):
+                ## matplotlib general axes or Artist
+                ## Figure units version:
+                #t.get_extent() is like [-2.84147705365001e-15, 1458.5500000000002, 0.0, 287.7697841726619] and in data units
+                y_min = 0.0
+                y_max = track_heights[track_IDX] ## these are in data units, like [0.0, 287.7697841726619] and so the same for many tracks
+                h = y_max - y_min ## in data units
+                extent = [t.get_extent()[0], t.get_extent()[1], y_offset, (y_offset+h)]
+                export_infos.append(dict(kind="mpl", subkind="Axes", obj=t, extent=extent, y_height=h))
+                
+
             else:  # assume pg.PlotItem
                 # ## Data units version: for 3 tracks, we get [[-4.4, 0.4], [-4.0, 45.5], [0, 1]]
                 # y_min, y_max = t.getViewBox().viewRange()[1]
@@ -1025,7 +1045,7 @@ class FigureToImageHelpers:
                 h = y_max - y_min ## in data units
                 extent = [x_min, x_max, y_offset, (y_offset+h)]
 
-                export_infos.append(dict(kind="pg", obj=t, extent=extent, y_height=h))
+                export_infos.append(dict(kind="pg", subkind="PlotItem", obj=t, extent=extent, y_height=h))
 
             ## must spit out `h`
             y_offset += h
@@ -1060,12 +1080,64 @@ class FigureToImageHelpers:
                             print(f'info["extent"]: {info["extent"]}')
 
                         if info['kind'] == "mpl":
-                            arr = info['obj'].get_array()
-                            cmap = info['obj'].get_cmap()
-                            ax.imshow(arr, extent=[info['extent'][0], info['extent'][1], info['extent'][2], info['extent'][3]], aspect='auto', cmap=cmap, origin=info['obj'].origin)
+                            if info['subkind'] == "AxesImage":
+                                arr = info['obj'].get_array()
+                                cmap = info['obj'].get_cmap()
+                                ax.imshow(arr, extent=[info['extent'][0], info['extent'][1], info['extent'][2], info['extent'][3]], aspect='auto', cmap=cmap, origin=info['obj'].origin)
+                            elif info['subkind'] == "Axes":
+                                ## Copy the general matplotlib Axes object to the temporary render axes:
+                                source_ax = info['obj']
+                                
+                                # Get original limits
+                                orig_xlim = source_ax.get_xlim()
+                                orig_ylim = source_ax.get_ylim()
+                                
+                                # Temporarily set X limits to chunk range
+                                source_ax.set_xlim(start, end)
+                                
+                                # Get the figure and ensure it's drawn
+                                source_fig = source_ax.figure
+                                source_fig.canvas.draw()
+                                
+                                # Get the axes bbox in figure coordinates
+                                bbox = source_ax.get_tightbbox(source_fig.canvas.renderer)
+                                
+                                # Create a buffer to render to
+                                buf = io.BytesIO()
+                                
+                                # Render the figure to the buffer, cropping to the axes bbox
+                                # Use the existing canvas if it's an Agg backend, otherwise create a temporary one
+                                if hasattr(source_fig.canvas, 'print_figure'):
+                                    source_fig.canvas.print_figure(buf, format='png', dpi=dpi, bbox_inches=bbox)
+                                else:
+                                    # Create a temporary canvas for rendering
+                                    temp_canvas = FigureCanvasAgg(source_fig)
+                                    temp_canvas.draw()
+                                    temp_canvas.print_figure(buf, format='png', dpi=dpi, bbox_inches=bbox)
+                                
+                                # Read the buffer as an image array
+                                buf.seek(0)
+                                img_arr = mimage.imread(buf)
+                                buf.close()
+                                
+                                # Restore original limits
+                                source_ax.set_xlim(*orig_xlim)
+                                source_ax.set_ylim(*orig_ylim)
+                                
+                                # Display the rendered image in the target axes
+                                ax.imshow(img_arr, extent=[start, end, info['extent'][2], info['extent'][3]], aspect='auto', origin='upper')
+                            
                         else:  # pyqtgraph-backed tracks
                             pi = info['obj']
-                            orig_x, orig_y = pi.getViewBox().viewRange()
+                            vb = pi.getViewBox()
+                            orig_x, orig_y = vb.viewRange()
+                            
+                            # Temporarily break X-link if present (e.g., for new_curves_separate_plot)
+                            # This prevents the linked plot from overriding the X range change during export
+                            orig_x_link = vb.linkedView(pg.ViewBox.XAxis)  # Get current X-axis link
+                            if orig_x_link is not None:
+                                pi.setXLink(None)  # Temporarily unlink
+                            
                             pi.setXRange(start, end, padding=0) ## set to this chunk
                             pi.setYRange(*orig_y, padding=0)
                             exporter = ImageExporter(pi)
@@ -1098,8 +1170,12 @@ class FigureToImageHelpers:
                             ## render the image into the temporary matplotlib ax using `ax.imshow(...)`
                             ax.imshow(arr, extent=[start, end, info['extent'][2], info['extent'][3]], aspect='auto', origin='upper') 
                             # ax.imshow(arr, extent=[info['extent'][0], info['extent'][1], info['extent'][2], info['extent'][3]], aspect='auto', origin='upper') ## tried this, and it's markedly wrong
+                            
+                            ## restore previous ranges and X-link
                             pi.setXRange(*orig_x, padding=0)
                             pi.setYRange(*orig_y, padding=0)
+                            if orig_x_link is not None:
+                                pi.setXLink(orig_x_link)  # Restore X-link
 
                     # separators between tracks
                     if len(export_infos) > 1:
