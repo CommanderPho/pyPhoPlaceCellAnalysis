@@ -551,7 +551,7 @@ class FigureToImageHelpers:
     """ Exports the entire active_2d_plot timeline (all tracks) to a multi-page PDF file 
     """
     @classmethod
-    def _helper_extract_renderables_from_track_widgets(cls, active_2d_plot, included_track_dock_identifiers: Optional[List]=None):
+    def _DEP_helper_extract_renderables_from_track_widgets(cls, active_2d_plot, included_track_dock_identifiers: Optional[List]=None):
         """ Gets the renderable embedded in the track widget for the provided `included_track_dock_identifiers`.
         Usage:
 
@@ -633,9 +633,9 @@ class FigureToImageHelpers:
     
 
 
-    @function_attributes(short_name=None, tags=['pdf', 'export', 'wrapped', 'multi-track', 'pyqtgraph', 'matplotlib'], creation_date='2025-08-22 02:30')
+    @function_attributes(short_name=None, tags=['DEP', 'OLD', 'pdf', 'export', 'wrapped', 'multi-track', 'pyqtgraph', 'matplotlib'], creation_date='2025-08-22 02:30')
     @classmethod
-    def perform_export_wrapped_tracks_to_paged_pdf(cls, tracks: List, x_extent: tuple, chunk_width: float, output_pdf_path: str, rows_per_page: int=5, figsize=(8, 11), dpi=150, normalized_track_heights: Optional[List]=None, debug_max_num_pages: Optional[int]=5, track_labels: Optional[List[str]]=None, debug_print:bool=False):
+    def _DEP_perform_export_wrapped_tracks_to_paged_pdf(cls, tracks: List, x_extent: tuple, chunk_width: float, output_pdf_path: str, rows_per_page: int=5, figsize=(8, 11), dpi=150, normalized_track_heights: Optional[List]=None, debug_max_num_pages: Optional[int]=5, track_labels: Optional[List[str]]=None, debug_print:bool=False):
         """
         Export a mixed list of matplotlib AxesImages and PyQtGraph PlotItems to a wrapped, paged PDF.
 
@@ -902,9 +902,9 @@ class FigureToImageHelpers:
         print(f"PDF saved to {output_pdf_path}")
         return output_pdf_path
 
-    @function_attributes(short_name=None, tags=['tracks', 'MAIN', 'save', 'export', 'pdf', 'multi-page-pdf', 'timeline'], input_requires=[], output_provides=[], uses=['_helper_extract_renderables_from_track_widgets', 'perform_export_wrapped_tracks_to_paged_pdf'], used_by=[], creation_date='2025-08-22 08:13', related_items=[])
+    @function_attributes(short_name=None, tags=['DEP', 'OLD', 'tracks', 'MAIN', 'save', 'export', 'pdf', 'multi-page-pdf', 'timeline'], input_requires=[], output_provides=[], uses=['_helper_extract_renderables_from_track_widgets', 'perform_export_wrapped_tracks_to_paged_pdf'], used_by=[], creation_date='2025-08-22 08:13', related_items=[])
     @classmethod
-    def _OLD_export_wrapped_tracks_to_paged_df(cls, active_2d_plot, output_pdf_path: str, included_track_dock_identifiers: Optional[List]=None, **kwargs):
+    def _DEP_export_wrapped_tracks_to_paged_df(cls, active_2d_plot, output_pdf_path: str, included_track_dock_identifiers: Optional[List]=None, **kwargs):
         """ Exports the entire timeline (all tracks) out to a multi-paged PDF
         
         Usage:
@@ -914,9 +914,9 @@ class FigureToImageHelpers:
         """
 
 
-        found_heterogeneous_stack, normalized_track_heights, included_track_dock_identifiers = cls._helper_extract_renderables_from_track_widgets(active_2d_plot, included_track_dock_identifiers=included_track_dock_identifiers)
+        found_heterogeneous_stack, normalized_track_heights, included_track_dock_identifiers = cls._DEP_helper_extract_renderables_from_track_widgets(active_2d_plot, included_track_dock_identifiers=included_track_dock_identifiers)
 
-        return cls.perform_export_wrapped_tracks_to_paged_pdf(tracks=found_heterogeneous_stack, x_extent=(active_2d_plot.total_data_start_time, active_2d_plot.total_data_end_time), chunk_width=active_2d_plot.active_window_duration, output_pdf_path=output_pdf_path,
+        return cls._DEP_perform_export_wrapped_tracks_to_paged_pdf(tracks=found_heterogeneous_stack, x_extent=(active_2d_plot.total_data_start_time, active_2d_plot.total_data_end_time), chunk_width=active_2d_plot.active_window_duration, output_pdf_path=output_pdf_path,
                                                         normalized_track_heights = normalized_track_heights, **kwargs,
                                                         )
 
