@@ -628,11 +628,9 @@ class FigureToImageHelpers:
         track_heights = np.array(track_heights)
         normalized_track_heights = track_heights / np.sum(track_heights)
 
-        # track_heights_dict = dict(zip(included_track_dock_identifiers, track_heights))
-        # track_heights_dict = dict(zip(included_track_dock_identifiers, normalized_track_heights))
-
-
         return found_heterogeneous_stack, normalized_track_heights, included_track_dock_identifiers
+    
+
 
     @function_attributes(short_name=None, tags=['pdf', 'export', 'wrapped', 'multi-track', 'pyqtgraph', 'matplotlib'], creation_date='2025-08-22 02:30')
     @classmethod
@@ -905,7 +903,7 @@ class FigureToImageHelpers:
 
     @function_attributes(short_name=None, tags=['tracks', 'MAIN', 'save', 'export', 'pdf', 'multi-page-pdf', 'timeline'], input_requires=[], output_provides=[], uses=['_helper_extract_renderables_from_track_widgets', 'perform_export_wrapped_tracks_to_paged_pdf'], used_by=[], creation_date='2025-08-22 08:13', related_items=[])
     @classmethod
-    def export_wrapped_tracks_to_paged_df(cls, active_2d_plot, output_pdf_path: str, included_track_dock_identifiers: Optional[List]=None, **kwargs):
+    def _OLD_export_wrapped_tracks_to_paged_df(cls, active_2d_plot, output_pdf_path: str, included_track_dock_identifiers: Optional[List]=None, **kwargs):
         """ Exports the entire timeline (all tracks) out to a multi-paged PDF
         
         Usage:
@@ -922,6 +920,302 @@ class FigureToImageHelpers:
                                                         )
 
 
+
+
+
+
+
+
+
+    @function_attributes(short_name=None, tags=['NEW', 'tracks', 'MAIN', 'save', 'export', 'pdf', 'multi-page-pdf', 'timeline'], input_requires=[], output_provides=[], uses=['_helper_extract_renderables_from_track_widgets', 'perform_export_wrapped_tracks_to_paged_pdf'], used_by=[], creation_date='2025-08-22 08:13', related_items=[])
+    @classmethod
+    def export_wrapped_tracks_to_paged_df(cls, active_2d_plot, output_pdf_path: str, included_track_dock_identifiers: Optional[List]=None, **kwargs):
+        """ Exports the entire timeline (all tracks) out to a multi-paged PDF
+        
+        Usage:
+
+            saved_output_pdf_path = FigureToImageHelpers.export_wrapped_tracks_to_paged_df(active_2d_plot, output_pdf_path=output_pdf_path)
+
+        """
+        import pyphoplacecellanalysis.External.pyqtgraph as pg
+        from pyphoplacecellanalysis.External.pyqtgraph.exporters.ImageExporter import ImageExporter
+        from PyQt5.QtGui import QImage
+        import matplotlib.image as mimage
+        from matplotlib.axes import Axes
+        from matplotlib.artist import Artist
+        import matplotlib.pyplot as plt
+        import io
+        from matplotlib.backends.backend_agg import FigureCanvasAgg
+        
+        # Unpack keyword arguments with defaults (kwargs with default values as individual assignments)
+        tracks = kwargs.pop('tracks', None)
+        x_extent = kwargs.pop('x_extent', None)
+        chunk_width = kwargs.pop('chunk_width', None)
+        output_pdf_path = kwargs.pop('output_pdf_path', None)
+        rows_per_page = kwargs.pop('rows_per_page', 5)
+        figsize = kwargs.pop('figsize', (8, 11))
+        dpi = kwargs.pop('dpi', 150)
+        normalized_track_heights = kwargs.pop('normalized_track_heights', None)
+        debug_max_num_pages = kwargs.pop('debug_max_num_pages', 5)
+        track_labels = kwargs.pop('track_labels', None)
+        debug_print = kwargs.pop('debug_print', False)
+
+        # found_heterogeneous_stack, normalized_track_heights, included_track_dock_identifiers = cls._helper_extract_renderables_from_track_widgets(active_2d_plot, included_track_dock_identifiers=included_track_dock_identifiers)
+
+        # If argument assignment was previously done in call, do it explicitly now:
+        tracks = found_heterogeneous_stack
+        x_extent = (active_2d_plot.total_data_start_time, active_2d_plot.total_data_end_time)
+        chunk_width = active_2d_plot.active_window_duration
+
+
+
+        # Styling like matplotlib version
+        track_separator_line_kwargs = dict(color='white', linewidth=2, linestyle='-', alpha=0.8)
+        time_label_formatting_kwargs = dict(fontsize=10, color='black')
+        multi_track_label_formatting_kwargs = dict(fontsize=9, color='black')
+
+        if not isinstance(tracks, (list, tuple)):
+            tracks = [tracks]
+
+        if track_labels is not None and len(track_labels) != len(tracks):
+            print(f"Warning: track_labels length ({len(track_labels)}) != tracks length ({len(tracks)}). Ignoring labels.")
+            track_labels = None
+        has_labels = track_labels is not None
+
+        if normalized_track_heights is None:
+            raise NotImplementedError(f'normalized_track_heights is now required! The previous implementation did not work.')
+
+        if normalized_track_heights is not None and len(normalized_track_heights) != len(tracks):
+            print(f"Warning: track_heights length ({len(normalized_track_heights)}) != tracks length ({len(tracks)}). Ignoring track_heights.")
+            normalized_track_heights = None
+        has_track_heights = normalized_track_heights is not None
+        if normalized_track_heights is not None:
+            ## converts the track heights into matplotlib figure units (inches):
+            fig_total_height: float = float(figsize[1])
+            # track_rel_heights = deepcopy(normalized_track_heights)
+            track_heights = (normalized_track_heights * fig_total_height)
+
+
+        x_min, x_max = x_extent
+
+        # Collect metadata dictionary for stacking
+        export_infos = []
+        y_offset = 0
+        for track_IDX, t in enumerate(tracks):
+
+            if isinstance(t, mimage.AxesImage):
+                # ## Data units version:
+                # #t.get_extent() is like [-2.84147705365001e-15, 1458.5500000000002, 0.0, 287.7697841726619] and in data units
+                # y_min, y_max = t.get_extent()[2:4] ## these are in data units, like [0.0, 287.7697841726619] and so the same for many tracks
+                # h = y_max - y_min ## in data units
+                # extent = [t.get_extent()[0], t.get_extent()[1], y_offset, (y_offset+h)]
+
+                ## Figure units version:
+                #t.get_extent() is like [-2.84147705365001e-15, 1458.5500000000002, 0.0, 287.7697841726619] and in data units
+                y_min = 0.0
+                y_max = track_heights[track_IDX] ## these are in data units, like [0.0, 287.7697841726619] and so the same for many tracks
+                h = y_max - y_min ## in data units
+                extent = [t.get_extent()[0], t.get_extent()[1], y_offset, (y_offset+h)]
+                export_infos.append(dict(kind="mpl", subkind="AxesImage", obj=t, extent=extent, y_height=h))
+                
+            elif isinstance(t, (Axes, Artist)):
+                ## matplotlib general axes or Artist
+                ## Figure units version:
+                # For Axes objects, use x_min and x_max from the function parameters (similar to pyqtgraph PlotItems)
+                y_min = 0.0
+                y_max = track_heights[track_IDX] ## these are in data units, like [0.0, 287.7697841726619] and so the same for many tracks
+                h = y_max - y_min ## in data units
+                extent = [x_min, x_max, y_offset, (y_offset+h)]
+                export_infos.append(dict(kind="mpl", subkind="Axes", obj=t, extent=extent, y_height=h))
+                
+
+            else:  # assume pg.PlotItem
+                # ## Data units version: for 3 tracks, we get [[-4.4, 0.4], [-4.0, 45.5], [0, 1]]
+                # y_min, y_max = t.getViewBox().viewRange()[1]
+                # h = y_max - y_min
+                # extent = [x_min, x_max, y_offset, y_offset+h]
+
+                ## Figure units version:
+                #t.get_extent() is like [-2.84147705365001e-15, 1458.5500000000002, 0.0, 287.7697841726619] and in data units
+                y_min = 0.0
+                y_max = track_heights[track_IDX] ## these are in data units, like [0.0, 287.7697841726619] and so the same for many tracks
+                h = y_max - y_min ## in data units
+                extent = [x_min, x_max, y_offset, (y_offset+h)]
+
+                export_infos.append(dict(kind="pg", subkind="PlotItem", obj=t, extent=extent, y_height=h))
+
+            ## must spit out `h`
+            y_offset += h
+
+        total_y_min, total_y_max = 0, y_offset
+
+        if debug_print:
+            print(f'export_infos: {export_infos}')
+
+        # Chunking/building output images:
+        chunks = []
+        start = x_min
+        while start < x_max:
+            end = min(start+chunk_width, x_max)
+            chunks.append((start, end))
+            start = end
+        pages = [chunks[i:(i+rows_per_page)] for i in range(0, len(chunks), rows_per_page)]
+        if debug_max_num_pages is not None:
+            pages = pages[:debug_max_num_pages]
+
+        with backend_pdf.PdfPages(output_pdf_path) as pdf:
+            for page_chunks in pages:
+                fig, axes = plt.subplots(nrows=len(page_chunks), figsize=figsize, dpi=dpi, constrained_layout=True)
+                if len(page_chunks) == 1:
+                    axes = [axes]
+
+                first_chunk = True
+                for ax, (start, end) in zip(axes, page_chunks):
+                    # render each track
+                    for info in export_infos:
+                        if debug_print:
+                            print(f'info["extent"]: {info["extent"]}')
+
+                        if info['kind'] == "mpl":
+                            if info['subkind'] == "AxesImage":
+                                arr = info['obj'].get_array()
+                                cmap = info['obj'].get_cmap()
+                                ax.imshow(arr, extent=[info['extent'][0], info['extent'][1], info['extent'][2], info['extent'][3]], aspect='auto', cmap=cmap, origin=info['obj'].origin)
+                            elif info['subkind'] == "Axes":
+                                ## Copy the general matplotlib Axes object to the temporary render axes:
+                                source_ax = info['obj']
+                                
+                                # Get original limits
+                                orig_xlim = source_ax.get_xlim()
+                                orig_ylim = source_ax.get_ylim()
+                                
+                                # Temporarily set X limits to chunk range
+                                source_ax.set_xlim(start, end)
+                                
+                                # Get the source figure and ensure it's drawn
+                                source_fig = source_ax.figure
+                                source_fig.canvas.draw()
+                                
+                                # Get the axes bbox in display coordinates
+                                bbox = source_ax.get_tightbbox(source_fig.canvas.renderer)
+                                
+                                # Convert bbox to inches for rendering
+                                # bbox is in display coordinates (pixels at source_fig.dpi), convert to inches
+                                bbox_inches = bbox.transformed(source_fig.dpi_scale_trans.inverted())
+                                
+                                # Calculate the output size in pixels when rendered at the specified DPI
+                                output_width_pixels = bbox_inches.width * dpi
+                                output_height_pixels = bbox_inches.height * dpi
+                                
+                                # Check if dimensions exceed the maximum (2^16 - 1 = 65535)
+                                max_dimension = 65535
+                                if output_width_pixels > max_dimension or output_height_pixels > max_dimension:
+                                    # Calculate scale factor to fit within limits
+                                    scale = min(max_dimension / output_width_pixels, max_dimension / output_height_pixels)
+                                    # Adjust DPI to achieve the desired size
+                                    effective_dpi = int(dpi * scale)
+                                else:
+                                    effective_dpi = dpi
+                                
+                                # Create a buffer to render to
+                                buf = io.BytesIO()
+                                
+                                # Render source figure with bbox_inches and adjusted DPI
+                                source_fig.savefig(buf, format='png', dpi=effective_dpi, bbox_inches=bbox_inches, pad_inches=0, facecolor='white')
+                                
+                                # Read the image array
+                                buf.seek(0)
+                                img_arr = mimage.imread(buf)
+                                buf.close()
+                                
+                                # Restore original limits
+                                source_ax.set_xlim(*orig_xlim)
+                                source_ax.set_ylim(*orig_ylim)
+                                
+                                # Display the rendered image in the target axes
+                                ax.imshow(img_arr, extent=[start, end, info['extent'][2], info['extent'][3]], aspect='auto', origin='upper')
+                            
+                        else:  
+                            # pyqtgraph-backed tracks
+                            pi = info['obj']
+                            vb = pi.getViewBox()
+                            orig_x, orig_y = vb.viewRange()
+                            
+                            # Temporarily break X-link if present (e.g., for new_curves_separate_plot)
+                            # This prevents the linked plot from overriding the X range change during export
+                            orig_x_link = vb.linkedView(pg.ViewBox.XAxis)  # Get current X-axis link
+                            if orig_x_link is not None:
+                                pi.setXLink(None)  # Temporarily unlink
+                            
+                            pi.setXRange(start, end, padding=0) ## set to this chunk
+                            pi.setYRange(*orig_y, padding=0)
+                            exporter = ImageExporter(pi)
+                            # exporter.parameters()['width'] = int(figsize[0]*dpi)
+                            # exporter.parameters()['height'] = int(((figsize[1]/len(page_chunks))*dpi)/len(tracks))
+                            exporter.parameters()['width'] = int((end - start) * dpi) # AI suggests I should be using `figsize[0] * dpi` - I don't think this is right.
+                            exporter.parameters()['height'] = int((info['extent'][3] - info['extent'][2]) * dpi)
+                            if debug_print:
+                                print(f"\texporter.parameters(): w: {exporter.parameters()['width']}, h: {exporter.parameters()['height']}")
+                            # exporter.parameters()['width'] = int(figsize[0]*dpi)
+                            # exporter.parameters()['height'] = int((figsize[1]/len(page_chunks))*dpi/len(tracks))
+                            img = exporter.export(toBytes=True)
+                            if isinstance(img, QImage):
+                                w, h = img.width(), img.height()
+                                ptr = img.bits(); ptr.setsize(img.byteCount())
+                                # QImage from pyqtgraph is typically in BGRA byte order.
+                                raw = np.array(ptr).reshape(h, w, 4).astype(np.float32) / 255.0
+                                b = raw[:, :, 0]
+                                g = raw[:, :, 1]
+                                r = raw[:, :, 2]
+                                a = raw[:, :, 3]
+                                rgb = np.stack([r, g, b], axis=-1)
+                                # Composite over white background so grid and image blend as on-screen
+                                bg = np.ones_like(rgb)
+                                comp = rgb * a[..., None] + bg * (1.0 - a[..., None])
+                                arr = (comp * 255).astype(np.uint8)
+                            else:
+                                arr = np.array(img)
+                                
+                            ## render the image into the temporary matplotlib ax using `ax.imshow(...)`
+                            ax.imshow(arr, extent=[start, end, info['extent'][2], info['extent'][3]], aspect='auto', origin='upper') 
+                            # ax.imshow(arr, extent=[info['extent'][0], info['extent'][1], info['extent'][2], info['extent'][3]], aspect='auto', origin='upper') ## tried this, and it's markedly wrong
+                            
+                            ## restore previous ranges and X-link
+                            pi.setXRange(*orig_x, padding=0)
+                            pi.setYRange(*orig_y, padding=0)
+                            if orig_x_link is not None:
+                                pi.setXLink(orig_x_link)  # Restore X-link
+
+                    # separators between tracks
+                    if len(export_infos) > 1:
+                        for i, info in enumerate(export_infos[:-1]):
+                            sep_y = info['extent'][3]
+                            ax.axhline(y=sep_y, **track_separator_line_kwargs)
+
+                    ax.set_xlim(start, end)
+                    ax.set_ylim(total_y_min, total_y_max)
+
+                    # labels (only first chunk per page)
+                    if first_chunk and has_labels:
+                        for info, lbl in zip(export_infos, track_labels):
+                            yc = (info['extent'][2]+info['extent'][3])/2
+                            ynorm = (yc-total_y_min)/(total_y_max-total_y_min)
+                            ax.text(-0.01, ynorm, lbl, rotation=90, va='center', ha='center', transform=ax.transAxes, **multi_track_label_formatting_kwargs)
+
+                    # start/end time outside edges
+                    ax.text(-0.02 if has_labels else -0.01, 0.5, f"{start:.0f}", rotation=90, va='center', ha='center', transform=ax.transAxes, **time_label_formatting_kwargs)
+                    ax.text(1.02, 0.5, f"{end:.0f}", rotation=90, va='center', ha='center', transform=ax.transAxes, **time_label_formatting_kwargs)
+
+                    ax.set_xticks([]); ax.set_yticks([])
+                    first_chunk = False
+
+                pdf.savefig(fig)
+                plt.close(fig)
+            ## END for page_chunks in pages...
+        ## END with backend_pdf.PdfPages(output_pdf_path) as pdf:...
+        
+        print(f"PDF saved to {output_pdf_path}")
+        return output_pdf_path
 
 
 
