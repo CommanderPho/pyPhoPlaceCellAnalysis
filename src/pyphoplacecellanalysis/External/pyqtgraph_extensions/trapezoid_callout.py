@@ -25,6 +25,19 @@ class TrapezoidOverlay(QWidget):
         # Color configuration
         self.fill_color = QColor(0, 255, 255, 30)  # Cyan with low alpha
         self.border_color = QColor(0, 255, 255, 80)
+        
+        # Hook into parent's resize event to redraw the overlay when the parent/containing widget size changes
+        if parent is not None:
+            parent.installEventFilter(self)
+            # Resize overlay to match parent initially
+            self.resize(parent.size())
+            # Position at top-left corner of parent
+            self.move(0, 0)
+            # Make sure the overlay is visible and on top
+            self.show()
+            self.raise_()
+            # Trigger initial paint
+            QTimer.singleShot(0, self.update)
 
 
     def paintEvent(self, event):
@@ -125,6 +138,16 @@ class TrapezoidOverlay(QWidget):
         painter.setPen(QPen(self.border_color, 1))
         painter.drawPolygon(polygon)
 
+    def eventFilter(self, obj, event):
+        """Event filter to catch resize events from the parent widget."""
+        if obj == self.parent() and event.type() == QEvent.Type.Resize:
+            # Resize the overlay to match the parent widget size
+            self.resize(self.parent().size())
+            # Schedule an update to redraw the overlay
+            QTimer.singleShot(0, self.update)
+        return super().eventFilter(obj, event)
+
+
 class SpacerDock(Dock):
     """
     A custom Dock designed to act as a fixed-height visual separator.
@@ -172,7 +195,7 @@ class SpacerDock(Dock):
 class TrapezoidTestingMainWindow(QMainWindow):
     """ just a concrete test window to display the effect of the trapezoid stuff
     """
-    def __init__(self, use_SpacerDock_approach: bool=True, zoomed_above: bool=False):
+    def __init__(self, use_SpacerDock_approach: bool=False, zoomed_above: bool=False):
         super().__init__()
         self.use_SpacerDock_approach = use_SpacerDock_approach
         self.zoomed_above = zoomed_above
@@ -237,14 +260,34 @@ class TrapezoidTestingMainWindow(QMainWindow):
             zoomed_widget=self.w2_zoomed
         )
 
-        # Connect signals to trigger repaints
-        # Use deferred update to ensure scene transforms are fully updated before redrawing
-        self.region.sigRegionChanged.connect(self._schedule_overlay_update)
 
-        # Important: Repaint when the user manually resizes the docks/window
-        # We use a timer to hook into the resize event of the main loop easily,
-        # or you can override resizeEvent
-        self.region.sigRegionChangeFinished.connect(self.update_zoom)
+        overlay = self.overlay
+        # display_dock_area = self.region
+        display_dock_area = self.area
+        
+        def regionResizeEvent(event):
+            """ captures: display_dock_area, overlay
+            """
+            # Resize the overlay to match the window size
+            print(f'debug: resizeEvent(event): event: {event}')
+            print(f'\tdisplay_dock_area.size(): {display_dock_area.size()}')
+            # if not self.use_SpacerDock_approach:
+            overlay.resize(display_dock_area.size())
+            # Schedule an update to repaint the overlay with new region coordinates
+            QTimer.singleShot(0, overlay.update)
+
+
+        # Connect signals to trigger repaints
+        # # Use deferred update to ensure scene transforms are fully updated before redrawing
+        # self.region.sigRegionChanged.connect(self._schedule_overlay_update)
+        # # Important: Repaint when the user manually resizes the docks/window. We use a timer to hook into the resize event of the main loop easily, or you can override resizeEvent
+        # self.region.sigRegionChangeFinished.connect(self.update_zoom)
+
+        ## connect local function
+        # Note: The TrapezoidOverlay now automatically hooks into parent's resize event via eventFilter
+        self.region.sigRegionChanged.connect(regionResizeEvent)
+        self.region.sigRegionChangeFinished.connect(regionResizeEvent)
+
 
 
     def resizeEvent(self, event):
