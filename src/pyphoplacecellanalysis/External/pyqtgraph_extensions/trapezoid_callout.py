@@ -12,6 +12,8 @@ class TrapezoidOverlay(QWidget):
     from pyphoplacecellanalysis.External.pyqtgraph_extensions.trapezoid_callout import TrapezoidOverlay, SpacerDock
 
     """
+
+
     def __init__(self, parent=None, overview_widget=None, overview_zoomed_region_item=None, zoomed_widget=None):
         super().__init__(parent)
         # Make this widget transparent to mouse clicks and background
@@ -26,8 +28,20 @@ class TrapezoidOverlay(QWidget):
         self.target_plot = zoomed_widget  # The bottom PlotWidget (zoomed view)
         
         # Color configuration
-        self.fill_color = QColor(0, 255, 255, 30)  # Cyan with low alpha
-        self.border_color = QColor(0, 255, 255, 80)
+        if (self.region is not None) and (self.region.brush is not None):
+            ## copy from parent so that it's the a matching color. Ideally we could reduce the opacity tho.
+            self.brush = pg.mkBrush(self.region.brush)
+            # border_color = self.brush.color()
+            border_color = QColor(200, 200, 200, 180) ## light gray
+            self.pen = pg.mkPen(border_color, width=1)
+
+        else:
+            fill_color = QColor(0, 255, 255, 30)  # Cyan with low alpha
+            border_color = QColor(0, 255, 255, 80)
+
+            self.brush = QBrush(fill_color)
+            self.pen = QPen(border_color, 1)
+
         
         # Hook into parent's resize event to redraw the overlay when the parent/containing widget size changes
         if parent is not None:
@@ -45,6 +59,7 @@ class TrapezoidOverlay(QWidget):
             # Trigger initial paint with delay to ensure layout is complete
             QTimer.singleShot(100, self.update)
 
+
     def _get_plot_item(self, widget):
         """Helper method to get PlotItem from either PlotWidget or PyqtgraphTimeSynchronizedWidget."""
         # Check if it's a PyqtgraphTimeSynchronizedWidget (or similar wrapper)
@@ -56,6 +71,7 @@ class TrapezoidOverlay(QWidget):
         else:
             raise AttributeError(f"Widget {type(widget)} does not have plotItem or getRootPlotItem method")
     
+
     def _get_scene_mapping_widget(self, widget):
         """Helper method to get the widget that supports mapFromScene.
         For PyqtgraphTimeSynchronizedWidget, returns the GraphicsLayoutWidget.
@@ -72,6 +88,7 @@ class TrapezoidOverlay(QWidget):
                 if hasattr(child, 'mapFromScene'):
                     return child
             raise AttributeError(f"Widget {type(widget)} does not have mapFromScene or getRootGraphicsLayoutWidget method")
+
 
     def paintEvent(self, event):
         # Add comprehensive validation checks
@@ -169,8 +186,8 @@ class TrapezoidOverlay(QWidget):
         polygon.append(bottom_right)
         polygon.append(bottom_left)
 
-        painter.setBrush(QBrush(self.fill_color))
-        painter.setPen(QPen(self.border_color, 1))
+        painter.setBrush(self.brush)
+        painter.setPen(self.pen)
         painter.drawPolygon(polygon)
 
 
@@ -190,6 +207,7 @@ class TrapezoidOverlay(QWidget):
                 QTimer.singleShot(0, lambda: self._safe_resize(new_size))
         return super().eventFilter(obj, event)
     
+
     def _safe_resize(self, new_size):
         """Safely resize the overlay with validation."""
         try:
