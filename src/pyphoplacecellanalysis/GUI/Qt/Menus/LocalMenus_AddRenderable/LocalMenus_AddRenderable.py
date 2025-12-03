@@ -307,7 +307,7 @@ class LocalMenus_AddRenderable(QtWidgets.QMainWindow):
                 combined_menu = QtWidgets.QMenu()
                 
                 # Get the default PyQtGraph ViewBox menu
-                default_menu = viewbox.getMenu()
+                default_menu = viewbox.getMenu(ev)
                 # default_menu = viewbox.menu # ViewBoxMenu
                 if default_menu is not None:
                     # Copy all actions from the default menu
@@ -328,33 +328,72 @@ class LocalMenus_AddRenderable(QtWidgets.QMainWindow):
             # Override the raiseContextMenu method
             viewbox.raiseContextMenu = _combined_raiseContextMenu
             
+            # Disable the parent widget's custom context menu override so only the ViewBox menu shows
+            if hasattr(parent_widget, '_pho_custom_context_menu'):
+                # Clear the custom context menu on parent widget
+                parent_widget._pho_custom_context_menu = None
+            
+            # Disconnect customContextMenuRequested signal if it was connected
+            if hasattr(parent_widget, '_pho_context_menu_connected') and parent_widget._pho_context_menu_connected:
+                try:
+                    parent_widget.customContextMenuRequested.disconnect()
+                    parent_widget._pho_context_menu_connected = False
+                except (TypeError, RuntimeError):
+                    # Signal might not be connected or already disconnected
+                    pass
+            
+            # Reset context menu policy to default if it was changed to CustomContextMenu
+            if hasattr(parent_widget, 'contextMenuPolicy'):
+                if parent_widget.contextMenuPolicy() == QtCore.Qt.CustomContextMenu:
+                    # Reset to default context menu policy (PyQtGraph will handle it via ViewBox)
+                    # parent_widget.setContextMenuPolicy(QtCore.Qt.DefaultContextMenu)
+                    parent_widget.setContextMenuPolicy(QtCore.Qt.NoContextMenu)
+
+            
             if debug_print:
-                print(f'PyQtGraph ViewBox context menu override installed. Default menu actions: {[an_action.text() for an_action in (viewbox.getMenu().actions() if viewbox.getMenu() else [])]}')
+                print(f'PyQtGraph ViewBox context menu override installed. Default menu actions: {[an_action.text() for an_action in (viewbox.getMenu(None).actions() if viewbox.getMenu(None) else [])]}')
+                print(f'Parent widget custom context menu disabled. Context menu policy: {parent_widget.contextMenuPolicy() if hasattr(parent_widget, "contextMenuPolicy") else "N/A"}')
                 
-
-
+            return True
+        
         # BEGIN FUNCTION BODY ________________________________________________________________________________________________ #
-
+        was_menu_resolved: bool = False
+        
         # Try pyqtgraph approach first (for PlotItem, ViewBox, etc.)
-        try:
-            if hasattr(parent_widget, 'vb') and hasattr(parent_widget.vb, 'menu'):
-                # This is likely a pyqtgraph PlotItem
-                _subfn_append_custom_menu_to_PyQtGraph_based_widget_context_menu(parent_widget, additional_menu, debug_print)
-                return
-            elif hasattr(parent_widget, 'menu'):
-                # This might be a pyqtgraph ViewBox or similar
-                active_parent_menu = parent_widget.menu
-                active_parent_menu.addSeparator()
-                active_parent_menu.addMenu(additional_menu)
-                if debug_print:
-                    print(f'pyqtgraph widget menu actions: {[an_action.text() for an_action in active_parent_menu.actions()]}')
-                return
-        except Exception as e:
-            if debug_print:
-                print(f'Pyqtgraph approach failed: {e}, falling back to QWidget approach')
+        if not was_menu_resolved:
+            try:
+                viewbox = try_find_child_viewbox(parent_widget=parent_widget)
+                if viewbox is not None:
+                # if hasattr(parent_widget, 'vb') and hasattr(parent_widget.vb, 'menu'):
+                    if debug_print:
+                        print(f'trying to add custom menu to child viewbox...')
+                    # This is likely a pyqtgraph PlotItem
+                    was_menu_resolved: bool = _subfn_append_custom_menu_to_PyQtGraph_based_widget_context_menu(parent_widget, additional_menu, debug_print)
+                    if debug_print:
+                        print(f'was_menu_resolved: {was_menu_resolved}.')
 
+                    if was_menu_resolved:
+                        return
+                elif hasattr(parent_widget, 'menu'):
+                    # This might be a pyqtgraph ViewBox or similar
+                    if debug_print:
+                        print(f'trying to add custom menu to parent QWidgets existing menu...')
+                    active_parent_menu = parent_widget.menu
+                    active_parent_menu.addSeparator()
+                    active_parent_menu.addMenu(additional_menu)
+                    if debug_print:
+                        print(f'was_menu_resolved: {was_menu_resolved}\n\tpyqtgraph widget menu actions: {[an_action.text() for an_action in active_parent_menu.actions()]}')
+                    was_menu_resolved = True
+                    if was_menu_resolved:
+                        return
+            except Exception as e:
+                if debug_print:
+                    print(f'Pyqtgraph approach failed: {e}, falling back to QWidget approach')
+                was_menu_resolved = False
+                
         # Fall back to general QWidget approach
-        _subfn_append_custom_menu_to_QWidget_context_menu(parent_widget, additional_menu, debug_print)
+        if not was_menu_resolved:
+            _subfn_append_custom_menu_to_QWidget_context_menu(parent_widget, additional_menu, debug_print)
 
 
 

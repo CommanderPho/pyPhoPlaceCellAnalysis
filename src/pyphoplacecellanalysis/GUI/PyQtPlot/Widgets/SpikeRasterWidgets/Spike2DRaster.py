@@ -1346,10 +1346,10 @@ class Spike2DRaster(SpecificDockWidgetManipulatingMixin, DynamicDockDisplayAreaO
         """
         try:
             ## Setup the right-click context menu for all dock widgets:
-                active_2d_plot_renderable_menus = self.ui.menus.custom_context_menus.add_renderables ## Otherwise have to do `active_2d_plot_renderable_menus = cls._build_renderable_menu(active_2d_plot, curr_active_pipeline, active_config_name)`
-                widget_2d_menu = active_2d_plot_renderable_menus[0]
-                menuAdd_Renderable = widget_2d_menu.ui.menuAdd_Renderable
-                return menuAdd_Renderable
+            active_2d_plot_renderable_menus = self.ui.menus.custom_context_menus.add_renderables ## Otherwise have to do `active_2d_plot_renderable_menus = cls._build_renderable_menu(active_2d_plot, curr_active_pipeline, active_config_name)`
+            widget_2d_menu = active_2d_plot_renderable_menus[0]
+            menuAdd_Renderable = widget_2d_menu.ui.menuAdd_Renderable
+            return menuAdd_Renderable
         except (KeyError, AttributeError, ValueError) as e:
             print(f'._menuContextAddRenderable is not yet set-up by LocalMenus_AddRenderable.initialize_renderable_context_menu(...). Menu creation will be deferred.')
             return None
