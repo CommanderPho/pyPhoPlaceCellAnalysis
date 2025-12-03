@@ -18,6 +18,9 @@ class TrapezoidOverlay(QWidget):
         self.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
         
+        # Ensure widget is visible and can receive paint events
+        self.setAttribute(Qt.WidgetAttribute.WA_PaintOnScreen, False)  # Use normal painting
+        
         self.source_plot = overview_widget  # The top PlotWidget
         self.region = overview_zoomed_region_item       # The LinearRegionItem (selection box)
         self.target_plot = zoomed_widget  # The bottom PlotWidget (zoomed view)
@@ -36,23 +39,67 @@ class TrapezoidOverlay(QWidget):
             # Make sure the overlay is visible and on top
             self.show()
             self.raise_()
-            # Trigger initial paint
-            QTimer.singleShot(0, self.update)
+            # Ensure parent is shown first
+            if parent.isVisible():
+                self.setParent(parent)  # Re-parent to ensure proper stacking
+            # Trigger initial paint with delay to ensure layout is complete
+            QTimer.singleShot(100, self.update)
 
+    def _get_plot_item(self, widget):
+        """Helper method to get PlotItem from either PlotWidget or PyqtgraphTimeSynchronizedWidget."""
+        # Check if it's a PyqtgraphTimeSynchronizedWidget (or similar wrapper)
+        if hasattr(widget, 'getRootPlotItem'):
+            return widget.getRootPlotItem()
+        # Otherwise assume it's a standard PlotWidget
+        elif hasattr(widget, 'plotItem'):
+            return widget.plotItem
+        else:
+            raise AttributeError(f"Widget {type(widget)} does not have plotItem or getRootPlotItem method")
+    
+    def _get_scene_mapping_widget(self, widget):
+        """Helper method to get the widget that supports mapFromScene.
+        For PyqtgraphTimeSynchronizedWidget, returns the GraphicsLayoutWidget.
+        For standard PlotWidget, returns the widget itself."""
+        # Check if it's a PyqtgraphTimeSynchronizedWidget (or similar wrapper)
+        if hasattr(widget, 'getRootGraphicsLayoutWidget'):
+            return widget.getRootGraphicsLayoutWidget()
+        # Otherwise assume it's a standard PlotWidget that supports mapFromScene
+        elif hasattr(widget, 'mapFromScene'):
+            return widget
+        else:
+            # Fallback: try to find a GraphicsLayoutWidget child
+            for child in widget.findChildren(type(widget).__class__):
+                if hasattr(child, 'mapFromScene'):
+                    return child
+            raise AttributeError(f"Widget {type(widget)} does not have mapFromScene or getRootGraphicsLayoutWidget method")
 
     def paintEvent(self, event):
+        # Add comprehensive validation checks
         if not (self.source_plot and self.region and self.target_plot):
             return
-
-        should_inset_for_visibility: bool = True
         
+        # Check if widgets are still valid (not deleted)
+        try:
+            if not (self.source_plot.isVisible() and self.target_plot.isVisible()):
+                return
+            
+            # Validate that widgets have valid geometry
+            if self.source_plot.width() <= 0 or self.source_plot.height() <= 0:
+                return
+            if self.target_plot.width() <= 0 or self.target_plot.height() <= 0:
+                return
+        except RuntimeError:
+            # Widget has been deleted
+            return
+
         painter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
 
-        if should_inset_for_visibility:
-
+        try:
             # --- 1. Get Source Coordinates (Overview Plot with Region) ---
-            vb_source = self.source_plot.plotItem.vb
+            plot_item_source = self._get_plot_item(self.source_plot)
+            vb_source = plot_item_source.vb
+            scene_mapping_widget_source = self._get_scene_mapping_widget(self.source_plot)
 
             # Get the bounding rect of the ViewBox (the grid area) in scene coordinates
             source_view_rect = vb_source.mapRectToScene(vb_source.boundingRect())
@@ -63,7 +110,9 @@ class TrapezoidOverlay(QWidget):
             p2_x = vb_source.mapViewToScene(QPointF(x_max, 0)).x()
 
             # --- 2. Get Target Coordinates (Zoomed Plot) ---
-            vb_target = self.target_plot.plotItem.vb
+            plot_item_target = self._get_plot_item(self.target_plot)
+            vb_target = plot_item_target.vb
+            scene_mapping_widget_target = self._get_scene_mapping_widget(self.target_plot)
             target_view_rect = vb_target.mapRectToScene(vb_target.boundingRect())
 
             # --- 3. Determine relative position of target vs source ---
@@ -84,41 +133,27 @@ class TrapezoidOverlay(QWidget):
                 target_anchor_point_right = target_view_rect.topRight()
 
             # Convert to Global Screen coordinates
-            top_left_global = self.source_plot.mapToGlobal(self.source_plot.mapFromScene(QPointF(p1_x, source_y_anchor)))
-            top_right_global = self.source_plot.mapToGlobal(self.source_plot.mapFromScene(QPointF(p2_x, source_y_anchor)))
+            # Map scene coordinates to widget-local coordinates, then to global
+            top_left_local = scene_mapping_widget_source.mapFromScene(QPointF(p1_x, source_y_anchor))
+            top_left_global = scene_mapping_widget_source.mapToGlobal(top_left_local)
+            
+            top_right_local = scene_mapping_widget_source.mapFromScene(QPointF(p2_x, source_y_anchor))
+            top_right_global = scene_mapping_widget_source.mapToGlobal(top_right_local)
 
             # Use the ViewBox width for the corners
-            bottom_left_global = self.target_plot.mapToGlobal(self.target_plot.mapFromScene(target_anchor_point_left))
-            bottom_right_global = self.target_plot.mapToGlobal(self.target_plot.mapFromScene(target_anchor_point_right))
+            bottom_left_local = scene_mapping_widget_target.mapFromScene(target_anchor_point_left)
+            bottom_left_global = scene_mapping_widget_target.mapToGlobal(bottom_left_local)
+            
+            bottom_right_local = scene_mapping_widget_target.mapFromScene(target_anchor_point_right)
+            bottom_right_global = scene_mapping_widget_target.mapToGlobal(bottom_right_local)
 
 
-        else:
-            # --- 1. Get Coordinates of the Top Selection (Source) ---
-            # Get the current X values of the region [min, max]
-            min_x, max_x = self.region.getRegion()
-            
-            # Map these data values to the ViewBox's internal coordinate system
-            vb_source = self.source_plot.plotItem.vb
-            
-            # Map data x to view pixel coordinates (0 to width of view)
-            p1_view = vb_source.mapViewToDevice(QPointF(min_x, 0))
-            p2_view = vb_source.mapViewToDevice(QPointF(max_x, 0))
-            
-            # We need the X position relative to the Source Widget
-            # Note: We take the Bottom Y of the source widget for the anchor
-            source_y_bottom = self.source_plot.height()
-            
-            # Convert to Global Screen coordinates, then back to this Overlay's local coordinates
-            top_left_global = self.source_plot.mapToGlobal(QPointF(p1_view.x(), source_y_bottom).toPoint())
-            top_right_global = self.source_plot.mapToGlobal(QPointF(p2_view.x(), source_y_bottom).toPoint())
-
-            # --- 2. Get Coordinates of the Bottom Widget (Target) ---
-            # We want the top-left and top-right corners of the bottom plot
-            target_rect = self.target_plot.rect()
-            
-            bottom_left_global = self.target_plot.mapToGlobal(target_rect.topLeft())
-            bottom_right_global = self.target_plot.mapToGlobal(target_rect.topRight())
-            
+        except (RuntimeError, AttributeError, ValueError) as e:
+            # Widgets may be in invalid state during resize - log for debugging
+            import traceback
+            print(f"TrapezoidOverlay.paintEvent error: {e}")
+            print(traceback.format_exc())
+            return
 
         # Common Drawing code
         top_left = self.mapFromGlobal(top_left_global)
@@ -138,14 +173,32 @@ class TrapezoidOverlay(QWidget):
         painter.setPen(QPen(self.border_color, 1))
         painter.drawPolygon(polygon)
 
+
     def eventFilter(self, obj, event):
         """Event filter to catch resize events from the parent widget."""
         if obj == self.parent() and event.type() == QEvent.Type.Resize:
-            # Resize the overlay to match the parent widget size
-            self.resize(self.parent().size())
-            # Schedule an update to redraw the overlay
-            QTimer.singleShot(0, self.update)
+            # Critical: Check if parent is still valid
+            parent = self.parent()
+            if parent is None:
+                return super().eventFilter(obj, event)
+            
+            # Prevent infinite recursion by checking if we're already resizing
+            # Use a flag or check if size actually changed
+            new_size = parent.size()
+            if new_size != self.size():
+                # Use QTimer to defer resize to avoid recursion
+                QTimer.singleShot(0, lambda: self._safe_resize(new_size))
         return super().eventFilter(obj, event)
+    
+    def _safe_resize(self, new_size):
+        """Safely resize the overlay with validation."""
+        try:
+            if self.parent() is not None:
+                self.resize(new_size)
+                QTimer.singleShot(0, self.update)
+        except RuntimeError:
+            # Parent may have been deleted
+            pass
 
 
 class SpacerDock(Dock):
@@ -287,6 +340,19 @@ class TrapezoidTestingMainWindow(QMainWindow):
         # Note: The TrapezoidOverlay now automatically hooks into parent's resize event via eventFilter
         self.region.sigRegionChanged.connect(regionResizeEvent)
         self.region.sigRegionChangeFinished.connect(regionResizeEvent)
+
+        # After creating the overlay, ensure it's properly shown and raised
+        overlay.show()
+        overlay.raise_()
+        # Force an update after a short delay to ensure everything is laid out
+        QTimer.singleShot(200, overlay.update)
+
+        # Also connect region signals to force updates
+        def force_overlay_update():
+            overlay.update()
+            
+        self.region.sigRegionChanged.connect(force_overlay_update)
+        self.region.sigRegionChangeFinished.connect(force_overlay_update)
 
 
 
