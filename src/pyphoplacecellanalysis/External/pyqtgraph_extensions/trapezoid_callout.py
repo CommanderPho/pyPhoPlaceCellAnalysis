@@ -4,12 +4,21 @@ from PyQt5.QtCore import Qt, QPointF, QTimer, QEvent
 from PyQt5.QtGui import QPainter, QColor, QPolygonF, QBrush, QPen
 import pyqtgraph as pg
 from pyqtgraph.dockarea import DockArea, Dock
+from pyphocorehelpers.programming_helpers import metadata_attributes
+from pyphocorehelpers.function_helpers import function_attributes
 
 
+@metadata_attributes(short_name=None, tags=['painter', 'renderer', 'trapazoid', 'region', 'timeline', 'track'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-12-03 15:41', related_items=[])
 class TrapezoidOverlay(QWidget):
     """ a callout that illustrates a specific dock item is a subset of the above (parent) dock item
 
     from pyphoplacecellanalysis.External.pyqtgraph_extensions.trapezoid_callout import TrapezoidOverlay, SpacerDock
+
+
+        ## Customization
+        self.brush
+        self.pen
+        self.top_bottom_edges_pen
 
     """
 
@@ -27,12 +36,16 @@ class TrapezoidOverlay(QWidget):
         self.region = overview_zoomed_region_item       # The LinearRegionItem (selection box)
         self.target_plot = zoomed_widget  # The bottom PlotWidget (zoomed view)
         
+
+        # Styles: DashLine, DotLine, DashDotLine, DashDotDotLine
+        # dashed_pen_style = pg.Qt.PenStyle.DashLine
+
         # Color configuration
         if (self.region is not None) and (self.region.brush is not None):
             ## copy from parent so that it's the a matching color. Ideally we could reduce the opacity tho.
             self.brush = pg.mkBrush(self.region.brush)
             # border_color = self.brush.color()
-            border_color = QColor(200, 200, 200, 180) ## light gray
+            border_color = QColor(250, 250, 250, 250) ## light gray
             self.pen = pg.mkPen(border_color, width=1)
 
         else:
@@ -41,6 +54,23 @@ class TrapezoidOverlay(QWidget):
 
             self.brush = QBrush(fill_color)
             self.pen = QPen(border_color, 1)
+
+        # Set pattern: [pixels_on, pixels_off, pixels_on, pixels_off, ...]
+        # Example: 10px line, 5px space
+        self.pen.setDashPattern([2, 2])
+        
+        # Pen for highlighting top and bottom edges
+        # Use a solid, brighter pen for the edges
+        top_bottom_edge_color = QColor(255, 255, 255, 0)  # White, clear
+        self.top_bottom_edges_pen = QPen(top_bottom_edge_color, 2)  # Thicker, solid line
+        
+        # Or if you want to match the region color but brighter:
+        # if (self.region is not None) and (self.region.brush is not None):
+        #     edge_color = self.brush.color()
+        #     edge_color.setAlpha(255)  # Fully opaque
+        #     self.top_bottom_edges_pen = QPen(edge_color, 2)
+        # else:
+        #     self.top_bottom_edges_pen = QPen(QColor(255, 255, 255, 255), 2)
 
         
         # Hook into parent's resize event to redraw the overlay when the parent/containing widget size changes
@@ -58,6 +88,18 @@ class TrapezoidOverlay(QWidget):
                 self.setParent(parent)  # Re-parent to ensure proper stacking
             # Trigger initial paint with delay to ensure layout is complete
             QTimer.singleShot(100, self.update)
+        
+        # Connect region signals to force updates when region changes
+        if self.region is not None:
+            def force_overlay_update():
+                self.update()
+            
+            self.region.sigRegionChanged.connect(force_overlay_update)
+            self.region.sigRegionChangeFinished.connect(force_overlay_update)
+
+
+
+
 
 
     def _get_plot_item(self, widget):
@@ -186,9 +228,22 @@ class TrapezoidOverlay(QWidget):
         polygon.append(bottom_right)
         polygon.append(bottom_left)
 
+        # Draw filled polygon without border
         painter.setBrush(self.brush)
-        painter.setPen(self.pen)
+        painter.setPen(Qt.PenStyle.NoPen)  # No border for the fill
         painter.drawPolygon(polygon)
+        
+        # Draw edges with appropriate pens
+        # Top and bottom edges with highlighted pen
+        painter.setPen(self.top_bottom_edges_pen)
+        painter.drawLine(top_left, top_right)  # Top edge
+        painter.drawLine(bottom_left, bottom_right)  # Bottom edge
+        
+        # Left and right edges with regular pen
+        painter.setPen(self.pen)
+        painter.drawLine(top_left, bottom_left)  # Left edge
+        painter.drawLine(top_right, bottom_right)  # Right edge
+
 
 
     def eventFilter(self, obj, event):
@@ -217,6 +272,47 @@ class TrapezoidOverlay(QWidget):
         except RuntimeError:
             # Parent may have been deleted
             pass
+
+
+    @function_attributes(short_name=None, tags=['timeline', 'tracks', 'SpikeRaster2D'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-12-03 15:41', related_items=[])
+    @classmethod
+    def add_overview_indicator_trapazoids_to_timeline(cls, active_2d_plot):
+        """
+        from pyphoplacecellanalysis.External.pyqtgraph_extensions.trapezoid_callout import TrapezoidOverlay, SpacerDock
+        
+        _out_overlays: Dict[Tuple, TrapezoidOverlay] = TrapezoidOverlay.add_overview_indicator_trapazoids_to_timeline(active_2d_plot=active_2d_plot)
+        
+        """
+
+        flat_dock_item_tuples_dict = active_2d_plot.get_flat_dock_item_tuple_dict()
+
+        overview_child_dock_identifer_pair_list = [('rasters[raster_overview]', 'rasters[raster_window]'),
+                                                ('interval_overview', 'intervals'),
+                                                ]
+
+        _out_overlays = {}
+        for (an_overview_id, a_zoomed_id) in overview_child_dock_identifer_pair_list:
+            ov_d, ov_widget = flat_dock_item_tuples_dict[an_overview_id]
+            zoomed_d, zoomed_widget = flat_dock_item_tuples_dict[a_zoomed_id]
+            ## timeline common scroll item:
+            overview_zoomed_region_item = active_2d_plot.ui.scroll_window_region
+            display_dock_area = active_2d_plot.dock_manager_widget.displayDockArea
+            
+            # print_keys_if_possible('ov_widget', ov_widget, max_depth=2)
+            # print_keys_if_possible('zoomed_widget', zoomed_widget, max_depth=2)
+            # We must parent the overlay to the central widget (DockArea) 
+            # so it covers all docks.
+            overlay = TrapezoidOverlay(
+                parent=display_dock_area, ## this will always be this value 
+                overview_widget=ov_widget, 
+                # overview_zoomed_region_item=ov_widget.ui.region, 
+                overview_zoomed_region_item=overview_zoomed_region_item,
+                zoomed_widget=zoomed_widget,
+            )
+            _out_overlays[(an_overview_id, a_zoomed_id)] = overlay
+
+        # END for (an....    
+        return _out_overlays
 
 
 class SpacerDock(Dock):
