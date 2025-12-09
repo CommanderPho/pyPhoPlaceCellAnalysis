@@ -26,8 +26,36 @@ from pyphoplacecellanalysis.Pho2D.PyQtPlots.TimeSynchronizedPlotters.Mixins.Anim
 from attrs import define, field, Factory
 from pyphoplacecellanalysis.Pho2D.PyQtPlots.TimeSynchronizedPlotters.Mixins.UserEditableROIMixin import UserEditableROIMixin, Rois
 
+import param
+import panel as pn
+from panel.viewable import Viewer
+from pyphoplacecellanalysis.General.Model.Configs.ParamConfigs import BasePlotDataParams, ExtendedPlotDataParams
 
-        
+
+class LayerDisplayConfig(BasePlotDataParams):
+    """ This class uses the 'param' library to observe changes to its members 
+    and perform corresponding updates to the class that holds it when they happen.
+    """
+    # Overriding defaults from parent
+    name = param.String(default='SessionEpochs', doc='Name of the layer')
+    isVisible = param.Boolean(default=True, doc="Whether the layer is visible")
+    cmap = param.String(default='matplotlib.jet', doc='The cmap to use')
+    opacity = param.Number(default=0.5, bounds=(0.0, 1.0), step=0.1)   
+    drop_below_threshold = param.Number(default=1e-3, bounds=(1e-27, 0.1), step=1e-3)
+
+    
+    @staticmethod
+    def _config_update_watch_labels():
+        """Returns list of parameter names that trigger full updates"""
+        return ['cmap', 'opacity', 'drop_below_threshold', 'isVisible']
+    
+    @staticmethod
+    def _config_visibility_watch_labels():
+        """Returns list of parameter names that trigger visibility updates"""
+        return ['isVisible']
+    
+
+    # a_stack_item.params.cmap = pg.colormap.get('jet','matplotlib') # prepare a linear color map
 
 
 @define(slots=False)
@@ -41,8 +69,20 @@ class TimeSynchronizedGenericPlotterLayer:
 
     Usage
 
-        from pyphoplacecellanalysis.Pho2D.PyQtPlots.TimeSynchronizedPlotters.TimeSynchronizedGenericPlotterLayer import TimeSynchronizedGenericPlotterLayer
+        from pyphoplacecellanalysis.Pho2D.PyQtPlots.TimeSynchronizedPlotters.TimeSynchronizedGenericPlotterLayer import TimeSynchronizedGenericPlotterLayer, LayerDisplayConfig
 
+# an_epoch_name: str = 'roam'
+# an_epoch_idx: int = 0 ## 0 or 1
+
+an_epoch_name: str = 'sprinkle'
+an_epoch_idx: int = 1 ## 0 or 1
+a_plotter = sync_plotters[an_epoch_name]
+a_plotter
+        a_layer: TimeSynchronizedGenericPlotterLayer = TimeSynchronizedGenericPlotterLayer(name=f"{an_epoch_name}_hist", parent=a_plotter, contents={}, data={'time_window_centers': deepcopy(time_window_centers),
+                                                                                                                                                            'main': deepcopy(a_moving_avg), 
+                                                                                                                                                            #    'pos_df': deepcopy(pos_df),
+                                                                                                                                                    })
+        a_layer
 
     """
     name: str = field()
@@ -50,8 +90,10 @@ class TimeSynchronizedGenericPlotterLayer:
     contents: Dict[str, Any] = field(default=Factory(Dict), repr=keys_only_repr)
     data: Optional[Dict] = field(default=None, repr=keys_only_repr)
     _params: Optional[VisualizationParameters] = field(default=None)
+    gui_params: LayerDisplayConfig = field(default=None, init=False)
     last_window_time: float = field(default=None, init=False)
     last_window_index: int = field(default=None, init=False)
+
 
     @property
     def is_layer(self) -> bool:
@@ -101,12 +143,33 @@ class TimeSynchronizedGenericPlotterLayer:
         assert self.parent is not None
         assert self.parent.params is not None
         # self.params = deepcopy(self.parent.params) ## #TODO 2025-12-09 14:49: - [ ] Ideally we'd only copy the relevant params from the parent
-        relevant_only_params_keys = ['name', 'cmap', 'image_margins', 'image_bounds_extent', 'x_range', 'y_range', 'debug_print', 'shared_axis_order']
+        relevant_only_params_keys = ['name', 'cmap', 'image_margins', 'image_bounds_extent', 'x_range', 'y_range', 'debug_print', 'shared_axis_order', 'drop_below_threshold']
         parent_params = get_dict_subset(self.parent.params.to_dict(), subset_includelist=relevant_only_params_keys) 
         parent_params['name'] = f"{parent_params['name']}_{self.name}" ## append "_{self.name}" to parent's name
         self.params = VisualizationParameters.init_from_dict(parent_params)
+        self.params.opacity = 1.0
         
-        
+        self.gui_params = LayerDisplayConfig()
+        self.gui_params.cmap = f'matplotlib.{self.params.cmap.name}'
+        if self.params.drop_below_threshold is not None:
+            self.gui_params.drop_below_threshold = self.params.drop_below_threshold
+        else:
+            self.gui_params.drop_below_threshold = 1e-90 ## insanely small so it's effectively None
+            
+
+        # Setup watchers in your implementor class:
+        self.gui_params.param.watch(
+            self.on_gui_params_update, 
+            LayerDisplayConfig._config_update_watch_labels(), 
+            queued=True
+        )
+
+        # self.gui_params.param.watch(
+        #     self.on_gui_params_update, 
+        #     LayerDisplayConfig._config_visibility_watch_labels(), 
+        #     queued=True
+        # )
+
 
     def _buildGraphics(self):
         ## More Involved Mode:
@@ -130,10 +193,55 @@ class TimeSynchronizedGenericPlotterLayer:
         imv.setColorMap(self.params.cmap)
 
 
-    def on_params_update(self):
-        self.contents['main'].setColorMap(self.params.cmap)
+    def on_gui_params_update(self, updated_params):
+        """ called when the user changes the GUI params object. Needs to update the internal self.params
+        """
+        print(f'on_gui_params_update(updated_params: {updated_params}):')
+        did_change: bool = False
         
+        cmap_str: str = self.gui_params.cmap
+        if '.' in cmap_str:
+            ## split
+            src_path, src_rel_name = cmap_str.split('.', maxsplit=1)
+            print(f'src_path: {src_path}, src_rel_name: {src_rel_name}')
+            cmap = pg.colormap.get(src_rel_name, src_path)
+        else:
+            cmap = pg.colormap.get(cmap_str) ## specifically named colormap
+        did_change = did_change or (self.params.cmap != cmap)
+        self.params.cmap = cmap
 
+        drop_below_threshold: float = self.gui_params.drop_below_threshold
+        if drop_below_threshold < 1e-89:
+            drop_below_threshold = None
+            
+        did_change = did_change or (self.params.drop_below_threshold != drop_below_threshold)
+        
+        opacity: float = self.gui_params.opacity
+        did_change = did_change or (self.params.opacity != opacity)
+        self.params.opacity = opacity
+
+        isVisible: bool = self.gui_params.isVisible
+        prev_was_visible: bool = (self.params.opacity > 0.0)
+        did_change = did_change or (prev_was_visible != isVisible)        
+        # if isVisible:
+        #     did_change = did_change or (self.params.opacity > 0.0)        
+        # else:
+        #     did_change = did_change or (prev_was_visible != isVisible)
+            
+        if did_change:
+            print(f'\tchange occured!')
+            self.on_params_update()
+            
+        print('\tdone.')
+
+
+
+    def on_params_update(self):
+        """ updates """
+        print(f'on_params_update():')
+        self.contents['main'].setColorMap(self.params.cmap)
+        self.contents['main'].setOpacity(self.params.opacity)
+        print('\tdone.')
 
     # ==================================================================================================================== #
     # QT Slots                                                                                                             #
