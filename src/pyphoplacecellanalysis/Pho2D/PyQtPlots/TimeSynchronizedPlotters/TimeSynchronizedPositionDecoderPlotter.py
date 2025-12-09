@@ -31,7 +31,7 @@ class TimeSynchronizedPositionDecoderPlotter(UserEditableROIMixin, AnimalTraject
 
     TODO: refactor, these plotters are all supposed to be for the PfND_TimeDependent class usage I think. 
     
-    
+        
     Usage:
     
         TODO: Document
@@ -132,14 +132,22 @@ class TimeSynchronizedPositionDecoderPlotter(UserEditableROIMixin, AnimalTraject
         # self.ui.root_view = self.ui.root_graphics_layout_widget.addViewBox()
         ## lock the aspect ratio so pixels are always square
         # self.ui.root_view.setAspectLocked(True)
-        
+        a_plotter = self
+
+        ## Create the new plot_stack to hold the render hierarchy
+        self.ui.plot_stack = {} ## initialize
+
         ## Background-only image item
         if self.params.needs_background_image:
             self.ui.bg_imv = pg.ImageItem()
+            self.ui.plot_stack['bg_imv'] = self.ui.bg_imv
+
             # self.ui.root_view.addItem(self.ui.bg_imv)
 
         ## Create image item
         self.ui.imv = pg.ImageItem(border='w')
+        self.ui.plot_stack['imv'] = self.ui.imv
+
         # self.ui.root_view.addItem(self.ui.imv)
         # self.ui.root_view.setRange(QtCore.QRectF(*self.params.image_bounds_extent))
 
@@ -279,8 +287,25 @@ class TimeSynchronizedPositionDecoderPlotter(UserEditableROIMixin, AnimalTraject
             print(f'TimeSynchronizedPositionDecoderPlotter.on_window_changed(start_t: {start_t}, end_t: {end_t})')
         # if self.enable_debug_print:
         #     profiler = pg.debug.Profiler(disabled=True, delayed=True)
+
         # self.update(end_t, defer_render=False)
         self.update(start_t, defer_render=False)
+
+        ## update any additional image layers in the stack
+        for z_idx, (a_stack_item_key, a_stack_item) in enumerate(self.ui.plot_stack.items()):
+            print(f'on_window_changed: z_idx: {z_idx}, a_stack_item_key: "{a_stack_item_key}", a_stack_item: {a_stack_item}')
+            try:
+                if (hasattr(a_stack_item, 'is_layer') and getattr(a_stack_item, 'is_layer', False)):
+                    a_stack_item.on_window_changed(start_t=start_t, end_t=end_t, defer_render=True) ## call update plots on the child item
+                    print(f'\ton_window_changed successful.')
+                else:
+                    print(f'\tskipped!')
+            except (KeyError, AttributeError) as e:
+                print(f'\t encountered error "{e}" while trying to on_window_changed item. Skipping.')
+            except Exception as e:
+                ## Unexpected exception!
+                raise e
+            
         if self.params.debug_print:
             print('\tFinished calling _update_plots()')
 
@@ -289,6 +314,23 @@ class TimeSynchronizedPositionDecoderPlotter(UserEditableROIMixin, AnimalTraject
         # Finds the nearest previous decoded position for the time t:
         self.last_window_index = np.searchsorted(self.time_window_centers, t, side='left') # side='left' ensures that no future values (later than 't') are ever returned
         self.last_window_time = self.time_window_centers[self.last_window_index] # If there is no suitable index, return either 0 or N (where N is the length of `a`).
+        
+        ## update any additional image layers in the stack
+        for z_idx, (a_stack_item_key, a_stack_item) in enumerate(self.ui.plot_stack.items()):
+            print(f'Update: z_idx: {z_idx}, a_stack_item_key: "{a_stack_item_key}", a_stack_item: {a_stack_item}')
+            try:
+                if (hasattr(a_stack_item, 'is_layer') and getattr(a_stack_item, 'is_layer', False)):
+                    a_stack_item.update(t=t, defer_render=True) ## call update plots on the child item
+                    print(f'\tupdate successful.')
+                else:
+                    print(f'\tskipped!')
+            except (KeyError, AttributeError) as e:
+                print(f'\t encountered error "{e}" while trying to update item. Skipping.')
+            except Exception as e:
+                ## Unexpected exception!
+                raise e
+            
+
         # Update the plots:
         if not defer_render:
             self._update_plots()
@@ -340,6 +382,21 @@ class TimeSynchronizedPositionDecoderPlotter(UserEditableROIMixin, AnimalTraject
         self.setWindowTitle(f'TimeSynchronizedPositionDecoderPlotter - {image_title} t = {curr_t}')
     
         self.AnimalTrajectoryPlottingMixin_update_plots()
+
+        ## update any additional image layers in the stack
+        for z_idx, (a_stack_item_key, a_stack_item) in enumerate(self.ui.plot_stack.items()):
+            print(f'Update: z_idx: {z_idx}, a_stack_item_key: "{a_stack_item_key}", a_stack_item: {a_stack_item}')
+            try:
+                if (hasattr(a_stack_item, 'is_layer') and getattr(a_stack_item, 'is_layer', False)):
+                    a_stack_item._update_plots() ## call update plots on the child item
+                    print(f'\tupdate successful.')
+                else:
+                    print(f'\tskipped!')
+            except (KeyError, AttributeError) as e:
+                print(f'\t encountered error "{e}" while trying to update item. Skipping.')
+            except Exception as e:
+                ## Unexpected exception!
+                raise e
 
 
     @function_attributes(short_name=None, tags=['video', 'export', 'mp4', 'avi', 'output'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-11-24 23:09', related_items=[])
