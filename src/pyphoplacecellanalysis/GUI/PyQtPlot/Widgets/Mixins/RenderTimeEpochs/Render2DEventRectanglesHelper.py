@@ -10,7 +10,7 @@ from neuropy.core import Epoch
 
 import pyphoplacecellanalysis.External.pyqtgraph as pg
 # from pyphoplacecellanalysis.External.pyqtgraph.Qt import QtCore, QtGui, QtWidgets
-from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.GraphicsObjects.IntervalRectsItem import IntervalRectsItem
+from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.GraphicsObjects.IntervalRectsItem import IntervalRectsItem, IntervalRectsItemData
 from pyphoplacecellanalysis.General.Model.Datasources.IntervalDatasource import IntervalsDatasource
 
 
@@ -37,7 +37,14 @@ class Render2DEventRectanglesHelper:
         """    
         ## Validate that it has all required columns:
         assert np.isin(cls._required_interval_visualization_columns, df.columns).all(), f"dataframe is missing required columns:\n Required: {cls._required_interval_visualization_columns}, current: {df.columns} "
-        return list(zip(df.t_start, df.series_vertical_offset, df.t_duration, df.series_height, df.pen, df.brush))
+        # return list(zip(df.t_start, df.series_vertical_offset, df.t_duration, df.series_height, df.pen, df.brush))
+        if 'label' in df.columns:
+            return [IntervalRectsItemData(*row) for row in zip(df.t_start, df.series_vertical_offset, df.t_duration, df.series_height, df.pen, df.brush, df.label)]
+        else:
+            ## most basic
+            return [IntervalRectsItemData(*row) for row in zip(df.t_start, df.series_vertical_offset, df.t_duration, df.series_height, df.pen, df.brush)]
+
+
         
     @classmethod
     def build_IntervalRectsItem_from_epoch(cls, epochs: Epoch, dataframe_vis_columns_function, debug_print=False, **kwargs):

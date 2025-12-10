@@ -3,15 +3,49 @@ Demonstrate creation of a custom graphic (a candlestick plot)
 
 """
 import copy
-from typing import Callable, Tuple
+from typing import Dict, List, Tuple, Optional, Callable, Union, Any
+from attr import has
 from neuropy.core.user_annotations import function_attributes
 import numpy as np
+
+from neuropy.utils.mixins.indexing_helpers import UnpackableMixin
+from attrs import asdict, astuple, define, field, Factory
+from qtpy import QtGui, QtWidgets
 import pyphoplacecellanalysis.External.pyqtgraph as pg
 from pyphoplacecellanalysis.External.pyqtgraph import QtCore, QtGui, QtWidgets
 from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.helpers import RectangleRenderTupleHelpers
 from pyphoplacecellanalysis.External.pyqtgraph.graphicsItems.LegendItem import ItemSample, LegendItem # for custom legend
 from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.Mixins.ReprPrintableWidgetMixin import ReprPrintableItemMixin
 from pyphoplacecellanalysis.External.pyqtgraph_extensions.graphicsItems.TextItem.AlignableTextItem import CustomRectBoundedTextItem
+
+
+
+@define(slots=False, repr=True)
+class IntervalRectsItemData(UnpackableMixin):
+    """ incremental progress towards more flexible self.data for `IntervalRectsItem` while maintaining drop-in compatibility with pre 2025-12-10 tuple-based approach via `UnpackableMixin`.
+    
+    from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.GraphicsObjects.IntervalRectsItem import IntervalRectsItemData
+    
+    rect_data_tuple: IntervalRectsItemData = IntervalRectsItemData(*rect_data_tuple) ## init from raw tuple object
+    start_t, series_vertical_offset, duration_t, series_height, pen, brush = rect_data_tuple ## unpack just like tuple
+    
+    
+    """
+    start_t: float = field()
+    series_vertical_offset: float = field()
+    duration_t: float = field()
+    series_height: float = field()
+    pen: QtGui.QPen = field()
+    brush: QtGui.QBrush = field()
+    label: Optional[str] = field(default=None)
+    
+
+    def UnpackableMixin_unpacking_includes(self) -> Optional[List]:
+        """ Items to be included (allowlist) from unpacking. 
+        """
+        return [self.__attrs_attrs__.start_t, self.__attrs_attrs__.series_vertical_offset, self.__attrs_attrs__.duration_t, self.__attrs_attrs__.series_height, self.__attrs_attrs__.pen, self.__attrs_attrs__.brush]
+    
+
 
 ## Create a subclass of GraphicsObject.
 ## The only required methods are paint() and boundingRect() 
@@ -72,6 +106,7 @@ class IntervalRectsItem(ReprPrintableItemMixin, pg.GraphicsObject):
     # sigPositionChangeFinished = QtCore.Signal(object)
     # sigPositionChanged = QtCore.Signal(object)
     # sigClicked = QtCore.Signal(object, object)
+    
     
 
     def __init__(self, data, format_tooltip_fn=None, format_label_fn=None, debug_print=False):
@@ -139,7 +174,10 @@ class IntervalRectsItem(ReprPrintableItemMixin, pg.GraphicsObject):
         return self._current_hovered_item_tooltip_format_fn
     @format_item_tooltip_fn.setter
     def format_item_tooltip_fn(self, value: Callable):
+        is_changing: bool = (self._current_hovered_item_tooltip_format_fn != value)
         self._current_hovered_item_tooltip_format_fn = value
+        # if is_changing:
+        #     self.rebuild_label_items()
 
 
     @property
@@ -148,7 +186,11 @@ class IntervalRectsItem(ReprPrintableItemMixin, pg.GraphicsObject):
         return self._item_label_format_fn
     @item_label_format_fn.setter
     def item_label_format_fn(self, value):
+        is_changing: bool = (self._item_label_format_fn != value)
         self._item_label_format_fn = value
+        if is_changing:
+            self.rebuild_label_items()
+        
         
 
     def rebuild_label_items(self, debug_print: bool=False):
@@ -273,9 +315,19 @@ class IntervalRectsItem(ReprPrintableItemMixin, pg.GraphicsObject):
         start_t, series_vertical_offset, duration_t, series_height, pen, brush = rect_data_tuple
         """
         start_t, series_vertical_offset, duration_t, series_height, pen, brush = rect_data_tuple
+        ## get the optional label field if `rect_data_tuple` is a `IntervalRectsItemData` instead of a plain tuple
+        a_label = None
+        if not isinstance(rect_data_tuple, Tuple):
+            a_label = rect_data_tuple.label
+        
         end_t = start_t + duration_t
-        tooltip_text = f"Item[{rect_index}]\nStart: {start_t:.3f}\nEnd: {end_t:.3f}\nDuration: {duration_t:.3f}"
+        if a_label:
+            tooltip_text = f"{a_label}\nItem[{rect_index}]\nStart: {start_t:.3f}\nEnd: {end_t:.3f}\nDuration: {duration_t:.3f}"
+        else:
+            tooltip_text = f"Item[{rect_index}]\nStart: {start_t:.3f}\nEnd: {end_t:.3f}\nDuration: {duration_t:.3f}"
         return tooltip_text
+
+
 
     def _show_tooltip_for_rect(self, rect_index, global_pos):
         """
@@ -293,6 +345,7 @@ class IntervalRectsItem(ReprPrintableItemMixin, pg.GraphicsObject):
         tooltip_text: str = self._current_hovered_item_tooltip_format_fn(rect_index=rect_index, rect_data_tuple=rect_data_tuple)        
         QtWidgets.QToolTip.showText(global_pos, tooltip_text)
         
+
     def setToolTip(self, text):
         """
         Override setToolTip to provide custom behavior.
@@ -406,7 +459,12 @@ class IntervalRectsItem(ReprPrintableItemMixin, pg.GraphicsObject):
             start_t, series_vertical_offset, duration_t, series_height, pen, brush = a_tuple
             override_pen = pg.mkPen('g')
             override_brush = pg.mkBrush('g')
-            self.data[i] = (start_t, series_vertical_offset, duration_t, series_height, override_pen, override_brush)
+            # self.data[i] = (start_t, series_vertical_offset, duration_t, series_height, override_pen, override_brush)
+            a_label = None
+            if not isinstance(a_tuple, Tuple):
+                a_label = a_tuple.label
+            self.data[i] = IntervalRectsItemData(start_t, series_vertical_offset, duration_t, series_height, override_pen, override_brush, label=a_label)
+
         
         # Need to regenerate picture
         self.generatePicture()
@@ -423,8 +481,13 @@ class IntervalRectsItem(ReprPrintableItemMixin, pg.GraphicsObject):
             start_t, series_vertical_offset, duration_t, series_height, pen, brush = a_tuple
             override_pen = pg.mkPen('b')
             override_brush = pg.mkBrush('b')
-            self.data[i] = (start_t, series_vertical_offset, duration_t, series_height, override_pen, override_brush)
-            
+            # self.data[i] = (start_t, series_vertical_offset, duration_t, series_height, override_pen, override_brush)
+            a_label = None
+            if not isinstance(a_tuple, Tuple):
+                a_label = a_tuple.label
+            self.data[i] = IntervalRectsItemData(start_t, series_vertical_offset, duration_t, series_height, override_pen, override_brush, label=a_label)
+
+
         # Need to regenerate picture
         self.generatePicture()
         self.update()
