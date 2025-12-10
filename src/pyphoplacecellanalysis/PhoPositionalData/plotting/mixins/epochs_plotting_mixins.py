@@ -228,7 +228,7 @@ class EpochDisplayConfig(BasePlotDataParams):
         # Collect the relevant fields for code generation
         fields = [
             'y_location', 'height', 'pen_color', 'pen_opacity',
-            'brush_color', 'brush_opacity'
+            'brush_color', 'brush_opacity', 'isVisible'
         ]
         # Build the dictionary for this config
         config_dict = {}
