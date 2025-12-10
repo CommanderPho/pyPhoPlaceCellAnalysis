@@ -667,7 +667,7 @@ def final_process_non_kdiba_all_comps(curr_active_pipeline, active_data_mode_nam
     return curr_active_pipeline
 
 
-@function_attributes(short_name=None, tags=['bapun', 'pending', 'pseudo2D'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-09-29 10:48', related_items=[])
+@function_attributes(short_name=None, tags=['bapun', 'pending', 'pseudo2D'], input_requires=[], output_provides=[], uses=['decode_using_contextual_pf2D_decoder'], used_by=[], creation_date='2025-09-29 10:48', related_items=[])
 def build_non_kdiba_directional_decoders(curr_active_pipeline, epochs_decoding_time_bin_size: float = 1.0):
     """ builds directional decoders for non-kdiba sessions
     
