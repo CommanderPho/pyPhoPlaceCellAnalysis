@@ -346,8 +346,8 @@ def _setup_spike_raster_window_for_debugging(spike_raster_window, wants_docked_r
 
         
     ### Begin Running Commands Function body
-    # active_2d_plot.params.enable_non_marginalized_raw_result = False
-    active_2d_plot.params.enable_non_marginalized_raw_result = True ## TODO 2025-12-02 - NEW
+    active_2d_plot.params.enable_non_marginalized_raw_result = False
+    # active_2d_plot.params.enable_non_marginalized_raw_result = True ## TODO 2025-12-02 - NEW
     active_2d_plot.params.enable_marginal_over_direction = False
     active_2d_plot.params.enable_marginal_over_track_ID = True
 
