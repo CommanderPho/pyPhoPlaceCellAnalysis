@@ -333,12 +333,15 @@ class EpochRenderingMixin(LiveWindowEventIntervalMonitoringMixin):
                 self.mixin._is_updating_from_widget = True
                 for name, ds in self.mixin.interval_datasources.items():
                     if hasattr(ds, 'source_data_changed_signal'):
-                        self.blocked_datasources[name] = ds.source_data_changed_signal.blockSignals(True)
+                        # Block signals on the QObject (datasource), not on the signal itself
+                        # blockSignals() blocks ALL signals from the object, which is what we want
+                        self.blocked_datasources[name] = ds.blockSignals(True)
                 return self
             def __exit__(self, *args):
                 for name, was_blocked in self.blocked_datasources.items():
                     if name in self.mixin.interval_datasources:
-                        self.mixin.interval_datasources[name].source_data_changed_signal.blockSignals(was_blocked)
+                        # Restore previous blocking state on the datasource QObject
+                        self.mixin.interval_datasources[name].blockSignals(was_blocked)
                 self.mixin._is_updating_from_widget = False
         
         return _SignalBlocker(self)
@@ -1104,11 +1107,21 @@ class EpochRenderingMixin(LiveWindowEventIntervalMonitoringMixin):
                 except (TypeError, RuntimeError):
                     pass  # Connection may not exist or already disconnected
             self.ui.connections['epochs_render_configs_widget_updated'] = an_epochs_display_list_widget.sigAnyConfigChanged.connect(lambda x: self.update_epochs_from_configs_widget())
+            # Connect refresh signal to rebuild widget from datasources
+            if 'epochs_render_configs_widget_refresh' in self.ui.connections:
+                try:
+                    an_epochs_display_list_widget.sigRefreshRequested.disconnect(self.ui.connections['epochs_render_configs_widget_refresh'])
+                except (TypeError, RuntimeError):
+                    pass
+            self.ui.connections['epochs_render_configs_widget_refresh'] = an_epochs_display_list_widget.sigRefreshRequested.connect(lambda x: self.build_or_update_epoch_render_configs_widget(parent=parent))
         else:
             an_epochs_display_list_widget.update_from_configs(configs=epoch_display_configs)
             # Ensure connection exists even when updating existing widget
             if 'epochs_render_configs_widget_updated' not in self.ui.connections:
                 self.ui.connections['epochs_render_configs_widget_updated'] = an_epochs_display_list_widget.sigAnyConfigChanged.connect(lambda x: self.update_epochs_from_configs_widget())
+            # Ensure refresh connection exists
+            if 'epochs_render_configs_widget_refresh' not in self.ui.connections:
+                self.ui.connections['epochs_render_configs_widget_refresh'] = an_epochs_display_list_widget.sigRefreshRequested.connect(lambda x: self.build_or_update_epoch_render_configs_widget(parent=parent))
 
 
     def update_epoch_interval_render_configs_from_configs(self, _out_configs: Dict[str, Union[EpochDisplayConfig, List[EpochDisplayConfig]]]):
