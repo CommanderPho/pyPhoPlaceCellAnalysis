@@ -418,8 +418,12 @@ class EpochRenderingMixin(LiveWindowEventIntervalMonitoringMixin):
                 # Otherwise the datasource should be replaced:
                 if debug_print:
                     print(f'\t replacing extant datasource.')
-                # TODO: remove plots associated with replaced datasource? DONE: as long as name doesn't change, this is done below
-                # TODO: disconnect the previous datasource from the update signal?
+                # Disconnect the previous datasource from the update signal before replacing
+                if hasattr(extant_datasource, 'source_data_changed_signal'):
+                    try:
+                        extant_datasource.source_data_changed_signal.disconnect(self.EpochRenderingMixin_on_interval_datasource_changed)
+                    except (TypeError, RuntimeError):
+                        pass  # Connection may not exist or already disconnected
                 self.interval_datasources[name] = interval_datasource
                 # Connect the source_data_changed_signal to handle changes to the datasource:
                 self.interval_datasources[name].source_data_changed_signal.connect(self.EpochRenderingMixin_on_interval_datasource_changed)
@@ -551,6 +555,14 @@ class EpochRenderingMixin(LiveWindowEventIntervalMonitoringMixin):
             # if the item is now empty, remove it and its and paired datasource
             if debug_print:
                 print(f'self.rendered_epochs[{name}] now empty. Removing it and its datasource...')
+            # Disconnect signal connection before removing datasource
+            if name in self.interval_datasources:
+                datasource = self.interval_datasources[name]
+                if hasattr(datasource, 'source_data_changed_signal'):
+                    try:
+                        datasource.source_data_changed_signal.disconnect(self.EpochRenderingMixin_on_interval_datasource_changed)
+                    except (TypeError, RuntimeError):
+                        pass  # Connection may not exist or already disconnected
             del self.rendered_epochs[name]
             del self.interval_datasources[name]
             self.sigRenderedIntervalsListChanged.emit(self) # Emit the intervals list changed signal when the item is removed
