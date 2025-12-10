@@ -1128,6 +1128,13 @@ class EpochRenderingMixin(LiveWindowEventIntervalMonitoringMixin):
                 except (TypeError, RuntimeError):
                     pass
             self.ui.connections['epochs_render_configs_widget_refresh'] = an_epochs_display_list_widget.sigRefreshRequested.connect(lambda x: self.build_or_update_epoch_render_configs_widget(parent=parent))
+            # Connect remove signal to remove datasource
+            if 'epochs_render_configs_widget_remove' in self.ui.connections:
+                try:
+                    an_epochs_display_list_widget.sigRemoveRequested.disconnect(self.ui.connections['epochs_render_configs_widget_remove'])
+                except (TypeError, RuntimeError):
+                    pass
+            self.ui.connections['epochs_render_configs_widget_remove'] = an_epochs_display_list_widget.sigRemoveRequested.connect(self.on_remove_epoch_series_from_widget)
         else:
             an_epochs_display_list_widget.update_from_configs(configs=epoch_display_configs)
             # Ensure connection exists even when updating existing widget
@@ -1136,7 +1143,29 @@ class EpochRenderingMixin(LiveWindowEventIntervalMonitoringMixin):
             # Ensure refresh connection exists
             if 'epochs_render_configs_widget_refresh' not in self.ui.connections:
                 self.ui.connections['epochs_render_configs_widget_refresh'] = an_epochs_display_list_widget.sigRefreshRequested.connect(lambda x: self.build_or_update_epoch_render_configs_widget(parent=parent))
+            # Ensure remove connection exists
+            if 'epochs_render_configs_widget_remove' not in self.ui.connections:
+                self.ui.connections['epochs_render_configs_widget_remove'] = an_epochs_display_list_widget.sigRemoveRequested.connect(self.on_remove_epoch_series_from_widget)
 
+
+    def on_remove_epoch_series_from_widget(self, widget, config_name: str):
+        """Handle remove request from the config widget.
+        
+        This is called when the user clicks 'Remove' in the UI, which triggers:
+        1. Widget removal (handled in EpochRenderConfigsListWidget.on_remove_epoch_series)
+        2. Datasource removal (handled here)
+        3. Widget refresh (triggered by sigRenderedIntervalsListChanged)
+        
+        Args:
+            widget: The EpochRenderConfigsListWidget that emitted the signal
+            config_name: The name of the config/datasource to remove
+        """
+        print(f'EpochRenderingMixin.on_remove_epoch_series_from_widget(widget: {widget}, config_name: {config_name})')
+        if config_name in self.interval_datasources:
+            # Remove the datasource and rendered intervals
+            self.perform_remove_epoch_intervals(removed_interval_keys=[config_name], should_perform_remove=True)
+        else:
+            print(f'WARNING: config_name "{config_name}" not found in interval_datasources. Available keys: {list(self.interval_datasources.keys())}')
 
     def perform_remove_epoch_intervals(self, removed_interval_keys: List[str], should_perform_remove: bool = True):
         """ actually remove the intervals. """

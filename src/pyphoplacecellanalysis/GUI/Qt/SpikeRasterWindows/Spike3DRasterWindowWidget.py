@@ -921,7 +921,8 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
         ## Get Interval Datasources:
         interval_datasources = self.spike_raster_plt_2d.interval_datasources
         assert curr_series_name in interval_datasources, f"curr_series_name: '{curr_series_name}' not in interval_datasources: {interval_datasources}"
-        self.spike_raster_plt_2d.remove_rendered_intervals(name=curr_series_name)
+        self.spike_raster_plt_2d.remove_rendered_intervals(name=curr_series_name) # Needs to update the interval config widgets appropriately too
+
 
     @pyqtExceptionPrintingSlot(str)
     def perform_interval_series_customize_item(self, curr_series_name):
