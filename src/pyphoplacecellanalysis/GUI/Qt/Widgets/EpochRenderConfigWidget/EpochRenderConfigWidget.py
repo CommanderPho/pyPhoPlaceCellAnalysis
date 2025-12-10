@@ -352,16 +352,39 @@ class EpochRenderConfigsListWidget(pg.Qt.QtWidgets.QWidget):
                     a_config_container_layout.setContentsMargins(0, 0, 0, 0)
                     a_config_container_layout.setObjectName(f"containerLayout[{a_config_name}]")
                     
-                    # Add a tiny title label showing the config name
-                    a_config_title_label = pg.Qt.QtWidgets.QLabel(a_config_name)
-                    a_config_title_label.setObjectName(f"titleLabel[{a_config_name}]")
-                    # Make it small and subtle
-                    font = a_config_title_label.font()
-                    font.setPointSize(8)
+                    # Create a widget container to hold the layout (so we can apply stylesheet)
+                    a_config_container_widget = pg.Qt.QtWidgets.QWidget()
+                    a_config_container_widget.setLayout(a_config_container_layout)
+                    a_config_container_widget.setObjectName(f"containerWidget[{a_config_name}]")
+                    
+                    # Set stylesheet for the container widget
+                    custom_stylesheet = """
+background-color: rgba(71, 65, 60, 180);
+border-color: rgb(0, 0, 0);
+color: rgb(244, 244, 244);
+QToolTip {
+    background-color: #2a2a2a;
+    color: #ffffff;
+    border: 1px solid #3a3a3a;
+    border-radius: 3px;
+    padding: 2px;
+    font-size: 12px;
+}
+"""
+                    a_config_container_widget.setStyleSheet(custom_stylesheet)
+                    
+                    # Add a button showing the config name, matching EpochRenderConfigWidget's btnTitle exactly
+                    # btnTitle is a disabled flat QPushButton - use the same widget type for consistency
+                    a_config_title_button = pg.Qt.QtWidgets.QPushButton(a_config_name)
+                    a_config_title_button.setObjectName(f"titleButton_{a_config_name}")
+                    a_config_title_button.setEnabled(False)  # Disabled like btnTitle
+                    a_config_title_button.setFlat(True)  # Flat like btnTitle
+                    font = a_config_title_button.font()
+                    font.setPointSize(10)
                     font.setBold(True)
-                    a_config_title_label.setFont(font)
-                    a_config_title_label.setStyleSheet("color: #888888;")
-                    a_config_container_layout.addWidget(a_config_title_label)
+                    a_config_title_button.setFont(font)
+                    # Color will inherit from parent container widget's stylesheet (rgb(244, 244, 244))
+                    a_config_container_layout.addWidget(a_config_title_button)
                     
                     # Create horizontal layout for the widgets
                     a_sub_config_widget_layout = pg.Qt.QtWidgets.QHBoxLayout()
@@ -374,6 +397,17 @@ class EpochRenderConfigsListWidget(pg.Qt.QtWidgets.QWidget):
                     a_sub_config_widget_container.setLayout(a_sub_config_widget_layout)
                     a_sub_config_widget_container.setObjectName(f"widgetContainer[{a_config_name}]")
 
+
+                    # --- Begin block to make scroll bar NOT cover bottom of widgets
+                    # Place the scroll area inside a QWidget with a QVBoxLayout to act as a spacer/padding container
+                    a_sub_config_scroll_container = pg.Qt.QtWidgets.QWidget()
+                    a_sub_config_scroll_container_layout = pg.Qt.QtWidgets.QVBoxLayout()
+                    a_sub_config_scroll_container_layout.setSpacing(0)
+                    a_sub_config_scroll_container_layout.setContentsMargins(0, 0, 0, 0)
+                    a_sub_config_scroll_container_layout.setObjectName(f"scrollContainerLayout[{a_config_name}]")
+                    a_sub_config_scroll_container.setLayout(a_sub_config_scroll_container_layout)
+                    a_sub_config_scroll_container.setObjectName(f"scrollContainerWidget[{a_config_name}]")
+
                     # Create a scroll area with horizontal scrolling
                     a_sub_config_scroll_area = pg.Qt.QtWidgets.QScrollArea()
                     a_sub_config_scroll_area.setWidget(a_sub_config_widget_container)
@@ -382,9 +416,16 @@ class EpochRenderConfigsListWidget(pg.Qt.QtWidgets.QWidget):
                     a_sub_config_scroll_area.setVerticalScrollBarPolicy(pg.Qt.QtCore.Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
                     a_sub_config_scroll_area.setFrameShape(pg.Qt.QtWidgets.QFrame.Shape.NoFrame)
                     a_sub_config_scroll_area.setObjectName(f"scrollArea[{a_config_name}]")
-                    
-                    # Add scroll area to container layout
-                    a_config_container_layout.addWidget(a_sub_config_scroll_area)
+
+                    # Add a bottom margin to the sub_config_scroll_container_layout to avoid the scroll bar cutting off content
+                    # This margin can be dynamically set if needed
+                    margin_pixels = 20  # adjust as needed for the typical scroll bar height
+                    a_sub_config_scroll_container_layout.addWidget(a_sub_config_scroll_area)
+                    a_sub_config_scroll_container_layout.addSpacing(margin_pixels)
+
+                    # Add scroll area container to container layout instead of directly adding the scroll area
+                    a_config_container_layout.addWidget(a_sub_config_scroll_container)
+                    # --- End of block
                     
                     self.ui.out_render_config_widgets_dict[a_config_name] = [] # start with an empty list
                     # added_widget_dict[a_config] = []
@@ -435,8 +476,8 @@ class EpochRenderConfigsListWidget(pg.Qt.QtWidgets.QWidget):
                         # Update the scroll area's viewport to show the content properly
                         a_sub_config_scroll_area.updateGeometry()
 
-                    # Add the container layout (with title + scroll area) to the parent layout
-                    self.ui.config_widget_layout.addLayout(a_config_container_layout)
+                    # Add the container widget (with title + scroll area) to the parent layout
+                    self.ui.config_widget_layout.addWidget(a_config_container_widget)
 
             else:
                 # Otherwise a straight-up config
@@ -819,25 +860,29 @@ class EpochRenderConfigsListWidget(pg.Qt.QtWidgets.QWidget):
                 widget.deleteLater()
                 widget_or_list.pop(idx)
                 
-                # If the list is now empty, remove the whole entry including container layout
+                # If the list is now empty, remove the whole entry including container widget
                 if len(widget_or_list) == 0:
-                    # Find and remove the container layout from config_widget_layout
+                    # Find and remove the container widget from config_widget_layout
                     for i in range(self.ui.config_widget_layout.count()):
                         item = self.ui.config_widget_layout.itemAt(i)
                         if item is not None:
-                            layout = item.layout()
-                            if layout is not None and layout.objectName() == f"containerLayout[{config_name}]":
-                                # Clear the layout's widgets before removing
-                                while layout.count():
-                                    layout_item = layout.takeAt(0)
-                                    layout_widget = layout_item.widget()
-                                    if layout_widget is not None:
-                                        layout_widget.deleteLater()
-                                    layout_layout = layout_item.layout()
-                                    if layout_layout is not None:
-                                        # Recursively clear nested layouts
-                                        clear_layout(layout_layout)
-                                self.ui.config_widget_layout.removeItem(item)
+                            widget = item.widget()
+                            if widget is not None and widget.objectName() == f"containerWidget[{config_name}]":
+                                # Get the layout from the widget to clear nested widgets
+                                layout = widget.layout()
+                                if layout is not None:
+                                    # Clear the layout's widgets before removing
+                                    while layout.count():
+                                        layout_item = layout.takeAt(0)
+                                        layout_widget = layout_item.widget()
+                                        if layout_widget is not None:
+                                            layout_widget.deleteLater()
+                                        layout_layout = layout_item.layout()
+                                        if layout_layout is not None:
+                                            # Recursively clear nested layouts
+                                            clear_layout(layout_layout)
+                                self.ui.config_widget_layout.removeWidget(widget)
+                                widget.deleteLater()
                                 break
                     
                     del self.ui.out_render_config_widgets_dict[config_name]
