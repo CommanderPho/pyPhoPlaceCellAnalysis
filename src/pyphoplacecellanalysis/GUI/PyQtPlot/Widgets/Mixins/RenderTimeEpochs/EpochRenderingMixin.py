@@ -701,6 +701,8 @@ class EpochRenderingMixin(LiveWindowEventIntervalMonitoringMixin):
             stacked_epoch_layout_dict = {interval_key:dict(y_location=y_location, height=height) for interval_key, y_location, height in zip(rendered_interval_keys, required_vertical_offsets, required_interval_heights)}
 
         """
+
+
         ## Inline Concise: Position Replays, PBEs, and Ripples all below the scatter:
         for interval_key, interval_update_kwargs in update_dict.items():
             if interval_key in self.interval_datasources:
@@ -1124,7 +1126,27 @@ class EpochRenderingMixin(LiveWindowEventIntervalMonitoringMixin):
                 self.ui.connections['epochs_render_configs_widget_refresh'] = an_epochs_display_list_widget.sigRefreshRequested.connect(lambda x: self.build_or_update_epoch_render_configs_widget(parent=parent))
 
 
-    def update_epoch_interval_render_configs_from_configs(self, _out_configs: Dict[str, Union[EpochDisplayConfig, List[EpochDisplayConfig]]]):
+    def perform_remove_epoch_intervals(self, removed_interval_keys: List[str], should_perform_remove: bool = True):
+        """ actually remove the intervals. """
+
+        _all_removed_items = {}
+        if removed_interval_keys:
+            print(f"Intervals to be removed (present in self.interval_datasources but not in update_dict): {removed_interval_keys}")
+            ## perform remove
+            if should_perform_remove:
+                print(f'trying to remove removed_interval_keys: {removed_interval_keys} intervals...')
+                for a_key in removed_interval_keys:
+                    print(f'\tremoving "{a_key}"')
+                    _removed_items_list = self.remove_rendered_intervals(name=a_key)
+                    if _removed_items_list:
+                        _all_removed_items[a_key] = _removed_items_list
+                    print(f'\t\tsuccess, removed {len(_removed_items_list)} items')
+                print('\tdone.')
+        return _all_removed_items
+
+
+
+    def update_epoch_interval_render_configs_from_configs(self, _out_configs: Dict[str, Union[EpochDisplayConfig, List[EpochDisplayConfig], Dict[str, EpochDisplayConfig]]]):
         """ Update plots from configs:
         configs widget -> `Plotted Rects` 
         
@@ -1148,8 +1170,17 @@ class EpochRenderingMixin(LiveWindowEventIntervalMonitoringMixin):
                 update_dict[k] = v.to_dict()
             else:
                 update_dict[k] = [sub_v.to_dict() for sub_v in v] ## get the sub-items in the list
+
+        # Determine interval_keys that are missing from update_dict but exist in self.interval_datasources
+        removed_interval_keys = [k for k in self.interval_datasources.keys() if k not in update_dict]
+        if removed_interval_keys:
+            print(f"Intervals to be removed (present in self.interval_datasources but not in update_dict): {removed_interval_keys}")
+            self.perform_remove_epoch_intervals(removed_interval_keys=removed_interval_keys, should_perform_remove=True)
+
+
         self.update_rendered_intervals_visualization_properties(update_dict=update_dict)
-        
+
+
 
 
     @function_attributes(short_name=None, tags=['epochs', 'epoch_render_configs', 'update', 'sync'], input_requires=[], output_provides=[], uses=['self.update_rendered_intervals_visualization_properties'], used_by=[], creation_date='2024-07-03 11:27', related_items=['build_or_update_epoch_render_configs_widget'])
@@ -1169,9 +1200,16 @@ class EpochRenderingMixin(LiveWindowEventIntervalMonitoringMixin):
             raise NotImplementedError
         
         update_dict = an_epochs_display_list_widget.config_dicts_from_states()
-        
+        # Determine interval_keys that are missing from update_dict but exist in self.interval_datasources
+        removed_interval_keys = [k for k in self.interval_datasources.keys() if k not in update_dict]
+
         # Block signals to prevent circular updates
         with self._block_datasource_signals():
+
+            if removed_interval_keys:
+                print(f"Intervals to be removed (present in self.interval_datasources but not in update_dict): {removed_interval_keys}")
+                self.perform_remove_epoch_intervals(removed_interval_keys=removed_interval_keys, should_perform_remove=True)
+
             # Update datasources
             self.update_rendered_intervals_visualization_properties(update_dict=update_dict)
             
