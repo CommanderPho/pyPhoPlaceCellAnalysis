@@ -481,6 +481,7 @@ class EpochRenderingMixin(LiveWindowEventIntervalMonitoringMixin):
 
         return returned_rect_items 
 
+
     def remove_rendered_intervals(self, name, child_plots_removal_list=None, debug_print=False):
         """ removes the intervals specified by the interval_datasource to the plots
 
@@ -520,6 +521,7 @@ class EpochRenderingMixin(LiveWindowEventIntervalMonitoringMixin):
             self.sigRenderedIntervalsListChanged.emit(self) # Emit the intervals list changed signal when the item is removed
     
         return items_to_remove_from_rendered_epochs
+
 
     def clear_all_rendered_intervals(self, child_plots_removal_list=None, debug_print=False):
         """ removes all rendered rects - a batch version of removed_rendered_intervals(...) """
@@ -800,6 +802,7 @@ class EpochRenderingMixin(LiveWindowEventIntervalMonitoringMixin):
                 pass
 
         return all_series_positioning_dfs, all_series_compressed_positioning_dfs, all_series_compressed_positioning_update_dicts
+
 
     def recover_interval_flat_positioning_df(self) -> pd.DataFrame:
         """ returns a single flat dataframe with one entry for each series color 

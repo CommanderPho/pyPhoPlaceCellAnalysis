@@ -28,7 +28,7 @@ class Render2DEventRectanglesHelper:
     _required_interval_visualization_columns = ['t_start', 't_duration', 'series_vertical_offset', 'series_height', 'pen', 'brush']
     
     @classmethod
-    def _build_interval_tuple_list_from_dataframe(cls, df):
+    def _build_interval_tuple_list_from_dataframe(cls, df: pd.DataFrame):
         """ build the tuple list required for rendering intervals: fields are (start_t, series_vertical_offset, duration_t, series_height, pen, brush).
         Inputs:
             df: a Pandas.DataFrame with the columns ['t_start', 't_duration', 'series_vertical_offset', 'series_height', 'pen', 'brush']
