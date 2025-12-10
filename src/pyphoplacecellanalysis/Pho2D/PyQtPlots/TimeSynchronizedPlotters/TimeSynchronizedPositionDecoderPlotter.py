@@ -23,6 +23,8 @@ from pyphoplacecellanalysis.Pho2D.PyQtPlots.TimeSynchronizedPlotters.Mixins.Anim
 from attrs import define, field, Factory
 from pyphoplacecellanalysis.Pho2D.PyQtPlots.TimeSynchronizedPlotters.Mixins.UserEditableROIMixin import UserEditableROIMixin, Rois
 
+from pyphoplacecellanalysis.Pho2D.PyQtPlots.TimeSynchronizedPlotters.TimeSynchronizedGenericPlotterLayer import TimeSynchronizedGenericPlotterLayer, LayerDisplayConfig
+
 
 class TimeSynchronizedPositionDecoderPlotter(UserEditableROIMixin, AnimalTrajectoryPlottingMixin, TimeSynchronizedPlotterBase):
     """ Plots the decoded position posteriors at a given moment in time. 
@@ -102,8 +104,10 @@ class TimeSynchronizedPositionDecoderPlotter(UserEditableROIMixin, AnimalTraject
         self.params.posterior_variable_to_render = posterior_variable_to_render
         self.params.drop_below_threshold = drop_below_threshold
         
-        self.buildUI()
+        self.buildUI() # calls `self._buildGraphics()`
         self._update_plots()
+        
+
         
     def setup(self):
         # self.setup_spike_rendering_mixin() # NeuronIdentityAccessingMixin
@@ -132,7 +136,6 @@ class TimeSynchronizedPositionDecoderPlotter(UserEditableROIMixin, AnimalTraject
         # self.ui.root_view = self.ui.root_graphics_layout_widget.addViewBox()
         ## lock the aspect ratio so pixels are always square
         # self.ui.root_view.setAspectLocked(True)
-        a_plotter = self
 
         ## Create the new plot_stack to hold the render hierarchy
         self.ui.plot_stack = {} ## initialize
@@ -141,12 +144,41 @@ class TimeSynchronizedPositionDecoderPlotter(UserEditableROIMixin, AnimalTraject
         if self.params.needs_background_image:
             self.ui.bg_imv = pg.ImageItem()
             self.ui.plot_stack['bg_imv'] = self.ui.bg_imv
-
+            # bg_imv_layer: TimeSynchronizedGenericPlotterLayer = TimeSynchronizedGenericPlotterLayer(name='bg_imv', parent=self, contents={'main': self.ui.bg_imv}, data={'time_window_centers': deepcopy(self.time_window_centers),
+            #                                                                                                                                         'main': deepcopy(a_moving_avg),
+            #                                                                                                                                         })
+            # self.ui.plot_stack['bg_imv'] = bg_imv_layer
             # self.ui.root_view.addItem(self.ui.bg_imv)
+
 
         ## Create image item
         self.ui.imv = pg.ImageItem(border='w')
-        self.ui.plot_stack['imv'] = self.ui.imv
+        ## Build layer with appropriate controls:
+        Assert.is_in(self.posterior_variable_to_render, allowed_variable_list=['p_x_given_n', 'p_x_given_n_and_x_prev'])
+        # self.posterior_variable_to_render: allowed values: ['p_x_given_n', 'p_x_given_n_and_x_prev', ...]
+        if self.posterior_variable_to_render == 'p_x_given_n':
+            main_data = deepcopy(self.active_one_step_decoder.p_x_given_n)
+            main_data_title = f'p_x_given_n'
+        elif self.posterior_variable_to_render == 'p_x_given_n_and_x_prev':
+            main_data = deepcopy(self.active_two_step_decoder.p_x_given_n_and_x_prev)
+            main_data_title = f'p_x_given_n_and_x_prev'
+        # elif self.posterior_variable_to_render == 'num_pos_samples_smoothed_occupancy':
+        #     image = self.active_time_dependent_placefields.curr_num_pos_samples_smoothed_occupancy_map.copy()
+        #     main_data_title = 'curr_num_pos_samples_occupancy map (smoothed)'
+        # elif self.posterior_variable_to_render == 'normalized_occupancy':
+        #     image = self.active_time_dependent_placefields.curr_normalized_occupancy.copy()
+        #     main_data_title = 'curr_normalized_occupancy map'
+        else:
+            raise NotImplementedError        
+
+        a_layer_key: str = f'imv[{main_data_title}]'
+        imv_layer: TimeSynchronizedGenericPlotterLayer = TimeSynchronizedGenericPlotterLayer(name=a_layer_key, parent=self, contents={'main': self.ui.imv}, data={'time_window_centers': deepcopy(self.time_window_centers),
+                                                                                                                                                            'main': deepcopy(main_data),
+                                                                                                                                                            })
+        # self.ui.plot_stack['imv'] = self.ui.imv
+        if a_layer_key not in self.ui.plot_stack:
+            self.ui.plot_stack[a_layer_key] = imv_layer
+        
 
         # self.ui.root_view.addItem(self.ui.imv)
         # self.ui.root_view.setRange(QtCore.QRectF(*self.params.image_bounds_extent))
@@ -350,36 +382,35 @@ class TimeSynchronizedPositionDecoderPlotter(UserEditableROIMixin, AnimalTraject
             print(f'WARN: TimeSynchronizedPositionDecoderPlotter._update_plots: curr_time_window_index: {curr_time_window_index}')
             return # return without updating
         
-        Assert.is_in(self.posterior_variable_to_render, allowed_variable_list=['p_x_given_n', 'p_x_given_n_and_x_prev'])
-        # self.posterior_variable_to_render: allowed values: ['p_x_given_n', 'p_x_given_n_and_x_prev', ...]
-        if self.posterior_variable_to_render == 'p_x_given_n':
-            image = np.squeeze(self.active_one_step_decoder.p_x_given_n[:, :, curr_time_window_index]).copy()
-            image_title = f'p_x_given_n'
-        elif self.posterior_variable_to_render == 'p_x_given_n_and_x_prev':
-            image = np.squeeze(self.active_two_step_decoder.p_x_given_n_and_x_prev[:, :, curr_time_window_index]).copy()
-            image_title = f'p_x_given_n_and_x_prev'
-        # elif self.posterior_variable_to_render == 'num_pos_samples_smoothed_occupancy':
-        #     image = self.active_time_dependent_placefields.curr_num_pos_samples_smoothed_occupancy_map.copy()
-        #     image_title = 'curr_num_pos_samples_occupancy map (smoothed)'
-        # elif self.posterior_variable_to_render == 'normalized_occupancy':
-        #     image = self.active_time_dependent_placefields.curr_normalized_occupancy.copy()
-        #     image_title = 'curr_normalized_occupancy map'
-        else:
-            raise NotImplementedError
+        # Assert.is_in(self.posterior_variable_to_render, allowed_variable_list=['p_x_given_n', 'p_x_given_n_and_x_prev'])
+        # # self.posterior_variable_to_render: allowed values: ['p_x_given_n', 'p_x_given_n_and_x_prev', ...]
+        # if self.posterior_variable_to_render == 'p_x_given_n':
+        #     image = np.squeeze(self.active_one_step_decoder.p_x_given_n[:, :, curr_time_window_index]).copy()
+        #     image_title = f'p_x_given_n'
+        # elif self.posterior_variable_to_render == 'p_x_given_n_and_x_prev':
+        #     image = np.squeeze(self.active_two_step_decoder.p_x_given_n_and_x_prev[:, :, curr_time_window_index]).copy()
+        #     image_title = f'p_x_given_n_and_x_prev'
+        # # elif self.posterior_variable_to_render == 'num_pos_samples_smoothed_occupancy':
+        # #     image = self.active_time_dependent_placefields.curr_num_pos_samples_smoothed_occupancy_map.copy()
+        # #     image_title = 'curr_num_pos_samples_occupancy map (smoothed)'
+        # # elif self.posterior_variable_to_render == 'normalized_occupancy':
+        # #     image = self.active_time_dependent_placefields.curr_normalized_occupancy.copy()
+        # #     image_title = 'curr_normalized_occupancy map'
+        # else:
+        #     raise NotImplementedError
         
-        if self.params.drop_below_threshold is not None:
-            # image[np.where(occupancy < self.params.drop_below_threshold)] = np.nan # null out the occupancy
-            image[np.where(image < self.params.drop_below_threshold)] = np.nan # null out the occupancy
+        # if self.params.drop_below_threshold is not None:
+        #     # image[np.where(occupancy < self.params.drop_below_threshold)] = np.nan # null out the occupancy
+        #     image[np.where(image < self.params.drop_below_threshold)] = np.nan # null out the occupancy
         
-        # self.ui.imv.setImage(image, xvals=self.active_time_dependent_placefields.xbin)
-        if self.params.shared_axis_order is None:
-            self.ui.imv.setImage(image, rect=self.params.image_bounds_extent)
-        else:
-            self.ui.imv.setImage(image, rect=self.params.image_bounds_extent, axisOrder=self.params.shared_axis_order)
-        
+        # # self.ui.imv.setImage(image, xvals=self.active_time_dependent_placefields.xbin)
+        # if self.params.shared_axis_order is None:
+        #     self.ui.imv.setImage(image, rect=self.params.image_bounds_extent)
+        # else:
+        #     self.ui.imv.setImage(image, rect=self.params.image_bounds_extent, axisOrder=self.params.shared_axis_order)
         
         # self.setWindowTitle(f'{self.windowName} - {image_title} t = {curr_t}')
-        self.setWindowTitle(f'TimeSynchronizedPositionDecoderPlotter - {image_title} t = {curr_t}')
+        # self.setWindowTitle(f'TimeSynchronizedPositionDecoderPlotter - {image_title} t = {curr_t}')
     
         self.AnimalTrajectoryPlottingMixin_update_plots()
 
