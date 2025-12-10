@@ -105,6 +105,8 @@ class EpochRenderConfigWidget(pg.Qt.QtWidgets.QWidget):
 
     def on_update_config(self, *args, **kwargs):
         print(f'EpochRenderConfigWidget.on_update_config(*args: {args}, **kwargs: {kwargs})')
+        # Update self.config from UI state before emitting signal
+        self.config = self.config_from_state()
         self.sigConfigChanged.emit(self)
         
 
@@ -392,7 +394,7 @@ class EpochRenderConfigsListWidget(pg.Qt.QtWidgets.QWidget):
                     a_config_container_widget = pg.Qt.QtWidgets.QWidget()
                     a_config_container_widget.setLayout(a_config_container_layout)
                     a_config_container_widget.setObjectName(f"containerWidget[{a_config_name}]")
-                    
+                    a_config_container_widget.setMinimumSize(150, 112)
                     # Set stylesheet for the container widget
                     custom_stylesheet = """
 background-color: rgba(71, 65, 60, 180);
@@ -411,7 +413,7 @@ QToolTip {
                     
                     # Create horizontal layout for title row (title button + visibility toggle button)
                     a_config_title_row_layout = pg.Qt.QtWidgets.QHBoxLayout()
-                    a_config_title_row_layout.setSpacing(2)
+                    a_config_title_row_layout.setSpacing(0)
                     a_config_title_row_layout.setContentsMargins(0, 0, 0, 0)
                     a_config_title_row_layout.setObjectName(f"titleRowLayout_{a_config_name}")
                     

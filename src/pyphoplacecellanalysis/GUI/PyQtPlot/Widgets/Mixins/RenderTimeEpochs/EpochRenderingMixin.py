@@ -1327,6 +1327,21 @@ class EpochRenderingMixin(LiveWindowEventIntervalMonitoringMixin):
                     datasource = self.interval_datasources[interval_key]
                     new_rects_item = Render2DEventRectanglesHelper.build_IntervalRectsItem_from_interval_datasource(datasource)
                     
+                    # Extract visibility setting (handle both single dict and list of dicts)
+                    is_visible = None
+                    if isinstance(interval_update_kwargs, (list, tuple)):
+                        # For list case, use the first item's visibility (all items in a row share visibility)
+                        if len(interval_update_kwargs) > 0:
+                            first_kwargs = interval_update_kwargs[0]
+                            if not isinstance(first_kwargs, dict):
+                                first_kwargs = first_kwargs.to_dict()
+                            is_visible = first_kwargs.get('isVisible', None)
+                    else:
+                        # Single dict case
+                        if not isinstance(interval_update_kwargs, dict):
+                            interval_update_kwargs = interval_update_kwargs.to_dict()
+                        is_visible = interval_update_kwargs.get('isVisible', None)
+                    
                     # Update all plot items for this interval
                     container = self.rendered_epochs[interval_key]
                     for a_plot, rect_item in container.items():
@@ -1336,6 +1351,9 @@ class EpochRenderingMixin(LiveWindowEventIntervalMonitoringMixin):
                             # Preserve tooltip function from original item
                             if hasattr(new_rects_item, 'format_item_tooltip_fn'):
                                 rect_item.format_item_tooltip_fn = deepcopy(new_rects_item.format_item_tooltip_fn)
+                            # Apply visibility setting if provided
+                            if is_visible is not None:
+                                rect_item.setVisible(is_visible)
 
 
 

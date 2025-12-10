@@ -211,7 +211,7 @@ class EpochDisplayConfig(BasePlotDataParams):
 
     def to_dict(self) -> dict:
         """ returns as a dictionary representation """
-        return dict(y_location=self.y_location, height=self.height, pen_color=self.pen_QColor, brush_color=self.brush_QColor)
+        return dict(y_location=self.y_location, height=self.height, pen_color=self.pen_QColor, brush_color=self.brush_QColor, isVisible=self.isVisible)
 
 
     def to_clipboard_epochs_update_dict_code(self) -> Tuple[str, bool]:
