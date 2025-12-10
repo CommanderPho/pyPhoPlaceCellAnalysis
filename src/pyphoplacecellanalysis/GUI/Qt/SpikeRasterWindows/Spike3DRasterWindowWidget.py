@@ -1579,6 +1579,33 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
             needs_init = False
             an_epochs_display_list_widget: EpochRenderConfigsListWidget = an_extant_epochs_display_list_widget
             assert an_epochs_display_list_widget is not None
+            # Ensure connections exist (they might have been disconnected)
+            if 'epochs_render_configs_widget_updated' not in active_raster_plot.ui.connections:
+                active_raster_plot.ui.connections['epochs_render_configs_widget_updated'] = an_epochs_display_list_widget.sigAnyConfigChanged.connect(lambda x: active_raster_plot.update_epochs_from_configs_widget())
+            if 'epochs_render_configs_widget_refresh' not in active_raster_plot.ui.connections:
+                active_raster_plot.ui.connections['epochs_render_configs_widget_refresh'] = an_epochs_display_list_widget.sigRefreshRequested.connect(lambda x: active_raster_plot.build_or_update_epoch_render_configs_widget())
+            
+        elif (dDisplayItem is None) and (an_extant_epochs_display_list_widget is not None):
+            # Dock was closed but widget still exists - reuse widget and recreate dock
+            needs_init = False
+            an_epochs_display_list_widget: EpochRenderConfigsListWidget = an_extant_epochs_display_list_widget
+            # Update widget with current configs
+            epoch_display_configs = active_raster_plot.extract_interval_display_config_lists()
+            an_epochs_display_list_widget.update_from_configs(configs=epoch_display_configs)
+            # Recreate the dock with existing widget
+            display_config = CustomDockDisplayConfig(showCloseButton=True, showCollapseButton=True, orientation='horizontal', custom_get_colors_dict={False: DockDisplayColors(fg_color='#111', bg_color='#c5c5c5', border_color='#a7babd'),
+                    True: DockDisplayColors(fg_color='#333', bg_color='#757575', border_color='#424242'),
+                })
+            _, dDisplayItem = right_sidebar_contents_container_dockarea.add_display_dock(name, display_config=display_config, widget=an_epochs_display_list_widget, dockAddLocationOpts=['bottom'], autoOrientation=False)
+            dDisplayItem.setOrientation('horizontal', force=True)
+            dDisplayItem.updateStyle()
+            dDisplayItem.update()
+            rightSideContainerWidget.dock_items[name] = dDisplayItem
+            # Ensure connections exist (check if they're already connected to avoid duplicates)
+            if 'epochs_render_configs_widget_updated' not in active_raster_plot.ui.connections:
+                active_raster_plot.ui.connections['epochs_render_configs_widget_updated'] = an_epochs_display_list_widget.sigAnyConfigChanged.connect(lambda x: active_raster_plot.update_epochs_from_configs_widget())
+            if 'epochs_render_configs_widget_refresh' not in active_raster_plot.ui.connections:
+                active_raster_plot.ui.connections['epochs_render_configs_widget_refresh'] = an_epochs_display_list_widget.sigRefreshRequested.connect(lambda x: active_raster_plot.build_or_update_epoch_render_configs_widget())
             
 
         if needs_init:
@@ -1622,6 +1649,10 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
             ## Connect the update signal
             _a_sigAnyConfigChanged_connection = an_epochs_display_list_widget.sigAnyConfigChanged.connect(lambda an_updated_epochs_display_list: active_raster_plot.update_epochs_from_configs_widget())
             _connections_list.append(_a_sigAnyConfigChanged_connection)
+            
+            ## Connect the refresh signal to rebuild widget from datasources
+            _a_sigRefreshRequested_connection = an_epochs_display_list_widget.sigRefreshRequested.connect(lambda x: active_raster_plot.build_or_update_epoch_render_configs_widget())
+            _connections_list.append(_a_sigRefreshRequested_connection)
 
         ## END if needs_init...
         # self.ui.rightSideContainerWidget.ui.neuron_widget_container, _connections_list = self._perform_build_attached_neuron_visual_configs_widget(neuron_plotting_configs_dict)

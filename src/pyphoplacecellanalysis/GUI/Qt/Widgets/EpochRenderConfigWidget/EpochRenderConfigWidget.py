@@ -293,6 +293,7 @@ class EpochRenderConfigsListWidget(pg.Qt.QtWidgets.QWidget):
     
     """
     sigAnyConfigChanged = QtCore.Signal(object)
+    sigRefreshRequested = QtCore.Signal(object)  # Signal emitted when refresh button is clicked
     # sigSpecificConfigChanged = QtCore.Signal(object, object)
     
     ui: PhoUIContainer = field(init=False, default=None)
@@ -305,6 +306,7 @@ class EpochRenderConfigsListWidget(pg.Qt.QtWidgets.QWidget):
         super().__init__(parent=parent) # Call the inherited classes __init__ method
         self.configs = configs or {}
         # self.out_render_config_widgets_dict = 
+        self._is_programmatic_update = False  # Flag to track programmatic updates and prevent circular updates
         if parent is not None:
             parent.addWidget(self)
         self.initUI()
@@ -386,12 +388,53 @@ class EpochRenderConfigsListWidget(pg.Qt.QtWidgets.QWidget):
         self.ui.out_render_config_widgets_dict = {}
         # self.ui.out_render_config_widgets_dict = self._build_children_widgets(configs=self.configs)
         self._build_children_widgets(configs=self.configs)
+        
+        # Add refresh button at the bottom
+        self.ui.btnRefresh = pg.Qt.QtWidgets.QPushButton("Refresh Configs")
+        self.ui.btnRefresh.setToolTip("Refresh all configs from interval datasources")
+        self.ui.btnRefresh.pressed.connect(self.on_refresh_button_pressed)
+        self.ui.config_widget_layout.addWidget(self.ui.btnRefresh)
+        
         self.setLayout(self.ui.config_widget_layout)
 
                 
     def clear_all_child_widgets(self):
+        """Clear all child widgets and ensure proper cleanup.
+        
+        Disconnects signals from widgets before deletion to prevent stale signal connections.
+        Ensures out_render_config_widgets_dict is cleared synchronously with layout clearing.
+        """
+        # Disconnect signals from all widgets before clearing
+        for widget_or_list in self.ui.out_render_config_widgets_dict.values():
+            if isinstance(widget_or_list, (list, tuple)):
+                for widget in widget_or_list:
+                    if widget is not None:
+                        # Disconnect signals to prevent stale connections
+                        try:
+                            widget.sigConfigChanged.disconnect()
+                            widget.sigRemoveRequested.disconnect()
+                        except (TypeError, RuntimeError):
+                            # Signals may not be connected or already disconnected
+                            pass
+            else:
+                if widget_or_list is not None:
+                    # Disconnect signals to prevent stale connections
+                    try:
+                        widget_or_list.sigConfigChanged.disconnect()
+                        widget_or_list.sigRemoveRequested.disconnect()
+                    except (TypeError, RuntimeError):
+                        # Signals may not be connected or already disconnected
+                        pass
+        
+        # Clear the layout (this will delete widgets via deleteLater())
         clear_layout(self.ui.config_widget_layout)
+        
+        # Clear the dictionary synchronously with layout clearing
         self.ui.out_render_config_widgets_dict.clear()
+        
+        # Assert that cleanup was successful
+        assert len(self.ui.out_render_config_widgets_dict) == 0, "out_render_config_widgets_dict should be empty after clearing"
+        assert self.ui.config_widget_layout.count() == 0, "config_widget_layout should be empty after clearing"
 
     ## Programmatic Update/Retrieval:    
     def update_from_configs(self, configs: Dict[str, Union[EpochDisplayConfig, List[EpochDisplayConfig]]]):
@@ -399,61 +442,94 @@ class EpochRenderConfigsListWidget(pg.Qt.QtWidgets.QWidget):
         
         Attempts to update widgets in-place when structure hasn't changed to preserve widget state.
         Only clears and rebuilds if structure changed significantly.
-        """
-        # Check if structure changed significantly
-        structure_changed = False
-        if self.configs is None or set(configs.keys()) != set(self.configs.keys()):
-            structure_changed = True
-        else:
-            # Check if any config changed from single to list or vice versa
-            for key in configs.keys():
-                old_is_list = isinstance(self.configs.get(key, None), (list, tuple))
-                new_is_list = isinstance(configs[key], (list, tuple))
-                if old_is_list != new_is_list:
-                    structure_changed = True
-                    break
-                if new_is_list:
-                    if len(self.configs[key]) != len(configs[key]):
-                        structure_changed = True
-                        break
         
-        if structure_changed:
-            # Structure changed, need to rebuild
-            self.clear_all_child_widgets()
-            self.configs = configs
-            self._build_children_widgets(configs=self.configs)
-        else:
-            # Structure same, update widgets in-place
-            self.configs = configs
-            for a_config_name, a_config in configs.items():
-                widget_or_list = self.ui.out_render_config_widgets_dict.get(a_config_name, None)
-                if widget_or_list is None:
-                    continue  # Skip if widget doesn't exist
-                
-                if isinstance(a_config, (list, tuple)):
-                    if isinstance(widget_or_list, list):
-                        # Update list of widgets
-                        for i, a_sub_config in enumerate(a_config):
-                            if i < len(widget_or_list):
-                                widget_or_list[i].update_from_config(a_sub_config)
-                    else:
-                        # Widget is single but config is list - need to rebuild this one
-                        # This shouldn't happen if structure check worked, but handle it
+        Ensures robust operation by:
+        - Updating self.configs before clearing widgets to prevent stale data
+        - Using _is_programmatic_update flag to prevent circular updates (instead of blocking signals)
+        - Handling orphaned widgets (widgets without corresponding configs)
+        - Blocking signals on child widgets during programmatic updates to prevent them from triggering parent signals
+        """
+        # Set flag to indicate we're doing a programmatic update
+        # This prevents on_config_ui_updated() from emitting sigAnyConfigChanged during updates
+        self._is_programmatic_update = True
+        try:
+            # Check if structure changed significantly
+            structure_changed = False
+            if self.configs is None or set(configs.keys()) != set(self.configs.keys()):
+                structure_changed = True
+            else:
+                # Check if any config changed from single to list or vice versa
+                for key in configs.keys():
+                    old_is_list = isinstance(self.configs.get(key, None), (list, tuple))
+                    new_is_list = isinstance(configs[key], (list, tuple))
+                    if old_is_list != new_is_list:
                         structure_changed = True
                         break
-                else:
-                    if isinstance(widget_or_list, list):
-                        # Config is single but widget is list - need to rebuild this one
-                        structure_changed = True
-                        break
-                    else:
-                        # Update single widget in-place
-                        widget_or_list.update_from_config(a_config)
+                    if new_is_list:
+                        if len(self.configs[key]) != len(configs[key]):
+                            structure_changed = True
+                            break
             
-            # If we found a mismatch during in-place update, rebuild everything
+            # Detect orphaned widgets (widgets that exist but configs don't)
+            orphaned_widget_keys = set(self.ui.out_render_config_widgets_dict.keys()) - set(configs.keys())
+            if orphaned_widget_keys:
+                structure_changed = True  # Need to rebuild to remove orphaned widgets
+            
             if structure_changed:
+                # Structure changed, need to rebuild
+                # IMPORTANT: Update self.configs BEFORE clearing widgets to ensure consistency
+                self.configs = configs
                 self.clear_all_child_widgets()
                 self._build_children_widgets(configs=self.configs)
+            else:
+                # Structure same, update widgets in-place
+                # Update self.configs first to keep it in sync
+                self.configs = configs
+                for a_config_name, a_config in configs.items():
+                    widget_or_list = self.ui.out_render_config_widgets_dict.get(a_config_name, None)
+                    if widget_or_list is None:
+                        continue  # Skip if widget doesn't exist
+                    
+                    if isinstance(a_config, (list, tuple)):
+                        if isinstance(widget_or_list, list):
+                            # Update list of widgets
+                            for i, a_sub_config in enumerate(a_config):
+                                if i < len(widget_or_list):
+                                    # Block signals on child widget during programmatic update
+                                    child_widget = widget_or_list[i]
+                                    was_child_blocked = child_widget.blockSignals(True)
+                                    try:
+                                        child_widget.update_from_config(a_sub_config)
+                                    finally:
+                                        child_widget.blockSignals(was_child_blocked)
+                        else:
+                            # Widget is single but config is list - need to rebuild this one
+                            # This shouldn't happen if structure check worked, but handle it
+                            structure_changed = True
+                            break
+                    else:
+                        if isinstance(widget_or_list, list):
+                            # Config is single but widget is list - need to rebuild this one
+                            structure_changed = True
+                            break
+                        else:
+                            # Update single widget in-place
+                            # Block signals on child widget during programmatic update
+                            was_child_blocked = widget_or_list.blockSignals(True)
+                            try:
+                                widget_or_list.update_from_config(a_config)
+                            finally:
+                                widget_or_list.blockSignals(was_child_blocked)
+                
+                # If we found a mismatch during in-place update, rebuild everything
+                if structure_changed:
+                    # IMPORTANT: Update self.configs BEFORE clearing widgets to ensure consistency
+                    self.configs = configs
+                    self.clear_all_child_widgets()
+                    self._build_children_widgets(configs=self.configs)
+        finally:
+            # Always reset flag, even if an exception occurred
+            self._is_programmatic_update = False
 
 
     def configs_from_states(self, as_EpochDisplayConfig_obj: bool=True) -> Dict[str, Union[EpochDisplayConfig, List[EpochDisplayConfig]]]:
@@ -495,13 +571,35 @@ class EpochRenderConfigsListWidget(pg.Qt.QtWidgets.QWidget):
         return self.configs_from_states(as_EpochDisplayConfig_obj=False) # type: ignore
 
     def on_config_ui_updated(self, *args, **kwargs):
+        """Handle config updates from child widgets.
+        
+        Only emits sigAnyConfigChanged if this is a user-initiated update (not a programmatic update).
+        This prevents circular updates when update_from_configs() is called programmatically.
+        """
         print(f'EpochRenderConfigsListWidget.on_config_ui_updated(*args: {args}, **kwargs: {kwargs})')
-        self.sigAnyConfigChanged.emit(self)
+        # Only emit signal if this is NOT a programmatic update
+        # Programmatic updates are handled by the datasource removal/addition flow
+        if not self._is_programmatic_update:
+            self.sigAnyConfigChanged.emit(self)
+
+    def on_refresh_button_pressed(self):
+        """Handle refresh button press - emits signal to request refresh from datasources"""
+        print(f'EpochRenderConfigsListWidget.on_refresh_button_pressed()')
+        self.sigRefreshRequested.emit(self)
 
 
     # Add this method to handle the remove request
     def on_remove_epoch_series(self, widget):
-        """Handle a request to remove an epoch series"""
+        """Handle a request to remove an epoch series
+        
+        Note: We do NOT emit sigAnyConfigChanged here because when a datasource is removed
+        via remove_rendered_intervals(), it will emit sigRenderedIntervalsListChanged which
+        triggers update_from_configs() to sync the widget. Emitting here would cause a
+        circular update that can create duplicates.
+        
+        If removal is initiated from UI only (not from datasource removal), the parent
+        should handle the datasource removal separately.
+        """
         print(f'EpochRenderConfigsListWidget.on_remove_epoch_series(widget: {widget})')
         
         # Find the config name for this widget
@@ -531,16 +629,19 @@ class EpochRenderConfigsListWidget(pg.Qt.QtWidgets.QWidget):
                 # If the list is now empty, remove the whole entry
                 if len(widget_or_list) == 0:
                     del self.ui.out_render_config_widgets_dict[config_name]
-                    del self.configs[config_name]
+                    if config_name in self.configs:
+                        del self.configs[config_name]
             else:
                 # Remove the single widget
                 self.ui.config_widget_layout.removeWidget(widget)
                 widget.deleteLater()
                 del self.ui.out_render_config_widgets_dict[config_name]
-                del self.configs[config_name]
+                if config_name in self.configs:
+                    del self.configs[config_name]
             
-            # Emit signal to notify of the change
-            self.sigAnyConfigChanged.emit(self)
+            # Do NOT emit sigAnyConfigChanged here to prevent circular updates.
+            # The datasource removal flow (remove_rendered_intervals() → sigRenderedIntervalsListChanged)
+            # already triggers proper widget updates via _on_update_rendered_intervals().
             
 
 
