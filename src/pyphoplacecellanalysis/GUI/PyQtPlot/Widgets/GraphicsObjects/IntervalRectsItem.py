@@ -166,6 +166,21 @@ class IntervalRectsItem(ReprPrintableItemMixin, pg.GraphicsObject):
 
         p.end()
     
+    def update_data(self, new_data):
+        """Update the data in-place and regenerate the picture
+        
+        Args:
+            new_data: List of tuples or IntervalRectsItemData objects with format:
+                (start_t, series_vertical_offset, duration_t, series_height, pen, brush) or
+                IntervalRectsItemData(...)
+        """
+        self.data = new_data
+        self.generatePicture()
+        self.update()
+        # Rebuild labels if label format function exists
+        if self.item_label_format_fn is not None:
+            self.rebuild_label_items()
+    
     def paint(self, p, *args):
         p.drawPicture(0, 0, self.picture)
     

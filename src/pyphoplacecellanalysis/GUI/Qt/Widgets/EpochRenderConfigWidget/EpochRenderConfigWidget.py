@@ -337,10 +337,65 @@ class EpochRenderConfigsListWidget(pg.Qt.QtWidgets.QWidget):
 
     ## Programmatic Update/Retrieval:    
     def update_from_configs(self, configs: Dict[str, Union[EpochDisplayConfig, List[EpochDisplayConfig]]]):
-        """ called to programmatically update the config """
-        self.clear_all_child_widgets()
-        self.configs = configs ## update self.configs
-        self._build_children_widgets(configs=self.configs)
+        """ called to programmatically update the config 
+        
+        Attempts to update widgets in-place when structure hasn't changed to preserve widget state.
+        Only clears and rebuilds if structure changed significantly.
+        """
+        # Check if structure changed significantly
+        structure_changed = False
+        if self.configs is None or set(configs.keys()) != set(self.configs.keys()):
+            structure_changed = True
+        else:
+            # Check if any config changed from single to list or vice versa
+            for key in configs.keys():
+                old_is_list = isinstance(self.configs.get(key, None), (list, tuple))
+                new_is_list = isinstance(configs[key], (list, tuple))
+                if old_is_list != new_is_list:
+                    structure_changed = True
+                    break
+                if new_is_list:
+                    if len(self.configs[key]) != len(configs[key]):
+                        structure_changed = True
+                        break
+        
+        if structure_changed:
+            # Structure changed, need to rebuild
+            self.clear_all_child_widgets()
+            self.configs = configs
+            self._build_children_widgets(configs=self.configs)
+        else:
+            # Structure same, update widgets in-place
+            self.configs = configs
+            for a_config_name, a_config in configs.items():
+                widget_or_list = self.ui.out_render_config_widgets_dict.get(a_config_name, None)
+                if widget_or_list is None:
+                    continue  # Skip if widget doesn't exist
+                
+                if isinstance(a_config, (list, tuple)):
+                    if isinstance(widget_or_list, list):
+                        # Update list of widgets
+                        for i, a_sub_config in enumerate(a_config):
+                            if i < len(widget_or_list):
+                                widget_or_list[i].update_from_config(a_sub_config)
+                    else:
+                        # Widget is single but config is list - need to rebuild this one
+                        # This shouldn't happen if structure check worked, but handle it
+                        structure_changed = True
+                        break
+                else:
+                    if isinstance(widget_or_list, list):
+                        # Config is single but widget is list - need to rebuild this one
+                        structure_changed = True
+                        break
+                    else:
+                        # Update single widget in-place
+                        widget_or_list.update_from_config(a_config)
+            
+            # If we found a mismatch during in-place update, rebuild everything
+            if structure_changed:
+                self.clear_all_child_widgets()
+                self._build_children_widgets(configs=self.configs)
 
 
     def configs_from_states(self, as_EpochDisplayConfig_obj: bool=True) -> Dict[str, Union[EpochDisplayConfig, List[EpochDisplayConfig]]]:

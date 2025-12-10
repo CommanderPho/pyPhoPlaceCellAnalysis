@@ -257,7 +257,7 @@ class EpochRenderingMixin(LiveWindowEventIntervalMonitoringMixin):
         """ perform any parameters setting/checking during init """
         self.plots_data['interval_datasources'] = RenderPlotsData('EpochRenderingMixin')
         self.LiveWindowEventIntervalMonitoringMixin_on_init()
-        
+        self._is_updating_from_widget = False  # Flag to prevent circular updates
 
         # self.plots_data['interval_datasource_updating_connections'] = ConnectionsContainer('EpochRenderingMixin')
     
@@ -323,9 +323,31 @@ class EpochRenderingMixin(LiveWindowEventIntervalMonitoringMixin):
     
     #######################################################################################################################################
     
+    def _block_datasource_signals(self):
+        """Context manager to temporarily block datasource update signals during widget-driven updates"""
+        class _SignalBlocker:
+            def __init__(self, mixin):
+                self.mixin = mixin
+                self.blocked_datasources = {}
+            def __enter__(self):
+                self.mixin._is_updating_from_widget = True
+                for name, ds in self.mixin.interval_datasources.items():
+                    if hasattr(ds, 'source_data_changed_signal'):
+                        self.blocked_datasources[name] = ds.source_data_changed_signal.blockSignals(True)
+                return self
+            def __exit__(self, *args):
+                for name, was_blocked in self.blocked_datasources.items():
+                    if name in self.mixin.interval_datasources:
+                        self.mixin.interval_datasources[name].source_data_changed_signal.blockSignals(was_blocked)
+                self.mixin._is_updating_from_widget = False
+        
+        return _SignalBlocker(self)
+    
     @pyqtExceptionPrintingSlot(object)
     def EpochRenderingMixin_on_interval_datasource_changed(self, datasource: IntervalsDatasource):
         """ emit our own custom signal when the general datasource update method returns """
+        if self._is_updating_from_widget:
+            return  # Skip if update is from widget to prevent circular updates
         # print(f'datasource: {datasource.custom_datasource_name}')
         self.add_rendered_intervals(datasource, name=datasource.custom_datasource_name, debug_print=False) # updates the rendered intervals on the change
         
@@ -452,25 +474,24 @@ class EpochRenderingMixin(LiveWindowEventIntervalMonitoringMixin):
             
             for a_plot in child_plots:
                 if a_plot in extant_rects_plot_items_container:
-                    # the plot is already here: remove and re-add it
+                    # Update data in-place instead of remove/recreate
                     extant_rect_plot_item = extant_rects_plot_items_container[a_plot]
-                    self._perform_remove_render_item(a_plot, extant_rect_plot_item)
-
-                    # TODO: update the item's data instead of replacing it
-                    # # add the new one:
-                    # extant_rects_plot_items_container[a_plot] = new_interval_rects_item.copy()
-                    # a_plot.addItem(extant_rects_plot_items_container[a_plot])
-                # if a_plot in extant_rects_plot_items_container...           
-
-                independent_data_copy = RectangleRenderTupleHelpers.copy_data(new_interval_rects_item.data)
-                extant_rects_plot_items_container[a_plot] = IntervalRectsItem(data=independent_data_copy, format_tooltip_fn=deepcopy(_custom_format_tooltip_for_rect_data))
-                extant_rects_plot_items_container[a_plot].format_item_tooltip_fn = deepcopy(_custom_format_tooltip_for_rect_data)
-                
-                # extant_rects_plot_items_container[a_plot].setToolTip(name) # would set a single, static tooltip for the entire graphics item.
-                self._perform_add_render_item(a_plot, extant_rects_plot_items_container[a_plot])
-                returned_rect_items[a_plot.objectName()] = dict(plot=a_plot, rect_item=extant_rects_plot_items_container[a_plot])
-                # Adjust the bounds to fit any children:
-                EpochRenderingMixin.compute_bounds_adjustment_for_rect_item(a_plot, extant_rects_plot_items_container[a_plot])
+                    new_data = RectangleRenderTupleHelpers.copy_data(new_interval_rects_item.data)
+                    extant_rect_plot_item.update_data(new_data)
+                    # Preserve tooltip function
+                    extant_rect_plot_item.format_item_tooltip_fn = deepcopy(_custom_format_tooltip_for_rect_data)
+                    returned_rect_items[a_plot.objectName()] = dict(plot=a_plot, rect_item=extant_rect_plot_item)
+                    # Adjust the bounds to fit any children:
+                    EpochRenderingMixin.compute_bounds_adjustment_for_rect_item(a_plot, extant_rect_plot_item)
+                else:
+                    # New plot, add new item
+                    independent_data_copy = RectangleRenderTupleHelpers.copy_data(new_interval_rects_item.data)
+                    extant_rects_plot_items_container[a_plot] = IntervalRectsItem(data=independent_data_copy, format_tooltip_fn=deepcopy(_custom_format_tooltip_for_rect_data))
+                    extant_rects_plot_items_container[a_plot].format_item_tooltip_fn = deepcopy(_custom_format_tooltip_for_rect_data)
+                    self._perform_add_render_item(a_plot, extant_rects_plot_items_container[a_plot])
+                    returned_rect_items[a_plot.objectName()] = dict(plot=a_plot, rect_item=extant_rects_plot_items_container[a_plot])
+                    # Adjust the bounds to fit any children:
+                    EpochRenderingMixin.compute_bounds_adjustment_for_rect_item(a_plot, extant_rects_plot_items_container[a_plot])
                 
                     
         else:
@@ -1075,9 +1096,19 @@ class EpochRenderingMixin(LiveWindowEventIntervalMonitoringMixin):
             print(f'no epochs_render_configs_widget exists, creating a new one...')
             an_epochs_display_list_widget:EpochRenderConfigsListWidget = EpochRenderConfigsListWidget(epoch_display_configs, parent=parent)
             self.ui.epochs_render_configs_widget = an_epochs_display_list_widget
-            self.ui.connections['epochs_render_configs_widget_updated'] = an_epochs_display_list_widget.sigAnyConfigChanged.connect(lambda x: self.update_epochs_from_configs_widget())            
+            # Check if connection already exists before creating new one
+            if 'epochs_render_configs_widget_updated' in self.ui.connections:
+                # Disconnect existing connection first
+                try:
+                    an_epochs_display_list_widget.sigAnyConfigChanged.disconnect(self.ui.connections['epochs_render_configs_widget_updated'])
+                except (TypeError, RuntimeError):
+                    pass  # Connection may not exist or already disconnected
+            self.ui.connections['epochs_render_configs_widget_updated'] = an_epochs_display_list_widget.sigAnyConfigChanged.connect(lambda x: self.update_epochs_from_configs_widget())
         else:
             an_epochs_display_list_widget.update_from_configs(configs=epoch_display_configs)
+            # Ensure connection exists even when updating existing widget
+            if 'epochs_render_configs_widget_updated' not in self.ui.connections:
+                self.ui.connections['epochs_render_configs_widget_updated'] = an_epochs_display_list_widget.sigAnyConfigChanged.connect(lambda x: self.update_epochs_from_configs_widget())
 
 
     def update_epoch_interval_render_configs_from_configs(self, _out_configs: Dict[str, Union[EpochDisplayConfig, List[EpochDisplayConfig]]]):
@@ -1117,20 +1148,36 @@ class EpochRenderingMixin(LiveWindowEventIntervalMonitoringMixin):
         update_epochs_from_configs_widget(active_2d_plot)
 
         """
+        from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.Mixins.RenderTimeEpochs.Render2DEventRectanglesHelper import Render2DEventRectanglesHelper
+        
         an_epochs_display_list_widget = self.ui.get('epochs_render_configs_widget', None)
         if an_epochs_display_list_widget is None:
             # create a new one:    
             raise NotImplementedError
-            # an_epochs_display_list_widget:EpochRenderConfigsListWidget = EpochRenderConfigsListWidget(active_2d_plot.extract_interval_display_config_lists(), parent=active_2d_plot)
-            # active_2d_plot.ui.epochs_render_configs_widget = an_epochs_display_list_widget
-        # else:
-        #     an_epochs_display_list_widget.update_from_configs(configs=epoch_display_configs)
-
-        ## get the configs from the configs widget
-        # _out_configs = an_epochs_display_list_widget.configs_from_states()
-        update_dict = an_epochs_display_list_widget.config_dicts_from_states()        
-        # update_dict = {k:v.to_dict() for k, v in _out_configs.items()}
-        self.update_rendered_intervals_visualization_properties(update_dict=update_dict)
+        
+        update_dict = an_epochs_display_list_widget.config_dicts_from_states()
+        
+        # Block signals to prevent circular updates
+        with self._block_datasource_signals():
+            # Update datasources
+            self.update_rendered_intervals_visualization_properties(update_dict=update_dict)
+            
+            # Directly update existing IntervalRectsItem objects
+            for interval_key, interval_update_kwargs in update_dict.items():
+                if interval_key in self.rendered_epochs and interval_key in self.interval_datasources:
+                    # Rebuild data from updated datasource
+                    datasource = self.interval_datasources[interval_key]
+                    new_rects_item = Render2DEventRectanglesHelper.build_IntervalRectsItem_from_interval_datasource(datasource)
+                    
+                    # Update all plot items for this interval
+                    container = self.rendered_epochs[interval_key]
+                    for a_plot, rect_item in container.items():
+                        if not isinstance(a_plot, str) and isinstance(rect_item, IntervalRectsItem):
+                            new_data = RectangleRenderTupleHelpers.copy_data(new_rects_item.data)
+                            rect_item.update_data(new_data)
+                            # Preserve tooltip function from original item
+                            if hasattr(new_rects_item, 'format_item_tooltip_fn'):
+                                rect_item.format_item_tooltip_fn = deepcopy(new_rects_item.format_item_tooltip_fn)
 
 
 
