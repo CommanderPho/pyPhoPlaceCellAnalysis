@@ -373,6 +373,12 @@ QToolTip {
 """
                     a_config_container_widget.setStyleSheet(custom_stylesheet)
                     
+                    # Create horizontal layout for title row (title button + visibility toggle button)
+                    a_config_title_row_layout = pg.Qt.QtWidgets.QHBoxLayout()
+                    a_config_title_row_layout.setSpacing(2)
+                    a_config_title_row_layout.setContentsMargins(0, 0, 0, 0)
+                    a_config_title_row_layout.setObjectName(f"titleRowLayout_{a_config_name}")
+                    
                     # Add a button showing the config name, matching EpochRenderConfigWidget's btnTitle exactly
                     # btnTitle is a disabled flat QPushButton - use the same widget type for consistency
                     a_config_title_button = pg.Qt.QtWidgets.QPushButton(a_config_name)
@@ -384,7 +390,44 @@ QToolTip {
                     font.setBold(True)
                     a_config_title_button.setFont(font)
                     # Color will inherit from parent container widget's stylesheet (rgb(244, 244, 244))
-                    a_config_container_layout.addWidget(a_config_title_button)
+                    a_config_title_row_layout.addWidget(a_config_title_button)
+                    
+                    # Create visibility toggle button for the row
+                    a_config_visibility_toggle_button = pg.Qt.QtWidgets.QToolButton()
+                    a_config_visibility_toggle_button.setObjectName(f"visibilityToggleButton_{a_config_name}")
+                    a_config_visibility_toggle_button.setMinimumSize(20, 25)
+                    a_config_visibility_toggle_button.setBaseSize(20, 25)
+                    a_config_visibility_toggle_button.setToolTip("Toggle visibility of all items in this row")
+                    a_config_visibility_toggle_button.setCheckable(True)
+                    a_config_visibility_toggle_button.setToolButtonStyle(pg.Qt.QtCore.Qt.ToolButtonStyle.ToolButtonIconOnly)
+                    # Set eye icons (same as chkbtnVisible)
+                    a_config_visibility_toggle_button.setIcon(pg.Qt.QtGui.QIcon(":/State/Icons/actions/eye.png"))
+                    # Style similar to chkbtnVisible
+                    a_config_visibility_toggle_button.setStyleSheet("""
+QToolButton {
+    color: rgb(244, 244, 244);
+}
+QToolButton:disabled {
+    color: gray;
+    background-color: gray;
+    border: 1px black;
+    border-style: outset;
+}
+QToolButton:checked {
+    color: rgb(255, 170, 0);
+    font: bold;
+    border: 1px white;
+    border-style: outset;
+}
+QToolButton:!checked {
+}
+""")
+                    # Connect toggle button to toggle method
+                    a_config_visibility_toggle_button.clicked.connect(lambda checked, name=a_config_name: self._toggle_row_visibility(name))
+                    a_config_title_row_layout.addWidget(a_config_visibility_toggle_button)
+                    
+                    # Add the title row layout to the container layout
+                    a_config_container_layout.addLayout(a_config_title_row_layout)
                     
                     # Create horizontal layout for the widgets
                     a_sub_config_widget_layout = pg.Qt.QtWidgets.QHBoxLayout()
@@ -461,6 +504,9 @@ QToolTip {
                         self.ui.out_render_config_widgets_dict[a_config_name].append(a_sub_curr_widget)
                         # added_widget_dict[a_config].append(a_sub_curr_widget)
                         added_widget_dict[a_sub_config] = [a_sub_curr_widget]
+                        
+                        # Connect individual widget visibility changes to update toggle button state
+                        a_sub_curr_widget.ui.chkbtnVisible.toggled.connect(lambda checked, name=a_config_name: self._update_row_visibility_toggle_button_state(name))
 
                     # Update the widget container's size after adding all widgets
                     # This is critical when setWidgetResizable(False) - the container needs explicit sizing
@@ -475,6 +521,9 @@ QToolTip {
                         a_sub_config_widget_container.setSizePolicy(size_policy)
                         # Update the scroll area's viewport to show the content properly
                         a_sub_config_scroll_area.updateGeometry()
+                        
+                        # Set initial state of the visibility toggle button based on current widget states
+                        self._update_row_visibility_toggle_button_state(a_config_name)
 
                     # Add the container widget (with title + scroll area) to the parent layout
                     self.ui.config_widget_layout.addWidget(a_config_container_widget)
@@ -557,6 +606,99 @@ QToolTip {
         # Assert that cleanup was successful
         assert len(self.ui.out_render_config_widgets_dict) == 0, "out_render_config_widgets_dict should be empty after clearing"
         assert self.ui.config_widget_layout.count() == 0, "config_widget_layout should be empty after clearing"
+
+
+    def _get_row_visibility_toggle_button(self, config_name: str):
+        """Helper method to find the visibility toggle button for a given config row.
+        
+        Args:
+            config_name: The name of the config row
+            
+        Returns:
+            The QToolButton toggle button, or None if not found
+        """
+        # Find the container widget
+        for i in range(self.ui.config_widget_layout.count()):
+            item = self.ui.config_widget_layout.itemAt(i)
+            if item is not None:
+                widget = item.widget()
+                if widget is not None and widget.objectName() == f"containerWidget[{config_name}]":
+                    container_widget = widget
+                    layout = container_widget.layout()
+                    if layout is not None and layout.count() > 0:
+                        # Get the title row layout (first item)
+                        title_row_item = layout.itemAt(0)
+                        if title_row_item is not None:
+                            title_row_layout = title_row_item.layout()
+                            if title_row_layout is not None:
+                                # Find the toggle button (second widget in the title row layout)
+                                if title_row_layout.count() >= 2:
+                                    toggle_button_item = title_row_layout.itemAt(1)
+                                    if toggle_button_item is not None:
+                                        toggle_button = toggle_button_item.widget()
+                                        if toggle_button is not None and toggle_button.objectName() == f"visibilityToggleButton_{config_name}":
+                                            return toggle_button
+        return None
+
+    def _update_row_visibility_toggle_button_state(self, config_name: str):
+        """Update the visibility toggle button state based on current widget visibility states.
+        
+        Args:
+            config_name: The name of the config row to update
+        """
+        if config_name not in self.ui.out_render_config_widgets_dict:
+            return
+        
+        widget_list = self.ui.out_render_config_widgets_dict[config_name]
+        if not isinstance(widget_list, (list, tuple)) or len(widget_list) == 0:
+            return
+        
+        # Determine current state: count how many are visible
+        visible_count = sum(1 for w in widget_list if w.ui.chkbtnVisible.isChecked())
+        total_count = len(widget_list)
+        
+        # Update the toggle button's checked state
+        # If all visible, button is checked; otherwise unchecked (handles mixed state as unchecked)
+        toggle_button = self._get_row_visibility_toggle_button(config_name)
+        if toggle_button is not None:
+            toggle_button.setChecked(visible_count == total_count)
+
+    def _toggle_row_visibility(self, config_name: str):
+        """Toggle visibility of all sub-config widgets in a row.
+        
+        Args:
+            config_name: The name of the config row to toggle visibility for
+        """
+        if config_name not in self.ui.out_render_config_widgets_dict:
+            return
+        
+        widget_list = self.ui.out_render_config_widgets_dict[config_name]
+        if not isinstance(widget_list, (list, tuple)) or len(widget_list) == 0:
+            return
+        
+        # Determine current state: count how many are visible
+        visible_count = sum(1 for w in widget_list if w.ui.chkbtnVisible.isChecked())
+        total_count = len(widget_list)
+        
+        # Determine target state:
+        # - If all visible or mixed → set all to hidden
+        # - If all hidden → set all to visible
+        if visible_count == total_count:
+            # All visible → set all to hidden
+            target_visible = False
+        else:
+            # All hidden or mixed → set all to visible
+            target_visible = True
+        
+        # Update all widgets' visibility checkboxes
+        for widget in widget_list:
+            if widget.ui.chkbtnVisible.isChecked() != target_visible:
+                widget.ui.chkbtnVisible.setChecked(target_visible)
+        
+        # Update the toggle button's checked state to reflect the new state
+        toggle_button = self._get_row_visibility_toggle_button(config_name)
+        if toggle_button is not None:
+            toggle_button.setChecked(target_visible)
 
 
     ## Programmatic Update/Retrieval:    
