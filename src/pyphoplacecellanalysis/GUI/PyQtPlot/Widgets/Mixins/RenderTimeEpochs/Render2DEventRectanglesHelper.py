@@ -185,7 +185,17 @@ class Render2DEventRectanglesHelper:
             """
             start_t, series_vertical_offset, duration_t, series_height, pen, brush = rect_data_tuple
             end_t = start_t + duration_t
-            tooltip_text = f"Burst[{rect_index}]\nStart: {start_t:.3f}\nEnd: {end_t:.3f}\nDuration: {duration_t:.3f}" # The tooltip is set generically here to 'PBEs', 'Replays' or whatever the dataseries name is
+
+            ## get the optional label field if `rect_data_tuple` is a `IntervalRectsItemData` instead of a plain tuple
+            a_label = None
+            if not isinstance(rect_data_tuple, Tuple):
+                a_label = rect_data_tuple.label
+            
+            if a_label:
+                tooltip_text = f"{a_label}\nBurst[{rect_index}]\nStart: {start_t:.3f}\nEnd: {end_t:.3f}\nDuration: {duration_t:.3f}"
+            else:
+                tooltip_text = f"Burst[{rect_index}]\nStart: {start_t:.3f}\nEnd: {end_t:.3f}\nDuration: {duration_t:.3f}" # The tooltip is set generically here to 'PBEs', 'Replays' or whatever the dataseries name is
+
             return tooltip_text
 
         ## build the mesh:

@@ -5,7 +5,7 @@ Demonstrate creation of a custom graphic (a candlestick plot)
 import copy
 from typing import Dict, List, Tuple, Optional, Callable, Union, Any
 from attr import has
-from neuropy.core.user_annotations import function_attributes
+from neuropy.core.user_annotations import function_attributes, metadata_attributes
 import numpy as np
 
 from neuropy.utils.mixins.indexing_helpers import UnpackableMixin
@@ -19,7 +19,7 @@ from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.Mixins.ReprPrintableWidgetMixin
 from pyphoplacecellanalysis.External.pyqtgraph_extensions.graphicsItems.TextItem.AlignableTextItem import CustomRectBoundedTextItem
 
 
-
+# @metadata_attributes(short_name=None, tags=['data'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-12-10 08:55', related_items=['pyphoplacecellanalysis.PhoPositionalData.plotting.mixins.epochs_plotting_mixins.EpochDisplayConfig'])
 @define(slots=False, repr=True)
 class IntervalRectsItemData(UnpackableMixin):
     """ incremental progress towards more flexible self.data for `IntervalRectsItem` while maintaining drop-in compatibility with pre 2025-12-10 tuple-based approach via `UnpackableMixin`.
@@ -86,8 +86,16 @@ class IntervalRectsItem(ReprPrintableItemMixin, pg.GraphicsObject):
         
             def _custom_format_tooltip_for_rect_data(rect_index: int, rect_data_tuple: Tuple) -> str:
                 start_t, series_vertical_offset, duration_t, series_height, pen, brush = rect_data_tuple
+                ## get the optional label field if `rect_data_tuple` is a `IntervalRectsItemData` instead of a plain tuple
+                a_label = None
+                if not isinstance(rect_data_tuple, Tuple):
+                    a_label = rect_data_tuple.label
+                
                 end_t = start_t + duration_t
-                tooltip_text = f"{name}[{rect_index}]\nStart: {start_t:.3f}\nEnd: {end_t:.3f}\nDuration: {duration_t:.3f}" # The tooltip is set generically here to 'PBEs', 'Replays' or whatever the dataseries name is
+                if a_label:
+                    tooltip_text = f"{a_label}\n{name}[{rect_index}]\nStart: {start_t:.3f}\nEnd: {end_t:.3f}\nDuration: {duration_t:.3f}"
+                else:
+                    tooltip_text = f"{name}[{rect_index}]\nStart: {start_t:.3f}\nEnd: {end_t:.3f}\nDuration: {duration_t:.3f}"
                 return tooltip_text
 
 
