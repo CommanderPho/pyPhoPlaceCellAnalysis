@@ -1510,7 +1510,7 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
 
         return self.ui.rightSideContainerWidget.ui.neuron_widget_container, _connections_list
     
-    @function_attributes(short_name=None, tags=['widget', 'interactive', 'display', 'config', 'intervals', 'epoch', 'visual'], input_requires=[], output_provides=[], uses=['_perform_build_attached_neuron_visual_configs_widget'], used_by=[], creation_date='2025-01-27 16:27', related_items=[])
+    @function_attributes(short_name=None, tags=['widget', 'interactive', 'display', 'config', 'intervals', 'epoch', 'visual', 'right-sidebar'], input_requires=[], output_provides=[], uses=['_perform_build_attached_neuron_visual_configs_widget'], used_by=[], creation_date='2025-01-27 16:27', related_items=[])
     def build_neuron_visual_configs_widget(self, build_new_neuron_colormap:bool=False):
         """ addds to the right sidebar and connects controls """
         ## Get 2D or 3D Raster from spike_raster_window
@@ -1542,7 +1542,7 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
     
 
 
-    @function_attributes(short_name=None, tags=['widget', 'interactive', 'display', 'config', 'intervals', 'epoch', 'visual'], input_requires=[], output_provides=[], uses=['EpochRenderConfigsListWidget'], used_by=[], creation_date='2025-01-27 14:06', related_items=[])
+    @function_attributes(short_name=None, tags=['widget', 'interactive', 'display', 'config', 'intervals', 'epoch', 'visual', 'right-sidebar'], input_requires=[], output_provides=[], uses=['EpochRenderConfigsListWidget'], used_by=[], creation_date='2025-01-27 14:06', related_items=[])
     def build_epoch_intervals_visual_configs_widget(self):
         """ adds the epoch interval visual configs to the right sidebar and connects controls 
         
@@ -1608,7 +1608,7 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
                 an_epochs_display_list_widget = active_2d_plot.ui.get('epochs_render_configs_widget', None)
                 if an_epochs_display_list_widget is None:
                     # create a new one:    
-                    an_epochs_display_list_widget:EpochRenderConfigsListWidget = EpochRenderConfigsListWidget(epoch_display_configs)
+                    an_epochs_display_list_widget: EpochRenderConfigsListWidget = EpochRenderConfigsListWidget(epoch_display_configs)
                     active_2d_plot.ui.epochs_render_configs_widget = an_epochs_display_list_widget
                 else:
                     an_epochs_display_list_widget.update_from_configs(configs=epoch_display_configs)
