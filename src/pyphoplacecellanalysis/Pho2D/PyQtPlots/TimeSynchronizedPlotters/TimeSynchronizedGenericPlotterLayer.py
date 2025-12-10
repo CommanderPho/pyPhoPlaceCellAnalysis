@@ -30,9 +30,10 @@ import param
 import panel as pn
 from panel.viewable import Viewer
 from pyphoplacecellanalysis.General.Model.Configs.ParamConfigs import BasePlotDataParams, ExtendedPlotDataParams
+from pyphocorehelpers.gui.Qt.ParamQtWidget import ParamQtWidget, ParamQtWidgetMappingMixin
 
 
-class LayerDisplayConfig(BasePlotDataParams):
+class LayerDisplayConfig(ParamQtWidgetMappingMixin, BasePlotDataParams):
     """ This class uses the 'param' library to observe changes to its members 
     and perform corresponding updates to the class that holds it when they happen.
     """
@@ -41,7 +42,7 @@ class LayerDisplayConfig(BasePlotDataParams):
     isVisible = param.Boolean(default=True, doc="Whether the layer is visible")
     cmap = param.String(default='matplotlib.jet', doc='The cmap to use')
     opacity = param.Number(default=0.5, bounds=(0.0, 1.0), step=0.1)   
-    drop_below_threshold = param.Number(default=1e-3, bounds=(1e-27, 0.1), step=1e-3)
+    drop_below_threshold = param.Number(default=1e-3, bounds=(1e-27, 1.0), step=1e-3)
 
     
     @staticmethod
@@ -200,21 +201,29 @@ a_plotter
         did_change: bool = False
         
         cmap_str: str = self.gui_params.cmap
-        if '.' in cmap_str:
-            ## split
-            src_path, src_rel_name = cmap_str.split('.', maxsplit=1)
-            print(f'src_path: {src_path}, src_rel_name: {src_rel_name}')
-            cmap = pg.colormap.get(src_rel_name, src_path)
+        if cmap_str != '<Custom>':
+            if '.' in cmap_str:
+                ## split
+                src_path, src_rel_name = cmap_str.split('.', maxsplit=1)
+                print(f'src_path: {src_path}, src_rel_name: {src_rel_name}')
+                cmap = pg.colormap.get(src_rel_name, src_path)
+            else:
+                cmap = pg.colormap.get(cmap_str) ## specifically named colormap
+            
+
+            did_change = did_change or (self.params.cmap != cmap)
+            self.params.cmap = cmap
         else:
-            cmap = pg.colormap.get(cmap_str) ## specifically named colormap
-        did_change = did_change or (self.params.cmap != cmap)
-        self.params.cmap = cmap
+            print(f'Custom colormap detected!')
+            
 
         drop_below_threshold: float = self.gui_params.drop_below_threshold
         if drop_below_threshold < 1e-89:
+            print(f'treating `drop_below_threshold = None` because drop_below_threshold: {drop_below_threshold} < 1e-89')
             drop_below_threshold = None
             
         did_change = did_change or (self.params.drop_below_threshold != drop_below_threshold)
+        self.params.drop_below_threshold = drop_below_threshold
         
         opacity: float = self.gui_params.opacity
         did_change = did_change or (self.params.opacity != opacity)
@@ -222,7 +231,10 @@ a_plotter
 
         isVisible: bool = self.gui_params.isVisible
         prev_was_visible: bool = (self.params.opacity > 0.0)
-        did_change = did_change or (prev_was_visible != isVisible)        
+        did_change = did_change or (prev_was_visible != isVisible)
+        if (not isVisible) and did_change:
+            self.params.opacity = 0.0
+
         # if isVisible:
         #     did_change = did_change or (self.params.opacity > 0.0)        
         # else:
@@ -239,9 +251,37 @@ a_plotter
     def on_params_update(self):
         """ updates """
         print(f'on_params_update():')
-        self.contents['main'].setColorMap(self.params.cmap)
+        if isinstance(self.params.cmap, NDArray):
+            self.contents['main'].setLookupTable(self.params.cmap, update=True)
+        else:
+            self.contents['main'].setLookupTable(self.params.cmap.getLookupTable(nPts=256), update=True)
+        # self.contents['main'].setColorMap(self.params.cmap)
         self.contents['main'].setOpacity(self.params.opacity)
+        print(f'\tcalling self._update_plots()...')
+        self._update_plots()
         print('\tdone.')
+
+
+
+    def create_layer_configs_widget(self) -> QtWidgets.QWidget:
+        """Creates a PyQt5 widget containing the Panel param GUI"""
+
+        from qtpy import QtCore, QtWidgets
+
+        # 3. Setup Qt Container
+        container = QtWidgets.QWidget()
+        layout = QtWidgets.QVBoxLayout(container)
+        layout.setContentsMargins(0, 0, 0, 0) # Remove margins for seamless integration
+        
+        # 4. Embed WebEngine
+        main_config_widget = self.gui_params.get_gui_widget()
+        # Ensure the background blends in (optional)
+        # main_config_widget.setBackgroundColor(QtCore.Qt.transparent)
+        
+        layout.addWidget(main_config_widget)
+        
+        return container
+
 
     # ==================================================================================================================== #
     # QT Slots                                                                                                             #
@@ -289,15 +329,28 @@ a_plotter
         if self.params.drop_below_threshold is not None:
             image[np.where(image < self.params.drop_below_threshold)] = np.nan # null out the low values if needed
         
+        is_all_nan = np.all(np.isnan(image))
 
         ## get the image item to draw:
         imv: pg.ImageItem = self.contents['main']
 
-        # self.ui.imv.setImage(image, xvals=self.active_time_dependent_placefields.xbin)
-        if self.params.shared_axis_order is None:
-            imv.setImage(image, rect=self.params.image_bounds_extent)
+        if is_all_nan:
+            # Optimization: Don't just set data to None/NaN, actually remove it from the render pipeline
+            if imv.isVisible():
+                print(f'WARNING: is_all_nan == True for image. Hiding item.')
+                imv.hide()
+                # Optional: clear the image data to free memory if the object stays hidden for long
+                # imv.clear() 
         else:
-            imv.setImage(image, rect=self.params.image_bounds_extent, axisOrder=self.params.shared_axis_order)
+            # Ensure it is visible if it was previously hidden
+            if not imv.isVisible():
+                imv.show()
+
+            # Update Image:
+            if self.params.shared_axis_order is None:
+                imv.setImage(image, rect=self.params.image_bounds_extent)
+            else:
+                imv.setImage(image, rect=self.params.image_bounds_extent, axisOrder=self.params.shared_axis_order)
         
         
 
