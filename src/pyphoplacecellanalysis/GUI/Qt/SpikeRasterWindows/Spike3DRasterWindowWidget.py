@@ -1592,6 +1592,15 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
             # Update widget with current configs
             epoch_display_configs = active_raster_plot.extract_interval_display_config_lists()
             an_epochs_display_list_widget.update_from_configs(configs=epoch_display_configs)
+            # Ensure widget is properly reparented - remove from old parent if it exists
+            # This prevents layout issues when adding to new dock
+            old_parent = an_epochs_display_list_widget.parent()
+            if old_parent is not None:
+                # Remove widget from old parent's layout if it's in a layout
+                old_parent_layout = old_parent.layout()
+                if old_parent_layout is not None:
+                    old_parent_layout.removeWidget(an_epochs_display_list_widget)
+                an_epochs_display_list_widget.setParent(None)
             # Recreate the dock with existing widget
             display_config = CustomDockDisplayConfig(showCloseButton=True, showCollapseButton=True, orientation='horizontal', custom_get_colors_dict={False: DockDisplayColors(fg_color='#111', bg_color='#c5c5c5', border_color='#a7babd'),
                     True: DockDisplayColors(fg_color='#333', bg_color='#757575', border_color='#424242'),
@@ -1600,6 +1609,9 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
             dDisplayItem.setOrientation('horizontal', force=True)
             dDisplayItem.updateStyle()
             dDisplayItem.update()
+            # Ensure widget is visible and layout is updated after reparenting
+            an_epochs_display_list_widget.show()
+            an_epochs_display_list_widget.update()
             rightSideContainerWidget.dock_items[name] = dDisplayItem
             # Ensure connections exist (check if they're already connected to avoid duplicates)
             if 'epochs_render_configs_widget_updated' not in active_raster_plot.ui.connections:
