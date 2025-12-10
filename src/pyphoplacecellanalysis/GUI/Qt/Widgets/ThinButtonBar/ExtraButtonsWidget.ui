@@ -90,7 +90,7 @@
          <string>...</string>
         </property>
         <property name="icon">
-         <iconset resource="../../../../../../../silx/src/silx/resources/silx_resources.qrc">
+         <iconset>
           <normaloff>:/png/gui/icons/image-select-erase.png</normaloff>:/png/gui/icons/image-select-erase.png</iconset>
         </property>
        </widget>
@@ -101,7 +101,7 @@
          <string>...</string>
         </property>
         <property name="icon">
-         <iconset resource="../../../../../../../silx/src/silx/resources/silx_resources.qrc">
+         <iconset>
           <normaloff>:/png/gui/icons/image-select-add.png</normaloff>:/png/gui/icons/image-select-add.png</iconset>
         </property>
        </widget>
@@ -133,7 +133,7 @@
            <string notr="true">Refresh</string>
           </property>
           <property name="icon">
-           <iconset resource="../../../../../../../silx/src/silx/resources/silx_resources.qrc">
+           <iconset>
             <normaloff>:/png/gui/icons/view-refresh.png</normaloff>:/png/gui/icons/view-refresh.png</iconset>
           </property>
           <property name="autoRaise">
@@ -150,7 +150,7 @@
            <string notr="true">Clipboard</string>
           </property>
           <property name="icon">
-           <iconset resource="../../../../../../../silx/src/silx/resources/silx_resources.qrc">
+           <iconset>
             <normaloff>:/png/gui/icons/clipboard.png</normaloff>:/png/gui/icons/clipboard.png</iconset>
           </property>
          </widget>
@@ -177,7 +177,7 @@
            <string notr="true">Copy Selections</string>
           </property>
           <property name="icon">
-           <iconset resource="../../../../../../../silx/src/silx/resources/silx_resources.qrc">
+           <iconset>
             <normaloff>:/png/gui/icons/edit-copy.png</normaloff>:/png/gui/icons/edit-copy.png</iconset>
           </property>
           <property name="autoRaise">
@@ -200,7 +200,7 @@
            <string notr="true">Load Selections from Annotations</string>
           </property>
           <property name="icon">
-           <iconset resource="../../../../../../../silx/src/silx/resources/silx_resources.qrc">
+           <iconset>
             <normaloff>:/png/gui/icons/document-open.png</normaloff>:/png/gui/icons/document-open.png</iconset>
           </property>
           <property name="autoRaise">
@@ -224,7 +224,7 @@
            <string notr="true">Printer</string>
           </property>
           <property name="icon">
-           <iconset resource="../../../../../../../silx/src/silx/resources/silx_resources.qrc">
+           <iconset>
             <normaloff>:/png/gui/icons/document-print.png</normaloff>:/png/gui/icons/document-print.png</iconset>
           </property>
           <property name="autoRaise">
@@ -257,7 +257,7 @@
            <string notr="true">Brush</string>
           </property>
           <property name="icon">
-           <iconset resource="../../../../../../../silx/src/silx/resources/silx_resources.qrc">
+           <iconset>
             <normaloff>:/png/gui/icons/draw-brush.png</normaloff>:/png/gui/icons/draw-brush.png</iconset>
           </property>
           <property name="checkable">
@@ -280,7 +280,7 @@
            <string notr="true">Pencil</string>
           </property>
           <property name="icon">
-           <iconset resource="../../../../../../../silx/src/silx/resources/silx_resources.qrc">
+           <iconset>
             <normaloff>:/png/gui/icons/draw-pencil.png</normaloff>:/png/gui/icons/draw-pencil.png</iconset>
           </property>
           <property name="checkable">
@@ -303,7 +303,7 @@
            <string notr="true">Eraser</string>
           </property>
           <property name="icon">
-           <iconset resource="../../../../../../../silx/src/silx/resources/silx_resources.qrc">
+           <iconset>
             <normaloff>:/png/gui/icons/draw-rubber.png</normaloff>:/png/gui/icons/draw-rubber.png</iconset>
           </property>
           <property name="checkable">
@@ -325,7 +325,7 @@
   </layout>
  </widget>
  <resources>
-  <include location="../../../../../../../silx/src/silx/resources/silx_resources.qrc"/>
+  <include location="../../../../Resources/silx_resources.qrc"/>
  </resources>
  <connections/>
  <buttongroups>

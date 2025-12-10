@@ -179,7 +179,7 @@ QStatusBar {
  </widget>
  <resources>
   <include location="../../../../Resources/GuiResources.qrc"/>
-  <include location="../../../../../../../silx/src/silx/resources/silx_resources.qrc"/>
+  <include location="../../../../Resources/silx_resources.qrc"/>
   <include location="../../../../Resources/ActionIcons.qrc"/>
  </resources>
  <connections/>

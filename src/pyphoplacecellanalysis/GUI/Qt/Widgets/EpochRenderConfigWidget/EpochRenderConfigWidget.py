@@ -18,8 +18,8 @@ from pyphocorehelpers.gui.Qt.Param_to_PyQt_Binding import ParamToPyQtBinding
 from pyphoplacecellanalysis.PhoPositionalData.plotting.mixins.epochs_plotting_mixins import EpochDisplayConfig, _get_default_epoch_configs
 # from pyphoplacecellanalysis.External.pyqtgraph.Qt import QtCore, QtGui, QtWidgets, mkQApp
 # from pyphoplacecellanalysis.External.pyqtgraph.widgets.ColorButton import ColorButton
+from pyphoplacecellanalysis.GUI.Qt.Widgets.ThinButtonBar.IntervalConfigListExtraButtonsWidget import IntervalConfigListExtraButtonsWidget
 
-# 
 
 ## Define the .ui file path
 path = os.path.dirname(os.path.abspath(__file__))
@@ -295,7 +295,9 @@ class EpochRenderConfigsListWidget(pg.Qt.QtWidgets.QWidget):
     sigAnyConfigChanged = QtCore.Signal(object)
     sigRefreshRequested = QtCore.Signal(object)  # Signal emitted when refresh button is clicked
     # sigSpecificConfigChanged = QtCore.Signal(object, object)
+    sigCopyAllConfigsRequested = QtCore.Signal(object)  # Signal emitted when refresh button is clicked
     
+
     ui: PhoUIContainer = field(init=False, default=None)
     configs: Dict[str, Union[EpochDisplayConfig, List[EpochDisplayConfig]]] = field(init=False, default=None)
     # out_render_config_widgets_dict: Dict[str, pg.Qt.QtWidgets.QWidget] = field(init=False, default=None)
@@ -328,6 +330,7 @@ class EpochRenderConfigsListWidget(pg.Qt.QtWidgets.QWidget):
         
         # self.ui.out_render_config_widgets_dict = {}
         for a_config_name, a_config in configs.items():
+
             if isinstance(a_config, (list, tuple)):
                 # a list of configs
                 if len(a_config) == 1:
@@ -389,11 +392,13 @@ class EpochRenderConfigsListWidget(pg.Qt.QtWidgets.QWidget):
         # self.ui.out_render_config_widgets_dict = self._build_children_widgets(configs=self.configs)
         self._build_children_widgets(configs=self.configs)
         
-        # Add refresh button at the bottom
-        self.ui.btnRefresh = pg.Qt.QtWidgets.QPushButton("Refresh Configs")
-        self.ui.btnRefresh.setToolTip("Refresh all configs from interval datasources")
-        self.ui.btnRefresh.pressed.connect(self.on_refresh_button_pressed)
-        self.ui.config_widget_layout.addWidget(self.ui.btnRefresh)
+        # Add custom buttons bar widget
+        self.ui.buttons_bar_widget = IntervalConfigListExtraButtonsWidget(parent=self)
+        self.ui.config_widget_layout.addWidget(self.ui.buttons_bar_widget)
+        
+        # Connect button bar callbacks to parent widget methods
+        self._connect_button_bar_callbacks()
+
         
         self.setLayout(self.ui.config_widget_layout)
 
@@ -435,6 +440,7 @@ class EpochRenderConfigsListWidget(pg.Qt.QtWidgets.QWidget):
         # Assert that cleanup was successful
         assert len(self.ui.out_render_config_widgets_dict) == 0, "out_render_config_widgets_dict should be empty after clearing"
         assert self.ui.config_widget_layout.count() == 0, "config_widget_layout should be empty after clearing"
+
 
     ## Programmatic Update/Retrieval:    
     def update_from_configs(self, configs: Dict[str, Union[EpochDisplayConfig, List[EpochDisplayConfig]]]):
@@ -582,10 +588,113 @@ class EpochRenderConfigsListWidget(pg.Qt.QtWidgets.QWidget):
         if not self._is_programmatic_update:
             self.sigAnyConfigChanged.emit(self)
 
+    def _connect_button_bar_callbacks(self):
+        """Connect the button bar widget's callbacks to parent widget methods"""
+        if not hasattr(self.ui, 'buttons_bar_widget') or self.ui.buttons_bar_widget is None:
+            return
+        
+        button_bar = self.ui.buttons_bar_widget
+        
+        # Disconnect default callbacks and connect to parent methods
+        if 'reload' in button_bar.new_buttons_dict:
+            button_bar.new_buttons_dict['reload'].pressed.disconnect()
+            button_bar.new_buttons_dict['reload'].pressed.connect(self.on_refresh_button_pressed)
+        
+        if 'copy-all' in button_bar.new_buttons_dict:
+            button_bar.new_buttons_dict['copy-all'].pressed.disconnect()
+            button_bar.new_buttons_dict['copy-all'].pressed.connect(self.on_copy_all_configs)
+        
+        if 'apply' in button_bar.new_buttons_dict:
+            button_bar.new_buttons_dict['apply'].pressed.disconnect()
+            button_bar.new_buttons_dict['apply'].pressed.connect(self.on_apply_configs)
+        
+        if 'config' in button_bar.new_buttons_dict:
+            button_bar.new_buttons_dict['config'].pressed.disconnect()
+            button_bar.new_buttons_dict['config'].pressed.connect(self.on_config_button_pressed)
+
     def on_refresh_button_pressed(self):
         """Handle refresh button press - emits signal to request refresh from datasources"""
         print(f'EpochRenderConfigsListWidget.on_refresh_button_pressed()')
         self.sigRefreshRequested.emit(self)
+        if hasattr(self.ui, 'buttons_bar_widget') and self.ui.buttons_bar_widget is not None:
+            self.ui.buttons_bar_widget.label_message = 'Refresh requested'
+
+    def on_copy_all_configs(self):
+        """Handle copy-all button press - copies all configs to clipboard"""
+        print(f'EpochRenderConfigsListWidget.on_copy_all_configs()')
+        try:
+            # Get all configs from UI state
+            all_configs = self.configs_from_states(as_EpochDisplayConfig_obj=True)
+            
+            # Generate code string for all configs
+            code_lines = []
+            code_lines.append("# Epoch Display Configs Update Dictionary")
+            code_lines.append("epoch_display_configs_update_dict = {")
+            
+            for config_name, config_or_list in all_configs.items():
+                if isinstance(config_or_list, (list, tuple)):
+                    # Multiple configs for this name
+                    code_lines.append(f"    '{config_name}': [")
+                    for sub_config in config_or_list:
+                        code_str, _ = sub_config.to_clipboard_epochs_update_dict_code()
+                        # code_str is like "'MyEpoch': dict(...)", extract just the dict part
+                        if "': dict(" in code_str:
+                            dict_part = code_str.split("': ", 1)[1] if "': " in code_str else code_str
+                            code_lines.append(f"        {dict_part},")
+                        else:
+                            code_lines.append(f"        {code_str},")
+                    code_lines.append("    ],")
+                else:
+                    # Single config - code_str is like "'MyEpoch': dict(...)"
+                    code_str, _ = config_or_list.to_clipboard_epochs_update_dict_code()
+                    # Extract just the dict part after the colon
+                    if "': dict(" in code_str:
+                        dict_part = code_str.split("': ", 1)[1] if "': " in code_str else code_str
+                        code_lines.append(f"    '{config_name}': {dict_part},")
+                    else:
+                        code_lines.append(f"    {code_str},")
+            
+            code_lines.append("}")
+            full_code = "\n".join(code_lines)
+
+            ## print to the copied data:            
+            print(f'{full_code}\n')
+
+            # Copy to clipboard
+            clipboard = pg.Qt.QtWidgets.QApplication.clipboard()
+            clipboard.setText(full_code)
+            
+            print(f'Successfully copied all configs to clipboard')
+            # Show user-visible feedback
+            cursor_pos = pg.Qt.QtGui.QCursor.pos()
+            pg.Qt.QtWidgets.QToolTip.showText(cursor_pos, f"All configs copied to clipboard!\n{len(all_configs)} config(s)", self, pg.Qt.QtCore.QRect(), 2000)
+            
+            if hasattr(self.ui, 'buttons_bar_widget') and self.ui.buttons_bar_widget is not None:
+                self.ui.buttons_bar_widget.label_message = f'Copied {len(all_configs)} config(s)'
+            
+            self.sigCopyAllConfigsRequested.emit(self)
+        except Exception as e:
+            print(f'Error in on_copy_all_configs: {e}')
+            import traceback
+            traceback.print_exc()
+            # Show error tooltip
+            cursor_pos = pg.Qt.QtGui.QCursor.pos()
+            pg.Qt.QtWidgets.QToolTip.showText(cursor_pos, f"Error copying configs: {str(e)}", self, pg.Qt.QtCore.QRect(), 3000)
+
+    def on_apply_configs(self):
+        """Handle apply button press - applies current config state"""
+        print(f'EpochRenderConfigsListWidget.on_apply_configs()')
+        # Emit signal that configs have changed (this will trigger parent to apply them)
+        self.sigAnyConfigChanged.emit(self)
+        if hasattr(self.ui, 'buttons_bar_widget') and self.ui.buttons_bar_widget is not None:
+            self.ui.buttons_bar_widget.label_message = 'Configs applied'
+
+    def on_config_button_pressed(self):
+        """Handle config button press - shows configuration options"""
+        print(f'EpochRenderConfigsListWidget.on_config_button_pressed()')
+        # TODO: Implement config dialog or menu if needed
+        if hasattr(self.ui, 'buttons_bar_widget') and self.ui.buttons_bar_widget is not None:
+            self.ui.buttons_bar_widget.label_message = 'Config options'
 
 
     # Add this method to handle the remove request
@@ -662,11 +771,39 @@ def build_single_epoch_display_config_widget(render_config: EpochDisplayConfig) 
 
 
 
+# Testing/__main__
+
+def _main_test_single_widget(app):
+    test_config = EpochDisplayConfig()
+    widget = EpochRenderConfigWidget(config=test_config)
+    # widget = EpochRenderConfigWidget()
+    widget.show()
+    return widget
+
+
+def _main_test_EpochRenderConfigsListWidget(app):
+    """Test function for EpochRenderConfigsListWidget."""
+    # Build some sample EpochDisplayConfig dicts
+    from collections import OrderedDict
+    test_configs = OrderedDict()
+    for i in range(4):
+        config = EpochDisplayConfig(name=f"Epoch {i+1}")
+        test_configs[f"epoch_{i+1}"] = config
+
+    ## set item[2] to be a list of configs
+    row_idx: int = 2
+    test_configs[f"epoch_{row_idx+1}"] = [EpochDisplayConfig(name=f"Epoch {row_idx+1}[{named_intervals}]") for i, named_intervals in enumerate(('a', 'b', 'c', 'd'))]
+
+    widget = EpochRenderConfigsListWidget(configs=test_configs)
+    widget.show()
+    return widget
+
+
 
 
 ## Start Qt event loop
 if __name__ == '__main__':
-    app = pg.mkQApp('test EpochRenderConfigWidget')
+    app = pg.mkQApp('test EpochRenderConfigsListWidget')
     app.setStyleSheet("""
         QToolTip {
             background-color: #2a2a2a;
@@ -677,8 +814,8 @@ if __name__ == '__main__':
             font-size: 12px;
         }
     """)
-    test_config = EpochDisplayConfig()
-    widget = EpochRenderConfigWidget(config=test_config)
-    # widget = EpochRenderConfigWidget()
-    widget.show()
+    # widget = _main_test_single_widget(app)
+    widget = _main_test_EpochRenderConfigsListWidget(app)
     sys.exit(app.exec_())
+
+
