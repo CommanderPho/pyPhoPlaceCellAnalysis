@@ -97,21 +97,9 @@ class IntervalRectsItem(ReprPrintableItemMixin, pg.GraphicsObject):
         self._item_label_format_fn = format_label_fn
 
         self._labels = []
-        if self._item_label_format_fn is not None:
-            ## Build labels
-            for rect_index in np.arange(len(self.data)):
-                rect_data_tuple = self.data[rect_index]
-                (start_t, series_vertical_offset, duration_t, series_height, pen, brush) = rect_data_tuple
-                label_text: str = self._item_label_format_fn(rect_index=rect_index, rect_data_tuple=rect_data_tuple)
-                a_rect = QtCore.QRectF(start_t, series_vertical_offset, duration_t, series_height)  # QRectF: (left, top, width, height)
-                if debug_print:
-                    print(f'rect_index: {rect_index}, a_rect: {a_rect}, label_text: "{label_text}"')
-                # a_text_item: RectLabel = RectLabel(text=label_text, rect=a_rect)
-                a_text_item: CustomRectBoundedTextItem = CustomRectBoundedTextItem(rect=a_rect, text=label_text, parent=self)                
-                self._labels.append(a_text_item)
-                if debug_print:
-                    print(f'\tadded label: {a_text_item}')
-                a_text_item.updatePosition()
+        self.rebuild_label_items()
+        
+
 
     def generatePicture(self):
         ## pre-computing a QPicture object allows paint() to run much more quickly, 
@@ -161,6 +149,43 @@ class IntervalRectsItem(ReprPrintableItemMixin, pg.GraphicsObject):
     @item_label_format_fn.setter
     def item_label_format_fn(self, value):
         self._item_label_format_fn = value
+        
+
+    def rebuild_label_items(self, debug_print: bool=False):
+        """ rebuilds self._labels after update """
+        if debug_print:
+            print(f'removing existing label items: len(self._labels): {len(self._labels)}')
+        ## remove existing label items:
+        for a_text_item in self._labels:
+            # Properly remove from parent/scene
+            a_text_item.setParentItem(None)
+        self._labels = []
+        print(f'\tdone.')
+
+        if self.item_label_format_fn is not None:
+            print(f'\tbuilding labels...')
+            ## Build labels
+            for rect_index in np.arange(len(self.data)):
+                rect_data_tuple = self.data[rect_index]
+                (start_t, series_vertical_offset, duration_t, series_height, pen, brush) = rect_data_tuple
+                label_text: str = self.item_label_format_fn(rect_index=rect_index, rect_data_tuple=rect_data_tuple)
+                a_rect = QtCore.QRectF(start_t, series_vertical_offset, duration_t, series_height)  # QRectF: (left, top, width, height)
+                if debug_print:
+                    print(f'rect_index: {rect_index}, a_rect: {a_rect}, label_text: "{label_text}"')
+                # a_text_item: RectLabel = RectLabel(text=label_text, rect=a_rect)
+                a_text_item: CustomRectBoundedTextItem = CustomRectBoundedTextItem(rect=a_rect, text=label_text, parent=self)
+                           
+                self._labels.append(a_text_item)
+                if debug_print:
+                    print(f'\tadded label: {a_text_item}')
+                a_text_item.updatePosition()
+                
+        else:
+            print(f'\tno self.item_label_format_fn, so not building labels.')
+
+        print(f'\tdone.')
+        
+
 
     ## Copy Constructors:
     def __copy__(self):
