@@ -40,7 +40,9 @@ class EpochRenderConfigWidget(pg.Qt.QtWidgets.QWidget):
     """
     sigConfigChanged = QtCore.Signal(object)
     sigRemoveRequested = QtCore.Signal(object)  # New signal for remove requests
-    
+    sigCopyRequested = QtCore.Signal(object)
+
+
     # sigCollapseClicked = QtCore.Signal(object)
     # sigGroupClicked = QtCore.Signal(object)
     config: EpochDisplayConfig = field(default=Factory(EpochDisplayConfig))
@@ -191,26 +193,82 @@ class EpochRenderConfigWidget(pg.Qt.QtWidgets.QWidget):
         self.setContextMenuPolicy(QtCore.Qt.ContextMenuPolicy.CustomContextMenu)
         self.customContextMenuRequested.connect(self.showContextMenu)
         
-        # Create the action if it's not already part of the UI
+        # 2. Setup policy for the Title Button (to allow right-clicking the title)
+        self.ui.btnTitle.setContextMenuPolicy(QtCore.Qt.ContextMenuPolicy.CustomContextMenu)
+        self.ui.btnTitle.customContextMenuRequested.connect(self.showContextMenu)
+
+        # Create the actions if it's not already part of the UI
+
+        # 3. Create/Connect 'Remove' Action
         if not hasattr(self.ui, 'actionRemoveEpochSeries'):
             self.ui.actionRemoveEpochSeries = QtWidgets.QAction("Remove Epoch Series", self)
             # You can set the icon if available in your resources
             # self.ui.actionRemoveEpochSeries.setIcon(QtGui.QIcon(":/Icons/Icons/actions/pencil--minus.png"))
         
-        # Connect the action to a slot
         self.ui.actionRemoveEpochSeries.triggered.connect(self.onRemoveEpochSeries)
+
+        # 4. Create/Connect 'Copy' Action (NEW)
+        if not hasattr(self.ui, 'actionCopyConfig'):
+            self.ui.actionCopyConfig = QtWidgets.QAction("Copy Config", self)
+            # Optional: Set icon if available
+            # self.ui.actionCopyConfig.setIcon(QtGui.QIcon(":/Icons/Icons/actions/edit-copy.png"))
+        
+        self.ui.actionCopyConfig.triggered.connect(self.onCopyConfig)
+
+
     
     def showContextMenu(self, position):
         """Show the context menu at the requested position"""
-        menu = QtWidgets.QMenu(self)
+        # menu = QtWidgets.QMenu(self)
+        # menu.addAction(self.ui.actionRemoveEpochSeries)
+        # menu.exec_(self.mapToGlobal(position))
+        sender = self.sender()
+        # Determine the correct parent for the menu and mapping coordinate
+        # If triggered by btnTitle, map from btnTitle. If by self, map from self.
+        target_widget = sender if isinstance(sender, QtWidgets.QWidget) else self
+        
+        menu = QtWidgets.QMenu(target_widget)
+        menu.addAction(self.ui.actionCopyConfig)       # <--- Add Copy
+        menu.addSeparator()                            # <--- Optional separator
         menu.addAction(self.ui.actionRemoveEpochSeries)
-        menu.exec_(self.mapToGlobal(position))
+        
+        # Map local position to global screen position
+        menu.exec_(target_widget.mapToGlobal(position))
+
     
     def onRemoveEpochSeries(self):
         """Handler for the remove action"""
+        print(f'EpochRenderConfigWidget.onRemoveEpochSeries()')    
         self.sigRemoveRequested.emit(self)
         
 
+    def onCopyConfig(self):
+        """Handler for the copy action"""
+        print(f'EpochRenderConfigWidget.onCopyConfig()')
+        try:
+            # Get current config state from UI and copy to clipboard
+            current_config = self.config_from_state()
+            code_str, clipboard_success = current_config.to_clipboard_epochs_update_dict_code()
+            
+            if clipboard_success:
+                print(f'Successfully copied to clipboard: {code_str}')
+                # Show user-visible feedback
+                cursor_pos = QtGui.QCursor.pos()
+                QtWidgets.QToolTip.showText(cursor_pos, f"Config copied to clipboard!\n{current_config.name}", self, QtCore.QRect(), 2000)
+            else:
+                print(f'Warning: Generated code but clipboard copy failed: {code_str}')
+                # Show warning tooltip
+                cursor_pos = QtGui.QCursor.pos()
+                QtWidgets.QToolTip.showText(cursor_pos, f"Code generated but clipboard copy failed.\nCheck console for code.", self, QtCore.QRect(), 3000)
+        except Exception as e:
+            print(f'Error in onCopyConfig: {e}')
+            import traceback
+            traceback.print_exc()
+            # Show error tooltip
+            cursor_pos = QtGui.QCursor.pos()
+            QtWidgets.QToolTip.showText(cursor_pos, f"Error copying config: {str(e)}", self, QtCore.QRect(), 3000)
+        
+        self.sigCopyRequested.emit(self) # Emit self or self.config depending on preference
 
 
 def clear_layout(layout):

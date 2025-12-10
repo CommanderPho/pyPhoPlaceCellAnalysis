@@ -1,4 +1,4 @@
-from typing import List, Dict, Optional
+from typing import List, Dict, Optional, Tuple
 import param
 import numpy as np
 import pyphoplacecellanalysis.External.pyqtgraph as pg
@@ -212,6 +212,74 @@ class EpochDisplayConfig(BasePlotDataParams):
     def to_dict(self) -> dict:
         """ returns as a dictionary representation """
         return dict(y_location=self.y_location, height=self.height, pen_color=self.pen_QColor, brush_color=self.brush_QColor)
+
+
+    def to_clipboard_epochs_update_dict_code(self) -> Tuple[str, bool]:
+        """
+        Returns a tuple of (code_string, clipboard_success) where:
+        - code_string: Python code that can be pasted elsewhere to recreate an
+          `epochs_update_dict` entry for this EpochDisplayConfig. The output is a
+          single dictionary item (with key=self.name) showing the non-default config
+          values, suitable for copy-paste.
+        - clipboard_success: True if code was successfully copied to clipboard, False otherwise.
+        
+        Also attempts to copy the code to the system clipboard.
+        """
+        # Collect the relevant fields for code generation
+        fields = [
+            'y_location', 'height', 'pen_color', 'pen_opacity',
+            'brush_color', 'brush_opacity'
+        ]
+        # Build the dictionary for this config
+        config_dict = {}
+        for field in fields:
+            value = getattr(self, field)
+            # Format color values as hex strings if necessary
+            if 'color' in field and isinstance(value, str):
+                value_str = f"'{value}'"
+            else:
+                value_str = repr(value)
+            config_dict[field] = value_str
+
+        # Create the dict display: e.g.,
+        # 'MyEpoch': dict(y_location=-12.0, height=1.5, pen_color='#00ffff', pen_opacity=0.8, brush_color='#00ffff', brush_opacity=0.5)
+        dict_items = ', '.join([f"{k}={v}" for k, v in config_dict.items()])
+        code_str = f"'{self.name}': dict({dict_items})"
+
+        # Try copying to the clipboard with consistent Qt wrapper
+        clipboard_success = False
+        try:
+            # Use consistent Qt wrapper from pyqtgraph
+            from pyphoplacecellanalysis.External.pyqtgraph.Qt import QtWidgets
+            app = QtWidgets.QApplication.instance()
+            if app is None:
+                app = QtWidgets.QApplication([])
+            cb = app.clipboard()
+            cb.setText(code_str)
+            clipboard_success = True
+        except Exception as e1:
+            # Fallback to PyQt5 if pyqtgraph wrapper fails
+            try:
+                from PyQt5.QtWidgets import QApplication
+                app = QApplication.instance()
+                if app is None:
+                    app = QApplication([])
+                cb = app.clipboard()
+                cb.setText(code_str)
+                clipboard_success = True
+            except Exception as e2:
+                # Fallback to pyperclip if Qt methods fail
+                try:
+                    import pyperclip
+                    pyperclip.copy(code_str)
+                    clipboard_success = True
+                except Exception as e3:
+                    # All clipboard methods failed
+                    print(f"Warning: Could not copy to clipboard. Qt error: {e1}, PyQt5 error: {e2}, pyperclip error: {e3}")
+                    clipboard_success = False
+
+        return (code_str, clipboard_success)
+
 
 
     # @param.depends('height','y_location','pen_color','pen_opacity','brush_color','brush_opacity', watch=True)

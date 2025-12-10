@@ -340,6 +340,18 @@ QToolButton:!checked{
     <string>Remove Epoch Series</string>
    </property>
   </action>
+  <action name="actionCopyConfig">
+    <property name="icon">
+      <iconset resource="../../../../Resources/ActionIcons.qrc">
+      <normaloff>:/Icons/Icons/actions/edit-copy.png</normaloff>:/Icons/Icons/actions/edit-copy.png</iconset>
+    </property>
+    <property name="text">
+      <string>Copy Config</string>
+    </property>
+    <property name="toolTip">
+      <string>Copy Configuration</string>
+    </property>
+    </action>
  </widget>
  <customwidgets>
   <customwidget>
