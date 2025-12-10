@@ -272,11 +272,16 @@ class EpochRenderConfigWidget(pg.Qt.QtWidgets.QWidget):
 
 
 def clear_layout(layout):
+    """Recursively clear a layout and all its widgets and nested layouts."""
     while layout.count():
         item = layout.takeAt(0)
         widget = item.widget()
         if widget is not None:
             widget.deleteLater()
+        nested_layout = item.layout()
+        if nested_layout is not None:
+            # Recursively clear nested layouts
+            clear_layout(nested_layout)
 
 
 
@@ -341,17 +346,74 @@ class EpochRenderConfigsListWidget(pg.Qt.QtWidgets.QWidget):
                     
                 else:
                     ## extract all items
+                    # Create a vertical container layout for title + scrollable horizontal layout
+                    a_config_container_layout = pg.Qt.QtWidgets.QVBoxLayout()
+                    a_config_container_layout.setSpacing(0)
+                    a_config_container_layout.setContentsMargins(0, 0, 0, 0)
+                    a_config_container_layout.setObjectName(f"containerLayout[{a_config_name}]")
+                    
+                    # Add a tiny title label showing the config name
+                    a_config_title_label = pg.Qt.QtWidgets.QLabel(a_config_name)
+                    a_config_title_label.setObjectName(f"titleLabel[{a_config_name}]")
+                    # Make it small and subtle
+                    font = a_config_title_label.font()
+                    font.setPointSize(8)
+                    font.setBold(True)
+                    a_config_title_label.setFont(font)
+                    a_config_title_label.setStyleSheet("color: #888888;")
+                    a_config_container_layout.addWidget(a_config_title_label)
+                    
+                    # Create horizontal layout for the widgets
                     a_sub_config_widget_layout = pg.Qt.QtWidgets.QHBoxLayout()
                     a_sub_config_widget_layout.setSpacing(0)
                     a_sub_config_widget_layout.setContentsMargins(0, 0, 0, 0)
                     a_sub_config_widget_layout.setObjectName(f"horizontalLayout[{a_config_name}]")
                     
+                    # Create a widget to hold the horizontal layout (layouts can't be directly added to scroll areas)
+                    a_sub_config_widget_container = pg.Qt.QtWidgets.QWidget()
+                    a_sub_config_widget_container.setLayout(a_sub_config_widget_layout)
+                    a_sub_config_widget_container.setObjectName(f"widgetContainer[{a_config_name}]")
+
+                    # Create a scroll area with horizontal scrolling
+                    a_sub_config_scroll_area = pg.Qt.QtWidgets.QScrollArea()
+                    a_sub_config_scroll_area.setWidget(a_sub_config_widget_container)
+                    a_sub_config_scroll_area.setWidgetResizable(False)  # Don't resize widget, enable scrolling
+                    a_sub_config_scroll_area.setHorizontalScrollBarPolicy(pg.Qt.QtCore.Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+                    a_sub_config_scroll_area.setVerticalScrollBarPolicy(pg.Qt.QtCore.Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+                    a_sub_config_scroll_area.setFrameShape(pg.Qt.QtWidgets.QFrame.Shape.NoFrame)
+                    a_sub_config_scroll_area.setObjectName(f"scrollArea[{a_config_name}]")
+                    
+                    # Add scroll area to container layout
+                    a_config_container_layout.addWidget(a_sub_config_scroll_area)
+                    
                     self.ui.out_render_config_widgets_dict[a_config_name] = [] # start with an empty list
                     # added_widget_dict[a_config] = []
 
-
+                    print(f'a_config_name: "{a_config_name}" with {len(a_config)} sub-items:')
                     for i, a_sub_config in enumerate(a_config):
-                        a_sub_curr_widget = build_single_epoch_display_config_widget(a_sub_config)
+                        a_sub_config_name: str = deepcopy(a_sub_config.name)
+                        # Strip a_config_name (ignoring case, allowing '_' to replace ' ')
+                        def normalize_key(s):
+                            return s.lower().replace(' ', '_')
+                        norm_sub = normalize_key(a_sub_config_name)
+                        norm_config = normalize_key(a_config_name)
+                        # Remove norm_config from the start or end if present
+                        if norm_sub.startswith(norm_config):
+                            a_proper_sub_config_name = a_sub_config_name[len(a_config_name):].lstrip(" _-")
+                        elif norm_sub.endswith(norm_config):
+                            a_proper_sub_config_name = a_sub_config_name[:-len(a_config_name)].rstrip(" _-")
+                        else:
+                            a_proper_sub_config_name = a_sub_config_name
+
+                        a_proper_sub_config_name = a_proper_sub_config_name.strip('[]{}()') ## strip bracket characters
+                        print(f'\ti: {i}, a_sub_config_name: {a_sub_config_name}, a_proper_sub_config_name: {a_proper_sub_config_name}')
+                        if not hasattr(a_sub_config, '_original_name'):
+                            a_sub_config._original_name = deepcopy(a_sub_config.name) ## only back up once
+                            ## only override once:
+                            a_sub_config.name = a_proper_sub_config_name ## override the name
+                            print(f'\toverrode name!')
+
+                        a_sub_curr_widget = build_single_epoch_display_config_widget(a_sub_config, is_config_list=True)
                         a_sub_curr_widget.setObjectName(f"config[{a_config_name}][{i}]")
                         a_sub_config_widget_layout.addWidget(a_sub_curr_widget)
                         # self.ui.out_render_config_widgets_dict[a_config_name] = curr_widget
@@ -359,8 +421,22 @@ class EpochRenderConfigsListWidget(pg.Qt.QtWidgets.QWidget):
                         # added_widget_dict[a_config].append(a_sub_curr_widget)
                         added_widget_dict[a_sub_config] = [a_sub_curr_widget]
 
-                    # curr_widget = a_sub_config_widget_layout
-                    self.ui.config_widget_layout.addLayout(a_sub_config_widget_layout)
+                    # Update the widget container's size after adding all widgets
+                    # This is critical when setWidgetResizable(False) - the container needs explicit sizing
+                    # Calculate size hint based on the tallest widget and total width of all widgets
+                    if len(self.ui.out_render_config_widgets_dict[a_config_name]) > 0:
+                        max_height = max([w.sizeHint().height() for w in self.ui.out_render_config_widgets_dict[a_config_name]], default=50)
+                        total_width = sum([w.sizeHint().width() for w in self.ui.out_render_config_widgets_dict[a_config_name]], 0)
+                        # Set minimum size to ensure content is visible, but allow horizontal scrolling
+                        a_sub_config_widget_container.setMinimumSize(total_width, max_height)
+                        # Set size policy to allow vertical expansion but maintain horizontal scrollability
+                        size_policy = pg.Qt.QtWidgets.QSizePolicy(pg.Qt.QtWidgets.QSizePolicy.Policy.Minimum, pg.Qt.QtWidgets.QSizePolicy.Policy.Minimum)
+                        a_sub_config_widget_container.setSizePolicy(size_policy)
+                        # Update the scroll area's viewport to show the content properly
+                        a_sub_config_scroll_area.updateGeometry()
+
+                    # Add the container layout (with title + scroll area) to the parent layout
+                    self.ui.config_widget_layout.addLayout(a_config_container_layout)
 
             else:
                 # Otherwise a straight-up config
@@ -681,6 +757,7 @@ class EpochRenderConfigsListWidget(pg.Qt.QtWidgets.QWidget):
             cursor_pos = pg.Qt.QtGui.QCursor.pos()
             pg.Qt.QtWidgets.QToolTip.showText(cursor_pos, f"Error copying configs: {str(e)}", self, pg.Qt.QtCore.QRect(), 3000)
 
+
     def on_apply_configs(self):
         """Handle apply button press - applies current config state"""
         print(f'EpochRenderConfigsListWidget.on_apply_configs()')
@@ -731,17 +808,43 @@ class EpochRenderConfigsListWidget(pg.Qt.QtWidgets.QWidget):
             if isinstance(widget_or_list, list):
                 # If it's in a list, remove just that one widget
                 idx = widget_or_list.index(widget)
-                self.ui.config_widget_layout.removeWidget(widget)
+                
+                # Find the widget's parent layout (the horizontal layout inside the scroll area)
+                parent_widget = widget.parent()
+                if parent_widget is not None:
+                    parent_layout = parent_widget.layout()
+                    if parent_layout is not None:
+                        parent_layout.removeWidget(widget)
+                
                 widget.deleteLater()
                 widget_or_list.pop(idx)
                 
-                # If the list is now empty, remove the whole entry
+                # If the list is now empty, remove the whole entry including container layout
                 if len(widget_or_list) == 0:
+                    # Find and remove the container layout from config_widget_layout
+                    for i in range(self.ui.config_widget_layout.count()):
+                        item = self.ui.config_widget_layout.itemAt(i)
+                        if item is not None:
+                            layout = item.layout()
+                            if layout is not None and layout.objectName() == f"containerLayout[{config_name}]":
+                                # Clear the layout's widgets before removing
+                                while layout.count():
+                                    layout_item = layout.takeAt(0)
+                                    layout_widget = layout_item.widget()
+                                    if layout_widget is not None:
+                                        layout_widget.deleteLater()
+                                    layout_layout = layout_item.layout()
+                                    if layout_layout is not None:
+                                        # Recursively clear nested layouts
+                                        clear_layout(layout_layout)
+                                self.ui.config_widget_layout.removeItem(item)
+                                break
+                    
                     del self.ui.out_render_config_widgets_dict[config_name]
                     if config_name in self.configs:
                         del self.configs[config_name]
             else:
-                # Remove the single widget
+                # Remove the single widget (not in a list, so directly in config_widget_layout)
                 self.ui.config_widget_layout.removeWidget(widget)
                 widget.deleteLater()
                 del self.ui.out_render_config_widgets_dict[config_name]
@@ -755,7 +858,7 @@ class EpochRenderConfigsListWidget(pg.Qt.QtWidgets.QWidget):
 
 
 
-def build_single_epoch_display_config_widget(render_config: EpochDisplayConfig) -> EpochRenderConfigWidget:
+def build_single_epoch_display_config_widget(render_config: EpochDisplayConfig, is_config_list: bool=False) -> EpochRenderConfigWidget:
     """ builds a simple EpochRenderConfigWidget widget from a simple EpochDisplayConfig
     
     Called in build_containing_epoch_display_configs_root_widget(...) down below.
@@ -764,7 +867,12 @@ def build_single_epoch_display_config_widget(render_config: EpochDisplayConfig) 
     curr_epoch_config_string = f'{render_config.name}'
     curr_widget = EpochRenderConfigWidget(config=render_config) # new widget type
     curr_widget.setObjectName(curr_epoch_config_string)
-    
+    if is_config_list:
+        # TODO: strip the common series name and only use the specific rect/item name
+        # curr_epoch_config_string
+        # render_config.name = 
+        pass
+
     # curr_widget.update_from_config(render_config) # is this the right type of config? I think it is.
 
     return curr_widget
