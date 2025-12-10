@@ -208,6 +208,72 @@ class EpochRenderingMixin(LiveWindowEventIntervalMonitoringMixin):
             
         ## Clearing:
             active_2d_plot.clear_all_rendered_intervals()
+    
+    Signal Flow Documentation:
+        ======================
+        
+        sigRenderedIntervalsListChanged Signal Flow:
+        ---------------------------------------------
+        This signal is emitted when intervals are added or removed to notify all listeners
+        that the datasource list has changed.
+        
+        Emission Points:
+        - add_rendered_intervals(): Emitted when a NEW datasource is added (line 519)
+        - remove_rendered_intervals(): Emitted after datasource is deleted (line 568)
+        
+        Connected Handlers:
+        1. _on_update_rendered_intervals() (Spike3DRasterWindowWidget):
+           - Refreshes config widget to match current datasources
+           - Calls extract_interval_display_config_lists() → update_from_configs()
+           - Uses _is_programmatic_update flag to prevent circular updates
+        
+        2. on_rendered_intervals_list_changed() (Spike3DRasterBottomPlaybackControlBarWidget):
+           - Updates jump target series options in bottom bar
+        
+        3. on_update_right_sidebar_visible_interval_info_tables() (Spike3DRasterWindowWidget):
+           - Updates right sidebar interval info tables
+        
+        UI-Initiated Removal Flow:
+        --------------------------
+        When user clicks "Remove" in the config widget context menu:
+        
+        1. EpochRenderConfigWidget.onRemoveEpochSeries()
+           → Emits: sigRemoveRequested.emit(self)
+        
+        2. EpochRenderConfigsListWidget.on_remove_epoch_series(widget)
+           → Removes widget from UI layout
+           → Removes from out_render_config_widgets_dict
+           → Removes from self.configs
+           → Emits: sigRemoveRequested.emit(self, config_name)
+        
+        3. EpochRenderingMixin.on_remove_epoch_series_from_widget(widget, config_name)
+           → Calls: perform_remove_epoch_intervals([config_name])
+        
+        4. EpochRenderingMixin.perform_remove_epoch_intervals()
+           → Calls: remove_rendered_intervals(name) for each key
+        
+        5. EpochRenderingMixin.remove_rendered_intervals()
+           → Removes rendered items from plots
+           → Disconnects datasource signal (prevents memory leaks)
+           → Deletes: rendered_epochs[name] and interval_datasources[name]
+           → Emits: sigRenderedIntervalsListChanged.emit(self)
+        
+        6. _on_update_rendered_intervals() handler
+           → extract_interval_display_config_lists() (only includes existing datasources)
+           → update_from_configs() (rebuilds widget list to match datasources)
+           → Uses _is_programmatic_update flag to prevent sigAnyConfigChanged emission
+        
+        Circular Update Prevention:
+        ---------------------------
+        - update_from_configs() sets _is_programmatic_update = True
+        - on_config_ui_updated() checks this flag and does NOT emit sigAnyConfigChanged
+        - This prevents: Widget update → Config change → Datasource update → Widget update loop
+        
+        Signal Cleanup:
+        --------------
+        - Datasource signals are disconnected before deletion (line 563)
+        - Prevents orphaned signal connections and errors after deletion
+        - Widget deletion uses deleteLater() for safe async cleanup
         
     """
 

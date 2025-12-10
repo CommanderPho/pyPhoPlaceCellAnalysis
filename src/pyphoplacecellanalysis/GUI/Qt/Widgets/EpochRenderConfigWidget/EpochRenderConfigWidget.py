@@ -295,13 +295,49 @@ class EpochRenderConfigsListWidget(pg.Qt.QtWidgets.QWidget):
 
     from pyphoplacecellanalysis.GUI.Qt.Widgets.EpochRenderConfigWidget.EpochRenderConfigWidget import EpochRenderConfigsListWidget
 
+    Signal Flow Documentation:
+        ======================
+        
+        sigRemoveRequested Signal Flow:
+        --------------------------------
+        Emitted when user requests removal of an epoch series via context menu.
+        Signal signature: sigRemoveRequested.emit(self, config_name)
+        
+        Flow:
+        1. User clicks "Remove" → EpochRenderConfigWidget.onRemoveEpochSeries()
+           → Emits: sigRemoveRequested.emit(self)
+        
+        2. EpochRenderConfigsListWidget.on_remove_epoch_series(widget)
+           → Removes widget from UI layout and internal dictionaries
+           → Emits: sigRemoveRequested.emit(self, config_name)
+        
+        3. Connected to: EpochRenderingMixin.on_remove_epoch_series_from_widget()
+           → Removes datasource and triggers widget refresh via sigRenderedIntervalsListChanged
+        
+        sigAnyConfigChanged Signal Flow:
+        ---------------------------------
+        Emitted when user modifies config properties (visibility, colors, positions, etc.)
+        Connected to: EpochRenderingMixin.update_epochs_from_configs_widget()
+        
+        Circular Update Prevention:
+        ---------------------------
+        - update_from_configs() sets _is_programmatic_update = True
+        - on_config_ui_updated() only emits sigAnyConfigChanged if NOT programmatic
+        - Prevents: Widget update → Config change → Datasource update → Widget update loop
+        
+        sigRefreshRequested Signal Flow:
+        --------------------------------
+        Emitted when user clicks refresh button to rebuild widget from datasources.
+        Connected to: EpochRenderingMixin.build_or_update_epoch_render_configs_widget()
     
     """
     sigAnyConfigChanged = QtCore.Signal(object)
     sigRefreshRequested = QtCore.Signal(object)  # Signal emitted when refresh button is clicked
     # sigSpecificConfigChanged = QtCore.Signal(object, object)
     sigCopyAllConfigsRequested = QtCore.Signal(object)  # Signal emitted when refresh button is clicked
-    
+    sigRemoveRequested = QtCore.Signal(object, object) # (self, str)
+
+
 
     ui: PhoUIContainer = field(init=False, default=None)
     configs: Dict[str, Union[EpochDisplayConfig, List[EpochDisplayConfig]]] = field(init=False, default=None)
@@ -1038,10 +1074,11 @@ QToolButton:!checked {
                 if config_name in self.configs:
                     del self.configs[config_name]
             
+            # Emit sigRemoveRequested to notify parent to remove the datasource
             # Do NOT emit sigAnyConfigChanged here to prevent circular updates.
             # The datasource removal flow (remove_rendered_intervals() → sigRenderedIntervalsListChanged)
             # already triggers proper widget updates via _on_update_rendered_intervals().
-            
+            self.sigRemoveRequested.emit(self, config_name)
 
 
 
