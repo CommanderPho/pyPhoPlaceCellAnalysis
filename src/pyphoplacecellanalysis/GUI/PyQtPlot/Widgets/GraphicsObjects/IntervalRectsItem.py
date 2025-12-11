@@ -219,16 +219,18 @@ class IntervalRectsItem(ReprPrintableItemMixin, pg.GraphicsObject):
     def rebuild_label_items(self, debug_print: bool=False):
         """ rebuilds self._labels after update """
         if debug_print:
-            print(f'removing existing label items: len(self._labels): {len(self._labels)}')
+            print(f'IntervalRectsItem.rebuild_label_items(...): removing existing label items: len(self._labels): {len(self._labels)}')
         ## remove existing label items:
         for a_text_item in self._labels:
             # Properly remove from parent/scene
             a_text_item.setParentItem(None)
         self._labels = []
-        print(f'\tdone.')
+        if debug_print:
+            print(f'\tdone.')
 
         if self.item_label_format_fn is not None:
-            print(f'\tbuilding labels...')
+            if debug_print:
+                print(f'\tbuilding labels...')
             ## Build labels
             for rect_index in np.arange(len(self.data)):
                 rect_data_tuple = self.data[rect_index]
@@ -246,9 +248,11 @@ class IntervalRectsItem(ReprPrintableItemMixin, pg.GraphicsObject):
                 a_text_item.updatePosition()
                 
         else:
-            print(f'\tno self.item_label_format_fn, so not building labels.')
+            if debug_print:
+                print(f'\tno self.item_label_format_fn, so not building labels.')
 
-        print(f'\tdone.')
+        if debug_print:
+            print(f'\tdone.')
         
 
 
