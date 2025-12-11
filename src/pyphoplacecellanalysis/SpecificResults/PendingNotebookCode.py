@@ -115,6 +115,97 @@ from pyphocorehelpers.gui.Qt.color_helpers import ColormapHelpers, ColorFormatCo
 
 
 
+# ==================================================================================================================================================================================================================================================================================== #
+# 2025-12-10 Bapun Proper Epochs and additional Computations                                                                                                                                                                                                                           #
+# ==================================================================================================================================================================================================================================================================================== #
+from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.Mixins.RenderTimeEpochs.Specific2DRenderTimeEpochs import General2DRenderTimeEpochs, inline_mkColor
+from pyphoplacecellanalysis.General.Model.Datasources.IntervalDatasource import IntervalsDatasource
+from neuropy.utils.mixins.time_slicing import TimeColumnAliasesProtocol
+from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.GraphicsObjects.IntervalRectsItem import IntervalRectsItem
+
+@function_attributes(short_name=None, tags=['private', 'epochs', 'paradigm'], input_requires=[], output_provides=[], uses=[], used_by=['build_bapun_proper_epoch_intervals'], creation_date='2025-12-09 00:01', related_items=[])
+def build_bapun_all_epochs_df(curr_active_pipeline):
+    """ builds all epochs
+    """
+    import matplotlib.pyplot as plt
+    from pyphocorehelpers.gui.Qt.color_helpers import ColormapHelpers, ColorFormatConverter
+    from neuropy.core.epoch import Epoch, EpochsAccessor, ensure_dataframe, ensure_Epoch
+
+    def generate_colors(n_epoch):
+        cmap = plt.get_cmap('tab20', n_epoch)
+        return [plt.matplotlib.colors.rgb2hex(cmap(i)) for i in range(n_epoch)]
+
+    sess = curr_active_pipeline.sess # global_session
+
+    # pos_df = sess.compute_position_laps() # ensures the laps are computed if they need to be:
+    position_obj = deepcopy(sess.position)
+    position_obj.compute_higher_order_derivatives()
+    pos_df = position_obj.compute_smoothed_position_info(N=20) ## Smooth the velocity curve to apply meaningful logic to it
+    pos_df = position_obj.to_dataframe()
+    # Drop rows with missing data in columns: 't', 'velocity_x_smooth' and 2 other columns. This occurs from smoothing
+    pos_df = pos_df.dropna(subset=['t', 'x_smooth', 'velocity_x_smooth', 'acceleration_x_smooth']).reset_index(drop=True)
+    # curr_laps_df = sess.laps.to_dataframe()
+
+    curr_paradigm_df = ensure_dataframe(sess.paradigm)
+    curr_paradigm_df = curr_paradigm_df[np.logical_not(np.isin(curr_paradigm_df['label'], ['maze_GLOBAL', 'maze']))] ## exclude the global epoch
+    n_epochs: int = len(curr_paradigm_df)
+    # epoch_color_strs: List[str] = generate_colors(n_epochs)
+    epoch_color_strs: List[str] = [ColorFormatConverter.qColor_to_hexstring(v, include_alpha=False) for v in ColormapHelpers.mpl_to_pg_colormap(mpl_cmap_name='tab20', resolution=n_epochs).getColors(mode='qcolor')]
+    curr_paradigm_df['lap_color'] = "#10FF44"
+    curr_paradigm_df['lap_color'] = epoch_color_strs
+    curr_paradigm_df['lap_accent_color'] = '#FFFFFF'
+    return curr_paradigm_df
+
+
+@function_attributes(short_name=None, tags=['intervals', 'epochs'], uses=['build_bapun_all_epochs_df'], used_by=[], creation_date='2025-12-10 09:43', related_items=[])
+def build_bapun_proper_epoch_intervals(curr_active_pipeline, active_2d_plot):
+    """ adds the proper session epochs to the timeline
+    
+    Usage:
+        from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import build_bapun_proper_epoch_intervals, build_bapun_all_epochs_df
+        a_rect_item, an_interval_ds = build_bapun_proper_epoch_intervals(curr_active_pipeline=curr_active_pipeline, active_2d_plot=active_2d_plot)
+    
+    """
+    curr_paradigm_df = build_bapun_all_epochs_df(curr_active_pipeline=curr_active_pipeline)
+
+    ## INPUTS: curr_paradigm_df
+
+    # 'lap_color', 'lap_accent_color'
+    curr_paradigm_df['pen_color'] = [inline_mkColor(c, 0.8) for c in curr_paradigm_df['lap_accent_color'].tolist()]
+    curr_paradigm_df['brush_color'] = [inline_mkColor(c, 0.5) for c in curr_paradigm_df['lap_color'].tolist()]
+    # curr_paradigm_df
+
+    ## INPUTS: curr_paradigm_df
+    # active_2d_plot.get_added_rect_item_required_y_value()
+    a_final_interval_df = TimeColumnAliasesProtocol.renaming_synonym_columns_if_needed(df=curr_paradigm_df, required_columns_synonym_dict=IntervalsDatasource._time_column_name_synonyms)
+
+    an_interval_ds: IntervalsDatasource = General2DRenderTimeEpochs.build_render_time_epochs_datasource(a_final_interval_df)
+    ## INPUTS: an_interval_ds
+
+    # Extract the pen_color and brush_color lists from the dataframe
+    pen_colors = an_interval_ds.df['pen_color'].tolist()
+    brush_colors = an_interval_ds.df['brush_color'].tolist()
+
+    # Update the visualization properties to convert colors to pen/brush
+    an_interval_ds.update_visualization_properties(
+        lambda active_df, **kwargs: General2DRenderTimeEpochs._update_df_visualization_columns(
+            active_df, 
+            pen_color=pen_colors,  # Pass as list for multi-color
+            brush_color=brush_colors,  # Pass as list for multi-color
+            **kwargs
+        )
+    )
+
+    ## OUTPUTS: an_interval_ds
+
+    # an_interval_ds.update_visualization_properties(lambda active_df, **kwargs: General2DRenderTimeEpochs._update_df_visualization_columns(active_df, **(train_test_split_laps_epochs_formatting_dict[k] | kwargs)))
+    _added_items_dict = active_2d_plot.add_rendered_intervals(an_interval_ds, name=f'custom_paradigm', debug_print=True) # adds the interval
+    a_rect_item: IntervalRectsItem = _added_items_dict['RootPlot']['rect_item']
+
+    return a_rect_item, an_interval_ds
+
+
+
 
 
 
