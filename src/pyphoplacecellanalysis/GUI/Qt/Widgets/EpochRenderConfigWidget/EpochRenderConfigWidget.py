@@ -25,7 +25,26 @@ from pyphoplacecellanalysis.GUI.Qt.Widgets.ThinButtonBar.IntervalConfigListExtra
 path = os.path.dirname(os.path.abspath(__file__))
 uiFile = os.path.join(path, 'EpochRenderConfigWidget.ui')
 
+""" UNRESOLVED BUGS
 
+#TODO 2025-12-11 08:01: - [ ] Bottom Buttons Bar and refresh button go away after calling `_on_update_rendered_intervals(...)`. Output Produced:
+        num_plot_items: 3
+        plotting item
+        plotting item
+        _on_update_rendered_intervals(...)
+        a_config_name: "custom_paradigm" with 4 sub-items:
+            i: 0, a_sub_config_name: custom_paradigm, a_proper_sub_config_name: 
+            overrode name!
+            i: 1, a_sub_config_name: custom_paradigm, a_proper_sub_config_name: 
+            overrode name!
+            i: 2, a_sub_config_name: custom_paradigm, a_proper_sub_config_name: 
+            overrode name!
+            i: 3, a_sub_config_name: custom_paradigm, a_proper_sub_config_name: 
+            overrode name!
+
+
+
+"""
 
 
 # @define(slots=False, auto_detect=True) # , init=False
