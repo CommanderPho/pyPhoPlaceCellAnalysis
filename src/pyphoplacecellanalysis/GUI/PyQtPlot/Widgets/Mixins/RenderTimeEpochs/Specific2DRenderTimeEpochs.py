@@ -14,6 +14,7 @@ import pyphoplacecellanalysis.External.pyqtgraph as pg
 from pyphoplacecellanalysis.General.Model.Datasources.IntervalDatasource import IntervalsDatasource
 from pyphoplacecellanalysis.General.Model.Configs.LongShortDisplayConfig import LongShortDisplayConfigManager # for getting colors of session epochs
 from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.Mixins.ReprPrintableWidgetMixin import ReprPrintableItemMixin
+from neuropy.utils.mixins.time_slicing import TimeColumnAliasesProtocol
 
 """ 
 A general epochs_dataframe_formatter takes a dataframe and adds the required columns
@@ -213,6 +214,112 @@ class SessionEpochs2DRenderTimeEpochs(General2DRenderTimeEpochs):
 
         return _add_interval_dataframe_visualization_columns_general_epoch
     
+    @classmethod
+    def _build_bapun_epochs_dataframe_from_session(cls, sess):
+        """Helper function to build Bapun epochs dataframe from a DataSession.
+        
+        This is adapted from build_bapun_all_epochs_df in PendingNotebookCode.py
+        but works with just a DataSession instead of requiring a pipeline.
+        """
+        import matplotlib.pyplot as plt
+        from pyphocorehelpers.gui.Qt.color_helpers import ColormapHelpers, ColorFormatConverter
+        from neuropy.core.epoch import ensure_dataframe
+        
+        curr_paradigm_df = ensure_dataframe(sess.paradigm)
+        curr_paradigm_df = curr_paradigm_df[np.logical_not(np.isin(curr_paradigm_df['label'], ['maze_GLOBAL', 'maze']))] ## exclude the global epoch
+        n_epochs: int = len(curr_paradigm_df)
+        epoch_color_strs: List[str] = [ColorFormatConverter.qColor_to_hexstring(v, include_alpha=False) for v in ColormapHelpers.mpl_to_pg_colormap(mpl_cmap_name='tab20', resolution=n_epochs).getColors(mode='qcolor')]
+        curr_paradigm_df['lap_color'] = "#10FF44"
+        curr_paradigm_df['lap_color'] = epoch_color_strs
+        curr_paradigm_df['lap_accent_color'] = '#FFFFFF'
+        return curr_paradigm_df
+    
+    @classmethod
+    def add_render_time_epochs(cls, curr_sess, destination_plot, **kwargs):
+        """Override to handle Bapun-type sessions with proper epoch intervals.
+        
+        For Bapun sessions, uses the correct epoch intervals from build_bapun_proper_epoch_intervals.
+        For other sessions, falls back to the default behavior.
+        """
+        # Check if this is a Bapun session
+        is_bapun_session = False
+        if isinstance(curr_sess, DataSession):
+            # Check if the session format is 'bapun'
+            if hasattr(curr_sess, 'config') and hasattr(curr_sess.config, 'format_name'):
+                is_bapun_session = (curr_sess.config.format_name.lower() == 'bapun')
+        
+        if is_bapun_session:
+            # Use Bapun-specific logic
+            sess = curr_sess
+            
+            # Build the Bapun epochs dataframe
+            curr_paradigm_df = cls._build_bapun_epochs_dataframe_from_session(sess)
+            
+            # Add color columns (adapted from build_bapun_proper_epoch_intervals)
+            curr_paradigm_df['pen_color'] = [inline_mkColor(c, 0.8) for c in curr_paradigm_df['lap_accent_color'].tolist()]
+            curr_paradigm_df['brush_color'] = [inline_mkColor(c, 0.5) for c in curr_paradigm_df['lap_color'].tolist()]
+            
+            # Rename columns to match required time column names
+            a_final_interval_df = TimeColumnAliasesProtocol.renaming_synonym_columns_if_needed(df=curr_paradigm_df, required_columns_synonym_dict=IntervalsDatasource._time_column_name_synonyms)
+            
+            # Build the datasource (it will use default formatter to add missing visualization columns)
+            an_interval_ds: IntervalsDatasource = General2DRenderTimeEpochs.build_render_time_epochs_datasource(a_final_interval_df)
+            
+            # Extract the pen_color and brush_color lists from the dataframe
+            pen_colors = an_interval_ds.df['pen_color'].tolist()
+            brush_colors = an_interval_ds.df['brush_color'].tolist()
+            
+            # Update the visualization properties to convert colors to pen/brush
+            an_interval_ds.update_visualization_properties(
+                lambda active_df, **kwargs: General2DRenderTimeEpochs._update_df_visualization_columns(
+                    active_df, 
+                    pen_color=pen_colors,  # Pass as list for multi-color
+                    brush_color=brush_colors,  # Pass as list for multi-color
+                    **kwargs
+                )
+            )
+            
+            # Add the intervals to the plot
+            out_rects = destination_plot.add_rendered_intervals(an_interval_ds, name=kwargs.setdefault('name', cls.default_datasource_name), debug_print=True)
+            return out_rects
+        else:
+            # Use default behavior from parent class
+            return super().add_render_time_epochs(curr_sess, destination_plot, **kwargs)
+
+
+    # @classmethod
+    # def is_render_time_epochs_enabled(cls, curr_sess, **kwargs) -> bool:
+    #     """ takes the exact same arguments as `add_render_time_epochs(...) but returns True if the call would be valid and False otherwise. """
+    #     try:
+    #         if isinstance(curr_sess, DataSession):
+    #             active_Epochs = curr_sess.laps.as_epoch_obj() # <Epoch> object
+    #         elif isinstance(curr_sess, Laps):
+    #             active_Epochs = curr_sess.as_epoch_obj()
+    #         elif isinstance(curr_sess, Epoch):
+    #             active_Epochs = curr_sess
+    #         else:
+    #             return False
+    #         return (active_Epochs is not None)
+    #     except BaseException:
+    #         return False
+        
+    # @classmethod
+    # def add_render_time_epochs(cls, curr_sess, destination_plot, **kwargs):
+    #     """ directly-called method 
+    #     destination_plot should implement add_rendered_intervals
+    #     """
+    #     if isinstance(curr_sess, DataSession):
+    #         active_Epochs = curr_sess.laps.as_epoch_obj() # <Epoch> object
+    #     elif isinstance(curr_sess, Laps):
+    #         active_Epochs = curr_sess.as_epoch_obj()
+    #     elif isinstance(curr_sess, Epoch):
+    #         active_Epochs = curr_sess
+    #     else:
+    #         raise NotImplementedError(f'type(curr_sess): {type(curr_sess)}')
+    #     interval_datasource = cls.build_render_time_epochs_datasource(active_epochs_obj=active_Epochs, **kwargs)
+    #     out_rects = destination_plot.add_rendered_intervals(interval_datasource, name=kwargs.setdefault('name', cls.default_datasource_name), debug_print=True)
+
+
 ##########################################
 ## Laps
 class Laps2DRenderTimeEpochs(General2DRenderTimeEpochs):
