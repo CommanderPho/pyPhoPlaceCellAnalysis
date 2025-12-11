@@ -261,7 +261,7 @@ def _setup_spike_raster_window_for_debugging(spike_raster_window, wants_docked_r
             print(f'_subfn_trigger_add_intervals_menu_commands():')
     
         # add_renderables_menu = active_2d_plot.ui.menus.custom_context_menus.add_renderables[0].programmatic_actions_dict
-        menu_commands = ['AddTimeIntervals.Replays', 'AddTimeIntervals.Laps', 'AddTimeIntervals.SessionEpochs', 'AddTimeIntervals.PBEs'] # , 'AddTimeIntervals.SessionEpochs', 'AddTimeIntervals.PBEs', 'AddTimeIntervals.Ripples',
+        menu_commands = ['AddTimeIntervals.Replays', 'AddTimeIntervals.Laps', 'AddTimeIntervals.PBEs'] # , 'AddTimeIntervals.SessionEpochs', 'AddTimeIntervals.SessionEpochs', 'AddTimeIntervals.PBEs', 'AddTimeIntervals.Ripples',
         for a_command in menu_commands:
             assert a_command in global_flat_action_dict, f"a_command: '{a_command}' is not present in global_flat_action_dict: {list(global_flat_action_dict.keys())}"
             # add_renderables_menu[a_command].trigger()
