@@ -3222,7 +3222,7 @@ def compute_and_export_session_extended_placefield_peak_information_completion_f
 
 
 @function_attributes(short_name=None, tags=['posterior', 'marginal', 'CSV', 'non-PBE', 'epochs', 'decoding'], input_requires=[], output_provides=[], uses=['GenericDecoderDictDecodedEpochsDictResult', 'pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.EpochComputationFunctions.EpochComputationFunctions.perform_compute_non_PBE_epochs'], used_by=[], creation_date='2025-03-09 16:35', related_items=['figures_plot_generalized_decode_epochs_dict_and_export_results_completion_function'])
-def generalized_decode_epochs_dict_and_export_results_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict, epochs_decoding_time_bin_size:float=0.025, force_recompute:bool=True, debug_print:bool=True, export_pkl: bool=True) -> dict:
+def generalized_decode_epochs_dict_and_export_results_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict, epochs_decoding_time_bin_size:float=0.025, force_recompute:bool=True, debug_print:bool=True, export_pkl: bool=True, compute_2D=False) -> dict:
     """ Aims to generally:
     1. Build a dict of decoders (usually 1D) built on several different subsets of input epochs (long_LR_laps-only, long_laps-only, long_non_PBE-only, ...etc
     2. Use these decoders and the neural data to decode posteriors for a variety of parameters (e.g. cell types, epochs-to-be-decoded, time_bin_sizes, etc)
@@ -3311,7 +3311,7 @@ def generalized_decode_epochs_dict_and_export_results_completion_function(self, 
 
         ## Next wave of computations
         extended_computations_include_includelist = ['split_to_directional_laps', 'non_PBE_epochs_results', 'generalized_specific_epochs_decoding',] # do only specified
-        computation_kwargs_dict = {'non_PBE_epochs_results': dict(epochs_decoding_time_bin_size=epochs_decoding_time_bin_size, drop_previous_result_and_compute_fresh=False, compute_2D=False), }
+        computation_kwargs_dict = {'non_PBE_epochs_results': dict(epochs_decoding_time_bin_size=epochs_decoding_time_bin_size, drop_previous_result_and_compute_fresh=False, compute_2D=compute_2D), }
 
         # force_recompute_override_computations_includelist = deepcopy(extended_computations_include_includelist)
         force_recompute_override_computations_includelist = []
@@ -3338,6 +3338,11 @@ def generalized_decode_epochs_dict_and_export_results_completion_function(self, 
 
 
     a_new_fully_generic_result: GenericDecoderDictDecodedEpochsDictResult = valid_EpochComputations_result.a_generic_decoder_dict_decoded_epochs_dict_result
+
+    # valid_EpochComputations_result_pkl_output_path: Path = curr_active_pipeline.get_output_path().joinpath('2025-12-10_valid_EpochComputations_result.pkl')
+    # valid_EpochComputations_result.save(pkl_output_path=valid_EpochComputations_result_pkl_output_path)
+    # print(f'valid_EpochComputations_result_pkl_output_path: "{valid_EpochComputations_result_pkl_output_path.as_posix()}"')
+
 
     if (a_new_fully_generic_result is None):
         print(f'WARN/ERROR: a_new_fully_generic_result is None! Doing last-ditch recomputation...')
