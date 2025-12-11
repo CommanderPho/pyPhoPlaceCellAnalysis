@@ -94,6 +94,11 @@ from neuropy.utils.mixins.binning_helpers import BinningContainer, BinningInfo
 from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import DecodedFilterEpochsResult
 
 import numpy as np
+from typing import NewType
+# import neuropy.utils.type_aliases as types
+import nptyping as ND
+from nptyping import NDArray
+
 from pyphoplacecellanalysis.Analysis.Decoder.transition_matrix import TransitionMatrixComputations
 from pyphoplacecellanalysis.Analysis.Decoder.context_dependent import GenericDecoderDictDecodedEpochsDictResult
 from neuropy.utils.mixins.binning_helpers import BinningContainer, BinningInfo
@@ -102,8 +107,7 @@ from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import DecodedFilter
 from pyphoplacecellanalysis.SpecificResults.PhoDiba2023Paper import LongShortTrackDataframeAccessor
 from typing import Dict, List, Tuple, Optional, Callable, Union, Any, TypeVar
 from typing_extensions import TypeAlias
-import nptyping as ND
-from nptyping import NDArray
+
 
 # import neuropy.utils.type_aliases as types
 import pyphoplacecellanalysis.General.type_aliases as types
@@ -112,6 +116,352 @@ from pyphocorehelpers.assertion_helpers import Assert
 
 from pyphoplacecellanalysis.General.Model.Configs.LongShortDisplayConfig import DecoderIdentityColors, long_short_display_config_manager, apply_LR_to_RL_adjustment
 from pyphocorehelpers.gui.Qt.color_helpers import ColormapHelpers, ColorFormatConverter, debug_print_color, build_adjusted_color
+
+
+
+# ==================================================================================================================================================================================================================================================================================== #
+# 2025-12-11 - Predictive Coding and adding Layers                                                                                                                                                                                                                                     #
+# ==================================================================================================================================================================================================================================================================================== #
+
+from scipy.interpolate import interp1d
+from pyphoplacecellanalysis.Pho2D.PyQtPlots.TimeSynchronizedPlotters.TimeSynchronizedGenericPlotterLayer import TimeSynchronizedGenericPlotterLayer, LayerDisplayConfig
+
+# @METADA
+@define(slots=False)
+class PredictiveDecoding:
+    """ 
+    
+    Implementation Notes:
+        Integrate using a sliding window with the last 30 seconds as inputtttt
+
+        For each actual position, see if it was predicted from the preceeding decoded position
+
+        Kamran suspects that replay will occur of places that the animal is NOT CURRENTLY GOING OR AT. TO "keep em fresh" maybe, or "normalize them in the brain", or "consolidate representation"
+
+    Usage:
+    
+        from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import PredictiveDecoding
+    
+        time_window_centers, moving_avg = PredictiveDecoding.add_predictive_decoding_layers(curr_active_pipeline=curr_active_pipeline, directional_decoders_decode_result=directional_decoders_decode_result, window_size=90)
+        out_layers, config_widgets_dict_dict = PredictiveDecoding.add_moving_average_layers(sync_plotters=sync_plotters, time_window_centers=time_window_centers, moving_avg=moving_avg)
+
+
+        epoch_names = list(sync_plotters.keys())
+        moving_avg_dict, moving_avg_meas_pos_overlap_dict, gaussian_volume = _obj.build_normalized_outputs(epoch_names=epoch_names, sigma=1.0)
+
+
+    """
+    window_size: int = field()
+    time_window_centers: NDArray[ND.Shape["N_TIME_BINS"], np.floating] = field()
+    pos_df: pd.DataFrame = field()
+    xbin: NDArray = field()
+    ybin: NDArray = field()
+    xbin_centers: NDArray = field()
+    ybin_centers: NDArray = field()
+
+    ## computed
+    new_positions: NDArray[ND.Shape["N_TIME_BINS, 2"], np.floating] = field()
+    moving_avg: NDArray[ND.Shape["N_X_BINS, N_Y_BINS, 2, N_TIME_BINS"], np.floating] = field()
+
+    ## one of these for each context (e.g. maze1, maze2 or ['roam', 'sprinkle'], etc
+    gaussian_volume: NDArray[ND.Shape["N_X_BINS, N_Y_BINS, N_TIME_BINS"], np.floating] = field(default=None)
+    moving_avg_dict: Dict[str, NDArray[ND.Shape["N_X_BINS, N_Y_BINS, N_TIME_BINS"], np.floating]] = field(default=Factory(dict))
+    moving_avg_meas_pos_overlap_dict: Dict[str, NDArray[ND.Shape["N_X_BINS, N_Y_BINS, N_TIME_BINS"], np.floating]] = field(default=Factory(dict))
+    
+
+
+    @function_attributes(short_name=None, tags=['predictive_decoding', 'layers'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-12-09 19:03', related_items=[])
+    @classmethod
+    def _perform_add_predictive_decoding_layers(cls, curr_active_pipeline, directional_decoders_decode_result, window_size: int = 200, extant_decoded_time_bin_size: float = 0.25):
+        """
+
+        moving_avg = _perform_add_predictive_decoding_layers(curr_active_pipeline=curr_active_pipeline, directional_decoders_decode_result=directional_decoders_decode_result, window_size=200)
+
+
+        """
+        a_result_decoded = directional_decoders_decode_result.continuously_decoded_pseudo2D_decoder_dict[extant_decoded_time_bin_size]
+        # a_result_decoded
+
+        # a_result_decoded.p_x_given_n # .shape (41, 63, 2, 103948) - (n_x_bins, n_y_bins, n_tasks, n_time_bins) 
+        
+        time_window_centers = deepcopy(a_result_decoded.time_bin_container.centers)
+        pos_df = deepcopy(curr_active_pipeline.sess.position.to_dataframe())
+        # pos_df
+
+        # axis=0 interpolates along rows (time) for all columns ('x' and 'y')
+        # fill_value="extrapolate" allows sampling outside original time range
+        interpolator = interp1d(pos_df['t'], pos_df[['x', 'y']], kind='linear', axis=0, fill_value="extrapolate")
+
+        # Returns shape new_positions .shape: (n_target_times, 2)
+        new_positions = interpolator(time_window_centers)
+        # new_positions
+        p_x_given_n = deepcopy(a_result_decoded.p_x_given_n)
+        
+        # 2. Calculate Cumulative Sum along the time axis (axis=-1)
+        # We use float64 to prevent precision loss over 100k+ bins
+        cumsum = np.cumsum(np.insert(p_x_given_n, 0, 0, axis=-1), axis=-1, dtype=np.float64)
+
+        # 3. Compute the Mean
+        # The mean at index 'i' is (Sum[i+1] - Sum[i-W+1]) / W
+        # We slice the cumsum array to subtract the trailing window sums
+        # Shape becomes (..., 103948 - 2000 + 1)
+        valid_means = (cumsum[..., window_size:] - cumsum[..., :-window_size]) / window_size
+
+        # 4. Align with Original Time Bins
+        # Create an array of NaNs for the first (window_size - 1) bins
+        pad_shape = list(p_x_given_n.shape)
+        pad_shape[-1] = window_size - 1
+        nan_padding = np.full(pad_shape, np.nan)
+
+        # Concatenate to restore original shape (..., 103948)
+        moving_avg = np.concatenate((nan_padding, valid_means), axis=-1)
+
+        # print(moving_avg.shape)
+        # Output: (41, 63, 2, 103948)
+
+        ## INPUTS: sync_plotters, moving_avg
+        return time_window_centers, pos_df, moving_avg, new_positions
+    
+
+    @classmethod
+    def init_from_decode_result(cls, curr_active_pipeline, directional_decoders_decode_result, window_size: int = 200) -> "PredictiveDecoding":
+        """ 
+        _obj: PredictiveDecoding = PredictiveDecoding.init_from_decode_result(
+        """
+        # moving_avg = cls._perform_add_predictive_decoding_layers(curr_active_pipeline=curr_active_pipeline, directional_decoders_decode_result=directional_decoders_decode_result, window_size=window_size)
+        time_window_centers, pos_df, moving_avg, new_positions = PredictiveDecoding._perform_add_predictive_decoding_layers(curr_active_pipeline=curr_active_pipeline, directional_decoders_decode_result=directional_decoders_decode_result, window_size=window_size)
+        
+        _obj = cls(window_size=window_size, time_window_centers=time_window_centers, pos_df=deepcopy(pos_df),
+                   xbin=deepcopy(directional_decoders_decode_result.pseudo2D_decoder.xbin), ybin=deepcopy(directional_decoders_decode_result.pseudo2D_decoder.ybin),
+                   xbin_centers=deepcopy(directional_decoders_decode_result.pseudo2D_decoder.xbin_centers), ybin_centers=deepcopy(directional_decoders_decode_result.pseudo2D_decoder.ybin_centers),
+                   moving_avg=moving_avg, new_positions=new_positions)
+        return _obj
+
+
+    def build_normalized_outputs(self, epoch_names: List[str], sigma: float = 1.0):
+        """ 
+        Normalize and convolve each new_position 2D point (x, y) with a fixed width 2D gaussian
+        
+        Updates: self.
+            .moving_avg_dict, .moving_avg_meas_pos_overlap_dict, .gaussian_volume
+        """
+        ## INPUTS: gaussian_volume
+        self.moving_avg_dict = {}
+        self.moving_avg_meas_pos_overlap_dict = {}
+        
+        self.gaussian_volume = self._build_sampled_pos_with_gaussian_spread(sigma=sigma)
+
+        # for an_epoch_idx, (an_epoch_name, a_plotter) in enumerate(sync_plotters.items()):
+        for an_epoch_idx, an_epoch_name in enumerate(epoch_names):
+            a_moving_avg = deepcopy(np.squeeze(self.moving_avg[:, :, an_epoch_idx, :]))
+            # np.shape(a_moving_avg)
+            ## renormalize over context:
+            norm_sums = np.nansum(a_moving_avg, axis=(0, 1))
+            is_nonzero = np.nonzero(norm_sums)
+            for a_nonzero_idx in is_nonzero:
+                a_moving_avg[:, :, a_nonzero_idx] = a_moving_avg[:, :, a_nonzero_idx] / norm_sums[a_nonzero_idx]
+            self.moving_avg_dict[an_epoch_name] = a_moving_avg
+            
+            self.moving_avg_meas_pos_overlap_dict[an_epoch_name] = (self.gaussian_volume * a_moving_avg)
+
+        ## OUTPUTS: _a_moving_avg_dict, _a_moving_avg_meas_pos_overlap_dict
+        return self.moving_avg_dict, self.moving_avg_meas_pos_overlap_dict, self.gaussian_volume
+    
+
+    def _build_sampled_pos_with_gaussian_spread(self, sigma: float = 1.0):
+        """ 
+        gaussian_volume = _obj._build_sampled_pos_with_gaussian_spread(sigma=1.0)
+        np.shape(gaussian_volume) # (42, 64, 103948)
+        """
+        # 1. Setup the Grid
+        # Ensure x_bounds/y_bounds match the physical extent of _obj.moving_avg
+        # Example: x_bounds = (0, 100), y_bounds = (0, 150)
+        x = deepcopy(self.xbin_centers) # np.linspace(x_bounds[0], x_bounds[1], n_x_bins) 
+        y = deepcopy(self.ybin_centers) # np.linspace(y_bounds[0], y_bounds[1], n_y_bins)
+        X, Y = np.meshgrid(x, y, indexing='ij')  # Shape: (41, 63)
+
+        # np.shape(X)
+        # np.shape(Y)
+        # np.shape(x)
+
+        # 2. Prepare for Broadcasting
+        # Grid shape: (41, 63, 1, 2) 
+        # We add a dimension at index 2 to broadcast against time
+        grid_stack = np.stack([X, Y], axis=-1)[:, :, np.newaxis, :]
+
+        # Position shape: (1, 1, n_target_times, 2)
+        # We add dimensions at indices 0 and 1 to broadcast against the grid
+        pos_stack = self.new_positions[np.newaxis, np.newaxis, :, :]
+
+        # 3. Calculate Gaussian (Vectorized)
+        # The subtraction broadcasts to shape (41, 63, n_target_times, 2)
+        # Summing over the last axis (coordinates) gives squared distance
+        dist_sq = np.sum((grid_stack - pos_stack)**2, axis=-1)
+
+        # Apply Gaussian function
+        # sigma must be in the same physical units as the bounds/positions
+        
+        gaussian_volume = np.exp(-dist_sq / (2 * sigma**2))
+
+        # Result: gaussian_volume.shape is (41, 63, n_target_times)
+        return gaussian_volume
+
+
+    ## INPUTS: sync_plotters, moving_avg
+    @function_attributes(short_name=None, tags=['predictive_decoding', 'layers', 'heatmap', 'overlay'], input_requires=[], output_provides=[], uses=['TimeSynchronizedGenericPlotterLayer'], used_by=[], creation_date='2025-12-09 19:03', related_items=[])
+    @classmethod
+    def add_moving_average_layers(cls, sync_plotters: Dict, time_window_centers: NDArray, moving_avg: NDArray):
+        """ 
+        
+        moving_avg = add_predictive_decoding_layers(curr_active_pipeline=curr_active_pipeline, directional_decoders_decode_result=directional_decoders_decode_result, window_size=200)
+        out_layers, config_widgets_dict = add_moving_average_layers(sync_plotters=sync_plotters, moving_avg=moving_avg)
+
+        """
+        out_layers = {}
+        config_widgets_dict_dict = {}
+
+        for an_epoch_idx, (an_epoch_name, a_plotter) in enumerate(sync_plotters.items()):
+            a_moving_avg = deepcopy(np.squeeze(moving_avg[:, :, an_epoch_idx, :]))
+            # np.shape(a_moving_avg)
+            ## renormalize over context:
+            norm_sums = np.nansum(a_moving_avg, axis=(0, 1))
+            is_nonzero = np.nonzero(norm_sums)
+            for a_nonzero_idx in is_nonzero:
+                a_moving_avg[:, :, a_nonzero_idx] = a_moving_avg[:, :, a_nonzero_idx] / norm_sums[a_nonzero_idx]
+
+            ## OUTPUTS: a_moving_avg
+            a_stack_item_key: str = f"{an_epoch_name}_hist"
+            
+            a_layer: TimeSynchronizedGenericPlotterLayer = TimeSynchronizedGenericPlotterLayer(name=a_stack_item_key, parent=a_plotter, contents={}, data={'time_window_centers': deepcopy(time_window_centers),
+                                                                                                                                                                'main': deepcopy(a_moving_avg), 
+                                                                                                                                                        })
+            out_layers[an_epoch_name] = a_layer
+            # a_widget = a_stack_item.create_layer_configs_widget()
+            # config_widgets_dict[a_stack_item_key] = a_widget
+            config_widgets_dict_dict[an_epoch_name] = {} 
+
+            ## adjust just the relevant layer
+            a_widget = a_layer.create_layer_configs_widget()
+            config_widgets_dict_dict[an_epoch_name][a_stack_item_key] = a_widget
+            a_widget.show()  
+            
+            # ## scan through all possible extant layers:
+            # for z_idx, (a_stack_item_key, a_stack_item) in enumerate(a_plotter.ui.plot_stack.items()):
+            #     print(f'Update: z_idx: {z_idx}, a_stack_item_key: "{a_stack_item_key}", a_stack_item: {a_stack_item}')
+            #     try:
+            #         if (hasattr(a_stack_item, 'is_layer') and getattr(a_stack_item, 'is_layer', False)):
+            #             a_widget = a_stack_item.create_layer_configs_widget()
+            #             config_widgets_dict_dict[an_epoch_name][a_stack_item_key] = a_widget
+            #             a_widget.show()            
+            #             print(f'\tupdate successful.')
+            #         else:
+            #             print(f'\tskipped!')
+            #     except (KeyError, AttributeError) as e:
+            #         print(f'\t encountered error "{e}" while trying to update item. Skipping.')
+            #     except Exception as e:
+            #         ## Unexpected exception!
+            #         raise e
+                
+
+        return out_layers, config_widgets_dict_dict
+
+
+    def add_all_layers(self, sync_plotters: Dict, **kwargs):
+        """ 
+        
+        moving_avg = add_predictive_decoding_layers(curr_active_pipeline=curr_active_pipeline, directional_decoders_decode_result=directional_decoders_decode_result, window_size=200)
+        out_layers, config_widgets_dict = add_moving_average_layers(sync_plotters=sync_plotters, moving_avg=moving_avg)
+
+        """
+        out_layers = {}
+        config_widgets_dict_dict = {}
+
+        for an_epoch_idx, (an_epoch_name, a_plotter) in enumerate(sync_plotters.items()):
+            a_moving_avg = deepcopy(self.moving_avg_dict[an_epoch_name])
+            a_stack_item_key: str = f"{an_epoch_name}_hist"
+            
+            a_history_layer: TimeSynchronizedGenericPlotterLayer = TimeSynchronizedGenericPlotterLayer(name=a_stack_item_key, parent=a_plotter, contents={}, data={'time_window_centers': deepcopy(self.time_window_centers),
+                                                                                                                                                                'main': deepcopy(a_moving_avg), 
+                                                                                                                                                        })
+            out_layers[a_stack_item_key] = a_history_layer
+            # a_widget = a_stack_item.create_layer_configs_widget()
+            # config_widgets_dict[a_stack_item_key] = a_widget
+            config_widgets_dict_dict[an_epoch_name] = {} 
+
+            # ## adjust just the relevant layer
+            # a_widget = a_history_layer.create_layer_configs_widget()
+            # config_widgets_dict_dict[an_epoch_name][a_stack_item_key] = a_widget
+            # a_widget.setWindowTitle(f"Config[{a_stack_item_key}]")
+            # a_widget.show() 
+            
+
+            a_moving_avg_meas_pos_overlap = deepcopy(self.moving_avg_meas_pos_overlap_dict[an_epoch_name])
+            a_stack_item_key: str = f"{an_epoch_name}_overlap"
+            
+            a_overlap_layer: TimeSynchronizedGenericPlotterLayer = TimeSynchronizedGenericPlotterLayer(name=a_stack_item_key, parent=a_plotter, contents={}, data={'time_window_centers': deepcopy(self.time_window_centers),
+                                                                                                                                                                'main': deepcopy(a_moving_avg_meas_pos_overlap), 
+                                                                                                                                                        })
+            out_layers[a_stack_item_key] = a_overlap_layer
+
+            # ## adjust just the relevant layer
+            # a_widget = a_overlap_layer.create_layer_configs_widget()
+            # config_widgets_dict_dict[an_epoch_name][a_stack_item_key] = a_widget
+            # a_widget.setWindowTitle(f"Config[{a_stack_item_key}]")
+            # a_widget.show() 
+
+
+            ## scan through all possible extant layers:
+            for z_idx, (a_stack_item_key, a_stack_item) in enumerate(a_plotter.ui.plot_stack.items()):
+                print(f'Update: z_idx: {z_idx}, a_stack_item_key: "{a_stack_item_key}", a_stack_item: {a_stack_item}')
+                try:
+                    if (hasattr(a_stack_item, 'is_layer') and getattr(a_stack_item, 'is_layer', False)):
+                        a_widget = a_stack_item.create_layer_configs_widget()
+                        config_widgets_dict_dict[an_epoch_name][a_stack_item_key] = a_widget
+                        a_widget.setWindowTitle(f"Config[{a_stack_item_key}]")
+                        a_widget.show()            
+                        print(f'\tupdate successful.')
+                    else:
+                        print(f'\tskipped!')
+                except (KeyError, AttributeError) as e:
+                    print(f'\t encountered error "{e}" while trying to update item. Skipping.')
+                except Exception as e:
+                    ## Unexpected exception!
+                    raise e
+                
+
+        return out_layers, config_widgets_dict_dict
+    
+
+    @classmethod
+    def add_layers_params_config_widgets(cls, sync_plotters):
+        """ 
+        """
+        config_widgets_dict_dict = {}
+
+        for an_epoch_idx, (an_epoch_name, a_plotter) in enumerate(sync_plotters.items()):
+
+            config_widgets_dict_dict[an_epoch_name] = {} 
+            
+            for z_idx, (a_stack_item_key, a_stack_item) in enumerate(a_plotter.ui.plot_stack.items()):
+                print(f'Update: z_idx: {z_idx}, a_stack_item_key: "{a_stack_item_key}", a_stack_item: {a_stack_item}')
+                try:
+                    if (hasattr(a_stack_item, 'is_layer') and getattr(a_stack_item, 'is_layer', False)):
+                        a_widget = a_stack_item.create_layer_configs_widget()
+                        config_widgets_dict_dict[an_epoch_name][a_stack_item_key] = a_widget
+                        a_widget.setWindowTitle(f"Config[{a_stack_item_key}]")
+                        a_widget.show()            
+                        print(f'\tupdate successful.')
+                    else:
+                        print(f'\tskipped!')
+                except (KeyError, AttributeError) as e:
+                    print(f'\t encountered error "{e}" while trying to update item. Skipping.')
+                except Exception as e:
+                    ## Unexpected exception!
+                    raise e
+                
+        ## OUTPUTS: config_widgets_dict_dict
+        return config_widgets_dict_dict
+
 
 
 
