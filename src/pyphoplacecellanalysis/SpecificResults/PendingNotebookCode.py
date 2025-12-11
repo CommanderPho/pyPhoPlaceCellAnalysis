@@ -373,6 +373,47 @@ class PredictiveDecoding:
         out_layers, config_widgets_dict = add_moving_average_layers(sync_plotters=sync_plotters, moving_avg=moving_avg)
 
         """
+        import pyqtgraph as pg
+        from pyqtgraph.dockarea import DockArea, Dock
+        from PyQt5.QtWidgets import QMainWindow
+
+        def _subfn_stack_widgets_vertically(config_widgets_dict_dict):
+            # 1. Create the container window and DockArea
+            win = QMainWindow()
+            win.setWindowTitle("Stacked Config Widgets")
+            area = DockArea()
+            win.setCentralWidget(area)
+            win.resize(400, 800)
+
+            # 2. Iterate and stack
+            prev_dock = None
+            
+            # Loop through the outer dictionary (categories like 'roam', 'sprinkle')
+            for category, inner_dict in config_widgets_dict_dict.items():
+                # Loop through the inner dictionary (actual widgets)
+                for name, widget in inner_dict.items():
+                    # Create the Dock (title includes category for clarity)
+                    dock = Dock(f"{category}: {name}", size=(500, 200))
+                    dock.addWidget(widget)
+
+                    # Stack logic: 
+                    # If it's the first dock, place it. 
+                    # Otherwise, place it at the 'bottom' relative to the previous dock.
+                    if prev_dock is None:
+                        area.addDock(dock, 'left')
+                    else:
+                        area.addDock(dock, 'bottom', prev_dock)
+                    
+                    prev_dock = dock
+
+            win.show()
+            return win
+
+
+        # ==================================================================================================================================================================================================================================================================================== #
+        # BEGIN FUNCTION BODY                                                                                                                                                                                                                                                                  #
+        # ==================================================================================================================================================================================================================================================================================== #
+
         out_layers = {}
         config_widgets_dict_dict = {}
 
@@ -428,8 +469,10 @@ class PredictiveDecoding:
                     ## Unexpected exception!
                     raise e
                 
+        ## Wrap each widget in a pg.DockItem and then stack them vertically in a new window:
+        dock_window = _subfn_stack_widgets_vertically(config_widgets_dict_dict)
 
-        return out_layers, config_widgets_dict_dict
+        return out_layers, config_widgets_dict_dict, dock_window
     
 
     @classmethod
