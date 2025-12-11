@@ -1233,6 +1233,7 @@ class EpochRenderingMixin(LiveWindowEventIntervalMonitoringMixin):
         else:
             print(f'WARNING: config_name "{config_name}" not found in interval_datasources. Available keys: {list(self.interval_datasources.keys())}')
 
+
     def perform_remove_epoch_intervals(self, removed_interval_keys: List[str], should_perform_remove: bool = True):
         """ actually remove the intervals. """
 
@@ -1279,7 +1280,8 @@ class EpochRenderingMixin(LiveWindowEventIntervalMonitoringMixin):
                 update_dict[k] = [sub_v.to_dict() for sub_v in v] ## get the sub-items in the list
 
         # Determine interval_keys that are missing from update_dict but exist in self.interval_datasources
-        removed_interval_keys = [k for k in self.interval_datasources.keys() if k not in update_dict]
+        removed_interval_keys = [k for k in self.rendered_epoch_series_names if k not in update_dict] # need to use this and not `self.interval_datasources.keys()` directly because it has non-attribute members like 'name'
+
         if removed_interval_keys:
             print(f"Intervals to be removed (present in self.interval_datasources but not in update_dict): {removed_interval_keys}")
             self.perform_remove_epoch_intervals(removed_interval_keys=removed_interval_keys, should_perform_remove=True)
@@ -1308,7 +1310,7 @@ class EpochRenderingMixin(LiveWindowEventIntervalMonitoringMixin):
         
         update_dict = an_epochs_display_list_widget.config_dicts_from_states()
         # Determine interval_keys that are missing from update_dict but exist in self.interval_datasources
-        removed_interval_keys = [k for k in self.interval_datasources.keys() if k not in update_dict]
+        removed_interval_keys = [k for k in self.rendered_epoch_series_names if k not in update_dict] # need to use this and not `self.interval_datasources.keys()` directly because it has non-attribute members like 'name'
 
         # Block signals to prevent circular updates
         with self._block_datasource_signals():
