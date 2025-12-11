@@ -123,6 +123,358 @@ from pyphocorehelpers.gui.Qt.color_helpers import ColormapHelpers, ColorFormatCo
 # 2025-12-11 - Predictive Coding and adding Layers                                                                                                                                                                                                                                     #
 # ==================================================================================================================================================================================================================================================================================== #
 
+def build_paired_time_synchronized_Bapun_decoder_with_lead_lag_window(curr_active_pipeline, included_filter_names: List[str]=None, fixed_window_duration = 15.0, controlling_widget=None, context=None, create_new_controlling_widget=True,
+                                                           directional_decoders_decode_result: Optional[DirectionalDecodersContinuouslyDecodedResult]=None) -> GenericPyQtGraphContainer:
+    """ Builds a paired window with two time_synchronized plotters (Lead and Lag) for the same decoder, with a controllable offset.
+    
+    Usage:
+        from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.ContainerBased.PhoContainerTool import GenericPyQtGraphContainer
+        from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import build_paired_time_synchronized_Bapun_decoder_with_lead_lag_window
+
+        _out_container: GenericPyQtGraphContainer = build_paired_time_synchronized_Bapun_decoder_with_lead_lag_window(curr_active_pipeline, included_filter_names=['maze1'], fixed_window_duration = 15.0, create_new_controlling_widget=True)
+    """
+    from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.SpikeRasterWidgets.Spike2DRaster import Spike2DRaster
+    from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.SpikeRasterWidgets.Spike2DRaster import SynchronizedPlotMode
+    from pyphoplacecellanalysis.Pho2D.PyQtPlots.TimeSynchronizedPlotters.TimeSynchronizedPositionDecoderPlotter import TimeSynchronizedPositionDecoderPlotter
+    from pyphoplacecellanalysis.Pho2D.PyQtPlots.TimeSynchronizedPlotters.TimeSynchronizedOccupancyPlotter import TimeSynchronizedOccupancyPlotter
+    from pyphoplacecellanalysis.Pho2D.PyQtPlots.TimeSynchronizedPlotters.TimeSynchronizedPlacefieldsPlotter import TimeSynchronizedPlacefieldsPlotter
+    from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.DockAreaWrapper import DockAreaWrapper
+
+    from pyphoplacecellanalysis.GUI.PyQtPlot.DockingWidgets.DynamicDockDisplayAreaContent import CustomDockDisplayConfig
+    from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError import _temp_debug_two_step_plots_animated_pyqtgraph
+    from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.ContainerBased.PhoContainerTool import GenericPyQtGraphContainer
+    from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.SpikeRasterWidgets.Spike2DRaster import Spike2DRaster, SynchronizedPlotMode
+    from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.DockAreaWrapper import PhoDockAreaContainingWindow
+    from PyQt5.QtGui import QPainter
+    from qtpy import QtWidgets, QtGui, QtCore
+    import pyphoplacecellanalysis.External.pyqtgraph as pg
+    from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.Mixins.RenderTimeEpochs.Specific2DRenderTimeEpochs import General2DRenderTimeEpochs
+    from pyphoplacecellanalysis.External.pyqtgraph.dockarea.Dock import Dock
+
+
+    if context is not None:
+        ## Finally, add the display function to the active context
+        active_display_fn_identifying_ctx = context.adding_context('paired_time_synchronized_plotters', display_fn_name='paired_time_synchronized_plotters')
+        active_display_fn_identifying_ctx_string = active_display_fn_identifying_ctx.get_description(separator='|') # Get final discription string:
+        title = f'Paired Lead/Lag Time Synchronized Plotters <{active_display_fn_identifying_ctx_string}>'
+    else:
+        title = 'Paired Lead/Lag Time Synchronized Plotters'
+    
+    if included_filter_names is None:
+        included_filter_names = ['maze1']
+        
+    target_filter_name = included_filter_names[0]
+    
+    
+    def _subfn_merge_plotters(a_controlling_widget, is_controlling_widget_external=False, debug_print=False, **_out_sync_plotters) -> GenericPyQtGraphContainer:
+        """ implicitly captures title from the outer function """
+        if len(_out_sync_plotters) > 0:
+            out_Width_Height_Tuple = list(_out_sync_plotters.values())[0].size()
+            out_Width_Height_Tuple = (out_Width_Height_Tuple.width(), out_Width_Height_Tuple.height())
+            if debug_print:
+                print(f'out_Width_Height_Tuple: {out_Width_Height_Tuple}')
+            
+            final_desired_width, final_desired_height = out_Width_Height_Tuple
+        
+        # build a win of type PhoDockAreaContainingWindow
+        root_dockAreaWindow, app = DockAreaWrapper.build_default_dockAreaWindow(title=title, defer_show=True)
+        
+        _display_configs = {}
+        _display_dock_items = {}
+        _display_sync_connections = {}
+        
+        for a_name, a_sync_plotter in _out_sync_plotters.items():
+            _display_configs[a_name] = CustomDockDisplayConfig(showCloseButton=False)
+            _, _display_dock_items[a_name] = root_dockAreaWindow.add_display_dock(f"{a_name}", dockSize=(final_desired_width, final_desired_height), widget=a_sync_plotter, dockAddLocationOpts=['right'], display_config=_display_configs[a_name])
+        # END for a_name, a_sync_plotter in _out_sync_plotter...
+        
+        if a_controlling_widget is not None:
+            if not is_controlling_widget_external:
+                controlling_widget_id: str = 'Controller'
+                a_controlling_widget, _display_dock_items[controlling_widget_id] = root_dockAreaWindow.add_display_dock(identifier=f'{controlling_widget_id}', widget=a_controlling_widget, dockAddLocationOpts=['bottom'])
+                
+            ## Add the lead/lag offset control:
+            time_offset_spinbox = QtWidgets.QDoubleSpinBox()
+            time_offset_spinbox.setRange(-100.0, 100.0)
+            time_offset_spinbox.setSingleStep(0.01)
+            time_offset_spinbox.setValue(0.0)
+            time_offset_spinbox.setPrefix("Lag Offset: ")
+            time_offset_spinbox.setSuffix(" s")
+            time_offset_spinbox.setDecimals(3)
+            
+            _display_dock_items['OffsetParams'] = root_dockAreaWindow.add_display_dock(identifier='OffsetParams', widget=time_offset_spinbox, dockAddLocationOpts=['bottom'])
+                
+        root_dockAreaWindow.show()
+        
+        root_dockAreaWindow.try_register_any_control_widgets()
+        
+        if a_controlling_widget is not None:
+            root_dockAreaWindow.connection_man.register_driver(a_controlling_widget)
+            
+            # Wire up signals such that time-synchronized plotters are controlled by the RasterPlot2D:
+            # 1. Lead Plotter: Direct connection
+            _display_sync_connections['Lead'] = root_dockAreaWindow.connection_man.connect_drivable_to_driver(drivable=_out_sync_plotters['Lead'], driver=a_controlling_widget,
+                                                            custom_connect_function=(lambda driver, drivable: pg.SignalProxy(driver.window_scrolled, delay=0.2, rateLimit=60, slot=drivable.on_window_changed_rate_limited)))
+
+            # 2. Lag Plotter: Offset connection
+            lag_plotter = _out_sync_plotters['Lag']
+            
+            def on_lag_window_update_requested(evt):
+                """ called when the main window is scrolled to update the lag plotter with the offset. """
+                current_start, current_end = evt[0], evt[1]
+                offset = time_offset_spinbox.value()
+                lag_plotter.on_window_changed_rate_limited(current_start + offset, current_end + offset)
+                
+            lag_signal_proxy = pg.SignalProxy(a_controlling_widget.window_scrolled, delay=0.2, rateLimit=60, slot=on_lag_window_update_requested)
+            _display_sync_connections['Lag'] = lag_signal_proxy # Store to prevent garbage collection
+            
+            # 3. Connect Spinbox change to update Lag Plotter immediately (if we knew the current time)
+            # Problem: Spinbox change doesn't know current time unless we store it.
+            # But the RasterPlot emits signals.
+            # We can trigger a re-emit or just store the last known time.
+            
+            # To handle spinbox changes updating the view, we can manually trigger an update if we track the last window.
+            # For now, let's just let the next scroll update it, or try to access the controller's current window.
+            def on_spinbox_value_changed(val):
+                # Request current window from controller
+                current_start, current_end = a_controlling_widget.plot_data.time_window_start, a_controlling_widget.plot_data.time_window_end
+                lag_plotter.on_window_changed_rate_limited(current_start + val, current_end + val)
+                
+            time_offset_spinbox.valueChanged.connect(on_spinbox_value_changed)
+
+
+        _out_container: GenericPyQtGraphContainer = GenericPyQtGraphContainer(name='build_paired_time_synchronized_lead_lag')       
+        _out_container.ui.root_dockAreaWindow = root_dockAreaWindow
+        _out_container.ui.app = app
+        _out_container.ui.display_sync_connections = _display_sync_connections
+        _out_container.ui.display_dock_items = _display_dock_items
+        _out_container.ui.sync_plotters = _out_sync_plotters
+        _out_container.ui.controlling_widget = controlling_widget
+        _out_container.ui.time_offset_spinbox = time_offset_spinbox
+
+        _out_container.plot_data.display_configs = _display_configs
+        if context is not None:
+            _out_container.plot_data.display_context = context
+        if included_filter_names is not None:
+            _out_container.params.included_filter_names = included_filter_names ## captured
+
+        return _out_container
+    
+    
+    def _subfn_prepare_plotters_visually(sync_plotters):
+        """ make overlay of top plot render using a multiplicitive composition mode
+        """
+        for a_plotter_name, a_plotter in sync_plotters.items():
+            a_plotter.params.recent_position_trajectory_max_seconds_ago = 1.5
+            a_plotter.params.recent_position_trajectory_max_num_plotted_samples = 5
+            a_plotter.ui.imv.setCompositionMode(QPainter.CompositionMode_Plus) ## Set this mode so that the heatmap overlays the occupancy map
+            a_plotter.params.recent_position_trajectory_symbol_brush = pg.mkBrush(50, 50, 50)
+            a_plotter.params.recent_position_trajectory_symbol_pen = pg.mkPen({'color': [255, 0, 0, 100], 'width': 0.2}) # Red
+            
+            ## Perform updates:
+            traj_curve: pg.PlotDataItem = a_plotter.ui.trajectory_curve
+            traj_curve.setSymbolPen(a_plotter.params.recent_position_trajectory_symbol_pen)
+            traj_curve.setSymbolBrush(a_plotter.params.recent_position_trajectory_symbol_brush)
+            QtWidgets.QApplication.processEvents()
+
+    def _subfn_add_session_epoch_intervals(active_2d_plot, curr_active_pipeline, **kwargs):
+        def _updated_custom_interval_dataframe_visualization_columns_general_epoch(active_df, **kwargs):  
+            num_intervals = np.shape(active_df)[0]  
+            ## parameters:  
+            y_location = 0.0  
+            height = 40.5  
+            # pen_color = pg.mkColor('white')  
+            pen_color = [pg.intColor(i, hues=num_intervals) for i in np.arange(num_intervals)]
+            brush_color = [pg.intColor(i, hues=num_intervals) for i in np.arange(num_intervals)]
+            for a_pen_color in pen_color:
+                a_pen_color.setAlphaF(0.8)
+
+            for a_brush_color in brush_color:
+                a_brush_color.setAlphaF(0.5)
+
+            ## Update the dataframe's visualization columns:  
+            active_df = General2DRenderTimeEpochs._update_df_visualization_columns(active_df, y_location=y_location, height=height, pen_color=pen_color, brush_color=brush_color, **kwargs)  
+            return active_df
+
+
+        ## Set intervals to only draw of the first 3 plots
+        active_2d_plot.params.custom_interval_rendering_plots = active_2d_plot.params.custom_interval_rendering_plots[:3] ## only get the first 3 plots, updates `active_2d_plot.interval_rendering_plots`
+
+        ## Add the paradigm session epochs:
+        active_paradigm_epochs_ds = ensure_dataframe(curr_active_pipeline.sess.epochs)
+        _out = active_2d_plot.add_rendered_intervals(active_paradigm_epochs_ds, 'SessionEpochs', child_plots=[])
+        active_paradigm_epochs_ds = active_2d_plot.interval_datasources.SessionEpochs
+        active_paradigm_epochs_ds.update_visualization_properties(_updated_custom_interval_dataframe_visualization_columns_general_epoch)
+
+        ## Add the PBE intervals:
+        active_pbe_ds = ensure_dataframe(curr_active_pipeline.sess.pbe)
+        _out_pbes = active_2d_plot.add_rendered_intervals(active_pbe_ds, 'PBEs')
+
+        ## Layout the two sets of intervals:
+        _out_stacked_epoch_layout_dict = active_2d_plot.apply_relative_epoch_layout(rendered_interval_keys_to_adjust=['SessionEpochs', 'PBEs'], desired_interval_heights=[1.0, 0.5], desired_intra_interval_padding=0.1, interval_stack_location='below', debug_print=True)
+        
+
+    def _subfn_add_pbes_full_result_marginals(active_2d_plot, pbes_full_result, **kwargs):
+        ## Add the PBEs decoded result:
+        from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import _add_context_marginal_to_timeline, _add_context_decoded_epoch_marginals_to_timeline
+
+        ## Add the decoded PBE marginal contexts:
+        pbe_track_identifier: str = f"pbe[{pbes_full_result.decoder_result.decoding_time_bin_size}]"
+        if 't_rel_seconds' not in active_2d_plot.spikes_df:
+            active_2d_plot.spikes_df['t_rel_seconds'] = active_2d_plot.spikes_df['t_seconds'] # KeyError: 't_rel_seconds'
+            
+        _out_pbe_tracks = _add_context_decoded_epoch_marginals_to_timeline(active_2d_plot=active_2d_plot, decoded_epochs_result=pbes_full_result.decoder_result, name=pbe_track_identifier)
+        active_2d_plot.sync_matplotlib_render_plot_widget(identifier=pbe_track_identifier, sync_mode=SynchronizedPlotMode.TO_WINDOW)
+
+        pbe_overview_track_identifier: str = f"{pbe_track_identifier} (Overview)"
+        _out_pbe_overview_tracks = _add_context_decoded_epoch_marginals_to_timeline(active_2d_plot=active_2d_plot, decoded_epochs_result=pbes_full_result.decoder_result, name=pbe_overview_track_identifier)
+        active_2d_plot.sync_matplotlib_render_plot_widget(identifier=pbe_overview_track_identifier, sync_mode=SynchronizedPlotMode.TO_GLOBAL_DATA)
+        return (_out_pbe_tracks, _out_pbe_overview_tracks)
+
+    def _subfn_build_overview_and_windowed_dockgroups(active_2d_plot, debug_print:bool=False, **kwargs):
+        flat_dockitems_list = active_2d_plot.get_flat_dockitems_list() ## get the non-grouped dockitems
+        grouped_dock_items_dict: Dict[str, List[Dock]] = {}
+        for a_dock in flat_dockitems_list:
+            if debug_print:
+                print(f'a_dock.name: {a_dock.name()}')
+            if 'overview' in a_dock.name().lower():
+                if 'overview' not in a_dock.config.dock_group_names:
+                    a_dock.config.dock_group_names.append('overview')
+            else:
+                ## otherwise call it "windowed"
+                if 'windowed' not in a_dock.config.dock_group_names:
+                    a_dock.config.dock_group_names.append('windowed') 
+
+        return active_2d_plot.ui.dynamic_docked_widget_container.get_dockGroup_dock_dict()
+
+
+    # ==================================================================================================================================================================================================================================================================================== #
+    # BEGIN FUNCTION BODY                                                                                                                                                                                                                                                                  #
+    # ==================================================================================================================================================================================================================================================================================== #
+    global_timeline_start_time: float = np.min([curr_active_pipeline.computation_results[a_filter_name].computed_data['pf2D_Decoder'].pf.filtered_spikes_df['t'].min() for a_filter_name in included_filter_names])
+    
+    all_epochs_spikes_df: pd.DataFrame = pd.concat([curr_active_pipeline.computation_results[a_filter_name].computed_data['pf2D_Decoder'].pf.filtered_spikes_df for a_filter_name in included_filter_names], axis='index', verify_integrity=True).drop_duplicates(subset=['t_seconds'], ignore_index=True).sort_values(by='t_seconds', ascending=True).reset_index(drop=True) 
+    
+    vis_cols_to_drop = [col for col in ['visualization_raster_y_location', 'visualization_raster_emphasis_state'] if col in all_epochs_spikes_df.columns]
+    if len(vis_cols_to_drop) > 0:
+        all_epochs_spikes_df = all_epochs_spikes_df.drop(columns=vis_cols_to_drop, inplace=False)
+    
+    # Build the 2D Raster Plotter using a fixed window duration    
+    if (controlling_widget is None):
+        if create_new_controlling_widget:
+            spike_raster_plt_2d = Spike2DRaster.init_from_independent_data(all_epochs_spikes_df, window_duration=fixed_window_duration, window_start_time=global_timeline_start_time,
+                                                                        neuron_colors=None, neuron_sort_order=None, application_name='TimeSynchronizedPlotterControlSpikeRaster2D',
+                                                                        enable_independent_playback_controller=False, should_show=False, parent=None) # setting , parent=spike_raster_plt_3d makes a single window
+            spike_raster_plt_2d.setWindowTitle('2D Raster Control Window')
+            # Update the 2D Scroll Region to the initial value:
+            spike_raster_plt_2d.update_scroll_window_region(global_timeline_start_time, (global_timeline_start_time + fixed_window_duration), block_signals=False)
+            controlling_widget = spike_raster_plt_2d
+            is_controlling_widget_external = False
+        else:
+            print(f'WARNING: build_paired_time_synchronized_Bapun_decoder_with_lead_lag_window(...) called with (controlling_widget == None) and (create_new_controlling_widget == False)')
+            controlling_widget = None # no controlling widget
+            is_controlling_widget_external = True
+    else:
+        # otherwise we have a controlling widget already
+        is_controlling_widget_external = True # external to window being created        
+        
+
+    ## Build the specific filter results:
+    _out_sync_plotters = {}
+    
+    if directional_decoders_decode_result is not None:
+        pf2D_Decoder_dict: Dict[str, BasePositionDecoder] = directional_decoders_decode_result.pf1D_Decoder_dict
+        pseudo3D_decoder: BasePositionDecoder = directional_decoders_decode_result.pseudo2D_decoder
+        continuously_decoded_result_cache_dict = directional_decoders_decode_result.continuously_decoded_result_cache_dict
+        continuously_decoded_pseudo2D_decoder_dict = directional_decoders_decode_result.continuously_decoded_pseudo2D_decoder_dict
+        ## Unpacking a result:
+        a_time_bin_size: float = list(continuously_decoded_pseudo2D_decoder_dict.keys())[-1] ## ALWAYS GET THE MOST RECENT
+        all_context_filter_epochs_decoder_result: SingleEpochDecodedResult = continuously_decoded_pseudo2D_decoder_dict[a_time_bin_size] ## ALWAYS GET THE MOST RECENT
+
+        ## HACK post-hoc: build correct 2D results from 3D only:
+        one_step_decoder_dummy_dict = {}
+        for i, a_filter_name in enumerate(included_filter_names):
+            a_single_decoder_p_x_given_n = np.squeeze(all_context_filter_epochs_decoder_result.p_x_given_n[:, :, i, :])
+            a_single_decoder_p_x_given_n = a_single_decoder_p_x_given_n / np.nansum(a_single_decoder_p_x_given_n, axis=(0, 1), keepdims=True)
+            one_step_decoder_dummy_dict[a_filter_name] = DummyOneStepDecoder(xbin=deepcopy(pseudo3D_decoder.xbin), ybin=deepcopy(pseudo3D_decoder.ybin), time_window_centers=deepcopy(all_context_filter_epochs_decoder_result.time_bin_container.centers),
+                                                                  p_x_given_n=deepcopy(a_single_decoder_p_x_given_n))
+    else:
+        all_context_filter_epochs_decoder_result = None
+        marginal_z = None
+
+    # Loop over the TWO plotters 'Lead' and 'Lag' for the SAME filter name:
+    active_session_configuration_context = curr_active_pipeline.filtered_contexts[target_filter_name]
+    computation_result = curr_active_pipeline.computation_results[target_filter_name]
+
+    if all_context_filter_epochs_decoder_result is None:
+        active_one_step_decoder = computation_result.computed_data['pf2D_Decoder']
+        active_two_step_decoder = computation_result.computed_data.get('pf2D_TwoStepDecoder', None)
+    else:
+        active_one_step_decoder = one_step_decoder_dummy_dict[target_filter_name] 
+        active_two_step_decoder = None
+
+    active_measured_positions = computation_result.sess.position.to_dataframe()
+
+    for plotter_name in ['Lead', 'Lag']:
+        ## Build the connected position plotter:
+        curr_position_decoder_plotter = TimeSynchronizedPositionDecoderPlotter(active_one_step_decoder=active_one_step_decoder, active_two_step_decoder=active_two_step_decoder, needs_background_image=True)
+        if active_measured_positions is not None:
+            curr_position_decoder_plotter.params.AnimalTrajectoryPlottingMixin_all_time_pos_df = deepcopy(active_measured_positions)
+            curr_position_decoder_plotter.params.AnimalTrajectoryPlottingMixin_filtered_pos_df = deepcopy(active_measured_positions)
+            curr_position_decoder_plotter.AnimalTrajectoryPlottingMixin_on_setup()
+            curr_position_decoder_plotter.AnimalTrajectoryPlottingMixin_on_buildUI()
+            curr_position_decoder_plotter.AnimalTrajectoryPlottingMixin_update_plots()
+            
+        ## Add the static occupancy maze backgrounds:
+        active_pf_2D = curr_active_pipeline.computation_results[target_filter_name].computed_data['pf2D']
+        image = deepcopy(active_pf_2D.occupancy)
+
+        if curr_position_decoder_plotter.params.drop_below_threshold is not None:
+            image[np.where(image < curr_position_decoder_plotter.params.drop_below_threshold)] = np.nan 
+
+        if curr_position_decoder_plotter.params.shared_axis_order is None:
+            curr_position_decoder_plotter.ui.bg_imv.setImage(image, rect=curr_position_decoder_plotter.params.image_bounds_extent)
+        else:
+            curr_position_decoder_plotter.ui.bg_imv.setImage(image, rect=curr_position_decoder_plotter.params.image_bounds_extent, axisOrder=curr_position_decoder_plotter.params.shared_axis_order)
+            
+        _out_sync_plotters[plotter_name] = curr_position_decoder_plotter
+    
+    # Merge
+    _out_container = _subfn_merge_plotters(controlling_widget, is_controlling_widget_external=is_controlling_widget_external, **_out_sync_plotters)
+    
+    if directional_decoders_decode_result is not None:
+        _out_container.plot_data.directional_decoders_decode_result = directional_decoders_decode_result
+
+    if (all_context_filter_epochs_decoder_result is not None) and (controlling_widget is not None):
+        ## Add a context likelihood track as well
+        try:
+            _out_global_context_tuple = _add_context_marginal_to_timeline(controlling_widget, a_filter_epochs_decoded_result=all_context_filter_epochs_decoder_result, name='global context')
+            _out_global_context_overview_tuple = _add_context_marginal_to_timeline(controlling_widget, a_filter_epochs_decoded_result=all_context_filter_epochs_decoder_result, name='global context (overview)')        
+            controlling_widget.sync_matplotlib_render_plot_widget(identifier='global context (overview)', sync_mode=SynchronizedPlotMode.TO_GLOBAL_DATA)
+            _out_container.plots.context_marginal_tracks = {'global_context': _out_global_context_tuple, 'global context (overview)': _out_global_context_overview_tuple}
+        except Exception as e:
+            print(f"Warning: could not add global context tracks: {e}")
+
+    active_2d_plot: Spike2DRaster = _out_container.ui.controlling_widget
+    sync_plotters: Dict[str, TimeSynchronizedPositionDecoderPlotter] = _out_container.ui.sync_plotters
+    win: PhoDockAreaContainingWindow = _out_container.ui.root_dockAreaWindow
+
+    _subfn_prepare_plotters_visually(_out_sync_plotters)
+
+    ## Assign the update functions:
+    _out_container.add_session_epoch_intervals = lambda curr_active_pipeline, **kwargs: _subfn_add_session_epoch_intervals(active_2d_plot=_out_container.ui.controlling_widget, curr_active_pipeline=curr_active_pipeline, **kwargs)
+    _out_container.add_pbes_full_result_marginals = lambda pbes_full_result, **kwargs: _subfn_add_pbes_full_result_marginals(active_2d_plot=_out_container.ui.controlling_widget, pbes_full_result=pbes_full_result, **kwargs)
+    _out_container.build_overview_and_windowed_dockgroups = lambda debug_print=False, **kwargs: _subfn_build_overview_and_windowed_dockgroups(active_2d_plot=_out_container.ui.controlling_widget, debug_print=debug_print, **kwargs)
+
+    ## Execute those of the marginals that we can do already:
+    try:
+        _out_container.add_session_epoch_intervals(curr_active_pipeline=curr_active_pipeline)
+    except Exception as e:
+        print(f"Warning: could not add session epoch intervals: {e}")
+
+    return _out_container
+
+
 from scipy.interpolate import interp1d
 from pyphoplacecellanalysis.Pho2D.PyQtPlots.TimeSynchronizedPlotters.TimeSynchronizedGenericPlotterLayer import TimeSynchronizedGenericPlotterLayer, LayerDisplayConfig
 
@@ -1773,8 +2125,7 @@ def build_combined_time_synchronized_Bapun_decoders_window(curr_active_pipeline,
 
         _out_container: GenericPyQtGraphContainer = build_combined_time_synchronized_Bapun_decoders_window(curr_active_pipeline, included_filter_names=['maze1', 'maze2', 'maze'], fixed_window_duration = 15.0)
     """
-    from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.SpikeRasterWidgets.Spike2DRaster import Spike2DRaster
-    from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.SpikeRasterWidgets.Spike2DRaster import SynchronizedPlotMode
+    from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.SpikeRasterWidgets.Spike2DRaster import Spike2DRaster, SynchronizedPlotMode
     from pyphoplacecellanalysis.Pho2D.PyQtPlots.TimeSynchronizedPlotters.TimeSynchronizedPositionDecoderPlotter import TimeSynchronizedPositionDecoderPlotter
     from pyphoplacecellanalysis.Pho2D.PyQtPlots.TimeSynchronizedPlotters.TimeSynchronizedOccupancyPlotter import TimeSynchronizedOccupancyPlotter
     from pyphoplacecellanalysis.Pho2D.PyQtPlots.TimeSynchronizedPlotters.TimeSynchronizedPlacefieldsPlotter import TimeSynchronizedPlacefieldsPlotter
@@ -1783,7 +2134,6 @@ def build_combined_time_synchronized_Bapun_decoders_window(curr_active_pipeline,
     from pyphoplacecellanalysis.GUI.PyQtPlot.DockingWidgets.DynamicDockDisplayAreaContent import CustomDockDisplayConfig
     from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError import _temp_debug_two_step_plots_animated_pyqtgraph
     from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.ContainerBased.PhoContainerTool import GenericPyQtGraphContainer
-    from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.SpikeRasterWidgets.Spike2DRaster import Spike2DRaster, SynchronizedPlotMode
     from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.DockAreaWrapper import PhoDockAreaContainingWindow
     from PyQt5.QtGui import QPainter
     from qtpy import QtWidgets, QtGui
