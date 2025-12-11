@@ -662,7 +662,7 @@ def build_bapun_all_epochs_df(curr_active_pipeline):
 
 
 @function_attributes(short_name=None, tags=['intervals', 'epochs'], uses=['build_bapun_all_epochs_df'], used_by=[], creation_date='2025-12-10 09:43', related_items=[])
-def build_bapun_proper_epoch_intervals(curr_active_pipeline, active_2d_plot):
+def build_bapun_proper_epoch_intervals(curr_active_pipeline, active_2d_plot, y_location: float=-1.0, height: float = 0.9):
     """ adds the proper session epochs to the timeline
     
     Usage:
@@ -677,13 +677,14 @@ def build_bapun_proper_epoch_intervals(curr_active_pipeline, active_2d_plot):
     # 'lap_color', 'lap_accent_color'
     curr_paradigm_df['pen_color'] = [inline_mkColor(c, 0.8) for c in curr_paradigm_df['lap_accent_color'].tolist()]
     curr_paradigm_df['brush_color'] = [inline_mkColor(c, 0.5) for c in curr_paradigm_df['lap_color'].tolist()]
-    # curr_paradigm_df
+    curr_paradigm_df['y_location'] = y_location
+    curr_paradigm_df['height'] = height
 
     ## INPUTS: curr_paradigm_df
     # active_2d_plot.get_added_rect_item_required_y_value()
     a_final_interval_df = TimeColumnAliasesProtocol.renaming_synonym_columns_if_needed(df=curr_paradigm_df, required_columns_synonym_dict=IntervalsDatasource._time_column_name_synonyms)
 
-    an_interval_ds: IntervalsDatasource = General2DRenderTimeEpochs.build_render_time_epochs_datasource(a_final_interval_df)
+    an_interval_ds: IntervalsDatasource = General2DRenderTimeEpochs.build_render_time_epochs_datasource(a_final_interval_df, series_vertical_offset=y_location, series_height = height) # , series_vertical_offset=y_location, series_height = height
     ## INPUTS: an_interval_ds
 
     # Extract the pen_color and brush_color lists from the dataframe
@@ -693,7 +694,8 @@ def build_bapun_proper_epoch_intervals(curr_active_pipeline, active_2d_plot):
     # Update the visualization properties to convert colors to pen/brush
     an_interval_ds.update_visualization_properties(
         lambda active_df, **kwargs: General2DRenderTimeEpochs._update_df_visualization_columns(
-            active_df, 
+            active_df,
+            y_location=y_location, height=height, 
             pen_color=pen_colors,  # Pass as list for multi-color
             brush_color=brush_colors,  # Pass as list for multi-color
             **kwargs
