@@ -127,7 +127,9 @@ def _setup_spike_raster_window_for_debugging(spike_raster_window, wants_docked_r
     from PyQt5.QtWidgets import QSizePolicy
     from pyphoplacecellanalysis.Pho2D.PyQtPlots.Extensions.pyqtgraph_helpers import block_until_render_complete
     from PyQt5.QtCore import QTimer
-    
+    from pyphoplacecellanalysis.External.pyqtgraph_extensions.trapezoid_callout import TrapezoidOverlay
+
+
     is_docked_pyqtgraph_plots_mode: bool = spike_raster_window.params.use_docked_pyqtgraph_plots
 
     if additional_post_hoc_fcns is None:
@@ -299,6 +301,28 @@ def _setup_spike_raster_window_for_debugging(spike_raster_window, wants_docked_r
         return
     
 
+    def _subfn_add_overview_indicator_trapazoids_to_timeline():
+        """ captures: _all_outputs_dict, active_2d_plot, debug_print
+        """
+        if debug_print:
+            print(f'_subfn_add_overview_indicator_trapazoids_to_timeline():')
+
+        try:
+            _out_overlays: Dict[Tuple, TrapezoidOverlay] = TrapezoidOverlay.add_overview_indicator_trapazoids_to_timeline(active_2d_plot=active_2d_plot)
+            _all_outputs_dict['_overview_indicator_trapazoids'] = _out_overlays
+
+        except Exception as e:
+            print(f'\t\terror {e} occurred while running TrapezoidOverlay.add_overview_indicator_trapazoids_to_timeline(...): {e}')
+            raise
+        
+        if debug_print:
+            print(f'\t_subfn_add_overview_indicator_trapazoids_to_timeline() done.')
+            
+        return
+
+
+
+
     def _subfn_run_additional_post_hoc_fcns():
         """ captures: additional_post_hoc_fcns, debug_print
         """
@@ -317,14 +341,16 @@ def _setup_spike_raster_window_for_debugging(spike_raster_window, wants_docked_r
             
         return
 
+
+
     ## META FCN
     def _subfn_META_RUN_ALL_BACKGROUND_FCNS():
-        """ captures: _subfn_add_additional_plots, _subfn_trigger_add_intervals_menu_commands, _subfn_trigger_add_time_curve_menu_commands, _subfn_run_additional_post_hoc_fcns, debug_print
+        """ captures: _subfn_add_additional_plots, _subfn_trigger_add_intervals_menu_commands, _subfn_trigger_add_time_curve_menu_commands, _subfn_add_overview_indicator_trapazoids_to_timeline, _subfn_run_additional_post_hoc_fcns, debug_print
         """
         if debug_print:
             print(f'_subfn_META_RUN_ALL_BACKGROUND_FCNS():')
 
-        background_fns_dict = dict(zip(["_subfn_add_additional_plots", "_subfn_trigger_add_intervals_menu_commands", "_subfn_trigger_add_time_curve_menu_commands", "_subfn_run_additional_post_hoc_fcns"], [_subfn_add_additional_plots, _subfn_trigger_add_intervals_menu_commands, _subfn_trigger_add_time_curve_menu_commands, _subfn_run_additional_post_hoc_fcns]))
+        background_fns_dict = dict(zip(["_subfn_add_additional_plots", "_subfn_trigger_add_intervals_menu_commands", "_subfn_trigger_add_time_curve_menu_commands", '_subfn_add_overview_indicator_trapazoids_to_timeline', "_subfn_run_additional_post_hoc_fcns"], [_subfn_add_additional_plots, _subfn_trigger_add_intervals_menu_commands, _subfn_trigger_add_time_curve_menu_commands, _subfn_add_overview_indicator_trapazoids_to_timeline, _subfn_run_additional_post_hoc_fcns]))
         for a_fn_name, a_fn in background_fns_dict.items():
             print(f'\trunning BACKGROUND fn: {a_fn_name}...')
             try:
