@@ -2343,6 +2343,8 @@ class BasePositionDecoder(HDFMixin, AttrsBasedClassHelperMixin, ContinuousPeakLo
             filter_epochs_decoder_result = cls._build_decode_specific_epochs_result_shell(neuron_IDs=active_decoder.neuron_IDs, spikes_df=spikes_df, filter_epochs=filter_epochs, decoding_time_bin_size=decoding_time_bin_size, use_single_time_bin_per_epoch=use_single_time_bin_per_epoch, debug_print=debug_print)
 
         """
+        from neuropy.core.epoch import Epoch, EpochsAccessor, ensure_dataframe, ensure_Epoch
+
         filter_epochs_decoder_result = DynamicContainer(most_likely_positions_list=[], p_x_given_n_list=[], marginal_x_list=[], marginal_y_list=[], marginal_z_list=[], most_likely_position_indicies_list=[])
         
         if isinstance(filter_epochs, pd.DataFrame):
@@ -2350,6 +2352,10 @@ class BasePositionDecoder(HDFMixin, AttrsBasedClassHelperMixin, ContinuousPeakLo
         else:
             filter_epochs_df = filter_epochs.to_dataframe()
             
+
+        filter_epochs_df = ensure_dataframe(filter_epochs)
+        filter_epochs = ensure_Epoch(filter_epochs)
+
         if debug_print:
             print(f'filter_epochs: {filter_epochs.n_epochs}')
         ## Get the spikes during these epochs to attempt to decode from:
