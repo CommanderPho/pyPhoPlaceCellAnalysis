@@ -506,6 +506,117 @@ class PredictiveDecoding:
         return config_widgets_dict_dict
 
 
+    # ==================================================================================================================================================================================================================================================================================== #
+    # 2025-12-11 - Prospective/Retrospective Decoding Analysis                                                                                                                                                                                                                             #
+    # ==================================================================================================================================================================================================================================================================================== #
+
+    @function_attributes(short_name=None, tags=['prospective', 'future', 'past', 'replay'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-12-11 07:43', related_items=[])
+    @classmethod
+    def calculate_position_epoch_overlap(cls, gaussian_volume: np.ndarray, pos_time_bin_centers: np.ndarray, decoded_epochs_all_filter_epochs: pd.DataFrame, decoded_epochs_result: Any, curr_decoder_context_idx: int = 0, debug_max_time_steps_to_process: Optional[int] = 200, debug_overide_start_idx: Optional[int]=None, debug_print: bool = True) -> np.ndarray:
+        """
+        Calculates the overlap between the current position probability (Gaussian volume)
+        and all preceding decoded epochs.
+        
+        Optimized to use vectorized matrix multiplication instead of nested loops.
+
+        Args:
+            gaussian_volume: 3D array (X, Y, Time)
+            pos_time_bin_centers: 1D array of time centers corresponding to gaussian_volume dim 2
+            decoded_epochs_all_filter_epochs: DataFrame containing 'start' and 'stop' columns
+            decoded_epochs_result: Object containing .p_x_given_n_list (list of 4D arrays)
+            curr_decoder_context_idx: Index for the context dimension (0 or 1)
+            debug_max_time_steps_to_process: Max number of time steps to process (for debugging)
+            debug_print: Whether to print progress/shape info
+
+        Returns:
+            np.ndarray: A 2D array (Time, Epochs) containing scalar overlap scores.
+                        Future epochs (relative to time t) are represented as NaN.
+        """
+
+        # 1. Setup Time Selection
+        # -----------------------
+        # Preserve original logic: take last 2000 bins, then apply debug limit
+        total_time_bins = len(pos_time_bin_centers)
+        if debug_overide_start_idx is not None:
+            start_idx = max(0, debug_overide_start_idx)
+        else:
+            start_idx = 0
+
+        if debug_max_time_steps_to_process is not None:
+            # Limit the end index relative to the start_idx
+            end_idx = min(total_time_bins, (start_idx + debug_max_time_steps_to_process))
+        else:
+            end_idx = total_time_bins
+
+        # Slice inputs to relevant time window
+        active_pos_time_bin_centers = pos_time_bin_centers[start_idx:end_idx]
+        num_pos_time_bin_centers: int = len(active_pos_time_bin_centers)
+
+        if debug_print:
+            print(f'num_pos_time_bin_centers: {num_pos_time_bin_centers}')
+
+        # 2. Data Preparation (Flattening & Cleaning)
+        # -------------------------------------------
+        # Slice the Gaussian volume to match the active time window
+        active_gaussian_slice = gaussian_volume[:, :, start_idx:end_idx]
+        n_x, n_y, n_t = active_gaussian_slice.shape
+        
+        # Reshape Gaussian Volume: (X, Y, T) -> (X*Y, T)
+        # Use nan_to_num so NaNs become 0.0, allowing efficient dot products (acting like nansum)
+        flat_gaussian = np.nan_to_num(active_gaussian_slice.reshape(n_x * n_y, n_t))
+
+        # Prepare Epoch Data
+        # We assume decoded_epochs_result.p_x_given_n_list corresponds to the rows in the DataFrame
+        all_epoch_stops = decoded_epochs_all_filter_epochs['stop'].to_numpy()
+        
+        # Flatten spatial dims for all epochs: List of (X*Y, Epoch_Time_Bins) arrays
+        # We extract the specific context (curr_decoder_context_idx) immediately
+        flat_epoch_arrays = [
+            np.nan_to_num(v[:, :, curr_decoder_context_idx, :].reshape(n_x * n_y, -1))
+            for v in decoded_epochs_result.p_x_given_n_list
+        ]
+
+        # 3. Vectorized Calculation
+        # -------------------------
+        # Initialize result matrix: (N_Time_Steps, N_Total_Epochs)
+        # Initialize with NaN to represent "future" epochs (or padding)
+        padded_pos_overlap_matrix = np.full(
+            (num_pos_time_bin_centers, len(flat_epoch_arrays)), 
+            np.nan
+        )
+
+        # Iterate over EPOCHS (Outer loop is now Epochs)
+        # This allows us to apply one Epoch to ALL valid time bins simultaneously via matrix mult
+        for epoch_idx, (epoch_arr, stop_time) in enumerate(zip(flat_epoch_arrays, all_epoch_stops)):
+            
+            # Mask: Find all time bins where this epoch is strictly in the past (or current)
+            valid_time_mask = active_pos_time_bin_centers >= stop_time
+            
+            # Optimization: Skip if this epoch hasn't happened yet for any active time bin
+            if not np.any(valid_time_mask):
+                continue
+
+            # Select the Gaussian columns for valid times: (Space, Valid_Times)
+            # Transpose to (Valid_Times, Space) for matrix multiplication
+            relevant_gaussian_T = flat_gaussian[:, valid_time_mask].T
+            
+            # CORE CALCULATION: Matrix Multiplication (The "Dot Product")
+            # (Valid_Times, Space) @ (Space, Epoch_Bins) -> (Valid_Times, Epoch_Bins)
+            # This effectively performs the sum(A * B) over spatial dimensions
+            spatial_sums = np.matmul(relevant_gaussian_T, epoch_arr)
+            
+            # Calculate median over the epoch's internal time bins (Axis 1)
+            scalar_scores = np.median(spatial_sums, axis=1)
+            
+            # Assign to the main result matrix
+            padded_pos_overlap_matrix[valid_time_mask, epoch_idx] = scalar_scores
+
+        if debug_print:
+            print(f"Processed {num_pos_time_bin_centers} time steps. "
+                f"Final shape: {padded_pos_overlap_matrix.shape}")
+
+        return active_pos_time_bin_centers, padded_pos_overlap_matrix
+
 
 
 # ==================================================================================================================================================================================================================================================================================== #
