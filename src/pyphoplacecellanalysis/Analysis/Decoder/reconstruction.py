@@ -954,7 +954,7 @@ class DecodedFilterEpochsResult(HDF_SerializationMixin, AttrsBasedClassHelperMix
                 
             valid_attr_value = getattr(self, field_name)            
             # print(f'len(valid_attr_value): {len(valid_attr_value)}')
-            assert active_epoch_idx < len(valid_attr_value), f"for field_name: {field_name}\n\tactive_epoch_idx: {active_epoch_idx} len(valid_attr_value): {len(valid_attr_value)}"
+            assert active_epoch_idx < len(valid_attr_value), f"for field_name: {field_name}\n\tactive_epoch_idx: {active_epoch_idx} len(valid_attr_value): {len(valid_attr_value)}" # #TODO 2025-12-11 05:05: - [ ] Failing for 'marginal_z_name' field  but fixed in notebook with `decoded_epochs_result.marginal_z_list = [None for i in np.arange(decoded_epochs_result.num_filter_epochs)]`
             
         # END for field_name in single_epoch_field_names...
 
