@@ -784,13 +784,18 @@ class EpochRenderingMixin(LiveWindowEventIntervalMonitoringMixin):
         ## Inline Concise: Position Replays, PBEs, and Ripples all below the scatter:
         for interval_key, interval_update_kwargs in update_dict.items():
             if interval_key in self.interval_datasources:
+                # Extract visibility settings before updating datasource (handle both single dict and list of dicts)
+                visibility_settings = None
                 if isinstance(interval_update_kwargs, (list, tuple)):
-                    ## list of update dicts
+                    ## list of update dicts - each item can have its own isVisible property
                     a_list_interval_update_kwargs = []
+                    visibility_settings = []
                     for a_sub_interval_update_kwargs in interval_update_kwargs:
                         if not isinstance(a_sub_interval_update_kwargs, dict):
                             a_sub_interval_update_kwargs = a_sub_interval_update_kwargs.to_dict() # deal with EpochDisplayConfig 
                         a_list_interval_update_kwargs.append(a_sub_interval_update_kwargs)
+                        # Extract visibility from each item (can be None if not specified)
+                        visibility_settings.append(a_sub_interval_update_kwargs.get('isVisible', None))
                         # self.interval_datasources[interval_key].update_visualization_properties(lambda active_df, **kwargs: General2DRenderTimeEpochs._update_df_visualization_columns(active_df, **(a_sub_interval_update_kwargs | kwargs))) ## Fully inline
                     ## Update with list
                     # a_list_interval_update_kwargs = [a_sub_interval_update_kwargs for a_sub_interval_update_kwargs in interval_update_kwargs]
@@ -800,7 +805,32 @@ class EpochRenderingMixin(LiveWindowEventIntervalMonitoringMixin):
                     ## single update item dict
                     if not isinstance(interval_update_kwargs, dict):
                         interval_update_kwargs = interval_update_kwargs.to_dict() # deal with EpochDisplayConfig 
+                    visibility_settings = interval_update_kwargs.get('isVisible', None)
                     self.interval_datasources[interval_key].update_visualization_properties(lambda active_df, **kwargs: General2DRenderTimeEpochs._update_df_visualization_columns(active_df, **(interval_update_kwargs | kwargs))) ## Fully inline
+                
+                # Apply visibility setting to rendered items if provided
+                # For list configs: only apply if all items have the same visibility (or all None)
+                # For single configs: apply directly
+                if visibility_settings is not None and interval_key in self.rendered_epochs:
+                    if isinstance(visibility_settings, list):
+                        # List case: check if all non-None values are the same
+                        non_none_visibilities = [v for v in visibility_settings if v is not None]
+                        if len(non_none_visibilities) > 0:
+                            # If all non-None values are the same, apply that visibility
+                            if len(set(non_none_visibilities)) == 1:
+                                is_visible = non_none_visibilities[0]
+                                container = self.rendered_epochs[interval_key]
+                                for a_plot, rect_item in container.items():
+                                    if not isinstance(a_plot, str) and isinstance(rect_item, IntervalRectsItem):
+                                        rect_item.setVisible(is_visible)
+                            # If they differ, we can't set per-rectangle visibility, so skip
+                            # (IntervalRectsItem is a single graphics item that renders all rectangles)
+                    else:
+                        # Single config case: apply directly
+                        container = self.rendered_epochs[interval_key]
+                        for a_plot, rect_item in container.items():
+                            if not isinstance(a_plot, str) and isinstance(rect_item, IntervalRectsItem):
+                                rect_item.setVisible(visibility_settings)
             else:
                 print(f"WARNING: interval_key '{interval_key}' was not found in self.interval_datasources. Skipping update for unknown item.")
 
@@ -1329,20 +1359,22 @@ class EpochRenderingMixin(LiveWindowEventIntervalMonitoringMixin):
                     datasource = self.interval_datasources[interval_key]
                     new_rects_item = Render2DEventRectanglesHelper.build_IntervalRectsItem_from_interval_datasource(datasource)
                     
-                    # Extract visibility setting (handle both single dict and list of dicts)
-                    is_visible = None
+                    # Extract visibility settings (handle both single dict and list of dicts)
+                    # Each item in a list can have its own isVisible property (or it can be missing)
+                    visibility_settings = None
                     if isinstance(interval_update_kwargs, (list, tuple)):
-                        # For list case, use the first item's visibility (all items in a row share visibility)
-                        if len(interval_update_kwargs) > 0:
-                            first_kwargs = interval_update_kwargs[0]
-                            if not isinstance(first_kwargs, dict):
-                                first_kwargs = first_kwargs.to_dict()
-                            is_visible = first_kwargs.get('isVisible', None)
+                        # List case: extract visibility from each item
+                        visibility_settings = []
+                        for a_sub_kwargs in interval_update_kwargs:
+                            if not isinstance(a_sub_kwargs, dict):
+                                a_sub_kwargs = a_sub_kwargs.to_dict()
+                            # Extract visibility from each item (can be None if not specified)
+                            visibility_settings.append(a_sub_kwargs.get('isVisible', None))
                     else:
                         # Single dict case
                         if not isinstance(interval_update_kwargs, dict):
                             interval_update_kwargs = interval_update_kwargs.to_dict()
-                        is_visible = interval_update_kwargs.get('isVisible', None)
+                        visibility_settings = interval_update_kwargs.get('isVisible', None)
                     
                     # Update all plot items for this interval
                     container = self.rendered_epochs[interval_key]
@@ -1354,8 +1386,21 @@ class EpochRenderingMixin(LiveWindowEventIntervalMonitoringMixin):
                             if hasattr(new_rects_item, 'format_item_tooltip_fn'):
                                 rect_item.format_item_tooltip_fn = deepcopy(new_rects_item.format_item_tooltip_fn)
                             # Apply visibility setting if provided
-                            if is_visible is not None:
-                                rect_item.setVisible(is_visible)
+                            # For list configs: only apply if all items have the same visibility (or all None)
+                            # For single configs: apply directly
+                            if visibility_settings is not None:
+                                if isinstance(visibility_settings, list):
+                                    # List case: check if all non-None values are the same
+                                    non_none_visibilities = [v for v in visibility_settings if v is not None]
+                                    if len(non_none_visibilities) > 0:
+                                        # If all non-None values are the same, apply that visibility
+                                        if len(set(non_none_visibilities)) == 1:
+                                            rect_item.setVisible(non_none_visibilities[0])
+                                        # If they differ, we can't set per-rectangle visibility, so skip
+                                        # (IntervalRectsItem is a single graphics item that renders all rectangles)
+                                else:
+                                    # Single config case: apply directly
+                                    rect_item.setVisible(visibility_settings)
 
 
 
