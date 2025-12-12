@@ -1152,7 +1152,7 @@ class EpochRenderingMixin(LiveWindowEventIntervalMonitoringMixin):
             pn.Row(*[pn.Column(*[pn.Param(a_sub_v) for a_sub_v in v]) for k,v in out_configs_dict.items()])
 
 
-
+            out_configs_df = active_2d_plot.extract_interval_display_config_df()
 
         """
         epoch_display_configs = self.extract_interval_display_config_lists()
@@ -1266,6 +1266,8 @@ class EpochRenderingMixin(LiveWindowEventIntervalMonitoringMixin):
 
     def perform_remove_epoch_intervals(self, removed_interval_keys: List[str], should_perform_remove: bool = True):
         """ actually remove the intervals. """
+        if isinstance(removed_interval_keys, str):
+            removed_interval_keys = [removed_interval_keys] ## single key, wrap in list
 
         _all_removed_items = {}
         if removed_interval_keys:
