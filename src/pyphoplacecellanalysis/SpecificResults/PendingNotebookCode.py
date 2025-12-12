@@ -118,6 +118,115 @@ from pyphoplacecellanalysis.General.Model.Configs.LongShortDisplayConfig import 
 from pyphocorehelpers.gui.Qt.color_helpers import ColormapHelpers, ColorFormatConverter, debug_print_color, build_adjusted_color
 
 
+def approx_downsample_pdf(a_p_x_given_n, downsample_factor=4, xbin_centers=None, ybin_centers=None):
+    """
+    Approximates a downsampled version of a 2D or 3D positional probability
+    density function (PDF) while preserving total probability mass.
+
+    Supports:
+        - 3D PDFs: shape (H, W, T)
+        - 2D PDFs: shape (H, W)
+
+    Also optionally downsamples xbin_centers and ybin_centers consistently
+    with the spatial downsampling.
+
+    Args:
+        a_p_x_given_n : np.ndarray, (H, W) or (H, W, T)
+        downsample_factor : int
+        xbin_centers : optional 1D array of length H
+        ybin_centers : optional 1D array of length W
+
+    Returns:
+        a_p_x_given_n_small
+        xbin_centers_small (or None)
+        ybin_centers_small (or None)
+
+    USage:
+        from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import approx_downsample_pdf
+        a_p_x_given_n_small, xbin_centers_small, ybin_centers_small = approx_downsample_pdf(a_p_x_given_n=a_p_x_given_n, xbin_centers = _obj.xbin_centers, ybin_centers = _obj.ybin_centers, downsample_factor=4)
+        np.shape(a_p_x_given_n_small)
+        xbin_centers_small
+
+    """
+
+    a = np.asarray(a_p_x_given_n)
+    k = downsample_factor
+
+    # --- handle 2D → 3D ---
+    if a.ndim == 2:
+        a = a[:, :, None]
+        squeeze_back = True
+    else:
+        squeeze_back = False
+
+    H, W, T = a.shape
+
+    # compute padding
+    pad_h = (k - (H % k)) % k
+    pad_w = (k - (W % k)) % k
+
+    # pad
+    a_padded = np.pad(
+        a,
+        pad_width=((0, pad_h), (0, pad_w), (0, 0)),
+        mode='edge'
+    ).astype(float)
+
+    Hc, Wc = a_padded.shape[0], a_padded.shape[1]
+
+    # block-sum PDF values
+    a_blocksum = a_padded.reshape(Hc//k, k, Wc//k, k, T).sum(axis=(1, 3))
+
+    # renormalize per timestamp
+    mass = a_blocksum.sum(axis=(0, 1), keepdims=True)
+    mass_safe = np.where(mass == 0, 1.0, mass)
+    a_p_x_given_n_small = a_blocksum / mass_safe
+
+    if squeeze_back:
+        a_p_x_given_n_small = a_p_x_given_n_small[:, :, 0]
+
+    # ---------------------------
+    # Downsample xbin_centers, ybin_centers
+    # ---------------------------
+
+    # xbin_centers (H dimension)
+    if xbin_centers is not None:
+        xbin_centers = np.asarray(xbin_centers)
+
+        # pad if needed
+        if pad_h > 0:
+            xbin_centers = np.pad(
+                xbin_centers,
+                pad_width=(0, pad_h),
+                mode='edge'
+            )
+
+        # reshape into blocks and average
+        xbin_centers_small = xbin_centers.reshape(-1, k).mean(axis=1)
+    else:
+        xbin_centers_small = None
+
+    # ybin_centers (W dimension)
+    if ybin_centers is not None:
+        ybin_centers = np.asarray(ybin_centers)
+
+        if pad_w > 0:
+            ybin_centers = np.pad(
+                ybin_centers,
+                pad_width=(0, pad_w),
+                mode='edge'
+            )
+
+        ybin_centers_small = ybin_centers.reshape(-1, k).mean(axis=1)
+    else:
+        ybin_centers_small = None
+
+    return a_p_x_given_n_small, xbin_centers_small, ybin_centers_small
+
+
+
+
+
 
 # ==================================================================================================================================================================================================================================================================================== #
 # 2025-12-11 - Predictive Coding and adding Layers                                                                                                                                                                                                                                     #
@@ -697,12 +806,17 @@ class PredictiveDecoding(ComputedResult): #PickleSerializableMixin, AttrsBasedCl
     ## one of these for each context (e.g. maze1, maze2 or ['roam', 'sprinkle'], etc
     gaussian_volume: NDArray[ND.Shape["N_X_BINS, N_Y_BINS, N_TIME_BINS"], np.floating] = serialized_field(default=None)
 
+    epoch_names: List[str] = serialized_field(default=Factory(list))
     p_x_given_n_dict: Dict[str, NDArray[ND.Shape["N_X_BINS, N_Y_BINS, N_TIME_BINS"], np.floating]] = serialized_field(default=Factory(dict))
     moving_avg_dict: Dict[str, NDArray[ND.Shape["N_X_BINS, N_Y_BINS, N_TIME_BINS"], np.floating]] = serialized_field(default=Factory(dict))
+
+    ## past/future to present comparisons:
     moving_avg_meas_pos_overlap_dict: Dict[str, NDArray[ND.Shape["N_X_BINS, N_Y_BINS, N_TIME_BINS"], np.floating]] = serialized_field(default=Factory(dict))
 
-
+    ## locality comparisons:
     decoding_meas_pos_locality_measure_dict: Dict[str, NDArray[ND.Shape["N_TIME_BINS"], np.floating]] = serialized_field(default=Factory(dict))
+    # Generic dict to store all computed measures - allows easy extension without adding new fields
+    locality_measures_dict_dict: Dict[str, Dict[str, Any]] = serialized_field(default=Factory(dict))
 
     
     def __attrs_post_init__(self):
@@ -779,54 +893,18 @@ class PredictiveDecoding(ComputedResult): #PickleSerializableMixin, AttrsBasedCl
         # moving_avg = cls._perform_compute_predictive_decoding(curr_active_pipeline=curr_active_pipeline, directional_decoders_decode_result=directional_decoders_decode_result, window_size=window_size)
         time_window_centers, pos_df, moving_avg, new_positions, p_x_given_n = PredictiveDecoding._perform_compute_predictive_decoding(curr_active_pipeline=curr_active_pipeline, directional_decoders_decode_result=directional_decoders_decode_result, window_size=window_size)
         
+        epoch_names: List[str] = list(directional_decoders_decode_result.pf1D_Decoder_dict.keys())
+
         _obj = cls(window_size=window_size, time_window_centers=time_window_centers, pos_df=deepcopy(pos_df),
                    xbin=deepcopy(directional_decoders_decode_result.pseudo2D_decoder.xbin), ybin=deepcopy(directional_decoders_decode_result.pseudo2D_decoder.ybin),
                    xbin_centers=deepcopy(directional_decoders_decode_result.pseudo2D_decoder.xbin_centers), ybin_centers=deepcopy(directional_decoders_decode_result.pseudo2D_decoder.ybin_centers),
-                   moving_avg=moving_avg, new_positions=new_positions, p_x_given_n=deepcopy(p_x_given_n))
+                   moving_avg=moving_avg, new_positions=new_positions, p_x_given_n=deepcopy(p_x_given_n), epoch_names=epoch_names)
         return _obj
 
 
-    # def compute_locality(self):
-    #     """ 
-
-    #     gaussian_volume
-
-    #     """
-
-
-    #     # Source - https://stackoverflow.com/a
-    #     # Posted by fuglede, modified by community. See post 'Timeline' for change history
-    #     # Retrieved 2025-12-11, License - CC BY-SA 4.0
-
-    #     from scipy.spatial.distance import cdist
-    #     from scipy.optimize import linear_sum_assignment
-
-    #     d = cdist(Y1, Y2)
-    #     assignment = linear_sum_assignment(d)
-    #     print(d[assignment].sum() / n)
-
-
-
-    #     # OLD ________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
-
-    #     # ests.append(wasserstein_distance(X_proj, Y_proj)
-
-
-
-    #     a_timestamp_idx: int = 100
-
-    #     X_s = self.gaussian_volume[:, :, a_timestamp_idx]
-    #     X_t = self.moving_avg_dict['roam'][:, :, a_timestamp_idx]
-
-    #     # X_t = gaussian_volume[:, :, (a_timestamp_idx-1)]
-    #     # X_t = gaussian_volume[:, :, (a_timestamp_idx-50)]
-    #     _out_earthmovers_dist = ot.sliced.sliced_wasserstein_distance(X_s, X_t, a=None, b=None, n_projections=50, p=2, projections=None, seed=None, log=False) # for two adjacent timestamp's gaussian's, the dist is very small, like `9.552666541993098e-07`
-    #     # for the gaussian and the moving average it's larger, likke `0.0018466814191766255`
-    #     _out_earthmovers_dist
-
 
     @function_attributes(short_name=None, tags=['normalization', 'locality', 'overlap'], input_requires=[], output_provides=[], uses=['self.compute_locality'], used_by=[], creation_date='2025-12-11 17:03', related_items=[])
-    def build_normalized_outputs(self, epoch_names: List[str]):
+    def build_normalized_outputs(self):
         """ Normalize: self.p_x_given_n_dict and self.moving_avg over the decoer time period ('sprinkle', 'roam')
 
         Normalize and convolve each new_position 2D point (x, y) with a fixed width 2D gaussian
@@ -856,7 +934,7 @@ class PredictiveDecoding(ComputedResult): #PickleSerializableMixin, AttrsBasedCl
         self.moving_avg_meas_pos_overlap_dict = {}
 
         # for an_epoch_idx, (an_epoch_name, a_plotter) in enumerate(sync_plotters.items()):
-        for an_epoch_idx, an_epoch_name in enumerate(epoch_names):
+        for an_epoch_idx, an_epoch_name in enumerate(self.epoch_names):
             ## "epoch" in the loop variables refers to only the session.paradigm epochs, like ['roam', 'sprinkle']
 
             a_p_x_given_n = deepcopy(np.squeeze(self.p_x_given_n[:, :, an_epoch_idx, :]))
@@ -876,7 +954,7 @@ class PredictiveDecoding(ComputedResult): #PickleSerializableMixin, AttrsBasedCl
     
 
     @function_attributes(short_name=None, tags=['normalization', 'locality', 'overlap'], input_requires=[], output_provides=[], uses=['self.compute_locality'], used_by=[], creation_date='2025-12-11 17:03', related_items=[])
-    def compute(self, epoch_names: List[str], sigma: float = 1.0):
+    def compute(self, sigma: float = 1.0):
         """ Normalize: self.p_x_given_n_dict and self.moving_avg over the decoer time period ('sprinkle', 'roam')
 
         Normalize and convolve each new_position 2D point (x, y) with a fixed width 2D gaussian
@@ -889,6 +967,7 @@ class PredictiveDecoding(ComputedResult): #PickleSerializableMixin, AttrsBasedCl
 
         from scipy.spatial.distance import cdist
         from scipy.optimize import linear_sum_assignment
+        from scipy.ndimage import center_of_mass
 
         def _subfn_calculate_spatial_emd(Xs, Xt):
             """
@@ -1028,10 +1107,6 @@ class PredictiveDecoding(ComputedResult): #PickleSerializableMixin, AttrsBasedCl
                 
             return swd_dists
 
-
-        
-
-
         def _subfn_calculate_spatial_emd_fast(Xs, Xt, downsample_factor=4):
             """
             #TODO 2025-12-11 18:28: - [ ] This is the only one fast enough to be practicle, runs in about 4 minutes per decoder context (2 x session)
@@ -1075,6 +1150,49 @@ class PredictiveDecoding(ComputedResult): #PickleSerializableMixin, AttrsBasedCl
             return emd_scores
 
 
+        def pdf_spatial_distances(_obj, a_p_x_given_n, xbin_centers, ybin_centers):
+            """
+            Computes the Euclidean distance between the spatial centers of two 2D positional
+            probability distributions (_obj.gaussian_volume vs a_p_x_given_n) for all timestamps.
+
+            Args:
+                _obj.gaussian_volume : np.ndarray, shape (H, W, T)
+                    Reference 2D PDFs over timestamps.
+                a_p_x_given_n : np.ndarray, shape (H, W, T)
+                    Comparison 2D PDFs over timestamps.
+                xbin_centers : np.ndarray, shape (H,)
+                    x-axis bin centers.
+                ybin_centers : np.ndarray, shape (W,)
+                    y-axis bin centers.
+
+            Returns:
+                distances_spatial : np.ndarray, shape (T,)
+                    Euclidean distance between the expected positions of the two PDFs for each timestamp.
+            """
+
+            H, W, T = _obj.gaussian_volume.shape
+
+            # Compute center-of-mass in pixel coordinates for all timestamps
+            com_obj = np.array([center_of_mass(_obj.gaussian_volume[:, :, t]) for t in range(T)])  # (T,2)
+            com_a   = np.array([center_of_mass(a_p_x_given_n[:, :, t]) for t in range(T)])          # (T,2)
+
+            # Map pixel indices to actual bin coordinates
+            x_obj = xbin_centers[np.clip(np.round(com_obj[:,0]).astype(int), 0, H-1)]
+            y_obj = ybin_centers[np.clip(np.round(com_obj[:,1]).astype(int), 0, W-1)]
+
+            x_a = xbin_centers[np.clip(np.round(com_a[:,0]).astype(int), 0, H-1)]
+            y_a = ybin_centers[np.clip(np.round(com_a[:,1]).astype(int), 0, W-1)]
+
+            # Euclidean distance per timestamp
+            distances_spatial = np.sqrt((x_obj - x_a)**2 + (y_obj - y_a)**2)
+
+            max_possible_distance: float = np.sqrt(np.ptp(xbin_centers)**2 + np.ptp(ybin_centers)**2)
+            distances_spatial_frac_max = distances_spatial / max_possible_distance
+            
+            return distances_spatial, distances_spatial_frac_max
+
+        distances_spatial, distances_spatial_frac_max = pdf_spatial_distances(_obj=_obj, a_p_x_given_n=a_p_x_given_n, xbin_centers = _obj.xbin_centers, ybin_centers = _obj.ybin_centers)
+
         # active_subfn_compute_earthmovers_fn = _subfn_calculate_spatial_emd # #TODO 2025-12-11 17:53: - [ ] TOO SLOW
         # active_subfn_compute_earthmovers_fn = _subfn_calculate_sinkhorn_distance
         # active_subfn_compute_earthmovers_fn = _subfn_calculate_sliced_wasserstein_correct
@@ -1085,14 +1203,16 @@ class PredictiveDecoding(ComputedResult): #PickleSerializableMixin, AttrsBasedCl
         # ==================================================================================================================================================================================================================================================================================== #
 
         self.gaussian_volume = self._build_sampled_pos_with_gaussian_spread(sigma=sigma)
-        _out = self.build_normalized_outputs(epoch_names=epoch_names)
+        _out = self.build_normalized_outputs()
 
         ## INPUTS: gaussian_volume
+        self.locality_measures_dict_dict = {}
         self.moving_avg_meas_pos_overlap_dict = {}
 
         # for an_epoch_idx, (an_epoch_name, a_plotter) in enumerate(sync_plotters.items()):
-        for an_epoch_idx, an_epoch_name in enumerate(epoch_names):
+        for an_epoch_idx, an_epoch_name in enumerate(self.epoch_names):
             ## "epoch" in the loop variables refers to only the session.paradigm epochs, like ['roam', 'sprinkle']
+            self.locality_measures_dict_dict[an_epoch_name] = {} ## empty
 
             a_p_x_given_n = self.p_x_given_n_dict[an_epoch_name]
             a_moving_avg = self.moving_avg_dict[an_epoch_name]
@@ -1126,6 +1246,36 @@ class PredictiveDecoding(ComputedResult): #PickleSerializableMixin, AttrsBasedCl
             # self.decoding_meas_pos_locality_measure_dict[an_epoch_name] = np.array([_subfn_calculate_spatial_emd(self.gaussian_volume[:, :, a_timestamp_idx], a_p_x_given_n[:, :, a_timestamp_idx]) for a_timestamp_idx in np.arange(num_timestamps)])
 
             self.decoding_meas_pos_locality_measure_dict[an_epoch_name] = active_subfn_compute_earthmovers_fn(self.gaussian_volume, a_p_x_given_n)
+
+            ## do all computation measures
+            a_computation_measure_name: str = 'mask_overlap'
+            ## above a certain promence ideally:
+            min_val_epsilon: float = 1e-9
+            is_high_prob_mask = (a_p_x_given_n > min_val_epsilon)
+            self.locality_measures_dict_dict[an_epoch_name][a_computation_measure_name] = ((self.gaussian_volume * is_high_prob_mask) > min_val_epsilon).astype(int) ## the "overlap" is computed by taking the elementwise dot-product with the moving average
+
+
+            # a_computation_measure_name: str = 'peak_prom'
+            # ## above a certain promence ideally:
+            # min_val_epsilon: float = 1e-9
+            # is_high_prob_mask = (a_p_x_given_n > min_val_epsilon)
+            # self.locality_measures_dict_dict[an_epoch_name][a_computation_measure_name] = ((self.gaussian_volume * is_high_prob_mask) > min_val_epsilon).astype(int) ## the "overlap" is computed by taking the elementwise dot-product with the moving average
+
+
+            a_computation_measure_name: str = 'dist_to_highest_peak'
+            ## above a certain promence ideally:
+            # peak_locations = np.argmax(a_p_x_given_n, axis=(0, 1))
+            distances_spatial, distances_spatial_frac_max = pdf_spatial_distances(_obj=self, a_p_x_given_n=a_p_x_given_n, xbin_centers = self.xbin_centers, ybin_centers = self.ybin_centers)
+
+            self.locality_measures_dict_dict[an_epoch_name][a_computation_measure_name] = distances_spatial_frac_max ## the "overlap" is computed by taking the elementwise dot-product with the moving average
+            
+
+            # a_computation_measure_name: str = 'dist_to_nearest_peak'
+            # ## above a certain promence ideally:
+            # min_val_epsilon: float = 1e-9
+            # is_high_prob_mask = (a_p_x_given_n > min_val_epsilon)
+            # self.locality_measures_dict_dict[an_epoch_name][a_computation_measure_name] = ((self.gaussian_volume * is_high_prob_mask) > min_val_epsilon).astype(int) ## the "overlap" is computed by taking the elementwise dot-product with the moving average
+
 
 
 
