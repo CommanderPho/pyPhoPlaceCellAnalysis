@@ -122,10 +122,19 @@ from pyphocorehelpers.gui.Qt.color_helpers import ColormapHelpers, ColorFormatCo
 # ==================================================================================================================================================================================================================================================================================== #
 # 2025-12-11 - Predictive Coding and adding Layers                                                                                                                                                                                                                                     #
 # ==================================================================================================================================================================================================================================================================================== #
-@function_attributes(short_name=None, tags=['plot', 'figure', 'two-pane'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-12-11 13:09', related_items=[])
+@function_attributes(short_name=None, tags=['UNFINISHED', 'AI', 'plot', 'figure', 'two-pane'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-12-11 13:09', related_items=[])
 def build_paired_time_synchronized_Bapun_decoder_with_lead_lag_window(curr_active_pipeline, included_filter_names: List[str]=None, fixed_window_duration = 15.0, controlling_widget=None, context=None, create_new_controlling_widget=True,
                                                            directional_decoders_decode_result: Optional[DirectionalDecodersContinuouslyDecodedResult]=None) -> GenericPyQtGraphContainer:
     """ Builds a paired window with two time_synchronized plotters (Lead and Lag) for the same decoder, with a controllable offset.
+    
+    For each of the two plotters (Lead and Lag), a time range control widget is added underneath that allows the user to manually override the start/end time ranges to display. Each widget includes:
+    - Two spinboxes for start and end time values
+    - A button to synchronize to the values of the other plotter
+    
+    When the plotter's time window is updated externally (e.g., by the controlling widget), the time range control widget spinboxes are automatically updated to reflect the current values. Update loops are prevented using signal blocking and update flags to ensure that:
+    - Manual changes to spinboxes update the plotter without triggering external update handlers
+    - External updates to the plotter update the spinboxes without triggering manual change handlers
+    - Sync button operations copy values from the other plotter without causing recursive updates
     
     Usage:
         from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.ContainerBased.PhoContainerTool import GenericPyQtGraphContainer
@@ -183,9 +192,105 @@ def build_paired_time_synchronized_Bapun_decoder_with_lead_lag_window(curr_activ
         _display_dock_items = {}
         _display_sync_connections = {}
         
+        # Initialize time window tracking for each plotter
+        _plotter_time_windows = {}
+        for a_name, a_sync_plotter in _out_sync_plotters.items():
+            # Initialize with None - will be set when first window update occurs
+            _plotter_time_windows[a_name] = {'start': None, 'end': None}
+        
+        # Helper function to create time range control widget
+        def _create_time_range_control_widget(plotter_name, other_plotter_name, sync_plotters_dict, time_windows_dict):
+            """ Creates a widget with spinboxes for start/end time and a sync button """
+            widget = QtWidgets.QWidget()
+            layout = QtWidgets.QHBoxLayout(widget)
+            
+            # Start time spinbox
+            start_spinbox = QtWidgets.QDoubleSpinBox()
+            start_spinbox.setRange(-1e6, 1e6)
+            start_spinbox.setSingleStep(0.1)
+            start_spinbox.setDecimals(3)
+            start_spinbox.setPrefix("Start: ")
+            start_spinbox.setSuffix(" s")
+            if time_windows_dict[plotter_name]['start'] is not None:
+                start_spinbox.setValue(time_windows_dict[plotter_name]['start'])
+            
+            # End time spinbox
+            end_spinbox = QtWidgets.QDoubleSpinBox()
+            end_spinbox.setRange(-1e6, 1e6)
+            end_spinbox.setSingleStep(0.1)
+            end_spinbox.setDecimals(3)
+            end_spinbox.setPrefix("End: ")
+            end_spinbox.setSuffix(" s")
+            if time_windows_dict[plotter_name]['end'] is not None:
+                end_spinbox.setValue(time_windows_dict[plotter_name]['end'])
+            
+            # Sync button
+            sync_button = QtWidgets.QPushButton(f"Sync to {other_plotter_name}")
+            
+            layout.addWidget(start_spinbox)
+            layout.addWidget(end_spinbox)
+            layout.addWidget(sync_button)
+            layout.addStretch()
+            
+            # Flag to prevent update loops
+            _updating_from_external = {'value': False}
+            
+            # Handler for spinbox changes
+            def on_start_time_changed(val):
+                if not _updating_from_external['value']:
+                    current_end = end_spinbox.value()
+                    if current_end > val:
+                        time_windows_dict[plotter_name]['start'] = val
+                        time_windows_dict[plotter_name]['end'] = current_end
+                        sync_plotters_dict[plotter_name].on_window_changed_rate_limited((val, current_end))
+            
+            def on_end_time_changed(val):
+                if not _updating_from_external['value']:
+                    current_start = start_spinbox.value()
+                    if val > current_start:
+                        time_windows_dict[plotter_name]['start'] = current_start
+                        time_windows_dict[plotter_name]['end'] = val
+                        sync_plotters_dict[plotter_name].on_window_changed_rate_limited((current_start, val))
+            
+            # Handler for sync button
+            def on_sync_button_clicked():
+                other_start = time_windows_dict[other_plotter_name]['start']
+                other_end = time_windows_dict[other_plotter_name]['end']
+                if other_start is not None and other_end is not None:
+                    _updating_from_external['value'] = True
+                    start_spinbox.blockSignals(True)
+                    end_spinbox.blockSignals(True)
+                    start_spinbox.setValue(other_start)
+                    end_spinbox.setValue(other_end)
+                    start_spinbox.blockSignals(False)
+                    end_spinbox.blockSignals(False)
+                    _updating_from_external['value'] = False
+                    # Update the plotter
+                    time_windows_dict[plotter_name]['start'] = other_start
+                    time_windows_dict[plotter_name]['end'] = other_end
+                    sync_plotters_dict[plotter_name].on_window_changed_rate_limited((other_start, other_end))
+            
+            start_spinbox.valueChanged.connect(on_start_time_changed)
+            end_spinbox.valueChanged.connect(on_end_time_changed)
+            sync_button.clicked.connect(on_sync_button_clicked)
+            
+            # Store references for external updates
+            widget._start_spinbox = start_spinbox
+            widget._end_spinbox = end_spinbox
+            widget._updating_from_external = _updating_from_external
+            widget._plotter_name = plotter_name
+            
+            return widget
+        
         for a_name, a_sync_plotter in _out_sync_plotters.items():
             _display_configs[a_name] = CustomDockDisplayConfig(showCloseButton=False)
             _, _display_dock_items[a_name] = root_dockAreaWindow.add_display_dock(f"{a_name}", dockSize=(final_desired_width, final_desired_height), widget=a_sync_plotter, dockAddLocationOpts=['right'], display_config=_display_configs[a_name])
+            
+            # Create and add time range control widget underneath this plotter
+            other_name = 'Lag' if a_name == 'Lead' else 'Lead'
+            time_range_widget = _create_time_range_control_widget(a_name, other_name, _out_sync_plotters, _plotter_time_windows)
+            time_range_widget_id = f"{a_name}_TimeRangeControl"
+            _, _display_dock_items[time_range_widget_id] = root_dockAreaWindow.add_display_dock(identifier=time_range_widget_id, widget=time_range_widget, dockAddLocationOpts=['bottom', _display_dock_items[a_name]], display_config=CustomDockDisplayConfig(showCloseButton=False))
         # END for a_name, a_sync_plotter in _out_sync_plotter...
         
         if a_controlling_widget is not None:
@@ -203,6 +308,24 @@ def build_paired_time_synchronized_Bapun_decoder_with_lead_lag_window(curr_activ
             time_offset_spinbox.setDecimals(3)
             
             _display_dock_items['OffsetParams'] = root_dockAreaWindow.add_display_dock(identifier='OffsetParams', widget=time_offset_spinbox, dockAddLocationOpts=['bottom'])
+            
+            # Initialize time windows from controlling widget
+            initial_start, initial_end = a_controlling_widget.plot_data.time_window_start, a_controlling_widget.plot_data.time_window_end
+            _plotter_time_windows['Lead']['start'] = initial_start
+            _plotter_time_windows['Lead']['end'] = initial_end
+            offset = time_offset_spinbox.value()
+            _plotter_time_windows['Lag']['start'] = initial_start + offset
+            _plotter_time_windows['Lag']['end'] = initial_end + offset
+            
+            # Update widgets with initial values
+            lead_widget = _display_dock_items.get('Lead_TimeRangeControl', None)
+            lag_widget = _display_dock_items.get('Lag_TimeRangeControl', None)
+            if lead_widget is not None and hasattr(lead_widget, '_start_spinbox'):
+                lead_widget._start_spinbox.setValue(initial_start)
+                lead_widget._end_spinbox.setValue(initial_end)
+            if lag_widget is not None and hasattr(lag_widget, '_start_spinbox'):
+                lag_widget._start_spinbox.setValue(initial_start + offset)
+                lag_widget._end_spinbox.setValue(initial_end + offset)
                 
         root_dockAreaWindow.show()
         
@@ -211,10 +334,40 @@ def build_paired_time_synchronized_Bapun_decoder_with_lead_lag_window(curr_activ
         if a_controlling_widget is not None:
             root_dockAreaWindow.connection_man.register_driver(a_controlling_widget)
             
+            # Get references to time range control widgets
+            lead_time_range_widget = _display_dock_items.get('Lead_TimeRangeControl', None)
+            lag_time_range_widget = _display_dock_items.get('Lag_TimeRangeControl', None)
+            
+            # Helper function to update time range widget from external change
+            def update_time_range_widget(widget, start_t, end_t):
+                """ Update the time range widget spinboxes when plotter window changes externally """
+                if widget is not None and hasattr(widget, '_start_spinbox'):
+                    widget._updating_from_external['value'] = True
+                    widget._start_spinbox.blockSignals(True)
+                    widget._end_spinbox.blockSignals(True)
+                    widget._start_spinbox.setValue(start_t)
+                    widget._end_spinbox.setValue(end_t)
+                    widget._start_spinbox.blockSignals(False)
+                    widget._end_spinbox.blockSignals(False)
+                    widget._updating_from_external['value'] = False
+                    # Update tracked window
+                    plotter_name = widget._plotter_name
+                    _plotter_time_windows[plotter_name]['start'] = start_t
+                    _plotter_time_windows[plotter_name]['end'] = end_t
+            
             # Wire up signals such that time-synchronized plotters are controlled by the RasterPlot2D:
             # 1. Lead Plotter: Direct connection
-            _display_sync_connections['Lead'] = root_dockAreaWindow.connection_man.connect_drivable_to_driver(drivable=_out_sync_plotters['Lead'], driver=a_controlling_widget,
-                                                            custom_connect_function=(lambda driver, drivable: pg.SignalProxy(driver.window_scrolled, delay=0.2, rateLimit=60, slot=drivable.on_window_changed_rate_limited)))
+            def on_lead_window_update_requested(evt):
+                """ called when the main window is scrolled to update the lead plotter. """
+                current_start, current_end = evt[0], evt[1]
+                _out_sync_plotters['Lead'].on_window_changed_rate_limited(current_start, current_end)
+                # Track window and update widget
+                _plotter_time_windows['Lead']['start'] = current_start
+                _plotter_time_windows['Lead']['end'] = current_end
+                update_time_range_widget(lead_time_range_widget, current_start, current_end)
+            
+            lead_signal_proxy = pg.SignalProxy(a_controlling_widget.window_scrolled, delay=0.2, rateLimit=60, slot=on_lead_window_update_requested)
+            _display_sync_connections['Lead'] = lead_signal_proxy
 
             # 2. Lag Plotter: Offset connection
             lag_plotter = _out_sync_plotters['Lag']
@@ -223,7 +376,13 @@ def build_paired_time_synchronized_Bapun_decoder_with_lead_lag_window(curr_activ
                 """ called when the main window is scrolled to update the lag plotter with the offset. """
                 current_start, current_end = evt[0], evt[1]
                 offset = time_offset_spinbox.value()
-                lag_plotter.on_window_changed_rate_limited(current_start + offset, current_end + offset)
+                lag_start = current_start + offset
+                lag_end = current_end + offset
+                lag_plotter.on_window_changed_rate_limited(lag_start, lag_end)
+                # Track window and update widget
+                _plotter_time_windows['Lag']['start'] = lag_start
+                _plotter_time_windows['Lag']['end'] = lag_end
+                update_time_range_widget(lag_time_range_widget, lag_start, lag_end)
                 
             lag_signal_proxy = pg.SignalProxy(a_controlling_widget.window_scrolled, delay=0.2, rateLimit=60, slot=on_lag_window_update_requested)
             _display_sync_connections['Lag'] = lag_signal_proxy # Store to prevent garbage collection
@@ -238,10 +397,15 @@ def build_paired_time_synchronized_Bapun_decoder_with_lead_lag_window(curr_activ
             def on_spinbox_value_changed(val):
                 # Request current window from controller
                 current_start, current_end = a_controlling_widget.plot_data.time_window_start, a_controlling_widget.plot_data.time_window_end
-                lag_plotter.on_window_changed_rate_limited(current_start + val, current_end + val)
+                lag_start = current_start + val
+                lag_end = current_end + val
+                lag_plotter.on_window_changed_rate_limited(lag_start, lag_end)
+                # Track window and update widget
+                _plotter_time_windows['Lag']['start'] = lag_start
+                _plotter_time_windows['Lag']['end'] = lag_end
+                update_time_range_widget(lag_time_range_widget, lag_start, lag_end)
                 
             time_offset_spinbox.valueChanged.connect(on_spinbox_value_changed)
-
 
         _out_container: GenericPyQtGraphContainer = GenericPyQtGraphContainer(name='build_paired_time_synchronized_lead_lag')       
         _out_container.ui.root_dockAreaWindow = root_dockAreaWindow
@@ -251,6 +415,11 @@ def build_paired_time_synchronized_Bapun_decoder_with_lead_lag_window(curr_activ
         _out_container.ui.sync_plotters = _out_sync_plotters
         _out_container.ui.controlling_widget = controlling_widget
         _out_container.ui.time_offset_spinbox = time_offset_spinbox
+        _out_container.ui.plotter_time_windows = _plotter_time_windows
+        _out_container.ui.time_range_control_widgets = {
+            'Lead': _display_dock_items.get('Lead_TimeRangeControl', None),
+            'Lag': _display_dock_items.get('Lag_TimeRangeControl', None)
+        }
 
         _out_container.plot_data.display_configs = _display_configs
         if context is not None:
