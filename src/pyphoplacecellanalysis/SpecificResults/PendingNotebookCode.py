@@ -825,11 +825,22 @@ class PredictiveDecoding(ComputedResult): #PickleSerializableMixin, AttrsBasedCl
 
 
     @property
-    def earthmovers_dist_df(self) -> pd.DataFrame:
-        """The earthmovers_dist_df property."""
-        _out_earthmovers_dist_df = pd.DataFrame(self.decoding_meas_pos_locality_measure_dict)
-        _out_earthmovers_dist_df['t'] = self.time_window_centers
-        return _out_earthmovers_dist_df
+    def locality_measures_df(self) -> pd.DataFrame:
+        """The locality_measures_df property."""
+        # _out_locality_measures_df = pd.DataFrame(self.decoding_meas_pos_locality_measure_dict)
+        _out_locality_measures_df = pd.DataFrame(self.time_window_centers, columns=['t'])
+        # _out_locality_measures_df['t'] = self.time_window_centers
+
+        for an_epoch_name, v in self.locality_measures_dict_dict.items():
+
+            for a_computation_measure_name, vv in v.items():
+                if a_computation_measure_name == 'mask_overlap':
+                    total_num_possible_bins: int = len(self.xbin_centers) * len(self.ybin_centers)
+                    vv = np.nansum(vv, (0, 1)) / total_num_possible_bins
+                _out_locality_measures_df[f"{a_computation_measure_name}_{an_epoch_name}"] = vv # _obj.locality_measures_dict_dict[an_epoch_name][a_computation_measure_name]
+
+
+        return _out_locality_measures_df
 
 
     @function_attributes(short_name=None, tags=['predictive_decoding', 'layers'], input_requires=[], output_provides=[], uses=[], used_by=['init_from_decode_result'], creation_date='2025-12-09 19:03', related_items=[])
