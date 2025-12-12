@@ -194,7 +194,7 @@ class SingleArtistMultiEpochBatchHelpers:
     
 
     @function_attributes(short_name=None, tags=['data'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-02-17 16:07', related_items=[])
-    def shared_build_flat_stacked_data(self, debug_print=False, should_expand_first_dim: bool=True, force_recompute:bool=False, **kwargs):
+    def shared_build_flat_stacked_data(self, debug_print=False, should_expand_first_dim: bool=True, force_recompute:bool=False, desired_epoch_start_idx=None, desired_epoch_end_idx=None, **kwargs):
         """ finalize building the data for single-artist plotting (does not plot anything)
         
         From `#### 2025-02-14 - Perform plotting of Measured Positions (using `stacked_flat_global_pos_df['global_frame_division_x_data_offset']`)`
@@ -225,7 +225,12 @@ class SingleArtistMultiEpochBatchHelpers:
         ## INPUTS: a_result2D, a_new_global2D_decoder
         
         # rotate_to_vertical: bool = False
-                
+        if desired_epoch_start_idx is not None:
+            self.desired_epoch_start_idx = desired_epoch_start_idx
+            
+        if desired_epoch_end_idx is not None:
+            self.desired_epoch_end_idx = desired_epoch_end_idx
+
         pos_col_names = ['x', 'y']
         binned_col_names = ['binned_x', 'binned_y']
 
@@ -495,8 +500,8 @@ class SingleArtistMultiEpochBatchHelpers:
         
         curr_artist_dict, image_extent, plots_data = batch_plot_helper.add_position_posteriors(posterior_masking_value=0.0025, debug_print=True, defer_draw=False)
         """
-        _active_plot_fn = DecodedTrajectoryMatplotlibPlotter._helper_add_heatmap
-        # _active_plot_fn = DecodedTrajectoryMatplotlibPlotter._helper_add_hdr_contours
+        # _active_plot_fn = DecodedTrajectoryMatplotlibPlotter._helper_add_heatmap
+        _active_plot_fn = DecodedTrajectoryMatplotlibPlotter._helper_add_hdr_contours
 
         if override_ax is None:
             active_ax = self.active_ax
@@ -1902,7 +1907,7 @@ class DecodedTrajectoryMatplotlibPlotter(DecodedTrajectoryPlotter):
                                             alpha=full_posterior_opacity)
                     else:
                         # Outlines (Lines)
-                        cset = an_ax.contour(XX, YY, frame_data, 
+                        cset = an_ax.contour(XX, YY, frame_data.T, 
                                             levels=current_levels, 
                                             colors=[rgba_color], 
                                             linewidths=1.5, 
