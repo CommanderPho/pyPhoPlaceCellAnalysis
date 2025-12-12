@@ -117,7 +117,7 @@ from pyphocorehelpers.assertion_helpers import Assert
 from pyphoplacecellanalysis.General.Model.Configs.LongShortDisplayConfig import DecoderIdentityColors, long_short_display_config_manager, apply_LR_to_RL_adjustment
 from pyphocorehelpers.gui.Qt.color_helpers import ColormapHelpers, ColorFormatConverter, debug_print_color, build_adjusted_color
 
-
+@function_attributes(short_name=None, tags=['downsample', 'efficiency', 'speed-up', 'approximate', 'pdf', 'posterior'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-12-12 14:14', related_items=[])
 def approx_downsample_pdf(a_p_x_given_n, downsample_factor=4, xbin_centers=None, ybin_centers=None):
     """
     Approximates a downsampled version of a 2D or 3D positional probability
@@ -231,7 +231,7 @@ def approx_downsample_pdf(a_p_x_given_n, downsample_factor=4, xbin_centers=None,
 # ==================================================================================================================================================================================================================================================================================== #
 # 2025-12-11 - Predictive Coding and adding Layers                                                                                                                                                                                                                                     #
 # ==================================================================================================================================================================================================================================================================================== #
-@function_attributes(short_name=None, tags=['UNFINISHED', 'AI', 'plot', 'figure', 'two-pane'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-12-11 13:09', related_items=[])
+@function_attributes(short_name=None, tags=['UNFINISHED', 'AI', 'GUI', 'widget', 'plot', 'figure', 'two-pane'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-12-11 13:09', related_items=[])
 def build_paired_time_synchronized_Bapun_decoder_with_lead_lag_window(curr_active_pipeline, included_filter_names: List[str]=None, fixed_window_duration = 15.0, controlling_widget=None, context=None, create_new_controlling_widget=True,
                                                            directional_decoders_decode_result: Optional[DirectionalDecodersContinuouslyDecodedResult]=None) -> GenericPyQtGraphContainer:
     """ Builds a paired window with two time_synchronized plotters (Lead and Lag) for the same decoder, with a controllable offset.
@@ -765,7 +765,7 @@ import ot ## used to compute the earth-mover's distance
 # @METADA
 @define(slots=False, eq=False)
 class PredictiveDecoding(ComputedResult): #PickleSerializableMixin, AttrsBasedClassHelperMixin):
-    """ 
+    """ Relates to how PBE activity predicts future visited locations, and how visited locations are potentially replayed in future PBEs
     
     Implementation Notes:
         Integrate using a sliding window with the last 30 seconds as inputtttt
@@ -2250,6 +2250,8 @@ def final_process_non_kdiba_all_comps(curr_active_pipeline, active_data_mode_nam
         ## forcibly compute the linearized position so it doesn't fallback to "isomap" method which eats all the memory
         a_pos_df: pd.DataFrame = a_sess.position.compute_linearized_position(**linearization_kwargs)
         
+    
+    # Estimate laps, is this working correctly? For Bapun OpenField 2025-12-12 it looks like the laps are only being found during 'sprinkle', the 2nd of the two epochs, and also for somee reason trailing into subsequent sleep.
     for k, a_sess in curr_active_pipeline.filtered_sessions.items():
         a_sess = estimate_session_laps(a_sess, should_plot_laps_2d=False)
 
@@ -2869,7 +2871,7 @@ def add_static_occupancy_maze_backgrounds(curr_active_pipeline, sync_plotters):
             a_plotter.ui.bg_imv.setImage(image, rect=a_plotter.params.image_bounds_extent, axisOrder=a_plotter.params.shared_axis_order)
 
 
-
+@function_attributes(short_name=None, tags=['GUI', 'dual-conteext', 'context-decoding', 'bapun', 'WORKING'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-09-01 08:00', related_items=[])
 def build_combined_time_synchronized_Bapun_decoders_window(curr_active_pipeline, included_filter_names: List[str]=None, fixed_window_duration = 15.0, controlling_widget=None, context=None, create_new_controlling_widget=True,
                                                            directional_decoders_decode_result: Optional[DirectionalDecodersContinuouslyDecodedResult]=None) -> GenericPyQtGraphContainer:
     """ Builds a single window with time_synchronized (time-dependent placefield) plotters controlled by an internal 2DRasterPlot widget.
