@@ -701,10 +701,8 @@ class PredictiveDecoding(ComputedResult): #PickleSerializableMixin, AttrsBasedCl
     moving_avg_dict: Dict[str, NDArray[ND.Shape["N_X_BINS, N_Y_BINS, N_TIME_BINS"], np.floating]] = serialized_field(default=Factory(dict))
     moving_avg_meas_pos_overlap_dict: Dict[str, NDArray[ND.Shape["N_X_BINS, N_Y_BINS, N_TIME_BINS"], np.floating]] = serialized_field(default=Factory(dict))
 
+
     decoding_meas_pos_locality_measure_dict: Dict[str, NDArray[ND.Shape["N_TIME_BINS"], np.floating]] = serialized_field(default=Factory(dict))
-    
-    # Generic dict to store all computed measures - allows easy extension without adding new fields
-    measures_dict: Dict[str, Dict[str, Any]] = serialized_field(default=Factory(dict))
 
     
     def __attrs_post_init__(self):
@@ -884,12 +882,7 @@ class PredictiveDecoding(ComputedResult): #PickleSerializableMixin, AttrsBasedCl
         Normalize and convolve each new_position 2D point (x, y) with a fixed width 2D gaussian
         
         Updates: self.
-            .moving_avg_dict, .moving_avg_meas_pos_overlap_dict, .gaussian_volume, .decoding_meas_pos_locality_measure_dict, .measures_dict
-        
-        To add a new measure:
-            1. Define a function that takes (gaussian_volume, p_x_given_n, moving_avg, epoch_name) and returns the measure
-            2. Add it to the `measure_functions` dict inside this method
-            3. Access results via `self.measures_dict['your_measure_name'][epoch_name]`
+            .moving_avg_dict, .moving_avg_meas_pos_overlap_dict, .gaussian_volume, .decoding_meas_pos_locality_measure_dict
         """
         import ot
         from tqdm.notebook import tqdm
@@ -1094,41 +1087,51 @@ class PredictiveDecoding(ComputedResult): #PickleSerializableMixin, AttrsBasedCl
         self.gaussian_volume = self._build_sampled_pos_with_gaussian_spread(sigma=sigma)
         _out = self.build_normalized_outputs(epoch_names=epoch_names)
 
-        # Define measure computation functions - easy to extend by adding new entries here
-        def compute_overlap(gaussian_volume, p_x_given_n, moving_avg, epoch_name):
-            """Compute overlap between gaussian volume and moving average."""
-            return gaussian_volume * moving_avg
-        
-        def compute_locality(gaussian_volume, p_x_given_n, moving_avg, epoch_name):
-            """Compute locality measure using earth mover's distance."""
-            return active_subfn_compute_earthmovers_fn(gaussian_volume, p_x_given_n)
-        
-        # Registry of measure functions - add new measures here
-        measure_functions = {
-            'overlap': compute_overlap,
-            'locality': compute_locality,
-        }
-        
-        # Initialize measures dict
-        self.measures_dict = {}
-        for measure_name in measure_functions.keys():
-            self.measures_dict[measure_name] = {}
+        ## INPUTS: gaussian_volume
+        self.moving_avg_meas_pos_overlap_dict = {}
 
-        # Compute all measures for each epoch
+        # for an_epoch_idx, (an_epoch_name, a_plotter) in enumerate(sync_plotters.items()):
         for an_epoch_idx, an_epoch_name in enumerate(epoch_names):
             ## "epoch" in the loop variables refers to only the session.paradigm epochs, like ['roam', 'sprinkle']
+
             a_p_x_given_n = self.p_x_given_n_dict[an_epoch_name]
             a_moving_avg = self.moving_avg_dict[an_epoch_name]
-            
-            # Compute all registered measures
-            for measure_name, measure_fn in measure_functions.items():
-                self.measures_dict[measure_name][an_epoch_name] = measure_fn(
-                    self.gaussian_volume, a_p_x_given_n, a_moving_avg, an_epoch_name
-                )
 
-        # Populate legacy fields for backward compatibility
-        self.moving_avg_meas_pos_overlap_dict = self.measures_dict.get('overlap', {})
-        self.decoding_meas_pos_locality_measure_dict = self.measures_dict.get('locality', {})
+            ## compute the overlap measures:            
+            self.moving_avg_meas_pos_overlap_dict[an_epoch_name] = (self.gaussian_volume * a_moving_avg) ## the "overlap" is computed by taking the elementwise dot-product with the moving average
+
+            ## compute the locality:
+            # X_s = self.gaussian_volume[:, :, a_timestamp_idx]
+            # X_t = self.moving_avg_dict['roam'][:, :, a_timestamp_idx]
+            # X_s = self.gaussian_volume
+            # X_t = a_p_x_given_n
+            # an_earthmovers_dist = ot.sliced.sliced_wasserstein_distance(X_s, X_t, a=None, b=None, n_projections=50, p=2, projections=None, seed=None, log=False) # for two adjacent timestamp's gaussian's, the dist is very small, like `9.552666541993098e-07`
+
+            num_timestamps: int = np.shape(self.gaussian_volume)[-1]
+            
+            # an_earthmovers_dist = []
+            # for a_timestamp_idx in np.arange(num_timestamps):
+            #     d = cdist(self.gaussian_volume[:, :, a_timestamp_idx], a_p_x_given_n[:, :, a_timestamp_idx])
+            #     assignment = linear_sum_assignment(d)
+            #     # an_earthmovers_dist.append(d[assignment].sum() / n) ## what is n?
+            #     an_earthmovers_dist.append(d[assignment].sum())
+ 
+            # ## END for a_timestamp_idx in np.ar..
+            # an_earthmovers_dist = np.array(an_earthmovers_dist)
+
+            # self.decoding_meas_pos_locality_measure_dict[an_epoch_name] = an_earthmovers_dist
+
+            # Final correct POM __________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
+
+            # self.decoding_meas_pos_locality_measure_dict[an_epoch_name] = np.array([_subfn_calculate_spatial_emd(self.gaussian_volume[:, :, a_timestamp_idx], a_p_x_given_n[:, :, a_timestamp_idx]) for a_timestamp_idx in np.arange(num_timestamps)])
+
+            self.decoding_meas_pos_locality_measure_dict[an_epoch_name] = active_subfn_compute_earthmovers_fn(self.gaussian_volume, a_p_x_given_n)
+
+
+
+
+        ## END for an_epoch_idx, an_epoch_n...
+
 
         ## OUTPUTS: _a_moving_avg_dict, _a_moving_avg_meas_pos_overlap_dict
         return self.moving_avg_dict, self.moving_avg_meas_pos_overlap_dict, self.gaussian_volume
