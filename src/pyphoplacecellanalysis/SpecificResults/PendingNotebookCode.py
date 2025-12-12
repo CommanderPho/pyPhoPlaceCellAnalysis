@@ -829,7 +829,12 @@ class PredictiveDecoding(ComputedResult): #PickleSerializableMixin, AttrsBasedCl
 
         import scipy.ndimage
 
-        def _subfn_calculate_spatial_emd_fast(Xs, Xt, downsample_factor=2):
+
+        def _subfn_calculate_spatial_emd_fast(Xs, Xt, downsample_factor=4):
+            """
+            #TODO 2025-12-11 18:28: - [ ] This is the only one fast enough to be practicle, runs in about 4 minutes per decoder context (2 x session)
+            
+            """
             # 1. Downsample the input arrays (Average pooling)
             # This reduces 41x63 -> ~20x31
             # We slice [::factor] to skip, or use block_reduce for true averaging
