@@ -495,8 +495,8 @@ class SingleArtistMultiEpochBatchHelpers:
         
         curr_artist_dict, image_extent, plots_data = batch_plot_helper.add_position_posteriors(posterior_masking_value=0.0025, debug_print=True, defer_draw=False)
         """
-        # _active_plot_fn = DecodedTrajectoryMatplotlibPlotter._helper_add_heatmap
-        _active_plot_fn = DecodedTrajectoryMatplotlibPlotter._helper_add_hdr_contours        
+        _active_plot_fn = DecodedTrajectoryMatplotlibPlotter._helper_add_heatmap
+        # _active_plot_fn = DecodedTrajectoryMatplotlibPlotter._helper_add_hdr_contours
 
         if override_ax is None:
             active_ax = self.active_ax
