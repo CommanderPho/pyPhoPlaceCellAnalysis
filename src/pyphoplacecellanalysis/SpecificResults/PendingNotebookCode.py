@@ -1107,6 +1107,7 @@ class PredictiveDecoding(ComputedResult): #PickleSerializableMixin, AttrsBasedCl
                 
             return swd_dists
 
+        # a_computation_measure_name: str = 'earthmovers'
         def _subfn_calculate_spatial_emd_fast(Xs, Xt, downsample_factor=4):
             """
             #TODO 2025-12-11 18:28: - [ ] This is the only one fast enough to be practicle, runs in about 4 minutes per decoder context (2 x session)
@@ -1149,49 +1150,60 @@ class PredictiveDecoding(ComputedResult): #PickleSerializableMixin, AttrsBasedCl
                 
             return emd_scores
 
-
-        def pdf_spatial_distances(_obj, a_p_x_given_n, xbin_centers, ybin_centers):
+        # a_computation_measure_name: str = 'dist_to_highest_peak'
+        def _subfn_pdf_spatial_distances(_obj, a_p_x_given_n, xbin_centers, ybin_centers):
             """
-            Computes the Euclidean distance between the spatial centers of two 2D positional
-            probability distributions (_obj.gaussian_volume vs a_p_x_given_n) for all timestamps.
-
-            Args:
-                _obj.gaussian_volume : np.ndarray, shape (H, W, T)
-                    Reference 2D PDFs over timestamps.
-                a_p_x_given_n : np.ndarray, shape (H, W, T)
-                    Comparison 2D PDFs over timestamps.
-                xbin_centers : np.ndarray, shape (H,)
-                    x-axis bin centers.
-                ybin_centers : np.ndarray, shape (W,)
-                    y-axis bin centers.
-
-            Returns:
-                distances_spatial : np.ndarray, shape (T,)
-                    Euclidean distance between the expected positions of the two PDFs for each timestamp.
+            Computes the Euclidean distance between the expected positions (COM) of 
+            two 2D probability distributions using vectorized weighted averages.
             """
+            # 1. Get Shapes
+            # Assuming shape is (Rows/H, Cols/W, Time)
+            pdf_obj = _obj.gaussian_volume
+            pdf_cmp = a_p_x_given_n
+            
+            # 2. Calculate Marginals to simplify COM calculation
+            # Sum over columns (axis 1) to get mass distribution along rows (Height/x_bins)
+            # Shape becomes (H, T)
+            marg_x_obj = np.sum(pdf_obj, axis=1)
+            marg_x_cmp = np.sum(pdf_cmp, axis=1)
 
-            H, W, T = _obj.gaussian_volume.shape
+            # Sum over rows (axis 0) to get mass distribution along columns (Width/y_bins)
+            # Shape becomes (W, T)
+            marg_y_obj = np.sum(pdf_obj, axis=0)
+            marg_y_cmp = np.sum(pdf_cmp, axis=0)
 
-            # Compute center-of-mass in pixel coordinates for all timestamps
-            com_obj = np.array([center_of_mass(_obj.gaussian_volume[:, :, t]) for t in range(T)])  # (T,2)
-            com_a   = np.array([center_of_mass(a_p_x_given_n[:, :, t]) for t in range(T)])          # (T,2)
+            # 3. Compute Expected Position (Weighted Average of Bin Centers)
+            # Formula: Sum(Probability * Value) / Sum(Probability)
+            
+            # reshape centers for broadcasting: (H, 1) * (H, T) -> sum -> (T,)
+            denom_x_obj = np.sum(marg_x_obj, axis=0)
+            # Handle division by zero if a timebin has all-zeros
+            denom_x_obj[denom_x_obj == 0] = 1.0 
+            
+            x_obj = np.sum(marg_x_obj * xbin_centers[:, np.newaxis], axis=0) / denom_x_obj
+            
+            # Repeat for Comparison Object
+            denom_x_cmp = np.sum(marg_x_cmp, axis=0)
+            denom_x_cmp[denom_x_cmp == 0] = 1.0
+            x_cmp = np.sum(marg_x_cmp * xbin_centers[:, np.newaxis], axis=0) / denom_x_cmp
 
-            # Map pixel indices to actual bin coordinates
-            x_obj = xbin_centers[np.clip(np.round(com_obj[:,0]).astype(int), 0, H-1)]
-            y_obj = ybin_centers[np.clip(np.round(com_obj[:,1]).astype(int), 0, W-1)]
+            # Repeat for Y (Width)
+            denom_y_obj = np.sum(marg_y_obj, axis=0)
+            denom_y_obj[denom_y_obj == 0] = 1.0
+            y_obj = np.sum(marg_y_obj * ybin_centers[:, np.newaxis], axis=0) / denom_y_obj
 
-            x_a = xbin_centers[np.clip(np.round(com_a[:,0]).astype(int), 0, H-1)]
-            y_a = ybin_centers[np.clip(np.round(com_a[:,1]).astype(int), 0, W-1)]
+            denom_y_cmp = np.sum(marg_y_cmp, axis=0)
+            denom_y_cmp[denom_y_cmp == 0] = 1.0
+            y_cmp = np.sum(marg_y_cmp * ybin_centers[:, np.newaxis], axis=0) / denom_y_cmp
 
-            # Euclidean distance per timestamp
-            distances_spatial = np.sqrt((x_obj - x_a)**2 + (y_obj - y_a)**2)
+            # 4. Euclidean Distance
+            distances_spatial = np.sqrt((x_obj - x_cmp)**2 + (y_obj - y_cmp)**2)
 
-            max_possible_distance: float = np.sqrt(np.ptp(xbin_centers)**2 + np.ptp(ybin_centers)**2)
+            # 5. Max distance (Diagonal of the ROI)
+            max_possible_distance = np.sqrt(np.ptp(xbin_centers)**2 + np.ptp(ybin_centers)**2)
             distances_spatial_frac_max = distances_spatial / max_possible_distance
             
             return distances_spatial, distances_spatial_frac_max
-
-        distances_spatial, distances_spatial_frac_max = pdf_spatial_distances(_obj=_obj, a_p_x_given_n=a_p_x_given_n, xbin_centers = _obj.xbin_centers, ybin_centers = _obj.ybin_centers)
 
         # active_subfn_compute_earthmovers_fn = _subfn_calculate_spatial_emd # #TODO 2025-12-11 17:53: - [ ] TOO SLOW
         # active_subfn_compute_earthmovers_fn = _subfn_calculate_sinkhorn_distance
@@ -1245,17 +1257,21 @@ class PredictiveDecoding(ComputedResult): #PickleSerializableMixin, AttrsBasedCl
 
             # self.decoding_meas_pos_locality_measure_dict[an_epoch_name] = np.array([_subfn_calculate_spatial_emd(self.gaussian_volume[:, :, a_timestamp_idx], a_p_x_given_n[:, :, a_timestamp_idx]) for a_timestamp_idx in np.arange(num_timestamps)])
 
-            self.decoding_meas_pos_locality_measure_dict[an_epoch_name] = active_subfn_compute_earthmovers_fn(self.gaussian_volume, a_p_x_given_n)
+
+            # ==================================================================================================================================================================================================================================================================================== #
+            # do all computation measures                                                                                                                                                                                                                                                          #
+            # ==================================================================================================================================================================================================================================================================================== #
 
             ## do all computation measures
             a_computation_measure_name: str = 'mask_overlap'
+            print(f'\tcomputing: "{a_computation_measure_name}"...')
             ## above a certain promence ideally:
             min_val_epsilon: float = 1e-9
             is_high_prob_mask = (a_p_x_given_n > min_val_epsilon)
             self.locality_measures_dict_dict[an_epoch_name][a_computation_measure_name] = ((self.gaussian_volume * is_high_prob_mask) > min_val_epsilon).astype(int) ## the "overlap" is computed by taking the elementwise dot-product with the moving average
 
-
             # a_computation_measure_name: str = 'peak_prom'
+            # print(f'\tcomputing: "{a_computation_measure_name}"...')
             # ## above a certain promence ideally:
             # min_val_epsilon: float = 1e-9
             # is_high_prob_mask = (a_p_x_given_n > min_val_epsilon)
@@ -1263,25 +1279,31 @@ class PredictiveDecoding(ComputedResult): #PickleSerializableMixin, AttrsBasedCl
 
 
             a_computation_measure_name: str = 'dist_to_highest_peak'
+            print(f'\tcomputing: "{a_computation_measure_name}"...')
             ## above a certain promence ideally:
             # peak_locations = np.argmax(a_p_x_given_n, axis=(0, 1))
-            distances_spatial, distances_spatial_frac_max = pdf_spatial_distances(_obj=self, a_p_x_given_n=a_p_x_given_n, xbin_centers = self.xbin_centers, ybin_centers = self.ybin_centers)
-
+            distances_spatial, distances_spatial_frac_max = _subfn_pdf_spatial_distances(_obj=self, a_p_x_given_n=a_p_x_given_n, xbin_centers=self.xbin_centers, ybin_centers=self.ybin_centers)
             self.locality_measures_dict_dict[an_epoch_name][a_computation_measure_name] = distances_spatial_frac_max ## the "overlap" is computed by taking the elementwise dot-product with the moving average
             
 
             # a_computation_measure_name: str = 'dist_to_nearest_peak'
+            # print(f'\tcomputing: "{a_computation_measure_name}"...')
             # ## above a certain promence ideally:
             # min_val_epsilon: float = 1e-9
             # is_high_prob_mask = (a_p_x_given_n > min_val_epsilon)
             # self.locality_measures_dict_dict[an_epoch_name][a_computation_measure_name] = ((self.gaussian_volume * is_high_prob_mask) > min_val_epsilon).astype(int) ## the "overlap" is computed by taking the elementwise dot-product with the moving average
 
 
+            a_computation_measure_name: str = 'earthmovers'
+            print(f'\tcomputing: "{a_computation_measure_name}"...')
+            self.decoding_meas_pos_locality_measure_dict[an_epoch_name] = active_subfn_compute_earthmovers_fn(self.gaussian_volume, a_p_x_given_n)
+            self.locality_measures_dict_dict[an_epoch_name][a_computation_measure_name] =  self.decoding_meas_pos_locality_measure_dict[an_epoch_name]
+
 
 
 
         ## END for an_epoch_idx, an_epoch_n...
-
+        print(f'done with compute.')
 
         ## OUTPUTS: _a_moving_avg_dict, _a_moving_avg_meas_pos_overlap_dict
         return self.moving_avg_dict, self.moving_avg_meas_pos_overlap_dict, self.gaussian_volume
