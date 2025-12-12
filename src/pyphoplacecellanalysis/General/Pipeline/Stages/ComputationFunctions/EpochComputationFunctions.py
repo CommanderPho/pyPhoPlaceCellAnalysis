@@ -77,9 +77,11 @@ class ComputeGlobalEpochBase(ComputedResult):
     Extracted from `Compute_NonPBE_Epochs` on 2025-06-30 07:40  
 
     """
-    _VersionedResultMixin_version: str = "2025.06.30_0" # to be updated in your IMPLEMENTOR to indicate its version
+    _VersionedResultMixin_version: str = "2025.12.12_0" # to be updated in your IMPLEMENTOR to indicate its version
 
     single_global_epoch_df: pd.DataFrame = serialized_field()
+    active_result_epoch_name: str = serialized_attribute_field(default='global', metadata={'field_added': "2025.12.12_0"})
+    
 
     @property
     def frame_divide_bin_size(self) -> float:
@@ -405,6 +407,16 @@ class ComputeGlobalEpochBase(ComputedResult):
         # Restore instance attributes (i.e., _mapping and _keys_at_init).
         # For `VersionedResultMixin`
         self._VersionedResultMixin__setstate__(state)
+        
+        result_version: str = state.get('result_version', None)
+        if result_version is None:
+            result_version = "2025.07.23_0"
+            state['result_version'] = result_version
+        
+        # Add defaults for new fields based on version
+        if self.is_result_version_earlier_than("2025.12.12_0"):
+            state['active_result_epoch_name'] = 'global'  # or appropriate default
+
 
         # _non_pickled_field_restore_defaults = dict(zip(['curr_active_pipeline', 'track_templates'], [None, None]))
         # for a_field_name, a_default_restore_value in _non_pickled_field_restore_defaults.items():
@@ -414,6 +426,7 @@ class ComputeGlobalEpochBase(ComputedResult):
         self.__dict__.update(state)
         # # Call the superclass __init__() (from https://stackoverflow.com/a/48325758)
         # super(WCorrShuffle, self).__init__() # from
+
 
     def __repr__(self):
         """ 2024-01-11 - Renders only the fields and their sizes
@@ -467,7 +480,7 @@ class DecodingResultND(UnpackableMixin, ComputedResult):
 
 
     """
-    _VersionedResultMixin_version: str = "2025.06.30_0" # to be updated in your IMPLEMENTOR to indicate its version
+    _VersionedResultMixin_version: str = "2025.12.12_0" # to be updated in your IMPLEMENTOR to indicate its version
     
     ndim: int = serialized_attribute_field()  # 1 or 2
     pos_df: pd.DataFrame = serialized_field()
@@ -481,13 +494,21 @@ class DecodingResultND(UnpackableMixin, ComputedResult):
     frame_divided_epochs_df: pd.DataFrame = serialized_field(metadata={'desc': 'used for rendering a series of successive 2D decoded posteriors as "frames" on a 1D timeline.'})
     frame_divided_epochs_results: Dict[types.DecoderName, DecodedFilterEpochsResult] = serialized_field(metadata={'desc': 'used for rendering a series of successive 2D decoded posteriors as "frames" on a 1D timeline.'})
 
+    active_result_epoch_name: str = serialized_attribute_field(default='global', metadata={'field_added': "2025.12.12_0"})
+
+
     @property
     def a_result2D(self) -> DecodedFilterEpochsResult:
-        return self.frame_divided_epochs_results['global']
+        return self.frame_divided_epochs_results[self.active_result_epoch_name]
+    
+
+    @property
+    def a_result2D(self) -> DecodedFilterEpochsResult:
+        return self.frame_divided_epochs_results[self.active_result_epoch_name]
 
     @property
     def a_new_global2D_decoder(self) -> BasePositionDecoder:
-        return self.decoders['global']
+        return self.decoders[self.active_result_epoch_name]
 
     def __attrs_post_init__(self):
         assert self.ndim in (1, 2), f"ndim must be 1 or 2, got {self.ndim}"
@@ -525,6 +546,16 @@ class DecodingResultND(UnpackableMixin, ComputedResult):
         # for a_field_name, a_default_restore_value in _non_pickled_field_restore_defaults.items():
         #     if a_field_name not in state:
         #         state[a_field_name] = a_default_restore_value
+
+        result_version: str = state.get('result_version', None)
+        if result_version is None:
+            result_version = "2025.07.23_0"
+            state['result_version'] = result_version
+        
+        # Add defaults for new fields based on version
+        if self.is_result_version_earlier_than("2025.12.12_0"):
+            state['active_result_epoch_name'] = 'global'  # or appropriate default
+
 
         self.__dict__.update(state)
         # # Call the superclass __init__() (from https://stackoverflow.com/a/48325758)

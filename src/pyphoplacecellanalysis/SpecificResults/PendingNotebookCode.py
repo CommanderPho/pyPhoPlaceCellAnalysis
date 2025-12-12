@@ -689,6 +689,9 @@ class PredictiveDecoding(ComputedResult): #PickleSerializableMixin, AttrsBasedCl
             Returns: array of spatial EMD (Earth Mover's Distance) for each timestamp.
 
             Captures nothing:
+
+            #TODO 2025-12-11 18:13: - [ ] WAY too slow, like 10hrs to run for 10k timestamps
+            
             """
             rows, cols, T = Xs.shape
             
@@ -737,6 +740,8 @@ class PredictiveDecoding(ComputedResult): #PickleSerializableMixin, AttrsBasedCl
                 Larger (e.g. 1.0) = Faster, but blurrier (less accurate).
                 Smaller (e.g. 0.01) = Slower, closer to exact EMD.
                 0.1 is a good starting point for maze data.
+                
+            #TODO 2025-12-11 18:13: - [ ] also way too slow, like 2hrs to run for 10k timestamps
             """
             x_bins, y_bins, T = Xs.shape
             
@@ -771,8 +776,11 @@ class PredictiveDecoding(ComputedResult): #PickleSerializableMixin, AttrsBasedCl
 
 
 
-        def _subfn_calculate_sliced_wasserstein_correct(Xs, Xt, n_projections=50, seed=42):
+        def _subfn_calculate_sliced_wasserstein_correct(Xs, Xt, n_projections=50, seed=1337):
             """ fastest but least precise. 
+
+            #TODO 2025-12-11 18:13: - [ ] also way too slow, like 1 hr to run for 10k timestamps
+
             """
             x_bins, y_bins, T = Xs.shape
             
@@ -819,9 +827,50 @@ class PredictiveDecoding(ComputedResult): #PickleSerializableMixin, AttrsBasedCl
             return swd_dists
 
 
+        import scipy.ndimage
+
+        def _subfn_calculate_spatial_emd_fast(Xs, Xt, downsample_factor=2):
+            # 1. Downsample the input arrays (Average pooling)
+            # This reduces 41x63 -> ~20x31
+            # We slice [::factor] to skip, or use block_reduce for true averaging
+            # Simple slicing is often sufficient for speed
+            Xs_small = Xs[::downsample_factor, ::downsample_factor, :]
+            Xt_small = Xt[::downsample_factor, ::downsample_factor, :]
+            
+            # Scale the coordinates so the result implies the ORIGINAL bin units
+            scale = downsample_factor 
+            
+            rows, cols, T = Xs_small.shape
+            
+            # 2. Setup scaled grid
+            xx, yy = np.meshgrid(np.arange(cols), np.arange(rows))
+            # Multiply by scale so the distance is still in "Original Bins"
+            coords = np.column_stack((xx.ravel(), yy.ravel())).astype(np.float64) * scale
+            
+            M = ot.dist(coords, coords, metric='euclidean')
+            emd_scores = np.zeros(T)
+
+            for t in tqdm(range(T), desc="Fast EMD"):
+                a = Xs_small[:, :, t].ravel()
+                b = Xt_small[:, :, t].ravel()
+                
+                sum_a, sum_b = a.sum(), b.sum()
+                if sum_a < 1e-9 or sum_b < 1e-9:
+                    emd_scores[t] = np.nan
+                    continue
+                    
+                a /= sum_a
+                b /= sum_b
+                
+                emd_scores[t] = ot.emd2(a, b, M)
+                
+            return emd_scores
+
+
         # active_subfn_compute_earthmovers_fn = _subfn_calculate_spatial_emd # #TODO 2025-12-11 17:53: - [ ] TOO SLOW
         # active_subfn_compute_earthmovers_fn = _subfn_calculate_sinkhorn_distance
-        active_subfn_compute_earthmovers_fn = _subfn_calculate_sliced_wasserstein_correct
+        # active_subfn_compute_earthmovers_fn = _subfn_calculate_sliced_wasserstein_correct
+        active_subfn_compute_earthmovers_fn = _subfn_calculate_spatial_emd_fast
 
         # ==================================================================================================================================================================================================================================================================================== #
         # BEGIN FUNCTION BODY                                                                                                                                                                                                                                                                  #
