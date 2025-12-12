@@ -104,7 +104,7 @@ def _post_hoc_layout_resize(active_2d_plot, desired_static_area_height: Optional
 
 
 @function_attributes(short_name=None, tags=['2024-12-18', 'ACTIVE', 'gui', 'debugging', 'continuous'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-12-18 19:29', related_items=[])
-def _setup_spike_raster_window_for_debugging(spike_raster_window, wants_docked_raster_window_track:bool=False, enable_interval_overview_track:bool=False, allow_replace_hardcoded_main_plots_with_tracks: bool = False, debug_print=False, additional_post_hoc_fcns: Dict[str, Any]=None):
+def _setup_spike_raster_window_for_debugging(spike_raster_window, wants_docked_raster_window_track:bool=False, enable_interval_overview_track:bool=False, allow_replace_hardcoded_main_plots_with_tracks: bool = False, debug_print=False, additional_post_hoc_fcns: Dict[str, Any]=None, enable_overview_indicator_trapazoids: bool=False):
     """ Called to setup a specific `spike_raster_window` instance for 2024-12-18 style debugging.
     
     
@@ -122,6 +122,7 @@ def _setup_spike_raster_window_for_debugging(spike_raster_window, wants_docked_r
         all_global_menus_actionsDict, global_flat_action_dict = _setup_spike_raster_window_for_debugging(spike_raster_window)
 
     """
+
     import pyphoplacecellanalysis.External.pyqtgraph as pg
     from PyQt5.QtWidgets import QAbstractScrollArea
     from PyQt5.QtWidgets import QSizePolicy
@@ -350,8 +351,14 @@ def _setup_spike_raster_window_for_debugging(spike_raster_window, wants_docked_r
         if debug_print:
             print(f'_subfn_META_RUN_ALL_BACKGROUND_FCNS():')
 
-        background_fns_dict = dict(zip(["_subfn_add_additional_plots", "_subfn_trigger_add_intervals_menu_commands", "_subfn_trigger_add_time_curve_menu_commands", '_subfn_add_overview_indicator_trapazoids_to_timeline', "_subfn_run_additional_post_hoc_fcns"], [_subfn_add_additional_plots, _subfn_trigger_add_intervals_menu_commands, _subfn_trigger_add_time_curve_menu_commands, _subfn_add_overview_indicator_trapazoids_to_timeline, _subfn_run_additional_post_hoc_fcns]))
+        background_fns_dict = dict(zip(["_subfn_add_additional_plots", "_subfn_trigger_add_intervals_menu_commands", "_subfn_trigger_add_time_curve_menu_commands", "_subfn_run_additional_post_hoc_fcns"], [_subfn_add_additional_plots, _subfn_trigger_add_intervals_menu_commands, _subfn_trigger_add_time_curve_menu_commands, _subfn_run_additional_post_hoc_fcns]))
+
+        if enable_overview_indicator_trapazoids:
+            background_fns_dict['_subfn_add_overview_indicator_trapazoids_to_timeline'] = _subfn_add_overview_indicator_trapazoids_to_timeline
+
+
         for a_fn_name, a_fn in background_fns_dict.items():
+
             print(f'\trunning BACKGROUND fn: {a_fn_name}...')
             try:
                 # a_fn()
