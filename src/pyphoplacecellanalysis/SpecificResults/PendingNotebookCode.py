@@ -826,7 +826,57 @@ class PredictiveDecoding(ComputedResult): #PickleSerializableMixin, AttrsBasedCl
 
 
     @function_attributes(short_name=None, tags=['normalization', 'locality', 'overlap'], input_requires=[], output_provides=[], uses=['self.compute_locality'], used_by=[], creation_date='2025-12-11 17:03', related_items=[])
-    def build_normalized_outputs(self, epoch_names: List[str], sigma: float = 1.0):
+    def build_normalized_outputs(self, epoch_names: List[str]):
+        """ Normalize: self.p_x_given_n_dict and self.moving_avg over the decoer time period ('sprinkle', 'roam')
+
+        Normalize and convolve each new_position 2D point (x, y) with a fixed width 2D gaussian
+        
+        Updates: self.
+            .moving_avg_dict, .moving_avg_meas_pos_overlap_dict, .gaussian_volume, .decoding_meas_pos_locality_measure_dict
+        """
+        def _subfn_renormalize_marginal(a_moving_avg):
+            # np.shape(a_moving_avg)
+            ## renormalize over context:
+            norm_sums = np.nansum(a_moving_avg, axis=(0, 1))
+            is_nonzero = np.nonzero(norm_sums)
+            for a_nonzero_idx in is_nonzero:
+                a_moving_avg[:, :, a_nonzero_idx] = a_moving_avg[:, :, a_nonzero_idx] / norm_sums[a_nonzero_idx]
+            return a_moving_avg
+
+
+        # ==================================================================================================================================================================================================================================================================================== #
+        # BEGIN FUNCTION BODY                                                                                                                                                                                                                                                                  #
+        # ==================================================================================================================================================================================================================================================================================== #
+
+        ## INPUTS: quantities to renormalize
+        self.moving_avg_dict = {}
+        self.p_x_given_n_dict = {}
+
+        ## related outputs to clear:
+        self.moving_avg_meas_pos_overlap_dict = {}
+
+        # for an_epoch_idx, (an_epoch_name, a_plotter) in enumerate(sync_plotters.items()):
+        for an_epoch_idx, an_epoch_name in enumerate(epoch_names):
+            ## "epoch" in the loop variables refers to only the session.paradigm epochs, like ['roam', 'sprinkle']
+
+            a_p_x_given_n = deepcopy(np.squeeze(self.p_x_given_n[:, :, an_epoch_idx, :]))
+            a_p_x_given_n = _subfn_renormalize_marginal(a_p_x_given_n)
+            self.p_x_given_n_dict[an_epoch_name] = a_p_x_given_n
+
+
+            a_moving_avg = deepcopy(np.squeeze(self.moving_avg[:, :, an_epoch_idx, :]))
+            a_moving_avg = _subfn_renormalize_marginal(a_moving_avg)
+            self.moving_avg_dict[an_epoch_name] = a_moving_avg
+
+        ## END for an_epoch_idx, an_epoch_n...
+
+
+        ## OUTPUTS: _a_moving_avg_dict, _a_moving_avg_meas_pos_overlap_dict
+        return self.moving_avg_dict, self.moving_avg_meas_pos_overlap_dict
+    
+
+    @function_attributes(short_name=None, tags=['normalization', 'locality', 'overlap'], input_requires=[], output_provides=[], uses=['self.compute_locality'], used_by=[], creation_date='2025-12-11 17:03', related_items=[])
+    def compute(self, epoch_names: List[str], sigma: float = 1.0):
         """ Normalize: self.p_x_given_n_dict and self.moving_avg over the decoer time period ('sprinkle', 'roam')
 
         Normalize and convolve each new_position 2D point (x, y) with a fixed width 2D gaussian
@@ -839,18 +889,6 @@ class PredictiveDecoding(ComputedResult): #PickleSerializableMixin, AttrsBasedCl
 
         from scipy.spatial.distance import cdist
         from scipy.optimize import linear_sum_assignment
-
-        def _subfn_renormalize(a_moving_avg):
-            # np.shape(a_moving_avg)
-            ## renormalize over context:
-            norm_sums = np.nansum(a_moving_avg, axis=(0, 1))
-            is_nonzero = np.nonzero(norm_sums)
-            for a_nonzero_idx in is_nonzero:
-                a_moving_avg[:, :, a_nonzero_idx] = a_moving_avg[:, :, a_nonzero_idx] / norm_sums[a_nonzero_idx]
-            return a_moving_avg
-
-
-
 
         def _subfn_calculate_spatial_emd(Xs, Xt):
             """
@@ -900,9 +938,6 @@ class PredictiveDecoding(ComputedResult): #PickleSerializableMixin, AttrsBasedCl
 
             return emd_scores
 
-
-        
-
         def _subfn_calculate_sinkhorn_distance(Xs, Xt, reg=0.1):
             """
             reg: Regularization term. 
@@ -942,8 +977,6 @@ class PredictiveDecoding(ComputedResult): #PickleSerializableMixin, AttrsBasedCl
                 sinkhorn_dists[t] = ot.sinkhorn2(a, b, M, reg)
 
             return sinkhorn_dists
-
-
 
         def _subfn_calculate_sliced_wasserstein_correct(Xs, Xt, n_projections=50, seed=1337):
             """ fastest but least precise. 
@@ -996,7 +1029,7 @@ class PredictiveDecoding(ComputedResult): #PickleSerializableMixin, AttrsBasedCl
             return swd_dists
 
 
-        import scipy.ndimage
+        
 
 
         def _subfn_calculate_spatial_emd_fast(Xs, Xt, downsample_factor=4):
@@ -1004,6 +1037,7 @@ class PredictiveDecoding(ComputedResult): #PickleSerializableMixin, AttrsBasedCl
             #TODO 2025-12-11 18:28: - [ ] This is the only one fast enough to be practicle, runs in about 4 minutes per decoder context (2 x session)
             
             """
+            import scipy.ndimage
             # 1. Downsample the input arrays (Average pooling)
             # This reduces 41x63 -> ~20x31
             # We slice [::factor] to skip, or use block_reduce for true averaging
@@ -1050,26 +1084,18 @@ class PredictiveDecoding(ComputedResult): #PickleSerializableMixin, AttrsBasedCl
         # BEGIN FUNCTION BODY                                                                                                                                                                                                                                                                  #
         # ==================================================================================================================================================================================================================================================================================== #
 
-        ## INPUTS: gaussian_volume
-        self.moving_avg_dict = {}
-        self.moving_avg_meas_pos_overlap_dict = {}
-        self.p_x_given_n_dict = {}
-
-
         self.gaussian_volume = self._build_sampled_pos_with_gaussian_spread(sigma=sigma)
+        _out = self.build_normalized_outputs(epoch_names=epoch_names)
+
+        ## INPUTS: gaussian_volume
+        self.moving_avg_meas_pos_overlap_dict = {}
 
         # for an_epoch_idx, (an_epoch_name, a_plotter) in enumerate(sync_plotters.items()):
         for an_epoch_idx, an_epoch_name in enumerate(epoch_names):
             ## "epoch" in the loop variables refers to only the session.paradigm epochs, like ['roam', 'sprinkle']
 
-            a_p_x_given_n = deepcopy(np.squeeze(self.p_x_given_n[:, :, an_epoch_idx, :]))
-            a_p_x_given_n = _subfn_renormalize(a_p_x_given_n)
-            self.p_x_given_n_dict[an_epoch_name] = a_p_x_given_n
-
-
-            a_moving_avg = deepcopy(np.squeeze(self.moving_avg[:, :, an_epoch_idx, :]))
-            a_moving_avg = _subfn_renormalize(a_moving_avg)
-            self.moving_avg_dict[an_epoch_name] = a_moving_avg
+            a_p_x_given_n = self.p_x_given_n_dict[an_epoch_name]
+            a_moving_avg = self.moving_avg_dict[an_epoch_name]
 
             ## compute the overlap measures:            
             self.moving_avg_meas_pos_overlap_dict[an_epoch_name] = (self.gaussian_volume * a_moving_avg) ## the "overlap" is computed by taking the elementwise dot-product with the moving average
