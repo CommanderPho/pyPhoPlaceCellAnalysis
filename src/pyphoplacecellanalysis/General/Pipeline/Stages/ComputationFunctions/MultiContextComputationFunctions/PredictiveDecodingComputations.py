@@ -22,6 +22,8 @@ from neuropy.utils.misc import build_shuffled_ids, shuffle_ids # used in _SHELL_
 from neuropy.utils.mixins.binning_helpers import find_minimum_time_bin_duration
 from neuropy.core.epoch import find_data_indicies_from_epoch_times
 from neuropy.utils.result_context import IdentifyingContext
+from neuropy.utils.efficient_interval_search import OverlappingIntervalsFallbackBehavior, determine_event_interval_identity, determine_event_interval_is_included # numba acceleration
+from neuropy.utils.mixins.time_slicing import TimePointEventAccessor
 
 from neuropy.utils.misc import build_shuffled_ids # used in _SHELL_analyze_leave_one_out_decoding_results
 
@@ -68,7 +70,7 @@ class DecodingLocalityMeasures(ComputedResult): #PickleSerializableMixin, AttrsB
     Usage:
 
         from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.PredictiveDecodingComputations import DecodingLocalityMeasures, PredictiveDecoding
-
+        
         decoding_locality_measures: DecodingLocalityMeasures = DecodingLocalityMeasures.init_from_decode_result(curr_active_pipeline=curr_active_pipeline, directional_decoders_decode_result=directional_decoders_decode_result, extant_decoded_time_bin_size=0.25)
         decoding_locality_measures.compute() ## ~30 seconds
         decoding_locality_measures
@@ -85,7 +87,9 @@ class DecodingLocalityMeasures(ComputedResult): #PickleSerializableMixin, AttrsB
     p_x_given_n: NDArray[ND.Shape["N_X_BINS, N_Y_BINS, 2, N_TIME_BINS"], np.floating] = serialized_field()
     epoch_names: List[str] = serialized_field(default=Factory(list))
     _interpolator: interp1d = non_serialized_field(default=None, is_computable=False)
+    paradigm_epochs_df: pd.DataFrame = serialized_field()
     
+
     ## computed
     new_positions: NDArray[ND.Shape["N_TIME_BINS, 2"], np.floating] = serialized_field()
     
@@ -164,11 +168,16 @@ class DecodingLocalityMeasures(ComputedResult): #PickleSerializableMixin, AttrsB
         # new_positions
         p_x_given_n = deepcopy(a_result_decoded.p_x_given_n)
         epoch_names: List[str] = list(directional_decoders_decode_result.pf1D_Decoder_dict.keys())
+        # decoding_locality_measures.epoch_names
+        paradigm_epochs_df = deepcopy(curr_active_pipeline.sess.epochs.to_dataframe())
+        paradigm_epochs_df = paradigm_epochs_df.epochs.label_slice(epoch_names)
 
         _obj = cls(time_window_centers=time_window_centers, pos_df=deepcopy(pos_df),
                    xbin=deepcopy(directional_decoders_decode_result.pseudo2D_decoder.xbin), ybin=deepcopy(directional_decoders_decode_result.pseudo2D_decoder.ybin),
                    xbin_centers=deepcopy(directional_decoders_decode_result.pseudo2D_decoder.xbin_centers), ybin_centers=deepcopy(directional_decoders_decode_result.pseudo2D_decoder.ybin_centers),
-                   new_positions=new_positions, interpolator=interpolator, p_x_given_n=deepcopy(p_x_given_n), epoch_names=epoch_names, sigma=sigma)
+                   new_positions=new_positions, interpolator=interpolator, p_x_given_n=deepcopy(p_x_given_n),
+                   paradigm_epochs_df=paradigm_epochs_df, epoch_names=epoch_names,
+                   sigma=sigma)
         return _obj
 
 
@@ -616,6 +625,7 @@ class DecodingLocalityMeasures(ComputedResult): #PickleSerializableMixin, AttrsB
         """ called to rebuild the final output df
         Updates: self.locality_measures_df,
         
+        ## Adds ['correct_paradigm_epoch', 'is_non_local_period', 'correct_paradigm_epoch'] columns
         
             ## show just hhe non-locqal periods
             non_local_locality_measures_df: pd.DataFrame = deepcopy(_out_locality_measures_df[_out_locality_measures_df['is_non_local_period']]).reset_index(drop=True)
@@ -643,26 +653,29 @@ class DecodingLocalityMeasures(ComputedResult): #PickleSerializableMixin, AttrsB
         # _out_locality_measures_df
         ## #TODO 2025-12-12 18:39: - [ ] Manually coded times for epochs ['roam', 'sprinkle'] -- fix setting proper epoch
 
-        ## - [ ] add the correct maze_id to know which maze decoder to use.  
-        _out_locality_measures_df['correct_paradigm_epoch'] = ''
+        ## - [ ] add the correct maze_id to know which maze decoder to use. Adds 'correct_paradigm_epoch' columns
+        _out_locality_measures_df = _out_locality_measures_df.time_point_event.adding_epochs_identity_column(epochs_df=self.paradigm_epochs_df, epoch_id_key_name='correct_paradigm_epoch', epoch_label_column_name='label', override_time_variable_name='t',
+                                                            no_interval_fill_value='', should_replace_existing_column=True, drop_non_epoch_events=False, overlap_behavior=OverlappingIntervalsFallbackBehavior.FALLBACK_TO_SLOW_SEARCH)
+        
 
-        ## - [ ] use the various quantities for that maze to determine if it's non-local
-        roam_start = 7423.0
-        roam_stop = 10185.99999
+        
+        # _out_locality_measures_df['correct_paradigm_epoch'] = ''
 
-        sprinkle_start = 10186.0
-        sprinkle_stop = 11483.000000
+        # ## - [ ] use the various quantities for that maze to determine if it's non-local
+        # roam_start = 7423.0
+        # roam_stop = 10185.99999
 
-        _out_locality_measures_df.loc[np.logical_and((_out_locality_measures_df['t'].to_numpy() >= roam_start), (_out_locality_measures_df['t'] < roam_stop)), 'correct_paradigm_epoch'] = 'roam'
-        _out_locality_measures_df.loc[np.logical_and((_out_locality_measures_df['t'] >= sprinkle_start), (_out_locality_measures_df['t'] < sprinkle_stop)), 'correct_paradigm_epoch'] = 'sprinkle'
+        # sprinkle_start = 10186.0
+        # sprinkle_stop = 11483.000000
+
+        # _out_locality_measures_df.loc[np.logical_and((_out_locality_measures_df['t'].to_numpy() >= roam_start), (_out_locality_measures_df['t'] < roam_stop)), 'correct_paradigm_epoch'] = 'roam'
+        # _out_locality_measures_df.loc[np.logical_and((_out_locality_measures_df['t'] >= sprinkle_start), (_out_locality_measures_df['t'] < sprinkle_stop)), 'correct_paradigm_epoch'] = 'sprinkle'
+
 
         _out_locality_measures_df['is_non_local_period'] = False
 
-        # is_sprinkle = (_out_locality_measures_df['correct_paradigm_epoch'] == 'sprinkle')
-        # is_roam = (_out_locality_measures_df['correct_paradigm_epoch'] == 'roam')
-
         # an_epoch_name: str = 'sprinkle'
-        for an_epoch_name in ['sprinkle', 'roam']:
+        for an_epoch_name in self.epoch_names:
             is_epoch_idx = (_out_locality_measures_df['correct_paradigm_epoch'] == an_epoch_name)
             _out_locality_measures_df.loc[is_epoch_idx, 'is_non_local_period'] =  np.logical_and((_out_locality_measures_df[f'dist_to_highest_peak_{an_epoch_name}'][is_epoch_idx] >= 0.4), (_out_locality_measures_df[f'mask_overlap_{an_epoch_name}'][is_epoch_idx] < 0.1))
 
