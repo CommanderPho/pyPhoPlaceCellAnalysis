@@ -117,6 +117,75 @@ from pyphocorehelpers.assertion_helpers import Assert
 from pyphoplacecellanalysis.General.Model.Configs.LongShortDisplayConfig import DecoderIdentityColors, long_short_display_config_manager, apply_LR_to_RL_adjustment
 from pyphocorehelpers.gui.Qt.color_helpers import ColormapHelpers, ColorFormatConverter, debug_print_color, build_adjusted_color
 
+
+
+
+def _split_into_consequitive_sequences(df: pd.DataFrame, column_name: str='is_adjacent_epoch_bin') -> pd.DataFrame:
+    """splits a dataframe into consequtive/contiguous sequences of values
+
+
+    from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import _split_into_consequitive_sequences
+
+
+    """
+    last_start_idx = None
+    last_start_value = None
+    accumulated_run_tuples = []
+    
+    assert len(df) > 0
+    
+    # values = deepcopy(df[column_name])
+    
+    # for i, v in enumerate(values):
+
+    # values = deepcopy(df[column_name])
+    
+    column_names = list(df.columns)
+    
+    for i, row in enumerate(df.itertuples(index=True)):
+
+        row = row._asdict()
+        v = row[column_name]
+        # v_remainder = get_dict_subset(row, subset_excludelist=[column_name])
+        
+
+        if last_start_idx is None:
+            last_start_idx = i
+            last_start_value = v
+        else:
+            ## any case other than the first element
+            did_change: bool = (last_start_value != v)
+            if did_change:
+                ## change point detected, this is the last index included in this value then
+                accumulated_run_tuples.append((last_start_idx, (i-1), deepcopy(last_start_value)))
+                
+                ## start the new (next) series
+                last_start_idx = i
+                last_start_value = v
+                
+
+    ## END for i, v in enumerate(values)...
+
+    ## Close the last series if left open
+    if (accumulated_run_tuples[-1][0] != last_start_idx):
+        ## close the last series
+        accumulated_run_tuples.append((last_start_idx, (i-1), deepcopy(last_start_value)))
+
+    accumulated_run_tuples = pd.DataFrame.from_records(accumulated_run_tuples, columns=['start_idx', 'end_idx', 'value'])
+    accumulated_run_tuples['num_timesteps'] = accumulated_run_tuples['end_idx'] - accumulated_run_tuples['start_idx']
+
+    return accumulated_run_tuples
+
+
+
+
+
+
+
+
+
+
+
 @function_attributes(short_name=None, tags=['downsample', 'efficiency', 'speed-up', 'approximate', 'pdf', 'posterior'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-12-12 14:14', related_items=[])
 def approx_downsample_pdf(a_p_x_given_n, downsample_factor=4, xbin_centers=None, ybin_centers=None):
     """
