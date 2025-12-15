@@ -974,7 +974,7 @@ def build_bapun_all_epochs_df(curr_active_pipeline):
     return curr_paradigm_df
 
 
-@function_attributes(short_name=None, tags=['intervals', 'epochs'], uses=['build_bapun_all_epochs_df'], used_by=[], creation_date='2025-12-10 09:43', related_items=[])
+@function_attributes(short_name=None, tags=['intervals', 'epochs', 'SpikeRaster2D', 'rendering', 'bapun'], uses=['build_bapun_all_epochs_df'], used_by=[], creation_date='2025-12-10 09:43', related_items=[])
 def build_bapun_proper_epoch_intervals(curr_active_pipeline, active_2d_plot, y_location: float=-1.0, height: float = 0.9):
     """ adds the proper session epochs to the timeline
     

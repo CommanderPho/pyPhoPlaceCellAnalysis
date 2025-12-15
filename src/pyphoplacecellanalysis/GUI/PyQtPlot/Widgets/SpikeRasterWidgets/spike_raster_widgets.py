@@ -70,7 +70,7 @@ def _get_required_static_layout_height(active_2d_plot) -> float:
     return required_static_children_bounding_rect_height
 
     
-@function_attributes(short_name=None, tags=['resize'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-06-02 14:29', related_items=[])
+@function_attributes(short_name=None, tags=['resize'], input_requires=[], output_provides=[], uses=[], used_by=['_setup_spike_raster_window_for_debugging'], creation_date='2025-06-02 14:29', related_items=[])
 def _post_hoc_layout_resize(active_2d_plot, desired_static_area_height: Optional[float]=None):
     """ resizes the dynamic tracks to static area heights
     
@@ -103,7 +103,7 @@ def _post_hoc_layout_resize(active_2d_plot, desired_static_area_height: Optional
             main_content_splitter.setSizes(desired_sizes.tolist())
 
 
-@function_attributes(short_name=None, tags=['2024-12-18', 'ACTIVE', 'gui', 'debugging', 'continuous'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-12-18 19:29', related_items=[])
+@function_attributes(short_name=None, tags=['2024-12-18', 'ACTIVE', 'gui', 'debugging', 'continuous'], input_requires=[], output_provides=[], uses=['_post_hoc_layout_resize', '_get_required_static_layout_height'], used_by=[], creation_date='2024-12-18 19:29', related_items=[])
 def _setup_spike_raster_window_for_debugging(spike_raster_window, wants_docked_raster_window_track:bool=False, enable_interval_overview_track:bool=False, allow_replace_hardcoded_main_plots_with_tracks: bool = False, debug_print=False, additional_post_hoc_fcns: Dict[str, Any]=None, enable_overview_indicator_trapazoids: bool=False):
     """ Called to setup a specific `spike_raster_window` instance for 2024-12-18 style debugging.
     
@@ -128,7 +128,7 @@ def _setup_spike_raster_window_for_debugging(spike_raster_window, wants_docked_r
     from PyQt5.QtWidgets import QSizePolicy
     from pyphoplacecellanalysis.Pho2D.PyQtPlots.Extensions.pyqtgraph_helpers import block_until_render_complete
     from PyQt5.QtCore import QTimer
-    from pyphoplacecellanalysis.External.pyqtgraph_extensions.trapezoid_callout import TrapezoidOverlay
+    
 
 
     is_docked_pyqtgraph_plots_mode: bool = spike_raster_window.params.use_docked_pyqtgraph_plots
@@ -305,6 +305,7 @@ def _setup_spike_raster_window_for_debugging(spike_raster_window, wants_docked_r
     def _subfn_add_overview_indicator_trapazoids_to_timeline():
         """ captures: _all_outputs_dict, active_2d_plot, debug_print
         """
+        from pyphoplacecellanalysis.External.pyqtgraph_extensions.trapezoid_callout import TrapezoidOverlay
         if debug_print:
             print(f'_subfn_add_overview_indicator_trapazoids_to_timeline():')
 
