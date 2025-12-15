@@ -69,9 +69,9 @@ class DecodingLocalityMeasures(ComputedResult): #PickleSerializableMixin, AttrsB
 
         from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.PredictiveDecodingComputations import DecodingLocalityMeasures, PredictiveDecoding
 
-        epoch_names = list(sync_plotters.keys())
-        moving_avg_dict, moving_avg_meas_pos_overlap_dict, gaussian_volume = _obj.build_normalized_outputs(epoch_names=epoch_names, sigma=1.0)
-
+        decoding_locality_measures: DecodingLocalityMeasures = DecodingLocalityMeasures.init_from_decode_result(curr_active_pipeline=curr_active_pipeline, directional_decoders_decode_result=directional_decoders_decode_result, extant_decoded_time_bin_size=0.25)
+        decoding_locality_measures.compute() ## ~30 seconds
+        decoding_locality_measures
 
     """
     _VersionedResultMixin_version: str = "2025.12.15_0" # to be updated in your IMPLEMENTOR to indicate its version
@@ -86,22 +86,21 @@ class DecodingLocalityMeasures(ComputedResult): #PickleSerializableMixin, AttrsB
     epoch_names: List[str] = serialized_field(default=Factory(list))
     _interpolator: interp1d = non_serialized_field(default=None, is_computable=False)
     
-
     ## computed
     new_positions: NDArray[ND.Shape["N_TIME_BINS, 2"], np.floating] = serialized_field()
     
     ## one of these for each context (e.g. maze1, maze2 or ['roam', 'sprinkle'], etc
     sigma: Optional[float] = serialized_attribute_field(default=None, is_computable=True)
-    gaussian_volume: NDArray[ND.Shape["N_X_BINS, N_Y_BINS, N_TIME_BINS"], np.floating] = serialized_field(default=None)
+    gaussian_volume: NDArray[ND.Shape["N_X_BINS, N_Y_BINS, N_TIME_BINS"], np.floating] = serialized_field(default=None, is_computable=True)
 
-    p_x_given_n_dict: Dict[str, NDArray[ND.Shape["N_X_BINS, N_Y_BINS, N_TIME_BINS"], np.floating]] = serialized_field(default=Factory(dict))
+    p_x_given_n_dict: Dict[str, NDArray[ND.Shape["N_X_BINS, N_Y_BINS, N_TIME_BINS"], np.floating]] = serialized_field(default=None, is_computable=True)
 
     ## locality comparisons:
     # decoding_meas_pos_locality_measure_dict: Dict[str, NDArray[ND.Shape["N_TIME_BINS"], np.floating]] = serialized_field(default=Factory(dict))
     # Generic dict to store all computed measures - allows easy extension without adding new fields
-    locality_measures_dict_dict: Dict[str, Dict[str, Any]] = serialized_field(default=Factory(dict))
+    locality_measures_dict_dict: Dict[str, Dict[str, Any]] = serialized_field(default=Factory(dict), is_computable=True)
     
-    locality_measures_df: pd.DataFrame = serialized_field(default=Factory(pd.DataFrame), init=False)
+    locality_measures_df: pd.DataFrame = serialized_field(default=None, is_computable=True, init=False)
 
 
     def __attrs_post_init__(self):
@@ -113,9 +112,15 @@ class DecodingLocalityMeasures(ComputedResult): #PickleSerializableMixin, AttrsB
             self.sigma = np.nanmax([x_step, y_step]) * 5.0
             print(f'sigma: {self.sigma}')
             
-
+        print(f'building sampled and normalized outputs...')
         self._build_sampled_pos_with_gaussian_spread()
-        self.build_normalized_outputs()
+        
+        if (self.gaussian_volume is None):
+            self.gaussian_volume = self._build_sampled_pos_with_gaussian_spread()
+
+        if (self.p_x_given_n_dict is None) or (len(self.p_x_given_n_dict) == 0):
+            self.build_normalized_outputs()
+        print(f'done.')
 
 
     # @property
@@ -141,7 +146,7 @@ class DecodingLocalityMeasures(ComputedResult): #PickleSerializableMixin, AttrsB
     @classmethod
     def init_from_decode_result(cls, curr_active_pipeline, directional_decoders_decode_result, extant_decoded_time_bin_size: float = 0.25, sigma: Optional[float] = None) -> "DecodingLocalityMeasures":
         """ 
-        _obj: PredictiveDecoding = PredictiveDecoding.init_from_decode_result(
+        _obj: PredictiveDecoding = DecodingLocalityMeasures.init_from_decode_result(
         """
         a_result_decoded = directional_decoders_decode_result.continuously_decoded_pseudo2D_decoder_dict[extant_decoded_time_bin_size]
         # a_result_decoded.p_x_given_n # .shape (41, 63, 2, 103948) - (n_x_bins, n_y_bins, n_tasks, n_time_bins) 
@@ -163,7 +168,7 @@ class DecodingLocalityMeasures(ComputedResult): #PickleSerializableMixin, AttrsB
         _obj = cls(time_window_centers=time_window_centers, pos_df=deepcopy(pos_df),
                    xbin=deepcopy(directional_decoders_decode_result.pseudo2D_decoder.xbin), ybin=deepcopy(directional_decoders_decode_result.pseudo2D_decoder.ybin),
                    xbin_centers=deepcopy(directional_decoders_decode_result.pseudo2D_decoder.xbin_centers), ybin_centers=deepcopy(directional_decoders_decode_result.pseudo2D_decoder.ybin_centers),
-                   new_positions=new_positions, _interpolator=interpolator, p_x_given_n=deepcopy(p_x_given_n), epoch_names=epoch_names, sigma=sigma)
+                   new_positions=new_positions, interpolator=interpolator, p_x_given_n=deepcopy(p_x_given_n), epoch_names=epoch_names, sigma=sigma)
         return _obj
 
 
@@ -521,14 +526,18 @@ class DecodingLocalityMeasures(ComputedResult): #PickleSerializableMixin, AttrsB
         # active_subfn_compute_earthmovers_fn = _subfn_calculate_spatial_emd # #TODO 2025-12-11 17:53: - [ ] TOO SLOW
         # active_subfn_compute_earthmovers_fn = _subfn_calculate_sinkhorn_distance
         # active_subfn_compute_earthmovers_fn = _subfn_calculate_sliced_wasserstein_correct
-        active_subfn_compute_earthmovers_fn = _subfn_calculate_spatial_emd_fast
+        # active_subfn_compute_earthmovers_fn = _subfn_calculate_spatial_emd_fast
+        active_subfn_compute_earthmovers_fn = None
 
         # ==================================================================================================================================================================================================================================================================================== #
         # BEGIN FUNCTION BODY                                                                                                                                                                                                                                                                  #
         # ==================================================================================================================================================================================================================================================================================== #
 
-        self.gaussian_volume = self._build_sampled_pos_with_gaussian_spread(sigma=sigma)
-        _out = self.build_normalized_outputs()
+        if self.gaussian_volume is None:
+            self.gaussian_volume = self._build_sampled_pos_with_gaussian_spread()
+            
+        if (self.p_x_given_n_dict is None) or (len(self.p_x_given_n_dict) == 0):
+            _out = self.build_normalized_outputs()
 
         ## INPUTS: gaussian_volume
         self.locality_measures_dict_dict = {}
@@ -540,36 +549,13 @@ class DecodingLocalityMeasures(ComputedResult): #PickleSerializableMixin, AttrsB
             self.locality_measures_dict_dict[an_epoch_name] = {} ## empty
 
             a_p_x_given_n = self.p_x_given_n_dict[an_epoch_name]
-            a_moving_avg = self.moving_avg_dict[an_epoch_name]
-
-            ## compute the overlap measures:            
-            self.moving_avg_meas_pos_overlap_dict[an_epoch_name] = (self.gaussian_volume * a_moving_avg) ## the "overlap" is computed by taking the elementwise dot-product with the moving average
 
             ## compute the locality:
-            # X_s = self.gaussian_volume[:, :, a_timestamp_idx]
-            # X_t = self.moving_avg_dict['roam'][:, :, a_timestamp_idx]
-            # X_s = self.gaussian_volume
-            # X_t = a_p_x_given_n
-            # an_earthmovers_dist = ot.sliced.sliced_wasserstein_distance(X_s, X_t, a=None, b=None, n_projections=50, p=2, projections=None, seed=None, log=False) # for two adjacent timestamp's gaussian's, the dist is very small, like `9.552666541993098e-07`
-
             num_timestamps: int = np.shape(self.gaussian_volume)[-1]
             
-            # an_earthmovers_dist = []
-            # for a_timestamp_idx in np.arange(num_timestamps):
-            #     d = cdist(self.gaussian_volume[:, :, a_timestamp_idx], a_p_x_given_n[:, :, a_timestamp_idx])
-            #     assignment = linear_sum_assignment(d)
-            #     # an_earthmovers_dist.append(d[assignment].sum() / n) ## what is n?
-            #     an_earthmovers_dist.append(d[assignment].sum())
- 
-            # ## END for a_timestamp_idx in np.ar..
-            # an_earthmovers_dist = np.array(an_earthmovers_dist)
-
-            # self.decoding_meas_pos_locality_measure_dict[an_epoch_name] = an_earthmovers_dist
-
             # Final correct POM __________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
 
             # self.decoding_meas_pos_locality_measure_dict[an_epoch_name] = np.array([_subfn_calculate_spatial_emd(self.gaussian_volume[:, :, a_timestamp_idx], a_p_x_given_n[:, :, a_timestamp_idx]) for a_timestamp_idx in np.arange(num_timestamps)])
-
 
             # ==================================================================================================================================================================================================================================================================================== #
             # do all computation measures                                                                                                                                                                                                                                                          #
@@ -607,12 +593,11 @@ class DecodingLocalityMeasures(ComputedResult): #PickleSerializableMixin, AttrsB
             # self.locality_measures_dict_dict[an_epoch_name][a_computation_measure_name] = ((self.gaussian_volume * is_high_prob_mask) > min_val_epsilon).astype(int) ## the "overlap" is computed by taking the elementwise dot-product with the moving average
 
 
-            a_computation_measure_name: str = 'earthmovers'
-            print(f'\tcomputing: "{a_computation_measure_name}"...')
-            self.decoding_meas_pos_locality_measure_dict[an_epoch_name] = active_subfn_compute_earthmovers_fn(self.gaussian_volume, a_p_x_given_n)
-            self.locality_measures_dict_dict[an_epoch_name][a_computation_measure_name] =  self.decoding_meas_pos_locality_measure_dict[an_epoch_name]
-
-
+            if active_subfn_compute_earthmovers_fn is not None:
+                a_computation_measure_name: str = 'earthmovers'
+                print(f'\tcomputing: "{a_computation_measure_name}"...')
+                self.decoding_meas_pos_locality_measure_dict[an_epoch_name] = active_subfn_compute_earthmovers_fn(self.gaussian_volume, a_p_x_given_n)
+                self.locality_measures_dict_dict[an_epoch_name][a_computation_measure_name] =  self.decoding_meas_pos_locality_measure_dict[an_epoch_name]
 
 
         ## END for an_epoch_idx, an_epoch_n...
