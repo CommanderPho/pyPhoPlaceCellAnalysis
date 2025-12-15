@@ -919,7 +919,7 @@ def build_paired_time_synchronized_Bapun_decoder_with_lead_lag_window(curr_activ
     return _out_container
 
 
-from scipy.interpolate import interp1d
+
 from pyphoplacecellanalysis.Pho2D.PyQtPlots.TimeSynchronizedPlotters.TimeSynchronizedGenericPlotterLayer import TimeSynchronizedGenericPlotterLayer, LayerDisplayConfig
 from pyphoplacecellanalysis.General.Mixins.PickleSerializableMixin import PickleSerializableMixin
 from pyphoplacecellanalysis.General.Model.ComputationResults import ComputedResult
