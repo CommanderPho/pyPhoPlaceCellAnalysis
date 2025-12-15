@@ -1360,7 +1360,8 @@ def final_process_non_kdiba_all_comps(curr_active_pipeline, active_data_mode_nam
     ## INPUTS: basedir 
 
 
-    session_epochs: Epoch = BapunDataSessionFormatRegisteredClass.session_fixup_epochs(sess=curr_active_pipeline.sess)
+    # session_epochs: Epoch = BapunDataSessionFormatRegisteredClass.session_fixup_epochs(sess=curr_active_pipeline.sess)
+    session_epochs: Epoch = BapunDataSessionFormatRegisteredClass.session_fixup_epochs(sess=curr_active_pipeline.sess, override_extant=True)
     session_epochs
 
     curr_epoch_names: List[str] = curr_active_pipeline.sess.epochs.to_dataframe()['label'].to_list()
@@ -1422,6 +1423,23 @@ def final_process_non_kdiba_all_comps(curr_active_pipeline, active_data_mode_nam
     epochs_df = ensure_dataframe(deepcopy(curr_active_pipeline.sess.epochs))
 
     activity_only_epochs_df: pd.DataFrame = epochs_df[epochs_df['label'].isin(hardcoded_params.non_global_activity_session_names)].epochs.get_non_overlapping_df()
+    if len(activity_only_epochs_df) < len(hardcoded_params.non_global_activity_session_names):
+        print(f'issue with hardcoded_params.non_global_activity_session_names: {hardcoded_params.non_global_activity_session_names}')
+        activity_only_epochs_df: pd.DataFrame = epochs_df[epochs_df['label'].isin(hardcoded_params.non_global_activity_session_names)]
+        activity_only_epochs_df.loc[1, 'stop'] = activity_only_epochs_df.loc[2, 'start'] - 0.001
+        activity_only_epochs_df.loc[1, 'label'] = 'roam' 
+        activity_only_epochs_df['duration'] = activity_only_epochs_df['stop'] -  activity_only_epochs_df['start']
+        assert len(activity_only_epochs_df) == len(hardcoded_params.non_global_activity_session_names), f"len(activity_only_epochs_df): {len(activity_only_epochs_df)} != len(hardcoded_params.non_global_activity_session_names): {len(hardcoded_params.non_global_activity_session_names)}"
+        activity_only_epochs_df = activity_only_epochs_df.epochs.get_non_overlapping_df()
+        assert len(activity_only_epochs_df) == len(hardcoded_params.non_global_activity_session_names), f"post-activity_only_epochs_df.epochs.get_non_overlapping_df(): len(activity_only_epochs_df): {len(activity_only_epochs_df)} != len(hardcoded_params.non_global_activity_session_names): {len(hardcoded_params.non_global_activity_session_names)}"
+        ## override the bad sessions:
+        new_non_global_activity_session_names = ['roam', 'sprinkle']
+        print(f'overriding hardcoded_params.non_global_activity_session_names: {hardcoded_params.non_global_activity_session_names} -> new_non_global_activity_session_names: {new_non_global_activity_session_names}')
+        hardcoded_params.non_global_activity_session_names = new_non_global_activity_session_names
+        print('\tdone.')
+
+
+
     activity_only_epochs: Epoch = ensure_Epoch(activity_only_epochs_df, metadata=curr_active_pipeline.sess.epochs.metadata)
     curr_active_pipeline.sess.activity_only_epochs = deepcopy(activity_only_epochs)
 
@@ -1486,7 +1504,7 @@ def final_process_non_kdiba_all_comps(curr_active_pipeline, active_data_mode_nam
         # curr_active_pipeline.perform_computations(active_session_computation_configs[0], computation_functions_name_excludelist=['_perform_spike_burst_detection_computation', '_perform_velocity_vs_pf_density_computation', '_perform_velocity_vs_pf_simplified_count_density_computation']) # SpikeAnalysisComputations._perform_spike_burst_detection_computation
         # curr_active_pipeline.perform_computations(active_session_computation_configs[0], computation_functions_name_includelist=active_computation_functions_name_includelist, enabled_filter_names=activity_only_epoch_names, overwrite_extant_results=True, fail_on_exception=False, debug_print=True) # SpikeAnalysisComputations._perform_spike_burst_detection_computation
         curr_active_pipeline.perform_computations(a_config, computation_functions_name_includelist=active_computation_functions_name_includelist, enabled_filter_names=active_epoch_names, overwrite_extant_results=False, fail_on_exception=False, debug_print=True) # SpikeAnalysisComputations._perform_spike_burst_detection_computation
-
+        # curr_active_pipeline.perform_computations(a_config, computation_functions_name_includelist=active_computation_functions_name_includelist, enabled_filter_names=active_epoch_names, overwrite_extant_results=False, fail_on_exception=False, debug_print=True)
 
     # ==================================================================================================================================================================================================================================================================================== #
     # COMPUTE DONE                                                                                                                                                                                                                                                                         #
