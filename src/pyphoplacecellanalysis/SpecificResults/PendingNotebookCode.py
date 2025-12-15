@@ -1915,7 +1915,7 @@ def build_contextual_pf2D_decoder(curr_active_pipeline, epochs_to_create_global_
 
 
 @function_attributes(short_name=None, tags=['IMPORTANT', 'pseduo3D', 'pseudoND', 'context-decoding', 'bapun', 'WORKING'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-09-09 10:50', related_items=[])
-def decode_using_contextual_pf2D_decoder(curr_active_pipeline, contextual_pf2D_Decoder: BasePositionDecoder, desired_global_created_epoch_name: str = 'maze_GLOBAL', active_laps_decoding_time_bin_size: float = 0.75):
+def decode_using_contextual_pf2D_decoder(curr_active_pipeline, contextual_pf2D_Decoder: BasePositionDecoder, desired_global_created_epoch_name: str = 'maze_GLOBAL', active_laps_decoding_time_bin_size: float = 0.75, epochs_to_merge_as_global_epoch_names=None):
     """ The generalized context decoder for Bapun session, which is created out of the specified `epochs_to_create_global_from_names` and then used to decode the 'maze_any' epoch at the specified time bin size.
     
     Usage:
@@ -1939,8 +1939,12 @@ def decode_using_contextual_pf2D_decoder(curr_active_pipeline, contextual_pf2D_D
     
     # epochs_to_decode_names = ['maze_any']
     epochs_df = ensure_dataframe(curr_active_pipeline.sess.epochs)
-    epochs_to_merge_as_global_epoch_names: List[str] = [v for v in epochs_df['label'].to_list() if (v != desired_global_created_epoch_name)]
+    if epochs_to_merge_as_global_epoch_names is None:
+        epochs_to_merge_as_global_epoch_names: List[str] = [v for v in epochs_df['label'].to_list() if (v != desired_global_created_epoch_name)]
+
     print(f'epochs_to_merge_as_global_epoch_names: {epochs_to_merge_as_global_epoch_names}')
+
+
     epochs_df = epochs_df.epochs.adding_concatenated_epoch(epochs_to_create_global_from_names=epochs_to_merge_as_global_epoch_names, created_epoch_name=desired_global_created_epoch_name)
     global_only_epoch: Epoch = ensure_Epoch(epochs_df[(epochs_df['label'] == desired_global_created_epoch_name)])
     # global_only_epoch
