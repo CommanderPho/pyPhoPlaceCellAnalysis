@@ -120,6 +120,81 @@ from pyphocorehelpers.gui.Qt.color_helpers import ColormapHelpers, ColorFormatCo
 
 
 
+# def _split_into_consequitive_sequences(df: pd.DataFrame, column_name: str='is_adjacent_epoch_bin') -> pd.DataFrame:
+#     """splits a dataframe into consequtive/contiguous sequences of values
+
+
+#     from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import _split_into_consequitive_sequences
+
+
+#     """
+#     last_start_idx = None
+#     last_start_value = None
+#     accumulated_run_tuples = []
+    
+#     assert len(df) > 0
+    
+#     # values = deepcopy(df[column_name])
+    
+#     # for i, v in enumerate(values):
+
+#     # values = deepcopy(df[column_name])
+    
+#     column_names = list(df.columns)
+    
+#     for i, row in enumerate(df.itertuples(index=True)):
+
+#         row = row._asdict()
+#         is_adjacent_epoch_bin: bool = row[column_name]
+        
+#         v_remainder = get_dict_subset(row, subset_excludelist=[column_name])
+        
+
+#         if last_start_idx is None:
+#             ## initial entry:
+#             last_start_idx = i
+#             assert is_adjacent_epoch_bin == False, f"should always be False because it's the first timestamp"
+#             last_start_value = is_adjacent_epoch_bin
+#             # last_start_value = deepcopy(list(v_remainder.values()))
+            
+#         else:
+#             ## any case other than the first element
+#             is_new_run_series: bool = (not is_adjacent_epoch_bin)
+#             if is_new_run_series:
+#                 ## change point detected, this is the last index included in this value then
+#                 accumulated_run_tuples.append((last_start_idx, (i-1), last_start_value))
+                
+#                 ## start the new (next) series
+#                 last_start_idx = i
+#                 assert is_adjacent_epoch_bin == False, f"should always be False because it's the first timestamp"
+#                 last_start_value = is_adjacent_epoch_bin
+#                 # last_start_value = deepcopy(list(v_remainder.values()))
+
+
+#             # did_change: bool = (last_start_value != is_adjacent_epoch_bin)
+#             # if did_change:
+#             #     ## change point detected, this is the last index included in this value then
+#             #     accumulated_run_tuples.append((last_start_idx, (i-1), deepcopy(last_start_value)))
+                
+#             #     ## start the new (next) series
+#             #     last_start_idx = i
+#             #     last_start_value = is_adjacent_epoch_bin
+                
+
+#     ## END for i, v in enumerate(values)...
+
+#     ## Close the last series if left open
+#     if (accumulated_run_tuples[-1][0] != last_start_idx):
+#         ## close the last series
+#         accumulated_run_tuples.append((last_start_idx, (i-1), last_start_value))
+
+#     accumulated_run_tuples = pd.DataFrame.from_records(accumulated_run_tuples, columns=['start_idx', 'end_idx', column_name])
+#     accumulated_run_tuples['num_timesteps'] = accumulated_run_tuples['end_idx'] - accumulated_run_tuples['start_idx']
+
+#     return accumulated_run_tuples
+
+
+
 def _split_into_consequitive_sequences(df: pd.DataFrame, column_name: str='is_adjacent_epoch_bin') -> pd.DataFrame:
     """splits a dataframe into consequtive/contiguous sequences of values
 
@@ -140,28 +215,47 @@ def _split_into_consequitive_sequences(df: pd.DataFrame, column_name: str='is_ad
 
     # values = deepcopy(df[column_name])
     
-    column_names = list(df.columns)
+    column_names = ['Index'] + list(df.columns)
     
     for i, row in enumerate(df.itertuples(index=True)):
 
         row = row._asdict()
-        v = row[column_name]
+        is_adjacent_epoch_bin: bool = row[column_name]        
         # v_remainder = get_dict_subset(row, subset_excludelist=[column_name])
+        v_remainder = row
+
         
 
         if last_start_idx is None:
+            ## initial entry:
             last_start_idx = i
-            last_start_value = v
+            assert is_adjacent_epoch_bin == False, f"should always be False because it's the first timestamp"
+            # last_start_value = is_adjacent_epoch_bin
+            last_start_value = deepcopy(list(v_remainder.values()))
+            
         else:
             ## any case other than the first element
-            did_change: bool = (last_start_value != v)
-            if did_change:
+            is_new_run_series: bool = (not is_adjacent_epoch_bin)
+            if is_new_run_series:
                 ## change point detected, this is the last index included in this value then
-                accumulated_run_tuples.append((last_start_idx, (i-1), deepcopy(last_start_value)))
+                # accumulated_run_tuples.append((last_start_idx, (i-1), last_start_value))
+                accumulated_run_tuples.append((last_start_idx, (i-1), *last_start_value))
                 
                 ## start the new (next) series
                 last_start_idx = i
-                last_start_value = v
+                assert is_adjacent_epoch_bin == False, f"should always be False because it's the first timestamp"
+                # last_start_value = is_adjacent_epoch_bin
+                last_start_value = deepcopy(list(v_remainder.values()))
+
+
+            # did_change: bool = (last_start_value != is_adjacent_epoch_bin)
+            # if did_change:
+            #     ## change point detected, this is the last index included in this value then
+            #     accumulated_run_tuples.append((last_start_idx, (i-1), deepcopy(last_start_value)))
+                
+            #     ## start the new (next) series
+            #     last_start_idx = i
+            #     last_start_value = is_adjacent_epoch_bin
                 
 
     ## END for i, v in enumerate(values)...
@@ -169,9 +263,12 @@ def _split_into_consequitive_sequences(df: pd.DataFrame, column_name: str='is_ad
     ## Close the last series if left open
     if (accumulated_run_tuples[-1][0] != last_start_idx):
         ## close the last series
-        accumulated_run_tuples.append((last_start_idx, (i-1), deepcopy(last_start_value)))
+        # accumulated_run_tuples.append((last_start_idx, (i-1), last_start_value))
+        accumulated_run_tuples.append((last_start_idx, (i-1), *last_start_value))
 
-    accumulated_run_tuples = pd.DataFrame.from_records(accumulated_run_tuples, columns=['start_idx', 'end_idx', 'value'])
+    # accumulated_run_tuples = pd.DataFrame.from_records(accumulated_run_tuples, columns=['start_idx', 'end_idx', column_name])
+    accumulated_run_tuples = pd.DataFrame.from_records(accumulated_run_tuples, columns=['start_idx', 'end_idx', *column_names])
+
     accumulated_run_tuples['num_timesteps'] = accumulated_run_tuples['end_idx'] - accumulated_run_tuples['start_idx']
 
     return accumulated_run_tuples
