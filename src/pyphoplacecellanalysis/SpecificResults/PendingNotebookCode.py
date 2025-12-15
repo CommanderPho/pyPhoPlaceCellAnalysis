@@ -1477,7 +1477,7 @@ def final_process_non_kdiba_all_comps(curr_active_pipeline, active_data_mode_nam
     
     # Estimate laps, is this working correctly? For Bapun OpenField 2025-12-12 it looks like the laps are only being found during 'sprinkle', the 2nd of the two epochs, and also for somee reason trailing into subsequent sleep.
     for k, a_sess in curr_active_pipeline.filtered_sessions.items():
-        a_sess = estimate_session_laps(a_sess, should_plot_laps_2d=False)
+        a_sess = estimate_session_laps(a_sess, should_plot_laps_2d=False, **(hardcoded_params.lap_estimation_parameters or {}))
 
 
     
@@ -1530,9 +1530,14 @@ def final_process_non_kdiba_all_comps(curr_active_pipeline, active_data_mode_nam
     maze_epochs_obj = ensure_Epoch(deepcopy(curr_active_pipeline.sess.epochs).to_dataframe())
     if "maze_GLOBAL" not in maze_epochs_obj.labels.tolist():
         _bak_Epoch = deepcopy(curr_active_pipeline.sess.epochs)
-        curr_active_pipeline.sess.epochs_bak = _bak_Epoch
-        maze_epochs_obj.adding_global_epoch_row(global_epoch_name=hardcoded_params.global_session_name, first_included_epoch_name=None, last_included_epoch_name=None)
-        maze_epochs_obj
+        if not hasattr(curr_active_pipeline.sess, 'epochs_bak'):
+            curr_active_pipeline.sess.epochs_bak = _bak_Epoch
+    
+        # maze_epochs_obj.adding_global_epoch_row(global_epoch_name=hardcoded_params.global_session_name, first_included_epoch_name=None, last_included_epoch_name=None)
+        maze_epochs_obj = maze_epochs_obj.adding_global_epoch_row(global_epoch_name=hardcoded_params.global_session_name, 
+                                                first_included_epoch_name=hardcoded_params.non_global_activity_session_names[0], last_included_epoch_name=hardcoded_params.non_global_activity_session_names[-1], inplace=False)
+
+        
         # maze_epochs_obj
         # curr_active_pipeline.sess.epochs = deepcopy(maze_epochs_obj)
         
