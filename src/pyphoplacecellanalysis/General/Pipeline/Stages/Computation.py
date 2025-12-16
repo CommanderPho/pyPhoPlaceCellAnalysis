@@ -726,11 +726,19 @@ class ComputedPipelineStage(FilterablePipelineStage, LoadedPipelineStage):
             global_epoch_name: str = curr_active_pipeline.find_Global_epoch_name()
             
         """
+        from neuropy.core.epoch import Epoch, ensure_dataframe, ensure_Epoch
+        
         if (self.active_sess_config.format_name =='kdiba'):
             _, _, global_epoch_name = self.find_LongShortGlobal_epoch_names()
             return global_epoch_name
         else:
             ## non-KDIBA session
+            global_activity_only_epoch = getattr(self.sess, 'global_activity_only_epoch', None)
+            if (global_activity_only_epoch is not None) and (len(global_activity_only_epoch) == 1):
+                global_epoch_name: str = ensure_Epoch(global_activity_only_epoch).labels[0]
+                return global_epoch_name
+            
+            ## fallback to trying to find the longest epoch, but this doesn't work for some Bapun sessions with long 'post':
             df = self.sess.paradigm.to_dataframe()
             # return df['label'].values[-1] ## last item
             global_epoch_name: str = df.iloc[df['duration'].argmax()]['label']
