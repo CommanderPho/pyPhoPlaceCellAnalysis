@@ -29,7 +29,7 @@ from pyphoplacecellanalysis.Pho2D.PyQtPlots.TimeSynchronizedPlotters.Mixins.User
 # @metadata_attributes(short_name=None, tags=['debug', 'window', 'visualization', 'activity', 'spikes', 'syncrhonized'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-12-03 15:41', related_items=[])
 class TimeSynchronizedPlacefieldActivityDebugPlotter(UserEditableROIMixin, AnimalTrajectoryPlottingMixin, TimeSynchronizedPlotterBase):
     """ Renders a `6 x n_cols` grid of subplots, each showing a heatmap of 2D place cells colored according to that' cells identity color, sorted according to their peak linearized 1D position (`lin_pos`) along the track.
-    All cell heatmaps start black, but light up when the cell fires, fading out back to black gradually over the following 3 seconds. 
+    All cell heatmaps start black, but **light up when the cell fires**, fading out back to black gradually over the following 3 seconds. 
 
     """
     # Application/Window Configuration Options:
