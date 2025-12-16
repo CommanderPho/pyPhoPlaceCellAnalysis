@@ -1263,16 +1263,12 @@ def final_process_bapun_all_comps(curr_active_pipeline, posthoc_save: bool=True,
     curr_active_pipeline = final_process_bapun_all_comps(curr_active_pipeline=curr_active_pipeline, posthoc_save=True)
     
     """
-    
-    from pyphoplacecellanalysis.General.Pipeline.NeuropyPipeline import NeuropyPipeline
-    from pyphoplacecellanalysis.General.Batch.NonInteractiveProcessing import batch_extended_computations
     from neuropy.core.session.Formats.BaseDataSessionFormats import HardcodedProcessingParameters
     from neuropy.core.session.Formats.Specific.BapunDataSessionFormat import BapunDataSessionFormatRegisteredClass
     from neuropy.core.epoch import Epoch, ensure_dataframe, ensure_Epoch, EpochsAccessor
     from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import build_contextual_pf2D_decoder, decode_using_contextual_pf2D_decoder
     from pyphoplacecellanalysis.Analysis.Decoder.context_dependent import GenericDecoderDictDecodedEpochsDictResult
     from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.EpochComputationFunctions import EpochComputationFunctions, EpochComputationsComputationsContainer
-
     from neuropy.analyses.placefields import Position
     from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import post_process_non_kdiba
     from neuropy.analyses.laps import estimate_session_laps
@@ -1334,8 +1330,6 @@ def final_process_non_kdiba_all_comps(curr_active_pipeline, active_data_mode_nam
 
     ## define lienarization kwargs:
     linearization_kwargs = dict(method=linearization_method, all_session_mazes=all_session_mazes)
-
-
 
     active_data_mode_registered_class, active_data_mode_type_properties = curr_active_pipeline.sess.config.get_format_data_session_type_class_info()
 
