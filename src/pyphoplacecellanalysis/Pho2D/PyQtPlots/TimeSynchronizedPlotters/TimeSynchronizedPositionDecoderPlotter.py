@@ -157,10 +157,10 @@ class TimeSynchronizedPositionDecoderPlotter(UserEditableROIMixin, AnimalTraject
         Assert.is_in(self.posterior_variable_to_render, allowed_variable_list=['p_x_given_n', 'p_x_given_n_and_x_prev'])
         # self.posterior_variable_to_render: allowed values: ['p_x_given_n', 'p_x_given_n_and_x_prev', ...]
         if self.posterior_variable_to_render == 'p_x_given_n':
-            main_data = deepcopy(self.active_one_step_decoder.p_x_given_n)
+            main_data = self.active_one_step_decoder.p_x_given_n
             main_data_title = f'p_x_given_n'
         elif self.posterior_variable_to_render == 'p_x_given_n_and_x_prev':
-            main_data = deepcopy(self.active_two_step_decoder.p_x_given_n_and_x_prev)
+            main_data = self.active_two_step_decoder.p_x_given_n_and_x_prev
             main_data_title = f'p_x_given_n_and_x_prev'
         # elif self.posterior_variable_to_render == 'num_pos_samples_smoothed_occupancy':
         #     image = self.active_time_dependent_placefields.curr_num_pos_samples_smoothed_occupancy_map.copy()
@@ -172,8 +172,8 @@ class TimeSynchronizedPositionDecoderPlotter(UserEditableROIMixin, AnimalTraject
             raise NotImplementedError        
 
         a_layer_key: str = f'imv[{main_data_title}]'
-        imv_layer: TimeSynchronizedGenericPlotterLayer = TimeSynchronizedGenericPlotterLayer(name=a_layer_key, parent=self, contents={'main': self.ui.imv}, data={'time_window_centers': deepcopy(self.time_window_centers),
-                                                                                                                                                            'main': deepcopy(main_data),
+        imv_layer: TimeSynchronizedGenericPlotterLayer = TimeSynchronizedGenericPlotterLayer(name=a_layer_key, parent=self, contents={'main': self.ui.imv}, data={'time_window_centers': self.time_window_centers,
+                                                                                                                                                            'main': main_data,
                                                                                                                                                             })
         # self.ui.plot_stack['imv'] = self.ui.imv
         if a_layer_key not in self.ui.plot_stack:
@@ -325,13 +325,16 @@ class TimeSynchronizedPositionDecoderPlotter(UserEditableROIMixin, AnimalTraject
 
         ## update any additional image layers in the stack
         for z_idx, (a_stack_item_key, a_stack_item) in enumerate(self.ui.plot_stack.items()):
-            print(f'on_window_changed: z_idx: {z_idx}, a_stack_item_key: "{a_stack_item_key}", a_stack_item: {a_stack_item}')
+            if self.enable_debug_print:
+                print(f'on_window_changed: z_idx: {z_idx}, a_stack_item_key: "{a_stack_item_key}", a_stack_item: {a_stack_item}')
             try:
                 if (hasattr(a_stack_item, 'is_layer') and getattr(a_stack_item, 'is_layer', False)):
                     a_stack_item.on_window_changed(start_t=start_t, end_t=end_t, defer_render=True) ## call update plots on the child item
-                    print(f'\ton_window_changed successful.')
+                    if self.enable_debug_print:
+                        print(f'\ton_window_changed successful.')
                 else:
-                    print(f'\tskipped!')
+                    if self.enable_debug_print:
+                        print(f'\tskipped!')
             except (KeyError, AttributeError) as e:
                 print(f'\t encountered error "{e}" while trying to on_window_changed item. Skipping.')
             except Exception as e:
@@ -349,13 +352,16 @@ class TimeSynchronizedPositionDecoderPlotter(UserEditableROIMixin, AnimalTraject
         
         ## update any additional image layers in the stack
         for z_idx, (a_stack_item_key, a_stack_item) in enumerate(self.ui.plot_stack.items()):
-            print(f'Update: z_idx: {z_idx}, a_stack_item_key: "{a_stack_item_key}", a_stack_item: {a_stack_item}')
+            if self.enable_debug_print:
+                print(f'Update: z_idx: {z_idx}, a_stack_item_key: "{a_stack_item_key}", a_stack_item: {a_stack_item}')
             try:
                 if (hasattr(a_stack_item, 'is_layer') and getattr(a_stack_item, 'is_layer', False)):
                     a_stack_item.update(t=t, defer_render=True) ## call update plots on the child item
-                    print(f'\tupdate successful.')
+                    if self.enable_debug_print:
+                        print(f'\tupdate successful.')
                 else:
-                    print(f'\tskipped!')
+                    if self.enable_debug_print:
+                        print(f'\tskipped!')
             except (KeyError, AttributeError) as e:
                 print(f'\t encountered error "{e}" while trying to update item. Skipping.')
             except Exception as e:
@@ -416,13 +422,16 @@ class TimeSynchronizedPositionDecoderPlotter(UserEditableROIMixin, AnimalTraject
 
         ## update any additional image layers in the stack
         for z_idx, (a_stack_item_key, a_stack_item) in enumerate(self.ui.plot_stack.items()):
-            print(f'Update: z_idx: {z_idx}, a_stack_item_key: "{a_stack_item_key}", a_stack_item: {a_stack_item}')
+            if self.enable_debug_print:
+                print(f'Update: z_idx: {z_idx}, a_stack_item_key: "{a_stack_item_key}", a_stack_item: {a_stack_item}')
             try:
                 if (hasattr(a_stack_item, 'is_layer') and getattr(a_stack_item, 'is_layer', False)):
                     a_stack_item._update_plots() ## call update plots on the child item
-                    print(f'\tupdate successful.')
+                    if self.enable_debug_print:
+                        print(f'\tupdate successful.')
                 else:
-                    print(f'\tskipped!')
+                    if self.enable_debug_print:
+                        print(f'\tskipped!')
             except (KeyError, AttributeError) as e:
                 print(f'\t encountered error "{e}" while trying to update item. Skipping.')
             except Exception as e:
