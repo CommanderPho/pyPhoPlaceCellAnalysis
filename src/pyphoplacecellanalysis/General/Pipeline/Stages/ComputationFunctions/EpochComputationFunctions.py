@@ -323,7 +323,7 @@ class ComputeGlobalEpochBase(ComputedResult):
         # single_global_epoch_df: pd.DataFrame = pd.DataFrame({'start': [t_start], 'stop': [t_end], 'label': [0]})
         # single_global_epoch: Epoch = Epoch(single_global_epoch_df)
  
-        ## Common:
+        ## Common: # curr_active_pipeline.sess.active_maze_epochs_df
         global_session = curr_active_pipeline.filtered_sessions[global_epoch_name]
         global_pos_obj: "Position" = deepcopy(global_session.position)
         global_pos_df: pd.DataFrame = global_pos_obj.compute_higher_order_derivatives().position.compute_smoothed_position_info(N=15)
