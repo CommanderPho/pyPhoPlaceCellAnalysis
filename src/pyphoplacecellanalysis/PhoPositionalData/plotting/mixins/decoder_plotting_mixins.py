@@ -1907,7 +1907,9 @@ class DecodedTrajectoryMatplotlibPlotter(DecodedTrajectoryPlotter):
                                             alpha=full_posterior_opacity)
                     else:
                         # Outlines (Lines)
-                        cset = an_ax.contour(XX, YY, frame_data.T, 
+                        if np.shape(frame_data.T) == np.shape(XX):
+                            frame_data = frame_data.T
+                        cset = an_ax.contour(XX, YY, frame_data, 
                                             levels=current_levels, 
                                             colors=[rgba_color], 
                                             linewidths=1.5, 
