@@ -2139,7 +2139,10 @@ def build_combined_time_synchronized_Bapun_decoders_window(curr_active_pipeline,
         
     
     def _subfn_merge_plotters(a_controlling_widget, is_controlling_widget_external=False, debug_print=False, **_out_sync_plotters) -> GenericPyQtGraphContainer:
-        """ implicitly captures title from the outer function """
+        """ Merges the provided list of `_out_sync_plotters` into a single horizontally stacked widget, all controlled by `a_controlling_widget`
+        
+            implicitly captures title from the outer function
+        """
         if len(_out_sync_plotters) > 0:
             # out_Width_Height_Tuple = list(_out_sync_plotters.values())[0].desired_widget_size(desired_page_height = 600.0, debug_print=True)
             out_Width_Height_Tuple = list(_out_sync_plotters.values())[0].size()
@@ -2410,12 +2413,19 @@ def build_combined_time_synchronized_Bapun_decoders_window(curr_active_pipeline,
         # for i, (k, v) in enumerate(individual_decoder_decoding_results.items()):
         for i, a_filter_name in enumerate(included_filter_names):
             a_single_decoder_p_x_given_n = np.squeeze(all_context_filter_epochs_decoder_result.p_x_given_n[:, :, i, :])
-            a_single_decoder_p_x_given_n = a_single_decoder_p_x_given_n / np.nansum(a_single_decoder_p_x_given_n, axis=(0, 1), keepdims=True)
+            # a_single_decoder_p_x_given_n = a_single_decoder_p_x_given_n / np.nansum(a_single_decoder_p_x_given_n, axis=(0, 1), keepdims=True)
+
+
+            # Normalize over position dimensions for each time bin without creating a giant NaN mask copy:
+            denom = np.sum(a_single_decoder_p_x_given_n, axis=(0, 1), keepdims=True)
+            # Avoid division-by-zero; bins with zero total mass stay unchanged
+            denom[denom == 0.0] = 1.0
+            a_single_decoder_p_x_given_n = a_single_decoder_p_x_given_n / denom
+
             one_step_decoder_dummy_dict[a_filter_name] = DummyOneStepDecoder(xbin=deepcopy(pseudo3D_decoder.xbin), ybin=deepcopy(pseudo3D_decoder.ybin), time_window_centers=deepcopy(all_context_filter_epochs_decoder_result.time_bin_container.centers),
-                                                                  p_x_given_n=deepcopy(a_single_decoder_p_x_given_n))
-
-
-            # _out_container.plot
+                                                                            p_x_given_n=a_single_decoder_p_x_given_n,
+                                                                            # p_x_given_n=deepcopy(a_single_decoder_p_x_given_n),
+                                                                            )
 
 
         # one_step_decoder_dummy_dict
@@ -2474,6 +2484,7 @@ def build_combined_time_synchronized_Bapun_decoders_window(curr_active_pipeline,
         _out_sync_plotters[a_filter_name] = curr_position_decoder_plotter
     # END for a_filter_name in included_filter_names...
 
+    # Merge the plotters here: ___________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
     _out_container = _subfn_merge_plotters(controlling_widget, is_controlling_widget_external=is_controlling_widget_external, **_out_sync_plotters)
     if directional_decoders_decode_result is not None:
         _out_container.plot_data.directional_decoders_decode_result = directional_decoders_decode_result
@@ -2485,7 +2496,7 @@ def build_combined_time_synchronized_Bapun_decoders_window(curr_active_pipeline,
         # _out_container.plot_data.directional_decoders_decode_result = directional_decoders_decode_result
         
 
-    if (all_context_filter_epochs_decoder_result is not None) and (controlling_widget is not None):
+    if (all_context_filter_epochs_decoder_result is not None) and (controlling_widget is not None) and (not is_controlling_widget_external):
         ## Add a context likelihood track as well
         _out_global_context_tuple = _add_context_marginal_to_timeline(controlling_widget, a_filter_epochs_decoded_result=all_context_filter_epochs_decoder_result, name='global context')
         _out_global_context_overview_tuple = _add_context_marginal_to_timeline(controlling_widget, a_filter_epochs_decoded_result=all_context_filter_epochs_decoder_result, name='global context (overview)')        
@@ -2493,12 +2504,9 @@ def build_combined_time_synchronized_Bapun_decoders_window(curr_active_pipeline,
         _out_container.plots.context_marginal_tracks = {'global_context': _out_global_context_tuple, 'global context (overview)': _out_global_context_overview_tuple}
 
 
-
-
     active_2d_plot: Spike2DRaster = _out_container.ui.controlling_widget
     sync_plotters: Dict[str, TimeSynchronizedPositionDecoderPlotter] = _out_container.ui.sync_plotters
     win: PhoDockAreaContainingWindow = _out_container.ui.root_dockAreaWindow
-
 
     _subfn_prepare_plotters_visually(_out_sync_plotters)
 
@@ -2511,7 +2519,9 @@ def build_combined_time_synchronized_Bapun_decoders_window(curr_active_pipeline,
     _out_container.build_overview_and_windowed_dockgroups = lambda debug_print=False, **kwargs: _subfn_build_overview_and_windowed_dockgroups(active_2d_plot=_out_container.ui.controlling_widget, debug_print=debug_print, **kwargs)
 
     ## Execute those of the marginals that we can do already:
-    _out_container.add_session_epoch_intervals(curr_active_pipeline=curr_active_pipeline) ## this will work
+    if (not is_controlling_widget_external):
+        _out_container.add_session_epoch_intervals(curr_active_pipeline=curr_active_pipeline) ## this will work
+
 
     """ unpacking
         
