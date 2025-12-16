@@ -2381,7 +2381,9 @@ class BasePositionDecoder(HDFMixin, AttrsBasedClassHelperMixin, ContinuousPeakLo
             # [(a_n_bins == len(time_bin_containers_list[i].centers)) ]
         assert np.all([(a_n_bins == len(time_bin_containers_list[i].centers)) for i, a_n_bins in enumerate(n_tbin_centers)])
         # assert np.all([(a_n_bins == (len(time_bin_containers_list[i].edges)-1)) for i, a_n_bins in enumerate(nbins)]) # don't know why this wouldn't be true, but it's okay if it isn't I guess
-        assert np.all([(a_n_bins == time_bin_containers_list[i].num_bins) for i, a_n_bins in enumerate(n_tbin_centers)])
+        are_same_num_bins = np.array([(a_n_bins == time_bin_containers_list[i].num_bins) for i, a_n_bins in enumerate(n_tbin_centers)])
+        are_diff_num_bins = np.logical_not(are_same_num_bins)
+        assert np.all(are_same_num_bins), [(a_diff_n_bins_idx, n_tbin_centers[a_diff_n_bins_idx], time_bin_containers_list[a_diff_n_bins_idx].num_bins) for a_diff_n_bins_idx in np.where(are_diff_num_bins)[0]]
 
         filter_epochs_decoder_result.spkcount = spkcount
         filter_epochs_decoder_result.nbins = n_tbin_centers
