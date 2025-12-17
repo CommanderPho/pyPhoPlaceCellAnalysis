@@ -919,15 +919,83 @@ class ComputedPipelineStage(FilterablePipelineStage, LoadedPipelineStage):
                         active_computation_results[a_select_config_name] = ComputedPipelineStage._build_initial_computationResult(a_filtered_session, curr_active_computation_params) # returns a computation result. This stores the computation config used to compute it.
                         skip_computations_for_this_result = False # need to compute the result
                     else:
-                        # Otherwise it already exists and is not None, so don't overwrite it:
-                        if progress_logger_callback is not None:
-                            progress_logger_callback(f'WARNING: skipping computation because overwrite_extant_results={overwrite_extant_results} and `active_computation_results[{a_select_config_name}]` already exists and is non-None')
-                            progress_logger_callback('\t TODO: this will prevent recomputation even when the excludelist/includelist or computation function definitions change. Rework so that this is smarter.')
+                        # Otherwise it already exists and is not None - use validators to check if it's still valid:
+                        needs_recomputation = False
                         
-                        print(f'WARNING: skipping computation because overwrite_extant_results={overwrite_extant_results} and `active_computation_results[{a_select_config_name}]` already exists and is non-None')
-                        print('\t TODO: this will prevent recomputation even when the excludelist/includelist or computation function definitions change. Rework so that this is smarter.')
-                        # active_computation_results.setdefault(a_select_config_name, ComputedPipelineStage._build_initial_computationResult(a_filtered_session, curr_active_computation_params)) # returns a computation result. This stores the computation config used to compute it.
-                        skip_computations_for_this_result = True
+                        # Get the list of functions that would be computed
+                        search_mode = FunctionsSearchMode.ANY
+                        if (computation_functions_name_includelist is None) and (computation_functions_name_excludelist is None):
+                            # Both are None - will compute all functions
+                            if are_global:
+                                active_computation_functions = self.registered_global_computation_functions
+                            else:
+                                active_computation_functions = self.registered_computation_functions
+                        else:
+                            # Get filtered list of functions
+                            if (computation_functions_name_includelist is not None):
+                                if (computation_functions_name_excludelist is not None):
+                                    computation_functions_name_includelist = [a_fn_name for a_fn_name in computation_functions_name_includelist if (a_fn_name not in computation_functions_name_excludelist)]
+                                active_computation_functions = self.find_registered_computation_functions(computation_functions_name_includelist, search_mode=search_mode, names_list_is_excludelist=False)
+                                if (computation_functions_name_excludelist is not None):
+                                    excluded_active_computation_functions = self.find_registered_computation_functions(computation_functions_name_excludelist, search_mode=search_mode, names_list_is_excludelist=True)
+                                    active_computation_functions = [fn for fn in active_computation_functions if fn not in excluded_active_computation_functions]
+                            else:
+                                # Only excludelist provided
+                                active_computation_functions = self.find_registered_computation_functions(computation_functions_name_excludelist, search_mode=search_mode, names_list_is_excludelist=True)
+                        
+                        # Check validators for each function that would be computed
+                        all_validators_dict = self.get_merged_computation_function_validators()
+                        invalid_functions = []
+                        functions_without_validators = []
+                        for comp_fn in active_computation_functions:
+                            comp_fn_name = comp_fn.__name__
+                            # Find the validator for this function
+                            validator = None
+                            for validator_key, validator_obj in all_validators_dict.items():
+                                if validator_obj.computation_fn_name == comp_fn_name:
+                                    validator = validator_obj
+                                    break
+                            
+                            if validator is not None:
+                                # Check if this specific computation is valid
+                                is_valid = validator.try_validate_is_computation_valid(
+                                    self, 
+                                    computation_filter_name=a_select_config_name,
+                                    fail_on_exception=False,
+                                    progress_print=False,
+                                    debug_print=debug_print,
+                                    force_recompute=False
+                                )
+                                if not is_valid:
+                                    needs_recomputation = True
+                                    invalid_functions.append(comp_fn_name)
+                            else:
+                                # If no validator available, we conservatively assume it needs recomputation
+                                # (this handles functions without validators - they'll be recomputed if requested)
+                                needs_recomputation = True
+                                functions_without_validators.append(comp_fn_name)
+                        
+                        if needs_recomputation:
+                            # Result is stale or incomplete, need to recompute
+                            recompute_reasons = []
+                            if invalid_functions:
+                                recompute_reasons.append(f'invalid results for: {invalid_functions}')
+                            if functions_without_validators:
+                                recompute_reasons.append(f'functions without validators: {functions_without_validators}')
+                            reason_msg = '; '.join(recompute_reasons)
+                            if progress_logger_callback is not None:
+                                progress_logger_callback(f'INFO: recomputing because {reason_msg}')
+                            if debug_print:
+                                print(f'INFO: recomputing because {reason_msg}')
+                            active_computation_results[a_select_config_name] = ComputedPipelineStage._build_initial_computationResult(a_filtered_session, curr_active_computation_params)
+                            skip_computations_for_this_result = False
+                        else:
+                            # All validators passed - result is still valid
+                            if progress_logger_callback is not None:
+                                progress_logger_callback(f'INFO: skipping computation - existing result is valid according to validators')
+                            if debug_print:
+                                print(f'INFO: skipping computation - existing result is valid according to validators')
+                            skip_computations_for_this_result = True
 
                     if not skip_computations_for_this_result:
                         # call to perform any registered computations:
