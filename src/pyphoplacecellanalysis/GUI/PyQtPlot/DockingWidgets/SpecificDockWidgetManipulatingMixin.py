@@ -59,20 +59,78 @@ class SpecificDockWidgetManipulatingMixin(BaseDynamicInstanceConformingMixin):
         
 
     """
-    def on_toggle_timeline_sync_mode(self, an_item, is_checked):
+    def on_toggle_timeline_sync_mode(self, an_item, mode_name):
         """ Called to update the sync mode
+        
+        Works for both matplotlib-based and PyQtGraph-based tracks.
+        mode_name: str - one of 'Generic' (TO_WINDOW), 'to_global_data' (TO_GLOBAL_DATA), or 'no_sync' (NO_SYNC)
         """
         from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.SpikeRasterWidgets.Spike2DRaster import SynchronizedPlotMode
 
-        print(f'on_toggle_timeline_sync_mode(an_item: {an_item}, is_checked: {is_checked})')
+        print(f'on_toggle_timeline_sync_mode(an_item: {an_item}, mode_name: {mode_name})')
         identifier_name = an_item._name
         print(f'\tidentifier_name: "{identifier_name}"')
-        if is_checked:
-            sync_mode: SynchronizedPlotMode = SynchronizedPlotMode.TO_GLOBAL_DATA
+        
+        # Convert mode_name string to SynchronizedPlotMode enum
+        sync_mode: SynchronizedPlotMode
+        if mode_name == 'Generic':
+            sync_mode = SynchronizedPlotMode.TO_WINDOW
+        elif mode_name == 'to_global_data':
+            sync_mode = SynchronizedPlotMode.TO_GLOBAL_DATA
+        elif mode_name == 'no_sync':
+            sync_mode = SynchronizedPlotMode.NO_SYNC
         else:
-            sync_mode: SynchronizedPlotMode = SynchronizedPlotMode.TO_WINDOW
+            print(f'\tWARNING: Unknown mode_name "{mode_name}", defaulting to TO_WINDOW')
+            sync_mode = SynchronizedPlotMode.TO_WINDOW
+        
         print(f'\tsync_mode: {sync_mode}')
+        
+        # Get the widget to check if it's PyQtGraph-based
+        active_widget = self.ui.matplotlib_view_widgets.get(identifier_name, None)
+        if active_widget is None:
+            print(f'\tWARNING: Widget with identifier "{identifier_name}" not found!')
+            return
+        
+        # For PyQtGraph widgets, handle X linking appropriately.
+        # This is especially important for pyqtgraph-based tracks like `new_curves_separate_plot`,
+        # which would otherwise remain permanently linked to the main window.
+        if active_widget.is_pyqtgraph_based():
+            from pyphoplacecellanalysis.External import pyqtgraph as pg
+
+            root_plot_item = active_widget.getRootPlotItem()
+            main_plot_widget = self.plots.main_plot_widget if hasattr(self, 'plots') and self.plots.main_plot_widget is not None else None
+
+            # Try to find a child PlotItem that represents this specific track (e.g., `new_curves_separate_plot`)
+            target_plot_item = root_plot_item
+            try:
+                root_layout = active_widget.getRootGraphicsLayoutWidget()
+                for item in getattr(root_layout, "items", lambda: [])():
+                    if isinstance(item, pg.PlotItem) and item.objectName() == identifier_name:
+                        target_plot_item = item
+                        break
+            except Exception as e:
+                print(f'\tWARNING: Failed to inspect root graphics layout for "{identifier_name}". Error: {e}')
+
+            if target_plot_item is not None:
+                if sync_mode.name == SynchronizedPlotMode.TO_GLOBAL_DATA.name:
+                    # For TO_GLOBAL_DATA: unlink from main plot widget and set to global range
+                    if main_plot_widget is not None:
+                        target_plot_item.setXLink(None)  # Unlink from main plot widget
+                    # Set to global data range
+                    target_plot_item.setXRange(self.spikes_window.total_df_start_end_times[0], self.spikes_window.total_df_start_end_times[1], padding=0)
+                elif sync_mode.name == SynchronizedPlotMode.TO_WINDOW.name:
+                    # For TO_WINDOW: link to main plot widget so it tracks the active window
+                    if main_plot_widget is not None:
+                        target_plot_item.setXLink(main_plot_widget)
+                elif sync_mode.name == SynchronizedPlotMode.NO_SYNC.name:
+                    # For NO_SYNC: unlink from main plot widget and leave the current range as-is
+                    if main_plot_widget is not None:
+                        target_plot_item.setXLink(None)
+        
+        # Sync works for both matplotlib and PyQtGraph widgets since they're both stored in
+        # self.ui.matplotlib_view_widgets and both implement on_window_changed
         self.sync_matplotlib_render_plot_widget(identifier_name, sync_mode=sync_mode)
+        
         print('\tdone.')
 
 
@@ -490,11 +548,11 @@ class SpecificDockWidgetManipulatingMixin(BaseDynamicInstanceConformingMixin):
             self.sync_matplotlib_render_plot_widget(identifier_name, sync_mode=sync_mode)
             
 
-        def pyqtgraph_widget_on_toggle_timeline_sync_mode(an_item, is_checked):
+        def pyqtgraph_widget_on_toggle_timeline_sync_mode(an_item, mode_name):
             """ Captures: widget
             """
-            print(f'pyqtgraph_widget_on_toggle_timeline_sync_mode(an_item: {an_item}, is_checked: {is_checked})')
-            self.on_toggle_timeline_sync_mode(an_item=an_item, is_checked=is_checked)
+            print(f'pyqtgraph_widget_on_toggle_timeline_sync_mode(an_item: {an_item}, mode_name: {mode_name})')
+            self.on_toggle_timeline_sync_mode(an_item=an_item, mode_name=mode_name)
             widget.draw()
             
         if 'button_action_callbacks' not in dock_item.connections:
@@ -593,11 +651,11 @@ class SpecificDockWidgetManipulatingMixin(BaseDynamicInstanceConformingMixin):
             self.sync_matplotlib_render_plot_widget(identifier_name, sync_mode=sync_mode)
             
 
-        def pyqtgraph_widget_on_toggle_timeline_sync_mode(an_item, is_checked):
+        def pyqtgraph_widget_on_toggle_timeline_sync_mode(an_item, mode_name):
             """ Captures: widget
             """
-            print(f'pyqtgraph_widget_on_toggle_timeline_sync_mode(an_item: {an_item}, is_checked: {is_checked})')
-            self.on_toggle_timeline_sync_mode(an_item=an_item, is_checked=is_checked)
+            print(f'pyqtgraph_widget_on_toggle_timeline_sync_mode(an_item: {an_item}, mode_name: {mode_name})')
+            self.on_toggle_timeline_sync_mode(an_item=an_item, mode_name=mode_name)
             widget.draw()
             
         if 'button_action_callbacks' not in dock_item.connections:

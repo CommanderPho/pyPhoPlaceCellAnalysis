@@ -186,7 +186,11 @@ class DockDisplayConfig(object):
     
 buttonIconOrientation = {'horizontal': QtWidgets.QStyle.StandardPixmap.SP_ToolBarHorizontalExtensionButton, 'vertical': QtWidgets.QStyle.StandardPixmap.SP_ToolBarVerticalExtensionButton}
 buttonIconShade = {'shade': QtWidgets.QStyle.StandardPixmap.SP_TitleBarShadeButton, 'unshade': QtWidgets.QStyle.StandardPixmap.SP_TitleBarUnshadeButton}
-buttonIconTimelineSyncMode = {'to_global_data': QtWidgets.QStyle.StandardPixmap.SP_FileDialogContentsView, 'Generic': QtWidgets.QStyle.StandardPixmap.SP_FileDialogDetailedView}
+buttonIconTimelineSyncMode = {
+    'to_global_data': QtWidgets.QStyle.StandardPixmap.SP_FileDialogContentsView, 
+    'Generic': QtWidgets.QStyle.StandardPixmap.SP_FileDialogDetailedView,
+    'no_sync': QtWidgets.QStyle.StandardPixmap.SP_DialogCancelButton
+}
 
 
 
@@ -203,7 +207,7 @@ class Dock(QtWidgets.QWidget, DockDrop):
     sigCollapseClicked = QtCore.Signal(object)
     sigGroupClicked = QtCore.Signal(object)
     sigToggleOrientationClicked = QtCore.Signal(object, bool)
-    sigToggleTimelineSyncModeClicked = QtCore.Signal(object, bool)
+    sigToggleTimelineSyncModeClicked = QtCore.Signal(object, str)
     
 
     @property
@@ -628,20 +632,11 @@ class Dock(QtWidgets.QWidget, DockDrop):
         self.sigToggleOrientationClicked.emit(self, is_checked)
         
 
-    def on_sync_mode_btn_toggled(self, is_checked):
-        """Remove this dock from the DockArea it lives inside."""
-        # from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.SpikeRasterWidgets.Spike2DRaster import SynchronizedPlotMode
-        
-        if is_checked:
-            print(f'changing to TO_GLOBAL_DATA ("to_global_data").')
-            new_icon_name = buttonIconTimelineSyncMode['to_global_data']
-        else:
-            print(f'changing to TO_WINDOW ("Generic")')
-            new_icon_name = buttonIconTimelineSyncMode['Generic']
-        
-        icon = QtWidgets.QApplication.style().standardIcon(new_icon_name)
-        self.label.timelineSyncModeButton.setIcon(icon)
-        self.sigToggleTimelineSyncModeClicked.emit(self, is_checked)
+    def on_sync_mode_btn_toggled(self, mode_name):
+        """Handle sync mode change from DockLabel - forwards the signal with dock and mode name."""
+        # The DockLabel already handled the state cycling and UI updates
+        # Just forward the signal with the dock instance and mode name
+        self.sigToggleTimelineSyncModeClicked.emit(self, mode_name)
 
     def _checkWidgetForOptions(self, widget):
         """Check if a widget provides an options panel.
@@ -946,7 +941,7 @@ class DockLabel(VerticalLabel):
     sigCollapseClicked = QtCore.Signal()
     sigGroupClicked = QtCore.Signal()
     sigToggleOrientationClicked = QtCore.Signal(bool)
-    sigToggleTimelineSyncModeClicked = QtCore.Signal(bool)
+    sigToggleTimelineSyncModeClicked = QtCore.Signal(str)
     sigOptionsClicked = QtCore.Signal()
     
 
@@ -973,6 +968,10 @@ class DockLabel(VerticalLabel):
         self.groupButton = None
         self.orientationButton = None
         self.optionsButton = None
+        
+        # Initialize sync mode state (default: TO_WINDOW)
+        from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.SpikeRasterWidgets.Spike2DRaster import SynchronizedPlotMode
+        self.current_sync_mode = SynchronizedPlotMode.TO_WINDOW
         
         # Create all possible buttons (always create them)
         MIN_BUTTON_SIZE = 12
@@ -1012,14 +1011,14 @@ class DockLabel(VerticalLabel):
         self.orientationButton.setToolTip("Change dock Orientation")
         
 
-        # Create orientation button
+        # Create timeline sync mode button (tri-state: TO_WINDOW -> TO_GLOBAL_DATA -> NO_SYNC -> TO_WINDOW)
         self.timelineSyncModeButton = QtWidgets.QToolButton(self)
-        self.timelineSyncModeButton.setCheckable(True)
-        self.timelineSyncModeButton.toggled.connect(self.sigToggleTimelineSyncModeClicked)
+        self.timelineSyncModeButton.setCheckable(False)  # Regular button, not checkable
+        self.timelineSyncModeButton.clicked.connect(self.on_sync_mode_btn_clicked)
         self.timelineSyncModeButton.setIcon(QtWidgets.QApplication.style().standardIcon(QtWidgets.QStyle.StandardPixmap.SP_FileDialogDetailedView))
         self.timelineSyncModeButton.setMinimumSize(MIN_BUTTON_SIZE, MIN_BUTTON_SIZE)
         self.timelineSyncModeButton.setFixedSize(MIN_BUTTON_SIZE, MIN_BUTTON_SIZE)
-        self.timelineSyncModeButton.setToolTip("Change Track's Timeline Sync Mode")
+        self.timelineSyncModeButton.setToolTip("Timeline Sync Mode: TO_WINDOW")
 
         # Create options button (will be shown/hidden dynamically based on widget options)
         self.optionsButton = QtWidgets.QToolButton(self)
@@ -1036,6 +1035,34 @@ class DockLabel(VerticalLabel):
         # Connect config property changes to UI updates
         # self.config.propertyChanged.connect(self.updateButtonsFromConfig)
     
+    def on_sync_mode_btn_clicked(self):
+        """Handle timeline sync mode button click - cycles through TO_WINDOW -> TO_GLOBAL_DATA -> NO_SYNC -> TO_WINDOW."""
+        from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.SpikeRasterWidgets.Spike2DRaster import SynchronizedPlotMode
+        
+        # Cycle through states: TO_WINDOW -> TO_GLOBAL_DATA -> NO_SYNC -> TO_WINDOW
+        if self.current_sync_mode == SynchronizedPlotMode.TO_WINDOW:
+            self.current_sync_mode = SynchronizedPlotMode.TO_GLOBAL_DATA
+            mode_name = 'to_global_data'
+            tooltip_text = "Timeline Sync Mode: TO_GLOBAL_DATA"
+        elif self.current_sync_mode == SynchronizedPlotMode.TO_GLOBAL_DATA:
+            self.current_sync_mode = SynchronizedPlotMode.NO_SYNC
+            mode_name = 'no_sync'
+            tooltip_text = "Timeline Sync Mode: NO_SYNC"
+        else:  # NO_SYNC
+            self.current_sync_mode = SynchronizedPlotMode.TO_WINDOW
+            mode_name = 'Generic'
+            tooltip_text = "Timeline Sync Mode: TO_WINDOW"
+        
+        # Update button icon
+        new_icon_name = buttonIconTimelineSyncMode[mode_name]
+        icon = QtWidgets.QApplication.style().standardIcon(new_icon_name)
+        self.timelineSyncModeButton.setIcon(icon)
+        
+        # Update tooltip
+        self.timelineSyncModeButton.setToolTip(tooltip_text)
+        
+        # Emit signal with mode name
+        self.sigToggleTimelineSyncModeClicked.emit(mode_name)
 
 
     def updateButtonsFromConfig(self):
