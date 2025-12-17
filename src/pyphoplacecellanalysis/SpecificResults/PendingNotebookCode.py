@@ -194,7 +194,7 @@ from pyphocorehelpers.gui.Qt.color_helpers import ColormapHelpers, ColorFormatCo
 #     return accumulated_run_tuples
 
 
-
+@function_attributes(short_name=None, tags=['UNFINISHED'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-12-17 09:17', related_items=[])
 def _split_into_consequitive_sequences(df: pd.DataFrame, column_name: str='is_adjacent_epoch_bin') -> pd.DataFrame:
     """splits a dataframe into consequtive/contiguous sequences of values
 
@@ -283,6 +283,7 @@ import numpy as np
 from typing import Tuple, Optional
 import matplotlib.pyplot as plt  # For optional visualization
 
+@metadata_attributes(short_name=None, tags=['UNFINISHED', 'UNEVALUATED', 'AI'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-12-17 09:17', related_items=[])
 class RigorousPDFDownsampler:
     """
     Mathematically rigorous 2D PDF downsampler using conservative coarse-graining.
@@ -298,6 +299,16 @@ class RigorousPDFDownsampler:
     
     Input: fine_pdf (Nx x Ny array of densities p[k,l])
     Coarse cells: Integrate via overlap-weighted sum of fine masses.
+
+
+    Usage:
+
+        from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import RigorousPDFDownsampler
+
+        # app = pg.mkApp('RigorousPDFDownsampler test')
+        _out = RigorousPDFDownsampler._TEST()
+        _out
+
     """
     
     def __init__(self, fine_pdf: np.ndarray, dx_f: float, dy_f: float):
@@ -375,8 +386,7 @@ class RigorousPDFDownsampler:
         
         return coarse_pdf, dx_c, dy_c
     
-    def plot_comparison(self, coarse_pdf: np.ndarray, dx_c: float, dy_c: float,
-                        figsize: Tuple[int, int] = (12, 5)):
+    def plot_comparison(self, coarse_pdf: np.ndarray, dx_c: float, dy_c: float, figsize: Tuple[int, int] = (12, 5)):
         """Visualize fine vs coarse PDF."""
         fig, (ax1, ax2) = plt.subplots(1, 2, figsize=figsize)
         
@@ -390,6 +400,25 @@ class RigorousPDFDownsampler:
         
         plt.tight_layout()
         plt.show()
+
+
+    @classmethod
+    def _TEST(cls):
+        # Example: 2D Gaussian (PASTE THIS INTO JUPYTER)
+        Nx_f, Ny_f = 200, 200
+        x_f = np.linspace(0, 10, Nx_f)
+        y_f = np.linspace(0, 10, Ny_f)
+        X_f, Y_f = np.meshgrid(x_f, y_f)
+        mu_x, mu_y, sigma = 5.0, 5.0, 1.0
+        fine_pdf = np.exp(-((X_f - mu_x)**2 + (Y_f - mu_y)**2) / (2 * sigma**2))
+        dx_f = np.median(X_f)
+        dy_f = np.median(Y_f)
+        fine_pdf /= np.sum(fine_pdf) * dx_f * dy_f  # <-- THE FIXED LINE
+
+        downsampler = RigorousPDFDownsampler(fine_pdf, dx_f, dy_f)
+        coarse_pdf, dx_c, dy_c = downsampler.downsample(rx=4.2, ry=3.8)
+        downsampler.plot_comparison(coarse_pdf, dx_c, dy_c)
+        return downsampler
 
 
 # Example Usage: 2D Gaussian PDF
