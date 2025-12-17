@@ -524,6 +524,9 @@ class OptimizedViewportRenderer:
             import traceback
             traceback.print_exc()
             return None
+
+
+
     
     def render_viewport(self, viewport: Viewport, posterior_masking_value: float = 0.0025,
                        debug_print: bool = False) -> Tuple[Dict[str, Any], Tuple[float, float, float, float]]:
@@ -598,7 +601,7 @@ class OptimizedViewportRenderer:
                 thumbnail = np.array(img)
             composite_image[:, x_start:x_end, :] = thumbnail
 
-        
+
         if debug_print:
             print(f"Composite image shape: {composite_image.shape}")
             print(f"Composite image min/max: {composite_image.min()}/{composite_image.max()}")
@@ -673,7 +676,7 @@ class OptimizedViewportRenderer:
 
 
 
-@metadata_attributes(short_name=None, tags=['2D_timeseries', '2D_posteriors', 'frames', 'UNFINISHED', 'KINDA-WORKING'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-02-19 00:00', related_items=['multi_DecodedTrajectoryMatplotlibPlotter_side_by_side'])
+@metadata_attributes(short_name=None, tags=['OLD', '2D_timeseries', '2D_posteriors', 'frames', 'UNFINISHED', 'KINDA-WORKING'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-02-19 00:00', related_items=['multi_DecodedTrajectoryMatplotlibPlotter_side_by_side'])
 @define(slots=False, eq=False)
 class SingleArtistMultiEpochBatchHelpers:
     """ Handles draw
