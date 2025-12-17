@@ -1437,14 +1437,15 @@ def final_process_bapun_all_comps(curr_active_pipeline, posthoc_save: bool=True,
     from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import post_process_non_kdiba
     from neuropy.analyses.laps import estimate_session_laps
 
-    hardcoded_params: HardcodedProcessingParameters = BapunDataSessionFormatRegisteredClass._get_session_specific_parameters(session_context=curr_active_pipeline.get_session_context())
-    
+    hardcoded_params: HardcodedProcessingParameters = deepcopy(BapunDataSessionFormatRegisteredClass._get_session_specific_parameters(session_context=curr_active_pipeline.get_session_context()))
+    # linearization_method: str = hardcoded_params.lap_estimation_parameters.pop('linearization_method', 'umap') # 'shapely'
+    # print(f'linearization_method: {linearization_method}')
     # active_data_mode_name = 'rachel'
     return final_process_non_kdiba_all_comps(curr_active_pipeline, active_data_mode_name=active_data_mode_name, posthoc_save=posthoc_save, override_parameters_flat_keypaths_dict=override_parameters_flat_keypaths_dict, time_bin_size=time_bin_size)
 
     
 @function_attributes(short_name=None, tags=['bapun'], input_requires=[], output_provides=[], uses=['post_process_non_kdiba', 'LapsAccessor.non_kdiba_laps_determine_directions'], used_by=[], creation_date='2025-09-19 17:50', related_items=[])
-def final_process_non_kdiba_all_comps(curr_active_pipeline, active_data_mode_name: str = 'bapun', posthoc_save: bool=True, override_parameters_flat_keypaths_dict=None, time_bin_size=0.5, linearization_method: str = 'shapely'):
+def final_process_non_kdiba_all_comps(curr_active_pipeline, active_data_mode_name: str = 'bapun', posthoc_save: bool=True, override_parameters_flat_keypaths_dict=None, time_bin_size=0.5):
     """ 
     from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import final_process_bapun_all_comps
     curr_active_pipeline = final_process_bapun_all_comps(curr_active_pipeline=curr_active_pipeline, posthoc_save=True)
@@ -1466,34 +1467,10 @@ def final_process_non_kdiba_all_comps(curr_active_pipeline, active_data_mode_nam
     from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import post_process_non_kdiba
     from neuropy.analyses.laps import estimate_session_laps
 
-    from neuropy.utils.position_util import ShapelyMaze, ShapelyMazeCollection
-
-    # linearization_method: str = 'umap'
-
-    # linearization_method: str = 'shapely'
-    all_session_mazes: ShapelyMazeCollection = ShapelyMazeCollection(shapelyMazes = {
-        # Define the skeletons (re-using the coordinates identified earlier)
-        # "N"-shaped maze
-        'maze1': ShapelyMaze(nodes = [
-            (-66.31, 88.82),  # TL
-            (-64.57, -54.62), # BL
-            (25.0, 65.0),  # TR
-            (73.88, -59.85)   # BR
-        ]),
-        # "U"-shaped maze
-        'maze2': ShapelyMaze(nodes = [
-            (-48.62, 63.79),  # Top-Left
-            (-33.99, -41.77), # Bot-Left
-            (3.32, -49.23),   # Bot-Mid
-            (37.16, -34.00),  # Bot-Right
-            (52.74, 76.34)    # Top-Right
-        ]),
-    },
-        valid_epochs =  {'maze1': (11070.0, 13970.0), 'maze2': (20756.0, 24004.0)}, # 'maze_GLOBAL': (0.0, 42305.0), 
-    )    
+ 
 
     ## define lienarization kwargs:
-    linearization_kwargs = dict(method=linearization_method, all_session_mazes=all_session_mazes)
+    # linearization_kwargs = dict(method=linearization_method, all_session_mazes=all_session_mazes)
 
     active_data_mode_registered_class, active_data_mode_type_properties = curr_active_pipeline.sess.config.get_format_data_session_type_class_info()
 
@@ -1516,7 +1493,8 @@ def final_process_non_kdiba_all_comps(curr_active_pipeline, active_data_mode_nam
 
     # basedir = Path('/media/halechr/MAX/Data/Rachel/Cho_241117_Session2').resolve()
     ## INPUTS: basedir 
-
+    linearization_kwargs = hardcoded_params.linearization_parameters
+    linearization_method: str = linearization_kwargs.get('method', 'umap')
 
     # session_epochs: Epoch = BapunDataSessionFormatRegisteredClass.session_fixup_epochs(sess=curr_active_pipeline.sess)
     session_epochs: Epoch = BapunDataSessionFormatRegisteredClass.session_fixup_epochs(sess=curr_active_pipeline.sess, override_extant=True)
