@@ -164,6 +164,7 @@ class OptimizedViewportRenderer:
     _thumbnail_cache: OrderedDict = field(default=Factory(OrderedDict), init=False, repr=False)
     _epoch_index: Optional[Dict] = field(default=None, init=False, repr=False)
     _total_time_duration: Optional[float] = field(default=None, init=False, repr=False)
+    _prev_composite_artist: Optional[Any] = field(default=None, init=False, repr=False)
     
     def __attrs_post_init__(self):
         """Initialize internal data structures"""
@@ -639,6 +640,65 @@ class OptimizedViewportRenderer:
             print(f"Rendered {len(thumbnails)} thumbnails, cache size: {len(self._thumbnail_cache)}")
         
         return artists_dict, extent
+    
+    def on_window_changed(self, start_t: float, end_t: float, debug_print: bool = False):
+        """
+        Window update callback method conforming to the window update protocol.
+        
+        This method is called when the visible time window changes (e.g., when user scrolls).
+        It automatically renders the viewport for the new time range.
+        
+        Args:
+            start_t: Start time of the visible window (absolute time in seconds)
+            end_t: End time of the visible window (absolute time in seconds)
+            debug_print: Whether to print debug information
+        
+        This method conforms to the same protocol as TimeSynchronizedPlotterBase.on_window_changed()
+        and can be used as a subscriber to window update signals.
+        
+        Usage:
+            # Connect to window update signal
+            window_scrolled.connect(renderer.on_window_changed)
+            
+            # Or call directly
+            renderer.on_window_changed(start_t=9293.5, end_t=9295.5)
+        """
+        # Clear previous artist if it exists
+        if hasattr(self, '_prev_composite_artist') and self._prev_composite_artist is not None:
+            try:
+                self._prev_composite_artist.remove()
+            except:
+                pass
+        
+        # Get current axis dimensions
+        ax = self.active_ax
+        bbox = ax.get_window_extent()
+        width_pixels = int(bbox.width)
+        height_pixels = int(bbox.height)
+        
+        # Create viewport for current visible window
+        viewport = Viewport(
+            start_time=start_t,
+            end_time=end_t,
+            width_pixels=width_pixels,
+            height_pixels=height_pixels
+        )
+        
+        # Render viewport
+        artists, extent = self.render_viewport(viewport, debug_print=debug_print)
+        
+        # Store artist for cleanup
+        if 'composite_image' in artists:
+            self._prev_composite_artist = artists['composite_image']
+        
+        # Ensure axis limits match viewport
+        ax.set_xlim(start_t, end_t)
+        ax.set_ylim(0.0, 1.0)
+        
+        # Force redraw
+        ax.figure.canvas.draw_idle()
+        
+        return artists, extent
     
     def clear_cache(self):
         """Clear the thumbnail cache"""
