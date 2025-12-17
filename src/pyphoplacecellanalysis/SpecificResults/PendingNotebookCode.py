@@ -118,6 +118,47 @@ from pyphoplacecellanalysis.General.Model.Configs.LongShortDisplayConfig import 
 from pyphocorehelpers.gui.Qt.color_helpers import ColormapHelpers, ColorFormatConverter, debug_print_color, build_adjusted_color
 
 
+from pathlib import Path
+
+@function_attributes(short_name=None, tags=['fixup', 'CSV', 'epochs', 'paradigm', 'BAPUN'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-12-17 18:14', related_items=[])
+def export_finalized_epochs_csvs(curr_active_pipeline):
+    """ exports csvs
+
+    
+    from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import export_finalized_epochs_csvs
+    
+    csv_output_paths_dict = export_finalized_epochs_csvs(curr_active_pipeline=curr_active_pipeline)
+    csv_output_paths_dict
+
+    """
+    def _subfn_do_export(epochs_df: pd.DataFrame, csv_output_path: Path):
+        if not csv_output_path.exists():        
+            epochs_df.to_csv(csv_output_path)
+        else:
+            print(f"file '{csv_output_path.as_posix()}' already exists and we will not overwrite it. skipping.")
+
+        print(f'csv_output_path: "{csv_output_path.as_uri()}"')
+        return csv_output_path
+
+
+    # ==================================================================================================================================================================================================================================================================================== #
+    # BEGIN FUNCTION BODY                                                                                                                                                                                                                                                                  #
+    # ==================================================================================================================================================================================================================================================================================== #
+    export_paths = {}
+
+
+    _bak_csv_output_path: Path = curr_active_pipeline.get_output_path().joinpath(f'{curr_active_pipeline.session_name}.epochs.csv')
+    epochs_df = ensure_dataframe(curr_active_pipeline.sess.epochs)
+    _bak_csv_output_path = _subfn_do_export(epochs_df=epochs_df, csv_output_path=_bak_csv_output_path)
+    export_paths['epochs'] = _bak_csv_output_path
+
+    if (hasattr(curr_active_pipeline.sess, 'epochs_bak') and (curr_active_pipeline.sess.epochs_bak is not None)):
+        csv_output_path: Path = curr_active_pipeline.get_output_path().joinpath(f'{curr_active_pipeline.session_name}.epochs_bak.csv')
+        epochs_df = ensure_dataframe(curr_active_pipeline.sess.epochs_bak)
+        _bak_csv_output_path = _subfn_do_export(epochs_df=epochs_df, csv_output_path=csv_output_path)
+        export_paths['epochs_bak'] = _bak_csv_output_path
+        
+    return export_paths
 
 
 # def _split_into_consequitive_sequences(df: pd.DataFrame, column_name: str='is_adjacent_epoch_bin') -> pd.DataFrame:
