@@ -475,7 +475,7 @@ class EpochsEditor:
 
         # Draws the lap positions as a thin, semi-transparent dark line so epochs remain visible behind it
         pos_pen = pg.mkPen(color='#e4fd0032', width=0.1)
-        ax_pos = pg.PlotDataItem(x=pos_df.t.to_numpy(), y=pos_df[pos_variable_names[0]].to_numpy(), pen=pos_pen, name=pos_variable_names[0]) # Draws the laps as semi-transparent lines
+        ax_pos = pg.PlotDataItem(x=pos_df.t.to_numpy(), y=pos_df[pos_variable_names[0]].to_numpy(), pen=pos_pen, antialias=True, name=pos_variable_names[0]) # Draws the laps as semi-transparent lines
 
 
         v1.setMouseEnabled(x=True, y=False)
