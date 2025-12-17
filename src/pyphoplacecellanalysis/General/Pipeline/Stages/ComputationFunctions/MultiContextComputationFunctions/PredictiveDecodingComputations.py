@@ -770,7 +770,7 @@ class DecodingLocalityMeasures(ComputedResult): #PickleSerializableMixin, AttrsB
         return non_local_locality_measures_epochs_df
 
 
-    def add_non_local_epochs_to_intervals_timeline(self, active_2d_plot, visualization_update_dict=None):
+    def add_non_local_epochs_to_intervals_timeline(self, active_2d_plot, identifier:str='non-local', non_local_epochs_df: pd.DataFrame=None, visualization_update_dict=None):
         """  Add `non_local_locality_measures_epochs_df` to timeline as interval epochs
 
         a_rect_item, non_local_locality_measures_epochs_df = decoding_locality_measures.add_non_local_epochs_to_intervals_timeline(active_2d_plot=active_2d_plot)
@@ -778,11 +778,12 @@ class DecodingLocalityMeasures(ComputedResult): #PickleSerializableMixin, AttrsB
         from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.GraphicsObjects.IntervalRectsItem import IntervalRectsItem
 
         ## Compute adjacent epochs:
-        non_local_locality_measures_epochs_df = self.get_non_local_epochs(merging_adjacent_max_separation_sec=0.5)
+        if non_local_epochs_df is None:
+            non_local_epochs_df = self.get_non_local_epochs(merging_adjacent_max_separation_sec=0.5)
+            
         ## INPUTS: non_local_locality_measures_epochs_df
-        _out_intervals = active_2d_plot.add_rendered_intervals(non_local_locality_measures_epochs_df, name='non-local')
+        _out_intervals = active_2d_plot.add_rendered_intervals(non_local_epochs_df, name=identifier)
         a_rect_item: IntervalRectsItem = _out_intervals['RootPlot']['rect_item']
-        a_rect_item
         # Direct dictionary update
         if visualization_update_dict is None:
             visualization_update_dict = {
@@ -791,7 +792,7 @@ class DecodingLocalityMeasures(ComputedResult): #PickleSerializableMixin, AttrsB
         active_2d_plot.update_rendered_intervals_visualization_properties(visualization_update_dict)
 
 
-        return a_rect_item, non_local_locality_measures_epochs_df
+        return a_rect_item, non_local_epochs_df
 
 
 @define(slots=False, repr=False, eq=False)
