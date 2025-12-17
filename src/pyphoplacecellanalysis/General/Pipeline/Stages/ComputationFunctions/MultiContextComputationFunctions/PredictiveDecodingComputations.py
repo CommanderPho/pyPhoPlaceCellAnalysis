@@ -26,6 +26,9 @@ from neuropy.utils.efficient_interval_search import OverlappingIntervalsFallback
 from neuropy.utils.mixins.time_slicing import TimePointEventAccessor
 
 from neuropy.utils.misc import build_shuffled_ids # used in _SHELL_analyze_leave_one_out_decoding_results
+from neuropy.utils.mixins.time_slicing import TimePointEventAccessor
+from neuropy.utils.indexing_helpers import NeuroPyDataframeAccessor
+from neuropy.utils.mixins.indexing_helpers import get_dict_subset
 
 from pyphocorehelpers.mixins.member_enumerating import AllFunctionEnumeratingMixin
 from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.ComputationFunctionRegistryHolder import ComputationFunctionRegistryHolder
@@ -740,7 +743,55 @@ class DecodingLocalityMeasures(ComputedResult): #PickleSerializableMixin, AttrsB
         super().to_hdf(file_path, key=key, **kwargs)
 
 
+    @classmethod
+    def _reload_class(cls, an_instance):
+        """ specifically updates the instance after its class definition has been updated.
+        """
+        return cls(**get_dict_subset(an_instance.__getstate__(), subset_excludelist=['_VersionedResultMixin_version', '_interpolator', 'locality_measures_df',
+            'moving_avg_meas_pos_overlap_dict',
+        ]))
 
+
+
+    # ==================================================================================================================================================================================================================================================================================== #
+    # Graphical/Display Helpers                                                                                                                                                                                                                                                            #
+    # ==================================================================================================================================================================================================================================================================================== #
+    def get_non_local_epochs(self, merging_adjacent_max_separation_sec=0.5, **kwargs) -> pd.DataFrame:
+        """
+        non_local_locality_measures_epochs_df = decoding_locality_measures.get_non_local_epochs(merging_adjacent_max_separation_sec=0.5)
+        render_scrollable_colored_table_from_dataframe(non_local_locality_measures_epochs_df)
+
+        """
+        _out_locality_measures_df: pd.DataFrame = deepcopy(self.locality_measures_df)
+        # _out_locality_measures_df['t'].diff() # 0.25
+        non_local_locality_measures_df = deepcopy(_out_locality_measures_df[_out_locality_measures_df['is_non_local_period']])
+        ## Compute adjacent epochs:
+        non_local_locality_measures_epochs_df = _out_locality_measures_df.neuropy.detect_epoch_satisfying_condition(is_condition_satisfied = (_out_locality_measures_df['is_non_local_period'].to_numpy()), merging_adjacent_max_separation_sec=merging_adjacent_max_separation_sec, **kwargs)
+        return non_local_locality_measures_epochs_df
+
+
+    def add_non_local_epochs_to_intervals_timeline(self, active_2d_plot, visualization_update_dict=None):
+        """  Add `non_local_locality_measures_epochs_df` to timeline as interval epochs
+
+        a_rect_item, non_local_locality_measures_epochs_df = decoding_locality_measures.add_non_local_epochs_to_intervals_timeline(active_2d_plot=active_2d_plot)
+        """
+        from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.GraphicsObjects.IntervalRectsItem import IntervalRectsItem
+
+        ## Compute adjacent epochs:
+        non_local_locality_measures_epochs_df = self.get_non_local_epochs(merging_adjacent_max_separation_sec=0.5)
+        ## INPUTS: non_local_locality_measures_epochs_df
+        _out_intervals = active_2d_plot.add_rendered_intervals(non_local_locality_measures_epochs_df, name='non-local')
+        a_rect_item: IntervalRectsItem = _out_intervals['RootPlot']['rect_item']
+        a_rect_item
+        # Direct dictionary update
+        if visualization_update_dict is None:
+            visualization_update_dict = {
+                'non-local': dict(y_location=-2.0, height=0.9, pen_color="#d8db06", pen_opacity=0.7843137254901961, brush_color="#bbae00", brush_opacity=0.6078431372549019),
+            }
+        active_2d_plot.update_rendered_intervals_visualization_properties(visualization_update_dict)
+
+
+        return a_rect_item, non_local_locality_measures_epochs_df
 
 
 @define(slots=False, repr=False, eq=False)
