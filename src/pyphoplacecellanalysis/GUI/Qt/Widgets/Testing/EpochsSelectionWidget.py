@@ -10,6 +10,7 @@ from PyQt5.QtGui import *
 from PyQt5.QtWidgets import *
 
 class EpochsWindow(QWidget):
+    """ Unfinished prototype widget for editing the options associated with display each epoch interval series."""
     def __init__(self, parent=None):
         super(EpochsWindow, self).__init__(parent)
 
