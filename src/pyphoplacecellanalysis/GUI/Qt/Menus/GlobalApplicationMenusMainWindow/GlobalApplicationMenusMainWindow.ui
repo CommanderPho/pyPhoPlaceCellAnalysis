@@ -7,8 +7,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>796</width>
-    <height>600</height>
+    <width>747</width>
+    <height>526</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -20,19 +20,30 @@
     <rect>
      <x>0</x>
      <y>0</y>
-     <width>796</width>
-     <height>22</height>
+     <width>747</width>
+     <height>21</height>
     </rect>
    </property>
    <widget class="QMenu" name="menuFile">
     <property name="title">
      <string>File</string>
     </property>
+    <widget class="QMenu" name="menuExport">
+     <property name="title">
+      <string>Export</string>
+     </property>
+     <addaction name="actionFullTimelineTracks"/>
+     <addaction name="actionVideoFiles"/>
+     <addaction name="actionOther"/>
+    </widget>
     <addaction name="actionLoad"/>
+    <addaction name="separator"/>
     <addaction name="actionSave"/>
     <addaction name="actionSave_As"/>
+    <addaction name="menuExport"/>
     <addaction name="separator"/>
     <addaction name="actionQuit_Application"/>
+    <addaction name="separator"/>
    </widget>
    <widget class="QMenu" name="menuAnalyses">
     <property name="title">
@@ -258,6 +269,26 @@
    </property>
    <property name="text">
     <string>New 1D Ratemaps Plot</string>
+   </property>
+  </action>
+  <action name="actionExportFullTimeline">
+   <property name="text">
+    <string>Export Full Timeline</string>
+   </property>
+  </action>
+  <action name="actionFullTimelineTracks">
+   <property name="text">
+    <string>Full Timeline Tracks</string>
+   </property>
+  </action>
+  <action name="actionVideoFiles">
+   <property name="text">
+    <string>Video Files</string>
+   </property>
+  </action>
+  <action name="actionOther">
+   <property name="text">
+    <string>Other</string>
    </property>
   </action>
  </widget>
