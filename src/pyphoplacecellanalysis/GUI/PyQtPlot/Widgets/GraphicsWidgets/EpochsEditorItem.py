@@ -6,6 +6,7 @@ import copy
 from typing import Optional, Dict, List, Tuple, Callable
 from attrs import define, field, Factory
 from neuropy.core.user_annotations import function_attributes, metadata_attributes
+from neuropy.core.epoch import Epoch, EpochsAccessor, ensure_dataframe, ensure_Epoch, EpochHelpers
 import numpy as np
 import pandas as pd
 import pyphoplacecellanalysis.External.pyqtgraph as pg
@@ -22,6 +23,8 @@ from pyphoplacecellanalysis.General.Model.Configs.LongShortDisplayConfig import 
 from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.Mixins.ReprPrintableWidgetMixin import ReprPrintableItemMixin
 
 __all__ = ['EpochsEditor']
+
+
 
 class CustomViewBox(ReprPrintableItemMixin, pg.ViewBox):
     def __init__(self, parent=None):
@@ -82,6 +85,36 @@ class EpochsEditor:
     _pos_variable_names = ('x_smooth', 'velocity_x_smooth', 'acceleration_x_smooth')
     # _pos_variable_names = ('x', 'velocity_x', 'acceleration_x')
 
+    @staticmethod
+    def _compute_epoch_span_from_offset(overlap_y_offset: Optional[int], curr_laps_df: pd.DataFrame, base_span: Tuple[float, float] = (0, 1)) -> Tuple[float, float]:
+        """Compute the vertical span for an epoch based on its overlap_y_offset.
+        
+        Args:
+            overlap_y_offset: The y-offset level for this epoch (None if not using offsets)
+            curr_laps_df: The dataframe containing all epochs (to compute max offset)
+            base_span: The base span range to divide (default: (0, 1))
+            
+        Returns:
+            Tuple of (y_bottom, y_top) for the epoch's vertical span
+        """
+        if overlap_y_offset is None or 'overlap_y_offset' not in curr_laps_df.columns:
+            return base_span
+        
+        max_offset = curr_laps_df['overlap_y_offset'].max()
+        if max_offset is None or pd.isna(max_offset) or max_offset < 0:
+            return base_span
+        
+        if max_offset == 0:
+            # Only one level, use full span
+            return base_span
+        
+        # Divide the available span into bands
+        span_range = base_span[1] - base_span[0]
+        band_height = span_range / (max_offset + 1)
+        y_bottom = base_span[0] + overlap_y_offset * band_height
+        y_top = base_span[0] + (overlap_y_offset + 1) * band_height
+        return (y_bottom, y_top)
+
     def connect_double_click_event(self):
         print("Connecting double-click event...")
         self.plots.viewboxes[0].scene().sigMouseClicked.connect(self.on_mouse_click)
@@ -108,6 +141,12 @@ class EpochsEditor:
                     'lap_accent_color': '#c4ff26de',
                     'is_included': True
                 }
+                # If overlap_y_offset column exists, assign offset for the new epoch
+                if 'overlap_y_offset' in self.curr_laps_df.columns:
+                    # Create a temporary df with the new epoch to compute its offset
+                    temp_df = self.curr_laps_df.append(new_epoch, ignore_index=True)
+                    temp_df = EpochHelpers.assign_overlap_y_offset(temp_df, start_col='start', stop_col='stop', out_col='overlap_y_offset')
+                    new_epoch['overlap_y_offset'] = temp_df.iloc[-1]['overlap_y_offset']
                 print(f"\tAdding new epoch: {new_epoch}")
                 self.curr_laps_df = self.curr_laps_df.append(new_epoch, ignore_index=True)
                 self.add_epoch_region(new_epoch)
@@ -247,8 +286,15 @@ class EpochsEditor:
 
         print(f"Creating epoch region for: {epoch}")
         v1 = self.plots.viewboxes[0]
+        
+        # Compute span from overlap_y_offset if available
+        overlap_y_offset = epoch.get('overlap_y_offset', None)
+        base_span = (0, 1)  # Default span
+        epoch_span = self._compute_epoch_span_from_offset(overlap_y_offset, self.curr_laps_df, base_span)
+        
         epoch_linear_region, epoch_region_label = build_pyqtgraph_epoch_indicator_regions(
             v1, t_start=epoch['start'], t_stop=epoch['stop'], epoch_label=epoch['label'], movable=True,
+            span=epoch_span,
             **dict(pen=pg.mkPen(f'{epoch["lap_color"]}d6', width=1.0), brush=pg.mkBrush(f"{epoch['lap_color']}42"),
                    hoverBrush=pg.mkBrush(f"{epoch['lap_color']}a8"), hoverPen=pg.mkPen(epoch['lap_accent_color'], width=2.5)),
             custom_bound_data=epoch['lap_id']
@@ -284,9 +330,15 @@ class EpochsEditor:
         for a_lap in curr_laps_df.itertuples():
             epoch_linear_region = lap_epoch_widgets.get(a_lap.label, None)
             if epoch_linear_region is None:
+                ## Compute span from overlap_y_offset if available
+                overlap_y_offset = getattr(a_lap, 'overlap_y_offset', None)
+                base_span = (0, 1)  # Default span
+                epoch_span = self._compute_epoch_span_from_offset(overlap_y_offset, curr_laps_df, base_span)
+                
                 ## Create a new one:
                 # add alpha
                 epoch_linear_region, epoch_region_label = build_pyqtgraph_epoch_indicator_regions(v1, t_start=a_lap.start, t_stop=a_lap.stop, epoch_label=a_lap.label, movable=True, removable=True,
+                                                                                                   span=epoch_span,
                                                                                                    **dict(pen=pg.mkPen(f'{a_lap.lap_color}d6', width=1.0), brush=pg.mkBrush(f"{a_lap.lap_color}42"), hoverBrush=pg.mkBrush(f"{a_lap.lap_color}a8"), hoverPen=pg.mkPen(a_lap.lap_accent_color, width=2.5)), 
                                                                                                   custom_bound_data=a_lap.Index)                
                 lap_epoch_widgets[a_lap.label] = epoch_linear_region
@@ -421,10 +473,9 @@ class EpochsEditor:
             additional_items[f'{k}_line'] = vline
             
 
-
-
-        # Draws the lap positions as a white line _____________________________________________________________________________________ #
-        ax_pos = pg.PlotDataItem(x=pos_df.t.to_numpy(), y=pos_df[pos_variable_names[0]].to_numpy(), pen='white', name=pos_variable_names[0]) # Draws the laps as white lines
+        # Draws the lap positions as a thin, semi-transparent dark line so epochs remain visible behind it
+        pos_pen = pg.mkPen(color='#e4fd0032', width=0.1)
+        ax_pos = pg.PlotDataItem(x=pos_df.t.to_numpy(), y=pos_df[pos_variable_names[0]].to_numpy(), pen=pos_pen, name=pos_variable_names[0]) # Draws the laps as semi-transparent lines
 
 
         v1.setMouseEnabled(x=True, y=False)
@@ -479,6 +530,7 @@ class EpochsEditor:
 
         movable = kwargs.pop('movable', True)
         removable = kwargs.pop('removable', True)
+        base_span = kwargs.pop('span', (0, 1))  # Extract span from kwargs if provided
         
         lap_epoch_widgets = {}
         lap_epoch_labels = {}
@@ -486,9 +538,13 @@ class EpochsEditor:
         for a_lap in curr_laps_df.itertuples():
             epoch_linear_region = lap_epoch_widgets.get(a_lap.label, None)
             if epoch_linear_region is None:
+                ## Compute span from overlap_y_offset if available
+                overlap_y_offset = getattr(a_lap, 'overlap_y_offset', None)
+                epoch_span = cls._compute_epoch_span_from_offset(overlap_y_offset, curr_laps_df, base_span)
+                
                 ## Create a new one:
                 # add alpha
-                epoch_linear_region, epoch_region_label = build_pyqtgraph_epoch_indicator_regions(v1, t_start=a_lap.start, t_stop=a_lap.stop, epoch_label=a_lap.label, movable=movable, removable=removable, **dict(pen=pg.mkPen(f'{a_lap.lap_color}d6', width=1.0), brush=pg.mkBrush(f"{a_lap.lap_color}42"), hoverBrush=pg.mkBrush(f"{a_lap.lap_color}a8"), hoverPen=pg.mkPen(a_lap.lap_accent_color, width=2.5)), 
+                epoch_linear_region, epoch_region_label = build_pyqtgraph_epoch_indicator_regions(v1, t_start=a_lap.start, t_stop=a_lap.stop, epoch_label=a_lap.label, movable=movable, removable=removable, span=epoch_span, **dict(pen=pg.mkPen(f'{a_lap.lap_color}d6', width=1.0), brush=pg.mkBrush(f"{a_lap.lap_color}42"), hoverBrush=pg.mkBrush(f"{a_lap.lap_color}a8"), hoverPen=pg.mkPen(a_lap.lap_accent_color, width=2.5)), 
                                                                                                   custom_bound_data=a_lap.Index, **custom_epoch_label_kwargs, **kwargs)               
                 lap_epoch_widgets[a_lap.label] = epoch_linear_region
                 lap_epoch_labels[a_lap.label] = epoch_region_label
