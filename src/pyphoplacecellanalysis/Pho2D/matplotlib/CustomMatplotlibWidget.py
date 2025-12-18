@@ -259,6 +259,7 @@ class CustomMatplotlibWidget(CrosshairsTracingMixin, ToastShowingWidgetMixin, Pl
         """
         #TODO 2023-07-06 15:05: - [ ] PERFORMANCE - REDRAW
         self.ui.canvas.draw()
+        # self.ui.canvas.draw_idle()
         
 
     def copy_figure_to_clipboard(self):

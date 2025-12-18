@@ -106,7 +106,7 @@ class LiveWindowEventIntervalMonitoringMixin(ReprPrintableItemMixin):
     @pyqtExceptionPrintingSlot(float, float)
     def LiveWindowEventIntervalMonitoringMixin_on_window_update(self, new_start=None, new_end=None):
         """ called to perform updates when the active window changes. Redraw, recompute data, etc. """
-        self.on_visible_intervals_changed()
+        self.on_visible_intervals_changed() # TODO 2025-12-18 - PERFORMANCE
             
     @pyqtExceptionPrintingSlot(object)
     def LiveWindowEventIntervalMonitoringMixin_on_window_update_rate_limited(self, evt):

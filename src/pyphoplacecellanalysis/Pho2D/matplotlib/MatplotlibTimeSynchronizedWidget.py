@@ -38,7 +38,7 @@ class MatplotlibTimeSynchronizedWidget(CustomMatplotlibWidget):
         ## Update all children axes:
         for curr_ax in self.axes:
             curr_ax.set_xlim(start_t, end_t)
-        self.draw()
+        self.draw() # Impact: Each matplotlib track adds ~50-200ms per scroll event. TODO 2025-12-18 - PERFORMANCE
         
     ############### Rate-Limited SLots ###############:
     ##################################################
