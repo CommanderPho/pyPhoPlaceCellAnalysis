@@ -91,7 +91,7 @@ class DecodingLocalityMeasures(ComputedResult): #PickleSerializableMixin, AttrsB
     epoch_names: List[str] = serialized_field(default=Factory(list))
     _interpolator: interp1d = non_serialized_field(default=None, is_computable=False)
     paradigm_epochs_df: pd.DataFrame = serialized_field()
-    
+    defer_compute_on_init: bool = non_serialized_field(default=False, is_computable=False)
 
     ## computed
     new_positions: NDArray[ND.Shape["N_TIME_BINS, 2"], np.floating] = serialized_field()
@@ -112,42 +112,26 @@ class DecodingLocalityMeasures(ComputedResult): #PickleSerializableMixin, AttrsB
 
     def __attrs_post_init__(self):
         # Add post-init logic here
-        if self.sigma is None:
-            x_step: float = np.nanmean(np.diff(self.xbin))
-            y_step: float = np.nanmean(np.diff(self.ybin))
+        if self.defer_compute_on_init:
+            print('DecodingLocalityMeasures.__attrs_post_init__(...): init will not be performed because `self.defer_compute_on_init == True`.')
+        else:
+            if self.sigma is None:
+                x_step: float = np.nanmean(np.diff(self.xbin))
+                y_step: float = np.nanmean(np.diff(self.ybin))
 
-            self.sigma = np.nanmax([x_step, y_step]) * 5.0
-            print(f'sigma: {self.sigma}')
+                self.sigma = np.nanmax([x_step, y_step]) * 5.0
+                print(f'sigma: {self.sigma}')
+                
+            print(f'building sampled and normalized outputs...')
+            self._build_sampled_pos_with_gaussian_spread()
             
-        print(f'building sampled and normalized outputs...')
-        self._build_sampled_pos_with_gaussian_spread()
-        
-        if (self.gaussian_volume is None):
-            self.gaussian_volume = self._build_sampled_pos_with_gaussian_spread()
+            if (self.gaussian_volume is None):
+                self.gaussian_volume = self._build_sampled_pos_with_gaussian_spread()
 
-        if (self.p_x_given_n_dict is None) or (len(self.p_x_given_n_dict) == 0):
-            self.build_normalized_outputs()
+            if (self.p_x_given_n_dict is None) or (len(self.p_x_given_n_dict) == 0):
+                self.build_normalized_outputs()
+
         print(f'done.')
-
-
-    # @property
-    # def locality_measures_df(self) -> pd.DataFrame:
-    #     """The locality_measures_df property."""
-    #     # _out_locality_measures_df = pd.DataFrame(self.decoding_meas_pos_locality_measure_dict)
-    #     _out_locality_measures_df = pd.DataFrame(self.time_window_centers, columns=['t'])
-    #     # _out_locality_measures_df['t'] = self.time_window_centers
-
-    #     for an_epoch_name, v in self.locality_measures_dict_dict.items():
-
-    #         for a_computation_measure_name, vv in v.items():
-    #             if a_computation_measure_name == 'mask_overlap':
-    #                 total_num_possible_bins: int = len(self.xbin_centers) * len(self.ybin_centers)
-    #                 vv = np.nansum(vv, (0, 1)) / total_num_possible_bins
-    #             _out_locality_measures_df[f"{a_computation_measure_name}_{an_epoch_name}"] = vv # _obj.locality_measures_dict_dict[an_epoch_name][a_computation_measure_name]
-
-
-    #     return _out_locality_measures_df
-
 
 
     @classmethod
@@ -747,10 +731,18 @@ class DecodingLocalityMeasures(ComputedResult): #PickleSerializableMixin, AttrsB
     def _reload_class(cls, an_instance):
         """ specifically updates the instance after its class definition has been updated.
         """
-        return cls(**get_dict_subset(an_instance.__getstate__(), subset_excludelist=['_VersionedResultMixin_version', '_interpolator', 'locality_measures_df',
+        non_init_subset=['_VersionedResultMixin_version', '_interpolator', 'locality_measures_df',
             'moving_avg_meas_pos_overlap_dict',
-        ]))
+        ]
 
+        _full_state = an_instance.__getstate__()
+        defer_compute_on_init: bool = _full_state.pop('defer_compute_on_init', True) ## exclude this
+        defer_compute_on_init = True ## OVERRIDE
+        _init_state = get_dict_subset(_full_state, subset_excludelist=non_init_subset)
+        _post_init_state = get_dict_subset(_full_state, subset_includelist=non_init_subset)
+        _obj = cls(defer_compute_on_init=True, **_init_state) ## prevent computation
+        _obj.__dict__.update(**_post_init_state) ## perform literal update
+        return _obj
 
 
     # ==================================================================================================================================================================================================================================================================================== #
@@ -790,9 +782,12 @@ class DecodingLocalityMeasures(ComputedResult): #PickleSerializableMixin, AttrsB
                 identifier: dict(y_location=-2.0, height=0.9, pen_color="#d8db06", pen_opacity=0.7843137254901961, brush_color="#bbae00", brush_opacity=0.6078431372549019),
             }
         active_2d_plot.update_rendered_intervals_visualization_properties(visualization_update_dict)
-
-
         return a_rect_item, non_local_epochs_df
+
+
+
+
+
 
 
 @define(slots=False, repr=False, eq=False)
