@@ -65,7 +65,6 @@ from neuropy.utils.mixins.binning_helpers import find_minimum_time_bin_duration
 
 
 
-
 @define(slots=False, repr=False, eq=False)
 class DecodingLocalityMeasures(ComputedResult): #PickleSerializableMixin, AttrsBasedClassHelperMixin):
     """ Handles computing information about how the current decoded position relates to the present position (e.g. is it local, non-local, etc)
@@ -908,16 +907,25 @@ class PredictiveDecoding(ComputedResult): #PickleSerializableMixin, AttrsBasedCl
 
     Usage:
     
-        from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import PredictiveDecoding
-        from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.PredictiveDecodingComputations import PredictiveDecoding
-
-    
-        time_window_centers, moving_avg = PredictiveDecoding.add_predictive_decoding_layers(curr_active_pipeline=curr_active_pipeline, directional_decoders_decode_result=directional_decoders_decode_result, window_size=90)
-        out_layers, config_widgets_dict_dict = PredictiveDecoding.add_moving_average_layers(sync_plotters=sync_plotters, time_window_centers=time_window_centers, moving_avg=moving_avg)
-
-
-        epoch_names = list(sync_plotters.keys())
-        moving_avg_dict, moving_avg_meas_pos_overlap_dict, gaussian_volume = _obj.build_normalized_outputs(epoch_names=epoch_names, sigma=1.0)
+        from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.PredictiveDecodingComputations import PredictiveDecoding, DecodingLocalityMeasures
+        
+        # First create DecodingLocalityMeasures (if not already available)
+        locality_measures = DecodingLocalityMeasures.init_from_decode_result(...)
+        
+        # Then create PredictiveDecoding from locality_measures
+        predictive_decoding = PredictiveDecoding.init_from_decode_result(
+            curr_active_pipeline=curr_active_pipeline,
+            locality_measures=locality_measures,
+            a_result_decoded=a_result_decoded,  # optional, can extract from locality_measures if not provided
+            window_size=200
+        )
+        
+        # Compute normalized outputs
+        predictive_decoding.compute(sigma=1.0)
+        moving_avg_dict, moving_avg_meas_pos_overlap_dict, gaussian_volume = predictive_decoding.compute(sigma=1.0)
+        
+        # Add layers for visualization
+        out_layers, config_widgets_dict_dict, dock_window = predictive_decoding.add_all_layers(sync_plotters=sync_plotters)
 
 
     """
@@ -989,34 +997,40 @@ class PredictiveDecoding(ComputedResult): #PickleSerializableMixin, AttrsBasedCl
 
     @function_attributes(short_name=None, tags=['predictive_decoding', 'layers'], input_requires=[], output_provides=[], uses=[], used_by=['init_from_decode_result'], creation_date='2025-12-09 19:03', related_items=[])
     @classmethod
-    def _perform_compute_predictive_decoding(cls, curr_active_pipeline, a_result_decoded: DecodedFilterEpochsResult, window_size: int = 200):
+    def _perform_compute_predictive_decoding(cls, curr_active_pipeline, time_window_centers: NDArray, p_x_given_n: NDArray, window_size: int = 200):
         """ Computes a moving average from the decoded posterior
 
-        moving_avg = _perform_compute_predictive_decoding(curr_active_pipeline=curr_active_pipeline, a_result_decoded=a_result_decoded, window_size=200)
+        Args:
+            curr_active_pipeline: The active pipeline object
+            time_window_centers: Array of time window centers
+            p_x_given_n: Decoded posterior probability array with shape (n_x_bins, n_y_bins, n_tasks, n_time_bins)
+            window_size: Size of the moving average window (default: 200)
 
+        Returns:
+            tuple: (time_window_centers, pos_df, moving_avg, new_positions, p_x_given_n)
 
+        Usage:
+            time_window_centers, pos_df, moving_avg, new_positions, p_x_given_n = _perform_compute_predictive_decoding(
+                curr_active_pipeline=curr_active_pipeline,
+                time_window_centers=time_window_centers,
+                p_x_given_n=p_x_given_n,
+                window_size=200
+            )
         """
         from scipy.interpolate import interp1d
+        from neuropy.utils.indexing_helpers import flatten
 
-        
-        # a_result_decoded
-
-        # a_result_decoded.p_x_given_n # .shape (41, 63, 2, 103948) - (n_x_bins, n_y_bins, n_tasks, n_time_bins) 
-        time_window_centers = getattr(a_result_decoded, 'time_window_centers', None)
-        if time_window_centers is None:
-            time_window_centers = deepcopy(a_result_decoded.time_bin_container.centers)
-            
+        # Get position dataframe
         pos_df = deepcopy(curr_active_pipeline.sess.position.to_dataframe())
-        # pos_df
 
         # axis=0 interpolates along rows (time) for all columns ('x' and 'y')
         # fill_value="extrapolate" allows sampling outside original time range
         interpolator = interp1d(pos_df['t'], pos_df[['x', 'y']], kind='linear', axis=0, fill_value="extrapolate")
 
         # Returns shape new_positions .shape: (n_target_times, 2)
+        time_window_centers = flatten(time_window_centers)
+
         new_positions = interpolator(time_window_centers)
-        # new_positions
-        p_x_given_n = deepcopy(a_result_decoded.p_x_given_n)
         
         # 2. Calculate Cumulative Sum along the time axis (axis=-1)
         # We use float64 to prevent precision loss over 100k+ bins
@@ -1045,33 +1059,69 @@ class PredictiveDecoding(ComputedResult): #PickleSerializableMixin, AttrsBasedCl
     
 
     @classmethod
-    def init_from_decode_result(cls, curr_active_pipeline, locality_measures:Optional[DecodingLocalityMeasures]=None, a_result_decoded:Optional[DecodedFilterEpochsResult]=None, directional_decoders_decode_result:Optional[DirectionalDecodersContinuouslyDecodedResult]=None, window_size: int = 200, extant_decoded_time_bin_size: float = 0.25, sigma: Optional[float] = None) -> "PredictiveDecoding":
-        """ 
-        _obj: PredictiveDecoding = PredictiveDecoding.init_from_decode_result(
-        """
-        # Create DecodingLocalityMeasures instance first (handles all locality-related computations)
-        if locality_measures is None:
-            assert directional_decoders_decode_result is not None, f"a real directional_decoders_decode_result is required to build a new DecodingLocalityMeasures"
-            locality_measures = DecodingLocalityMeasures.init_from_decode_result(
+    def init_from_decode_result(cls, curr_active_pipeline, locality_measures: DecodingLocalityMeasures, a_result_decoded: Optional[DecodedFilterEpochsResult] = None, window_size: int = 200, sigma: Optional[float] = None) -> "PredictiveDecoding":
+        """ Initialize PredictiveDecoding from locality_measures and optionally a_result_decoded.
+        
+        Args:
+            curr_active_pipeline: The active pipeline object
+            locality_measures: DecodingLocalityMeasures object containing decoder information and locality data
+            a_result_decoded: Optional DecodedFilterEpochsResult. If not provided, data will be extracted from locality_measures
+            window_size: Size of the moving average window (default: 200)
+            sigma: Optional sigma parameter (currently unused but kept for compatibility)
+        
+        Returns:
+            PredictiveDecoding: Initialized PredictiveDecoding instance
+        
+        Usage:
+            _obj: PredictiveDecoding = PredictiveDecoding.init_from_decode_result(
                 curr_active_pipeline=curr_active_pipeline,
-                directional_decoders_decode_result=directional_decoders_decode_result,
-                extant_decoded_time_bin_size=extant_decoded_time_bin_size,
-                sigma=sigma
+                locality_measures=locality_measures,
+                a_result_decoded=a_result_decoded,  # optional
+                window_size=200
             )
-
-
+        """
+        # If a_result_decoded is not provided, extract needed data from locality_measures
         if a_result_decoded is None:
-            assert directional_decoders_decode_result is not None
-            a_result_decoded = directional_decoders_decode_result.continuously_decoded_pseudo2D_decoder_dict[extant_decoded_time_bin_size]
+            # Extract time_window_centers and p_x_given_n from locality_measures
+            time_window_centers = deepcopy(locality_measures.time_window_centers)
+            p_x_given_n = deepcopy(locality_measures.p_x_given_n)
         else:
-            assert directional_decoders_decode_result is None
-
-
+            # Try to use data from a_result_decoded, but fall back to locality_measures if attributes don't exist
+            from neuropy.utils.indexing_helpers import flatten
+            
+            # Prefer flat_time_window_centers if available (for DecodedFilterEpochsResult)
+            time_window_centers = getattr(a_result_decoded, 'flat_time_window_centers', None)
+            if time_window_centers is None:
+                # Try time_window_centers (might be a list of arrays)
+                time_window_centers = getattr(a_result_decoded, 'time_window_centers', None)
+                if time_window_centers is not None:
+                    # Flatten if it's a list of arrays
+                    if isinstance(time_window_centers, list):
+                        time_window_centers = flatten(time_window_centers)
+                    else:
+                        time_window_centers = deepcopy(time_window_centers)
+                else:
+                    # Try time_bin_container (singular) for continuous decoded results
+                    if hasattr(a_result_decoded, 'time_bin_container'):
+                        time_window_centers = deepcopy(a_result_decoded.time_bin_container.centers)
+                    else:
+                        # Fall back to locality_measures
+                        time_window_centers = deepcopy(locality_measures.time_window_centers)
+            else:
+                time_window_centers = deepcopy(time_window_centers)
+            
+            p_x_given_n = getattr(a_result_decoded, 'p_x_given_n', None)
+            if p_x_given_n is None:
+                # Fall back to locality_measures
+                p_x_given_n = deepcopy(locality_measures.p_x_given_n)
+            else:
+                p_x_given_n = deepcopy(p_x_given_n)
 
         # Compute moving average (unique to PredictiveDecoding)
         time_window_centers, pos_df, moving_avg, new_positions, p_x_given_n = cls._perform_compute_predictive_decoding(
             curr_active_pipeline=curr_active_pipeline,
-            a_result_decoded=a_result_decoded,
+            time_window_centers=time_window_centers,
+            p_x_given_n=p_x_given_n,
             window_size=window_size,
         )
 
@@ -1129,7 +1179,7 @@ class PredictiveDecoding(ComputedResult): #PickleSerializableMixin, AttrsBasedCl
         Note: Locality measures are computed by DecodingLocalityMeasures.compute()
         """
         # Delegate locality computations to DecodingLocalityMeasures
-        if (self.locality_measures.sigma is None) or (self.locality_measures.sigma != sigma):
+        if (self.locality_measures.sigma is None) or ((self.locality_measures.sigma != sigma) and (not (sigma is None))):
             # Update sigma if different
             self.locality_measures.sigma = sigma
             # Force recomputation by clearing gaussian_volume (will be recomputed in compute())
@@ -1635,7 +1685,7 @@ class PredictiveDecodingComputationsGlobalComputationFunctions(AllFunctionEnumer
 
 
         """
-        from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.PredictiveDecodingComputations import PredictiveDecoding
+        from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.PredictiveDecodingComputations import PredictiveDecoding, DecodingLocalityMeasures
         from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import DirectionalDecodersContinuouslyDecodedResult
         from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import DecodedFilterEpochsResult
         
@@ -1693,10 +1743,26 @@ class PredictiveDecodingComputationsGlobalComputationFunctions(AllFunctionEnumer
             ## add some more shuffles to it:
             wcorr_tool.compute_shuffles(num_shuffles=desired_new_num_shuffles, curr_active_pipeline=owning_pipeline_reference)
 
-
         
 
-        _obj: PredictiveDecoding = PredictiveDecoding.init_from_decode_result(curr_active_pipeline=owning_pipeline_reference, directional_decoders_decode_result=directional_decoders_decode_result, window_size=90)
+        # Create DecodingLocalityMeasures first (required for new interface)
+        locality_measures = DecodingLocalityMeasures.init_from_decode_result(
+            curr_active_pipeline=owning_pipeline_reference,
+            directional_decoders_decode_result=directional_decoders_decode_result,
+            extant_decoded_time_bin_size=time_bin_size,
+            sigma=None  # Will be computed automatically if not provided
+        )
+        
+        # Get a_result_decoded from directional_decoders_decode_result
+        a_result_decoded = directional_decoders_decode_result.continuously_decoded_pseudo2D_decoder_dict[time_bin_size]
+        
+        # Create PredictiveDecoding using the new simplified interface
+        _obj: PredictiveDecoding = PredictiveDecoding.init_from_decode_result(
+            curr_active_pipeline=owning_pipeline_reference,
+            locality_measures=locality_measures,
+            a_result_decoded=a_result_decoded,
+            window_size=90
+        )
         # _obj
 
         x_step: float = np.nanmean(np.diff(_obj.xbin))
