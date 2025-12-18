@@ -115,21 +115,7 @@ class DecodingLocalityMeasures(ComputedResult): #PickleSerializableMixin, AttrsB
         if self.defer_compute_on_init:
             print('DecodingLocalityMeasures.__attrs_post_init__(...): init will not be performed because `self.defer_compute_on_init == True`.')
         else:
-            if self.sigma is None:
-                x_step: float = np.nanmean(np.diff(self.xbin))
-                y_step: float = np.nanmean(np.diff(self.ybin))
-
-                self.sigma = np.nanmax([x_step, y_step]) * 5.0
-                print(f'sigma: {self.sigma}')
-                
-            print(f'building sampled and normalized outputs...')
-            self._build_sampled_pos_with_gaussian_spread()
-            
-            if (self.gaussian_volume is None):
-                self.gaussian_volume = self._build_sampled_pos_with_gaussian_spread()
-
-            if (self.p_x_given_n_dict is None) or (len(self.p_x_given_n_dict) == 0):
-                self.build_normalized_outputs()
+            self.perform_compute_on_load()
 
         print(f'done.')
 
@@ -263,6 +249,27 @@ class DecodingLocalityMeasures(ComputedResult): #PickleSerializableMixin, AttrsB
         # Result: gaussian_volume.shape is (41, 63, n_target_times)
         return gaussian_volume
 
+
+    def perform_compute_on_load(self):
+        """ called by `__attrs_post_init__` to build initial properties if they're missing
+        Builds: .gaussian_volume, .p_x_given_n_dict, .sigma
+        
+        """
+        if self.sigma is None:
+            x_step: float = np.nanmean(np.diff(self.xbin))
+            y_step: float = np.nanmean(np.diff(self.ybin))
+
+            self.sigma = np.nanmax([x_step, y_step]) * 5.0
+            print(f'sigma: {self.sigma}')
+            
+        print(f'building sampled and normalized outputs...')
+        self._build_sampled_pos_with_gaussian_spread()
+        
+        if (self.gaussian_volume is None):
+            self.gaussian_volume = self._build_sampled_pos_with_gaussian_spread()
+
+        if (self.p_x_given_n_dict is None) or (len(self.p_x_given_n_dict) == 0):
+            self.build_normalized_outputs()
 
 
     # ==================================================================================================================================================================================================================================================================================== #
@@ -753,9 +760,9 @@ class DecodingLocalityMeasures(ComputedResult): #PickleSerializableMixin, AttrsB
         from neuropy.utils.probability_downsampling import RigorousPDFDownsampler
         from neuropy.utils.mixins.binning_helpers import get_bin_edges
 
-        decoding_locality_measures = deepcopy(self) ## make a copy of self
+        downsampled_decoding_locality_measures = deepcopy(self) ## make a copy of self
         
-        p_x_given_n = decoding_locality_measures.p_x_given_n ## np.shape(p_x_given_n) # (62, 62, 2, 151732)
+        p_x_given_n = downsampled_decoding_locality_measures.p_x_given_n ## np.shape(p_x_given_n) # (62, 62, 2, 151732)
         fine_pdf = p_x_given_n
 
         ## before downsampling
@@ -770,27 +777,31 @@ class DecodingLocalityMeasures(ComputedResult): #PickleSerializableMixin, AttrsB
         assert np.allclose(coarse_norm_sum, 1)
 
         # Update PDF data
-        decoding_locality_measures.p_x_given_n = coarse_pdf
+        downsampled_decoding_locality_measures.p_x_given_n = coarse_pdf
 
         # Update spatial bin centers
-        decoding_locality_measures.xbin_centers = coarse_bins[0]
-        decoding_locality_measures.ybin_centers = coarse_bins[1]
+        downsampled_decoding_locality_measures.xbin_centers = coarse_bins[0]
+        downsampled_decoding_locality_measures.ybin_centers = coarse_bins[1]
 
         # Compute bin edges from centers
-        decoding_locality_measures.xbin = get_bin_edges(decoding_locality_measures.xbin_centers)
-        decoding_locality_measures.ybin = get_bin_edges(decoding_locality_measures.ybin_centers)
+        downsampled_decoding_locality_measures.xbin = get_bin_edges(downsampled_decoding_locality_measures.xbin_centers)
+        downsampled_decoding_locality_measures.ybin = get_bin_edges(downsampled_decoding_locality_measures.ybin_centers)
 
         # Update sigma based on new bin sizes
         x_step = coarse_bin_sizes[0]
         y_step = coarse_bin_sizes[1]
-        decoding_locality_measures.sigma = np.nanmax([x_step, y_step]) * 5.0
+        downsampled_decoding_locality_measures.sigma = np.nanmax([x_step, y_step]) * 5.0
 
         # Reset computed fields that depend on spatial bins
-        decoding_locality_measures.gaussian_volume = None
-        decoding_locality_measures.p_x_given_n_dict = None
-        decoding_locality_measures.locality_measures_df = None
+        downsampled_decoding_locality_measures.gaussian_volume = None
+        downsampled_decoding_locality_measures.p_x_given_n_dict = None
+        downsampled_decoding_locality_measures.locality_measures_df = None
 
-        return decoding_locality_measures
+        ## do the final computes to ensure all the properties are correct:
+        downsampled_decoding_locality_measures.perform_compute_on_load()
+        downsampled_decoding_locality_measures.compute() ## ~30 seconds
+
+        return downsampled_decoding_locality_measures
 
 
 
