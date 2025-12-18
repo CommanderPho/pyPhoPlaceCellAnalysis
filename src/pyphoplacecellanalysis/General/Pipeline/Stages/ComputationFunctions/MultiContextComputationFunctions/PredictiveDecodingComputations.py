@@ -751,6 +751,7 @@ class DecodingLocalityMeasures(ComputedResult): #PickleSerializableMixin, AttrsB
         decoding_locality_measures = decoding_locality_measures.downsampling_spatial_data()
         """
         from neuropy.utils.probability_downsampling import RigorousPDFDownsampler
+        from neuropy.utils.mixins.binning_helpers import get_bin_edges
 
         decoding_locality_measures = deepcopy(self) ## make a copy of self
         
@@ -759,23 +760,35 @@ class DecodingLocalityMeasures(ComputedResult): #PickleSerializableMixin, AttrsB
 
         ## before downsampling
         fine_norm_sum = np.nansum(fine_pdf, axis=spatial_axes)
-        fine_norm_sum # array([1, 1, 1, ..., 1, 1, 1]) -- summing each t_step over all position bins yields 1 because that's how a probability density function over space should be normalized.
         assert np.allclose(fine_norm_sum, 1)
 
-        # downsampler = RigorousPDFDownsampler(fine_pdf, bins=(decoding_locality_measures.xbin_centers, decoding_locality_measures.ybin_centers, None, decoding_locality_measures.time_window_centers)) ## Warning: Input total mass = 123148.967784 (should be ~1)
-        downsampler = RigorousPDFDownsampler(fine_pdf, spatial_axes=spatial_axes) ## Warning: Input total mass = 123148.967784 (should be ~1)
-        # rx = 5
-        # ry = 5
-        # print(f'(rx: {rx}, ry: {ry})')
-        coarse_pdf, coarse_bin_sizes, coarse_bins = downsampler.downsample(factors=factors, axes=axes) ## 1m for ## np.shape(p_x_given_n) # (62, 62, 2, 151732)
-        np.shape(coarse_pdf) # (13, 13, 2, 151732)
+        downsampler = RigorousPDFDownsampler(fine_pdf, spatial_axes=spatial_axes)
+        coarse_pdf, coarse_bin_sizes, coarse_bins = downsampler.downsample(factors=factors, axes=axes)
 
         ## after downsampling
         coarse_norm_sum = np.nansum(coarse_pdf, axis=spatial_axes)
-        # np.shape(norm_sum)
-        coarse_norm_sum # array([3.57004e-07, 3.57004e-07, 3.57004e-07, ..., 3.57004e-07, 3.57004e-07, 3.57004e-07]) -- !! unfortunately after downsampling, the sum over all position bins for each time bin do NOT sum to 1.0, meaning they aren't valid PDF functions. Why is this? Is there a normalization error in `RigorousPDFDownsampler` or am I missing something conceptually?
-        np.shape(coarse_pdf)
         assert np.allclose(coarse_norm_sum, 1)
+
+        # Update PDF data
+        decoding_locality_measures.p_x_given_n = coarse_pdf
+
+        # Update spatial bin centers
+        decoding_locality_measures.xbin_centers = coarse_bins[0]
+        decoding_locality_measures.ybin_centers = coarse_bins[1]
+
+        # Compute bin edges from centers
+        decoding_locality_measures.xbin = get_bin_edges(decoding_locality_measures.xbin_centers)
+        decoding_locality_measures.ybin = get_bin_edges(decoding_locality_measures.ybin_centers)
+
+        # Update sigma based on new bin sizes
+        x_step = coarse_bin_sizes[0]
+        y_step = coarse_bin_sizes[1]
+        decoding_locality_measures.sigma = np.nanmax([x_step, y_step]) * 5.0
+
+        # Reset computed fields that depend on spatial bins
+        decoding_locality_measures.gaussian_volume = None
+        decoding_locality_measures.p_x_given_n_dict = None
+        decoding_locality_measures.locality_measures_df = None
 
         return decoding_locality_measures
 
