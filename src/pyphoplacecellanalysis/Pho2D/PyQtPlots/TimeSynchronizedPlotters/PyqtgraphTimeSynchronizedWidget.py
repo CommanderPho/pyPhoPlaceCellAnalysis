@@ -269,8 +269,16 @@ class PyqtgraphTimeSynchronizedWidget(CrosshairsTracingMixin, PlotImageExportabl
         # if self.enable_debug_print:
         #     profiler = pg.debug.Profiler(disabled=True, delayed=True)
 
-        if (start_t is not None) and (end_t is not None):            
+        if (start_t is not None) and (end_t is not None):
+            # Preserve the current Y range to prevent auto-fitting
+            vb = self.getRootPlotItem().getViewBox()
+            current_y_range = vb.viewRange()[1]  # Get current Y range [min, max]
+
             self.getRootPlotItem().setXRange(start_t, end_t, padding=0) ## global frame
+
+            # Explicitly restore Y range in case it was changed
+            self.getRootPlotItem().setYRange(current_y_range[0], current_y_range[1], padding=0)
+
 
         self.update(end_t, defer_render=False)
         # if self.enable_debug_print:
