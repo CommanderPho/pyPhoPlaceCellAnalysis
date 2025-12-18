@@ -989,21 +989,23 @@ class PredictiveDecoding(ComputedResult): #PickleSerializableMixin, AttrsBasedCl
 
     @function_attributes(short_name=None, tags=['predictive_decoding', 'layers'], input_requires=[], output_provides=[], uses=[], used_by=['init_from_decode_result'], creation_date='2025-12-09 19:03', related_items=[])
     @classmethod
-    def _perform_compute_predictive_decoding(cls, curr_active_pipeline, directional_decoders_decode_result, window_size: int = 200, extant_decoded_time_bin_size: float = 0.25):
+    def _perform_compute_predictive_decoding(cls, curr_active_pipeline, a_result_decoded: DecodedFilterEpochsResult, window_size: int = 200):
         """ Computes a moving average from the decoded posterior
 
-        moving_avg = _perform_compute_predictive_decoding(curr_active_pipeline=curr_active_pipeline, directional_decoders_decode_result=directional_decoders_decode_result, window_size=200)
+        moving_avg = _perform_compute_predictive_decoding(curr_active_pipeline=curr_active_pipeline, a_result_decoded=a_result_decoded, window_size=200)
 
 
         """
         from scipy.interpolate import interp1d
 
-        a_result_decoded = directional_decoders_decode_result.continuously_decoded_pseudo2D_decoder_dict[extant_decoded_time_bin_size]
+        
         # a_result_decoded
 
         # a_result_decoded.p_x_given_n # .shape (41, 63, 2, 103948) - (n_x_bins, n_y_bins, n_tasks, n_time_bins) 
-        
-        time_window_centers = deepcopy(a_result_decoded.time_bin_container.centers)
+        time_window_centers = getattr(a_result_decoded, 'time_window_centers', None)
+        if time_window_centers is None:
+            time_window_centers = deepcopy(a_result_decoded.time_bin_container.centers)
+            
         pos_df = deepcopy(curr_active_pipeline.sess.position.to_dataframe())
         # pos_df
 
@@ -1043,24 +1045,34 @@ class PredictiveDecoding(ComputedResult): #PickleSerializableMixin, AttrsBasedCl
     
 
     @classmethod
-    def init_from_decode_result(cls, curr_active_pipeline, directional_decoders_decode_result, window_size: int = 200, extant_decoded_time_bin_size: float = 0.25, sigma: Optional[float] = None) -> "PredictiveDecoding":
+    def init_from_decode_result(cls, curr_active_pipeline, locality_measures:Optional[DecodingLocalityMeasures]=None, a_result_decoded:Optional[DecodedFilterEpochsResult]=None, directional_decoders_decode_result:Optional[DirectionalDecodersContinuouslyDecodedResult]=None, window_size: int = 200, extant_decoded_time_bin_size: float = 0.25, sigma: Optional[float] = None) -> "PredictiveDecoding":
         """ 
         _obj: PredictiveDecoding = PredictiveDecoding.init_from_decode_result(
         """
         # Create DecodingLocalityMeasures instance first (handles all locality-related computations)
-        locality_measures = DecodingLocalityMeasures.init_from_decode_result(
-            curr_active_pipeline=curr_active_pipeline,
-            directional_decoders_decode_result=directional_decoders_decode_result,
-            extant_decoded_time_bin_size=extant_decoded_time_bin_size,
-            sigma=sigma
-        )
-        
+        if locality_measures is None:
+            assert directional_decoders_decode_result is not None, f"a real directional_decoders_decode_result is required to build a new DecodingLocalityMeasures"
+            locality_measures = DecodingLocalityMeasures.init_from_decode_result(
+                curr_active_pipeline=curr_active_pipeline,
+                directional_decoders_decode_result=directional_decoders_decode_result,
+                extant_decoded_time_bin_size=extant_decoded_time_bin_size,
+                sigma=sigma
+            )
+
+
+        if a_result_decoded is None:
+            assert directional_decoders_decode_result is not None
+            a_result_decoded = directional_decoders_decode_result.continuously_decoded_pseudo2D_decoder_dict[extant_decoded_time_bin_size]
+        else:
+            assert directional_decoders_decode_result is None
+
+
+
         # Compute moving average (unique to PredictiveDecoding)
-        time_window_centers, pos_df, moving_avg, new_positions, p_x_given_n = PredictiveDecoding._perform_compute_predictive_decoding(
+        time_window_centers, pos_df, moving_avg, new_positions, p_x_given_n = cls._perform_compute_predictive_decoding(
             curr_active_pipeline=curr_active_pipeline,
-            directional_decoders_decode_result=directional_decoders_decode_result,
+            a_result_decoded=a_result_decoded,
             window_size=window_size,
-            extant_decoded_time_bin_size=extant_decoded_time_bin_size
         )
 
         _obj = cls(window_size=window_size, locality_measures=locality_measures, moving_avg=moving_avg)
