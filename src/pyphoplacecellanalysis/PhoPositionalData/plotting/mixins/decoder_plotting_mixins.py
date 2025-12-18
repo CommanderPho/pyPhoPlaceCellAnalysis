@@ -515,7 +515,21 @@ class OptimizedViewportRenderer:
             # Render to image
             fig.canvas.draw()
             buf = np.frombuffer(fig.canvas.tostring_rgb(), dtype=np.uint8)
-            image = buf.reshape((height_px, width_px, 3))
+
+            # Get actual canvas dimensions instead of assuming they match width_px/height_px
+            actual_width = int(fig.canvas.get_width_height()[0])
+            actual_height = int(fig.canvas.get_width_height()[1])
+
+            # Reshape using actual dimensions
+            image = buf.reshape((actual_height, actual_width, 3))
+
+            # Resize to desired dimensions if they don't match
+            if actual_width != width_px or actual_height != height_px:
+                from PIL import Image
+                img = Image.fromarray(image)
+                img = img.resize((width_px, height_px), Image.Resampling.LANCZOS)
+                image = np.array(img)
+
             plt.close(fig)
             
             return image
