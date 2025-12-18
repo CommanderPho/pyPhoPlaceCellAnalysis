@@ -787,7 +787,7 @@ class DecodingLocalityMeasures(ComputedResult): #PickleSerializableMixin, AttrsB
         # Direct dictionary update
         if visualization_update_dict is None:
             visualization_update_dict = {
-                'non-local': dict(y_location=-2.0, height=0.9, pen_color="#d8db06", pen_opacity=0.7843137254901961, brush_color="#bbae00", brush_opacity=0.6078431372549019),
+                identifier: dict(y_location=-2.0, height=0.9, pen_color="#d8db06", pen_opacity=0.7843137254901961, brush_color="#bbae00", brush_opacity=0.6078431372549019),
             }
         active_2d_plot.update_rendered_intervals_visualization_properties(visualization_update_dict)
 
