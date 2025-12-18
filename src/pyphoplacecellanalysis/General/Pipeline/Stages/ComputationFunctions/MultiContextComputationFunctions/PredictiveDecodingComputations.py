@@ -760,6 +760,54 @@ class DecodingLocalityMeasures(ComputedResult): #PickleSerializableMixin, AttrsB
         ## Compute adjacent epochs:
         non_local_locality_measures_epochs_df = _out_locality_measures_df.neuropy.detect_epoch_satisfying_condition(is_condition_satisfied = (_out_locality_measures_df['is_non_local_period'].to_numpy()), merging_adjacent_max_separation_sec=merging_adjacent_max_separation_sec, **kwargs)
         return non_local_locality_measures_epochs_df
+    
+
+    @function_attributes(short_name=None, tags=['NEW', 'MAIN', 'epochs'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-12-18 08:02', related_items=[])
+    def get_non_moving_PBE_non_local_epochs(self, sess, merging_adjacent_max_separation_sec=0.5, skip_get_non_overlapping = False, **kwargs) -> pd.DataFrame:
+        """
+        overlap_included_only_df_dict = decoding_locality_measures.overlap_included_only_df_dict(merging_adjacent_max_separation_sec=0.5)
+        render_scrollable_colored_table_from_dataframe(non_local_locality_measures_epochs_df)
+
+        """
+        from neuropy.core.epoch import Epoch, EpochsAccessor, ensure_dataframe, ensure_Epoch, EpochHelpers
+        from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.PredictiveDecodingComputations import DecodingLocalityMeasures, PredictiveDecoding
+
+        # skip_get_non_overlapping = True
+
+        non_local_locality_measures_epochs_df = self.get_non_local_epochs(merging_adjacent_max_separation_sec=merging_adjacent_max_separation_sec, **kwargs)
+
+        intervals_to_overlap_dict ={'is_in_laps': deepcopy(sess.laps.to_dataframe()), 'is_in_pbes': deepcopy(sess.pbe),
+                                    'is_non_moving_pbe': [deepcopy(sess.pbe), deepcopy(sess.non_running_epochs)],
+                                    'is_non_moving_laps': [deepcopy(sess.laps.to_dataframe()), deepcopy(sess.non_running_epochs)],
+        }
+        overlap_included_only_df_dict = {}
+
+        for is_in_key, epochs_df_required_to_overlap in intervals_to_overlap_dict.items(): #:str ='is_in_laps'
+            if isinstance(epochs_df_required_to_overlap, (list, tuple)):
+                ## iterate through
+                active_main_epochs_df = None
+                
+                for a_series_epochs_df_required_to_overlap in epochs_df_required_to_overlap:
+                    if active_main_epochs_df is None:
+                        active_main_epochs_df = deepcopy(non_local_locality_measures_epochs_df)
+                        
+                    # is_included: NDArray = EpochHelpers.find_epochs_overlapping_other_epochs(epochs_df=non_local_locality_measures_epochs_df, epochs_df_required_to_overlap=a_series_epochs_df_required_to_overlap)
+                    active_main_epochs_df = active_main_epochs_df.epochs.intersecting(a_series_epochs_df_required_to_overlap, skip_get_non_overlapping=skip_get_non_overlapping)
+                ## END for a_series_epochs_df_requi....
+                
+            else:
+                ## single epochs to overlap
+                # is_included: NDArray = EpochHelpers.find_epochs_overlapping_other_epochs(epochs_df=non_local_locality_measures_epochs_df, epochs_df_required_to_overlap=epochs_df_required_to_overlap)
+                active_main_epochs_df = deepcopy(non_local_locality_measures_epochs_df).epochs.intersecting(epochs_df_required_to_overlap, skip_get_non_overlapping=skip_get_non_overlapping)
+            ## OUTPUTS: active_main_epochs_df
+            # non_local_locality_measures_epochs_df[is_in_key] = is_included ## as a column to the original dataframe (worthless now)
+            overlap_included_only_df_dict[is_in_key] = active_main_epochs_df # non_local_locality_measures_epochs_df[non_local_locality_measures_epochs_df[is_in_key]].drop(columns=[is_in_key])
+        ## END for is_in_key, epoch....
+            
+        return overlap_included_only_df_dict
+    
+
+
 
 
     def add_non_local_epochs_to_intervals_timeline(self, active_2d_plot, identifier:str='non-local', non_local_epochs_df: pd.DataFrame=None, visualization_update_dict=None):
