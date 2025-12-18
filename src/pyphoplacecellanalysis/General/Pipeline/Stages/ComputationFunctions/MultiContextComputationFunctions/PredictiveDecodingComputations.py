@@ -807,9 +807,6 @@ class DecodingLocalityMeasures(ComputedResult): #PickleSerializableMixin, AttrsB
         return overlap_included_only_df_dict
     
 
-
-
-
     def add_non_local_epochs_to_intervals_timeline(self, active_2d_plot, identifier:str='non-local', non_local_epochs_df: pd.DataFrame=None, visualization_update_dict=None):
         """  Add `non_local_locality_measures_epochs_df` to timeline as interval epochs
 
@@ -864,63 +861,70 @@ class PredictiveDecoding(ComputedResult): #PickleSerializableMixin, AttrsBasedCl
 
 
     """
-    _VersionedResultMixin_version: str = "2025.12.11_0" # to be updated in your IMPLEMENTOR to indicate its version
+    _VersionedResultMixin_version: str = "2025.12.15_0" # to be updated in your IMPLEMENTOR to indicate its version
 
     window_size: int = serialized_field()
-    time_window_centers: NDArray[ND.Shape["N_TIME_BINS"], np.floating] = serialized_field()
-    pos_df: pd.DataFrame = serialized_field()
-    xbin: NDArray = serialized_field()
-    ybin: NDArray = serialized_field()
-    xbin_centers: NDArray = serialized_field()
-    ybin_centers: NDArray = serialized_field()
-    p_x_given_n: NDArray[ND.Shape["N_X_BINS, N_Y_BINS, 2, N_TIME_BINS"], np.floating] = serialized_field()
-
-
-    ## computed
-    new_positions: NDArray[ND.Shape["N_TIME_BINS, 2"], np.floating] = serialized_field()
     
+    # Composition: delegate locality-related computations to DecodingLocalityMeasures
+    locality_measures: DecodingLocalityMeasures = serialized_field()
 
-    # predictive decoding:
+    # predictive decoding (unique to PredictiveDecoding):
     moving_avg: NDArray[ND.Shape["N_X_BINS, N_Y_BINS, 2, N_TIME_BINS"], np.floating] = serialized_field()
-
-    ## one of these for each context (e.g. maze1, maze2 or ['roam', 'sprinkle'], etc
-    gaussian_volume: NDArray[ND.Shape["N_X_BINS, N_Y_BINS, N_TIME_BINS"], np.floating] = serialized_field(default=None)
-
-    epoch_names: List[str] = serialized_field(default=Factory(list))
-    p_x_given_n_dict: Dict[str, NDArray[ND.Shape["N_X_BINS, N_Y_BINS, N_TIME_BINS"], np.floating]] = serialized_field(default=Factory(dict))
     moving_avg_dict: Dict[str, NDArray[ND.Shape["N_X_BINS, N_Y_BINS, N_TIME_BINS"], np.floating]] = serialized_field(default=Factory(dict))
 
     ## past/future to present comparisons:
     moving_avg_meas_pos_overlap_dict: Dict[str, NDArray[ND.Shape["N_X_BINS, N_Y_BINS, N_TIME_BINS"], np.floating]] = serialized_field(default=Factory(dict))
-
-    ## locality comparisons:
-    decoding_meas_pos_locality_measure_dict: Dict[str, NDArray[ND.Shape["N_TIME_BINS"], np.floating]] = serialized_field(default=Factory(dict))
-    # Generic dict to store all computed measures - allows easy extension without adding new fields
-    locality_measures_dict_dict: Dict[str, Dict[str, Any]] = serialized_field(default=Factory(dict))
 
     
     def __attrs_post_init__(self):
         # Add post-init logic here
         pass
 
+    # Delegate properties to DecodingLocalityMeasures
+    @property
+    def time_window_centers(self) -> NDArray:
+        """Delegate to DecodingLocalityMeasures."""
+        return self.locality_measures.time_window_centers
+
+    @property
+    def epoch_names(self) -> List[str]:
+        """Delegate to DecodingLocalityMeasures."""
+        return self.locality_measures.epoch_names
+
+    @property
+    def gaussian_volume(self) -> NDArray:
+        """Delegate to DecodingLocalityMeasures."""
+        return self.locality_measures.gaussian_volume
+
+    @property
+    def p_x_given_n_dict(self) -> Dict[str, NDArray]:
+        """Delegate to DecodingLocalityMeasures."""
+        return self.locality_measures.p_x_given_n_dict
+
+    @property
+    def xbin(self) -> NDArray:
+        """Delegate to DecodingLocalityMeasures."""
+        return self.locality_measures.xbin
+
+    @property
+    def ybin(self) -> NDArray:
+        """Delegate to DecodingLocalityMeasures."""
+        return self.locality_measures.ybin
+
+    @property
+    def xbin_centers(self) -> NDArray:
+        """Delegate to DecodingLocalityMeasures."""
+        return self.locality_measures.xbin_centers
+
+    @property
+    def ybin_centers(self) -> NDArray:
+        """Delegate to DecodingLocalityMeasures."""
+        return self.locality_measures.ybin_centers
 
     @property
     def locality_measures_df(self) -> pd.DataFrame:
-        """The locality_measures_df property."""
-        # _out_locality_measures_df = pd.DataFrame(self.decoding_meas_pos_locality_measure_dict)
-        _out_locality_measures_df = pd.DataFrame(self.time_window_centers, columns=['t'])
-        # _out_locality_measures_df['t'] = self.time_window_centers
-
-        for an_epoch_name, v in self.locality_measures_dict_dict.items():
-
-            for a_computation_measure_name, vv in v.items():
-                if a_computation_measure_name == 'mask_overlap':
-                    total_num_possible_bins: int = len(self.xbin_centers) * len(self.ybin_centers)
-                    vv = np.nansum(vv, (0, 1)) / total_num_possible_bins
-                _out_locality_measures_df[f"{a_computation_measure_name}_{an_epoch_name}"] = vv # _obj.locality_measures_dict_dict[an_epoch_name][a_computation_measure_name]
-
-
-        return _out_locality_measures_df
+        """Delegate to DecodingLocalityMeasures."""
+        return self.locality_measures.locality_measures_df
 
 
     @function_attributes(short_name=None, tags=['predictive_decoding', 'layers'], input_requires=[], output_provides=[], uses=[], used_by=['init_from_decode_result'], creation_date='2025-12-09 19:03', related_items=[])
@@ -979,34 +983,40 @@ class PredictiveDecoding(ComputedResult): #PickleSerializableMixin, AttrsBasedCl
     
 
     @classmethod
-    def init_from_decode_result(cls, curr_active_pipeline, directional_decoders_decode_result, window_size: int = 200) -> "PredictiveDecoding":
+    def init_from_decode_result(cls, curr_active_pipeline, directional_decoders_decode_result, window_size: int = 200, extant_decoded_time_bin_size: float = 0.25, sigma: Optional[float] = None) -> "PredictiveDecoding":
         """ 
         _obj: PredictiveDecoding = PredictiveDecoding.init_from_decode_result(
         """
-        # moving_avg = cls._perform_compute_predictive_decoding(curr_active_pipeline=curr_active_pipeline, directional_decoders_decode_result=directional_decoders_decode_result, window_size=window_size)
-        time_window_centers, pos_df, moving_avg, new_positions, p_x_given_n = PredictiveDecoding._perform_compute_predictive_decoding(curr_active_pipeline=curr_active_pipeline, directional_decoders_decode_result=directional_decoders_decode_result, window_size=window_size)
+        # Create DecodingLocalityMeasures instance first (handles all locality-related computations)
+        locality_measures = DecodingLocalityMeasures.init_from_decode_result(
+            curr_active_pipeline=curr_active_pipeline,
+            directional_decoders_decode_result=directional_decoders_decode_result,
+            extant_decoded_time_bin_size=extant_decoded_time_bin_size,
+            sigma=sigma
+        )
         
-        epoch_names: List[str] = list(directional_decoders_decode_result.pf1D_Decoder_dict.keys())
+        # Compute moving average (unique to PredictiveDecoding)
+        time_window_centers, pos_df, moving_avg, new_positions, p_x_given_n = PredictiveDecoding._perform_compute_predictive_decoding(
+            curr_active_pipeline=curr_active_pipeline,
+            directional_decoders_decode_result=directional_decoders_decode_result,
+            window_size=window_size,
+            extant_decoded_time_bin_size=extant_decoded_time_bin_size
+        )
 
-        _obj = cls(window_size=window_size, time_window_centers=time_window_centers, pos_df=deepcopy(pos_df),
-                   xbin=deepcopy(directional_decoders_decode_result.pseudo2D_decoder.xbin), ybin=deepcopy(directional_decoders_decode_result.pseudo2D_decoder.ybin),
-                   xbin_centers=deepcopy(directional_decoders_decode_result.pseudo2D_decoder.xbin_centers), ybin_centers=deepcopy(directional_decoders_decode_result.pseudo2D_decoder.ybin_centers),
-                   moving_avg=moving_avg, new_positions=new_positions, p_x_given_n=deepcopy(p_x_given_n), epoch_names=epoch_names)
+        _obj = cls(window_size=window_size, locality_measures=locality_measures, moving_avg=moving_avg)
         return _obj
 
 
 
-    @function_attributes(short_name=None, tags=['normalization', 'locality', 'overlap'], input_requires=[], output_provides=[], uses=['self.compute_locality'], used_by=[], creation_date='2025-12-11 17:03', related_items=[])
+    @function_attributes(short_name=None, tags=['normalization', 'predictive_decoding'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-12-11 17:03', related_items=[])
     def build_normalized_outputs(self):
-        """ Normalize: self.p_x_given_n_dict and self.moving_avg over the decoer time period ('sprinkle', 'roam')
-
-        Normalize and convolve each new_position 2D point (x, y) with a fixed width 2D gaussian
+        """ Normalize: self.moving_avg over the decoder time period ('sprinkle', 'roam')
         
-        Updates: self.
-            .moving_avg_dict, .moving_avg_meas_pos_overlap_dict, .gaussian_volume, .decoding_meas_pos_locality_measure_dict
+        Note: p_x_given_n_dict normalization is handled by DecodingLocalityMeasures.build_normalized_outputs()
+        
+        Updates: self.moving_avg_dict, self.moving_avg_meas_pos_overlap_dict
         """
         def _subfn_renormalize_marginal(a_moving_avg):
-            # np.shape(a_moving_avg)
             ## renormalize over context:
             norm_sums = np.nansum(a_moving_avg, axis=(0, 1))
             is_nonzero = np.nonzero(norm_sums)
@@ -1014,26 +1024,17 @@ class PredictiveDecoding(ComputedResult): #PickleSerializableMixin, AttrsBasedCl
                 a_moving_avg[:, :, a_nonzero_idx] = a_moving_avg[:, :, a_nonzero_idx] / norm_sums[a_nonzero_idx]
             return a_moving_avg
 
-
-        # ==================================================================================================================================================================================================================================================================================== #
-        # BEGIN FUNCTION BODY                                                                                                                                                                                                                                                                  #
-        # ==================================================================================================================================================================================================================================================================================== #
+        # Ensure DecodingLocalityMeasures has normalized p_x_given_n_dict
+        if (self.locality_measures.p_x_given_n_dict is None) or (len(self.locality_measures.p_x_given_n_dict) == 0):
+            self.locality_measures.build_normalized_outputs()
 
         ## INPUTS: quantities to renormalize
         self.moving_avg_dict = {}
-        self.p_x_given_n_dict = {}
-
-        ## related outputs to clear:
         self.moving_avg_meas_pos_overlap_dict = {}
 
         # for an_epoch_idx, (an_epoch_name, a_plotter) in enumerate(sync_plotters.items()):
         for an_epoch_idx, an_epoch_name in enumerate(self.epoch_names):
             ## "epoch" in the loop variables refers to only the session.paradigm epochs, like ['roam', 'sprinkle']
-
-            a_p_x_given_n = deepcopy(np.squeeze(self.p_x_given_n[:, :, an_epoch_idx, :]))
-            a_p_x_given_n = _subfn_renormalize_marginal(a_p_x_given_n)
-            self.p_x_given_n_dict[an_epoch_name] = a_p_x_given_n
-
 
             a_moving_avg = deepcopy(np.squeeze(self.moving_avg[:, :, an_epoch_idx, :]))
             a_moving_avg = _subfn_renormalize_marginal(a_moving_avg)
@@ -1041,405 +1042,45 @@ class PredictiveDecoding(ComputedResult): #PickleSerializableMixin, AttrsBasedCl
 
         ## END for an_epoch_idx, an_epoch_n...
 
-
         ## OUTPUTS: _a_moving_avg_dict, _a_moving_avg_meas_pos_overlap_dict
         return self.moving_avg_dict, self.moving_avg_meas_pos_overlap_dict
     
 
-    @function_attributes(short_name=None, tags=['normalization', 'locality', 'overlap'], input_requires=[], output_provides=[], uses=['self.compute_locality'], used_by=[], creation_date='2025-12-11 17:03', related_items=[])
+    @function_attributes(short_name=None, tags=['normalization', 'locality', 'overlap'], input_requires=[], output_provides=[], uses=['self.locality_measures.compute'], used_by=[], creation_date='2025-12-11 17:03', related_items=[])
     def compute(self, sigma: float = 1.0):
-        """ Normalize: self.p_x_given_n_dict and self.moving_avg over the decoer time period ('sprinkle', 'roam')
+        """ Normalize: self.p_x_given_n_dict and self.moving_avg over the decoder time period ('sprinkle', 'roam')
 
         Normalize and convolve each new_position 2D point (x, y) with a fixed width 2D gaussian
         
         Updates: self.
-            .moving_avg_dict, .moving_avg_meas_pos_overlap_dict, .gaussian_volume, .decoding_meas_pos_locality_measure_dict
+            .moving_avg_dict, .moving_avg_meas_pos_overlap_dict
+        Note: Locality measures are computed by DecodingLocalityMeasures.compute()
         """
-        import ot
-        from tqdm.notebook import tqdm
-
-        from scipy.spatial.distance import cdist
-        from scipy.optimize import linear_sum_assignment
-        from scipy.ndimage import center_of_mass
-
-        def _subfn_calculate_spatial_emd(Xs, Xt):
-            """
-            Xs, Xt: arrays of shape (rows, cols, time) containing probability weights.
-            Returns: array of spatial EMD (Earth Mover's Distance) for each timestamp.
-
-            Captures nothing:
-
-            #TODO 2025-12-11 18:13: - [ ] WAY too slow, like 10hrs to run for 10k timestamps
-            
-            """
-            rows, cols, T = Xs.shape
-            
-            # 1. PRE-COMPUTE COST MATRIX (Do this once)
-            # Create coordinate grid for every pixel
-            yy, xx = np.meshgrid(np.arange(cols), np.arange(rows))
-            coords = np.column_stack((xx.ravel(), yy.ravel())).astype(np.float64)
-            
-            # M is the distance matrix between every pixel and every other pixel
-            # 'euclidean' gives W1 distance (EMD). 
-            M = ot.dist(coords, coords, metric='euclidean')
-
-            emd_scores = np.zeros(T)
-
-            # num_timestamps: int = T
-            # 2. COMPUTE PER TIMESTAMP
-            for t in range(T):
-                # Flatten images to 1D probability vectors
-                a = Xs[:, :, t].ravel()
-                b = Xt[:, :, t].ravel()
-
-                # Normalize to ensure they are valid probability distributions
-                sum_a = a.sum()
-                sum_b = b.sum()
-                
-                # Handle empty frames safely
-                if sum_a < 1e-9 or sum_b < 1e-9:
-                    emd_scores[t] = np.nan # Or 0.0, depending on preference
-                    continue
-                    
-                a /= sum_a
-                b /= sum_b
-
-                # Calculate Exact EMD using the cost matrix M
-                # This returns the total work (mass * distance)
-                emd_scores[t] = ot.emd2(a, b, M)
-
-            return emd_scores
-
-        def _subfn_calculate_sinkhorn_distance(Xs, Xt, reg=0.1):
-            """
-            reg: Regularization term. 
-                Larger (e.g. 1.0) = Faster, but blurrier (less accurate).
-                Smaller (e.g. 0.01) = Slower, closer to exact EMD.
-                0.1 is a good starting point for maze data.
-                
-            #TODO 2025-12-11 18:13: - [ ] also way too slow, like 2hrs to run for 10k timestamps
-            """
-            x_bins, y_bins, T = Xs.shape
-            
-            # 1. Setup Grid & Cost Matrix (Same as before)
-            xx, yy = np.meshgrid(np.arange(x_bins), np.arange(y_bins), indexing='ij')
-            coords = np.column_stack((xx.ravel(), yy.ravel())).astype(np.float64)
-            M = ot.dist(coords, coords, metric='euclidean')
-            
-            # Pre-compute normalization for stability
-            M = M / M.max() 
-
-            sinkhorn_dists = np.zeros(T)
-
-            for t in tqdm(range(T), desc="Sinkhorn"):
-                a = Xs[:, :, t].ravel()
-                b = Xt[:, :, t].ravel()
-
-                # Normalize
-                sum_a, sum_b = a.sum(), b.sum()
-                if sum_a < 1e-9 or sum_b < 1e-9:
-                    sinkhorn_dists[t] = np.nan
-                    continue
-                    
-                a /= sum_a
-                b /= sum_b
-
-                # 2. Compute Sinkhorn
-                #    This is the fast approximation
-                sinkhorn_dists[t] = ot.sinkhorn2(a, b, M, reg)
-
-            return sinkhorn_dists
-
-        def _subfn_calculate_sliced_wasserstein_correct(Xs, Xt, n_projections=50, seed=1337):
-            """ fastest but least precise. 
-
-            #TODO 2025-12-11 18:13: - [ ] also way too slow, like 1 hr to run for 10k timestamps
-
-            """
-            x_bins, y_bins, T = Xs.shape
-            
-            # 1. Setup Coordinates
-            xx, yy = np.meshgrid(np.arange(x_bins), np.arange(y_bins), indexing='ij')
-            coords = np.column_stack((xx.ravel(), yy.ravel())).astype(np.float64)
-            
-            # 2. Generate Random Projections (Lines through the maze)
-            rng = np.random.default_rng(seed)
-            projections = rng.normal(size=(2, n_projections))
-            projections /= np.linalg.norm(projections, axis=0) # Normalize to unit length
-
-            # Project the GRID coordinates onto these lines
-            # Shape: (N_pixels, n_projections)
-            projected_coords = coords @ projections 
-
-            swd_dists = np.zeros(T)
-
-            for t in tqdm(range(T), desc="Sliced Wasserstein"):
-                a = Xs[:, :, t].ravel()
-                b = Xt[:, :, t].ravel()
-                
-                # Normalize weights
-                sum_a, sum_b = a.sum(), b.sum()
-                if sum_a < 1e-9 or sum_b < 1e-9:
-                    swd_dists[t] = np.nan
-                    continue
-                a /= sum_a
-                b /= sum_b
-                
-                # Compute 1D Wasserstein for each projection and average
-                # We iterate over the 50 projections
-                dists = []
-                for p in range(n_projections):
-                    # The coordinates on this line:
-                    proj_x = projected_coords[:, p]
-                    
-                    # 1D Wasserstein with weights
-                    d = ot.wasserstein_1d(proj_x, proj_x, a, b, p=2)
-                    dists.append(d)
-                    
-                swd_dists[t] = np.mean(dists)
-                
-            return swd_dists
-
-        # a_computation_measure_name: str = 'earthmovers'
-        def _subfn_calculate_spatial_emd_fast(Xs, Xt, downsample_factor=4):
-            """
-            #TODO 2025-12-11 18:28: - [ ] This is the only one fast enough to be practicle, runs in about 4 minutes per decoder context (2 x session)
-            
-            """
-            import scipy.ndimage
-            # 1. Downsample the input arrays (Average pooling)
-            # This reduces 41x63 -> ~20x31
-            # We slice [::factor] to skip, or use block_reduce for true averaging
-            # Simple slicing is often sufficient for speed
-            Xs_small = Xs[::downsample_factor, ::downsample_factor, :]
-            Xt_small = Xt[::downsample_factor, ::downsample_factor, :]
-            
-            # Scale the coordinates so the result implies the ORIGINAL bin units
-            scale = downsample_factor 
-            
-            rows, cols, T = Xs_small.shape
-            
-            # 2. Setup scaled grid
-            xx, yy = np.meshgrid(np.arange(cols), np.arange(rows))
-            # Multiply by scale so the distance is still in "Original Bins"
-            coords = np.column_stack((xx.ravel(), yy.ravel())).astype(np.float64) * scale
-            
-            M = ot.dist(coords, coords, metric='euclidean')
-            emd_scores = np.zeros(T)
-
-            for t in tqdm(range(T), desc="Fast EMD"):
-                a = Xs_small[:, :, t].ravel()
-                b = Xt_small[:, :, t].ravel()
-                
-                sum_a, sum_b = a.sum(), b.sum()
-                if sum_a < 1e-9 or sum_b < 1e-9:
-                    emd_scores[t] = np.nan
-                    continue
-                    
-                a /= sum_a
-                b /= sum_b
-                
-                emd_scores[t] = ot.emd2(a, b, M)
-                
-            return emd_scores
-
-        # a_computation_measure_name: str = 'dist_to_highest_peak'
-        def _subfn_pdf_spatial_distances(_obj, a_p_x_given_n, xbin_centers, ybin_centers):
-            """
-            Computes the Euclidean distance between the expected positions (COM) of 
-            two 2D probability distributions using vectorized weighted averages.
-            """
-            # 1. Get Shapes
-            # Assuming shape is (Rows/H, Cols/W, Time)
-            pdf_obj = _obj.gaussian_volume
-            pdf_cmp = a_p_x_given_n
-            
-            # 2. Calculate Marginals to simplify COM calculation
-            # Sum over columns (axis 1) to get mass distribution along rows (Height/x_bins)
-            # Shape becomes (H, T)
-            marg_x_obj = np.sum(pdf_obj, axis=1)
-            marg_x_cmp = np.sum(pdf_cmp, axis=1)
-
-            # Sum over rows (axis 0) to get mass distribution along columns (Width/y_bins)
-            # Shape becomes (W, T)
-            marg_y_obj = np.sum(pdf_obj, axis=0)
-            marg_y_cmp = np.sum(pdf_cmp, axis=0)
-
-            # 3. Compute Expected Position (Weighted Average of Bin Centers)
-            # Formula: Sum(Probability * Value) / Sum(Probability)
-            
-            # reshape centers for broadcasting: (H, 1) * (H, T) -> sum -> (T,)
-            denom_x_obj = np.sum(marg_x_obj, axis=0)
-            # Handle division by zero if a timebin has all-zeros
-            denom_x_obj[denom_x_obj == 0] = 1.0 
-            
-            x_obj = np.sum(marg_x_obj * xbin_centers[:, np.newaxis], axis=0) / denom_x_obj
-            
-            # Repeat for Comparison Object
-            denom_x_cmp = np.sum(marg_x_cmp, axis=0)
-            denom_x_cmp[denom_x_cmp == 0] = 1.0
-            x_cmp = np.sum(marg_x_cmp * xbin_centers[:, np.newaxis], axis=0) / denom_x_cmp
-
-            # Repeat for Y (Width)
-            denom_y_obj = np.sum(marg_y_obj, axis=0)
-            denom_y_obj[denom_y_obj == 0] = 1.0
-            y_obj = np.sum(marg_y_obj * ybin_centers[:, np.newaxis], axis=0) / denom_y_obj
-
-            denom_y_cmp = np.sum(marg_y_cmp, axis=0)
-            denom_y_cmp[denom_y_cmp == 0] = 1.0
-            y_cmp = np.sum(marg_y_cmp * ybin_centers[:, np.newaxis], axis=0) / denom_y_cmp
-
-            # 4. Euclidean Distance
-            distances_spatial = np.sqrt((x_obj - x_cmp)**2 + (y_obj - y_cmp)**2)
-
-            # 5. Max distance (Diagonal of the ROI)
-            max_possible_distance = np.sqrt(np.ptp(xbin_centers)**2 + np.ptp(ybin_centers)**2)
-            distances_spatial_frac_max = distances_spatial / max_possible_distance
-            
-            return distances_spatial, distances_spatial_frac_max
-
-        # active_subfn_compute_earthmovers_fn = _subfn_calculate_spatial_emd # #TODO 2025-12-11 17:53: - [ ] TOO SLOW
-        # active_subfn_compute_earthmovers_fn = _subfn_calculate_sinkhorn_distance
-        # active_subfn_compute_earthmovers_fn = _subfn_calculate_sliced_wasserstein_correct
-        active_subfn_compute_earthmovers_fn = _subfn_calculate_spatial_emd_fast
-
-        # ==================================================================================================================================================================================================================================================================================== #
-        # BEGIN FUNCTION BODY                                                                                                                                                                                                                                                                  #
-        # ==================================================================================================================================================================================================================================================================================== #
-
-        self.gaussian_volume = self._build_sampled_pos_with_gaussian_spread(sigma=sigma)
-        _out = self.build_normalized_outputs()
-
-        ## INPUTS: gaussian_volume
-        self.locality_measures_dict_dict = {}
+        # Delegate locality computations to DecodingLocalityMeasures
+        if (self.locality_measures.sigma is None) or (self.locality_measures.sigma != sigma):
+            # Update sigma if different
+            self.locality_measures.sigma = sigma
+            # Force recomputation by clearing gaussian_volume (will be recomputed in compute())
+            if hasattr(self.locality_measures, 'gaussian_volume'):
+                self.locality_measures.gaussian_volume = None
+        
+        # Compute locality measures (handles gaussian_volume, p_x_given_n_dict, locality_measures_dict_dict)
+        self.locality_measures.compute()
+        
+        # Build normalized outputs for moving average (unique to PredictiveDecoding)
+        self.build_normalized_outputs()
+        
+        # Compute moving_avg_meas_pos_overlap_dict (unique to PredictiveDecoding)
         self.moving_avg_meas_pos_overlap_dict = {}
-
-        # for an_epoch_idx, (an_epoch_name, a_plotter) in enumerate(sync_plotters.items()):
-        for an_epoch_idx, an_epoch_name in enumerate(self.epoch_names):
-            ## "epoch" in the loop variables refers to only the session.paradigm epochs, like ['roam', 'sprinkle']
-            self.locality_measures_dict_dict[an_epoch_name] = {} ## empty
-
-            a_p_x_given_n = self.p_x_given_n_dict[an_epoch_name]
+        for an_epoch_name in self.epoch_names:
             a_moving_avg = self.moving_avg_dict[an_epoch_name]
+            # Compute overlap between gaussian_volume (from locality_measures) and moving_avg
+            self.moving_avg_meas_pos_overlap_dict[an_epoch_name] = (self.gaussian_volume * a_moving_avg)
 
-            ## compute the overlap measures:            
-            self.moving_avg_meas_pos_overlap_dict[an_epoch_name] = (self.gaussian_volume * a_moving_avg) ## the "overlap" is computed by taking the elementwise dot-product with the moving average
-
-            ## compute the locality:
-            # X_s = self.gaussian_volume[:, :, a_timestamp_idx]
-            # X_t = self.moving_avg_dict['roam'][:, :, a_timestamp_idx]
-            # X_s = self.gaussian_volume
-            # X_t = a_p_x_given_n
-            # an_earthmovers_dist = ot.sliced.sliced_wasserstein_distance(X_s, X_t, a=None, b=None, n_projections=50, p=2, projections=None, seed=None, log=False) # for two adjacent timestamp's gaussian's, the dist is very small, like `9.552666541993098e-07`
-
-            num_timestamps: int = np.shape(self.gaussian_volume)[-1]
-            
-            # an_earthmovers_dist = []
-            # for a_timestamp_idx in np.arange(num_timestamps):
-            #     d = cdist(self.gaussian_volume[:, :, a_timestamp_idx], a_p_x_given_n[:, :, a_timestamp_idx])
-            #     assignment = linear_sum_assignment(d)
-            #     # an_earthmovers_dist.append(d[assignment].sum() / n) ## what is n?
-            #     an_earthmovers_dist.append(d[assignment].sum())
- 
-            # ## END for a_timestamp_idx in np.ar..
-            # an_earthmovers_dist = np.array(an_earthmovers_dist)
-
-            # self.decoding_meas_pos_locality_measure_dict[an_epoch_name] = an_earthmovers_dist
-
-            # Final correct POM __________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
-
-            # self.decoding_meas_pos_locality_measure_dict[an_epoch_name] = np.array([_subfn_calculate_spatial_emd(self.gaussian_volume[:, :, a_timestamp_idx], a_p_x_given_n[:, :, a_timestamp_idx]) for a_timestamp_idx in np.arange(num_timestamps)])
-
-
-            # ==================================================================================================================================================================================================================================================================================== #
-            # do all computation measures                                                                                                                                                                                                                                                          #
-            # ==================================================================================================================================================================================================================================================================================== #
-
-            ## do all computation measures
-            a_computation_measure_name: str = 'mask_overlap'
-            print(f'\tcomputing: "{a_computation_measure_name}"...')
-            ## above a certain promence ideally:
-            min_val_epsilon: float = 1e-9
-            is_high_prob_mask = (a_p_x_given_n > min_val_epsilon)
-            self.locality_measures_dict_dict[an_epoch_name][a_computation_measure_name] = ((self.gaussian_volume * is_high_prob_mask) > min_val_epsilon).astype(int) ## the "overlap" is computed by taking the elementwise dot-product with the moving average
-
-            # a_computation_measure_name: str = 'peak_prom'
-            # print(f'\tcomputing: "{a_computation_measure_name}"...')
-            # ## above a certain promence ideally:
-            # min_val_epsilon: float = 1e-9
-            # is_high_prob_mask = (a_p_x_given_n > min_val_epsilon)
-            # self.locality_measures_dict_dict[an_epoch_name][a_computation_measure_name] = ((self.gaussian_volume * is_high_prob_mask) > min_val_epsilon).astype(int) ## the "overlap" is computed by taking the elementwise dot-product with the moving average
-
-
-            a_computation_measure_name: str = 'dist_to_highest_peak'
-            print(f'\tcomputing: "{a_computation_measure_name}"...')
-            ## above a certain promence ideally:
-            # peak_locations = np.argmax(a_p_x_given_n, axis=(0, 1))
-            distances_spatial, distances_spatial_frac_max = _subfn_pdf_spatial_distances(_obj=self, a_p_x_given_n=a_p_x_given_n, xbin_centers=self.xbin_centers, ybin_centers=self.ybin_centers)
-            self.locality_measures_dict_dict[an_epoch_name][a_computation_measure_name] = distances_spatial_frac_max ## the "overlap" is computed by taking the elementwise dot-product with the moving average
-            
-
-            # a_computation_measure_name: str = 'dist_to_nearest_peak'
-            # print(f'\tcomputing: "{a_computation_measure_name}"...')
-            # ## above a certain promence ideally:
-            # min_val_epsilon: float = 1e-9
-            # is_high_prob_mask = (a_p_x_given_n > min_val_epsilon)
-            # self.locality_measures_dict_dict[an_epoch_name][a_computation_measure_name] = ((self.gaussian_volume * is_high_prob_mask) > min_val_epsilon).astype(int) ## the "overlap" is computed by taking the elementwise dot-product with the moving average
-
-
-            a_computation_measure_name: str = 'earthmovers'
-            print(f'\tcomputing: "{a_computation_measure_name}"...')
-            self.decoding_meas_pos_locality_measure_dict[an_epoch_name] = active_subfn_compute_earthmovers_fn(self.gaussian_volume, a_p_x_given_n)
-            self.locality_measures_dict_dict[an_epoch_name][a_computation_measure_name] =  self.decoding_meas_pos_locality_measure_dict[an_epoch_name]
-
-
-
-
-        ## END for an_epoch_idx, an_epoch_n...
         print(f'done with compute.')
-
+        
         ## OUTPUTS: _a_moving_avg_dict, _a_moving_avg_meas_pos_overlap_dict
         return self.moving_avg_dict, self.moving_avg_meas_pos_overlap_dict, self.gaussian_volume
-    
-
-
-    def _build_sampled_pos_with_gaussian_spread(self, sigma: float = 1.0):
-        """ 
-        gaussian_volume = _obj._build_sampled_pos_with_gaussian_spread(sigma=1.0)
-        np.shape(gaussian_volume) # (42, 64, 103948)
-        """
-        # 1. Setup the Grid
-        # Ensure x_bounds/y_bounds match the physical extent of _obj.moving_avg
-        # Example: x_bounds = (0, 100), y_bounds = (0, 150)
-        x = deepcopy(self.xbin_centers) # np.linspace(x_bounds[0], x_bounds[1], n_x_bins) 
-        y = deepcopy(self.ybin_centers) # np.linspace(y_bounds[0], y_bounds[1], n_y_bins)
-        X, Y = np.meshgrid(x, y, indexing='ij')  # Shape: (41, 63)
-
-        # np.shape(X)
-        # np.shape(Y)
-        # np.shape(x)
-
-        # 2. Prepare for Broadcasting
-        # Grid shape: (41, 63, 1, 2) 
-        # We add a dimension at index 2 to broadcast against time
-        grid_stack = np.stack([X, Y], axis=-1)[:, :, np.newaxis, :]
-
-        # Position shape: (1, 1, n_target_times, 2)
-        # We add dimensions at indices 0 and 1 to broadcast against the grid
-        pos_stack = self.new_positions[np.newaxis, np.newaxis, :, :]
-
-        # 3. Calculate Gaussian (Vectorized)
-        # The subtraction broadcasts to shape (41, 63, n_target_times, 2)
-        # Summing over the last axis (coordinates) gives squared distance
-        dist_sq = np.sum((grid_stack - pos_stack)**2, axis=-1)
-
-        # Apply Gaussian function
-        # sigma must be in the same physical units as the bounds/positions
-        
-        gaussian_volume = np.exp(-dist_sq / (2 * sigma**2))
-
-        # Result: gaussian_volume.shape is (41, 63, n_target_times)
-        return gaussian_volume
 
 
     # ==================================================================================================================================================================================================================================================================================== #
