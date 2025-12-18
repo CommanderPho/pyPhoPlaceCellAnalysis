@@ -1726,7 +1726,8 @@ class Spike2DRaster(SpecificDockWidgetManipulatingMixin, DynamicDockDisplayAreaO
             elif sync_mode.name == SynchronizedPlotMode.TO_WINDOW.name:
                 # Perform Initial (one-time) update from source -> controlled:
                 active_matplotlib_view_widget.on_window_changed(self.spikes_window.active_window_start_time, self.spikes_window.active_window_end_time)
-                sync_connection = self.window_scrolled.connect(active_matplotlib_view_widget.on_window_changed)
+                # sync_connection = self.window_scrolled.connect(active_matplotlib_view_widget.on_window_changed)
+                sync_connection = pg.SignalProxy(self.window_scrolled, delay=0.2, rateLimit=30, slot=active_matplotlib_view_widget.on_window_changed)
                 self.ui.connections[identifier] = sync_connection # add the connection to the connections array
                 return sync_connection # return the connection
             else:
