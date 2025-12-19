@@ -108,6 +108,10 @@ class DecodingLocalityMeasures(ComputedResult): #PickleSerializableMixin, AttrsB
     
     locality_measures_df: pd.DataFrame = serialized_field(default=None, is_computable=True, init=False)
 
+    non_local_PBE_non_moving_epochs_df: pd.DataFrame = serialized_field(default=None, is_computable=True)
+    
+
+
 
     def __attrs_post_init__(self):
         # Add post-init logic here
@@ -824,8 +828,23 @@ class DecodingLocalityMeasures(ComputedResult): #PickleSerializableMixin, AttrsB
     @function_attributes(short_name=None, tags=['NEW', 'MAIN', 'epochs'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-12-18 08:02', related_items=[])
     def get_non_moving_PBE_non_local_epochs(self, sess, merging_adjacent_max_separation_sec=0.5, skip_get_non_overlapping = False, should_assign_to_session: bool=True, **kwargs) -> pd.DataFrame:
         """
-        overlap_included_only_df_dict = decoding_locality_measures.overlap_included_only_df_dict(merging_adjacent_max_separation_sec=0.5)
-        render_scrollable_colored_table_from_dataframe(non_local_locality_measures_epochs_df)
+        
+        Updates:
+            `self.non_local_PBE_non_moving_epochs_df`
+            
+            
+        Usage:
+            from neuropy.utils.mixins.time_slicing import TimePointEventAccessor
+            from neuropy.core.session.dataSession import DataSession
+            from neuropy.core.epoch import Epoch, EpochsAccessor, ensure_dataframe, ensure_Epoch, EpochHelpers
+            from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.PredictiveDecodingComputations import DecodingLocalityMeasures, PredictiveDecoding
+
+            ## get the non-local, non-pbe, epochs
+            overlap_included_only_df_dict = decoding_locality_measures.get_non_moving_PBE_non_local_epochs(curr_active_pipeline.sess, merging_adjacent_max_separation_sec=0.5)
+            non_local_PBE_non_moving_epochs_df: pd.DataFrame = overlap_included_only_df_dict['non_moving_PBE']
+            curr_active_pipeline.sess.non_moving_pbe_non_local_epochs = deepcopy(non_local_PBE_non_moving_epochs_df)
+
+            render_scrollable_colored_table_from_dataframe(non_local_PBE_non_moving_epochs_df)
 
         """
         from neuropy.core.epoch import Epoch, EpochsAccessor, ensure_dataframe, ensure_Epoch, EpochHelpers
@@ -880,7 +899,11 @@ class DecodingLocalityMeasures(ComputedResult): #PickleSerializableMixin, AttrsB
 
 
         ## END for is_in_key, epoch....
-            
+        
+        ## Assign to `self.non_local_PBE_non_moving_epochs_df`
+        non_local_PBE_non_moving_epochs_df: pd.DataFrame = overlap_included_only_df_dict['non_moving_PBE']
+        self.non_local_PBE_non_moving_epochs_df = deepcopy(non_local_PBE_non_moving_epochs_df)
+
         return overlap_included_only_df_dict
     
 
@@ -1607,8 +1630,9 @@ class PredictiveDecodingComputationsContainer(ComputedResult):
             print(f'PredictiveDecoding is not computed.')
             
     """
-    _VersionedResultMixin_version: str = "2024.05.27_0" # to be updated in your IMPLEMENTOR to indicate its version
+    _VersionedResultMixin_version: str = "2025.12.19_0" # to be updated in your IMPLEMENTOR to indicate its version
     
+    decoding_locality: Optional[DecodingLocalityMeasures] = serialized_field(default=None, repr=False)
     predictive_decoding: Optional[PredictiveDecoding] = serialized_field(default=None, repr=False)
     # RL_ripple: Optional[RankOrderResult] = serialized_field(default=None, repr=False)
     # LR_laps: Optional[RankOrderResult] = serialized_field(default=None, repr=False)
