@@ -1808,11 +1808,16 @@ class PredictiveDecodingComputationsContainer(ComputedResult):
             is_relevant_past_times = (relevant_positions_df['t'] < curr_epoch_time_bin_centers[0])
             is_relevant_future_times = (relevant_positions_df['t'] > curr_epoch_time_bin_centers[-1])
             ## how many timestamps still remain in the past and the future:
-            n_total_past_times = (measured_positions_df['t'] < curr_epoch_time_bin_centers[0])
-            n_total_future_times = (measured_positions_df['t'] > curr_epoch_time_bin_centers[-1])
+            n_total_possible_past_times = np.sum(measured_positions_df['t'] < curr_epoch_time_bin_centers[0])
+            n_total_possible_future_times = np.sum(measured_positions_df['t'] > curr_epoch_time_bin_centers[-1])
             
+            n_relevant_past_times = np.sum(is_relevant_past_times)
+            n_relevant_future_times = np.sum(is_relevant_future_times)
 
-            epoch_matching_past_future_positions.append((pos_matches_epoch_mask[is_relevant_past_times], pos_matches_epoch_mask[is_relevant_future_times], n_total_past_times, n_total_future_times)) ## basically split on current
+            # n_total_past_times = (measured_positions_df['t'] < curr_epoch_time_bin_centers[0])
+            # n_total_future_times = (measured_positions_df['t'] > curr_epoch_time_bin_centers[-1])
+            
+            epoch_matching_past_future_positions.append((pos_matches_epoch_mask[is_relevant_past_times], pos_matches_epoch_mask[is_relevant_future_times], n_total_possible_past_times, n_total_possible_future_times, n_relevant_past_times, n_relevant_future_times)) ## basically split on current
             
             # relevant_positions_df['is_past'] = (relevant_positions_df['t'] < curr_epoch_time_bin_centers[-1])
 
@@ -1838,11 +1843,17 @@ class PredictiveDecodingComputationsContainer(ComputedResult):
         ratio_past = np.array([len(epoch_matching_past_future_positions[i][0])/ len(decoded_local_epochs_result.time_bin_containers[i].centers) for i, a_row in enumerate(ensure_dataframe(decoded_local_epochs_result.filter_epochs).itertuples(index=False))])
         ratio_future = np.array([len(epoch_matching_past_future_positions[i][1])/ len(decoded_local_epochs_result.time_bin_containers[i].centers) for i, a_row in enumerate(ensure_dataframe(decoded_local_epochs_result.filter_epochs).itertuples(index=False))])
 
-        n_total_past = np.array([epoch_matching_past_future_positions[i][2] for i, a_row in enumerate(ensure_dataframe(decoded_local_epochs_result.filter_epochs).itertuples(index=False))])
-        n_total_future = np.array([epoch_matching_past_future_positions[i][3] for i, a_row in enumerate(ensure_dataframe(decoded_local_epochs_result.filter_epochs).itertuples(index=False))])
+        n_total_possible_past = np.array([epoch_matching_past_future_positions[i][2] for i, a_row in enumerate(ensure_dataframe(decoded_local_epochs_result.filter_epochs).itertuples(index=False))])
+        n_total_possible_future = np.array([epoch_matching_past_future_positions[i][3] for i, a_row in enumerate(ensure_dataframe(decoded_local_epochs_result.filter_epochs).itertuples(index=False))])
+
+        n_total_relevant_past = np.array([epoch_matching_past_future_positions[i][4] for i, a_row in enumerate(ensure_dataframe(decoded_local_epochs_result.filter_epochs).itertuples(index=False))])
+        n_total_relevant_future = np.array([epoch_matching_past_future_positions[i][5] for i, a_row in enumerate(ensure_dataframe(decoded_local_epochs_result.filter_epochs).itertuples(index=False))])
 
 
-        return epoch_high_prob_pos_masks, epoch_matching_positions, (ratio_past, ratio_future, n_total_past, n_total_future) # , epoch_high_prob_pos_masks
+        past_future_info_dict = {'ratio_past': ratio_past, 'ratio_future': ratio_future, 'n_total_possible_past': n_total_possible_past, 'n_total_possible_future': n_total_possible_future, 'n_total_relevant_past': n_total_relevant_past, 'n_total_relevant_future': n_total_relevant_future, }
+        # non_local_PBE_non_moving_epochs_df.update(past_future_info_dict)
+
+        return epoch_high_prob_pos_masks, epoch_matching_positions, past_future_info_dict #(ratio_past, ratio_future, n_total_past, n_total_future) # , epoch_high_prob_pos_masks
 
 
 
