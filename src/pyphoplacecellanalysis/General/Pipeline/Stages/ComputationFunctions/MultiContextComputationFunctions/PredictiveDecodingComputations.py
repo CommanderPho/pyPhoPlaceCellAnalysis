@@ -1688,18 +1688,15 @@ class PredictiveDecodingComputationsGlobalComputationFunctions(AllFunctionEnumer
                         input_requires=['DirectionalDecodersDecoded', 'RankOrder', 'global_computation_results.computation_config.rank_order_shuffle_analysis.minimum_inclusion_fr_Hz', 'global_computation_results.computation_config.rank_order_shuffle_analysis.included_qclu_values'], output_provides=['PredictiveDecoding'], uses=['PredictiveDecodingComputationsContainer', 'WCorrShuffle'], used_by=[], creation_date='2024-05-27 14:31', related_items=[],
         requires_global_keys=['DirectionalDecodersDecoded', 'DirectionalMergedDecoders', 'RankOrder', 'DirectionalDecodersEpochsEvaluations'], provides_global_keys=['PredictiveDecoding'],
         validate_computation_test=validate_has_predictive_decoding_results, is_global=True)
-    def perform_predictive_decoding_analysis(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, debug_print=False, num_shuffles:int=1024, drop_previous_result_and_compute_fresh:bool=False):
-        """ Performs the computation of the spearman and pearson correlations for the ripple and lap epochs.
+    def perform_predictive_decoding_analysis(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, debug_print=False, window_size:int=90, drop_previous_result_and_compute_fresh:bool=False):
+        """ Performs predictive decoding analysis to relate PBE activity to future visited locations.
 
         Requires:
-            ['sess']
+            ['DirectionalDecodersDecoded']
 
         Provides:
             global_computation_results.computed_data['PredictiveDecoding']
-                ['PredictiveDecoding'].odd_ripple
-                ['RankOrder'].even_ripple
-                ['RankOrder'].odd_laps
-                ['RankOrder'].even_laps
+                ['PredictiveDecoding'].predictive_decoding - PredictiveDecoding instance containing computed results
 
 
         """
@@ -1719,49 +1716,15 @@ class PredictiveDecodingComputationsGlobalComputationFunctions(AllFunctionEnumer
 
         time_bin_size: float = directional_decoders_decode_result.most_recent_decoding_time_bin_size
         print(f'time_bin_size: {time_bin_size}')
-        # continuously_decoded_dict: Dict[str, DecodedFilterEpochsResult] = directional_decoders_decode_result.most_recent_continuously_decoded_dict
-        # all_directional_continuously_decoded_dict: Dict[types.DecoderName, DecodedFilterEpochsResult] = {k:v for k, v in (continuously_decoded_dict or {}).items() if k in TrackTemplates.get_decoder_names()} ## what is plotted in the `f'{a_decoder_name}_ContinuousDecode'` rows by `AddNewDirectionalDecodedEpochs_MatplotlibPlotCommand`
-        ## OUT: all_directional_continuously_decoded_dict
-        ## Draw the position meas/decoded on the plot widget
-        ## INPUT: fig, ax_list, all_directional_continuously_decoded_dict, track_templates
-
-
-        # Needs to store the parameters
-        # num_shuffles:int=1000
-        # minimum_inclusion_fr_Hz:float=12.0
-        # included_qclu_values=[1,2]
 
         if drop_previous_result_and_compute_fresh:
             removed_predictive_decoding_result = global_computation_results.computed_data.pop('PredictiveDecoding', None)
             if removed_predictive_decoding_result is not None:
                 print(f'removed previous "PredictiveDecoding" result and computing fresh since `drop_previous_result_and_compute_fresh == True`')
 
-
         if ('PredictiveDecoding' not in global_computation_results.computed_data) or (not hasattr(global_computation_results.computed_data, 'PredictiveDecoding')):
             # initialize
-            global_computation_results.computed_data['PredictiveDecoding'] = PredictiveDecodingComputationsContainer(wcorr_ripple_shuffle=None, is_global=True)
-
-        # global_computation_results.computed_data['PredictiveDecoding'].included_qclu_values = included_qclu_values
-        if (not hasattr(global_computation_results.computed_data['PredictiveDecoding'], 'wcorr_ripple_shuffle') or (global_computation_results.computed_data['PredictiveDecoding'].wcorr_ripple_shuffle is None)):
-            # initialize a new wcorr result            
-            wcorr_tool: WCorrShuffle = WCorrShuffle.init_from_templates(curr_active_pipeline=owning_pipeline_reference, enable_saving_entire_decoded_shuffle_result=False)
-            global_computation_results.computed_data['PredictiveDecoding'].wcorr_ripple_shuffle = wcorr_tool
-        else:
-            ## get the existing one:
-            wcorr_tool = global_computation_results.computed_data['PredictiveDecoding'].wcorr_ripple_shuffle
-        
-
-        n_completed_shuffles: int = wcorr_tool.n_completed_shuffles
-
-        if n_completed_shuffles < num_shuffles:   
-            print(f'n_prev_completed_shuffles: {n_completed_shuffles}.')
-            print(f'needed num_shuffles: {num_shuffles}.')
-            desired_new_num_shuffles: int = max((num_shuffles - wcorr_tool.n_completed_shuffles), 0)
-            print(f'need desired_new_num_shuffles: {desired_new_num_shuffles} more shuffles.')
-            ## add some more shuffles to it:
-            wcorr_tool.compute_shuffles(num_shuffles=desired_new_num_shuffles, curr_active_pipeline=owning_pipeline_reference)
-
-        
+            global_computation_results.computed_data['PredictiveDecoding'] = PredictiveDecodingComputationsContainer(predictive_decoding=None, is_global=True)
 
         # Create DecodingLocalityMeasures first (required for new interface)
         locality_measures = DecodingLocalityMeasures.init_from_decode_result(
@@ -1771,6 +1734,9 @@ class PredictiveDecodingComputationsGlobalComputationFunctions(AllFunctionEnumer
             sigma=None  # Will be computed automatically if not provided
         )
         
+        # Compute locality measures to ensure they are fully computed
+        locality_measures.compute()
+        
         # Get a_result_decoded from directional_decoders_decode_result
         a_result_decoded = directional_decoders_decode_result.continuously_decoded_pseudo2D_decoder_dict[time_bin_size]
         
@@ -1779,44 +1745,38 @@ class PredictiveDecodingComputationsGlobalComputationFunctions(AllFunctionEnumer
             curr_active_pipeline=owning_pipeline_reference,
             locality_measures=locality_measures,
             a_result_decoded=a_result_decoded,
-            window_size=90
+            window_size=window_size
         )
-        # _obj
 
-        x_step: float = np.nanmean(np.diff(_obj.xbin))
-        y_step: float = np.nanmean(np.diff(_obj.ybin))
+        # Use sigma from locality_measures (computed automatically) or compute from bin sizes if not available
+        if locality_measures.sigma is None:
+            x_step: float = np.nanmean(np.diff(_obj.xbin))
+            y_step: float = np.nanmean(np.diff(_obj.ybin))
+            sigma: float = np.nanmax([x_step, y_step]) * 5.0
+            print(f'computed sigma from bin sizes: {sigma}')
+        else:
+            sigma = locality_measures.sigma
+            print(f'using sigma from locality_measures: {sigma}')
 
-        sigma: float = np.nanmax([x_step, y_step]) * 5.0
-        print(f'sigma: {sigma}')
+        # Compute predictive decoding outputs
+        moving_avg_dict, moving_avg_meas_pos_overlap_dict, gaussian_volume = _obj.compute(sigma=sigma)
 
-        # epoch_names = list(sync_plotters.keys())
-        epoch_names = list(directional_decoders_decode_result.pf1D_Decoder_dict.keys())
-        # moving_avg_dict, moving_avg_meas_pos_overlap_dict, gaussian_volume = _obj.build_normalized_outputs(epoch_names=epoch_names, sigma=25.0)
-
-        moving_avg_dict, moving_avg_meas_pos_overlap_dict, gaussian_volume = _obj.compute(sigma=25.0)
-
-
-        ## ~4 m
-        # 2m with wrong version
-        # num_timestamps: int = np.shape(gaussian_volume)[-1]
-
-
-
-
-        # (_out_p, _out_p_dict), (_out_shuffle_wcorr_ZScore_LONG, _out_shuffle_wcorr_ZScore_SHORT), (total_n_shuffles_more_extreme_than_real_df, total_n_shuffles_more_extreme_than_real_dict) = wcorr_tool.post_compute(debug_print=False)
-        # wcorr_tool.save_data(filepath='temp100.pkl')
-
-        global_computation_results.computed_data['PredictiveDecoding'].predictive_decoding = wcorr_tool
+        # Store the PredictiveDecoding instance in the container
+        global_computation_results.computed_data['PredictiveDecoding'].predictive_decoding = _obj
         
 
         """ Usage:
         
-        from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.PredictiveDecodingComputations import WCorrShuffle, PredictiveDecodingComputationsContainer
+        from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.PredictiveDecodingComputations import PredictiveDecoding, PredictiveDecodingComputationsContainer
 
-        wcorr_shuffle_results: PredictiveDecodingComputationsContainer = curr_active_pipeline.global_computation_results.computed_data.get('PredictiveDecoding', None)
-        if wcorr_shuffle_results is not None:    
-            wcorr_ripple_shuffle: WCorrShuffle = wcorr_shuffle_results.wcorr_ripple_shuffle
-            print(f'wcorr_ripple_shuffle.n_completed_shuffles: {wcorr_ripple_shuffle.n_completed_shuffles}')
+        predictive_decoding_results: PredictiveDecodingComputationsContainer = curr_active_pipeline.global_computation_results.computed_data.get('PredictiveDecoding', None)
+        if predictive_decoding_results is not None:    
+            predictive_decoding: PredictiveDecoding = predictive_decoding_results.predictive_decoding
+            if predictive_decoding is not None:
+                print(f'PredictiveDecoding computed with window_size: {predictive_decoding.window_size}')
+                print(f'epoch_names: {predictive_decoding.epoch_names}')
+            else:
+                print(f'PredictiveDecoding is None.')
         else:
             print(f'PredictiveDecoding is not computed.')
             
