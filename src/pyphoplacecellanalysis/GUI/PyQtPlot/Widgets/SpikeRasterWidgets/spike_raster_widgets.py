@@ -402,7 +402,12 @@ def _setup_spike_raster_window_for_debugging(spike_raster_window, wants_docked_r
 
     _post_hoc_layout_resize(active_2d_plot=active_2d_plot, desired_static_area_height=144)
 
-    
+    # ## 2025-09-19 - Add Session Paradigm Epochs with a different color for each session
+    # from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import build_bapun_proper_epoch_intervals, build_bapun_all_epochs_df
+
+    # a_rect_item, an_interval_ds = build_bapun_proper_epoch_intervals(curr_active_pipeline=curr_active_pipeline, active_2d_plot=active_2d_plot)
+
+
     print(f'waiting until complete....')
     block_until_render_complete()
     print(f'\tblock_until_render_complete is done. Continuing execution.')
