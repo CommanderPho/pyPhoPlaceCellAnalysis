@@ -20,7 +20,7 @@ from attrs import define, field, asdict, evolve
 import neuropy.utils.type_aliases as types
 from neuropy.utils.misc import build_shuffled_ids, shuffle_ids # used in _SHELL_analyze_leave_one_out_decoding_results
 from neuropy.utils.mixins.binning_helpers import find_minimum_time_bin_duration
-from neuropy.core.epoch import find_data_indicies_from_epoch_times
+from neuropy.core.epoch import EpochHelpers, ensure_dataframe, find_data_indicies_from_epoch_times
 from neuropy.utils.result_context import IdentifyingContext
 from neuropy.utils.efficient_interval_search import OverlappingIntervalsFallbackBehavior, determine_event_interval_identity, determine_event_interval_is_included # numba acceleration
 from neuropy.utils.mixins.time_slicing import TimePointEventAccessor
@@ -207,6 +207,7 @@ class DecodingLocalityMeasures(ComputedResult): #PickleSerializableMixin, AttrsB
         Updates: self.
             .moving_avg_dict, .moving_avg_meas_pos_overlap_dict, .gaussian_volume, .decoding_meas_pos_locality_measure_dict
         """
+        self.perform_compute_on_load()
         locality_measures_df = self.compute_locality_measures()
         
         ## OUTPUTS: _a_moving_avg_dict, _a_moving_avg_meas_pos_overlap_dict
@@ -215,7 +216,8 @@ class DecodingLocalityMeasures(ComputedResult): #PickleSerializableMixin, AttrsB
 
 
     def _build_sampled_pos_with_gaussian_spread(self, sigma: float = 1.0):
-        """ 
+        """ Computed for each position in `self.new_positions`
+        
         gaussian_volume = _obj._build_sampled_pos_with_gaussian_spread(sigma=1.0)
         np.shape(gaussian_volume) # (42, 64, 103948)
         """
@@ -273,6 +275,14 @@ class DecodingLocalityMeasures(ComputedResult): #PickleSerializableMixin, AttrsB
 
         if (self.p_x_given_n_dict is None) or (len(self.p_x_given_n_dict) == 0):
             self.build_normalized_outputs()
+            
+        if (self.xbin is not None) and (self.ybin is not None):
+            self.pos_df = self.pos_df.dropna(how='any', subset=['t', 'x', 'y'])
+            self.pos_df = self.pos_df.position.adding_binned_position_columns(xbin_edges=self.xbin, ybin_edges=self.ybin)
+            self.pos_df = self.pos_df[(self.pos_df['binned_x'].notna()) & (self.pos_df['binned_y'].notna())] # Filter rows based on columns: 'binned_x', 'binned_y'
+
+        # self.pos_df = self.pos_df.rename(columns={'x':'x_meas', 'y':'y_meas', 'binned_x':'binned_x_meas', 'binned_y':'binned_y_meas'}, inplace=False).drop(columns=['t'], inplace=False) ## measured
+
 
 
     # ==================================================================================================================================================================================================================================================================================== #
@@ -571,7 +581,7 @@ class DecodingLocalityMeasures(ComputedResult): #PickleSerializableMixin, AttrsB
             a_computation_measure_name: str = 'mask_overlap'
             print(f'\tcomputing: "{a_computation_measure_name}"...')
             ## above a certain promence ideally:
-            min_val_epsilon: float = 1e-9
+            min_val_epsilon: float = 1e-9 ## Oh dang this is kinda tiny
             is_high_prob_mask = (a_p_x_given_n > min_val_epsilon)
             self.locality_measures_dict_dict[an_epoch_name][a_computation_measure_name] = ((self.gaussian_volume * is_high_prob_mask) > min_val_epsilon).astype(int) ## the "overlap" is computed by taking the elementwise dot-product with the moving average
 
@@ -840,7 +850,7 @@ class DecodingLocalityMeasures(ComputedResult): #PickleSerializableMixin, AttrsB
             from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.PredictiveDecodingComputations import DecodingLocalityMeasures, PredictiveDecoding
 
             ## get the non-local, non-pbe, epochs
-            overlap_included_only_df_dict = decoding_locality_measures.get_non_moving_PBE_non_local_epochs(curr_active_pipeline.sess, merging_adjacent_max_separation_sec=0.5)
+            non_local_PBE_non_moving_epochs_df: pd.DataFrame = decoding_locality_measures.get_non_moving_PBE_non_local_epochs(curr_active_pipeline.sess, merging_adjacent_max_separation_sec=0.5)
             non_local_PBE_non_moving_epochs_df: pd.DataFrame = overlap_included_only_df_dict['non_moving_PBE']
             curr_active_pipeline.sess.non_moving_pbe_non_local_epochs = deepcopy(non_local_PBE_non_moving_epochs_df)
 
@@ -1633,10 +1643,11 @@ class PredictiveDecodingComputationsContainer(ComputedResult):
             print(f'PredictiveDecoding is not computed.')
             
     """
-    _VersionedResultMixin_version: str = "2025.12.19_0" # to be updated in your IMPLEMENTOR to indicate its version
+    _VersionedResultMixin_version: str = "2025.12.20_0" # to be updated in your IMPLEMENTOR to indicate its version
     
     decoding_locality: Optional[DecodingLocalityMeasures] = serialized_field(default=None, repr=False)
     predictive_decoding: Optional[PredictiveDecoding] = serialized_field(default=None, repr=False)
+    
     # RL_ripple: Optional[RankOrderResult] = serialized_field(default=None, repr=False)
     # LR_laps: Optional[RankOrderResult] = serialized_field(default=None, repr=False)
     # RL_laps: Optional[RankOrderResult] = serialized_field(default=None, repr=False)
@@ -1654,34 +1665,206 @@ class PredictiveDecodingComputationsContainer(ComputedResult):
     # minimum_inclusion_fr_Hz: float = serialized_attribute_field(default=2.0, repr=True)
     # included_qclu_values: Optional[List] = serialized_attribute_field(default=None, repr=True)
 
+    # @property
+    # def decoding_locality(self) -> DecodingLocalityMeasures:
+    #     """The decoding_locality property."""
+    #     assert self.predictive_decoding is not None
+    #     return self.predictive_decoding.locality_measures
+    # @decoding_locality.setter
+    # def decoding_locality(self, value: DecodingLocalityMeasures):
+    #     assert self.predictive_decoding is not None
+    #     self.predictive_decoding.locality_measures = value
+
+    def __attrs_post_init__(self):
+        # Add post-init logic here
+        if (self.predictive_decoding is not None) and (self.decoding_locality is None):
+            self.decoding_locality = self.predictive_decoding.locality_measures
+                
 
     # Utility Methods ____________________________________________________________________________________________________ #
 
-    # def to_dict(self) -> Dict:
-    #     # return asdict(self, filter=attrs.filters.exclude((self.__attrs_attrs__.is_global))) #  'is_global'
-    #     return {k:v for k, v in self.__dict__.items() if k not in ['is_global']}
-    
-    # def to_hdf(self, file_path, key: str, debug_print=False, enable_hdf_testing_mode:bool=False, **kwargs):
-    #     """ Saves the object to key in the hdf5 file specified by file_path
-    #     enable_hdf_testing_mode: bool - default False - if True, errors are not thrown for the first field that cannot be serialized, and instead all are attempted to see which ones work.
+    @function_attributes(short_name=None, tags=['PENDING', 'IN-PROCESS', '2025-12-20_future_and_past_analysis'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-12-19 14:28', related_items=[])
+    def compute_future_and_past_analysis(self, curr_active_pipeline, an_epoch_name:str = 'roam'):
+        from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import BayesianPlacemapPositionDecoder, DecodedFilterEpochsResult
+        
+        ## Get the non-local epochs -- where do they encode?
+        # container: PredictiveDecodingComputationsContainer = curr_active_pipeline.global_computation_results.computed_data['PredictiveDecoding']
+        container = self
+        if container.decoding_locality is None:
+            container.decoding_locality = container.predictive_decoding.locality_measures
+
+        decoding_locality: DecodingLocalityMeasures = container.decoding_locality
+        decoding_locality
+        non_local_PBE_non_moving_epochs_df: pd.DataFrame = decoding_locality.get_non_moving_PBE_non_local_epochs(curr_active_pipeline.sess, merging_adjacent_max_separation_sec=0.5)
+        # non_local_PBE_non_moving_epochs_df: pd.DataFrame = container.decoding_locality.non_local_PBE_non_moving_epochs_df
+        non_local_PBE_non_moving_epochs_df
+
+        measured_positions_df: pd.DataFrame = decoding_locality.pos_df
+        measured_positions_df
+        measured_positions_df = measured_positions_df.drop(columns=['binned_x', 'binned_y'], inplace=False)
+        measured_positions_df = measured_positions_df.dropna(how='any', subset=['t', 'x', 'y'])
+        measured_positions_df = measured_positions_df.position.adding_binned_position_columns(xbin_edges=decoding_locality.xbin, ybin_edges=decoding_locality.ybin)
+        measured_positions_df = measured_positions_df[(measured_positions_df['binned_x'].notna()) & (measured_positions_df['binned_y'].notna())] # Filter rows based on columns: 'binned_x', 'binned_y'
+        # decoding_locality.pos_df = measured_positions_df
+        measured_positions_df
+
+        from neuropy.utils.efficient_interval_search import OverlappingIntervalsFallbackBehavior
+
+        ## add the final detected non_local_pbe_epoch indicies to the decoded points:
+        _out_locality_measures_df = deepcopy(decoding_locality.locality_measures_df)
+        _out_locality_measures_df = _out_locality_measures_df.time_point_event.adding_epochs_identity_column(epochs_df=decoding_locality.non_local_PBE_non_moving_epochs_df, epoch_id_key_name='non_local_PBE_non_moving_epoch', epoch_label_column_name='label', override_time_variable_name='t',
+                                                            no_interval_fill_value=np.nan, should_replace_existing_column=True, drop_non_epoch_events=False, overlap_behavior=OverlappingIntervalsFallbackBehavior.FALLBACK_TO_SLOW_SEARCH)
+        _out_locality_measures_df
+        _out_locality_measures_df.dropna(how='any', subset=['non_local_PBE_non_moving_epoch'])
+
+        epoch_times = decoding_locality.locality_measures_df['t']
+        time_to_idx_map = EpochHelpers.find_epoch_times_to_data_indicies_map(decoding_locality.non_local_PBE_non_moving_epochs_df, epoch_times)
+        # _out
+        non_local_PBE_non_moving_epochs_df: pd.DataFrame = decoding_locality.non_local_PBE_non_moving_epochs_df
+        non_local_PBE_non_moving_epochs_df['start_idx'] = non_local_PBE_non_moving_epochs_df['start'].map(time_to_idx_map)
+        non_local_PBE_non_moving_epochs_df['stop_idx'] = non_local_PBE_non_moving_epochs_df['stop'].map(time_to_idx_map)
+        # matching_epoch_times_slice
+        non_local_PBE_non_moving_epochs_df
 
 
-    #     Usage:
-    #         hdf5_output_path: Path = curr_active_pipeline.get_output_path().joinpath('test_data.h5')
-    #         _pfnd_obj: PfND = long_one_step_decoder_1D.pf
-    #         _pfnd_obj.to_hdf(hdf5_output_path, key='test_pfnd')
-    #     """
-    #     super().to_hdf(file_path, key=key, debug_print=debug_print, enable_hdf_testing_mode=enable_hdf_testing_mode, **kwargs)
-    #     # handle custom properties here
+        directional_decoders_decode_result = curr_active_pipeline.global_computation_results.computed_data['DirectionalDecodersDecoded']
+        directional_decoders_decode_result
+
+        assert directional_decoders_decode_result is not None
+        ## INPUTS: container, directional_decoders_decode_result
+        ## decode each epoch at a small time bin size:
+        a_decoder: BayesianPlacemapPositionDecoder = directional_decoders_decode_result.pf1D_Decoder_dict[an_epoch_name]
+        decoded_local_epochs_result: DecodedFilterEpochsResult = a_decoder.decode_specific_epochs(spikes_df=curr_active_pipeline.sess.spikes_df, filter_epochs=non_local_PBE_non_moving_epochs_df, decoding_time_bin_size=0.025)
+
+        decoding_locality: DecodingLocalityMeasures = container.decoding_locality
+        non_local_PBE_non_moving_epochs_df: pd.DataFrame = decoding_locality.non_local_PBE_non_moving_epochs_df
+
+        animal_future_scores = {}
+
+        ## HARDCODED an_epoch_name
+        an_epoch_name: str = 'roam'
+        high_val_epsilon: float = 1e-6 ## Oh dang this is kinda tiny
+        epoch_high_prob_pos_masks = []
+        epoch_matching_positions = []
+
+        a_p_x_given_n = decoding_locality.p_x_given_n_dict[an_epoch_name] ## hmmm, this is global probability - (41, 63, 103948)
+        # decoding_locality.time_window_centers
+
+        for i, a_row in enumerate(ensure_dataframe(decoded_local_epochs_result.filter_epochs).itertuples(index=False)):
+        # for a_row in non_local_PBE_non_moving_epochs_df.itertuples(index=False):
+            
+            ## need to know the indices this corresponds to so I can use my gaussian, p_x_given_n, etc
+            
+            a_row.start
+            a_row.stop
+            ## compute the locality:
+            num_timestamps: int = np.shape(decoding_locality.gaussian_volume)[-1]
+
+            ## What positions does the epoch decode to?
+            
+            ## Does the animal go there in the futre?
+            # an_epoch_pos_df = decoding_locality.pos_df.position.time_sliced(a_row.start, a_row.stop) ## Irreleevant, these are the literal positions during the PBE!
+            # a_timestamp_indicies = an_epoch_pos_df.index.to_numpy() ## These on the other hand ARE relevant to ALL arrays, like the p_x_given_n
+            
+            # is_timebin_included = np.logical_and((a_row.start <= decoding_locality.time_window_centers), (decoding_locality.time_window_centers <= a_row.stop))
+            # print(np.sum(is_timebin_included)) ## shoot, because the time bins are so small :[
+            
+            ## Need correect portion of p_x_given_n for these times
+            curr_epoch_p_x_given_n = decoded_local_epochs_result.p_x_given_n_list[i] # [:, :, is_timebin_included]
+            curr_epoch_time_bin_centers = decoded_local_epochs_result.time_bin_containers[i].centers    
+            # is_high_prob_mask = (curr_epoch_p_x_given_n > high_val_epsilon)
+            
+            print(np.shape(curr_epoch_p_x_given_n))
+            # curr_epoch_p_x_given_n  # np.shape(curr_epoch_p_x_given_n): (n_x_bins, n_y_Bins, n_time_bins)
+            # is_high_prob_mask = curr_epoch_p_x_given_n >= np.sort(curr_epoch_p_x_given_n.ravel())[::-1][np.searchsorted(np.cumsum(np.sort(curr_epoch_p_x_given_n.ravel())[::-1]), 0.1 * curr_epoch_p_x_given_n.sum())]
+
+            ## for each time bin compute the top 10% of the time bins and use those instead of a fixed "high_val_epsilon" threshold:
+            top_v_percent: float = 0.1
+            flat = curr_epoch_p_x_given_n.reshape(-1, curr_epoch_p_x_given_n.shape[-1])  # (n_xy, n_time)
+            sorted_flat = np.sort(flat, axis=0)[::-1]
+            cdf = np.cumsum(sorted_flat, axis=0)
+            thresholds = sorted_flat[np.argmax(cdf >= top_v_percent * flat.sum(axis=0), axis=0), np.arange(flat.shape[1])]
+            is_high_prob_mask = curr_epoch_p_x_given_n >= thresholds
+            ## allow future positions to match any position in the epoch to count:
+            any_t_Bin_high_prob_pos_mask = np.any(is_high_prob_mask, axis=-1) ## mask for high prob positions during the epoch
+            epoch_high_prob_pos_masks.append(any_t_Bin_high_prob_pos_mask)
+
+            # curr_most_likely_position_indicies = decoded_local_epochs_result.most_likely_position_indicies_list[i]
+            # curr_most_likely_position_indicies
+            
+            # curr_most_likely_position_indicies
+            # array([[24, 32,  3,  1,  0,  0],
+            #        [20, 62, 40, 32, 22, 23]], dtype=int64)
+
+            # any_t_Bin_high_prob_pos_mask[measured_positions_df['binned_x'].to_numpy(), measured_positions_df['binned_y'].to_numpy(), :]
+            pos_matches_epoch_mask = np.where([any_t_Bin_high_prob_pos_mask[a_pos.binned_x, a_pos.binned_y] for a_pos in measured_positions_df.iterrows()])[0]
+            
+            # measured_positions_df[['binned_x', 'binned_y']].to_numpy()
+            epoch_matching_positions.append(pos_matches_epoch_mask)
+            # epoch_pos_df = decoding_locality.pos_df.position.time_slice_indicies(a_row.start, a_row.stop)
+            
+            # min_val_epsilon: float = 1e-9
+            # is_high_prob_mask = (a_p_x_given_n > min_val_epsilon)
+            # decoding_locality.locality_measures_dict_dict[an_epoch_name][a_computation_measure_name] = ((decoding_locality.gaussian_volume * is_high_prob_mask) > min_val_epsilon).astype(int) ## the "overlap" is computed by taking the elementwise dot-product with the moving average
+
+
+        # PredictiveDecodingComputationsContainer
+        ## Has it been there in the past (duh or we wouldn't have placefields for it)?
+
+        ## Some PBEs that don't qualify as non-local actually might be but they're just paths across the environment.
+
+        ## Let's stick within the same block (roam/sprinkle) for now
+        return epoch_high_prob_pos_masks, epoch_matching_positions # , epoch_high_prob_pos_masks
+
+
+
+
+    # For serialization/pickling: ________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
+    def __getstate__(self):
+        # Copy the object's state from self.__dict__ which contains all our instance attributes. Always use the dict.copy() method to avoid modifying the original state.
+        state = self.__dict__.copy()
+        # # Remove the unpicklable entries.
+        # _non_pickled_fields = ['curr_active_pipeline', 'track_templates']
+        # for a_non_pickleable_field in _non_pickled_fields:
+        #     del state[a_non_pickleable_field]
+        return state
+
 
     def __setstate__(self, state):
-        # Restore instance attributes
-
+        # Restore instance attributes (i.e., _mapping and _keys_at_init).
         # For `VersionedResultMixin`
         self._VersionedResultMixin__setstate__(state)
 
-        self.__dict__.update(state)
+        # _non_pickled_field_restore_defaults = dict(zip(['curr_active_pipeline', 'track_templates'], [None, None]))
+        # for a_field_name, a_default_restore_value in _non_pickled_field_restore_defaults.items():
+        #     if a_field_name not in state:
+        #         state[a_field_name] = a_default_restore_value
 
+        self.__dict__.update(state)
+        # # Call the superclass __init__() (from https://stackoverflow.com/a/48325758)
+        # super(WCorrShuffle, self).__init__() # from
+
+    def __repr__(self):
+        """ 2024-01-11 - Renders only the fields and their sizes
+        """
+        from pyphocorehelpers.print_helpers import strip_type_str_to_classname
+        attr_reprs = []
+        for a in self.__attrs_attrs__:
+            attr_type = strip_type_str_to_classname(type(getattr(self, a.name)))
+            if 'shape' in a.metadata:
+                shape = ', '.join(a.metadata['shape'])  # this joins tuple elements with a comma, creating a string without quotes
+                attr_reprs.append(f"{a.name}: {attr_type} | shape ({shape})")  # enclose the shape string with parentheses
+            else:
+                attr_reprs.append(f"{a.name}: {attr_type}")
+        content = ",\n\t".join(attr_reprs)
+        return f"{type(self).__name__}({content}\n)"
+
+
+
+    # HDFMixin Conformances ______________________________________________________________________________________________ #
+    def to_hdf(self, file_path, key: str, **kwargs):
+        """ Saves the object to key in the hdf5 file specified by file_path"""
+        super().to_hdf(file_path, key=key, **kwargs)
 
 
 
@@ -1699,6 +1882,8 @@ def validate_has_predictive_decoding_results(curr_active_pipeline, computation_f
     predictive_decoding = seq_results.predictive_decoding
     if predictive_decoding is None:
         return False
+    
+
 
     # return True
 
@@ -1715,7 +1900,8 @@ class PredictiveDecodingComputationsGlobalComputationFunctions(AllFunctionEnumer
                         input_requires=['DirectionalDecodersDecoded', 'RankOrder', 'global_computation_results.computation_config.rank_order_shuffle_analysis.minimum_inclusion_fr_Hz', 'global_computation_results.computation_config.rank_order_shuffle_analysis.included_qclu_values'], output_provides=['PredictiveDecoding'], uses=['PredictiveDecodingComputationsContainer', 'WCorrShuffle'], used_by=[], creation_date='2024-05-27 14:31', related_items=[],
         requires_global_keys=['DirectionalDecodersDecoded', 'DirectionalMergedDecoders', 'RankOrder', 'DirectionalDecodersEpochsEvaluations'], provides_global_keys=['PredictiveDecoding'],
         validate_computation_test=validate_has_predictive_decoding_results, is_global=True)
-    def perform_predictive_decoding_analysis(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, debug_print=False, window_size:int=90, drop_previous_result_and_compute_fresh:bool=False):
+    def perform_predictive_decoding_analysis(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, debug_print=False, window_size:int=90, extant_decoded_time_bin_size: Optional[float]=None,
+                drop_previous_result_and_compute_fresh:bool=False):
         """ Performs predictive decoding analysis to relate PBE activity to future visited locations.
 
         Requires:
@@ -1741,7 +1927,12 @@ class PredictiveDecodingComputationsGlobalComputationFunctions(AllFunctionEnumer
         previously_decoded_keys: List[float] = list(continuously_decoded_result_cache_dict.keys()) # [0.03333]
         print(F'previously_decoded time_bin_sizes: {previously_decoded_keys}')
 
-        time_bin_size: float = directional_decoders_decode_result.most_recent_decoding_time_bin_size
+        if extant_decoded_time_bin_size is None:
+            time_bin_size: float = directional_decoders_decode_result.most_recent_decoding_time_bin_size
+        else:
+            assert extant_decoded_time_bin_size in directional_decoders_decode_result.continuously_decoded_pseudo2D_decoder_dict, f"extant size wasn't computed!"
+            time_bin_size: float = extant_decoded_time_bin_size
+
         print(f'time_bin_size: {time_bin_size}')
 
         if drop_previous_result_and_compute_fresh:
@@ -1763,7 +1954,9 @@ class PredictiveDecodingComputationsGlobalComputationFunctions(AllFunctionEnumer
         
         # Compute locality measures to ensure they are fully computed
         locality_measures.compute()
+        non_local_PBE_non_moving_epochs_df: pd.DataFrame = locality_measures.get_non_moving_PBE_non_local_epochs(owning_pipeline_reference.sess, merging_adjacent_max_separation_sec=0.5)
         
+
         # Get a_result_decoded from directional_decoders_decode_result
         a_result_decoded = directional_decoders_decode_result.continuously_decoded_pseudo2D_decoder_dict[time_bin_size]
         
