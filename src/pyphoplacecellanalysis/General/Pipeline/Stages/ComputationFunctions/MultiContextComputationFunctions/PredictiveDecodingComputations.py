@@ -1687,9 +1687,18 @@ class PredictiveDecodingComputationsContainer(ComputedResult):
     def compute_future_and_past_analysis(self, curr_active_pipeline, an_epoch_name:str = 'roam'):
         """ computes the times that 
         
+        ## Get the non-local epochs -- where do they encode?
+
+        
         ## Does the animal go there in the futre?
         
-        
+        ## Has it been there in the past (duh or we wouldn't have placefields for it)?
+
+        ## Some PBEs that don't qualify as non-local actually might be but they're just paths across the environment.
+
+        ## #TODO 2025-12-19 16:52: - [ ] Let's stick within the same block (roam/sprinkle) for now
+
+
         """
         from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import BayesianPlacemapPositionDecoder, DecodedFilterEpochsResult
         from neuropy.utils.efficient_interval_search import OverlappingIntervalsFallbackBehavior
@@ -1824,23 +1833,13 @@ class PredictiveDecodingComputationsContainer(ComputedResult):
         ## END for i, a_row in enumerate(ensure_dat...
 
 
-        # PredictiveDecodingComputationsContainer
-        ## Has it been there in the past (duh or we wouldn't have placefields for it)?
-
-        ## Some PBEs that don't qualify as non-local actually might be but they're just paths across the environment.
-
-        ## #TODO 2025-12-19 16:52: - [ ] Let's stick within the same block (roam/sprinkle) for now
-        
-        ## END for i, a_row in enumerate(ensure_dat...
-
         ## OUTPUTS: epoch_matching_positions
 
         ratio_past = np.array([len(epoch_matching_past_future_positions[i][0])/ len(decoded_local_epochs_result.time_bin_containers[i].centers) for i, a_row in enumerate(ensure_dataframe(decoded_local_epochs_result.filter_epochs).itertuples(index=False))])
         ratio_future = np.array([len(epoch_matching_past_future_positions[i][1])/ len(decoded_local_epochs_result.time_bin_containers[i].centers) for i, a_row in enumerate(ensure_dataframe(decoded_local_epochs_result.filter_epochs).itertuples(index=False))])
 
-        n_total_past = np.array([epoch_matching_past_future_positions[i][3] for i, a_row in enumerate(ensure_dataframe(decoded_local_epochs_result.filter_epochs).itertuples(index=False))])
-        n_total_future = np.array([epoch_matching_past_future_positions[i][4] for i, a_row in enumerate(ensure_dataframe(decoded_local_epochs_result.filter_epochs).itertuples(index=False))])
-
+        n_total_past = np.array([epoch_matching_past_future_positions[i][2] for i, a_row in enumerate(ensure_dataframe(decoded_local_epochs_result.filter_epochs).itertuples(index=False))])
+        n_total_future = np.array([epoch_matching_past_future_positions[i][3] for i, a_row in enumerate(ensure_dataframe(decoded_local_epochs_result.filter_epochs).itertuples(index=False))])
 
 
         return epoch_high_prob_pos_masks, epoch_matching_positions, (ratio_past, ratio_future, n_total_past, n_total_future) # , epoch_high_prob_pos_masks
