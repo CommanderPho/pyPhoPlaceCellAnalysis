@@ -963,7 +963,7 @@ class FigureToImageHelpers:
         # output_pdf_path = kwargs.pop('output_pdf_path', None)
         rows_per_page = kwargs.pop('rows_per_page', 5)
         figsize = kwargs.pop('figsize', (8, 11))
-        dpi = kwargs.pop('dpi', 150)
+        dpi = kwargs.pop('dpi', 600)
         # normalized_track_heights = kwargs.pop('normalized_track_heights', None)
         debug_max_num_pages = kwargs.pop('debug_max_num_pages', 5)
         track_labels = kwargs.pop('track_labels', None)
