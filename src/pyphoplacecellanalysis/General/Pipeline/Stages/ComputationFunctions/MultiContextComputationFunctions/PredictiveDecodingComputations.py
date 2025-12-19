@@ -1685,7 +1685,17 @@ class PredictiveDecodingComputationsContainer(ComputedResult):
 
     @function_attributes(short_name=None, tags=['PENDING', 'IN-PROCESS', '2025-12-20_future_and_past_analysis'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-12-19 14:28', related_items=[])
     def compute_future_and_past_analysis(self, curr_active_pipeline, an_epoch_name:str = 'roam'):
+        """ computes the times that 
+        
+        ## Does the animal go there in the futre?
+        
+        
+        """
         from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import BayesianPlacemapPositionDecoder, DecodedFilterEpochsResult
+        from neuropy.utils.efficient_interval_search import OverlappingIntervalsFallbackBehavior
+        
+
+        ## HARDCODED an_epoch_name
         
         ## Get the non-local epochs -- where do they encode?
         # container: PredictiveDecodingComputationsContainer = curr_active_pipeline.global_computation_results.computed_data['PredictiveDecoding']
@@ -1694,42 +1704,37 @@ class PredictiveDecodingComputationsContainer(ComputedResult):
             container.decoding_locality = container.predictive_decoding.locality_measures
 
         decoding_locality: DecodingLocalityMeasures = container.decoding_locality
-        decoding_locality
+        
         non_local_PBE_non_moving_epochs_df: pd.DataFrame = decoding_locality.get_non_moving_PBE_non_local_epochs(curr_active_pipeline.sess, merging_adjacent_max_separation_sec=0.5)
         # non_local_PBE_non_moving_epochs_df: pd.DataFrame = container.decoding_locality.non_local_PBE_non_moving_epochs_df
-        non_local_PBE_non_moving_epochs_df
 
         measured_positions_df: pd.DataFrame = decoding_locality.pos_df
-        measured_positions_df
-        measured_positions_df = measured_positions_df.drop(columns=['binned_x', 'binned_y'], inplace=False)
+        # measured_positions_df = measured_positions_df.drop(columns=['binned_x', 'binned_y'], inplace=False)
         measured_positions_df = measured_positions_df.dropna(how='any', subset=['t', 'x', 'y'])
         measured_positions_df = measured_positions_df.position.adding_binned_position_columns(xbin_edges=decoding_locality.xbin, ybin_edges=decoding_locality.ybin)
         measured_positions_df = measured_positions_df[(measured_positions_df['binned_x'].notna()) & (measured_positions_df['binned_y'].notna())] # Filter rows based on columns: 'binned_x', 'binned_y'
         # decoding_locality.pos_df = measured_positions_df
-        measured_positions_df
-
-        from neuropy.utils.efficient_interval_search import OverlappingIntervalsFallbackBehavior
+        # measured_positions_df
 
         ## add the final detected non_local_pbe_epoch indicies to the decoded points:
         _out_locality_measures_df = deepcopy(decoding_locality.locality_measures_df)
         _out_locality_measures_df = _out_locality_measures_df.time_point_event.adding_epochs_identity_column(epochs_df=decoding_locality.non_local_PBE_non_moving_epochs_df, epoch_id_key_name='non_local_PBE_non_moving_epoch', epoch_label_column_name='label', override_time_variable_name='t',
                                                             no_interval_fill_value=np.nan, should_replace_existing_column=True, drop_non_epoch_events=False, overlap_behavior=OverlappingIntervalsFallbackBehavior.FALLBACK_TO_SLOW_SEARCH)
-        _out_locality_measures_df
+        # _out_locality_measures_df
         _out_locality_measures_df.dropna(how='any', subset=['non_local_PBE_non_moving_epoch'])
 
-        epoch_times = decoding_locality.locality_measures_df['t']
+        epoch_times = decoding_locality.locality_measures_df['t'].to_numpy()
         time_to_idx_map = EpochHelpers.find_epoch_times_to_data_indicies_map(decoding_locality.non_local_PBE_non_moving_epochs_df, epoch_times)
         # _out
         non_local_PBE_non_moving_epochs_df: pd.DataFrame = decoding_locality.non_local_PBE_non_moving_epochs_df
         non_local_PBE_non_moving_epochs_df['start_idx'] = non_local_PBE_non_moving_epochs_df['start'].map(time_to_idx_map)
         non_local_PBE_non_moving_epochs_df['stop_idx'] = non_local_PBE_non_moving_epochs_df['stop'].map(time_to_idx_map)
         # matching_epoch_times_slice
-        non_local_PBE_non_moving_epochs_df
+        # non_local_PBE_non_moving_epochs_dft
 
 
         directional_decoders_decode_result = curr_active_pipeline.global_computation_results.computed_data['DirectionalDecodersDecoded']
-        directional_decoders_decode_result
-
+        
         assert directional_decoders_decode_result is not None
         ## INPUTS: container, directional_decoders_decode_result
         ## decode each epoch at a small time bin size:
@@ -1739,26 +1744,17 @@ class PredictiveDecodingComputationsContainer(ComputedResult):
         decoding_locality: DecodingLocalityMeasures = container.decoding_locality
         non_local_PBE_non_moving_epochs_df: pd.DataFrame = decoding_locality.non_local_PBE_non_moving_epochs_df
 
-        animal_future_scores = {}
-
-        ## HARDCODED an_epoch_name
-        an_epoch_name: str = 'roam'
-        high_val_epsilon: float = 1e-6 ## Oh dang this is kinda tiny
         epoch_high_prob_pos_masks = []
         epoch_matching_positions = []
+        epoch_matching_past_future_positions: List[Tuple[pd.DataFrame, pd.DataFrame]] = []
 
-        a_p_x_given_n = decoding_locality.p_x_given_n_dict[an_epoch_name] ## hmmm, this is global probability - (41, 63, 103948)
-        # decoding_locality.time_window_centers
+        # a_p_x_given_n = decoding_locality.p_x_given_n_dict[an_epoch_name] ## hmmm, this is global probability - (41, 63, 103948)
 
         for i, a_row in enumerate(ensure_dataframe(decoded_local_epochs_result.filter_epochs).itertuples(index=False)):
-        # for a_row in non_local_PBE_non_moving_epochs_df.itertuples(index=False):
             
             ## need to know the indices this corresponds to so I can use my gaussian, p_x_given_n, etc
-            
-            a_row.start
-            a_row.stop
             ## compute the locality:
-            num_timestamps: int = np.shape(decoding_locality.gaussian_volume)[-1]
+            # num_timestamps: int = np.shape(decoding_locality.gaussian_volume)[-1]
 
             ## What positions does the epoch decode to?
             
@@ -1774,7 +1770,7 @@ class PredictiveDecodingComputationsContainer(ComputedResult):
             curr_epoch_time_bin_centers = decoded_local_epochs_result.time_bin_containers[i].centers    
             # is_high_prob_mask = (curr_epoch_p_x_given_n > high_val_epsilon)
             
-            print(np.shape(curr_epoch_p_x_given_n))
+            # print(np.shape(curr_epoch_p_x_given_n))
             # curr_epoch_p_x_given_n  # np.shape(curr_epoch_p_x_given_n): (n_x_bins, n_y_Bins, n_time_bins)
             # is_high_prob_mask = curr_epoch_p_x_given_n >= np.sort(curr_epoch_p_x_given_n.ravel())[::-1][np.searchsorted(np.cumsum(np.sort(curr_epoch_p_x_given_n.ravel())[::-1]), 0.1 * curr_epoch_p_x_given_n.sum())]
 
@@ -1797,8 +1793,20 @@ class PredictiveDecodingComputationsContainer(ComputedResult):
             #        [20, 62, 40, 32, 22, 23]], dtype=int64)
 
             # any_t_Bin_high_prob_pos_mask[measured_positions_df['binned_x'].to_numpy(), measured_positions_df['binned_y'].to_numpy(), :]
-            pos_matches_epoch_mask = np.where([any_t_Bin_high_prob_pos_mask[a_pos.binned_x, a_pos.binned_y] for a_pos in measured_positions_df.iterrows()])[0]
+
+            pos_matches_epoch_mask = np.where([any_t_Bin_high_prob_pos_mask[(a_pos.binned_x-1), (a_pos.binned_y-1)] for a_pos in measured_positions_df.itertuples()])[0]
+            relevant_positions_df = measured_positions_df.iloc[pos_matches_epoch_mask]
+            is_relevant_past_times = (relevant_positions_df['t'] < curr_epoch_time_bin_centers[0])
+            is_relevant_future_times = (relevant_positions_df['t'] > curr_epoch_time_bin_centers[-1])
+            ## how many timestamps still remain in the past and the future:
+            n_total_past_times = (measured_positions_df['t'] < curr_epoch_time_bin_centers[0])
+            n_total_future_times = (measured_positions_df['t'] > curr_epoch_time_bin_centers[-1])
             
+
+            epoch_matching_past_future_positions.append((pos_matches_epoch_mask[is_relevant_past_times], pos_matches_epoch_mask[is_relevant_future_times], n_total_past_times, n_total_future_times)) ## basically split on current
+            
+            # relevant_positions_df['is_past'] = (relevant_positions_df['t'] < curr_epoch_time_bin_centers[-1])
+
             # measured_positions_df[['binned_x', 'binned_y']].to_numpy()
             epoch_matching_positions.append(pos_matches_epoch_mask)
             # epoch_pos_df = decoding_locality.pos_df.position.time_slice_indicies(a_row.start, a_row.stop)
@@ -1807,14 +1815,35 @@ class PredictiveDecodingComputationsContainer(ComputedResult):
             # is_high_prob_mask = (a_p_x_given_n > min_val_epsilon)
             # decoding_locality.locality_measures_dict_dict[an_epoch_name][a_computation_measure_name] = ((decoding_locality.gaussian_volume * is_high_prob_mask) > min_val_epsilon).astype(int) ## the "overlap" is computed by taking the elementwise dot-product with the moving average
 
+            # PredictiveDecodingComputationsContainer
+            ## Has it been there in the past (duh or we wouldn't have placefields for it)?
+
+            ## Some PBEs that don't qualify as non-local actually might be but they're just paths across the environment.
+
+            ## Let's stick within the same block (roam/sprinkle) for now
+        ## END for i, a_row in enumerate(ensure_dat...
+
 
         # PredictiveDecodingComputationsContainer
         ## Has it been there in the past (duh or we wouldn't have placefields for it)?
 
         ## Some PBEs that don't qualify as non-local actually might be but they're just paths across the environment.
 
-        ## Let's stick within the same block (roam/sprinkle) for now
-        return epoch_high_prob_pos_masks, epoch_matching_positions # , epoch_high_prob_pos_masks
+        ## #TODO 2025-12-19 16:52: - [ ] Let's stick within the same block (roam/sprinkle) for now
+        
+        ## END for i, a_row in enumerate(ensure_dat...
+
+        ## OUTPUTS: epoch_matching_positions
+
+        ratio_past = np.array([len(epoch_matching_past_future_positions[i][0])/ len(decoded_local_epochs_result.time_bin_containers[i].centers) for i, a_row in enumerate(ensure_dataframe(decoded_local_epochs_result.filter_epochs).itertuples(index=False))])
+        ratio_future = np.array([len(epoch_matching_past_future_positions[i][1])/ len(decoded_local_epochs_result.time_bin_containers[i].centers) for i, a_row in enumerate(ensure_dataframe(decoded_local_epochs_result.filter_epochs).itertuples(index=False))])
+
+        n_total_past = np.array([epoch_matching_past_future_positions[i][3] for i, a_row in enumerate(ensure_dataframe(decoded_local_epochs_result.filter_epochs).itertuples(index=False))])
+        n_total_future = np.array([epoch_matching_past_future_positions[i][4] for i, a_row in enumerate(ensure_dataframe(decoded_local_epochs_result.filter_epochs).itertuples(index=False))])
+
+
+
+        return epoch_high_prob_pos_masks, epoch_matching_positions, (ratio_past, ratio_future, n_total_past, n_total_future) # , epoch_high_prob_pos_masks
 
 
 
