@@ -825,13 +825,13 @@ class DecodingLocalityMeasures(ComputedResult): #PickleSerializableMixin, AttrsB
         return non_local_locality_measures_epochs_df
     
 
-    @function_attributes(short_name=None, tags=['NEW', 'MAIN', 'epochs'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-12-18 08:02', related_items=[])
+    @function_attributes(short_name=None, tags=['MAIN', 'NEW', 'epochs'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-12-18 08:02', related_items=[])
     def get_non_moving_PBE_non_local_epochs(self, sess, merging_adjacent_max_separation_sec=0.5, skip_get_non_overlapping = False, should_assign_to_session: bool=True, **kwargs) -> pd.DataFrame:
-        """
+        """ not-pure, updates `self.non_local_PBE_non_moving_epochs_df`
         
         Updates:
             `self.non_local_PBE_non_moving_epochs_df`
-            
+            `sess.non_moving_pbe_non_local_epochs` -- creates the epochs in the pipeline
             
         Usage:
             from neuropy.utils.mixins.time_slicing import TimePointEventAccessor
@@ -904,7 +904,10 @@ class DecodingLocalityMeasures(ComputedResult): #PickleSerializableMixin, AttrsB
         non_local_PBE_non_moving_epochs_df: pd.DataFrame = overlap_included_only_df_dict['non_moving_PBE']
         self.non_local_PBE_non_moving_epochs_df = deepcopy(non_local_PBE_non_moving_epochs_df)
 
-        return overlap_included_only_df_dict
+        ## Assigns to the session when we build the epochs:
+        sess.non_moving_pbe_non_local_epochs = ensure_Epoch(deepcopy(non_local_PBE_non_moving_epochs_df), metadata={'computed_by':'DecodingLocalityMeasures.get_non_moving_PBE_non_local_epochs'})
+
+        return self.non_local_PBE_non_moving_epochs_df
     
 
     def add_non_local_epochs_to_intervals_timeline(self, active_2d_plot, identifier:str='non-local', non_local_epochs_df: pd.DataFrame=None, visualization_update_dict=None):
