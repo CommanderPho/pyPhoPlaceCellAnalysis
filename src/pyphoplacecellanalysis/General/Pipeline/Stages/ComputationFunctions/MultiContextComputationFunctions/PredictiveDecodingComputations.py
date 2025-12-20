@@ -1656,10 +1656,10 @@ class PredictiveDecodingComputationsContainer(ComputedResult):
     @property
     def most_recent_decoding_time_bin_size(self) -> Optional[float]:
         """Gets the last cached continuously_decoded_dict property."""
-        if ((self.continuously_decoded_result_cache_dict is None) or (len(self.continuously_decoded_result_cache_dict or {}) < 1)):
+        if ((self.epochs_decoded_result_cache_dict is None) or (len(self.epochs_decoded_result_cache_dict or {}) < 1)):
             return None
         else:
-            last_time_bin_size: float = list(self.continuously_decoded_result_cache_dict.keys())[-1]
+            last_time_bin_size: float = list(self.epochs_decoded_result_cache_dict.keys())[-1]
             return last_time_bin_size   
         
 
@@ -1671,7 +1671,7 @@ class PredictiveDecodingComputationsContainer(ComputedResult):
             return None
         else:
             # otherwise return the result            
-            return self.continuously_decoded_result_cache_dict[last_time_bin_size]   
+            return self.epochs_decoded_result_cache_dict[last_time_bin_size]   
 
 
 
