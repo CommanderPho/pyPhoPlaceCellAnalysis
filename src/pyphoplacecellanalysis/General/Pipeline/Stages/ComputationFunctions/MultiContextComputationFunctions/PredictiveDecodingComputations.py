@@ -2171,3 +2171,136 @@ class PredictiveDecodingComputationsGlobalComputationFunctions(AllFunctionEnumer
 #     These display functions compare results across several contexts.
 #     Must have a signature of: (owning_pipeline_reference, global_computation_results, computation_results, active_configs, ..., **kwargs) at a minimum
 #     """
+
+from pyphoplacecellanalysis.PhoPositionalData.plotting.mixins.decoder_plotting_mixins import DecodedTrajectoryMatplotlibPlotter, DecodedTrajectoryPlotter
+
+
+@define(slots=False, repr=False, eq=False)
+class PredictiveDecodingDisplayWidget:
+    """ 
+        from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.PredictiveDecodingComputations import PredictiveDecodingDisplayWidget
+
+        a_widget: PredictiveDecodingDisplayWidget = PredictiveDecodingDisplayWidget.init_from_container(container=container, decoding_time_bin_size=0.025, an_epoch_name='roam')
+        a_widget
+    """
+    container: PredictiveDecodingComputationsContainer = field()
+    
+    xbin: np.ndarray = field(default=None)
+    ybin: np.ndarray = field(default=None)
+    xbin_centers: np.ndarray = field(default=None)
+    ybin_centers: np.ndarray = field(default=None)
+    curr_position_df: pd.DataFrame = field(default=None)
+    
+    pf1D_Decoder: BasePositionDecoder = field(default=None)
+    decoded_result: DecodedFilterEpochsResult = field(default=None)
+
+    ## Display Variables
+    trajectory_displaying_plotter: Dict[str, DecodedTrajectoryMatplotlibPlotter] = field(default=Factory(dict))
+
+
+    @classmethod
+    def init_from_container(cls, container: PredictiveDecodingComputationsContainer, decoding_time_bin_size: float, an_epoch_name: str) -> "PredictiveDecodingDisplayWidget":
+        """
+
+        """
+        decoded_local_epochs_result = container.epochs_decoded_result_cache_dict[decoding_time_bin_size][an_epoch_name]
+        pf1D_Decoder = container.pf1D_Decoder_dict[an_epoch_name]
+        decoded_result: DecodedFilterEpochsResult = decoded_local_epochs_result
+        curr_position_df: pd.DataFrame = deepcopy(container.decoding_locality.pos_df)
+
+        # global_session = deepcopy(curr_active_pipeline.sess)
+        # a_result2D: DecodedFilterEpochsResult = decoded_local_epochs_result.frame_divided_epochs_results[an_epoch_name]
+        a_new_global_decoder2D = container.pf1D_Decoder_dict[an_epoch_name]
+        # a_result2D = results2D.a_result2D
+        # a_new_global_decoder2D = results2D.a_new_global_decoder2D
+        ## INPUTS: directional_laps_results, decoder_ripple_filter_epochs_decoder_result_dict
+        xbin = deepcopy(a_new_global_decoder2D.xbin)
+        xbin_centers = deepcopy(a_new_global_decoder2D.xbin_centers)
+        ybin_centers = deepcopy(a_new_global_decoder2D.ybin_centers)
+        ybin = deepcopy(a_new_global_decoder2D.ybin)
+
+        # num_filter_epochs: int = decoded_local_epochs_result.num_filter_epochs
+
+        _obj = cls(
+            container=container,
+            xbin=xbin,
+            ybin=ybin,
+            xbin_centers=xbin_centers,
+            ybin_centers=ybin_centers,
+            curr_position_df=curr_position_df,
+            pf1D_Decoder=pf1D_Decoder, decoded_result=decoded_result,
+        )
+
+        return _obj
+
+
+    def init_UI(self):
+        pass
+        # container = self.container
+        # assert len(self.container.predictive_decoding.matching_pos_dfs_list) > 0
+        # matching_pos_dfs_list = self.container.predictive_decoding.matching_pos_dfs_list
+        # assert len(self.container.predictive_decoding.matching_pos_epochs_dfs_list) > 0
+        # matching_pos_epochs_dfs_list = self.container.predictive_decoding.matching_pos_epochs_dfs_list
+
+        # a_decoded_traj_plotter = DecodedTrajectoryMatplotlibPlotter(a_result=self.decoded_result, xbin=self.xbin, xbin_centers=self.xbin_centers, ybin=self.ybin, ybin_centers=self.ybin_centers)
+        # # epoch_specific_position_dfs = an_epoch_specific_past_position_dfs
+        # # epoch_ids = an_epoch_specific_past_epoch_ids
+        # # epoch_specific_position_dfs = list(curr_matching_positions_df_dict.values())
+        # # epoch_ids = np.array(list(curr_matching_positions_df_dict.keys()))
+
+        # epoch_specific_position_dfs = list(curr_matching_past_future_positions_df_dict[a_past_future_name].values())
+        # epoch_ids = np.array(list(curr_matching_past_future_positions_df_dict[a_past_future_name].keys()))
+        # # epoch_specific_position_dfs
+        # curr_num_subplots: int = min(8, len(epoch_ids))
+        # fig, axs, laps_pages = a_decoded_traj_plotter.plot_decoded_trajectories_2d(curr_position_df=self.curr_position_df, epoch_specific_position_dfs=epoch_specific_position_dfs, epoch_ids=epoch_ids, curr_num_subplots=curr_num_subplots, active_page_index=0, plot_actual_lap_lines=True, use_theoretical_tracks_instead=False)
+
+
+
+    def update_displayed_epoch(self, an_epoch_idx: int = 8):
+        """ updates the GUI to reflect the epoch idx provided:
+
+        """
+
+        assert len(self.container.predictive_decoding.matching_pos_dfs_list) > 0
+        matching_pos_dfs_list = self.container.predictive_decoding.matching_pos_dfs_list
+        assert len(self.container.predictive_decoding.matching_pos_epochs_dfs_list) > 0
+        matching_pos_epochs_dfs_list = self.container.predictive_decoding.matching_pos_epochs_dfs_list
+
+        curr_matching_epochs_df: pd.DataFrame = matching_pos_epochs_dfs_list[an_epoch_idx]
+        curr_matching_positions_df: pd.DataFrame = matching_pos_dfs_list[an_epoch_idx]
+        curr_matching_epochs_df_dict: Dict[int, pd.DataFrame] = curr_matching_epochs_df.pho.partition_df_dict('is_future_present_past')
+
+        past_future_names = ['past', 'future']
+        curr_matching_past_future_positions_df_dict: Dict[str, Dict[int, pd.DataFrame]] = {}
+        # for a_past_future_name in past_future_names:
+        for a_past_future_name, an_epoch_specific_past_position_dfs in curr_matching_epochs_df_dict.items():
+            # an_epoch_specific_past_position_dfs = curr_matching_epochs_df_dict['past']
+            # an_epoch_specific_past_epoch_ids = an_epoch_specific_past_position_dfs.index.to_numpy()
+            ## OUTPUTS: an_epoch_specific_past_position_dfs, an_epoch_specific_past_epoch_ids
+            a_decoded_traj_plotter = self.trajectory_displaying_plotter.get(a_past_future_name, None)
+            if a_decoded_traj_plotter is None:
+                ## create a new plotter
+                a_decoded_traj_plotter = DecodedTrajectoryMatplotlibPlotter(a_result=self.decoded_result, xbin=self.xbin, xbin_centers=self.xbin_centers, ybin=self.ybin, ybin_centers=self.ybin_centers)
+                self.trajectory_displaying_plotter[a_past_future_name] = a_decoded_traj_plotter
+
+
+            ## add the final detected non_local_pbe_epoch indicies to the decoded points:
+            a_curr_matching_positions_df = deepcopy(curr_matching_positions_df)
+            col_name: str = 'past_future_matching_pos_epoch_id'
+            a_curr_matching_positions_df = a_curr_matching_positions_df.time_point_event.adding_epochs_identity_column(epochs_df=an_epoch_specific_past_position_dfs, epoch_id_key_name=col_name, epoch_label_column_name='label', override_time_variable_name='t',
+                                                                no_interval_fill_value='', should_replace_existing_column=True, drop_non_epoch_events=True, overlap_behavior=OverlappingIntervalsFallbackBehavior.FALLBACK_TO_SLOW_SEARCH)
+            curr_matching_positions_df_dict: Dict[int, pd.DataFrame] = a_curr_matching_positions_df.pho.partition_df_dict(col_name) ## the position dataframes for each possible future/past epoch
+            curr_matching_past_future_positions_df_dict[a_past_future_name] = curr_matching_positions_df_dict
+
+
+            epoch_specific_position_dfs = list(curr_matching_past_future_positions_df_dict[a_past_future_name].values())
+            epoch_ids = np.array(list(curr_matching_past_future_positions_df_dict[a_past_future_name].keys()))
+            # epoch_specific_position_dfs
+            curr_num_subplots: int = min(8, len(epoch_ids))
+            fig, axs, laps_pages = a_decoded_traj_plotter.plot_decoded_trajectories_2d(curr_position_df=self.curr_position_df, epoch_specific_position_dfs=epoch_specific_position_dfs, epoch_ids=epoch_ids, curr_num_subplots=curr_num_subplots, active_page_index=0, plot_actual_lap_lines=True, use_theoretical_tracks_instead=False)
+        ### for a_past_future_name, an_epoch_specific_past_position_dfs in curr_matc...
+
+
+        ## END for a_past_future_name, an_epoch_specific_past_positi...
+
+        ## OUTPUTS: curr_matching_past_future_positions_df_dict 
