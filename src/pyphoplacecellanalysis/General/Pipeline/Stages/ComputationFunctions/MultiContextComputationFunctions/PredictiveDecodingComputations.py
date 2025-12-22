@@ -2196,6 +2196,12 @@ class PredictiveDecodingDisplayWidget:
 
     ## Display Variables
     trajectory_displaying_plotter: Dict[str, DecodedTrajectoryMatplotlibPlotter] = field(default=Factory(dict))
+    
+    ## Dock UI Variables
+    dock_area: Any = field(default=None)
+    dock_window: Any = field(default=None)
+    dock_widgets: Dict[str, Any] = field(default=Factory(dict))
+    dock_canvas_widgets: Dict[str, Any] = field(default=Factory(dict))
 
 
     @classmethod
@@ -2232,27 +2238,46 @@ class PredictiveDecodingDisplayWidget:
         )
 
         return _obj
+    
+
+    def __attrs_post_init__(self):
+        self.init_UI()
 
 
     def init_UI(self):
-        pass
-        # container = self.container
-        # assert len(self.container.predictive_decoding.matching_pos_dfs_list) > 0
-        # matching_pos_dfs_list = self.container.predictive_decoding.matching_pos_dfs_list
-        # assert len(self.container.predictive_decoding.matching_pos_epochs_dfs_list) > 0
-        # matching_pos_epochs_dfs_list = self.container.predictive_decoding.matching_pos_epochs_dfs_list
-
-        # a_decoded_traj_plotter = DecodedTrajectoryMatplotlibPlotter(a_result=self.decoded_result, xbin=self.xbin, xbin_centers=self.xbin_centers, ybin=self.ybin, ybin_centers=self.ybin_centers)
-        # # epoch_specific_position_dfs = an_epoch_specific_past_position_dfs
-        # # epoch_ids = an_epoch_specific_past_epoch_ids
-        # # epoch_specific_position_dfs = list(curr_matching_positions_df_dict.values())
-        # # epoch_ids = np.array(list(curr_matching_positions_df_dict.keys()))
-
-        # epoch_specific_position_dfs = list(curr_matching_past_future_positions_df_dict[a_past_future_name].values())
-        # epoch_ids = np.array(list(curr_matching_past_future_positions_df_dict[a_past_future_name].keys()))
-        # # epoch_specific_position_dfs
-        # curr_num_subplots: int = min(8, len(epoch_ids))
-        # fig, axs, laps_pages = a_decoded_traj_plotter.plot_decoded_trajectories_2d(curr_position_df=self.curr_position_df, epoch_specific_position_dfs=epoch_specific_position_dfs, epoch_ids=epoch_ids, curr_num_subplots=curr_num_subplots, active_page_index=0, plot_actual_lap_lines=True, use_theoretical_tracks_instead=False)
+        """Initialize the UI with DockArea and Dock widgets for past/future trajectory plotters."""
+        import pyphoplacecellanalysis.External.pyqtgraph as pg
+        from pyphoplacecellanalysis.External.pyqtgraph.dockarea import DockArea, Dock
+        from pyphoplacecellanalysis.External.pyqtgraph.Qt import QtWidgets, QtGui, QtCore
+        
+        # Create the DockArea and window
+        self.dock_window = QtWidgets.QMainWindow()
+        self.dock_window.setWindowTitle("Predictive Decoding Display - Past/Future Trajectories")
+        self.dock_area = DockArea()
+        self.dock_window.setCentralWidget(self.dock_area)
+        self.dock_window.resize(1400, 800)
+        
+        # Create docks for past and future (will be populated when update_displayed_epoch is called)
+        prev_dock = None
+        for category_name in ['past', 'future']:
+            dock_name = f"{category_name.capitalize()} Trajectories"
+            dock = Dock(dock_name, size=(600, 700), closable=True)
+            
+            # Create placeholder widget (will be replaced with actual plot in update_displayed_epoch)
+            placeholder_widget = QtWidgets.QLabel(f"Waiting for data...\nCall update_displayed_epoch() to display {category_name} trajectories.")
+            placeholder_widget.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
+            dock.addWidget(placeholder_widget)
+            
+            # Add dock horizontally
+            if prev_dock is None:
+                self.dock_area.addDock(dock, 'left')
+            else:
+                self.dock_area.addDock(dock, 'right', prev_dock)
+            
+            self.dock_widgets[category_name] = dock
+            prev_dock = dock
+        
+        self.dock_window.show()
 
 
 
@@ -2260,6 +2285,11 @@ class PredictiveDecodingDisplayWidget:
         """ updates the GUI to reflect the epoch idx provided:
 
         """
+        from pyphoplacecellanalysis.External.pyqtgraph.Qt import QtWidgets
+
+        # Initialize UI if not already done
+        if self.dock_area is None:
+            self.init_UI()
 
         assert len(self.container.predictive_decoding.matching_pos_dfs_list) > 0
         matching_pos_dfs_list = self.container.predictive_decoding.matching_pos_dfs_list
@@ -2298,6 +2328,42 @@ class PredictiveDecodingDisplayWidget:
             # epoch_specific_position_dfs
             curr_num_subplots: int = min(8, len(epoch_ids))
             fig, axs, laps_pages = a_decoded_traj_plotter.plot_decoded_trajectories_2d(curr_position_df=self.curr_position_df, epoch_specific_position_dfs=epoch_specific_position_dfs, epoch_ids=epoch_ids, curr_num_subplots=curr_num_subplots, active_page_index=0, plot_actual_lap_lines=True, use_theoretical_tracks_instead=False)
+            
+            # Embed the matplotlib figure in the dock widget
+            dock = self.dock_widgets.get(a_past_future_name)
+            if dock is not None:
+                # Remove existing widgets from dock
+                # Dock uses a QGridLayout and maintains a widgets list
+                layout = dock.layout
+                if layout is not None:
+                    while layout.count():
+                        child = layout.takeAt(0)
+                        if child.widget():
+                            child.widget().setParent(None)
+                # Clear the widgets list maintained by Dock
+                if hasattr(dock, 'widgets'):
+                    dock.widgets.clear()
+                dock.currentRow = 0
+                
+                # Create canvas and toolbar for the matplotlib figure
+                from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
+                from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as NavigationToolbar
+                canvas = FigureCanvas(fig)
+                toolbar = NavigationToolbar(canvas, self.dock_window)
+                
+                # Create a widget to hold canvas and toolbar
+                plot_widget = QtWidgets.QWidget()
+                plot_layout = QtWidgets.QVBoxLayout()
+                plot_layout.setContentsMargins(0, 0, 0, 0)
+                plot_layout.addWidget(toolbar)
+                plot_layout.addWidget(canvas)
+                plot_widget.setLayout(plot_layout)
+                
+                # Add to dock
+                dock.addWidget(plot_widget)
+                
+                # Store reference to canvas widget
+                self.dock_canvas_widgets[a_past_future_name] = canvas
         ### for a_past_future_name, an_epoch_specific_past_position_dfs in curr_matc...
 
 
