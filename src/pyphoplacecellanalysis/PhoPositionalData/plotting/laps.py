@@ -3,6 +3,7 @@
 """
 @author: pho
 """
+from copy import deepcopy
 from itertools import islice # for Pagination class
 import numpy as np
 import matplotlib.pyplot as plt
@@ -312,7 +313,16 @@ def plot_lap_trajectories_3d(sess, curr_num_subplots=1, active_page_index=0, inc
         ## single_combined_plot == False mode (mode 2.):        
         p, laps_pages = plot_lap_trajectories_3d(curr_active_pipeline.sess, single_combined_plot=False, curr_num_subplots=len(curr_active_pipeline.sess.laps.lap_id), active_page_index=1)
         p.show()
+        
+        
+    Usage 2:
 
+        from pyphoplacecellanalysis.GUI.PyVista.InteractivePlotter.Mixins.LapsVisualizationMixin import LapsVisualizationMixin
+        from pyphoplacecellanalysis.PhoPositionalData.plotting.laps import plot_lap_trajectories_3d
+
+        ## single_combined_plot == True mode (mode 1.):
+        p, laps_pages = plot_lap_trajectories_3d(a_sess, single_combined_plot=True, color_by_speed=True)
+        p.show()
 
     """
     def _chunks(iterable, size=10):
@@ -325,7 +335,7 @@ def plot_lap_trajectories_3d(sess, curr_num_subplots=1, active_page_index=0, inc
             yield chunk()         # in outer generator, yield next chunk
 
         
-    def _build_laps_multiplotter(nfields, single_combined_plot: bool, linear_plot_data=None, maximum_fixed_columns:int=5, debug_print=True):
+    def _build_epochs_multiplotter(nfields, single_combined_plot: bool, linear_plot_data=None, maximum_fixed_columns:int=5, debug_print=True):
         """ builds the appropriate multiplotter """
         linear_plotter_indicies = np.arange(nfields)
         fixed_columns = min(maximum_fixed_columns, nfields)
@@ -374,7 +384,7 @@ def plot_lap_trajectories_3d(sess, curr_num_subplots=1, active_page_index=0, inc
         return mp, linear_plotter_indicies, row_column_indicies
 
     
-    def _add_specific_lap_trajectory(p, linear_plotter_indicies, row_column_indicies, active_page_laps_ids, curr_lap_position_traces, curr_lap_time_range, single_combined_plot: bool, lap_start_z: float, lap_id_dependent_z_offset: float):
+    def _add_specific_epoch_trajectory(p, linear_plotter_indicies, row_column_indicies, active_page_laps_ids, curr_lap_position_traces, curr_lap_time_range, single_combined_plot: bool, lap_start_z: float, lap_id_dependent_z_offset: float):
         """ captures kwargs
         """
         # Add the lap trajectory:
@@ -407,7 +417,7 @@ def plot_lap_trajectories_3d(sess, curr_num_subplots=1, active_page_index=0, inc
         pdata_maze_shared, pc_maze_shared = _build_flat_arena_data(all_maze_positions[0,:], all_maze_positions[1,:], smoothing=False)
         all_maze_data = np.full((curr_num_subplots,), pc_maze_shared) # repeat the maze data for each subplot
 
-    p, linear_plotter_indicies, row_column_indicies = _build_laps_multiplotter(curr_num_subplots, single_combined_plot, all_maze_data, maximum_fixed_columns=maximum_fixed_columns, debug_print=debug_print)
+    p, linear_plotter_indicies, row_column_indicies = _build_epochs_multiplotter(curr_num_subplots, single_combined_plot, all_maze_data, maximum_fixed_columns=maximum_fixed_columns, debug_print=debug_print)
     
     if included_lap_idxs is None:
         included_lap_idxs = np.arange(len(sess.laps.lap_id)) # all lap indicies are included by default
@@ -453,7 +463,7 @@ def plot_lap_trajectories_3d(sess, curr_num_subplots=1, active_page_index=0, inc
                 perform_plot_flat_arena(p[0,0], all_maze_data[0], all_maze_data[1], z=curr_maze_z_offset, name=f'maze_offset[{curr_lap_idx}]', render=False, color=[0.1, 0.1, 0.1, 1.0], smoothing=False, extrude_height=-2, opacity=0.5)
 
     # add the laps
-    _add_specific_lap_trajectory(p, linear_plotter_indicies, row_column_indicies, active_page_laps_ids, lap_specific_position_traces, lap_specific_time_ranges, single_combined_plot=single_combined_plot, lap_start_z=lap_start_z, lap_id_dependent_z_offset=lap_id_dependent_z_offset)
+    _add_specific_epoch_trajectory(p, linear_plotter_indicies, row_column_indicies, active_page_laps_ids, lap_specific_position_traces, lap_specific_time_ranges, single_combined_plot=single_combined_plot, lap_start_z=lap_start_z, lap_id_dependent_z_offset=lap_id_dependent_z_offset)
     
     ## Set title:
     
@@ -474,6 +484,26 @@ def plot_lap_trajectories_2d(sess, curr_num_subplots=5, active_page_index=0, fix
         out3: GenericMatplotlibContainer = plot_lap_trajectories_2d(a_sess, curr_num_subplots=20, active_page_index=0, fixed_columns = 4, use_time_gradient_line=False)
         p3, axs, laps_pages3 = out3.fig, out3.axes, out3.plots_data.laps_pages ## unpack like
 
+        
+
+    Usage Full:
+
+        arrow_concentration_kwargs = dict(
+            arrow_skip = 50, time_cmap='viridis',
+            mutation_scale_multiplier = 20, mutation_scale_constant = 1,
+            arrow_length_multiplier = 0.05, arrow_length_constant = 0.01,
+            arrow_lw = 0.5,
+        )
+
+        plot_lap_trajectories_2d_kwargs = dict(
+            curr_num_subplots=(6*5), active_page_index=0, fixed_columns = 6,
+        )
+
+        out3: GenericMatplotlibContainer = plot_lap_trajectories_2d(a_sess, **plot_lap_trajectories_2d_kwargs, use_time_gradient_line=True, arrow_concentration_kwargs=arrow_concentration_kwargs)
+        p3, axs, laps_pages3 = out3.fig, out3.axes, out3.plots_data.laps_pages
+        p3
+
+
     """    
     from pyphoplacecellanalysis.PhoPositionalData.plotting.mixins.decoder_plotting_mixins import DecodedTrajectoryMatplotlibPlotter
     
@@ -492,7 +522,7 @@ def plot_lap_trajectories_2d(sess, curr_num_subplots=5, active_page_index=0, fix
                     yield more    # yield more elements from the iterator
             yield chunk()         # in outer generator, yield next chunk
         
-    def _subfn_build_laps_multiplotter(nfields, linear_plot_data=None):
+    def _subfn_build_epochs_multiplotter(nfields, linear_plot_data=None):
         """ captures: fixed_columns
         """
         linear_plotter_indicies = np.arange(nfields)
@@ -508,36 +538,36 @@ def plot_lap_trajectories_2d(sess, curr_num_subplots=5, active_page_index=0, fix
             
         return mp, axs, linear_plotter_indicies, row_column_indicies
     
-    def _subfn_add_specific_lap_trajectory(p, axs, linear_plotter_indicies, row_column_indicies, active_page_laps_ids, laps_position_traces, lap_time_ranges, use_time_gradient_line: bool=True):
+    def _subfn_add_specific_epoch_trajectory(p, axs, linear_plotter_indicies, row_column_indicies, active_page_epochs_ids, epochs_position_traces, epoch_time_ranges, use_time_gradient_line: bool=True):
         # Add the lap trajectory:
         _out_objs = {'line_artists': {}, 'line_markers': {}}
         if use_time_gradient_line:
             _out_objs['line_collections'] = {}
             
         for a_linear_index in linear_plotter_indicies:
-            curr_lap_id = active_page_laps_ids[a_linear_index]
+            curr_epoch_id = active_page_epochs_ids[a_linear_index]
             curr_row = row_column_indicies[0][a_linear_index]
             curr_col = row_column_indicies[1][a_linear_index]
-            curr_lap_time_range = lap_time_ranges[curr_lap_id]
-            curr_lap_label_text = 'Lap[{}]: t({:.2f}, {:.2f})'.format(curr_lap_id, curr_lap_time_range[0], curr_lap_time_range[1])
-            curr_lap_num_points = len(laps_position_traces[curr_lap_id][0,:])
+            curr_lap_time_range = epoch_time_ranges[curr_epoch_id]
+            curr_lap_label_text = 'Lap[{}]: t({:.2f}, {:.2f})'.format(curr_epoch_id, curr_lap_time_range[0], curr_lap_time_range[1])
+            curr_lap_num_points = len(epochs_position_traces[curr_epoch_id][0,:])
             
             _out_objs['line_markers'][a_linear_index] = {}
             if use_time_gradient_line:
                 # Create a continuous norm to map from data points to colors
-                curr_lap_timeseries = np.linspace(curr_lap_time_range[0], curr_lap_time_range[-1], len(laps_position_traces[curr_lap_id][0,:]))
+                curr_lap_timeseries = np.linspace(curr_lap_time_range[0], curr_lap_time_range[-1], len(epochs_position_traces[curr_epoch_id][0,:]))
                 # norm = plt.Normalize(curr_lap_timeseries.min(), curr_lap_timeseries.max())
 
                 line, _out_markers = DecodedTrajectoryMatplotlibPlotter._helper_add_gradient_line(ax=axs[curr_row][curr_col], 
                     t=curr_lap_timeseries, # np.linspace(curr_lap_time_range[0], curr_lap_time_range[-1], len(laps_position_traces[curr_lap_id][0,:]))
-                    x=laps_position_traces[curr_lap_id][0,:],
-                    y=laps_position_traces[curr_lap_id][1,:], add_markers=False, time_cmap='viridis', #norm=norm,
+                    x=epochs_position_traces[curr_epoch_id][0,:],
+                    y=epochs_position_traces[curr_epoch_id][1,:], add_markers=False, time_cmap='viridis', #norm=norm,
                 )
 
                 _out_markers = DecodedTrajectoryMatplotlibPlotter._helper_add_concentrated_arrows_to_line(ax=axs[curr_row][curr_col], 
                     t=curr_lap_timeseries, # np.linspace(curr_lap_time_range[0], curr_lap_time_range[-1], len(laps_position_traces[curr_lap_id][0,:]))
-                    x=laps_position_traces[curr_lap_id][0,:],
-                    y=laps_position_traces[curr_lap_id][1,:], 
+                    x=epochs_position_traces[curr_epoch_id][0,:],
+                    y=epochs_position_traces[curr_epoch_id][1,:], 
                     speed=None,
                     **arrow_concentration_kwargs
                 )
@@ -562,7 +592,7 @@ def plot_lap_trajectories_2d(sess, curr_num_subplots=5, active_page_index=0, fix
                 # _out_objs['line_markers'][a_linear_index]['end'] = _plot_helper_add_arrow(line, position=curr_lap_num_points, position_mode='index', direction='right', size=20, color='red') # end
                 
             else:
-                line = axs[curr_row][curr_col].plot(laps_position_traces[curr_lap_id][0,:], laps_position_traces[curr_lap_id][1,:], c='k', alpha=0.85)
+                line = axs[curr_row][curr_col].plot(epochs_position_traces[curr_epoch_id][0,:], epochs_position_traces[curr_epoch_id][1,:], c='k', alpha=0.85)
                 # curr_lap_endpoint = curr_lap_position_traces[curr_lap_id][:,-1].T
                 _out_objs['line_markers'][a_linear_index]['start'] = _plot_helper_add_arrow(line[0], position=0, position_mode='index', direction='right', size=20, color='green') # start
                 _out_objs['line_markers'][a_linear_index]['middle'] = _plot_helper_add_arrow(line[0], position=None, position_mode='index', direction='right', size=20, color='yellow') # middle
@@ -586,27 +616,31 @@ def plot_lap_trajectories_2d(sess, curr_num_subplots=5, active_page_index=0, fix
     # BEGIN FUNCTION BODY ________________________________________________________________________________________________ #
 
     # Compute required data from session:
-    curr_position_df, lap_specific_position_dfs = LapsVisualizationMixin._compute_laps_specific_position_dfs(sess)
-    laps_position_traces_list = [lap_pos_df[['x','y']].to_numpy().T for lap_pos_df in lap_specific_position_dfs]
-    laps_time_range_list = [[lap_pos_df[['t']].to_numpy()[0].item(), lap_pos_df[['t']].to_numpy()[-1].item()] for lap_pos_df in lap_specific_position_dfs]
-    
-    num_laps = len(sess.laps.lap_id)
-    linear_lap_index = np.arange(num_laps)
-    lap_time_ranges = dict(zip(sess.laps.lap_id, laps_time_range_list))
-    lap_position_traces = dict(zip(sess.laps.lap_id, laps_position_traces_list))
+    curr_position_df, epoch_specific_position_dfs = LapsVisualizationMixin._compute_laps_specific_position_dfs(sess)
+    epochs_position_traces_list = [epoch_pos_df[['x','y']].to_numpy().T for epoch_pos_df in epoch_specific_position_dfs]
+    epochs_time_range_list = [[epoch_pos_df[['t']].to_numpy()[0].item(), epoch_pos_df[['t']].to_numpy()[-1].item()] for epoch_pos_df in epoch_specific_position_dfs]
+    epoch_ids = deepcopy(sess.laps.lap_id)
+    ## OUTPUTS: epoch_ids, epochs_time_range_list, epochs_position_traces_list, curr_position_df
+
+
+    ## INPUTS: epoch_ids, epochs_time_range_list, epochs_position_traces_list, curr_position_df
+    # num_laps = len(epoch_ids)
+    # linear_lap_index = np.arange(num_laps)
+    epochs_time_ranges = dict(zip(epoch_ids, epochs_time_range_list))
+    epochs_position_traces = dict(zip(epoch_ids, epochs_position_traces_list))
     
     all_maze_positions = curr_position_df[['x','y']].to_numpy().T # (2, 59308)
     # np.shape(all_maze_positions)
     all_maze_data = [all_maze_positions for i in  np.arange(curr_num_subplots)] # repeat the maze data for each subplot. (2, 593080)
-    p, axs, linear_plotter_indicies, row_column_indicies = _subfn_build_laps_multiplotter(curr_num_subplots, all_maze_data)
+    p, axs, linear_plotter_indicies, row_column_indicies = _subfn_build_epochs_multiplotter(curr_num_subplots, all_maze_data)
     # generate the pages
-    laps_pages = [list(chunk) for chunk in _subfn_chunks(sess.laps.lap_id, curr_num_subplots)]
-    active_page_laps_ids = laps_pages[active_page_index]
-    _out_objs = _subfn_add_specific_lap_trajectory(p, axs, linear_plotter_indicies, row_column_indicies, active_page_laps_ids, lap_position_traces, lap_time_ranges, use_time_gradient_line=use_time_gradient_line)
+    epochs_pages = [list(chunk) for chunk in _subfn_chunks(epoch_ids, curr_num_subplots)]
+    active_page_epochs_ids = epochs_pages[active_page_index]
+    _out_objs = _subfn_add_specific_epoch_trajectory(p, axs, linear_plotter_indicies, row_column_indicies, active_page_epochs_ids, epochs_position_traces, epochs_time_ranges, use_time_gradient_line=use_time_gradient_line)
     # plt.ylim((125, 152))
     
     # return p, axs, laps_pages, _out_objs
-    return GenericMatplotlibContainer.init_from_matplotlib_objects(name='plot_lap_trajectories_2d', figures=[p], axes=axs, context=None, plots={'artists': _out_objs}, plots_data={'laps_pages': laps_pages})
+    return GenericMatplotlibContainer.init_from_matplotlib_objects(name='plot_lap_trajectories_2d', figures=[p], axes=axs, context=None, plots={'artists': _out_objs}, plots_data={'laps_pages': epochs_pages})
     # return MatplotlibRenderPlots(name='plot_lap_trajectories_2d', figures=[p], axes=axs, context=None, plot_data={'laps_pages': laps_pages, 'artists': _out_objs})
 
 
