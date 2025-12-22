@@ -79,6 +79,7 @@ class LiveWindowEventIntervalMonitoringMixin(ReprPrintableItemMixin):
     def LiveWindowEventIntervalMonitoringMixin_on_init(self):
         """ perform any parameters setting/checking during init """
         self._active_window_visible_intervals_dict = {}
+        self._enable_live_window_event_interval_monitoring = False
 
     @pyqtExceptionPrintingSlot()
     def LiveWindowEventIntervalMonitoringMixin_on_setup(self):
@@ -106,6 +107,8 @@ class LiveWindowEventIntervalMonitoringMixin(ReprPrintableItemMixin):
     @pyqtExceptionPrintingSlot(float, float)
     def LiveWindowEventIntervalMonitoringMixin_on_window_update(self, new_start=None, new_end=None):
         """ called to perform updates when the active window changes. Redraw, recompute data, etc. """
+        if not self._enable_live_window_event_interval_monitoring:
+            return
         self.on_visible_intervals_changed() # TODO 2025-12-18 - PERFORMANCE
             
     @pyqtExceptionPrintingSlot(object)
@@ -120,6 +123,14 @@ class LiveWindowEventIntervalMonitoringMixin(ReprPrintableItemMixin):
     @active_window_visible_intervals_dict.setter
     def active_window_visible_intervals_dict(self, value):
         self._active_window_visible_intervals_dict = value
+
+    @property
+    def enable_live_window_event_interval_monitoring(self):
+        """The enable_live_window_event_interval_monitoring property."""
+        return self._enable_live_window_event_interval_monitoring
+    @enable_live_window_event_interval_monitoring.setter
+    def enable_live_window_event_interval_monitoring(self, value):
+        self._enable_live_window_event_interval_monitoring = value
 
     def find_intervals_in_active_window(self, debug_print=False) -> Dict[str, pd.DataFrame]:
         raise NotImplementedError(f'Implementors must override!')
