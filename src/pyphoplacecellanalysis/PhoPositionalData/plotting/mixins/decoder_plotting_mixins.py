@@ -2030,14 +2030,14 @@ class DecodedTrajectoryMatplotlibPlotter(DecodedTrajectoryPlotter):
     """
     ## Artists/Figures/Axes:
     prev_heatmaps: List = field(default=Factory(list))
-    artist_line_dict = field(default=Factory(dict))
-    artist_markers_dict = field(default=Factory(dict))
+    artist_line_dict: Dict = field(default=Factory(dict))
+    artist_markers_dict: Dict = field(default=Factory(dict))
     
     plots_data_dict_array: List[List[RenderPlotsData]] = field(init=False)
     artist_dict_array: List[List[Dict]] = field(init=False)
     fig = field(default=None)
     axs: NDArray = field(default=None)
-    laps_pages: List = field(default=Factory(list))
+    epochs_pages: List = field(default=Factory(list))
     row_column_indicies: NDArray = field(default=None)
     linear_plotter_indicies: NDArray = field(default=None)
     
@@ -2852,6 +2852,14 @@ class DecodedTrajectoryMatplotlibPlotter(DecodedTrajectoryPlotter):
 
         
         """
+        from pyphocorehelpers.geometry_helpers import compute_data_aspect_ratio
+
+        if (self.xbin is not None) and (self.ybin is not None):
+            single_ax_aspect_ratio, (single_ax_width, single_ax_height) = compute_data_aspect_ratio(xbin=self.xbin, ybin=self.ybin)
+        else:
+            single_ax_width = None
+            single_ax_height = None
+
         # try:
         if cmap is None:
             cmap = 'viridis'
@@ -2872,18 +2880,32 @@ class DecodedTrajectoryMatplotlibPlotter(DecodedTrajectoryPlotter):
                         yield more    # yield more elements from the iterator
                 yield chunk()         # in outer generator, yield next chunk
             
-        def _subfn_build_epochs_multiplotter(nfields, linear_plot_data=None):
+        def _subfn_build_epochs_multiplotter(nfields: int, linear_plot_data=None):
             """ builds the figures
-             captures: self.rotate_to_vertical, fixed_columns, (long_track_inst, short_track_inst)
+             captures: self.rotate_to_vertical, fixed_columns, (long_track_inst, short_track_inst), single_ax_width, single_ax_height
             
             """
             linear_plotter_indicies = np.arange(nfields)
-            needed_rows = int(np.ceil(nfields / fixed_columns))
+            needed_rows: int = int(np.ceil(nfields / fixed_columns))
+
+            if (single_ax_width is not None) and (single_ax_height is not None):
+                all_column_width: float = (single_ax_width * float(fixed_columns))
+                all_row_height: float = (single_ax_height * float(needed_rows))
+
+                (all_column_width, all_row_height)
+                scaling_factor: float = 0.01
+                figsize = [(scaling_factor * all_column_width), (scaling_factor * all_row_height)]
+            else:
+                ## OLD:
+                figsize = [4*fixed_columns, 14*needed_rows]
+
+            print(f'[4*fixed_columns, 14*needed_rows]: {[4*fixed_columns, 14*needed_rows]}')
+            print(f'figsize: {figsize}')
             row_column_indicies = np.unravel_index(linear_plotter_indicies, (needed_rows, fixed_columns)) # inverse is: np.ravel_multi_index(row_column_indicies, (needed_rows, fixed_columns))
             
             if existing_ax is None:
                 ## Create a new axes and figure
-                fig, axs = plt.subplots(needed_rows, fixed_columns, sharex=True, sharey=True, figsize=[4*fixed_columns,14*needed_rows], gridspec_kw={'wspace': 0, 'hspace': 0}) #ndarray (5,2)
+                fig, axs = plt.subplots(needed_rows, fixed_columns, sharex=True, sharey=True, figsize=figsize, gridspec_kw={'wspace': 0, 'hspace': 0}) #ndarray (5,2)
                 
             else:
                 ## use the existing axes to plot the subaxes on
@@ -2937,6 +2959,8 @@ class DecodedTrajectoryMatplotlibPlotter(DecodedTrajectoryPlotter):
                 
             return fig, axs, linear_plotter_indicies, row_column_indicies, background_track_shadings
         
+
+
         def _subfn_add_specific_epoch_trajectory(p, axs, linear_plotter_indicies, row_column_indicies, active_page_epochs_ids, epochs_position_traces, epochs_time_ranges, use_time_gradient_line=True):
             """ captures: cmap 
             """
@@ -2971,7 +2995,8 @@ class DecodedTrajectoryMatplotlibPlotter(DecodedTrajectoryPlotter):
                     # add_arrow(line[0], position=curr_lap_endpoint, position_mode='abs', direction='right', size=50, color='blue')
                     # add_arrow(line[0], position=None, position_mode='rel', direction='right', size=50, color='blue')
                 # add lap text label
-                a_lap_label_text = axs[curr_row][curr_col].text(250, 126, curr_lap_label_text, horizontalalignment='right', size=12)
+                # Position text above the axes, centered horizontally, using axes coordinates (0-1)
+                a_lap_label_text = axs[curr_row][curr_col].text(0.5, 1.02, curr_lap_label_text, horizontalalignment='center', verticalalignment='bottom', size=6, transform=axs[curr_row][curr_col].transAxes)
                 # PhoWidgetHelper.perform_add_text(p[curr_row, curr_col], curr_lap_label_text, name='lblLapIdIndicator')
 
         # BEGIN FUNCTION BODY ________________________________________________________________________________________________ #
@@ -3040,7 +3065,7 @@ class DecodedTrajectoryMatplotlibPlotter(DecodedTrajectoryPlotter):
         else:
             _out_objs = None
 
-        self.laps_pages = epochs_pages
+        self.epochs_pages = epochs_pages
 
         ## Build artist holders:
         # MatplotlibRenderPlots
