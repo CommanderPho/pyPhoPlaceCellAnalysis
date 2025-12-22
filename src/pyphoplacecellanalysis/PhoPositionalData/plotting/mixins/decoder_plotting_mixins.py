@@ -1213,8 +1213,9 @@ class SingleArtistMultiEpochBatchHelpers:
         
         curr_artist_dict, image_extent, plots_data = batch_plot_helper.add_position_posteriors(posterior_masking_value=0.0025, debug_print=True, defer_draw=False)
         """
+        _active_plot_fn = kwargs.pop('active_plot_fn', DecodedTrajectoryMatplotlibPlotter._helper_add_heatmap)
         # _active_plot_fn = DecodedTrajectoryMatplotlibPlotter._helper_add_heatmap
-        _active_plot_fn = DecodedTrajectoryMatplotlibPlotter._helper_add_hdr_contours
+        # _active_plot_fn = DecodedTrajectoryMatplotlibPlotter._helper_add_hdr_contours
 
         if override_ax is None:
             active_ax = self.active_ax
@@ -1919,7 +1920,9 @@ def multi_DecodedTrajectoryMatplotlibPlotter_side_by_side(a_result2D: DecodedFil
     ybin = deepcopy(a_new_global_decoder2D.ybin)
     num_filter_epochs: int = a_result2D.num_filter_epochs
     a_decoded_traj_plotter = DecodedTrajectoryMatplotlibPlotter(a_result=a_result2D, xbin=xbin, xbin_centers=xbin_centers, ybin=ybin, ybin_centers=ybin_centers, rotate_to_vertical=True)
-    fig, axs, decoded_epochs_pages = a_decoded_traj_plotter.plot_decoded_trajectories_2d(global_session, curr_num_subplots=n_axes, active_page_index=0, plot_actual_lap_lines=False, use_theoretical_tracks_instead=True, fixed_columns=n_axes)
+    # fig, axs, decoded_epochs_pages = a_decoded_traj_plotter.plot_decoded_trajectories_2d(global_session, curr_num_subplots=n_axes, active_page_index=0, plot_actual_lap_lines=False, use_theoretical_tracks_instead=True, fixed_columns=n_axes)
+    fig, axs, decoded_epochs_pages = a_decoded_traj_plotter.plot_decoded_laps_2d(global_session, curr_num_subplots=n_axes, active_page_index=0, plot_actual_lap_lines=False, use_theoretical_tracks_instead=True, fixed_columns=n_axes)
+
     # perform_update_title_subtitle(fig=fig, ax=None, title_string="DecodedTrajectoryMatplotlibPlotter - plot_decoded_trajectories_2d") # , subtitle_string="TEST - SUBTITLE"
 
     # a_decoded_traj_plotter.fig = fig
@@ -2703,7 +2706,7 @@ class DecodedTrajectoryMatplotlibPlotter(DecodedTrajectoryPlotter):
     @classmethod
     def _perform_add_decoded_posterior_and_trajectory(cls, an_ax, xbin_centers, a_p_x_given_n, a_time_bin_centers, a_most_likely_positions, ybin_centers=None, a_measured_pos_df: Optional[pd.DataFrame]=None,
                                                         include_most_likely_pos_line: Optional[bool]=None, time_bin_index: Optional[int]=None, rotate_to_vertical:bool=False, debug_print=False, posterior_masking_value: float = 0.0025, should_perform_reshape: bool=True, should_post_hoc_fit_to_image_extent: bool=False,
-                                                        time_cmap='viridis'): # posterior_masking_value: float = 0.01 -- 1D
+                                                        time_cmap='viridis', **kwargs): # posterior_masking_value: float = 0.01 -- 1D
         """ Plots the 1D or 2D posterior and most likely position trajectory over the top of an axes created with `fig, axs, laps_pages = plot_decoded_trajectories_2d(curr_active_pipeline.sess, curr_num_subplots=8, active_page_index=0, plot_actual_lap_lines=False)`
         
         np.shape(a_time_bin_centers) # 1D & 2D: (12,)
@@ -2736,7 +2739,9 @@ class DecodedTrajectoryMatplotlibPlotter(DecodedTrajectoryPlotter):
         # Plot the posterior heatmap                                                                                           #
         # ==================================================================================================================== #
         # _active_plot_fn = cls._helper_add_heatmap
-        _active_plot_fn = cls._helper_add_hdr_contours
+        # _active_plot_fn = cls._helper_add_hdr_contours
+        _active_plot_fn = kwargs.pop('active_plot_fn', DecodedTrajectoryMatplotlibPlotter._helper_add_heatmap)
+
         
         # Delegate the posterior plotting functionality.
         heatmaps, image_extent, extra_dict = _active_plot_fn(
@@ -2824,9 +2829,8 @@ class DecodedTrajectoryMatplotlibPlotter(DecodedTrajectoryPlotter):
         return heatmaps, (a_meas_pos_line, a_line), (_meas_pos_out_markers, _out_markers), plots_data
 
 
-
-    @function_attributes(short_name=None, tags=['main', 'plot'], input_requires=[], output_provides=[], uses=[], used_by=['multi_DecodedTrajectoryMatplotlibPlotter_side_by_side'], creation_date='2025-06-30 12:58', related_items=[])
-    def plot_decoded_trajectories_2d(self, sess, curr_num_subplots=10, active_page_index=0, plot_actual_lap_lines:bool=False, fixed_columns: int = 2, use_theoretical_tracks_instead: bool = True, existing_ax=None, axes_inset_locators_list=None, cmap=None, **kwargs):
+    @function_attributes(short_name=None, tags=['main', 'plot'], input_requires=[], output_provides=[], uses=[], used_by=['multi_DecodedTrajectoryMatplotlibPlotter_side_by_side', 'self.plot_decoded_laps_2d'], creation_date='2025-06-30 12:58', related_items=[])
+    def plot_decoded_trajectories_2d(self, curr_position_df: pd.DataFrame, epoch_specific_position_dfs: List[pd.DataFrame], epoch_ids: NDArray, sess=None, curr_num_subplots=10, active_page_index=0, plot_actual_lap_lines:bool=False, fixed_columns: int = 2, use_theoretical_tracks_instead: bool = True, existing_ax=None, axes_inset_locators_list=None, cmap=None, **kwargs):
         """ Plots a MatplotLib 2D Figure with each lap being shown in one of its subplots
         
         Called to setup the graph.
@@ -2853,7 +2857,7 @@ class DecodedTrajectoryMatplotlibPlotter(DecodedTrajectoryPlotter):
             cmap = 'viridis'
         
     
-        if use_theoretical_tracks_instead:
+        if (use_theoretical_tracks_instead and (sess is not None)):
             from pyphoplacecellanalysis.Pho2D.track_shape_drawing import LinearTrackInstance, _perform_plot_matplotlib_2D_tracks
             long_track_inst, short_track_inst = LinearTrackInstance.init_tracks_from_session_config(deepcopy(sess.config))
 
@@ -2933,23 +2937,23 @@ class DecodedTrajectoryMatplotlibPlotter(DecodedTrajectoryPlotter):
                 
             return fig, axs, linear_plotter_indicies, row_column_indicies, background_track_shadings
         
-        def _subfn_add_specific_lap_trajectory(p, axs, linear_plotter_indicies, row_column_indicies, active_page_laps_ids, lap_position_traces, lap_time_ranges, use_time_gradient_line=True):
+        def _subfn_add_specific_epoch_trajectory(p, axs, linear_plotter_indicies, row_column_indicies, active_page_epochs_ids, epochs_position_traces, epochs_time_ranges, use_time_gradient_line=True):
             """ captures: cmap 
             """
             # Add the lap trajectory:
             for a_linear_index in linear_plotter_indicies:
-                curr_lap_id = active_page_laps_ids[a_linear_index]
+                curr_lap_id = active_page_epochs_ids[a_linear_index]
                 curr_row = row_column_indicies[0][a_linear_index]
                 curr_col = row_column_indicies[1][a_linear_index]
-                curr_lap_time_range = lap_time_ranges[curr_lap_id]
-                curr_lap_label_text = 'Lap[{}]: t({:.2f}, {:.2f})'.format(curr_lap_id, curr_lap_time_range[0], curr_lap_time_range[1])
-                curr_lap_num_points = len(lap_position_traces[curr_lap_id][0,:])
+                curr_lap_time_range = epochs_time_ranges[curr_lap_id]
+                curr_lap_label_text = 'Epoch[{}]: t({:.2f}, {:.2f})'.format(curr_lap_id, curr_lap_time_range[0], curr_lap_time_range[1])
+                curr_lap_num_points = len(epochs_position_traces[curr_lap_id][0,:])
                 if use_time_gradient_line:
                     # Create a continuous norm to map from data points to colors
-                    curr_lap_timeseries = np.linspace(curr_lap_time_range[0], curr_lap_time_range[-1], len(lap_position_traces[curr_lap_id][0,:]))
+                    curr_lap_timeseries = np.linspace(curr_lap_time_range[0], curr_lap_time_range[-1], len(epochs_position_traces[curr_lap_id][0,:]))
                     norm = plt.Normalize(curr_lap_timeseries.min(), curr_lap_timeseries.max())
                     # needs to be (numlines) x (points per line) x 2 (for x and y)
-                    points = np.array([lap_position_traces[curr_lap_id][0,:], lap_position_traces[curr_lap_id][1,:]]).T.reshape(-1, 1, 2)
+                    points = np.array([epochs_position_traces[curr_lap_id][0,:], epochs_position_traces[curr_lap_id][1,:]]).T.reshape(-1, 1, 2)
                     segments = np.concatenate([points[:-1], points[1:]], axis=1)
                     lc = LineCollection(segments, cmap=cmap, norm=norm)
                     # Set the values used for colormapping
@@ -2959,7 +2963,7 @@ class DecodedTrajectoryMatplotlibPlotter(DecodedTrajectoryPlotter):
                     a_line = axs[curr_row][curr_col].add_collection(lc)
                     # add_arrow(line)
                 else:
-                    a_line = axs[curr_row][curr_col].plot(lap_position_traces[curr_lap_id][0,:], lap_position_traces[curr_lap_id][1,:], c='k', alpha=0.85)
+                    a_line = axs[curr_row][curr_col].plot(epochs_position_traces[curr_lap_id][0,:], epochs_position_traces[curr_lap_id][1,:], c='k', alpha=0.85)
                     # curr_lap_endpoint = curr_lap_position_traces[curr_lap_id][:,-1].T
                     a_start_arrow = _plot_helper_add_arrow(a_line[0], position=0, position_mode='index', direction='right', size=20, color='green') # start
                     a_middle_arrow = _plot_helper_add_arrow(a_line[0], position=None, position_mode='index', direction='right', size=20, color='yellow') # middle
@@ -2973,16 +2977,13 @@ class DecodedTrajectoryMatplotlibPlotter(DecodedTrajectoryPlotter):
         # BEGIN FUNCTION BODY ________________________________________________________________________________________________ #
 
         # Compute required data from session:
-        curr_position_df, lap_specific_position_dfs = LapsVisualizationMixin._compute_laps_specific_position_dfs(sess)
         
-        # lap_specific_position_dfs = [curr_position_df.groupby('lap').get_group(i)[['t','x','y','lin_pos']] for i in session.laps.lap_id]
-
         if self.rotate_to_vertical:
             # vertical
             # x_columns = [col for col in lap_specific_position_dfs[0].columns if col.startswith("x")]
             # y_columns = [col for col in lap_specific_position_dfs[0].columns if col.startswith("y")]
 
-            for a_df in lap_specific_position_dfs:
+            for a_df in epoch_specific_position_dfs:
                 a_df['x_temp'] = deepcopy(a_df['x'])
                 a_df['x'] = deepcopy(a_df['y'])
                 a_df['y'] = deepcopy(a_df['x_temp'])
@@ -2998,17 +2999,28 @@ class DecodedTrajectoryMatplotlibPlotter(DecodedTrajectoryPlotter):
             
             # lap_specific_position_dfs[['x', 'y']] = lap_specific_position_dfs[['y', 'x']] ## swap the columns order
             # curr_position_df[['x', 'y']] = lap_specific_position_dfs[['y', 'x']] ## swap the columns order
+        ## END if self.rotate_to_vertical
+
+        epochs_position_traces_list = [epoch_pos_df[['x','y']].to_numpy().T for epoch_pos_df in epoch_specific_position_dfs]
+        epochs_time_range_list = [[epoch_pos_df[['t']].to_numpy()[0].item(), epoch_pos_df[['t']].to_numpy()[-1].item()] for epoch_pos_df in epoch_specific_position_dfs]
+        
+        ## OUTPUTS: epoch_ids, epochs_time_range_list, epochs_position_traces_list, curr_position_df
+
+        # lap_specific_position_dfs = [curr_position_df.groupby('lap').get_group(i)[['t','x','y','lin_pos']] for i in session.laps.lap_id]
 
         position_col_names = ['x', 'y']
-        laps_position_traces_list = [lap_pos_df[position_col_names].to_numpy().T for lap_pos_df in lap_specific_position_dfs]
-        
-        laps_time_range_list = [[lap_pos_df[['t']].to_numpy()[0].item(), lap_pos_df[['t']].to_numpy()[-1].item()] for lap_pos_df in lap_specific_position_dfs]
-        
-        num_laps = len(sess.laps.lap_id)
-        linear_lap_index = np.arange(num_laps)
-        lap_time_ranges = dict(zip(sess.laps.lap_id, laps_time_range_list))
-        lap_position_traces = dict(zip(sess.laps.lap_id, laps_position_traces_list)) ## each lap indexed by lap_id
-        
+        # epochs_position_traces_list = [lap_pos_df[position_col_names].to_numpy().T for lap_pos_df in epoch_specific_position_dfs]
+        # laps_time_range_list = [[lap_pos_df[['t']].to_numpy()[0].item(), lap_pos_df[['t']].to_numpy()[-1].item()] for lap_pos_df in epoch_specific_position_dfs]
+        # epoch_time_ranges = dict(zip(sess.laps.lap_id, laps_time_range_list))
+        # epoch_position_traces = dict(zip(sess.laps.lap_id, epochs_position_traces_list)) ## each lap indexed by lap_id
+
+
+        ## INPUTS: epoch_ids, epochs_time_range_list, epochs_position_traces_list, curr_position_df
+        # num_laps = len(epoch_ids)
+        # linear_lap_index = np.arange(num_laps)
+        epochs_time_ranges = dict(zip(epoch_ids, epochs_time_range_list))
+        epochs_position_traces = dict(zip(epoch_ids, epochs_position_traces_list))
+
         all_maze_positions = curr_position_df[position_col_names].to_numpy().T # (2, 59308)
         # np.shape(all_maze_positions)
         all_maze_data = [all_maze_positions for i in np.arange(curr_num_subplots)] # repeat the maze data for each subplot. (2, 593080)
@@ -3018,17 +3030,17 @@ class DecodedTrajectoryMatplotlibPlotter(DecodedTrajectoryPlotter):
         perform_update_title_subtitle(fig=self.fig, ax=None, title_string="DecodedTrajectoryMatplotlibPlotter - plot_decoded_trajectories_2d") # , subtitle_string="TEST - SUBTITLE"
         
         # generate the pages
-        epochs_pages = [list(chunk) for chunk in _subfn_chunks(sess.laps.lap_id, curr_num_subplots)] ## this is specific to actual laps...
+        epochs_pages = [list(chunk) for chunk in _subfn_chunks(epoch_ids, curr_num_subplots)] ## this is specific to actual laps...
          
         if plot_actual_lap_lines:
             ## IDK what this is sadly, i think it's a reminant of the lap plotter?
-            active_page_laps_ids = epochs_pages[active_page_index]
-            _subfn_add_specific_lap_trajectory(self.fig, self.axs, linear_plotter_indicies=self.linear_plotter_indicies, row_column_indicies=self.row_column_indicies, active_page_laps_ids=active_page_laps_ids, lap_position_traces=lap_position_traces, lap_time_ranges=lap_time_ranges, use_time_gradient_line=True)
+            active_page_epochs_ids = epochs_pages[active_page_index]
+            _out_objs = _subfn_add_specific_epoch_trajectory(self.fig, self.axs, linear_plotter_indicies=self.linear_plotter_indicies, row_column_indicies=self.row_column_indicies, active_page_epochs_ids=active_page_epochs_ids, epochs_position_traces=epochs_position_traces, epochs_time_ranges=epochs_time_ranges, use_time_gradient_line=True)
             # plt.ylim((125, 152))
-            
+        else:
+            _out_objs = None
+
         self.laps_pages = epochs_pages
-
-
 
         ## Build artist holders:
         # MatplotlibRenderPlots
@@ -3051,6 +3063,20 @@ class DecodedTrajectoryMatplotlibPlotter(DecodedTrajectoryPlotter):
             #   curr_artist_dict = self.artist_dict_array[curr_row][curr_col]
 
         return self.fig, self.axs, epochs_pages
+
+
+    @function_attributes(short_name=None, tags=['main', 'factored-out'], input_requires=[], output_provides=[], uses=['self.plot_decoded_trajectories_2d'], used_by=[], creation_date='2025-12-22 13:33', related_items=[])
+    def plot_decoded_laps_2d(self, sess, *args, **kwargs):
+        """ Helper function that plots specifically the laps
+        """
+        curr_position_df, epoch_specific_position_dfs = LapsVisualizationMixin._compute_laps_specific_position_dfs(sess)
+        epoch_ids = deepcopy(sess.laps.lap_id)
+        if kwargs.get('use_theoretical_tracks_instead', False):
+            ## need to pass sess
+            kwargs['sess'] = sess
+
+        return self.plot_decoded_trajectories_2d(curr_position_df=curr_position_df, epoch_specific_position_dfs=epoch_specific_position_dfs, epoch_ids=epoch_ids, *args, **kwargs)
+        
 
 
 
