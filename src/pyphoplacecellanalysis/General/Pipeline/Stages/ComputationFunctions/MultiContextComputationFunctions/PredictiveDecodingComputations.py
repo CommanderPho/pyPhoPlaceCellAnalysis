@@ -920,27 +920,57 @@ class DecodingLocalityMeasures(ComputedResult): #PickleSerializableMixin, AttrsB
         return self.non_local_PBE_non_moving_epochs_df
     
 
-    def add_non_local_epochs_to_intervals_timeline(self, active_2d_plot, identifier:str='non-local', non_local_epochs_df: pd.DataFrame=None, visualization_update_dict=None):
+    # @function_attributes(short_name=None, tags=['intervals', 'track', 'GUI', 'epochs', 'non-local'], input_requires=[], output_provides=[], uses=['IntervalRectsItem', 'self.get_non_local_epochs'], used_by=[], creation_date='2025-12-22 07:48', related_items=[])
+    # def add_non_local_epochs_to_intervals_timeline(self, active_2d_plot, identifier:str='non-local', non_local_epochs_df: pd.DataFrame=None, visualization_update_dict=None):
+    #     """  Add `non_local_locality_measures_epochs_df` to timeline as interval epochs
+
+    #     a_rect_item, non_local_locality_measures_epochs_df = decoding_locality_measures.add_non_local_epochs_to_intervals_timeline(active_2d_plot=active_2d_plot)
+    #     """
+    #     from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.GraphicsObjects.IntervalRectsItem import IntervalRectsItem
+
+    #     ## Compute adjacent epochs:
+    #     if non_local_epochs_df is None:
+    #         non_local_epochs_df = self.get_non_local_epochs(merging_adjacent_max_separation_sec=0.5)
+            
+    #     ## INPUTS: non_local_locality_measures_epochs_df
+    #     _out_intervals = active_2d_plot.add_rendered_intervals(non_local_epochs_df, name=identifier)
+    #     a_rect_item: IntervalRectsItem = _out_intervals['RootPlot']['rect_item']
+    #     # Direct dictionary update
+    #     if visualization_update_dict is None:
+    #         visualization_update_dict = {
+    #             identifier: dict(y_location=-2.0, height=0.9, pen_color="#d8db06", pen_opacity=0.7843137254901961, brush_color="#bbae00", brush_opacity=0.6078431372549019),
+    #         }
+    #     active_2d_plot.update_rendered_intervals_visualization_properties(visualization_update_dict)
+    #     return a_rect_item, non_local_epochs_df
+    
+
+    @function_attributes(short_name=None, tags=['intervals', 'track', 'GUI', 'epochs', 'non-local'], input_requires=[], output_provides=[], uses=['IntervalRectsItem', 'self.get_non_local_epochs'], used_by=[], creation_date='2025-12-22 07:48', related_items=[])
+    def add_non_local_PBE_non_moving_epochs_to_intervals_timeline(self, active_2d_plot, identifier:str='non-local-non-moving-PBEs', non_local_PBE_non_moving_epochs_df: pd.DataFrame=None, visualization_update_dict=None):
         """  Add `non_local_locality_measures_epochs_df` to timeline as interval epochs
 
-        a_rect_item, non_local_locality_measures_epochs_df = decoding_locality_measures.add_non_local_epochs_to_intervals_timeline(active_2d_plot=active_2d_plot)
+        non_local_PBE_non_moving_rect_item, non_local_PBE_non_moving_epochs_df = decoding_locality_measures.add_non_local_PBE_non_moving_epochs_to_intervals_timeline(active_2d_plot=active_2d_plot)
         """
         from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.GraphicsObjects.IntervalRectsItem import IntervalRectsItem
 
         ## Compute adjacent epochs:
-        if non_local_epochs_df is None:
-            non_local_epochs_df = self.get_non_local_epochs(merging_adjacent_max_separation_sec=0.5)
+        if non_local_PBE_non_moving_epochs_df is None:
+            ## unless provided by user, use the internally computed ones (which have to exist
+            assert self.non_local_PBE_non_moving_epochs_df is not None
+            non_local_PBE_non_moving_epochs_df = deepcopy(self.non_local_PBE_non_moving_epochs_df)
             
+                
         ## INPUTS: non_local_locality_measures_epochs_df
-        _out_intervals = active_2d_plot.add_rendered_intervals(non_local_epochs_df, name=identifier)
-        a_rect_item: IntervalRectsItem = _out_intervals['RootPlot']['rect_item']
+        _out_intervals = active_2d_plot.add_rendered_intervals(non_local_PBE_non_moving_epochs_df, name=identifier)
+        non_local_PBE_non_moving_rect_item: IntervalRectsItem = _out_intervals['RootPlot']['rect_item']
         # Direct dictionary update
         if visualization_update_dict is None:
             visualization_update_dict = {
-                identifier: dict(y_location=-2.0, height=0.9, pen_color="#d8db06", pen_opacity=0.7843137254901961, brush_color="#bbae00", brush_opacity=0.6078431372549019),
+                identifier: dict(y_location=-2.0, height=0.9, pen_color="#dbb406", pen_opacity=0.78, brush_color="#bb8f00", brush_opacity=0.61),
             }
         active_2d_plot.update_rendered_intervals_visualization_properties(visualization_update_dict)
-        return a_rect_item, non_local_epochs_df
+        return non_local_PBE_non_moving_rect_item, non_local_PBE_non_moving_epochs_df
+
+
 
 
 
