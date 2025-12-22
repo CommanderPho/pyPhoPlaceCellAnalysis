@@ -2907,8 +2907,14 @@ class DecodedTrajectoryMatplotlibPlotter(DecodedTrajectoryPlotter):
                 ## Create a new axes and figure
                 fig, axs = plt.subplots(needed_rows, fixed_columns, sharex=True, sharey=True, figsize=figsize, gridspec_kw={'wspace': 0, 'hspace': 0}) #ndarray (5,2)
                 
+            elif isinstance(existing_ax, (list, tuple)):
+                ## passed axes were a list of axes
+                assert len(existing_ax) <= (needed_rows * fixed_columns)
+                axs = existing_ax
+                fig = axs[0].get_figure()
+
             else:
-                ## use the existing axes to plot the subaxes on
+                ## use the existing axes to plot the subaxes on                
                 print(f'using subaxes on the existing axes')
                 assert axes_inset_locators_list is not None
                 

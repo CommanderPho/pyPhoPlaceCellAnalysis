@@ -2173,7 +2173,8 @@ class PredictiveDecodingComputationsGlobalComputationFunctions(AllFunctionEnumer
 #     """
 
 from pyphoplacecellanalysis.PhoPositionalData.plotting.mixins.decoder_plotting_mixins import DecodedTrajectoryMatplotlibPlotter, DecodedTrajectoryPlotter
-
+from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
+from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as NavigationToolbar
 
 @define(slots=False, repr=False, eq=False)
 class PredictiveDecodingDisplayWidget:
@@ -2327,11 +2328,19 @@ class PredictiveDecodingDisplayWidget:
             epoch_ids = np.array(list(curr_matching_past_future_positions_df_dict[a_past_future_name].keys()))
             # epoch_specific_position_dfs
             curr_num_subplots: int = min(8, len(epoch_ids))
-            fig, axs, laps_pages = a_decoded_traj_plotter.plot_decoded_trajectories_2d(curr_position_df=self.curr_position_df, epoch_specific_position_dfs=epoch_specific_position_dfs, epoch_ids=epoch_ids, curr_num_subplots=curr_num_subplots, active_page_index=0, plot_actual_lap_lines=True, use_theoretical_tracks_instead=False)
+
+
+            existing_ax = None
+            canvas: FigureCanvas = self.dock_canvas_widgets.get(a_past_future_name, None)
+            if canvas is not None:
+                existing_ax = canvas.figure.get_axes() ## a list of 8 Axes objects
+
+            fig, axs, laps_pages = a_decoded_traj_plotter.plot_decoded_trajectories_2d(curr_position_df=self.curr_position_df, epoch_specific_position_dfs=epoch_specific_position_dfs, epoch_ids=epoch_ids, curr_num_subplots=curr_num_subplots, active_page_index=0,
+                                                                                     plot_actual_lap_lines=True, use_theoretical_tracks_instead=False, existing_ax=existing_ax)
             
             # Embed the matplotlib figure in the dock widget
             dock = self.dock_widgets.get(a_past_future_name)
-            if dock is not None:
+            if (canvas is None) and (dock is not None):
                 # Remove existing widgets from dock
                 # Dock uses a QGridLayout and maintains a widgets list
                 layout = dock.layout
@@ -2346,8 +2355,6 @@ class PredictiveDecodingDisplayWidget:
                 dock.currentRow = 0
                 
                 # Create canvas and toolbar for the matplotlib figure
-                from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
-                from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as NavigationToolbar
                 canvas = FigureCanvas(fig)
                 toolbar = NavigationToolbar(canvas, self.dock_window)
                 
