@@ -4,6 +4,7 @@
 from copy import deepcopy
 from pathlib import Path
 from typing import Dict, List, Tuple, Optional, Callable, Union, Any
+from neuropy.utils.matplotlib_helpers import perform_update_title_subtitle
 from typing_extensions import TypeAlias
 import nptyping as ND
 from nptyping import NDArray
@@ -2172,19 +2173,20 @@ class PredictiveDecodingComputationsGlobalComputationFunctions(AllFunctionEnumer
 #     Must have a signature of: (owning_pipeline_reference, global_computation_results, computation_results, active_configs, ..., **kwargs) at a minimum
 #     """
 
+from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.ContainerBased.PhoContainerTool import GenericMatplotlibContainer
 from pyphoplacecellanalysis.PhoPositionalData.plotting.mixins.decoder_plotting_mixins import DecodedTrajectoryMatplotlibPlotter, DecodedTrajectoryPlotter
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as NavigationToolbar
 
 @define(slots=False, repr=False, eq=False)
-class PredictiveDecodingDisplayWidget:
+class PredictiveDecodingDisplayWidget(): # GenericMatplotlibContainer
     """ 
         from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.PredictiveDecodingComputations import PredictiveDecodingDisplayWidget
 
         a_widget: PredictiveDecodingDisplayWidget = PredictiveDecodingDisplayWidget.init_from_container(container=container, decoding_time_bin_size=0.025, an_epoch_name='roam')
         a_widget
     """
-    container: PredictiveDecodingComputationsContainer = field()
+    container: PredictiveDecodingComputationsContainer = field(default=None)
     
     xbin: np.ndarray = field(default=None)
     ybin: np.ndarray = field(default=None)
@@ -2211,20 +2213,20 @@ class PredictiveDecodingDisplayWidget:
 
         """
         decoded_local_epochs_result = container.epochs_decoded_result_cache_dict[decoding_time_bin_size][an_epoch_name]
-        pf1D_Decoder = container.pf1D_Decoder_dict[an_epoch_name]
+        pf_decoder = container.pf1D_Decoder_dict[an_epoch_name]
         decoded_result: DecodedFilterEpochsResult = decoded_local_epochs_result
         curr_position_df: pd.DataFrame = deepcopy(container.decoding_locality.pos_df)
 
         # global_session = deepcopy(curr_active_pipeline.sess)
         # a_result2D: DecodedFilterEpochsResult = decoded_local_epochs_result.frame_divided_epochs_results[an_epoch_name]
-        a_new_global_decoder2D = container.pf1D_Decoder_dict[an_epoch_name]
+        # pf_Decoder = container.pf1D_Decoder_dict[an_epoch_name]
         # a_result2D = results2D.a_result2D
         # a_new_global_decoder2D = results2D.a_new_global_decoder2D
         ## INPUTS: directional_laps_results, decoder_ripple_filter_epochs_decoder_result_dict
-        xbin = deepcopy(a_new_global_decoder2D.xbin)
-        xbin_centers = deepcopy(a_new_global_decoder2D.xbin_centers)
-        ybin_centers = deepcopy(a_new_global_decoder2D.ybin_centers)
-        ybin = deepcopy(a_new_global_decoder2D.ybin)
+        xbin = deepcopy(pf_decoder.xbin)
+        xbin_centers = deepcopy(pf_decoder.xbin_centers)
+        ybin_centers = deepcopy(pf_decoder.ybin_centers)
+        ybin = deepcopy(pf_decoder.ybin)
 
         # num_filter_epochs: int = decoded_local_epochs_result.num_filter_epochs
 
@@ -2235,13 +2237,39 @@ class PredictiveDecodingDisplayWidget:
             xbin_centers=xbin_centers,
             ybin_centers=ybin_centers,
             curr_position_df=curr_position_df,
-            pf1D_Decoder=pf1D_Decoder, decoded_result=decoded_result,
+            pf1D_Decoder=pf_decoder, decoded_result=decoded_result,
         )
 
         return _obj
     
 
     def __attrs_post_init__(self):
+        merging_adjacent_max_separation_sec: float = 0.5
+        minimum_epoch_duration: float = 0.05
+        # matching_pos_dfs_list: List[pd.DataFrame] = []
+        # matching_pos_epochs_dfs_list: List[pd.DataFrame] = []
+        assert len(self.container.predictive_decoding.matching_pos_dfs_list) > 0
+        matching_pos_dfs_list = self.container.predictive_decoding.matching_pos_dfs_list
+        assert len(self.container.predictive_decoding.matching_pos_epochs_dfs_list) > 0
+        matching_pos_epochs_dfs_list = self.container.predictive_decoding.matching_pos_epochs_dfs_list
+        ## INPUTS: matching_pos_epochs_dfs_list, decoded_local_epochs_result
+
+        for i, a_row in enumerate(ensure_dataframe(self.decoded_result.filter_epochs).itertuples(index=False)):
+        # for i, a_pos_matches_epoch_mask in enumerate(epoch_matching_positions):
+            a_matching_pos_epochs: pd.DataFrame = matching_pos_epochs_dfs_list[i]
+            # a_row.start, a_row.stop
+            curr_epoch_start_t: float = a_row.start
+            curr_epoch_stop_t: float = a_row.stop
+            
+            is_relevant_past_times = (a_matching_pos_epochs['stop'] < curr_epoch_start_t)
+            is_relevant_future_times = (a_matching_pos_epochs['start'] > curr_epoch_stop_t)
+            a_matching_pos_epochs['is_future_present_past'] = 'present'
+            a_matching_pos_epochs.loc[is_relevant_past_times, 'is_future_present_past'] = 'past'
+            a_matching_pos_epochs.loc[is_relevant_future_times, 'is_future_present_past'] = 'future'
+                    
+            self.container.predictive_decoding.matching_pos_epochs_dfs_list[i] = a_matching_pos_epochs
+
+        # self.container.predictive_decoding.matching_pos_epochs_dfs_list = matching_pos_epochs_dfs_list
         self.init_UI()
 
 
@@ -2279,7 +2307,8 @@ class PredictiveDecodingDisplayWidget:
             prev_dock = dock
         
         self.dock_window.show()
-
+        
+        self.update_displayed_epoch(an_epoch_idx=4) ## go to first index if possible
 
 
     def update_displayed_epoch(self, an_epoch_idx: int = 8):
@@ -2305,72 +2334,81 @@ class PredictiveDecodingDisplayWidget:
         curr_matching_past_future_positions_df_dict: Dict[str, Dict[int, pd.DataFrame]] = {}
         # for a_past_future_name in past_future_names:
         for a_past_future_name, an_epoch_specific_past_position_dfs in curr_matching_epochs_df_dict.items():
+            ## add the final detected non_local_pbe_epoch indicies to the decoded points:
+            a_curr_matching_positions_df = deepcopy(curr_matching_positions_df)
+            an_epoch_specific_past_position_dfs['label'] = an_epoch_specific_past_position_dfs['label'].astype(int) ## convert to int
+            col_name: str = 'past_future_matching_pos_epoch_id'
+            a_curr_matching_positions_df = a_curr_matching_positions_df.time_point_event.adding_epochs_identity_column(epochs_df=an_epoch_specific_past_position_dfs, epoch_id_key_name=col_name, override_time_variable_name='t',
+                                                                # epoch_label_column_name='label', no_interval_fill_value='',
+                                                                epoch_label_column_name='label', no_interval_fill_value=-1,
+                                                                should_replace_existing_column=True, drop_non_epoch_events=True, overlap_behavior=OverlappingIntervalsFallbackBehavior.FALLBACK_TO_SLOW_SEARCH)
+            curr_matching_positions_df_dict: Dict[int, pd.DataFrame] = a_curr_matching_positions_df.pho.partition_df_dict(col_name) ## the position dataframes for each possible future/past epoch
+            curr_matching_past_future_positions_df_dict[a_past_future_name] = curr_matching_positions_df_dict
+            epoch_specific_position_dfs = list(curr_matching_past_future_positions_df_dict[a_past_future_name].values())
+            epoch_ids = np.array(list(curr_matching_past_future_positions_df_dict[a_past_future_name].keys()))
+            # epoch_specific_position_dfs
+            curr_num_subplots: int = min(8, len(epoch_ids))
+            
+
             # an_epoch_specific_past_position_dfs = curr_matching_epochs_df_dict['past']
             # an_epoch_specific_past_epoch_ids = an_epoch_specific_past_position_dfs.index.to_numpy()
             ## OUTPUTS: an_epoch_specific_past_position_dfs, an_epoch_specific_past_epoch_ids
+            existing_ax = None
+            needed_init: bool = False
             a_decoded_traj_plotter = self.trajectory_displaying_plotter.get(a_past_future_name, None)
             if a_decoded_traj_plotter is None:
                 ## create a new plotter
                 a_decoded_traj_plotter = DecodedTrajectoryMatplotlibPlotter(a_result=self.decoded_result, xbin=self.xbin, xbin_centers=self.xbin_centers, ybin=self.ybin, ybin_centers=self.ybin_centers)
                 self.trajectory_displaying_plotter[a_past_future_name] = a_decoded_traj_plotter
+                needed_init = True
+            else:
+                existing_ax = a_decoded_traj_plotter.axs
 
+            # canvas: FigureCanvas = self.dock_canvas_widgets.get(a_past_future_name, None)
+            # if canvas is not None:
+            #     existing_ax = canvas.figure.get_axes() ## a list of 8 Axes objects
 
-            ## add the final detected non_local_pbe_epoch indicies to the decoded points:
-            a_curr_matching_positions_df = deepcopy(curr_matching_positions_df)
-            col_name: str = 'past_future_matching_pos_epoch_id'
-            a_curr_matching_positions_df = a_curr_matching_positions_df.time_point_event.adding_epochs_identity_column(epochs_df=an_epoch_specific_past_position_dfs, epoch_id_key_name=col_name, epoch_label_column_name='label', override_time_variable_name='t',
-                                                                no_interval_fill_value='', should_replace_existing_column=True, drop_non_epoch_events=True, overlap_behavior=OverlappingIntervalsFallbackBehavior.FALLBACK_TO_SLOW_SEARCH)
-            curr_matching_positions_df_dict: Dict[int, pd.DataFrame] = a_curr_matching_positions_df.pho.partition_df_dict(col_name) ## the position dataframes for each possible future/past epoch
-            curr_matching_past_future_positions_df_dict[a_past_future_name] = curr_matching_positions_df_dict
-
-
-            epoch_specific_position_dfs = list(curr_matching_past_future_positions_df_dict[a_past_future_name].values())
-            epoch_ids = np.array(list(curr_matching_past_future_positions_df_dict[a_past_future_name].keys()))
-            # epoch_specific_position_dfs
-            curr_num_subplots: int = min(8, len(epoch_ids))
-
-
-            existing_ax = None
-            canvas: FigureCanvas = self.dock_canvas_widgets.get(a_past_future_name, None)
-            if canvas is not None:
-                existing_ax = canvas.figure.get_axes() ## a list of 8 Axes objects
-
-            fig, axs, laps_pages = a_decoded_traj_plotter.plot_decoded_trajectories_2d(curr_position_df=self.curr_position_df, epoch_specific_position_dfs=epoch_specific_position_dfs, epoch_ids=epoch_ids, curr_num_subplots=curr_num_subplots, active_page_index=0,
+            fig, axs, epochs_pages = a_decoded_traj_plotter.plot_decoded_trajectories_2d(curr_position_df=self.curr_position_df, epoch_specific_position_dfs=epoch_specific_position_dfs, epoch_ids=epoch_ids, curr_num_subplots=curr_num_subplots, active_page_index=0,
                                                                                      plot_actual_lap_lines=True, use_theoretical_tracks_instead=False, existing_ax=existing_ax)
             
+            perform_update_title_subtitle(fig=fig, ax=None, title_string=f"{a_past_future_name} - an_epoch_idx: {an_epoch_idx}")
+
+
             # Embed the matplotlib figure in the dock widget
-            dock = self.dock_widgets.get(a_past_future_name)
-            if (canvas is None) and (dock is not None):
-                # Remove existing widgets from dock
-                # Dock uses a QGridLayout and maintains a widgets list
-                layout = dock.layout
-                if layout is not None:
-                    while layout.count():
-                        child = layout.takeAt(0)
-                        if child.widget():
-                            child.widget().setParent(None)
-                # Clear the widgets list maintained by Dock
-                if hasattr(dock, 'widgets'):
-                    dock.widgets.clear()
-                dock.currentRow = 0
-                
-                # Create canvas and toolbar for the matplotlib figure
-                canvas = FigureCanvas(fig)
-                toolbar = NavigationToolbar(canvas, self.dock_window)
-                
-                # Create a widget to hold canvas and toolbar
-                plot_widget = QtWidgets.QWidget()
-                plot_layout = QtWidgets.QVBoxLayout()
-                plot_layout.setContentsMargins(0, 0, 0, 0)
-                plot_layout.addWidget(toolbar)
-                plot_layout.addWidget(canvas)
-                plot_widget.setLayout(plot_layout)
-                
-                # Add to dock
-                dock.addWidget(plot_widget)
-                
-                # Store reference to canvas widget
-                self.dock_canvas_widgets[a_past_future_name] = canvas
+            if needed_init:
+                dock = self.dock_widgets.get(a_past_future_name)
+                if (dock is not None): # (canvas is None)
+                    # Remove existing widgets from dock
+                    # Dock uses a QGridLayout and maintains a widgets list
+                    layout = dock.layout
+                    if layout is not None:
+                        while layout.count():
+                            child = layout.takeAt(0)
+                            if child.widget():
+                                child.widget().setParent(None)
+                    # Clear the widgets list maintained by Dock
+                    if hasattr(dock, 'widgets'):
+                        dock.widgets.clear()
+                    dock.currentRow = 0
+                    
+                    # Create canvas and toolbar for the matplotlib figure
+                    canvas = FigureCanvas(fig)
+                    toolbar = NavigationToolbar(canvas, self.dock_window)
+                    
+                    # Create a widget to hold canvas and toolbar
+                    plot_widget = QtWidgets.QWidget()
+                    plot_layout = QtWidgets.QVBoxLayout()
+                    plot_layout.setContentsMargins(0, 0, 0, 0)
+                    plot_layout.addWidget(toolbar)
+                    plot_layout.addWidget(canvas)
+                    plot_widget.setLayout(plot_layout)
+                    
+                    # Add to dock
+                    dock.addWidget(plot_widget)
+                    
+                    # Store reference to canvas widget
+                    self.dock_canvas_widgets[a_past_future_name] = canvas                
+
         ### for a_past_future_name, an_epoch_specific_past_position_dfs in curr_matc...
 
 

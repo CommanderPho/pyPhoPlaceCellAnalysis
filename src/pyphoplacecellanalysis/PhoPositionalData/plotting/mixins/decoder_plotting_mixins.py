@@ -2909,9 +2909,15 @@ class DecodedTrajectoryMatplotlibPlotter(DecodedTrajectoryPlotter):
                 
             elif isinstance(existing_ax, (list, tuple)):
                 ## passed axes were a list of axes
-                assert len(existing_ax) <= (needed_rows * fixed_columns)
+                assert len(existing_ax) >= (needed_rows * fixed_columns)
                 axs = existing_ax
                 fig = axs[0].get_figure()
+            elif isinstance(existing_ax, NDArray):
+                ## passed axes were a list of axes
+                assert np.size(existing_ax) >= (needed_rows * fixed_columns)
+                axs = existing_ax
+                axs = np.atleast_2d(axs)
+                fig = axs[0][0].get_figure() ## get first axis to get the figure
 
             else:
                 ## use the existing axes to plot the subaxes on                
