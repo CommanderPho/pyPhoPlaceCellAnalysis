@@ -37,6 +37,28 @@ from pyphocorehelpers.gui.Qt.ExceptionPrintingSlot import pyqtExceptionPrintingS
 from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.Mixins.ReprPrintableWidgetMixin import ReprPrintableItemMixin
 
 
+from enum import Enum, auto
+
+class AddedEpochPositionNormalizationMode(Enum):
+    """How the epoch or epochs to be added are positioned when adding."""
+    ABSOLUTE = auto() # the specified positions/heights are absolute and no auto normalization will be performed (compatibility)
+    ADD_HEIGHT = auto() # height will be added to the overall portion of each plot dedicated to display the intervals so that the new intervals fit
+    SCALE_HEIGHT = auto() # height will remain unchanged after adding the new intervals, such that the height of previous intervals will be reduced to prevent overlaps
+
+    def __str__(self):
+        return self.name
+
+    @classmethod
+    def list_values(cls):
+        """Returns a list of all enum values"""
+        return list(cls)
+
+    @classmethod
+    def list_names(cls):
+        """Returns a list of all enum names"""
+        return [e.name for e in cls]
+
+
 
 class RenderedEpochsItemsContainer(iPythonKeyCompletingMixin, DynamicParameters):
     """ Wraps a list of plots and their rendered_rects_item for a given datasource/name
@@ -432,7 +454,11 @@ class EpochRenderingMixin(LiveWindowEventIntervalMonitoringMixin):
         self.add_rendered_intervals(datasource, name=datasource.custom_datasource_name, debug_print=False) # updates the rendered intervals on the change
         
         
-    def add_rendered_intervals(self, interval_datasource: Union[pd.DataFrame, IntervalsDatasource], name=None, child_plots=None, debug_print=False, **vis_kwargs):
+
+    # Render2DEventRectanglesHelper.build_IntervalRectsItem_from_interval_datasource
+    def add_rendered_intervals(self, interval_datasource: Union[pd.DataFrame, IntervalsDatasource], name=None, child_plots=None, debug_print=False, 
+        position_mode: AddedEpochPositionNormalizationMode=AddedEpochPositionNormalizationMode.ABSOLUTE,
+        **vis_kwargs):
         """ adds or updates the intervals specified by the interval_datasource to the plots 
         
         Inputs: 
@@ -444,7 +470,7 @@ class EpochRenderingMixin(LiveWindowEventIntervalMonitoringMixin):
             returned_rect_items: a dictionary of tuples containing the newly created rect items and the plots they were added to.
             
             
-        Uses: 'RectangleRenderTupleHelpers', 'RenderedEpochsItemsContainer', 'IntervalRectsItem', 'self._perform_add_render_item(...)'
+        Uses: 'RectangleRenderTupleHelpers', 'RenderedEpochsItemsContainer', 'IntervalRectsItem', 'self._perform_add_render_item(...)', 'EpochRenderingMixin.compute_bounds_adjustment_for_rect_item'
         
         Example:
             active_pbe_interval_rects_item = Render2DEventRectanglesHelper.build_IntervalRectsItem_from_interval_datasource(interval_datasources.PBEs)
@@ -566,7 +592,8 @@ class EpochRenderingMixin(LiveWindowEventIntervalMonitoringMixin):
                     extant_rect_plot_item.format_item_tooltip_fn = deepcopy(_custom_format_tooltip_for_rect_data)
                     returned_rect_items[a_plot.objectName()] = dict(plot=a_plot, rect_item=extant_rect_plot_item)
                     # Adjust the bounds to fit any children:
-                    EpochRenderingMixin.compute_bounds_adjustment_for_rect_item(a_plot, extant_rect_plot_item)
+                    EpochRenderingMixin.compute_bounds_adjustment_for_rect_item(a_plot, extant_rect_plot_item, position_mode=position_mode)
+
                 else:
                     # New plot, add new item
                     independent_data_copy = RectangleRenderTupleHelpers.copy_data(new_interval_rects_item.data)
@@ -575,13 +602,16 @@ class EpochRenderingMixin(LiveWindowEventIntervalMonitoringMixin):
                     self._perform_add_render_item(a_plot, extant_rects_plot_items_container[a_plot])
                     returned_rect_items[a_plot.objectName()] = dict(plot=a_plot, rect_item=extant_rects_plot_items_container[a_plot])
                     # Adjust the bounds to fit any children:
-                    EpochRenderingMixin.compute_bounds_adjustment_for_rect_item(a_plot, extant_rects_plot_items_container[a_plot])
+                    EpochRenderingMixin.compute_bounds_adjustment_for_rect_item(a_plot, extant_rects_plot_items_container[a_plot], position_mode=position_mode)
                 
+            ## END for a_plot in child_plots....
+
+
                     
         else:
             # Need to create a new RenderedEpochsItemsContainer with the items:
             self.rendered_epochs[name] = RenderedEpochsItemsContainer(new_interval_rects_item, child_plots, format_tooltip_fn=deepcopy(_custom_format_tooltip_for_rect_data)) # set the plot item
-            for a_plot, a_rect_item in self.rendered_epochs[name].items():
+            for a_plot, a_rect_item in self.rendered_epochs[name].items(): ## iterate through the plots now:
                 if not isinstance(a_rect_item, str):
                     if debug_print:
                         print(f'plotting item')
@@ -590,12 +620,13 @@ class EpochRenderingMixin(LiveWindowEventIntervalMonitoringMixin):
                     returned_rect_items[a_plot.objectName()] = dict(plot=a_plot, rect_item=a_rect_item)
                     
                     # Adjust the bounds to fit any children:
-                    EpochRenderingMixin.compute_bounds_adjustment_for_rect_item(a_plot, a_rect_item)
+                    EpochRenderingMixin.compute_bounds_adjustment_for_rect_item(a_plot, a_rect_item, position_mode=position_mode)
+            ## END for a_plot, a_rect_item in self.rende....
 
         if rendered_intervals_list_did_change:
             self.sigRenderedIntervalsListChanged.emit(self) # Emit the intervals list changed signal when a truely new item is added
 
-        return returned_rect_items 
+        return returned_rect_items
 
 
     def remove_rendered_intervals(self, name, child_plots_removal_list=None, debug_print=False):
@@ -1591,7 +1622,7 @@ class EpochRenderingMixin(LiveWindowEventIntervalMonitoringMixin):
     #                                 Class Methods                                #
     # ---------------------------------------------------------------------------- #
     @classmethod
-    def compute_bounds_adjustment_for_rect_item(cls, a_plot, a_rect_item, should_apply_adjustment:bool=True, debug_print=False):
+    def compute_bounds_adjustment_for_rect_item(cls, a_plot, a_rect_item, position_mode: AddedEpochPositionNormalizationMode=AddedEpochPositionNormalizationMode.ABSOLUTE, should_apply_adjustment:bool=True, debug_print=False):
         """ 
         NOTE: 2D Only
         
@@ -1612,29 +1643,46 @@ class EpochRenderingMixin(LiveWindowEventIntervalMonitoringMixin):
             print(f'compute_bounds_adjustment_for_rect_item(a_plot, a_rect_item):')
             print(f'\ta_plot.y: {curr_y_min}, {curr_y_max}')
             
-        new_min_y_range, new_max_y_range = cls.get_added_rect_item_required_y_value(a_rect_item, debug_print=debug_print)
-        if (new_max_y_range > curr_y_max):
-            # needs adjustment
-            adjustment_needed = (new_max_y_range - curr_y_max)
-            if debug_print:
-                print(f'\t needs adjustment: a_rect_item requested new y_max: {new_max_y_range}')
-                    
-        final_y_max = max(new_max_y_range, curr_y_max)
+
+        ## TODO Implement the different interval positioning methods:
+        if position_mode.name == AddedEpochPositionNormalizationMode.ABSOLUTE.name:
+            print(f'ABSOLUTE.')
+            new_min_y_range, new_max_y_range = cls.get_added_rect_item_required_y_value(a_rect_item, debug_print=debug_print)
+            if (new_max_y_range > curr_y_max):
+                # needs adjustment
+                adjustment_needed = (new_max_y_range - curr_y_max)
+                if debug_print:
+                    print(f'\t needs adjustment: a_rect_item requested new y_max: {new_max_y_range}')
+                        
+            final_y_max = max(new_max_y_range, curr_y_max)
+            
+            if (new_min_y_range < curr_y_min):
+                # needs adjustment
+                if adjustment_needed is None:
+                    adjustment_needed = 0
+                adjustment_needed = adjustment_needed + (new_min_y_range - curr_y_min)
+                if debug_print:
+                    print(f'\t needs adjustment: a_rect_item requested new new_min_y_range: {new_min_y_range}')            
+            else:
+                adjusted_y_min_range = new_min_y_range
         
-        if (new_min_y_range < curr_y_min):
-            # needs adjustment
-            if adjustment_needed is None:
-                adjustment_needed = 0
-            adjustment_needed = adjustment_needed + (new_min_y_range - curr_y_min)
-            if debug_print:
-                print(f'\t needs adjustment: a_rect_item requested new new_min_y_range: {new_min_y_range}')            
+            final_y_min = min(new_min_y_range, curr_y_min)
+        
+
+
+
+        elif position_mode.name == AddedEpochPositionNormalizationMode.ADD_HEIGHT.name:
+            print(f'ADD_HEIGHT')
+        elif position_mode.name == AddedEpochPositionNormalizationMode.SCALE_HEIGHT.name:
+            print(f'SCALE_HEIGHT')
         else:
-            adjusted_y_min_range = new_min_y_range
-    
-        final_y_min = min(new_min_y_range, curr_y_min)
-    
+            raise NotImplementedError(f'position_mode: {position_mode} does not match any known enum value: AddedEpochPositionNormalizationMode.list_names(): {AddedEpochPositionNormalizationMode.list_names()}')
+
+
+
         if (adjustment_needed and should_apply_adjustment):
             a_plot.setYRange(final_y_min, final_y_max, padding=0)
+
     
         return adjustment_needed
     
