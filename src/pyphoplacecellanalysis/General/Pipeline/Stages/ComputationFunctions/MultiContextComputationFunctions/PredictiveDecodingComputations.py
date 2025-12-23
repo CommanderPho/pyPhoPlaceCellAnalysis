@@ -107,6 +107,9 @@ class DecodingLocalityMeasures(ComputedResult): #PickleSerializableMixin, AttrsB
     # Generic dict to store all computed measures - allows easy extension without adding new fields
     locality_measures_dict_dict: Dict[str, Dict[str, Any]] = serialized_field(default=Factory(dict), is_computable=True)
     
+    debugging_dict_dict: Dict[str, Dict[str, Any]] = serialized_field(default=Factory(dict), is_computable=True)
+
+    
     locality_measures_df: pd.DataFrame = serialized_field(default=None, is_computable=True, init=False)
 
     non_local_PBE_non_moving_epochs_df: pd.DataFrame = serialized_field(default=None, is_computable=True)
@@ -295,7 +298,7 @@ class DecodingLocalityMeasures(ComputedResult): #PickleSerializableMixin, AttrsB
     # Locality Computations                                                                                                                                                                                                                                                                #
     # ==================================================================================================================================================================================================================================================================================== #
     @function_attributes(short_name=None, tags=['compute', 'MAIN', 'locality'], input_requires=[], output_provides=[], uses=['.rebuild_locality_measures_df'], used_by=['.compute'], creation_date='2025-12-15 06:54', related_items=[])
-    def compute_locality_measures(self):
+    def compute_locality_measures(self, enable_debug_outputs: bool=True):
         """ computes all required locality measures
 
         Normalize and convolve each new_position 2D point (x, y) with a fixed width 2D gaussian
@@ -565,12 +568,14 @@ class DecodingLocalityMeasures(ComputedResult): #PickleSerializableMixin, AttrsB
         ## INPUTS: gaussian_volume
         self.locality_measures_dict_dict = {}
         self.moving_avg_meas_pos_overlap_dict = {}
-
+        self.debugging_dict_dict = {}
+        
         # for an_epoch_idx, (an_epoch_name, a_plotter) in enumerate(sync_plotters.items()):
         for an_epoch_idx, an_epoch_name in enumerate(self.epoch_names):
             ## "epoch" in the loop variables refers to only the session.paradigm epochs, like ['roam', 'sprinkle']
             self.locality_measures_dict_dict[an_epoch_name] = {} ## empty
-
+            self.debugging_dict_dict[an_epoch_name] = {}
+            
             a_p_x_given_n = self.p_x_given_n_dict[an_epoch_name]
 
             ## compute the locality:
@@ -590,6 +595,9 @@ class DecodingLocalityMeasures(ComputedResult): #PickleSerializableMixin, AttrsB
             ## above a certain promence ideally:
             min_val_epsilon: float = 1e-9 ## Oh dang this is kinda tiny
             is_high_prob_mask = (a_p_x_given_n > min_val_epsilon)
+            # if enable_debug_outputs:
+            #     self.debugging_dict_dict[an_epoch_name]['mask_overlap_masks'] = is_high_prob_mask            
+
             self.locality_measures_dict_dict[an_epoch_name][a_computation_measure_name] = ((self.gaussian_volume * is_high_prob_mask) > min_val_epsilon).astype(int) ## the "overlap" is computed by taking the elementwise dot-product with the moving average
 
             a_computation_measure_name: str = 'peak_prom'
@@ -600,6 +608,10 @@ class DecodingLocalityMeasures(ComputedResult): #PickleSerializableMixin, AttrsB
             epoch_masks = np.stack(epoch_masks, axis=-1) # (5, 41, 63) - (n_t_bins, n_x_bins, n_y_bins)
             assert np.shape(epoch_masks) == np.shape(a_p_x_given_n)
             is_high_prob_mask = epoch_masks
+            if enable_debug_outputs:
+                self.debugging_dict_dict[an_epoch_name]['peak_prom_masks'] = epoch_masks
+                # self.debugging_dict_dict[an_epoch_name]['peak_prom_product'] = epoch_masks
+                
             self.locality_measures_dict_dict[an_epoch_name][a_computation_measure_name] = ((self.gaussian_volume * is_high_prob_mask) > min_val_epsilon).astype(int) ## the "overlap" is computed by taking the elementwise dot-product with the moving average
             # self.locality_measures_dict_dict[an_epoch_name][f"{a_computation_measure_name}_score"] = [(np.nansum(np.stack(an_epoch_mask, axis=-1), axis=(0, 1))/self.n_total_pos_bins) for an_epoch_idx, an_epoch_mask in enumerate(all_epochs_masks)]
             self.locality_measures_dict_dict[an_epoch_name][f"{a_computation_measure_name}_num_bins"] = np.nansum(epoch_masks, axis=(0, 1))
