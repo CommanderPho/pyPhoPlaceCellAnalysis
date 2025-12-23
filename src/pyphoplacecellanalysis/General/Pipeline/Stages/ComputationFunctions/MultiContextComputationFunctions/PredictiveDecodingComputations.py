@@ -1748,7 +1748,7 @@ class PredictiveDecodingComputationsContainer(ComputedResult):
 
     @function_attributes(short_name=None, tags=['PENDING', 'IN-PROCESS', '2025-12-20_future_and_past_analysis'], input_requires=[], output_provides=[], uses=['decode_specific_epochs'], used_by=[], creation_date='2025-12-19 14:28', related_items=[])
     def compute_future_and_past_analysis(self, curr_active_pipeline, an_epoch_name:str = 'roam', decoding_time_bin_size=0.025, top_v_percent: float = 0.1, 
-                                        merging_adjacent_max_separation_sec: float = 0.5, minimum_epoch_duration: float = 0.05, ## for merging detected future/past position dataframes
+                                        merging_adjacent_max_separation_sec: float = 0.5, minimum_epoch_duration: float = 0.050, ## for merging detected future/past position dataframes
                                         ):
         """ computes the times that 
         
@@ -1773,11 +1773,10 @@ class PredictiveDecodingComputationsContainer(ComputedResult):
         
         ## Get the non-local epochs -- where do they encode?
         # container: PredictiveDecodingComputationsContainer = curr_active_pipeline.global_computation_results.computed_data['PredictiveDecoding']
-        container = self
-        if (container.decoding_locality is None) and (container.predictive_decoding is not None):
-            container.decoding_locality = container.predictive_decoding.locality_measures
+        if (self.decoding_locality is None) and (self.predictive_decoding is not None):
+            self.decoding_locality = self.predictive_decoding.locality_measures
 
-        decoding_locality: DecodingLocalityMeasures = container.decoding_locality
+        decoding_locality: DecodingLocalityMeasures = self.decoding_locality
         
         non_local_PBE_non_moving_epochs_df: pd.DataFrame = decoding_locality.get_non_moving_PBE_non_local_epochs(curr_active_pipeline.sess, merging_adjacent_max_separation_sec=merging_adjacent_max_separation_sec)
         # non_local_PBE_non_moving_epochs_df: pd.DataFrame = container.decoding_locality.non_local_PBE_non_moving_epochs_df
@@ -1791,9 +1790,9 @@ class PredictiveDecodingComputationsContainer(ComputedResult):
         # measured_positions_df
 
         ## add the final detected non_local_pbe_epoch indicies to the decoded points:
-        decoding_locality.non_local_PBE_non_moving_epochs_df['label'] = decoding_locality.non_local_PBE_non_moving_epochs_df['label'].astype(int)
+        non_local_PBE_non_moving_epochs_df['label'] = non_local_PBE_non_moving_epochs_df['label'].astype(int)
         _out_locality_measures_df = deepcopy(decoding_locality.locality_measures_df)
-        _out_locality_measures_df = _out_locality_measures_df.time_point_event.adding_epochs_identity_column(epochs_df=decoding_locality.non_local_PBE_non_moving_epochs_df, epoch_id_key_name='non_local_PBE_non_moving_epoch', override_time_variable_name='t',
+        _out_locality_measures_df = _out_locality_measures_df.time_point_event.adding_epochs_identity_column(epochs_df=non_local_PBE_non_moving_epochs_df, epoch_id_key_name='non_local_PBE_non_moving_epoch', override_time_variable_name='t',
                                                             # epoch_label_column_name='label', no_interval_fill_value=np.nan,
                                                             epoch_label_column_name='label', no_interval_fill_value=-1,
                                                             should_replace_existing_column=True, drop_non_epoch_events=True,
@@ -1802,9 +1801,9 @@ class PredictiveDecodingComputationsContainer(ComputedResult):
         # _out_locality_measures_df.dropna(how='any', subset=['non_local_PBE_non_moving_epoch'])
 
         epoch_times = decoding_locality.locality_measures_df['t'].to_numpy()
-        time_to_idx_map = EpochHelpers.find_epoch_times_to_data_indicies_map(decoding_locality.non_local_PBE_non_moving_epochs_df, epoch_times)
+        time_to_idx_map = EpochHelpers.find_epoch_times_to_data_indicies_map(non_local_PBE_non_moving_epochs_df, epoch_times)
         # _out
-        non_local_PBE_non_moving_epochs_df: pd.DataFrame = decoding_locality.non_local_PBE_non_moving_epochs_df
+        non_local_PBE_non_moving_epochs_df: pd.DataFrame = non_local_PBE_non_moving_epochs_df
         non_local_PBE_non_moving_epochs_df['start_idx'] = non_local_PBE_non_moving_epochs_df['start'].map(time_to_idx_map)
         non_local_PBE_non_moving_epochs_df['stop_idx'] = non_local_PBE_non_moving_epochs_df['stop'].map(time_to_idx_map)
         # matching_epoch_times_slice
@@ -1812,27 +1811,27 @@ class PredictiveDecodingComputationsContainer(ComputedResult):
 
 
         # Get the decoders to decode the epochs with higher precision ________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
-        directional_decoders_decode_result = curr_active_pipeline.global_computation_results.computed_data['DirectionalDecodersDecoded']
-        
-        assert directional_decoders_decode_result is not None
-        
-        self.pf1D_Decoder_dict = deepcopy(directional_decoders_decode_result.pf1D_Decoder_dict) ## copy the independent decoders
+
         if decoding_time_bin_size not in self.epochs_decoded_result_cache_dict:
             self.epochs_decoded_result_cache_dict[decoding_time_bin_size] = {} ## make the new dict for this time bin size
         
+
         ## INPUTS: container, directional_decoders_decode_result
         ## decode each epoch at a small time bin size:
-        # for an_epoch_name, a_decoder in self.pf1D_Decoder_dict.items():
-        a_decoder: BayesianPlacemapPositionDecoder = directional_decoders_decode_result.pf1D_Decoder_dict[an_epoch_name]
-        
+        a_decoder: BayesianPlacemapPositionDecoder = self.pf1D_Decoder_dict.get(an_epoch_name, None)
+        if a_decoder is None:
+            directional_decoders_decode_result = curr_active_pipeline.global_computation_results.computed_data['DirectionalDecodersDecoded']            
+            assert directional_decoders_decode_result is not None
+            self.pf1D_Decoder_dict = deepcopy(directional_decoders_decode_result.pf1D_Decoder_dict) ## copy the independent decoders
+            a_decoder = directional_decoders_decode_result.pf1D_Decoder_dict[an_epoch_name]
+    
         decoded_local_epochs_result = self.epochs_decoded_result_cache_dict[decoding_time_bin_size].get(an_epoch_name, None)
         if decoded_local_epochs_result is None:
             ## if we can't find a pre-computed one:    
-            decoded_local_epochs_result: DecodedFilterEpochsResult = a_decoder.decode_specific_epochs(spikes_df=curr_active_pipeline.sess.spikes_df, filter_epochs=non_local_PBE_non_moving_epochs_df, decoding_time_bin_size=decoding_time_bin_size)
+            decoded_local_epochs_result: DecodedFilterEpochsResult = a_decoder.decode_specific_epochs(spikes_df=deepcopy(curr_active_pipeline.sess.spikes_df), filter_epochs=non_local_PBE_non_moving_epochs_df, decoding_time_bin_size=decoding_time_bin_size)
             self.epochs_decoded_result_cache_dict[decoding_time_bin_size][an_epoch_name] = decoded_local_epochs_result
 
         print(f'done with all decoding.')
-
 
         epoch_high_prob_pos_masks = []
         epoch_matching_positions = []
@@ -1879,8 +1878,27 @@ class PredictiveDecodingComputationsContainer(ComputedResult):
             any_t_Bin_high_prob_pos_mask = np.any(is_high_prob_mask, axis=-1) ## mask for high prob positions during the epoch
             epoch_high_prob_pos_masks.append(any_t_Bin_high_prob_pos_mask)
 
-            pos_matches_epoch_mask = np.where([any_t_Bin_high_prob_pos_mask[(a_pos.binned_x-1), (a_pos.binned_y-1)] for a_pos in measured_positions_df.itertuples()])[0]
-            relevant_positions_df: pd.DataFrame = measured_positions_df.iloc[pos_matches_epoch_mask]
+            # pos_matches_epoch_mask = np.where([any_t_Bin_high_prob_pos_mask[(a_pos.binned_x-1), (a_pos.binned_y-1)] for a_pos in measured_positions_df.itertuples()])[0]
+
+            # Check if bins are 0-indexed or 1-indexed, handle NaNs, and add bounds checking
+            valid_mask = []
+            for a_pos in measured_positions_df.itertuples():
+                if pd.isna(a_pos.binned_x) or pd.isna(a_pos.binned_y):
+                    valid_mask.append(False)
+                    continue
+                # Determine if 0-indexed or 1-indexed (check if max value equals array size)
+                x_idx = int(a_pos.binned_x) - 1 if a_pos.binned_x > 0 else int(a_pos.binned_x)
+                y_idx = int(a_pos.binned_y) - 1 if a_pos.binned_y > 0 else int(a_pos.binned_y)
+                # Bounds check
+                if (0 <= x_idx < any_t_Bin_high_prob_pos_mask.shape[0] and 
+                    0 <= y_idx < any_t_Bin_high_prob_pos_mask.shape[1]):
+                    valid_mask.append(any_t_Bin_high_prob_pos_mask[x_idx, y_idx])
+                else:
+                    valid_mask.append(False)
+            pos_matches_epoch_mask = np.where(valid_mask)[0]
+
+
+            relevant_positions_df: pd.DataFrame = measured_positions_df.iloc[pos_matches_epoch_mask].copy()
             is_relevant_past_times = (relevant_positions_df['t'] < curr_epoch_start_t)
             is_relevant_future_times = (relevant_positions_df['t'] > curr_epoch_stop_t)
             relevant_positions_df['is_future_present_past'] = 'present'
@@ -2134,8 +2152,8 @@ class PredictiveDecodingComputationsGlobalComputationFunctions(AllFunctionEnumer
         # Store the PredictiveDecoding instance in the container
         global_computation_results.computed_data['PredictiveDecoding'].predictive_decoding = _obj
         
-        epoch_high_prob_pos_masks, epoch_matching_positions, past_future_info_dict, matching_pos_dfs_list, matching_pos_epochs_dfs_list = global_computation_results.computed_data['PredictiveDecoding'].compute_future_and_past_analysis(owning_pipeline_reference, an_epoch_name='roam')
-
+        _out = global_computation_results.computed_data['PredictiveDecoding'].compute_future_and_past_analysis(owning_pipeline_reference, an_epoch_name='roam')
+        # epoch_high_prob_pos_masks, epoch_matching_positions, past_future_info_dict, matching_pos_dfs_list, matching_pos_epochs_dfs_list
 
         """ Usage:
         
