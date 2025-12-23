@@ -112,6 +112,11 @@ class DecodingLocalityMeasures(ComputedResult): #PickleSerializableMixin, AttrsB
     non_local_PBE_non_moving_epochs_df: pd.DataFrame = serialized_field(default=None, is_computable=True)
     
 
+    @property
+    def n_total_pos_bins(self) -> int:
+        """The n_total_pos_bins property."""
+        return int(len(self.xbin_centers) * len(self.ybin_centers))
+
 
 
     def __attrs_post_init__(self):
@@ -303,6 +308,7 @@ class DecodingLocalityMeasures(ComputedResult): #PickleSerializableMixin, AttrsB
         from scipy.spatial.distance import cdist
         from scipy.optimize import linear_sum_assignment
         from scipy.ndimage import center_of_mass
+        from pyphoplacecellanalysis.External.peak_prominence2d import PeakPromenence
 
         def _subfn_calculate_spatial_emd(Xs, Xt):
             """
@@ -586,12 +592,19 @@ class DecodingLocalityMeasures(ComputedResult): #PickleSerializableMixin, AttrsB
             is_high_prob_mask = (a_p_x_given_n > min_val_epsilon)
             self.locality_measures_dict_dict[an_epoch_name][a_computation_measure_name] = ((self.gaussian_volume * is_high_prob_mask) > min_val_epsilon).astype(int) ## the "overlap" is computed by taking the elementwise dot-product with the moving average
 
-            # a_computation_measure_name: str = 'peak_prom'
-            # print(f'\tcomputing: "{a_computation_measure_name}"...')
-            # ## above a certain promence ideally:
-            # min_val_epsilon: float = 1e-9
-            # is_high_prob_mask = (a_p_x_given_n > min_val_epsilon)
-            # self.locality_measures_dict_dict[an_epoch_name][a_computation_measure_name] = ((self.gaussian_volume * is_high_prob_mask) > min_val_epsilon).astype(int) ## the "overlap" is computed by taking the elementwise dot-product with the moving average
+            a_computation_measure_name: str = 'peak_prom'
+            print(f'\tcomputing: "{a_computation_measure_name}"...')
+            ## above a certain promence ideally:
+            alpha: float = 0.8 # above 85% of the peak height of the centeral peak
+            epoch_promenences, epoch_masks = PeakPromenence.compute_2d_dt_posterior_peak_promenences(a_p_x_given_n=a_p_x_given_n, alpha=alpha)
+            epoch_masks = np.stack(epoch_masks, axis=-1) # (5, 41, 63) - (n_t_bins, n_x_bins, n_y_bins)
+            assert np.shape(epoch_masks) == np.shape(a_p_x_given_n)
+            is_high_prob_mask = epoch_masks
+            self.locality_measures_dict_dict[an_epoch_name][a_computation_measure_name] = ((self.gaussian_volume * is_high_prob_mask) > min_val_epsilon).astype(int) ## the "overlap" is computed by taking the elementwise dot-product with the moving average
+            # self.locality_measures_dict_dict[an_epoch_name][f"{a_computation_measure_name}_score"] = [(np.nansum(np.stack(an_epoch_mask, axis=-1), axis=(0, 1))/self.n_total_pos_bins) for an_epoch_idx, an_epoch_mask in enumerate(all_epochs_masks)]
+            self.locality_measures_dict_dict[an_epoch_name][f"{a_computation_measure_name}_num_bins"] = np.nansum(epoch_masks, axis=(0, 1))
+            self.locality_measures_dict_dict[an_epoch_name][f"{a_computation_measure_name}_score"] = (np.nansum(epoch_masks, axis=(0, 1))/float(self.n_total_pos_bins))
+
 
 
             a_computation_measure_name: str = 'dist_to_highest_peak'
@@ -650,6 +663,9 @@ class DecodingLocalityMeasures(ComputedResult): #PickleSerializableMixin, AttrsB
                 if a_computation_measure_name == 'mask_overlap':
                     total_num_possible_bins: int = len(self.xbin_centers) * len(self.ybin_centers)
                     vv = np.nansum(vv, (0, 1)) / total_num_possible_bins
+                if a_computation_measure_name == 'peak_prom':                    
+                    continue ## skip
+                
                 _out_locality_measures_df[f"{a_computation_measure_name}_{an_epoch_name}"] = vv # _obj.locality_measures_dict_dict[an_epoch_name][a_computation_measure_name]
 
 

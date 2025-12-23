@@ -28,11 +28,20 @@ Update time: 2018-11-10 16:03:49.
 
 
 #--------Import modules-------------------------
+from typing import Dict, List, Tuple, Optional, Callable, Union, Any
+import nptyping as ND
+from nptyping import NDArray
 import numpy as np
+
 from matplotlib.transforms import Bbox
 from matplotlib.path import Path
 import matplotlib.pyplot as plt
 from scipy.interpolate import interp1d
+from warnings import warn
+from pyphocorehelpers.programming_helpers import metadata_attributes
+from pyphocorehelpers.function_helpers import function_attributes
+
+
 
 def isClosed(xs,ys):
     if np.alltrue([np.allclose(xs[0],xs[-1]),\
@@ -504,6 +513,8 @@ def compute_prominence_contours(xbin_centers, ybin_centers, slab, step=0.1, min_
 
 
 from pyphocorehelpers.DataStructure.dynamic_parameters import DynamicParameters
+from scipy import ndimage # used for `PeakPromenence.compute_2d_peak_prominence`
+from skimage.morphology import reconstruction # used for `PeakPromenence.compute_2d_peak_prominence`
 
 
 class PeakPromenence:
@@ -804,190 +815,244 @@ class PeakPromenence:
 
     @classmethod
     def _perform_find_posterior_peaks_peak_prominence2d_computation(cls, p_x_given_n_list, xbin_centers, ybin_centers, step=0.01, peak_height_multiplier_probe_levels=(0.5, 0.9), minimum_included_peak_height = 0.2, uniform_blur_size = 3, gaussian_blur_sigma = 3, debug_print=False):
-            """ Uses the peak_prominence2d package to find the peaks and promenences of 2D placefields
-            
-            Independent of the other peak-computing computation functions above
-            
+            """Uses the peak_prominence2d package to find the peaks and prominences of 2D decoded posteriors.
+
+            This is analogous to `_perform_pf_find_ratemap_peaks_peak_prominence2d_computation`, but operates on
+            decoded posterior probability distributions instead of placefield tuning curves.
+
             Inputs:
-                peak_height_multiplier_probe_levels = (0.5, 0.9) # 50% and 90% of the peak height
-                gaussian_blur_sigma: input to gaussian_filter for blur of peak counts
-                uniform_blur_size: inputt to uniform_filter for blur of peak counts
-                
-                
-            Requires:
-                computed_data['pf2D']
-                
-            Provides:
-                computed_data['RatemapPeaksAnalysis']['PeakProminence2D']:
-                    computed_data['RatemapPeaksAnalysis']['PeakProminence2D']['xx']:
-                    computed_data['RatemapPeaksAnalysis']['PeakProminence2D']['yy']:
-                    computed_data['RatemapPeaksAnalysis']['PeakProminence2D']['neuron_extended_ids']
-                    
-                    
-                    computed_data['RatemapPeaksAnalysis']['PeakProminence2D']['result_tuples']: (slab, peaks, idmap, promap, parentmap)
-                    
-                    flat_peaks_df
-                    filtered_flat_peaks_df
-                    
-                    peak_counts
-                        raw
-                        uniform_blurred
-                        gaussian_blurred
-                    
+                p_x_given_n_list: list of per-epoch posterior arrays. Each element should be either:
+                    - 3D: (n_xbins, n_ybins, n_time_bins) or
+                    - 2D: (n_xbins, n_ybins) for single-time-bin epochs.
+                xbin_centers, ybin_centers: spatial bin centers for the posterior grid.
+                peak_height_multiplier_probe_levels: slice levels as fractions of peak height (e.g., (0.5, 0.9)).
+                minimum_included_peak_height: threshold applied to the `peak_height` column when filtering.
+
+            Returns:
+                DynamicParameters with fields:
+                    xx, yy: xbin_centers, ybin_centers
+                    results: dict keyed by (epoch_idx, time_bin_idx) with per-slab peak results:
+                        {'peaks': peaks_dict, 'slab': slab, 'id_map': id_map,
+                         'prominence_map': prominence_map, 'parent_map': parent_map}
+                    flat_peaks_df: concatenated DataFrame of all peaks across epochs/time-bins
+                    filtered_flat_peaks_df: filtered subset used for peak-count maps
+                    peak_counts: DynamicParameters(raw=..., uniform_blurred=..., gaussian_blurred=...)
+
+            Usage (example):
+                >>> decoded_epochs_result = some_decoder_result  # has .p_x_given_n_list
+                >>> xbin_centers = decoded_epochs_result.xbin_centers
+                >>> ybin_centers = decoded_epochs_result.ybin_centers
+                >>> posterior_peaks = PeakPromenence._perform_find_posterior_peaks_peak_prominence2d_computation(
+                ...     decoded_epochs_result.p_x_given_n_list,
+                ...     xbin_centers,
+                ...     ybin_centers,
+                ...     step=0.02,
+                ...     peak_height_multiplier_probe_levels=(0.5, 0.9),
+                ...     minimum_included_peak_height=0.2,
+                ...     uniform_blur_size=3,
+                ...     gaussian_blur_sigma=3,
+                ...     debug_print=False)
+                >>> posterior_peaks.flat_peaks_df.head()
             """
+            from neuropy.utils.mixins.binning_helpers import build_df_discretized_binned_position_columns
+            from scipy.ndimage.filters import uniform_filter, gaussian_filter
+            import pandas as pd
+
             n_epochs = len(p_x_given_n_list)
-            
-            ## TODO: change to amap with keys of active_pf_2D.neuron_ids
-            
-            # active_tuning_curves = active_pf_2D.ratemap.tuning_curves # Raw Tuning Curves
-            active_tuning_curves = active_pf_2D.ratemap.unit_max_tuning_curves # Unit-max scaled tuning curves
-            # tuning_curve_peak_firing_rates = active_pf_2D.ratemap.tuning_curve_peak_firing_rates # the peak firing rates of each tuning curve
-            tuning_curve_peak_firing_rates = active_pf_2D.ratemap.tuning_curve_unsmoothed_peak_firing_rates
-             
+
             #  Build the results:
             out_results = {}
-            out_cell_peak_dfs_list = []
+            out_posteriors_peak_dfs_list = []
             n_slices = len(peak_height_multiplier_probe_levels)
 
+            # infer edges from centers for later binning (xbin, ybin)
+            xbin_centers = np.asarray(xbin_centers)
+            ybin_centers = np.asarray(ybin_centers)
+            if xbin_centers.ndim != 1 or ybin_centers.ndim != 1:
+                raise ValueError('xbin_centers and ybin_centers must be 1D arrays.')
+            if len(xbin_centers) < 2 or len(ybin_centers) < 2:
+                raise ValueError('xbin_centers and ybin_centers must each have length >= 2.')
+
+            x_edges = np.concatenate(([xbin_centers[0] - (xbin_centers[1] - xbin_centers[0]) / 2.0],
+                                      (xbin_centers[:-1] + xbin_centers[1:]) / 2.0,
+                                      [xbin_centers[-1] + (xbin_centers[-1] - xbin_centers[-2]) / 2.0]))
+            y_edges = np.concatenate(([ybin_centers[0] - (ybin_centers[1] - ybin_centers[0]) / 2.0],
+                                      (ybin_centers[:-1] + ybin_centers[1:]) / 2.0,
+                                      [ybin_centers[-1] + (ybin_centers[-1] - ybin_centers[-2]) / 2.0]))
+
             for epoch_idx in np.arange(n_epochs):
-                p_x_given_n = p_x_given_n_list[epoch_idx]
+                p_x_given_n = np.asarray(p_x_given_n_list[epoch_idx])
 
-                a_p_x_given_n = np.squeeze(p_x_given_n[:, :, a_t_bin_idx])
+                if p_x_given_n.ndim == 2:
+                    # (n_xbins, n_ybins) => add singleton time dimension
+                    p_x_given_n = p_x_given_n[:, :, np.newaxis]
+                elif p_x_given_n.ndim != 3:
+                    raise ValueError(f'p_x_given_n for epoch {epoch_idx} must be 2D or 3D, got shape {p_x_given_n.shape}')
 
-                slab = a_p_x_given_n.T
-                _, _, slab, a_t_bin_peaks_dict, id_map, prominence_map, parent_map = compute_prominence_contours(xbin_centers=xbin_centers, ybin_centers=ybin_centers, slab=slab, step=step, min_area=None, min_depth=0.2, include_edge=True, verbose=False)
-                #""" Analyze all peaks of a given cell/ratemap """
-                n_peaks = len(a_t_bin_peaks_dict)
-                
-                ## Neuron:
-                n_total_cell_slice_results = n_slices * n_peaks                
-                neuron_id_arr = np.full((n_total_cell_slice_results,), neuron_id) # repeat the neuron_id many times for the datatable
-                neuron_peak_curve_rate_arr = np.full((n_total_cell_slice_results,), neuron_tuning_curve_peak_firing_rate) # repeat the neuron_id many times for the datatable
-                
-                ## Peak
-                summit_slice_peak_id_arr = np.zeros((n_peaks, n_slices), dtype=np.int16) # same summit/peak id for all in the slice
-                summit_slice_peak_level_multiplier_arr = np.zeros((n_peaks, n_slices), dtype=float) # same summit/peak id for all in the slice
-                summit_slice_peak_level_arr = np.zeros((n_peaks, n_slices), dtype=float) # same summit/peak id for all in the slice
-                summit_slice_peak_height_arr = np.zeros((n_peaks, n_slices), dtype=float) # same summit/peak id for all in the slice
-                summit_slice_peak_prominence_arr = np.zeros((n_peaks, n_slices), dtype=float) # same summit/peak id for all in the slice
-                summit_peak_center_x_arr = np.zeros((n_peaks, n_slices), dtype=float)
-                summit_peak_center_y_arr = np.zeros((n_peaks, n_slices), dtype=float)
-                
-                ## Slice
-                summit_slice_idx_arr = np.tile(np.arange(n_slices), n_peaks).astype('int') # array([0, 1, 0, 1, 0, 1, 0, 1, 0, 1])
-                summit_slice_x_side_length_arr = np.zeros((n_peaks, n_slices), dtype=float)
-                summit_slice_y_side_length_arr = np.zeros((n_peaks, n_slices), dtype=float)
-                summit_slice_center_x_arr = np.zeros((n_peaks, n_slices), dtype=float)
-                summit_slice_center_y_arr = np.zeros((n_peaks, n_slices), dtype=float)
+                n_xbins, n_ybins, n_time_bins = p_x_given_n.shape
+                if (n_xbins != len(xbin_centers)) or (n_ybins != len(ybin_centers)):
+                    raise ValueError(f'epoch {epoch_idx}: posterior shape {(n_xbins, n_ybins)} does not match x/y bin centers '
+                                     f'({len(xbin_centers)}, {len(ybin_centers)})')
 
-                for peak_idx, (peak_id, a_peak_dict) in enumerate(a_t_bin_peaks_dict.items()):
+                for t_idx in np.arange(n_time_bins):
+                    a_p_x_given_n = np.squeeze(p_x_given_n[:, :, t_idx])
+                    slab = a_p_x_given_n.T  # match compute_prominence_contours convention
+
+                    _, _, slab, peaks_dict, id_map, prominence_map, parent_map = compute_prominence_contours(
+                        xbin_centers=xbin_centers, ybin_centers=ybin_centers, slab=slab, step=step,
+                        min_area=None, min_depth=0.2, include_edge=True, verbose=False)
+
+                    n_peaks = len(peaks_dict)
+                    if n_peaks == 0:
+                        # nothing to record for this (epoch, t_idx)
+                        continue
+
+                    # arrays sized per peak and per slice level
+                    n_total_cell_slice_results = n_slices * n_peaks
+
+                    # Peak
+                    summit_slice_peak_id_arr = np.zeros((n_peaks, n_slices), dtype=np.int16)
+                    summit_slice_peak_level_multiplier_arr = np.zeros((n_peaks, n_slices), dtype=float)
+                    summit_slice_peak_level_arr = np.zeros((n_peaks, n_slices), dtype=float)
+                    summit_slice_peak_height_arr = np.zeros((n_peaks, n_slices), dtype=float)
+                    summit_slice_peak_prominence_arr = np.zeros((n_peaks, n_slices), dtype=float)
+                    summit_peak_center_x_arr = np.zeros((n_peaks, n_slices), dtype=float)
+                    summit_peak_center_y_arr = np.zeros((n_peaks, n_slices), dtype=float)
+
+                    # Slice geometry
+                    summit_slice_idx_arr = np.tile(np.arange(n_slices), n_peaks).astype('int')
+                    summit_slice_x_side_length_arr = np.zeros((n_peaks, n_slices), dtype=float)
+                    summit_slice_y_side_length_arr = np.zeros((n_peaks, n_slices), dtype=float)
+                    summit_slice_center_x_arr = np.zeros((n_peaks, n_slices), dtype=float)
+                    summit_slice_center_y_arr = np.zeros((n_peaks, n_slices), dtype=float)
+
+                    for peak_idx, (peak_id, a_peak_dict) in enumerate(peaks_dict.items()):
+                        if debug_print:
+                            print(f'computing contours for epoch[{epoch_idx}], t[{t_idx}], peak_id: {peak_id}...')
+
+                        summit_slice_peak_height_arr[peak_idx, :] = a_peak_dict['height']
+                        summit_slice_peak_prominence_arr[peak_idx, :] = a_peak_dict['prominence']
+                        summit_peak_center_x_arr[peak_idx, :] = a_peak_dict['center'][0]
+                        summit_peak_center_y_arr[peak_idx, :] = a_peak_dict['center'][1]
+
+                        # probe levels for this peak
+                        a_peak_dict['probe_levels'] = np.array(
+                            [a_peak_dict['height'] * multiplier for multiplier in peak_height_multiplier_probe_levels],
+                            dtype=float)
+                        summit_slice_peak_level_multiplier_arr[peak_idx, :] = np.array(
+                            peak_height_multiplier_probe_levels, dtype=float)
+                        summit_slice_peak_level_arr[peak_idx, :] = a_peak_dict['probe_levels']
+
+                        included_computed_contours = PeakPromenence._find_contours_at_levels(xbin_centers, ybin_centers, slab, a_peak_dict['center'], a_peak_dict['probe_levels'])
+
+                        # Build the dict that contains the output level slices
+                        a_peak_dict['level_slices'] = {
+                            probe_lvl: {'contour': contour,
+                                        'bbox': contour.get_extents(),
+                                        'size': contour.get_extents().size}
+                            for probe_lvl, contour in included_computed_contours.items()
+                            if (contour is not None)
+                        }
+
+                        if debug_print:
+                            print(f"probe_levels: {a_peak_dict['probe_levels']}")
+
+                        # Build flat output:
+                        for lvl_idx, probe_lvl in enumerate(a_peak_dict['probe_levels']):
+                            a_slice = a_peak_dict['level_slices'].get(probe_lvl, None)
+                            if a_slice is None:
+                                print('WARNING: a_slice is None in posterior prominence computation; skipping this slice.')
+                            else:
+                                slice_bbox = a_slice['bbox']
+                                (x0, y0, width, height) = slice_bbox.bounds
+                                summit_slice_peak_id_arr[peak_idx, lvl_idx] = peak_id
+                                summit_slice_x_side_length_arr[peak_idx, lvl_idx] = width
+                                summit_slice_y_side_length_arr[peak_idx, lvl_idx] = height
+                                summit_slice_center_x_arr[peak_idx, lvl_idx] = float(x0) + (0.5 * float(width))
+                                summit_slice_center_y_arr[peak_idx, lvl_idx] = float(y0) + (0.5 * float(height))
+                    ## END for peak_idx, (peak_id, a_pe...
+
                     if debug_print:
-                        print(f'computing contours for peak_id: {peak_id}...')                    
-                    summit_slice_peak_height_arr[peak_idx, :] = a_peak_dict['height']
-                    summit_slice_peak_prominence_arr[peak_idx, :] = a_peak_dict['prominence']
-                    summit_peak_center_x_arr[peak_idx, :] = a_peak_dict['center'][0]
-                    summit_peak_center_y_arr[peak_idx, :] = a_peak_dict['center'][1]
-                    
-                    ## This is where we would loop through each desired slice/probe levels:
-                    a_peak_dict['probe_levels'] = np.array([a_peak_dict['height']*multiplier for multiplier in peak_height_multiplier_probe_levels]).astype('float') # specific probe levels
-                    summit_slice_peak_level_multiplier_arr[peak_idx, :] = np.array(peak_height_multiplier_probe_levels).astype('float')
-                    summit_slice_peak_level_arr[peak_idx, :] = a_peak_dict['probe_levels']
-                    included_computed_contours = PeakPromenence._find_contours_at_levels(xbin_centers, ybin_centers, slab, a_peak_dict['center'], a_peak_dict['probe_levels']) # DONE: efficiency: This would be more efficient to do for all peaks at once I believe. CONCLUSION: No, this needs to be done separately for each peak as they each have separate prominences which determine the levels they should be sliced at.
-                    ## Build the dict that contains the output level slices
-                    a_peak_dict['level_slices'] = {probe_lvl:{'contour':contour, 'bbox':contour.get_extents(), 'size':contour.get_extents().size} for probe_lvl, contour in included_computed_contours.items() if (contour is not None)} # if contour is None, it looks like the 'build flat output' step fails below
+                        print(f'building peak_df for epoch[{epoch_idx}], t[{t_idx}] with {n_peaks} peaks...')
+
+                    # For posteriors, use a simple peak_height definition identical to peak_relative_height:
+                    peak_relative_height_flat = summit_slice_peak_height_arr.flatten()
+
+                    posterior_peaks_df = pd.DataFrame({
+                        'epoch_idx': np.full((n_total_cell_slice_results,), epoch_idx, dtype=int),
+                        'time_bin_idx': np.full((n_total_cell_slice_results,), t_idx, dtype=int),
+                        'summit_idx': summit_slice_peak_id_arr.flatten(),
+                        'summit_slice_idx': summit_slice_idx_arr.flatten(),
+                        'slice_level_multiplier': summit_slice_peak_level_multiplier_arr.flatten(),
+                        'summit_slice_level': summit_slice_peak_level_arr.flatten(),
+                        'peak_relative_height': peak_relative_height_flat,
+                        'peak_prominence': summit_slice_peak_prominence_arr.flatten(),
+                        'peak_center_x': summit_peak_center_x_arr.flatten(),
+                        'peak_center_y': summit_peak_center_y_arr.flatten(),
+                        'summit_slice_x_width': summit_slice_x_side_length_arr.flatten(),
+                        'summit_slice_y_width': summit_slice_y_side_length_arr.flatten(),
+                        'summit_slice_center_x': summit_slice_center_x_arr.flatten(),
+                        'summit_slice_center_y': summit_slice_center_y_arr.flatten()
+                    })
+                    posterior_peaks_df['peak_height'] = peak_relative_height_flat
+
+                    out_posteriors_peak_dfs_list.append(posterior_peaks_df)
 
                     if debug_print:
-                        print(f"probe_levels: {a_peak_dict['probe_levels']}")
+                        print('done building peak_df for posterior slab.')  # END Analyze peaks
 
-                    ## Build flat output:
-                    for lvl_idx, probe_lvl in enumerate(a_peak_dict['probe_levels']):
-                        # a_slice = a_peak_dict['level_slices'][probe_lvl]
-                        a_slice = a_peak_dict['level_slices'].get(probe_lvl, None) # allow missing entries. This will occur when (contour is None) above.
-                        #TODO 2023-09-25 23:59: - [ ] Do I need to do anything else to handle this case, like remove the invalid curve from 
-                        if a_slice is None:
-                            print(f'WARNING: a_slice is None. 2023-09-25 - Unsure if this is okay, used to be a fatal error.') # a_peak_dict: {a_peak_dict}
-                        else:
-                            slice_bbox = a_slice['bbox']
-                            (x0, y0, width, height) = slice_bbox.bounds        
-                            summit_slice_peak_id_arr[peak_idx, lvl_idx] = peak_id
-                            summit_slice_x_side_length_arr[peak_idx, lvl_idx] = width
-                            summit_slice_y_side_length_arr[peak_idx, lvl_idx] = height
-                            # summit_slice_center_x_arr[peak_idx, lvl_idx] = slice_bbox.center[0]
-                            # summit_slice_center_y_arr[peak_idx, lvl_idx] = slice_bbox.center[1]
-                            summit_slice_center_x_arr[peak_idx, lvl_idx] = float(x0) + (0.5 * float(width))
-                            summit_slice_center_y_arr[peak_idx, lvl_idx] = float(y0) + (0.5 * float(height))
-                    
-                if debug_print:
-                    print(f'building peak_df for neuron[{epoch_idx}] with {n_peaks}...')
-                cell_peaks_df = pd.DataFrame({'neuron_id': neuron_id_arr, 'neuron_peak_firing_rate': neuron_peak_curve_rate_arr, 'summit_idx': summit_slice_peak_id_arr.flatten(), 'summit_slice_idx': summit_slice_idx_arr.flatten(),
-                                             'slice_level_multiplier': summit_slice_peak_level_multiplier_arr.flatten(), 'summit_slice_level': summit_slice_peak_level_arr.flatten(),
-                                             'peak_relative_height': summit_slice_peak_height_arr.flatten(), 'peak_prominence': summit_slice_peak_prominence_arr.flatten(),
-                                             'peak_center_x': summit_peak_center_x_arr.flatten(), 'peak_center_y': summit_peak_center_y_arr.flatten(),
-                                             'summit_slice_x_width': summit_slice_x_side_length_arr.flatten(), 'summit_slice_y_width': summit_slice_y_side_length_arr.flatten(),
-                                             'summit_slice_center_x': summit_slice_center_x_arr.flatten(), 'summit_slice_center_y': summit_slice_center_y_arr.flatten()
-                                             })
-                cell_peaks_df['peak_height'] = cell_peaks_df['peak_relative_height'] * neuron_peak_curve_rate_arr
-                
-                out_cell_peak_dfs_list.append(cell_peaks_df)
-                
-                                           
-                if debug_print:
-                    print(f'done.') # END Analyze peaks
-                    
-                out_results[neuron_id] = {'peaks': a_t_bin_peaks_dict, 'slab': slab, 'id_map':id_map, 'prominence_map':prominence_map, 'parent_map':parent_map} 
-    
+                    out_results[(epoch_idx, t_idx)] = {
+                        'peaks': peaks_dict,
+                        'slab': slab,
+                        'id_map': id_map,
+                        'prominence_map': prominence_map,
+                        'parent_map': parent_map
+                    }
+                ## END for t_idx in np.arange(n_time_bins)....
+
+            ## END for epoch_idx in np.arange(n_epochs)....
+
+            if len(out_posteriors_peak_dfs_list) == 0:
+                # no peaks found anywhere; return empty structures
+                empty_df = pd.DataFrame()
+                empty_counts = np.zeros((len(xbin_centers), len(ybin_centers)), dtype=int)
+                empty_counts_blurred = uniform_filter(empty_counts.astype('float'), size=uniform_blur_size, mode='constant')
+                empty_counts_blurred_gaussian = gaussian_filter(empty_counts.astype('float'), sigma=gaussian_blur_sigma)
+                peak_counts_results = DynamicParameters(raw=empty_counts, uniform_blurred=empty_counts_blurred, gaussian_blurred=empty_counts_blurred_gaussian)
+                return DynamicParameters(xx=xbin_centers, yy=ybin_centers, results=out_results, flat_peaks_df=empty_df, filtered_flat_peaks_df=empty_df, peak_counts=peak_counts_results)
+
             # Build final concatenated dataframe:
             if debug_print:
-                print(f'building final concatenated cell_peaks_df for {n_epochs} total neurons...')
-            cell_peaks_df = pd.concat(out_cell_peak_dfs_list)
-            ## Find which position bin each peak falls in and add it to the flat_peaks_df:
-            cell_peaks_df, (xbin, ybin), bin_infos = build_df_discretized_binned_position_columns(cell_peaks_df, bin_values=(xbin, ybin), position_column_names=('peak_center_x', 'peak_center_y'), binned_column_names=('peak_center_binned_x', 'peak_center_binned_y'), active_computation_config=None, force_recompute=False, debug_print=debug_print)
+                print(f'building final concatenated posterior cell_peaks_df for {n_epochs} epochs...')
+            posterior_peaks_df = pd.concat(out_posteriors_peak_dfs_list, ignore_index=True)
 
-            ## Find the avg velocity corresponding to each position bin containing a peak value:
-            active_eloy_analysis = computation_result.computed_data.get('EloyAnalysis', None)            
-            if active_eloy_analysis is not None:
-                ## Extract the previously computed results:
-                avg_2D_speed_per_pos = active_eloy_analysis.avg_2D_speed_per_pos # (60, 8)
-                # avg_2D_speed_sort_idxs = active_eloy_analysis.avg_2D_speed_sort_idxs
-                # assert np.shape(avg_2D_speed_per_pos) == np.shape(pf_peak_counts_map), f"the shape of the active_eloy_analysis.avg_2D_speed_per_pos ({np.shape(avg_2D_speed_per_pos)}) and the shape of the newly built pf_peak_counts_map ({np.shape(pf_peak_counts_map)}) must match!"
-                _temp_peak_center_bin_label_xy = cell_peaks_df[['peak_center_binned_x', 'peak_center_binned_y']].to_numpy()-1 # (26, 2)
-                ## Add the column to matrix:
-                cell_peaks_df['peak_center_avg_speed'] = avg_2D_speed_per_pos[_temp_peak_center_bin_label_xy[:,0], _temp_peak_center_bin_label_xy[:,1]] # array([33.2289, 33.7748, 35.9964, 0, 59.3887, 37.354, 16.1506, 0, 49.8418, 33.2289, 0, 14.9843, 33.8302, 29.8891, 37.354, 10.6905, 0, 33.7748, nan, 53.9505, 34.003, 33.7748, 22.7252, nan, 11.8898, 58.9018])                
-            
+            # Find which position bin each peak falls in and add it to the flat_peaks_df:
+            posterior_peaks_df, (xbin, ybin), bin_infos = build_df_discretized_binned_position_columns(
+                posterior_peaks_df, bin_values=(x_edges, y_edges),
+                position_column_names=('peak_center_x', 'peak_center_y'),
+                binned_column_names=('peak_center_binned_x', 'peak_center_binned_y'),
+                active_computation_config=None, force_recompute=False, debug_print=debug_print)
 
-            ## Filter the summits, compute velocities, etc:            
-            filtered_summits_analysis_df, pf_peak_counts_map = PeakPromenence._build_filtered_summits_analysis_results(xbin, ybin, xbin_labels, ybin_labels, cell_peaks_df, active_eloy_analysis, slice_level_multiplier=0.5, minimum_included_peak_height=minimum_included_peak_height, debug_print = debug_print)
-            
+            # Filter the summits, compute peak-counts, etc:
+            # We do not currently have an EloyAnalysis-like object for posteriors, so pass None.
+            active_eloy_analysis = None
+            filtered_summits_analysis_df, pf_peak_counts_map = PeakPromenence._build_filtered_summits_analysis_results(
+                xbin, ybin, np.arange(1, len(xbin)), np.arange(1, len(ybin)),
+                posterior_peaks_df, active_eloy_analysis,
+                slice_level_multiplier=0.5,
+                minimum_included_peak_height=minimum_included_peak_height,
+                debug_print=debug_print)
+
             pf_peak_counts_map_blurred = uniform_filter(pf_peak_counts_map.astype('float'), size=uniform_blur_size, mode='constant')
             pf_peak_counts_map_blurred_gaussian = gaussian_filter(pf_peak_counts_map.astype('float'), sigma=gaussian_blur_sigma)
-            pf_peak_counts_results = DynamicParameters(raw=pf_peak_counts_map, uniform_blurred=pf_peak_counts_map_blurred, gaussian_blurred=pf_peak_counts_map_blurred_gaussian)
+            pf_peak_counts_results = DynamicParameters(raw=pf_peak_counts_map,
+                                                       uniform_blurred=pf_peak_counts_map_blurred,
+                                                       gaussian_blurred=pf_peak_counts_map_blurred_gaussian)
 
-            try:
-                ## Add distance to boundary by computing the distance to the nearest never-occupied bin
-                peak_nearest_directional_boundary_bins, peak_nearest_directional_boundary_displacements, peak_nearest_directional_boundary_distances = PeakPromenence._compute_distances_from_peaks_to_boundary(active_pf_2D, filtered_summits_analysis_df, debug_print=debug_print)
-
-                ## Add the output columns to the peaks dataframe:
-                # Output Columns:
-                # ['peak_nearest_boundary_bin_negX', 'peak_nearest_boundary_bin_posX', 'peak_nearest_boundary_bin_negY', 'peak_nearest_boundary_bin_posY'] # separate
-                # ['peak_nearest_directional_boundary_bins', 'peak_nearest_directional_boundary_displacements', 'peak_nearest_directional_boundary_distances'] # combined tuple columns
-                filtered_summits_analysis_df['peak_nearest_directional_boundary_bins'] = peak_nearest_directional_boundary_bins
-                filtered_summits_analysis_df['peak_nearest_directional_boundary_displacements'] = peak_nearest_directional_boundary_displacements
-                filtered_summits_analysis_df['peak_nearest_directional_boundary_distances'] = peak_nearest_directional_boundary_distances
-                filtered_summits_analysis_df['nearest_directional_boundary_direction_idx'] = np.argmin(peak_nearest_directional_boundary_distances, axis=1) # an index [0,1,2,3] corresponding to the direction of travel to the nearest index. Corresponds to (down, up, left, right)
-                filtered_summits_analysis_df['nearest_directional_boundary_direction_distance'] = np.min(peak_nearest_directional_boundary_distances, axis=1) # the distance in the minimal dimension towards the nearest boundary
-
-                # ['peak_nearest_boundary_bin_negX', 'peak_nearest_boundary_bin_posX', 'peak_nearest_boundary_bin_negY', 'peak_nearest_boundary_bin_posY'] # separate
-                distances = np.vstack([np.asarray(a_tuple) for a_tuple in peak_nearest_directional_boundary_distances])
-                x_distances = np.min(distances[:,3:], axis=1) # find the distance to nearest wall vertically
-                y_distances = np.min(distances[:,:2], axis=1) # find the distance to nearest wall horizontally
-
-                filtered_summits_analysis_df['nearest_x_boundary_distance'] = x_distances # the distance in the minimal dimension towards the nearest x boundary
-                filtered_summits_analysis_df['nearest_y_boundary_distance'] = y_distances # the distance in the minimal dimension towards the nearest y boundary
-            except (BaseException, NotImplementedError) as err:
-                print(f'could not find distances to nearest boundary in `ratemap_peaks_prominence2d`. Some columns will be missing from the output dataframe. Error: {err}')
-
-                            
-            return DynamicParameters(xx=xbin_centers, yy=ybin_centers, results=out_results, flat_peaks_df=cell_peaks_df, filtered_flat_peaks_df=filtered_summits_analysis_df, peak_counts=pf_peak_counts_results)
+            return DynamicParameters(xx=xbin_centers, yy=ybin_centers, results=out_results,
+                                     flat_peaks_df=posterior_peaks_df,
+                                     filtered_flat_peaks_df=filtered_summits_analysis_df,
+                                     peak_counts=pf_peak_counts_results)
 
 
 
@@ -995,6 +1060,107 @@ class PeakPromenence:
 
 
 
+    @function_attributes(short_name=None, tags=['high-efficiency', 'rewrite'], input_requires=[], output_provides=[], uses=[], used_by=['cls.compute_posterior_peak_promenences'], creation_date='2025-12-23 08:44', related_items=[])
+    @classmethod
+    def compute_2d_peak_prominence(cls, Z_2d: NDArray[ND.Shape["N_XBINS, N_YBINS"], Any]):
+        """
+        Computes prominence for all 2D local maxima in Z_2d.
+
+        Returns:
+            peak_coords: (N, 2) array of (x, y) peak locations
+            prominences: (N,) prominence values
+        """
+        if Z_2d.ndim != 2:
+            raise ValueError(f"compute_2d_peak_prominence expects a 2D array, got shape {Z_2d.shape}")
+
+        # --- find local maxima ---
+        neighborhood = ndimage.generate_binary_structure(2, 2)
+        local_max = (Z_2d == ndimage.maximum_filter(Z_2d, footprint=neighborhood))
+        local_max &= (Z_2d > np.min(Z_2d))
+
+        peak_coords = np.column_stack(np.nonzero(local_max))
+        peak_heights = Z_2d[local_max]
+
+        # --- compute prominence surface ---
+        seed = Z_2d.copy()
+        seed[local_max] = -np.inf
+
+        reconstructed = reconstruction(seed, Z_2d, method="dilation")
+
+        prominences = peak_heights - reconstructed[local_max]
+
+        return peak_coords, prominences
+
+
+    @function_attributes(short_name=None, tags=['high-efficiency', 'rewrite'], input_requires=[], output_provides=[], uses=['cls.compute_2d_peak_prominence'], used_by=[], creation_date='2025-12-23 08:44', related_items=[])
+    @classmethod
+    def compute_2d_dt_posterior_peak_promenences(cls, a_p_x_given_n: NDArray[ND.Shape["N_XBINS, N_YBINS, N_TBINS"], Any], alpha: float = 0.9):
+        """ for a single posterior (from a single decoded epoch, etc) process each time bin
+
+        epoch_promenences, epoch_masks = PeakPromenence.compute_2d_posterior_peak_promenences(a_p_x_given_n=a_p_x_given_n, alpha=alpha)
+        
+        """
+        if a_p_x_given_n.ndim != 3:
+            raise ValueError(f"compute_2d_posterior_peak_promenences expects a 3D array, got shape {a_p_x_given_n.shape}")
+
+        n_t_bins = np.shape(a_p_x_given_n)[-1]
+        
+        epoch_promenences = []
+        epoch_masks = []
+        for t_idx in range(n_t_bins):
+            Z_2d = a_p_x_given_n[:, :, t_idx]
+            peak_coords, prominences = cls.compute_2d_peak_prominence(Z_2d=Z_2d)
+
+            # if no peaks were found for this time bin, record an all-False mask and continue
+            if peak_coords.size == 0:
+                dominant_peak_mask = np.zeros_like(Z_2d, dtype=bool)
+                epoch_masks.append(dominant_peak_mask)
+                epoch_promenences.append((peak_coords, prominences, np.array([])))
+                continue
+            
+            # --- identify dominant peak ---
+            peak_heights = Z_2d[peak_coords[:, 0], peak_coords[:, 1]]
+            dominant_peak_idx: int = np.argmax(peak_heights)
+
+            px, py = peak_coords[dominant_peak_idx]
+            peak_height_max: float = peak_heights[dominant_peak_idx]
+
+            # --- threshold ---
+            threshold_mask = Z_2d >= (alpha * peak_height_max)
+
+            # --- connected components ---
+            labeled, num = ndimage.label(threshold_mask)
+            dominant_label = labeled[px, py]
+            dominant_peak_mask = (labeled == dominant_label)
+            ## OUTPUTS: dominant_peak_mask
+            epoch_masks.append(dominant_peak_mask)
+            epoch_promenences.append((peak_coords, prominences, peak_heights))
+        ## END for t_idx in range(n_t_bins)...
+            
+        return epoch_promenences, epoch_masks
+
+
+    @function_attributes(short_name=None, tags=['high-efficiency', 'rewrite'], input_requires=[], output_provides=[], uses=['cls.compute_2d_peak_prominence'], used_by=[], creation_date='2025-12-23 08:44', related_items=[])
+    @classmethod
+    def compute_posterior_peak_promenences(cls, p_x_given_n_list: List[NDArray[ND.Shape["N_XBINS, N_YBINS, N_TBINS"], Any]], alpha: float = 0.9):
+        """ 
+        from pyphoplacecellanalysis.External.peak_prominence2d import PeakPromenence
+
+        all_epochs_promenences, all_epochs_masks = PeakPromenence.compute_posterior_peak_promenences(p_x_given_n_list=a_widget.decoded_result.p_x_given_n_list, alpha=0.9)
+        
+        """
+        all_epochs_promenences = []
+        all_epochs_masks = []
+
+        for i, a_p_x_given_n in enumerate(p_x_given_n_list):
+            n_t_bins = np.shape(a_p_x_given_n)[-1]
+            epoch_promenences, epoch_masks = cls.compute_2d_dt_posterior_peak_promenences(a_p_x_given_n=a_p_x_given_n, alpha=alpha)
+            all_epochs_promenences.append(epoch_promenences)
+            all_epochs_masks.append(epoch_masks)
+            
+        ## END for i, a_p_x_given_n in enumerat
+
+        return all_epochs_promenences, all_epochs_masks
 
 
 
