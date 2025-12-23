@@ -830,7 +830,7 @@ class SingleArtistMultiEpochBatchHelpers:
     """
     results2D: "DecodingResultND" = field()
 
-    active_ax = field()
+    active_ax: Any = field()
     frame_divide_bin_size: float = field()
     rotate_to_vertical: bool = field(default=True)
     
@@ -2035,7 +2035,7 @@ class DecodedTrajectoryMatplotlibPlotter(DecodedTrajectoryPlotter):
     
     plots_data_dict_array: List[List[RenderPlotsData]] = field(init=False)
     artist_dict_array: List[List[Dict]] = field(init=False)
-    fig = field(default=None)
+    fig: Any = field(default=None)
     axs: NDArray = field(default=None)
     epochs_pages: List = field(default=Factory(list))
     row_column_indicies: NDArray = field(default=None)
@@ -2830,7 +2830,8 @@ class DecodedTrajectoryMatplotlibPlotter(DecodedTrajectoryPlotter):
 
 
     @function_attributes(short_name=None, tags=['main', 'plot'], input_requires=[], output_provides=[], uses=[], used_by=['multi_DecodedTrajectoryMatplotlibPlotter_side_by_side', 'self.plot_decoded_laps_2d'], creation_date='2025-06-30 12:58', related_items=[])
-    def plot_decoded_trajectories_2d(self, curr_position_df: pd.DataFrame, epoch_specific_position_dfs: List[pd.DataFrame], epoch_ids: NDArray, sess=None, curr_num_subplots=10, active_page_index=0, plot_actual_lap_lines:bool=False, fixed_columns: int = 2, use_theoretical_tracks_instead: bool = True, existing_ax=None, axes_inset_locators_list=None, cmap=None, **kwargs):
+    def plot_decoded_trajectories_2d(self, curr_position_df: pd.DataFrame, epoch_specific_position_dfs: List[pd.DataFrame], epoch_ids: NDArray, sess=None, curr_num_subplots=10, active_page_index=0, plot_actual_lap_lines:bool=False, fixed_columns: int = 2, use_theoretical_tracks_instead: bool = True, existing_ax=None, axes_inset_locators_list=None, cmap=None,
+                                     plot_mode: str='time_gradient', **kwargs):
         """ Plots a MatplotLib 2D Figure with each lap being shown in one of its subplots
         
         Called to setup the graph.
@@ -2848,7 +2849,7 @@ class DecodedTrajectoryMatplotlibPlotter(DecodedTrajectoryPlotter):
         Usage:
             from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import plot_decoded_trajectories_2d
         
-            fig, axs, laps_pages = plot_decoded_trajectories_2d(curr_active_pipeline.sess, curr_num_subplots=8, active_page_index=0, plot_actual_lap_lines=False)
+            fig, axs, laps_pages = plot_decoded_trajectories_2d(curr_position_df, epoch_specific_position_dfs=None, epoch_ids=None, curr_num_subplots=8, active_page_index=0, plot_actual_lap_lines=False)
 
         
         """
@@ -2892,15 +2893,15 @@ class DecodedTrajectoryMatplotlibPlotter(DecodedTrajectoryPlotter):
                 all_column_width: float = (single_ax_width * float(fixed_columns))
                 all_row_height: float = (single_ax_height * float(needed_rows))
 
-                (all_column_width, all_row_height)
+                # (all_column_width, all_row_height)
                 scaling_factor: float = 0.01
                 figsize = [(scaling_factor * all_column_width), (scaling_factor * all_row_height)]
             else:
                 ## OLD:
                 figsize = [4*fixed_columns, 14*needed_rows]
 
-            print(f'[4*fixed_columns, 14*needed_rows]: {[4*fixed_columns, 14*needed_rows]}')
-            print(f'figsize: {figsize}')
+            # print(f'[4*fixed_columns, 14*needed_rows]: {[4*fixed_columns, 14*needed_rows]}')
+            # print(f'figsize: {figsize}')
             row_column_indicies = np.unravel_index(linear_plotter_indicies, (needed_rows, fixed_columns)) # inverse is: np.ravel_multi_index(row_column_indicies, (needed_rows, fixed_columns))
             
             if existing_ax is None:
@@ -2973,9 +2974,11 @@ class DecodedTrajectoryMatplotlibPlotter(DecodedTrajectoryPlotter):
         
 
 
-        def _subfn_add_specific_epoch_trajectory(p, axs, linear_plotter_indicies, row_column_indicies, active_page_epochs_ids, epochs_position_traces, epochs_time_ranges, use_time_gradient_line=True):
+        def _subfn_add_specific_epoch_trajectory(p, axs, linear_plotter_indicies, row_column_indicies, active_page_epochs_ids, epochs_position_traces, epochs_time_ranges, active_plot_mode: str ='time_gradient', **plot_traj_kwargs):
             """ captures: cmap 
             """
+
+
             # Add the lap trajectory:
             for a_linear_index in linear_plotter_indicies:
                 curr_lap_id = active_page_epochs_ids[a_linear_index]
@@ -2984,7 +2987,9 @@ class DecodedTrajectoryMatplotlibPlotter(DecodedTrajectoryPlotter):
                 curr_lap_time_range = epochs_time_ranges[curr_lap_id]
                 curr_lap_label_text = 'Epoch[{}]: t({:.2f}, {:.2f})'.format(curr_lap_id, curr_lap_time_range[0], curr_lap_time_range[1])
                 curr_lap_num_points = len(epochs_position_traces[curr_lap_id][0,:])
-                if use_time_gradient_line:
+                valid_plotting_modes: List[str] = ['time_gradient', 'line', 'scatter']
+                # if use_time_gradient_line:
+                if active_plot_mode == 'time_gradient':
                     # Create a continuous norm to map from data points to colors
                     curr_lap_timeseries = np.linspace(curr_lap_time_range[0], curr_lap_time_range[-1], len(epochs_position_traces[curr_lap_id][0,:]))
                     norm = plt.Normalize(curr_lap_timeseries.min(), curr_lap_timeseries.max())
@@ -2994,18 +2999,33 @@ class DecodedTrajectoryMatplotlibPlotter(DecodedTrajectoryPlotter):
                     lc = LineCollection(segments, cmap=cmap, norm=norm)
                     # Set the values used for colormapping
                     lc.set_array(curr_lap_timeseries)
-                    lc.set_linewidth(2)
-                    lc.set_alpha(0.85)
+                    lc.set_linewidth(plot_traj_kwargs.get('linewidth', 2))
+                    lc.set_alpha(plot_traj_kwargs.get('alpha', 0.85))
                     a_line = axs[curr_row][curr_col].add_collection(lc)
                     # add_arrow(line)
-                else:
-                    a_line = axs[curr_row][curr_col].plot(epochs_position_traces[curr_lap_id][0,:], epochs_position_traces[curr_lap_id][1,:], c='k', alpha=0.85)
+                elif active_plot_mode == 'line':
+                    if 'c' not in plot_traj_kwargs:
+                        plot_traj_kwargs['c'] = 'k'
+                    if 'alpha' not in plot_traj_kwargs:
+                        plot_traj_kwargs['alpha'] = 0.85
+                    a_line = axs[curr_row][curr_col].plot(epochs_position_traces[curr_lap_id][0,:], epochs_position_traces[curr_lap_id][1,:], **plot_traj_kwargs)
                     # curr_lap_endpoint = curr_lap_position_traces[curr_lap_id][:,-1].T
                     a_start_arrow = _plot_helper_add_arrow(a_line[0], position=0, position_mode='index', direction='right', size=20, color='green') # start
                     a_middle_arrow = _plot_helper_add_arrow(a_line[0], position=None, position_mode='index', direction='right', size=20, color='yellow') # middle
                     a_end_arrow = _plot_helper_add_arrow(a_line[0], position=curr_lap_num_points, position_mode='index', direction='right', size=20, color='red') # end
                     # add_arrow(line[0], position=curr_lap_endpoint, position_mode='abs', direction='right', size=50, color='blue')
                     # add_arrow(line[0], position=None, position_mode='rel', direction='right', size=50, color='blue')
+
+                elif active_plot_mode == 'scatter':
+                    if 'c' not in plot_traj_kwargs:
+                        plot_traj_kwargs['c'] = 'k'
+                    if 'alpha' not in plot_traj_kwargs:
+                        plot_traj_kwargs['alpha'] = 0.85
+                    a_scatter = axs[curr_row][curr_col].scatter(epochs_position_traces[curr_lap_id][0,:], epochs_position_traces[curr_lap_id][1,:], **plot_traj_kwargs)
+
+                else:
+                    raise NotImplementedError(f'unexpected plotting mode: plot_mode: "{active_plot_mode}", valid options: {valid_plotting_modes}))                    
+
                 # add lap text label
                 # Position text above the axes, centered horizontally, using axes coordinates (0-1)
                 a_lap_label_text = axs[curr_row][curr_col].text(0.5, 1.02, curr_lap_label_text, horizontalalignment='center', verticalalignment='bottom', size=6, transform=axs[curr_row][curr_col].transAxes)
@@ -3072,7 +3092,7 @@ class DecodedTrajectoryMatplotlibPlotter(DecodedTrajectoryPlotter):
         if plot_actual_lap_lines:
             ## IDK what this is sadly, i think it's a reminant of the lap plotter?
             active_page_epochs_ids = epochs_pages[active_page_index]
-            _out_objs = _subfn_add_specific_epoch_trajectory(self.fig, self.axs, linear_plotter_indicies=self.linear_plotter_indicies, row_column_indicies=self.row_column_indicies, active_page_epochs_ids=active_page_epochs_ids, epochs_position_traces=epochs_position_traces, epochs_time_ranges=epochs_time_ranges, use_time_gradient_line=True)
+            _out_objs = _subfn_add_specific_epoch_trajectory(self.fig, self.axs, linear_plotter_indicies=self.linear_plotter_indicies, row_column_indicies=self.row_column_indicies, active_page_epochs_ids=active_page_epochs_ids, epochs_position_traces=epochs_position_traces, epochs_time_ranges=epochs_time_ranges, active_plot_mode=plot_mode, **kwargs)
             # plt.ylim((125, 152))
         else:
             _out_objs = None
