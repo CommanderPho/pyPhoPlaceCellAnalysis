@@ -3765,10 +3765,14 @@ class DecodedTrajectoryNapariPlotter(DecodedTrajectoryPlotter):
         if viewer is None:
             viewer = napari.Viewer(title=title, **viewer_kwargs)
 
-        image_layer = viewer.add_image(posterior_volume, name=layer_name, colormap='viridis', blending='additive')
+        image_layer = viewer.add_image(posterior_volume, name=layer_name, colormap='viridis', blending='additive', interpolation='nearest')
 
         # axes: (epoch, time_bin, xbin, ybin)
         viewer.dims.axis_labels = ('epoch', 'time_bin', 'xbin', 'ybin')
+        # Ensure the epoch slider appears above the time_bin slider in the dims panel.
+        # In napari, the visual order of sliders is controlled by dims.order.
+        # Swapping the first two entries orders the corresponding sliders (epoch, time_bin).
+        viewer.dims.order = (1, 0, 2, 3)
 
         # initialize current step
         epoch_idx = int(self.curr_epoch_idx) if self.curr_epoch_idx is not None else 0

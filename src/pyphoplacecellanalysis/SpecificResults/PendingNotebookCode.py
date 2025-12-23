@@ -118,6 +118,135 @@ from pyphoplacecellanalysis.General.Model.Configs.LongShortDisplayConfig import 
 from pyphocorehelpers.gui.Qt.color_helpers import ColormapHelpers, ColorFormatConverter, debug_print_color, build_adjusted_color
 
 
+
+
+
+
+
+def interactive_p_x_given_n_slider(p_x_given_n: np.ndarray, xbin: Optional[np.ndarray]=None, ybin: Optional[np.ndarray]=None, cmap: str = "viridis"):
+    """
+    Renders a 3D array (x, y, t) as a fast image viewer with a slider for t using pyqtgraph, or falls back to matplotlib if needed.
+
+    Usage:
+        # Suppose you have a 3D probability array `p_x_given_n` of shape (n_x_bins, n_y_bins, n_t_bins)
+        # Optionally provide xbin and ybin arrays for coordinate axes, otherwise indices will be used
+
+        from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import interactive_p_x_given_n_slider
+
+        interactive_p_x_given_n_slider(p_x_given_n, xbin, ybin)
+        # or with default bins (indices)
+        interactive_p_x_given_n_slider(p_x_given_n)
+
+    Args:
+        p_x_given_n: numpy array of shape (n_x_bins, n_y_bins, n_t_bins)
+        xbin, ybin: 1D arrays of bin edges/centers, optional (will use index if not provided)
+        cmap: Colormap for rendering.
+
+    Returns:
+        The widget/display component.
+    """
+    try:
+        import pyphoplacecellanalysis.External.pyqtgraph as pg
+        from pyphoplacecellanalysis.External.pyqtgraph.Qt import QtWidgets
+        from pyphoplacecellanalysis.External.pyqtgraph.Qt import mkQApp
+        app = mkQApp()
+        import IPython
+
+        # Shape
+        x_bins, y_bins, t_bins = p_x_given_n.shape
+        if xbin is None:
+            xbin = np.arange(x_bins)
+        if ybin is None:
+            ybin = np.arange(y_bins)
+        
+        # Initialize window and layout
+        win = pg.QtWidgets.QWidget()
+        layout = pg.QtWidgets.QVBoxLayout()
+        win.setLayout(layout)
+        
+        view = pg.GraphicsLayoutWidget()
+        layout.addWidget(view)
+        img = pg.ImageView(view=pg.PlotItem())
+        view.addItem(img)
+        win.setWindowTitle('p_x_given_n viewer (pyqtgraph)')
+        
+        # Set the image data: pyqtgraph expects data as (frames, y, x)
+        img_data = p_x_given_n.transpose(2, 1, 0)  # (t, y, x)
+        img.setImage(img_data, axes={'t':0, 'y':1, 'x':2}, xvals=xbin)
+        img.ui.roiBtn.hide()
+        img.ui.menuBtn.hide()
+        img.setPredefinedGradient(cmap)
+
+        plot_item = img.getView()
+        plot_item.setLabel('bottom', "X" if xbin is None else "X (bins)")
+        plot_item.setLabel('left', "Y" if ybin is None else "Y (bins)")
+        
+        win.show()
+        print("Interactive GPU-accelerated viewer created (pyqtgraph).")
+        # For jupyter: display inline using IPython
+        if 'IPython' in globals():
+            try:
+                from IPython.display import display
+                display(win)
+            except Exception:
+                pass
+        return win
+
+    except Exception as e:
+        print(f"Falling back to matplotlib. pyqtgraph accelerated view not available. Reason: {e}")
+        from matplotlib.widgets import Slider
+        import matplotlib.pyplot as plt
+
+        x_bins, y_bins, t_bins = p_x_given_n.shape
+        if xbin is None:
+            xbin = np.arange(x_bins)
+        if ybin is None:
+            ybin = np.arange(y_bins)
+        
+        fig, ax = plt.subplots()
+        plt.subplots_adjust(bottom=0.25)
+        im = ax.imshow(p_x_given_n[:,:,0].T, cmap=cmap, origin='lower', aspect='auto',
+                       extent=[xbin[0], xbin[-1], ybin[0], ybin[-1]])
+        ax.set_xlabel("X")
+        ax.set_ylabel("Y")
+        cbar = plt.colorbar(im, ax=ax)
+        cbar.set_label("p(x|n)")
+
+        axframe = plt.axes((0.2, 0.1, 0.65, 0.03))
+        frame_slider = Slider(axframe, 't', 0, t_bins - 1, valinit=0, valfmt='%0.0f', valstep=1)
+        
+        def update(val):
+            idx = int(frame_slider.val)
+            im.set_data(p_x_given_n[:,:,idx].T)
+            ax.set_title(f't = {idx}')
+            im.set_clim(np.nanmin(p_x_given_n[:,:,idx]), np.nanmax(p_x_given_n[:,:,idx]))
+            fig.canvas.draw_idle()
+        
+        frame_slider.on_changed(update)
+        ax.set_title(f't = 0')
+        plt.show()
+        print("Matplotlib-based interactive view.")
+        return fig
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 from pathlib import Path
 
 @function_attributes(short_name=None, tags=['fixup', 'CSV', 'epochs', 'paradigm', 'BAPUN'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-12-17 18:14', related_items=[])
