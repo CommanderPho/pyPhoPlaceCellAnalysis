@@ -1779,7 +1779,7 @@ class PredictiveDecodingComputationsContainer(ComputedResult):
 
         decoding_locality: DecodingLocalityMeasures = container.decoding_locality
         
-        non_local_PBE_non_moving_epochs_df: pd.DataFrame = decoding_locality.get_non_moving_PBE_non_local_epochs(curr_active_pipeline.sess, merging_adjacent_max_separation_sec=0.5)
+        non_local_PBE_non_moving_epochs_df: pd.DataFrame = decoding_locality.get_non_moving_PBE_non_local_epochs(curr_active_pipeline.sess, merging_adjacent_max_separation_sec=merging_adjacent_max_separation_sec)
         # non_local_PBE_non_moving_epochs_df: pd.DataFrame = container.decoding_locality.non_local_PBE_non_moving_epochs_df
 
         measured_positions_df: pd.DataFrame = decoding_locality.pos_df
@@ -1791,11 +1791,15 @@ class PredictiveDecodingComputationsContainer(ComputedResult):
         # measured_positions_df
 
         ## add the final detected non_local_pbe_epoch indicies to the decoded points:
+        decoding_locality.non_local_PBE_non_moving_epochs_df['label'] = decoding_locality.non_local_PBE_non_moving_epochs_df['label'].astype(int)
         _out_locality_measures_df = deepcopy(decoding_locality.locality_measures_df)
-        _out_locality_measures_df = _out_locality_measures_df.time_point_event.adding_epochs_identity_column(epochs_df=decoding_locality.non_local_PBE_non_moving_epochs_df, epoch_id_key_name='non_local_PBE_non_moving_epoch', epoch_label_column_name='label', override_time_variable_name='t',
-                                                            no_interval_fill_value=np.nan, should_replace_existing_column=True, drop_non_epoch_events=False, overlap_behavior=OverlappingIntervalsFallbackBehavior.FALLBACK_TO_SLOW_SEARCH)
+        _out_locality_measures_df = _out_locality_measures_df.time_point_event.adding_epochs_identity_column(epochs_df=decoding_locality.non_local_PBE_non_moving_epochs_df, epoch_id_key_name='non_local_PBE_non_moving_epoch', override_time_variable_name='t',
+                                                            # epoch_label_column_name='label', no_interval_fill_value=np.nan,
+                                                            epoch_label_column_name='label', no_interval_fill_value=-1,
+                                                            should_replace_existing_column=True, drop_non_epoch_events=True,
+                                                            overlap_behavior=OverlappingIntervalsFallbackBehavior.FALLBACK_TO_SLOW_SEARCH)
         # _out_locality_measures_df
-        _out_locality_measures_df.dropna(how='any', subset=['non_local_PBE_non_moving_epoch'])
+        # _out_locality_measures_df.dropna(how='any', subset=['non_local_PBE_non_moving_epoch'])
 
         epoch_times = decoding_locality.locality_measures_df['t'].to_numpy()
         time_to_idx_map = EpochHelpers.find_epoch_times_to_data_indicies_map(decoding_locality.non_local_PBE_non_moving_epochs_df, epoch_times)
@@ -1829,8 +1833,6 @@ class PredictiveDecodingComputationsContainer(ComputedResult):
 
         print(f'done with all decoding.')
 
-        decoding_locality: DecodingLocalityMeasures = container.decoding_locality
-        non_local_PBE_non_moving_epochs_df: pd.DataFrame = decoding_locality.non_local_PBE_non_moving_epochs_df
 
         epoch_high_prob_pos_masks = []
         epoch_matching_positions = []
