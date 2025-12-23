@@ -27,18 +27,12 @@ Update time: 2018-11-10 16:03:49.
 '''
 
 
-
-
-
 #--------Import modules-------------------------
 import numpy as np
 from matplotlib.transforms import Bbox
 from matplotlib.path import Path
 import matplotlib.pyplot as plt
 from scipy.interpolate import interp1d
-
-
-
 
 def isClosed(xs,ys):
     if np.alltrue([np.allclose(xs[0],xs[-1]),\
@@ -88,8 +82,7 @@ def contourArea(contour):
 
     return result
 
-def polygonGeoArea(lons,lats,method='basemap',projection='cea',bmap=None,
-        verbose=True):
+def polygonGeoArea(lons,lats,method='basemap',projection='cea',bmap=None, verbose=True):
 
     #------Use basemap to project coordinates------
     if method=='basemap':
@@ -155,13 +148,7 @@ def contourGeoArea(contour,bmap=None):
     return result
 
 
-
-def getProminence(var, step, ybin_centers=None, xbin_centers=None, min_depth=None,
-        include_edge=True,
-        min_area=None, max_area=None, area_func=contourArea,
-        centroid_num_to_center=5,
-        allow_hole=True, max_hole_area=None,
-        verbose=False):
+def getProminence(var, step, ybin_centers=None, xbin_centers=None, min_depth=None, include_edge=True, min_area=None, max_area=None, area_func=contourArea, centroid_num_to_center=5, allow_hole=True, max_hole_area=None, verbose=False):
     '''Find 2d prominences of peaks.
 
     <var>: 2D ndarray, data to find local maxima. Missings (nans) are masked.
@@ -514,6 +501,509 @@ def compute_prominence_contours(xbin_centers, ybin_centers, slab, step=0.1, min_
     """
     peaks_dict, id_map, prominence_map, parent_map = getProminence(slab, step, ybin_centers=ybin_centers, xbin_centers=xbin_centers, min_area=min_area, min_depth=min_depth, include_edge=include_edge, verbose=verbose, **kwargs)
     return xbin_centers, ybin_centers, slab, peaks_dict, id_map, prominence_map, parent_map
+
+
+from pyphocorehelpers.DataStructure.dynamic_parameters import DynamicParameters
+
+
+class PeakPromenence:
+    """ 
+        from pyphoplacecellanalysis.External.peak_prominence2d import PeakPromenence
+
+    """
+
+
+    @classmethod
+    def _find_contours_at_levels(cls, xbin_centers, ybin_centers, slab, peak_probe_point, probe_levels):
+        """ finds the contours containing the peak_probe_point at the specified probe_levels.
+            performs slicing through desired z-values (1/2 prominence, etc) using contourf
+            
+            
+        Inputs:
+            peak_probe_point: a point (x, y) to use to validate or exclude found contours. This allows us to only get the contour the encloses a peak at a given level, not any others that may happen to be at that level as well.
+            probe_levels: a list of z-values to slice at to find the contours
+            
+        Returns:
+            a dict with keys of the probe_levels and values containing a list of their corresponding contours
+        """
+        vmax = np.nanmax(slab)
+        fig, ax = plt.subplots()
+        included_computed_contours = DynamicParameters.init_from_dict({}) 
+        #---------------Loop through levels---------------
+        for ii, levii in enumerate(probe_levels[::-1]):
+            # Note that contourf requires at least 2 levels, hence the use of the vmax+1.0 term and accessing only the first item in the collection. Otherwise: "ValueError: Filled contours require at least 2 levels."
+            csii = ax.contourf(xbin_centers, ybin_centers, slab, [levii, vmax+1.0]) ## Heavy-lifting code here. levii is the level
+            csii = csii.collections[0]
+            # ax.cla() ## TODO: this is the most computationally expensive part of the code, and it doesn't seem necissary
+            #--------------Loop through contours at level--------------
+            # find only the ones containing the peak_probe_point
+            included_computed_contours[levii] = [contjj for jj, contjj in enumerate(csii.get_paths()) if contjj.contains_point(peak_probe_point)]
+            n_contours = len(included_computed_contours[levii])
+            assert n_contours <= 1, f"n_contours is supposed to be equal to be either 0 or 1 but len(included_computed_contours[levii]): {len(included_computed_contours[levii])}!"
+            # assert n_contours == 1, f"contour_stats is supposed to be equal to 1 but len(included_computed_contours[levii]): {len(included_computed_contours[levii])}!"
+            if n_contours == 0:
+                warn( f"n_contours is 0 for level: {levii}")
+                included_computed_contours[levii] = None # set to None
+            else:                   
+                included_computed_contours[levii] = included_computed_contours[levii][0] # unwrapped from the list format, it's just the single Path/Curve now
+            
+        plt.close(fig) # close the figure when done generating the contours to prevent an empty figure from showing
+        return included_computed_contours
+
+    @classmethod
+    def _build_filtered_summits_analysis_results(cls, xbin, ybin, xbin_labels, ybin_labels, flat_peaks_df, active_eloy_analysis, slice_level_multiplier=0.5, minimum_included_peak_height=0.5, debug_print=False):
+        """ builds the filtered summits analysis results dataframe and flat counts matrix 
+        
+        Usage:
+            filtered_summits_analysis_df, pf_peak_counts_map = build_filtered_summits_analysis_results(active_pf_2D.xbin, active_pf_2D.ybin, active_pf_2D.xbin_labels, active_pf_2D.ybin_labels,
+                                                                                            active_peak_prominence_2d_results, active_eloy_analysis, slice_level_multiplier=0.5, minimum_included_peak_height=1.0, debug_print = False)
+                                                                                            
+        """
+        ## Find which position bin each peak falls in and add it to the flat_peaks_df:
+        filtered_summits_analysis_df = flat_peaks_df[flat_peaks_df['peak_height'] >= minimum_included_peak_height].copy() # filter for peaks greater than 1.0Hz
+        
+        ## IMPORTANT: Filter by only one of the slice_levels before continuing, otherwise you're double-counting:
+        filtered_summits_analysis_df = filtered_summits_analysis_df[filtered_summits_analysis_df['slice_level_multiplier'] == slice_level_multiplier].copy()
+
+        ## Build outputs:
+        n_xbins = len(xbin) - 1 # the -1 is to get the counts for the centers only
+        n_ybins = len(ybin) - 1 # the -1 is to get the counts for the centers only
+        pf_peak_counts_map = np.zeros((n_xbins, n_ybins), dtype=int) # create an initially zero matrix
+
+        current_bin_counts = filtered_summits_analysis_df.value_counts(subset=['peak_center_binned_x', 'peak_center_binned_y'], normalize=False, sort=False, ascending=True, dropna=True) # current_bin_counts: a series with a MultiIndex index for each bin that has nonzero counts
+        if debug_print:
+            print(f'np.shape(current_bin_counts): {np.shape(current_bin_counts)}') # (247,)
+        for (xbin_label, ybin_label), count in current_bin_counts.iteritems():
+            if debug_print:
+                print(f'xbin_label: {xbin_label}, ybin_label: {ybin_label}, count: {count}')
+            try:
+                pf_peak_counts_map[xbin_label-1, ybin_label-1] += count #if it's already a label, why are we subtracting 1?
+            except IndexError as e:
+                print(f'e: {e}\n filtered_summits_analysis_df: {np.shape(filtered_summits_analysis_df)}, current_bin_counts: {np.shape(current_bin_counts)}\n pf_peak_counts_map: {np.shape(pf_peak_counts_map)}')
+                raise e
+            
+        return filtered_summits_analysis_df, pf_peak_counts_map
+
+    @classmethod
+    def _compute_distances_from_peaks_to_boundary(cls, active_pf_2D, filtered_flat_peaks_df, debug_print = True):
+        """ Computes the distance to boundary by computing the distance to the nearest never-occupied bin
+                For any given peak location, the distance to the boundary in each of the four directions can be computed.
+                
+            TODO: this function currently uses the binned peak positions and computes distances to the boundaries in terms of bins in each dimension. Could use a continuous position measure as well.
+            
+
+        # filtered_flat_peaks_df
+
+        # Required Input Columns:
+        # ['peak_center_binned_x', 'peak_center_binned_y']
+
+        # Output Columns:
+        # ['peak_nearest_boundary_bin_negX', 'peak_nearest_boundary_bin_posX', 'peak_nearest_boundary_bin_negY', 'peak_nearest_boundary_bin_posY'] # separate
+
+        # ['peak_nearest_directional_boundary_bins', 'peak_nearest_directional_boundary_displacements', 'peak_nearest_directional_boundary_distances'] # combined tuple columns
+        
+        
+        TODO: I should have just used actual continuous position values instead of counting bins :[
+            
+        Usage:
+            peak_nearest_directional_boundary_bins, peak_nearest_directional_boundary_displacements, peak_nearest_directional_boundary_distances = _compute_distances_from_peaks_to_boundary(active_pf_2D, filtered_summits_analysis_df, debug_print=debug_print)
+
+        """
+        # Build the boundary mask from the NaN speeds, which correspond to never-occupied cells:
+        # boundary_mask_indicies = ~np.isfinite(active_eloy_analysis.avg_2D_speed_per_pos)
+        boundary_mask_indicies = active_pf_2D.never_visited_occupancy_mask.copy() # True if value is never-occupied, False otherwise
+
+        ## Add a padding of size 1 of True values around the edge, ensuring a border of never-visited bins on all sides:
+        # boundary_mask_indicies = np.pad(boundary_mask_indicies, 1, 'constant', constant_values=(True, True)) ## BUG: this changes the indicies and doesn't completely fix the problem
+
+        ## Get just the True indicies. A 2-tuple of 1D np.array vectors containing the true indicies
+        boundary_mask_true_indicies = np.vstack(np.where(boundary_mask_indicies)).T
+        # boundary_mask_true_indicies.shape # (235, 2)
+        # boundary_mask_true_indicies
+
+        ## Compute the extrema to deal with border effects:
+        # active_pf_2D.bin_info
+        xbin_indicies = active_pf_2D.xbin_labels -1
+        xbin_outer_extrema = (xbin_indicies[0]-1, xbin_indicies[-1]+1) # if indicies [0, 59] are valid, the outer_extrema for this axis should be (-1, 60)
+        ybin_indicies = active_pf_2D.ybin_labels -1
+        ybin_outer_extrema = (ybin_indicies[0]-1, ybin_indicies[-1]+1) # if indicies [0, 7] are valid, the outer_extrema for this axis should be (-1, 8)
+
+        if debug_print:
+            print(f'xbin_indicies: {xbin_indicies}\nxbin_outer_extrema: {xbin_outer_extrema}\nybin_indicies: {ybin_indicies}\nybin_outer_extrema: {ybin_outer_extrema}')
+        
+        peak_nearest_directional_boundary_bins, peak_nearest_directional_boundary_displacements, peak_nearest_directional_boundary_distances = list(), list(), list()
+
+        for a_peak_row in filtered_flat_peaks_df[['peak_center_binned_x', 'peak_center_binned_y']].itertuples():
+            peak_x_bin_idx, peak_y_bin_idx = (a_peak_row.peak_center_binned_x-1), (a_peak_row.peak_center_binned_y-1)
+            if debug_print:
+                print(f'peak_x_bin_idx: {peak_x_bin_idx}, peak_y_bin_idx: {peak_y_bin_idx}')
+            # For a given (x_idx, y_idx):
+            ## Perform vertical line scan (across y-values) by first getting all matching x-values:
+            matching_vertical_scan_y_idxs = boundary_mask_true_indicies[(boundary_mask_true_indicies[:,0]==peak_x_bin_idx), 1] # the [*, 1] is because we only need the y-values
+            # matching_vertical_scan_y_idxs # array([0, 1, 2, 6, 7], dtype=int64)
+            if debug_print:
+                print(f'\tmatching_vertical_scan_y_idxs: {matching_vertical_scan_y_idxs}')
+
+            if len(matching_vertical_scan_y_idxs) == 0:
+                # both min and max ends missing. Should be set to the bin just outside the minimum and maximum bin in that dimension
+                warn(f'\tWARNING: len(matching_vertical_scan_y_idxs) == 0: setting matching_vertical_scan_y_idxs = {ybin_outer_extrema}')
+                matching_vertical_scan_y_idxs = ybin_outer_extrema
+            elif len(matching_vertical_scan_y_idxs) == 1:
+                # only one end missing, need to determine which end it is and replace the missing end with the appropriate extrema
+                if (matching_vertical_scan_y_idxs[0] > peak_y_bin_idx):
+                    # add the lower extrema
+                    warn(f'\tWARNING: len(matching_vertical_scan_y_idxs) == 1: missing lower extrema, adding ybin_outer_extrema[0] = {ybin_outer_extrema[0]} to matching_vertical_scan_y_idxs')
+                    matching_vertical_scan_y_idxs = np.insert(matching_vertical_scan_y_idxs, 0, ybin_outer_extrema[0])
+                    # matching_horizontal_scan_x_idxs.insert(xbin_outer_extrema[0], 0)
+                elif (matching_vertical_scan_y_idxs[0] < peak_y_bin_idx):
+                    # add the upper extrema
+                    warn(f'\tWARNING: len(matching_vertical_scan_y_idxs) == 1: missing upper extrema, adding ybin_outer_extrema[1] = {ybin_outer_extrema[1]} to matching_vertical_scan_y_idxs')
+                    matching_vertical_scan_y_idxs = np.append(matching_vertical_scan_y_idxs, [ybin_outer_extrema[1]])
+                else:
+                    # # EQUAL CONDITION SHOULDN'T HAPPEN!
+                    # raise NotImplementedError
+                    # This condition should only happen when peak_y_bin_idx is right against the boundary itself (e.g. (peak_y_bin_idx == 7) or (peak_y_bin_idx == 0)
+                    if (peak_y_bin_idx == ybin_indicies[0]):
+                        # matching_vertical_scan_y_idxs[0] = ybin_outer_extrema[0] ## replace the duplicated value with the lower extreme
+                        warn(f'\tWARNING: peak_y_bin_idx ({peak_y_bin_idx}) == ybin_indicies[0] ({ybin_indicies[0]}): setting matching_vertical_scan_y_idxs = {ybin_outer_extrema}')
+                        matching_vertical_scan_y_idxs = ybin_outer_extrema
+                    elif (peak_y_bin_idx == ybin_indicies[-1]):
+                        # matching_vertical_scan_y_idxs[0] = ybin_outer_extrema[1] ## replace the duplicated value with the upper extreme
+                        warn(f'\tWARNING: peak_y_bin_idx ({peak_y_bin_idx}) == ybin_indicies[-1] ({ybin_indicies[-1]}): setting matching_vertical_scan_y_idxs = {ybin_outer_extrema}')
+                        matching_vertical_scan_y_idxs = ybin_outer_extrema
+                    else:
+                        warn(f'\tWARNING: This REALLY should not happen! peak_y_bin_idx: {peak_y_bin_idx}, matching_vertical_scan_y_idxs: {matching_vertical_scan_y_idxs}!!')
+                        raise NotImplementedError
+                        
+            ## Partition on the peak_y_bin_idx:
+            found_start_indicies = np.searchsorted(matching_vertical_scan_y_idxs, peak_y_bin_idx, side='left')
+            found_end_indicies = np.searchsorted(matching_vertical_scan_y_idxs, peak_y_bin_idx, side='right') # find the end of the range
+            out = np.hstack((found_start_indicies, found_end_indicies))
+            if debug_print:     
+                print(f'\tfound_start_indicies: {found_start_indicies}, found_end_indicies: {found_end_indicies}, out: {out}')
+            split_vertical_scan_y_idxs = np.array_split(matching_vertical_scan_y_idxs, [found_start_indicies]) # need to pass in found_start_indicies as a list containing the scalar value because this functionality is different than if the scalar itself is passed in.
+            if debug_print:
+                print(f'\tsplit_vertical_scan_y_idxs: {split_vertical_scan_y_idxs}')
+
+            """ Encountering IndexError with split_vertical_scan_y_idxs[0][-1], says len(split_vertical_scan_y_idxs[0]) == 0
+            peak_x_bin_idx: 1, peak_y_bin_idx: 0
+                matching_vertical_scan_y_idxs: [6 7]
+                found_start_indicies: 0, found_end_indicies: 0, out: [0 0]
+                split_vertical_scan_y_idxs: [array([], dtype=int64), array([6, 7], dtype=int64)]
+
+            """
+            lower_list, upper_list = split_vertical_scan_y_idxs[0], split_vertical_scan_y_idxs[1]
+            if len(lower_list)==0:
+                # if the lower list is empty get the ybin_outer_extrema[0]
+                below_bound = ybin_outer_extrema[0]
+            else:
+                below_bound = lower_list[-1] # get the last (maximum) of the lower list
+
+            if len(upper_list)==0:
+                # if the upper list is empty get the ybin_outer_extrema[1]
+                above_bound = ybin_outer_extrema[1]
+            else:
+                above_bound = upper_list[0] # get the first (minimum) of the upper list
+            vertical_scan_result = (below_bound, above_bound) # get the last (maximum) of the lower list, and the first (minimum) of the upper list.
+            if debug_print:
+                print(f'\tvertical_scan_result: {vertical_scan_result}') # vertical_scan_result: (2, 6)
+
+
+            ## Perform horizontal line scan (across x-values):
+            matching_horizontal_scan_x_idxs = boundary_mask_true_indicies[(boundary_mask_true_indicies[:,1]==peak_y_bin_idx), 0] # the [*, 0] is because we only need the x-values
+            # matching_horizontal_scan_x_idxs # array([0, 1, 2, 6, 7], dtype=int64)
+            if debug_print:
+                print(f'\tmatching_horizontal_scan_x_idxs: {matching_horizontal_scan_x_idxs}')
+
+            if len(matching_horizontal_scan_x_idxs) == 0:
+                # both min and max ends missing. Should be set to the bin just outside the minimum and maximum bin in that dimension
+                warn(f'\tWARNING: len(matching_horizontal_scan_x_idxs) == 0: setting matching_horizontal_scan_x_idxs = {xbin_outer_extrema}')
+                matching_horizontal_scan_x_idxs = xbin_outer_extrema
+            elif len(matching_horizontal_scan_x_idxs) == 1:
+                # only one end missing, need to determine which end it is and replace the missing end with the appropriate extrema
+                if (matching_horizontal_scan_x_idxs[0] > peak_x_bin_idx):
+                    # add the lower extrema
+                    warn(f'\tWARNING: len(matching_horizontal_scan_x_idxs) == 1: missing lower extrema, adding xbin_outer_extrema[0] = {xbin_outer_extrema[0]} to matching_horizontal_scan_x_idxs')
+                    matching_horizontal_scan_x_idxs = np.insert(matching_horizontal_scan_x_idxs, 0, xbin_outer_extrema[0])
+                    # matching_horizontal_scan_x_idxs.insert(xbin_outer_extrema[0], 0)
+                elif (matching_horizontal_scan_x_idxs[0] < peak_x_bin_idx):
+                    # add the upper extrema
+                    warn(f'\tWARNING: len(matching_horizontal_scan_x_idxs) == 1: missing upper extrema, adding xbin_outer_extrema[1] = {xbin_outer_extrema[1]} to matching_horizontal_scan_x_idxs')
+                    matching_horizontal_scan_x_idxs = np.append(matching_horizontal_scan_x_idxs, [xbin_outer_extrema[1]])
+                else:
+                    # # EQUAL CONDITION SHOULDN'T HAPPEN!
+                    # raise NotImplementedError
+                    # This condition should only happen when peak_x_bin_idx is right against the boundary itself (e.g. (peak_x_bin_idx == 7) or (peak_x_bin_idx == 0)
+                    if (peak_x_bin_idx == xbin_indicies[0]):
+                        # matching_horizontal_scan_x_idxs[0] = xbin_outer_extrema[0] ## replace the duplicated value with the lower extreme
+                        warn(f'\tWARNING: peak_x_bin_idx ({peak_x_bin_idx}) == xbin_indicies[0] ({xbin_indicies[0]}): setting matching_horizontal_scan_x_idxs = {xbin_outer_extrema}')
+                        matching_horizontal_scan_x_idxs = xbin_outer_extrema
+                    elif (peak_x_bin_idx == xbin_indicies[-1]):
+                        # matching_horizontal_scan_x_idxs[0] = xbin_outer_extrema[1] ## replace the duplicated value with the upper extreme
+                        warn(f'\tWARNING: peak_x_bin_idx ({peak_x_bin_idx}) == xbin_indicies[-1] ({xbin_indicies[-1]}): setting matching_horizontal_scan_x_idxs = {xbin_outer_extrema}')
+                        matching_horizontal_scan_x_idxs = xbin_outer_extrema
+                    else:
+                        warn(f'\tWARNING: This REALLY should not happen! peak_x_bin_idx: {peak_x_bin_idx}, matching_horizontal_scan_x_idxs: {matching_horizontal_scan_x_idxs}!!')
+                        raise NotImplementedError
+                        
+            # Otherwise we're good
+
+            ### Partition on the peak_x_bin_idx
+            found_start_indicies = np.searchsorted(matching_horizontal_scan_x_idxs, peak_x_bin_idx, side='left')
+            found_end_indicies = np.searchsorted(matching_horizontal_scan_x_idxs, peak_x_bin_idx, side='right') # find the end of the range
+            out = np.hstack((found_start_indicies, found_end_indicies))
+            if debug_print:
+                print(f'\tfound_start_indicies: {found_start_indicies}, found_end_indicies: {found_end_indicies}, out: {out}')
+            split_horizontal_scan_x_idxs = np.array_split(matching_horizontal_scan_x_idxs, [found_start_indicies]) # need to pass in found_start_indicies as a list containing the scalar value because this functionality is different than if the scalar itself is passed in.
+            if debug_print:
+                print(f'\tsplit_horizontal_scan_x_idxs: {split_horizontal_scan_x_idxs}')
+
+            lower_list, upper_list = split_horizontal_scan_x_idxs[0], split_horizontal_scan_x_idxs[1]
+            if len(lower_list)==0:
+                # if the lower list is empty get the xbin_outer_extrema[0]
+                below_bound = xbin_outer_extrema[0]
+            else:
+                below_bound = lower_list[-1] # get the last (maximum) of the lower list
+            if len(upper_list)==0:
+                # if the upper list is empty get the xbin_outer_extrema[1]
+                above_bound = xbin_outer_extrema[1]
+            else:
+                above_bound = upper_list[0] # get the first (minimum) of the upper list
+            horizontal_scan_result = (below_bound, above_bound) # get the last (maximum) of the lower list, and the first (minimum) of the upper list.
+            if debug_print:
+                print(f'\thorizontal_scan_result: {horizontal_scan_result}') # horizontal_scan_result: (0, 60)
+            
+            ## Build final four directional boundary bins:
+            final_four_boundary_bin_tuples = [(peak_x_bin_idx, boundary_y) for boundary_y in vertical_scan_result] # [(46, 2), (46, 7)]
+            final_four_boundary_bin_tuples += [(boundary_x, peak_y_bin_idx) for boundary_x in horizontal_scan_result] # [(0, 4), (60, 4)]
+            # final_four_boundary_bin_tuples # [(46, 2), (46, 7), (0, 4), (60, 4)]
+            # Add to outputs:
+            peak_nearest_directional_boundary_bins.append(final_four_boundary_bin_tuples)
+            final_four_boundary_bins = np.array(final_four_boundary_bin_tuples) # convert to a (4, 2) np.array
+            if debug_print:
+                print(f'\tfinal_four_boundary_bins: {final_four_boundary_bins}')
+            ## Compute displacements from current point to each boundary:
+            final_four_boundary_displacements = final_four_boundary_bins - [peak_x_bin_idx, peak_y_bin_idx]
+            if debug_print:
+                print(f'\tfinal_four_boundary_displacements: {final_four_boundary_displacements}')
+
+            # Add to outputs:
+            peak_nearest_directional_boundary_displacements.append([(final_four_boundary_displacements[row_idx,0], final_four_boundary_displacements[row_idx,1]) for row_idx in np.arange(final_four_boundary_displacements.shape[0])])
+
+            # Compute distances from current point to each boundary:
+            # Flatten down to the pure distances in each component axis, form is (down, up, left, right)
+            final_four_boundary_distances = np.max(np.abs(final_four_boundary_displacements), axis=1) # array([ 2,  2, 47, 14], dtype=int64)
+            # final_four_boundary_distances # again a (4, 2) np.array
+            if debug_print:
+                print(f'\tfinal_four_boundary_distances: {final_four_boundary_distances}')
+            peak_nearest_directional_boundary_distances.append(final_four_boundary_distances)
+        
+        return peak_nearest_directional_boundary_bins, peak_nearest_directional_boundary_displacements, peak_nearest_directional_boundary_distances
+
+
+
+    @classmethod
+    def _perform_find_posterior_peaks_peak_prominence2d_computation(cls, p_x_given_n_list, xbin_centers, ybin_centers, step=0.01, peak_height_multiplier_probe_levels=(0.5, 0.9), minimum_included_peak_height = 0.2, uniform_blur_size = 3, gaussian_blur_sigma = 3, debug_print=False):
+            """ Uses the peak_prominence2d package to find the peaks and promenences of 2D placefields
+            
+            Independent of the other peak-computing computation functions above
+            
+            Inputs:
+                peak_height_multiplier_probe_levels = (0.5, 0.9) # 50% and 90% of the peak height
+                gaussian_blur_sigma: input to gaussian_filter for blur of peak counts
+                uniform_blur_size: inputt to uniform_filter for blur of peak counts
+                
+                
+            Requires:
+                computed_data['pf2D']
+                
+            Provides:
+                computed_data['RatemapPeaksAnalysis']['PeakProminence2D']:
+                    computed_data['RatemapPeaksAnalysis']['PeakProminence2D']['xx']:
+                    computed_data['RatemapPeaksAnalysis']['PeakProminence2D']['yy']:
+                    computed_data['RatemapPeaksAnalysis']['PeakProminence2D']['neuron_extended_ids']
+                    
+                    
+                    computed_data['RatemapPeaksAnalysis']['PeakProminence2D']['result_tuples']: (slab, peaks, idmap, promap, parentmap)
+                    
+                    flat_peaks_df
+                    filtered_flat_peaks_df
+                    
+                    peak_counts
+                        raw
+                        uniform_blurred
+                        gaussian_blurred
+                    
+            """
+            n_epochs = len(p_x_given_n_list)
+            
+            ## TODO: change to amap with keys of active_pf_2D.neuron_ids
+            
+            # active_tuning_curves = active_pf_2D.ratemap.tuning_curves # Raw Tuning Curves
+            active_tuning_curves = active_pf_2D.ratemap.unit_max_tuning_curves # Unit-max scaled tuning curves
+            # tuning_curve_peak_firing_rates = active_pf_2D.ratemap.tuning_curve_peak_firing_rates # the peak firing rates of each tuning curve
+            tuning_curve_peak_firing_rates = active_pf_2D.ratemap.tuning_curve_unsmoothed_peak_firing_rates
+             
+            #  Build the results:
+            out_results = {}
+            out_cell_peak_dfs_list = []
+            n_slices = len(peak_height_multiplier_probe_levels)
+
+            for epoch_idx in np.arange(n_epochs):
+                p_x_given_n = p_x_given_n_list[epoch_idx]
+
+                a_p_x_given_n = np.squeeze(p_x_given_n[:, :, a_t_bin_idx])
+
+                slab = a_p_x_given_n.T
+                _, _, slab, a_t_bin_peaks_dict, id_map, prominence_map, parent_map = compute_prominence_contours(xbin_centers=xbin_centers, ybin_centers=ybin_centers, slab=slab, step=step, min_area=None, min_depth=0.2, include_edge=True, verbose=False)
+                #""" Analyze all peaks of a given cell/ratemap """
+                n_peaks = len(a_t_bin_peaks_dict)
+                
+                ## Neuron:
+                n_total_cell_slice_results = n_slices * n_peaks                
+                neuron_id_arr = np.full((n_total_cell_slice_results,), neuron_id) # repeat the neuron_id many times for the datatable
+                neuron_peak_curve_rate_arr = np.full((n_total_cell_slice_results,), neuron_tuning_curve_peak_firing_rate) # repeat the neuron_id many times for the datatable
+                
+                ## Peak
+                summit_slice_peak_id_arr = np.zeros((n_peaks, n_slices), dtype=np.int16) # same summit/peak id for all in the slice
+                summit_slice_peak_level_multiplier_arr = np.zeros((n_peaks, n_slices), dtype=float) # same summit/peak id for all in the slice
+                summit_slice_peak_level_arr = np.zeros((n_peaks, n_slices), dtype=float) # same summit/peak id for all in the slice
+                summit_slice_peak_height_arr = np.zeros((n_peaks, n_slices), dtype=float) # same summit/peak id for all in the slice
+                summit_slice_peak_prominence_arr = np.zeros((n_peaks, n_slices), dtype=float) # same summit/peak id for all in the slice
+                summit_peak_center_x_arr = np.zeros((n_peaks, n_slices), dtype=float)
+                summit_peak_center_y_arr = np.zeros((n_peaks, n_slices), dtype=float)
+                
+                ## Slice
+                summit_slice_idx_arr = np.tile(np.arange(n_slices), n_peaks).astype('int') # array([0, 1, 0, 1, 0, 1, 0, 1, 0, 1])
+                summit_slice_x_side_length_arr = np.zeros((n_peaks, n_slices), dtype=float)
+                summit_slice_y_side_length_arr = np.zeros((n_peaks, n_slices), dtype=float)
+                summit_slice_center_x_arr = np.zeros((n_peaks, n_slices), dtype=float)
+                summit_slice_center_y_arr = np.zeros((n_peaks, n_slices), dtype=float)
+
+                for peak_idx, (peak_id, a_peak_dict) in enumerate(a_t_bin_peaks_dict.items()):
+                    if debug_print:
+                        print(f'computing contours for peak_id: {peak_id}...')                    
+                    summit_slice_peak_height_arr[peak_idx, :] = a_peak_dict['height']
+                    summit_slice_peak_prominence_arr[peak_idx, :] = a_peak_dict['prominence']
+                    summit_peak_center_x_arr[peak_idx, :] = a_peak_dict['center'][0]
+                    summit_peak_center_y_arr[peak_idx, :] = a_peak_dict['center'][1]
+                    
+                    ## This is where we would loop through each desired slice/probe levels:
+                    a_peak_dict['probe_levels'] = np.array([a_peak_dict['height']*multiplier for multiplier in peak_height_multiplier_probe_levels]).astype('float') # specific probe levels
+                    summit_slice_peak_level_multiplier_arr[peak_idx, :] = np.array(peak_height_multiplier_probe_levels).astype('float')
+                    summit_slice_peak_level_arr[peak_idx, :] = a_peak_dict['probe_levels']
+                    included_computed_contours = PeakPromenence._find_contours_at_levels(xbin_centers, ybin_centers, slab, a_peak_dict['center'], a_peak_dict['probe_levels']) # DONE: efficiency: This would be more efficient to do for all peaks at once I believe. CONCLUSION: No, this needs to be done separately for each peak as they each have separate prominences which determine the levels they should be sliced at.
+                    ## Build the dict that contains the output level slices
+                    a_peak_dict['level_slices'] = {probe_lvl:{'contour':contour, 'bbox':contour.get_extents(), 'size':contour.get_extents().size} for probe_lvl, contour in included_computed_contours.items() if (contour is not None)} # if contour is None, it looks like the 'build flat output' step fails below
+
+                    if debug_print:
+                        print(f"probe_levels: {a_peak_dict['probe_levels']}")
+
+                    ## Build flat output:
+                    for lvl_idx, probe_lvl in enumerate(a_peak_dict['probe_levels']):
+                        # a_slice = a_peak_dict['level_slices'][probe_lvl]
+                        a_slice = a_peak_dict['level_slices'].get(probe_lvl, None) # allow missing entries. This will occur when (contour is None) above.
+                        #TODO 2023-09-25 23:59: - [ ] Do I need to do anything else to handle this case, like remove the invalid curve from 
+                        if a_slice is None:
+                            print(f'WARNING: a_slice is None. 2023-09-25 - Unsure if this is okay, used to be a fatal error.') # a_peak_dict: {a_peak_dict}
+                        else:
+                            slice_bbox = a_slice['bbox']
+                            (x0, y0, width, height) = slice_bbox.bounds        
+                            summit_slice_peak_id_arr[peak_idx, lvl_idx] = peak_id
+                            summit_slice_x_side_length_arr[peak_idx, lvl_idx] = width
+                            summit_slice_y_side_length_arr[peak_idx, lvl_idx] = height
+                            # summit_slice_center_x_arr[peak_idx, lvl_idx] = slice_bbox.center[0]
+                            # summit_slice_center_y_arr[peak_idx, lvl_idx] = slice_bbox.center[1]
+                            summit_slice_center_x_arr[peak_idx, lvl_idx] = float(x0) + (0.5 * float(width))
+                            summit_slice_center_y_arr[peak_idx, lvl_idx] = float(y0) + (0.5 * float(height))
+                    
+                if debug_print:
+                    print(f'building peak_df for neuron[{epoch_idx}] with {n_peaks}...')
+                cell_peaks_df = pd.DataFrame({'neuron_id': neuron_id_arr, 'neuron_peak_firing_rate': neuron_peak_curve_rate_arr, 'summit_idx': summit_slice_peak_id_arr.flatten(), 'summit_slice_idx': summit_slice_idx_arr.flatten(),
+                                             'slice_level_multiplier': summit_slice_peak_level_multiplier_arr.flatten(), 'summit_slice_level': summit_slice_peak_level_arr.flatten(),
+                                             'peak_relative_height': summit_slice_peak_height_arr.flatten(), 'peak_prominence': summit_slice_peak_prominence_arr.flatten(),
+                                             'peak_center_x': summit_peak_center_x_arr.flatten(), 'peak_center_y': summit_peak_center_y_arr.flatten(),
+                                             'summit_slice_x_width': summit_slice_x_side_length_arr.flatten(), 'summit_slice_y_width': summit_slice_y_side_length_arr.flatten(),
+                                             'summit_slice_center_x': summit_slice_center_x_arr.flatten(), 'summit_slice_center_y': summit_slice_center_y_arr.flatten()
+                                             })
+                cell_peaks_df['peak_height'] = cell_peaks_df['peak_relative_height'] * neuron_peak_curve_rate_arr
+                
+                out_cell_peak_dfs_list.append(cell_peaks_df)
+                
+                                           
+                if debug_print:
+                    print(f'done.') # END Analyze peaks
+                    
+                out_results[neuron_id] = {'peaks': a_t_bin_peaks_dict, 'slab': slab, 'id_map':id_map, 'prominence_map':prominence_map, 'parent_map':parent_map} 
+    
+            # Build final concatenated dataframe:
+            if debug_print:
+                print(f'building final concatenated cell_peaks_df for {n_epochs} total neurons...')
+            cell_peaks_df = pd.concat(out_cell_peak_dfs_list)
+            ## Find which position bin each peak falls in and add it to the flat_peaks_df:
+            cell_peaks_df, (xbin, ybin), bin_infos = build_df_discretized_binned_position_columns(cell_peaks_df, bin_values=(xbin, ybin), position_column_names=('peak_center_x', 'peak_center_y'), binned_column_names=('peak_center_binned_x', 'peak_center_binned_y'), active_computation_config=None, force_recompute=False, debug_print=debug_print)
+
+            ## Find the avg velocity corresponding to each position bin containing a peak value:
+            active_eloy_analysis = computation_result.computed_data.get('EloyAnalysis', None)            
+            if active_eloy_analysis is not None:
+                ## Extract the previously computed results:
+                avg_2D_speed_per_pos = active_eloy_analysis.avg_2D_speed_per_pos # (60, 8)
+                # avg_2D_speed_sort_idxs = active_eloy_analysis.avg_2D_speed_sort_idxs
+                # assert np.shape(avg_2D_speed_per_pos) == np.shape(pf_peak_counts_map), f"the shape of the active_eloy_analysis.avg_2D_speed_per_pos ({np.shape(avg_2D_speed_per_pos)}) and the shape of the newly built pf_peak_counts_map ({np.shape(pf_peak_counts_map)}) must match!"
+                _temp_peak_center_bin_label_xy = cell_peaks_df[['peak_center_binned_x', 'peak_center_binned_y']].to_numpy()-1 # (26, 2)
+                ## Add the column to matrix:
+                cell_peaks_df['peak_center_avg_speed'] = avg_2D_speed_per_pos[_temp_peak_center_bin_label_xy[:,0], _temp_peak_center_bin_label_xy[:,1]] # array([33.2289, 33.7748, 35.9964, 0, 59.3887, 37.354, 16.1506, 0, 49.8418, 33.2289, 0, 14.9843, 33.8302, 29.8891, 37.354, 10.6905, 0, 33.7748, nan, 53.9505, 34.003, 33.7748, 22.7252, nan, 11.8898, 58.9018])                
+            
+
+            ## Filter the summits, compute velocities, etc:            
+            filtered_summits_analysis_df, pf_peak_counts_map = PeakPromenence._build_filtered_summits_analysis_results(xbin, ybin, xbin_labels, ybin_labels, cell_peaks_df, active_eloy_analysis, slice_level_multiplier=0.5, minimum_included_peak_height=minimum_included_peak_height, debug_print = debug_print)
+            
+            pf_peak_counts_map_blurred = uniform_filter(pf_peak_counts_map.astype('float'), size=uniform_blur_size, mode='constant')
+            pf_peak_counts_map_blurred_gaussian = gaussian_filter(pf_peak_counts_map.astype('float'), sigma=gaussian_blur_sigma)
+            pf_peak_counts_results = DynamicParameters(raw=pf_peak_counts_map, uniform_blurred=pf_peak_counts_map_blurred, gaussian_blurred=pf_peak_counts_map_blurred_gaussian)
+
+            try:
+                ## Add distance to boundary by computing the distance to the nearest never-occupied bin
+                peak_nearest_directional_boundary_bins, peak_nearest_directional_boundary_displacements, peak_nearest_directional_boundary_distances = PeakPromenence._compute_distances_from_peaks_to_boundary(active_pf_2D, filtered_summits_analysis_df, debug_print=debug_print)
+
+                ## Add the output columns to the peaks dataframe:
+                # Output Columns:
+                # ['peak_nearest_boundary_bin_negX', 'peak_nearest_boundary_bin_posX', 'peak_nearest_boundary_bin_negY', 'peak_nearest_boundary_bin_posY'] # separate
+                # ['peak_nearest_directional_boundary_bins', 'peak_nearest_directional_boundary_displacements', 'peak_nearest_directional_boundary_distances'] # combined tuple columns
+                filtered_summits_analysis_df['peak_nearest_directional_boundary_bins'] = peak_nearest_directional_boundary_bins
+                filtered_summits_analysis_df['peak_nearest_directional_boundary_displacements'] = peak_nearest_directional_boundary_displacements
+                filtered_summits_analysis_df['peak_nearest_directional_boundary_distances'] = peak_nearest_directional_boundary_distances
+                filtered_summits_analysis_df['nearest_directional_boundary_direction_idx'] = np.argmin(peak_nearest_directional_boundary_distances, axis=1) # an index [0,1,2,3] corresponding to the direction of travel to the nearest index. Corresponds to (down, up, left, right)
+                filtered_summits_analysis_df['nearest_directional_boundary_direction_distance'] = np.min(peak_nearest_directional_boundary_distances, axis=1) # the distance in the minimal dimension towards the nearest boundary
+
+                # ['peak_nearest_boundary_bin_negX', 'peak_nearest_boundary_bin_posX', 'peak_nearest_boundary_bin_negY', 'peak_nearest_boundary_bin_posY'] # separate
+                distances = np.vstack([np.asarray(a_tuple) for a_tuple in peak_nearest_directional_boundary_distances])
+                x_distances = np.min(distances[:,3:], axis=1) # find the distance to nearest wall vertically
+                y_distances = np.min(distances[:,:2], axis=1) # find the distance to nearest wall horizontally
+
+                filtered_summits_analysis_df['nearest_x_boundary_distance'] = x_distances # the distance in the minimal dimension towards the nearest x boundary
+                filtered_summits_analysis_df['nearest_y_boundary_distance'] = y_distances # the distance in the minimal dimension towards the nearest y boundary
+            except (BaseException, NotImplementedError) as err:
+                print(f'could not find distances to nearest boundary in `ratemap_peaks_prominence2d`. Some columns will be missing from the output dataframe. Error: {err}')
+
+                            
+            return DynamicParameters(xx=xbin_centers, yy=ybin_centers, results=out_results, flat_peaks_df=cell_peaks_df, filtered_flat_peaks_df=filtered_summits_analysis_df, peak_counts=pf_peak_counts_results)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
