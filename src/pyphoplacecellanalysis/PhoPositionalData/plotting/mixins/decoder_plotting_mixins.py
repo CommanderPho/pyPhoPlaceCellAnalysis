@@ -3024,7 +3024,7 @@ class DecodedTrajectoryMatplotlibPlotter(DecodedTrajectoryPlotter):
                     a_scatter = axs[curr_row][curr_col].scatter(epochs_position_traces[curr_lap_id][0,:], epochs_position_traces[curr_lap_id][1,:], **plot_traj_kwargs)
 
                 else:
-                    raise NotImplementedError(f'unexpected plotting mode: plot_mode: "{active_plot_mode}", valid options: {valid_plotting_modes}))                    
+                    raise NotImplementedError(f'unexpected plotting mode: plot_mode: "{active_plot_mode}", valid options: {valid_plotting_modes}')                    
 
                 # add lap text label
                 # Position text above the axes, centered horizontally, using axes coordinates (0-1)
