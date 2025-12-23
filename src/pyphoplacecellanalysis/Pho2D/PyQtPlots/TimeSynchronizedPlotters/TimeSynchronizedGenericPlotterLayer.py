@@ -1,7 +1,7 @@
 from neuropy.core.user_annotations import function_attributes
 import numpy as np
 import pandas as pd
-from qtpy import QtCore, QtWidgets
+from qtpy import QtCore, QtWidgets, QtGui
 from copy import deepcopy
 from typing import Dict, List, Tuple, Optional, Callable, Union, Any
 from typing_extensions import TypeAlias
@@ -9,6 +9,7 @@ import nptyping as ND
 from nptyping import NDArray
 from attrs import define, field, Factory
 from neuropy.utils.mixins.AttrsClassHelpers import keys_only_repr, shape_only_repr
+from PyQt5.QtGui import QPainter
 
 # from neuropy.analyses.time_dependent_placefields import PfND_TimeDependent
 from pyphocorehelpers.assertion_helpers import Assert
@@ -33,6 +34,7 @@ from pyphoplacecellanalysis.General.Model.Configs.ParamConfigs import BasePlotDa
 from pyphocorehelpers.gui.Qt.ParamQtWidget import ParamQtWidget, ParamQtWidgetMappingMixin
 
 
+## a_plotter.ui.imv.setCompositionMode(QPainter.CompositionMode_Plus) ## Set this mode so that the heatmap overlays the occupancy map
 class LayerDisplayConfig(ParamQtWidgetMappingMixin, BasePlotDataParams):
     """ This class uses the 'param' library to observe changes to its members 
     and perform corresponding updates to the class that holds it when they happen.
@@ -333,6 +335,7 @@ a_plotter
 
         ## get the image item to draw:
         imv: pg.ImageItem = self.contents['main']
+        imv.setCompositionMode(QPainter.CompositionMode_Plus) ## Set this mode so that the heatmap overlays the occupancy map
 
         if is_all_nan:
             # Optimization: Don't just set data to None/NaN, actually remove it from the render pipeline
