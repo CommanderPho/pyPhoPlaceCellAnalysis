@@ -2347,9 +2347,8 @@ class PredictiveDecodingDisplayWidget(): # GenericMatplotlibContainer
             epoch_specific_position_dfs = list(curr_matching_past_future_positions_df_dict[a_past_future_name].values())
             epoch_ids = np.array(list(curr_matching_past_future_positions_df_dict[a_past_future_name].keys()))
             # epoch_specific_position_dfs
-            curr_num_subplots: int = min(8, len(epoch_ids))
+            curr_num_subplots: int = min(40, len(epoch_ids))
             
-
             # an_epoch_specific_past_position_dfs = curr_matching_epochs_df_dict['past']
             # an_epoch_specific_past_epoch_ids = an_epoch_specific_past_position_dfs.index.to_numpy()
             ## OUTPUTS: an_epoch_specific_past_position_dfs, an_epoch_specific_past_epoch_ids
@@ -2369,6 +2368,7 @@ class PredictiveDecodingDisplayWidget(): # GenericMatplotlibContainer
             #     existing_ax = canvas.figure.get_axes() ## a list of 8 Axes objects
 
             fig, axs, epochs_pages = a_decoded_traj_plotter.plot_decoded_trajectories_2d(curr_position_df=self.curr_position_df, epoch_specific_position_dfs=epoch_specific_position_dfs, epoch_ids=epoch_ids, curr_num_subplots=curr_num_subplots, active_page_index=0,
+                                                                                     fixed_columns = 5,
                                                                                      plot_actual_lap_lines=True, use_theoretical_tracks_instead=False, existing_ax=existing_ax)
             
             perform_update_title_subtitle(fig=fig, ax=None, title_string=f"{a_past_future_name} - an_epoch_idx: {an_epoch_idx}")
