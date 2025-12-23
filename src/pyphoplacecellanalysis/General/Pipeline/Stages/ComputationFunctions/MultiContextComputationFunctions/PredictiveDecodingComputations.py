@@ -2179,7 +2179,7 @@ from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as NavigationToolbar
 
 @define(slots=False, repr=False, eq=False)
-class PredictiveDecodingDisplayWidget(): # GenericMatplotlibContainer
+class PredictiveDecodingDisplayWidget:
     """ 
         from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.PredictiveDecodingComputations import PredictiveDecodingDisplayWidget
 
@@ -2286,14 +2286,21 @@ class PredictiveDecodingDisplayWidget(): # GenericMatplotlibContainer
         self.dock_window.setCentralWidget(self.dock_area)
         self.dock_window.resize(1400, 800)
         
-        # Create docks for past and future (will be populated when update_displayed_epoch is called)
+        # Create docks for past, decoded_posterior, and future (will be populated when update_displayed_epoch is called)
         prev_dock = None
-        for category_name in ['past', 'future']:
-            dock_name = f"{category_name.capitalize()} Trajectories"
+        for category_name in ['past', 'decoded_posterior', 'future']:
+            if category_name == 'decoded_posterior':
+                dock_name = "Decoded Posterior"
+            else:
+                dock_name = f"{category_name.capitalize()} Trajectories"
             dock = Dock(dock_name, size=(600, 700), closable=True)
             
             # Create placeholder widget (will be replaced with actual plot in update_displayed_epoch)
-            placeholder_widget = QtWidgets.QLabel(f"Waiting for data...\nCall update_displayed_epoch() to display {category_name} trajectories.")
+            if category_name == 'decoded_posterior':
+                placeholder_text = f"Waiting for data...\nCall update_displayed_epoch() to display decoded posterior heatmap."
+            else:
+                placeholder_text = f"Waiting for data...\nCall update_displayed_epoch() to display {category_name} trajectories."
+            placeholder_widget = QtWidgets.QLabel(placeholder_text)
             placeholder_widget.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
             dock.addWidget(placeholder_widget)
             
@@ -2413,5 +2420,79 @@ class PredictiveDecodingDisplayWidget(): # GenericMatplotlibContainer
 
 
         ## END for a_past_future_name, an_epoch_specific_past_positi...
+
+        # Plot decoded posterior heatmap for 'decoded_posterior' dock
+        category_name = 'decoded_posterior'
+        p_x_given_n = self.decoded_result.p_x_given_n_list[an_epoch_idx]  # Shape: (n_x_bins, n_y_bins, n_time_bins)
+        # Sum over time dimension to create 2D heatmap
+        posterior_2d = np.sum(p_x_given_n, axis=2)
+        
+        # Create matplotlib figure for heatmap
+        import matplotlib.pyplot as plt
+        fig, ax = plt.subplots(figsize=(8, 6), layout="constrained")
+        
+        # Calculate extent from bin edges (more accurate than using centers)
+        extent = [self.xbin[0], self.xbin[-1], self.ybin[0], self.ybin[-1]]
+        
+        # Plot heatmap
+        im = ax.imshow(posterior_2d, aspect='auto', origin='lower', extent=extent, cmap='viridis', interpolation='nearest')
+        ax.set_xlabel('X Position')
+        ax.set_ylabel('Y Position')
+        ax.set_title(f'Decoded Posterior Heatmap - Epoch {an_epoch_idx}')
+        
+        # Add colorbar
+        cbar = plt.colorbar(im, ax=ax)
+        cbar.set_label('Probability (sum over time)')
+        
+        # Embed the matplotlib figure in the dock widget
+        needed_init: bool = category_name not in self.dock_canvas_widgets
+        if needed_init:
+            dock = self.dock_widgets.get(category_name)
+            if dock is not None:
+                # Remove existing widgets from dock
+                layout = dock.layout
+                if layout is not None:
+                    while layout.count():
+                        child = layout.takeAt(0)
+                        if child.widget():
+                            child.widget().setParent(None)
+                # Clear the widgets list maintained by Dock
+                if hasattr(dock, 'widgets'):
+                    dock.widgets.clear()
+                dock.currentRow = 0
+                
+                # Create canvas and toolbar for the matplotlib figure
+                canvas = FigureCanvas(fig)
+                toolbar = NavigationToolbar(canvas, self.dock_window)
+                
+                # Create a widget to hold canvas and toolbar
+                plot_widget = QtWidgets.QWidget()
+                plot_layout = QtWidgets.QVBoxLayout()
+                plot_layout.setContentsMargins(0, 0, 0, 0)
+                plot_layout.addWidget(toolbar)
+                plot_layout.addWidget(canvas)
+                plot_widget.setLayout(plot_layout)
+                
+                # Add to dock
+                dock.addWidget(plot_widget)
+                
+                # Store reference to canvas widget
+                self.dock_canvas_widgets[category_name] = canvas
+        else:
+            # Update existing canvas
+            canvas = self.dock_canvas_widgets.get(category_name)
+            if canvas is not None:
+                # Clear existing axes and replot
+                canvas.figure.clear()
+                ax = canvas.figure.add_subplot(111)
+                # Recalculate extent for update
+                extent = [self.xbin[0], self.xbin[-1], self.ybin[0], self.ybin[-1]]
+                im = ax.imshow(posterior_2d, aspect='auto', origin='lower', extent=extent, cmap='viridis', interpolation='nearest')
+                ax.set_xlabel('X Position')
+                ax.set_ylabel('Y Position')
+                ax.set_title(f'Decoded Posterior Heatmap - Epoch {an_epoch_idx}')
+                cbar = plt.colorbar(im, ax=ax)
+                cbar.set_label('Probability (sum over time)')
+                canvas.draw()
 
         ## OUTPUTS: curr_matching_past_future_positions_df_dict 
