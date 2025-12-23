@@ -1687,7 +1687,7 @@ class PredictiveDecodingComputationsContainer(ComputedResult):
 
     pf1D_Decoder_dict: Dict[types.DecoderName, BasePositionDecoder] = serialized_field(default=Factory(dict), metadata={'field_added': "2025.12.20_0", 'copied_from': 'DirectionalDecodersContinuouslyDecodedResult'})
     epochs_decoded_result_cache_dict: Dict[float, Dict[types.DecoderName, DecodedFilterEpochsResult]] = serialized_field(default=Factory(dict), metadata={'field_added': "2025.12.20_0", 'copied_from': 'DirectionalDecodersContinuouslyDecodedResult'}) # key is the t_bin_size in seconds
-    
+    debug_computed_dict: Dict[types.DecoderName, Dict] = non_serialized_field(default=Factory(dict), metadata={'field_added': "2025.12.21_0"})
 
     @property
     def most_recent_decoding_time_bin_size(self) -> Optional[float]:
@@ -2145,7 +2145,6 @@ class PredictiveDecodingComputationsGlobalComputationFunctions(AllFunctionEnumer
         locality_measures.compute()
         non_local_PBE_non_moving_epochs_df: pd.DataFrame = locality_measures.get_non_moving_PBE_non_local_epochs(owning_pipeline_reference.sess, merging_adjacent_max_separation_sec=0.5)
         
-
         # Get a_result_decoded from directional_decoders_decode_result
         a_result_decoded = directional_decoders_decode_result.continuously_decoded_pseudo2D_decoder_dict[time_bin_size]
         
@@ -2173,7 +2172,13 @@ class PredictiveDecodingComputationsGlobalComputationFunctions(AllFunctionEnumer
         # Store the PredictiveDecoding instance in the container
         global_computation_results.computed_data['PredictiveDecoding'].predictive_decoding = predictive_decoding
         
-        _out = global_computation_results.computed_data['PredictiveDecoding'].compute_future_and_past_analysis(owning_pipeline_reference, an_epoch_name='roam')
+        epoch_names: List[str] = ['roam', 'sprinkle']
+        for an_epoch_name in epoch_names:    
+            global_computation_results.computed_data['PredictiveDecoding'].debug_computed_dict[an_epoch_name] = {}
+            _out = global_computation_results.computed_data['PredictiveDecoding'].compute_future_and_past_analysis(owning_pipeline_reference, an_epoch_name='roam')
+            epoch_high_prob_pos_masks, epoch_matching_positions, past_future_info_dict, matching_pos_dfs_list, matching_pos_epochs_dfs_list = _out
+            global_computation_results.computed_data['PredictiveDecoding'].debug_computed_dict[an_epoch_name] = {'epoch_high_prob_pos_masks': epoch_high_prob_pos_masks, 'epoch_matching_positions': epoch_matching_positions, 'past_future_info_dict': past_future_info_dict}
+            
         # epoch_high_prob_pos_masks, epoch_matching_positions, past_future_info_dict, matching_pos_dfs_list, matching_pos_epochs_dfs_list
 
         """ Usage:
@@ -2400,7 +2405,8 @@ class PredictiveDecodingDisplayWidget:
             epoch_specific_position_dfs = list(curr_matching_past_future_positions_df_dict[a_past_future_name].values())
             epoch_ids = np.array(list(curr_matching_past_future_positions_df_dict[a_past_future_name].keys()))
             # epoch_specific_position_dfs
-            curr_num_subplots: int = min(40, len(epoch_ids))
+            curr_num_subplots: int = min(20, len(epoch_ids))
+            # curr_num_subplots: int = 40
             
             # an_epoch_specific_past_position_dfs = curr_matching_epochs_df_dict['past']
             # an_epoch_specific_past_epoch_ids = an_epoch_specific_past_position_dfs.index.to_numpy()
@@ -2424,7 +2430,7 @@ class PredictiveDecodingDisplayWidget:
                                                                                      fixed_columns = 4,
                                                                                      plot_actual_lap_lines=True, use_theoretical_tracks_instead=False, existing_ax=existing_ax,
                                                                                      #  plot_mode='line',
-                                                                                     plot_mode='scatter', c='red',
+                                                                                     plot_mode='scatter', c='red', cmap='Reds', alpha=0.95,
                                                                                      )
             
             perform_update_title_subtitle(fig=fig, ax=None, title_string=f"{a_past_future_name} - an_epoch_idx: {an_epoch_idx}")
