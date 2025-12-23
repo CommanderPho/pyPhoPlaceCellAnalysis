@@ -86,9 +86,16 @@ import matplotlib
 matplotlib.use('Agg')  # Use non-interactive backend for image rendering
 
 if TYPE_CHECKING:
+    import napari
     from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.EpochComputationFunctions import DecodingResultND
     from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import DecodedFilterEpochsResult, BasePositionDecoder
     from nptyping import NDArray
+
+from neuropy.utils.mixins.AttrsClassHelpers import keys_only_repr
+from pyphocorehelpers.DataStructure.general_parameter_containers import VisualizationParameters, RenderPlotsData, RenderPlots # PyqtgraphRenderPlots
+from pyphoplacecellanalysis.GUI.PyVista.InteractivePlotter.PhoInteractivePlotter import PhoInteractivePlotter # DecodedTrajectoryPyVistaPlotter
+from pyphoplacecellanalysis.Pho3D.PyVista.graphs import plot_3d_binned_bars, plot_3d_stem_points, plot_point_labels # DecodedTrajectoryPyVistaPlotter
+
 
 
 @dataclass
@@ -1952,8 +1959,6 @@ def multi_DecodedTrajectoryMatplotlibPlotter_side_by_side(a_result2D: DecodedFil
     return a_decoded_traj_plotter, (fig, axs, decoded_epochs_pages)
 
 
-from neuropy.utils.mixins.AttrsClassHelpers import keys_only_repr
-from pyphocorehelpers.DataStructure.general_parameter_containers import VisualizationParameters, RenderPlotsData, RenderPlots # PyqtgraphRenderPlots
 
 
 @define(slots=False)
@@ -3136,10 +3141,9 @@ class DecodedTrajectoryMatplotlibPlotter(DecodedTrajectoryPlotter):
         
 
 
-
-from pyphoplacecellanalysis.GUI.PyVista.InteractivePlotter.PhoInteractivePlotter import PhoInteractivePlotter
-from pyphoplacecellanalysis.Pho3D.PyVista.graphs import plot_3d_binned_bars, plot_3d_stem_points, plot_point_labels
-
+# ==================================================================================================================================================================================================================================================================================== #
+# PyVista/3D                                                                                                                                                                                                                                                                           #
+# ==================================================================================================================================================================================================================================================================================== #
 
 @define(slots=False, eq=False)
 class DecodedTrajectoryPyVistaPlotter(DecodedTrajectoryPlotter):
@@ -3639,3 +3643,152 @@ class DecoderRenderingPyVistaMixin:
         return (plotActors, data_dict), (plotActors_CenterLabels, data_dict_CenterLabels)
 
 
+
+# ==================================================================================================================================================================================================================================================================================== #
+# Napari/3D                                                                                                                                                                                                                                                                            #
+# ==================================================================================================================================================================================================================================================================================== #
+@define(slots=False, eq=False)
+class DecodedTrajectoryNapariPlotter(DecodedTrajectoryPlotter):
+    """ plots decoded posteriors using Napari with sliders for epoch and time-bin.
+
+    Builds a 4D volume over (epoch, time_bin, xbin, ybin) and shows it as a Napari image layer.
+
+    Usage (example):
+
+        from pyphoplacecellanalysis.PhoPositionalData.plotting.mixins.decoder_plotting_mixins import DecodedTrajectoryNapariPlotter
+        napari_plotter = DecodedTrajectoryNapariPlotter(a_result=a_result, xbin=xbin, xbin_centers=xbin_centers, ybin=ybin, ybin_centers=ybin_centers)
+        viewer, layer = napari_plotter.build_ui()
+
+    """
+
+    viewer: Optional["napari.viewer.Viewer"] = field(default=None)
+    image_layer: Any = field(default=None)
+
+    posterior_volume: Optional[NDArray] = field(default=None)
+    time_bin_centers_matrix: Optional[NDArray] = field(default=None)
+
+    curr_epoch_idx: int = field(default=0)
+    curr_time_bin_index: int = field(default=0)
+
+    enable_plot_all_time_bins_in_epoch_mode: bool = field(default=False, metadata={'desc': 'if True, Napari time axis spans all time bins for all epochs; otherwise still the same but semantics may differ in callers.'})
+
+    @function_attributes(short_name=None, tags=['napari', 'posterior', 'volume', 'helper'], input_requires=[], output_provides=[], uses=[], used_by=['DecodedTrajectoryNapariPlotter.build_ui'], creation_date='2025-12-23 08:00', related_items=['DecodedTrajectoryPyVistaPlotter'])
+    def build_posterior_volume(self, desired_max_height: float = 50.0) -> Tuple[NDArray, NDArray]:
+        """Builds a 4D volume over (epoch, time_bin, xbin, ybin) suitable for Napari.
+
+        Uses the same logic as `_perform_get_curr_posterior` on `DecodedTrajectoryPyVistaPlotter`
+        to ensure scaling and 1D/2D handling matches the PyVista implementation.
+
+        Returns:
+            posterior_volume: np.ndarray with shape (num_epochs, max_num_time_bins, n_xbins, n_ybins)
+            time_bin_centers_matrix: np.ndarray with shape (num_epochs, max_num_time_bins)
+        """
+        assert self.a_result is not None, "DecodedTrajectoryNapariPlotter requires `a_result`."
+        assert self.xbin_centers is not None, "DecodedTrajectoryNapariPlotter requires `xbin_centers`."
+
+        num_epochs: int = self.num_filter_epochs
+        epoch_time_bin_counts: List[int] = []
+        for an_epoch_idx in np.arange(num_epochs):
+            time_bin_centers = self.a_result.time_bin_containers[an_epoch_idx].centers
+            epoch_time_bin_counts.append(len(time_bin_centers))
+
+        max_num_time_bins: int = int(np.max(epoch_time_bin_counts))
+        n_xbins: int = len(self.xbin_centers)
+        if self.ybin_centers is not None:
+            n_ybins: int = len(self.ybin_centers)
+        else:
+            # treat as 1D in y if not provided
+            n_ybins = 1
+
+        posterior_volume = np.zeros((num_epochs, max_num_time_bins, n_xbins, n_ybins), dtype=float)
+        time_bin_centers_matrix = np.full((num_epochs, max_num_time_bins), np.nan, dtype=float)
+
+        for an_epoch_idx in np.arange(num_epochs):
+            # replicate core of DecodedTrajectoryPyVistaPlotter._perform_get_curr_posterior
+            a_posterior_p_x_given_n_all_t = self.a_result.p_x_given_n_list[an_epoch_idx]
+            a_most_likely_positions = self.a_result.most_likely_positions_list[an_epoch_idx]
+            a_time_bin_centers = self.a_result.time_bin_containers[an_epoch_idx].centers
+            assert len(a_time_bin_centers) == len(a_most_likely_positions), f"len(a_time_bin_centers): {len(a_time_bin_centers)} != len(a_most_likely_positions): {len(a_most_likely_positions)}"
+
+            min_v = np.nanmin(a_posterior_p_x_given_n_all_t)
+            max_v = np.nanmax(a_posterior_p_x_given_n_all_t)
+            multiplier_factor: float = desired_max_height / (float(max_v) - float(min_v))
+
+            n_time_bins_for_epoch: int = epoch_time_bin_counts[an_epoch_idx]
+
+            for time_bin_index in np.arange(n_time_bins_for_epoch):
+                # slice per time bin using same ndim-conditional logic
+                if np.ndim(a_posterior_p_x_given_n_all_t) > 2:
+                    a_posterior_p_x_given_n = np.squeeze(a_posterior_p_x_given_n_all_t[:, :, int(time_bin_index)])
+                else:
+                    a_posterior_p_x_given_n = np.squeeze(a_posterior_p_x_given_n_all_t[:, int(time_bin_index)])
+
+                a_posterior_p_x_given_n = a_posterior_p_x_given_n * multiplier_factor
+
+                # ensure 2D matrix (n_xbins, n_ybins)
+                if np.ndim(a_posterior_p_x_given_n) == 1:
+                    a_posterior_p_x_given_n = np.atleast_2d(a_posterior_p_x_given_n).T
+
+                n_x, n_y = np.shape(a_posterior_p_x_given_n)
+                assert n_x == n_xbins, f"epoch {an_epoch_idx}, time_bin_index {time_bin_index}: n_x ({n_x}) != len(xbin_centers) ({n_xbins})"
+
+                if n_y != n_ybins:
+                    if (n_y == 1) and (n_ybins > 1):
+                        # tile single y across all available y-bins
+                        a_posterior_p_x_given_n = np.tile(a_posterior_p_x_given_n, (1, n_ybins))
+                        n_x, n_y = np.shape(a_posterior_p_x_given_n)
+                    else:
+                        raise AssertionError(f"epoch {an_epoch_idx}, time_bin_index {time_bin_index}: n_y ({n_y}) != len(ybin_centers) ({n_ybins}) and cannot be safely broadcast.")
+
+                posterior_volume[an_epoch_idx, int(time_bin_index), :, :] = a_posterior_p_x_given_n
+                time_bin_centers_matrix[an_epoch_idx, int(time_bin_index)] = a_time_bin_centers[int(time_bin_index)]
+
+        self.posterior_volume = posterior_volume
+        self.time_bin_centers_matrix = time_bin_centers_matrix
+        return posterior_volume, time_bin_centers_matrix
+
+    @function_attributes(short_name=None, tags=['napari', 'posterior', 'viewer', 'ui'], input_requires=[], output_provides=[], uses=['DecodedTrajectoryNapariPlotter.build_posterior_volume'], used_by=[], creation_date='2025-12-23 08:05', related_items=['DecodedTrajectoryPyVistaPlotter', 'napari_from_layers_dict'])
+    def build_ui(self, viewer: Optional["napari.viewer.Viewer"] = None, layer_name: str = 'decoded_posterior', title: str = 'Decoded Posterior', **viewer_kwargs) -> Tuple["napari.viewer.Viewer", Any]:
+        """Builds the Napari viewer and image layer showing the decoded posterior.
+
+        If `viewer` is None, a new `napari.Viewer` is created. Otherwise the provided viewer is used.
+
+        Returns:
+            viewer: the Napari viewer instance
+            image_layer: the created image layer containing the posterior volume
+        """
+        # local import to avoid hard dependency if Napari is not installed in non-Napari contexts
+        import napari
+
+        posterior_volume, _ = self.build_posterior_volume()
+
+        if viewer is None:
+            viewer = napari.Viewer(title=title, **viewer_kwargs)
+
+        image_layer = viewer.add_image(posterior_volume, name=layer_name, colormap='viridis', blending='additive')
+
+        # axes: (epoch, time_bin, xbin, ybin)
+        viewer.dims.axis_labels = ('epoch', 'time_bin', 'xbin', 'ybin')
+
+        # initialize current step
+        epoch_idx = int(self.curr_epoch_idx) if self.curr_epoch_idx is not None else 0
+        time_idx = int(self.curr_time_bin_index) if self.curr_time_bin_index is not None else 0
+        viewer.dims.current_step = (epoch_idx, time_idx, 0, 0)
+
+        self.viewer = viewer
+        self.image_layer = image_layer
+
+        def _on_current_step_change(event):
+            """Keep internal indices synchronized with Napari sliders."""
+            if event is None:
+                return
+            if not hasattr(event, 'value'):
+                return
+            curr_step = event.value
+            if len(curr_step) >= 2:
+                self.curr_epoch_idx = int(curr_step[0])
+                self.curr_time_bin_index = int(curr_step[1])
+
+        viewer.dims.events.current_step.connect(_on_current_step_change)
+
+        return viewer, image_layer
