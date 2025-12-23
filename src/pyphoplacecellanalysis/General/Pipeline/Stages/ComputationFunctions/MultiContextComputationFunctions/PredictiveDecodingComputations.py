@@ -1905,7 +1905,7 @@ class PredictiveDecodingComputationsContainer(ComputedResult):
             relevant_positions_df.loc[is_relevant_past_times, 'is_future_present_past'] = 'past'
             relevant_positions_df.loc[is_relevant_future_times, 'is_future_present_past'] = 'future'
 
-            _out_split = relevant_positions_df.pho.partition_df_dict('is_future_present_past')
+            # _out_split = relevant_positions_df.pho.partition_df_dict('is_future_present_past')
 
             ## how many timestamps still remain in the past and the future:
             n_total_possible_past_times = np.sum(measured_positions_df['t'] < curr_epoch_start_t)
@@ -2226,6 +2226,8 @@ class PredictiveDecodingDisplayWidget:
     dock_widgets: Dict[str, Any] = field(default=Factory(dict))
     dock_canvas_widgets: Dict[str, Any] = field(default=Factory(dict))
 
+    active_epoch_idx: int = field(default=4)
+    
 
     @classmethod
     def init_from_container(cls, container: PredictiveDecodingComputationsContainer, decoding_time_bin_size: float, an_epoch_name: str) -> "PredictiveDecodingDisplayWidget":
@@ -2335,7 +2337,7 @@ class PredictiveDecodingDisplayWidget:
         
         self.dock_window.show()
         
-        self.update_displayed_epoch(an_epoch_idx=4) ## go to first index if possible
+        self.update_displayed_epoch(an_epoch_idx=self.active_epoch_idx) ## go to first index if possible
 
 
     def update_displayed_epoch(self, an_epoch_idx: int = 8):
@@ -2343,11 +2345,14 @@ class PredictiveDecodingDisplayWidget:
 
         """
         from pyphoplacecellanalysis.External.pyqtgraph.Qt import QtWidgets
+        import matplotlib.pyplot as plt
 
         # Initialize UI if not already done
         if self.dock_area is None:
             self.init_UI()
 
+        prev_epoch_idx: int = deepcopy(self.active_epoch_idx)
+                
         assert len(self.container.predictive_decoding.matching_pos_dfs_list) > 0
         matching_pos_dfs_list = self.container.predictive_decoding.matching_pos_dfs_list
         assert len(self.container.predictive_decoding.matching_pos_epochs_dfs_list) > 0
@@ -2399,7 +2404,7 @@ class PredictiveDecodingDisplayWidget:
                                                                                      plot_actual_lap_lines=True, use_theoretical_tracks_instead=False, existing_ax=existing_ax)
             
             perform_update_title_subtitle(fig=fig, ax=None, title_string=f"{a_past_future_name} - an_epoch_idx: {an_epoch_idx}")
-
+            # self.active_epoch_idx = an_epoch_idx
 
             # Embed the matplotlib figure in the dock widget
             if needed_init:
@@ -2434,7 +2439,10 @@ class PredictiveDecodingDisplayWidget:
                     dock.addWidget(plot_widget)
                     
                     # Store reference to canvas widget
-                    self.dock_canvas_widgets[a_past_future_name] = canvas                
+                    self.dock_canvas_widgets[a_past_future_name] = canvas
+                    
+                    # Close the figure window if it's open (since it's now embedded in the dock)
+                    plt.close(fig)                
 
         ### for a_past_future_name, an_epoch_specific_past_position_dfs in curr_matc...
 
@@ -2443,30 +2451,45 @@ class PredictiveDecodingDisplayWidget:
 
         # Plot decoded posterior heatmap for 'decoded_posterior' dock
         category_name = 'decoded_posterior'
-        p_x_given_n = self.decoded_result.p_x_given_n_list[an_epoch_idx]  # Shape: (n_x_bins, n_y_bins, n_time_bins)
-        # Sum over time dimension to create 2D heatmap
-        posterior_2d = np.sum(p_x_given_n, axis=2)
+
+        posterior_2d = None
+        epoch_high_prob_pos_masks = getattr(self.container.predictive_decoding, 'epoch_high_prob_pos_masks', None)
+        if epoch_high_prob_pos_masks is not None:
+            print(f'using high_prob mask version!')
+            # posterior_2d = self.container.predictive_decoding.epoch_high_prob_pos_masks[an_epoch_idx]
+            posterior_2d = epoch_high_prob_pos_masks[an_epoch_idx]
+            
+        else:
+            ## use posterior:
+            p_x_given_n = self.decoded_result.p_x_given_n_list[an_epoch_idx]  # Shape: (n_x_bins, n_y_bins, n_time_bins)
+            # Sum over time dimension to create 2D heatmap
+            posterior_2d = np.sum(p_x_given_n, axis=2)
+            
         
-        # Create matplotlib figure for heatmap
-        import matplotlib.pyplot as plt
-        fig, ax = plt.subplots(figsize=(8, 6), layout="constrained")
-        
-        # Calculate extent from bin edges (more accurate than using centers)
-        extent = [self.xbin[0], self.xbin[-1], self.ybin[0], self.ybin[-1]]
-        
-        # Plot heatmap
-        im = ax.imshow(posterior_2d, aspect='auto', origin='lower', extent=extent, cmap='viridis', interpolation='nearest')
-        ax.set_xlabel('X Position')
-        ax.set_ylabel('Y Position')
-        ax.set_title(f'Decoded Posterior Heatmap - Epoch {an_epoch_idx}')
-        
-        # Add colorbar
-        cbar = plt.colorbar(im, ax=ax)
-        cbar.set_label('Probability (sum over time)')
-        
-        # Embed the matplotlib figure in the dock widget
+        # Check if we need to initialize (create new figure) or update existing one
         needed_init: bool = category_name not in self.dock_canvas_widgets
+        
+        
         if needed_init:
+            # Create matplotlib figure for heatmap (using Figure directly to avoid showing in separate window)
+            from matplotlib.figure import Figure
+            fig = Figure(figsize=(8, 6), layout="constrained")
+            ax = fig.add_subplot(111)
+            
+            # Calculate extent from bin edges (more accurate than using centers)
+            extent = [self.xbin[0], self.xbin[-1], self.ybin[0], self.ybin[-1]]
+            
+            # Plot heatmap
+            im = ax.imshow(posterior_2d, aspect='auto', origin='lower', extent=extent, cmap='viridis', interpolation='nearest')
+            ax.set_xlabel('X Position')
+            ax.set_ylabel('Y Position')
+            ax.set_title(f'Decoded Posterior Heatmap - Epoch {an_epoch_idx}')
+            
+            # Add colorbar
+            cbar = plt.colorbar(im, ax=ax)
+            cbar.set_label('Probability (sum over time)')
+            
+            # Embed the matplotlib figure in the dock widget
             dock = self.dock_widgets.get(category_name)
             if dock is not None:
                 # Remove existing widgets from dock
@@ -2498,6 +2521,9 @@ class PredictiveDecodingDisplayWidget:
                 
                 # Store reference to canvas widget
                 self.dock_canvas_widgets[category_name] = canvas
+                
+                # Close the figure window if it's open (since it's now embedded in the dock)
+                plt.close(fig)
         else:
             # Update existing canvas
             canvas = self.dock_canvas_widgets.get(category_name)
@@ -2516,3 +2542,4 @@ class PredictiveDecodingDisplayWidget:
                 canvas.draw()
 
         ## OUTPUTS: curr_matching_past_future_positions_df_dict 
+        self.active_epoch_idx = an_epoch_idx
