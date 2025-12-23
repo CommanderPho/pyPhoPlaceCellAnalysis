@@ -2226,7 +2226,9 @@ from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as Navigatio
 
 @define(slots=False, repr=False, eq=False)
 class PredictiveDecodingDisplayWidget:
-    """ 
+    """ Plots 3 panels side-by-side: Left: Past positions, Mid: Decoded Epoch Posterior, Right: Future positions
+    
+    
         from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.PredictiveDecodingComputations import PredictiveDecodingDisplayWidget
 
         a_widget: PredictiveDecodingDisplayWidget = PredictiveDecodingDisplayWidget.init_from_container(container=container, decoding_time_bin_size=0.025, an_epoch_name='roam')
@@ -2256,7 +2258,7 @@ class PredictiveDecodingDisplayWidget:
     
 
     @classmethod
-    def init_from_container(cls, container: PredictiveDecodingComputationsContainer, decoding_time_bin_size: float, an_epoch_name: str) -> "PredictiveDecodingDisplayWidget":
+    def init_from_container(cls, container: PredictiveDecodingComputationsContainer, decoding_time_bin_size: float, an_epoch_name: str, active_epoch_idx: int=6) -> "PredictiveDecodingDisplayWidget":
         """
 
         """
@@ -2286,6 +2288,7 @@ class PredictiveDecodingDisplayWidget:
             ybin_centers=ybin_centers,
             curr_position_df=curr_position_df,
             pf1D_Decoder=pf_decoder, decoded_result=decoded_result,
+            active_epoch_idx=active_epoch_idx,
         )
 
         return _obj
