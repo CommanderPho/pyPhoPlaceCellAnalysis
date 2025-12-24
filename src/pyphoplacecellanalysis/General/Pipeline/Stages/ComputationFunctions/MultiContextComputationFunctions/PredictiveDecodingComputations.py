@@ -1174,7 +1174,7 @@ class PredictiveDecoding(ComputedResult): #PickleSerializableMixin, AttrsBasedCl
 
     @function_attributes(short_name=None, tags=['predictive_decoding', 'layers'], input_requires=[], output_provides=[], uses=[], used_by=['init_from_decode_result'], creation_date='2025-12-09 19:03', related_items=[])
     @classmethod
-    def _perform_compute_predictive_decoding(cls, curr_active_pipeline, time_window_centers: NDArray, p_x_given_n: NDArray, window_size: int = 200):
+    def _perform_compute_predictive_decoding(cls, pos_df: pd.DataFrame, time_window_centers: NDArray, p_x_given_n: NDArray, window_size: int = 200):
         """ Computes a moving average from the decoded posterior
 
         Args:
@@ -1187,8 +1187,11 @@ class PredictiveDecoding(ComputedResult): #PickleSerializableMixin, AttrsBasedCl
             tuple: (time_window_centers, pos_df, moving_avg, new_positions, p_x_given_n)
 
         Usage:
+            # Get position dataframe
+            pos_df = deepcopy(curr_active_pipeline.sess.position.to_dataframe())
+
             time_window_centers, pos_df, moving_avg, new_positions, p_x_given_n = _perform_compute_predictive_decoding(
-                curr_active_pipeline=curr_active_pipeline,
+                pos_df=pos_df,
                 time_window_centers=time_window_centers,
                 p_x_given_n=p_x_given_n,
                 window_size=200
@@ -1197,8 +1200,7 @@ class PredictiveDecoding(ComputedResult): #PickleSerializableMixin, AttrsBasedCl
         from scipy.interpolate import interp1d
         from neuropy.utils.indexing_helpers import flatten
 
-        # Get position dataframe
-        pos_df = deepcopy(curr_active_pipeline.sess.position.to_dataframe())
+        
 
         # axis=0 interpolates along rows (time) for all columns ('x' and 'y')
         # fill_value="extrapolate" allows sampling outside original time range
@@ -1236,7 +1238,7 @@ class PredictiveDecoding(ComputedResult): #PickleSerializableMixin, AttrsBasedCl
     
 
     @classmethod
-    def init_from_decode_result(cls, curr_active_pipeline, locality_measures: DecodingLocalityMeasures, a_result_decoded: Optional[DecodedFilterEpochsResult] = None, window_size: int = 200, sigma: Optional[float] = None) -> "PredictiveDecoding":
+    def init_from_decode_result(cls, pos_df: pd.DataFrame, locality_measures: DecodingLocalityMeasures, a_result_decoded: Optional[DecodedFilterEpochsResult] = None, window_size: int = 200, sigma: Optional[float] = None) -> "PredictiveDecoding":
         """ Initialize PredictiveDecoding from locality_measures and optionally a_result_decoded.
         
         Args:
@@ -1250,8 +1252,10 @@ class PredictiveDecoding(ComputedResult): #PickleSerializableMixin, AttrsBasedCl
             PredictiveDecoding: Initialized PredictiveDecoding instance
         
         Usage:
+            # Get position dataframe
+            pos_df = deepcopy(curr_active_pipeline.sess.position.to_dataframe())
             _obj: PredictiveDecoding = PredictiveDecoding.init_from_decode_result(
-                curr_active_pipeline=curr_active_pipeline,
+                pos_df=pos_df,
                 locality_measures=locality_measures,
                 a_result_decoded=a_result_decoded,  # optional
                 window_size=200
@@ -1296,7 +1300,7 @@ class PredictiveDecoding(ComputedResult): #PickleSerializableMixin, AttrsBasedCl
 
         # Compute moving average (unique to PredictiveDecoding)
         time_window_centers, pos_df, moving_avg, new_positions, p_x_given_n = cls._perform_compute_predictive_decoding(
-            curr_active_pipeline=curr_active_pipeline,
+            pos_df=pos_df,
             time_window_centers=time_window_centers,
             p_x_given_n=p_x_given_n,
             window_size=window_size,
@@ -2207,6 +2211,7 @@ class PredictiveDecodingComputationsGlobalComputationFunctions(AllFunctionEnumer
         directional_decoders_decode_result: DirectionalDecodersContinuouslyDecodedResult = global_computation_results.computed_data['DirectionalDecodersDecoded']
         all_directional_pf1D_Decoder_dict: Dict[str, BasePositionDecoder] = directional_decoders_decode_result.pf1D_Decoder_dict
         spikes_df: pd.DataFrame = deepcopy(directional_decoders_decode_result.spikes_df)
+        pos_df: pd.DataFrame = deepcopy(owning_pipeline_reference.sess.position.to_dataframe())
         continuously_decoded_result_cache_dict = directional_decoders_decode_result.continuously_decoded_result_cache_dict
         previously_decoded_keys: List[float] = list(continuously_decoded_result_cache_dict.keys()) # [0.03333]
         print(F'previously_decoded time_bin_sizes: {previously_decoded_keys}')
@@ -2230,7 +2235,7 @@ class PredictiveDecodingComputationsGlobalComputationFunctions(AllFunctionEnumer
 
         # Create DecodingLocalityMeasures first (required for new interface)
         locality_measures = DecodingLocalityMeasures.init_from_decode_result(
-            curr_active_pipeline=owning_pipeline_reference,
+            pos_df=pos_df,
             directional_decoders_decode_result=directional_decoders_decode_result,
             extant_decoded_time_bin_size=time_bin_size,
             sigma=None  # Will be computed automatically if not provided
@@ -2243,6 +2248,15 @@ class PredictiveDecodingComputationsGlobalComputationFunctions(AllFunctionEnumer
         # Get a_result_decoded from directional_decoders_decode_result
         a_result_decoded = directional_decoders_decode_result.continuously_decoded_pseudo2D_decoder_dict[time_bin_size]
         
+        masked_result, mask_index_tuple = a_result_decoded.mask_computed_DecodedFilterEpochsResult_by_required_spike_counts_per_time_bin(
+            spikes_df=spikes_df,
+            min_num_spikes_per_bin_to_be_considered_active=5,
+            min_num_unique_active_neurons_per_time_bin=1,
+            masked_bin_fill_mode='dropped',
+            # masked_bin_fill_mode='nan_filled'
+        )
+        masked_result
+
 
         #TODO 2025-12-23 20:55: - [ ] Found that everything seems to be working well except that there are sometimes a few time bins out of an epoch that have poorly localized posteriors in general (they look very diffuse and like an error, maybe low firing bins)
         ### These need to be filtered out (either by diffusivity of low-firing criteria) so that when we collapse over all the time bins within each epoch we don't pick up a bunch of garbage (the diffuse bins are too liberal).
@@ -2255,10 +2269,14 @@ class PredictiveDecodingComputationsGlobalComputationFunctions(AllFunctionEnumer
         # )
 
         ## TODO: do something with masked_result, mask_index_tuple
+        
+
+
 
         # Create PredictiveDecoding using the new simplified interface
+        ## INPUTS: pos_df, locality_measures, ..
         predictive_decoding: PredictiveDecoding = PredictiveDecoding.init_from_decode_result(
-            curr_active_pipeline=owning_pipeline_reference,
+            pos_df=pos_df,
             locality_measures=locality_measures,
             a_result_decoded=a_result_decoded,
             window_size=window_size
