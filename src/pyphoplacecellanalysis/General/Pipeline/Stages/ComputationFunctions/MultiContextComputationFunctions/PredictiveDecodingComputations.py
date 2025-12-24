@@ -688,8 +688,7 @@ class DecodingLocalityMeasures(ComputedResult): #PickleSerializableMixin, AttrsB
             if active_subfn_compute_earthmovers_fn is not None:
                 a_computation_measure_name: str = 'earthmovers'
                 print(f'\tcomputing: "{a_computation_measure_name}"...')
-                self.decoding_meas_pos_locality_measure_dict[an_epoch_name] = active_subfn_compute_earthmovers_fn(self.gaussian_volume, a_p_x_given_n)
-                self.locality_measures_dict_dict[an_epoch_name][a_computation_measure_name] =  self.decoding_meas_pos_locality_measure_dict[an_epoch_name]
+                self.locality_measures_dict_dict[an_epoch_name][a_computation_measure_name] = active_subfn_compute_earthmovers_fn(self.gaussian_volume, a_p_x_given_n)
 
 
         ## END for an_epoch_idx, an_epoch_n...
