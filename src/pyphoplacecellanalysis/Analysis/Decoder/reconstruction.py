@@ -965,6 +965,72 @@ class DecodedFilterEpochsResult(HDF_SerializationMixin, AttrsBasedClassHelperMix
         single_epoch_result: SingleEpochDecodedResult = SingleEpochDecodedResult(**values_dict, epoch_info_tuple=active_epoch_info_tuple, epoch_data_index=active_epoch_idx)
         return single_epoch_result
     
+    @function_attributes(short_name=None, tags=['single-epoch', 'conversion', 'compatibility'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-12-23 00:00', related_items=['self.get_result_for_epoch'])
+    @classmethod
+    def init_from_single_epoch_result(cls, single_epoch_result: SingleEpochDecodedResult, decoding_time_bin_size: float, spkcount: Optional[NDArray] = None, pos_bin_edges: Optional[NDArray] = None) -> "DecodedFilterEpochsResult":
+        """Converts a SingleEpochDecodedResult back into a DecodedFilterEpochsResult with a single epoch.
+        
+        This is the inverse operation of get_result_for_epoch(), enabling compatibility with functions
+        that only accept DecodedFilterEpochsResult.
+        
+        Args:
+            single_epoch_result: The SingleEpochDecodedResult to convert
+            decoding_time_bin_size: The time bin size in seconds used for decoding
+            spkcount: Optional spike count array. If None, will be set to [None]
+            pos_bin_edges: Optional position bin edges array
+            
+        Returns:
+            DecodedFilterEpochsResult: A DecodedFilterEpochsResult containing a single epoch
+            
+        Usage:
+            single_epoch = decoded_result.get_result_for_epoch(0)
+            multi_epoch_result = DecodedFilterEpochsResult.from_single_epoch_result(
+                single_epoch, 
+                decoding_time_bin_size=0.05,
+                spkcount=spike_counts
+            )
+        """
+        # Convert epoch_info_tuple to DataFrame
+        epoch_info_dict = single_epoch_result.epoch_info_tuple._asdict()
+        filter_epochs_df = pd.DataFrame([epoch_info_dict])
+        
+        # Map single-epoch fields to list format
+        most_likely_positions_list = [single_epoch_result.most_likely_positions]
+        p_x_given_n_list = [single_epoch_result.p_x_given_n]
+        marginal_x_list = [single_epoch_result.marginal_x]
+        marginal_y_list = [single_epoch_result.marginal_y] if single_epoch_result.marginal_y is not None else [None]
+        marginal_z_list = [single_epoch_result.marginal_z] if single_epoch_result.marginal_z is not None else [None]
+        most_likely_position_indicies_list = [single_epoch_result.most_likely_position_indicies]
+        nbins = np.array([single_epoch_result.nbins], dtype=np.int_)
+        time_bin_containers = [single_epoch_result.time_bin_container]
+        time_bin_edges_list = [single_epoch_result.time_bin_edges]
+        
+        # Handle optional spkcount
+        if spkcount is not None:
+            spkcount_list = [spkcount]
+        else:
+            spkcount_list = [None]
+        
+        # Construct and return DecodedFilterEpochsResult
+        result = cls(
+            decoding_time_bin_size=decoding_time_bin_size,
+            filter_epochs=filter_epochs_df,
+            num_filter_epochs=1,
+            most_likely_positions_list=most_likely_positions_list,
+            p_x_given_n_list=p_x_given_n_list,
+            marginal_x_list=marginal_x_list,
+            marginal_y_list=marginal_y_list,
+            marginal_z_list=marginal_z_list,
+            most_likely_position_indicies_list=most_likely_position_indicies_list,
+            spkcount=spkcount_list,
+            nbins=nbins,
+            time_bin_containers=time_bin_containers,
+            time_bin_edges=time_bin_edges_list,
+            epoch_description_list=[],
+            pos_bin_edges=pos_bin_edges
+        )
+        return result
+    
     @function_attributes(short_name=None, tags=['single-epoch', 'indexing', 'start-time'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-09-18 07:36', related_items=['self.get_result_for_epoch'])
     def get_result_for_epoch_at_time(self, epoch_start_time: float) -> SingleEpochDecodedResult:
         """ returns a container with the result from a single epoch, based on a start time
