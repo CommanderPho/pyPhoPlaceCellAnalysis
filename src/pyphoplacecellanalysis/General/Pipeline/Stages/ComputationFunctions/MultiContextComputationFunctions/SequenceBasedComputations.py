@@ -15,6 +15,7 @@ from attrs import asdict, define, field, Factory, astuple
 import numpy as np
 import pandas as pd
 from datetime import datetime, timedelta
+import scipy.ndimage as ndimage
 
 from attrs import define, field, asdict, evolve
 import neuropy.utils.type_aliases as types
@@ -1456,6 +1457,251 @@ class SequenceBasedComputationsGlobalComputationFunctions(AllFunctionEnumerating
         """
         return global_computation_results
     
+
+
+    @function_attributes(short_name=None, tags=['NOT-FINISHED', 'NOT-TESTED'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-12-24 12:34', related_items=[])
+    def compute_temporal_sequentiality_measures(self, alpha_epoch_masks: NDArray[ND.Shape["N_X_BINS, N_Y_BINS, N_T_BINS"], np.bool_], epoch_promenence_tuples: List[Tuple[NDArray, NDArray, NDArray]], 
+            xbin_centers: NDArray[ND.Shape["N_X_BINS"], np.floating], ybin_centers: NDArray[ND.Shape["N_Y_BINS"], np.floating],
+            computation_measure_name: str = 'temporal_sequentiality', min_val_epsilon: float = 1e-9, enable_debug_outputs:bool=True) -> Dict[str, NDArray]:
+        """Compute temporal sequentiality measures from spatial masks and peak locations.
+        
+        This function computes measures of temporal sequentiality in spatial-temporal data by:
+        1. Computing mask overlap (Jaccard index) between subsequent time bins after dilation
+        2. Computing change vectors between subsequent peak locations
+        3. Computing direction change angles between subsequent change vectors
+        
+        Args:
+            alpha_epoch_masks: 3D boolean array (n_x_bins, n_y_bins, n_t_bins) - prominence masks for each time bin
+            epoch_promenence_tuples: List of tuples, each containing (peak_coords, prominences, peak_heights) for each time bin
+            xbin_centers: 1D array of x-bin center coordinates (for converting bin space to cm space)
+            ybin_centers: 1D array of y-bin center coordinates (for converting bin space to cm space)
+            computation_measure_name: Optional string (default: 'temporal_sequentiality') for naming the output keys
+            
+        Returns:
+            Dictionary containing:
+                - f"{computation_measure_name}_mask_overlap": Sequentiality mask overlap (Jaccard index) between subsequent time bins
+                - f"{computation_measure_name}_peak_change_vector_bin_space": Change vectors in bin space
+                - f"{computation_measure_name}_peak_change_vector_cm_space": Change vectors in cm space
+                - f"{computation_measure_name}_peak_change_vector_magnitude": Magnitude of change vectors
+                - f"{computation_measure_name}_direction_change_angle_rad": Direction change angles in radians
+                - f"{computation_measure_name}_direction_change_angle_deg": Direction change angles in degrees
+        """
+        from scipy.spatial.distance import cdist
+        from scipy.optimize import linear_sum_assignment
+        from scipy.ndimage import center_of_mass
+        from pyphoplacecellanalysis.External.peak_prominence2d import PeakPromenence
+
+        def safe_nanmax(arr):
+            try:
+                if arr.size == 0:
+                    return np.nan
+                return np.nanmax(arr)
+            except (ValueError, AttributeError):
+                return np.nan
+
+        ## INPUTS: gaussian_volume
+        self.locality_measures_dict_dict = {}
+        self.temporal_sequentiality_dict_dict = {}
+        self.debugging_dict_dict = {}
+        
+        # for an_epoch_idx, (an_epoch_name, a_plotter) in enumerate(sync_plotters.items()):
+        for an_epoch_idx, an_epoch_name in enumerate(self.epoch_names):
+            ## "epoch" in the loop variables refers to only the session.paradigm epochs, like ['roam', 'sprinkle']
+            self.locality_measures_dict_dict[an_epoch_name] = {} ## empty
+            self.debugging_dict_dict[an_epoch_name] = {}            
+            self.temporal_sequentiality_dict_dict[an_epoch_name] = {}
+
+            a_p_x_given_n = self.p_x_given_n_dict[an_epoch_name]
+
+            ## compute the locality:
+            num_timestamps: int = np.shape(self.gaussian_volume)[-1]
+            
+            
+            # self.decoding_meas_pos_locality_measure_dict[an_epoch_name] = np.array([_subfn_calculate_spatial_emd(self.gaussian_volume[:, :, a_timestamp_idx], a_p_x_given_n[:, :, a_timestamp_idx]) for a_timestamp_idx in np.arange(num_timestamps)])
+
+            # ==================================================================================================================================================================================================================================================================================== #
+            # do all computation measures                                                                                                                                                                                                                                                          #
+            # ==================================================================================================================================================================================================================================================================================== #
+
+            ## do all computation measures
+            a_computation_measure_name: str = 'peak_prom'
+            print(f'\tcomputing: "{a_computation_measure_name}"...')
+            ## above a certain promence ideally:
+            # alpha: float = 0.8 # above 85% of the peak height of the centeral peak
+            # alpha_list = [0.5, 0.8]
+            alpha_list = [0.8]
+            epoch_promenence_tuples, epoch_masks_list = PeakPromenence.compute_2d_dt_posterior_peak_promenences(a_p_x_given_n=a_p_x_given_n, alpha=alpha_list) # (103948, 1, 41, 63)
+            epoch_masks_dict = dict(zip(alpha_list, epoch_masks_list))            
+            a_high_alpha: float = alpha_list[-1]
+            an_alpha_epoch_masks: NDArray = epoch_masks_dict[a_high_alpha] ## get the high mask
+            # an_alpha_epoch_masks = np.stack(an_alpha_epoch_masks, axis=-1) # (5, 41, 63) - (n_x_bins, n_y_bins, n_t_bins)
+            assert np.shape(an_alpha_epoch_masks) == np.shape(a_p_x_given_n)
+            
+            if enable_debug_outputs:
+                self.debugging_dict_dict[an_epoch_name]['peak_prom_promenence_tuples'] = epoch_promenence_tuples
+                # self.debugging_dict_dict[an_epoch_name]['peak_prom_masks'] = an_alpha_epoch_masks
+                self.debugging_dict_dict[an_epoch_name]['peak_prom_masks_dict'] = epoch_masks_dict
+                # self.debugging_dict_dict[an_epoch_name]['peak_prom_masks_dict'] = epoch_masks_dict
+                # self.debugging_dict_dict[an_epoch_name]['peak_prom_product'] = epoch_masks
+                
+            try:
+                all_t_bin_peak_heights: NDArray = np.array([safe_nanmax(peak_heights) for (peak_coords, prominences, peak_heights) in epoch_promenence_tuples])
+                if enable_debug_outputs:
+                    self.debugging_dict_dict[an_epoch_name]['all_t_bin_peak_heights'] = all_t_bin_peak_heights
+
+            except (ValueError, AttributeError) as e:
+                print(f'error computing `all_t_bin_peak_heights`: {e}. skipping.')
+            except Exception as e:
+                raise e
+
+
+            self.locality_measures_dict_dict[an_epoch_name][a_computation_measure_name] = ((self.gaussian_volume * an_alpha_epoch_masks) > min_val_epsilon).astype(int) ## the "overlap" is computed by taking the elementwise dot-product with the moving average
+            # self.locality_measures_dict_dict[an_epoch_name][f"{a_computation_measure_name}_score"] = [(np.nansum(np.stack(an_epoch_mask, axis=-1), axis=(0, 1))/self.n_total_pos_bins) for an_epoch_idx, an_epoch_mask in enumerate(all_epochs_masks)]
+            self.locality_measures_dict_dict[an_epoch_name][f"{a_computation_measure_name}_num_bins"] = np.nansum(an_alpha_epoch_masks, axis=(0, 1))
+            # self.locality_measures_dict_dict[an_epoch_name][f"{a_computation_measure_name}_score"] = (np.nansum(an_alpha_epoch_masks, axis=(0, 1))/float(self.n_total_pos_bins))
+
+            ## ⚓ Decoded 2D Posterior Specificity - Metrics using the promenence mask
+
+            ## Focality/Diffusivity: Number of bins in in the 90% promenence mask over the total number of bins --> [0.0, 1.0]
+                ## definitionally the 90% promenance mask bins must be together/contiguous spatially, as outliers are considered different peaks.
+            self.locality_measures_dict_dict[an_epoch_name][f"{a_computation_measure_name}_Focality"] = (np.nansum(an_alpha_epoch_masks, axis=(0, 1))/float(self.n_total_pos_bins))
+
+            ## Sharpness/Peakiness: Number of bins in the 90% promenence mask over the number of bins exceeding 90% of the promenence peak height -- specifically looks at the area of the mean peak compared to the off-peak non-contiguous areas of similar heights
+            # self.locality_measures_dict_dict[an_epoch_name][f"{a_computation_measure_name}_Peakiness"] = np.nansum(an_alpha_epoch_masks, axis=(0, 1)) / np.array([np.nansum((a_p_x_given_n[:, :, i] >= (a_peak_height * alpha_list[-1])), axis=(0, 1)) for i, a_peak_height in enumerate(all_t_bin_peak_heights)])
+            self.locality_measures_dict_dict[an_epoch_name][f"{a_computation_measure_name}_Peakiness"] = np.nansum(an_alpha_epoch_masks, axis=(0, 1)) / np.array([np.nansum((a_p_x_given_n[:, :, i] >= (a_peak_height * alpha_list[-1])), axis=(0, 1)) if not np.isnan(a_peak_height) else np.nan for i, a_peak_height in enumerate(all_t_bin_peak_heights)])
+
+            try:
+                ## Modality: The count of detected peaks exceeding a certain promenence -- e.g. 1 if unimodal, 2 if bimodal, ..., N if multi-modal. 
+                all_t_bin_num_peaks: NDArray = np.array([len(peak_heights) for (peak_coords, prominences, peak_heights) in epoch_promenence_tuples])
+
+                self.locality_measures_dict_dict[an_epoch_name][f"{a_computation_measure_name}_num_peaks"] = all_t_bin_num_peaks
+
+            except (ValueError, AttributeError) as e:
+                print(f'error computing `all_t_bin_num_peaks`: {e}. skipping.')
+            except Exception as e:
+                raise e
+
+            num_t_bins = alpha_epoch_masks.shape[2]
+            n_x_bins, n_y_bins = alpha_epoch_masks.shape[0], alpha_epoch_masks.shape[1]
+            
+            
+            
+            ## 1. Sequentiality - dilate the 80% prominence mask of the top peak and compute the mask overlap with the subsequent time bin.
+            ##    0 indicates disjoint/discontiguous... but it could be a jumpy sequence!!
+            sequentiality_mask_overlap = np.full(num_t_bins, np.nan, dtype=np.float64)
+            if num_t_bins > 1:
+                # Create a 3x3 dilation kernel (8-connected neighborhood)
+                dilation_kernel = np.ones((3, 3), dtype=bool)
+                
+                for t_idx in range(num_t_bins - 1):
+                    # Get the 80% prominence mask for current time bin
+                    current_mask = alpha_epoch_masks[:, :, t_idx].astype(bool)
+                    next_mask = alpha_epoch_masks[:, :, t_idx + 1].astype(bool)
+                    
+                    # Skip if either mask is empty
+                    if not np.any(current_mask) or not np.any(next_mask):
+                        sequentiality_mask_overlap[t_idx] = 0.0
+                        continue
+                    
+                    # Dilate the current mask
+                    dilated_current_mask = ndimage.binary_dilation(current_mask, structure=dilation_kernel)
+                    
+                    # Compute overlap: intersection of dilated current mask with next mask
+                    overlap_mask = dilated_current_mask & next_mask
+                    overlap_count = np.sum(overlap_mask)
+                    
+                    # Normalize by the union of the two masks (Jaccard index) or by the next mask size
+                    # Using Jaccard index: intersection / union
+                    union_mask = dilated_current_mask | next_mask
+                    union_count = np.sum(union_mask)
+                    
+                    if union_count > 0:
+                        sequentiality_mask_overlap[t_idx] = overlap_count / union_count
+                    else:
+                        sequentiality_mask_overlap[t_idx] = 0.0
+            
+            self.temporal_sequentiality_dict_dict[an_epoch_name][f"{computation_measure_name}_mask_overlap"] = sequentiality_mask_overlap
+            
+            ## 2. Compute the 2D change vector between subsequent peak locations (either bin-space or cm)
+            ##    Real trajectories should be roughly aligned and have constrained changes in direction (e.g. momentum)
+            peak_change_vectors_bin_space = np.full((num_t_bins, 2), np.nan, dtype=np.float64)
+            peak_change_vectors_cm_space = np.full((num_t_bins, 2), np.nan, dtype=np.float64)
+            peak_change_vector_magnitudes = np.full(num_t_bins, np.nan, dtype=np.float64)
+            
+            if num_t_bins > 1:
+                # Extract top peak locations for each time bin
+                top_peak_locations_bin_space = np.full((num_t_bins, 2), np.nan, dtype=np.float64)
+                top_peak_locations_cm_space = np.full((num_t_bins, 2), np.nan, dtype=np.float64)
+                
+                for t_idx, (peak_coords, prominences, peak_heights) in enumerate(epoch_promenence_tuples):
+                    if peak_coords.size > 0 and peak_heights.size > 0:
+                        # Get the top peak (highest peak)
+                        top_peak_idx = np.argmax(peak_heights)
+                        top_peak_bin_coords = peak_coords[top_peak_idx]  # [x, y] in bin space
+                        top_peak_locations_bin_space[t_idx] = top_peak_bin_coords
+                        
+                        # Convert to cm space using bin centers
+                        top_peak_locations_cm_space[t_idx, 0] = xbin_centers[int(top_peak_bin_coords[0])]
+                        top_peak_locations_cm_space[t_idx, 1] = ybin_centers[int(top_peak_bin_coords[1])]
+                
+                # Compute change vectors between subsequent time bins
+                for t_idx in range(num_t_bins - 1):
+                    current_bin = top_peak_locations_bin_space[t_idx]
+                    next_bin = top_peak_locations_bin_space[t_idx + 1]
+                    current_cm = top_peak_locations_cm_space[t_idx]
+                    next_cm = top_peak_locations_cm_space[t_idx + 1]
+                    
+                    # Skip if either location is NaN
+                    if np.any(np.isnan(current_bin)) or np.any(np.isnan(next_bin)):
+                        continue
+                    
+                    # Compute change vector: next - current
+                    peak_change_vectors_bin_space[t_idx] = next_bin - current_bin
+                    peak_change_vectors_cm_space[t_idx] = next_cm - current_cm
+                    
+                    # Compute magnitude of change vector
+                    peak_change_vector_magnitudes[t_idx] = np.linalg.norm(peak_change_vectors_cm_space[t_idx])
+            
+            self.temporal_sequentiality_dict_dict[an_epoch_name][f"{computation_measure_name}_peak_change_vector_bin_space"] = peak_change_vectors_bin_space
+            self.temporal_sequentiality_dict_dict[an_epoch_name][f"{computation_measure_name}_peak_change_vector_cm_space"] = peak_change_vectors_cm_space
+            self.temporal_sequentiality_dict_dict[an_epoch_name][f"{computation_measure_name}_peak_change_vector_magnitude"] = peak_change_vector_magnitudes
+            
+            ## 3. Direction change / momentum - compute the angle change between subsequent change vectors
+            ##    Real trajectories should have constrained changes in direction (e.g. momentum)
+            direction_change_angles = np.full(num_t_bins, np.nan, dtype=np.float64)
+            direction_change_angles_degrees = np.full(num_t_bins, np.nan, dtype=np.float64)
+            
+            if num_t_bins > 2:
+                for t_idx in range(num_t_bins - 2):
+                    vec1 = peak_change_vectors_cm_space[t_idx]
+                    vec2 = peak_change_vectors_cm_space[t_idx + 1]
+                    
+                    # Skip if either vector is NaN or zero
+                    if np.any(np.isnan(vec1)) or np.any(np.isnan(vec2)):
+                        continue
+                    
+                    vec1_mag = np.linalg.norm(vec1)
+                    vec2_mag = np.linalg.norm(vec2)
+                    
+                    # Skip if either vector has zero magnitude
+                    if vec1_mag < 1e-9 or vec2_mag < 1e-9:
+                        continue
+                    
+                    # Compute angle between vectors using dot product: cos(θ) = (v1 · v2) / (|v1| |v2|)
+                    cos_angle = np.clip(np.dot(vec1, vec2) / (vec1_mag * vec2_mag), -1.0, 1.0)
+                    angle_rad = np.arccos(cos_angle)
+                    angle_deg = np.degrees(angle_rad)
+                    
+                    direction_change_angles[t_idx] = angle_rad
+                    direction_change_angles_degrees[t_idx] = angle_deg
+            
+            self.temporal_sequentiality_dict_dict[an_epoch_name][f"{computation_measure_name}_direction_change_angle_rad"] = direction_change_angles
+            self.temporal_sequentiality_dict_dict[an_epoch_name][f"{computation_measure_name}_direction_change_angle_deg"] = direction_change_angles_degrees
+        ## END for an_epoch_idx, an_epoch_name in enumerate(self.epoch_names)...
+
+
+        return self.temporal_sequentiality_dict_dict
+
 
    
 
