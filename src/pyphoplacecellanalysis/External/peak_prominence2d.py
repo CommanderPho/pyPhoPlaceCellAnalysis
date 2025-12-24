@@ -1143,7 +1143,8 @@ class PeakPromenence:
 
             # if no peaks were found for this time bin, record an all-False mask and continue
             if peak_coords.size == 0:
-                dominant_peak_mask = np.zeros_like(Z_2d, dtype=bool)
+                # Create a list of masks (one for each alpha), all False
+                dominant_peak_mask = [np.zeros_like(Z_2d, dtype=bool) for _ in alpha]
                 epoch_masks.append(dominant_peak_mask)
                 epoch_promenence_tuples.append((peak_coords, prominences, np.array([])))
                 continue
@@ -1160,9 +1161,8 @@ class PeakPromenence:
             
             ## OUTPUTS: dominant_peak_mask
             epoch_masks.append(dominant_peak_mask)
-            # epoch_masks_dict[an_alpha]
-            
             epoch_promenence_tuples.append((peak_coords, prominences, peak_heights))
+
         ## END for t_idx in range(n_t_bins)...
         epoch_masks: List[NDArray] = [np.stack([a_mask[an_alpha_idx] for a_t_idx, a_mask in enumerate(epoch_masks)], axis=-1) for an_alpha_idx, an_alpha in enumerate(alpha)] # ValueError: all input arrays must have the same shape
         
