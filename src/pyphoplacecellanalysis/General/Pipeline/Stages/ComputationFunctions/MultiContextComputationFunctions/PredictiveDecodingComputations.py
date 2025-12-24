@@ -216,6 +216,7 @@ class DecodingLocalityMeasures(ComputedResult): #PickleSerializableMixin, AttrsB
         Updates: self.
             .moving_avg_dict, .moving_avg_meas_pos_overlap_dict, .gaussian_volume, .decoding_meas_pos_locality_measure_dict
         """
+        # Ensure initial computations are done (idempotent - only computes if needed)
         self.perform_compute_on_load()
         locality_measures_df = self.compute_locality_measures()
         
@@ -224,12 +225,21 @@ class DecodingLocalityMeasures(ComputedResult): #PickleSerializableMixin, AttrsB
     
 
 
-    def _build_sampled_pos_with_gaussian_spread(self, sigma: float = 1.0):
+    def _build_sampled_pos_with_gaussian_spread(self, sigma: Optional[float] = None):
         """ Computed for each position in `self.new_positions`
         
         gaussian_volume = _obj._build_sampled_pos_with_gaussian_spread(sigma=1.0)
         np.shape(gaussian_volume) # (42, 64, 103948)
+        
+        Args:
+            sigma: Optional sigma value. If None, uses self.sigma (must be set)
         """
+        # Use self.sigma if sigma not provided
+        if sigma is None:
+            if self.sigma is None:
+                raise ValueError("sigma must be provided either as argument or set on self.sigma")
+            sigma = self.sigma
+        
         # 1. Setup the Grid
         # Ensure x_bounds/y_bounds match the physical extent of _obj.moving_avg
         # Example: x_bounds = (0, 100), y_bounds = (0, 150)
@@ -257,7 +267,6 @@ class DecodingLocalityMeasures(ComputedResult): #PickleSerializableMixin, AttrsB
 
         # Apply Gaussian function
         # sigma must be in the same physical units as the bounds/positions
-        
         gaussian_volume = np.exp(-dist_sq / (2 * sigma**2))
 
         # Result: gaussian_volume.shape is (41, 63, n_target_times)
@@ -277,7 +286,6 @@ class DecodingLocalityMeasures(ComputedResult): #PickleSerializableMixin, AttrsB
             print(f'sigma: {self.sigma}')
             
         print(f'building sampled and normalized outputs...')
-        self._build_sampled_pos_with_gaussian_spread()
         
         if (self.gaussian_volume is None):
             self.gaussian_volume = self._build_sampled_pos_with_gaussian_spread()
@@ -679,6 +687,7 @@ class DecodingLocalityMeasures(ComputedResult): #PickleSerializableMixin, AttrsB
 
 
 
+            #TODO 2025-12-24 12:16: - [ ] These sequentiality measures are ultimately unrelated to *Locality*
             ## Decoded Epoch Temporal Sequentiality - detecting spatial sweeps in subsequent time bins
                 ## partially depends on time bin sizes -- of interest -- a real effect should remain at lower resolution/temporal subdivisions while fake ones can get washed out
             
@@ -802,6 +811,11 @@ class DecodingLocalityMeasures(ComputedResult): #PickleSerializableMixin, AttrsB
             self.locality_measures_dict_dict[an_epoch_name][f"{a_computation_measure_name}_direction_change_angle_rad"] = direction_change_angles
             self.locality_measures_dict_dict[an_epoch_name][f"{a_computation_measure_name}_direction_change_angle_deg"] = direction_change_angles_degrees
 
+
+            # ==================================================================================================================================================================================================================================================================================== #
+            # END SEQUENTIALITY SECTION                                                                                                                                                                                                                                                            #
+            # ==================================================================================================================================================================================================================================================================================== #
+            
 
             a_computation_measure_name: str = 'dist_to_highest_peak'
             print(f'\tcomputing: "{a_computation_measure_name}"...')
