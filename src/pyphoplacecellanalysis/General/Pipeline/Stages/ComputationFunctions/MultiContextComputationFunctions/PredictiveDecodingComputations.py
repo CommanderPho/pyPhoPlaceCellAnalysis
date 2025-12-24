@@ -38,7 +38,7 @@ from pyphocorehelpers.programming_helpers import metadata_attributes
 from pyphocorehelpers.function_helpers import function_attributes
 
 from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import DirectionalLapsResult, DirectionalPseudo2DDecodersResult
-from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import BasePositionDecoder, DecodedFilterEpochsResult
+from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import BasePositionDecoder, DecodedFilterEpochsResult, SingleEpochDecodedResult
 from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import DecoderDecodedEpochsResult
 from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import compute_weighted_correlations
 from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import filter_and_update_epochs_and_spikes
@@ -2188,7 +2188,7 @@ class PredictiveDecodingComputationsGlobalComputationFunctions(AllFunctionEnumer
         requires_global_keys=['DirectionalDecodersDecoded', 'DirectionalMergedDecoders', 'RankOrder', 'DirectionalDecodersEpochsEvaluations'], provides_global_keys=['PredictiveDecoding'],
         validate_computation_test=validate_has_predictive_decoding_results, is_global=True)
     def perform_predictive_decoding_analysis(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, debug_print=False, window_size:int=90, extant_decoded_time_bin_size: Optional[float]=None,
-                drop_previous_result_and_compute_fresh:bool=False):
+                drop_previous_result_and_compute_fresh:bool=False, min_num_spikes_per_bin_to_be_considered_active: Optional[int]=5):
         """ Performs predictive decoding analysis to relate PBE activity to future visited locations.
 
         Requires:
@@ -2208,9 +2208,40 @@ class PredictiveDecodingComputationsGlobalComputationFunctions(AllFunctionEnumer
             print(f'WARN: perform_predictive_decoding_analysis(...): include_includelist: {include_includelist} is specified but include_includelist is currently ignored! Continuing with defaults.')
 
         ## Get the needed data:
-        directional_decoders_decode_result: DirectionalDecodersContinuouslyDecodedResult = global_computation_results.computed_data['DirectionalDecodersDecoded']
+
+
+        # ==================================================================================================================================================================================================================================================================================== #
+        # MASK low-firing bins before using result                                                                                                                                                                                                                                             #
+        # ==================================================================================================================================================================================================================================================================================== #
+        # extant_decoded_time_bin_size = 0.250
+        if (min_num_spikes_per_bin_to_be_considered_active is not None) and (min_num_spikes_per_bin_to_be_considered_active > 0):
+            ## Masked result:
+            directional_decoders_decode_result: DirectionalDecodersContinuouslyDecodedResult = deepcopy(owning_pipeline_reference.global_computation_results.computed_data['DirectionalDecodersDecoded'])
+            spikes_df: pd.DataFrame = directional_decoders_decode_result.spikes_df
+
+            for extant_decoded_time_bin_size, a_result_decoded in directional_decoders_decode_result.continuously_decoded_pseudo2D_decoder_dict.items():
+                a_result_decoded: SingleEpochDecodedResult = directional_decoders_decode_result.continuously_decoded_pseudo2D_decoder_dict[extant_decoded_time_bin_size]
+                a_result_decoded: DecodedFilterEpochsResult = DecodedFilterEpochsResult.init_from_single_epoch_result(single_epoch_result=a_result_decoded, decoding_time_bin_size=extant_decoded_time_bin_size) ## convert to a `DecodedFilterEpochsResult` for masking
+                a_masked_result, mask_index_tuple = a_result_decoded.mask_computed_DecodedFilterEpochsResult_by_required_spike_counts_per_time_bin(
+                    spikes_df=deepcopy(spikes_df),
+                    min_num_spikes_per_bin_to_be_considered_active=min_num_spikes_per_bin_to_be_considered_active,
+                    min_num_unique_active_neurons_per_time_bin=1,
+                    masked_bin_fill_mode='dropped',
+                    # masked_bin_fill_mode='nan_filled'
+                )
+                # a_masked_result: DecodedFilterEpochsResult
+                # is_time_bin_active_list, inactive_mask_list, all_time_bin_indicies_list, last_valid_indices_list = mask_index_tuple
+                ## re-assign to `directional_decoders_decode_result.continuously_decoded_pseudo2D_decoder_dict[extant_decoded_time_bin_size]`
+                directional_decoders_decode_result.continuously_decoded_pseudo2D_decoder_dict[extant_decoded_time_bin_size] = a_masked_result.get_result_for_epoch(0) ## get the single epoch, re-assign
+
+        else:
+            directional_decoders_decode_result: DirectionalDecodersContinuouslyDecodedResult = global_computation_results.computed_data['DirectionalDecodersDecoded']
+            spikes_df: pd.DataFrame = deepcopy(directional_decoders_decode_result.spikes_df)
+
+
+
         all_directional_pf1D_Decoder_dict: Dict[str, BasePositionDecoder] = directional_decoders_decode_result.pf1D_Decoder_dict
-        spikes_df: pd.DataFrame = deepcopy(directional_decoders_decode_result.spikes_df)
+        
         pos_df: pd.DataFrame = deepcopy(owning_pipeline_reference.sess.position.to_dataframe())
         continuously_decoded_result_cache_dict = directional_decoders_decode_result.continuously_decoded_result_cache_dict
         previously_decoded_keys: List[float] = list(continuously_decoded_result_cache_dict.keys()) # [0.03333]
@@ -2270,9 +2301,6 @@ class PredictiveDecodingComputationsGlobalComputationFunctions(AllFunctionEnumer
 
         ## TODO: do something with masked_result, mask_index_tuple
         
-
-
-
         # Create PredictiveDecoding using the new simplified interface
         ## INPUTS: pos_df, locality_measures, ..
         predictive_decoding: PredictiveDecoding = PredictiveDecoding.init_from_decode_result(
@@ -2301,7 +2329,7 @@ class PredictiveDecodingComputationsGlobalComputationFunctions(AllFunctionEnumer
         epoch_names: List[str] = ['roam', 'sprinkle']
         for an_epoch_name in epoch_names:    
             global_computation_results.computed_data['PredictiveDecoding'].debug_computed_dict[an_epoch_name] = {}
-            _out = global_computation_results.computed_data['PredictiveDecoding'].compute_future_and_past_analysis(owning_pipeline_reference, an_epoch_name='roam')
+            _out = global_computation_results.computed_data['PredictiveDecoding'].compute_future_and_past_analysis(owning_pipeline_reference, an_epoch_name=an_epoch_name)
             epoch_high_prob_pos_masks, epoch_matching_positions, past_future_info_dict, matching_pos_dfs_list, matching_pos_epochs_dfs_list = _out
             global_computation_results.computed_data['PredictiveDecoding'].debug_computed_dict[an_epoch_name] = {'epoch_high_prob_pos_masks': epoch_high_prob_pos_masks, 'epoch_matching_positions': epoch_matching_positions, 'past_future_info_dict': past_future_info_dict}
             
