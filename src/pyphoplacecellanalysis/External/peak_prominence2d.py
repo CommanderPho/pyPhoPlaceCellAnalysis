@@ -1059,6 +1059,9 @@ class PeakPromenence:
 
 
 
+    # ==================================================================================================================================================================================================================================================================================== #
+    # 2025-12-22 - New High-efficiency 2D peak promenence calculations                                                                                                                                                                                                                     #
+    # ==================================================================================================================================================================================================================================================================================== #
 
     @function_attributes(short_name=None, tags=['high-efficiency', 'rewrite'], input_requires=[], output_provides=[], uses=[], used_by=['cls.compute_posterior_peak_promenences'], creation_date='2025-12-23 08:44', related_items=[])
     @classmethod
@@ -1094,19 +1097,46 @@ class PeakPromenence:
 
     @function_attributes(short_name=None, tags=['high-efficiency', 'rewrite'], input_requires=[], output_provides=[], uses=['cls.compute_2d_peak_prominence'], used_by=[], creation_date='2025-12-23 08:44', related_items=[])
     @classmethod
-    def compute_2d_dt_posterior_peak_promenences(cls, a_p_x_given_n: NDArray[ND.Shape["N_XBINS, N_YBINS, N_TBINS"], Any], alpha: float = 0.9):
+    def compute_2d_dt_posterior_peak_promenences(cls, a_p_x_given_n: NDArray[ND.Shape["N_XBINS, N_YBINS, N_TBINS"], Any], alpha: Union[float, List[float]] = 0.9):
         """ for a single posterior (from a single decoded epoch, etc) process each time bin
 
         epoch_promenences, epoch_masks = PeakPromenence.compute_2d_posterior_peak_promenences(a_p_x_given_n=a_p_x_given_n, alpha=alpha)
-        
+
+                [peak_heights[np.argmax(peak_heights)] for (peak_coords, prominences, peak_heights) in epoch_promenence_tuples]
+                
+                all_t_bin_peak_heights: NDArray = np.array([np.nanmax(peak_heights) for (peak_coords, prominences, peak_heights) in epoch_promenence_tuples])
+                
+
         """
+        def _subfn_compute_promenence_alpha_level(Z_2d, peak_coords, peak_heights, a_peak_idx: int, an_alpha: float):
+
+            px, py = peak_coords[a_peak_idx]
+            peak_height_max: float = peak_heights[a_peak_idx]
+
+            # --- threshold ---
+            threshold_mask = Z_2d >= (an_alpha * peak_height_max)
+
+            # --- connected components ---
+            labeled, num = ndimage.label(threshold_mask)
+            a_dominant_label = labeled[px, py]
+            a_dominant_peak_mask = (labeled == a_dominant_label)
+            return a_dominant_label, a_dominant_peak_mask
+
+        # ==================================================================================================================================================================================================================================================================================== #
+        # BEGIN FUNCTION BODY                                                                                                                                                                                                                                                                  #
+        # ==================================================================================================================================================================================================================================================================================== #
         if a_p_x_given_n.ndim != 3:
             raise ValueError(f"compute_2d_posterior_peak_promenences expects a 3D array, got shape {a_p_x_given_n.shape}")
 
+        if np.isscalar(alpha):
+            alpha = [alpha] ## make into a single element list
+
         n_t_bins = np.shape(a_p_x_given_n)[-1]
         
-        epoch_promenences = []
-        epoch_masks = []
+        epoch_promenence_tuples: List[Tuple] = []
+        # epoch_masks: List[List[NDArray]] = []
+        epoch_masks_dict Dict[float, List[List[NDArray]]] = {an_alpha:[] for an_alpha in alpha}
+        
         for t_idx in range(n_t_bins):
             Z_2d = a_p_x_given_n[:, :, t_idx]
             peak_coords, prominences = cls.compute_2d_peak_prominence(Z_2d=Z_2d)
@@ -1115,52 +1145,71 @@ class PeakPromenence:
             if peak_coords.size == 0:
                 dominant_peak_mask = np.zeros_like(Z_2d, dtype=bool)
                 epoch_masks.append(dominant_peak_mask)
-                epoch_promenences.append((peak_coords, prominences, np.array([])))
+                epoch_promenence_tuples.append((peak_coords, prominences, np.array([])))
                 continue
             
             # --- identify dominant peak ---
             peak_heights = Z_2d[peak_coords[:, 0], peak_coords[:, 1]]
             dominant_peak_idx: int = np.argmax(peak_heights)
 
-            px, py = peak_coords[dominant_peak_idx]
-            peak_height_max: float = peak_heights[dominant_peak_idx]
-
-            # --- threshold ---
-            threshold_mask = Z_2d >= (alpha * peak_height_max)
-
-            # --- connected components ---
-            labeled, num = ndimage.label(threshold_mask)
-            dominant_label = labeled[px, py]
-            dominant_peak_mask = (labeled == dominant_label)
-            ## OUTPUTS: dominant_peak_mask
-            epoch_masks.append(dominant_peak_mask)
-            epoch_promenences.append((peak_coords, prominences, peak_heights))
-        ## END for t_idx in range(n_t_bins)...
+            # dominant_peak_mask = []
+            for an_alpha in alpha:
+                a_dominant_label, a_dominant_peak_mask = _subfn_compute_promenence_alpha_level(Z_2d=Z_2d, peak_coords=peak_coords, peak_heights=peak_heights, a_peak_idx=dominant_peak_idx, an_alpha=an_alpha)
+                # dominant_peak_mask.append(a_dominant_peak_mask)
+                epoch_masks_dict[an_alpha].append(a_dominant_peak_mask)
             
-        return epoch_promenences, epoch_masks
+            ## OUTPUTS: dominant_peak_mask
+            # epoch_masks.append(dominant_peak_mask)
+            # epoch_masks_dict[an_alpha]
+            
+            epoch_promenence_tuples.append((peak_coords, prominences, peak_heights))
+        ## END for t_idx in range(n_t_bins)...
+        # epoch_masks: List[NDArray] = [np.stack([a_mask[an_alpha_idx] for a_t_idx, a_mask in enumerate(epoch_masks)], axis=-1) for an_alpha_idx, an_alpha in enumerate(alpha)] # ValueError: all input arrays must have the same shape
+        
+        # try:
+            for an_alpha, v in epoch_masks_dict.items():
+                try:
+                    epoch_masks_dict[an_alpha] = np.stack(v, axis=-1)
+                except Exception as e:
+                    raise e
+
+            # epoch_masks_dict = {an_alpha:np.stack(v, axis=-1) for an_alpha, v in epoch_masks_dict.items()}
+        # except Exception as e:
+        #     raise e
+
+        return epoch_promenence_tuples, epoch_masks_dict
 
 
     @function_attributes(short_name=None, tags=['high-efficiency', 'rewrite'], input_requires=[], output_provides=[], uses=['cls.compute_2d_peak_prominence'], used_by=[], creation_date='2025-12-23 08:44', related_items=[])
     @classmethod
-    def compute_posterior_peak_promenences(cls, p_x_given_n_list: List[NDArray[ND.Shape["N_XBINS, N_YBINS, N_TBINS"], Any]], alpha: float = 0.9):
+    def compute_posterior_peak_promenences(cls, p_x_given_n_list: List[NDArray[ND.Shape["N_XBINS, N_YBINS, N_TBINS"], Any]], alpha: Union[float, List[float]] = 0.9):
         """ 
         from pyphoplacecellanalysis.External.peak_prominence2d import PeakPromenence
 
         all_epochs_promenences, all_epochs_masks = PeakPromenence.compute_posterior_peak_promenences(p_x_given_n_list=a_widget.decoded_result.p_x_given_n_list, alpha=0.9)
         
         """
-        all_epochs_promenences = []
-        all_epochs_masks = []
+        all_epochs_promenence_tuples = []
+        all_epochs_masks: List[List[NDArray]] = []
 
         for i, a_p_x_given_n in enumerate(p_x_given_n_list):
             n_t_bins = np.shape(a_p_x_given_n)[-1]
-            epoch_promenences, epoch_masks = cls.compute_2d_dt_posterior_peak_promenences(a_p_x_given_n=a_p_x_given_n, alpha=alpha)
-            all_epochs_promenences.append(epoch_promenences)
-            all_epochs_masks.append(epoch_masks)
+            # epoch_promenences, epoch_masks_list = cls.compute_2d_dt_posterior_peak_promenences(a_p_x_given_n=a_p_x_given_n, alpha=alpha)
+            
+            epoch_promenences, epoch_masks_dict = cls.compute_2d_dt_posterior_peak_promenences(a_p_x_given_n=a_p_x_given_n, alpha=alpha)
+
+
+            all_epochs_promenence_tuples.append(epoch_promenences)
+            
+            # epoch_masks: List[NDArray] = [np.stack(an_alpha_epoch_masks, axis=-1) for an_alpha_epoch_masks in epoch_masks_list] # List[(41, 63, 5)] - List[(n_x_bins, n_y_bins, n_t_bins)] (one for each value of alpha)
+            epoch_masks: List[List[NDArray]] = epoch_masks_list
+            # assert np.shape(epoch_masks) == np.shape(a_p_x_given_n)
+            # all_epochs_masks.append(epoch_masks)
+            all_epochs_masks.append(epoch_masks_dict)
             
         ## END for i, a_p_x_given_n in enumerat
 
-        return all_epochs_promenences, all_epochs_masks
+        return all_epochs_promenence_tuples, all_epochs_masks
 
 
 
