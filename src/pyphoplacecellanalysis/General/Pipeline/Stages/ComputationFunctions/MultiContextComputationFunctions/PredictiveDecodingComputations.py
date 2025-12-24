@@ -2326,14 +2326,26 @@ class PredictiveDecodingComputationsGlobalComputationFunctions(AllFunctionEnumer
         # Store the PredictiveDecoding instance in the container
         global_computation_results.computed_data['PredictiveDecoding'].predictive_decoding = predictive_decoding
         
-        epoch_names: List[str] = ['roam', 'sprinkle']
+        if include_includelist is None:
+            include_includelist = ['roam'] # , 'sprinkle'
+        epoch_names: List[str] = include_includelist 
+        print(f'\t processing will occur for epoch_names: {epoch_names}')
         for an_epoch_name in epoch_names:    
-            global_computation_results.computed_data['PredictiveDecoding'].debug_computed_dict[an_epoch_name] = {}
-            _out = global_computation_results.computed_data['PredictiveDecoding'].compute_future_and_past_analysis(owning_pipeline_reference, an_epoch_name=an_epoch_name)
-            epoch_high_prob_pos_masks, epoch_matching_positions, past_future_info_dict, matching_pos_dfs_list, matching_pos_epochs_dfs_list = _out
-            global_computation_results.computed_data['PredictiveDecoding'].debug_computed_dict[an_epoch_name] = {'epoch_high_prob_pos_masks': epoch_high_prob_pos_masks, 'epoch_matching_positions': epoch_matching_positions, 'past_future_info_dict': past_future_info_dict}
-            
+            try:
+                print(f'\ttrying `.compute_future_and_past_analysis(...)` for an_epoch_name: "{an_epoch_name}"...')
+                global_computation_results.computed_data['PredictiveDecoding'].debug_computed_dict[an_epoch_name] = {}
+                _out = global_computation_results.computed_data['PredictiveDecoding'].compute_future_and_past_analysis(owning_pipeline_reference, an_epoch_name=an_epoch_name)
+                epoch_high_prob_pos_masks, epoch_matching_positions, past_future_info_dict, matching_pos_dfs_list, matching_pos_epochs_dfs_list = _out
+                global_computation_results.computed_data['PredictiveDecoding'].debug_computed_dict[an_epoch_name] = {'epoch_high_prob_pos_masks': epoch_high_prob_pos_masks, 'epoch_matching_positions': epoch_matching_positions, 'past_future_info_dict': past_future_info_dict}
+            except (ValueError, AttributeError, IndexError, KeyError, TypeError) as e:
+                print(f'\t\tWARN: the last part of `perform_predictive_decoding_analysis(...) failed with error: {e}. Skipping.')
+                pass
+            except Exception as e:
+                raise e
+
         # epoch_high_prob_pos_masks, epoch_matching_positions, past_future_info_dict, matching_pos_dfs_list, matching_pos_epochs_dfs_list
+        print(f'done')
+
 
         """ Usage:
         
@@ -2407,6 +2419,8 @@ class PredictiveDecodingDisplayWidget:
     dock_window: Any = field(default=None)
     dock_widgets: Dict[str, Any] = field(default=Factory(dict))
     dock_canvas_widgets: Dict[str, Any] = field(default=Factory(dict))
+    epoch_slider: Any = field(default=None)
+    epoch_value_label: Any = field(default=None)
 
     active_epoch_idx: int = field(default=20)
     
@@ -2518,10 +2532,67 @@ class PredictiveDecodingDisplayWidget:
             self.dock_widgets[category_name] = dock
             prev_dock = dock
         
+        # Create slider widget at the bottom of the window
+        num_epochs = len(ensure_dataframe(self.decoded_result.filter_epochs))
+        if num_epochs > 0:
+            # Create a bottom widget container for the slider
+            bottom_widget = QtWidgets.QWidget()
+            bottom_layout = QtWidgets.QHBoxLayout()
+            bottom_layout.setContentsMargins(10, 5, 10, 5)
+            
+            # Create label for the slider
+            slider_label = QtWidgets.QLabel("Epoch Index:")
+            bottom_layout.addWidget(slider_label)
+            
+            # Create slider
+            self.epoch_slider = QtWidgets.QSlider(QtCore.Qt.Orientation.Horizontal)
+            self.epoch_slider.setMinimum(0)
+            self.epoch_slider.setMaximum(max(0, num_epochs - 1))
+            self.epoch_slider.setValue(min(self.active_epoch_idx, num_epochs - 1))
+            self.epoch_slider.setTickPosition(QtWidgets.QSlider.TickPosition.TicksBelow)
+            self.epoch_slider.setTickInterval(max(1, num_epochs // 20))  # Show ~20 ticks
+            self.epoch_slider.setMinimumWidth(400)
+            bottom_layout.addWidget(self.epoch_slider, stretch=1)  # Stretch to fill width
+            
+            # Create label to show current value
+            self.epoch_value_label = QtWidgets.QLabel(f"{self.epoch_slider.value()}")
+            self.epoch_value_label.setMinimumWidth(50)
+            self.epoch_value_label.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
+            bottom_layout.addWidget(self.epoch_value_label)
+            
+            # Connect slider signals:
+            # - valueChanged: Update label only (for immediate feedback while dragging)
+            # - sliderReleased: Update display (only when user releases the slider)
+            self.epoch_slider.valueChanged.connect(self._on_slider_value_changed_label_only)
+            self.epoch_slider.sliderReleased.connect(self._on_slider_released)
+            
+            bottom_widget.setLayout(bottom_layout)
+            
+            # Add bottom widget to the main window using a status bar or dock
+            # We'll use a dock at the bottom
+            bottom_dock = Dock("Epoch Control", size=(1400, 50), closable=False)
+            bottom_dock.addWidget(bottom_widget)
+            self.dock_area.addDock(bottom_dock, 'bottom')
+            self.dock_widgets['epoch_control'] = bottom_dock
+        
         self.dock_window.show()
         
         self.update_displayed_epoch(an_epoch_idx=self.active_epoch_idx) ## go to first index if possible
 
+    def _on_slider_value_changed_label_only(self, value: int):
+        """Handle slider value change to update only the label (for immediate feedback while dragging)."""
+        if self.epoch_value_label is not None:
+            self.epoch_value_label.setText(f"{value}")
+
+    def _on_slider_released(self):
+        """Handle slider release to update the displayed epoch."""
+        if self.epoch_slider is not None:
+            value = self.epoch_slider.value()
+            self.update_displayed_epoch(an_epoch_idx=value)
+            # Update all canvas widgets to ensure they refresh
+            for canvas in self.dock_canvas_widgets.values():
+                if canvas is not None:
+                    canvas.draw_idle()
 
     def update_displayed_epoch(self, an_epoch_idx: int = 8):
         """ updates the GUI to reflect the epoch idx provided:
@@ -2535,11 +2606,41 @@ class PredictiveDecodingDisplayWidget:
             self.init_UI()
 
         prev_epoch_idx: int = deepcopy(self.active_epoch_idx)
+        
+        # Validate epoch index bounds
+        num_epochs = len(ensure_dataframe(self.decoded_result.filter_epochs))
+        if an_epoch_idx < 0 or an_epoch_idx >= num_epochs:
+            print(f"Warning: epoch_idx {an_epoch_idx} is out of bounds (0-{num_epochs-1}). Clamping to valid range.")
+            an_epoch_idx = max(0, min(an_epoch_idx, num_epochs - 1))
+        
+        # Update slider value if it exists (block signals to avoid recursion)
+        if self.epoch_slider is not None:
+            self.epoch_slider.blockSignals(True)
+            self.epoch_slider.setValue(an_epoch_idx)
+            self.epoch_slider.blockSignals(False)
+            if self.epoch_value_label is not None:
+                self.epoch_value_label.setText(f"{an_epoch_idx}")
                 
         assert len(self.container.predictive_decoding.matching_pos_dfs_list) > 0
         matching_pos_dfs_list = self.container.predictive_decoding.matching_pos_dfs_list
         assert len(self.container.predictive_decoding.matching_pos_epochs_dfs_list) > 0
         matching_pos_epochs_dfs_list = self.container.predictive_decoding.matching_pos_epochs_dfs_list
+
+        # Calculate maximum number of subplots needed across all epochs for each category
+        # This ensures the layout doesn't need to resize when switching between epochs
+        max_subplots_per_category: Dict[str, int] = {}
+        for epoch_idx in range(len(matching_pos_epochs_dfs_list)):
+            curr_matching_epochs_df_temp: pd.DataFrame = matching_pos_epochs_dfs_list[epoch_idx]
+            curr_matching_epochs_df_dict_temp: Dict[int, pd.DataFrame] = curr_matching_epochs_df_temp.pho.partition_df_dict('is_future_present_past')
+            for a_past_future_name, an_epoch_specific_dfs in curr_matching_epochs_df_dict_temp.items():
+                if a_past_future_name not in max_subplots_per_category:
+                    max_subplots_per_category[a_past_future_name] = 0
+                num_items = len(an_epoch_specific_dfs)
+                max_subplots_per_category[a_past_future_name] = max(max_subplots_per_category[a_past_future_name], num_items)
+        
+        # Cap at 20 subplots maximum
+        for key in max_subplots_per_category:
+            max_subplots_per_category[key] = min(20, max_subplots_per_category[key])
 
         curr_matching_epochs_df: pd.DataFrame = matching_pos_epochs_dfs_list[an_epoch_idx]
         curr_matching_positions_df: pd.DataFrame = matching_pos_dfs_list[an_epoch_idx]
@@ -2562,7 +2663,26 @@ class PredictiveDecodingDisplayWidget:
             epoch_specific_position_dfs = list(curr_matching_past_future_positions_df_dict[a_past_future_name].values())
             epoch_ids = np.array(list(curr_matching_past_future_positions_df_dict[a_past_future_name].keys()))
             # epoch_specific_position_dfs
-            curr_num_subplots: int = min(20, len(epoch_ids))
+            # Always use the maximum number of subplots for this category (capped at 20)
+            curr_num_subplots: int = max_subplots_per_category.get(a_past_future_name, min(20, len(epoch_ids)))
+            
+            # Pad the lists to match curr_num_subplots if needed (to prevent IndexError)
+            # This ensures the layout is consistent even when current epoch has fewer items
+            if len(epoch_specific_position_dfs) < curr_num_subplots:
+                # Create dummy DataFrames for padding - need at least one row to prevent IndexError
+                num_to_pad = curr_num_subplots - len(epoch_specific_position_dfs)
+                if len(epoch_specific_position_dfs) > 0:
+                    # Use the first DataFrame's structure as a template
+                    template_df = epoch_specific_position_dfs[0]
+                    # Create a dummy row with NaN values for all columns
+                    dummy_row = {col: np.nan for col in template_df.columns}
+                    empty_df = pd.DataFrame([dummy_row], columns=template_df.columns)
+                else:
+                    # Fallback: use common position DataFrame columns with dummy row
+                    empty_df = pd.DataFrame([{'t': np.nan, 'x': np.nan, 'y': np.nan, 'binned_x': np.nan, 'binned_y': np.nan}])
+                epoch_specific_position_dfs.extend([empty_df.copy() for _ in range(num_to_pad)])
+                # Pad epoch_ids with -1 (invalid ID) for empty subplots
+                epoch_ids = np.concatenate([epoch_ids, np.full(num_to_pad, -1, dtype=epoch_ids.dtype)])
             # curr_num_subplots: int = 40
             
             # an_epoch_specific_past_position_dfs = curr_matching_epochs_df_dict['past']
@@ -2578,6 +2698,20 @@ class PredictiveDecodingDisplayWidget:
                 needed_init = True
             else:
                 existing_ax = a_decoded_traj_plotter.axs
+                # Clear existing axes before plotting to prevent drawing over previous plots
+                if existing_ax is not None:
+                    # Handle different axis structures (list, array, or single axis)
+                    if isinstance(existing_ax, (list, tuple, np.ndarray)):
+                        for ax in existing_ax:
+                            if ax is not None and hasattr(ax, 'clear'):
+                                ax.clear()
+                    elif hasattr(existing_ax, 'clear'):
+                        existing_ax.clear()
+                    # Also clear the figure if it exists
+                    if hasattr(a_decoded_traj_plotter, 'fig') and a_decoded_traj_plotter.fig is not None:
+                        # Clear all axes in the figure
+                        for ax in a_decoded_traj_plotter.fig.get_axes():
+                            ax.clear()
 
             # canvas: FigureCanvas = self.dock_canvas_widgets.get(a_past_future_name, None)
             # if canvas is not None:
@@ -2632,9 +2766,11 @@ class PredictiveDecodingDisplayWidget:
                     plt.close(fig)                
 
             else:
-                ## just redraw
+                ## just redraw - axes are already cleared above before plotting
                 canvas = self.dock_canvas_widgets[a_past_future_name]
                 if canvas is not None:
+                    # The axes were already cleared before plot_decoded_trajectories_2d was called
+                    # Just trigger a redraw
                     canvas.draw_idle()
 
         ### for a_past_future_name, an_epoch_specific_past_position_dfs in curr_matc...
