@@ -583,6 +583,17 @@ class DecodingLocalityMeasures(ComputedResult): #PickleSerializableMixin, AttrsB
             
             # Final correct POM __________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
 
+
+            #TODO 2025-12-23 20:55: - [ ] Found that everything seems to be working well except that there are sometimes a few time bins out of an epoch that have poorly localized posteriors in general (they look very diffuse and like an error, maybe low firing bins)
+            ### These need to be filtered out (either by diffusivity of low-firing criteria) so that when we collapse over all the time bins within each epoch we don't pick up a bunch of garbage (the diffuse bins are too liberal).
+            # masked_result, mask_index_tuple = decoded_result.mask_computed_DecodedFilterEpochsResult_by_required_spike_counts_per_time_bin(
+            #     spikes_df=spikes_df,
+            #     min_num_spikes_per_bin_to_be_considered_active=5,
+            #     min_num_unique_active_neurons_per_time_bin=1,
+            #     masked_bin_fill_mode='ignore'
+            # )
+                        
+
             # self.decoding_meas_pos_locality_measure_dict[an_epoch_name] = np.array([_subfn_calculate_spatial_emd(self.gaussian_volume[:, :, a_timestamp_idx], a_p_x_given_n[:, :, a_timestamp_idx]) for a_timestamp_idx in np.arange(num_timestamps)])
 
             # ==================================================================================================================================================================================================================================================================================== #
@@ -2140,6 +2151,7 @@ class PredictiveDecodingComputationsGlobalComputationFunctions(AllFunctionEnumer
         ## Get the needed data:
         directional_decoders_decode_result: DirectionalDecodersContinuouslyDecodedResult = global_computation_results.computed_data['DirectionalDecodersDecoded']
         all_directional_pf1D_Decoder_dict: Dict[str, BasePositionDecoder] = directional_decoders_decode_result.pf1D_Decoder_dict
+        spikes_df: pd.DataFrame = deepcopy(directional_decoders_decode_result.spikes_df)
         continuously_decoded_result_cache_dict = directional_decoders_decode_result.continuously_decoded_result_cache_dict
         previously_decoded_keys: List[float] = list(continuously_decoded_result_cache_dict.keys()) # [0.03333]
         print(F'previously_decoded time_bin_sizes: {previously_decoded_keys}')
@@ -2176,6 +2188,19 @@ class PredictiveDecodingComputationsGlobalComputationFunctions(AllFunctionEnumer
         # Get a_result_decoded from directional_decoders_decode_result
         a_result_decoded = directional_decoders_decode_result.continuously_decoded_pseudo2D_decoder_dict[time_bin_size]
         
+
+        #TODO 2025-12-23 20:55: - [ ] Found that everything seems to be working well except that there are sometimes a few time bins out of an epoch that have poorly localized posteriors in general (they look very diffuse and like an error, maybe low firing bins)
+        ### These need to be filtered out (either by diffusivity of low-firing criteria) so that when we collapse over all the time bins within each epoch we don't pick up a bunch of garbage (the diffuse bins are too liberal).
+        ## INPUTS: spikes_df
+        masked_result, mask_index_tuple = a_result_decoded.mask_computed_DecodedFilterEpochsResult_by_required_spike_counts_per_time_bin(
+            spikes_df=spikes_df,
+            min_num_spikes_per_bin_to_be_considered_active=5,
+            min_num_unique_active_neurons_per_time_bin=1,
+            masked_bin_fill_mode='ignore'
+        )
+
+        ## TODO: do something with masked_result, mask_index_tuple
+
         # Create PredictiveDecoding using the new simplified interface
         predictive_decoding: PredictiveDecoding = PredictiveDecoding.init_from_decode_result(
             curr_active_pipeline=owning_pipeline_reference,
