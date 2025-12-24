@@ -1134,8 +1134,8 @@ class PeakPromenence:
         n_t_bins = np.shape(a_p_x_given_n)[-1]
         
         epoch_promenence_tuples: List[Tuple] = []
-        # epoch_masks: List[List[NDArray]] = []
-        epoch_masks_dict Dict[float, List[List[NDArray]]] = {an_alpha:[] for an_alpha in alpha}
+        epoch_masks: List[List[NDArray]] = []
+        # epoch_masks_dict Dict[float, List[List[NDArray]]] = {an_alpha:[] for an_alpha in alpha}
         
         for t_idx in range(n_t_bins):
             Z_2d = a_p_x_given_n[:, :, t_idx]
@@ -1152,32 +1152,33 @@ class PeakPromenence:
             peak_heights = Z_2d[peak_coords[:, 0], peak_coords[:, 1]]
             dominant_peak_idx: int = np.argmax(peak_heights)
 
-            # dominant_peak_mask = []
+            dominant_peak_mask = []
             for an_alpha in alpha:
                 a_dominant_label, a_dominant_peak_mask = _subfn_compute_promenence_alpha_level(Z_2d=Z_2d, peak_coords=peak_coords, peak_heights=peak_heights, a_peak_idx=dominant_peak_idx, an_alpha=an_alpha)
-                # dominant_peak_mask.append(a_dominant_peak_mask)
-                epoch_masks_dict[an_alpha].append(a_dominant_peak_mask)
+                dominant_peak_mask.append(a_dominant_peak_mask)
+                # epoch_masks_dict[an_alpha].append(a_dominant_peak_mask)
             
             ## OUTPUTS: dominant_peak_mask
-            # epoch_masks.append(dominant_peak_mask)
+            epoch_masks.append(dominant_peak_mask)
             # epoch_masks_dict[an_alpha]
             
             epoch_promenence_tuples.append((peak_coords, prominences, peak_heights))
         ## END for t_idx in range(n_t_bins)...
-        # epoch_masks: List[NDArray] = [np.stack([a_mask[an_alpha_idx] for a_t_idx, a_mask in enumerate(epoch_masks)], axis=-1) for an_alpha_idx, an_alpha in enumerate(alpha)] # ValueError: all input arrays must have the same shape
+        epoch_masks: List[NDArray] = [np.stack([a_mask[an_alpha_idx] for a_t_idx, a_mask in enumerate(epoch_masks)], axis=-1) for an_alpha_idx, an_alpha in enumerate(alpha)] # ValueError: all input arrays must have the same shape
         
         # try:
-            for an_alpha, v in epoch_masks_dict.items():
-                try:
-                    epoch_masks_dict[an_alpha] = np.stack(v, axis=-1)
-                except Exception as e:
-                    raise e
+            # for an_alpha, v in epoch_masks_dict.items():
+            #     try:
+            #         epoch_masks_dict[an_alpha] = np.stack(v, axis=-1)
+            #     except Exception as e:
+            #         raise e
 
             # epoch_masks_dict = {an_alpha:np.stack(v, axis=-1) for an_alpha, v in epoch_masks_dict.items()}
         # except Exception as e:
         #     raise e
 
-        return epoch_promenence_tuples, epoch_masks_dict
+        # return epoch_promenence_tuples, epoch_masks_dict
+        return epoch_promenence_tuples, epoch_masks
 
 
     @function_attributes(short_name=None, tags=['high-efficiency', 'rewrite'], input_requires=[], output_provides=[], uses=['cls.compute_2d_peak_prominence'], used_by=[], creation_date='2025-12-23 08:44', related_items=[])
