@@ -448,6 +448,8 @@ class SingleEpochDecodedResult(HDF_SerializationMixin, AttrsBasedClassHelperMixi
 
     epoch_data_index: Optional[int] = non_serialized_field()
 
+    spkcount: Optional[NDArray] = non_serialized_field()
+
     # active_num_neighbors: int = serialized_attribute_field()
     # active_neighbors_arr: List = field()
 
@@ -940,9 +942,9 @@ class DecodedFilterEpochsResult(HDF_SerializationMixin, AttrsBasedClassHelperMix
         if active_epoch_idx >= len(self.active_filter_epochs):
             raise ValueError(f"Requested epoch {active_epoch_idx}, but only {len(self.active_filter_epochs)} available.")
 
-        single_epoch_field_names = ['most_likely_positions_list', 'p_x_given_n_list', 'marginal_x_list', 'marginal_y_list', 'marginal_z_list', 'most_likely_position_indicies_list', 'nbins', 'time_bin_containers', 'time_bin_edges'] # a_decoder_decoded_epochs_result._test_find_fields_by_shape_metadata()
-        fields_to_single_epoch_fields_dict = dict(zip(['most_likely_positions_list', 'p_x_given_n_list', 'marginal_x_list', 'marginal_y_list', 'marginal_z_list', 'most_likely_position_indicies_list', 'nbins', 'time_bin_containers', 'time_bin_edges'],
-            ['most_likely_positions', 'p_x_given_n', 'marginal_x', 'marginal_y', 'marginal_z', 'most_likely_position_indicies', 'nbins', 'time_bin_container', 'time_bin_edges'])) # maps list names to single-epoch specific field names
+        single_epoch_field_names = ['most_likely_positions_list', 'p_x_given_n_list', 'marginal_x_list', 'marginal_y_list', 'marginal_z_list', 'most_likely_position_indicies_list', 'nbins', 'time_bin_containers', 'time_bin_edges', 'spkcount'] # a_decoder_decoded_epochs_result._test_find_fields_by_shape_metadata()
+        fields_to_single_epoch_fields_dict = dict(zip(['most_likely_positions_list', 'p_x_given_n_list', 'marginal_x_list', 'marginal_y_list', 'marginal_z_list', 'most_likely_position_indicies_list', 'nbins', 'time_bin_containers', 'time_bin_edges', 'spkcount'],
+            ['most_likely_positions', 'p_x_given_n', 'marginal_x', 'marginal_y', 'marginal_z', 'most_likely_position_indicies', 'nbins', 'time_bin_container', 'time_bin_edges', 'spkcount'])) # maps list names to single-epoch specific field names
         
         for field_name in single_epoch_field_names:
             if (not hasattr(self, field_name)) or (getattr(self, field_name, None) is None):
@@ -1006,8 +1008,11 @@ class DecodedFilterEpochsResult(HDF_SerializationMixin, AttrsBasedClassHelperMix
         time_bin_edges_list = [single_epoch_result.time_bin_edges]
         
         # Handle optional spkcount
+        # Priority: use parameter if provided, else use stored value from single_epoch_result if available, else None
         if spkcount is not None:
             spkcount_list = [spkcount]
+        elif hasattr(single_epoch_result, 'spkcount') and single_epoch_result.spkcount is not None:
+            spkcount_list = [single_epoch_result.spkcount]
         else:
             spkcount_list = [None]
         
@@ -1655,8 +1660,11 @@ class DecodedFilterEpochsResult(HDF_SerializationMixin, AttrsBasedClassHelperMix
             elif len(num_spatial_dims_list) == 1:
                 # 1D
                 num_positions = num_spatial_dims_list
+            elif len(num_spatial_dims_list) == 3:
+                # 3D
+                num_positions, num_y_bins, num_z_bins = num_spatial_dims_list
             else:
-                raise NotImplementedError(f'len(num_spatial_dims_list): {len(num_spatial_dims_list)}: num_spatial_dims_list: {num_spatial_dims_list} but expected 2 or 3')
+                raise NotImplementedError(f'len(num_spatial_dims_list): {len(num_spatial_dims_list)}: num_spatial_dims_list: {num_spatial_dims_list} but expected 1, 2, or 3')
 
             a_time_bin_edges: NDArray = deepcopy(a_decoded_result.time_bin_edges[i])
             if (len(a_time_bin_edges) != (num_time_bins+1)):
@@ -1701,10 +1709,10 @@ class DecodedFilterEpochsResult(HDF_SerializationMixin, AttrsBasedClassHelperMix
                     a_decoded_result.p_x_given_n_list[i][..., all_time_bin_indicies] = original_data[..., last_valid_indices]
 
                     # Also fix the most_likely_position arrays using the same technique
-                    # For most_likely_position_indicies_list (shape: 2, num_time_bins)
-                    a_decoded_result.most_likely_position_indicies_list[i][:, all_time_bin_indicies] = a_decoded_result.most_likely_position_indicies_list[i][:, last_valid_indices]
+                    # For most_likely_position_indicies_list (shape: (n_dims, num_time_bins) where n_dims=2 for 2D, 3 for 3D)
+                    a_decoded_result.most_likely_position_indicies_list[i][..., all_time_bin_indicies] = a_decoded_result.most_likely_position_indicies_list[i][..., last_valid_indices]
                     
-                    # For most_likely_positions_list (shape: num_time_bins, 2)
+                    # For most_likely_positions_list (shape: (num_time_bins, n_dims) where n_dims=2 for 2D, 3 for 3D)
                     a_decoded_result.most_likely_positions_list[i][all_time_bin_indicies, ...] = a_decoded_result.most_likely_positions_list[i][last_valid_indices, ...] # Use a dimension-agnostic approach:
 
                 else:
@@ -1715,8 +1723,8 @@ class DecodedFilterEpochsResult(HDF_SerializationMixin, AttrsBasedClassHelperMix
                 ## just drop the invalid bins by selecting via the `is_time_bin_active` (active_mask):
                 # Drop inactive time bins by selecting only active ones
                 a_decoded_result.p_x_given_n_list[i] = a_decoded_result.p_x_given_n_list[i][..., is_time_bin_active]
-                a_decoded_result.most_likely_position_indicies_list[i] = a_decoded_result.most_likely_position_indicies_list[i][:, is_time_bin_active]
-                a_decoded_result.most_likely_positions_list[i] = a_decoded_result.most_likely_positions_list[i][is_time_bin_active, :]
+                a_decoded_result.most_likely_position_indicies_list[i] = a_decoded_result.most_likely_position_indicies_list[i][..., is_time_bin_active]
+                a_decoded_result.most_likely_positions_list[i] = a_decoded_result.most_likely_positions_list[i][is_time_bin_active, ...]
 
                 a_binning_container: BinningContainer = deepcopy(a_decoded_result.time_bin_containers[i])
                 # a_binning_container.centers = a_binning_container.centers[is_time_bin_active]
@@ -1756,7 +1764,9 @@ class DecodedFilterEpochsResult(HDF_SerializationMixin, AttrsBasedClassHelperMix
                 # a_decoded_result.nbins[i] = len(a_time_bin_edges[is_time_bin_active]) # 2025-03-20 16:46 -  IndexError: boolean index did not match indexed array along dimension 0; dimension is 239 but corresponding boolean dimension is 238 
                 a_decoded_result.nbins[i] = np.sum(is_time_bin_active) ## this should count the number of bin centers, previously (pre 2025-03-20 16:50) it was counting the number of bin edges which was logically wrong.
                 
-                a_decoded_result.spkcount[i] = a_decoded_result.spkcount[i][:, is_time_bin_active] # (80, 66) - (n_neurons, n_epoch_t_bins[i])
+                # Only update spkcount if it exists and is not None
+                if a_decoded_result.spkcount[i] is not None:
+                    a_decoded_result.spkcount[i] = a_decoded_result.spkcount[i][:, is_time_bin_active] # (80, 66) - (n_neurons, n_epoch_t_bins[i])
                 ## maybe messing up: epoch_description_list,
                 last_valid_indices = None # we don't need `last_valid_indices` in these modes
                 
