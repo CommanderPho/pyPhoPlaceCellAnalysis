@@ -614,19 +614,58 @@ class DecodingLocalityMeasures(ComputedResult): #PickleSerializableMixin, AttrsB
             a_computation_measure_name: str = 'peak_prom'
             print(f'\tcomputing: "{a_computation_measure_name}"...')
             ## above a certain promence ideally:
-            alpha: float = 0.8 # above 85% of the peak height of the centeral peak
-            epoch_promenences, epoch_masks = PeakPromenence.compute_2d_dt_posterior_peak_promenences(a_p_x_given_n=a_p_x_given_n, alpha=alpha)
-            epoch_masks = np.stack(epoch_masks, axis=-1) # (5, 41, 63) - (n_t_bins, n_x_bins, n_y_bins)
-            assert np.shape(epoch_masks) == np.shape(a_p_x_given_n)
-            is_high_prob_mask = epoch_masks
+            # alpha: float = 0.8 # above 85% of the peak height of the centeral peak
+            # alpha_list = [0.5, 0.8]
+            alpha_list = [0.8]
+            epoch_promenence_tuples, epoch_masks_list = PeakPromenence.compute_2d_dt_posterior_peak_promenences(a_p_x_given_n=a_p_x_given_n, alpha=alpha_list) # (103948, 1, 41, 63)
+            epoch_masks_dict = dict(zip(alpha_list, epoch_masks_list))            
+            a_high_alpha: float = alpha_list[-1]
+            an_alpha_epoch_masks: NDArray = epoch_masks_dict[a_high_alpha] ## get the high mask
+            # an_alpha_epoch_masks = np.stack(an_alpha_epoch_masks, axis=-1) # (5, 41, 63) - (n_x_bins, n_y_bins, n_t_bins)
+            assert np.shape(an_alpha_epoch_masks) == np.shape(a_p_x_given_n)
+            
+            all_t_bin_peak_heights: NDArray = np.array([np.nanmax(peak_heights) for (peak_coords, prominences, peak_heights) in epoch_promenence_tuples])
+            all_t_bin_num_peaks: NDArray = np.array([len(peak_heights) for (peak_coords, prominences, peak_heights) in epoch_promenence_tuples])
+
             if enable_debug_outputs:
-                self.debugging_dict_dict[an_epoch_name]['peak_prom_masks'] = epoch_masks
+                self.debugging_dict_dict[an_epoch_name]['peak_prom_promenence_tuples'] = epoch_promenence_tuples
+                # self.debugging_dict_dict[an_epoch_name]['peak_prom_masks'] = an_alpha_epoch_masks
+                self.debugging_dict_dict[an_epoch_name]['peak_prom_masks_dict'] = epoch_masks_dict
+                self.debugging_dict_dict[an_epoch_name]['all_t_bin_peak_heights'] = all_t_bin_peak_heights
+                # self.debugging_dict_dict[an_epoch_name]['peak_prom_masks_dict'] = epoch_masks_dict
+                # self.debugging_dict_dict[an_epoch_name]['peak_prom_masks_dict'] = epoch_masks_dict
                 # self.debugging_dict_dict[an_epoch_name]['peak_prom_product'] = epoch_masks
                 
-            self.locality_measures_dict_dict[an_epoch_name][a_computation_measure_name] = ((self.gaussian_volume * is_high_prob_mask) > min_val_epsilon).astype(int) ## the "overlap" is computed by taking the elementwise dot-product with the moving average
+            self.locality_measures_dict_dict[an_epoch_name][a_computation_measure_name] = ((self.gaussian_volume * an_alpha_epoch_masks) > min_val_epsilon).astype(int) ## the "overlap" is computed by taking the elementwise dot-product with the moving average
             # self.locality_measures_dict_dict[an_epoch_name][f"{a_computation_measure_name}_score"] = [(np.nansum(np.stack(an_epoch_mask, axis=-1), axis=(0, 1))/self.n_total_pos_bins) for an_epoch_idx, an_epoch_mask in enumerate(all_epochs_masks)]
-            self.locality_measures_dict_dict[an_epoch_name][f"{a_computation_measure_name}_num_bins"] = np.nansum(epoch_masks, axis=(0, 1))
-            self.locality_measures_dict_dict[an_epoch_name][f"{a_computation_measure_name}_score"] = (np.nansum(epoch_masks, axis=(0, 1))/float(self.n_total_pos_bins))
+            self.locality_measures_dict_dict[an_epoch_name][f"{a_computation_measure_name}_num_bins"] = np.nansum(an_alpha_epoch_masks, axis=(0, 1))
+            # self.locality_measures_dict_dict[an_epoch_name][f"{a_computation_measure_name}_score"] = (np.nansum(an_alpha_epoch_masks, axis=(0, 1))/float(self.n_total_pos_bins))
+
+            ## ⚓ Decoded 2D Posterior Specificity - Metrics using the promenence mask
+
+            ## Focality/Diffusivity: Number of bins in in the 90% promenence mask over the total number of bins --> [0.0, 1.0]
+                ## definitionally the 90% promenance mask bins must be together/contiguous spatially, as outliers are considered different peaks.
+            self.locality_measures_dict_dict[an_epoch_name][f"{a_computation_measure_name}_Focality"] = (np.nansum(an_alpha_epoch_masks, axis=(0, 1))/float(self.n_total_pos_bins))
+
+            ## Sharpness/Peakiness: Number of bins in the 90% promenence mask over the number of bins exceeding 90% of the promenence peak height -- specifically looks at the area of the mean peak compared to the off-peak non-contiguous areas of similar heights
+            self.locality_measures_dict_dict[an_epoch_name][f"{a_computation_measure_name}_Peakiness"] = np.nansum(an_alpha_epoch_masks, axis=(0, 1)) / np.array([np.nansum((a_p_x_given_n[:, :, i] >= (a_peak_height * alpha_list[-1])), axis=(0, 1)) for i, a_peak_height in enumerate(all_t_bin_peak_heights)])
+
+            ## Modality: The count of detected peaks exceeding a certain promenence -- e.g. 1 if unimodal, 2 if bimodal, ..., N if multi-modal. 
+            self.locality_measures_dict_dict[an_epoch_name][f"{a_computation_measure_name}_num_peaks"] = all_t_bin_num_peaks
+
+
+
+            #TODO 2025-12-24 10:03: - [ ] IMPLEMENT
+            ## Decoded Epoch Temporal Sequentiality - detecting spatial sweeps in subsequent time bins
+                ## partially dpeends on time bin sizes -- of interest -- a real effect should remain at lower resolution/temporal subdivisions while fake ones can get washed out
+
+            ## ❌ Sequentiality - dilate the 80% promenence mask of the top peak (? same as using a lower mask percentage??) and compute the mask overlap with the subsequent time bin.
+                # 0 indicates disjoint/discontiguous... but it could be a jumpy sequence!!
+
+            ## compute the 2D change vector between subsequent peak locations (either bin-space or cm)
+                ## real trajectories should be roughly aligned and have constrained changes in direction (e.g. momentum)
+
+
 
 
 

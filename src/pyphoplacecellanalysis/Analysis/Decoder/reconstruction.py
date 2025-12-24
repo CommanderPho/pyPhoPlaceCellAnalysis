@@ -1707,7 +1707,7 @@ class DecodedFilterEpochsResult(HDF_SerializationMixin, AttrsBasedClassHelperMix
 
 
             # Add the marginal container to the list
-            curr_unit_marginal_x, curr_unit_marginal_y = BasePositionDecoder.perform_build_marginals(p_x_given_n=a_decoded_result.p_x_given_n_list[i], most_likely_positions=a_decoded_result.most_likely_positions_list[i], debug_print=False)
+            curr_unit_marginal_x, curr_unit_marginal_y, curr_unit_marginal_z = BasePositionDecoder.perform_build_marginals(p_x_given_n=a_decoded_result.p_x_given_n_list[i], most_likely_positions=a_decoded_result.most_likely_positions_list[i], debug_print=False)
             if curr_unit_marginal_x is not None:
                 a_decoded_result.marginal_x_list[i] = curr_unit_marginal_x
             if curr_unit_marginal_y is not None:
@@ -2259,8 +2259,8 @@ class BasePositionDecoder(HDFMixin, AttrsBasedClassHelperMixin, ContinuousPeakLo
         
         
         most_likely_positions, p_x_given_n, most_likely_position_indicies, flat_outputs_container = self.decode(spkcount, time_bin_size=decoding_time_bin_size, output_flat_versions=output_flat_versions, debug_print=debug_print)
-        curr_unit_marginal_x, curr_unit_marginal_y = self.perform_build_marginals(p_x_given_n, most_likely_positions, debug_print=debug_print)
-        return time_bin_container, p_x_given_n, most_likely_positions, curr_unit_marginal_x, curr_unit_marginal_y, flat_outputs_container
+        curr_unit_marginal_x, curr_unit_marginal_y, curr_unit_marginal_z = self.perform_build_marginals(p_x_given_n, most_likely_positions, debug_print=debug_print)
+        return time_bin_container, p_x_given_n, most_likely_positions, curr_unit_marginal_x, curr_unit_marginal_y, curr_unit_marginal_z, flat_outputs_container
 
 
     # ==================================================================================================================== #
@@ -2471,9 +2471,10 @@ class BasePositionDecoder(HDFMixin, AttrsBasedClassHelperMixin, ContinuousPeakLo
             filter_epochs_decoder_result.most_likely_position_indicies_list.append(np.atleast_1d(most_likely_position_indicies))
 
             # Add the marginal container to the list
-            curr_unit_marginal_x, curr_unit_marginal_y = cls.perform_build_marginals(p_x_given_n, most_likely_positions, debug_print=debug_print)
+            curr_unit_marginal_x, curr_unit_marginal_y, curr_unit_marginal_z = cls.perform_build_marginals(p_x_given_n, most_likely_positions, debug_print=debug_print)
             filter_epochs_decoder_result.marginal_x_list.append(curr_unit_marginal_x)
             filter_epochs_decoder_result.marginal_y_list.append(curr_unit_marginal_y)
+            filter_epochs_decoder_result.marginal_z_list.append(curr_unit_marginal_z)
         ## end for
         
         ## 2024-08-07: POST-HOC VALIDATE
@@ -2588,6 +2589,23 @@ class BasePositionDecoder(HDFMixin, AttrsBasedClassHelperMixin, ContinuousPeakLo
             curr_unit_marginal_x['most_likely_positions_1D'].shape # (106,)
 
             curr_unit_marginal_y: None
+            curr_unit_marginal_z: None
+
+        # For 2D Decoder:
+            p_x_given_n.shape # (x_bins, y_bins, time_bins)
+            most_likely_positions.shape # (time_bins, 2)
+
+            curr_unit_marginal_x['p_x_given_n'].shape # (x_bins, time_bins)
+            curr_unit_marginal_y['p_x_given_n'].shape # (y_bins, time_bins)
+            curr_unit_marginal_z: None
+
+        # For 3D Decoder:
+            p_x_given_n.shape # (x_bins, y_bins, z_bins, time_bins)
+            most_likely_positions.shape # (time_bins, 3)
+
+            curr_unit_marginal_x['p_x_given_n'].shape # (x_bins, time_bins)
+            curr_unit_marginal_y['p_x_given_n'].shape # (y_bins, time_bins)
+            curr_unit_marginal_z['p_x_given_n'].shape # (z_bins, time_bins)
 
         External validations:
 
@@ -2596,8 +2614,9 @@ class BasePositionDecoder(HDFMixin, AttrsBasedClassHelperMixin, ContinuousPeakLo
 
         """
         is_1D_decoder = (most_likely_positions.ndim < 2) # check if we're dealing with a 1D decoder, in which case there is no y-marginal (y doesn't exist)
+        is_3D_decoder = (not is_1D_decoder and most_likely_positions.shape[1] == 3) # check if we're dealing with a 3D decoder
         if debug_print:
-            print(f'perform_build_marginals(...): is_1D_decoder: {is_1D_decoder}')
+            print(f'perform_build_marginals(...): is_1D_decoder: {is_1D_decoder}, is_3D_decoder: {is_3D_decoder}')
             print(f"\t{p_x_given_n = }\n\t{most_likely_positions = }")
             print(f"\t{np.shape(p_x_given_n) = }\n\t{np.shape(most_likely_positions) = }")
 
@@ -2612,8 +2631,47 @@ class BasePositionDecoder(HDFMixin, AttrsBasedClassHelperMixin, ContinuousPeakLo
             # p_x_given_n should come in with shape (x_bins, time_bins)
             curr_unit_marginal_x.p_x_given_n = p_x_given_n.copy() # Result should be [x_bins, time_bins]
             curr_unit_marginal_x.p_x_given_n = curr_unit_marginal_x.p_x_given_n # / np.sum(curr_unit_marginal_x.p_x_given_n, axis=0) # should already be normalized but do it again anyway just in case (so there's a normalized distribution at each timestep)
-            # for the 1D decoder case, there are no y-positions
+            # for the 1D decoder case, there are no y-positions or z-positions
             curr_unit_marginal_y = None
+            curr_unit_marginal_z = None
+
+        elif is_3D_decoder:
+            # a 3D decoder
+            # Collapse the 3D position posterior into three separate 1D (X, Y & Z) marginal posteriors. Be sure to re-normalize each marginal after summing
+            # x-axis marginal: sum over y and z
+            curr_unit_marginal_x.p_x_given_n = np.squeeze(np.sum(p_x_given_n, axis=(1, 2))) # sum over all y and z. Result should be [x_bins x time_bins]
+            curr_unit_marginal_x.p_x_given_n = curr_unit_marginal_x.p_x_given_n / np.sum(curr_unit_marginal_x.p_x_given_n, axis=0) # sum over all positions for each time_bin (so there's a normalized distribution at each timestep)
+            ## Ensures that the marginal posterior is at least 2D:
+            if curr_unit_marginal_x.p_x_given_n.ndim == 0:
+                curr_unit_marginal_x.p_x_given_n = curr_unit_marginal_x.p_x_given_n.reshape(1, 1)
+            elif curr_unit_marginal_x.p_x_given_n.ndim == 1:
+                curr_unit_marginal_x.p_x_given_n = curr_unit_marginal_x.p_x_given_n[:, np.newaxis]
+                if debug_print:
+                    print(f'\t added dimension to curr_posterior for marginal_x: {curr_unit_marginal_x.p_x_given_n.shape}')
+
+            # y-axis marginal: sum over x and z
+            curr_unit_marginal_y = DynamicContainer(p_x_given_n=None, most_likely_positions_1D=None)
+            curr_unit_marginal_y.p_x_given_n = np.squeeze(np.sum(p_x_given_n, axis=(0, 2))) # sum over all x and z. Result should be [y_bins x time_bins]
+            curr_unit_marginal_y.p_x_given_n = curr_unit_marginal_y.p_x_given_n / np.sum(curr_unit_marginal_y.p_x_given_n, axis=0) # sum over all positions for each time_bin (so there's a normalized distribution at each timestep)
+            ## Ensures that the marginal posterior is at least 2D:
+            if curr_unit_marginal_y.p_x_given_n.ndim == 0:
+                curr_unit_marginal_y.p_x_given_n = curr_unit_marginal_y.p_x_given_n.reshape(1, 1)
+            elif curr_unit_marginal_y.p_x_given_n.ndim == 1:
+                curr_unit_marginal_y.p_x_given_n = curr_unit_marginal_y.p_x_given_n[:, np.newaxis]
+                if debug_print:
+                    print(f'\t added dimension to curr_posterior for marginal_y: {curr_unit_marginal_y.p_x_given_n.shape}')
+
+            # z-axis marginal: sum over x and y
+            curr_unit_marginal_z = DynamicContainer(p_x_given_n=None, most_likely_positions_1D=None)
+            curr_unit_marginal_z.p_x_given_n = np.squeeze(np.sum(p_x_given_n, axis=(0, 1))) # sum over all x and y. Result should be [z_bins x time_bins]
+            curr_unit_marginal_z.p_x_given_n = curr_unit_marginal_z.p_x_given_n / np.sum(curr_unit_marginal_z.p_x_given_n, axis=0) # sum over all positions for each time_bin (so there's a normalized distribution at each timestep)
+            ## Ensures that the marginal posterior is at least 2D:
+            if curr_unit_marginal_z.p_x_given_n.ndim == 0:
+                curr_unit_marginal_z.p_x_given_n = curr_unit_marginal_z.p_x_given_n.reshape(1, 1)
+            elif curr_unit_marginal_z.p_x_given_n.ndim == 1:
+                curr_unit_marginal_z.p_x_given_n = curr_unit_marginal_z.p_x_given_n[:, np.newaxis]
+                if debug_print:
+                    print(f'\t added dimension to curr_posterior for marginal_z: {curr_unit_marginal_z.p_x_given_n.shape}')
 
         else:
             # a 2D decoder
@@ -2639,8 +2697,10 @@ class BasePositionDecoder(HDFMixin, AttrsBasedClassHelperMixin, ContinuousPeakLo
                 curr_unit_marginal_y.p_x_given_n = curr_unit_marginal_y.p_x_given_n[:, np.newaxis]
                 if debug_print:
                     print(f'\t added dimension to curr_posterior for marginal_y: {curr_unit_marginal_y.p_x_given_n.shape}')
+            # for the 2D decoder case, there are no z-positions
+            curr_unit_marginal_z = None
                 
-        ## Add the most-likely positions to the posterior_x container:
+        ## Add the most-likely positions to the posterior containers:
         if is_1D_decoder:
             ## 1D Decoder Case, there is no y marginal (y doesn't exist)
             if debug_print:
@@ -2655,12 +2715,16 @@ class BasePositionDecoder(HDFMixin, AttrsBasedClassHelperMixin, ContinuousPeakLo
             # # Same as np.amax(x, axis=-1)
             # np.take_along_axis(x, np.expand_dims(index_array, axis=-1), axis=-1).squeeze(axis=-1)
 
+        elif is_3D_decoder:
+            curr_unit_marginal_x.most_likely_positions_1D = most_likely_positions[:,0].T
+            curr_unit_marginal_y.most_likely_positions_1D = most_likely_positions[:,1].T
+            curr_unit_marginal_z.most_likely_positions_1D = most_likely_positions[:,2].T
 
         else:
             curr_unit_marginal_x.most_likely_positions_1D = most_likely_positions[:,0].T
             curr_unit_marginal_y.most_likely_positions_1D = most_likely_positions[:,1].T
         
-        return curr_unit_marginal_x, curr_unit_marginal_y
+        return curr_unit_marginal_x, curr_unit_marginal_y, curr_unit_marginal_z
 
     @classmethod
     def perform_compute_most_likely_positions(cls, flat_p_x_given_n, original_position_data_shape):
@@ -2996,8 +3060,8 @@ class BasePositionDecoder(HDFMixin, AttrsBasedClassHelperMixin, ContinuousPeakLo
             active_two_step_result.most_likely_positions_list[an_epoch_idx] = active_two_step_result.most_likely_positions_list[an_epoch_idx].T
 
             ## Once done, compute marginals for the two-step:
-            curr_unit_marginal_x, curr_unit_marginal_y = active_decoder.perform_build_marginals(p_x_given_n_and_x_prev, active_two_step_result.most_likely_positions_list[an_epoch_idx], debug_print=debug_print)
-            _OLD_two_step_decoder_result['marginal'] = DynamicContainer(x=curr_unit_marginal_x, y=curr_unit_marginal_y)
+            curr_unit_marginal_x, curr_unit_marginal_y, curr_unit_marginal_z = active_decoder.perform_build_marginals(p_x_given_n_and_x_prev, active_two_step_result.most_likely_positions_list[an_epoch_idx], debug_print=debug_print)
+            _OLD_two_step_decoder_result['marginal'] = DynamicContainer(x=curr_unit_marginal_x, y=curr_unit_marginal_y, z=curr_unit_marginal_z)
         ## END for i in np.arange(num_filter_epochs)...
         
 
@@ -3356,7 +3420,7 @@ class BayesianPlacemapPositionDecoder(SerializedAttributesAllowBlockSpecifyingCl
             ## Single sweep decoding:
 
             ## 2022-09-23 - Epochs-style encoding (that works):
-            self.time_binning_container, self.p_x_given_n, self.most_likely_positions, curr_unit_marginal_x, curr_unit_marginal_y, flat_outputs_container = self.hyper_perform_decode(self.spikes_df, decoding_time_bin_size=self.time_bin_size, output_flat_versions=True, debug_print=(debug_print or self.debug_print)) ## this is where it's getting messed up
+            self.time_binning_container, self.p_x_given_n, self.most_likely_positions, curr_unit_marginal_x, curr_unit_marginal_y, curr_unit_marginal_z, flat_outputs_container = self.hyper_perform_decode(self.spikes_df, decoding_time_bin_size=self.time_bin_size, output_flat_versions=True, debug_print=(debug_print or self.debug_print)) ## this is where it's getting messed up
             if should_use_safe_time_binning:
                 num_extra_bins_in_old: int = original_time_bin_container.num_bins - self.time_binning_container.num_bins
                 # np.isin(original_time_bin_container.centers, self.time_binning_container.centers)
@@ -3448,6 +3512,9 @@ class BayesianPlacemapPositionDecoder(SerializedAttributesAllowBlockSpecifyingCl
             if self.marginal.y is not None:
                 # self.marginal.y.revised_most_likely_positions_1D = self.perform_compute_forward_filled_positions(self.marginal.y.most_likely_positions_1D, is_non_firing_bin=is_non_firing_bin)
                 self.marginal.y.revised_most_likely_positions_1D =  _revised_marginals[1].most_likely_positions_1D.copy()
+            if self.marginal.z is not None:
+                # self.marginal.z.revised_most_likely_positions_1D = self.perform_compute_forward_filled_positions(self.marginal.z.most_likely_positions_1D, is_non_firing_bin=is_non_firing_bin)
+                self.marginal.z.revised_most_likely_positions_1D =  _revised_marginals[2].most_likely_positions_1D.copy()
 
         return self.revised_most_likely_positions
 
