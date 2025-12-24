@@ -4,17 +4,26 @@ from silx.gui.plot3d.ScalarFieldView import ScalarFieldView
 from silx.gui.plot3d.SceneWindow import SceneWindow, items as plot3d_items
 from silx.gui.colors import Colormap
 import numpy as np
+import pandas as pd
 from typing import Dict, List, Tuple, Optional, Callable, Union, Any
 from nptyping import NDArray
 import neuropy.utils.type_aliases as types
 from pyphocorehelpers.programming_helpers import metadata_attributes
 from pyphocorehelpers.function_helpers import function_attributes
+from neuropy.core.epoch import Epoch, EpochsAccessor, ensure_dataframe, ensure_Epoch, EpochHelpers
 
 
 @metadata_attributes(short_name=None, tags=['Silx', 'gui', '3D', 'volumetric', 'epoch_idx_slider', 'epoch_t_bin_idx_slider', 'two-slider'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-12-23', related_items=[])
 class EpochTimeBinViewer(qt.QWidget):
     """ Silx volumentric widget - renders two sliders, one controlling the `epoch_idx`, 
             and a sub-slider controlling the `t_bin_idx` within that epoch.
+
+    Args:
+        decoded_result: Decoded result object with p_x_given_n_list attribute
+        xbin_centers: Optional array of X bin center coordinates
+        ybin_centers: Optional array of Y bin center coordinates
+        locality_measures_df: Optional DataFrame with 'start' and 'stop' columns for matching time bins
+        text_columns: Optional list of column names from locality_measures_df to render as text labels
 
     Usage:
 
@@ -26,22 +35,29 @@ class EpochTimeBinViewer(qt.QWidget):
         import numpy as np
         from pyphoplacecellanalysis.GUI.Silx.EpochTimeBinViewerWidget import EpochTimeBinViewer
 
-        # Usage:
+        # Basic usage:
         a_decoder = a_widget.container.pf1D_Decoder_dict['roam']
-        # p_x_given_n = a_widget.decoded_result.p_x_given_n_list[a_widget.active_epoch_idx]
         viewer = EpochTimeBinViewer(decoded_result=a_widget.decoded_result,
                                         xbin_centers=a_decoder.xbin_centers,
                                         ybin_centers=a_decoder.ybin_centers)
         viewer.show()
-
-
+        
+        # With text labels:
+        viewer = EpochTimeBinViewer(decoded_result=a_widget.decoded_result,
+                                        xbin_centers=a_decoder.xbin_centers,
+                                        ybin_centers=a_decoder.ybin_centers,
+                                        locality_measures_df=measures_df,
+                                        text_columns=['measure1', 'measure2'])
+        viewer.show()
 
     """
-    def __init__(self, decoded_result, xbin_centers=None, ybin_centers=None):
+    def __init__(self, decoded_result, xbin_centers=None, ybin_centers=None, locality_measures_df: Optional[pd.DataFrame] = None, text_columns: Optional[List[str]] = None):
         super().__init__()
         self.decoded_result = decoded_result
         self.xbin_centers = xbin_centers
         self.ybin_centers = ybin_centers
+        self.locality_measures_df = locality_measures_df
+        self.text_columns = text_columns if text_columns is not None else []
         
         # Current indices
         self.curr_epoch_idx = 0
@@ -49,6 +65,10 @@ class EpochTimeBinViewer(qt.QWidget):
         
         # Store wireframe items for cleanup
         self.wireframe_items = []
+        
+        # Store text label items for cleanup
+        self.text_label_items_2d = []
+        self.text_label_items_3d = []
         
         # Create UI
         layout = qt.QVBoxLayout()
@@ -111,6 +131,79 @@ class EpochTimeBinViewer(qt.QWidget):
         """Get number of time bins for current epoch"""
         p_x_given_n = self.decoded_result.p_x_given_n_list[self.curr_epoch_idx]
         return p_x_given_n.shape[-1]  # Last dimension is time
+    
+    def _get_time_bin_centers(self) -> Optional[NDArray]:
+        """Get time bin centers for current epoch if available"""
+        try:
+            if hasattr(self.decoded_result, 'time_bin_containers') and self.decoded_result.time_bin_containers is not None:
+                return self.decoded_result.time_bin_containers[self.curr_epoch_idx].centers
+            elif hasattr(self.decoded_result, 'time_window_centers'):
+                # Fallback to time_window_centers if available
+                return self.decoded_result.time_window_centers
+        except (AttributeError, IndexError, KeyError):
+            pass
+        return None
+    
+    def _match_time_bin_to_dataframe_row(self, t_bin_idx: int) -> Optional[pd.Series]:
+        """Match a time bin index to a dataframe row using start/stop times.
+        
+        Args:
+            t_bin_idx: Time bin index within current epoch
+            
+        Returns:
+            Matching dataframe row (Series) or None if no match found
+        """
+        if self.locality_measures_df is None or 'start' not in self.locality_measures_df.columns or 'stop' not in self.locality_measures_df.columns:
+            return None
+        
+        time_bin_centers = self._get_time_bin_centers()
+        if time_bin_centers is None:
+            return None
+        
+        if t_bin_idx >= len(time_bin_centers):
+            return None
+        
+        # Get time bin center time
+        t_bin_time = time_bin_centers[t_bin_idx]
+        
+        # Find matching row where start <= t_bin_time <= stop
+        matching_rows = self.locality_measures_df[
+            (self.locality_measures_df['start'] <= t_bin_time) & 
+            (t_bin_time <= self.locality_measures_df['stop'])
+        ]
+        
+        if len(matching_rows) > 0:
+            # Return first matching row
+            return matching_rows.iloc[0]
+        return None
+    
+    def _get_text_label_string(self, t_bin_idx: int) -> Optional[str]:
+        """Get text label string for a time bin.
+        
+        Args:
+            t_bin_idx: Time bin index within current epoch
+            
+        Returns:
+            Formatted text string or None if no label available
+        """
+        row = self._match_time_bin_to_dataframe_row(t_bin_idx)
+        if row is None or not self.text_columns:
+            return None
+        
+        # Build label from specified columns
+        label_parts = []
+        for col in self.text_columns:
+            if col in row.index:
+                value = row[col]
+                # Format the value appropriately
+                if pd.isna(value):
+                    label_parts.append(f"{col}: N/A")
+                elif isinstance(value, (int, float)):
+                    label_parts.append(f"{col}: {value:.3f}" if isinstance(value, float) else f"{col}: {value}")
+                else:
+                    label_parts.append(f"{col}: {value}")
+        
+        return ", ".join(label_parts) if label_parts else None
     
     def update_time_bin_slider_range(self):
         """Update time_bin slider range when epoch changes"""
@@ -372,6 +465,9 @@ class EpochTimeBinViewer(qt.QWidget):
         # Add wireframe boxes for each time bin plane
         self._add_wireframe_boxes(volume_data, x_scale, y_scale, time_scale)
         
+        # Add text labels to 3D view
+        self._add_text_labels_3d(volume_data, x_scale, y_scale, time_scale)
+        
         # Update 2D slice view
         self.update_2d_slice()
     
@@ -409,6 +505,105 @@ class EpochTimeBinViewer(qt.QWidget):
         except Exception:
             pass  # Silently fail if update isn't possible
     
+    def _add_text_labels_2d(self):
+        """Add text labels to 2D plot for current time bin"""
+        # Remove existing text labels
+        for item in self.text_label_items_2d:
+            try:
+                self.plot_2d.removeItem(item)
+            except:
+                pass
+        self.text_label_items_2d.clear()
+        
+        if not self.text_columns:
+            return
+        
+        # Get text label for current time bin
+        label_text = self._get_text_label_string(self.curr_time_bin_idx)
+        if label_text is None:
+            return
+        
+        # Calculate position: center of plot, just below the image
+        if self.xbin_centers is not None and self.ybin_centers is not None:
+            x_pos = (self.xbin_centers[0] + self.xbin_centers[-1]) / 2.0
+            y_pos = self.ybin_centers[0] - (self.ybin_centers[-1] - self.ybin_centers[0]) * 0.05  # 5% below
+        else:
+            # Use default positioning
+            x_pos = 0.5
+            y_pos = -0.05
+        
+        # Add text annotation to 2D plot
+        try:
+            text_item = self.plot_2d.addText(label_text, x_pos, y_pos, color='white', fontsize=10)
+            self.text_label_items_2d.append(text_item)
+        except Exception:
+            # If addText doesn't work, try alternative method
+            try:
+                # Some versions might use different API
+                if hasattr(self.plot_2d, 'addAnnotation'):
+                    text_item = self.plot_2d.addAnnotation(label_text, x_pos, y_pos)
+                    self.text_label_items_2d.append(text_item)
+            except Exception:
+                pass  # Silently fail if text rendering isn't available
+    
+    def _add_text_labels_3d(self, volume_data: NDArray, x_scale: float, y_scale: float, time_scale: float):
+        """Add text labels to 3D scene for all time bins"""
+        scene_widget = self._get_scene_widget()
+        if scene_widget is None or not self.text_columns:
+            return
+        
+        # Remove existing text labels
+        for item in self.text_label_items_3d:
+            try:
+                if hasattr(scene_widget, 'removeItem'):
+                    scene_widget.removeItem(item)
+            except:
+                pass
+        self.text_label_items_3d.clear()
+        
+        n_time_bins = volume_data.shape[0]
+        
+        # Calculate bounds for positioning
+        if self.xbin_centers is not None and self.ybin_centers is not None:
+            x_min = float(self.xbin_centers[0])
+            x_max = float(self.xbin_centers[-1])
+            y_min = float(self.ybin_centers[0])
+            y_max = float(self.ybin_centers[-1])
+        else:
+            n_x_bins = volume_data.shape[2]
+            n_y_bins = volume_data.shape[1]
+            x_min = 0.0
+            x_max = float(n_x_bins - 1) * x_scale if x_scale > 0 else float(n_x_bins - 1)
+            y_min = 0.0
+            y_max = float(n_y_bins - 1) * y_scale if y_scale > 0 else float(n_y_bins - 1)
+        
+        # Add text label for each time bin
+        for t_bin_idx in range(n_time_bins):
+            label_text = self._get_text_label_string(t_bin_idx)
+            if label_text is None:
+                continue
+            
+            # Position text below the time bin plane
+            x_pos = (x_min + x_max) / 2.0
+            y_pos = y_min - (y_max - y_min) * 0.1  # 10% below
+            z_pos = t_bin_idx * time_scale
+            
+            # Try to add text using Scatter3D with a single point and text visualization
+            try:
+                # Create a text item using Scatter3D positioned at the label location
+                text_item = plot3d_items.Scatter3D()
+                # Use a single point to position the text
+                text_item.setData(np.array([x_pos]), np.array([y_pos]), np.array([z_pos]), np.array([1.0]))
+                text_item.setVisualization('points')
+                text_item.setPointSize(0)  # Make point invisible
+                # Note: silx may not directly support text labels in 3D, so this is a placeholder
+                # The actual text rendering might need to be done differently depending on silx version
+                scene_widget.addItem(text_item)
+                self.text_label_items_3d.append(text_item)
+            except Exception:
+                # If direct text rendering isn't available, we'll skip it
+                pass
+    
     def update_2d_slice(self):
         """Update the 2D slice view for current time bin"""
         p_x_given_n = self.decoded_result.p_x_given_n_list[self.curr_epoch_idx]
@@ -427,6 +622,9 @@ class EpochTimeBinViewer(qt.QWidget):
             ymin, ymax = self.ybin_centers[0], self.ybin_centers[-1]
             self.plot_2d.getXAxis().setLimits(xmin, xmax)
             self.plot_2d.getYAxis().setLimits(ymin, ymax)
+        
+        # Add text labels
+        self._add_text_labels_2d()
 
 
 @metadata_attributes(short_name=None, tags=['Silx', 'gui', '3D', 'scene', 'epoch_idx_slider', 'height-map'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-12-23', related_items=[])
@@ -437,29 +635,49 @@ class Epoch3DSceneTimeBinViewer(qt.QWidget):
     as 3D height map surfaces arranged horizontally. Each time bin is displayed as a 
     2D scatter plot with height map enabled, positioned side-by-side along the X axis.
     
+    Args:
+        decoded_result: Decoded result object with p_x_given_n_list attribute
+        xbin_centers: Optional array of X bin center coordinates
+        ybin_centers: Optional array of Y bin center coordinates
+        locality_measures_df: Optional DataFrame with 'start' and 'stop' columns for matching time bins
+        text_columns: Optional list of column names from locality_measures_df to render as text labels
+    
     Usage:
     
         from pyphoplacecellanalysis.GUI.Silx.EpochTimeBinViewerWidget import Epoch3DSceneTimeBinViewer
         
-        # Usage:
+        # Basic usage:
         a_decoder = a_widget.container.pf1D_Decoder_dict['roam']
         viewer = Epoch3DSceneTimeBinViewer(decoded_result=a_widget.decoded_result,
                                            xbin_centers=a_decoder.xbin_centers,
                                            ybin_centers=a_decoder.ybin_centers)
         viewer.show()
+        
+        # With text labels:
+        viewer = Epoch3DSceneTimeBinViewer(decoded_result=a_widget.decoded_result,
+                                           xbin_centers=a_decoder.xbin_centers,
+                                           ybin_centers=a_decoder.ybin_centers,
+                                           locality_measures_df=measures_df,
+                                           text_columns=['measure1', 'measure2'])
+        viewer.show()
     
     """
-    def __init__(self, decoded_result, xbin_centers=None, ybin_centers=None):
+    def __init__(self, decoded_result, xbin_centers=None, ybin_centers=None, locality_measures_df: Optional[pd.DataFrame] = None, text_columns: Optional[List[str]] = None):
         super().__init__()
         self.decoded_result = decoded_result
         self.xbin_centers = xbin_centers
         self.ybin_centers = ybin_centers
+        self.locality_measures_df = locality_measures_df
+        self.text_columns = text_columns if text_columns is not None else []
         
         # Current epoch index
         self.curr_epoch_idx = 0
         
         # Store time bin items for cleanup
         self.time_bin_items = []
+        
+        # Store text label items for cleanup (Qt QLabel widgets)
+        self.text_label_items = []
         
         # Create UI
         layout = qt.QVBoxLayout()
@@ -471,6 +689,12 @@ class Epoch3DSceneTimeBinViewer(qt.QWidget):
         
         # Add SceneWindow to layout
         layout.addWidget(self.scene_window)
+        
+        # Store label data for repositioning on resize
+        self._label_data = []  # List of (text, t_bin_idx, x_translation, x_min, x_max, y_min, y_max, bin_spacing) tuples
+        
+        # Install event filter to catch resize events
+        self.scene_window.installEventFilter(self)
         
         # Create epoch slider
         slider_layout = qt.QHBoxLayout()
@@ -497,6 +721,103 @@ class Epoch3DSceneTimeBinViewer(qt.QWidget):
         p_x_given_n = self.decoded_result.p_x_given_n_list[self.curr_epoch_idx]
         return p_x_given_n.shape[-1]  # Last dimension is time
     
+    def _get_time_bin_centers(self) -> Optional[NDArray]:
+        """Get time bin centers for current epoch if available"""
+        try:
+            if hasattr(self.decoded_result, 'time_bin_containers') and self.decoded_result.time_bin_containers is not None:
+                return self.decoded_result.time_bin_containers[self.curr_epoch_idx].centers
+            elif hasattr(self.decoded_result, 'time_window_centers'):
+                # Fallback to time_window_centers if available
+                return self.decoded_result.time_window_centers
+        except (AttributeError, IndexError, KeyError):
+            pass
+        return None
+    
+    def _match_time_bin_to_dataframe_row(self, t_bin_idx: int) -> Optional[pd.Series]:
+        """Match a time bin index to a dataframe row using start/stop times.
+        
+        Args:
+            t_bin_idx: Time bin index within current epoch
+            
+        Returns:
+            Matching dataframe row (Series) or None if no match found
+        """
+        if (self.locality_measures_df is None):
+            return None
+
+        # if self.locality_measures_df is None or ('start' not in self.locality_measures_df.columns) or ('stop' not in self.locality_measures_df.columns):
+        #     return None
+        
+        time_bin_centers = self._get_time_bin_centers()
+        if time_bin_centers is None:
+            return None
+        
+        if t_bin_idx >= len(time_bin_centers):
+            return None
+        
+        # Get time bin center time
+        t_bin_time = time_bin_centers[t_bin_idx]
+        
+        # Find matching row where start <= t_bin_time <= stop
+        if ('stop' in self.locality_measures_df) and ('stop' in self.locality_measures_df):
+            ## epoch-style updates
+            matching_rows = self.locality_measures_df[
+                (self.locality_measures_df['start'] <= t_bin_time) & 
+                (t_bin_time <= self.locality_measures_df['stop'])
+            ]
+        elif ('t' in self.locality_measures_df):
+            ## point/position-style updates: find closest match within tolerance
+            print(f'debug: point-style data: t_bin_time: {t_bin_time}')
+            # Find the index with the closest time value
+            time_diffs = (self.locality_measures_df['t'] - t_bin_time).abs()
+            closest_idx = time_diffs.idxmin()
+            closest_time_diff = time_diffs.loc[closest_idx]
+            print(f'\tclosest_idx: {closest_idx}, closest_time_diff: {closest_time_diff}, self.locality_measures_df.loc[[closest_idx]]: {self.locality_measures_df.loc[[closest_idx]]}')
+            # Check if closest match is within tolerance (default 1ms)
+            atol = 0.100  # 100 millisecond tolerance, kinda insanely high
+            if closest_time_diff <= atol:
+                matching_rows = self.locality_measures_df.loc[[closest_idx]]
+            else:
+                # No match within tolerance
+                matching_rows = pd.DataFrame()  # Empty DataFrame
+
+        else:
+            print(f'WARN: attempting to get time_bin_to_dataframe_row text failed because self.locality_measures_df does not look epoch-like or point-like: self.locality_measures_df.columns: {list(self.locality_measures_df.columns)}')
+            return None
+        
+        if len(matching_rows) > 0:
+            # Return first matching row
+            return matching_rows.iloc[0]
+        return None
+    
+    def _get_text_label_string(self, t_bin_idx: int) -> Optional[str]:
+        """Get text label string for a time bin.
+        
+        Args:
+            t_bin_idx: Time bin index within current epoch
+            
+        Returns:
+            Formatted text string or None if no label available
+        """
+        row = self._match_time_bin_to_dataframe_row(t_bin_idx)
+        if row is None or not self.text_columns:
+            return None
+        
+        # Build label from specified columns
+        label_parts = []
+        for col in self.text_columns:
+            if col in row.index:
+                value = row[col]
+                # Format the value appropriately
+                if pd.isna(value):
+                    label_parts.append(f"{col}: N/A")
+                elif isinstance(value, (int, float)):
+                    label_parts.append(f"{col}: {value:.3f}" if isinstance(value, float) else f"{col}: {value}")
+                else:
+                    label_parts.append(f"{col}: {value}")
+        
+        return "\n".join(label_parts) if label_parts else None
+    
     def _clear_time_bin_items(self):
         """Remove all time bin items from the scene"""
         for item in self.time_bin_items:
@@ -506,6 +827,91 @@ class Epoch3DSceneTimeBinViewer(qt.QWidget):
             except:
                 pass
         self.time_bin_items.clear()
+    
+    def _clear_text_label_items(self):
+        """Remove all text label items (Qt QLabel widgets) from the scene"""
+        for label in self.text_label_items:
+            try:
+                if label and label.parent():
+                    label.setParent(None)
+                    label.deleteLater()
+            except:
+                pass
+        self.text_label_items.clear()
+    
+    def _add_text_label_3d(self, label_text: str, t_bin_idx: int, x_translation: float, x_min: float, x_max: float, y_min: float, y_max: float, bin_spacing: float):
+        """Add a text label as a Qt QLabel widget positioned below a time bin surface.
+        
+        Args:
+            label_text: Text to display
+            t_bin_idx: Time bin index
+            x_translation: X translation of the time bin surface
+            x_min, x_max: X bounds of the surface
+            y_min, y_max: Y bounds of the surface
+            bin_spacing: Spacing between bins
+        """
+        try:
+            # Create a QLabel for the text
+            label = qt.QLabel(label_text, self.scene_window)
+            label.setStyleSheet("""
+                QLabel {
+                    background-color: transparent;
+                    color: white;
+                    padding: 3px 6px;
+                    border: none;
+                    border-radius: 3px;
+                    font-size: 9px;
+                    font-weight: normal;
+                }
+            """)
+            label.setAlignment(qt.Qt.AlignCenter | qt.Qt.AlignVCenter)
+            # label.setWordWrap(True)  # Allow text wrapping for long labels
+            label.setWordWrap(False)  # Allow text wrapping for long labels
+            
+            # Get scene window dimensions
+            scene_width = self.scene_window.width()
+            scene_height = self.scene_window.height()
+            
+            # Get slider height to avoid collision
+            # The slider is in a separate layout below the scene_window
+            # We need to leave space at the bottom of the scene_window for visual separation
+            slider_height = 60  # Estimated height for slider + labels + spacing
+            
+            # If window not yet sized, use default or wait
+            if scene_width <= 0 or scene_height <= 0:
+                scene_width = 800  # Default width
+                scene_height = 600  # Default height
+            
+            # Calculate approximate position: distribute labels horizontally
+            n_time_bins = self.curr_n_time_bins
+            if n_time_bins > 0:
+                # Position labels at the bottom of the scene, above the slider
+                # Calculate label width based on available space
+                label_width = min(150, max(80, scene_width // max(n_time_bins, 1)))
+                label_height = 200  # 4x taller (was 25px)
+                
+                # Calculate X position based on time bin index
+                # Distribute labels evenly across the width
+                if n_time_bins > 1:
+                    x_pos = int((t_bin_idx / (n_time_bins - 1)) * (scene_width - label_width))
+                else:
+                    x_pos = int((scene_width - label_width) / 2)
+                
+                # Position above the slider with some padding
+                y_pos = scene_height - label_height - slider_height - 10  # 10px padding above slider
+                
+                # Ensure label doesn't go outside bounds
+                x_pos = max(5, min(x_pos, scene_width - label_width - 5))
+                
+                label.setGeometry(x_pos, y_pos, label_width, label_height)
+                label.show()
+                label.raise_()  # Bring to front
+                label.setAttribute(qt.Qt.WA_TransparentForMouseEvents, True)  # Don't block mouse events
+                
+                self.text_label_items.append(label)
+        except Exception:
+            # Silently fail if label creation doesn't work
+            pass
     
     def _create_time_bin_items(self):
         """Create and position all time bin height maps for current epoch"""
@@ -571,14 +977,58 @@ class Epoch3DSceneTimeBinViewer(qt.QWidget):
             
             # Store item for cleanup
             self.time_bin_items.append(item)
-    
+            
+            # Add text label below this time bin if available
+            if self.text_columns:
+                label_text = self._get_text_label_string(t_bin_idx)
+                if label_text is not None:
+                    # Store label data for later positioning
+                    self._label_data.append((label_text, t_bin_idx, x_translation, x_min, x_max, y_min, y_max, bin_spacing))
+                    self._add_text_label_3d(label_text, t_bin_idx, x_translation, x_min, x_max, y_min, y_max, bin_spacing)
+        ## END for t_bin_idx in range(n_time_bins)...
+
+
+
+
     def on_epoch_changed(self, value):
         """Called when epoch slider changes"""
         self.curr_epoch_idx = int(value)
         self.epoch_label.setText(str(self.curr_epoch_idx))
         
-        # Clear existing time bin items
+        # Clear existing items
         self._clear_time_bin_items()
+        self._clear_text_label_items()
+        self._label_data = []  # Clear label data
         
         # Create new time bin items for selected epoch
         self._create_time_bin_items()
+        
+        # Update label positions after a short delay to ensure window is sized
+        qt.QTimer.singleShot(100, self._update_text_label_positions)
+    
+    def eventFilter(self, obj, event):
+        """Event filter to catch scene window resize events"""
+        try:
+            # Check if this is a resize event
+            # QEvent.Resize is typically 14 in Qt5/Qt6
+            if obj == self.scene_window:
+                event_type = event.type()
+                # Check for resize event (works for both Qt5 and Qt6)
+                if hasattr(qt.QEvent, 'Resize') and event_type == qt.QEvent.Resize:
+                    qt.QTimer.singleShot(50, self._update_text_label_positions)
+                elif int(event_type) == 14:  # Resize event type code
+                    qt.QTimer.singleShot(50, self._update_text_label_positions)
+        except:
+            pass
+        return super().eventFilter(obj, event)
+    
+    def _update_text_label_positions(self):
+        """Update positions of all text labels after window resize"""
+        if not self._label_data:
+            return
+        
+        # Clear and recreate labels with updated positions
+        self._clear_text_label_items()
+        for label_data in self._label_data:
+            label_text, t_bin_idx, x_translation, x_min, x_max, y_min, y_max, bin_spacing = label_data
+            self._add_text_label_3d(label_text, t_bin_idx, x_translation, x_min, x_max, y_min, y_max, bin_spacing)
