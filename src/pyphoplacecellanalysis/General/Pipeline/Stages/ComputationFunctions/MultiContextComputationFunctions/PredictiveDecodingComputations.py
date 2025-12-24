@@ -2192,12 +2192,12 @@ class PredictiveDecodingComputationsGlobalComputationFunctions(AllFunctionEnumer
         #TODO 2025-12-23 20:55: - [ ] Found that everything seems to be working well except that there are sometimes a few time bins out of an epoch that have poorly localized posteriors in general (they look very diffuse and like an error, maybe low firing bins)
         ### These need to be filtered out (either by diffusivity of low-firing criteria) so that when we collapse over all the time bins within each epoch we don't pick up a bunch of garbage (the diffuse bins are too liberal).
         ## INPUTS: spikes_df
-        masked_result, mask_index_tuple = a_result_decoded.mask_computed_DecodedFilterEpochsResult_by_required_spike_counts_per_time_bin(
-            spikes_df=spikes_df,
-            min_num_spikes_per_bin_to_be_considered_active=5,
-            min_num_unique_active_neurons_per_time_bin=1,
-            masked_bin_fill_mode='ignore'
-        )
+        # masked_result, mask_index_tuple = a_result_decoded.mask_computed_DecodedFilterEpochsResult_by_required_spike_counts_per_time_bin(
+        #     spikes_df=spikes_df,
+        #     min_num_spikes_per_bin_to_be_considered_active=5,
+        #     min_num_unique_active_neurons_per_time_bin=1,
+        #     masked_bin_fill_mode='ignore'
+        # )
 
         ## TODO: do something with masked_result, mask_index_tuple
 
