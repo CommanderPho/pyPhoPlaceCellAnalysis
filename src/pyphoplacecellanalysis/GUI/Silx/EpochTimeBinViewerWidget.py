@@ -896,8 +896,8 @@ class Epoch3DSceneTimeBinViewer(qt.QWidget):
         table_widget = qt.QTableWidget()
         self.locality_measures_table = table_widget
         
-        # Populate table with dataframe
-        df = self.locality_measures_df
+        # Filter dataframe by current epoch time range
+        df = self._get_filtered_dataframe_for_current_epoch()
         n_rows, n_cols = df.shape
         table_widget.setRowCount(n_rows)
         table_widget.setColumnCount(n_cols)
@@ -960,8 +960,8 @@ class Epoch3DSceneTimeBinViewer(qt.QWidget):
         table_widget = qt.QTableWidget()
         self.locality_measures_table = table_widget
         
-        # Populate table with dataframe
-        df = self.locality_measures_df
+        # Filter dataframe by current epoch time range
+        df = self._get_filtered_dataframe_for_current_epoch()
         n_rows, n_cols = df.shape
         table_widget.setRowCount(n_rows)
         table_widget.setColumnCount(n_cols)
@@ -1128,6 +1128,136 @@ class Epoch3DSceneTimeBinViewer(qt.QWidget):
         except (AttributeError, IndexError, KeyError):
             pass
         return None
+    
+    def _get_epoch_time_range(self) -> Optional[Tuple[float, float]]:
+        """Get the time range (earliest start, latest stop) for the current epoch.
+        
+        Returns:
+            Tuple of (start_time, stop_time) or None if not available
+        """
+        try:
+            if hasattr(self.decoded_result, 'time_bin_containers') and self.decoded_result.time_bin_containers is not None:
+                time_bin_container = self.decoded_result.time_bin_containers[self.curr_epoch_idx]
+                print(f'time_bin_container: {time_bin_container}')
+                # Check if container has start/stop attributes
+                if hasattr(time_bin_container, 'start') and hasattr(time_bin_container, 'stop'):
+                    # If it's a single value, return it
+                    if hasattr(time_bin_container.start, '__len__') and len(time_bin_container.start) > 0:
+                        start = float(np.nanmin(time_bin_container.start))
+                        stop = float(np.nanmax(time_bin_container.stop))
+                    else:
+                        start = float(time_bin_container.start)
+                        stop = float(time_bin_container.stop)
+                    return (start, stop)
+                # If not, try to get from centers (use first and last with some margin)
+                elif hasattr(time_bin_container, 'centers'):
+                    centers = time_bin_container.centers
+                    print(f'\tlen(centers): {len(centers)}')
+                    if len(centers) > 0:
+                        # Estimate range from centers (assuming bins are evenly spaced)
+                        if len(centers) > 1:
+                            bin_width = centers[1] - centers[0]
+                            start = float(centers[0] - bin_width / 2)
+                            stop = float(centers[-1] + bin_width / 2)
+                        else:
+                            # Single bin, use a small range around it
+                            start = float(centers[0] - 0.1)
+                            stop = float(centers[0] + 0.1)
+                        return (start, stop)
+        except (AttributeError, IndexError, KeyError, TypeError) as e:
+            pass
+        
+        # Fallback: try to get from time_window_centers
+        try:
+            if hasattr(self.decoded_result, 'time_window_centers'):
+                centers = self.decoded_result.time_window_centers
+                if len(centers) > 0:
+                    if len(centers) > 1:
+                        bin_width = centers[1] - centers[0]
+                        start = float(centers[0] - bin_width / 2)
+                        stop = float(centers[-1] + bin_width / 2)
+                    else:
+                        start = float(centers[0] - 0.1)
+                        stop = float(centers[0] + 0.1)
+                    return (start, stop)
+        except (AttributeError, TypeError):
+            pass
+        
+        
+        return None
+    
+
+    def _get_filtered_dataframe_for_current_epoch(self) -> pd.DataFrame:
+        """Filter locality_measures_df to show only rows within the current epoch's time range.
+        
+        Returns:
+            Filtered DataFrame containing only rows where 't' is between epoch start and stop
+        """
+        if self.locality_measures_df is None or not self.is_point_like_mode:
+            return pd.DataFrame()
+        
+        # Get epoch time range
+        time_range = self._get_epoch_time_range()
+        print(f'time_range: {time_range}')
+        if time_range is None:
+            # If we can't get time range, return full dataframe
+            return self.locality_measures_df
+        
+        start_time, stop_time = time_range
+        
+        # Filter dataframe: keep rows where 't' is between start_time and stop_time
+        if 't' in self.locality_measures_df.columns:
+            filtered_df = self.locality_measures_df[
+                (self.locality_measures_df['t'] >= start_time) & 
+                (self.locality_measures_df['t'] <= stop_time)
+            ].copy()
+            return filtered_df
+        
+        # If no 't' column, return full dataframe
+        return self.locality_measures_df
+    
+    def _update_table_for_current_epoch(self):
+        """Update the table to show only rows for the current epoch."""
+        if self.locality_measures_table is None or not self.is_point_like_mode:
+            return
+        
+        # Get filtered dataframe
+        df = self._get_filtered_dataframe_for_current_epoch()
+        
+        # Clear existing table
+        self.locality_measures_table.setRowCount(0)
+        
+        # Repopulate with filtered data
+        n_rows, n_cols = df.shape
+        self.locality_measures_table.setRowCount(n_rows)
+        self.locality_measures_table.setColumnCount(n_cols)
+        self.locality_measures_table.setHorizontalHeaderLabels([str(col) for col in df.columns])
+        
+        # Populate cells
+        for row_idx in range(n_rows):
+            for col_idx, col_name in enumerate(df.columns):
+                value = df.iloc[row_idx, col_idx]
+                # Format value appropriately
+                if pd.isna(value):
+                    item_text = "N/A"
+                elif isinstance(value, (int, float)):
+                    item_text = f"{value:.6f}" if isinstance(value, float) else str(value)
+                else:
+                    item_text = str(value)
+                
+                item = qt.QTableWidgetItem(item_text)
+                # Make read-only
+                try:
+                    flags = item.flags()
+                    item.setFlags(flags & ~qt.Qt.ItemIsEditable)
+                except (AttributeError, TypeError):
+                    # Fallback: use integer value for ItemIsEditable flag
+                    flags = item.flags()
+                    item.setFlags(flags & ~0x00000002)  # ItemIsEditable flag
+                self.locality_measures_table.setItem(row_idx, col_idx, item)
+        
+        # Resize columns to fit content
+        self.locality_measures_table.resizeColumnsToContents()
     
     def _match_time_bin_to_dataframe_row(self, t_bin_idx: int) -> Optional[pd.Series]:
         """Match a time bin index to a dataframe row using start/stop times.
@@ -1402,9 +1532,10 @@ class Epoch3DSceneTimeBinViewer(qt.QWidget):
         # Update label positions after a short delay to ensure window is sized
         qt.QTimer.singleShot(100, self._update_text_label_positions)
         
-        # Highlight matching row in table if in point-like mode
-        # Highlight based on first time bin of the epoch (since this widget shows all time bins at once)
+        # Update table for current epoch if in point-like mode
         if self.is_point_like_mode:
+            self._update_table_for_current_epoch()
+            # Highlight matching row based on first time bin of the epoch (since this widget shows all time bins at once)
             self._highlight_matching_row_in_table(0)
     
     def eventFilter(self, obj, event):
