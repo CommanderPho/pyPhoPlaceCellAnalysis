@@ -1459,7 +1459,7 @@ class SequenceBasedComputationsGlobalComputationFunctions(AllFunctionEnumerating
     
 
 
-    @function_attributes(short_name=None, tags=['NOT-FINISHED', 'NOT-TESTED'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-12-24 12:34', related_items=[])
+    @function_attributes(short_name='temporal_sequentiality_measures', tags=['NOT-FINISHED', 'NOT-TESTED'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-12-24 12:34', related_items=[])
     @classmethod
     def compute_temporal_sequentiality_measures(cls, self, alpha_epoch_masks: NDArray[ND.Shape["N_X_BINS, N_Y_BINS, N_T_BINS"], np.bool_], epoch_promenence_tuples: List[Tuple[NDArray, NDArray, NDArray]], 
             xbin_centers: NDArray[ND.Shape["N_X_BINS"], np.floating], ybin_centers: NDArray[ND.Shape["N_Y_BINS"], np.floating],

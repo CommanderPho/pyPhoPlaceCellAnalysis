@@ -670,6 +670,9 @@ class Epoch3DSceneTimeBinViewer(qt.QWidget):
         self.locality_measures_df = locality_measures_df
         self.text_columns = text_columns if text_columns is not None else []
         
+        # Detect point-like mode (when 't' column exists in locality_measures_df)
+        self.is_point_like_mode = (locality_measures_df is not None and 't' in locality_measures_df.columns)
+        
         # Current epoch index
         self.curr_epoch_idx = 0
         
@@ -678,6 +681,9 @@ class Epoch3DSceneTimeBinViewer(qt.QWidget):
         
         # Store text label items for cleanup (Qt QLabel widgets)
         self.text_label_items = []
+        
+        # Store table widget for locality measures (point-like mode)
+        self.locality_measures_table = None
         
         # Create UI
         layout = qt.QVBoxLayout()
@@ -689,6 +695,11 @@ class Epoch3DSceneTimeBinViewer(qt.QWidget):
         
         # Add SceneWindow to layout
         layout.addWidget(self.scene_window)
+        
+        # Create table tab for point-like mode (delayed to ensure sidebar is available)
+        if self.is_point_like_mode:
+            # Use QTimer to delay table creation until after window is shown
+            qt.QTimer.singleShot(100, self._create_locality_measures_table_tab)
         
         # Store label data for repositioning on resize
         self._label_data = []  # List of (text, t_bin_idx, x_translation, x_min, x_max, y_min, y_max, bin_spacing) tuples
@@ -714,6 +725,391 @@ class Epoch3DSceneTimeBinViewer(qt.QWidget):
         
         # Initialize
         self.on_epoch_changed(0)
+    
+    def _get_sidebar_tab_widget(self) -> Optional[qt.QTabWidget]:
+        """Access the SceneWindow sidebar QTabWidget.
+        
+        Based on silx documentation, the sidebar can be accessed through the plot3d widget.
+        
+        Returns:
+            QTabWidget if found, None otherwise
+        """
+        # Helper function to recursively find QTabWidget
+        def find_tab_widget(widget):
+            if widget is None:
+                return None
+            if isinstance(widget, qt.QTabWidget):
+                return widget
+            # Check all children recursively
+            for child in widget.children():
+                if isinstance(child, qt.QWidget):
+                    result = find_tab_widget(child)
+                    if result is not None:
+                        return result
+            return None
+        
+        # Method 1: Try getPlot3DWidget() if available (as per silx docs)
+        try:
+            if hasattr(self.scene_window, 'getPlot3DWidget'):
+                plot3d_widget = self.scene_window.getPlot3DWidget()
+                if plot3d_widget:
+                    # Try findChild to locate the sidebar QTabWidget
+                    sidebar = plot3d_widget.findChild(qt.QTabWidget)
+                    if sidebar is not None:
+                        print("DEBUG: Found sidebar via getPlot3DWidget().findChild()")
+                        return sidebar
+                    # Also try recursive search
+                    result = find_tab_widget(plot3d_widget)
+                    if result is not None:
+                        print("DEBUG: Found sidebar via getPlot3DWidget() recursive search")
+                        return result
+        except Exception as e:
+            print(f"DEBUG: getPlot3DWidget() failed: {e}")
+            pass
+        
+        # Method 2: Try direct access if available
+        try:
+            if hasattr(self.scene_window, 'getSidebar'):
+                sidebar = self.scene_window.getSidebar()
+                if isinstance(sidebar, qt.QTabWidget):
+                    print("DEBUG: Found sidebar via getSidebar()")
+                    return sidebar
+        except Exception as e:
+            print(f"DEBUG: getSidebar() failed: {e}")
+            pass
+        
+        # Method 3: Use findChild directly on SceneWindow
+        try:
+            sidebar = self.scene_window.findChild(qt.QTabWidget)
+            if sidebar is not None:
+                # Verify it's the right one by checking tab names
+                tab_count = sidebar.count()
+                if tab_count >= 1:
+                    print(f"DEBUG: Found sidebar via findChild() with {tab_count} tabs")
+                    return sidebar
+        except Exception as e:
+            print(f"DEBUG: findChild() failed: {e}")
+            pass
+        
+        # Method 4: Traverse children to find QTabWidget
+        try:
+            result = find_tab_widget(self.scene_window)
+            if result is not None:
+                tab_count = result.count()
+                # Check tab names to confirm this is the sidebar
+                has_object_params = False
+                has_global_params = False
+                for i in range(tab_count):
+                    tab_text = result.tabText(i)
+                    if "Object parameters" in tab_text or "Object" in tab_text:
+                        has_object_params = True
+                    if "Global parameters" in tab_text or "Global" in tab_text:
+                        has_global_params = True
+                if (has_object_params or has_global_params) and tab_count >= 1:
+                    print(f"DEBUG: Found sidebar via recursive search with {tab_count} tabs")
+                    return result
+        except Exception as e:
+            print(f"DEBUG: Recursive search failed: {e}")
+            pass
+        
+        # Method 5: Try accessing through centralWidget
+        try:
+            if hasattr(self.scene_window, 'centralWidget'):
+                central = self.scene_window.centralWidget()
+                if central:
+                    sidebar = central.findChild(qt.QTabWidget)
+                    if sidebar is not None:
+                        print("DEBUG: Found sidebar via centralWidget().findChild()")
+                        return sidebar
+                    result = find_tab_widget(central)
+                    if result is not None:
+                        print("DEBUG: Found sidebar via centralWidget() recursive search")
+                        return result
+        except Exception as e:
+            print(f"DEBUG: centralWidget() search failed: {e}")
+            pass
+        
+        # Method 6: Search through all widgets in the scene window
+        try:
+            all_widgets = []
+            def collect_widgets(widget):
+                if isinstance(widget, qt.QWidget):
+                    all_widgets.append(widget)
+                    for child in widget.children():
+                        if isinstance(child, qt.QWidget):
+                            collect_widgets(child)
+            
+            collect_widgets(self.scene_window)
+            for widget in all_widgets:
+                if isinstance(widget, qt.QTabWidget):
+                    tab_count = widget.count()
+                    # Check tab names to confirm this is the sidebar
+                    has_object_params = False
+                    has_global_params = False
+                    for i in range(tab_count):
+                        tab_text = widget.tabText(i)
+                        if "Object parameters" in tab_text or "Object" in tab_text:
+                            has_object_params = True
+                        if "Global parameters" in tab_text or "Global" in tab_text:
+                            has_global_params = True
+                    if (has_object_params or has_global_params) and tab_count >= 1:
+                        print(f"DEBUG: Found sidebar via comprehensive search with {tab_count} tabs")
+                        return widget
+        except Exception as e:
+            print(f"DEBUG: Comprehensive search failed: {e}")
+            pass
+        
+        print("DEBUG: Could not find sidebar QTabWidget using any method")
+        return None
+    
+    def _create_locality_measures_table_tab(self):
+        """Create and add a table tab to the sidebar displaying locality_measures_df."""
+        if not self.is_point_like_mode or self.locality_measures_df is None:
+            print(f"DEBUG: Skipping table creation - is_point_like_mode={self.is_point_like_mode}, df is None={self.locality_measures_df is None}")
+            return
+        
+        # Get the sidebar tab widget
+        sidebar_tabs = self._get_sidebar_tab_widget()
+        if sidebar_tabs is None:
+            # If we can't find the sidebar, try again after a longer delay
+            # This can happen if the SceneWindow hasn't fully initialized yet
+            # But limit retries to avoid infinite loops
+            if not hasattr(self, '_table_creation_retry_count'):
+                self._table_creation_retry_count = 0
+            self._table_creation_retry_count += 1
+            if self._table_creation_retry_count < 5:  # Try up to 5 times
+                print(f"DEBUG: Sidebar not found, retrying ({self._table_creation_retry_count}/5)...")
+                qt.QTimer.singleShot(500, self._create_locality_measures_table_tab)
+            else:
+                # Sidebar not found after retries, create dock widget instead
+                print("DEBUG: Sidebar not found after retries, creating dock widget instead")
+                self._create_locality_measures_dock_widget()
+            return
+        
+        # Reset retry count on success
+        if hasattr(self, '_table_creation_retry_count'):
+            self._table_creation_retry_count = 0
+        
+        print(f"DEBUG: Found sidebar with {sidebar_tabs.count()} tabs")
+        
+        # Create QTableWidget
+        table_widget = qt.QTableWidget()
+        self.locality_measures_table = table_widget
+        
+        # Populate table with dataframe
+        df = self.locality_measures_df
+        n_rows, n_cols = df.shape
+        table_widget.setRowCount(n_rows)
+        table_widget.setColumnCount(n_cols)
+        table_widget.setHorizontalHeaderLabels([str(col) for col in df.columns])
+        
+        # Populate cells
+        for row_idx in range(n_rows):
+            for col_idx, col_name in enumerate(df.columns):
+                value = df.iloc[row_idx, col_idx]
+                # Format value appropriately
+                if pd.isna(value):
+                    item_text = "N/A"
+                elif isinstance(value, (int, float)):
+                    item_text = f"{value:.6f}" if isinstance(value, float) else str(value)
+                else:
+                    item_text = str(value)
+                
+                item = qt.QTableWidgetItem(item_text)
+                # Make read-only
+                try:
+                    item.setFlags(item.flags() & ~qt.Qt.ItemIsEditable)
+                except AttributeError:
+                    # Fallback: use integer value
+                    item.setFlags(item.flags() & ~0x00000002)  # ItemIsEditable flag
+                table_widget.setItem(row_idx, col_idx, item)
+        
+        # Set table properties
+        table_widget.setAlternatingRowColors(True)
+        # Set selection behavior and mode using Qt enums
+        try:
+            table_widget.setSelectionBehavior(qt.QAbstractItemView.SelectRows)
+            table_widget.setSelectionMode(qt.QAbstractItemView.SingleSelection)
+        except AttributeError:
+            # Fallback if enum access doesn't work
+            table_widget.setSelectionBehavior(1)  # SelectRows
+            table_widget.setSelectionMode(1)  # SingleSelection
+        table_widget.setSortingEnabled(True)
+        
+        # Resize columns to fit content
+        table_widget.resizeColumnsToContents()
+        
+        # Create a container widget with layout for the table
+        container = qt.QWidget()
+        container_layout = qt.QVBoxLayout()
+        container_layout.setContentsMargins(0, 0, 0, 0)
+        container_layout.addWidget(table_widget)
+        container.setLayout(container_layout)
+        
+        # Add tab to sidebar (insert before last tab to keep "Global parameters" last)
+        tab_index = sidebar_tabs.count() - 1 if sidebar_tabs.count() > 0 else 0
+        sidebar_tabs.insertTab(tab_index, container, "Locality Measures")
+        print(f"DEBUG: Added 'Locality Measures' tab at index {tab_index}. Total tabs: {sidebar_tabs.count()}")
+    
+    def _create_locality_measures_dock_widget(self):
+        """Create a dock widget containing the locality measures table."""
+        if not self.is_point_like_mode or self.locality_measures_df is None:
+            return
+        
+        # Create QTableWidget
+        table_widget = qt.QTableWidget()
+        self.locality_measures_table = table_widget
+        
+        # Populate table with dataframe
+        df = self.locality_measures_df
+        n_rows, n_cols = df.shape
+        table_widget.setRowCount(n_rows)
+        table_widget.setColumnCount(n_cols)
+        table_widget.setHorizontalHeaderLabels([str(col) for col in df.columns])
+        
+        # Populate cells
+        for row_idx in range(n_rows):
+            for col_idx, col_name in enumerate(df.columns):
+                value = df.iloc[row_idx, col_idx]
+                # Format value appropriately
+                if pd.isna(value):
+                    item_text = "N/A"
+                elif isinstance(value, (int, float)):
+                    item_text = f"{value:.6f}" if isinstance(value, float) else str(value)
+                else:
+                    item_text = str(value)
+                
+                item = qt.QTableWidgetItem(item_text)
+                # Make read-only
+                try:
+                    flags = item.flags()
+                    item.setFlags(flags & ~qt.Qt.ItemIsEditable)
+                except (AttributeError, TypeError):
+                    # Fallback: use integer value for ItemIsEditable flag
+                    flags = item.flags()
+                    item.setFlags(flags & ~0x00000002)  # ItemIsEditable flag
+                table_widget.setItem(row_idx, col_idx, item)
+        
+        # Set table properties
+        table_widget.setAlternatingRowColors(True)
+        # Set selection behavior and mode using Qt enums
+        try:
+            table_widget.setSelectionBehavior(qt.QAbstractItemView.SelectRows)
+            table_widget.setSelectionMode(qt.QAbstractItemView.SingleSelection)
+        except AttributeError:
+            # Fallback if enum access doesn't work
+            table_widget.setSelectionBehavior(1)  # SelectRows
+            table_widget.setSelectionMode(1)  # SingleSelection
+        table_widget.setSortingEnabled(True)
+        
+        # Resize columns to fit content
+        table_widget.resizeColumnsToContents()
+        
+        # Create dock widget
+        dock_widget = qt.QDockWidget("Locality Measures", self)
+        dock_widget.setWidget(table_widget)
+        dock_widget.setAllowedAreas(qt.Qt.RightDockWidgetArea | qt.Qt.LeftDockWidgetArea)
+        
+        # Check if self is a QMainWindow or has addDockWidget method
+        if hasattr(self, 'addDockWidget'):
+            self.addDockWidget(qt.Qt.RightDockWidgetArea, dock_widget)
+            print("DEBUG: Created dock widget for Locality Measures table")
+        else:
+            # If not a QMainWindow, try to find parent that is
+            parent = self.parent()
+            while parent:
+                if hasattr(parent, 'addDockWidget'):
+                    parent.addDockWidget(qt.Qt.RightDockWidgetArea, dock_widget)
+                    print("DEBUG: Created dock widget for Locality Measures table in parent window")
+                    break
+                parent = parent.parent() if hasattr(parent, 'parent') else None
+            else:
+                # Last resort: just show as a separate window
+                dock_widget.setFloating(True)
+                dock_widget.show()
+                print("DEBUG: Created floating dock widget for Locality Measures table")
+    
+    def _highlight_matching_row_in_table(self, t_bin_idx: int):
+        """Highlight and scroll to the row in the table matching the current time bin.
+        
+        Args:
+            t_bin_idx: Time bin index within current epoch
+        """
+        if self.locality_measures_table is None or not self.is_point_like_mode:
+            return
+        
+        # Find matching row using the same logic as _match_time_bin_to_dataframe_row
+        time_bin_centers = self._get_time_bin_centers()
+        if time_bin_centers is None:
+            return
+        
+        if t_bin_idx >= len(time_bin_centers):
+            return
+        
+        # Get time bin center time
+        t_bin_time = time_bin_centers[t_bin_idx]
+        
+        # Find matching row in dataframe
+        if 't' in self.locality_measures_df.columns:
+            time_diffs = (self.locality_measures_df['t'] - t_bin_time).abs()
+            closest_idx = time_diffs.idxmin()
+            closest_time_diff = time_diffs.loc[closest_idx]
+            
+            # Check if closest match is within tolerance
+            atol = 0.100  # 100 millisecond tolerance
+            if closest_time_diff <= atol:
+                # Find the row index in the dataframe
+                # Get the position of closest_idx in the dataframe index
+                df_index_pos = self.locality_measures_df.index.get_loc(closest_idx)
+                # If get_loc returns a slice or boolean array, get the first position
+                if isinstance(df_index_pos, (slice, np.ndarray)):
+                    if isinstance(df_index_pos, slice):
+                        df_index_pos = df_index_pos.start if df_index_pos.start is not None else 0
+                    else:
+                        df_index_pos = int(np.where(df_index_pos)[0][0]) if np.any(df_index_pos) else 0
+                else:
+                    df_index_pos = int(df_index_pos)
+                
+                # Clear previous highlights first
+                for row in range(self.locality_measures_table.rowCount()):
+                    for col in range(self.locality_measures_table.columnCount()):
+                        item = self.locality_measures_table.item(row, col)
+                        if item:
+                            item.setBackground(qt.QBrush())  # Reset to default
+                
+                # Clear previous selection
+                self.locality_measures_table.clearSelection()
+                
+                # Select and highlight the row
+                self.locality_measures_table.selectRow(df_index_pos)
+                
+                # Scroll to make the row visible
+                first_item = self.locality_measures_table.item(df_index_pos, 0)
+                if first_item:
+                    # Scroll to item using Qt enum
+                    try:
+                        self.locality_measures_table.scrollToItem(
+                            first_item,
+                            qt.QAbstractItemView.EnsureVisible
+                        )
+                    except AttributeError:
+                        # Fallback if enum access doesn't work
+                        self.locality_measures_table.scrollToItem(first_item, 1)
+                
+                # Set background color for highlighting
+                for col_idx in range(self.locality_measures_table.columnCount()):
+                    item = self.locality_measures_table.item(df_index_pos, col_idx)
+                    if item:
+                        item.setBackground(qt.QColor(255, 255, 0, 100))  # Yellow highlight with transparency
+            else:
+                # No match within tolerance, clear selection
+                self.locality_measures_table.clearSelection()
+                # Clear any previous highlights
+                for row in range(self.locality_measures_table.rowCount()):
+                    for col in range(self.locality_measures_table.columnCount()):
+                        item = self.locality_measures_table.item(row, col)
+                        if item:
+                            item.setBackground(qt.QBrush())  # Reset to default
     
     @property
     def curr_n_time_bins(self) -> int:
@@ -1005,6 +1401,11 @@ class Epoch3DSceneTimeBinViewer(qt.QWidget):
         
         # Update label positions after a short delay to ensure window is sized
         qt.QTimer.singleShot(100, self._update_text_label_positions)
+        
+        # Highlight matching row in table if in point-like mode
+        # Highlight based on first time bin of the epoch (since this widget shows all time bins at once)
+        if self.is_point_like_mode:
+            self._highlight_matching_row_in_table(0)
     
     def eventFilter(self, obj, event):
         """Event filter to catch scene window resize events"""
