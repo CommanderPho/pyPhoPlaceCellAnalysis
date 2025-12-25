@@ -305,6 +305,213 @@ class DecodingLocalityMeasures(ComputedResult): #PickleSerializableMixin, AttrsB
     # ==================================================================================================================================================================================================================================================================================== #
     # Locality Computations                                                                                                                                                                                                                                                                #
     # ==================================================================================================================================================================================================================================================================================== #
+    @classmethod
+    @function_attributes(short_name=None, tags=['compute', 'locality', 'static'], input_requires=[], output_provides=[], uses=[], used_by=['.compute_locality_measures'], creation_date='2025-12-23 21:00', related_items=[])
+    def compute_locality_measures_for_posterior(cls, a_p_x_given_n: NDArray, gaussian_volume: NDArray, xbin_centers: NDArray, ybin_centers: NDArray, n_total_pos_bins: Optional[int] = None, min_val_epsilon: float = 1e-9, enable_debug_outputs: bool = True, earthmovers_fn: Optional[Callable] = None) -> Dict[str, Any]:
+        """Computes all locality measures for a given posterior probability distribution.
+        
+        This is a completely independent classmethod that can be called without an instance.
+        
+        Args:
+            a_p_x_given_n: NDArray with shape (N_X_BINS, N_Y_BINS, N_TIME_BINS) - the posterior probability distribution
+            gaussian_volume: NDArray with shape (N_X_BINS, N_Y_BINS, N_TIME_BINS) - the gaussian spread volume
+            xbin_centers: NDArray - x-axis bin centers
+            ybin_centers: NDArray - y-axis bin centers
+            n_total_pos_bins: Optional[int] - total number of position bins (computed from xbin_centers/ybin_centers if None)
+            min_val_epsilon: float - minimum value threshold (default: 1e-9)
+            enable_debug_outputs: bool - whether to compute and return debug outputs (default: True)
+            earthmovers_fn: Optional[Callable] - optional function for computing earthmovers distance (default: None)
+            
+        Returns:
+            Dict[str, Any] containing:
+                - 'mask_overlap': NDArray
+                - 'peak_prom': NDArray
+                - 'peak_prom_num_bins': NDArray
+                - 'peak_prom_Focality': NDArray
+                - 'peak_prom_Peakiness': NDArray
+                - 'peak_prom_num_peaks': NDArray (if computation succeeds)
+                - 'dist_to_highest_peak': NDArray
+                - 'earthmovers': NDArray (only if earthmovers_fn is provided)
+                - 'debug': Dict[str, Any] (only if enable_debug_outputs=True)
+        """
+        from pyphoplacecellanalysis.External.peak_prominence2d import PeakPromenence
+        
+        def safe_nanmax(arr):
+            try:
+                if arr.size == 0:
+                    return np.nan
+                return np.nanmax(arr)
+            except (ValueError, AttributeError):
+                return np.nan
+        
+        def _subfn_pdf_spatial_distances(gaussian_volume, a_p_x_given_n, xbin_centers, ybin_centers):
+            """
+            Computes the Euclidean distance between the expected positions (COM) of 
+            two 2D probability distributions using vectorized weighted averages.
+            """
+            # 1. Get Shapes
+            # Assuming shape is (Rows/H, Cols/W, Time)
+            pdf_obj = gaussian_volume
+            pdf_cmp = a_p_x_given_n
+            
+            # 2. Calculate Marginals to simplify COM calculation
+            # Sum over columns (axis 1) to get mass distribution along rows (Height/x_bins)
+            # Shape becomes (H, T)
+            marg_x_obj = np.sum(pdf_obj, axis=1)
+            marg_x_cmp = np.sum(pdf_cmp, axis=1)
+
+            # Sum over rows (axis 0) to get mass distribution along columns (Width/y_bins)
+            # Shape becomes (W, T)
+            marg_y_obj = np.sum(pdf_obj, axis=0)
+            marg_y_cmp = np.sum(pdf_cmp, axis=0)
+
+            # 3. Compute Expected Position (Weighted Average of Bin Centers)
+            # Formula: Sum(Probability * Value) / Sum(Probability)
+            
+            # reshape centers for broadcasting: (H, 1) * (H, T) -> sum -> (T,)
+            denom_x_obj = np.sum(marg_x_obj, axis=0)
+            # Handle division by zero if a timebin has all-zeros
+            denom_x_obj[denom_x_obj == 0] = 1.0 
+            
+            x_obj = np.sum(marg_x_obj * xbin_centers[:, np.newaxis], axis=0) / denom_x_obj
+            
+            # Repeat for Comparison Object
+            denom_x_cmp = np.sum(marg_x_cmp, axis=0)
+            denom_x_cmp[denom_x_cmp == 0] = 1.0
+            x_cmp = np.sum(marg_x_cmp * xbin_centers[:, np.newaxis], axis=0) / denom_x_cmp
+
+            # Repeat for Y (Width)
+            denom_y_obj = np.sum(marg_y_obj, axis=0)
+            denom_y_obj[denom_y_obj == 0] = 1.0
+            y_obj = np.sum(marg_y_obj * ybin_centers[:, np.newaxis], axis=0) / denom_y_obj
+
+            denom_y_cmp = np.sum(marg_y_cmp, axis=0)
+            denom_y_cmp[denom_y_cmp == 0] = 1.0
+            y_cmp = np.sum(marg_y_cmp * ybin_centers[:, np.newaxis], axis=0) / denom_y_cmp
+
+            # 4. Euclidean Distance
+            distances_spatial = np.sqrt((x_obj - x_cmp)**2 + (y_obj - y_cmp)**2)
+
+            # 5. Max distance (Diagonal of the ROI)
+            max_possible_distance = np.sqrt(np.ptp(xbin_centers)**2 + np.ptp(ybin_centers)**2)
+            distances_spatial_frac_max = distances_spatial / max_possible_distance
+            
+            return distances_spatial, distances_spatial_frac_max
+        
+        # Compute n_total_pos_bins if not provided
+        if n_total_pos_bins is None:
+            n_total_pos_bins = int(len(xbin_centers) * len(ybin_centers))
+        
+        # Initialize result dictionary
+        result_dict: Dict[str, Any] = {}
+        debug_dict: Dict[str, Any] = {}
+        
+        # ==================================================================================================================================================================================================================================================================================== #
+        # do all computation measures                                                                                                                                                                                                                                                          #
+        # ==================================================================================================================================================================================================================================================================================== #
+
+        ## do all computation measures
+        a_computation_measure_name: str = 'mask_overlap'
+        print(f'\tcomputing: "{a_computation_measure_name}"...')
+        ## above a certain promence ideally:
+         ## Oh dang this is kinda tiny
+        is_high_prob_mask = (a_p_x_given_n > min_val_epsilon)
+        # if enable_debug_outputs:
+        #     debug_dict['mask_overlap_masks'] = is_high_prob_mask            
+
+        result_dict[a_computation_measure_name] = ((gaussian_volume * is_high_prob_mask) > min_val_epsilon).astype(int) ## the "overlap" is computed by taking the elementwise dot-product with the moving average
+
+        a_computation_measure_name: str = 'peak_prom'
+        print(f'\tcomputing: "{a_computation_measure_name}"...')
+        ## above a certain promence ideally:
+        # alpha: float = 0.8 # above 85% of the peak height of the centeral peak
+        # alpha_list = [0.5, 0.8]
+        alpha_list = [0.8]
+        epoch_promenence_tuples, epoch_masks_list = PeakPromenence.compute_2d_dt_posterior_peak_promenences(a_p_x_given_n=a_p_x_given_n, alpha=alpha_list) # (103948, 1, 41, 63)
+        epoch_masks_dict = dict(zip(alpha_list, epoch_masks_list))            
+        a_high_alpha: float = alpha_list[-1]
+        an_alpha_epoch_masks: NDArray = epoch_masks_dict[a_high_alpha] ## get the high mask
+        # an_alpha_epoch_masks = np.stack(an_alpha_epoch_masks, axis=-1) # (5, 41, 63) - (n_x_bins, n_y_bins, n_t_bins)
+        assert np.shape(an_alpha_epoch_masks) == np.shape(a_p_x_given_n)
+        
+        if enable_debug_outputs:
+            debug_dict['peak_prom_promenence_tuples'] = epoch_promenence_tuples
+            # debug_dict['peak_prom_masks'] = an_alpha_epoch_masks
+            debug_dict['peak_prom_masks_dict'] = epoch_masks_dict
+            # debug_dict['peak_prom_masks_dict'] = epoch_masks_dict
+            # debug_dict['peak_prom_product'] = epoch_masks
+            
+        try:
+            all_t_bin_peak_heights: NDArray = np.array([safe_nanmax(peak_heights) for (peak_coords, prominences, peak_heights) in epoch_promenence_tuples])
+            if enable_debug_outputs:
+                debug_dict['all_t_bin_peak_heights'] = all_t_bin_peak_heights
+
+        except (ValueError, AttributeError) as e:
+            print(f'error computing `all_t_bin_peak_heights`: {e}. skipping.')
+            all_t_bin_peak_heights = None
+        except Exception as e:
+            raise e
+
+        result_dict[a_computation_measure_name] = ((gaussian_volume * an_alpha_epoch_masks) > min_val_epsilon).astype(int) ## the "overlap" is computed by taking the elementwise dot-product with the moving average
+        # result_dict[f"{a_computation_measure_name}_score"] = [(np.nansum(np.stack(an_epoch_mask, axis=-1), axis=(0, 1))/n_total_pos_bins) for an_epoch_idx, an_epoch_mask in enumerate(all_epochs_masks)]
+        result_dict[f"{a_computation_measure_name}_num_bins"] = np.nansum(an_alpha_epoch_masks, axis=(0, 1))
+        # result_dict[f"{a_computation_measure_name}_score"] = (np.nansum(an_alpha_epoch_masks, axis=(0, 1))/float(n_total_pos_bins))
+
+        ## ⚓ Decoded 2D Posterior Specificity - Metrics using the promenence mask
+
+        ## Focality/Diffusivity: Number of bins in in the 90% promenence mask over the total number of bins --> [0.0, 1.0]
+            ## definitionally the 90% promenance mask bins must be together/contiguous spatially, as outliers are considered different peaks.
+        result_dict[f"{a_computation_measure_name}_Focality"] = (np.nansum(an_alpha_epoch_masks, axis=(0, 1))/float(n_total_pos_bins))
+
+        ## Sharpness/Peakiness: Number of bins in the 90% promenence mask over the number of bins exceeding 90% of the promenence peak height -- specifically looks at the area of the mean peak compared to the off-peak non-contiguous areas of similar heights
+        # result_dict[f"{a_computation_measure_name}_Peakiness"] = np.nansum(an_alpha_epoch_masks, axis=(0, 1)) / np.array([np.nansum((a_p_x_given_n[:, :, i] >= (a_peak_height * alpha_list[-1])), axis=(0, 1)) for i, a_peak_height in enumerate(all_t_bin_peak_heights)])
+        if all_t_bin_peak_heights is not None:
+            result_dict[f"{a_computation_measure_name}_Peakiness"] = np.nansum(an_alpha_epoch_masks, axis=(0, 1)) / np.array([np.nansum((a_p_x_given_n[:, :, i] >= (a_peak_height * alpha_list[-1])), axis=(0, 1)) if not np.isnan(a_peak_height) else np.nan for i, a_peak_height in enumerate(all_t_bin_peak_heights)])
+        else:
+            result_dict[f"{a_computation_measure_name}_Peakiness"] = np.full(a_p_x_given_n.shape[-1], np.nan)
+
+        try:
+            ## Modality: The count of detected peaks exceeding a certain promenence -- e.g. 1 if unimodal, 2 if bimodal, ..., N if multi-modal. 
+            all_t_bin_num_peaks: NDArray = np.array([len(peak_heights) for (peak_coords, prominences, peak_heights) in epoch_promenence_tuples])
+
+            result_dict[f"{a_computation_measure_name}_num_peaks"] = all_t_bin_num_peaks
+
+        except (ValueError, AttributeError) as e:
+            print(f'error computing `all_t_bin_num_peaks`: {e}. skipping.')
+        except Exception as e:
+            raise e
+        
+
+        a_computation_measure_name: str = 'dist_to_highest_peak'
+        print(f'\tcomputing: "{a_computation_measure_name}"...')
+        ## above a certain promence ideally:
+        # peak_locations = np.argmax(a_p_x_given_n, axis=(0, 1))
+        distances_spatial, distances_spatial_frac_max = _subfn_pdf_spatial_distances(gaussian_volume=gaussian_volume, a_p_x_given_n=a_p_x_given_n, xbin_centers=xbin_centers, ybin_centers=ybin_centers)
+        result_dict[a_computation_measure_name] = distances_spatial_frac_max ## the "overlap" is computed by taking the elementwise dot-product with the moving average
+        
+
+        # a_computation_measure_name: str = 'dist_to_nearest_peak'
+        # print(f'\tcomputing: "{a_computation_measure_name}"...')
+        # ## above a certain promence ideally:
+        # min_val_epsilon: float = 1e-9
+        # is_high_prob_mask = (a_p_x_given_n > min_val_epsilon)
+        # result_dict[a_computation_measure_name] = ((gaussian_volume * is_high_prob_mask) > min_val_epsilon).astype(int) ## the "overlap" is computed by taking the elementwise dot-product with the moving average
+
+
+        if earthmovers_fn is not None:
+            a_computation_measure_name: str = 'earthmovers'
+            print(f'\tcomputing: "{a_computation_measure_name}"...')
+            result_dict[a_computation_measure_name] = earthmovers_fn(gaussian_volume, a_p_x_given_n)
+
+        # Add debug dict to result if enabled
+        if enable_debug_outputs:
+            result_dict['debug'] = debug_dict
+        
+        return result_dict
+
+
+
+
     @function_attributes(short_name=None, tags=['compute', 'MAIN', 'locality'], input_requires=[], output_provides=[], uses=['.rebuild_locality_measures_df'], used_by=['.compute'], creation_date='2025-12-15 06:54', related_items=[])
     def compute_locality_measures(self, min_val_epsilon: float = 1e-9, enable_debug_outputs: bool=True):
         """ computes all required locality measures
@@ -329,188 +536,6 @@ class DecodingLocalityMeasures(ComputedResult): #PickleSerializableMixin, AttrsB
             except (ValueError, AttributeError):
                 return np.nan
             
-
-        def _subfn_calculate_spatial_emd(Xs, Xt):
-            """
-            Xs, Xt: arrays of shape (rows, cols, time) containing probability weights.
-            Returns: array of spatial EMD (Earth Mover's Distance) for each timestamp.
-
-            Captures nothing:
-
-            #TODO 2025-12-11 18:13: - [ ] WAY too slow, like 10hrs to run for 10k timestamps
-            
-            """
-            rows, cols, T = Xs.shape
-            
-            # 1. PRE-COMPUTE COST MATRIX (Do this once)
-            # Create coordinate grid for every pixel
-            yy, xx = np.meshgrid(np.arange(cols), np.arange(rows))
-            coords = np.column_stack((xx.ravel(), yy.ravel())).astype(np.float64)
-            
-            # M is the distance matrix between every pixel and every other pixel
-            # 'euclidean' gives W1 distance (EMD). 
-            M = ot.dist(coords, coords, metric='euclidean')
-
-            emd_scores = np.zeros(T)
-
-            # num_timestamps: int = T
-            # 2. COMPUTE PER TIMESTAMP
-            for t in range(T):
-                # Flatten images to 1D probability vectors
-                a = Xs[:, :, t].ravel()
-                b = Xt[:, :, t].ravel()
-
-                # Normalize to ensure they are valid probability distributions
-                sum_a = a.sum()
-                sum_b = b.sum()
-                
-                # Handle empty frames safely
-                if sum_a < 1e-9 or sum_b < 1e-9:
-                    emd_scores[t] = np.nan # Or 0.0, depending on preference
-                    continue
-                    
-                a /= sum_a
-                b /= sum_b
-
-                # Calculate Exact EMD using the cost matrix M
-                # This returns the total work (mass * distance)
-                emd_scores[t] = ot.emd2(a, b, M)
-
-            return emd_scores
-
-        def _subfn_calculate_sinkhorn_distance(Xs, Xt, reg=0.1):
-            """
-            reg: Regularization term. 
-                Larger (e.g. 1.0) = Faster, but blurrier (less accurate).
-                Smaller (e.g. 0.01) = Slower, closer to exact EMD.
-                0.1 is a good starting point for maze data.
-                
-            #TODO 2025-12-11 18:13: - [ ] also way too slow, like 2hrs to run for 10k timestamps
-            """
-            x_bins, y_bins, T = Xs.shape
-            
-            # 1. Setup Grid & Cost Matrix (Same as before)
-            xx, yy = np.meshgrid(np.arange(x_bins), np.arange(y_bins), indexing='ij')
-            coords = np.column_stack((xx.ravel(), yy.ravel())).astype(np.float64)
-            M = ot.dist(coords, coords, metric='euclidean')
-            
-            # Pre-compute normalization for stability
-            M = M / M.max() 
-
-            sinkhorn_dists = np.zeros(T)
-
-            for t in tqdm(range(T), desc="Sinkhorn"):
-                a = Xs[:, :, t].ravel()
-                b = Xt[:, :, t].ravel()
-
-                # Normalize
-                sum_a, sum_b = a.sum(), b.sum()
-                if sum_a < 1e-9 or sum_b < 1e-9:
-                    sinkhorn_dists[t] = np.nan
-                    continue
-                    
-                a /= sum_a
-                b /= sum_b
-
-                # 2. Compute Sinkhorn
-                #    This is the fast approximation
-                sinkhorn_dists[t] = ot.sinkhorn2(a, b, M, reg)
-
-            return sinkhorn_dists
-
-        def _subfn_calculate_sliced_wasserstein_correct(Xs, Xt, n_projections=50, seed=1337):
-            """ fastest but least precise. 
-
-            #TODO 2025-12-11 18:13: - [ ] also way too slow, like 1 hr to run for 10k timestamps
-
-            """
-            x_bins, y_bins, T = Xs.shape
-            
-            # 1. Setup Coordinates
-            xx, yy = np.meshgrid(np.arange(x_bins), np.arange(y_bins), indexing='ij')
-            coords = np.column_stack((xx.ravel(), yy.ravel())).astype(np.float64)
-            
-            # 2. Generate Random Projections (Lines through the maze)
-            rng = np.random.default_rng(seed)
-            projections = rng.normal(size=(2, n_projections))
-            projections /= np.linalg.norm(projections, axis=0) # Normalize to unit length
-
-            # Project the GRID coordinates onto these lines
-            # Shape: (N_pixels, n_projections)
-            projected_coords = coords @ projections 
-
-            swd_dists = np.zeros(T)
-
-            for t in tqdm(range(T), desc="Sliced Wasserstein"):
-                a = Xs[:, :, t].ravel()
-                b = Xt[:, :, t].ravel()
-                
-                # Normalize weights
-                sum_a, sum_b = a.sum(), b.sum()
-                if sum_a < 1e-9 or sum_b < 1e-9:
-                    swd_dists[t] = np.nan
-                    continue
-                a /= sum_a
-                b /= sum_b
-                
-                # Compute 1D Wasserstein for each projection and average
-                # We iterate over the 50 projections
-                dists = []
-                for p in range(n_projections):
-                    # The coordinates on this line:
-                    proj_x = projected_coords[:, p]
-                    
-                    # 1D Wasserstein with weights
-                    d = ot.wasserstein_1d(proj_x, proj_x, a, b, p=2)
-                    dists.append(d)
-                    
-                swd_dists[t] = np.mean(dists)
-                
-            return swd_dists
-
-        # a_computation_measure_name: str = 'earthmovers'
-        def _subfn_calculate_spatial_emd_fast(Xs, Xt, downsample_factor=4):
-            """
-            #TODO 2025-12-11 18:28: - [ ] This is the only one fast enough to be practicle, runs in about 4 minutes per decoder context (2 x session)
-            
-            """
-            import scipy.ndimage
-            # 1. Downsample the input arrays (Average pooling)
-            # This reduces 41x63 -> ~20x31
-            # We slice [::factor] to skip, or use block_reduce for true averaging
-            # Simple slicing is often sufficient for speed
-            Xs_small = Xs[::downsample_factor, ::downsample_factor, :]
-            Xt_small = Xt[::downsample_factor, ::downsample_factor, :]
-            
-            # Scale the coordinates so the result implies the ORIGINAL bin units
-            scale = downsample_factor 
-            
-            rows, cols, T = Xs_small.shape
-            
-            # 2. Setup scaled grid
-            xx, yy = np.meshgrid(np.arange(cols), np.arange(rows))
-            # Multiply by scale so the distance is still in "Original Bins"
-            coords = np.column_stack((xx.ravel(), yy.ravel())).astype(np.float64) * scale
-            
-            M = ot.dist(coords, coords, metric='euclidean')
-            emd_scores = np.zeros(T)
-
-            for t in tqdm(range(T), desc="Fast EMD"):
-                a = Xs_small[:, :, t].ravel()
-                b = Xt_small[:, :, t].ravel()
-                
-                sum_a, sum_b = a.sum(), b.sum()
-                if sum_a < 1e-9 or sum_b < 1e-9:
-                    emd_scores[t] = np.nan
-                    continue
-                    
-                a /= sum_a
-                b /= sum_b
-                
-                emd_scores[t] = ot.emd2(a, b, M)
-                
-            return emd_scores
-
         # a_computation_measure_name: str = 'dist_to_highest_peak'
         def _subfn_pdf_spatial_distances(_obj, a_p_x_given_n, xbin_centers, ybin_centers):
             """
@@ -617,32 +642,26 @@ class DecodingLocalityMeasures(ComputedResult): #PickleSerializableMixin, AttrsB
             # do all computation measures                                                                                                                                                                                                                                                          #
             # ==================================================================================================================================================================================================================================================================================== #
 
-            ## do all computation measures
-            a_computation_measure_name: str = 'mask_overlap'
-            print(f'\tcomputing: "{a_computation_measure_name}"...')
-            ## above a certain promence ideally:
-             ## Oh dang this is kinda tiny
-            is_high_prob_mask = (a_p_x_given_n > min_val_epsilon)
-            # if enable_debug_outputs:
-            #     self.debugging_dict_dict[an_epoch_name]['mask_overlap_masks'] = is_high_prob_mask            
+            ## Call the independent classmethod to compute all locality measures
+            computation_results = self.__class__.compute_locality_measures_for_posterior(
+                a_p_x_given_n=a_p_x_given_n,
+                gaussian_volume=self.gaussian_volume,
+                xbin_centers=self.xbin_centers,
+                ybin_centers=self.ybin_centers,
+                n_total_pos_bins=self.n_total_pos_bins,
+                min_val_epsilon=min_val_epsilon,
+                enable_debug_outputs=enable_debug_outputs,
+                earthmovers_fn=active_subfn_compute_earthmovers_fn
+            )
 
-            self.locality_measures_dict_dict[an_epoch_name][a_computation_measure_name] = ((self.gaussian_volume * is_high_prob_mask) > min_val_epsilon).astype(int) ## the "overlap" is computed by taking the elementwise dot-product with the moving average
+            # Extract results into self.locality_measures_dict_dict[an_epoch_name]
+            for key, value in computation_results.items():
+                if key != 'debug':
+                    self.locality_measures_dict_dict[an_epoch_name][key] = value
 
-            a_computation_measure_name: str = 'peak_prom'
-            print(f'\tcomputing: "{a_computation_measure_name}"...')
-            ## above a certain promence ideally:
-            # alpha: float = 0.8 # above 85% of the peak height of the centeral peak
-            # alpha_list = [0.5, 0.8]
-            alpha_list = [0.8]
-            epoch_promenence_tuples, epoch_masks_list = PeakPromenence.compute_2d_dt_posterior_peak_promenences(a_p_x_given_n=a_p_x_given_n, alpha=alpha_list) # (103948, 1, 41, 63)
-            epoch_masks_dict = dict(zip(alpha_list, epoch_masks_list))            
-            a_high_alpha: float = alpha_list[-1]
-            an_alpha_epoch_masks: NDArray = epoch_masks_dict[a_high_alpha] ## get the high mask
-            # an_alpha_epoch_masks = np.stack(an_alpha_epoch_masks, axis=-1) # (5, 41, 63) - (n_x_bins, n_y_bins, n_t_bins)
-            assert np.shape(an_alpha_epoch_masks) == np.shape(a_p_x_given_n)
-            
-            if enable_debug_outputs:
-                self.debugging_dict_dict[an_epoch_name]['peak_prom_promenence_tuples'] = epoch_promenence_tuples
+            # Extract debug outputs if enabled
+            if enable_debug_outputs and 'debug' in computation_results:
+                self.debugging_dict_dict[an_epoch_name].update(computation_results['debug'])
                 # self.debugging_dict_dict[an_epoch_name]['peak_prom_masks'] = an_alpha_epoch_masks
                 self.debugging_dict_dict[an_epoch_name]['peak_prom_masks_dict'] = epoch_masks_dict
                 # self.debugging_dict_dict[an_epoch_name]['peak_prom_masks_dict'] = epoch_masks_dict
