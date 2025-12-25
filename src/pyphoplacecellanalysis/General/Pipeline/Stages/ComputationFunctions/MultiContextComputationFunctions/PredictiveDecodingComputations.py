@@ -307,7 +307,7 @@ class DecodingLocalityMeasures(ComputedResult): #PickleSerializableMixin, AttrsB
     # ==================================================================================================================================================================================================================================================================================== #
     @classmethod
     @function_attributes(short_name=None, tags=['compute', 'locality', 'static'], input_requires=[], output_provides=[], uses=[], used_by=['.compute_locality_measures'], creation_date='2025-12-23 21:00', related_items=[])
-    def compute_locality_measures_for_posterior(cls, a_p_x_given_n: NDArray, gaussian_volume: NDArray, xbin_centers: NDArray, ybin_centers: NDArray, n_total_pos_bins: Optional[int] = None, min_val_epsilon: float = 1e-9, enable_debug_outputs: bool = True, earthmovers_fn: Optional[Callable] = None) -> Dict[str, Any]:
+    def compute_locality_measures_for_posterior(cls, a_p_x_given_n: NDArray, xbin_centers: NDArray, ybin_centers: NDArray, gaussian_volume: NDArray=None, n_total_pos_bins: Optional[int] = None, min_val_epsilon: float = 1e-9, enable_debug_outputs: bool = True, earthmovers_fn: Optional[Callable] = None, debug_print: bool=True) -> Dict[str, Any]:
         """Computes all locality measures for a given posterior probability distribution.
         
         This is a completely independent classmethod that can be called without an instance.
@@ -400,6 +400,8 @@ class DecodingLocalityMeasures(ComputedResult): #PickleSerializableMixin, AttrsB
         
         # Compute n_total_pos_bins if not provided
         if n_total_pos_bins is None:
+            assert (xbin_centers is not None)
+            assert (ybin_centers is not None)
             n_total_pos_bins = int(len(xbin_centers) * len(ybin_centers))
         
         # Initialize result dictionary
@@ -411,18 +413,23 @@ class DecodingLocalityMeasures(ComputedResult): #PickleSerializableMixin, AttrsB
         # ==================================================================================================================================================================================================================================================================================== #
 
         ## do all computation measures
-        a_computation_measure_name: str = 'mask_overlap'
-        print(f'\tcomputing: "{a_computation_measure_name}"...')
-        ## above a certain promence ideally:
-         ## Oh dang this is kinda tiny
-        is_high_prob_mask = (a_p_x_given_n > min_val_epsilon)
-        # if enable_debug_outputs:
-        #     debug_dict['mask_overlap_masks'] = is_high_prob_mask            
+        if gaussian_volume is not None:
+            a_computation_measure_name: str = 'mask_overlap'
+            if debug_print:
+                print(f'\tcomputing: "{a_computation_measure_name}"...')
+            ## above a certain promence ideally:
+            ## Oh dang this is kinda tiny
+            is_high_prob_mask = (a_p_x_given_n > min_val_epsilon)
+            if enable_debug_outputs:
+                debug_dict['mask_overlap_masks'] = is_high_prob_mask            
 
-        result_dict[a_computation_measure_name] = ((gaussian_volume * is_high_prob_mask) > min_val_epsilon).astype(int) ## the "overlap" is computed by taking the elementwise dot-product with the moving average
+            result_dict[a_computation_measure_name] = ((gaussian_volume * is_high_prob_mask) > min_val_epsilon).astype(int) ## the "overlap" is computed by taking the elementwise dot-product with the moving average
+
+
 
         a_computation_measure_name: str = 'peak_prom'
-        print(f'\tcomputing: "{a_computation_measure_name}"...')
+        if debug_print:
+            print(f'\tcomputing: "{a_computation_measure_name}"...')
         ## above a certain promence ideally:
         # alpha: float = 0.8 # above 85% of the peak height of the centeral peak
         # alpha_list = [0.5, 0.8]
@@ -443,16 +450,24 @@ class DecodingLocalityMeasures(ComputedResult): #PickleSerializableMixin, AttrsB
             
         try:
             all_t_bin_peak_heights: NDArray = np.array([safe_nanmax(peak_heights) for (peak_coords, prominences, peak_heights) in epoch_promenence_tuples])
+            all_t_bin_peak_prominences: NDArray = np.array([safe_nanmax(prominences) for (peak_coords, prominences, peak_heights) in epoch_promenence_tuples])
             if enable_debug_outputs:
                 debug_dict['all_t_bin_peak_heights'] = all_t_bin_peak_heights
+                debug_dict['all_t_bin_peak_prominences'] = all_t_bin_peak_prominences
 
         except (ValueError, AttributeError) as e:
             print(f'error computing `all_t_bin_peak_heights`: {e}. skipping.')
             all_t_bin_peak_heights = None
+            all_t_bin_peak_prominences = None
         except Exception as e:
             raise e
 
-        result_dict[a_computation_measure_name] = ((gaussian_volume * an_alpha_epoch_masks) > min_val_epsilon).astype(int) ## the "overlap" is computed by taking the elementwise dot-product with the moving average
+
+        if gaussian_volume is not None:
+            result_dict[a_computation_measure_name] = ((gaussian_volume * an_alpha_epoch_masks) > min_val_epsilon).astype(int) ## the "overlap" is computed by taking the elementwise dot-product with the moving average
+            
+
+
         # result_dict[f"{a_computation_measure_name}_score"] = [(np.nansum(np.stack(an_epoch_mask, axis=-1), axis=(0, 1))/n_total_pos_bins) for an_epoch_idx, an_epoch_mask in enumerate(all_epochs_masks)]
         result_dict[f"{a_computation_measure_name}_num_bins"] = np.nansum(an_alpha_epoch_masks, axis=(0, 1))
         # result_dict[f"{a_computation_measure_name}_score"] = (np.nansum(an_alpha_epoch_masks, axis=(0, 1))/float(n_total_pos_bins))
@@ -482,12 +497,14 @@ class DecodingLocalityMeasures(ComputedResult): #PickleSerializableMixin, AttrsB
             raise e
         
 
-        a_computation_measure_name: str = 'dist_to_highest_peak'
-        print(f'\tcomputing: "{a_computation_measure_name}"...')
-        ## above a certain promence ideally:
-        # peak_locations = np.argmax(a_p_x_given_n, axis=(0, 1))
-        distances_spatial, distances_spatial_frac_max = _subfn_pdf_spatial_distances(gaussian_volume=gaussian_volume, a_p_x_given_n=a_p_x_given_n, xbin_centers=xbin_centers, ybin_centers=ybin_centers)
-        result_dict[a_computation_measure_name] = distances_spatial_frac_max ## the "overlap" is computed by taking the elementwise dot-product with the moving average
+        if (gaussian_volume is not None) and (xbin_centers is not None) and (ybin_centers is not None):
+            a_computation_measure_name: str = 'dist_to_highest_peak'
+            if debug_print:
+                print(f'\tcomputing: "{a_computation_measure_name}"...')
+            ## above a certain promence ideally:
+            # peak_locations = np.argmax(a_p_x_given_n, axis=(0, 1))
+            distances_spatial, distances_spatial_frac_max = _subfn_pdf_spatial_distances(gaussian_volume=gaussian_volume, a_p_x_given_n=a_p_x_given_n, xbin_centers=xbin_centers, ybin_centers=ybin_centers)
+            result_dict[a_computation_measure_name] = distances_spatial_frac_max ## the "overlap" is computed by taking the elementwise dot-product with the moving average
         
 
         # a_computation_measure_name: str = 'dist_to_nearest_peak'
@@ -500,7 +517,8 @@ class DecodingLocalityMeasures(ComputedResult): #PickleSerializableMixin, AttrsB
 
         if earthmovers_fn is not None:
             a_computation_measure_name: str = 'earthmovers'
-            print(f'\tcomputing: "{a_computation_measure_name}"...')
+            if debug_print:
+                print(f'\tcomputing: "{a_computation_measure_name}"...')
             result_dict[a_computation_measure_name] = earthmovers_fn(gaussian_volume, a_p_x_given_n)
 
         # Add debug dict to result if enabled
@@ -512,7 +530,7 @@ class DecodingLocalityMeasures(ComputedResult): #PickleSerializableMixin, AttrsB
 
 
 
-    @function_attributes(short_name=None, tags=['compute', 'MAIN', 'locality'], input_requires=[], output_provides=[], uses=['.rebuild_locality_measures_df'], used_by=['.compute'], creation_date='2025-12-15 06:54', related_items=[])
+    @function_attributes(short_name=None, tags=['compute', 'MAIN', 'locality'], input_requires=[], output_provides=[], uses=['.compute_locality_measures_for_posterior', '.rebuild_locality_measures_df'], used_by=['.compute'], creation_date='2025-12-15 06:54', related_items=[])
     def compute_locality_measures(self, min_val_epsilon: float = 1e-9, enable_debug_outputs: bool=True):
         """ computes all required locality measures
 
@@ -520,77 +538,6 @@ class DecodingLocalityMeasures(ComputedResult): #PickleSerializableMixin, AttrsB
         
         
         """
-        import ot
-        from tqdm.notebook import tqdm
-
-        from scipy.spatial.distance import cdist
-        from scipy.optimize import linear_sum_assignment
-        from scipy.ndimage import center_of_mass
-        from pyphoplacecellanalysis.External.peak_prominence2d import PeakPromenence
-
-        def safe_nanmax(arr):
-            try:
-                if arr.size == 0:
-                    return np.nan
-                return np.nanmax(arr)
-            except (ValueError, AttributeError):
-                return np.nan
-            
-        # a_computation_measure_name: str = 'dist_to_highest_peak'
-        def _subfn_pdf_spatial_distances(_obj, a_p_x_given_n, xbin_centers, ybin_centers):
-            """
-            Computes the Euclidean distance between the expected positions (COM) of 
-            two 2D probability distributions using vectorized weighted averages.
-            """
-            # 1. Get Shapes
-            # Assuming shape is (Rows/H, Cols/W, Time)
-            pdf_obj = _obj.gaussian_volume
-            pdf_cmp = a_p_x_given_n
-            
-            # 2. Calculate Marginals to simplify COM calculation
-            # Sum over columns (axis 1) to get mass distribution along rows (Height/x_bins)
-            # Shape becomes (H, T)
-            marg_x_obj = np.sum(pdf_obj, axis=1)
-            marg_x_cmp = np.sum(pdf_cmp, axis=1)
-
-            # Sum over rows (axis 0) to get mass distribution along columns (Width/y_bins)
-            # Shape becomes (W, T)
-            marg_y_obj = np.sum(pdf_obj, axis=0)
-            marg_y_cmp = np.sum(pdf_cmp, axis=0)
-
-            # 3. Compute Expected Position (Weighted Average of Bin Centers)
-            # Formula: Sum(Probability * Value) / Sum(Probability)
-            
-            # reshape centers for broadcasting: (H, 1) * (H, T) -> sum -> (T,)
-            denom_x_obj = np.sum(marg_x_obj, axis=0)
-            # Handle division by zero if a timebin has all-zeros
-            denom_x_obj[denom_x_obj == 0] = 1.0 
-            
-            x_obj = np.sum(marg_x_obj * xbin_centers[:, np.newaxis], axis=0) / denom_x_obj
-            
-            # Repeat for Comparison Object
-            denom_x_cmp = np.sum(marg_x_cmp, axis=0)
-            denom_x_cmp[denom_x_cmp == 0] = 1.0
-            x_cmp = np.sum(marg_x_cmp * xbin_centers[:, np.newaxis], axis=0) / denom_x_cmp
-
-            # Repeat for Y (Width)
-            denom_y_obj = np.sum(marg_y_obj, axis=0)
-            denom_y_obj[denom_y_obj == 0] = 1.0
-            y_obj = np.sum(marg_y_obj * ybin_centers[:, np.newaxis], axis=0) / denom_y_obj
-
-            denom_y_cmp = np.sum(marg_y_cmp, axis=0)
-            denom_y_cmp[denom_y_cmp == 0] = 1.0
-            y_cmp = np.sum(marg_y_cmp * ybin_centers[:, np.newaxis], axis=0) / denom_y_cmp
-
-            # 4. Euclidean Distance
-            distances_spatial = np.sqrt((x_obj - x_cmp)**2 + (y_obj - y_cmp)**2)
-
-            # 5. Max distance (Diagonal of the ROI)
-            max_possible_distance = np.sqrt(np.ptp(xbin_centers)**2 + np.ptp(ybin_centers)**2)
-            distances_spatial_frac_max = distances_spatial / max_possible_distance
-            
-            return distances_spatial, distances_spatial_frac_max
-
         # active_subfn_compute_earthmovers_fn = _subfn_calculate_spatial_emd # #TODO 2025-12-11 17:53: - [ ] TOO SLOW
         # active_subfn_compute_earthmovers_fn = _subfn_calculate_sinkhorn_distance
         # active_subfn_compute_earthmovers_fn = _subfn_calculate_sliced_wasserstein_correct
@@ -662,69 +609,6 @@ class DecodingLocalityMeasures(ComputedResult): #PickleSerializableMixin, AttrsB
             # Extract debug outputs if enabled
             if enable_debug_outputs and 'debug' in computation_results:
                 self.debugging_dict_dict[an_epoch_name].update(computation_results['debug'])
-                # self.debugging_dict_dict[an_epoch_name]['peak_prom_masks'] = an_alpha_epoch_masks
-                self.debugging_dict_dict[an_epoch_name]['peak_prom_masks_dict'] = epoch_masks_dict
-                # self.debugging_dict_dict[an_epoch_name]['peak_prom_masks_dict'] = epoch_masks_dict
-                # self.debugging_dict_dict[an_epoch_name]['peak_prom_product'] = epoch_masks
-                
-            try:
-                all_t_bin_peak_heights: NDArray = np.array([safe_nanmax(peak_heights) for (peak_coords, prominences, peak_heights) in epoch_promenence_tuples])
-                if enable_debug_outputs:
-                    self.debugging_dict_dict[an_epoch_name]['all_t_bin_peak_heights'] = all_t_bin_peak_heights
-
-            except (ValueError, AttributeError) as e:
-                print(f'error computing `all_t_bin_peak_heights`: {e}. skipping.')
-            except Exception as e:
-                raise e
-
-            self.locality_measures_dict_dict[an_epoch_name][a_computation_measure_name] = ((self.gaussian_volume * an_alpha_epoch_masks) > min_val_epsilon).astype(int) ## the "overlap" is computed by taking the elementwise dot-product with the moving average
-            # self.locality_measures_dict_dict[an_epoch_name][f"{a_computation_measure_name}_score"] = [(np.nansum(np.stack(an_epoch_mask, axis=-1), axis=(0, 1))/self.n_total_pos_bins) for an_epoch_idx, an_epoch_mask in enumerate(all_epochs_masks)]
-            self.locality_measures_dict_dict[an_epoch_name][f"{a_computation_measure_name}_num_bins"] = np.nansum(an_alpha_epoch_masks, axis=(0, 1))
-            # self.locality_measures_dict_dict[an_epoch_name][f"{a_computation_measure_name}_score"] = (np.nansum(an_alpha_epoch_masks, axis=(0, 1))/float(self.n_total_pos_bins))
-
-            ## ⚓ Decoded 2D Posterior Specificity - Metrics using the promenence mask
-
-            ## Focality/Diffusivity: Number of bins in in the 90% promenence mask over the total number of bins --> [0.0, 1.0]
-                ## definitionally the 90% promenance mask bins must be together/contiguous spatially, as outliers are considered different peaks.
-            self.locality_measures_dict_dict[an_epoch_name][f"{a_computation_measure_name}_Focality"] = (np.nansum(an_alpha_epoch_masks, axis=(0, 1))/float(self.n_total_pos_bins))
-
-            ## Sharpness/Peakiness: Number of bins in the 90% promenence mask over the number of bins exceeding 90% of the promenence peak height -- specifically looks at the area of the mean peak compared to the off-peak non-contiguous areas of similar heights
-            # self.locality_measures_dict_dict[an_epoch_name][f"{a_computation_measure_name}_Peakiness"] = np.nansum(an_alpha_epoch_masks, axis=(0, 1)) / np.array([np.nansum((a_p_x_given_n[:, :, i] >= (a_peak_height * alpha_list[-1])), axis=(0, 1)) for i, a_peak_height in enumerate(all_t_bin_peak_heights)])
-            self.locality_measures_dict_dict[an_epoch_name][f"{a_computation_measure_name}_Peakiness"] = np.nansum(an_alpha_epoch_masks, axis=(0, 1)) / np.array([np.nansum((a_p_x_given_n[:, :, i] >= (a_peak_height * alpha_list[-1])), axis=(0, 1)) if not np.isnan(a_peak_height) else np.nan for i, a_peak_height in enumerate(all_t_bin_peak_heights)])
-
-            try:
-                ## Modality: The count of detected peaks exceeding a certain promenence -- e.g. 1 if unimodal, 2 if bimodal, ..., N if multi-modal. 
-                all_t_bin_num_peaks: NDArray = np.array([len(peak_heights) for (peak_coords, prominences, peak_heights) in epoch_promenence_tuples])
-
-                self.locality_measures_dict_dict[an_epoch_name][f"{a_computation_measure_name}_num_peaks"] = all_t_bin_num_peaks
-
-            except (ValueError, AttributeError) as e:
-                print(f'error computing `all_t_bin_num_peaks`: {e}. skipping.')
-            except Exception as e:
-                raise e
-            
-
-
-            a_computation_measure_name: str = 'dist_to_highest_peak'
-            print(f'\tcomputing: "{a_computation_measure_name}"...')
-            ## above a certain promence ideally:
-            # peak_locations = np.argmax(a_p_x_given_n, axis=(0, 1))
-            distances_spatial, distances_spatial_frac_max = _subfn_pdf_spatial_distances(_obj=self, a_p_x_given_n=a_p_x_given_n, xbin_centers=self.xbin_centers, ybin_centers=self.ybin_centers)
-            self.locality_measures_dict_dict[an_epoch_name][a_computation_measure_name] = distances_spatial_frac_max ## the "overlap" is computed by taking the elementwise dot-product with the moving average
-            
-
-            # a_computation_measure_name: str = 'dist_to_nearest_peak'
-            # print(f'\tcomputing: "{a_computation_measure_name}"...')
-            # ## above a certain promence ideally:
-            # min_val_epsilon: float = 1e-9
-            # is_high_prob_mask = (a_p_x_given_n > min_val_epsilon)
-            # self.locality_measures_dict_dict[an_epoch_name][a_computation_measure_name] = ((self.gaussian_volume * is_high_prob_mask) > min_val_epsilon).astype(int) ## the "overlap" is computed by taking the elementwise dot-product with the moving average
-
-
-            if active_subfn_compute_earthmovers_fn is not None:
-                a_computation_measure_name: str = 'earthmovers'
-                print(f'\tcomputing: "{a_computation_measure_name}"...')
-                self.locality_measures_dict_dict[an_epoch_name][a_computation_measure_name] = active_subfn_compute_earthmovers_fn(self.gaussian_volume, a_p_x_given_n)
 
 
         ## END for an_epoch_idx, an_epoch_n...
@@ -738,6 +622,50 @@ class DecodingLocalityMeasures(ComputedResult): #PickleSerializableMixin, AttrsB
         return locality_measures_df
     
 
+    @classmethod
+    def perform_build_locality_measures_df(cls, locality_measures_dict_dict: Dict[str, Dict], time_window_centers: NDArray, paradigm_epochs_df: Optional[pd.DataFrame]=None, xbin_centers=None, ybin_centers=None):
+        """ builds the measures_df
+        """
+        # _out_locality_measures_df = pd.DataFrame(self.decoding_meas_pos_locality_measure_dict)
+        locality_measures_df: pd.DataFrame = pd.DataFrame(time_window_centers, columns=['t'])
+        # _out_locality_measures_df['t'] = self.time_window_centers
+
+        for an_epoch_name, v in locality_measures_dict_dict.items():
+            for a_computation_measure_name, vv in v.items():
+                if (a_computation_measure_name == 'mask_overlap'):
+                    assert xbin_centers is not None
+                    assert ybin_centers is not None
+                    total_num_possible_bins: int = len(xbin_centers) * len(ybin_centers)
+                    vv = np.nansum(vv, (0, 1)) / total_num_possible_bins
+                if a_computation_measure_name == 'peak_prom':                    
+                    continue ## skip
+                
+                locality_measures_df[f"{a_computation_measure_name}_{an_epoch_name}"] = vv # _obj.locality_measures_dict_dict[an_epoch_name][a_computation_measure_name]
+
+
+
+        if (paradigm_epochs_df is not None):
+            # _out_locality_measures_df: pd.DataFrame = deepcopy(_obj.locality_measures_df)
+            # _out_locality_measures_df
+            ## #TODO 2025-12-12 18:39: - [ ] Manually coded times for epochs ['roam', 'sprinkle'] -- fix setting proper epoch
+
+            ## - [ ] add the correct maze_id to know which maze decoder to use. Adds 'correct_paradigm_epoch' columns
+            locality_measures_df = locality_measures_df.time_point_event.adding_epochs_identity_column(epochs_df=paradigm_epochs_df, epoch_id_key_name='correct_paradigm_epoch', epoch_label_column_name='label', override_time_variable_name='t',
+                                                                no_interval_fill_value='', should_replace_existing_column=True, drop_non_epoch_events=False, overlap_behavior=OverlappingIntervalsFallbackBehavior.FALLBACK_TO_SLOW_SEARCH)
+            
+            locality_measures_df['is_non_local_period'] = False
+
+            # an_epoch_name: str = 'sprinkle'
+            for an_epoch_name, v in locality_measures_dict_dict.items():
+                is_epoch_idx = (locality_measures_df['correct_paradigm_epoch'] == an_epoch_name)
+                locality_measures_df.loc[is_epoch_idx, 'is_non_local_period'] =  np.logical_and((locality_measures_df[f'dist_to_highest_peak_{an_epoch_name}'][is_epoch_idx] >= 0.4), (locality_measures_df[f'mask_overlap_{an_epoch_name}'][is_epoch_idx] < 0.1))
+
+                # _out_locality_measures_df.loc[is_sprinkle, 'is_non_local_period'] =  (_out_locality_measures_df[f'dist_to_highest_peak_{an_epoch_name}'][is_sprinkle] >= 0.4)
+
+        return locality_measures_df
+
+
+
     @function_attributes(short_name=None, tags=['private'], input_requires=[], output_provides=[], uses=[], used_by=['.compute_locality_measures'], creation_date='2025-12-15 07:01', related_items=[])
     def rebuild_locality_measures_df(self):
         """ called to rebuild the final output df
@@ -750,57 +678,60 @@ class DecodingLocalityMeasures(ComputedResult): #PickleSerializableMixin, AttrsB
             non_local_locality_measures_df
             
         """
-        # _out_locality_measures_df = pd.DataFrame(self.decoding_meas_pos_locality_measure_dict)
-        _out_locality_measures_df: pd.DataFrame = pd.DataFrame(self.time_window_centers, columns=['t'])
-        # _out_locality_measures_df['t'] = self.time_window_centers
+        _out_locality_measures_df: pd.DataFrame = deepcopy(self.perform_build_locality_measures_df(locality_measures_dict_dict=self.locality_measures_dict_dict, time_window_centers=self.time_window_centers, paradigm_epochs_df=self.paradigm_epochs_df,
+                                                                                                    xbin_centers=self.xbin_centers, ybin_centers=self.ybin_centers))
+                                                                                                            
+        # # _out_locality_measures_df = pd.DataFrame(self.decoding_meas_pos_locality_measure_dict)
+        # _out_locality_measures_df: pd.DataFrame = pd.DataFrame(self.time_window_centers, columns=['t'])
+        # # _out_locality_measures_df['t'] = self.time_window_centers
 
-        for an_epoch_name, v in self.locality_measures_dict_dict.items():
+        # for an_epoch_name, v in self.locality_measures_dict_dict.items():
 
-            for a_computation_measure_name, vv in v.items():
-                if a_computation_measure_name == 'mask_overlap':
-                    total_num_possible_bins: int = len(self.xbin_centers) * len(self.ybin_centers)
-                    vv = np.nansum(vv, (0, 1)) / total_num_possible_bins
-                if a_computation_measure_name == 'peak_prom':                    
-                    continue ## skip
+        #     for a_computation_measure_name, vv in v.items():
+        #         if a_computation_measure_name == 'mask_overlap':
+        #             total_num_possible_bins: int = len(self.xbin_centers) * len(self.ybin_centers)
+        #             vv = np.nansum(vv, (0, 1)) / total_num_possible_bins
+        #         if a_computation_measure_name == 'peak_prom':                    
+        #             continue ## skip
                 
-                _out_locality_measures_df[f"{a_computation_measure_name}_{an_epoch_name}"] = vv # _obj.locality_measures_dict_dict[an_epoch_name][a_computation_measure_name]
+        #         _out_locality_measures_df[f"{a_computation_measure_name}_{an_epoch_name}"] = vv # _obj.locality_measures_dict_dict[an_epoch_name][a_computation_measure_name]
 
 
 
-        self.locality_measures_df = deepcopy(_out_locality_measures_df)
+        # self.locality_measures_df = deepcopy(_out_locality_measures_df)
 
-        # _obj = self
-        # _out_locality_measures_df: pd.DataFrame = deepcopy(_obj.locality_measures_df)
-        # _out_locality_measures_df
-        ## #TODO 2025-12-12 18:39: - [ ] Manually coded times for epochs ['roam', 'sprinkle'] -- fix setting proper epoch
+        # # _obj = self
+        # # _out_locality_measures_df: pd.DataFrame = deepcopy(_obj.locality_measures_df)
+        # # _out_locality_measures_df
+        # ## #TODO 2025-12-12 18:39: - [ ] Manually coded times for epochs ['roam', 'sprinkle'] -- fix setting proper epoch
 
-        ## - [ ] add the correct maze_id to know which maze decoder to use. Adds 'correct_paradigm_epoch' columns
-        _out_locality_measures_df = _out_locality_measures_df.time_point_event.adding_epochs_identity_column(epochs_df=self.paradigm_epochs_df, epoch_id_key_name='correct_paradigm_epoch', epoch_label_column_name='label', override_time_variable_name='t',
-                                                            no_interval_fill_value='', should_replace_existing_column=True, drop_non_epoch_events=False, overlap_behavior=OverlappingIntervalsFallbackBehavior.FALLBACK_TO_SLOW_SEARCH)
+        # ## - [ ] add the correct maze_id to know which maze decoder to use. Adds 'correct_paradigm_epoch' columns
+        # _out_locality_measures_df = _out_locality_measures_df.time_point_event.adding_epochs_identity_column(epochs_df=self.paradigm_epochs_df, epoch_id_key_name='correct_paradigm_epoch', epoch_label_column_name='label', override_time_variable_name='t',
+        #                                                     no_interval_fill_value='', should_replace_existing_column=True, drop_non_epoch_events=False, overlap_behavior=OverlappingIntervalsFallbackBehavior.FALLBACK_TO_SLOW_SEARCH)
         
 
         
-        # _out_locality_measures_df['correct_paradigm_epoch'] = ''
+        # # _out_locality_measures_df['correct_paradigm_epoch'] = ''
 
-        # ## - [ ] use the various quantities for that maze to determine if it's non-local
-        # roam_start = 7423.0
-        # roam_stop = 10185.99999
+        # # ## - [ ] use the various quantities for that maze to determine if it's non-local
+        # # roam_start = 7423.0
+        # # roam_stop = 10185.99999
 
-        # sprinkle_start = 10186.0
-        # sprinkle_stop = 11483.000000
+        # # sprinkle_start = 10186.0
+        # # sprinkle_stop = 11483.000000
 
-        # _out_locality_measures_df.loc[np.logical_and((_out_locality_measures_df['t'].to_numpy() >= roam_start), (_out_locality_measures_df['t'] < roam_stop)), 'correct_paradigm_epoch'] = 'roam'
-        # _out_locality_measures_df.loc[np.logical_and((_out_locality_measures_df['t'] >= sprinkle_start), (_out_locality_measures_df['t'] < sprinkle_stop)), 'correct_paradigm_epoch'] = 'sprinkle'
+        # # _out_locality_measures_df.loc[np.logical_and((_out_locality_measures_df['t'].to_numpy() >= roam_start), (_out_locality_measures_df['t'] < roam_stop)), 'correct_paradigm_epoch'] = 'roam'
+        # # _out_locality_measures_df.loc[np.logical_and((_out_locality_measures_df['t'] >= sprinkle_start), (_out_locality_measures_df['t'] < sprinkle_stop)), 'correct_paradigm_epoch'] = 'sprinkle'
 
 
-        _out_locality_measures_df['is_non_local_period'] = False
+        # _out_locality_measures_df['is_non_local_period'] = False
 
-        # an_epoch_name: str = 'sprinkle'
-        for an_epoch_name in self.epoch_names:
-            is_epoch_idx = (_out_locality_measures_df['correct_paradigm_epoch'] == an_epoch_name)
-            _out_locality_measures_df.loc[is_epoch_idx, 'is_non_local_period'] =  np.logical_and((_out_locality_measures_df[f'dist_to_highest_peak_{an_epoch_name}'][is_epoch_idx] >= 0.4), (_out_locality_measures_df[f'mask_overlap_{an_epoch_name}'][is_epoch_idx] < 0.1))
+        # # an_epoch_name: str = 'sprinkle'
+        # for an_epoch_name in self.epoch_names:
+        #     is_epoch_idx = (_out_locality_measures_df['correct_paradigm_epoch'] == an_epoch_name)
+        #     _out_locality_measures_df.loc[is_epoch_idx, 'is_non_local_period'] =  np.logical_and((_out_locality_measures_df[f'dist_to_highest_peak_{an_epoch_name}'][is_epoch_idx] >= 0.4), (_out_locality_measures_df[f'mask_overlap_{an_epoch_name}'][is_epoch_idx] < 0.1))
 
-            # _out_locality_measures_df.loc[is_sprinkle, 'is_non_local_period'] =  (_out_locality_measures_df[f'dist_to_highest_peak_{an_epoch_name}'][is_sprinkle] >= 0.4)
+        #     # _out_locality_measures_df.loc[is_sprinkle, 'is_non_local_period'] =  (_out_locality_measures_df[f'dist_to_highest_peak_{an_epoch_name}'][is_sprinkle] >= 0.4)
 
 
         self.locality_measures_df = deepcopy(_out_locality_measures_df)
@@ -1992,8 +1923,27 @@ class PredictiveDecodingComputationsContainer(ComputedResult):
             # curr_epoch_p_x_given_n  # np.shape(curr_epoch_p_x_given_n): (n_x_bins, n_y_Bins, n_time_bins)
             # is_high_prob_mask = curr_epoch_p_x_given_n >= np.sort(curr_epoch_p_x_given_n.ravel())[::-1][np.searchsorted(np.cumsum(np.sort(curr_epoch_p_x_given_n.ravel())[::-1]), 0.1 * curr_epoch_p_x_given_n.sum())]
 
-            ## for each time bin compute the top 10% of the time bins and use those instead of a fixed "high_val_epsilon" threshold:
+
+            # ==================================================================================================================================================================================================================================================================================== #
+            # Special posterior measurement properties (diffusivity, promenence, etc) computed independently with newly decoded fine time bin grainularity posteriors                                                                                                                              #
+            # ==================================================================================================================================================================================================================================================================================== #
+            ## Call the independent classmethod to compute all locality measures
+            custom_computation_results_dict = DecodingLocalityMeasures.compute_locality_measures_for_posterior(
+                a_p_x_given_n=curr_epoch_p_x_given_n,
+                gaussian_volume=self.gaussian_volume, ## if we have it
+                xbin_centers=self.xbin_centers, 
+                ybin_centers=self.ybin_centers,
+                n_total_pos_bins=self.n_total_pos_bins,
+                min_val_epsilon=1e-9,
+                enable_debug_outputs=True,
+                earthmovers_fn=None,
+            )
             
+
+
+
+            ## for each time bin compute the top 10% of the time bins and use those instead of a fixed "high_val_epsilon" threshold:
+            #TODO 2025-12-24 20:48: - [ ] LAAAAME - this should use the real promenence topologically connected region, not the random top 10% which can be discontinuous...
             flat = curr_epoch_p_x_given_n.reshape(-1, curr_epoch_p_x_given_n.shape[-1])  # (n_xy, n_time)
             sorted_flat = np.sort(flat, axis=0)[::-1]
             cdf = np.cumsum(sorted_flat, axis=0)
@@ -2004,23 +1954,6 @@ class PredictiveDecodingComputationsContainer(ComputedResult):
             epoch_high_prob_pos_masks.append(any_t_Bin_high_prob_pos_mask)
 
             pos_matches_epoch_mask = np.where([any_t_Bin_high_prob_pos_mask[(a_pos.binned_x-1), (a_pos.binned_y-1)] for a_pos in measured_positions_df.itertuples()])[0]
-
-            # Check if bins are 0-indexed or 1-indexed, handle NaNs, and add bounds checking
-            # valid_mask = []
-            # for a_pos in measured_positions_df.itertuples():
-            #     if pd.isna(a_pos.binned_x) or pd.isna(a_pos.binned_y):
-            #         valid_mask.append(False)
-            #         continue
-            #     # Determine if 0-indexed or 1-indexed (check if max value equals array size)
-            #     x_idx = (int(a_pos.binned_x) - 1) if a_pos.binned_x > 0 else int(a_pos.binned_x)
-            #     y_idx = (int(a_pos.binned_y) - 1) if a_pos.binned_y > 0 else int(a_pos.binned_y)
-            #     # Bounds check
-            #     if (0 <= x_idx < any_t_Bin_high_prob_pos_mask.shape[0] and 
-            #         0 <= y_idx < any_t_Bin_high_prob_pos_mask.shape[1]):
-            #         valid_mask.append(any_t_Bin_high_prob_pos_mask[x_idx, y_idx])
-            #     else:
-            #         valid_mask.append(False)
-            # pos_matches_epoch_mask = np.where(valid_mask)[0]
 
             ## 2D approach
             # rows, cols = np.where(any_t_Bin_high_prob_pos_mask)
@@ -2259,7 +2192,7 @@ class PredictiveDecodingComputationsGlobalComputationFunctions(AllFunctionEnumer
 
 
 
-        all_directional_pf1D_Decoder_dict: Dict[str, BasePositionDecoder] = directional_decoders_decode_result.pf1D_Decoder_dict
+        # all_directional_pf1D_Decoder_dict: Dict[str, BasePositionDecoder] = directional_decoders_decode_result.pf1D_Decoder_dict
         
         pos_df: pd.DataFrame = deepcopy(owning_pipeline_reference.sess.position.to_dataframe())
         continuously_decoded_result_cache_dict = directional_decoders_decode_result.continuously_decoded_result_cache_dict
