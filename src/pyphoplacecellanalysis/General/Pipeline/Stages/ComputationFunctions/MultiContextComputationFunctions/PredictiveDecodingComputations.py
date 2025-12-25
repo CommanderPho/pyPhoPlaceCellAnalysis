@@ -307,7 +307,7 @@ class DecodingLocalityMeasures(ComputedResult): #PickleSerializableMixin, AttrsB
     # ==================================================================================================================================================================================================================================================================================== #
     @classmethod
     @function_attributes(short_name=None, tags=['compute', 'locality', 'static'], input_requires=[], output_provides=[], uses=[], used_by=['.compute_locality_measures'], creation_date='2025-12-23 21:00', related_items=[])
-    def compute_locality_measures_for_posterior(cls, a_p_x_given_n: NDArray, xbin_centers: NDArray, ybin_centers: NDArray, gaussian_volume: NDArray=None, n_total_pos_bins: Optional[int] = None, min_val_epsilon: float = 1e-9, enable_debug_outputs: bool = True, earthmovers_fn: Optional[Callable] = None, debug_print: bool=True) -> Dict[str, Any]:
+    def compute_locality_measures_for_posterior(cls, a_p_x_given_n: NDArray, xbin_centers: NDArray, ybin_centers: NDArray, gaussian_volume: NDArray=None, n_total_pos_bins: Optional[int] = None, min_val_epsilon: float = 1e-9, alpha_list = [0.8], enable_debug_outputs: bool = True, earthmovers_fn: Optional[Callable] = None, debug_print: bool=True) -> Dict[str, Any]:
         """Computes all locality measures for a given posterior probability distribution.
         
         This is a completely independent classmethod that can be called without an instance.
@@ -433,7 +433,7 @@ class DecodingLocalityMeasures(ComputedResult): #PickleSerializableMixin, AttrsB
         ## above a certain promence ideally:
         # alpha: float = 0.8 # above 85% of the peak height of the centeral peak
         # alpha_list = [0.5, 0.8]
-        alpha_list = [0.8]
+        
         epoch_promenence_tuples, epoch_masks_list = PeakPromenence.compute_2d_dt_posterior_peak_promenences(a_p_x_given_n=a_p_x_given_n, alpha=alpha_list) # (103948, 1, 41, 63)
         epoch_masks_dict = dict(zip(alpha_list, epoch_masks_list))            
         a_high_alpha: float = alpha_list[-1]

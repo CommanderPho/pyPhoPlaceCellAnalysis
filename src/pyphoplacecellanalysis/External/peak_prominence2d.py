@@ -1195,13 +1195,8 @@ class PeakPromenence:
 
         for i, a_p_x_given_n in enumerate(p_x_given_n_list):
             n_t_bins = np.shape(a_p_x_given_n)[-1]
-            # epoch_promenences, epoch_masks_list = cls.compute_2d_dt_posterior_peak_promenences(a_p_x_given_n=a_p_x_given_n, alpha=alpha)
-            
             epoch_promenences, epoch_masks_dict = cls.compute_2d_dt_posterior_peak_promenences(a_p_x_given_n=a_p_x_given_n, alpha=alpha)
-
-
             all_epochs_promenence_tuples.append(epoch_promenences)
-            
             # epoch_masks: List[NDArray] = [np.stack(an_alpha_epoch_masks, axis=-1) for an_alpha_epoch_masks in epoch_masks_list] # List[(41, 63, 5)] - List[(n_x_bins, n_y_bins, n_t_bins)] (one for each value of alpha)
             epoch_masks: List[List[NDArray]] = epoch_masks_list
             # assert np.shape(epoch_masks) == np.shape(a_p_x_given_n)
