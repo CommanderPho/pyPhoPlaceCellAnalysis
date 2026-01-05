@@ -29,6 +29,9 @@ Update time: 2018-11-10 16:03:49.
 
 #--------Import modules-------------------------
 from typing import Dict, List, Tuple, Optional, Callable, Union, Any
+from typing_extensions import TypeAlias
+from nptyping import NDArray
+import neuropy.utils.type_aliases as types
 import nptyping as ND
 from nptyping import NDArray
 import numpy as np
@@ -47,7 +50,12 @@ from pyphocorehelpers.programming_helpers import metadata_attributes
 from pyphocorehelpers.function_helpers import function_attributes
 from attrs import define, field
 import pandas as pd
+from pyphoplacecellanalysis.General.Model.ComputationResults import ComputedResult
+from neuropy.utils.mixins.AttrsClassHelpers import serialized_field, non_serialized_field
+from neuropy.utils.mixins.indexing_helpers import get_dict_subset
 
+decoded_epoch_index: TypeAlias = int # an integer index that is an aclu
+decoded_epoch_time_bin_index: TypeAlias = int # an integer index that is an aclu
 
 
 def isClosed(xs,ys):
@@ -533,23 +541,141 @@ from scipy import ndimage # used for `PeakPromenence.compute_2d_peak_prominence`
 from skimage.morphology import reconstruction # used for `PeakPromenence.compute_2d_peak_prominence`
 
 
-@define(slots=False, eq=False)
-class PeakCounts:
+@define(slots=False, repr=False, eq=False)
+class PeakCounts(ComputedResult):
     """Nested class containing raw and blurred peak count maps."""
-    raw: NDArray = field()
-    uniform_blurred: NDArray = field()
-    gaussian_blurred: NDArray = field()
+    _VersionedResultMixin_version: str = "2026.01.05_0"
+
+    raw: NDArray = serialized_field()
+    uniform_blurred: NDArray = serialized_field()
+    gaussian_blurred: NDArray = serialized_field()
+
+    # For serialization/pickling: ________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
+    def __getstate__(self):
+        # Copy the object's state from self.__dict__ which contains all our instance attributes. Always use the dict.copy() method to avoid modifying the original state.
+        state = self.__dict__.copy()
+        # # Remove the unpicklable entries.
+        # _non_pickled_fields = ['curr_active_pipeline', 'track_templates']
+        # for a_non_pickleable_field in _non_pickled_fields:
+        #     del state[a_non_pickleable_field]
+        return state
+
+    def __setstate__(self, state):
+        # Restore instance attributes (i.e., _mapping and _keys_at_init).
+        # For `VersionedResultMixin`
+        self._VersionedResultMixin__setstate__(state)
+
+        # _non_pickled_field_restore_defaults = dict(zip(['curr_active_pipeline', 'track_templates'], [None, None]))
+        # for a_field_name, a_default_restore_value in _non_pickled_field_restore_defaults.items():
+        #     if a_field_name not in state:
+        #         state[a_field_name] = a_default_restore_value
+
+        self.__dict__.update(state)
+        # # Call the superclass __init__() (from https://stackoverflow.com/a/48325758)
+        # super(PeakCounts, self).__init__() # from
+
+    def __repr__(self):
+        """ 2024-01-11 - Renders only the fields and their sizes
+        """
+        from pyphocorehelpers.print_helpers import strip_type_str_to_classname
+        attr_reprs = []
+        for a in self.__attrs_attrs__:
+            attr_type = strip_type_str_to_classname(type(getattr(self, a.name)))
+            if 'shape' in a.metadata:
+                shape = ', '.join(a.metadata['shape'])  # this joins tuple elements with a comma, creating a string without quotes
+                attr_reprs.append(f"{a.name}: {attr_type} | shape ({shape})")  # enclose the shape string with parentheses
+            else:
+                attr_reprs.append(f"{a.name}: {attr_type}")
+        content = ",\n\t".join(attr_reprs)
+        return f"{type(self).__name__}({content}\n)"
+
+    # HDFMixin Conformances ______________________________________________________________________________________________ #
+    def to_hdf(self, file_path, key: str, **kwargs):
+        """ Saves the object to key in the hdf5 file specified by file_path"""
+        super().to_hdf(file_path, key=key, **kwargs)
+
+    @classmethod
+    def _reload_class(cls, an_instance):
+        """ specifically updates the instance after its class definition has been updated.
+        """
+        non_init_subset=['_VersionedResultMixin_version']
+
+        _full_state = an_instance.__getstate__()
+        _init_state = get_dict_subset(_full_state, subset_excludelist=non_init_subset)
+        _post_init_state = get_dict_subset(_full_state, subset_includelist=non_init_subset)
+        _obj = cls(**_init_state)
+        _obj.__dict__.update(**_post_init_state) ## perform literal update
+        return _obj
 
 
-@define(slots=False, eq=False)
-class PosteriorPeaksPeakProminence2dResult:
+@define(slots=False, repr=False, eq=False)
+class PosteriorPeaksPeakProminence2dResult(ComputedResult):
     """Result class for posterior peaks peak prominence 2D computation."""
-    xx: NDArray = field()
-    yy: NDArray = field()
-    results: Dict[Tuple[int, int], Dict[str, Any]] = field()
-    flat_peaks_df: pd.DataFrame = field()
-    filtered_flat_peaks_df: pd.DataFrame = field()
-    peak_counts: PeakCounts = field()
+    _VersionedResultMixin_version: str = "2026.01.05_0"
+
+    xx: NDArray = serialized_field()
+    yy: NDArray = serialized_field()
+    results: Dict[Tuple[decoded_epoch_index, decoded_epoch_time_bin_index], Dict[str, Any]] = serialized_field()
+    flat_peaks_df: pd.DataFrame = serialized_field()
+    filtered_flat_peaks_df: pd.DataFrame = serialized_field()
+    peak_counts: PeakCounts = serialized_field()
+
+    # For serialization/pickling: ________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
+    def __getstate__(self):
+        # Copy the object's state from self.__dict__ which contains all our instance attributes. Always use the dict.copy() method to avoid modifying the original state.
+        state = self.__dict__.copy()
+        # # Remove the unpicklable entries.
+        # _non_pickled_fields = ['curr_active_pipeline', 'track_templates']
+        # for a_non_pickleable_field in _non_pickled_fields:
+        #     del state[a_non_pickleable_field]
+        return state
+
+    def __setstate__(self, state):
+        # Restore instance attributes (i.e., _mapping and _keys_at_init).
+        # For `VersionedResultMixin`
+        self._VersionedResultMixin__setstate__(state)
+
+        # _non_pickled_field_restore_defaults = dict(zip(['curr_active_pipeline', 'track_templates'], [None, None]))
+        # for a_field_name, a_default_restore_value in _non_pickled_field_restore_defaults.items():
+        #     if a_field_name not in state:
+        #         state[a_field_name] = a_default_restore_value
+
+        self.__dict__.update(state)
+        # # Call the superclass __init__() (from https://stackoverflow.com/a/48325758)
+        # super(PosteriorPeaksPeakProminence2dResult, self).__init__() # from
+
+    def __repr__(self):
+        """ 2024-01-11 - Renders only the fields and their sizes
+        """
+        from pyphocorehelpers.print_helpers import strip_type_str_to_classname
+        attr_reprs = []
+        for a in self.__attrs_attrs__:
+            attr_type = strip_type_str_to_classname(type(getattr(self, a.name)))
+            if 'shape' in a.metadata:
+                shape = ', '.join(a.metadata['shape'])  # this joins tuple elements with a comma, creating a string without quotes
+                attr_reprs.append(f"{a.name}: {attr_type} | shape ({shape})")  # enclose the shape string with parentheses
+            else:
+                attr_reprs.append(f"{a.name}: {attr_type}")
+        content = ",\n\t".join(attr_reprs)
+        return f"{type(self).__name__}({content}\n)"
+
+    # HDFMixin Conformances ______________________________________________________________________________________________ #
+    def to_hdf(self, file_path, key: str, **kwargs):
+        """ Saves the object to key in the hdf5 file specified by file_path"""
+        super().to_hdf(file_path, key=key, **kwargs)
+
+    @classmethod
+    def _reload_class(cls, an_instance):
+        """ specifically updates the instance after its class definition has been updated.
+        """
+        non_init_subset=['_VersionedResultMixin_version']
+
+        _full_state = an_instance.__getstate__()
+        _init_state = get_dict_subset(_full_state, subset_excludelist=non_init_subset)
+        _post_init_state = get_dict_subset(_full_state, subset_includelist=non_init_subset)
+        _obj = cls(**_init_state)
+        _obj.__dict__.update(**_post_init_state) ## perform literal update
+        return _obj
 
 
 @metadata_attributes(short_name=None, tags=['peak', 'promenence-2d', 'promenence', 'helper'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-12-21 00:00', related_items=[])
@@ -1949,6 +2075,7 @@ class PeakPromenenceDisplay:
 
 
     # Alternative function that shows multiple time bins in a grid
+    @function_attributes(short_name=None, tags=['NOT-FINISHEd', 'NOT-WORKING', 'NOT-TESTED'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-01-05 15:59', related_items=[])
     @classmethod
     def plot_prominence_peaks_3d_pyvista_grid(cls, posterior_peaks_result, p_x_given_n_list, epoch_idx=0, time_bin_indices=None, n_cols=3, show_col_contours=True, show_probe_level_contours=True, probe_level_to_show=None, **kwargs):
         """
