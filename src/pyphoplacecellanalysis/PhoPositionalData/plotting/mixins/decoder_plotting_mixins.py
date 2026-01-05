@@ -3795,26 +3795,7 @@ class DecodedTrajectoryNapariPlotter(DecodedTrajectoryPlotter):
                 return
             curr_step = event.value
             if len(curr_step) >= 2:
-                old_epoch_idx = self.curr_epoch_idx
-                new_epoch_idx = int(curr_step[0])
-                
-                # If epoch changed, update time_bin range and reset to minimum
-                if old_epoch_idx != new_epoch_idx:
-                    # Get the number of time bins for the new epoch
-                    n_time_bins = self.epoch_time_bin_counts[new_epoch_idx]
-                    # Get current range for time_bin axis (index 1)
-                    current_range = viewer.dims.range[1]
-                    # Update the range, preserving min and step while updating max
-                    viewer.dims.range[1] = (current_range[0], (n_time_bins - 1), current_range[2])
-                    # Reset time_bin to 0, preserving other dimensions
-                    # self.curr_time_bin_index = int(curr_step[1])
-                    curr_step[1] = 0 ## overwrite
-                    if len(curr_step) >= 4:
-                        viewer.dims.current_step = (new_epoch_idx, 0, curr_step[2], curr_step[3])
-                    else:
-                        viewer.dims.current_step = (new_epoch_idx, 0, 0, 0)
-                
-                self.curr_epoch_idx = new_epoch_idx
+                self.curr_epoch_idx = int(curr_step[0])
                 self.curr_time_bin_index = int(curr_step[1])
 
 
