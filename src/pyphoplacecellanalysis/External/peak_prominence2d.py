@@ -1232,10 +1232,7 @@ class PeakPromenence:
 #-------------------Plot------------------------
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
-import pyvista as pv
-import pyvistaqt as pvqt
-import numpy as np
-from matplotlib.path import Path
+
 
 def plot_Prominence(xx, yy, slab, peaks, idmap, promap, parentmap, n_contour_levels=None, debug_print=False):
     """ simple test plot of the results calculated from getProminence.
@@ -1413,38 +1410,28 @@ class PeakPromenenceDisplay:
         plotter : pv.Plotter
             PyVista plotter object
         """
-        # Get the results for this epoch/time_bin
-        result_key = (epoch_idx, time_bin_idx)
-        if result_key not in posterior_peaks_result.results:
-            raise ValueError(f"No results found for epoch_idx={epoch_idx}, time_bin_idx={time_bin_idx}")
+        import pyvista as pv
+        import pyvistaqt as pvqt
+
+        # Extract all available time_bin_idx values for the given epoch_idx
+        available_time_bins = sorted([k[1] for k in posterior_peaks_result.results.keys() if k[0] == epoch_idx])
+        if len(available_time_bins) == 0:
+            raise ValueError(f"No results found for epoch_idx={epoch_idx}")
         
-        result = posterior_peaks_result.results[result_key]
-        peaks_dict = result['peaks']
-        slab = result['slab']  # This is already transposed (y, x)
+        # Initialize with first available if provided one doesn't exist
+        if time_bin_idx not in available_time_bins:
+            time_bin_idx = available_time_bins[0]
         
-        # Get bin centers
+        # Get bin centers (these don't change with time_bin_idx)
         xx = posterior_peaks_result.xx
         yy = posterior_peaks_result.yy
         
-        # Get the original posterior (note: slab is transposed, so we need to transpose back for consistency)
-        p_x_given_n = np.asarray(p_x_given_n_list[epoch_idx])
-        if p_x_given_n.ndim == 3:
-            posterior_2d = p_x_given_n[:, :, time_bin_idx]
-        else:
-            posterior_2d = p_x_given_n
-        
-        # Create meshgrid for surface
-        XX, YY = np.meshgrid(xx, yy)
-        ZZ = slab  # slab is already in (y, x) format
-        
         # Initialize plotter
-        # plotter = pv.Plotter()
         plotter = pvqt.BackgroundPlotter()
         
-        # Create and add the posterior surface
-        grid = pv.StructuredGrid(XX, YY, ZZ)
-        plotter.add_mesh(grid, scalars=ZZ.flatten(), cmap=cmap, opacity=opacity, 
-                        show_scalar_bar=True, scalar_bar_args={'title': 'Posterior Probability'})
+        # Store mesh actors for cleanup when updating
+        mesh_actors = []
+        first_update = True  # Track if this is the first update (for scalar bar)
         
         # Helper function to convert matplotlib Path to PyVista PolyData
         def path_to_pyvista_polyline(path, z_level):
@@ -1481,53 +1468,118 @@ class PeakPromenenceDisplay:
             
             return extruded
         
-        # Plot col contours (key col - the lowest contour for each peak)
-        if show_col_contours:
-            for peak_id, peak_info in peaks_dict.items():
-                col_contour = peak_info.get('contour', None)
-                if col_contour is not None:
-                    col_level = peak_info.get('col_level', 0.0)
-                    # Create polyline at col level
-                    col_polyline = path_to_pyvista_polyline(col_contour, col_level)
-                    plotter.add_mesh(col_polyline, color='red', line_width=3, 
-                                    label=f'Peak {peak_id} Col (prom={peak_info["prominence"]:.3f})')
-        
-        # Plot probe level contours (slices at different height multipliers)
-        if show_probe_level_contours:
-            colors = ['cyan', 'yellow', 'magenta', 'green', 'orange']
-            for peak_id, peak_info in peaks_dict.items():
-                level_slices = peak_info.get('level_slices', {})
-                peak_height = peak_info.get('height', 0.0)
-                
-                for slice_idx, (probe_level, slice_info) in enumerate(level_slices.items()):
-                    # Filter by probe_level_to_show if specified
-                    if probe_level_to_show is not None:
-                        # Check if this probe level matches the desired multiplier
-                        probe_multiplier = probe_level / peak_height
-                        if not np.isclose(probe_multiplier, probe_level_to_show, atol=0.01):
-                            continue
+        # Function to update the plot for a given time_bin_idx
+        def _update_plot_for_time_bin(t_idx):
+            """Update the plot to show data for the specified time_bin_idx."""
+            nonlocal first_update
+            
+            # Clear existing meshes
+            for actor in mesh_actors:
+                plotter.remove_actor(actor)
+            mesh_actors.clear()
+            
+            # Get the results for this epoch/time_bin
+            result_key = (epoch_idx, t_idx)
+            if result_key not in posterior_peaks_result.results:
+                return  # Skip if no results for this time bin
+            
+            result = posterior_peaks_result.results[result_key]
+            peaks_dict = result['peaks']
+            slab = result['slab']  # This is already transposed (y, x)
+            
+            # Get the original posterior
+            p_x_given_n = np.asarray(p_x_given_n_list[epoch_idx])
+            if p_x_given_n.ndim == 3:
+                posterior_2d = p_x_given_n[:, :, t_idx]
+            else:
+                posterior_2d = p_x_given_n
+            
+            # Create meshgrid for surface
+            XX, YY = np.meshgrid(xx, yy)
+            ZZ = slab  # slab is already in (y, x) format
+            
+            # Create and add the posterior surface
+            # Only show scalar bar on first update to avoid duplicates
+            grid = pv.StructuredGrid(XX, YY, ZZ)
+            grid_actor = plotter.add_mesh(grid, scalars=ZZ.flatten(), cmap=cmap, opacity=opacity, 
+                                         show_scalar_bar=first_update, scalar_bar_args={'title': 'Posterior Probability'})
+            mesh_actors.append(grid_actor)
+            first_update = False
+            
+            # Plot col contours (key col - the lowest contour for each peak)
+            if show_col_contours:
+                for peak_id, peak_info in peaks_dict.items():
+                    col_contour = peak_info.get('contour', None)
+                    if col_contour is not None:
+                        col_level = peak_info.get('col_level', 0.0)
+                        # Create polyline at col level
+                        col_polyline = path_to_pyvista_polyline(col_contour, col_level)
+                        col_actor = plotter.add_mesh(col_polyline, color='red', line_width=3, 
+                                                     label=f'Peak {peak_id} Col (prom={peak_info["prominence"]:.3f})')
+                        mesh_actors.append(col_actor)
+            
+            # Plot probe level contours (slices at different height multipliers)
+            if show_probe_level_contours:
+                colors = ['cyan', 'yellow', 'magenta', 'green', 'orange']
+                for peak_id, peak_info in peaks_dict.items():
+                    level_slices = peak_info.get('level_slices', {})
+                    peak_height = peak_info.get('height', 0.0)
                     
-                    contour = slice_info.get('contour', None)
-                    if contour is not None:
-                        color = colors[slice_idx % len(colors)]
-                        # Create polyline at probe level
-                        probe_polyline = path_to_pyvista_polyline(contour, probe_level)
-                        plotter.add_mesh(probe_polyline, color=color, line_width=2,
-                                        label=f'Peak {peak_id} @ {probe_level/peak_height:.1f}x height')
+                    for slice_idx, (probe_level, slice_info) in enumerate(level_slices.items()):
+                        # Filter by probe_level_to_show if specified
+                        if probe_level_to_show is not None:
+                            # Check if this probe level matches the desired multiplier
+                            probe_multiplier = probe_level / peak_height
+                            if not np.isclose(probe_multiplier, probe_level_to_show, atol=0.01):
+                                continue
+                        
+                        contour = slice_info.get('contour', None)
+                        if contour is not None:
+                            color = colors[slice_idx % len(colors)]
+                            # Create polyline at probe level
+                            probe_polyline = path_to_pyvista_polyline(contour, probe_level)
+                            probe_actor = plotter.add_mesh(probe_polyline, color=color, line_width=2,
+                                                          label=f'Peak {peak_id} @ {probe_level/peak_height:.1f}x height')
+                            mesh_actors.append(probe_actor)
+            
+            # Add peak centers as spheres
+            for peak_id, peak_info in peaks_dict.items():
+                center = peak_info.get('center', None)
+                height = peak_info.get('height', 0.0)
+                if center is not None:
+                    peak_sphere = pv.Sphere(radius=0.1, center=(center[0], center[1], height))
+                    sphere_actor = plotter.add_mesh(peak_sphere, color='white', label=f'Peak {peak_id} center')
+                    mesh_actors.append(sphere_actor)
         
-        # Add peak centers as spheres
-        for peak_id, peak_info in peaks_dict.items():
-            center = peak_info.get('center', None)
-            height = peak_info.get('height', 0.0)
-            if center is not None:
-                peak_sphere = pv.Sphere(radius=0.1, center=(center[0], center[1], height))
-                plotter.add_mesh(peak_sphere, color='white', label=f'Peak {peak_id} center')
+        # Initial plot
+        _update_plot_for_time_bin(time_bin_idx)
         
-        # Set up the plotter
+        # Set up the plotter (only once, not in update function)
         plotter.add_axes()
         plotter.add_legend()
         plotter.show_grid()
         plotter.set_background('black')
+        
+        # Add slider if multiple time bins available
+        if len(available_time_bins) > 1:
+            def slider_callback(value):
+                """Callback function for slider widget."""
+                idx = int(round(value))
+                if 0 <= idx < len(available_time_bins):
+                    t_idx = available_time_bins[idx]
+                    _update_plot_for_time_bin(t_idx)
+            
+            # Get initial slider value
+            initial_slider_value = available_time_bins.index(time_bin_idx)
+            
+            plotter.add_slider_widget(
+                slider_callback,
+                value=initial_slider_value,
+                rng=[0, len(available_time_bins) - 1],
+                title='Time Bin',
+                pointa=(0.02, 0.02),
+                pointb=(0.98, 0.02)
+            )
         
         return plotter
 
@@ -1565,6 +1617,9 @@ class PeakPromenenceDisplay:
         plotter : pv.Plotter
             PyVista plotter with subplots
         """
+        import pyvista as pv
+        import pyvistaqt as pvqt
+
         # Helper function to convert matplotlib Path to PyVista PolyData
         def path_to_pyvista_polyline(path, z_level):
             """Convert matplotlib Path to PyVista polyline at given z-level."""
