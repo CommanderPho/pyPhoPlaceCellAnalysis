@@ -494,7 +494,7 @@ def getProminence(var, step, ybin_centers=None, xbin_centers=None, min_depth=Non
     return result, id_map, result_map, parent_map
 
 
-def compute_prominence_contours(xbin_centers, ybin_centers, slab, step=0.1, min_area=None, min_depth=0.2, include_edge=True, verbose=False, **kwargs):
+def compute_prominence_contours(xbin_centers: NDArray, ybin_centers: NDArray, slab: NDArray, step: float=0.1, min_area: Optional[float]=None, min_considered_promenence: float=0.2, include_edge: bool=True, verbose: bool=False, **kwargs):
     """ Simple wrapper around the getProminence function by Pho Hale
     xbin_centers and ybin_centers should be like *bin_labels not *bin
     slab should usually be transposed: tuning_curves[i].T
@@ -508,7 +508,7 @@ def compute_prominence_contours(xbin_centers, ybin_centers, slab, step=0.1, min_
         figure, (ax1, ax2, ax3, ax4) = plot_Prominence(xx, yy, slab, peaks, idmap, promap, parentmap, debug_print=False)
 
     """
-    peaks_dict, id_map, prominence_map, parent_map = getProminence(slab, step, ybin_centers=ybin_centers, xbin_centers=xbin_centers, min_area=min_area, min_depth=min_depth, include_edge=include_edge, verbose=verbose, **kwargs)
+    peaks_dict, id_map, prominence_map, parent_map = getProminence(slab, step, ybin_centers=ybin_centers, xbin_centers=xbin_centers, min_area=min_area, min_depth=min_considered_promenence, include_edge=include_edge, verbose=verbose, **kwargs)
     return xbin_centers, ybin_centers, slab, peaks_dict, id_map, prominence_map, parent_map
 
 
@@ -525,7 +525,7 @@ class PeakPromenence:
 
 
     @classmethod
-    def _find_contours_at_levels(cls, xbin_centers, ybin_centers, slab, peak_probe_point, probe_levels):
+    def _find_contours_at_levels(cls, xbin_centers: NDArray, ybin_centers: NDArray, slab: NDArray, peak_probe_point: NDArray, probe_levels: NDArray):
         """ finds the contours containing the peak_probe_point at the specified probe_levels.
             performs slicing through desired z-values (1/2 prominence, etc) using contourf
             
@@ -812,10 +812,13 @@ class PeakPromenence:
         return peak_nearest_directional_boundary_bins, peak_nearest_directional_boundary_displacements, peak_nearest_directional_boundary_distances
 
 
-
+    @function_attributes(short_name=None, tags=['peak', 'promenence-2d'], input_requires=[], output_provides=[], uses=['compute_prominence_contours'], used_by=[], creation_date='2025-12-21 00:00', related_items=['_perform_pf_find_ratemap_peaks_peak_prominence2d_computation', 'compute_2d_peak_prominence'])
     @classmethod
-    def _perform_find_posterior_peaks_peak_prominence2d_computation(cls, p_x_given_n_list, xbin_centers, ybin_centers, step=0.01, peak_height_multiplier_probe_levels=(0.5, 0.9), minimum_included_peak_height = 0.2, uniform_blur_size = 3, gaussian_blur_sigma = 3, debug_print=False):
+    def _perform_find_posterior_peaks_peak_prominence2d_computation(cls, p_x_given_n_list: List[NDArray], xbin_centers: NDArray, ybin_centers: NDArray, step: float = 0.01, peak_height_multiplier_probe_levels: Tuple = (0.5, 0.9), minimum_included_peak_height: float = 0.2, min_considered_promenence: float = 0.2, uniform_blur_size: int = 3, gaussian_blur_sigma: float = 3, debug_print: bool = False) -> 'DynamicParameters':
             """Uses the peak_prominence2d package to find the peaks and prominences of 2D decoded posteriors.
+
+            History:
+                Based off of '_perform_pf_find_ratemap_peaks_peak_prominence2d_computation'
 
             This is analogous to `_perform_pf_find_ratemap_peaks_peak_prominence2d_computation`, but operates on
             decoded posterior probability distributions instead of placefield tuning curves.
@@ -825,8 +828,15 @@ class PeakPromenence:
                     - 3D: (n_xbins, n_ybins, n_time_bins) or
                     - 2D: (n_xbins, n_ybins) for single-time-bin epochs.
                 xbin_centers, ybin_centers: spatial bin centers for the posterior grid.
+                step: float, contour interval used for prominence calculation. Finer (smaller) values give better accuracy but slower computation. Default: 0.01.
                 peak_height_multiplier_probe_levels: slice levels as fractions of peak height (e.g., (0.5, 0.9)).
                 minimum_included_peak_height: threshold applied to the `peak_height` column when filtering.
+                uniform_blur_size: int, size parameter for uniform filter applied to peak counts map.
+                    Default: 3.
+                gaussian_blur_sigma: float, sigma parameter for Gaussian filter applied to peak counts map.
+                    Default: 3.0.
+                debug_print: bool, if True, print verbose debugging information during computation.
+                    Default: False.
 
             Returns:
                 DynamicParameters with fields:
@@ -900,7 +910,7 @@ class PeakPromenence:
 
                     _, _, slab, peaks_dict, id_map, prominence_map, parent_map = compute_prominence_contours(
                         xbin_centers=xbin_centers, ybin_centers=ybin_centers, slab=slab, step=step,
-                        min_area=None, min_depth=0.2, include_edge=True, verbose=False)
+                        min_area=None, min_considered_promenence=min_considered_promenence, include_edge=True, verbose=False)
 
                     n_peaks = len(peaks_dict)
                     if n_peaks == 0:
@@ -937,10 +947,8 @@ class PeakPromenence:
 
                         # probe levels for this peak
                         a_peak_dict['probe_levels'] = np.array(
-                            [a_peak_dict['height'] * multiplier for multiplier in peak_height_multiplier_probe_levels],
-                            dtype=float)
-                        summit_slice_peak_level_multiplier_arr[peak_idx, :] = np.array(
-                            peak_height_multiplier_probe_levels, dtype=float)
+                            [a_peak_dict['height'] * multiplier for multiplier in peak_height_multiplier_probe_levels], dtype=float)
+                        summit_slice_peak_level_multiplier_arr[peak_idx, :] = np.array(peak_height_multiplier_probe_levels, dtype=float)
                         summit_slice_peak_level_arr[peak_idx, :] = a_peak_dict['probe_levels']
 
                         included_computed_contours = PeakPromenence._find_contours_at_levels(xbin_centers, ybin_centers, slab, a_peak_dict['center'], a_peak_dict['probe_levels'])
@@ -1063,11 +1071,14 @@ class PeakPromenence:
     # 2025-12-22 - New High-efficiency 2D peak promenence calculations                                                                                                                                                                                                                     #
     # ==================================================================================================================================================================================================================================================================================== #
 
-    @function_attributes(short_name=None, tags=['high-efficiency', 'rewrite'], input_requires=[], output_provides=[], uses=[], used_by=['cls.compute_posterior_peak_promenences'], creation_date='2025-12-23 08:44', related_items=[])
+    @function_attributes(short_name=None, tags=['high-efficiency', 'rewrite'], input_requires=[], output_provides=[], uses=[], used_by=['cls.compute_2d_dt_posterior_peak_promenences'], creation_date='2025-12-23 08:44', related_items=['_perform_find_posterior_peaks_peak_prominence2d_computation'])
     @classmethod
     def compute_2d_peak_prominence(cls, Z_2d: NDArray[ND.Shape["N_XBINS, N_YBINS"], Any]):
         """
         Computes prominence for all 2D local maxima in Z_2d.
+
+        High-efficiency rewrite of `_perform_find_posterior_peaks_peak_prominence2d_computation`
+
 
         Returns:
             peak_coords: (N, 2) array of (x, y) peak locations
@@ -1095,7 +1106,7 @@ class PeakPromenence:
         return peak_coords, prominences
 
 
-    @function_attributes(short_name=None, tags=['high-efficiency', 'rewrite'], input_requires=[], output_provides=[], uses=['cls.compute_2d_peak_prominence'], used_by=[], creation_date='2025-12-23 08:44', related_items=[])
+    @function_attributes(short_name=None, tags=['high-efficiency', 'rewrite'], input_requires=[], output_provides=[], uses=['cls.compute_2d_peak_prominence'], used_by=['cls.compute_posterior_peak_promenences'], creation_date='2025-12-23 08:44', related_items=[])
     @classmethod
     def compute_2d_dt_posterior_peak_promenences(cls, a_p_x_given_n: NDArray[ND.Shape["N_XBINS, N_YBINS, N_TBINS"], Any], alpha: Union[float, List[float]] = 0.9):
         """ for a single posterior (from a single decoded epoch, etc) process each time bin
@@ -1181,7 +1192,7 @@ class PeakPromenence:
         return epoch_promenence_tuples, epoch_masks
 
 
-    @function_attributes(short_name=None, tags=['high-efficiency', 'rewrite'], input_requires=[], output_provides=[], uses=['cls.compute_2d_peak_prominence'], used_by=[], creation_date='2025-12-23 08:44', related_items=[])
+    @function_attributes(short_name=None, tags=['high-efficiency', 'rewrite'], input_requires=[], output_provides=[], uses=['cls.compute_2d_dt_posterior_peak_promenences'], used_by=[], creation_date='2025-12-23 08:44', related_items=[])
     @classmethod
     def compute_posterior_peak_promenences(cls, p_x_given_n_list: List[NDArray[ND.Shape["N_XBINS, N_YBINS, N_TBINS"], Any]], alpha: Union[float, List[float]] = 0.9):
         """ 
