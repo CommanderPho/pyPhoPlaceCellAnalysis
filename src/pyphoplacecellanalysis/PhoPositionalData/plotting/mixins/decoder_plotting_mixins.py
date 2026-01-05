@@ -3164,7 +3164,7 @@ class DecodedTrajectoryPyVistaPlotter(DecodedTrajectoryPlotter):
     a_decoded_trajectory_pyvista_plotter.build_ui()
 
     """
-    p = field(default=None)
+    p: Any = field(default=None)
     curr_time_bin_index: int = field(default=0)
     enable_point_labels: bool = field(default=False)
     enable_plot_all_time_bins_in_epoch_mode: bool = field(default=False)
@@ -3526,7 +3526,7 @@ class DecoderRenderingPyVistaMixin:
 
 
     @function_attributes(short_name=None, tags=['probability'], input_requires=[], output_provides=[], uses=['DecodedTrajectoryPyVistaPlotter'], used_by=[], creation_date='2025-01-29 07:35', related_items=[])
-    def add_decoded_posterior_bars(self, a_result: DecodedFilterEpochsResult, xbin: NDArray, xbin_centers: NDArray, ybin: Optional[NDArray], ybin_centers: Optional[NDArray], enable_plot_all_time_bins_in_epoch_mode:bool=True, active_plot_fn=None):
+    def add_decoded_posterior_bars(self, a_result: DecodedFilterEpochsResult, xbin: NDArray, xbin_centers: NDArray, ybin: Optional[NDArray], ybin_centers: Optional[NDArray], enable_plot_all_time_bins_in_epoch_mode:bool=True, active_plot_fn=None) -> "DecodedTrajectoryPyVistaPlotter":
         """ adds the decoded posterior to the PyVista plotter
          
           
