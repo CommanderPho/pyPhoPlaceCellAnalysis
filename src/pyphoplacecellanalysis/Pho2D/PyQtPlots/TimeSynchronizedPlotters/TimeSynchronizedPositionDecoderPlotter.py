@@ -437,6 +437,18 @@ class TimeSynchronizedPositionDecoderPlotter(UserEditableROIMixin, AnimalTraject
             except Exception as e:
                 ## Unexpected exception!
                 raise e
+            
+        ## Update the plot title if needed:
+        curr_window_title_str: str = f'PositionDecoder -  '
+        if (curr_time_window_index is not None) and (curr_time_window_index >= 0):
+            curr_window_title_str = f"{curr_window_title_str} t_idx: {curr_time_window_index}"
+            
+        if (self.last_window_time is not None):
+            curr_window_title_str = f"{curr_window_title_str} | t: {self.last_window_time}"
+
+        # self.ui.root_plot.setTitle(f'PositionDecoder -  t = {self.last_window_time}')
+        self.ui.root_plot.setTitle(curr_window_title_str)
+        
 
 
     @function_attributes(short_name=None, tags=['video', 'export', 'mp4', 'avi', 'output'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-11-24 23:09', related_items=[])
