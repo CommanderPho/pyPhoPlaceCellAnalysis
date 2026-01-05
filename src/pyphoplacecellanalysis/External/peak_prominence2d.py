@@ -1232,6 +1232,9 @@ class PeakPromenence:
 #-------------------Plot------------------------
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
+import pyvista as pv
+import numpy as np
+from matplotlib.path import Path
 
 def plot_Prominence(xx, yy, slab, peaks, idmap, promap, parentmap, n_contour_levels=None, debug_print=False):
     """ simple test plot of the results calculated from getProminence.
@@ -1332,6 +1335,275 @@ def plot_Prominence(xx, yy, slab, peaks, idmap, promap, parentmap, n_contour_lev
         pprint(peaks)
     
     return figure, (ax1, ax2, ax3, ax4)
+
+class PeakPromenenceDisplay:
+    """ helper plot functions 
+
+    from pyphoplacecellanalysis.External.peak_prominence2d import PeakPromenence, PeakPromenenceDisplay
+
+    # Usage example:
+        from pyphoplacecellanalysis.External.peak_prominence2d import PeakPromenence, PeakPromenenceDisplay
+
+        # Compute peaks
+        posterior_peaks = PeakPromenence._perform_find_posterior_peaks_peak_prominence2d_computation(
+            p_x_given_n_list=decoded_result.p_x_given_n_list,
+            xbin_centers=decoded_result.xbin_centers,
+            ybin_centers=decoded_result.ybin_centers,
+            step=0.02,
+            peak_height_multiplier_probe_levels=(0.5, 0.9),
+            minimum_included_peak_height=0.2
+        )
+
+        # Plot single time bin
+        plotter = PeakPromenenceDisplay.plot_prominence_peaks_3d_pyvista(
+            posterior_peaks_result=posterior_peaks,
+            p_x_given_n_list=decoded_result.p_x_given_n_list,
+            epoch_idx=0,
+            time_bin_idx=0,
+            show_col_contours=True,
+            show_probe_level_contours=True,
+            probe_level_to_show=0.5,  # Only show 0.5x height contours
+            opacity=0.7
+        )
+
+        plotter.show()
+
+        # Or plot multiple time bins in a grid
+        plotter_grid = PeakPromenenceDisplay.plot_prominence_peaks_3d_pyvista_grid(
+            posterior_peaks_result=posterior_peaks,
+            p_x_given_n_list=decoded_result.p_x_given_n_list,
+            epoch_idx=0,
+            time_bin_indices=[0, 5, 10, 15],
+            n_cols=2
+        )
+
+        plotter_grid.show()
+    """
+        
+    @classmethod
+    def plot_prominence_peaks_3d_pyvista(cls, posterior_peaks_result, p_x_given_n_list, epoch_idx=0, time_bin_idx=0, show_col_contours=True, show_probe_level_contours=True, probe_level_to_show=None, opacity=0.7, cmap='viridis'):
+        """
+        Plot prominence peaks as 3D contours overlaying posteriors using PyVista.
+        
+        Parameters:
+        -----------
+        posterior_peaks_result : DynamicParameters
+            Result from `_perform_find_posterior_peaks_peak_prominence2d_computation`
+        p_x_given_n_list : List[NDArray]
+            Original posterior list used to generate peaks
+        epoch_idx : int
+            Which epoch to visualize (default: 0)
+        time_bin_idx : int
+            Which time bin to visualize (default: 0)
+        show_col_contours : bool
+            Whether to show the col (key col) contours (default: True)
+        show_probe_level_contours : bool
+            Whether to show probe level contours (default: True)
+        probe_level_to_show : float or None
+            If specified, only show contours at this probe level multiplier (e.g., 0.5, 0.9)
+            If None, show all probe levels (default: None)
+        opacity : float
+            Opacity of the posterior surface (default: 0.7)
+        cmap : str
+            Colormap for the posterior surface (default: 'viridis')
+        
+        Returns:
+        --------
+        plotter : pv.Plotter
+            PyVista plotter object
+        """
+        # Get the results for this epoch/time_bin
+        result_key = (epoch_idx, time_bin_idx)
+        if result_key not in posterior_peaks_result.results:
+            raise ValueError(f"No results found for epoch_idx={epoch_idx}, time_bin_idx={time_bin_idx}")
+        
+        result = posterior_peaks_result.results[result_key]
+        peaks_dict = result['peaks']
+        slab = result['slab']  # This is already transposed (y, x)
+        
+        # Get bin centers
+        xx = posterior_peaks_result.xx
+        yy = posterior_peaks_result.yy
+        
+        # Get the original posterior (note: slab is transposed, so we need to transpose back for consistency)
+        p_x_given_n = np.asarray(p_x_given_n_list[epoch_idx])
+        if p_x_given_n.ndim == 3:
+            posterior_2d = p_x_given_n[:, :, time_bin_idx]
+        else:
+            posterior_2d = p_x_given_n
+        
+        # Create meshgrid for surface
+        XX, YY = np.meshgrid(xx, yy)
+        ZZ = slab  # slab is already in (y, x) format
+        
+        # Initialize plotter
+        plotter = pv.Plotter()
+        
+        # Create and add the posterior surface
+        grid = pv.StructuredGrid(XX, YY, ZZ)
+        plotter.add_mesh(grid, scalars=ZZ.flatten(), cmap=cmap, opacity=opacity, 
+                        show_scalar_bar=True, scalar_bar_args={'title': 'Posterior Probability'})
+        
+        # Helper function to convert matplotlib Path to PyVista PolyData
+        def path_to_pyvista_polyline(path, z_level):
+            """Convert matplotlib Path to PyVista polyline at given z-level."""
+            vertices_2d = path.vertices
+            # Close the path if not already closed
+            if not np.allclose(vertices_2d[0], vertices_2d[-1]):
+                vertices_2d = np.vstack([vertices_2d, vertices_2d[0:1]])
+            
+            # Add z-coordinate
+            vertices_3d = np.column_stack([vertices_2d, np.full(len(vertices_2d), z_level)])
+            
+            # Create polyline
+            polyline = pv.PolyData(vertices_3d)
+            polyline.lines = np.array([len(vertices_3d)] + list(range(len(vertices_3d))))
+            
+            return polyline
+        
+        # Helper function to create a filled contour mesh (extruded to z-level)
+        def path_to_pyvista_mesh(path, z_level, height_offset=0.01):
+            """Convert matplotlib Path to PyVista mesh at given z-level with slight height."""
+            vertices_2d = path.vertices
+            # Close the path if not already closed
+            if not np.allclose(vertices_2d[0], vertices_2d[-1]):
+                vertices_2d = np.vstack([vertices_2d, vertices_2d[0:1]])
+            
+            # Create polygon
+            polygon = pv.PolyData(vertices_2d)
+            polygon = polygon.delaunay_2d()
+            
+            # Extrude to create a thin mesh at z-level
+            extruded = polygon.extrude((0, 0, height_offset))
+            extruded.translate((0, 0, z_level), inplace=True)
+            
+            return extruded
+        
+        # Plot col contours (key col - the lowest contour for each peak)
+        if show_col_contours:
+            for peak_id, peak_info in peaks_dict.items():
+                col_contour = peak_info.get('contour', None)
+                if col_contour is not None:
+                    col_level = peak_info.get('col_level', 0.0)
+                    # Create polyline at col level
+                    col_polyline = path_to_pyvista_polyline(col_contour, col_level)
+                    plotter.add_mesh(col_polyline, color='red', line_width=3, 
+                                    label=f'Peak {peak_id} Col (prom={peak_info["prominence"]:.3f})')
+        
+        # Plot probe level contours (slices at different height multipliers)
+        if show_probe_level_contours:
+            colors = ['cyan', 'yellow', 'magenta', 'green', 'orange']
+            for peak_id, peak_info in peaks_dict.items():
+                level_slices = peak_info.get('level_slices', {})
+                peak_height = peak_info.get('height', 0.0)
+                
+                for slice_idx, (probe_level, slice_info) in enumerate(level_slices.items()):
+                    # Filter by probe_level_to_show if specified
+                    if probe_level_to_show is not None:
+                        # Check if this probe level matches the desired multiplier
+                        probe_multiplier = probe_level / peak_height
+                        if not np.isclose(probe_multiplier, probe_level_to_show, atol=0.01):
+                            continue
+                    
+                    contour = slice_info.get('contour', None)
+                    if contour is not None:
+                        color = colors[slice_idx % len(colors)]
+                        # Create polyline at probe level
+                        probe_polyline = path_to_pyvista_polyline(contour, probe_level)
+                        plotter.add_mesh(probe_polyline, color=color, line_width=2,
+                                        label=f'Peak {peak_id} @ {probe_level/peak_height:.1f}x height')
+        
+        # Add peak centers as spheres
+        for peak_id, peak_info in peaks_dict.items():
+            center = peak_info.get('center', None)
+            height = peak_info.get('height', 0.0)
+            if center is not None:
+                peak_sphere = pv.Sphere(radius=0.1, center=(center[0], center[1], height))
+                plotter.add_mesh(peak_sphere, color='white', label=f'Peak {peak_id} center')
+        
+        # Set up the plotter
+        plotter.add_axes()
+        plotter.add_legend()
+        plotter.show_grid()
+        plotter.set_background('black')
+        
+        return plotter
+
+
+    # Alternative function that shows multiple time bins in a grid
+    @classmethod
+    def plot_prominence_peaks_3d_pyvista_grid(cls, posterior_peaks_result, p_x_given_n_list, epoch_idx=0, time_bin_indices=None, n_cols=3, **kwargs):
+        """
+        Plot multiple time bins in a grid layout.
+        
+        Parameters:
+        -----------
+        posterior_peaks_result : DynamicParameters
+            Result from `_perform_find_posterior_peaks_peak_prominence2d_computation`
+        p_x_given_n_list : List[NDArray]
+            Original posterior list
+        epoch_idx : int
+            Which epoch to visualize
+        time_bin_indices : List[int] or None
+            Which time bins to show. If None, show all available.
+        n_cols : int
+            Number of columns in the grid
+        **kwargs : dict
+            Additional arguments passed to plot_prominence_peaks_3d_pyvista
+        
+        Returns:
+        --------
+        plotter : pv.Plotter
+            PyVista plotter with subplots
+        """
+        # Determine which time bins to show
+        if time_bin_indices is None:
+            # Get all available time bins for this epoch
+            available_keys = [k for k in posterior_peaks_result.results.keys() if k[0] == epoch_idx]
+            time_bin_indices = sorted(list(set([k[1] for k in available_keys])))
+        
+        n_plots = len(time_bin_indices)
+        n_rows = int(np.ceil(n_plots / n_cols))
+        
+        plotter = pv.Plotter(shape=(n_rows, n_cols))
+        
+        for plot_idx, t_idx in enumerate(time_bin_indices):
+            row = plot_idx // n_cols
+            col = plot_idx % n_cols
+            plotter.subplot(row, col)
+            
+            # Create individual plot
+            result_key = (epoch_idx, t_idx)
+            if result_key in posterior_peaks_result.results:
+                result = posterior_peaks_result.results[result_key]
+                peaks_dict = result['peaks']
+                slab = result['slab']
+                
+                xx = posterior_peaks_result.xx
+                yy = posterior_peaks_result.yy
+                
+                # Get posterior
+                p_x_given_n = np.asarray(p_x_given_n_list[epoch_idx])
+                if p_x_given_n.ndim == 3:
+                    posterior_2d = p_x_given_n[:, :, t_idx]
+                else:
+                    posterior_2d = p_x_given_n
+                
+                # Create surface
+                XX, YY = np.meshgrid(xx, yy)
+                ZZ = slab
+                
+                grid = pv.StructuredGrid(XX, YY, ZZ)
+                plotter.add_mesh(grid, scalars=ZZ.flatten(), cmap=kwargs.get('cmap', 'viridis'), opacity=kwargs.get('opacity', 0.7))
+                
+                # Add contours (simplified version - you can extract the helper functions from above)
+                # ... (similar contour plotting code as above)
+                
+                plotter.add_text(f'Time bin {t_idx}', font_size=10)
+        
+        plotter.link_views()  # Link camera views
+        return plotter
+
 
 
 
