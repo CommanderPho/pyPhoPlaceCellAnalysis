@@ -36,6 +36,11 @@ import numpy as np
 from matplotlib.transforms import Bbox
 from matplotlib.path import Path
 import matplotlib.pyplot as plt
+# At module level or start of functions
+import matplotlib
+matplotlib.use('Agg')  # Non-interactive backend
+plt.ioff()  # Disable interactive mode
+
 from scipy.interpolate import interp1d
 from warnings import warn
 from pyphocorehelpers.programming_helpers import metadata_attributes
@@ -203,8 +208,14 @@ def getProminence(var, step, ybin_centers=None, xbin_centers=None, min_depth=Non
     Author: guangzhi XU (xugzhi1987@gmail.com; guangzhi.xu@outlook.com)
     Update time: 2018-11-11 18:42:04.
     '''
+    # At module level or start of functions
+    import matplotlib
+    matplotlib.use('Agg')  # Non-interactive backend
+    plt.ioff()  # Disable interactive mode
 
-    fig,ax=plt.subplots()
+    # Create figure once, reuse it
+    fig, ax = plt.subplots()
+    ax.set_axis_off()  # Disable axis rendering to reduce overhead
 
     def checkIn(cont1,cont2,lon1,lon2,lat1,lat2):
         fails=[]
@@ -276,7 +287,8 @@ def getProminence(var, step, ybin_centers=None, xbin_centers=None, min_depth=Non
         if include_edge:
             csii=ax.contourf(xbin_centers,ybin_centers,var,[levii,vmax+step]) ## Heavy-lifting code here. levii is the level
             csii=csii.collections[0]
-            ax.cla()
+            # Remove ax.cla() - it's expensive and not needed
+            # ax.cla()
         else:
             csii=contours[ii]
 
@@ -433,6 +445,8 @@ def getProminence(var, step, ybin_centers=None, xbin_centers=None, min_depth=Non
                     #for mm in match_list:
                         #peaks[mm].append(contjj)
 
+    ## END for ii,levii in enumerate(levels[::-1])...
+
     # ==================================================================================================================== #
     #------------------Prepare output------------------
     result={}
@@ -539,6 +553,7 @@ class PeakPromenence:
         """
         vmax = np.nanmax(slab)
         fig, ax = plt.subplots()
+        ax.set_axis_off()  # Disable axis rendering
         included_computed_contours = DynamicParameters.init_from_dict({}) 
         #---------------Loop through levels---------------
         for ii, levii in enumerate(probe_levels[::-1]):
@@ -557,7 +572,8 @@ class PeakPromenence:
                 included_computed_contours[levii] = None # set to None
             else:                   
                 included_computed_contours[levii] = included_computed_contours[levii][0] # unwrapped from the list format, it's just the single Path/Curve now
-            
+        ## END for ii, levii in enumerate(probe_levels[::-1])...
+
         plt.close(fig) # close the figure when done generating the contours to prevent an empty figure from showing
         return included_computed_contours
 
