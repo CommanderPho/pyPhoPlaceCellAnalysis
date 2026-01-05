@@ -45,6 +45,8 @@ from scipy.interpolate import interp1d
 from warnings import warn
 from pyphocorehelpers.programming_helpers import metadata_attributes
 from pyphocorehelpers.function_helpers import function_attributes
+from attrs import define, field
+import pandas as pd
 
 
 
@@ -530,6 +532,26 @@ from pyphocorehelpers.DataStructure.dynamic_parameters import DynamicParameters
 from scipy import ndimage # used for `PeakPromenence.compute_2d_peak_prominence`
 from skimage.morphology import reconstruction # used for `PeakPromenence.compute_2d_peak_prominence`
 
+
+@define(slots=False, eq=False)
+class PeakCounts:
+    """Nested class containing raw and blurred peak count maps."""
+    raw: NDArray = field()
+    uniform_blurred: NDArray = field()
+    gaussian_blurred: NDArray = field()
+
+
+@define(slots=False, eq=False)
+class PosteriorPeaksPeakProminence2dResult:
+    """Result class for posterior peaks peak prominence 2D computation."""
+    xx: NDArray = field()
+    yy: NDArray = field()
+    results: Dict[Tuple[int, int], Dict[str, Any]] = field()
+    flat_peaks_df: pd.DataFrame = field()
+    filtered_flat_peaks_df: pd.DataFrame = field()
+    peak_counts: PeakCounts = field()
+
+
 @metadata_attributes(short_name=None, tags=['peak', 'promenence-2d', 'promenence', 'helper'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-12-21 00:00', related_items=[])
 class PeakPromenence:
     """ 
@@ -830,7 +852,7 @@ class PeakPromenence:
 
     @function_attributes(short_name=None, tags=['peak', 'promenence-2d'], input_requires=[], output_provides=[], uses=['compute_prominence_contours', 'PeakPromenence._find_contours_at_levels'], used_by=[], creation_date='2025-12-21 00:00', related_items=['_perform_pf_find_ratemap_peaks_peak_prominence2d_computation', 'compute_2d_peak_prominence'])
     @classmethod
-    def _perform_find_posterior_peaks_peak_prominence2d_computation(cls, p_x_given_n_list: List[NDArray], xbin_centers: NDArray, ybin_centers: NDArray, step: float = 0.01, peak_height_multiplier_probe_levels: Tuple = (0.5, 0.9), minimum_included_peak_height: float = 0.2, min_considered_promenence: float = 0.2, uniform_blur_size: int = 3, gaussian_blur_sigma: float = 3, debug_print: bool = False) -> 'DynamicParameters':
+    def _perform_find_posterior_peaks_peak_prominence2d_computation(cls, p_x_given_n_list: List[NDArray], xbin_centers: NDArray, ybin_centers: NDArray, step: float = 0.01, peak_height_multiplier_probe_levels: Tuple = (0.5, 0.9), minimum_included_peak_height: float = 0.2, min_considered_promenence: float = 0.2, uniform_blur_size: int = 3, gaussian_blur_sigma: float = 3, debug_print: bool = False) -> 'PosteriorPeaksPeakProminence2dResult':
             """Uses the peak_prominence2d package to find the peaks and prominences of 2D decoded posteriors.
 
             History:
@@ -1042,8 +1064,8 @@ class PeakPromenence:
                 empty_counts = np.zeros((len(xbin_centers), len(ybin_centers)), dtype=int)
                 empty_counts_blurred = uniform_filter(empty_counts.astype('float'), size=uniform_blur_size, mode='constant')
                 empty_counts_blurred_gaussian = gaussian_filter(empty_counts.astype('float'), sigma=gaussian_blur_sigma)
-                peak_counts_results = DynamicParameters(raw=empty_counts, uniform_blurred=empty_counts_blurred, gaussian_blurred=empty_counts_blurred_gaussian)
-                return DynamicParameters(xx=xbin_centers, yy=ybin_centers, results=out_results, flat_peaks_df=empty_df, filtered_flat_peaks_df=empty_df, peak_counts=peak_counts_results)
+                peak_counts_results = PeakCounts(raw=empty_counts, uniform_blurred=empty_counts_blurred, gaussian_blurred=empty_counts_blurred_gaussian)
+                return PosteriorPeaksPeakProminence2dResult(xx=xbin_centers, yy=ybin_centers, results=out_results, flat_peaks_df=empty_df, filtered_flat_peaks_df=empty_df, peak_counts=peak_counts_results)
 
             # Build final concatenated dataframe:
             if debug_print:
@@ -1069,11 +1091,11 @@ class PeakPromenence:
 
             pf_peak_counts_map_blurred = uniform_filter(pf_peak_counts_map.astype('float'), size=uniform_blur_size, mode='constant')
             pf_peak_counts_map_blurred_gaussian = gaussian_filter(pf_peak_counts_map.astype('float'), sigma=gaussian_blur_sigma)
-            pf_peak_counts_results = DynamicParameters(raw=pf_peak_counts_map,
+            pf_peak_counts_results = PeakCounts(raw=pf_peak_counts_map,
                                                        uniform_blurred=pf_peak_counts_map_blurred,
                                                        gaussian_blurred=pf_peak_counts_map_blurred_gaussian)
 
-            return DynamicParameters(xx=xbin_centers, yy=ybin_centers, results=out_results,
+            return PosteriorPeaksPeakProminence2dResult(xx=xbin_centers, yy=ybin_centers, results=out_results,
                                      flat_peaks_df=posterior_peaks_df,
                                      filtered_flat_peaks_df=filtered_summits_analysis_df,
                                      peak_counts=pf_peak_counts_results)
@@ -1758,16 +1780,16 @@ class PeakPromenenceDisplay:
             posterior_2d = p_x_given_n
         
         # Create meshgrid for surface
+        # Use posterior_2d.T to match the transposed slab convention and ensure coordinate alignment
         XX, YY = np.meshgrid(xx, yy)
-        ZZ = slab  # slab is already in (y, x) format
+        ZZ = posterior_2d.T  # Transpose to match slab format (y, x)
         ZZ = (ZZ * z_axis_scale)
         
         actors = []
         
         # Create and add the posterior surface
         grid = pv.StructuredGrid(XX, YY, ZZ)
-        grid_actor = plotter.add_mesh(grid, scalars=ZZ.flatten(), cmap=cmap, opacity=opacity, 
-                                     show_scalar_bar=show_scalar_bar, scalar_bar_args={'title': 'Posterior Probability'})
+        grid_actor = plotter.add_mesh(grid, scalars=ZZ.flatten(), cmap=cmap, opacity=opacity, show_scalar_bar=show_scalar_bar, scalar_bar_args={'title': 'Posterior Probability'})
         actors.append(grid_actor)
         
         # Plot col contours (key col - the lowest contour for each peak)
@@ -1800,8 +1822,8 @@ class PeakPromenenceDisplay:
                     contour = slice_info.get('contour', None)
                     if contour is not None:
                         color = colors[slice_idx % len(colors)]
-                        # Create polyline at probe level
-                        probe_polyline = cls.path_to_pyvista_polyline(contour, probe_level)
+                        # Create polyline at probe level (scale to match surface z-scaling)
+                        probe_polyline = cls.path_to_pyvista_polyline(contour, probe_level * z_axis_scale)
                         probe_actor = plotter.add_mesh(probe_polyline, color=color, line_width=2,
                                                       label=f'Peak {peak_id} @ {probe_level/peak_height:.1f}x height')
                         actors.append(probe_actor)
@@ -1811,7 +1833,8 @@ class PeakPromenenceDisplay:
             center = peak_info.get('center', None)
             height = peak_info.get('height', 0.0)
             if center is not None:
-                peak_sphere = pv.Sphere(radius=0.1, center=(center[0], center[1], height))
+                # Scale height to match surface z-scaling
+                peak_sphere = pv.Sphere(radius=0.1, center=(center[0], center[1], height * z_axis_scale))
                 sphere_actor = plotter.add_mesh(peak_sphere, color='white', label=f'Peak {peak_id} center')
                 actors.append(sphere_actor)
         
@@ -1979,6 +2002,7 @@ class PeakPromenenceDisplay:
         # Get default kwargs
         cmap = kwargs.get('cmap', 'viridis')
         opacity = kwargs.get('opacity', 0.7)
+        z_axis_scale = kwargs.get('z_axis_scale', 100.0)
         colors = kwargs.get('colors', ['cyan', 'yellow', 'magenta', 'green', 'orange'])
         
         for plot_idx, t_idx in enumerate(time_bin_indices):
@@ -2005,8 +2029,10 @@ class PeakPromenenceDisplay:
                     posterior_2d = p_x_given_n
                 
                 # Create surface
+                # Use posterior_2d.T to match the transposed slab convention and ensure coordinate alignment
                 XX, YY = np.meshgrid(xx, yy)
-                ZZ = slab
+                ZZ = posterior_2d.T  # Transpose to match slab format (y, x)
+                ZZ = (ZZ * z_axis_scale)
                 
                 grid = pv.StructuredGrid(XX, YY, ZZ)
                 plotter.add_mesh(grid, scalars=ZZ.flatten(), cmap=cmap, opacity=opacity)
@@ -2017,6 +2043,8 @@ class PeakPromenenceDisplay:
                         col_contour = peak_info.get('contour', None)
                         if col_contour is not None:
                             col_level = peak_info.get('col_level', 0.0)
+                            # Scale col level to match surface z-scaling
+                            col_level = col_level * z_axis_scale
                             # Create polyline at col level
                             col_polyline = cls.path_to_pyvista_polyline(col_contour, col_level)
                             plotter.add_mesh(col_polyline, color='red', line_width=3)
@@ -2038,8 +2066,8 @@ class PeakPromenenceDisplay:
                             contour = slice_info.get('contour', None)
                             if contour is not None:
                                 color = colors[slice_idx % len(colors)]
-                                # Create polyline at probe level
-                                probe_polyline = cls.path_to_pyvista_polyline(contour, probe_level)
+                                # Create polyline at probe level (scale to match surface z-scaling)
+                                probe_polyline = cls.path_to_pyvista_polyline(contour, probe_level * z_axis_scale)
                                 plotter.add_mesh(probe_polyline, color=color, line_width=2)
                 
                 # Add peak centers as spheres
@@ -2047,7 +2075,8 @@ class PeakPromenenceDisplay:
                     center = peak_info.get('center', None)
                     height = peak_info.get('height', 0.0)
                     if center is not None:
-                        peak_sphere = pv.Sphere(radius=0.1, center=(center[0], center[1], height))
+                        # Scale height to match surface z-scaling
+                        peak_sphere = pv.Sphere(radius=0.1, center=(center[0], center[1], height * z_axis_scale))
                         plotter.add_mesh(peak_sphere, color='white')
                 
                 plotter.add_text(f'Time bin {t_idx}', font_size=10)
