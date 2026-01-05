@@ -3905,6 +3905,7 @@ class DecodedTrajectoryNapariPlotter(DecodedTrajectoryPlotter):
 
         # Store reference to peak_prominence_result for use in callback
         self.peak_prominence_result = peak_prominence_result
+        print(f"[DEBUG] add_peak_contours_layer: Stored peak_prominence_result with {len(peak_prominence_result.results)} result entries")
 
         # Helper function to extract contours from peaks_dict and convert to Napari shape format
         def extract_contours_from_peaks_dict(peaks_dict: Dict) -> List[NDArray]:
@@ -3957,12 +3958,14 @@ class DecodedTrajectoryNapariPlotter(DecodedTrajectoryPlotter):
             
             for peak_id, peak_info in peaks_dict.items():
                 level_slices = peak_info.get('level_slices', {})
+                print(f"[DEBUG] Peak {peak_id}: level_slices keys: {list(level_slices.keys())}")
                 for probe_lvl, slice_info in level_slices.items():
                     contour = slice_info.get('contour', None)
                     if contour is not None:
                         # Convert matplotlib Path to vertices array
                         # Path.vertices is Nx2 array of (x, y) coordinates in world coordinates
                         vertices_world = contour.vertices
+                        print(f"[DEBUG] Peak {peak_id}, level {probe_lvl}: contour has {len(vertices_world)} vertices")
                         if len(vertices_world) > 0:
                             # Convert from world coordinates to pixel coordinates
                             vertices_pixel = np.zeros_like(vertices_world)
@@ -3973,34 +3976,57 @@ class DecodedTrajectoryNapariPlotter(DecodedTrajectoryPlotter):
                             if len(vertices_pixel) > 1 and not np.allclose(vertices_pixel[0], vertices_pixel[-1], atol=1e-6):
                                 vertices_pixel = np.vstack([vertices_pixel, vertices_pixel[0:1]])
                             shapes_data.append(vertices_pixel)
+                            print(f"[DEBUG] Added contour shape with {len(vertices_pixel)} vertices")
+                        else:
+                            print(f"[DEBUG] Peak {peak_id}, level {probe_lvl}: contour has 0 vertices, skipping")
+                    else:
+                        print(f"[DEBUG] Peak {peak_id}, level {probe_lvl}: no contour found")
+            print(f"[DEBUG] extract_contours_from_peaks_dict returning {len(shapes_data)} shapes")
             return shapes_data
 
         # Helper function to update contours based on current epoch and time_bin
         def update_contours_for_current_indices(epoch_idx: int, time_bin_idx: int):
             """Update the shapes layer with contours for the specified epoch and time_bin indices."""
+            print(f"[DEBUG] update_contours_for_current_indices called: epoch_idx={epoch_idx}, time_bin_idx={time_bin_idx}")
             if self.peak_contours_layer is None:
+                print(f"[DEBUG] peak_contours_layer is None, returning early")
                 return
-            
+            # active_time_bin_id: int = (time_bin_idx + 1) 
+            active_time_bin_id: int = time_bin_idx # TODO: this is the right one
+            print(f"[DEBUG] active_time_bin_id = {active_time_bin_id} (time_bin_idx + 1)")
             a_peaks_results: Dict[Tuple[decoded_epoch_index, decoded_epoch_time_bin_index], Dict] = self.peak_prominence_result.results
-            a_epoch_t_bin_tuple: Tuple[decoded_epoch_index, decoded_epoch_time_bin_index] = (epoch_idx, time_bin_idx)
+            a_epoch_t_bin_tuple: Tuple[decoded_epoch_index, decoded_epoch_time_bin_index] = (epoch_idx, active_time_bin_id)
+            print(f"[DEBUG] Looking for key: {a_epoch_t_bin_tuple}")
+            print(f"[DEBUG] Available keys in results (first 10): {list(a_peaks_results.keys())[:10]}")
+            print(f"[DEBUG] Total number of keys in results: {len(a_peaks_results)}")
             
             # Check if results exist for this epoch/time_bin combination
             if a_epoch_t_bin_tuple not in a_peaks_results:
                 # No peaks for this combination, clear the layer
+                print(f"[DEBUG] Key {a_epoch_t_bin_tuple} NOT found in results. Clearing layer.")
                 self.peak_contours_layer.data = []
                 return
             
+            print(f"[DEBUG] Key {a_epoch_t_bin_tuple} found in results!")
             an_epoch_t_bin_peaks_result: Dict = a_peaks_results[a_epoch_t_bin_tuple]
             peaks_dict = an_epoch_t_bin_peaks_result.get('peaks', {})
+            print(f"[DEBUG] peaks_dict keys: {list(peaks_dict.keys())}")
+            print(f"[DEBUG] Number of peaks in peaks_dict: {len(peaks_dict)}")
             
             if len(peaks_dict) == 0:
                 # Empty peaks dict, clear the layer
+                print(f"[DEBUG] peaks_dict is empty. Clearing layer.")
                 self.peak_contours_layer.data = []
                 return
             
             # Extract and convert contours
+            print(f"[DEBUG] Extracting contours from {len(peaks_dict)} peaks...")
             shapes_data = extract_contours_from_peaks_dict(peaks_dict)
+            print(f"[DEBUG] Extracted {len(shapes_data)} contour shapes")
+            if len(shapes_data) > 0:
+                print(f"[DEBUG] First shape has {len(shapes_data[0])} vertices")
             self.peak_contours_layer.data = shapes_data
+            print(f"[DEBUG] Updated peak_contours_layer.data with {len(shapes_data)} shapes")
 
         # Create initial empty shapes layer
         shapes_layer = self.viewer.add_shapes(
@@ -4020,15 +4046,22 @@ class DecodedTrajectoryNapariPlotter(DecodedTrajectoryPlotter):
         # Create callback function to update contours when sliders change
         def _on_current_step_change_contours(event):
             """Update peak contours when epoch or time_bin slider changes."""
+            print(f"[DEBUG] _on_current_step_change_contours callback triggered")
             if event is None:
+                print(f"[DEBUG] event is None, returning")
                 return
             if not hasattr(event, 'value'):
+                print(f"[DEBUG] event has no 'value' attribute, returning")
                 return
             curr_step = event.value
+            print(f"[DEBUG] curr_step = {curr_step}, len = {len(curr_step) if hasattr(curr_step, '__len__') else 'N/A'}")
             if len(curr_step) >= 2:
                 epoch_idx = int(curr_step[0])
                 time_bin_idx = int(curr_step[1])
+                print(f"[DEBUG] Extracted epoch_idx={epoch_idx}, time_bin_idx={time_bin_idx} from curr_step")
                 update_contours_for_current_indices(epoch_idx, time_bin_idx)
+            else:
+                print(f"[DEBUG] curr_step length < 2, not updating")
 
         # Connect callback to slider changes
         self.viewer.dims.events.current_step.connect(_on_current_step_change_contours)
@@ -4036,6 +4069,7 @@ class DecodedTrajectoryNapariPlotter(DecodedTrajectoryPlotter):
         # Display initial contours for current epoch/time_bin
         epoch_idx = int(self.curr_epoch_idx) if self.curr_epoch_idx is not None else 0
         time_bin_idx = int(self.curr_time_bin_index) if self.curr_time_bin_index is not None else 0
+        print(f"[DEBUG] Initial display: epoch_idx={epoch_idx}, time_bin_idx={time_bin_idx}")
         update_contours_for_current_indices(epoch_idx, time_bin_idx)
 
-        return shapes_layer
+        return shapes_layer, update_contours_for_current_indices
