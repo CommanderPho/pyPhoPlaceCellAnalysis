@@ -516,14 +516,14 @@ from pyphocorehelpers.DataStructure.dynamic_parameters import DynamicParameters
 from scipy import ndimage # used for `PeakPromenence.compute_2d_peak_prominence`
 from skimage.morphology import reconstruction # used for `PeakPromenence.compute_2d_peak_prominence`
 
-
+@metadata_attributes(short_name=None, tags=['peak', 'promenence-2d', 'promenence', 'helper'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-12-21 00:00', related_items=[])
 class PeakPromenence:
     """ 
         from pyphoplacecellanalysis.External.peak_prominence2d import PeakPromenence
 
     """
 
-
+    @function_attributes(short_name=None, tags=['private'], input_requires=[], output_provides=[], uses=[], used_by=['_perform_find_posterior_peaks_peak_prominence2d_computation'], creation_date='2025-12-21 00:00', related_items=[])
     @classmethod
     def _find_contours_at_levels(cls, xbin_centers: NDArray, ybin_centers: NDArray, slab: NDArray, peak_probe_point: NDArray, probe_levels: NDArray):
         """ finds the contours containing the peak_probe_point at the specified probe_levels.
@@ -812,7 +812,7 @@ class PeakPromenence:
         return peak_nearest_directional_boundary_bins, peak_nearest_directional_boundary_displacements, peak_nearest_directional_boundary_distances
 
 
-    @function_attributes(short_name=None, tags=['peak', 'promenence-2d'], input_requires=[], output_provides=[], uses=['compute_prominence_contours'], used_by=[], creation_date='2025-12-21 00:00', related_items=['_perform_pf_find_ratemap_peaks_peak_prominence2d_computation', 'compute_2d_peak_prominence'])
+    @function_attributes(short_name=None, tags=['peak', 'promenence-2d'], input_requires=[], output_provides=[], uses=['compute_prominence_contours', 'PeakPromenence._find_contours_at_levels'], used_by=[], creation_date='2025-12-21 00:00', related_items=['_perform_pf_find_ratemap_peaks_peak_prominence2d_computation', 'compute_2d_peak_prominence'])
     @classmethod
     def _perform_find_posterior_peaks_peak_prominence2d_computation(cls, p_x_given_n_list: List[NDArray], xbin_centers: NDArray, ybin_centers: NDArray, step: float = 0.01, peak_height_multiplier_probe_levels: Tuple = (0.5, 0.9), minimum_included_peak_height: float = 0.2, min_considered_promenence: float = 0.2, uniform_blur_size: int = 3, gaussian_blur_sigma: float = 3, debug_print: bool = False) -> 'DynamicParameters':
             """Uses the peak_prominence2d package to find the peaks and prominences of 2D decoded posteriors.
