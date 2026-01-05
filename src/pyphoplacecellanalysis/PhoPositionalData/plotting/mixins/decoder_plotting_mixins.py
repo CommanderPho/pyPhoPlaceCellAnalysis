@@ -97,6 +97,9 @@ from pyphocorehelpers.DataStructure.general_parameter_containers import Visualiz
 from pyphoplacecellanalysis.GUI.PyVista.InteractivePlotter.PhoInteractivePlotter import PhoInteractivePlotter # DecodedTrajectoryPyVistaPlotter
 from pyphoplacecellanalysis.Pho3D.PyVista.graphs import plot_3d_binned_bars, plot_3d_stem_points, plot_point_labels # DecodedTrajectoryPyVistaPlotter
 
+import logging
+logger = logging.getLogger(__name__)
+
 
 
 @dataclass
@@ -3787,21 +3790,139 @@ class DecodedTrajectoryNapariPlotter(DecodedTrajectoryPlotter):
         self.viewer = viewer
         self.image_layer = image_layer
 
-        def _on_current_step_change(event):
-            """Keep internal indices synchronized with Napari sliders."""
-            if event is None:
-                return
-            if not hasattr(event, 'value'):
-                return
-            curr_step = event.value
-            if len(curr_step) >= 2:
-                self.curr_epoch_idx = int(curr_step[0])
-                self.curr_time_bin_index = int(curr_step[1])
+        # def _on_current_step_change(event):
+        #     """Keep internal indices synchronized with Napari sliders."""
+        #     if event is None:
+        #         return
+        #     if not hasattr(event, 'value'):
+        #         return
+        #     curr_step = event.value
+        #     if len(curr_step) >= 2:
+        #         self.curr_epoch_idx = int(curr_step[0])
+        #         self.curr_time_bin_index = int(curr_step[1])
 
+        # viewer.dims.events.current_step.connect(_on_current_step_change)
 
-        viewer.dims.events.current_step.connect(_on_current_step_change)
+        
+        viewer.dims.events.current_step.connect(self.on_current_step_change)
 
         return viewer, image_layer
+
+
+    def on_current_step_change(self, event):
+        """Update Napari sliders to match internal state.
+        
+        This method should be called if internal state (curr_epoch_idx, curr_time_bin_index)
+        is modified programmatically to ensure the sliders reflect the current state.
+        
+        Returns:
+            bool: True if sliders were updated, False if viewer doesn't exist
+
+        Updates:
+            self.curr_epoch_idx, self.curr_time_bin_index
+
+        Called by `viewer.dims.events.current_step.connect(self.on_current_step_change)`
+        
+        """
+        either_did_change: bool = False
+        if event is None:
+            return either_did_change
+        if not hasattr(event, 'value'):
+            return either_did_change
+        curr_step = event.value
+        if len(curr_step) >= 2:
+            old_epoch_idx = deepcopy(self.curr_epoch_idx)
+            old_time_bin_idx = deepcopy(self.curr_time_bin_index)
+
+            new_epoch_idx = int(curr_step[0])
+            new_time_bin_index = int(curr_step[1])
+            
+            epoch_idx_did_change: bool = (old_epoch_idx != new_epoch_idx)
+            time_bin_index_did_change: bool = (old_time_bin_idx != new_time_bin_index)
+
+            either_did_change = (epoch_idx_did_change or time_bin_index_did_change)
+            
+            # self.curr_epoch_idx = int(curr_step[0])
+            # self.curr_time_bin_index = int(curr_step[1])
+
+            ## apply the change
+            self.curr_epoch_idx = new_epoch_idx
+            self.curr_time_bin_index = new_time_bin_index
+
+        if either_did_change:
+            self.sync_sliders_from_state(block_updates=True)
+
+        return either_did_change
+
+
+
+    @function_attributes(short_name=None, tags=['napari', 'sync', 'state'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-01-05 00:00', related_items=[])
+    def sync_sliders_from_state(self, block_updates:bool=True):
+        """Update Napari sliders to match internal state.
+        
+        This method should be called if internal state (curr_epoch_idx, curr_time_bin_index)
+        is modified programmatically to ensure the sliders reflect the current state.
+        
+        Args:
+            block_updates: If True, temporarily disconnects the event handler to prevent recursion.
+                          Default is True.
+        
+        Returns:
+            bool: True if sliders were updated, False if viewer doesn't exist
+        """
+        logger.debug(f"sync_sliders_from_state called: block_updates={block_updates}, viewer={'exists' if self.viewer is not None else 'None'}")
+        
+        if self.viewer is not None:
+            # Get current viewer state for comparison
+            current_viewer_step = tuple(self.viewer.dims.current_step) if hasattr(self.viewer.dims, 'current_step') else None
+            target_step = (
+                self.curr_epoch_idx if self.curr_epoch_idx is not None else 0,
+                self.curr_time_bin_index if self.curr_time_bin_index is not None else 0,
+                0,
+                0
+            )
+            
+            logger.debug(f"sync_sliders_from_state: current internal state (epoch={self.curr_epoch_idx}, time_bin={self.curr_time_bin_index})")
+            logger.debug(f"sync_sliders_from_state: current viewer step={current_viewer_step}, target step={target_step}")
+            
+            if block_updates:
+                # Temporarily disconnect to prevent recursion
+                logger.debug("sync_sliders_from_state: disconnecting on_current_step_change callback to prevent recursion")
+                try:
+                    self.viewer.dims.events.current_step.disconnect(self.on_current_step_change)
+                    logger.debug("sync_sliders_from_state: successfully disconnected callback")
+                except (ValueError, TypeError) as e:
+                    # Callback might not be connected, which is fine
+                    logger.warning(f"sync_sliders_from_state: failed to disconnect callback (may not be connected): {e}")
+
+            try:
+                logger.debug(f"sync_sliders_from_state: setting viewer.dims.current_step to {target_step}")
+                self.viewer.dims.current_step = target_step
+                
+                # Verify the change was applied
+                new_viewer_step = tuple(self.viewer.dims.current_step)
+                if new_viewer_step[:2] == target_step[:2]:
+                    logger.debug(f"sync_sliders_from_state: successfully updated viewer step to {new_viewer_step}")
+                else:
+                    logger.warning(f"sync_sliders_from_state: viewer step mismatch! Expected {target_step[:2]}, got {new_viewer_step[:2]}")
+                
+                return True
+            except Exception as e:
+                logger.error(f"sync_sliders_from_state: error setting viewer.dims.current_step: {e}", exc_info=True)
+                raise
+            finally:
+                if block_updates:
+                    # Reconnect the callback
+                    logger.debug("sync_sliders_from_state: reconnecting on_current_step_change callback")
+                    try:
+                        self.viewer.dims.events.current_step.connect(self.on_current_step_change)
+                        logger.debug("sync_sliders_from_state: successfully reconnected callback")
+                    except Exception as e:
+                        logger.error(f"sync_sliders_from_state: failed to reconnect callback: {e}", exc_info=True)
+
+        else:
+            logger.debug("sync_sliders_from_state: viewer is None, returning False")
+        return False
 
 
     @function_attributes(short_name=None, tags=['napari', 'peak-counts', 'posterior', 'layer'], input_requires=[], output_provides=[], uses=['DecodedTrajectoryNapariPlotter.build_posterior_volume'], used_by=[], creation_date='2026-01-05 00:00', related_items=['PosteriorPeaksPeakProminence2dResult'])
@@ -4035,6 +4156,43 @@ class DecodedTrajectoryNapariPlotter(DecodedTrajectoryPlotter):
             self.peak_contours_layer.data = shapes_data
             print(f"[DEBUG] Updated peak_contours_layer.data with {len(shapes_data)} shapes")
 
+
+        def _on_current_step_change_contours(event):
+            """Update peak contours when epoch or time_bin slider changes.
+            
+            Uses internal state (self.curr_epoch_idx, self.curr_time_bin_index) which is
+            synchronized by the main event handler in build_ui, ensuring consistency.
+
+            Captures: update_contours_for_current_indices
+
+            """
+            print(f"[DEBUG] _on_current_step_change_contours callback triggered")
+            if event is None:
+                print(f"[DEBUG] event is None, returning")
+                return
+            if not hasattr(event, 'value'):
+                print(f"[DEBUG] event has no 'value' attribute, returning")
+                return
+            curr_step = event.value
+            print(f"[DEBUG] curr_step = {curr_step}, len = {len(curr_step) if hasattr(curr_step, '__len__') else 'N/A'}")
+            if len(curr_step) >= 2:
+                epoch_idx = int(curr_step[0])
+                time_bin_idx = int(curr_step[1])
+                print(f"[DEBUG] Extracted epoch_idx={epoch_idx}, time_bin_idx={time_bin_idx} from curr_step")
+                update_contours_for_current_indices(epoch_idx, time_bin_idx)
+            else:
+                print(f"[DEBUG] curr_step length < 2, not updating. \n\tcurr_step: {curr_step}")
+
+            # # Use internal state that is synchronized by the main handler
+            # epoch_idx = self.curr_epoch_idx if self.curr_epoch_idx is not None else 0
+            # time_bin_idx = self.curr_time_bin_index if self.curr_time_bin_index is not None else 0
+            # print(f"[DEBUG] Using synchronized state: epoch_idx={epoch_idx}, time_bin_idx={time_bin_idx}")
+            # update_contours_for_current_indices(epoch_idx, time_bin_idx)
+
+
+        ## END def _on_current_step_change_contours(event)...
+
+
         # Create initial empty shapes layer
         shapes_layer = self.viewer.add_shapes(
             data=[],
@@ -4051,32 +4209,19 @@ class DecodedTrajectoryNapariPlotter(DecodedTrajectoryPlotter):
         self.peak_contours_layer = shapes_layer
 
         # Create callback function to update contours when sliders change
-        def _on_current_step_change_contours(event):
-            """Update peak contours when epoch or time_bin slider changes."""
-            print(f"[DEBUG] _on_current_step_change_contours callback triggered")
-            if event is None:
-                print(f"[DEBUG] event is None, returning")
-                return
-            if not hasattr(event, 'value'):
-                print(f"[DEBUG] event has no 'value' attribute, returning")
-                return
-            curr_step = event.value
-            print(f"[DEBUG] curr_step = {curr_step}, len = {len(curr_step) if hasattr(curr_step, '__len__') else 'N/A'}")
-            if len(curr_step) >= 2:
-                epoch_idx = int(curr_step[0])
-                time_bin_idx = int(curr_step[1])
-                print(f"[DEBUG] Extracted epoch_idx={epoch_idx}, time_bin_idx={time_bin_idx} from curr_step")
-                update_contours_for_current_indices(epoch_idx, time_bin_idx)
-            else:
-                print(f"[DEBUG] curr_step length < 2, not updating")
 
         # Connect callback to slider changes
         self.viewer.dims.events.current_step.connect(_on_current_step_change_contours)
 
         # Display initial contours for current epoch/time_bin
-        epoch_idx = int(self.curr_epoch_idx) if self.curr_epoch_idx is not None else 0
-        time_bin_idx = int(self.curr_time_bin_index) if self.curr_time_bin_index is not None else 0
-        print(f"[DEBUG] Initial display: epoch_idx={epoch_idx}, time_bin_idx={time_bin_idx}")
+        # Read from actual slider positions to ensure sync with viewer state
+        curr_step = self.viewer.dims.current_step
+        epoch_idx = int(curr_step[0]) if len(curr_step) >= 1 else 0
+        time_bin_idx = int(curr_step[1]) if len(curr_step) >= 2 else 0
+        print(f"[DEBUG] Initial display from slider: epoch_idx={epoch_idx}, time_bin_idx={time_bin_idx}")
+        # Update internal state to match slider positions
+        self.curr_epoch_idx = epoch_idx
+        self.curr_time_bin_index = time_bin_idx
         update_contours_for_current_indices(epoch_idx, time_bin_idx)
 
         return shapes_layer, update_contours_for_current_indices
