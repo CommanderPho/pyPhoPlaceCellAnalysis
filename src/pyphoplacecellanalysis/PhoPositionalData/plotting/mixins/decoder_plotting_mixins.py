@@ -3893,7 +3893,7 @@ class DecodedTrajectoryNapariPlotter(DecodedTrajectoryPlotter):
 
     @function_attributes(short_name=None, tags=['napari', 'peak-counts', 'posterior', 'layer'], input_requires=[], output_provides=[], uses=['DecodedTrajectoryNapariPlotter.build_posterior_volume'], used_by=[], creation_date='2026-01-05 00:00', related_items=['PosteriorPeaksPeakProminence2dResult'])
     def add_peak_contours_layer(self, peak_prominence_result: "PosteriorPeaksPeakProminence2dResult", layer_name: str = 'peak_contours', 
-                                edge_color: str = 'transparent', face_color: str = '#ffaaff78', edge_width: float = 0.01,
+                                edge_color: str = 'transparent', face_color: str = '#ffaaff78', edge_width: float = 0.005,
                                 # edge_color: str = 'white', face_color: str = 'transparent', edge_width: float = 1.0,
                                 ) -> Any:
         """Adds peak contours as a Napari shapes layer that updates dynamically when epoch and time_bin sliders change.
