@@ -89,6 +89,7 @@ if TYPE_CHECKING:
     import napari
     from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.EpochComputationFunctions import DecodingResultND
     from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import DecodedFilterEpochsResult, BasePositionDecoder
+    from pyphoplacecellanalysis.External.peak_prominence2d import PosteriorPeaksPeakProminence2dResult
     from nptyping import NDArray
 
 from neuropy.utils.mixins.AttrsClassHelpers import keys_only_repr
@@ -3663,6 +3664,8 @@ class DecodedTrajectoryNapariPlotter(DecodedTrajectoryPlotter):
 
     viewer: Optional["napari.viewer.Viewer"] = field(default=None)
     image_layer: Any = field(default=None)
+    peak_contours_layer: Any = field(default=None)
+    peak_prominence_result: Optional[Any] = field(default=None)
 
     posterior_volume: Optional[NDArray] = field(default=None)
     time_bin_centers_matrix: Optional[NDArray] = field(default=None)
@@ -3796,3 +3799,243 @@ class DecodedTrajectoryNapariPlotter(DecodedTrajectoryPlotter):
         viewer.dims.events.current_step.connect(_on_current_step_change)
 
         return viewer, image_layer
+
+    @function_attributes(short_name=None, tags=['napari', 'peak-counts', 'posterior', 'layer'], input_requires=[], output_provides=[], uses=['DecodedTrajectoryNapariPlotter.build_posterior_volume'], used_by=[], creation_date='2026-01-05 00:00', related_items=['PosteriorPeaksPeakProminence2dResult'])
+    def add_peak_counts_layer(self, peak_prominence_result: "PosteriorPeaksPeakProminence2dResult", layer_name: str = 'peak_counts', colormap: str = 'plasma', blending: str = 'additive') -> Any:
+        """Adds the peak_counts.raw counter map from a PosteriorPeaksPeakProminence2dResult as a new Napari image layer.
+
+        The peak_counts.raw is a 2D array (n_xbins, n_ybins) that gets broadcast to match the posterior_volume
+        shape (num_epochs, max_num_time_bins, n_xbins, n_ybins) by repeating across all epochs and time bins.
+
+        Args:
+            peak_prominence_result: PosteriorPeaksPeakProminence2dResult object containing peak_counts
+            layer_name: Name for the Napari layer (default: 'peak_counts')
+            colormap: Colormap to use for the peak counts layer (default: 'plasma')
+            blending: Blending mode for the layer (default: 'additive')
+
+        Returns:
+            The created Napari image layer containing the peak counts volume
+
+        Raises:
+            AssertionError: If viewer or posterior_volume hasn't been built yet, or if coordinate dimensions don't match
+
+        Usage:
+            peak_counts_layer = napari_plotter.add_peak_counts_layer(peak_prominence_result=a_result_posterior_peaks)
+            peak_counts_layer
+        """
+        # local import to avoid hard dependency if Napari is not installed in non-Napari contexts
+        import napari
+        from pyphoplacecellanalysis.External.peak_prominence2d import PosteriorPeaksPeakProminence2dResult, decoded_epoch_index, decoded_epoch_time_bin_index
+
+        # Ensure posterior_volume has been built
+        if self.posterior_volume is None:
+            self.build_posterior_volume()
+
+        # Ensure viewer exists
+        if self.viewer is None:
+            # If no viewer exists, create one (though typically build_ui should be called first)
+            self.viewer = napari.Viewer(title='Decoded Posterior')
+
+        # Extract peak_counts.raw (2D array: n_xbins, n_ybins)
+        peak_counts_2d = peak_prominence_result.peak_counts.raw
+
+        # Verify coordinate alignment
+        assert peak_prominence_result.xx is not None, "peak_prominence_result.xx (xbin_centers) is required"
+        assert peak_prominence_result.yy is not None, "peak_prominence_result.yy (ybin_centers) is required"
+        
+        # Check that dimensions match
+        posterior_shape = self.posterior_volume.shape  # (num_epochs, max_num_time_bins, n_xbins, n_ybins)
+        n_xbins_posterior = posterior_shape[2]
+        n_ybins_posterior = posterior_shape[3]
+        
+        peak_counts_shape = peak_counts_2d.shape
+        n_xbins_peaks = peak_counts_shape[0]
+        n_ybins_peaks = peak_counts_shape[1] if len(peak_counts_shape) > 1 else 1
+
+        assert n_xbins_peaks == n_xbins_posterior, f"xbin dimension mismatch: peak_counts has {n_xbins_peaks} xbins but posterior_volume has {n_xbins_posterior}"
+        assert n_ybins_peaks == n_ybins_posterior, f"ybin dimension mismatch: peak_counts has {n_ybins_peaks} ybins but posterior_volume has {n_ybins_posterior}"
+
+        # Broadcast 2D peak_counts to 4D shape: (num_epochs, max_num_time_bins, n_xbins, n_ybins)
+        num_epochs = posterior_shape[0]
+        max_num_time_bins = posterior_shape[1]
+        
+        # Use np.tile to repeat the 2D array across epochs and time bins
+        peak_counts_4d = np.tile(peak_counts_2d[np.newaxis, np.newaxis, :, :], (num_epochs, max_num_time_bins, 1, 1))
+
+        # Add as new Napari image layer
+        peak_counts_layer = self.viewer.add_image(peak_counts_4d, name=layer_name, colormap=colormap, blending=blending, interpolation='nearest')
+
+        return peak_counts_layer
+
+
+    @function_attributes(short_name=None, tags=['napari', 'peak-counts', 'posterior', 'layer'], input_requires=[], output_provides=[], uses=['DecodedTrajectoryNapariPlotter.build_posterior_volume'], used_by=[], creation_date='2026-01-05 00:00', related_items=['PosteriorPeaksPeakProminence2dResult'])
+    def add_peak_contours_layer(self, peak_prominence_result: "PosteriorPeaksPeakProminence2dResult", layer_name: str = 'peak_contours', edge_color: str = 'red', face_color: str = 'transparent', edge_width: float = 2.0) -> Any:
+        """Adds peak contours as a Napari shapes layer that updates dynamically when epoch and time_bin sliders change.
+
+        The contours are extracted from the peak_prominence_result and displayed as shapes that update
+        based on the current epoch and time_bin indices in the Napari viewer.
+
+        Args:
+            peak_prominence_result: PosteriorPeaksPeakProminence2dResult object containing peak contours
+            layer_name: Name for the Napari shapes layer (default: 'peak_contours')
+            edge_color: Color for contour edges (default: 'red')
+            face_color: Color for contour faces, use 'transparent' for no fill (default: 'transparent')
+            edge_width: Width of contour edges (default: 2.0)
+
+        Returns:
+            The created Napari shapes layer containing the peak contours
+
+        Usage:
+
+            contours_layer = napari_plotter.add_peak_contours_layer(peak_prominence_result=a_result_posterior_peaks)
+
+        """
+        # local import to avoid hard dependency if Napari is not installed in non-Napari contexts
+        import napari
+        from pyphoplacecellanalysis.External.peak_prominence2d import PosteriorPeaksPeakProminence2dResult, decoded_epoch_index, decoded_epoch_time_bin_index
+
+        # Ensure posterior_volume has been built
+        if self.posterior_volume is None:
+            self.build_posterior_volume()
+
+        # Ensure viewer exists
+        if self.viewer is None:
+            # If no viewer exists, create one (though typically build_ui should be called first)
+            self.viewer = napari.Viewer(title='Decoded Posterior')
+
+        # Store reference to peak_prominence_result for use in callback
+        self.peak_prominence_result = peak_prominence_result
+
+        # Helper function to extract contours from peaks_dict and convert to Napari shape format
+        def extract_contours_from_peaks_dict(peaks_dict: Dict) -> List[NDArray]:
+            """Extract all contours from peaks_dict and convert matplotlib Path objects to Napari shape format.
+            
+            Converts world coordinates (xbin_centers, ybin_centers) to pixel coordinates that match
+            the image layer's coordinate system. Uses the plotter's xbin_centers/ybin_centers to ensure
+            coordinate system alignment.
+            
+            Args:
+                peaks_dict: Dictionary of peaks, each containing 'level_slices' with contour information
+                
+            Returns:
+                List of vertex arrays, each representing a contour shape for Napari in pixel coordinates
+            """
+            shapes_data = []
+            
+            # Use plotter's coordinate system to ensure alignment with image layer
+            xbin_centers_plotter = self.xbin_centers
+            ybin_centers_plotter = self.ybin_centers if self.ybin_centers is not None else np.array([0.0])
+            
+            # Helper function to convert world coordinate to pixel index using linear interpolation
+            def world_to_pixel_coord(world_coords: NDArray, bin_centers: NDArray) -> NDArray:
+                """Convert world coordinates to pixel indices using linear interpolation."""
+                if len(bin_centers) == 0:
+                    return np.zeros_like(world_coords)
+                if len(bin_centers) == 1:
+                    return np.zeros_like(world_coords)
+                
+                # Use searchsorted to find the bin index, then interpolate
+                # This handles both uniform and non-uniform bin spacing
+                indices = np.searchsorted(bin_centers, world_coords, side='right') - 1
+                indices = np.clip(indices, 0, len(bin_centers) - 2)  # -2 because we need at least 2 points for interpolation
+                
+                # Linear interpolation within the bin
+                lower_bounds = bin_centers[indices]
+                upper_bounds = bin_centers[indices + 1]
+                bin_widths = upper_bounds - lower_bounds
+                
+                # Avoid division by zero
+                bin_widths = np.where(bin_widths > 0, bin_widths, 1.0)
+                
+                # Interpolate position within bin (0.0 to 1.0)
+                frac = (world_coords - lower_bounds) / bin_widths
+                frac = np.clip(frac, 0.0, 1.0)
+                
+                # Convert to pixel coordinates (indices + fractional position within bin)
+                pixel_coords = indices.astype(float) + frac
+                return pixel_coords
+            
+            for peak_id, peak_info in peaks_dict.items():
+                level_slices = peak_info.get('level_slices', {})
+                for probe_lvl, slice_info in level_slices.items():
+                    contour = slice_info.get('contour', None)
+                    if contour is not None:
+                        # Convert matplotlib Path to vertices array
+                        # Path.vertices is Nx2 array of (x, y) coordinates in world coordinates
+                        vertices_world = contour.vertices
+                        if len(vertices_world) > 0:
+                            # Convert from world coordinates to pixel coordinates
+                            vertices_pixel = np.zeros_like(vertices_world)
+                            vertices_pixel[:, 0] = world_to_pixel_coord(vertices_world[:, 0], xbin_centers_plotter)
+                            vertices_pixel[:, 1] = world_to_pixel_coord(vertices_world[:, 1], ybin_centers_plotter)
+                            
+                            # Ensure closed contour by adding first point at end if not already closed
+                            if len(vertices_pixel) > 1 and not np.allclose(vertices_pixel[0], vertices_pixel[-1], atol=1e-6):
+                                vertices_pixel = np.vstack([vertices_pixel, vertices_pixel[0:1]])
+                            shapes_data.append(vertices_pixel)
+            return shapes_data
+
+        # Helper function to update contours based on current epoch and time_bin
+        def update_contours_for_current_indices(epoch_idx: int, time_bin_idx: int):
+            """Update the shapes layer with contours for the specified epoch and time_bin indices."""
+            if self.peak_contours_layer is None:
+                return
+            
+            a_peaks_results: Dict[Tuple[decoded_epoch_index, decoded_epoch_time_bin_index], Dict] = self.peak_prominence_result.results
+            a_epoch_t_bin_tuple: Tuple[decoded_epoch_index, decoded_epoch_time_bin_index] = (epoch_idx, time_bin_idx)
+            
+            # Check if results exist for this epoch/time_bin combination
+            if a_epoch_t_bin_tuple not in a_peaks_results:
+                # No peaks for this combination, clear the layer
+                self.peak_contours_layer.data = []
+                return
+            
+            an_epoch_t_bin_peaks_result: Dict = a_peaks_results[a_epoch_t_bin_tuple]
+            peaks_dict = an_epoch_t_bin_peaks_result.get('peaks', {})
+            
+            if len(peaks_dict) == 0:
+                # Empty peaks dict, clear the layer
+                self.peak_contours_layer.data = []
+                return
+            
+            # Extract and convert contours
+            shapes_data = extract_contours_from_peaks_dict(peaks_dict)
+            self.peak_contours_layer.data = shapes_data
+
+        # Create initial empty shapes layer
+        shapes_layer = self.viewer.add_shapes(
+            data=[],
+            shape_type='path',
+            name=layer_name,
+            edge_color=edge_color,
+            face_color=face_color,
+            edge_width=edge_width
+        )
+        # Configure shapes layer to work with 4D volume
+        shapes_layer.editable = False  # Make non-editable since it's dynamically updated
+        # Ensure shapes layer uses the same coordinate system as the image layer
+        # Shapes will automatically be displayed in the current 2D slice (epoch, time_bin)
+        self.peak_contours_layer = shapes_layer
+
+        # Create callback function to update contours when sliders change
+        def _on_current_step_change_contours(event):
+            """Update peak contours when epoch or time_bin slider changes."""
+            if event is None:
+                return
+            if not hasattr(event, 'value'):
+                return
+            curr_step = event.value
+            if len(curr_step) >= 2:
+                epoch_idx = int(curr_step[0])
+                time_bin_idx = int(curr_step[1])
+                update_contours_for_current_indices(epoch_idx, time_bin_idx)
+
+        # Connect callback to slider changes
+        self.viewer.dims.events.current_step.connect(_on_current_step_change_contours)
+
+        # Display initial contours for current epoch/time_bin
+        epoch_idx = int(self.curr_epoch_idx) if self.curr_epoch_idx is not None else 0
+        time_bin_idx = int(self.curr_time_bin_index) if self.curr_time_bin_index is not None else 0
+        update_contours_for_current_indices(epoch_idx, time_bin_idx)
+
+        return shapes_layer
