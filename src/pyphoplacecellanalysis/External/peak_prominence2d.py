@@ -709,29 +709,42 @@ class PosteriorPeaksPeakProminence2dResult(ComputedResult):
             # Create a copy by reconstructing from state
             result_obj = cls._reload_class(result_obj)
         
+        def convert_path_to_vertices(path_obj):
+            """Helper to convert a single Path object to vertices."""
+            if isinstance(path_obj, Path):
+                return path_obj.vertices.copy()
+            elif isinstance(path_obj, np.ndarray):
+                # Already converted, return as is
+                return path_obj
+            else:
+                return path_obj  # Unknown type, return as is
+        
         # Traverse results dictionary
         for result_key, slab_result_dict in result_obj.results.items():
             peaks_dict = slab_result_dict.get('peaks', {})
             
             for peak_id, peak_info in peaks_dict.items():
-                level_slices = peak_info.get('level_slices', {})
+                # Convert top-level 'contour' if present
+                if 'contour' in peak_info:
+                    peak_info['contour'] = convert_path_to_vertices(peak_info['contour'])
                 
+                # Convert top-level 'contours' list if present
+                if 'contours' in peak_info:
+                    contours_list = peak_info['contours']
+                    if isinstance(contours_list, list):
+                        peak_info['contours'] = [convert_path_to_vertices(contour) for contour in contours_list]
+                
+                # Convert 'contour' in level_slices
+                level_slices = peak_info.get('level_slices', {})
                 for probe_level, slice_info in level_slices.items():
-                    contour = slice_info.get('contour', None)
+                    if 'contour' in slice_info:
+                        slice_info['contour'] = convert_path_to_vertices(slice_info['contour'])
                     
-                    if contour is not None:
-                        # Check if it's a matplotlib Path object
-                        if isinstance(contour, Path):
-                            # Extract vertices and replace
-                            slice_info['contour'] = contour.vertices.copy()
-                        # If it's already a numpy array, leave it as is
-                        elif isinstance(contour, np.ndarray):
-                            # Already converted, skip
-                            pass
-                        else:
-                            # Unknown type, warn but continue
-                            import warnings
-                            warnings.warn(f"Unknown contour type {type(contour)} for peak {peak_id}, level {probe_level}")
+                    # Also check for 'contours' in level_slices (if it exists)
+                    if 'contours' in slice_info:
+                        contours_list = slice_info['contours']
+                        if isinstance(contours_list, list):
+                            slice_info['contours'] = [convert_path_to_vertices(contour) for contour in contours_list]
         
         return result_obj
 
