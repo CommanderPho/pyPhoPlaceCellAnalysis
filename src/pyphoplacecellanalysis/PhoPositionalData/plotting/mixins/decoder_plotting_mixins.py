@@ -3669,6 +3669,7 @@ class DecodedTrajectoryNapariPlotter(DecodedTrajectoryPlotter):
     image_layer: Any = field(default=None)
     peak_contours_layer: Any = field(default=None)
     peak_prominence_result: Optional[Any] = field(default=None)
+    custom_logging_widget: Optional[Any] = field(default=None, metadata={'desc': 'Custom dock widget for logging messages'})
 
     posterior_volume: Optional[NDArray] = field(default=None)
     time_bin_centers_matrix: Optional[NDArray] = field(default=None)
@@ -3677,6 +3678,10 @@ class DecodedTrajectoryNapariPlotter(DecodedTrajectoryPlotter):
     curr_time_bin_index: int = field(default=0)
 
     enable_plot_all_time_bins_in_epoch_mode: bool = field(default=False, metadata={'desc': 'if True, Napari time axis spans all time bins for all epochs; otherwise still the same but semantics may differ in callers.'})
+    
+    create_logging_dock: bool = field(default=False, metadata={'desc': 'If True, automatically creates a custom logging dock widget when build_ui() is called'})
+    logging_dock_area: str = field(default='bottom', metadata={'desc': 'Dock area placement for logging widget: left, right, top, or bottom'})
+    logging_dock_name: str = field(default='Custom Log', metadata={'desc': 'Name/title for the logging dock widget'})
 
     @function_attributes(short_name=None, tags=['napari', 'posterior', 'volume', 'helper'], input_requires=[], output_provides=[], uses=[], used_by=['DecodedTrajectoryNapariPlotter.build_ui'], creation_date='2025-12-23 08:00', related_items=['DecodedTrajectoryPyVistaPlotter'])
     def build_posterior_volume(self, desired_max_height: float = 50.0) -> Tuple[NDArray, NDArray]:
@@ -3756,10 +3761,22 @@ class DecodedTrajectoryNapariPlotter(DecodedTrajectoryPlotter):
 
 
     @function_attributes(short_name=None, tags=['napari', 'posterior', 'viewer', 'ui'], input_requires=[], output_provides=[], uses=['DecodedTrajectoryNapariPlotter.build_posterior_volume'], used_by=[], creation_date='2025-12-23 08:05', related_items=['DecodedTrajectoryPyVistaPlotter', 'napari_from_layers_dict'])
-    def build_ui(self, viewer: Optional["napari.viewer.Viewer"] = None, layer_name: str = 'decoded_posterior', title: str = 'Decoded Posterior', **viewer_kwargs) -> Tuple["napari.viewer.Viewer", Any]:
+    def build_ui(self, viewer: Optional["napari.viewer.Viewer"] = None, layer_name: str = 'decoded_posterior', title: str = 'Decoded Posterior', create_logging_dock: Optional[bool] = None, logging_dock_area: Optional[str] = None, logging_dock_name: Optional[str] = None, **viewer_kwargs) -> Tuple["napari.viewer.Viewer", Any]:
         """Builds the Napari viewer and image layer showing the decoded posterior.
 
         If `viewer` is None, a new `napari.Viewer` is created. Otherwise the provided viewer is used.
+
+        Args:
+            viewer: Optional Napari viewer instance. If None, a new viewer is created.
+            layer_name: Name for the image layer (default: 'decoded_posterior')
+            title: Title for the Napari viewer window (default: 'Decoded Posterior')
+            create_logging_dock: If True, automatically creates a custom logging dock widget. 
+                                If None, uses the instance field value (default: None, uses self.create_logging_dock)
+            logging_dock_area: Dock area for logging widget ('left', 'right', 'top', 'bottom').
+                              If None, uses the instance field value (default: None, uses self.logging_dock_area)
+            logging_dock_name: Name for the logging dock widget.
+                              If None, uses the instance field value (default: None, uses self.logging_dock_name)
+            **viewer_kwargs: Additional keyword arguments passed to napari.Viewer()
 
         Returns:
             viewer: the Napari viewer instance
@@ -3806,7 +3823,165 @@ class DecodedTrajectoryNapariPlotter(DecodedTrajectoryPlotter):
         
         viewer.dims.events.current_step.connect(self.on_current_step_change)
 
+        # Optionally create custom logging dock widget
+        # Use instance field values if parameters are None
+        should_create_dock = create_logging_dock if create_logging_dock is not None else self.create_logging_dock
+        dock_area = logging_dock_area if logging_dock_area is not None else self.logging_dock_area
+        dock_name = logging_dock_name if logging_dock_name is not None else self.logging_dock_name
+        
+        if should_create_dock:
+            self.add_custom_logging_dock(area=dock_area, name=dock_name)
+
         return viewer, image_layer
+
+
+    def _log_to_console(self, message: str):
+        """Output message to both stdout and Napari Console (if available).
+        
+        Args:
+            message: The message string to output
+        """
+        # Always output to stdout (maintains existing behavior)
+        print(message)
+        
+        # Also output to Napari Console if viewer exists and console is available
+        if self.viewer is not None:
+            try:
+                # Try to access the Napari console widget
+                if hasattr(self.viewer, 'window') and self.viewer.window is not None:
+                    qt_viewer = getattr(self.viewer.window, '_qt_viewer', None)
+                    if qt_viewer is not None:
+                        dock_console = getattr(qt_viewer, 'dockConsole', None)
+                        if dock_console is not None:
+                            # Get the console widget
+                            console_widget = getattr(dock_console, 'widget', None)
+                            if console_widget is not None:
+                                # Try to get the IPython console kernel
+                                kernel = getattr(console_widget, 'kernel', None)
+                                if kernel is not None:
+                                    # Execute print statement in the console
+                                    kernel.execute(f"print({repr(message)})")
+                                else:
+                                    # Fallback: try to write directly to console output
+                                    console_output = getattr(console_widget, 'console', None)
+                                    if console_output is not None:
+                                        console_output.write(message + '\n')
+            except Exception:
+                # Silently fail if console access doesn't work - stdout output is sufficient
+                pass
+        
+        # Also output to custom logging widget if it exists
+        if self.custom_logging_widget is not None:
+            try:
+                # Try to call append_log method (for LogViewer-style widgets)
+                if hasattr(self.custom_logging_widget, 'append_log'):
+                    self.custom_logging_widget.append_log(message)
+                # Fallback: try write_to_log method (for LogViewer from codebase)
+                elif hasattr(self.custom_logging_widget, 'write_to_log'):
+                    self.custom_logging_widget.write_to_log(message)
+                # Fallback: try append method (for QTextEdit/QPlainTextEdit)
+                elif hasattr(self.custom_logging_widget, 'append'):
+                    self.custom_logging_widget.append(message)
+            except Exception:
+                # Silently fail if custom widget write doesn't work - stdout output is sufficient
+                pass
+
+
+    @function_attributes(short_name=None, tags=['napari', 'logging', 'dock', 'widget'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-01-05 00:00', related_items=[])
+    def add_custom_logging_dock(self, area: str = 'bottom', name: str = 'Custom Log') -> Optional[Any]:
+        """Adds a custom scrolling text/console dock widget to the Napari window for logging.
+        
+        Creates a dock widget containing a read-only scrolling text area that displays log messages.
+        The widget is integrated with `_log_to_console()` method to automatically receive log messages.
+        
+        Args:
+            area: Dock area placement ('left', 'right', 'top', 'bottom'). Default is 'bottom'.
+            name: Name/title for the dock widget. Default is 'Custom Log'.
+            
+        Returns:
+            The created logging widget if successful, None if creation fails.
+            
+        Raises:
+            None - all errors are handled gracefully and logged as warnings.
+            
+        Usage:
+            logging_widget = napari_plotter.add_custom_logging_dock(area='bottom', name='Debug Log')
+            if logging_widget is not None:
+                print("Custom logging dock created successfully")
+        """
+        if self.viewer is None:
+            logger.warning("add_custom_logging_dock: viewer is None, cannot create dock widget")
+            return None
+        
+        try:
+            # Try to import Qt widgets
+            try:
+                from pyphoplacecellanalysis.External.pyqtgraph.Qt import QtWidgets, QtCore
+            except ImportError:
+                # Fallback: try direct Qt import
+                try:
+                    from qtpy.QtWidgets import QWidget, QVBoxLayout, QTextEdit, QPushButton
+                    from qtpy.QtCore import QTimer
+                    QtWidgets = type('QtWidgets', (), {
+                        'QWidget': QWidget,
+                        'QVBoxLayout': QVBoxLayout,
+                        'QTextEdit': QTextEdit,
+                        'QPushButton': QPushButton
+                    })()
+                    QtCore = type('QtCore', (), {'QTimer': QTimer})()
+                except ImportError:
+                    logger.warning("add_custom_logging_dock: Qt widgets not available, cannot create dock widget")
+                    return None
+            
+            # Create custom logging widget (similar to LogViewer but simpler)
+            class CustomLoggingWidget(QtWidgets.QWidget):
+                """Simple scrolling text widget for displaying log messages."""
+                def __init__(self, parent=None):
+                    super().__init__(parent)
+                    layout = QtWidgets.QVBoxLayout(self)
+                    layout.setContentsMargins(0, 0, 0, 0)
+                    
+                    # Create read-only text edit for log display
+                    self.log_display = QtWidgets.QTextEdit(self)
+                    self.log_display.setReadOnly(True)
+                    layout.addWidget(self.log_display)
+                    
+                    # Optional: Add clear button
+                    clear_button = QtWidgets.QPushButton('Clear Log', self)
+                    clear_button.clicked.connect(self.clear_log)
+                    layout.addWidget(clear_button)
+                
+                def append_log(self, message: str):
+                    """Append a message to the log display."""
+                    self.log_display.append(message)
+                    # Auto-scroll to bottom
+                    scrollbar = self.log_display.verticalScrollBar()
+                    scrollbar.setValue(scrollbar.maximum())
+                
+                def clear_log(self):
+                    """Clear the log display."""
+                    self.log_display.clear()
+            
+            # Create the widget instance
+            logging_widget = CustomLoggingWidget()
+            
+            # Add as dock widget to Napari window
+            if not hasattr(self.viewer, 'window') or self.viewer.window is None:
+                logger.warning("add_custom_logging_dock: viewer.window is not available")
+                return None
+            
+            try:
+                self.viewer.window.add_dock_widget(logging_widget, area=area, name=name)
+                self.custom_logging_widget = logging_widget
+                logger.debug(f"add_custom_logging_dock: Successfully created dock widget '{name}' in area '{area}'")
+                return logging_widget
+            except Exception as e:
+                logger.warning(f"add_custom_logging_dock: Failed to add dock widget: {e}")
+                return None
+                
+        except Exception as e:
+            logger.warning(f"add_custom_logging_dock: Failed to create custom logging dock widget: {e}")
+            return None
 
 
     def on_current_step_change(self, event):
@@ -3864,7 +4039,7 @@ class DecodedTrajectoryNapariPlotter(DecodedTrajectoryPlotter):
         is modified programmatically to ensure the sliders reflect the current state.
         
         Args:
-            block_updates: If True, temporarily disconnects the event handler to prevent recursion.
+            block_updates: If True, temporarily blocks all event callbacks to prevent recursion.
                           Default is True.
         
         Returns:
@@ -3886,40 +4061,40 @@ class DecodedTrajectoryNapariPlotter(DecodedTrajectoryPlotter):
             logger.debug(f"sync_sliders_from_state: current viewer step={current_viewer_step}, target step={target_step}")
             
             if block_updates:
-                # Temporarily disconnect to prevent recursion
-                logger.debug("sync_sliders_from_state: disconnecting on_current_step_change callback to prevent recursion")
-                try:
-                    self.viewer.dims.events.current_step.disconnect(self.on_current_step_change)
-                    logger.debug("sync_sliders_from_state: successfully disconnected callback")
-                except (ValueError, TypeError) as e:
-                    # Callback might not be connected, which is fine
-                    logger.warning(f"sync_sliders_from_state: failed to disconnect callback (may not be connected): {e}")
-
-            try:
-                logger.debug(f"sync_sliders_from_state: setting viewer.dims.current_step to {target_step}")
-                self.viewer.dims.current_step = target_step
-                
-                # Verify the change was applied
-                new_viewer_step = tuple(self.viewer.dims.current_step)
-                if new_viewer_step[:2] == target_step[:2]:
-                    logger.debug(f"sync_sliders_from_state: successfully updated viewer step to {new_viewer_step}")
-                else:
-                    logger.warning(f"sync_sliders_from_state: viewer step mismatch! Expected {target_step[:2]}, got {new_viewer_step[:2]}")
-                
-                return True
-            except Exception as e:
-                logger.error(f"sync_sliders_from_state: error setting viewer.dims.current_step: {e}", exc_info=True)
-                raise
-            finally:
-                if block_updates:
-                    # Reconnect the callback
-                    logger.debug("sync_sliders_from_state: reconnecting on_current_step_change callback")
+                # Block all callbacks temporarily to prevent recursion
+                logger.debug("sync_sliders_from_state: blocking current_step events to prevent recursion")
+                with self.viewer.dims.events.current_step.blocker():
+                    logger.debug(f"sync_sliders_from_state: setting viewer.dims.current_step to {target_step}")
                     try:
-                        self.viewer.dims.events.current_step.connect(self.on_current_step_change)
-                        logger.debug("sync_sliders_from_state: successfully reconnected callback")
+                        self.viewer.dims.current_step = target_step
+                        
+                        # Verify the change was applied
+                        new_viewer_step = tuple(self.viewer.dims.current_step)
+                        if new_viewer_step[:2] == target_step[:2]:
+                            logger.debug(f"sync_sliders_from_state: successfully updated viewer step to {new_viewer_step}")
+                        else:
+                            logger.warning(f"sync_sliders_from_state: viewer step mismatch! Expected {target_step[:2]}, got {new_viewer_step[:2]}")
                     except Exception as e:
-                        logger.error(f"sync_sliders_from_state: failed to reconnect callback: {e}", exc_info=True)
-
+                        logger.error(f"sync_sliders_from_state: error setting viewer.dims.current_step: {e}", exc_info=True)
+                        raise
+                logger.debug("sync_sliders_from_state: unblocked current_step events")
+            else:
+                # Don't block, just set the value
+                logger.debug(f"sync_sliders_from_state: setting viewer.dims.current_step to {target_step} (not blocking)")
+                try:
+                    self.viewer.dims.current_step = target_step
+                    
+                    # Verify the change was applied
+                    new_viewer_step = tuple(self.viewer.dims.current_step)
+                    if new_viewer_step[:2] == target_step[:2]:
+                        logger.debug(f"sync_sliders_from_state: successfully updated viewer step to {new_viewer_step}")
+                    else:
+                        logger.warning(f"sync_sliders_from_state: viewer step mismatch! Expected {target_step[:2]}, got {new_viewer_step[:2]}")
+                except Exception as e:
+                    logger.error(f"sync_sliders_from_state: error setting viewer.dims.current_step: {e}", exc_info=True)
+                    raise
+            
+            return True
         else:
             logger.debug("sync_sliders_from_state: viewer is None, returning False")
         return False
@@ -4033,8 +4208,11 @@ class DecodedTrajectoryNapariPlotter(DecodedTrajectoryPlotter):
 
         # Store reference to peak_prominence_result for use in callback
         self.peak_prominence_result = peak_prominence_result
-        print(f"[DEBUG] add_peak_contours_layer: Stored peak_prominence_result with {len(peak_prominence_result.results)} result entries")
+        self._log_to_console(f"[DEBUG] add_peak_contours_layer: Stored peak_prominence_result with {len(peak_prominence_result.results)} result entries")
 
+        # Capture log method reference for use in nested functions
+        log_to_console = self._log_to_console
+        
         # Helper function to extract contours from peaks_dict and convert to Napari shape format
         def extract_contours_from_peaks_dict(peaks_dict: Dict) -> List[NDArray]:
             """Extract all contours from peaks_dict and convert matplotlib Path objects to Napari shape format.
@@ -4086,14 +4264,14 @@ class DecodedTrajectoryNapariPlotter(DecodedTrajectoryPlotter):
             
             for peak_id, peak_info in peaks_dict.items():
                 level_slices = peak_info.get('level_slices', {})
-                print(f"[DEBUG] Peak {peak_id}: level_slices keys: {list(level_slices.keys())}")
+                log_to_console(f"[DEBUG] Peak {peak_id}: level_slices keys: {list(level_slices.keys())}")
                 for probe_lvl, slice_info in level_slices.items():
                     contour = slice_info.get('contour', None)
                     if contour is not None:
                         # Convert matplotlib Path to vertices array
                         # Path.vertices is Nx2 array of (x, y) coordinates in world coordinates
                         vertices_world = contour.vertices
-                        print(f"[DEBUG] Peak {peak_id}, level {probe_lvl}: contour has {len(vertices_world)} vertices")
+                        log_to_console(f"[DEBUG] Peak {peak_id}, level {probe_lvl}: contour has {len(vertices_world)} vertices")
                         if len(vertices_world) > 0:
                             # Convert from world coordinates to pixel coordinates
                             vertices_pixel = np.zeros_like(vertices_world)
@@ -4104,57 +4282,57 @@ class DecodedTrajectoryNapariPlotter(DecodedTrajectoryPlotter):
                             if len(vertices_pixel) > 1 and not np.allclose(vertices_pixel[0], vertices_pixel[-1], atol=1e-6):
                                 vertices_pixel = np.vstack([vertices_pixel, vertices_pixel[0:1]])
                             shapes_data.append(vertices_pixel)
-                            print(f"[DEBUG] Added contour shape with {len(vertices_pixel)} vertices")
+                            log_to_console(f"[DEBUG] Added contour shape with {len(vertices_pixel)} vertices")
                         else:
-                            print(f"[DEBUG] Peak {peak_id}, level {probe_lvl}: contour has 0 vertices, skipping")
+                            log_to_console(f"[DEBUG] Peak {peak_id}, level {probe_lvl}: contour has 0 vertices, skipping")
                     else:
-                        print(f"[DEBUG] Peak {peak_id}, level {probe_lvl}: no contour found")
-            print(f"[DEBUG] extract_contours_from_peaks_dict returning {len(shapes_data)} shapes")
+                        log_to_console(f"[DEBUG] Peak {peak_id}, level {probe_lvl}: no contour found")
+            log_to_console(f"[DEBUG] extract_contours_from_peaks_dict returning {len(shapes_data)} shapes")
             return shapes_data
 
         # Helper function to update contours based on current epoch and time_bin
         def update_contours_for_current_indices(epoch_idx: int, time_bin_idx: int):
             """Update the shapes layer with contours for the specified epoch and time_bin indices."""
-            print(f"[DEBUG] update_contours_for_current_indices called: epoch_idx={epoch_idx}, time_bin_idx={time_bin_idx}")
+            log_to_console(f"[DEBUG] update_contours_for_current_indices called: epoch_idx={epoch_idx}, time_bin_idx={time_bin_idx}")
             if self.peak_contours_layer is None:
-                print(f"[DEBUG] peak_contours_layer is None, returning early")
+                log_to_console(f"[DEBUG] peak_contours_layer is None, returning early")
                 return
             # active_time_bin_id: int = (time_bin_idx + 1) 
             active_time_bin_id: int = time_bin_idx # TODO: this is the right one
-            print(f"[DEBUG] active_time_bin_id = {active_time_bin_id} (time_bin_idx + 1)")
+            log_to_console(f"[DEBUG] active_time_bin_id = {active_time_bin_id} (time_bin_idx + 1)")
             a_peaks_results: Dict[Tuple[decoded_epoch_index, decoded_epoch_time_bin_index], Dict] = self.peak_prominence_result.results
             a_epoch_t_bin_tuple: Tuple[decoded_epoch_index, decoded_epoch_time_bin_index] = (epoch_idx, active_time_bin_id)
-            print(f"[DEBUG] Looking for key: {a_epoch_t_bin_tuple}")
-            print(f"[DEBUG] Available keys in results (first 10): {list(a_peaks_results.keys())[:10]}")
-            print(f"[DEBUG] Total number of keys in results: {len(a_peaks_results)}")
+            log_to_console(f"[DEBUG] Looking for key: {a_epoch_t_bin_tuple}")
+            log_to_console(f"[DEBUG] Available keys in results (first 10): {list(a_peaks_results.keys())[:10]}")
+            log_to_console(f"[DEBUG] Total number of keys in results: {len(a_peaks_results)}")
             
             # Check if results exist for this epoch/time_bin combination
             if a_epoch_t_bin_tuple not in a_peaks_results:
                 # No peaks for this combination, clear the layer
-                print(f"[DEBUG] Key {a_epoch_t_bin_tuple} NOT found in results. Clearing layer.")
+                log_to_console(f"[DEBUG] Key {a_epoch_t_bin_tuple} NOT found in results. Clearing layer.")
                 self.peak_contours_layer.data = []
                 return
             
-            print(f"[DEBUG] Key {a_epoch_t_bin_tuple} found in results!")
+            log_to_console(f"[DEBUG] Key {a_epoch_t_bin_tuple} found in results!")
             an_epoch_t_bin_peaks_result: Dict = a_peaks_results[a_epoch_t_bin_tuple]
             peaks_dict = an_epoch_t_bin_peaks_result.get('peaks', {})
-            print(f"[DEBUG] peaks_dict keys: {list(peaks_dict.keys())}")
-            print(f"[DEBUG] Number of peaks in peaks_dict: {len(peaks_dict)}")
+            log_to_console(f"[DEBUG] peaks_dict keys: {list(peaks_dict.keys())}")
+            log_to_console(f"[DEBUG] Number of peaks in peaks_dict: {len(peaks_dict)}")
             
             if len(peaks_dict) == 0:
                 # Empty peaks dict, clear the layer
-                print(f"[DEBUG] peaks_dict is empty. Clearing layer.")
+                log_to_console(f"[DEBUG] peaks_dict is empty. Clearing layer.")
                 self.peak_contours_layer.data = []
                 return
             
             # Extract and convert contours
-            print(f"[DEBUG] Extracting contours from {len(peaks_dict)} peaks...")
+            log_to_console(f"[DEBUG] Extracting contours from {len(peaks_dict)} peaks...")
             shapes_data = extract_contours_from_peaks_dict(peaks_dict)
-            print(f"[DEBUG] Extracted {len(shapes_data)} contour shapes")
+            log_to_console(f"[DEBUG] Extracted {len(shapes_data)} contour shapes")
             if len(shapes_data) > 0:
-                print(f"[DEBUG] First shape has {len(shapes_data[0])} vertices")
+                log_to_console(f"[DEBUG] First shape has {len(shapes_data[0])} vertices")
             self.peak_contours_layer.data = shapes_data
-            print(f"[DEBUG] Updated peak_contours_layer.data with {len(shapes_data)} shapes")
+            log_to_console(f"[DEBUG] Updated peak_contours_layer.data with {len(shapes_data)} shapes")
 
 
         def _on_current_step_change_contours(event):
@@ -4166,22 +4344,22 @@ class DecodedTrajectoryNapariPlotter(DecodedTrajectoryPlotter):
             Captures: update_contours_for_current_indices
 
             """
-            print(f"[DEBUG] _on_current_step_change_contours callback triggered")
+            log_to_console(f"[DEBUG] _on_current_step_change_contours callback triggered")
             if event is None:
-                print(f"[DEBUG] event is None, returning")
+                log_to_console(f"[DEBUG] event is None, returning")
                 return
             if not hasattr(event, 'value'):
-                print(f"[DEBUG] event has no 'value' attribute, returning")
+                log_to_console(f"[DEBUG] event has no 'value' attribute, returning")
                 return
             curr_step = event.value
-            print(f"[DEBUG] curr_step = {curr_step}, len = {len(curr_step) if hasattr(curr_step, '__len__') else 'N/A'}")
+            log_to_console(f"[DEBUG] curr_step = {curr_step}, len = {len(curr_step) if hasattr(curr_step, '__len__') else 'N/A'}")
             if len(curr_step) >= 2:
                 epoch_idx = int(curr_step[0])
                 time_bin_idx = int(curr_step[1])
-                print(f"[DEBUG] Extracted epoch_idx={epoch_idx}, time_bin_idx={time_bin_idx} from curr_step")
+                log_to_console(f"[DEBUG] Extracted epoch_idx={epoch_idx}, time_bin_idx={time_bin_idx} from curr_step")
                 update_contours_for_current_indices(epoch_idx, time_bin_idx)
             else:
-                print(f"[DEBUG] curr_step length < 2, not updating. \n\tcurr_step: {curr_step}")
+                log_to_console(f"[DEBUG] curr_step length < 2, not updating. \n\tcurr_step: {curr_step}")
 
             # # Use internal state that is synchronized by the main handler
             # epoch_idx = self.curr_epoch_idx if self.curr_epoch_idx is not None else 0
@@ -4218,7 +4396,7 @@ class DecodedTrajectoryNapariPlotter(DecodedTrajectoryPlotter):
         curr_step = self.viewer.dims.current_step
         epoch_idx = int(curr_step[0]) if len(curr_step) >= 1 else 0
         time_bin_idx = int(curr_step[1]) if len(curr_step) >= 2 else 0
-        print(f"[DEBUG] Initial display from slider: epoch_idx={epoch_idx}, time_bin_idx={time_bin_idx}")
+        self._log_to_console(f"[DEBUG] Initial display from slider: epoch_idx={epoch_idx}, time_bin_idx={time_bin_idx}")
         # Update internal state to match slider positions
         self.curr_epoch_idx = epoch_idx
         self.curr_time_bin_index = time_bin_idx
