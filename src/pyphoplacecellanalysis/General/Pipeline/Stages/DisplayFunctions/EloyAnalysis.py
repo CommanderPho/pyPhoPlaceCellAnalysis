@@ -7,7 +7,7 @@ from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DisplayFunc
 
 import pyphoplacecellanalysis.External.pyqtgraph as pg # for _display_speed_vs_PFoverlapDensity_plots
 
-from pyphoplacecellanalysis.External.peak_prominence2d import plot_Prominence # required for _plot_promenence_peaks
+from pyphoplacecellanalysis.External.peak_prominence2d import PeakPromenenceDisplay # required for _plot_promenence_peaks
 
 class EloyAnalysisDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=DisplayFunctionRegistryHolder):
     """ Functions related to visualizing results related to Pho's 2022 Analysis of Placefield Density and Animal Speed for Eloy """
@@ -66,7 +66,7 @@ class EloyAnalysisDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Displa
                 for curr_neuron_id, a_result in out_results.items():
                     # Test plot the promenence result
                     try:
-                        figure, (ax1, ax2, ax3, ax4) = plot_Prominence(xx, yy, a_result['slab'], a_result['peaks'], a_result['id_map'], a_result['prominence_map'], a_result['parent_map'], n_contour_levels=n_contour_levels, debug_print=debug_print)
+                        figure, (ax1, ax2, ax3, ax4) = PeakPromenenceDisplay.plot_Prominence(xx, yy, a_result['slab'], a_result['peaks'], a_result['id_map'], a_result['prominence_map'], a_result['parent_map'], n_contour_levels=n_contour_levels, debug_print=debug_print)
                         figure.suptitle(f'neuron: {curr_neuron_id}', fontsize=16)
                     except ValueError as e:
                         print(f'e: {e} for neuron_id: {curr_neuron_id}. Skipping')

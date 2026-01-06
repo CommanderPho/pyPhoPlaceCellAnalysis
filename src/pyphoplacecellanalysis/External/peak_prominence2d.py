@@ -1660,104 +1660,8 @@ from mpl_toolkits.mplot3d import Axes3D
 
 
 def plot_Prominence(xx, yy, slab, peaks, idmap, promap, parentmap, n_contour_levels=None, debug_print=False):
-    """ simple test plot of the results calculated from getProminence.
-    
-    Inputs:
-        n_contour_levels: should be an integer indicating the number of levels to display in the contour plot
-        
-    Usage:
-    
-        from pyphoplacecellanalysis.External.peak_prominence2d import getProminence, plot_Prominence
-        
-        step = 0.2
-        xx = active_pf_2D_dt.xbin_labels
-        yy = active_pf_2D_dt.ybin_labels
-        slab = active_pf_2D.ratemap.tuning_curves[3].T
-        zmax = slab.max()
-        peaks, idmap, promap, parentmap = getProminence(slab, step, ybin_centers=yy, xbin_centers=xx, min_area=None, include_edge=True, verbose=False)
-        figure, (ax1, ax2, ax3, ax4) = plot_Prominence(xx, yy, slab, peaks, idmap, promap, parentmap, debug_print=False)
-    
-    """
-    figure = plt.figure(figsize=(12,10),dpi=100)
-    zmax = slab.max()
-    XX, YY = np.meshgrid(xx, yy)
-
-    # ==================================================================================================================== #
-    ## Subplot 1: Top-Left - Contour Plot
-    ax1=figure.add_subplot(2,2,1)
-    
-    if n_contour_levels is not None:
-        levels = np.linspace(0.0, zmax, n_contour_levels)
-    else:
-        levels = np.arange(0, zmax, 1) # old way
-    ax1.contourf(XX, YY, slab, levels=levels)
-    ax1.set_xlabel('X')
-    ax1.set_ylabel('Y')
-    ax1.set_title('Top view, col contours as dashed lines')
-
-    # This plots the dashed lines on top of the contour plot, but idk what the dashed lines even are. They're often out in space irrelevant to the main peaks.
-    # The dotted black lines refer to the "col"s (see definition of col in header) of the peaks. 
-    for key, value in peaks.items():
-        if debug_print:
-            print (key)
-        cols=value['contour']
-        ax1.plot(cols.vertices[:,0], cols.vertices[:,1],'k:')
-
-    # ==================================================================================================================== #
-    ## Subplot 2: Top-Right - Cross-section
-    line=slab[slab.shape[0]//2]
-    ax2=figure.add_subplot(2,2,2)
-    ax2.plot(xx,line,'b-')
-    ax2.set_xlabel('X')
-    ax2.set_ylabel('Z')
-    ax2.set_title('Cross section through y=0')
-
-    # This adds the vertical black dotted lines to the cross-section through each peak and the text with the peak label/parent
-    for key, value in peaks.items():
-        xii, yii = value['center']
-        z2ii = value['height']
-        pro = value['prominence']
-        z1ii = z2ii-pro
-        ax2.plot([xii, xii], [z1ii, z2ii],'k:')
-        ax2.text(xii, z2ii,'p%d, parent = %d' %(key, value['parent']),
-                horizontalalignment='center',
-                verticalalignment='bottom')
-
-    # ==================================================================================================================== #
-    ## Subplot 3: Bottom-Left - 3D Grid
-    ax3=figure.add_subplot(2,2,3,projection='3d')
-        
-    # this actually plots the 3D surface:
-    ax3.plot_surface(XX, YY, slab, rstride=4, cstride=4, cmap='viridis', alpha=0.8) 
-    # rstride, cstride: Downsampling stride in each direction. These arguments are mutually exclusive with rcount and ccount.
-    
-    
-    ## This part looks like it just plots some ascending vertical lines through the peaks of the 3D plot, but you can't really see them. They look like they go through the center of the peak.
-    for key, value in peaks.items():
-        xii,yii=value['center']
-        z2ii=value['height']
-        pro=value['prominence']
-        z1ii=z2ii-pro
-        ax3.plot([xii,xii],[yii,yii],[z1ii,z2ii], color='r', linewidth=2)
-        
-        
-
-    # ==================================================================================================================== #
-    ## Subplot 4: Bottom-Right - Matrix of Promeneces
-    ax4=figure.add_subplot(2,2,4)
-    cs=ax4.imshow(promap,origin='lower',interpolation='nearest', extent=[-10,10,-10,10])
-    ax4.set_xlabel('X')
-    ax4.set_ylabel('Y')
-    ax4.set_title('Top view, prominences at peaks')
-    plt.colorbar(cs,ax=ax4)
-
-    plt.show(block=False)
-
-    if debug_print:
-        from pprint import pprint
-        pprint(peaks)
-    
-    return figure, (ax1, ax2, ax3, ax4)
+    """Compatibility wrapper. Use PeakPromenenceDisplay.plot_Prominence instead."""
+    return PeakPromenenceDisplay.plot_Prominence(xx, yy, slab, peaks, idmap, promap, parentmap, n_contour_levels=n_contour_levels, debug_print=debug_print)
 
 class PeakPromenenceDisplay:
     """ helper plot functions 
@@ -1802,6 +1706,108 @@ class PeakPromenenceDisplay:
 
         plotter_grid.show()
     """
+
+    @classmethod
+    def plot_Prominence(cls, xx, yy, slab, peaks, idmap, promap, parentmap, n_contour_levels=None, debug_print=False):
+        """ simple test plot of the results calculated from getProminence.
+        
+        Inputs:
+            n_contour_levels: should be an integer indicating the number of levels to display in the contour plot
+            
+        Usage:
+        
+            from pyphoplacecellanalysis.External.peak_prominence2d import getProminence, PeakPromenenceDisplay
+            
+            step = 0.2
+            xx = active_pf_2D_dt.xbin_labels
+            yy = active_pf_2D_dt.ybin_labels
+            slab = active_pf_2D.ratemap.tuning_curves[3].T
+            zmax = slab.max()
+            peaks, idmap, promap, parentmap = getProminence(slab, step, ybin_centers=yy, xbin_centers=xx, min_area=None, include_edge=True, verbose=False)
+            figure, (ax1, ax2, ax3, ax4) = PeakPromenenceDisplay.plot_Prominence(xx, yy, slab, peaks, idmap, promap, parentmap, debug_print=False)
+        
+        """
+        figure = plt.figure(figsize=(12,10),dpi=100)
+        zmax = slab.max()
+        XX, YY = np.meshgrid(xx, yy)
+
+        # ==================================================================================================================== #
+        ## Subplot 1: Top-Left - Contour Plot
+        ax1=figure.add_subplot(2,2,1)
+        
+        if n_contour_levels is not None:
+            levels = np.linspace(0.0, zmax, n_contour_levels)
+        else:
+            levels = np.arange(0, zmax, 1) # old way
+        ax1.contourf(XX, YY, slab, levels=levels)
+        ax1.set_xlabel('X')
+        ax1.set_ylabel('Y')
+        ax1.set_title('Top view, col contours as dashed lines')
+
+        # This plots the dashed lines on top of the contour plot, but idk what the dashed lines even are. They're often out in space irrelevant to the main peaks.
+        # The dotted black lines refer to the "col"s (see definition of col in header) of the peaks. 
+        for key, value in peaks.items():
+            if debug_print:
+                print (key)
+            cols=value['contour']
+            ax1.plot(cols.vertices[:,0], cols.vertices[:,1],'k:')
+
+        # ==================================================================================================================== #
+        ## Subplot 2: Top-Right - Cross-section
+        line=slab[slab.shape[0]//2]
+        ax2=figure.add_subplot(2,2,2)
+        ax2.plot(xx,line,'b-')
+        ax2.set_xlabel('X')
+        ax2.set_ylabel('Z')
+        ax2.set_title('Cross section through y=0')
+
+        # This adds the vertical black dotted lines to the cross-section through each peak and the text with the peak label/parent
+        for key, value in peaks.items():
+            xii, yii = value['center']
+            z2ii = value['height']
+            pro = value['prominence']
+            z1ii = z2ii-pro
+            ax2.plot([xii, xii], [z1ii, z2ii],'k:')
+            ax2.text(xii, z2ii,'p%d, parent = %d' %(key, value['parent']),
+                    horizontalalignment='center',
+                    verticalalignment='bottom')
+
+        # ==================================================================================================================== #
+        ## Subplot 3: Bottom-Left - 3D Grid
+        ax3=figure.add_subplot(2,2,3,projection='3d')
+            
+        # this actually plots the 3D surface:
+        ax3.plot_surface(XX, YY, slab, rstride=4, cstride=4, cmap='viridis', alpha=0.8) 
+        # rstride, cstride: Downsampling stride in each direction. These arguments are mutually exclusive with rcount and ccount.
+        
+        
+        ## This part looks like it just plots some ascending vertical lines through the peaks of the 3D plot, but you can't really see them. They look like they go through the center of the peak.
+        for key, value in peaks.items():
+            xii,yii=value['center']
+            z2ii=value['height']
+            pro=value['prominence']
+            z1ii=z2ii-pro
+            ax3.plot([xii,xii],[yii,yii],[z1ii,z2ii], color='r', linewidth=2)
+            
+            
+
+        # ==================================================================================================================== #
+        ## Subplot 4: Bottom-Right - Matrix of Promeneces
+        ax4=figure.add_subplot(2,2,4)
+        cs=ax4.imshow(promap,origin='lower',interpolation='nearest', extent=[-10,10,-10,10])
+        ax4.set_xlabel('X')
+        ax4.set_ylabel('Y')
+        ax4.set_title('Top view, prominences at peaks')
+        plt.colorbar(cs,ax=ax4)
+
+        plt.show(block=False)
+
+        if debug_print:
+            from pprint import pprint
+            pprint(peaks)
+        
+        return figure, (ax1, ax2, ax3, ax4)
+
     @classmethod
     def path_to_pyvista_polyline(cls, path, z_level):
         """Convert matplotlib Path to PyVista polyline at given z-level.
@@ -2238,7 +2244,7 @@ if __name__=='__main__':
     peaks, idmap, promap, parentmap = getProminence(slab, step, ybin_centers=yy, xbin_centers=xx, min_area=None, include_edge=True, verbose=False)
 
     #-------------------Plot------------------------
-    figure, (ax1, ax2, ax3, ax4) = plot_Prominence(xx, yy, slab, peaks, idmap, promap, parentmap, debug_print=False)
+    figure, (ax1, ax2, ax3, ax4) = PeakPromenenceDisplay.plot_Prominence(xx, yy, slab, peaks, idmap, promap, parentmap, debug_print=False)
     
     from pprint import pprint
     pprint(peaks)
