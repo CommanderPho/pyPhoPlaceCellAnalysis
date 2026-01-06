@@ -60,7 +60,7 @@ DecodedEpochIndex: TypeAlias = int # an integer index that is an aclu
 DecodedEpochTimeBinIndex: TypeAlias = int # an integer index that is an aclu
 
 # Define a new type as a tuple of the two above custom types
-DecodedEpochTimeBinIndexTuple: TypeAlias = DecodedEpochTimeBinIndexTuple
+DecodedEpochTimeBinIndexTuple: TypeAlias = Tuple[DecodedEpochIndex, DecodedEpochTimeBinIndex]
 
 
 def isClosed(xs,ys):

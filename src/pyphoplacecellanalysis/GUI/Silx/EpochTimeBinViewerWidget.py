@@ -745,17 +745,17 @@ class Epoch3DSceneTimeBinViewer(qt.QWidget):
         Returns:
             List of (N, 2) arrays of (x, y) vertices in world coordinates.
         """
-        from pyphoplacecellanalysis.External.peak_prominence2d import decoded_epoch_index, decoded_epoch_time_bin_index
+        from pyphoplacecellanalysis.External.peak_prominence2d import DecodedEpochIndex, DecodedEpochTimeBinIndex, DecodedEpochTimeBinIndexTuple
 
         if self.peak_prominence_result is None:
             return []
 
         try:
-            a_peaks_results: Dict[Tuple[decoded_epoch_index, decoded_epoch_time_bin_index], Dict] = self.peak_prominence_result.results
+            a_peaks_results: Dict[DecodedEpochTimeBinIndexTuple, Dict] = self.peak_prominence_result.results
         except AttributeError:
             return []
 
-        a_epoch_t_bin_tuple: Tuple[decoded_epoch_index, decoded_epoch_time_bin_index] = (int(epoch_idx), int(t_bin_idx))
+        a_epoch_t_bin_tuple: DecodedEpochTimeBinIndexTuple = (int(epoch_idx), int(t_bin_idx))
         if a_epoch_t_bin_tuple not in a_peaks_results:
             return []
 

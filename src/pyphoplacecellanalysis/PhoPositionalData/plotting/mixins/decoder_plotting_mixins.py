@@ -4125,7 +4125,7 @@ class DecodedTrajectoryNapariPlotter(DecodedTrajectoryPlotter):
         """
         # local import to avoid hard dependency if Napari is not installed in non-Napari contexts
         import napari
-        from pyphoplacecellanalysis.External.peak_prominence2d import PosteriorPeaksPeakProminence2dResult, decoded_epoch_index, decoded_epoch_time_bin_index
+        from pyphoplacecellanalysis.External.peak_prominence2d import PosteriorPeaksPeakProminence2dResult, DecodedEpochIndex, DecodedEpochTimeBinIndex
 
         # Ensure posterior_volume has been built
         if self.posterior_volume is None:
@@ -4195,7 +4195,7 @@ class DecodedTrajectoryNapariPlotter(DecodedTrajectoryPlotter):
         """
         # local import to avoid hard dependency if Napari is not installed in non-Napari contexts
         import napari
-        from pyphoplacecellanalysis.External.peak_prominence2d import PosteriorPeaksPeakProminence2dResult, decoded_epoch_index, decoded_epoch_time_bin_index
+        from pyphoplacecellanalysis.External.peak_prominence2d import PosteriorPeaksPeakProminence2dResult, DecodedEpochIndex, DecodedEpochTimeBinIndex, DecodedEpochTimeBinIndexTuple
 
         # Ensure posterior_volume has been built
         if self.posterior_volume is None:
@@ -4300,8 +4300,8 @@ class DecodedTrajectoryNapariPlotter(DecodedTrajectoryPlotter):
             # active_time_bin_id: int = (time_bin_idx + 1) 
             active_time_bin_id: int = time_bin_idx # TODO: this is the right one
             log_to_console(f"[DEBUG] active_time_bin_id = {active_time_bin_id} (time_bin_idx + 1)")
-            a_peaks_results: Dict[Tuple[decoded_epoch_index, decoded_epoch_time_bin_index], Dict] = self.peak_prominence_result.results
-            a_epoch_t_bin_tuple: Tuple[decoded_epoch_index, decoded_epoch_time_bin_index] = (epoch_idx, active_time_bin_id)
+            a_peaks_results: Dict[DecodedEpochTimeBinIndexTuple, Dict] = self.peak_prominence_result.results
+            a_epoch_t_bin_tuple: DecodedEpochTimeBinIndexTuple = (epoch_idx, active_time_bin_id)
             log_to_console(f"[DEBUG] Looking for key: {a_epoch_t_bin_tuple}")
             log_to_console(f"[DEBUG] Available keys in results (first 10): {list(a_peaks_results.keys())[:10]}")
             log_to_console(f"[DEBUG] Total number of keys in results: {len(a_peaks_results)}")
