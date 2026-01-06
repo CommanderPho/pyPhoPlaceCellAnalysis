@@ -56,8 +56,11 @@ from pyphoplacecellanalysis.General.Model.ComputationResults import ComputedResu
 from neuropy.utils.mixins.AttrsClassHelpers import serialized_field, non_serialized_field
 from neuropy.utils.mixins.indexing_helpers import get_dict_subset
 
-decoded_epoch_index: TypeAlias = int # an integer index that is an aclu
-decoded_epoch_time_bin_index: TypeAlias = int # an integer index that is an aclu
+DecodedEpochIndex: TypeAlias = int # an integer index that is an aclu
+DecodedEpochTimeBinIndex: TypeAlias = int # an integer index that is an aclu
+
+# Define a new type as a tuple of the two above custom types
+DecodedEpochTimeBinIndexTuple: TypeAlias = DecodedEpochTimeBinIndexTuple
 
 
 def isClosed(xs,ys):
@@ -681,7 +684,7 @@ class PosteriorPeaksPeakProminence2dResult(ComputedResult):
 
     xx: NDArray = serialized_field()
     yy: NDArray = serialized_field()
-    results: Dict[Tuple[decoded_epoch_index, decoded_epoch_time_bin_index], Dict[str, Any]] = serialized_field()
+    results: Dict[DecodedEpochTimeBinIndexTuple, Dict[str, Any]] = serialized_field()
     flat_peaks_df: pd.DataFrame = serialized_field()
     filtered_flat_peaks_df: pd.DataFrame = serialized_field()
     peak_counts: PeakCounts = serialized_field()
@@ -1586,8 +1589,8 @@ class PeakPromenence:
         all_epochs_all_t_bins_epoch_t_bin_idx_tuple_list, all_epochs_promenence_tuples_dict, all_epochs_masks = PeakPromenence.compute_posterior_peak_promenences(p_x_given_n_list=a_widget.decoded_result.p_x_given_n_list, alpha=0.9)
         
         """
-        all_epochs_all_t_bins_epoch_t_bin_idx_tuple_list: List[Tuple[decoded_epoch_index, decoded_epoch_time_bin_index]] = []
-        all_epochs_promenence_tuples_dict: Dict[Tuple[decoded_epoch_index, decoded_epoch_time_bin_index], Tuple] = {}
+        all_epochs_all_t_bins_epoch_t_bin_idx_tuple_list: List[DecodedEpochTimeBinIndexTuple] = []
+        all_epochs_promenence_tuples_dict: Dict[DecodedEpochTimeBinIndexTuple, Tuple] = {}
         all_epochs_promenence_tuples: List[Tuple] = []
         all_epochs_masks: List[List[NDArray]] = []
         
