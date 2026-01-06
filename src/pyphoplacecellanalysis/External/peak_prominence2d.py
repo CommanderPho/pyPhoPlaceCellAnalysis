@@ -529,7 +529,7 @@ def compute_prominence_contours(xbin_centers: NDArray, ybin_centers: NDArray, sl
         xx, yy, slab, peaks, idmap, promap, parentmap = perform_compute_prominence_contours(active_pf_2D_dt.xbin_labels, active_pf_2D_dt.ybin_labels, active_pf_2D.ratemap.tuning_curves[i].T, step=step)
         
         # Test plot the promenence result
-        figure, (ax1, ax2, ax3, ax4) = plot_Prominence(xx, yy, slab, peaks, idmap, promap, parentmap, debug_print=False)
+        figure, (ax1, ax2, ax3, ax4) = PeakPromenenceDisplay.plot_Prominence(xx, yy, slab, peaks, idmap, promap, parentmap, debug_print=False)
 
     """
     peaks_dict, id_map, prominence_map, parent_map = getProminence(slab, step, ybin_centers=ybin_centers, xbin_centers=xbin_centers, min_area=min_area, min_depth=min_considered_promenence, include_edge=include_edge, verbose=verbose, **kwargs)
@@ -972,7 +972,8 @@ class PeakPromenence:
             if debug_print:
                 print(f'\tfinal_four_boundary_distances: {final_four_boundary_distances}')
             peak_nearest_directional_boundary_distances.append(final_four_boundary_distances)
-        
+        ## END for a_peak_row in filtered_flat_peaks_df[['peak_center_binned_x', 'peak_center_binned_y']].itertuples()...
+
         return peak_nearest_directional_boundary_bins, peak_nearest_directional_boundary_displacements, peak_nearest_directional_boundary_distances
 
 
@@ -1656,12 +1657,12 @@ class PeakPromenence:
 
 #-------------------Plot------------------------
 import matplotlib.pyplot as plt
-from mpl_toolkits.mplot3d import Axes3D
+# from mpl_toolkits.mplot3d import Axes3D
 
+# def plot_Prominence(xx, yy, slab, peaks, idmap, promap, parentmap, n_contour_levels=None, debug_print=False):
+#     """Compatibility wrapper. Use PeakPromenenceDisplay.plot_Prominence instead."""
+#     return PeakPromenenceDisplay.plot_Prominence(xx, yy, slab, peaks, idmap, promap, parentmap, n_contour_levels=n_contour_levels, debug_print=debug_print)
 
-def plot_Prominence(xx, yy, slab, peaks, idmap, promap, parentmap, n_contour_levels=None, debug_print=False):
-    """Compatibility wrapper. Use PeakPromenenceDisplay.plot_Prominence instead."""
-    return PeakPromenenceDisplay.plot_Prominence(xx, yy, slab, peaks, idmap, promap, parentmap, n_contour_levels=n_contour_levels, debug_print=debug_print)
 
 class PeakPromenenceDisplay:
     """ helper plot functions 
