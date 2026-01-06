@@ -528,19 +528,11 @@ class Dock(QtWidgets.QWidget, DockDrop):
         self.layout.addWidget(widget, row, col, rowspan, colspan)
         
         # Check if widget provides options and update button visibility
-        if self._hasOptionsPanel():
-            self.config.showOptionsButton = True
-            if self.label:
-                self.label.updateButtonsFromConfig()
-            # Connect signal (disconnect first to avoid duplicates)
-            try:
-                self.label.sigOptionsClicked.disconnect(self.on_options_btn_clicked)
-            except (TypeError, RuntimeError):
-                pass  # Not connected yet, that's fine
-            self.label.sigOptionsClicked.connect(self.on_options_btn_clicked)
+        self.updateWidgetsHaveOptionsPanel()
         
         self.raiseOverlay()
         
+    
     def startDrag(self):
         self.drag = QtGui.QDrag(self)
         mime = QtCore.QMimeData()
@@ -638,7 +630,31 @@ class Dock(QtWidgets.QWidget, DockDrop):
         # Just forward the signal with the dock instance and mode name
         self.sigToggleTimelineSyncModeClicked.emit(self, mode_name)
 
-    def _checkWidgetForOptions(self, widget):
+
+
+
+    # ==================================================================================================================================================================================================================================================================================== #
+    # OptionsPanel/Button Methods                                                                                                                                                                                                                                                          #
+    # ==================================================================================================================================================================================================================================================================================== #
+
+    def updateWidgetsHaveOptionsPanel(self):
+        """ called to check whether any widgets contained within the dock provide an options panel, and if they do setup the button and callback.
+        ## called by `self.addWidget(...)` which used to be the only time it was ever checked.
+        """
+        # Check if widget provides options and update button visibility
+        if self._hasOptionsPanel():
+            self.config.showOptionsButton = True
+            if self.label:
+                self.label.updateButtonsFromConfig()
+            # Connect signal (disconnect first to avoid duplicates)
+            try:
+                self.label.sigOptionsClicked.disconnect(self.on_options_btn_clicked)
+            except (TypeError, RuntimeError):
+                pass  # Not connected yet, that's fine
+            self.label.sigOptionsClicked.connect(self.on_options_btn_clicked)
+        
+
+    def _checkWidgetForOptions(self, widget) -> Optional[QtWidgets.QWidget]:
         """Check if a widget provides an options panel.
         
         Returns:
@@ -664,7 +680,7 @@ class Dock(QtWidgets.QWidget, DockDrop):
                 return options_panel
         return None
 
-    def _hasOptionsPanel(self):
+    def _hasOptionsPanel(self) -> bool:
         """Check if any widget in this dock provides an options panel.
         
         Returns:
@@ -674,6 +690,7 @@ class Dock(QtWidgets.QWidget, DockDrop):
             if self._checkWidgetForOptions(widget) is not None:
                 return True
         return False
+
 
     def _getOptionsPanel(self):
         """Get the first available options panel from widgets.
@@ -686,6 +703,7 @@ class Dock(QtWidgets.QWidget, DockDrop):
             if options_panel is not None:
                 return options_panel
         return None
+
 
     def on_options_btn_clicked(self):
         """Open the options dialog when Options button is clicked."""
