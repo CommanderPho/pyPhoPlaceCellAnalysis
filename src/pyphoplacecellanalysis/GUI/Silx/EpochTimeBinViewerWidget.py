@@ -211,6 +211,8 @@ class EpochTimeBinViewer(qt.QWidget):
         self.time_bin_slider.setMaximum(max_time_bins)
         # Reset to 0 when epoch changes
         self.time_bin_slider.setValue(0)
+        self.time_bin_slider.setTickInterval(1)  # Tick at every integer value
+        self.time_bin_slider.setSingleStep(1)  # Step by 1        
         self.curr_time_bin_idx = 0
         self.update_time_bin_label()
     
@@ -681,6 +683,10 @@ class Epoch3DSceneTimeBinViewer(qt.QWidget):
         
         # Store text label items for cleanup (Qt QLabel widgets)
         self.text_label_items = []
+
+        # Peak-contour overlays (Silx-specific)
+        self.peak_prominence_result = None
+        self.peak_contour_items: List[Any] = []
         
         # Store table widget for locality measures (point-like mode)
         self.locality_measures_table = None
@@ -725,7 +731,156 @@ class Epoch3DSceneTimeBinViewer(qt.QWidget):
         
         # Initialize
         self.on_epoch_changed(0)
-    
+
+
+    def _get_epoch_time_bin_shape(self, epoch_idx: int) -> Tuple[int, int, int]:
+        """Return (n_x_bins, n_y_bins, n_time_bins) for the given epoch."""
+        p_x_given_n = self.decoded_result.p_x_given_n_list[epoch_idx]
+        return p_x_given_n.shape
+
+
+    def _extract_contours_for_epoch_timebin(self, epoch_idx: int, t_bin_idx: int) -> List[NDArray]:
+        """Extract contour vertex arrays for a given (epoch_idx, t_bin_idx) from peak_prominence_result.
+
+        Returns:
+            List of (N, 2) arrays of (x, y) vertices in world coordinates.
+        """
+        from pyphoplacecellanalysis.External.peak_prominence2d import decoded_epoch_index, decoded_epoch_time_bin_index
+
+        if self.peak_prominence_result is None:
+            return []
+
+        try:
+            a_peaks_results: Dict[Tuple[decoded_epoch_index, decoded_epoch_time_bin_index], Dict] = self.peak_prominence_result.results
+        except AttributeError:
+            return []
+
+        a_epoch_t_bin_tuple: Tuple[decoded_epoch_index, decoded_epoch_time_bin_index] = (int(epoch_idx), int(t_bin_idx))
+        if a_epoch_t_bin_tuple not in a_peaks_results:
+            return []
+
+        an_epoch_t_bin_peaks_result: Dict = a_peaks_results[a_epoch_t_bin_tuple]
+        peaks_dict = an_epoch_t_bin_peaks_result.get('peaks', {})
+        if len(peaks_dict) == 0:
+            return []
+
+        shapes_data: List[NDArray] = []
+        for _, peak_info in peaks_dict.items():
+            level_slices = peak_info.get('level_slices', {})
+            for _, slice_info in level_slices.items():
+                contour = slice_info.get('contour', None)
+                if contour is None:
+                    continue
+                vertices_world = getattr(contour, 'vertices', None)
+                if vertices_world is None or len(vertices_world) == 0:
+                    continue
+                shapes_data.append(np.asarray(vertices_world, dtype=float))
+        return shapes_data
+
+
+    def _clear_peak_contour_items(self):
+        """Remove all existing peak contour items from the scene widget."""
+        if not self.peak_contour_items:
+            return
+        for item in self.peak_contour_items:
+            try:
+                if hasattr(self.scene_widget, 'removeItem'):
+                    self.scene_widget.removeItem(item)
+            except Exception:
+                pass
+        self.peak_contour_items = []
+
+
+    def _add_contours_for_current_epoch(self, edge_color: str = '#ffaaff', line_width: float = 1.0, z_offset: float = 0.01):
+        """Add Silx 3D line items for all contours in the current epoch."""
+        if self.peak_prominence_result is None:
+            return
+
+        try:
+            p_x_given_n = self.decoded_result.p_x_given_n_list[self.curr_epoch_idx]
+        except Exception:
+            return
+
+        n_x_bins, n_y_bins, n_time_bins = p_x_given_n.shape
+
+        # Determine spatial bounds from bin centers or indices
+        if self.xbin_centers is not None and self.ybin_centers is not None:
+            x_coords = np.array(self.xbin_centers)
+            y_coords = np.array(self.ybin_centers)
+            x_min, x_max = float(x_coords[0]), float(x_coords[-1])
+            y_min, y_max = float(y_coords[0]), float(y_coords[-1])
+            x_extent = x_max - x_min
+        else:
+            x_min, x_max = 0.0, float(n_x_bins - 1)
+            y_min, y_max = 0.0, float(n_y_bins - 1)
+            x_extent = float(n_x_bins - 1)
+
+        spacing_factor = 1.2
+        bin_spacing = x_extent * spacing_factor
+
+        # Parse edge_color hex string into RGBA
+        def _parse_hex_color(hex_color: str) -> Tuple[float, float, float, float]:
+            hex_color = hex_color.lstrip('#')
+            if len(hex_color) == 8:
+                r = int(hex_color[0:2], 16) / 255.0
+                g = int(hex_color[2:4], 16) / 255.0
+                b = int(hex_color[4:6], 16) / 255.0
+                a = int(hex_color[6:8], 16) / 255.0
+            elif len(hex_color) == 6:
+                r = int(hex_color[0:2], 16) / 255.0
+                g = int(hex_color[2:4], 16) / 255.0
+                b = int(hex_color[4:6], 16) / 255.0
+                a = 1.0
+            else:
+                r, g, b, a = 1.0, 0.0, 1.0, 1.0
+            return (r, g, b, a)
+
+        rgba_color = _parse_hex_color(edge_color)
+        
+        # Calculate a reasonable z_offset based on the data range
+        # Height maps use the posterior values as z, so we need contours above the max value
+        max_posterior_value = np.nanmax(p_x_given_n)
+        # Position contours slightly above the maximum height map value
+        effective_z_offset = max_posterior_value + (max_posterior_value * 0.1) if max_posterior_value > 0 else 0.1
+
+        total_contours_added = 0
+        for t_bin_idx in range(n_time_bins):
+            contours_list = self._extract_contours_for_epoch_timebin(epoch_idx=self.curr_epoch_idx, t_bin_idx=t_bin_idx)
+            if len(contours_list) == 0:
+                continue
+
+            x_translation = t_bin_idx * bin_spacing
+            for vertices in contours_list:
+                if vertices.shape[1] != 2 or len(vertices) < 2:
+                    continue
+
+                # vertices are in world (x, y) coordinates; apply time-bin translation along X
+                x_coords = vertices[:, 0] + x_translation
+                y_coords = vertices[:, 1]
+                # Use the effective z offset calculated from data range
+                z_coords = np.full_like(x_coords, effective_z_offset, dtype=float)
+
+                try:
+                    values = np.ones_like(x_coords, dtype=float)
+                    line_item = plot3d_items.Scatter3D()
+                    line_item.setData(x_coords, y_coords, z_coords, values)
+                    line_item.setVisualization('lines')
+                    line_item.setLineWidth(float(line_width))
+                    line_item.setColor(rgba_color)
+                    # Explicitly set visibility
+                    if hasattr(line_item, 'setVisible'):
+                        line_item.setVisible(True)
+                    # Ensure the item is added to the scene
+                    self.scene_widget.addItem(line_item)
+                    self.peak_contour_items.append(line_item)
+                    total_contours_added += 1
+                except Exception as e:
+                    print(f"DEBUG: Failed to add contour line item: {e}")
+                    continue
+        
+        print(f"DEBUG: Added {total_contours_added} contour line items for epoch {self.curr_epoch_idx}")
+
+
     def _get_sidebar_tab_widget(self) -> Optional[qt.QTabWidget]:
         """Access the SceneWindow sidebar QTabWidget.
         
@@ -1438,7 +1593,45 @@ class Epoch3DSceneTimeBinViewer(qt.QWidget):
         except Exception:
             # Silently fail if label creation doesn't work
             pass
-    
+
+
+    def _configure_root_data_bounding_box(self):
+        """Disable bounding box visualization on the root 'Data' node if present."""
+        try:
+            if not hasattr(self.scene_widget, 'getItems'):
+                return
+            for item in self.scene_widget.getItems():
+                try:
+                    name = item.getName() if hasattr(item, 'getName') else None
+                    if name == 'Data' and hasattr(item, 'setBoundingBoxVisible'):
+                        item.setBoundingBoxVisible(False)
+                        break
+                except Exception:
+                    continue
+        except Exception:
+            # Silently ignore if scene introspection fails
+            pass
+
+
+    def _configure_time_bin_item(self, item):
+        """Configure per-time-bin scatter item appearance and bounding box."""
+        try:
+            if hasattr(item, 'setBoundingBoxVisible'):
+                item.setBoundingBoxVisible(True)
+            if hasattr(item, 'setVisualization'):
+                # Use point-based visualization for per-bin items
+                item.setVisualization('points')
+            # Point/marker appearance (APIs may vary across silx versions)
+            if hasattr(item, 'setPointSize'):
+                item.setPointSize(5.0)
+            # Anisotropic scale: emphasize Z (time/height) dimension
+            if hasattr(item, 'setScale'):
+                item.setScale(1.0, 1.0, 1000.0)
+        except Exception:
+            # Keep failures non-fatal so the scene still renders
+            pass
+
+
     def _create_time_bin_items(self):
         """Create and position all time bin height maps for current epoch"""
         p_x_given_n = self.decoded_result.p_x_given_n_list[self.curr_epoch_idx]
@@ -1478,11 +1671,12 @@ class Epoch3DSceneTimeBinViewer(qt.QWidget):
             
             # Create 2D scatter item with height map
             item = self.scene_widget.add2DScatter(x_flat, y_flat, values_flat)
-            
+
             # Enable height map visualization
             item.setHeightMap(True)
-            item.setVisualization('solid')
-            
+            # Per-item visualization and bounding box configuration
+            self._configure_time_bin_item(item)
+
             # Set colormap
             item.getColormap().setName('viridis')
             
@@ -1491,15 +1685,7 @@ class Epoch3DSceneTimeBinViewer(qt.QWidget):
             item.setTranslation(x_translation, 0.0, 0.0)
             
             # Set scale to maintain proper aspect ratio
-            if self.xbin_centers is not None and self.ybin_centers is not None:
-                # Use actual scale based on bin centers
-                x_scale = 1.0
-                y_scale = 1.0
-            else:
-                # Scale based on number of bins
-                x_scale = 1.0
-                y_scale = 1.0
-            item.setScale(x_scale, y_scale, 1.0)
+            # Horizontal layout is handled by translation; scale is handled in _configure_time_bin_item
             
             # Store item for cleanup
             self.time_bin_items.append(item)
@@ -1513,6 +1699,9 @@ class Epoch3DSceneTimeBinViewer(qt.QWidget):
                     self._add_text_label_3d(label_text, t_bin_idx, x_translation, x_min, x_max, y_min, y_max, bin_spacing)
         ## END for t_bin_idx in range(n_time_bins)...
 
+        # After items exist in the scene, configure the root 'Data' node bounding box if present
+        self._configure_root_data_bounding_box()
+
 
 
 
@@ -1525,9 +1714,14 @@ class Epoch3DSceneTimeBinViewer(qt.QWidget):
         self._clear_time_bin_items()
         self._clear_text_label_items()
         self._label_data = []  # Clear label data
+        self._clear_peak_contour_items()
         
         # Create new time bin items for selected epoch
         self._create_time_bin_items()
+
+        # Recreate peak-contour overlays for this epoch if available
+        if self.peak_prominence_result is not None:
+            self._add_contours_for_current_epoch()
         
         # Update label positions after a short delay to ensure window is sized
         qt.QTimer.singleShot(100, self._update_text_label_positions)
@@ -1537,7 +1731,26 @@ class Epoch3DSceneTimeBinViewer(qt.QWidget):
             self._update_table_for_current_epoch()
             # Highlight matching row based on first time bin of the epoch (since this widget shows all time bins at once)
             self._highlight_matching_row_in_table(0)
+
+
+    def add_peak_contours_overlays(self, peak_prominence_result, edge_color: str = '#ffaaff78', line_width: float = 1.0, z_offset: Optional[float] = None):
+        """Adds peak contours as Silx 3D line overlays that update when the epoch slider changes.
+
+        Mirrors the Napari add_peak_contours_layer conceptually but renders into the SceneWindow.
+
+        Args:
+            peak_prominence_result: PosteriorPeaksPeakProminence2dResult containing per-epoch, per-time-bin contours.
+            edge_color: Hex RGBA string for contour color (default '#ffaaff78').
+            line_width: Width of contour lines.
+            z_offset: Constant Z offset above the base plane for the contour lines.
+        """
+        self.peak_prominence_result = peak_prominence_result
+
+        # Clear any existing contour items and rebuild for current epoch
+        self._clear_peak_contour_items()
+        self._add_contours_for_current_epoch(edge_color=edge_color, line_width=line_width, z_offset=z_offset)
     
+
     def eventFilter(self, obj, event):
         """Event filter to catch scene window resize events"""
         try:
@@ -1554,6 +1767,7 @@ class Epoch3DSceneTimeBinViewer(qt.QWidget):
             pass
         return super().eventFilter(obj, event)
     
+
     def _update_text_label_positions(self):
         """Update positions of all text labels after window resize"""
         if not self._label_data:
