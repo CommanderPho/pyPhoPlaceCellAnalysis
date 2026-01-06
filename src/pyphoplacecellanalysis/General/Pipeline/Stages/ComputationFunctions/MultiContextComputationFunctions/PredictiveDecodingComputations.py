@@ -49,6 +49,35 @@ from neuropy.utils.mixins.HDF5_representable import HDF_DeserializationMixin, po
 from neuropy.utils.mixins.time_slicing import TimeColumnAliasesProtocol
 from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import get_proper_global_spikes_df
 
+
+"""
+
+## ⚓ Decoded 2D Posterior Specificity - Metrics using the promenence mask
+
+## Focality/Diffusivity: Number of bins in in the 90% promenence mask over the total number of bins --> [0.0, 1.0]
+    ## definitionally the 90% promenance mask bins must be together/contiguous spatially, as outliers are considered different peaks.
+
+## Sharpness/Peakiness: Number of bins in the 90% promenence mask over the number of bins exceeding 90% of the promenence peak height -- specifically looks at the area of the mean peak compared to the off-peak non-contiguous areas of similar heights
+
+## Modality: The count of detected peaks exceeding a certain promenence -- e.g. 1 if unimodal, 2 if bimodal, ..., N if multi-modal. 
+
+
+
+## Decoded Epoch Temporal Sequentiality - detecting spatial sweeps in subsequent time bins
+    ## partially dpeends on time bin sizes -- of interest -- a real effect should remain at lower resolution/temporal subdivisions while fake ones can get washed out
+
+## ❌ Sequentiality - dilate the 80% promenence mask of the top peak (? same as using a lower mask percentage??) and compute the mask overlap with the subsequent time bin.
+    # 0 indicates disjoint/discontiguous... but it could be a jumpy sequence!!
+
+## compute the 2D change vector between subsequent peak locations (either bin-space or cm)
+    ## real trajectories should be roughly aligned and have constrained changes in direction (e.g. momentum)
+
+
+
+
+
+"""
+
 # ==================================================================================================================== #
 # 2024-05-24 - Shuffling to show wcorr exceeds shuffles                                                                #
 # ==================================================================================================================== #
@@ -680,60 +709,6 @@ class DecodingLocalityMeasures(ComputedResult): #PickleSerializableMixin, AttrsB
         """
         _out_locality_measures_df: pd.DataFrame = deepcopy(self.perform_build_locality_measures_df(locality_measures_dict_dict=self.locality_measures_dict_dict, time_window_centers=self.time_window_centers, paradigm_epochs_df=self.paradigm_epochs_df,
                                                                                                     xbin_centers=self.xbin_centers, ybin_centers=self.ybin_centers))
-                                                                                                            
-        # # _out_locality_measures_df = pd.DataFrame(self.decoding_meas_pos_locality_measure_dict)
-        # _out_locality_measures_df: pd.DataFrame = pd.DataFrame(self.time_window_centers, columns=['t'])
-        # # _out_locality_measures_df['t'] = self.time_window_centers
-
-        # for an_epoch_name, v in self.locality_measures_dict_dict.items():
-
-        #     for a_computation_measure_name, vv in v.items():
-        #         if a_computation_measure_name == 'mask_overlap':
-        #             total_num_possible_bins: int = len(self.xbin_centers) * len(self.ybin_centers)
-        #             vv = np.nansum(vv, (0, 1)) / total_num_possible_bins
-        #         if a_computation_measure_name == 'peak_prom':                    
-        #             continue ## skip
-                
-        #         _out_locality_measures_df[f"{a_computation_measure_name}_{an_epoch_name}"] = vv # _obj.locality_measures_dict_dict[an_epoch_name][a_computation_measure_name]
-
-
-
-        # self.locality_measures_df = deepcopy(_out_locality_measures_df)
-
-        # # _obj = self
-        # # _out_locality_measures_df: pd.DataFrame = deepcopy(_obj.locality_measures_df)
-        # # _out_locality_measures_df
-        # ## #TODO 2025-12-12 18:39: - [ ] Manually coded times for epochs ['roam', 'sprinkle'] -- fix setting proper epoch
-
-        # ## - [ ] add the correct maze_id to know which maze decoder to use. Adds 'correct_paradigm_epoch' columns
-        # _out_locality_measures_df = _out_locality_measures_df.time_point_event.adding_epochs_identity_column(epochs_df=self.paradigm_epochs_df, epoch_id_key_name='correct_paradigm_epoch', epoch_label_column_name='label', override_time_variable_name='t',
-        #                                                     no_interval_fill_value='', should_replace_existing_column=True, drop_non_epoch_events=False, overlap_behavior=OverlappingIntervalsFallbackBehavior.FALLBACK_TO_SLOW_SEARCH)
-        
-
-        
-        # # _out_locality_measures_df['correct_paradigm_epoch'] = ''
-
-        # # ## - [ ] use the various quantities for that maze to determine if it's non-local
-        # # roam_start = 7423.0
-        # # roam_stop = 10185.99999
-
-        # # sprinkle_start = 10186.0
-        # # sprinkle_stop = 11483.000000
-
-        # # _out_locality_measures_df.loc[np.logical_and((_out_locality_measures_df['t'].to_numpy() >= roam_start), (_out_locality_measures_df['t'] < roam_stop)), 'correct_paradigm_epoch'] = 'roam'
-        # # _out_locality_measures_df.loc[np.logical_and((_out_locality_measures_df['t'] >= sprinkle_start), (_out_locality_measures_df['t'] < sprinkle_stop)), 'correct_paradigm_epoch'] = 'sprinkle'
-
-
-        # _out_locality_measures_df['is_non_local_period'] = False
-
-        # # an_epoch_name: str = 'sprinkle'
-        # for an_epoch_name in self.epoch_names:
-        #     is_epoch_idx = (_out_locality_measures_df['correct_paradigm_epoch'] == an_epoch_name)
-        #     _out_locality_measures_df.loc[is_epoch_idx, 'is_non_local_period'] =  np.logical_and((_out_locality_measures_df[f'dist_to_highest_peak_{an_epoch_name}'][is_epoch_idx] >= 0.4), (_out_locality_measures_df[f'mask_overlap_{an_epoch_name}'][is_epoch_idx] < 0.1))
-
-        #     # _out_locality_measures_df.loc[is_sprinkle, 'is_non_local_period'] =  (_out_locality_measures_df[f'dist_to_highest_peak_{an_epoch_name}'][is_sprinkle] >= 0.4)
-
-
         self.locality_measures_df = deepcopy(_out_locality_measures_df)
 
         return self.locality_measures_df
