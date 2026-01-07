@@ -3497,7 +3497,7 @@ class DecodedTrajectoryPyVistaPlotter(DecodedTrajectoryPlotter):
         # print(f'.on_update_slider_epoch_time_bin(value: {value})')
         assert self.p is not None
         self.curr_time_bin_index = int(value) # update `self.curr_time_bin_index` 
-        a_posterior_p_x_given_n, a_time_bin_centers, an_extra_rendering_info = self.get_curr_posterior(an_epoch_idx=self.curr_epoch_idx, time_bin_index=self.curr_time_bin_index)
+        a_posterior_p_x_given_n, a_time_bin_centers = self.get_curr_posterior(an_epoch_idx=self.curr_epoch_idx, time_bin_index=self.curr_time_bin_index)
 
         ## remove existing actors if they exist and are needed:
         self.perform_clear_existing_decoded_trajectory_plots()
@@ -3529,7 +3529,7 @@ class DecodedTrajectoryPyVistaPlotter(DecodedTrajectoryPlotter):
                 peak_prominence_kwargs_copy = self.peak_prominence_kwargs.copy()
                 peak_prominence_kwargs_copy.pop('debug_print', None)
                 
-                multiplier_factor = an_extra_rendering_info.get('multiplier_factor', 1.0)
+                # multiplier_factor = an_extra_rendering_info.get('multiplier_factor', 1.0)
                 
                 all_peaks_data, all_peaks_actors = _render_posterior_peak_prominence_2d_results_on_pyvista_plotter(
                     self.p,
@@ -3561,7 +3561,7 @@ class DecodedTrajectoryPyVistaPlotter(DecodedTrajectoryPlotter):
         if value is None:
             value = np.arange(self.curr_n_time_bins)
         self.curr_time_bin_index = value # update `self.curr_time_bin_index` 
-        a_posterior_p_x_given_n, a_time_bin_centers, an_extra_rendering_info = self.get_curr_posterior(an_epoch_idx=self.curr_epoch_idx, time_bin_index=value)
+        a_posterior_p_x_given_n, a_time_bin_centers = self.get_curr_posterior(an_epoch_idx=self.curr_epoch_idx, time_bin_index=value)
 
         ## remove existing actors if they exist and are needed:
         self.perform_clear_existing_decoded_trajectory_plots()
@@ -3661,7 +3661,7 @@ class DecodedTrajectoryPyVistaPlotter(DecodedTrajectoryPlotter):
 
 
     def get_curr_posterior(self, an_epoch_idx: int = 0, time_bin_index:Union[int, NDArray]=0):
-        a_posterior_p_x_given_n, a_time_bin_centers, an_extra_rendering_info = self._perform_get_curr_posterior(a_result=self.a_result, an_epoch_idx=an_epoch_idx, time_bin_index=time_bin_index)
+        a_posterior_p_x_given_n, a_time_bin_centers = self._perform_get_curr_posterior(a_result=self.a_result, an_epoch_idx=an_epoch_idx, time_bin_index=time_bin_index)
         n_epoch_timebins: int = len(a_time_bin_centers)
 
         if np.ndim(a_posterior_p_x_given_n) > 2:
@@ -3698,7 +3698,7 @@ class DecodedTrajectoryPyVistaPlotter(DecodedTrajectoryPlotter):
         assert n_xbins == np.shape(self.xbin_centers)[0], f"n_xbins: {n_xbins} != np.shape(xbin_centers)[0]: {np.shape(self.xbin_centers)}"
         assert n_ybins == np.shape(self.ybin_centers)[0], f"n_ybins: {n_ybins} != np.shape(ybin_centers)[0]: {np.shape(self.ybin_centers)}"
         # assert len(xbin_centers) == np.shape(a_result.p_x_given_n_list[an_epoch_idx])[0], f"np.shape(a_result.p_x_given_n_list[an_epoch_idx]): {np.shape(a_result.p_x_given_n_list[an_epoch_idx])}, len(xbin_centers): {len(xbin_centers)}"
-        return a_posterior_p_x_given_n, a_time_bin_centers, extra_rendering_info
+        return a_posterior_p_x_given_n, a_time_bin_centers
     
 
     @classmethod
@@ -3721,7 +3721,7 @@ class DecodedTrajectoryPyVistaPlotter(DecodedTrajectoryPlotter):
         # print(f'min_v: {min_v}, max_v: {max_v}')
         multiplier_factor: float = desired_max_height / (float(max_v) - float(min_v))
         # print(f'multiplier_factor: {multiplier_factor}')
-        extra_rendering_info = dict(min_v=min_v, max_v=max_v, multiplier_factor=multiplier_factor)
+        # extra_rendering_info = dict(min_v=min_v, max_v=max_v, multiplier_factor=multiplier_factor)
 
 
         ## get the specific time_bin_index posterior:
@@ -3734,7 +3734,7 @@ class DecodedTrajectoryPyVistaPlotter(DecodedTrajectoryPlotter):
             # n_xbins, n_ybins = np.shape(a_posterior_p_x_given_n_all_t) ???
             a_posterior_p_x_given_n = np.squeeze(a_posterior_p_x_given_n_all_t[:, time_bin_index])
         a_posterior_p_x_given_n = a_posterior_p_x_given_n * multiplier_factor # multiply by the desired multiplier factor
-        return a_posterior_p_x_given_n, a_time_bin_centers, extra_rendering_info
+        return a_posterior_p_x_given_n, a_time_bin_centers
 
 
 
