@@ -967,6 +967,10 @@ def _compute_single_posterior_slab(epoch_idx: int, t_idx: int, slab: NDArray, xb
     return epoch_idx, t_idx, posterior_peaks_df, slab_result_dict
 
 
+
+# ==================================================================================================================================================================================================================================================================================== #
+# Main Computations                                                                                                                                                                                                                                                                    #
+# ==================================================================================================================================================================================================================================================================================== #
 @metadata_attributes(short_name=None, tags=['peak', 'promenence-2d', 'promenence', 'helper'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-12-21 00:00', related_items=[])
 class PeakPromenence:
     """ 
@@ -1895,11 +1899,245 @@ class PeakPromenence:
 
 
 
+# ==================================================================================================================================================================================================================================================================================== #
+# Metrics/Scoring                                                                                                                                                                                                                                                                      #
+# ==================================================================================================================================================================================================================================================================================== #
+
+class PeakPromenenceMetrics:
+    """
+
+    Usage:
+        from pyphoplacecellanalysis.External.peak_prominence2d import PeakPromenenceMetrics
+
+
+        # After calling _compute_single_posterior_slab:
+        epoch_idx, t_idx, posterior_peaks_df, slab_result_dict = _compute_single_posterior_slab(...)
+
+        # Score the slab
+        score_result = score_slab_quality(
+            slab_result_dict=slab_result_dict,
+            posterior_peaks_df=posterior_peaks_df,
+            xbin_centers=xbin_centers,
+            ybin_centers=ybin_centers,
+            max_reasonable_peak_distance=50.0,  # cm, adjust for your maze
+            close_peak_distance_threshold=5.0    # cm, adjust for bin spacing
+        )
+
+        if score_result['is_well_localized']:
+            # This slab represents a specific decoded position
+            print(f"Good slab at epoch {epoch_idx}, t {t_idx}: score = {score_result['overall_score']:.3f}")
+        else:
+            # Too diffuse or disparate peaks
+            print(f"Reject slab at epoch {epoch_idx}, t {t_idx}: score = {score_result['overall_score']:.3f}")
+            print(f"  Components: {score_result['score_components']}")
+
+
+    """
+    @classmethod
+    def score_slab_quality(cls, slab_result_dict: dict, posterior_peaks_df: pd.DataFrame, xbin_centers: NDArray, ybin_centers: NDArray, 
+                        max_reasonable_peak_distance: float = None, min_contour_size_threshold: float = 0.5,
+                        close_peak_distance_threshold: float = None) -> dict:
+        """
+        Score the quality of a posterior slab based on peak prominence and spatial distribution.
+        
+        Returns a score dict with:
+        - 'overall_score': float in [0, 1], higher = better (more localized, single position)
+        - 'is_well_localized': bool, True if represents a specific decoded position
+        - 'score_components': dict with individual component scores
+        
+        Parameters:
+        -----------
+        slab_result_dict : dict
+            Contains 'peaks', 'slab', 'id_map', 'prominence_map', 'parent_map'
+        posterior_peaks_df : pd.DataFrame
+            DataFrame with peak information (one row per peak-slice combination)
+        xbin_centers, ybin_centers : NDArray
+            Spatial coordinates
+        max_reasonable_peak_distance : float, optional
+            Maximum reasonable distance between peaks (e.g., maze diagonal). 
+            If None, uses 2 * max(xbin_centers.ptp(), ybin_centers.ptp())
+        min_contour_size_threshold : float
+            Multiplier for contour size threshold (relative to bin spacing)
+        close_peak_distance_threshold : float, optional
+            Distance below which peaks are considered "close" (same blob).
+            If None, uses 3 * mean bin spacing
+        """
+        import numpy as np
+        from scipy.spatial.distance import cdist
+        
+        peaks_dict = slab_result_dict['peaks']
+        slab = slab_result_dict['slab']
+        
+        n_peaks = len(peaks_dict)
+        if n_peaks == 0:
+            return {
+                'overall_score': 0.0,
+                'is_well_localized': False,
+                'score_components': {
+                    'n_peaks': 0,
+                    'dominant_prominence_score': 0.0,
+                    'peak_clustering_score': 0.0,
+                    'spatial_dispersion_score': 0.0,
+                    'concentration_score': 0.0,
+                    'diffuseness_penalty': 1.0
+                }
+            }
+        
+        # Compute spatial scales
+        x_spacing = np.mean(np.diff(np.sort(xbin_centers))) if len(xbin_centers) > 1 else 1.0
+        y_spacing = np.mean(np.diff(np.sort(ybin_centers))) if len(ybin_centers) > 1 else 1.0
+        mean_bin_spacing = np.mean([x_spacing, y_spacing])
+        
+        if max_reasonable_peak_distance is None:
+            max_reasonable_peak_distance = 2.0 * max(xbin_centers.ptp(), ybin_centers.ptp())
+        
+        if close_peak_distance_threshold is None:
+            close_peak_distance_threshold = 3.0 * mean_bin_spacing
+        
+        # Extract peak information
+        peak_centers = np.array([peak['center'] for peak in peaks_dict.values()])
+        peak_heights = np.array([peak['height'] for peak in peaks_dict.values()])
+        peak_prominences = np.array([peak['prominence'] for peak in peaks_dict.values()])
+        peak_parents = np.array([peak['parent'] for peak in peaks_dict.values()])
+        peak_ids = np.array(list(peaks_dict.keys()))
+        
+        # Sort by prominence (descending)
+        sort_idx = np.argsort(peak_prominences)[::-1]
+        peak_prominences_sorted = peak_prominences[sort_idx]
+        peak_heights_sorted = peak_heights[sort_idx]
+        peak_centers_sorted = peak_centers[sort_idx]
+        
+        # === COMPONENT 1: Dominant Peak Prominence Score ===
+        # High prominence = distinct, well-separated peak
+        max_prominence = peak_prominences_sorted[0]
+        max_height = peak_heights_sorted[0]
+        
+        # Normalize prominence relative to peak height (prominence/height ratio)
+        # Higher ratio = more distinct peak
+        prominence_ratio = max_prominence / max_height if max_height > 0 else 0.0
+        dominant_prominence_score = np.clip(prominence_ratio, 0.0, 1.0)
+        
+        # === COMPONENT 2: Peak Clustering Score ===
+        # Check if peaks are close together (acceptable) vs far apart (bad)
+        if n_peaks == 1:
+            peak_clustering_score = 1.0  # Perfect: single peak
+        else:
+            # Compute pairwise distances
+            pairwise_distances = cdist(peak_centers, peak_centers)
+            # Remove diagonal (self-distances)
+            pairwise_distances = pairwise_distances[np.triu_indices(n_peaks, k=1)]
+            
+            # Check parent relationships: peaks with same parent are likely part of same structure
+            # Count how many peaks share the dominant peak as parent
+            dominant_peak_id = peak_ids[sort_idx[0]]
+            children_of_dominant = np.sum(peak_parents == dominant_peak_id)
+            
+            # Score based on:
+            # 1. How many peaks are "close" (within threshold)
+            # 2. How many share parent relationship with dominant peak
+            close_peaks_ratio = np.sum(pairwise_distances < close_peak_distance_threshold) / len(pairwise_distances)
+            parent_relationship_score = (children_of_dominant + 1) / n_peaks  # +1 for dominant itself
+            
+            # Combined: prefer many close peaks or peaks with parent relationships
+            peak_clustering_score = 0.6 * close_peaks_ratio + 0.4 * parent_relationship_score
+        
+        # === COMPONENT 3: Spatial Dispersion Score ===
+        # Penalize widely separated peaks (positional impossibility)
+        if n_peaks == 1:
+            spatial_dispersion_score = 1.0
+        else:
+            max_pairwise_distance = np.max(pairwise_distances)
+            # Score: 1.0 if all peaks close, 0.0 if max distance > max_reasonable_peak_distance
+            spatial_dispersion_score = 1.0 - np.clip(
+                (max_pairwise_distance - close_peak_distance_threshold) / 
+                (max_reasonable_peak_distance - close_peak_distance_threshold),
+                0.0, 1.0
+            )
+        
+        # === COMPONENT 4: Concentration Score ===
+        # Check if probability mass is concentrated vs diffuse
+        # Use contour sizes at a low threshold (e.g., 0.5 * peak height)
+        # Get the lowest probe level from the DataFrame
+        if len(posterior_peaks_df) > 0:
+            # Get contours at lowest threshold for dominant peak
+            dominant_peak_id = peak_ids[sort_idx[0]]
+            dominant_peak_rows = posterior_peaks_df[
+                (posterior_peaks_df['summit_idx'] == dominant_peak_id)
+            ]
+            
+            if len(dominant_peak_rows) > 0:
+                # Use the lowest slice level (highest multiplier = closer to peak)
+                lowest_slice = dominant_peak_rows.loc[
+                    dominant_peak_rows['slice_level_multiplier'].idxmin()
+                ]
+                
+                # Get contour dimensions
+                contour_width = lowest_slice['summit_slice_x_width']
+                contour_height = lowest_slice['summit_slice_y_width']
+                contour_area = contour_width * contour_height
+                
+                # Compare to expected size for a well-localized peak
+                # Expected size ~ (2-3 bins)^2 for a tight peak
+                expected_area = (2.5 * mean_bin_spacing) ** 2
+                area_ratio = expected_area / contour_area if contour_area > 0 else 0.0
+                
+                # Score: 1.0 if contour is small (concentrated), 0.0 if very large (diffuse)
+                concentration_score = np.clip(area_ratio, 0.0, 1.0)
+            else:
+                concentration_score = 0.5  # Default if no contour data
+        else:
+            concentration_score = 0.5
+        
+        # === COMPONENT 5: Diffuseness Penalty ===
+        # Additional check: compare total slab variance to peak concentration
+        slab_max = np.nanmax(slab)
+        slab_mean = np.nanmean(slab)
+        slab_std = np.nanstd(slab)
+        
+        # If std is high relative to max, distribution is diffuse
+        # If most values are similar to max, it's concentrated
+        concentration_ratio = (slab_max - slab_mean) / (slab_std + 1e-10)
+        # Higher ratio = more concentrated
+        diffuseness_penalty = 1.0 - np.clip(1.0 / (1.0 + concentration_ratio), 0.0, 1.0)
+        
+        # === COMBINE SCORES ===
+        # Weighted combination (adjust weights based on your priorities)
+        overall_score = (
+            0.30 * dominant_prominence_score +      # How distinct is the main peak?
+            0.25 * peak_clustering_score +          # Are peaks close together?
+            0.20 * spatial_dispersion_score +       # Are peaks too far apart?
+            0.15 * concentration_score +            # Is probability mass concentrated?
+            0.10 * diffuseness_penalty              # Penalty for diffuse distributions
+        )
+        
+        # Threshold for "well localized"
+        # Adjust threshold based on your needs (0.6-0.7 is reasonable)
+        is_well_localized = overall_score >= 0.65
+        
+        return {
+            'overall_score': overall_score,
+            'is_well_localized': is_well_localized,
+            'score_components': {
+                'n_peaks': n_peaks,
+                'dominant_prominence_score': dominant_prominence_score,
+                'peak_clustering_score': peak_clustering_score,
+                'spatial_dispersion_score': spatial_dispersion_score,
+                'concentration_score': concentration_score,
+                'diffuseness_penalty': diffuseness_penalty,
+                'max_pairwise_distance': np.max(pairwise_distances) if n_peaks > 1 else 0.0,
+                'dominant_prominence': max_prominence,
+                'dominant_height': max_height
+            }
+        }
 
 
 
 
-#-------------------Plot------------------------
+
+# ==================================================================================================================================================================================================================================================================================== #
+# Plotting/Figures                                                                                                                                                                                                                                                                     #
+# ==================================================================================================================================================================================================================================================================================== #
+
 import matplotlib.pyplot as plt
 # from mpl_toolkits.mplot3d import Axes3D
 
