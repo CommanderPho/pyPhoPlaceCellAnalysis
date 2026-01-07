@@ -177,14 +177,14 @@ def contourGeoArea(contour,bmap=None):
     return result
 
 
-def getProminence(var, step, ybin_centers=None, xbin_centers=None, min_depth=None, include_edge=True, min_area=None, max_area=None, area_func=contourArea, centroid_num_to_center=5, allow_hole=True, max_hole_area=None, verbose=False):
+def getProminence(var, step, ybin_centers=None, xbin_centers=None, min_considered_promenence=None, include_edge=True, min_area=None, max_area=None, area_func=contourArea, centroid_num_to_center=5, allow_hole=True, max_hole_area=None, verbose=False):
     '''Find 2d prominences of peaks.
 
     <var>: 2D ndarray, data to find local maxima. Missings (nans) are masked.
     <step>: float, contour interval. Finer (smaller) interval gives better accuarcy.
     <ybin_centers>, <xbin_centers>: 1d array, y and x coordinates of <var>. If not given,
                     use int indices.
-    <min_depth>: float, filter out peaks with prominence smaller than this.
+    <min_considered_promenence>: float, filter out peaks with prominence smaller than this.
     <include_edge>: bool, whether to include unclosed contours that touch
                     the edges of the data, useful to include incomplete
                     contours.
@@ -209,13 +209,13 @@ def getProminence(var, step, ybin_centers=None, xbin_centers=None, min_depth=Non
                      values: dict, storing info of a peak:
             'id'        : int, id of peak,
             'height'    : max of height level,
-            'col_level' : height level at col,
+            'col_level' : height level (altitude) at col (saddle),
             'prominence': prominence of peak,
             'area'      : float, area of col contour. If latitude and 
                           longitude axes available, geographical area in
                           km^2. Otherwise, area in unit^2, unit is the same
                           as x, y axes,
-            'contours'  : list, contours of peak from heights level to col,
+            'contours'  : list, contours of peak from peak summit down to col (saddle),
                           each being a matplotlib Path obj
             'parent'    : int, id of a peak's parent. Heightest peak as a
                           parent id of 0.
@@ -444,10 +444,10 @@ def getProminence(var, step, ybin_centers=None, xbin_centers=None, min_depth=Non
                         peaks[max_idx].append(contjj)
 
                     #---------------Filter by prominence---------------
-                    if min_depth is not None and len(match_list)>1:
+                    if min_considered_promenence is not None and len(match_list)>1:
                         match_list2=[]
                         for mm in match_list:
-                            if prominence[mm]<min_depth:
+                            if prominence[mm]<min_considered_promenence:
                                 del peaks[mm]
                                 del prominence[mm]
                                 if mm in parents:
@@ -481,7 +481,7 @@ def getProminence(var, step, ybin_centers=None, xbin_centers=None, min_depth=Non
         prokk=prominence[kk]
 
         #-------Use first few centroids to get center-------
-        nc = min(centroid_num_to_center,len(vv))
+        nc: int = min(centroid_num_to_center,len(vv))
         centerkk=np.array([jj.vertices.mean(axis=0) for jj in vv[:nc]])
         centerkk=np.mean(centerkk,axis=0)
 
@@ -538,7 +538,7 @@ def compute_prominence_contours(xbin_centers: NDArray, ybin_centers: NDArray, sl
         figure, (ax1, ax2, ax3, ax4) = PeakPromenenceDisplay.plot_Prominence(xx, yy, slab, peaks, idmap, promap, parentmap, debug_print=False)
 
     """
-    peaks_dict, id_map, prominence_map, parent_map = getProminence(slab, step, ybin_centers=ybin_centers, xbin_centers=xbin_centers, min_area=min_area, min_depth=min_considered_promenence, include_edge=include_edge, verbose=verbose, **kwargs)
+    peaks_dict, id_map, prominence_map, parent_map = getProminence(slab, step, ybin_centers=ybin_centers, xbin_centers=xbin_centers, min_area=min_area, min_considered_promenence=min_considered_promenence, include_edge=include_edge, verbose=verbose, **kwargs)
     return xbin_centers, ybin_centers, slab, peaks_dict, id_map, prominence_map, parent_map
 
 
