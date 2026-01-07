@@ -3869,7 +3869,11 @@ class DecoderRenderingPyVistaMixin:
 
 
     @classmethod
-    def perform_plot_posterior_fn(cls, p, xbin, ybin, xbin_centers, ybin_centers, posterior_p_x_given_n, time_bin_centers=None, enable_point_labels: bool = True, point_labeling_function=None, point_masking_function=None, posterior_name='P_x_given_n', active_plot_fn=None):
+    def perform_plot_posterior_fn(
+        cls, p, xbin, ybin, xbin_centers, ybin_centers, posterior_p_x_given_n, time_bin_centers=None,
+        enable_point_labels: bool = True, point_labeling_function=None, point_masking_function=None,
+        posterior_name='P_x_given_n', active_plot_fn=None, **kwargs
+    ):
         """ called to perform the mesh generation and add_mesh calls
         
         Looks like it switches between 3 different potential plotting functions, all imported directly below
@@ -3879,9 +3883,11 @@ class DecoderRenderingPyVistaMixin:
         """
         from pyphoplacecellanalysis.Pho3D.PyVista.graphs import plot_3d_binned_bars, plot_3d_stem_points, plot_3d_smooth_mesh, plot_point_labels
 
+        drop_below_threshold = kwargs.pop('drop_below_threshold', None)
+        opacity = kwargs.pop('opacity', 0.75)
+
         if active_plot_fn is None:
             ## Defaults to `plot_3d_binned_bars` if nothing else is provided     
-
             active_plot_fn = plot_3d_binned_bars
             # active_plot_fn = plot_3d_stem_points
         
@@ -3895,9 +3901,10 @@ class DecoderRenderingPyVistaMixin:
 
         is_single_time_bin_posterior_plot: bool = (np.ndim(posterior_p_x_given_n) < 3)
         if is_single_time_bin_posterior_plot:
-        
-            # plotActors, data_dict = active_plot_fn(p, xbin, ybin, posterior_p_x_given_n, drop_below_threshold=1E-6, name=posterior_name, opacity=0.75)
-            plotActors, data_dict = active_plot_fn(p, active_xbins, active_ybins, posterior_p_x_given_n, drop_below_threshold=1E-6, name=posterior_name, opacity=0.75)
+            plotActors, data_dict = active_plot_fn(
+                p, active_xbins, active_ybins, posterior_p_x_given_n, name=posterior_name,
+                drop_below_threshold=drop_below_threshold, opacity=opacity, **kwargs
+            )
 
             # , **({'drop_below_threshold': 1e-06, 'name': 'Occupancy', 'opacity': 0.75} | kwargs)
 
@@ -3908,14 +3915,19 @@ class DecoderRenderingPyVistaMixin:
                 point_labeling_function = lambda a_point: f'{a_point[2]:.2f}'
 
             if point_masking_function is None:
-                # point_masking_function = lambda points: points[:, 2] > 20.0
-                point_masking_function = lambda points: points[:, 2] > 1E-6
+                if drop_below_threshold is not None:
+                    # point_masking_function = lambda points: points[:, 2] > 20.0
+                    point_masking_function = lambda points: points[:, 2] > drop_below_threshold
+                else:
+                    point_masking_function = lambda points: points[:, 2] > -1
 
             if enable_point_labels:
-                plotActors_CenterLabels, data_dict_CenterLabels = plot_point_labels(p, xbin_centers, ybin_centers, posterior_p_x_given_n, 
-                                                                                    point_labels=point_labeling_function, 
-                                                                                    point_mask=point_masking_function,
-                                                                                    shape='rounded_rect', shape_opacity= 0.5, show_points=False, name=f'{posterior_name}Labels')
+                plotActors_CenterLabels, data_dict_CenterLabels = plot_point_labels(
+                    p, xbin_centers, ybin_centers, posterior_p_x_given_n, 
+                    point_labels=point_labeling_function, 
+                    point_mask=point_masking_function,
+                    shape='rounded_rect', shape_opacity=0.5, show_points=False, name=f'{posterior_name}Labels'
+                )
             else:
                 plotActors_CenterLabels, data_dict_CenterLabels = None, None
 
@@ -3925,15 +3937,15 @@ class DecoderRenderingPyVistaMixin:
 
             assert np.ndim(posterior_p_x_given_n) == 3
 
-            plotActors, data_dict = plot_3d_binned_bars_timeseries(p=p, xbin=active_xbins, ybin=active_ybins, t_bins=time_bin_centers, data=posterior_p_x_given_n,
-                                           drop_below_threshold=1E-6, name=posterior_name, opacity=0.75, active_plot_fn=active_plot_fn)
+            plotActors, data_dict = plot_3d_binned_bars_timeseries(
+                p=p, xbin=active_xbins, ybin=active_ybins, t_bins=time_bin_centers, data=posterior_p_x_given_n, name=posterior_name,
+                drop_below_threshold=drop_below_threshold, opacity=opacity, active_plot_fn=active_plot_fn, **kwargs
+            )
             
             if enable_point_labels:
                 print(f'WARN: enable_point_labels is not currently implemented for multi-time-bin plotting mode.')
 
             plotActors_CenterLabels, data_dict_CenterLabels = None, None
-
-
 
         return (plotActors, data_dict), (plotActors_CenterLabels, data_dict_CenterLabels)
 
