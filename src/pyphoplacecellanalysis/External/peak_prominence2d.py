@@ -2135,6 +2135,177 @@ class PeakPromenenceMetrics:
             }
         }
 
+    @classmethod
+    def score_all_slabs_quality(cls, a_pf_promenence_result_obj: PosteriorPeaksPeakProminence2dResult, max_reasonable_peak_distance: float = None, min_contour_size_threshold: float = 0.5, close_peak_distance_threshold: float = None) -> Dict[Any, dict]:
+        """
+        Score the quality of all posterior slabs in a PosteriorPeaksPeakProminence2dResult object.
+        
+        Iterates through all slabs in the result object and calls score_slab_quality for each,
+        returning a dictionary of scores keyed by the same keys as the results dictionary.
+        Supports both time-dependent posterior results (tuple keys like (epoch_idx, time_bin_idx))
+        and placefield/ratemap results (integer keys like neuron_id).
+        
+        Parameters:
+        -----------
+        a_pf_promenence_result_obj : PosteriorPeaksPeakProminence2dResult
+            The result object containing all computed slab results. Can represent:
+            - Time-dependent 2D position posterior decoding results (keys: (epoch_idx, time_bin_idx) tuples)
+            - 2D ratemap/tuning curve results (keys: neuron_id integers)
+        max_reasonable_peak_distance : float, optional
+            Maximum reasonable distance between peaks (e.g., maze diagonal). 
+            If None, uses 2 * max(xbin_centers.ptp(), ybin_centers.ptp())
+        min_contour_size_threshold : float
+            Multiplier for contour size threshold (relative to bin spacing)
+        close_peak_distance_threshold : float, optional
+            Distance below which peaks are considered "close" (same blob).
+            If None, uses 3 * mean bin spacing
+            
+        Returns:
+        --------
+        Dict[Any, dict]
+            Dictionary keyed by the same keys as a_pf_promenence_result_obj.results (e.g., 
+            (epoch_idx, time_bin_idx) tuples for posterior results, or neuron_id integers for 
+            placefield results). Each value is a score dict containing:
+            - 'overall_score': float in [0, 1], higher = better (more localized, single position)
+            - 'is_well_localized': bool, True if represents a specific decoded position
+            - 'score_components': dict with individual component scores
+            
+        Example:
+        --------
+        >>> from pyphoplacecellanalysis.External.peak_prominence2d import PeakPromenenceMetrics
+        >>> # For time-dependent posterior results (tuple keys)
+        >>> all_scores = PeakPromenenceMetrics.score_all_slabs_quality(
+        ...     a_pf_promenence_result_obj=posterior_peaks_result,
+        ...     max_reasonable_peak_distance=50.0,
+        ...     close_peak_distance_threshold=5.0
+        ... )
+        >>> epoch_idx, time_bin_idx = 0, 10
+        >>> slab_score = all_scores[(epoch_idx, time_bin_idx)]
+        >>> 
+        >>> # For placefield/ratemap results (integer keys)
+        >>> all_scores = PeakPromenenceMetrics.score_all_slabs_quality(
+        ...     a_pf_promenence_result_obj=placefield_prominence_result
+        ... )
+        >>> neuron_id = 5
+        >>> slab_score = all_scores[neuron_id]
+        """
+        # Extract spatial coordinates and flat peaks DataFrame
+        xbin_centers = a_pf_promenence_result_obj.xx
+        ybin_centers = a_pf_promenence_result_obj.yy
+        flat_peaks_df = a_pf_promenence_result_obj.flat_peaks_df
+        
+        # Dictionary to store scores for all slabs
+        all_scores = {}
+        
+        # Check if flat_peaks_df has epoch_idx and time_bin_idx columns (for time-dependent posterior results)
+        has_epoch_time_columns = len(flat_peaks_df) > 0 and 'epoch_idx' in flat_peaks_df.columns and 'time_bin_idx' in flat_peaks_df.columns
+        
+        # Iterate through all slabs in the results
+        for result_key, slab_result_dict in a_pf_promenence_result_obj.results.items():
+            # Determine how to filter flat_peaks_df based on the result_key type and available columns
+            slab_posterior_peaks_df = pd.DataFrame()  # Default to empty DataFrame
+            
+            # Handle different key formats
+            if isinstance(result_key, (int, float)):
+                # Integer/float key (e.g., neuron_id for placefield/ratemap results)
+                an_idx = int(result_key)
+                if has_epoch_time_columns:
+                    # Try to filter by epoch_idx and time_bin_idx if available
+                    # For integer keys with epoch/time columns, we might need to map them
+                    # But for placefield results, we may not have epoch/time columns, so use all or filter by other identifier
+                    if 'neuron_id' in flat_peaks_df.columns or 'cell_id' in flat_peaks_df.columns:
+                        # Filter by neuron/cell identifier if available
+                        id_col = 'neuron_id' if 'neuron_id' in flat_peaks_df.columns else 'cell_id'
+                        slab_posterior_peaks_df = flat_peaks_df[flat_peaks_df[id_col] == an_idx]
+                    else:
+                        # No identifier column - use all peaks for this result (or empty if we can't match)
+                        # For placefield results, all peaks might belong to the same neuron, so use all
+                        slab_posterior_peaks_df = flat_peaks_df.copy()
+                else:
+                    # No epoch/time columns - this is likely a placefield/ratemap result
+                    # Try to filter by identifier if available, otherwise use all
+                    if 'neuron_id' in flat_peaks_df.columns or 'cell_id' in flat_peaks_df.columns:
+                        id_col = 'neuron_id' if 'neuron_id' in flat_peaks_df.columns else 'cell_id'
+                        slab_posterior_peaks_df = flat_peaks_df[flat_peaks_df[id_col] == an_idx]
+                    else:
+                        # No identifier column - use all peaks (assumes all peaks belong to this result)
+                        slab_posterior_peaks_df = flat_peaks_df.copy()
+            elif isinstance(result_key, tuple) and len(result_key) == 2:
+                # Tuple key (epoch_idx, time_bin_idx) for time-dependent posterior results
+                epoch_idx, time_bin_idx = result_key
+                if has_epoch_time_columns:
+                    slab_posterior_peaks_df = flat_peaks_df[
+                        (flat_peaks_df['epoch_idx'] == epoch_idx) & 
+                        (flat_peaks_df['time_bin_idx'] == time_bin_idx)
+                    ]
+                else:
+                    # Tuple key but no epoch/time columns - use all peaks
+                    slab_posterior_peaks_df = flat_peaks_df.copy()
+            elif isinstance(result_key, (list, np.ndarray)) and len(result_key) == 2:
+                # List/array key - treat as (epoch_idx, time_bin_idx) if columns exist
+                epoch_idx, time_bin_idx = int(result_key[0]), int(result_key[1])
+                if has_epoch_time_columns:
+                    slab_posterior_peaks_df = flat_peaks_df[
+                        (flat_peaks_df['epoch_idx'] == epoch_idx) & 
+                        (flat_peaks_df['time_bin_idx'] == time_bin_idx)
+                    ]
+                else:
+                    slab_posterior_peaks_df = flat_peaks_df.copy()
+            elif hasattr(result_key, '__iter__') and not isinstance(result_key, (str, bytes)):
+                # Try to convert iterable to tuple
+                result_key_tuple = tuple(result_key)
+                if len(result_key_tuple) == 2:
+                    epoch_idx, time_bin_idx = int(result_key_tuple[0]), int(result_key_tuple[1])
+                    if has_epoch_time_columns:
+                        slab_posterior_peaks_df = flat_peaks_df[
+                            (flat_peaks_df['epoch_idx'] == epoch_idx) & 
+                            (flat_peaks_df['time_bin_idx'] == time_bin_idx)
+                        ]
+                    else:
+                        slab_posterior_peaks_df = flat_peaks_df.copy()
+                else:
+                    # Unknown iterable format - use all peaks
+                    slab_posterior_peaks_df = flat_peaks_df.copy()
+            else:
+                # Unknown key format - use all peaks (score_slab_quality can handle this)
+                slab_posterior_peaks_df = flat_peaks_df.copy()
+            
+            # Call score_slab_quality for this slab
+            slab_score = cls.score_slab_quality(
+                slab_result_dict=slab_result_dict,
+                posterior_peaks_df=slab_posterior_peaks_df,
+                xbin_centers=xbin_centers,
+                ybin_centers=ybin_centers,
+                max_reasonable_peak_distance=max_reasonable_peak_distance,
+                min_contour_size_threshold=min_contour_size_threshold,
+                close_peak_distance_threshold=close_peak_distance_threshold
+            )
+            
+            # Store the score in the results dictionary using the original result_key
+            all_scores[result_key] = slab_score
+        
+
+        # One-liner approach using pd.json_normalize (if keys are simple)
+        # For tuple keys, you might want to expand them first
+        rows = []
+        for key, score_dict in all_scores.items():
+            row = {'result_key': key}
+            if isinstance(key, tuple) and len(key) == 2:
+                row['epoch_idx'] = key[0]
+                row['time_bin_idx'] = key[1]
+            row.update({
+                'overall_score': score_dict['overall_score'],
+                'is_well_localized': score_dict['is_well_localized']
+            })
+            # Flatten score_components
+            for comp_key, comp_val in score_dict['score_components'].items():
+                row[comp_key] = comp_val
+            rows.append(row)
+
+        all_scores_df = pd.DataFrame(rows)
+
+        return all_scores_df, all_scores
+
 
 
 
