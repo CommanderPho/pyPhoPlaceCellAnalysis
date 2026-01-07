@@ -1371,6 +1371,7 @@ class Epoch3DSceneTimeBinViewer(qt.QWidget):
         # If no 't' column, return full dataframe
         return self.locality_measures_df
     
+
     def _update_table_for_current_epoch(self):
         """Update the table to show only rows for the current epoch."""
         if self.locality_measures_table is None or not self.is_point_like_mode:
@@ -1414,6 +1415,7 @@ class Epoch3DSceneTimeBinViewer(qt.QWidget):
         # Resize columns to fit content
         self.locality_measures_table.resizeColumnsToContents()
     
+
     def _match_time_bin_to_dataframe_row(self, t_bin_idx: int) -> Optional[pd.Series]:
         """Match a time bin index to a dataframe row using start/stop times.
         
@@ -1471,6 +1473,7 @@ class Epoch3DSceneTimeBinViewer(qt.QWidget):
             return matching_rows.iloc[0]
         return None
     
+
     def _get_text_label_string(self, t_bin_idx: int) -> Optional[str]:
         """Get text label string for a time bin.
         
@@ -1499,6 +1502,7 @@ class Epoch3DSceneTimeBinViewer(qt.QWidget):
         
         return "\n".join(label_parts) if label_parts else None
     
+
     def _clear_time_bin_items(self):
         """Remove all time bin items from the scene"""
         for item in self.time_bin_items:
