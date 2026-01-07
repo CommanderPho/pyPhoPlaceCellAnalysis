@@ -628,52 +628,32 @@ def _render_posterior_peak_prominence_2d_results_on_pyvista_plotter(plotter, pos
     # Use white color for posterior peaks by default
     active_curve_color = kwargs.get('active_curve_color', (1.0, 1.0, 1.0))
     
-
-    curr_scale_z = kwargs.pop('multiplier_factor', None)
-    
-    if curr_scale_z is None:
-        ## Compute the appropriate z-scaling factors from the actual height of the posterior mesh:
-        # Prioritize the Elevation scalar (which is what PyVista uses for rendering when scalars='Elevation')
-        # over the actual z-coordinates, since plot_3d_binned_bars sets Elevation = active_data * zScalingFactor
-        posterior_max_z = None
-        
-        # First, try to get the Elevation scalar (this is what's actually used for visual rendering)
-        if hasattr(posterior_pdata, 'GetPointData'):
-            elevation_array = posterior_pdata.GetPointData().GetArray('Elevation')
-            if elevation_array is not None:
+    ## Compute the appropriate z-scaling factors from the actual height of the posterior mesh:
+    # Get the maximum z-value from the posterior mesh
+    if hasattr(posterior_pdata, 'points'):
+        posterior_max_z = np.nanmax(posterior_pdata.points[:, 2])
+    elif hasattr(posterior_pdata, 'GetPoints'):
+        points = posterior_pdata.GetPoints()
+        if points is not None:
+            points_array = points.GetData()
+            posterior_max_z = np.nanmax(points_array[:, 2])
+        else:
+            # Fallback: use the maximum from the elevation scalars if available
+            if hasattr(posterior_pdata, 'GetPointData') and posterior_pdata.GetPointData().GetArray('Elevation') is not None:
+                elevation_array = posterior_pdata.GetPointData().GetArray('Elevation')
                 posterior_max_z = elevation_array.GetRange()[1]
-        elif hasattr(posterior_pdata, 'point_data') and 'Elevation' in posterior_pdata.point_data:
-            elevation_array = posterior_pdata.point_data['Elevation']
-            if elevation_array is not None:
-                posterior_max_z = np.nanmax(elevation_array)
-        
-        # Fallback to z-coordinates if Elevation scalar is not available
-        if posterior_max_z is None:
-            if hasattr(posterior_pdata, 'points'):
-                posterior_max_z = np.nanmax(posterior_pdata.points[:, 2])
-            elif hasattr(posterior_pdata, 'GetPoints'):
-                points = posterior_pdata.GetPoints()
-                if points is not None:
-                    points_array = points.GetData()
-                    posterior_max_z = np.nanmax(points_array[:, 2])
-        
-        # Last resort: use a default scaling
-        if posterior_max_z is None:
-            posterior_max_z = 50.0
-        
-        if debug_print:
-            print(f'posterior_max_z: {posterior_max_z}')
-
-        curr_scale_z = posterior_max_z
-
+            else:
+                # Last resort: use a default scaling
+                posterior_max_z = 50.0
     else:
-        if debug_print:
-            print(f'curr_scale_z was provided by passed `multiplier_factor`: {curr_scale_z}')
-
-        pass
+        # Fallback: use a default scaling
+        print(f'WARN: _render_posterior_peak_prominence_2d_results_on_pyvista_plotter(...): using fallback `posterior_max_z == 50.0`')
+        posterior_max_z = 50.0
     
-    assert curr_scale_z is not None
+    if debug_print:
+        print(f'posterior_max_z: {posterior_max_z}')
     
+    curr_scale_z = posterior_max_z
     if debug_print:
         print(f'curr_scale_z: {curr_scale_z}')
     
