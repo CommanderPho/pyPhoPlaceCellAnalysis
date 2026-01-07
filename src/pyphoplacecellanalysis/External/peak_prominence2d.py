@@ -46,6 +46,7 @@ plt.ioff()  # Disable interactive mode
 
 from scipy.interpolate import interp1d
 from warnings import warn
+
 from pyphocorehelpers.programming_helpers import metadata_attributes
 from pyphocorehelpers.function_helpers import function_attributes
 from attrs import define, field
@@ -54,7 +55,7 @@ from concurrent.futures import ProcessPoolExecutor, as_completed
 import os
 from pyphoplacecellanalysis.General.Model.ComputationResults import ComputedResult
 from neuropy.utils.mixins.AttrsClassHelpers import serialized_field, non_serialized_field
-from neuropy.utils.mixins.indexing_helpers import get_dict_subset
+from neuropy.utils.mixins.indexing_helpers import get_dict_subset, pop_dict_subset
 
 DecodedEpochIndex: TypeAlias = int # an integer index that is an aclu
 DecodedEpochTimeBinIndex: TypeAlias = int # an integer index that is an aclu
@@ -689,6 +690,55 @@ class PosteriorPeaksPeakProminence2dResult(ComputedResult):
     filtered_flat_peaks_df: pd.DataFrame = serialized_field()
     peak_counts: PeakCounts = serialized_field()
 
+    @classmethod
+    def init_from_old_PeakProminence2D_result_dict(cls, active_peak_prominence_2d_results) -> "PosteriorPeaksPeakProminence2dResult":
+        """ 
+
+        Usage:
+            from pyphoplacecellanalysis.External.peak_prominence2d import PosteriorPeaksPeakProminence2dResult
+            
+            
+            ## INPUTS: curr_active_pipeline, active_config_name
+            active_config_name = 'roam'
+            active_peak_prominence_2d_results = curr_active_pipeline.computation_results[active_config_name].computed_data.get('RatemapPeaksAnalysis', {}).get('PeakProminence2D', None)
+            if active_peak_prominence_2d_results is None:
+                curr_active_pipeline.perform_specific_computation(computation_functions_name_includelist=['ratemap_peaks_prominence2d'], enabled_filter_names=[active_config_name], fail_on_exception=True, debug_print=True)
+                # curr_active_pipeline.perform_specific_computation(computation_functions_name_includelist=['ratemap_peaks_prominence2d'], enabled_filter_names=[short_LR_name, short_RL_name, long_any_name, short_any_name], fail_on_exception=False, debug_print=False) # or at least
+                active_peak_prominence_2d_results = curr_active_pipeline.computation_results[active_config_name].computed_data.get('RatemapPeaksAnalysis', {}).get('PeakProminence2D', None)
+                assert active_peak_prominence_2d_results is not None, f"bad even after computation"
+
+            # active_peak_prominence_2d_results ## by default a `DynamicParameters`
+            
+
+            a_pf_promenence_result_obj: PosteriorPeaksPeakProminence2dResult = PosteriorPeaksPeakProminence2dResult.init_from_old_PeakProminence2D_result_dict(active_peak_prominence_2d_results=active_peak_prominence_2d_results)
+            ## OUTPUTS: a_pf_promenence_result_obj
+            
+
+        """
+        # Pop specific keys
+        if not isinstance(active_peak_prominence_2d_results, dict):
+            _active_peak_prominence_2d_results_dict = active_peak_prominence_2d_results.to_dict()
+        else:
+            _active_peak_prominence_2d_results_dict = active_peak_prominence_2d_results
+
+        _ignore_re_add_subset = ['_VersionedResultMixin_version']
+
+        _potential_subset_includelist = ['neuron_extended_ids', '_VersionedResultMixin_version']
+
+        subset_includelist = [a_col for a_col in _potential_subset_includelist if a_col in _active_peak_prominence_2d_results_dict] ## only exclude real columns
+        
+        popped_subset = pop_dict_subset(_active_peak_prominence_2d_results_dict, subset_includelist=subset_includelist)
+        ## INPUTS: active_peak_prominence_2d_results
+        a_pf_promenence_result_obj = cls(**_active_peak_prominence_2d_results_dict)
+        ## add the invalid properties
+        for k, v in popped_subset.items():
+            if k not in _ignore_re_add_subset:
+                setattr(a_pf_promenence_result_obj, k, v)
+
+        return a_pf_promenence_result_obj
+
+
+
     @function_attributes(short_name=None, tags=['efficiency', 'contours'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-01-06 15:54', related_items=[])
     @classmethod
     def perform_convert_paths_to_vertices(cls, result_obj: "PosteriorPeaksPeakProminence2dResult", in_place: bool = False) -> "PosteriorPeaksPeakProminence2dResult":
@@ -912,7 +962,8 @@ def _compute_single_posterior_slab(epoch_idx: int, t_idx: int, slab: NDArray, xb
                 # 'contour': contour,
                 'contour': _subfn_get_contour_curve(contour=contour), # contour_verticies Store as numpy array (N, 2)
                 'bbox': contour.get_extents(),
-                'size': contour.get_extents().size
+                'size': contour.get_extents().size,
+                'area': contourArea(contour) if (contour is not None) else None,  # Add this
             }
             for probe_lvl, contour in included_computed_contours.items()
             if (contour is not None)
@@ -2135,6 +2186,7 @@ class PeakPromenenceMetrics:
             }
         }
 
+
     @classmethod
     def score_all_slabs_quality(cls, a_pf_promenence_result_obj: PosteriorPeaksPeakProminence2dResult, max_reasonable_peak_distance: float = None, min_contour_size_threshold: float = 0.5, close_peak_distance_threshold: float = None) -> Dict[Any, dict]:
         """
@@ -2153,12 +2205,12 @@ class PeakPromenenceMetrics:
             - 2D ratemap/tuning curve results (keys: neuron_id integers)
         max_reasonable_peak_distance : float, optional
             Maximum reasonable distance between peaks (e.g., maze diagonal). 
-            If None, uses 2 * max(xbin_centers.ptp(), ybin_centers.ptp())
+            If None, uses (2 * max(xbin_centers.ptp(), ybin_centers.ptp()))
         min_contour_size_threshold : float
             Multiplier for contour size threshold (relative to bin spacing)
         close_peak_distance_threshold : float, optional
             Distance below which peaks are considered "close" (same blob).
-            If None, uses 3 * mean bin spacing
+            If None, uses (3 * mean bin spacing)
             
         Returns:
         --------
