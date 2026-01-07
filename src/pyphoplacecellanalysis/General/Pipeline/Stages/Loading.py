@@ -117,7 +117,7 @@ def saveData(pkl_path, db, should_append=False, safe_save:bool=True):
         This temporarily requires double the disk space.
         
     Usage:
-        from pyphoplacecellanalysis.General.Pipeline.Stages.Loading import saveData
+        from pyphoplacecellanalysis.General.Pipeline.Stages.Loading import saveData, safeSaveData
 
         saveData('temp.pkl', db)
     """
