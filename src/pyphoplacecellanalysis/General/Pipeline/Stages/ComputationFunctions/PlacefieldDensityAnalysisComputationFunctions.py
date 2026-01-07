@@ -425,7 +425,7 @@ class PlacefieldDensityAnalysisComputationFunctions(AllFunctionEnumeratingMixin,
                 neuron_id = active_pf_2D.neuron_extended_ids[neuron_idx].id #  Inner exception: 'NeuronExtendedIdentity' object has no attribute 'id'
                 neuron_tuning_curve_peak_firing_rate = tuning_curve_peak_firing_rates[neuron_idx]
                 slab = active_tuning_curves[neuron_idx].T
-                _, _, slab, cell_peaks_dict, id_map, prominence_map, parent_map = compute_prominence_contours(xbin_centers=active_pf_2D.xbin_centers, ybin_centers=active_pf_2D.ybin_centers, slab=slab, step=step, min_area=None, min_depth=0.2, include_edge=True, verbose=False)
+                _, _, slab, cell_peaks_dict, id_map, prominence_map, parent_map = compute_prominence_contours(xbin_centers=active_pf_2D.xbin_centers, ybin_centers=active_pf_2D.ybin_centers, slab=slab, step=step, min_area=None, min_considered_promenence=0.2, include_edge=True, verbose=False)
                 #""" Analyze all peaks of a given cell/ratemap """
                 n_peaks = len(cell_peaks_dict)
                 
