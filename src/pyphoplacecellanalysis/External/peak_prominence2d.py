@@ -932,6 +932,7 @@ def _compute_single_posterior_slab(epoch_idx: int, t_idx: int, slab: NDArray, xb
     summit_slice_y_side_length_arr = np.zeros((n_peaks, n_slices), dtype=float)
     summit_slice_center_x_arr = np.zeros((n_peaks, n_slices), dtype=float)
     summit_slice_center_y_arr = np.zeros((n_peaks, n_slices), dtype=float)
+    summit_slice_area_arr = np.zeros((n_peaks, n_slices), dtype=float)
 
     for peak_idx, (peak_id, a_peak_dict) in enumerate(peaks_dict.items()):
         if debug_print:
@@ -977,6 +978,7 @@ def _compute_single_posterior_slab(epoch_idx: int, t_idx: int, slab: NDArray, xb
             a_slice = a_peak_dict['level_slices'].get(probe_lvl, None)
             if a_slice is None:
                 print('WARNING: a_slice is None in posterior prominence computation; skipping this slice.')
+                summit_slice_area_arr[peak_idx, lvl_idx] = np.nan
             else:
                 slice_bbox = a_slice['bbox']
                 (x0, y0, width, height) = slice_bbox.bounds
@@ -985,6 +987,7 @@ def _compute_single_posterior_slab(epoch_idx: int, t_idx: int, slab: NDArray, xb
                 summit_slice_y_side_length_arr[peak_idx, lvl_idx] = height
                 summit_slice_center_x_arr[peak_idx, lvl_idx] = float(x0) + (0.5 * float(width))
                 summit_slice_center_y_arr[peak_idx, lvl_idx] = float(y0) + (0.5 * float(height))
+                summit_slice_area_arr[peak_idx, lvl_idx] = a_slice.get('area', np.nan)
 
     if debug_print:
         print(f'building peak_df for epoch[{epoch_idx}], t[{t_idx}] with {n_peaks} peaks...')
@@ -1006,7 +1009,8 @@ def _compute_single_posterior_slab(epoch_idx: int, t_idx: int, slab: NDArray, xb
         'summit_slice_x_width': summit_slice_x_side_length_arr.flatten(),
         'summit_slice_y_width': summit_slice_y_side_length_arr.flatten(),
         'summit_slice_center_x': summit_slice_center_x_arr.flatten(),
-        'summit_slice_center_y': summit_slice_center_y_arr.flatten()
+        'summit_slice_center_y': summit_slice_center_y_arr.flatten(),
+        'summit_slice_area': summit_slice_area_arr.flatten()
     })
     posterior_peaks_df['peak_height'] = peak_relative_height_flat
 
@@ -1794,6 +1798,7 @@ class PeakPromenence:
                 summit_slice_y_side_length_arr = np.zeros((n_peaks, n_slices), dtype=float)
                 summit_slice_center_x_arr = np.zeros((n_peaks, n_slices), dtype=float)
                 summit_slice_center_y_arr = np.zeros((n_peaks, n_slices), dtype=float)
+                summit_slice_area_arr = np.zeros((n_peaks, n_slices), dtype=float)
                 
                 for peak_idx in range(n_peaks):
                     # peak_coords is (N, 2) with [x_idx, y_idx] in original array coordinates
@@ -1833,7 +1838,8 @@ class PeakPromenence:
                     a_peak_dict['level_slices'] = {
                         probe_lvl: {'contour': contour,
                                     'bbox': contour.get_extents(),
-                                    'size': contour.get_extents().size}
+                                    'size': contour.get_extents().size,
+                                    'area': contourArea(contour) if (contour is not None) else None}
                         for probe_lvl, contour in included_computed_contours.items()
                         if (contour is not None)
                     }
@@ -1860,6 +1866,7 @@ class PeakPromenence:
                             summit_slice_y_side_length_arr[peak_idx, lvl_idx] = np.nan
                             summit_slice_center_x_arr[peak_idx, lvl_idx] = np.nan
                             summit_slice_center_y_arr[peak_idx, lvl_idx] = np.nan
+                            summit_slice_area_arr[peak_idx, lvl_idx] = np.nan
                         else:
                             slice_bbox = a_slice['bbox']
                             (x0, y0, width, height) = slice_bbox.bounds
@@ -1868,6 +1875,7 @@ class PeakPromenence:
                             summit_slice_y_side_length_arr[peak_idx, lvl_idx] = height
                             summit_slice_center_x_arr[peak_idx, lvl_idx] = float(x0) + (0.5 * float(width))
                             summit_slice_center_y_arr[peak_idx, lvl_idx] = float(y0) + (0.5 * float(height))
+                            summit_slice_area_arr[peak_idx, lvl_idx] = a_slice.get('area', np.nan)
                 ## END for peak_idx in range(n_peaks)...
                 
                 if debug_print:
@@ -1890,7 +1898,8 @@ class PeakPromenence:
                     'summit_slice_x_width': summit_slice_x_side_length_arr.flatten(),
                     'summit_slice_y_width': summit_slice_y_side_length_arr.flatten(),
                     'summit_slice_center_x': summit_slice_center_x_arr.flatten(),
-                    'summit_slice_center_y': summit_slice_center_y_arr.flatten()
+                    'summit_slice_center_y': summit_slice_center_y_arr.flatten(),
+                    'summit_slice_area': summit_slice_area_arr.flatten()
                 })
                 posterior_peaks_df['peak_height'] = peak_relative_height_flat
                 
