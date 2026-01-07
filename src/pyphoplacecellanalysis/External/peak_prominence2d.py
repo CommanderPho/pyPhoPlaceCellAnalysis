@@ -689,9 +689,9 @@ class PosteriorPeaksPeakProminence2dResult(ComputedResult):
     filtered_flat_peaks_df: pd.DataFrame = serialized_field()
     peak_counts: PeakCounts = serialized_field()
 
-
+    @function_attributes(short_name=None, tags=['efficiency', 'contours'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-01-06 15:54', related_items=[])
     @classmethod
-    def convert_paths_to_vertices(cls, result_obj: "PosteriorPeaksPeakProminence2dResult", in_place: bool = False) -> "PosteriorPeaksPeakProminence2dResult":
+    def perform_convert_paths_to_vertices(cls, result_obj: "PosteriorPeaksPeakProminence2dResult", in_place: bool = False) -> "PosteriorPeaksPeakProminence2dResult":
         """Convert matplotlib Path objects in level_slices to vertex arrays.
         
         Parameters:
@@ -751,6 +751,11 @@ class PosteriorPeaksPeakProminence2dResult(ComputedResult):
         
         return result_obj
 
+
+    def convert_paths_to_vertices(self, in_place: bool = False) -> "PosteriorPeaksPeakProminence2dResult":
+        """ if inplace == False it returns a copy of self. """
+        return self.perform_convert_paths_to_vertices(result_obj=self, in_place=in_place)
+    
 
 
     # For serialization/pickling: ________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
