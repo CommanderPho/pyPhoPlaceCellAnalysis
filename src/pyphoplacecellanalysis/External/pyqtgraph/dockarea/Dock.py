@@ -640,18 +640,24 @@ class Dock(QtWidgets.QWidget, DockDrop):
     def updateWidgetsHaveOptionsPanel(self):
         """ called to check whether any widgets contained within the dock provide an options panel, and if they do setup the button and callback.
         ## called by `self.addWidget(...)` which used to be the only time it was ever checked.
+        Safe to call multiple times - will properly disconnect/reconnect signals as needed.
         """
-        # Check if widget provides options and update button visibility
-        if self._hasOptionsPanel():
-            self.config.showOptionsButton = True
-            if self.label:
-                self.label.updateButtonsFromConfig()
-            # Connect signal (disconnect first to avoid duplicates)
+        # Always disconnect signal first to avoid duplicates (if label exists)
+        if self.label:
             try:
                 self.label.sigOptionsClicked.disconnect(self.on_options_btn_clicked)
             except (TypeError, RuntimeError):
                 pass  # Not connected yet, that's fine
-            self.label.sigOptionsClicked.connect(self.on_options_btn_clicked)
+        
+        # Check if widget provides options and update button visibility
+        has_options = self._hasOptionsPanel()
+        self.config.showOptionsButton = has_options
+        
+        if self.label:
+            self.label.updateButtonsFromConfig()
+            # Only connect signal if widget has options panel
+            if has_options:
+                self.label.sigOptionsClicked.connect(self.on_options_btn_clicked)
         
 
     def _checkWidgetForOptions(self, widget) -> Optional[QtWidgets.QWidget]:
@@ -701,13 +707,26 @@ class Dock(QtWidgets.QWidget, DockDrop):
         for widget in self.widgets:
             options_panel = self._checkWidgetForOptions(widget)
             if options_panel is not None:
-                return options_panel
+                return options_panel, widget
+        return None, None
+
+    def _getWidgetWithOptionsPanel(self):
+        """Get the widget that provides the first available options panel.
+        
+        Returns:
+            Optional[QtWidgets.QWidget]: The widget that provides the options panel, or None.
+        """
+        for widget in self.widgets:
+            options_panel = self._checkWidgetForOptions(widget)
+            if options_panel is not None:
+                return widget
         return None
 
 
     def on_options_btn_clicked(self):
         """Open the options dialog when Options button is clicked."""
-        options_panel = self._getOptionsPanel()
+        options_panel, widget_with_options = self._getOptionsPanel() ## this is the actual contents of the options panel provided by the widget
+
         if options_panel is None:
             return
         
@@ -725,6 +744,23 @@ class Dock(QtWidgets.QWidget, DockDrop):
         button_box.rejected.connect(dialog.reject)
         layout.addWidget(button_box)
         
+        # Connect callbacks to the widget that provided the options panel (if methods exist)
+        did_connect_to_panel: bool = False
+        if options_panel is not None:
+            if hasattr(options_panel, 'onOptionsAccepted') and callable(getattr(options_panel, 'onOptionsAccepted')):
+                dialog.accepted.connect(options_panel.onOptionsAccepted)
+            if hasattr(options_panel, 'onOptionsRejected') and callable(getattr(options_panel, 'onOptionsRejected')):
+                dialog.rejected.connect(options_panel.onOptionsRejected)
+                did_connect_to_panel = True
+
+        ## do not connect to the widget if already connected to pane:
+        if (not did_connect_to_panel) and (widget_with_options is not None):
+            if hasattr(widget_with_options, 'onOptionsAccepted') and callable(getattr(widget_with_options, 'onOptionsAccepted')):
+                dialog.accepted.connect(widget_with_options.onOptionsAccepted)
+            if hasattr(widget_with_options, 'onOptionsRejected') and callable(getattr(widget_with_options, 'onOptionsRejected')):
+                dialog.rejected.connect(widget_with_options.onOptionsRejected)
+        
+
         dialog.setLayout(layout)
         dialog.resize(400, 300)  # Default size, can be customized
         dialog.show()
