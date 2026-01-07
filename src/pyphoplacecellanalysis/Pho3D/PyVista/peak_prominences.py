@@ -316,7 +316,7 @@ def _render_peak_prominence_2d_results_on_pyvista_plotter(ipcDataExplorer, activ
         print(f'peak_levels: {peak_levels}')
 
     _common_plot_kwargs = dict(valid_neuron_id=valid_neuron_id, active_curve_color=active_curve_color, peak_locations=peak_locations, peak_labels=peak_labels, peak_levels=peak_levels, peak_level_bboxes=peak_level_bboxes,
-                               include_contour_bounding_box=False, include_text_labels=False, render=render, debug_print=debug_print)
+                            include_contour_bounding_box=kwargs.get('include_contour_bounding_box', False), include_text_labels=kwargs.get('include_text_labels', False), render=render, debug_print=debug_print)
     
     ### Add pyvista contours:
     curr_neuron_plot_data = ipcDataExplorer.plots_data.tuningCurvePlotData[valid_neuron_id]
