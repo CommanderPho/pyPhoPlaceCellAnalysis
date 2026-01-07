@@ -29,7 +29,7 @@ from pyphocorehelpers.DataStructure.RenderPlots.MatplotLibRenderPlots import Mat
 from pyphocorehelpers.DataStructure.general_parameter_containers import RenderPlotsData, VisualizationParameters
 
 from pyphocorehelpers.indexing_helpers import get_dict_subset
-from pyphoplacecellanalysis.External.pyqtgraph.Qt import QtCore
+from pyphoplacecellanalysis.External.pyqtgraph.Qt import QtCore, QtWidgets
 from pyphoplacecellanalysis.General.Model.Configs.NeuronPlottingParamConfig import NeuronConfigOwningMixin
 from pyphoplacecellanalysis.PhoPositionalData.plotting.placefield import plot_placefields2D, update_plotColorsPlacefield2D
 
@@ -95,7 +95,7 @@ if TYPE_CHECKING:
 from neuropy.utils.mixins.AttrsClassHelpers import keys_only_repr
 from pyphocorehelpers.DataStructure.general_parameter_containers import VisualizationParameters, RenderPlotsData, RenderPlots # PyqtgraphRenderPlots
 from pyphoplacecellanalysis.GUI.PyVista.InteractivePlotter.PhoInteractivePlotter import PhoInteractivePlotter # DecodedTrajectoryPyVistaPlotter
-from pyphoplacecellanalysis.Pho3D.PyVista.graphs import plot_3d_binned_bars, plot_3d_stem_points, plot_point_labels # DecodedTrajectoryPyVistaPlotter
+from pyphoplacecellanalysis.Pho3D.PyVista.graphs import plot_3d_binned_bars, plot_3d_stem_points, plot_3d_smooth_mesh, plot_point_labels # DecodedTrajectoryPyVistaPlotter
 
 import logging
 logger = logging.getLogger(__name__)
@@ -3178,154 +3178,326 @@ class DecodedTrajectoryPyVistaPlotter(DecodedTrajectoryPlotter):
     slider_epoch_time_bin = field(default=None)
     slider_epoch_time_bin_playback_checkbox = field(default=None)
     
+    # Qt slider widgets
+    qt_slider_epoch: Optional[QtWidgets.QSlider] = field(default=None)
+    qt_slider_epoch_time_bin: Optional[QtWidgets.QSlider] = field(default=None)
+    qt_slider_epoch_label: Optional[QtWidgets.QLabel] = field(default=None)
+    qt_slider_timebin_label: Optional[QtWidgets.QLabel] = field(default=None)
+    qt_playback_checkbox: Optional[QtWidgets.QCheckBox] = field(default=None)
+    qt_slider_bar_widget: Optional[QtWidgets.QWidget] = field(default=None)
+    
     interactive_plotter: PhoInteractivePlotter = field(default=None)
     plotActors = field(default=None)
     data_dict = field(default=None)
     plotActors_CenterLabels = field(default=None)
     data_dict_CenterLabels = field(default=None)
 
-    active_plot_fn: Callable = field(default=plot_3d_stem_points) # like [plot_3d_binned_bars, plot_3d_stem_points]
+    active_plot_fn: Callable = field(default=plot_3d_binned_bars) # like [plot_3d_binned_bars, plot_3d_stem_points]
     animation_callback_interval_ms: int = field(default=200) # 200ms per time bin
 
+    # Peak prominence fields
+    peak_prominence_result: Optional["PosteriorPeaksPeakProminence2dResult"] = field(default=None, repr=False)
+    peak_prominence_actors = field(default=None, repr=False)
+    peak_prominence_data = field(default=None, repr=False)
+    peak_prominence_kwargs: Dict[str, Any] = field(default=Factory(dict), repr=False)
+
+    # Callback blocking and execution guards to prevent freezing
+    _updating_slider_programmatically: bool = field(default=False, init=False, repr=False)
+    _update_in_progress: bool = field(default=False, init=False, repr=False)
+
+
     def build_ui(self):
-        """ builds the slider vtk widgets 
+        """ builds the Qt slider widgets in a bar at the bottom of the window
         """
 
         assert self.p is not None
         if self.curr_epoch_idx is None:
             self.curr_epoch_idx = 0
         
-        num_filter_epochs: int = self.num_filter_epochs
-        curr_num_epoch_time_bins: int = self.curr_n_time_bins
-
-        slider_epoch_kwargs = dict()
-        if self.enable_plot_all_time_bins_in_epoch_mode:
-            slider_epoch_kwargs = slider_epoch_kwargs | dict(event_type="always")
-
-        if self.slider_epoch is None:
-            def _on_slider_value_did_change_epoch_idx(value):
-                """ only called when the value actually changes from the previous one (or there wasn't a previous one). """
-                self.on_update_slider_epoch_idx(int(value))
+        # Build Qt slider bar instead of PyVista sliders
+        self._build_qt_slider_bar()
+        
+        # Note: Interactive plotter is no longer needed for VTK sliders, but we keep it for compatibility
+        # Playback is now handled directly by the Qt checkbox and timer
 
 
-            def _on_slider_callback_epoch_idx(value):
-                """ checks whether the value has changed from the previous one before re-updating. 
-                """
-                if not hasattr(_on_slider_callback_epoch_idx, "last_value"):
-                    _on_slider_callback_epoch_idx.last_value = value
-                if value != _on_slider_callback_epoch_idx.last_value:
-                    _on_slider_value_did_change_epoch_idx(value)
-                    _on_slider_callback_epoch_idx.last_value = value
-
-
-            self.slider_epoch = self.p.add_slider_widget(
-                # callback=lambda value: self.on_update_slider_epoch_idx(int(value)), #storage_engine('epoch', int(value)), # triggering .__call__(self, param='epoch', value)....
-                callback=lambda value: _on_slider_callback_epoch_idx(int(value)),
-                rng=[0, num_filter_epochs-1],
-                value=0,
-                title="Epoch Idx",
-                pointa=(0.64, 0.2),
-                pointb=(0.94, 0.2),
-                style='modern',
-                fmt='%0.0f',
-                **slider_epoch_kwargs,
-            )
-
-
-        if not self.enable_plot_all_time_bins_in_epoch_mode:
-            if self.slider_epoch_time_bin is None:
-                def _on_slider_value_did_change_epoch_time_bin(value):
-                    """ only called when the value actually changes from the previous one (or there wasn't a previous one). """
+    def _build_qt_slider_bar(self):
+        """Builds a Qt slider bar at the bottom of the plotter window with epoch and timebin sliders plus playback checkbox."""
+        assert self.p is not None
+        
+        # Check if plotter has app_window (BackgroundPlotter from pyvistaqt)
+        if not hasattr(self.p, 'app_window') or self.p.app_window is None:
+            # Fallback: try to get window from plotter
+            print("Warning: Plotter does not have app_window attribute. Qt sliders cannot be created.")
+            return
+        
+        app_window = self.p.app_window
+        
+        # Get or create the slider bar widget
+        if self.qt_slider_bar_widget is None:
+            # Create a horizontal widget bar
+            self.qt_slider_bar_widget = QtWidgets.QWidget()
+            slider_layout = QtWidgets.QHBoxLayout(self.qt_slider_bar_widget)
+            slider_layout.setContentsMargins(10, 5, 10, 5)
+            slider_layout.setSpacing(10)
+            
+            # Set fixed height for the bar
+            self.qt_slider_bar_widget.setFixedHeight(45)
+            
+            # Epoch slider section
+            epoch_label = QtWidgets.QLabel("Epoch Idx:")
+            epoch_label.setMinimumWidth(70)
+            slider_layout.addWidget(epoch_label)
+            
+            self.qt_slider_epoch = QtWidgets.QSlider(QtCore.Qt.Horizontal)
+            self.qt_slider_epoch.setMinimum(0)
+            self.qt_slider_epoch.setMaximum(max(0, self.num_filter_epochs - 1))
+            self.qt_slider_epoch.setValue(0)
+            self.qt_slider_epoch.setTickPosition(QtWidgets.QSlider.TicksBelow)
+            self.qt_slider_epoch.setTickInterval(1)
+            slider_layout.addWidget(self.qt_slider_epoch, stretch=1)
+            
+            self.qt_slider_epoch_label = QtWidgets.QLabel("0")
+            self.qt_slider_epoch_label.setMinimumWidth(30)
+            self.qt_slider_epoch_label.setAlignment(QtCore.Qt.AlignCenter)
+            slider_layout.addWidget(self.qt_slider_epoch_label)
+            
+            # Add spacing
+            slider_layout.addSpacing(20)
+            
+            # Timebin slider section (only if not in plot_all_time_bins mode)
+            if not self.enable_plot_all_time_bins_in_epoch_mode:
+                timebin_label = QtWidgets.QLabel("Timebin IDX:")
+                timebin_label.setMinimumWidth(80)
+                slider_layout.addWidget(timebin_label)
+                
+                self.qt_slider_epoch_time_bin = QtWidgets.QSlider(QtCore.Qt.Horizontal)
+                self.qt_slider_epoch_time_bin.setMinimum(0)
+                curr_num_epoch_time_bins = self.curr_n_time_bins if self.curr_n_time_bins is not None else 0
+                self.qt_slider_epoch_time_bin.setMaximum(max(0, curr_num_epoch_time_bins - 1))
+                self.qt_slider_epoch_time_bin.setValue(0)
+                self.qt_slider_epoch_time_bin.setTickPosition(QtWidgets.QSlider.TicksBelow)
+                self.qt_slider_epoch_time_bin.setTickInterval(1)
+                slider_layout.addWidget(self.qt_slider_epoch_time_bin, stretch=1)
+                
+                self.qt_slider_timebin_label = QtWidgets.QLabel("0")
+                self.qt_slider_timebin_label.setMinimumWidth(30)
+                self.qt_slider_timebin_label.setAlignment(QtCore.Qt.AlignCenter)
+                slider_layout.addWidget(self.qt_slider_timebin_label)
+                
+                # Add spacing
+                slider_layout.addSpacing(20)
+                
+                # Playback checkbox
+                self.qt_playback_checkbox = QtWidgets.QCheckBox("Playback")
+                slider_layout.addWidget(self.qt_playback_checkbox)
+            
+            # Add the slider bar to the window
+            # Get the central widget (should exist for BackgroundPlotter)
+            central_widget = app_window.centralWidget()
+            if central_widget is None:
+                # Create a central widget if it doesn't exist
+                central_widget = QtWidgets.QWidget()
+                app_window.setCentralWidget(central_widget)
+            
+            # Get or create the main layout
+            main_layout = central_widget.layout()
+            if main_layout is None:
+                # No layout exists, create one
+                main_layout = QtWidgets.QVBoxLayout(central_widget)
+                main_layout.setContentsMargins(0, 0, 0, 0)
+                main_layout.setSpacing(0)
+                
+                # The render widget should already be a child of central_widget
+                # Add all existing widgets to the layout (except our slider bar)
+                for child in central_widget.children():
+                    if isinstance(child, QtWidgets.QWidget) and child != self.qt_slider_bar_widget:
+                        # Remove from parent and add to layout
+                        child.setParent(None)
+                        main_layout.addWidget(child, stretch=1)
+            
+            # Check if slider bar is already in the layout
+            if self.qt_slider_bar_widget.parent() != central_widget or main_layout.indexOf(self.qt_slider_bar_widget) == -1:
+                # Add slider bar at the bottom (no stretch, fixed height)
+                main_layout.addWidget(self.qt_slider_bar_widget)
+            
+            # Connect signals
+            self._connect_qt_slider_signals()
+        
+        # Update slider ranges if they've changed
+        self._update_qt_slider_ranges()
+    
+    def _connect_qt_slider_signals(self):
+        """Connect Qt slider signals to callback methods."""
+        if self.qt_slider_epoch is not None:
+            # Use a wrapper to maintain the same callback logic
+            def _on_qt_slider_epoch_changed(value):
+                if not hasattr(_on_qt_slider_epoch_changed, "last_value"):
+                    _on_qt_slider_epoch_changed.last_value = value
+                if value != _on_qt_slider_epoch_changed.last_value:
+                    self.on_update_slider_epoch_idx(int(value))
+                    _on_qt_slider_epoch_changed.last_value = value
+                    # Update label
+                    if self.qt_slider_epoch_label is not None:
+                        self.qt_slider_epoch_label.setText(str(value))
+            
+            self.qt_slider_epoch.valueChanged.connect(_on_qt_slider_epoch_changed)
+            # Update label initially
+            if self.qt_slider_epoch_label is not None:
+                self.qt_slider_epoch_label.setText(str(self.qt_slider_epoch.value()))
+        
+        if self.qt_slider_epoch_time_bin is not None:
+            def _on_qt_slider_timebin_changed(value):
+                # Skip callback if programmatic update is in progress
+                if self._updating_slider_programmatically:
+                    return
+                if not hasattr(_on_qt_slider_timebin_changed, "last_value"):
+                    _on_qt_slider_timebin_changed.last_value = value
+                if value != _on_qt_slider_timebin_changed.last_value:
                     self.on_update_slider_epoch_time_bin(int(value))
-
-
-                def _on_slider_callback_epoch_time_bin(value):
-                    """ checks whether the value has changed from the previous one before re-updating. This might not be the best approach because it should be forcibly re-updated when the epoch_idx changes even if the time_bin_idx stays the same (like it's sitting at 0 while scrolling through epochs)
-                    """
-                    if not hasattr(_on_slider_callback_epoch_time_bin, "last_value"):
-                        _on_slider_callback_epoch_time_bin.last_value = value
-                    if value != _on_slider_callback_epoch_time_bin.last_value:
-                        _on_slider_value_did_change_epoch_time_bin(value)
-                        _on_slider_callback_epoch_time_bin.last_value = value
-
-                self.slider_epoch_time_bin = self.p.add_slider_widget(
-                    # callback=lambda value: self.on_update_slider_epoch_time_bin(int(value)), #storage_engine('time_bin', value),
-                    callback=lambda value: _on_slider_callback_epoch_time_bin(int(value)),
-                    rng=[0, curr_num_epoch_time_bins-1],
-                    value=0,
-                    title="Timebin IDX",
-                    pointa=(0.74, 0.12),
-                    pointb=(0.94, 0.12),
-                    style='modern',
-                    # fmt="%d",
-                    event_type="always",
-                    fmt='%0.0f',
-                )
-
-            if (self.interactive_plotter is None) or (self.slider_epoch_time_bin_playback_checkbox is None):
-                self.interactive_plotter = PhoInteractivePlotter.init_from_plotter_and_slider(pyvista_plotter=self.p, interactive_timestamp_slider_actor=self.slider_epoch_time_bin, step_size=1, animation_callback_interval_ms=self.animation_callback_interval_ms) # 500ms per time bin
-                self.slider_epoch_time_bin_playback_checkbox = self.interactive_plotter.interactive_checkbox_actor
+                    _on_qt_slider_timebin_changed.last_value = value
+                    # Update label
+                    if self.qt_slider_timebin_label is not None:
+                        self.qt_slider_timebin_label.setText(str(value))
+            
+            self.qt_slider_epoch_time_bin.valueChanged.connect(_on_qt_slider_timebin_changed)
+            # Update label initially
+            if self.qt_slider_timebin_label is not None:
+                self.qt_slider_timebin_label.setText(str(self.qt_slider_epoch_time_bin.value()))
+        
+        if self.qt_playback_checkbox is not None:
+            self.qt_playback_checkbox.stateChanged.connect(self._on_playback_checkbox_changed)
+    
+    def _update_qt_slider_ranges(self):
+        """Update Qt slider ranges based on current data."""
+        if self.qt_slider_epoch is not None:
+            max_epoch = max(0, self.num_filter_epochs - 1)
+            self.qt_slider_epoch.setMaximum(max_epoch)
+        
+        if self.qt_slider_epoch_time_bin is not None and self.curr_n_time_bins is not None:
+            max_timebin = max(0, self.curr_n_time_bins - 1)
+            self._updating_slider_programmatically = True
+            try:
+                self.qt_slider_epoch_time_bin.setMaximum(max_timebin)
+                self.qt_slider_epoch_time_bin.setValue(0)
+                if self.qt_slider_timebin_label is not None:
+                    self.qt_slider_timebin_label.setText("0")
+            finally:
+                self._updating_slider_programmatically = False
+    
+    def _on_playback_checkbox_changed(self, state):
+        """Handle playback checkbox state changes."""
+        is_checked = state == QtCore.Qt.Checked
+        if self.interactive_plotter is not None:
+            # Update the interactive plotter's animation state
+            self.interactive_plotter.interface_properties.animation_state = is_checked
+        # If interactive_plotter doesn't exist yet, we'll create it when needed
+        # For now, we can implement basic playback functionality
+        if is_checked and self.qt_slider_epoch_time_bin is not None:
+            # Start playback timer
+            if not hasattr(self, '_playback_timer'):
+                self._playback_timer = QtCore.QTimer()
+                self._playback_timer.timeout.connect(self._playback_step)
+            self._playback_timer.start(self.animation_callback_interval_ms)
+        else:
+            # Stop playback
+            if hasattr(self, '_playback_timer'):
+                self._playback_timer.stop()
+    
+    def _playback_step(self):
+        """Step forward in playback mode."""
+        if self.qt_slider_epoch_time_bin is not None:
+            current_value = self.qt_slider_epoch_time_bin.value()
+            max_value = self.qt_slider_epoch_time_bin.maximum()
+            if current_value < max_value:
+                self._updating_slider_programmatically = True
+                try:
+                    self.qt_slider_epoch_time_bin.setValue(current_value + 1)
+                finally:
+                    self._updating_slider_programmatically = False
+            else:
+                # Reached end, stop playback
+                if self.qt_playback_checkbox is not None:
+                    self.qt_playback_checkbox.setChecked(False)
 
 
     def update_ui(self):
         """ called to update the epoch_time_bin slider when the epoch_index slider is changed. 
         """
-        if (self.slider_epoch_time_bin is not None) and (self.curr_n_time_bins is not None):
-            self.slider_epoch_time_bin.GetRepresentation().SetMaximumValue((self.curr_n_time_bins-1))
-            self.slider_epoch_time_bin.GetRepresentation().SetValue(self.slider_epoch_time_bin.GetRepresentation().GetMinimumValue()) # set to 0
+        # Update Qt slider ranges and values
+        self._update_qt_slider_ranges()
 
 
     def perform_programmatic_slider_epoch_update(self, value):
         """ called to programmatically update the epoch_idx slider. """
-        if (self.slider_epoch is not None):
+        if self.qt_slider_epoch is not None:
             print(f'updating slider_epoch index to : {int(value)}')
-            self.slider_epoch.GetRepresentation().SetValue(int(value)) # set to 0
+            self._updating_slider_programmatically = True
+            try:
+                self.qt_slider_epoch.setValue(int(value))
+                if self.qt_slider_epoch_label is not None:
+                    self.qt_slider_epoch_label.setText(str(int(value)))
+            finally:
+                self._updating_slider_programmatically = False
             self.on_update_slider_epoch_idx(value=int(value))
             print(f'\tdone.')
 
     def on_update_slider_epoch_idx(self, value: int):
         """ called when the epoch_idx slider changes. 
         """
-        # print(f'.on_update_slider_epoch(value: {value})')
-        self.curr_epoch_idx = int(value) ## Update `curr_epoch_idx`
-        if not self.enable_plot_all_time_bins_in_epoch_mode:
-            self.curr_time_bin_index = 0 # change to 0
-        else:
-            ## otherwise default to a range
-            self.curr_time_bin_index = np.arange(self.curr_n_time_bins)
+        # Prevent nested execution to avoid freezing
+        if self._update_in_progress:
+            return
+        self._update_in_progress = True
+        try:
+            # print(f'.on_update_slider_epoch(value: {value})')
+            self.curr_epoch_idx = int(value) ## Update `curr_epoch_idx`
+            if not self.enable_plot_all_time_bins_in_epoch_mode:
+                self.curr_time_bin_index = 0 # change to 0
+            else:
+                ## otherwise default to a range
+                self.curr_time_bin_index = np.arange(self.curr_n_time_bins)
 
-        self.update_ui() # called to update the dependent time_bin slider
+            self.update_ui() # called to update the dependent time_bin slider
 
-        if not self.enable_plot_all_time_bins_in_epoch_mode:
-            self.perform_update_plot_single_epoch_time_bin(self.curr_time_bin_index)
-        else:
-            ## otherwise default to a range
-            self.perform_update_plot_epoch_time_bin_range(self.curr_time_bin_index)
+            if not self.enable_plot_all_time_bins_in_epoch_mode:
+                self.perform_update_plot_single_epoch_time_bin(self.curr_time_bin_index)
+            else:
+                ## otherwise default to a range
+                self.perform_update_plot_epoch_time_bin_range(self.curr_time_bin_index)
 
-        ## shouldn't be here:
-        # update_plot_fn = self.data_dict.get('plot_3d_binned_bars[55.63197815967686]', {}).get('update_plot_fn', None)
-        update_plot_fn = self.data_dict.get('plot_3d_stem_points_P_x_given_n', {}).get('update_plot_fn', None)
-        if update_plot_fn is not None:
-            update_plot_fn(self.curr_time_bin_index)
+            # Removed problematic double-update code that used potentially stale data_dict
+            # The main update above already handles the plotting correctly
+        finally:
+            self._update_in_progress = False
 
 
 
     def on_update_slider_epoch_time_bin(self, value: int):
         """ called when the epoch_time_bin within a given epoch_idx slider changes 
         """
-        # print(f'.on_update_slider_epoch_time_bin(value: {value})')
-        self.perform_update_plot_single_epoch_time_bin(value=value)
+        # Prevent nested execution to avoid freezing
+        if self._update_in_progress:
+            return
+        self._update_in_progress = True
+        try:
+            # print(f'.on_update_slider_epoch_time_bin(value: {value})')
+            self.perform_update_plot_single_epoch_time_bin(value=value)
+        finally:
+            self._update_in_progress = False
         
 
 
     @function_attributes(short_name=None, tags=['main_plot_update', 'single_time_bin'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-04-25 02:03', related_items=[])
     def perform_update_plot_single_epoch_time_bin(self, value: int):
         """ single-time-bin plotting:
+        Note: This method is called from guarded entry points (on_update_slider_epoch_idx, on_update_slider_epoch_time_bin),
+        so it doesn't need its own guard to prevent blocking legitimate nested calls.
         """
         # print(f'.on_update_slider_epoch_time_bin(value: {value})')
         assert self.p is not None
         self.curr_time_bin_index = int(value) # update `self.curr_time_bin_index` 
-        a_posterior_p_x_given_n, a_time_bin_centers = self.get_curr_posterior(an_epoch_idx=self.curr_epoch_idx, time_bin_index=self.curr_time_bin_index)
+        a_posterior_p_x_given_n, a_time_bin_centers, an_extra_rendering_info = self.get_curr_posterior(an_epoch_idx=self.curr_epoch_idx, time_bin_index=self.curr_time_bin_index)
 
         ## remove existing actors if they exist and are needed:
         self.perform_clear_existing_decoded_trajectory_plots()
@@ -3334,17 +3506,62 @@ class DecodedTrajectoryPyVistaPlotter(DecodedTrajectoryPlotter):
                                                                                                 xbin=self.xbin, ybin=self.ybin, xbin_centers=self.xbin_centers, ybin_centers=self.ybin_centers,
                                                                                                 posterior_p_x_given_n=a_posterior_p_x_given_n, enable_point_labels=self.enable_point_labels, active_plot_fn=self.active_plot_fn)
         
+        ## Render peak prominence if result is set:
+        if self.peak_prominence_result is not None and self.data_dict is not None:
+            # Get the posterior mesh from data_dict (first entry should contain 'grid')
+            posterior_pdata = None
+            for plot_name, plot_data in self.data_dict.items():
+                if 'grid' in plot_data:
+                    posterior_pdata = plot_data['grid']
+                    break
+            
+            if posterior_pdata is not None:
+                from pyphoplacecellanalysis.Pho3D.PyVista.peak_prominences import _render_posterior_peak_prominence_2d_results_on_pyvista_plotter
+                
+                # Get visibility of the posterior to match peak visibility
+                posterior_is_visible = 1
+                if self.plotActors is not None and len(self.plotActors) > 0:
+                    first_actor_key = list(self.plotActors.keys())[0]
+                    if 'main' in self.plotActors[first_actor_key]:
+                        posterior_is_visible = self.plotActors[first_actor_key]['main'].GetVisibility()
+                
+                # Create a copy of kwargs without debug_print to avoid duplicate argument error
+                peak_prominence_kwargs_copy = self.peak_prominence_kwargs.copy()
+                peak_prominence_kwargs_copy.pop('debug_print', None)
+                
+                multiplier_factor = an_extra_rendering_info.get('multiplier_factor', 1.0)
+                
+                all_peaks_data, all_peaks_actors = _render_posterior_peak_prominence_2d_results_on_pyvista_plotter(
+                    self.p,
+                    posterior_pdata,
+                    self.peak_prominence_result,
+                    self.curr_epoch_idx,
+                    self.curr_time_bin_index,
+                    render=False,
+                    debug_print=self.peak_prominence_kwargs.get('debug_print', False),
+                    **peak_prominence_kwargs_copy
+                )
+                
+                self.peak_prominence_data = all_peaks_data
+                self.peak_prominence_actors = all_peaks_actors
+                
+                # Set visibility to match posterior
+                if self.peak_prominence_actors is not None:
+                    self.peak_prominence_actors.SetVisibility(posterior_is_visible)
+        
 
     @function_attributes(short_name=None, tags=['main_plot_update', 'multi_time_bins', 'epoch'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-04-25 02:04', related_items=[])
     def perform_update_plot_epoch_time_bin_range(self, value: Optional[NDArray]=None):
         """ multi-time-bin plotting:
+        Note: This method is called from guarded entry points (on_update_slider_epoch_idx),
+        so it doesn't need its own guard to prevent blocking legitimate nested calls.
         """
         # print(f'.on_update_slider_epoch_time_bin(value: {value})')
         assert self.p is not None
         if value is None:
             value = np.arange(self.curr_n_time_bins)
         self.curr_time_bin_index = value # update `self.curr_time_bin_index` 
-        a_posterior_p_x_given_n, a_time_bin_centers = self.get_curr_posterior(an_epoch_idx=self.curr_epoch_idx, time_bin_index=value)
+        a_posterior_p_x_given_n, a_time_bin_centers, an_extra_rendering_info = self.get_curr_posterior(an_epoch_idx=self.curr_epoch_idx, time_bin_index=value)
 
         ## remove existing actors if they exist and are needed:
         self.perform_clear_existing_decoded_trajectory_plots()
@@ -3355,25 +3572,96 @@ class DecodedTrajectoryPyVistaPlotter(DecodedTrajectoryPlotter):
 
 
     def perform_clear_existing_decoded_trajectory_plots(self):
-        ## remove existing actors
+        """ Remove existing actors and clear data dictionaries to prevent stale state.
+        Ensures proper cleanup before new actors are created.
+        """
         from pyphoplacecellanalysis.Pho3D.PyVista.graphs import clear_3d_binned_bars_plots
+        from pyphocorehelpers.gui.PyVista.CascadingDynamicPlotsList import CascadingDynamicPlotsList
 
+        # Clear peak prominence actors first (before clearing posterior actors)
+        if self.peak_prominence_actors is not None:
+            # Remove all peak prominence actors from plotter
+            if isinstance(self.peak_prominence_actors, CascadingDynamicPlotsList):
+                # Iterate through all nested actors
+                for category_name, category_actors in self.peak_prominence_actors.items():
+                    if isinstance(category_actors, CascadingDynamicPlotsList):
+                        for actor_name, actor in category_actors.items():
+                            if actor is not None:
+                                try:
+                                    self.p.remove_actor(actor)
+                                except Exception as e:
+                                    pass  # Actor may already be removed
+                    elif category_actors is not None:
+                        try:
+                            self.p.remove_actor(category_actors)
+                        except Exception as e:
+                            pass  # Actor may already be removed
+            self.peak_prominence_actors = None
+        
+        # Clear peak prominence data
+        if self.peak_prominence_data is not None:
+            self.peak_prominence_data = None
+
+        # Clear main plot actors
         if self.plotActors is not None:
             clear_3d_binned_bars_plots(p=self.p, plotActors=self.plotActors)
             self.plotActors.clear()
+        
+        # Clear data_dict to remove any stale update functions or references
         if self.data_dict is not None:
+            # Explicitly clear any update functions stored in data_dict to prevent stale references
             self.data_dict.clear()
 
+        # Remove center label actors from plotter before clearing dict
         if self.plotActors_CenterLabels is not None:
+            # plotActors_CenterLabels has same structure as plotActors: dict with 'main' key
+            for k, v in self.plotActors_CenterLabels.items():
+                if isinstance(v, dict) and 'main' in v:
+                    self.p.remove_actor(v['main'])
+                elif v is not None:
+                    # Handle case where v is directly an actor
+                    self.p.remove_actor(v)
             self.plotActors_CenterLabels.clear()
+        
+        # Clear center labels data dict
         if self.data_dict_CenterLabels is not None:
             self.data_dict_CenterLabels.clear()
 
 
+    def set_peak_prominence_result(self, peak_prominence_result: "PosteriorPeaksPeakProminence2dResult", promenence_plot_threshold: float = 0.2, included_level_indicies: List[int] = [1], include_contour_bounding_box: bool = False, include_text_labels: bool = False, active_curve_color: Optional[Tuple[float, float, float]] = None, debug_print: bool = False, **kwargs):
+        """ Sets the peak prominence result and triggers re-render if plotter is already built.
+        
+        Args:
+            peak_prominence_result: PosteriorPeaksPeakProminence2dResult object
+            promenence_plot_threshold: Minimum prominence threshold for plotting
+            included_level_indicies: List of level indices to include
+            include_contour_bounding_box: Whether to include bounding boxes
+            include_text_labels: Whether to include text labels
+            active_curve_color: Color for contours/boxes/text (default: white)
+            debug_print: Whether to print debug info
+            **kwargs: Additional arguments passed to rendering functions
+        """
+        self.peak_prominence_result = peak_prominence_result
+        self.peak_prominence_kwargs = dict(
+            promenence_plot_threshold=promenence_plot_threshold,
+            included_level_indicies=included_level_indicies,
+            include_contour_bounding_box=include_contour_bounding_box,
+            include_text_labels=include_text_labels,
+            debug_print=debug_print,
+            **kwargs
+        )
+        if active_curve_color is not None:
+            self.peak_prominence_kwargs['active_curve_color'] = active_curve_color
+        
+        # Trigger re-render if plotter is already built and has data
+        if self.p is not None and self.data_dict is not None and len(self.data_dict) > 0:
+            # Re-render the current time bin to show peaks
+            self.perform_update_plot_single_epoch_time_bin(self.curr_time_bin_index)
+            self.p.render()
 
 
     def get_curr_posterior(self, an_epoch_idx: int = 0, time_bin_index:Union[int, NDArray]=0):
-        a_posterior_p_x_given_n, a_time_bin_centers = self._perform_get_curr_posterior(a_result=self.a_result, an_epoch_idx=an_epoch_idx, time_bin_index=time_bin_index)
+        a_posterior_p_x_given_n, a_time_bin_centers, an_extra_rendering_info = self._perform_get_curr_posterior(a_result=self.a_result, an_epoch_idx=an_epoch_idx, time_bin_index=time_bin_index)
         n_epoch_timebins: int = len(a_time_bin_centers)
 
         if np.ndim(a_posterior_p_x_given_n) > 2:
@@ -3410,8 +3698,9 @@ class DecodedTrajectoryPyVistaPlotter(DecodedTrajectoryPlotter):
         assert n_xbins == np.shape(self.xbin_centers)[0], f"n_xbins: {n_xbins} != np.shape(xbin_centers)[0]: {np.shape(self.xbin_centers)}"
         assert n_ybins == np.shape(self.ybin_centers)[0], f"n_ybins: {n_ybins} != np.shape(ybin_centers)[0]: {np.shape(self.ybin_centers)}"
         # assert len(xbin_centers) == np.shape(a_result.p_x_given_n_list[an_epoch_idx])[0], f"np.shape(a_result.p_x_given_n_list[an_epoch_idx]): {np.shape(a_result.p_x_given_n_list[an_epoch_idx])}, len(xbin_centers): {len(xbin_centers)}"
-        return a_posterior_p_x_given_n, a_time_bin_centers
+        return a_posterior_p_x_given_n, a_time_bin_centers, extra_rendering_info
     
+
     @classmethod
     def _perform_get_curr_posterior(cls, a_result, an_epoch_idx: int = 0, time_bin_index: Union[int, NDArray]=0, desired_max_height: float = 50.0):
         """ gets the current posterior for the specified epoch_idx and time_bin_index within the epoch."""
@@ -3432,6 +3721,8 @@ class DecodedTrajectoryPyVistaPlotter(DecodedTrajectoryPlotter):
         # print(f'min_v: {min_v}, max_v: {max_v}')
         multiplier_factor: float = desired_max_height / (float(max_v) - float(min_v))
         # print(f'multiplier_factor: {multiplier_factor}')
+        extra_rendering_info = dict(min_v=min_v, max_v=max_v, multiplier_factor=multiplier_factor)
+
 
         ## get the specific time_bin_index posterior:
         if np.ndim(a_posterior_p_x_given_n_all_t) > 2:
@@ -3443,7 +3734,7 @@ class DecodedTrajectoryPyVistaPlotter(DecodedTrajectoryPlotter):
             # n_xbins, n_ybins = np.shape(a_posterior_p_x_given_n_all_t) ???
             a_posterior_p_x_given_n = np.squeeze(a_posterior_p_x_given_n_all_t[:, time_bin_index])
         a_posterior_p_x_given_n = a_posterior_p_x_given_n * multiplier_factor # multiply by the desired multiplier factor
-        return a_posterior_p_x_given_n, a_time_bin_centers
+        return a_posterior_p_x_given_n, a_time_bin_centers, extra_rendering_info
 
 
 
@@ -3586,7 +3877,7 @@ class DecoderRenderingPyVistaMixin:
         ## Defaults to `plot_3d_binned_bars` if nothing else is provided        
         
         """
-        from pyphoplacecellanalysis.Pho3D.PyVista.graphs import plot_3d_binned_bars, plot_3d_stem_points, plot_point_labels
+        from pyphoplacecellanalysis.Pho3D.PyVista.graphs import plot_3d_binned_bars, plot_3d_stem_points, plot_3d_smooth_mesh, plot_point_labels
 
         if active_plot_fn is None:
             ## Defaults to `plot_3d_binned_bars` if nothing else is provided     
