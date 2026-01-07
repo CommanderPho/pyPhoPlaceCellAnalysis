@@ -298,6 +298,63 @@ def plot_3d_stem_points(p, xbin, ybin, data, zScalingFactor=1.0, drop_below_thre
     return plotActors, data_dict
     
 
+# @function_attributes(short_name=None, tags=[']NOT_FINISHED', 'NOT-WORKING'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-01-07 09:41', related_items=[])
+def plot_3d_smooth_mesh(p, xbin, ybin, data, zScalingFactor=1.0, drop_below_threshold: float=None, **kwargs):
+    """ Plots a 3D smooth mesh surface (similar to placefield tuning curves)
+    Usage:
+        plotActors, data_dict = plot_3d_smooth_mesh(pActiveTuningCurvesPlotter, active_epoch_placefields2D.ratemap.xbin, active_epoch_placefields2D.ratemap.ybin, active_epoch_placefields2D.ratemap.occupancy)
+    
+    Note: This function expects xbin and ybin to be bin edges (like plot_3d_binned_bars), and computes bin centers internally.
+    """
+    raise NotImplementedError(f'2026-01-07')
+    # Compute bin centers from edges (like placefields use xbin_centers and ybin_centers)
+    # If xbin has n+1 elements (edges), centers will have n elements
+    n_xbins, n_ybins = data.shape[0], data.shape[1]
+    if len(xbin) == n_xbins + 1 and len(ybin) == n_ybins + 1:
+        # xbin and ybin are edges, compute centers
+        xbin_centers = (xbin[:-1] + xbin[1:]) / 2.0
+        ybin_centers = (ybin[:-1] + ybin[1:]) / 2.0
+    elif len(xbin) == n_xbins and len(ybin) == n_ybins:
+        # xbin and ybin are already centers
+        xbin_centers = xbin.copy()
+        ybin_centers = ybin.copy()
+    else:
+        raise ValueError(f"xbin length ({len(xbin)}) and ybin length ({len(ybin)}) must match data shape ({n_xbins}, {n_ybins}) or be one larger (edges).")
+    
+    # Prepare the data (similar to placefields)
+    active_data = deepcopy(data[:,:].T.copy()) # A single tuning curve, transposed like placefields
+    
+    # Apply drop_below_threshold masking if provided
+    if drop_below_threshold is not None:
+        active_data[active_data < drop_below_threshold] = np.nan
+    
+    # Scale the data
+    active_data = active_data * zScalingFactor
+    
+    # Build meshgrid from bin centers (like placefields do)
+    twoDimGrid_x, twoDimGrid_y = np.meshgrid(xbin_centers, ybin_centers)
+    
+    # Create StructuredGrid directly (like placefields do)
+    mesh = pv.StructuredGrid(twoDimGrid_x, twoDimGrid_y, active_data)
+    mesh["Elevation"] = active_data.ravel(order="F")
+
+    plot_name = kwargs.pop('plot_name', build_3d_plot_identifier_name('plot_3d_smooth_mesh', kwargs.get('name', ''))) # if 'plot_name' is provided, use that as the full name without modifications
+    kwargs['name'] = plot_name # this is the only one to overwrite in kwargs
+    # print(f'name: {plot_name}')    
+    plotActor = p.add_mesh(mesh,
+                            **({'show_edges': True, 'edge_color': 'k', 'nan_opacity': 0.0, 'scalars': 'Elevation', 'opacity': 'sigmoid', 'use_transparency': True, 'smooth_shading': True, 'show_scalar_bar': False, 'render': True, 'reset_camera': False} | kwargs)
+                          )
+    # p.enable_depth_peeling() # this fixes bug where it appears transparent even when opacity is set to 1.00
+    
+    plotActors = {plot_name: {'main': plotActor}}
+    data_dict = {plot_name: { 
+            'name':plot_name,
+            'grid': mesh, 
+            'twoDimGrid_x':twoDimGrid_x, 'twoDimGrid_y':twoDimGrid_y, 
+            'active_data': active_data
+        }
+    }
+    return plotActors, data_dict
 
 
 def plot_3d_binned_bars_timeseries(p, xbin, ybin, t_bins, data, zScalingFactor=1.0, drop_below_threshold: float=None, active_plot_fn=plot_3d_stem_points, **kwargs):
@@ -389,6 +446,7 @@ def _perform_plot_point_labels(p, active_points, point_labels=None, point_mask=N
     }
     return plotActors, data_dict 
     
+
 def plot_point_labels(p, xbin_centers, ybin_centers, data, point_labels=None, point_mask=None, zScalingFactor=1.0, **kwargs):
     """ Plots 3D text point labels at the provided points.
 
