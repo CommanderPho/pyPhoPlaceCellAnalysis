@@ -195,15 +195,10 @@ class DecodingLocalityMeasures(ComputedResult): #PickleSerializableMixin, AttrsB
         return _obj
 
 
-
-    @function_attributes(short_name=None, tags=['normalization', 'locality', 'overlap'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-12-11 17:03', related_items=[])
-    def build_normalized_outputs(self):
+    @classmethod
+    def perform_build_normalized_outputs(cls, p_x_given_n, epoch_names: List[str]):
         """ Normalize: self.p_x_given_n_dict and self.moving_avg over the decoer time period ('sprinkle', 'roam')
 
-        Normalize and convolve each new_position 2D point (x, y) with a fixed width 2D gaussian
-        
-        Updates: self.
-            .moving_avg_dict, .moving_avg_meas_pos_overlap_dict, .gaussian_volume, .decoding_meas_pos_locality_measure_dict
         """
         def _subfn_renormalize_marginal(a_context_included_pdf):
             # np.shape(a_moving_avg)
@@ -220,20 +215,34 @@ class DecodingLocalityMeasures(ComputedResult): #PickleSerializableMixin, AttrsB
         # ==================================================================================================================================================================================================================================================================================== #
 
         ## INPUTS: quantities to renormalize
-        self.p_x_given_n_dict = {}
+        p_x_given_n_dict = {}
 
         # for an_epoch_idx, (an_epoch_name, a_plotter) in enumerate(sync_plotters.items()):
-        for an_epoch_idx, an_epoch_name in enumerate(self.epoch_names):
+        for an_epoch_idx, an_epoch_name in enumerate(epoch_names):
             ## "epoch" in the loop variables refers to only the session.paradigm epochs, like ['roam', 'sprinkle']
 
-            a_p_x_given_n = deepcopy(np.squeeze(self.p_x_given_n[:, :, an_epoch_idx, :]))
+            a_p_x_given_n = deepcopy(np.squeeze(p_x_given_n[:, :, an_epoch_idx, :]))
             a_p_x_given_n = _subfn_renormalize_marginal(a_p_x_given_n)
-            self.p_x_given_n_dict[an_epoch_name] = a_p_x_given_n
+            p_x_given_n_dict[an_epoch_name] = a_p_x_given_n
 
         ## END for an_epoch_idx, an_epoch_n...
 
 
         ## OUTPUTS: _a_moving_avg_dict, _a_moving_avg_meas_pos_overlap_dict
+        return p_x_given_n_dict
+    
+
+    @function_attributes(short_name=None, tags=['normalization', 'locality', 'overlap'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-12-11 17:03', related_items=[])
+    def build_normalized_outputs(self):
+        """ Normalize: self.p_x_given_n_dict and self.moving_avg over the decoer time period ('sprinkle', 'roam')
+
+        Normalize and convolve each new_position 2D point (x, y) with a fixed width 2D gaussian
+        
+        Updates: self.
+            .moving_avg_dict, .moving_avg_meas_pos_overlap_dict, .gaussian_volume, .decoding_meas_pos_locality_measure_dict
+        """
+        self.p_x_given_n_dict = self.perform_build_normalized_outputs(p_x_given_n=self.p_x_given_n, epoch_names=self.epoch_names)
+
     
 
     @function_attributes(short_name=None, tags=['normalization', 'locality', 'overlap'], input_requires=[], output_provides=[], uses=['self.compute_locality_measures'], used_by=[], creation_date='2025-12-11 17:03', related_items=[])
