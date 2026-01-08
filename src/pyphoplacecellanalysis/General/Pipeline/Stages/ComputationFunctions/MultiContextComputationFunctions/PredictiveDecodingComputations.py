@@ -1886,7 +1886,7 @@ class PredictiveDecodingComputationsContainer(ComputedResult):
         # [array([0, 1, 2, 3, 4]), array([0, 1]), array([0, 1, 2, 3, 4, 5, 6, 7]), array([ 0,  1,  2,  3,  4,  5,  6,  7,  8,  9, 10]),
         n_flattened_tbins: int = np.sum(decoded_local_epochs_result.nbins)
         flattened_time_bin_indicies = np.arange(n_flattened_tbins)
-        split_by_epoch_reverse_flattened_time_bin_indicies: List[NDArray] = split_array(flattened_time_bin_indicies, sub_element_lengths=decoded_local_epochs_result.nbins)
+        reverse_flattened_time_bin_indicies_list: List[NDArray] = split_array(flattened_time_bin_indicies, sub_element_lengths=decoded_local_epochs_result.nbins)
         # assert len(split_by_epoch_reverse_flattened_time_bin_indicies) == n_epochs
         gaussian_volume = self.predictive_decoding.gaussian_volume ## the volume for all time bins
 
@@ -1916,7 +1916,7 @@ class PredictiveDecodingComputationsContainer(ComputedResult):
             # print(np.shape(curr_epoch_p_x_given_n))
             # curr_epoch_p_x_given_n  # np.shape(curr_epoch_p_x_given_n): (n_x_bins, n_y_Bins, n_time_bins)
             # is_high_prob_mask = curr_epoch_p_x_given_n >= np.sort(curr_epoch_p_x_given_n.ravel())[::-1][np.searchsorted(np.cumsum(np.sort(curr_epoch_p_x_given_n.ravel())[::-1]), 0.1 * curr_epoch_p_x_given_n.sum())]
-            curr_epoch_tbin_indicies: NDArray = split_by_epoch_reverse_flattened_time_bin_indicies[i]
+            curr_epoch_tbin_indicies: NDArray = reverse_flattened_time_bin_indicies_list[i]
             a_gaussian_volume = None
             if gaussian_volume is not None:
                 a_gaussian_volume = gaussian_volume[..., curr_epoch_tbin_indicies]
