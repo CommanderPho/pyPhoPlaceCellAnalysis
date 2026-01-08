@@ -2155,7 +2155,7 @@ class PredictiveDecodingComputationsGlobalComputationFunctions(AllFunctionEnumer
         from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import DirectionalDecodersContinuouslyDecodedResult
         from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import DecodedFilterEpochsResult
         ## NEW: filtering by whether decoded posterior in each t_bin is "position-like"
-        from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import filter_to_position_like_epochs_only
+        from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import PositionLikePosteriorScoring
 
 
         if include_includelist is not None:
@@ -2179,7 +2179,7 @@ class PredictiveDecodingComputationsGlobalComputationFunctions(AllFunctionEnumer
                 a_result_decoded: DecodedFilterEpochsResult = DecodedFilterEpochsResult.init_from_single_epoch_result(single_epoch_result=a_result_decoded, decoding_time_bin_size=extant_decoded_time_bin_size) ## convert to a `DecodedFilterEpochsResult` for masking
                 
                 if mask_position_like_time_score_cutoff:
-                    a_masked_result, scoring_results = filter_to_position_like_epochs_only(decoded_local_epochs_result=a_result_decoded, position_like_score_cutoff=mask_position_like_time_score_cutoff, num_min_position_like_t_bins=None)
+                    a_masked_result, scoring_results = PositionLikePosteriorScoring.filter_to_position_like_epochs_only(decoded_local_epochs_result=a_result_decoded, position_like_score_cutoff=mask_position_like_time_score_cutoff, num_min_position_like_t_bins=None)
                 else:
                     a_masked_result = a_result_decoded
 
