@@ -128,12 +128,9 @@ import numpy as np
 import matplotlib.pyplot as plt
 import math
 import os
+from collections import deque
 
-# --- 1. DEFINE BIN EDGES (FROM USER) ---
-xbin = np.array([-85.7562, -80.9188, -76.0813, -71.2439, -66.4065, -61.569, -56.7316, -51.8942, -47.0568, -42.2193, -37.3819, -32.5445, -27.707, -22.8696, -18.0322, -13.1948, -8.35733, -3.5199, 1.31753, 6.15495, 10.9924, 15.8298, 20.6672, 25.5047, 30.3421, 35.1795, 40.017, 44.8544, 49.6918, 54.5292, 59.3667, 64.2041, 69.0415, 73.879, 78.7164, 83.5538, 88.3912, 93.2287, 98.0661, 102.904, 107.741, 112.578])
-ybin = np.array([-96.4477, -93.3514, -90.255, -87.1587, -84.0623, -80.966, -77.8697, -74.7733, -71.677, -68.5806, -65.4843, -62.3879, -59.2916, -56.1952, -53.0989, -50.0025, -46.9062, -43.8099, -40.7135, -37.6172, -34.5208, -31.4245, -28.3281, -25.2318, -22.1354, -19.0391, -15.9427, -12.8464, -9.75005, -6.6537, -3.55736, -0.46101, 2.63534, 5.73168, 8.82803, 11.9244, 15.0207, 18.1171, 21.2134, 24.3098, 27.4061, 30.5024, 33.5988, 36.6951, 39.7915, 42.8878, 45.9842, 49.0805, 52.1769, 55.2732, 58.3696, 61.4659, 64.5622, 67.6586, 70.7549, 73.8513, 76.9476, 80.044, 83.1403, 86.2367, 89.333, 92.4294, 95.5257, 98.6221])
-
-# --- 2. UPDATED SCORING CLASS ---
+@metadata_attributes(short_name=None, tags=['BEST', 'posterior', 'position-like', 'diffusivity', 'spread'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-01-08 08:52', related_items=[])
 class GeminiPositionLikePosteriorScoring:
     """
     A utility class for calculating Position-Like Information (PLI) scores 
@@ -141,6 +138,8 @@ class GeminiPositionLikePosteriorScoring:
 
 
     Usage:
+
+        from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import GeminiPositionLikePosteriorScoring
 
         import os
         # --- 2. LOADING LOGIC ---
@@ -165,52 +164,82 @@ class GeminiPositionLikePosteriorScoring:
             print(f"Shape of first epoch: {p_x_given_n_list[0].shape}")
 
 
+        ## INPUTS: p_x_given_n_list
 
+
+
+        from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import GeminiPositionLikePosteriorScoring
+
+        ## INPUTS: flat_p_x_given_n_list
+        xbin = np.array([-85.7562, -80.9188, -76.0813, -71.2439, -66.4065, -61.569, -56.7316, -51.8942, -47.0568, -42.2193, -37.3819, -32.5445, -27.707, -22.8696, -18.0322, -13.1948, -8.35733, -3.5199, 1.31753, 6.15495, 10.9924, 15.8298, 20.6672, 25.5047, 30.3421, 35.1795, 40.017, 44.8544, 49.6918, 54.5292, 59.3667, 64.2041, 69.0415, 73.879, 78.7164, 83.5538, 88.3912, 93.2287, 98.0661, 102.904, 107.741, 112.578])
+        ybin = np.array([-96.4477, -93.3514, -90.255, -87.1587, -84.0623, -80.966, -77.8697, -74.7733, -71.677, -68.5806, -65.4843, -62.3879, -59.2916, -56.1952, -53.0989, -50.0025, -46.9062, -43.8099, -40.7135, -37.6172, -34.5208, -31.4245, -28.3281, -25.2318, -22.1354, -19.0391, -15.9427, -12.8464, -9.75005, -6.6537, -3.55736, -0.46101, 2.63534, 5.73168, 8.82803, 11.9244, 15.0207, 18.1171, 21.2134, 24.3098, 27.4061, 30.5024, 33.5988, 36.6951, 39.7915, 42.8878, 45.9842, 49.0805, 52.1769, 55.2732, 58.3696, 61.4659, 64.5622, 67.6586, 70.7549, 73.8513, 76.9476, 80.044, 83.1403, 86.2367, 89.333, 92.4294, 95.5257, 98.6221])
 
         # Choose an epoch to visualize (e.g., the first one)
         test_epoch_idx = 0
         posterior_stack_to_test = p_x_given_n_list[test_epoch_idx]
         print(f"\nAnalyzing Epoch {test_epoch_idx}...")
-        GeminiPositionLikePosteriorScoring.compute_and_plot_posterior_stack(
-            posterior_stack_to_test,
+        scoring_results = GeminiPositionLikePosteriorScoring.compute_and_plot_posterior_stack(
+            flat_p_x_given_n_list,
             x_edges=xbin,
-            y_edges=ybin
+            y_edges=ybin, 
+            should_plot_results=False, 
+        )
+
+
+        scoring_results
+
+
+
+
+        page_idx: int = 200
+        max_n_frames_to_plot = 60
+
+        _ = GeminiPositionLikePosteriorScoring.compute_and_plot_posterior_stack(
+            flat_p_x_given_n_list[:, :, (max_n_frames_to_plot*page_idx):],
+            x_edges=xbin,
+            y_edges=ybin, 
+            should_plot_results=True,
+            max_n_frames_to_plot = max_n_frames_to_plot,
         )
 
 
     """
+    high_quality_score_cutoff: float = 0.7
+    position_like_score_cutoff: float = 0.42
 
     @classmethod
-    def calculate_pli_score(cls, posterior, x_edges, y_edges, w_sharpness=0.4, w_locality=0.6, tolerated_mass_spread_percent_diagonal:float=0.20):
+    def calculate_pli_score(cls, posterior, x_edges, y_edges, w_sharpness=0.4, w_locality=0.6, noise_threshold_percent=0.02, sigma_tolerated_env_diagonal_percent: float = 0.20):
         """
-        Calculates a score (0.0 - 1.0) indicating how 'position-like' a posterior is.
-        Uses x_edges and y_edges to handle non-square pixels and environment scaling.
+        Calculates PLI score and returns individual components.
         """
-        # 1. Preprocessing
+        # 1. Preprocessing & Noise Filtering
         P = np.array(posterior, dtype=float)
-        total_p = np.sum(P)
         
+        peak_val = np.max(P)
+        if peak_val > 0:
+            # Zero out pixels that are less than X% of the peak
+            P[P < (peak_val * noise_threshold_percent)] = 0.0
+            
+        total_p = np.sum(P)
         if total_p == 0 or np.isnan(total_p):
             return 0.0, {'sharpness': 0.0, 'locality': 0.0, 'rms_cm': 0.0}
         
-        P = P / total_p # Normalize to PMF
-        rows, cols = P.shape # Assumes Dim 0 is X, Dim 1 is Y (based on provided bins)
+        P = P / total_p # Re-normalize
+        rows, cols = P.shape
         
-        # 2. Derive Physical Metrics from Edges
-        # Calculate pixel dimensions (handling rectangular pixels)
-        bin_w_cm = np.abs(np.mean(np.diff(x_edges))) # Dim 0 resolution
-        bin_h_cm = np.abs(np.mean(np.diff(y_edges))) # Dim 1 resolution
+        # 2. Derive Physical Metrics
+        bin_w_cm = np.abs(np.mean(np.diff(x_edges))) 
+        bin_h_cm = np.abs(np.mean(np.diff(y_edges)))
         
-        # Calculate Diagonal of the environment
         env_width = np.max(x_edges) - np.min(x_edges)
         env_height = np.max(y_edges) - np.min(y_edges)
         env_diagonal_cm = np.sqrt(env_width**2 + env_height**2)
         
         # 3. Find Peak (MAP)
         map_flat = np.argmax(P)
-        map_idx = np.unravel_index(map_flat, P.shape) # (row_idx/x_idx, col_idx/y_idx)
+        map_idx = np.unravel_index(map_flat, P.shape)
         
-        # 4. Metric A: Sharpness (1 - Normalized Entropy)
+        # 4. Component A: Sharpness (Entropy)
         P_safe = P[P > 0]
         entropy = -np.sum(P_safe * np.log(P_safe))
         max_entropy = np.log(rows * cols)
@@ -218,20 +247,16 @@ class GeminiPositionLikePosteriorScoring:
         s_sharpness = 1.0 if max_entropy == 0 else 1.0 - (entropy / max_entropy)
         s_sharpness = np.clip(s_sharpness, 0, 1)
 
-        # 5. Metric B: Spatial Locality (RMS distance from Peak)
-        # Use np.indices to generate a grid of indices
+        # 5. Component B: Locality (Spatial Spread)
         row_indices, col_indices = np.indices((rows, cols))
         
-        # Convert index distances to physical cm distances
-        # Dim 0 corresponds to x_edges, Dim 1 corresponds to y_edges
         dx = (row_indices - map_idx[0]) * bin_w_cm
         dy = (col_indices - map_idx[1]) * bin_h_cm
         
         dist_sq = dx**2 + dy**2
-        rms_dist = np.sqrt(np.sum(P * dist_sq)) # Wasserstein-2 proxy
+        rms_dist = np.sqrt(np.sum(P * dist_sq))
         
-        # Score drops if mass is spread > 15% of environment diagonal
-        sigma_tolerated = env_diagonal_cm * tolerated_mass_spread_percent_diagonal 
+        sigma_tolerated = env_diagonal_cm * sigma_tolerated_env_diagonal_percent 
         s_locality = np.exp(-(rms_dist / sigma_tolerated))
 
         # 6. Composite Score
@@ -241,68 +266,336 @@ class GeminiPositionLikePosteriorScoring:
 
     @classmethod
     def get_pli_quality_label(cls, score):
-        if score >= 0.7: return "High Quality", "green"
-        elif score >= 0.5: return "Position-Like", "orange"
+        # if score >= cls.high_quality_score_cutoff: return "High Quality", "green"
+        # elif score >= cls.position_like_score_cutoff: return "Position-Like", "orange"
+        # else: return "Ambiguous", "red"
+        if score >= cls.high_quality_score_cutoff: return "Position-Like HQ", "limegreen"
+        elif score >= cls.position_like_score_cutoff: return "Position-Like", "green"
         else: return "Ambiguous", "red"
 
+
     @classmethod
-    def compute_and_plot_posterior_stack(cls, posterior_stack, x_edges, y_edges, should_plot_results=True):
+    def compute_and_plot_posterior_stack(cls, posterior_stack, x_edges, y_edges, noise_threshold_percent=0.02, should_plot_results=False, max_n_frames_to_plot: int = 20, cols: int = 5, debug_print:bool=False, **pli_score_kwargs) -> pd.DataFrame:
         """
-        Process an array of posteriors using specific bin edges.
-        posterior_stack shape expected: (n_x_bins, n_y_bins, n_t_bins)
+        Process an array of posteriors and display scores + components.
+
+        BUG: if should_plot_results the returned dataframe is truncated to `max_n_frames_to_plot` items
+        
         """
-        # Ensure 3D shape
-        if posterior_stack.ndim == 2:
-            posterior_stack = posterior_stack[:, :, np.newaxis]
-            
+        if posterior_stack.ndim == 2: posterior_stack = posterior_stack[:, :, np.newaxis]
         n_x, n_y, n_frames = posterior_stack.shape
         
-        # Validation: Check if stack dimensions match bin counts
-        # Edges are N+1 compared to Bins N
-        if n_x != (len(x_edges) - 1) or n_y != (len(y_edges) - 1):
-            print(f"Warning: Stack shape ({n_x}, {n_y}) does not match bin counts ({len(x_edges)-1}, {len(y_edges)-1}).")
-            print("Scores may be inaccurate due to mismatch.")
-
-        results = []
+        scoring_results = []
         
-        # Limit frames for plotting if huge
-        frames_to_process = min(n_frames, 20) 
-        if n_frames > 20: print(f"Processing first 20 of {n_frames} frames for visualization.")
+        # The code is checking the value of the variable `should_plot_results` and if it evaluates to
+        # `True`, it will execute the indented block of code below it.
+        if should_plot_results:
+            frames_to_process = min(n_frames, max_n_frames_to_plot) 
+            if n_frames > max_n_frames_to_plot: print(f"Processing first {max_n_frames_to_plot} of {n_frames} frames.")
+        else:
+            frames_to_process = n_frames
 
-        print(f"{'Frame':<6} | {'Score':<6} | {'Label':<15} | {'RMS (cm)':<8}")
-        print("-" * 50)
+
+        if debug_print:
+            # --- Updated Header to include Sharpness (S) and Locality (L) ---
+            print(f"{'Frame':<6} | {'Score':<6} | {'Label':<15} | {'RMS (cm)':<8} | {'Sharpness':<9} | {'Locality':<9}")
+            print("-" * 80)
 
         for t in range(frames_to_process):
             current_posterior = posterior_stack[:, :, t]
-            score, comps = cls.calculate_pli_score(current_posterior, x_edges, y_edges)
-            label, color = cls.get_pli_quality_label(score)
-            results.append({'t': t, 'score': score, 'label': label, 'color': color, 'comps': comps, 'data': current_posterior})
-            print(f"T={t:<4} | {score:.4f} | {label:<15} | {comps['rms_cm']:.1f}")
+            
+            score, comps = cls.calculate_pli_score(current_posterior, x_edges, y_edges, noise_threshold_percent=noise_threshold_percent, **pli_score_kwargs)
+            
+            a_record = {'t': t, 'score': score, 'comps': comps}
+            a_record.update(**comps) ## comps as separate columns
+
+            if should_plot_results:
+                label, color = cls.get_pli_quality_label(score)
+                a_record.update(**{'label': label, 'color': color, 'data': current_posterior})
+
+
+            scoring_results.append(a_record)
+            
+            if debug_print:
+                # --- Updated Print Statement ---
+                print(f"T={t:<4} | {score:.4f} | {label:<15} | {comps['rms_cm']:<8.1f} | {comps['sharpness']:.4f}    | {comps['locality']:.4f}")
+
 
         if should_plot_results:
-            cols = 4
             rows = math.ceil(frames_to_process / cols)
-            fig, axes = plt.subplots(rows, cols, figsize=(cols * 3.5, rows * 3.5))
+            # Increase figure height slightly to accommodate 3-line titles
+            fig, axes = plt.subplots(rows, cols, figsize=(cols * 3.5, rows * 3.7))
             axes = np.atleast_1d(axes).flatten()
             
             for i in range(len(axes)):
                 if i < frames_to_process:
-                    res = results[i]
+                    res = scoring_results[i]
                     ax = axes[i]
-                    # Note: We transpose (.T) the data for plotting so X is horizontal and Y is vertical
-                    # assuming the input is (X_index, Y_index)
                     im = ax.imshow(res['data'].T, origin='lower', cmap='inferno', aspect='auto')
                     
-                    title_str = f"T={res['t']}: {res['label']}\nScore: {res['score']:.3f}"
-                    ax.set_title(title_str, color=res['color'], fontweight='bold', fontsize=10)
-                    ax.set_xlabel("X (Dim 0)")
-                    ax.set_ylabel("Y (Dim 1)")
+                    # --- Updated Plot Title with Components ---
+                    # title_str = (
+                    #     f"T={res['t']} | Score: {res['score']:.2f} (S: {res['comps']['sharpness']:.2f} | L: {res['comps']['locality']:.2f})\n"
+                    #     f"{res['label']}"
+                    # )
+
+                    title_str = (
+                        f"T[{res['t']}]: {res['label']}\n"
+                        f"Score: {res['score']:.2f} (S: {res['comps']['sharpness']:.2f} | L: {res['comps']['locality']:.2f})"
+                    )
+
+                    
+                    ax.set_title(title_str, color=res['color'], fontweight='bold', fontsize=9)
+                    ax.set_xticks([]) # Hide ticks for cleaner look
+                    ax.set_yticks([])
                 else:
                     axes[i].axis('off')
                     
             plt.tight_layout()
-            plt.suptitle(f"Posterior Stack Analysis (Top 20)", y=1.02, fontsize=14)
             plt.show()
+            
+        ## convert to dataframe:
+        scoring_results = pd.DataFrame.from_records(scoring_results).rename(columns={'t': 't_bin_idx'}).drop(columns=['comps']) ## already have expanded comps
+        scoring_results['is_position_like'] = (scoring_results['score'] >= cls.position_like_score_cutoff)
+        
+        return scoring_results
+
+
+@metadata_attributes(short_name=None, tags=['WORSE', 'okay', 'posterior', 'position-like', 'diffusivity', 'spread'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-01-08 08:50', related_items=['GeminiPositionLikePosteriorScoring'])
+class ChatGPT_PositionLikePosteriorScoring:
+    """ worse than `GeminiPositionLikePosteriorScoring`, but incorporates more components into composite weight. Just a backup
+    
+    _test_results = ChatGPT_PositionLikePosteriorScoring.validate_position_like_score(should_plot_results=True)
+    _test_results
+    """
+    @classmethod    
+    def position_like_score(cls, posterior: np.ndarray, weights: Tuple[float, float, float] = (0.4, 0.3, 0.3), cluster_threshold_ratio: float = 0.5, connectivity: int = 8, eps: float = 1e-12) -> Dict[str, float]:
+        """
+        Compute a composite "position-likeness" score for a 2D posterior.
+        Components (each in [0,1]):
+        - S_ent: entropy-based sharpness (1 = delta, 0 = uniform)
+        - S_peak: normalized max-probability (peakiness)
+        - S_cluster: mass in the connected cluster containing the global max
+        Final score = weighted sum of components (weights sum to 1).
+
+        Args:
+        posterior: 2D numpy array (will be normalized to sum=1).
+        weights: tuple (w_ent, w_peak, w_cluster) summing to 1.
+        cluster_threshold_ratio: threshold as fraction of p_max for clustering (e.g. 0.5)
+        connectivity: 4 or 8 (neighborhood for connectivity in cluster)
+        eps: small value to avoid log(0)
+
+        Returns:
+        dict with keys: 'score', 'S_ent', 'S_peak', 'S_cluster', 'p_max', 'entropy'
+        """
+        if posterior.ndim != 2:
+            raise ValueError("posterior must be a 2D array")
+
+        # sanitize & normalize
+        P = np.asarray(posterior, dtype=float).copy()
+        P[P < 0] = 0.0
+        total = P.sum()
+        if total <= eps:
+            return {'score': 0.0, 'S_ent': 0.0, 'S_peak': 0.0, 'S_cluster': 0.0,
+                    'p_max': 0.0, 'entropy': 0.0}
+        P /= total
+
+        H = -np.sum(P[P > 0] * np.log(P[P > 0]))  # Shannon entropy
+        N = P.size
+        logN = np.log(N) if N > 1 else 1.0
+
+        # Entropy-based sharpness (1 = delta / very sharp, 0 = uniform)
+        S_ent = 1.0 - (H / logN)
+        S_ent = float(np.clip(S_ent, 0.0, 1.0))
+
+        # Peakiness: normalized p_max
+        p_max = float(np.max(P))
+        if N > 1:
+            S_peak = (p_max - 1.0 / N) / (1.0 - 1.0 / N)
+        else:
+            S_peak = 1.0
+        S_peak = float(np.clip(S_peak, 0.0, 1.0))
+
+        # Cluster mass around global maximum
+        # Threshold mask: bins >= cluster_threshold_ratio * p_max
+        thresh = cluster_threshold_ratio * p_max
+        mask = (P >= thresh)
+        # find coords of global max (take first if multiple)
+        max_idx = np.argmax(P)
+        start = np.unravel_index(int(max_idx), P.shape)
+        # If the start bin isn't above threshold, still include it as seed
+        if not mask[start]:
+            # treat only the seed as a tiny cluster if no neighbors pass threshold
+            cluster_mass = float(P[start])
+        else:
+            # BFS/stack to find connected component containing `start`
+            h, w = P.shape
+            visited = np.zeros_like(mask, dtype=bool)
+            dq = deque([start])
+            visited[start] = True
+            cluster_mass = 0.0
+            if connectivity == 4:
+                neigh = [(-1,0),(1,0),(0,-1),(0,1)]
+            else:  # 8-connectivity
+                neigh = [(-1,-1),(-1,0),(-1,1),(0,-1),(0,1),(1,-1),(1,0),(1,1)]
+
+            while dq:
+                (r,c) = dq.popleft()
+                if mask[r, c]:
+                    cluster_mass += float(P[r, c])
+                    for dr, dc in neigh:
+                        rr, cc = r + dr, c + dc
+                        if 0 <= rr < h and 0 <= cc < w and not visited[rr, cc]:
+                            visited[rr, cc] = True
+                            if mask[rr, cc]:
+                                dq.append((rr, cc))
+            # if cluster_mass is still 0 (edge cases), fall back to seed prob
+            if cluster_mass == 0.0:
+                cluster_mass = float(P[start])
+
+        S_cluster = float(np.clip(cluster_mass, 0.0, 1.0))
+
+        # Final weighted score
+        w_ent, w_peak, w_cluster = weights
+        # normalize weights if they don't sum to 1
+        wsum = w_ent + w_peak + w_cluster
+        if wsum <= 0:
+            w_ent, w_peak, w_cluster = 1/3, 1/3, 1/3
+        else:
+            w_ent, w_peak, w_cluster = w_ent/wsum, w_peak/wsum, w_cluster/wsum
+
+        # score = w_ent * S_ent + w_peak * S_peak + w_cluster * S_cluster
+        score = w_ent * S_ent + w_peak * S_peak + w_cluster * (S_cluster * S_peak)
+        score = float(np.clip(score, 0.0, 1.0))
+
+        return {
+            'score': score,
+            'S_ent': S_ent,
+            'S_peak': S_peak,
+            'S_cluster': S_cluster,
+            'p_max': p_max,
+            'entropy': H
+        }
+
+    @classmethod
+    def validate_position_like_score(cls, should_plot_results: bool = True, shape=(32, 32), random_seed: int = 0):
+        """
+        Runs a comprehensive test suite of synthetic 2D posteriors against
+        position_like_score(). Optionally plots all posteriors with scores.
+
+        Returns:
+            results: list of dicts with keys:
+                - 'label'
+                - 'posterior'
+                - 'score_dict'
+        """
+        np.random.seed(random_seed)
+
+        # ---------- Posterior generators ----------
+        def delta():
+            P = np.zeros(shape); P[shape[0]//2, shape[1]//2] = 1.0
+            return P
+
+        def uniform():
+            return np.ones(shape)
+
+        def gaussian(sigma=1.5, center=None):
+            if center is None:
+                center = (shape[0]//2, shape[1]//2)
+            y, x = np.indices(shape)
+            cy, cx = center
+            return np.exp(-((x-cx)**2 + (y-cy)**2)/(2*sigma**2))
+
+        def two_peaks():
+            return gaussian(1.2, (8,8)) + gaussian(1.2, (24,24))
+
+        def primary_secondary():
+            return gaussian(1.2) + 0.2 * gaussian(1.2, (24,16))
+
+        def noisy_peak():
+            return gaussian(1.5) + 0.05 * np.random.rand(*shape)
+
+        def speckle():
+            return np.random.rand(*shape)
+
+        def ring():
+            y, x = np.indices(shape)
+            cy, cx = shape[0]//2, shape[1]//2
+            r = np.sqrt((x-cx)**2 + (y-cy)**2)
+            return np.exp(-((r-8)**2)/(2*1.5**2))
+
+        def ridge():
+            y, x = np.indices(shape)
+            cx = shape[1]//2
+            return np.exp(-((x-cx)**2)/(2*1.0**2))
+
+        tests = [
+            ("Delta (perfect)", delta()),
+            ("Uniform", uniform()),
+            ("Gaussian σ=1", gaussian(1)),
+            ("Gaussian σ=4", gaussian(4)),
+            ("Two equal peaks", two_peaks()),
+            ("Primary + secondary", primary_secondary()),
+            ("Noisy peak", noisy_peak()),
+            ("Speckle noise", speckle()),
+            ("Ring / annulus", ring()),
+            ("Elongated ridge", ridge()),
+        ]
+
+        results = []
+        for label, P in tests:
+            score_dict = cls.position_like_score(P)
+            results.append(dict(
+                label=label,
+                posterior=P,
+                score_dict=score_dict
+            ))
+
+        # ---------- Plot ----------
+        if should_plot_results:
+            n = len(results)
+            cols = 5
+            rows = int(np.ceil(n / cols))
+            fig, axes = plt.subplots(rows, cols, figsize=(3*cols, 3*rows))
+            axes = np.atleast_1d(axes).ravel()
+
+            for ax, res in zip(axes, results):
+                im = ax.imshow(res['posterior'], origin='lower')
+                s = res['score_dict']
+                ax.set_title(
+                    f"{res['label']}\n"
+                    f"S={s['score']:.2f} | "
+                    f"E={s['S_ent']:.2f} "
+                    f"P={s['S_peak']:.2f} "
+                    f"C={s['S_cluster']:.2f}",
+                    fontsize=9
+                )
+                ax.axis('off')
+
+            for ax in axes[len(results):]:
+                ax.axis('off')
+
+            fig.suptitle("Position-Likeness Composite Score Validation", fontsize=14)
+            plt.tight_layout()
+            plt.show()
+
+
+        """
+        Convert validate_position_like_score() output to a pandas DataFrame.
+        """
+        rows = []
+        for r in results:
+            s = r['score_dict']
+            rows.append({
+                'label': r['label'],
+                'score': s['score'],
+                'S_ent': s['S_ent'],
+                'S_peak': s['S_peak'],
+                'S_cluster': s['S_cluster'],
+                'p_max': s['p_max'],
+                'entropy': s['entropy'],
+            })
+        return pd.DataFrame(rows)
 
 
 
