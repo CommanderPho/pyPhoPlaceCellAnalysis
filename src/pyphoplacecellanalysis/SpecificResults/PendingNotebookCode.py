@@ -361,241 +361,241 @@ class GeminiPositionLikePosteriorScoring:
         return scoring_results
 
 
-@metadata_attributes(short_name=None, tags=['WORSE', 'okay', 'posterior', 'position-like', 'diffusivity', 'spread'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-01-08 08:50', related_items=['GeminiPositionLikePosteriorScoring'])
-class ChatGPT_PositionLikePosteriorScoring:
-    """ worse than `GeminiPositionLikePosteriorScoring`, but incorporates more components into composite weight. Just a backup
+# @metadata_attributes(short_name=None, tags=['WORSE', 'okay', 'posterior', 'position-like', 'diffusivity', 'spread'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-01-08 08:50', related_items=['GeminiPositionLikePosteriorScoring'])
+# class ChatGPT_PositionLikePosteriorScoring:
+#     """ worse than `GeminiPositionLikePosteriorScoring`, but incorporates more components into composite weight. Just a backup
     
-    _test_results = ChatGPT_PositionLikePosteriorScoring.validate_position_like_score(should_plot_results=True)
-    _test_results
-    """
-    @classmethod    
-    def position_like_score(cls, posterior: np.ndarray, weights: Tuple[float, float, float] = (0.4, 0.3, 0.3), cluster_threshold_ratio: float = 0.5, connectivity: int = 8, eps: float = 1e-12) -> Dict[str, float]:
-        """
-        Compute a composite "position-likeness" score for a 2D posterior.
-        Components (each in [0,1]):
-        - S_ent: entropy-based sharpness (1 = delta, 0 = uniform)
-        - S_peak: normalized max-probability (peakiness)
-        - S_cluster: mass in the connected cluster containing the global max
-        Final score = weighted sum of components (weights sum to 1).
+#     _test_results = ChatGPT_PositionLikePosteriorScoring.validate_position_like_score(should_plot_results=True)
+#     _test_results
+#     """
+#     @classmethod    
+#     def position_like_score(cls, posterior: np.ndarray, weights: Tuple[float, float, float] = (0.4, 0.3, 0.3), cluster_threshold_ratio: float = 0.5, connectivity: int = 8, eps: float = 1e-12) -> Dict[str, float]:
+#         """
+#         Compute a composite "position-likeness" score for a 2D posterior.
+#         Components (each in [0,1]):
+#         - S_ent: entropy-based sharpness (1 = delta, 0 = uniform)
+#         - S_peak: normalized max-probability (peakiness)
+#         - S_cluster: mass in the connected cluster containing the global max
+#         Final score = weighted sum of components (weights sum to 1).
 
-        Args:
-        posterior: 2D numpy array (will be normalized to sum=1).
-        weights: tuple (w_ent, w_peak, w_cluster) summing to 1.
-        cluster_threshold_ratio: threshold as fraction of p_max for clustering (e.g. 0.5)
-        connectivity: 4 or 8 (neighborhood for connectivity in cluster)
-        eps: small value to avoid log(0)
+#         Args:
+#         posterior: 2D numpy array (will be normalized to sum=1).
+#         weights: tuple (w_ent, w_peak, w_cluster) summing to 1.
+#         cluster_threshold_ratio: threshold as fraction of p_max for clustering (e.g. 0.5)
+#         connectivity: 4 or 8 (neighborhood for connectivity in cluster)
+#         eps: small value to avoid log(0)
 
-        Returns:
-        dict with keys: 'score', 'S_ent', 'S_peak', 'S_cluster', 'p_max', 'entropy'
-        """
-        if posterior.ndim != 2:
-            raise ValueError("posterior must be a 2D array")
+#         Returns:
+#         dict with keys: 'score', 'S_ent', 'S_peak', 'S_cluster', 'p_max', 'entropy'
+#         """
+#         if posterior.ndim != 2:
+#             raise ValueError("posterior must be a 2D array")
 
-        # sanitize & normalize
-        P = np.asarray(posterior, dtype=float).copy()
-        P[P < 0] = 0.0
-        total = P.sum()
-        if total <= eps:
-            return {'score': 0.0, 'S_ent': 0.0, 'S_peak': 0.0, 'S_cluster': 0.0,
-                    'p_max': 0.0, 'entropy': 0.0}
-        P /= total
+#         # sanitize & normalize
+#         P = np.asarray(posterior, dtype=float).copy()
+#         P[P < 0] = 0.0
+#         total = P.sum()
+#         if total <= eps:
+#             return {'score': 0.0, 'S_ent': 0.0, 'S_peak': 0.0, 'S_cluster': 0.0,
+#                     'p_max': 0.0, 'entropy': 0.0}
+#         P /= total
 
-        H = -np.sum(P[P > 0] * np.log(P[P > 0]))  # Shannon entropy
-        N = P.size
-        logN = np.log(N) if N > 1 else 1.0
+#         H = -np.sum(P[P > 0] * np.log(P[P > 0]))  # Shannon entropy
+#         N = P.size
+#         logN = np.log(N) if N > 1 else 1.0
 
-        # Entropy-based sharpness (1 = delta / very sharp, 0 = uniform)
-        S_ent = 1.0 - (H / logN)
-        S_ent = float(np.clip(S_ent, 0.0, 1.0))
+#         # Entropy-based sharpness (1 = delta / very sharp, 0 = uniform)
+#         S_ent = 1.0 - (H / logN)
+#         S_ent = float(np.clip(S_ent, 0.0, 1.0))
 
-        # Peakiness: normalized p_max
-        p_max = float(np.max(P))
-        if N > 1:
-            S_peak = (p_max - 1.0 / N) / (1.0 - 1.0 / N)
-        else:
-            S_peak = 1.0
-        S_peak = float(np.clip(S_peak, 0.0, 1.0))
+#         # Peakiness: normalized p_max
+#         p_max = float(np.max(P))
+#         if N > 1:
+#             S_peak = (p_max - 1.0 / N) / (1.0 - 1.0 / N)
+#         else:
+#             S_peak = 1.0
+#         S_peak = float(np.clip(S_peak, 0.0, 1.0))
 
-        # Cluster mass around global maximum
-        # Threshold mask: bins >= cluster_threshold_ratio * p_max
-        thresh = cluster_threshold_ratio * p_max
-        mask = (P >= thresh)
-        # find coords of global max (take first if multiple)
-        max_idx = np.argmax(P)
-        start = np.unravel_index(int(max_idx), P.shape)
-        # If the start bin isn't above threshold, still include it as seed
-        if not mask[start]:
-            # treat only the seed as a tiny cluster if no neighbors pass threshold
-            cluster_mass = float(P[start])
-        else:
-            # BFS/stack to find connected component containing `start`
-            h, w = P.shape
-            visited = np.zeros_like(mask, dtype=bool)
-            dq = deque([start])
-            visited[start] = True
-            cluster_mass = 0.0
-            if connectivity == 4:
-                neigh = [(-1,0),(1,0),(0,-1),(0,1)]
-            else:  # 8-connectivity
-                neigh = [(-1,-1),(-1,0),(-1,1),(0,-1),(0,1),(1,-1),(1,0),(1,1)]
+#         # Cluster mass around global maximum
+#         # Threshold mask: bins >= cluster_threshold_ratio * p_max
+#         thresh = cluster_threshold_ratio * p_max
+#         mask = (P >= thresh)
+#         # find coords of global max (take first if multiple)
+#         max_idx = np.argmax(P)
+#         start = np.unravel_index(int(max_idx), P.shape)
+#         # If the start bin isn't above threshold, still include it as seed
+#         if not mask[start]:
+#             # treat only the seed as a tiny cluster if no neighbors pass threshold
+#             cluster_mass = float(P[start])
+#         else:
+#             # BFS/stack to find connected component containing `start`
+#             h, w = P.shape
+#             visited = np.zeros_like(mask, dtype=bool)
+#             dq = deque([start])
+#             visited[start] = True
+#             cluster_mass = 0.0
+#             if connectivity == 4:
+#                 neigh = [(-1,0),(1,0),(0,-1),(0,1)]
+#             else:  # 8-connectivity
+#                 neigh = [(-1,-1),(-1,0),(-1,1),(0,-1),(0,1),(1,-1),(1,0),(1,1)]
 
-            while dq:
-                (r,c) = dq.popleft()
-                if mask[r, c]:
-                    cluster_mass += float(P[r, c])
-                    for dr, dc in neigh:
-                        rr, cc = r + dr, c + dc
-                        if 0 <= rr < h and 0 <= cc < w and not visited[rr, cc]:
-                            visited[rr, cc] = True
-                            if mask[rr, cc]:
-                                dq.append((rr, cc))
-            # if cluster_mass is still 0 (edge cases), fall back to seed prob
-            if cluster_mass == 0.0:
-                cluster_mass = float(P[start])
+#             while dq:
+#                 (r,c) = dq.popleft()
+#                 if mask[r, c]:
+#                     cluster_mass += float(P[r, c])
+#                     for dr, dc in neigh:
+#                         rr, cc = r + dr, c + dc
+#                         if 0 <= rr < h and 0 <= cc < w and not visited[rr, cc]:
+#                             visited[rr, cc] = True
+#                             if mask[rr, cc]:
+#                                 dq.append((rr, cc))
+#             # if cluster_mass is still 0 (edge cases), fall back to seed prob
+#             if cluster_mass == 0.0:
+#                 cluster_mass = float(P[start])
 
-        S_cluster = float(np.clip(cluster_mass, 0.0, 1.0))
+#         S_cluster = float(np.clip(cluster_mass, 0.0, 1.0))
 
-        # Final weighted score
-        w_ent, w_peak, w_cluster = weights
-        # normalize weights if they don't sum to 1
-        wsum = w_ent + w_peak + w_cluster
-        if wsum <= 0:
-            w_ent, w_peak, w_cluster = 1/3, 1/3, 1/3
-        else:
-            w_ent, w_peak, w_cluster = w_ent/wsum, w_peak/wsum, w_cluster/wsum
+#         # Final weighted score
+#         w_ent, w_peak, w_cluster = weights
+#         # normalize weights if they don't sum to 1
+#         wsum = w_ent + w_peak + w_cluster
+#         if wsum <= 0:
+#             w_ent, w_peak, w_cluster = 1/3, 1/3, 1/3
+#         else:
+#             w_ent, w_peak, w_cluster = w_ent/wsum, w_peak/wsum, w_cluster/wsum
 
-        # score = w_ent * S_ent + w_peak * S_peak + w_cluster * S_cluster
-        score = w_ent * S_ent + w_peak * S_peak + w_cluster * (S_cluster * S_peak)
-        score = float(np.clip(score, 0.0, 1.0))
+#         # score = w_ent * S_ent + w_peak * S_peak + w_cluster * S_cluster
+#         score = w_ent * S_ent + w_peak * S_peak + w_cluster * (S_cluster * S_peak)
+#         score = float(np.clip(score, 0.0, 1.0))
 
-        return {
-            'score': score,
-            'S_ent': S_ent,
-            'S_peak': S_peak,
-            'S_cluster': S_cluster,
-            'p_max': p_max,
-            'entropy': H
-        }
+#         return {
+#             'score': score,
+#             'S_ent': S_ent,
+#             'S_peak': S_peak,
+#             'S_cluster': S_cluster,
+#             'p_max': p_max,
+#             'entropy': H
+#         }
 
-    @classmethod
-    def validate_position_like_score(cls, should_plot_results: bool = True, shape=(32, 32), random_seed: int = 0):
-        """
-        Runs a comprehensive test suite of synthetic 2D posteriors against
-        position_like_score(). Optionally plots all posteriors with scores.
+#     @classmethod
+#     def validate_position_like_score(cls, should_plot_results: bool = True, shape=(32, 32), random_seed: int = 0):
+#         """
+#         Runs a comprehensive test suite of synthetic 2D posteriors against
+#         position_like_score(). Optionally plots all posteriors with scores.
 
-        Returns:
-            results: list of dicts with keys:
-                - 'label'
-                - 'posterior'
-                - 'score_dict'
-        """
-        np.random.seed(random_seed)
+#         Returns:
+#             results: list of dicts with keys:
+#                 - 'label'
+#                 - 'posterior'
+#                 - 'score_dict'
+#         """
+#         np.random.seed(random_seed)
 
-        # ---------- Posterior generators ----------
-        def delta():
-            P = np.zeros(shape); P[shape[0]//2, shape[1]//2] = 1.0
-            return P
+#         # ---------- Posterior generators ----------
+#         def delta():
+#             P = np.zeros(shape); P[shape[0]//2, shape[1]//2] = 1.0
+#             return P
 
-        def uniform():
-            return np.ones(shape)
+#         def uniform():
+#             return np.ones(shape)
 
-        def gaussian(sigma=1.5, center=None):
-            if center is None:
-                center = (shape[0]//2, shape[1]//2)
-            y, x = np.indices(shape)
-            cy, cx = center
-            return np.exp(-((x-cx)**2 + (y-cy)**2)/(2*sigma**2))
+#         def gaussian(sigma=1.5, center=None):
+#             if center is None:
+#                 center = (shape[0]//2, shape[1]//2)
+#             y, x = np.indices(shape)
+#             cy, cx = center
+#             return np.exp(-((x-cx)**2 + (y-cy)**2)/(2*sigma**2))
 
-        def two_peaks():
-            return gaussian(1.2, (8,8)) + gaussian(1.2, (24,24))
+#         def two_peaks():
+#             return gaussian(1.2, (8,8)) + gaussian(1.2, (24,24))
 
-        def primary_secondary():
-            return gaussian(1.2) + 0.2 * gaussian(1.2, (24,16))
+#         def primary_secondary():
+#             return gaussian(1.2) + 0.2 * gaussian(1.2, (24,16))
 
-        def noisy_peak():
-            return gaussian(1.5) + 0.05 * np.random.rand(*shape)
+#         def noisy_peak():
+#             return gaussian(1.5) + 0.05 * np.random.rand(*shape)
 
-        def speckle():
-            return np.random.rand(*shape)
+#         def speckle():
+#             return np.random.rand(*shape)
 
-        def ring():
-            y, x = np.indices(shape)
-            cy, cx = shape[0]//2, shape[1]//2
-            r = np.sqrt((x-cx)**2 + (y-cy)**2)
-            return np.exp(-((r-8)**2)/(2*1.5**2))
+#         def ring():
+#             y, x = np.indices(shape)
+#             cy, cx = shape[0]//2, shape[1]//2
+#             r = np.sqrt((x-cx)**2 + (y-cy)**2)
+#             return np.exp(-((r-8)**2)/(2*1.5**2))
 
-        def ridge():
-            y, x = np.indices(shape)
-            cx = shape[1]//2
-            return np.exp(-((x-cx)**2)/(2*1.0**2))
+#         def ridge():
+#             y, x = np.indices(shape)
+#             cx = shape[1]//2
+#             return np.exp(-((x-cx)**2)/(2*1.0**2))
 
-        tests = [
-            ("Delta (perfect)", delta()),
-            ("Uniform", uniform()),
-            ("Gaussian σ=1", gaussian(1)),
-            ("Gaussian σ=4", gaussian(4)),
-            ("Two equal peaks", two_peaks()),
-            ("Primary + secondary", primary_secondary()),
-            ("Noisy peak", noisy_peak()),
-            ("Speckle noise", speckle()),
-            ("Ring / annulus", ring()),
-            ("Elongated ridge", ridge()),
-        ]
+#         tests = [
+#             ("Delta (perfect)", delta()),
+#             ("Uniform", uniform()),
+#             ("Gaussian σ=1", gaussian(1)),
+#             ("Gaussian σ=4", gaussian(4)),
+#             ("Two equal peaks", two_peaks()),
+#             ("Primary + secondary", primary_secondary()),
+#             ("Noisy peak", noisy_peak()),
+#             ("Speckle noise", speckle()),
+#             ("Ring / annulus", ring()),
+#             ("Elongated ridge", ridge()),
+#         ]
 
-        results = []
-        for label, P in tests:
-            score_dict = cls.position_like_score(P)
-            results.append(dict(
-                label=label,
-                posterior=P,
-                score_dict=score_dict
-            ))
+#         results = []
+#         for label, P in tests:
+#             score_dict = cls.position_like_score(P)
+#             results.append(dict(
+#                 label=label,
+#                 posterior=P,
+#                 score_dict=score_dict
+#             ))
 
-        # ---------- Plot ----------
-        if should_plot_results:
-            n = len(results)
-            cols = 5
-            rows = int(np.ceil(n / cols))
-            fig, axes = plt.subplots(rows, cols, figsize=(3*cols, 3*rows))
-            axes = np.atleast_1d(axes).ravel()
+#         # ---------- Plot ----------
+#         if should_plot_results:
+#             n = len(results)
+#             cols = 5
+#             rows = int(np.ceil(n / cols))
+#             fig, axes = plt.subplots(rows, cols, figsize=(3*cols, 3*rows))
+#             axes = np.atleast_1d(axes).ravel()
 
-            for ax, res in zip(axes, results):
-                im = ax.imshow(res['posterior'], origin='lower')
-                s = res['score_dict']
-                ax.set_title(
-                    f"{res['label']}\n"
-                    f"S={s['score']:.2f} | "
-                    f"E={s['S_ent']:.2f} "
-                    f"P={s['S_peak']:.2f} "
-                    f"C={s['S_cluster']:.2f}",
-                    fontsize=9
-                )
-                ax.axis('off')
+#             for ax, res in zip(axes, results):
+#                 im = ax.imshow(res['posterior'], origin='lower')
+#                 s = res['score_dict']
+#                 ax.set_title(
+#                     f"{res['label']}\n"
+#                     f"S={s['score']:.2f} | "
+#                     f"E={s['S_ent']:.2f} "
+#                     f"P={s['S_peak']:.2f} "
+#                     f"C={s['S_cluster']:.2f}",
+#                     fontsize=9
+#                 )
+#                 ax.axis('off')
 
-            for ax in axes[len(results):]:
-                ax.axis('off')
+#             for ax in axes[len(results):]:
+#                 ax.axis('off')
 
-            fig.suptitle("Position-Likeness Composite Score Validation", fontsize=14)
-            plt.tight_layout()
-            plt.show()
+#             fig.suptitle("Position-Likeness Composite Score Validation", fontsize=14)
+#             plt.tight_layout()
+#             plt.show()
 
 
-        """
-        Convert validate_position_like_score() output to a pandas DataFrame.
-        """
-        rows = []
-        for r in results:
-            s = r['score_dict']
-            rows.append({
-                'label': r['label'],
-                'score': s['score'],
-                'S_ent': s['S_ent'],
-                'S_peak': s['S_peak'],
-                'S_cluster': s['S_cluster'],
-                'p_max': s['p_max'],
-                'entropy': s['entropy'],
-            })
-        return pd.DataFrame(rows)
+#         """
+#         Convert validate_position_like_score() output to a pandas DataFrame.
+#         """
+#         rows = []
+#         for r in results:
+#             s = r['score_dict']
+#             rows.append({
+#                 'label': r['label'],
+#                 'score': s['score'],
+#                 'S_ent': s['S_ent'],
+#                 'S_peak': s['S_peak'],
+#                 'S_cluster': s['S_cluster'],
+#                 'p_max': s['p_max'],
+#                 'entropy': s['entropy'],
+#             })
+#         return pd.DataFrame(rows)
 
 
 
