@@ -2,6 +2,7 @@ from typing import Any, Callable, List, Dict, Optional, Union
 from types import ModuleType
 import dataclasses
 from dataclasses import dataclass
+import attrs
 from attrs import define, field, Factory
 from datetime import datetime
 import pathlib
@@ -139,6 +140,311 @@ def saveData(pkl_path, db, should_append=False, safe_save:bool=True):
 
                 dbfile.close()
 
+
+
+# ==================================================================================================================================================================================================================================================================================== #
+# Split Save Attempts                                                                                                                                                                                                                                                                  #
+# ==================================================================================================================================================================================================================================================================================== #
+@function_attributes(short_name=None, tags=['save', 'pickle', 'split'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-12-11 08:11', related_items=['load_split_pickled_global_computation_results'])
+def safeSaveSplitData(self, override_global_pickle_path: Optional[Path]=None, override_global_pickle_filename:Optional[str]=None, include_includelist=None, continue_after_pickling_errors: bool=True, debug_print:bool=True):
+    """Save out the `global_computation_results` which are not currently saved with the pipeline
+
+    Reciprocal:
+        load_pickled_global_computation_results
+
+    Usage:
+        split_save_folder, split_save_paths, split_save_output_types, failed_keys = curr_active_pipeline.save_split_global_computation_results(debug_print=True)
+        
+    #TODO 2023-11-22 18:54: - [ ] One major issue is that the types are lost upon reloading, so I think we'll need to save them somewhere. They can be fixed post-hoc like:
+    # Update result with correct type:
+    curr_active_pipeline.global_computation_results.computed_data['RankOrder'] = RankOrderComputationsContainer(**curr_active_pipeline.global_computation_results.computed_data['RankOrder'])
+
+    """
+    from pickle import PicklingError
+    from pyphocorehelpers.print_helpers import print_filesystem_file_size, print_object_memory_usage
+    
+
+    ## Case 1. `override_global_pickle_path` is provided:
+    if override_global_pickle_path is not None:
+        ## override_global_pickle_path is provided:
+        if not isinstance(override_global_pickle_path, Path):
+            override_global_pickle_path = Path(override_global_pickle_path).resolve()
+        # Case 1a: `override_global_pickle_path` is a complete file path
+        if not override_global_pickle_path.is_dir():
+            # a full filepath, just use that directly
+            global_computation_results_pickle_path = override_global_pickle_path.resolve()
+        else:
+            # default case, assumed to be a directory and we'll use the normal filename.
+            active_global_pickle_filename: str = (override_global_pickle_filename or self.global_computation_results_pickle_path or "global_computation_results.pkl")
+            global_computation_results_pickle_path = override_global_pickle_path.joinpath(active_global_pickle_filename).resolve()
+
+    else:
+        # No override path provided
+        if override_global_pickle_filename is None:
+            # no filename provided either, use default global pickle path:
+            global_computation_results_pickle_path = self.global_computation_results_pickle_path
+        else:
+            # Otherwise use default output path but specified override_global_pickle_filename:
+            global_computation_results_pickle_path = self.get_output_path().joinpath(override_global_pickle_filename).resolve() 
+
+    if debug_print:
+        print(f'global_computation_results_pickle_path: {global_computation_results_pickle_path}')
+    
+    ## In split save, we save each result separately in a folder
+    split_save_folder_name: str = f'{global_computation_results_pickle_path.stem}_split'
+    split_save_folder: Path = global_computation_results_pickle_path.parent.joinpath(split_save_folder_name).resolve()
+    if debug_print:
+        print(f'split_save_folder: {split_save_folder}')
+    # make if doesn't exist
+    split_save_folder.mkdir(exist_ok=True)
+    
+    if include_includelist is None:
+        ## include all keys if none are specified
+        include_includelist = list(self.global_computation_results.computed_data.keys())
+
+    ## only saves out the `global_computation_results` data:
+    global_computed_data = self.global_computation_results.computed_data
+    split_save_paths = {}
+    split_save_output_types = {}
+    failed_keys = []
+    skipped_keys = []
+    for k, v in global_computed_data.items():
+        if k in include_includelist:
+            curr_split_result_pickle_path = split_save_folder.joinpath(f'Split_{k}.pkl').resolve()
+            if debug_print:
+                print(f'k: {k} -- size_MB: {print_object_memory_usage(v, enable_print=False)}')
+                print(f'\tcurr_split_result_pickle_path: {curr_split_result_pickle_path}')
+            was_save_success = False
+            curr_item_type = type(v)
+            try:
+                ## try get as dict                
+                v_dict = v.__dict__ #__getstate__()
+                # saveData(curr_split_result_pickle_path, (v_dict))
+                saveData(curr_split_result_pickle_path, (v_dict, str(curr_item_type.__module__), str(curr_item_type.__name__)))    
+                was_save_success = True
+            except KeyError as e:
+                print(f'\t{k} encountered {e} while trying to save {k}. Skipping')
+                pass
+            except PicklingError as e:
+                if not continue_after_pickling_errors:
+                    raise
+                else:
+                    print(f'\t{k} encountered {e} while trying to save {k}. Skipping')
+                    pass
+                
+            if was_save_success:
+                split_save_paths[k] = curr_split_result_pickle_path
+                split_save_output_types[k] = curr_item_type
+                if debug_print:
+                    print(f'\tfile_size_MB: {print_filesystem_file_size(curr_split_result_pickle_path, enable_print=False)} MB')
+            else:
+                failed_keys.append(k)
+        else:
+            if debug_print:
+                print(f'\tskipping key "{k}" because it is not included in include_includelist: {include_includelist}')
+            skipped_keys.append(k)
+            
+    if len(failed_keys) > 0:
+        print(f'WARNING: failed_keys: {failed_keys} did not save for global results! They HAVE NOT BEEN SAVED!')
+    return split_save_folder, split_save_paths, split_save_output_types, failed_keys
+
+
+# ==================================================================================================================================================================================================================================================================================== #
+# Unfinished Implementation                                                                                                                                                                                                                                                            #
+# ==================================================================================================================================================================================================================================================================================== #
+
+
+# def safeSaveSplitData(obj: Any, exclude_types: tuple = (Callable, ModuleType, type), max_depth: int = 10, _current_depth: int = 0) -> Dict[str, Any]:
+#     """Decomposes an object into its picklable parts by iterating through its attrs-fields, dataclass fields, or __dict__ attributes.
+    
+#     This function recursively extracts all picklable attributes from an object, handling:
+#     - attrs objects (using attrs.fields())
+#     - dataclass objects (using dataclasses.fields())
+#     - Regular objects (using __dict__)
+#     - Objects with custom __getstate__ methods
+    
+#     Args:
+#         obj: The object to decompose into picklable parts
+#         exclude_types: Tuple of types to exclude from pickling (default: Callable, ModuleType, type)
+#         max_depth: Maximum recursion depth to prevent infinite loops (default: 10)
+#         _current_depth: Internal parameter to track recursion depth
+        
+#     Returns:
+#         Dictionary containing picklable field names and their values
+        
+#     Example:
+#         from pyphoplacecellanalysis.General.Pipeline.Stages.Loading import safeSaveSplitData
+        
+#         # For an attrs object
+#         picklable_data = safeSaveSplitData(my_attrs_object)
+        
+#         # For a dataclass object
+#         picklable_data = safeSaveSplitData(my_dataclass_object)
+        
+#         # For a regular object
+#         picklable_data = safeSaveSplitData(my_regular_object)
+#     """
+#     if _current_depth >= max_depth:
+#         return {}
+    
+#     result = {}
+    
+#     # Check if object has custom __getstate__ method
+#     if hasattr(obj, '__getstate__') and callable(getattr(obj, '__getstate__', None)):
+#         try:
+#             state = obj.__getstate__()
+#             if isinstance(state, dict):
+#                 # Recursively process the state dictionary
+#                 for key, value in state.items():
+#                     if _is_picklable(value, exclude_types):
+#                         result[key] = _process_value(value, exclude_types, max_depth, _current_depth + 1)
+#                     else:
+#                         # Try to decompose the unpicklable value
+#                         try:
+#                             decomposed = safeSaveSplitData(value, exclude_types, max_depth, _current_depth + 1)
+#                             if decomposed:
+#                                 result[key] = decomposed
+#                         except (AttributeError, TypeError, RecursionError):
+#                             pass  # Skip unpicklable values
+#             else:
+#                 result['__getstate__'] = state
+#         except (AttributeError, TypeError):
+#             pass  # Fall through to other methods
+    
+#     # Handle attrs objects
+#     try:
+#         if attrs.has(obj):
+#             for field in attrs.fields(type(obj)):
+#                 field_name = field.name
+#                 try:
+#                     value = getattr(obj, field_name, None)
+#                     if _is_picklable(value, exclude_types):
+#                         result[field_name] = _process_value(value, exclude_types, max_depth, _current_depth + 1)
+#                     else:
+#                         # Try to decompose the unpicklable value
+#                         try:
+#                             decomposed = safeSaveSplitData(value, exclude_types, max_depth, _current_depth + 1)
+#                             if decomposed:
+#                                 result[field_name] = decomposed
+#                         except (AttributeError, TypeError, RecursionError):
+#                             pass  # Skip unpicklable values
+#                 except AttributeError:
+#                     pass  # Skip if field doesn't exist
+#     except (TypeError, AttributeError):
+#         pass  # Not an attrs object, continue
+    
+#     # Handle dataclass objects
+#     try:
+#         if dataclasses.is_dataclass(obj):
+#             for field in dataclasses.fields(obj):
+#                 field_name = field.name
+#                 try:
+#                     value = getattr(obj, field_name, None)
+#                     if _is_picklable(value, exclude_types):
+#                         result[field_name] = _process_value(value, exclude_types, max_depth, _current_depth + 1)
+#                     else:
+#                         # Try to decompose the unpicklable value
+#                         try:
+#                             decomposed = safeSaveSplitData(value, exclude_types, max_depth, _current_depth + 1)
+#                             if decomposed:
+#                                 result[field_name] = decomposed
+#                         except (AttributeError, TypeError, RecursionError):
+#                             pass  # Skip unpicklable values
+#                 except AttributeError:
+#                     pass  # Skip if field doesn't exist
+#     except (TypeError, AttributeError):
+#         pass  # Not a dataclass, continue
+    
+#     # Handle regular objects with __dict__
+#     if hasattr(obj, '__dict__'):
+#         try:
+#             for key, value in obj.__dict__.items():
+#                 # Skip private/internal attributes that start with double underscore (except __getstate__ which we already handled)
+#                 if key.startswith('__') and key != '__getstate__':
+#                     continue
+                    
+#                 if _is_picklable(value, exclude_types):
+#                     result[key] = _process_value(value, exclude_types, max_depth, _current_depth + 1)
+#                 else:
+#                     # Try to decompose the unpicklable value
+#                     try:
+#                         decomposed = safeSaveSplitData(value, exclude_types, max_depth, _current_depth + 1)
+#                         if decomposed:
+#                             result[key] = decomposed
+#                     except (AttributeError, TypeError, RecursionError):
+#                         pass  # Skip unpicklable values
+#         except (AttributeError, TypeError):
+#             pass
+    
+#     return result
+
+
+# def _is_picklable(value: Any, exclude_types: tuple) -> bool:
+#     """Check if a value is picklable by testing if it's an instance of excluded types."""
+#     if value is None:
+#         return True
+    
+#     # Check if value is an instance of excluded types
+#     if isinstance(value, exclude_types):
+#         return False
+    
+#     # Check for common unpicklable types
+#     if isinstance(value, type) and not isinstance(value, type(None)):
+#         return False
+    
+#     # Try to pickle the value to see if it's actually picklable
+#     # This is the definitive test - dill can pickle many things that standard pickle cannot
+#     try:
+#         pickle.dumps(value, protocol=pickle.HIGHEST_PROTOCOL)
+#         return True
+#     except Exception:
+#         # Any exception during pickling means it's not picklable
+#         return False
+
+
+# def _process_value(value: Any, exclude_types: tuple, max_depth: int, current_depth: int) -> Any:
+#     """Process a value, recursively decomposing complex objects if needed."""
+#     if value is None:
+#         return None
+    
+#     # Handle basic picklable types
+#     if isinstance(value, (str, int, float, bool, bytes, type(None))):
+#         return value
+    
+#     # Handle lists
+#     if isinstance(value, list):
+#         return [_process_value(item, exclude_types, max_depth, current_depth + 1) for item in value]
+    
+#     # Handle tuples
+#     if isinstance(value, tuple):
+#         return tuple(_process_value(item, exclude_types, max_depth, current_depth + 1) for item in value)
+    
+#     # Handle dictionaries
+#     if isinstance(value, dict):
+#         return {k: _process_value(v, exclude_types, max_depth, current_depth + 1) for k, v in value.items()}
+    
+#     # Handle sets
+#     if isinstance(value, set):
+#         return {_process_value(item, exclude_types, max_depth, current_depth + 1) for item in value}
+    
+#     # For other objects, try to decompose if not directly picklable
+#     if not _is_picklable(value, exclude_types) and current_depth < max_depth:
+#         try:
+#             decomposed = safeSaveSplitData(value, exclude_types, max_depth, current_depth + 1)
+#             if decomposed:
+#                 return decomposed
+#         except (AttributeError, TypeError, RecursionError):
+#             pass
+    
+#     # Return as-is if it's picklable or we can't decompose it
+#     return value
+
+
+
+
+# ==================================================================================================================================================================================================================================================================================== #
+# SEP                                                                                                                                                                                                                                                                                  #
+# ==================================================================================================================================================================================================================================================================================== #
 
 
 # global_move_modules_list: Dict[str, str] - a dict with keys equal to the old full path to a class and values equal to the updated (replacement) full path to the class. Used to update the path to class definitions for loading previously pickled results after refactoring.
