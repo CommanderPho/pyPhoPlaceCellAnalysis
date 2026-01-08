@@ -133,7 +133,8 @@ from collections import deque
 
 from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import DecodedFilterEpochsResult
 
-def filter_to_position_like_epochs_only(decoded_local_epochs_result, num_min_position_like_t_bins: int = 3) -> DecodedFilterEpochsResult:
+@function_attributes(short_name=None, tags=['WORKING', 'filter', 'position-like', 'score', '2D', 'posterior'], input_requires=[], output_provides=[], uses=['GeminiPositionLikePosteriorScoring', 'DecodingLocalityMeasures'], used_by=[], creation_date='2026-01-08 13:02', related_items=[])
+def filter_to_position_like_epochs_only(decoded_local_epochs_result, position_like_score_cutoff: float = 0.42, num_min_position_like_t_bins: Optional[int] = None) -> DecodedFilterEpochsResult:
     """
     decoding_time_bin_size = 0.025
     an_epoch_name = 'roam'

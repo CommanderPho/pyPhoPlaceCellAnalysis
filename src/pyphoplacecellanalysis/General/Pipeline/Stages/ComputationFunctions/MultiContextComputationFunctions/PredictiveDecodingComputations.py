@@ -2124,7 +2124,7 @@ class PredictiveDecodingComputationsGlobalComputationFunctions(AllFunctionEnumer
         requires_global_keys=['DirectionalDecodersDecoded', 'DirectionalMergedDecoders', 'RankOrder', 'DirectionalDecodersEpochsEvaluations'], provides_global_keys=['PredictiveDecoding'],
         validate_computation_test=validate_has_predictive_decoding_results, is_global=True)
     def perform_predictive_decoding_analysis(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, debug_print=False, window_size:int=90, extant_decoded_time_bin_size: Optional[float]=None,
-                drop_previous_result_and_compute_fresh:bool=False, min_num_spikes_per_bin_to_be_considered_active: Optional[int]=5):
+                drop_previous_result_and_compute_fresh:bool=False, min_num_spikes_per_bin_to_be_considered_active: Optional[int]=5, num_min_position_like_t_bins: Optional[int] = 3, mask_position_like_time_score_cutoff: Optional[float] = 0.42):
         """ Performs predictive decoding analysis to relate PBE activity to future visited locations.
 
         Requires:
@@ -2139,7 +2139,10 @@ class PredictiveDecodingComputationsGlobalComputationFunctions(AllFunctionEnumer
         from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.PredictiveDecodingComputations import PredictiveDecoding, DecodingLocalityMeasures
         from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import DirectionalDecodersContinuouslyDecodedResult
         from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import DecodedFilterEpochsResult
-        
+        ## NEW: filtering by whether decoded posterior in each t_bin is "position-like"
+        from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import filter_to_position_like_epochs_only
+
+
         if include_includelist is not None:
             print(f'WARN: perform_predictive_decoding_analysis(...): include_includelist: {include_includelist} is specified but include_includelist is currently ignored! Continuing with defaults.')
 
@@ -2150,6 +2153,7 @@ class PredictiveDecodingComputationsGlobalComputationFunctions(AllFunctionEnumer
         # MASK low-firing bins before using result                                                                                                                                                                                                                                             #
         # ==================================================================================================================================================================================================================================================================================== #
         # extant_decoded_time_bin_size = 0.250
+        
         if (min_num_spikes_per_bin_to_be_considered_active is not None) and (min_num_spikes_per_bin_to_be_considered_active > 0):
             ## Masked result:
             directional_decoders_decode_result: DirectionalDecodersContinuouslyDecodedResult = deepcopy(owning_pipeline_reference.global_computation_results.computed_data['DirectionalDecodersDecoded'])
@@ -2158,13 +2162,22 @@ class PredictiveDecodingComputationsGlobalComputationFunctions(AllFunctionEnumer
             for extant_decoded_time_bin_size, a_result_decoded in directional_decoders_decode_result.continuously_decoded_pseudo2D_decoder_dict.items():
                 a_result_decoded: SingleEpochDecodedResult = directional_decoders_decode_result.continuously_decoded_pseudo2D_decoder_dict[extant_decoded_time_bin_size]
                 a_result_decoded: DecodedFilterEpochsResult = DecodedFilterEpochsResult.init_from_single_epoch_result(single_epoch_result=a_result_decoded, decoding_time_bin_size=extant_decoded_time_bin_size) ## convert to a `DecodedFilterEpochsResult` for masking
-                a_masked_result, mask_index_tuple = a_result_decoded.mask_computed_DecodedFilterEpochsResult_by_required_spike_counts_per_time_bin(
-                    spikes_df=deepcopy(spikes_df),
-                    min_num_spikes_per_bin_to_be_considered_active=min_num_spikes_per_bin_to_be_considered_active,
-                    min_num_unique_active_neurons_per_time_bin=1,
-                    masked_bin_fill_mode='dropped',
-                    # masked_bin_fill_mode='nan_filled'
-                )
+                
+                if mask_position_like_time_score_cutoff:
+                    a_masked_result, scoring_results = filter_to_position_like_epochs_only(decoded_local_epochs_result=a_result_decoded, position_like_score_cutoff=mask_position_like_time_score_cutoff, num_min_position_like_t_bins=None)
+                else:
+                    a_masked_result = a_result_decoded
+
+                if (min_num_spikes_per_bin_to_be_considered_active is not None) and (min_num_spikes_per_bin_to_be_considered_active > 0):
+                    ## TODO: I think this works?
+                    a_masked_result, mask_index_tuple = a_masked_result.mask_computed_DecodedFilterEpochsResult_by_required_spike_counts_per_time_bin(
+                        spikes_df=deepcopy(spikes_df),
+                        min_num_spikes_per_bin_to_be_considered_active=min_num_spikes_per_bin_to_be_considered_active,
+                        min_num_unique_active_neurons_per_time_bin=1,
+                        masked_bin_fill_mode='dropped',
+                        # masked_bin_fill_mode='nan_filled'
+                    )
+                    
                 # a_masked_result: DecodedFilterEpochsResult
                 # is_time_bin_active_list, inactive_mask_list, all_time_bin_indicies_list, last_valid_indices_list = mask_index_tuple
                 ## re-assign to `directional_decoders_decode_result.continuously_decoded_pseudo2D_decoder_dict[extant_decoded_time_bin_size]`
