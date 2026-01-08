@@ -30,6 +30,7 @@ from neuropy.utils.misc import build_shuffled_ids # used in _SHELL_analyze_leave
 from neuropy.utils.mixins.time_slicing import TimePointEventAccessor
 from neuropy.utils.indexing_helpers import NeuroPyDataframeAccessor
 from neuropy.utils.mixins.indexing_helpers import get_dict_subset
+from neuropy.utils.misc import split_array
 
 from pyphocorehelpers.mixins.member_enumerating import AllFunctionEnumeratingMixin
 from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.ComputationFunctionRegistryHolder import ComputationFunctionRegistryHolder
@@ -1705,7 +1706,7 @@ class PredictiveDecodingComputationsContainer(ComputedResult):
             print(f'PredictiveDecoding is not computed.')
             
     """
-    _VersionedResultMixin_version: str = "2025.12.20_0" # to be updated in your IMPLEMENTOR to indicate its version
+    _VersionedResultMixin_version: str = "2026.01.08_0" # to be updated in your IMPLEMENTOR to indicate its version
     
     predictive_decoding: Optional[PredictiveDecoding] = serialized_field(default=None, repr=False)
     
@@ -1713,6 +1714,9 @@ class PredictiveDecodingComputationsContainer(ComputedResult):
     pf1D_Decoder_dict: Dict[types.DecoderName, BasePositionDecoder] = serialized_field(default=Factory(dict), metadata={'field_added': "2025.12.20_0", 'copied_from': 'DirectionalDecodersContinuouslyDecodedResult'})
     epochs_decoded_result_cache_dict: Dict[float, Dict[types.DecoderName, DecodedFilterEpochsResult]] = serialized_field(default=Factory(dict), metadata={'field_added': "2025.12.20_0", 'copied_from': 'DirectionalDecodersContinuouslyDecodedResult'}) # key is the t_bin_size in seconds
     debug_computed_dict: Dict[types.DecoderName, Dict] = non_serialized_field(default=Factory(dict), metadata={'field_added': "2025.12.21_0"})
+
+    scoring_results_df: pd.DataFrame = non_serialized_field(default=None, metadata={'field_added': "2026.01.08_0"})
+
 
     @property
     def most_recent_decoding_time_bin_size(self) -> Optional[float]:
@@ -1879,8 +1883,14 @@ class PredictiveDecodingComputationsContainer(ComputedResult):
         matching_pos_dfs_list: List[pd.DataFrame] = []
         matching_pos_epochs_dfs_list: List[pd.DataFrame] = []
 
-        # a_p_x_given_n = decoding_locality.p_x_given_n_dict[an_epoch_name] ## hmmm, this is global probability - (41, 63, 103948)
+        # [array([0, 1, 2, 3, 4]), array([0, 1]), array([0, 1, 2, 3, 4, 5, 6, 7]), array([ 0,  1,  2,  3,  4,  5,  6,  7,  8,  9, 10]),
+        n_flattened_tbins: int = np.sum(decoded_local_epochs_result.nbins)
+        flattened_time_bin_indicies = np.arange(n_flattened_tbins)
+        split_by_epoch_reverse_flattened_time_bin_indicies: List[NDArray] = split_array(flattened_time_bin_indicies, sub_element_lengths=decoded_local_epochs_result.nbins)
+        # assert len(split_by_epoch_reverse_flattened_time_bin_indicies) == n_epochs
+        gaussian_volume = self.predictive_decoding.gaussian_volume ## the volume for all time bins
 
+        # a_p_x_given_n = decoding_locality.p_x_given_n_dict[an_epoch_name] ## hmmm, this is global probability - (41, 63, 103948)
         for i, a_row in enumerate(ensure_dataframe(decoded_local_epochs_result.filter_epochs).itertuples(index=False)):
             
             ## need to know the indices this corresponds to so I can use my gaussian, p_x_given_n, etc
@@ -1906,7 +1916,11 @@ class PredictiveDecodingComputationsContainer(ComputedResult):
             # print(np.shape(curr_epoch_p_x_given_n))
             # curr_epoch_p_x_given_n  # np.shape(curr_epoch_p_x_given_n): (n_x_bins, n_y_Bins, n_time_bins)
             # is_high_prob_mask = curr_epoch_p_x_given_n >= np.sort(curr_epoch_p_x_given_n.ravel())[::-1][np.searchsorted(np.cumsum(np.sort(curr_epoch_p_x_given_n.ravel())[::-1]), 0.1 * curr_epoch_p_x_given_n.sum())]
-
+            curr_epoch_tbin_indicies: NDArray = split_by_epoch_reverse_flattened_time_bin_indicies[i]
+            a_gaussian_volume = None
+            if gaussian_volume is not None:
+                a_gaussian_volume = gaussian_volume[..., curr_epoch_tbin_indicies]
+            
 
             # ==================================================================================================================================================================================================================================================================================== #
             # Special posterior measurement properties (diffusivity, promenence, etc) computed independently with newly decoded fine time bin grainularity posteriors                                                                                                                              #
@@ -1918,6 +1932,7 @@ class PredictiveDecodingComputationsContainer(ComputedResult):
                 xbin_centers=self.xbin_centers, 
                 ybin_centers=self.ybin_centers,
                 n_total_pos_bins=self.n_total_pos_bins,
+                gaussian_volume=a_gaussian_volume, ## if we have it ## this volume is for the hwole thingy
                 min_val_epsilon=1e-9,
                 enable_debug_outputs=True,
                 earthmovers_fn=None,
@@ -2298,14 +2313,20 @@ class PredictiveDecodingComputationsGlobalComputationFunctions(AllFunctionEnumer
 
         """ Usage:
         
-        from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.PredictiveDecodingComputations import PredictiveDecoding, PredictiveDecodingComputationsContainer
+        from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.PredictiveDecodingComputations import PredictiveDecoding, DecodingLocalityMeasures, PredictiveDecodingComputationsContainer
+        from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import BayesianPlacemapPositionDecoder
 
-        predictive_decoding_results: PredictiveDecodingComputationsContainer = curr_active_pipeline.global_computation_results.computed_data.get('PredictiveDecoding', None)
-        if predictive_decoding_results is not None:    
-            predictive_decoding: PredictiveDecoding = predictive_decoding_results.predictive_decoding
+        container: PredictiveDecodingComputationsContainer = curr_active_pipeline.global_computation_results.computed_data.get('PredictiveDecoding', None)
+        if container is not None:
+            predictive_decoding: PredictiveDecoding = container.predictive_decoding
             if predictive_decoding is not None:
                 print(f'PredictiveDecoding computed with window_size: {predictive_decoding.window_size}')
                 print(f'epoch_names: {predictive_decoding.epoch_names}')
+
+                if container.decoding_locality is None:
+                    container.decoding_locality = container.predictive_decoding.locality_measures
+
+                decoding_locality: DecodingLocalityMeasures = container.decoding_locality
             else:
                 print(f'PredictiveDecoding is None.')
         else:
