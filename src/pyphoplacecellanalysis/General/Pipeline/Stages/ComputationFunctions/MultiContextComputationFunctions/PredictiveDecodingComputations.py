@@ -1928,18 +1928,15 @@ class PredictiveDecodingComputationsContainer(ComputedResult):
             ## Call the independent classmethod to compute all locality measures
             custom_computation_results_dict = DecodingLocalityMeasures.compute_locality_measures_for_posterior(
                 a_p_x_given_n=curr_epoch_p_x_given_n,
-                gaussian_volume=self.gaussian_volume, ## if we have it
-                xbin_centers=self.xbin_centers, 
-                ybin_centers=self.ybin_centers,
-                n_total_pos_bins=self.n_total_pos_bins,
                 gaussian_volume=a_gaussian_volume, ## if we have it ## this volume is for the hwole thingy
+                xbin_centers=self.predictive_decoding.xbin_centers, 
+                ybin_centers=self.predictive_decoding.ybin_centers,
+                n_total_pos_bins=self.predictive_decoding.locality_measures.n_total_pos_bins,
                 min_val_epsilon=1e-9,
                 enable_debug_outputs=True,
                 earthmovers_fn=None,
             )
             
-
-
 
             ## for each time bin compute the top 10% of the time bins and use those instead of a fixed "high_val_epsilon" threshold:
             #TODO 2025-12-24 20:48: - [ ] LAAAAME - this should use the real promenence topologically connected region, not the random top 10% which can be discontinuous...
