@@ -1,4 +1,3 @@
- 
 from __future__ import annotations # prevents having to specify types for typehinting as strings
 from typing import TYPE_CHECKING
 
@@ -32,7 +31,7 @@ from neuropy.analyses.decoders import epochs_spkcount # for decode_specific_epoc
 from neuropy.utils.mixins.binning_helpers import BinningContainer # for epochs_spkcount getting the correct time bins
 from neuropy.analyses.placefields import PfND # for BasePositionDecoder
 from neuropy.utils.mixins.AttrsClassHelpers import keys_only_repr
-
+from neuropy.utils.misc import split_array
 
 from pyphocorehelpers.function_helpers import function_attributes
 from pyphocorehelpers.general_helpers import OrderedMeta
@@ -931,6 +930,23 @@ class DecodedFilterEpochsResult(HDF_SerializationMixin, AttrsBasedClassHelperMix
     def flat_time_window_centers(self) -> NDArray:
         """ for compatibility """
         return np.hstack(self.time_window_centers) ## a flat list of time_window_centers
+
+    @property
+    def n_epochs(self) -> int:
+        return len(self.filter_epochs)
+
+
+    @property
+    def reverse_flattened_time_bin_indicies_list(self) -> List[NDArray]:
+        """A list of the time bin indices for each epoch.
+            [array([0, 1, 2, 3, 4]), array([0, 1]), array([0, 1, 2, 3, 4, 5, 6, 7]), array([ 0,  1,  2,  3,  4,  5,  6,  7,  8,  9, 10]),
+        """
+        n_flattened_tbins: int = np.sum(self.nbins)
+        flattened_time_bin_indicies = np.arange(n_flattened_tbins)
+        split_by_epoch_reverse_flattened_time_bin_indicies = split_array(flattened_time_bin_indicies, sub_element_lengths=self.nbins)
+        assert len(split_by_epoch_reverse_flattened_time_bin_indicies) == self.n_epochs
+        return split_by_epoch_reverse_flattened_time_bin_indicies
+
 
 
     @function_attributes(short_name=None, tags=['single-epoch', 'indexing', 'start-time'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-01-01 00:00', related_items=['self.get_result_for_epoch_at_time'])
