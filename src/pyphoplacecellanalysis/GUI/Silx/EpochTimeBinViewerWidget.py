@@ -8,9 +8,71 @@ import pandas as pd
 from typing import Dict, List, Tuple, Optional, Callable, Union, Any
 from nptyping import NDArray
 import neuropy.utils.type_aliases as types
+from attrs import define, field
 from pyphocorehelpers.programming_helpers import metadata_attributes
 from pyphocorehelpers.function_helpers import function_attributes
 from neuropy.core.epoch import Epoch, EpochsAccessor, ensure_dataframe, ensure_Epoch, EpochHelpers
+
+
+@define(slots=False, eq=False, repr=False)
+class TextDataProviderDatasource:
+    """ simple datasource to show text for each epoch, t_bin 
+    """
+    a_df: pd.DataFrame = field()
+    text_columns: Optional[List[str]] = field(default=None)
+
+    def on_update_epoch_idx(self, epoch_idx: int) -> pd.DataFrame:
+        """ return the filtered df for this epoch_idx (df of all time bins in this epoch) """
+        return self.a_df[self.a_df['epoch_idx'] == epoch_idx]
+    
+
+    def get_text_label(self, epoch_idx: int, t_bin_idx: int) -> Optional[str]:
+        """Return formatted text label for a specific epoch and time bin.
+        
+        Args:
+            epoch_idx: Epoch index
+            t_bin_idx: Time bin index within the epoch
+            
+        Returns:
+            Formatted text string or None if no match found
+        """
+        # Filter dataframe by both epoch_idx and t_bin_idx
+        matching_rows = self.a_df[
+            (self.a_df['epoch_idx'] == epoch_idx) & 
+            (self.a_df['t_bin_idx'] == t_bin_idx)
+        ]
+        
+        if len(matching_rows) == 0:
+            return None
+        
+        # Get the first matching row
+        row = matching_rows.iloc[0]
+        
+        # Determine which columns to format
+        if self.text_columns is not None and len(self.text_columns) > 0:
+            # Use specified columns only
+            columns_to_format = [col for col in self.text_columns if col in row.index]
+        else:
+            # Use all columns except epoch_idx and t_bin_idx
+            columns_to_format = [col for col in row.index if col not in ['epoch_idx', 't_bin_idx']]
+        
+        # Build label from selected columns
+        label_parts = []
+        for col in columns_to_format:
+            value = row[col]
+            # Format the value appropriately
+            if pd.isna(value):
+                label_parts.append(f"{col}: N/A")
+            elif isinstance(value, (int, float)):
+                label_parts.append(f"{col}: {value:.3f}" if isinstance(value, float) else f"{col}: {value}")
+            else:
+                label_parts.append(f"{col}: {value}")
+        
+        # value_join_sep: str = ", "
+        value_join_sep: str = "\n"
+
+        return value_join_sep.join(label_parts) if label_parts else None
+
 
 
 @metadata_attributes(short_name=None, tags=['Silx', 'gui', '3D', 'volumetric', 'epoch_idx_slider', 'epoch_t_bin_idx_slider', 'two-slider'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-12-23', related_items=[])
@@ -664,13 +726,14 @@ class Epoch3DSceneTimeBinViewer(qt.QWidget):
         viewer.show()
     
     """
-    def __init__(self, decoded_result, xbin_centers=None, ybin_centers=None, locality_measures_df: Optional[pd.DataFrame] = None, text_columns: Optional[List[str]] = None):
+    def __init__(self, decoded_result, xbin_centers=None, ybin_centers=None, locality_measures_df: Optional[pd.DataFrame] = None, text_columns: Optional[List[str]] = None, text_data_provider: Optional[TextDataProviderDatasource] = None):
         super().__init__()
         self.decoded_result = decoded_result
         self.xbin_centers = xbin_centers
         self.ybin_centers = ybin_centers
         self.locality_measures_df = locality_measures_df
         self.text_columns = text_columns if text_columns is not None else []
+        self.text_data_provider = text_data_provider
         
         # Detect point-like mode (when 't' column exists in locality_measures_df)
         self.is_point_like_mode = (locality_measures_df is not None and 't' in locality_measures_df.columns)
@@ -1483,6 +1546,11 @@ class Epoch3DSceneTimeBinViewer(qt.QWidget):
         Returns:
             Formatted text string or None if no label available
         """
+        # Check if text_data_provider is provided (takes precedence)
+        if self.text_data_provider is not None:
+            return self.text_data_provider.get_text_label(self.curr_epoch_idx, t_bin_idx)
+        
+        # Fall back to existing text_columns approach
         row = self._match_time_bin_to_dataframe_row(t_bin_idx)
         if row is None or not self.text_columns:
             return None
@@ -1524,6 +1592,7 @@ class Epoch3DSceneTimeBinViewer(qt.QWidget):
                 pass
         self.text_label_items.clear()
     
+
     def _add_text_label_3d(self, label_text: str, t_bin_idx: int, x_translation: float, x_min: float, x_max: float, y_min: float, y_max: float, bin_spacing: float):
         """Add a text label as a Qt QLabel widget positioned below a time bin surface.
         
@@ -1550,16 +1619,13 @@ class Epoch3DSceneTimeBinViewer(qt.QWidget):
                 }
             """)
             label.setAlignment(qt.Qt.AlignCenter | qt.Qt.AlignVCenter)
-            # label.setWordWrap(True)  # Allow text wrapping for long labels
-            label.setWordWrap(False)  # Allow text wrapping for long labels
+            label.setWordWrap(False)
             
             # Get scene window dimensions
             scene_width = self.scene_window.width()
             scene_height = self.scene_window.height()
             
             # Get slider height to avoid collision
-            # The slider is in a separate layout below the scene_window
-            # We need to leave space at the bottom of the scene_window for visual separation
             slider_height = 60  # Estimated height for slider + labels + spacing
             
             # If window not yet sized, use default or wait
@@ -1567,33 +1633,45 @@ class Epoch3DSceneTimeBinViewer(qt.QWidget):
                 scene_width = 800  # Default width
                 scene_height = 600  # Default height
             
-            # Calculate approximate position: distribute labels horizontally
+            # Simple approach: distribute labels evenly based on time bin index
+            # This avoids issues with 3D-to-2D coordinate mapping and camera transformations
             n_time_bins = self.curr_n_time_bins
             if n_time_bins > 0:
-                # Position labels at the bottom of the scene, above the slider
-                # Calculate label width based on available space
-                label_width = min(150, max(80, scene_width // max(n_time_bins, 1)))
-                label_height = 200  # 4x taller (was 25px)
+                # Calculate evenly spaced positions across the window width
+                # Leave margins on both sides
+                margin = 50  # pixels on each side
+                usable_width = scene_width - 2 * margin
                 
-                # Calculate X position based on time bin index
-                # Distribute labels evenly across the width
                 if n_time_bins > 1:
-                    x_pos = int((t_bin_idx / (n_time_bins - 1)) * (scene_width - label_width))
+                    # Distribute evenly: first label at margin, last label at (scene_width - margin)
+                    # Each label is centered at its position
+                    normalized_pos = t_bin_idx / (n_time_bins - 1)
+                    x_pos_center = margin + (normalized_pos * usable_width)
                 else:
-                    x_pos = int((scene_width - label_width) / 2)
-                
-                # Position above the slider with some padding
-                y_pos = scene_height - label_height - slider_height - 10  # 10px padding above slider
-                
-                # Ensure label doesn't go outside bounds
-                x_pos = max(5, min(x_pos, scene_width - label_width - 5))
-                
-                label.setGeometry(x_pos, y_pos, label_width, label_height)
-                label.show()
-                label.raise_()  # Bring to front
-                label.setAttribute(qt.Qt.WA_TransparentForMouseEvents, True)  # Don't block mouse events
-                
-                self.text_label_items.append(label)
+                    # Single time bin: center it
+                    x_pos_center = scene_width / 2
+            else:
+                x_pos_center = scene_width / 2
+            
+            # Calculate label width
+            label_width = min(150, max(80, int(usable_width / max(n_time_bins, 1) * 0.8)))  # Scale with available space
+            label_height = 200  # 4x taller (was 25px)
+            
+            # Center the label on the calculated x position
+            x_pos = int(x_pos_center - label_width / 2)
+            
+            # Position above the slider with some padding
+            y_pos = scene_height - label_height - slider_height - 10  # 10px padding above slider
+            
+            # Ensure label doesn't go outside bounds
+            x_pos = max(5, min(x_pos, scene_width - label_width - 5))
+            
+            label.setGeometry(x_pos, y_pos, label_width, label_height)
+            label.show()
+            label.raise_()  # Bring to front
+            label.setAttribute(qt.Qt.WA_TransparentForMouseEvents, True)  # Don't block mouse events
+            
+            self.text_label_items.append(label)
         except Exception:
             # Silently fail if label creation doesn't work
             pass
@@ -1695,7 +1773,7 @@ class Epoch3DSceneTimeBinViewer(qt.QWidget):
             self.time_bin_items.append(item)
             
             # Add text label below this time bin if available
-            if self.text_columns:
+            if self.text_data_provider is not None or self.text_columns:
                 label_text = self._get_text_label_string(t_bin_idx)
                 if label_text is not None:
                     # Store label data for later positioning
