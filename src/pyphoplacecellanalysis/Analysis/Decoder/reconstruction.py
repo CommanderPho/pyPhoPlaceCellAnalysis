@@ -1846,37 +1846,17 @@ class DecodedFilterEpochsResult(HDF_SerializationMixin, AttrsBasedClassHelperMix
 
         assert masked_bin_fill_mode in ['ignore', 'last_valid', 'nan_filled', 'dropped']
         
+       ## must build `is_time_bin_active_list` 
+        is_time_bin_active_list = []
+
+
         # a_decoder = deepcopy(a_decoder)
         a_decoded_result: DecodedFilterEpochsResult = deepcopy(self) ## copy self to make the decoded result duplicate
         
         num_filter_epochs: int = a_decoded_result.num_filter_epochs
         
-        # time_bin_edges: NDArray = deepcopy(results1D.continuous_results['global'].time_bin_edges[0])
-        # time_bin_edges_list: List[NDArray] = deepcopy(a_decoded_result.time_bin_edges)
-        # assert len(time_bin_edges_list) == num_filter_epochs
-        
-        is_time_bin_active_list = []
-        inactive_mask_list = []
-        
-        all_time_bin_indicies_list = []
-        last_valid_indices_list = []
-
         for i in np.arange(num_filter_epochs):
-            ## Mask each output value
-            # inactive_mask_indicies = np.where(inactive_mask)[0]
             *num_spatial_dims_list, num_time_bins = np.shape(a_decoded_result.p_x_given_n_list[i])
-            if len(num_spatial_dims_list) == 2: 
-                # 2D
-                num_positions, num_y_bins = num_spatial_dims_list            
-            elif len(num_spatial_dims_list) == 1:
-                # 1D
-                num_positions = num_spatial_dims_list
-            elif len(num_spatial_dims_list) == 3:
-                # 3D
-                num_positions, num_y_bins, num_z_bins = num_spatial_dims_list
-            else:
-                raise NotImplementedError(f'len(num_spatial_dims_list): {len(num_spatial_dims_list)}: num_spatial_dims_list: {num_spatial_dims_list} but expected 1, 2, or 3')
-
             a_time_bin_edges: NDArray = deepcopy(a_decoded_result.time_bin_edges[i])
             if (len(a_time_bin_edges) != (num_time_bins+1)):
                 #@IgnoreException
@@ -1891,127 +1871,11 @@ class DecodedFilterEpochsResult(HDF_SerializationMixin, AttrsBasedClassHelperMix
                                                                                                                                                                                     min_num_spikes_per_bin_to_be_considered_active=min_num_spikes_per_bin_to_be_considered_active,
                                                                                                                                                                                     min_num_unique_active_neurons_per_time_bin=min_num_unique_active_neurons_per_time_bin)
             
-            # Make a copy of the original data before masking
-            original_data = a_decoded_result.p_x_given_n_list[i].copy()
-            all_time_bin_indicies = np.arange(num_time_bins, dtype=int) ## all time bins
-
-
-            if masked_bin_fill_mode != 'ignore':
-                # Mask inactive time bins with NaN in all modes except ignore mode
-                # Use arr[..., inactive_mask], which works for any number of dimensions:
-                a_decoded_result.p_x_given_n_list[i][..., inactive_mask] = np.nan
-                a_decoded_result.most_likely_position_indicies_list[i][..., inactive_mask] = -1 # use -1 instead of np.nan as it needs to be integer
-                a_decoded_result.most_likely_positions_list[i][inactive_mask, ...] = np.nan
-
-            if masked_bin_fill_mode == 'last_valid':
-                ## backfill from last_valid decoded position
-                last_valid_indices = np.zeros(num_time_bins, dtype=int)
-                current_valid_idx = 0
-                # Fill invalid time bins with the last valid value - EFFICIENT IMPLEMENTATION
-                if np.any(is_time_bin_active):  # Only proceed if we have some valid values
-                    # Calculate "last valid index" lookup array - very efficient O(n) operation
-                    for t in np.arange(num_time_bins):
-                        if is_time_bin_active[t]:
-                            current_valid_idx = t
-                        last_valid_indices[t] = current_valid_idx
-                    
-                    ## when done, have `last_valid_indices`
-                    # print(f'last_valid_indices: {last_valid_indices}')
-                    a_decoded_result.p_x_given_n_list[i][..., all_time_bin_indicies] = original_data[..., last_valid_indices]
-
-                    # Also fix the most_likely_position arrays using the same technique
-                    # For most_likely_position_indicies_list (shape: (n_dims, num_time_bins) where n_dims=2 for 2D, 3 for 3D)
-                    a_decoded_result.most_likely_position_indicies_list[i][..., all_time_bin_indicies] = a_decoded_result.most_likely_position_indicies_list[i][..., last_valid_indices]
-                    
-                    # For most_likely_positions_list (shape: (num_time_bins, n_dims) where n_dims=2 for 2D, 3 for 3D)
-                    a_decoded_result.most_likely_positions_list[i][all_time_bin_indicies, ...] = a_decoded_result.most_likely_positions_list[i][last_valid_indices, ...] # Use a dimension-agnostic approach:
-
-                else:
-                    ## no valid time bins
-                    print(f'WARN: Epoch[{i}]: with {num_time_bins} time_bins has no time bins with enough firing to infer back-filled positions from, so all entries will be NaN.')
-
-            elif masked_bin_fill_mode == 'dropped':
-                ## just drop the invalid bins by selecting via the `is_time_bin_active` (active_mask):
-                # Drop inactive time bins by selecting only active ones
-                a_decoded_result.p_x_given_n_list[i] = a_decoded_result.p_x_given_n_list[i][..., is_time_bin_active]
-                a_decoded_result.most_likely_position_indicies_list[i] = a_decoded_result.most_likely_position_indicies_list[i][..., is_time_bin_active]
-                a_decoded_result.most_likely_positions_list[i] = a_decoded_result.most_likely_positions_list[i][is_time_bin_active, ...]
-
-                a_binning_container: BinningContainer = deepcopy(a_decoded_result.time_bin_containers[i])
-                # a_binning_container.centers = a_binning_container.centers[is_time_bin_active]
-                a_sliced_centers = deepcopy(a_decoded_result.time_bin_containers[i].centers[is_time_bin_active])
-                center_info = BinningContainer.build_center_binning_info(centers=a_sliced_centers, variable_extents=a_binning_container.center_info.variable_extents)
-                
-                try:
-                    a_decoded_result.time_bin_edges[i] = get_bin_edges(a_sliced_centers) #
-                    ## make whole new container
-                    a_decoded_result.time_bin_containers[i] = BinningContainer(centers=a_sliced_centers, edges=a_decoded_result.time_bin_edges[i])
-                
-                except IndexError as e:
-                    if len(a_sliced_centers) == 0:
-                        ## no center => no edges
-                        a_decoded_result.time_bin_edges[i] = np.array([])
-                        ## make whole new container
-                        edge_info = BinningInfo(variable_extents=a_binning_container.edge_info.variable_extents, step=a_binning_container.edge_info.step, num_bins=0)
-                        a_decoded_result.time_bin_containers[i] = BinningContainer(centers=a_sliced_centers, edges=a_decoded_result.time_bin_edges[i], edge_info=edge_info, center_info=center_info)
-                
-                    else:
-                        assert len(a_sliced_centers) == 1, f"a_sliced_centers: {a_sliced_centers} -- len(a_sliced_centers): {len(a_sliced_centers)}"
-                        assert len(a_binning_container.center_info.variable_extents) == 2, f"a_binning_container.center_info.variable_extents: {a_binning_container.center_info.variable_extents}"
-                        a_decoded_result.time_bin_edges[i] = np.array(a_binning_container.center_info.variable_extents) ## use the extents directly
-                        ## make whole new container
-                        a_decoded_result.time_bin_containers[i] = BinningContainer(centers=a_sliced_centers, edges=a_decoded_result.time_bin_edges[i])
-                
-                    
-                except Exception as e:
-                    raise e
-                
-
-                # a_decoded_result.time_bin_containers[i] = a_decoded_result.time_bin_containers[i][is_time_bin_active]
-
-                # a_decoded_result.time_bin_edges[i] = a_time_bin_edges[is_time_bin_active]
-
-                # a_decoded_result.time_bin_edges[i] = a_time_bin_edges[is_time_bin_active] ## for sure wrong
-                # a_decoded_result.nbins[i] = len(a_time_bin_edges[is_time_bin_active]) # 2025-03-20 16:46 -  IndexError: boolean index did not match indexed array along dimension 0; dimension is 239 but corresponding boolean dimension is 238 
-                a_decoded_result.nbins[i] = np.sum(is_time_bin_active) ## this should count the number of bin centers, previously (pre 2025-03-20 16:50) it was counting the number of bin edges which was logically wrong.
-                
-                # Only update spkcount if it exists and is not None
-                if a_decoded_result.spkcount[i] is not None:
-                    a_decoded_result.spkcount[i] = a_decoded_result.spkcount[i][:, is_time_bin_active] # (80, 66) - (n_neurons, n_epoch_t_bins[i])
-                ## maybe messing up: epoch_description_list,
-                last_valid_indices = None # we don't need `last_valid_indices` in these modes
-                
-            elif masked_bin_fill_mode == 'nan_filled':
-                ## just NaN out the invalid bins, which we've already done as a pre-processing step
-                last_valid_indices = None # we don't need `last_valid_indices` in these modes
-                pass
-            elif masked_bin_fill_mode == 'ignore':
-                ## do nothing, not even NaN out the invalid values.
-                last_valid_indices = None # we don't need `last_valid_indices` in these modes
-                pass
-            else:
-                raise NotImplementedError(f"masked_bin_fill_mode: '{masked_bin_fill_mode}' was not one of the known valid modes: ['last_valid', 'nan_filled', 'dropped']")
-
-
-            # Add the marginal container to the list
-            curr_unit_marginal_x, curr_unit_marginal_y, curr_unit_marginal_z = BasePositionDecoder.perform_build_marginals(p_x_given_n=a_decoded_result.p_x_given_n_list[i], most_likely_positions=a_decoded_result.most_likely_positions_list[i], debug_print=False)
-            if curr_unit_marginal_x is not None:
-                a_decoded_result.marginal_x_list[i] = curr_unit_marginal_x
-            if curr_unit_marginal_y is not None:
-                a_decoded_result.marginal_y_list[i] = curr_unit_marginal_y
-            if curr_unit_marginal_z is not None:
-                a_decoded_result.marginal_z_list[i] = curr_unit_marginal_z          
-
-
-            ## END if np.any(is_time_bin_active)
             is_time_bin_active_list.append(is_time_bin_active)
-            inactive_mask_list.append(last_valid_indices)
-            all_time_bin_indicies_list.append(all_time_bin_indicies)
-            last_valid_indices_list.append(last_valid_indices)
-                    
+            
         #END for i in np.arange(num_filter_epochs)    
-        
-        return a_decoded_result, (is_time_bin_active_list, inactive_mask_list, all_time_bin_indicies_list, last_valid_indices_list)
+ 
+        return self.mask_computed_DecodedFilterEpochsResult_by_time_bin_inclusion_masks(is_time_bin_active_list=is_time_bin_active_list, masked_bin_fill_mode=masked_bin_fill_mode)
 
 
     @function_attributes(short_name=None, tags=['pseudo2D', 'timeline-track', '1D', 'split-to-1D'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-02-26 07:23', related_items=['pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions.DirectionalDecodersContinuouslyDecodedResult.split_pseudo2D_continuous_result_to_1D_continuous_result'])
