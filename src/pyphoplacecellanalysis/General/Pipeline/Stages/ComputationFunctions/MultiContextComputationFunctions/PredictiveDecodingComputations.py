@@ -2062,7 +2062,7 @@ class PredictiveDecodingComputationsContainer(ComputedResult):
         # Copy the object's state from self.__dict__ which contains all our instance attributes. Always use the dict.copy() method to avoid modifying the original state.
         state = self.__dict__.copy()
         # # Remove the unpicklable entries.
-        # _non_pickled_fields = ['curr_active_pipeline', 'track_templates']
+        # _non_pickled_fields = ['scoring_results_df'] # , 'track_templates'
         # for a_non_pickleable_field in _non_pickled_fields:
         #     del state[a_non_pickleable_field]
         return state
@@ -2139,7 +2139,7 @@ class PredictiveDecodingComputationsGlobalComputationFunctions(AllFunctionEnumer
         requires_global_keys=['DirectionalDecodersDecoded', 'DirectionalMergedDecoders', 'RankOrder', 'DirectionalDecodersEpochsEvaluations'], provides_global_keys=['PredictiveDecoding'],
         validate_computation_test=validate_has_predictive_decoding_results, is_global=True)
     def perform_predictive_decoding_analysis(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, debug_print=False, window_size:int=90, extant_decoded_time_bin_size: Optional[float]=None,
-                drop_previous_result_and_compute_fresh:bool=False, min_num_spikes_per_bin_to_be_considered_active: Optional[int]=5, num_min_position_like_t_bins: Optional[int] = 3, mask_position_like_time_score_cutoff: Optional[float] = 0.42):
+                drop_previous_result_and_compute_fresh:bool=False, min_num_spikes_per_bin_to_be_considered_active: Optional[int]=5, mask_position_like_time_score_cutoff: Optional[float] = 0.42):
         """ Performs predictive decoding analysis to relate PBE activity to future visited locations.
 
         Requires:
