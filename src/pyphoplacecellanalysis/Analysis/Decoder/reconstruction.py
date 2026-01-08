@@ -1624,7 +1624,7 @@ class DecodedFilterEpochsResult(HDF_SerializationMixin, AttrsBasedClassHelperMix
         return epoch_time_bin_marginals_df
     
     
-    @function_attributes(short_name=None, tags=['mask', 'unit-spike-counts', 'pure'], input_requires=[], output_provides=[], uses=['spikes_df.spikes.compute_unit_time_binned_spike_counts_and_mask'], used_by=[], creation_date='2026-01-08 01:32', related_items=[])
+    @function_attributes(short_name=None, tags=['mask', 'time-bin-mask', 'pure'], input_requires=[], output_provides=[], uses=['spikes_df.spikes.compute_unit_time_binned_spike_counts_and_mask'], used_by=[], creation_date='2026-01-08 01:32', related_items=[])
     def mask_computed_DecodedFilterEpochsResult_by_time_bin_inclusion_masks(self, is_time_bin_active_list: List[NDArray[ND.Shape["N_TIME_BINS"], Any]], masked_bin_fill_mode:MaskedTimeBinFillType='last_valid') -> Tuple["DecodedFilterEpochsResult", Tuple[NDArray, NDArray]]:
         """ Returns a copy of itself, masked by finding periods where there is insufficient firing to decode based on the provided paramters, copies the decoded result and returns a version with positions back-filled from the last bin that did meet the minimum firing criteria
         
@@ -1651,7 +1651,6 @@ class DecodedFilterEpochsResult(HDF_SerializationMixin, AttrsBasedClassHelperMix
 
         assert masked_bin_fill_mode in ['ignore', 'last_valid', 'nan_filled', 'dropped']
         
-        Tuple[NDArray[ND.Shape["N_TIME_BINS"], Any], NDArray[ND.Shape["N_TIME_BINS"], Any], NDArray[ND.Shape["1, N_TIME_BINS, 4"], np.uint8]]
 
         # a_decoder = deepcopy(a_decoder)
         a_decoded_result: DecodedFilterEpochsResult = deepcopy(self) ## copy self to make the decoded result duplicate
@@ -2708,7 +2707,7 @@ class BasePositionDecoder(HDFMixin, AttrsBasedClassHelperMixin, ContinuousPeakLo
         """ 
         """ NOTE 2025-02-20 09:40: even when ``enable_slow_debugging_time_bin_validation==False`, this function takes forever because it prints a ton of statements. 
         ERROR: epochs_spkcount(...): epoch[559], nbins[559]: 1 - TODO 2024-08-07 19:11: Building BinningContainer for epoch with fewer than 2 edges (occurs when epoch duration is shorter than the bin size). Using the epoch.start, epoch.stop as the two edges (giving a single bin) but this might be off and cause problems, as they are the edges of the epoch but maybe not "real" edges?
-	    ERROR (cont.): even after this hack `slide_view` is not updated, so the returned spkcount is not valid and has the old (wrong, way too many) number of bins. This results in decoded posteriors/postitions/etc with way too many bins downstream. see `SOLUTION 2024-08-07 20:08: - [ ] Recompute the Invalid Quantities with the known correct number of time bins` for info.
+        ERROR (cont.): even after this hack `slide_view` is not updated, so the returned spkcount is not valid and has the old (wrong, way too many) number of bins. This results in decoded posteriors/postitions/etc with way too many bins downstream. see `SOLUTION 2024-08-07 20:08: - [ ] Recompute the Invalid Quantities with the known correct number of time bins` for info.
         
         
         Occurs with epochs_decoding_time_bin_size = 1.0, frame_divide_bin_size = 1.0
