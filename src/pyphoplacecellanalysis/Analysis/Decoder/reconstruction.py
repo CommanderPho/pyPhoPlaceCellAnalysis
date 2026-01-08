@@ -1282,7 +1282,8 @@ class DecodedFilterEpochsResult(HDF_SerializationMixin, AttrsBasedClassHelperMix
         subset.p_x_given_n_list = [subset.p_x_given_n_list[i] for i in old_fashioned_indicies]
         subset.marginal_x_list = [subset.marginal_x_list[i] for i in old_fashioned_indicies]
         subset.marginal_y_list = [subset.marginal_y_list[i] for i in old_fashioned_indicies]
-        subset.marginal_z_list = [subset.marginal_z_list[i] for i in old_fashioned_indicies]
+        if len(subset.marginal_z_list) > 0:
+            subset.marginal_z_list = [subset.marginal_z_list[i] for i in old_fashioned_indicies]
         subset.most_likely_position_indicies_list = [subset.most_likely_position_indicies_list[i] for i in old_fashioned_indicies]
         subset.spkcount = [subset.spkcount[i] for i in old_fashioned_indicies]
         if len(old_fashioned_indicies) > 0:
