@@ -2331,6 +2331,13 @@ class PredictiveDecodingComputationsGlobalComputationFunctions(AllFunctionEnumer
                 print(f'PredictiveDecoding is None.')
         else:
             print(f'PredictiveDecoding is not computed.')
+
+
+        epoch_high_prob_pos_masks = container.debug_computed_dict[an_epoch_name]['epoch_high_prob_pos_masks']
+        epoch_matching_positions = container.debug_computed_dict[an_epoch_name]['epoch_matching_positions']
+        past_future_info_dict = container.debug_computed_dict[an_epoch_name]['past_future_info_dict']
+
+
             
         """
         return global_computation_results
