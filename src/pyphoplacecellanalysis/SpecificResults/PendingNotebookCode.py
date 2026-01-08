@@ -130,6 +130,115 @@ import math
 import os
 from collections import deque
 
+
+from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import DecodedFilterEpochsResult
+
+def filter_to_position_like_epochs_only(decoded_local_epochs_result, num_min_position_like_t_bins: int = 3) -> DecodedFilterEpochsResult:
+    """
+    decoding_time_bin_size = 0.025
+    an_epoch_name = 'roam'
+    decoded_local_epochs_result = container.epochs_decoded_result_cache_dict[decoding_time_bin_size].get(an_epoch_name, None)
+
+    """
+    from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.PredictiveDecodingComputations import DecodingLocalityMeasures
+    
+    ## INPUTS: container
+
+
+    ## INPUTS: flat_p_x_given_n_list
+    xbin = np.array([-85.7562, -80.9188, -76.0813, -71.2439, -66.4065, -61.569, -56.7316, -51.8942, -47.0568, -42.2193, -37.3819, -32.5445, -27.707, -22.8696, -18.0322, -13.1948, -8.35733, -3.5199, 1.31753, 6.15495, 10.9924, 15.8298, 20.6672, 25.5047, 30.3421, 35.1795, 40.017, 44.8544, 49.6918, 54.5292, 59.3667, 64.2041, 69.0415, 73.879, 78.7164, 83.5538, 88.3912, 93.2287, 98.0661, 102.904, 107.741, 112.578])
+    ybin = np.array([-96.4477, -93.3514, -90.255, -87.1587, -84.0623, -80.966, -77.8697, -74.7733, -71.677, -68.5806, -65.4843, -62.3879, -59.2916, -56.1952, -53.0989, -50.0025, -46.9062, -43.8099, -40.7135, -37.6172, -34.5208, -31.4245, -28.3281, -25.2318, -22.1354, -19.0391, -15.9427, -12.8464, -9.75005, -6.6537, -3.55736, -0.46101, 2.63534, 5.73168, 8.82803, 11.9244, 15.0207, 18.1171, 21.2134, 24.3098, 27.4061, 30.5024, 33.5988, 36.6951, 39.7915, 42.8878, 45.9842, 49.0805, 52.1769, 55.2732, 58.3696, 61.4659, 64.5622, 67.6586, 70.7549, 73.8513, 76.9476, 80.044, 83.1403, 86.2367, 89.333, 92.4294, 95.5257, 98.6221])
+
+    p_x_given_n_list: List[NDArray] = deepcopy(decoded_local_epochs_result.p_x_given_n_list) # a List[NDArray]
+    # flat_p_x_given_n_list = flatten(p_x_given_n_list)
+
+    # epoch_idx_list = [np.array([epoch_idx] * len(t_bin_values)) for epoch_idx, t_bin_values in enumerate(p_x_given_n_list)]
+    epoch_idx_list = [np.array([epoch_idx] * a_n_bins) for epoch_idx, a_n_bins in enumerate(decoded_local_epochs_result.nbins)]
+    
+    ## flatten all epochs across time bins
+    flat_p_x_given_n_list = np.concatenate(p_x_given_n_list, axis=2) # (41, 63, 1508)
+
+    np.shape(flat_p_x_given_n_list)
+
+    if (np.ndim(flat_p_x_given_n_list) > 3):
+        ## split by epoch
+        ## need to build at `p_x_given_n_dict: Dict[str, NDArray[ND.Shape["N_X_BINS, N_Y_BINS, N_TIME_BINS"], np.floating]] =`
+        p_x_given_n_dict: Dict[str, NDArray[ND.Shape["N_X_BINS, N_Y_BINS, N_TIME_BINS"], np.floating]] = DecodingLocalityMeasures.perform_build_normalized_outputs(p_x_given_n=flat_p_x_given_n_list, epoch_names=['roam', 'sprinkle'])
+
+        a_scoring_results_df_dict = {}
+        for k, v in p_x_given_n_dict.items():
+            a_scoring_results_df = GeminiPositionLikePosteriorScoring.compute_and_plot_posterior_stack(v, x_edges=xbin, y_edges=ybin, should_plot_results=False)
+            a_scoring_results_df['t'] = np.concatenate([v.centers for v in decoded_local_epochs_result.time_bin_containers])
+            a_scoring_results_df['epoch_idx'] = np.concatenate([np.array([epoch_idx] * a_n_bins) for epoch_idx, a_n_bins in enumerate(decoded_local_epochs_result.nbins)])
+
+            a_scoring_results_df_dict[k] = a_scoring_results_df
+
+        scoring_results_df = None
+        score_col_name: str = 'score'
+        all_score_col_names = []
+        for k, v in p_x_given_n_dict.items():
+            target_score_col_name = f'{score_col_name}_{k}'
+            if scoring_results_df is None:
+                scoring_results_df = deepcopy(a_scoring_results_df_dict[k]) # pd.concatenate(list(a_scoring_results_df_dict.values()))
+                scoring_results_df = scoring_results_df.rename(columns={score_col_name: target_score_col_name})
+            else:
+                scoring_results_df[target_score_col_name] = a_scoring_results_df_dict[k][score_col_name]
+            all_score_col_names.append(target_score_col_name)
+
+        ## set the new 'score' column to the best of all the individual scores:
+        scoring_results_df['score'] = scoring_results_df[all_score_col_names].max(axis=1, skipna=True)
+        scoring_results_df['is_position_like'] = (scoring_results_df['score'] >= GeminiPositionLikePosteriorScoring.position_like_score_cutoff) ## update/replace the 'is_position_like' columns
+
+        all_out_col_names = ['t_bin_idx', 'epoch_idx', 't', *all_score_col_names, 'score', 'is_position_like']
+        scoring_results_df = scoring_results_df[all_out_col_names]
+        
+    else:
+
+        # Choose an epoch to visualize (e.g., the first one)
+        scoring_results_df = GeminiPositionLikePosteriorScoring.compute_and_plot_posterior_stack(
+            flat_p_x_given_n_list,
+            x_edges=xbin,
+            y_edges=ybin, 
+            should_plot_results=False, 
+        )
+
+        scoring_results_df['t'] = np.concatenate([v.centers for v in decoded_local_epochs_result.time_bin_containers])
+        scoring_results_df['epoch_idx'] = np.concatenate([np.array([epoch_idx] * a_n_bins) for epoch_idx, a_n_bins in enumerate(decoded_local_epochs_result.nbins)])
+
+        scoring_results_df
+
+
+    ## FOR MASKING:
+    is_position_like_list = []
+    for epoch_idx, a_n_bins in enumerate(decoded_local_epochs_result.nbins):
+        curr_epoch_t_bins_is_position_like = scoring_results_df[scoring_results_df['epoch_idx'] == epoch_idx]['is_position_like'].to_numpy()
+        is_position_like_list.append(curr_epoch_t_bins_is_position_like)
+
+
+    filtered_decoded_local_epochs_result: DecodedFilterEpochsResult = deepcopy(decoded_local_epochs_result)
+
+    a_masked_filtered_decoded_local_epochs_result, mask_index_tuple = filtered_decoded_local_epochs_result.mask_computed_DecodedFilterEpochsResult_by_time_bin_inclusion_masks(
+        is_time_bin_active_list=is_position_like_list,
+        masked_bin_fill_mode='dropped',
+        # masked_bin_fill_mode='nan_filled'
+    )
+
+
+    ## Finds the epochs containing a at least a minimum number of position-like bins and returns a filtered result object with only those.
+    ## INPUTS: scoring_results, decoded_local_epochs_result
+    # 'num_position_like_t_bins'
+    
+    epoch_overall_scoring_results_df = scoring_results_df.groupby(['epoch_idx']).agg(num_position_like_t_bins=('is_position_like', 'sum'), score_mean=('score', 'mean')).reset_index()
+    is_epoch_idx_included = (epoch_overall_scoring_results_df['num_position_like_t_bins'] > num_min_position_like_t_bins)
+
+    included_epoch_idxs = epoch_overall_scoring_results_df[is_epoch_idx_included]['epoch_idx'].to_numpy()
+    a_masked_filtered_decoded_local_epochs_result = a_masked_filtered_decoded_local_epochs_result.filtered_by_epochs(included_epoch_indicies=included_epoch_idxs)
+
+    return a_masked_filtered_decoded_local_epochs_result, scoring_results_df
+
+
+
+
 @metadata_attributes(short_name=None, tags=['BEST', 'posterior', 'position-like', 'diffusivity', 'spread'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-01-08 08:52', related_items=[])
 class GeminiPositionLikePosteriorScoring:
     """
