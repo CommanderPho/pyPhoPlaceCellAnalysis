@@ -120,8 +120,195 @@ from pyphocorehelpers.gui.Qt.color_helpers import ColormapHelpers, ColorFormatCo
 
 
 
+# ==================================================================================================================================================================================================================================================================================== #
+# 2026-01-08 - 2D Posterior scoring how "position-like" it is                                                                                                                                                                                                                          #
+# ==================================================================================================================================================================================================================================================================================== #
+
+import numpy as np
+import matplotlib.pyplot as plt
+import math
+import os
+
+# --- 1. DEFINE BIN EDGES (FROM USER) ---
+xbin = np.array([-85.7562, -80.9188, -76.0813, -71.2439, -66.4065, -61.569, -56.7316, -51.8942, -47.0568, -42.2193, -37.3819, -32.5445, -27.707, -22.8696, -18.0322, -13.1948, -8.35733, -3.5199, 1.31753, 6.15495, 10.9924, 15.8298, 20.6672, 25.5047, 30.3421, 35.1795, 40.017, 44.8544, 49.6918, 54.5292, 59.3667, 64.2041, 69.0415, 73.879, 78.7164, 83.5538, 88.3912, 93.2287, 98.0661, 102.904, 107.741, 112.578])
+ybin = np.array([-96.4477, -93.3514, -90.255, -87.1587, -84.0623, -80.966, -77.8697, -74.7733, -71.677, -68.5806, -65.4843, -62.3879, -59.2916, -56.1952, -53.0989, -50.0025, -46.9062, -43.8099, -40.7135, -37.6172, -34.5208, -31.4245, -28.3281, -25.2318, -22.1354, -19.0391, -15.9427, -12.8464, -9.75005, -6.6537, -3.55736, -0.46101, 2.63534, 5.73168, 8.82803, 11.9244, 15.0207, 18.1171, 21.2134, 24.3098, 27.4061, 30.5024, 33.5988, 36.6951, 39.7915, 42.8878, 45.9842, 49.0805, 52.1769, 55.2732, 58.3696, 61.4659, 64.5622, 67.6586, 70.7549, 73.8513, 76.9476, 80.044, 83.1403, 86.2367, 89.333, 92.4294, 95.5257, 98.6221])
+
+# --- 2. UPDATED SCORING CLASS ---
+class GeminiPositionLikePosteriorScoring:
+    """
+    A utility class for calculating Position-Like Information (PLI) scores 
+    using explicit bin edges for physical distance calculations.
 
 
+    Usage:
+
+        import os
+        # --- 2. LOADING LOGIC ---
+        xbin = np.array([-85.7562, -80.9188, -76.0813, -71.2439, -66.4065, -61.569, -56.7316, -51.8942, -47.0568, -42.2193, -37.3819, -32.5445, -27.707, -22.8696, -18.0322, -13.1948, -8.35733, -3.5199, 1.31753, 6.15495, 10.9924, 15.8298, 20.6672, 25.5047, 30.3421, 35.1795, 40.017, 44.8544, 49.6918, 54.5292, 59.3667, 64.2041, 69.0415, 73.879, 78.7164, 83.5538, 88.3912, 93.2287, 98.0661, 102.904, 107.741, 112.578])
+        ybin = np.array([-96.4477, -93.3514, -90.255, -87.1587, -84.0623, -80.966, -77.8697, -74.7733, -71.677, -68.5806, -65.4843, -62.3879, -59.2916, -56.1952, -53.0989, -50.0025, -46.9062, -43.8099, -40.7135, -37.6172, -34.5208, -31.4245, -28.3281, -25.2318, -22.1354, -19.0391, -15.9427, -12.8464, -9.75005, -6.6537, -3.55736, -0.46101, 2.63534, 5.73168, 8.82803, 11.9244, 15.0207, 18.1171, 21.2134, 24.3098, 27.4061, 30.5024, 33.5988, 36.6951, 39.7915, 42.8878, 45.9842, 49.0805, 52.1769, 55.2732, 58.3696, 61.4659, 64.5622, 67.6586, 70.7549, 73.8513, 76.9476, 80.044, 83.1403, 86.2367, 89.333, 92.4294, 95.5257, 98.6221])
+
+        filename ='/content/2026-01-08_posteriors_data.npz' #'posteriors_data.npz'
+
+        if not os.path.exists(filename):
+            print(f"Error: {filename} not found. Please upload it to Colab files first.")
+        else:
+            # Load the .npz file
+            data_loaded = np.load(filename)
+
+            # Extract arrays back into a list.
+            # Important: Ensure they are sorted numerically (arr_0, arr_1, arr_10...)
+            # otherwise 'arr_10' might come before 'arr_2'
+            keys = sorted(data_loaded.files, key=lambda x: int(x.split('_')[1]))
+            p_x_given_n_list = [data_loaded[k] for k in keys]
+
+            print(f"Loaded {len(p_x_given_n_list)} epochs.")
+            print(f"Shape of first epoch: {p_x_given_n_list[0].shape}")
+
+
+
+
+        # Choose an epoch to visualize (e.g., the first one)
+        test_epoch_idx = 0
+        posterior_stack_to_test = p_x_given_n_list[test_epoch_idx]
+        print(f"\nAnalyzing Epoch {test_epoch_idx}...")
+        GeminiPositionLikePosteriorScoring.compute_and_plot_posterior_stack(
+            posterior_stack_to_test,
+            x_edges=xbin,
+            y_edges=ybin
+        )
+
+
+    """
+
+    @classmethod
+    def calculate_pli_score(cls, posterior, x_edges, y_edges, w_sharpness=0.4, w_locality=0.6, tolerated_mass_spread_percent_diagonal:float=0.20):
+        """
+        Calculates a score (0.0 - 1.0) indicating how 'position-like' a posterior is.
+        Uses x_edges and y_edges to handle non-square pixels and environment scaling.
+        """
+        # 1. Preprocessing
+        P = np.array(posterior, dtype=float)
+        total_p = np.sum(P)
+        
+        if total_p == 0 or np.isnan(total_p):
+            return 0.0, {'sharpness': 0.0, 'locality': 0.0, 'rms_cm': 0.0}
+        
+        P = P / total_p # Normalize to PMF
+        rows, cols = P.shape # Assumes Dim 0 is X, Dim 1 is Y (based on provided bins)
+        
+        # 2. Derive Physical Metrics from Edges
+        # Calculate pixel dimensions (handling rectangular pixels)
+        bin_w_cm = np.abs(np.mean(np.diff(x_edges))) # Dim 0 resolution
+        bin_h_cm = np.abs(np.mean(np.diff(y_edges))) # Dim 1 resolution
+        
+        # Calculate Diagonal of the environment
+        env_width = np.max(x_edges) - np.min(x_edges)
+        env_height = np.max(y_edges) - np.min(y_edges)
+        env_diagonal_cm = np.sqrt(env_width**2 + env_height**2)
+        
+        # 3. Find Peak (MAP)
+        map_flat = np.argmax(P)
+        map_idx = np.unravel_index(map_flat, P.shape) # (row_idx/x_idx, col_idx/y_idx)
+        
+        # 4. Metric A: Sharpness (1 - Normalized Entropy)
+        P_safe = P[P > 0]
+        entropy = -np.sum(P_safe * np.log(P_safe))
+        max_entropy = np.log(rows * cols)
+        
+        s_sharpness = 1.0 if max_entropy == 0 else 1.0 - (entropy / max_entropy)
+        s_sharpness = np.clip(s_sharpness, 0, 1)
+
+        # 5. Metric B: Spatial Locality (RMS distance from Peak)
+        # Use np.indices to generate a grid of indices
+        row_indices, col_indices = np.indices((rows, cols))
+        
+        # Convert index distances to physical cm distances
+        # Dim 0 corresponds to x_edges, Dim 1 corresponds to y_edges
+        dx = (row_indices - map_idx[0]) * bin_w_cm
+        dy = (col_indices - map_idx[1]) * bin_h_cm
+        
+        dist_sq = dx**2 + dy**2
+        rms_dist = np.sqrt(np.sum(P * dist_sq)) # Wasserstein-2 proxy
+        
+        # Score drops if mass is spread > 15% of environment diagonal
+        sigma_tolerated = env_diagonal_cm * tolerated_mass_spread_percent_diagonal 
+        s_locality = np.exp(-(rms_dist / sigma_tolerated))
+
+        # 6. Composite Score
+        score = (w_sharpness * s_sharpness) + (w_locality * s_locality)
+        
+        return float(score), {'sharpness': s_sharpness, 'locality': s_locality, 'rms_cm': rms_dist}
+
+    @classmethod
+    def get_pli_quality_label(cls, score):
+        if score >= 0.7: return "High Quality", "green"
+        elif score >= 0.5: return "Position-Like", "orange"
+        else: return "Ambiguous", "red"
+
+    @classmethod
+    def compute_and_plot_posterior_stack(cls, posterior_stack, x_edges, y_edges, should_plot_results=True):
+        """
+        Process an array of posteriors using specific bin edges.
+        posterior_stack shape expected: (n_x_bins, n_y_bins, n_t_bins)
+        """
+        # Ensure 3D shape
+        if posterior_stack.ndim == 2:
+            posterior_stack = posterior_stack[:, :, np.newaxis]
+            
+        n_x, n_y, n_frames = posterior_stack.shape
+        
+        # Validation: Check if stack dimensions match bin counts
+        # Edges are N+1 compared to Bins N
+        if n_x != (len(x_edges) - 1) or n_y != (len(y_edges) - 1):
+            print(f"Warning: Stack shape ({n_x}, {n_y}) does not match bin counts ({len(x_edges)-1}, {len(y_edges)-1}).")
+            print("Scores may be inaccurate due to mismatch.")
+
+        results = []
+        
+        # Limit frames for plotting if huge
+        frames_to_process = min(n_frames, 20) 
+        if n_frames > 20: print(f"Processing first 20 of {n_frames} frames for visualization.")
+
+        print(f"{'Frame':<6} | {'Score':<6} | {'Label':<15} | {'RMS (cm)':<8}")
+        print("-" * 50)
+
+        for t in range(frames_to_process):
+            current_posterior = posterior_stack[:, :, t]
+            score, comps = cls.calculate_pli_score(current_posterior, x_edges, y_edges)
+            label, color = cls.get_pli_quality_label(score)
+            results.append({'t': t, 'score': score, 'label': label, 'color': color, 'comps': comps, 'data': current_posterior})
+            print(f"T={t:<4} | {score:.4f} | {label:<15} | {comps['rms_cm']:.1f}")
+
+        if should_plot_results:
+            cols = 4
+            rows = math.ceil(frames_to_process / cols)
+            fig, axes = plt.subplots(rows, cols, figsize=(cols * 3.5, rows * 3.5))
+            axes = np.atleast_1d(axes).flatten()
+            
+            for i in range(len(axes)):
+                if i < frames_to_process:
+                    res = results[i]
+                    ax = axes[i]
+                    # Note: We transpose (.T) the data for plotting so X is horizontal and Y is vertical
+                    # assuming the input is (X_index, Y_index)
+                    im = ax.imshow(res['data'].T, origin='lower', cmap='inferno', aspect='auto')
+                    
+                    title_str = f"T={res['t']}: {res['label']}\nScore: {res['score']:.3f}"
+                    ax.set_title(title_str, color=res['color'], fontweight='bold', fontsize=10)
+                    ax.set_xlabel("X (Dim 0)")
+                    ax.set_ylabel("Y (Dim 1)")
+                else:
+                    axes[i].axis('off')
+                    
+            plt.tight_layout()
+            plt.suptitle(f"Posterior Stack Analysis (Top 20)", y=1.02, fontsize=14)
+            plt.show()
+
+
+
+# ==================================================================================================================================================================================================================================================================================== #
+# 2026-01-01 - Prev                                                                                                                                                                                                                                                                    #
+# ==================================================================================================================================================================================================================================================================================== #
 
 def interactive_p_x_given_n_slider(p_x_given_n: np.ndarray, xbin: Optional[np.ndarray]=None, ybin: Optional[np.ndarray]=None, cmap: str = "viridis"):
     """
