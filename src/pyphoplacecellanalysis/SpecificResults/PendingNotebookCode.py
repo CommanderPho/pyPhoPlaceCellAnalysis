@@ -134,102 +134,6 @@ from collections import deque
 from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import DecodedFilterEpochsResult
 
 
-def _main_run_all(container: PredictiveDecodingComputationsContainer):
-    from pyphoplacecellanalysis.GUI.Silx.EpochTimeBinViewerWidget import EpochTimeBinViewer, Epoch3DSceneTimeBinViewer
-    from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import PositionLikePosteriorScoring
-    from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import BayesianPlacemapPositionDecoder
-
-
-    ## OUTPUTS: container
-    assert container is not None, f"container is None after loading from pickle!"
-    ## Set pipeline data:
-    curr_active_pipeline.global_computation_results.computed_data['PredictiveDecoding'] = container
-    if container.decoding_locality is None:
-        container.decoding_locality = container.predictive_decoding.locality_measures
-    decoding_locality: DecodingLocalityMeasures = container.decoding_locality
-    # non_local_PBE_non_moving_epochs_df: pd.DataFrame = decoding_locality.get_non_moving_PBE_non_local_epochs(curr_active_pipeline.sess, merging_adjacent_max_separation_sec=0.5)
-    non_local_PBE_non_moving_epochs_df: pd.DataFrame = container.decoding_locality.non_local_PBE_non_moving_epochs_df
-    predictive_decoding: PredictiveDecoding = container.predictive_decoding
-    non_local_PBE_non_moving_epochs_df
-    ## OUTPUTS: container
-
-
-    ## ⚓🚧🎯🔷 After all computations, compute the fine-grained promenance/etc metrics for each posterior so we can see them (and assess how they're working) next to the posteriors themselves in the 3D Silx Volumetric viewer
-    # TODO 2025-12-24
-
-    ## INPUTS: container
-
-    decoding_time_bin_size = 0.025
-    an_epoch_name = 'roam'
-    decoded_local_epochs_result = container.epochs_decoded_result_cache_dict[decoding_time_bin_size].get(an_epoch_name, None)
-    a_decoder: BayesianPlacemapPositionDecoder = list(container.pf1D_Decoder_dict.values())[0]
-
-    # 2025-01-08 - Mask based on position-like bins only _________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
-    a_masked_result, scoring_results = PositionLikePosteriorScoring.filter_to_position_like_epochs_only(decoded_local_epochs_result=decoded_local_epochs_result, xbin=a_decoder.xbin, ybin=a_decoder.ybin, position_like_score_cutoff=0.42, num_min_position_like_t_bins=3)
-
-
-
-    # active_epochs_result = decoded_local_epochs_result
-    active_epochs_result = a_masked_result
-
-    ## INPUTS: active_epochs_result
-    custom_results_list = []
-    custom_results_df_list = []
-    for i, a_row in enumerate(ensure_dataframe(active_epochs_result.filter_epochs).itertuples(index=False)):
-        # print(f'epoch[{i}/{len(active_epochs_result.filter_epochs)}]')
-        ## Need correect portion of p_x_given_n for these times
-        curr_epoch_p_x_given_n = active_epochs_result.p_x_given_n_list[i] # [:, :, is_timebin_included]
-        curr_epoch_time_bin_centers = active_epochs_result.time_bin_containers[i].centers    
-        # is_high_prob_mask = (curr_epoch_p_x_given_n > high_val_epsilon)
-        curr_epoch_start_t: float = curr_epoch_time_bin_centers[0]
-        curr_epoch_stop_t: float = curr_epoch_time_bin_centers[-1]
-        
-        custom_computation_results_dict = DecodingLocalityMeasures.compute_locality_measures_for_posterior(
-            a_p_x_given_n=curr_epoch_p_x_given_n,
-            # gaussian_volume=container.predictive_decoding.gaussian_volume, ## if we have it
-            xbin_centers=container.predictive_decoding.xbin_centers, 
-            ybin_centers=container.predictive_decoding.ybin_centers,
-            min_val_epsilon=1e-6,
-            alpha_list = [0.5, 0.8],
-            enable_debug_outputs=True,
-            earthmovers_fn=None, debug_print=False,
-        )
-        # a_debug_result_dict = custom_computation_results_dict.pop('debug', None) ## remove so it isn't added to the df
-
-        custom_computation_results_df = DecodingLocalityMeasures.perform_build_locality_measures_df(locality_measures_dict_dict={an_epoch_name: custom_computation_results_dict}, ## expects a dict with key of the epoch type, so we need to wrap it
-            time_window_centers=curr_epoch_time_bin_centers, 
-            xbin_centers=container.predictive_decoding.xbin_centers, 
-            ybin_centers=container.predictive_decoding.ybin_centers,
-        )
-
-        custom_computation_results_df['epoch_idx'] = i ## same value for all
-        custom_computation_results_df['epoch_t_bin_idx'] = custom_computation_results_df.index.astype(int).to_numpy() ## ascending values
-        custom_results_list.append(custom_computation_results_dict)
-        custom_results_df_list.append(custom_computation_results_df)
-
-
-    ## flatten/concat into a single flat df for all epochs:
-    custom_results_df_list = pd.concat(custom_results_df_list, ignore_index=True)
-    custom_results_df_list
-
-    ## OUTPUTS: active_epochs_result (masked result),  custom_results_df_list
-
-
-
-
-
-    ## INPUTS: container
-    decoding_time_bin_size = 0.025
-    an_epoch_name = 'roam'
-    decoded_local_epochs_result = container.epochs_decoded_result_cache_dict[decoding_time_bin_size].get(an_epoch_name, None)
-    a_decoder: BayesianPlacemapPositionDecoder = list(container.pf1D_Decoder_dict.values())[0]
-
-    # 2025-01-08 - Mask based on position-like bins only _________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
-    a_masked_result, scoring_results = PositionLikePosteriorScoring.filter_to_position_like_epochs_only(decoded_local_epochs_result=decoded_local_epochs_result, xbin=a_decoder.xbin, ybin=a_decoder.ybin, position_like_score_cutoff=0.42, num_min_position_like_t_bins=3)
-
-
-
-
 
 
 
@@ -319,6 +223,125 @@ class PositionLikePosteriorScoring:
     """
     high_quality_score_cutoff: float = 0.7
     position_like_score_cutoff: float = 0.42
+
+
+
+
+    @function_attributes(short_name=None, tags=['ALL'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-01-09 15:26', related_items=[])
+    @classmethod
+    def _main_run_all(cls, containe): 
+        """
+        container: PredictiveDecodingComputationsContainer
+        
+        from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.PredictiveDecodingComputations import PredictiveDecoding, DecodingLocalityMeasures, PredictiveDecodingComputationsContainer
+
+        # pkl_output_path: Path = curr_active_pipeline.get_output_path().joinpath('2026-01-05_PredictiveDecodingComputationsContainer.pkl')
+        # pkl_output_path: Path = curr_active_pipeline.get_output_path().joinpath('2026-01-08_PredictiveDecodingComputationsContainer.pkl')
+        pkl_output_path: Path = curr_active_pipeline.get_output_path().joinpath('2026-01-09_PredictiveDecodingComputationsContainer.pkl')
+        container: PredictiveDecodingComputationsContainer = PredictiveDecodingComputationsContainer.from_file(pkl_output_path)
+        # loaded_container: PredictiveDecodingComputationsContainer = PredictiveDecodingComputationsContainer.from_file(pkl_output_path)
+        container
+
+        _main_run_all(container=container)
+        
+
+        """
+        from pyphoplacecellanalysis.GUI.Silx.EpochTimeBinViewerWidget import EpochTimeBinViewer, Epoch3DSceneTimeBinViewer
+        # from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import PositionLikePosteriorScoring
+        from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import BayesianPlacemapPositionDecoder
+        from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.PredictiveDecodingComputations import PredictiveDecoding, DecodingLocalityMeasures, PredictiveDecodingComputationsContainer
+
+
+        ## OUTPUTS: container
+        assert container is not None, f"container is None after loading from pickle!"
+        ## Set pipeline data:
+        curr_active_pipeline.global_computation_results.computed_data['PredictiveDecoding'] = container
+        if container.decoding_locality is None:
+            container.decoding_locality = container.predictive_decoding.locality_measures
+        decoding_locality: DecodingLocalityMeasures = container.decoding_locality
+        # non_local_PBE_non_moving_epochs_df: pd.DataFrame = decoding_locality.get_non_moving_PBE_non_local_epochs(curr_active_pipeline.sess, merging_adjacent_max_separation_sec=0.5)
+        non_local_PBE_non_moving_epochs_df: pd.DataFrame = container.decoding_locality.non_local_PBE_non_moving_epochs_df
+        predictive_decoding: PredictiveDecoding = container.predictive_decoding
+        non_local_PBE_non_moving_epochs_df
+        ## OUTPUTS: container
+
+
+        ## ⚓🚧🎯🔷 After all computations, compute the fine-grained promenance/etc metrics for each posterior so we can see them (and assess how they're working) next to the posteriors themselves in the 3D Silx Volumetric viewer
+        # TODO 2025-12-24
+
+        ## INPUTS: container
+
+        decoding_time_bin_size = 0.025
+        an_epoch_name = 'roam'
+        decoded_local_epochs_result = container.epochs_decoded_result_cache_dict[decoding_time_bin_size].get(an_epoch_name, None)
+        a_decoder: BayesianPlacemapPositionDecoder = list(container.pf1D_Decoder_dict.values())[0]
+
+        # 2025-01-08 - Mask based on position-like bins only _________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
+        a_masked_result, scoring_results = PositionLikePosteriorScoring.filter_to_position_like_epochs_only(decoded_local_epochs_result=decoded_local_epochs_result, xbin=a_decoder.xbin, ybin=a_decoder.ybin, position_like_score_cutoff=0.42, num_min_position_like_t_bins=3)
+
+        # active_epochs_result = decoded_local_epochs_result
+        active_epochs_result = a_masked_result
+
+        ## INPUTS: active_epochs_result
+        custom_results_list = []
+        custom_results_df_list = []
+        for i, a_row in enumerate(ensure_dataframe(active_epochs_result.filter_epochs).itertuples(index=False)):
+            # print(f'epoch[{i}/{len(active_epochs_result.filter_epochs)}]')
+            ## Need correect portion of p_x_given_n for these times
+            curr_epoch_p_x_given_n = active_epochs_result.p_x_given_n_list[i] # [:, :, is_timebin_included]
+            curr_epoch_time_bin_centers = active_epochs_result.time_bin_containers[i].centers    
+            # is_high_prob_mask = (curr_epoch_p_x_given_n > high_val_epsilon)
+            curr_epoch_start_t: float = curr_epoch_time_bin_centers[0]
+            curr_epoch_stop_t: float = curr_epoch_time_bin_centers[-1]
+            
+            custom_computation_results_dict = DecodingLocalityMeasures.compute_locality_measures_for_posterior(
+                a_p_x_given_n=curr_epoch_p_x_given_n,
+                # gaussian_volume=container.predictive_decoding.gaussian_volume, ## if we have it
+                xbin_centers=container.predictive_decoding.xbin_centers, 
+                ybin_centers=container.predictive_decoding.ybin_centers,
+                min_val_epsilon=1e-6,
+                alpha_list = [0.5, 0.8],
+                enable_debug_outputs=True,
+                earthmovers_fn=None, debug_print=False,
+            )
+            # a_debug_result_dict = custom_computation_results_dict.pop('debug', None) ## remove so it isn't added to the df
+
+            custom_computation_results_df = DecodingLocalityMeasures.perform_build_locality_measures_df(locality_measures_dict_dict={an_epoch_name: custom_computation_results_dict}, ## expects a dict with key of the epoch type, so we need to wrap it
+                time_window_centers=curr_epoch_time_bin_centers, 
+                xbin_centers=container.predictive_decoding.xbin_centers, 
+                ybin_centers=container.predictive_decoding.ybin_centers,
+            )
+
+            custom_computation_results_df['epoch_idx'] = i ## same value for all
+            custom_computation_results_df['epoch_t_bin_idx'] = custom_computation_results_df.index.astype(int).to_numpy() ## ascending values
+            custom_results_list.append(custom_computation_results_dict)
+            custom_results_df_list.append(custom_computation_results_df)
+
+
+        ## flatten/concat into a single flat df for all epochs:
+        custom_results_df_list = pd.concat(custom_results_df_list, ignore_index=True)
+        custom_results_df_list
+
+        ## OUTPUTS: active_epochs_result (masked result),  custom_results_df_list
+
+
+
+
+
+        ## INPUTS: container
+        decoding_time_bin_size = 0.025
+        an_epoch_name = 'roam'
+        decoded_local_epochs_result = container.epochs_decoded_result_cache_dict[decoding_time_bin_size].get(an_epoch_name, None)
+        a_decoder: BayesianPlacemapPositionDecoder = list(container.pf1D_Decoder_dict.values())[0]
+
+        # 2025-01-08 - Mask based on position-like bins only _________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
+        a_masked_result, scoring_results = PositionLikePosteriorScoring.filter_to_position_like_epochs_only(decoded_local_epochs_result=decoded_local_epochs_result, xbin=a_decoder.xbin, ybin=a_decoder.ybin, position_like_score_cutoff=0.42, num_min_position_like_t_bins=3)
+        return a_masked_result
+
+
+
+
+
 
     @classmethod
     def calculate_pli_score(cls, posterior, x_edges, y_edges, w_sharpness=0.4, w_locality=0.6, noise_threshold_percent=0.02, sigma_tolerated_env_diagonal_percent: float = 0.20):
