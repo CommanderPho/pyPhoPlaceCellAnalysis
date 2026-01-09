@@ -2649,20 +2649,20 @@ class PredictiveDecodingDisplayWidget:
     
 
     def __attrs_post_init__(self):
-        merging_adjacent_max_separation_sec: float = 0.5
-        minimum_epoch_duration: float = 0.05
-        # matching_pos_dfs_list: List[pd.DataFrame] = []
-        # matching_pos_epochs_dfs_list: List[pd.DataFrame] = []
+        """Basic validation, then call setup() and buildUI()."""
         assert len(self.container.predictive_decoding.matching_pos_dfs_list) > 0
-        matching_pos_dfs_list = self.container.predictive_decoding.matching_pos_dfs_list
         assert len(self.container.predictive_decoding.matching_pos_epochs_dfs_list) > 0
-        matching_pos_epochs_dfs_list = self.container.predictive_decoding.matching_pos_epochs_dfs_list
-        ## INPUTS: matching_pos_epochs_dfs_list, decoded_local_epochs_result
+        self.setup()
+        self.buildUI()
 
+
+    def setup(self):
+        """Calculate constants (max_subplots_per_category, extent), prepare data structures."""
+        matching_pos_epochs_dfs_list = self.container.predictive_decoding.matching_pos_epochs_dfs_list
+        
+        # Prepare matching_pos_epochs_dfs_list with is_future_present_past labels
         for i, a_row in enumerate(ensure_dataframe(self.decoded_result.filter_epochs).itertuples(index=False)):
-        # for i, a_pos_matches_epoch_mask in enumerate(epoch_matching_positions):
             a_matching_pos_epochs: pd.DataFrame = matching_pos_epochs_dfs_list[i]
-            # a_row.start, a_row.stop
             curr_epoch_start_t: float = a_row.start
             curr_epoch_stop_t: float = a_row.stop
             
@@ -2671,99 +2671,164 @@ class PredictiveDecodingDisplayWidget:
             a_matching_pos_epochs['is_future_present_past'] = 'present'
             a_matching_pos_epochs.loc[is_relevant_past_times, 'is_future_present_past'] = 'past'
             a_matching_pos_epochs.loc[is_relevant_future_times, 'is_future_present_past'] = 'future'
-                    
+            
             self.container.predictive_decoding.matching_pos_epochs_dfs_list[i] = a_matching_pos_epochs
-
-        # self.container.predictive_decoding.matching_pos_epochs_dfs_list = matching_pos_epochs_dfs_list
-        self.init_UI()
-
-
-    def init_UI(self):
-        """Initialize the UI with DockArea and Dock widgets for past/future trajectory plotters."""
-        import pyphoplacecellanalysis.External.pyqtgraph as pg
-        from pyphoplacecellanalysis.External.pyqtgraph.dockarea import DockArea, Dock
-        from pyphoplacecellanalysis.External.pyqtgraph.Qt import QtWidgets, QtGui, QtCore
         
-        # Create the DockArea and window
+        # Calculate max_subplots_per_category
+        self.max_subplots_per_category = self._calculate_max_subplots()
+        
+        # Calculate extent for posterior plots
+        self.extent = (self.xbin[0], self.xbin[-1], self.ybin[0], self.ybin[-1])
+        
+        # Initialize display_widgets dict for MatplotlibTimeSynchronizedWidget instances
+        if not hasattr(self, 'display_widgets'):
+            self.display_widgets: Dict[str, Any] = {}
+
+
+    def _calculate_max_subplots(self) -> Dict[str, int]:
+        """Pre-calculate max subplots needed (called once in setup)."""
+        matching_pos_epochs_dfs_list = self.container.predictive_decoding.matching_pos_epochs_dfs_list
+        matching_pos_dfs_list = self.container.predictive_decoding.matching_pos_dfs_list
+        
+        max_subplots_per_category: Dict[str, int] = {}
+        for epoch_idx in range(len(matching_pos_epochs_dfs_list)):
+            curr_matching_epochs_df_temp: pd.DataFrame = matching_pos_dfs_list[epoch_idx]
+            curr_matching_epochs_df_dict_temp: Dict[int, pd.DataFrame] = curr_matching_epochs_df_temp.pho.partition_df_dict('is_future_present_past')
+            for a_past_future_name, an_epoch_specific_dfs in curr_matching_epochs_df_dict_temp.items():
+                if a_past_future_name not in max_subplots_per_category:
+                    max_subplots_per_category[a_past_future_name] = 0
+                num_items = len(an_epoch_specific_dfs)
+                max_subplots_per_category[a_past_future_name] = max(max_subplots_per_category[a_past_future_name], num_items)
+        
+        # Cap at 20 subplots maximum
+        for key in max_subplots_per_category:
+            max_subplots_per_category[key] = min(20, max_subplots_per_category[key])
+        
+        return max_subplots_per_category
+
+
+    def buildUI(self):
+        """Create dock area and initialize ALL three widgets immediately."""
+        self._build_dock_area()
+        self._build_past_widget()
+        self._build_posterior_widget()
+        self._build_future_widget()
+        self._build_epoch_control()
+        self.dock_window.show()
+        self.update_displayed_epoch(an_epoch_idx=self.active_epoch_idx)
+
+
+    def _build_dock_area(self):
+        """Create window and dock area."""
+        from pyphoplacecellanalysis.External.pyqtgraph.dockarea import DockArea
+        from pyphoplacecellanalysis.External.pyqtgraph.Qt import QtWidgets
+        
         self.dock_window = QtWidgets.QMainWindow()
         self.dock_window.setWindowTitle("Predictive Decoding Display - Past/Future Trajectories")
         self.dock_area = DockArea()
         self.dock_window.setCentralWidget(self.dock_area)
         self.dock_window.resize(1400, 800)
+
+
+    def _build_past_widget(self):
+        """Create past trajectory widget (MatplotlibTimeSynchronizedWidget)."""
+        from pyphoplacecellanalysis.External.pyqtgraph.dockarea import Dock
+        from pyphoplacecellanalysis.External.pyqtgraph.Qt import QtWidgets, QtCore
+        from pyphoplacecellanalysis.Pho2D.matplotlib.MatplotlibTimeSynchronizedWidget import MatplotlibTimeSynchronizedWidget
         
-        # Create docks for past, decoded_posterior, and future (will be populated when update_displayed_epoch is called)
-        prev_dock = None
-        for category_name in ['past', 'decoded_posterior', 'future']:
-            if category_name == 'decoded_posterior':
-                dock_name = "Decoded Posterior"
-            else:
-                dock_name = f"{category_name.capitalize()} Trajectories"
-            dock = Dock(dock_name, size=(600, 700), closable=True)
-            
-            # Create placeholder widget (will be replaced with actual plot in update_displayed_epoch)
-            if category_name == 'decoded_posterior':
-                placeholder_text = f"Waiting for data...\nCall update_displayed_epoch() to display decoded posterior heatmap."
-            else:
-                placeholder_text = f"Waiting for data...\nCall update_displayed_epoch() to display {category_name} trajectories."
-            placeholder_widget = QtWidgets.QLabel(placeholder_text)
-            placeholder_widget.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
-            dock.addWidget(placeholder_widget)
-            
-            # Add dock horizontally
-            if prev_dock is None:
-                self.dock_area.addDock(dock, 'left')
-            else:
-                self.dock_area.addDock(dock, 'right', prev_dock)
-            
-            self.dock_widgets[category_name] = dock
-            prev_dock = dock
+        dock = Dock("Past Trajectories", size=(600, 700), closable=True)
+        self.dock_area.addDock(dock, 'left')
+        self.dock_widgets['past'] = dock
         
-        # Create slider widget at the bottom of the window
+        # Create and initialize the widget immediately
+        widget = MatplotlibTimeSynchronizedWidget(size=(8, 6), dpi=72, constrained_layout=True, disable_toolbar=False)
+        dock.addWidget(widget)
+        self.display_widgets['past'] = widget
+        
+        # Create trajectory plotter
+        plotter = DecodedTrajectoryMatplotlibPlotter(a_result=self.decoded_result, xbin=self.xbin, xbin_centers=self.xbin_centers, ybin=self.ybin, ybin_centers=self.ybin_centers)
+        self.trajectory_displaying_plotter['past'] = plotter
+
+
+    def _build_posterior_widget(self):
+        """Create decoded posterior widget (MatplotlibTimeSynchronizedWidget)."""
+        from pyphoplacecellanalysis.External.pyqtgraph.dockarea import Dock
+        from pyphoplacecellanalysis.Pho2D.matplotlib.MatplotlibTimeSynchronizedWidget import MatplotlibTimeSynchronizedWidget
+        
+        dock = Dock("Decoded Posterior", size=(600, 700), closable=True)
+        prev_dock = self.dock_widgets.get('past')
+        if prev_dock is not None:
+            self.dock_area.addDock(dock, 'right', prev_dock)
+        else:
+            self.dock_area.addDock(dock, 'left')
+        self.dock_widgets['decoded_posterior'] = dock
+        
+        # Create and initialize the widget immediately
+        widget = MatplotlibTimeSynchronizedWidget(size=(8, 6), dpi=72, constrained_layout=True, disable_toolbar=False)
+        dock.addWidget(widget)
+        self.display_widgets['decoded_posterior'] = widget
+
+
+    def _build_future_widget(self):
+        """Create future trajectory widget (MatplotlibTimeSynchronizedWidget)."""
+        from pyphoplacecellanalysis.External.pyqtgraph.dockarea import Dock
+        from pyphoplacecellanalysis.Pho2D.matplotlib.MatplotlibTimeSynchronizedWidget import MatplotlibTimeSynchronizedWidget
+        
+        dock = Dock("Future Trajectories", size=(600, 700), closable=True)
+        prev_dock = self.dock_widgets.get('decoded_posterior')
+        if prev_dock is not None:
+            self.dock_area.addDock(dock, 'right', prev_dock)
+        else:
+            self.dock_area.addDock(dock, 'left')
+        self.dock_widgets['future'] = dock
+        
+        # Create and initialize the widget immediately
+        widget = MatplotlibTimeSynchronizedWidget(size=(8, 6), dpi=72, constrained_layout=True, disable_toolbar=False)
+        dock.addWidget(widget)
+        self.display_widgets['future'] = widget
+        
+        # Create trajectory plotter
+        plotter = DecodedTrajectoryMatplotlibPlotter(a_result=self.decoded_result, xbin=self.xbin, xbin_centers=self.xbin_centers, ybin=self.ybin, ybin_centers=self.ybin_centers)
+        self.trajectory_displaying_plotter['future'] = plotter
+
+
+    def _build_epoch_control(self):
+        """Create slider controls."""
+        from pyphoplacecellanalysis.External.pyqtgraph.dockarea import Dock
+        from pyphoplacecellanalysis.External.pyqtgraph.Qt import QtWidgets, QtCore
+        
         num_epochs = len(ensure_dataframe(self.decoded_result.filter_epochs))
         if num_epochs > 0:
-            # Create a bottom widget container for the slider
             bottom_widget = QtWidgets.QWidget()
             bottom_layout = QtWidgets.QHBoxLayout()
             bottom_layout.setContentsMargins(10, 5, 10, 5)
             
-            # Create label for the slider
             slider_label = QtWidgets.QLabel("Epoch Index:")
             bottom_layout.addWidget(slider_label)
             
-            # Create slider
             self.epoch_slider = QtWidgets.QSlider(QtCore.Qt.Orientation.Horizontal)
             self.epoch_slider.setMinimum(0)
             self.epoch_slider.setMaximum(max(0, num_epochs - 1))
             self.epoch_slider.setValue(min(self.active_epoch_idx, num_epochs - 1))
             self.epoch_slider.setTickPosition(QtWidgets.QSlider.TickPosition.TicksBelow)
-            self.epoch_slider.setTickInterval(max(1, num_epochs // 20))  # Show ~20 ticks
+            self.epoch_slider.setTickInterval(max(1, num_epochs // 20))
             self.epoch_slider.setMinimumWidth(400)
-            bottom_layout.addWidget(self.epoch_slider, stretch=1)  # Stretch to fill width
+            bottom_layout.addWidget(self.epoch_slider, stretch=1)
             
-            # Create label to show current value
             self.epoch_value_label = QtWidgets.QLabel(f"{self.epoch_slider.value()}")
             self.epoch_value_label.setMinimumWidth(50)
             self.epoch_value_label.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
             bottom_layout.addWidget(self.epoch_value_label)
             
-            # Connect slider signals:
-            # - valueChanged: Update label only (for immediate feedback while dragging)
-            # - sliderReleased: Update display (only when user releases the slider)
             self.epoch_slider.valueChanged.connect(self._on_slider_value_changed_label_only)
             self.epoch_slider.sliderReleased.connect(self._on_slider_released)
             
             bottom_widget.setLayout(bottom_layout)
             
-            # Add bottom widget to the main window using a status bar or dock
-            # We'll use a dock at the bottom
             bottom_dock = Dock("Epoch Control", size=(1400, 50), closable=False)
             bottom_dock.addWidget(bottom_widget)
             self.dock_area.addDock(bottom_dock, 'bottom')
             self.dock_widgets['epoch_control'] = bottom_dock
-        
-        self.dock_window.show()
-        
-        self.update_displayed_epoch(an_epoch_idx=self.active_epoch_idx) ## go to first index if possible
 
 
     def _on_slider_value_changed_label_only(self, value: int):
@@ -2777,42 +2842,207 @@ class PredictiveDecodingDisplayWidget:
         if self.epoch_slider is not None:
             value = self.epoch_slider.value()
             self.update_displayed_epoch(an_epoch_idx=value)
-            # Update all widgets to ensure they refresh (handles both canvas and widget types)
-            for widget_or_canvas in self.dock_canvas_widgets.values():
-                if widget_or_canvas is not None:
-                    # Check if it's a widget (has draw method) or canvas (has draw_idle method)
-                    if hasattr(widget_or_canvas, 'draw'):
-                        widget_or_canvas.draw()
-                    elif hasattr(widget_or_canvas, 'draw_idle'):
-                        widget_or_canvas.draw_idle()
+            # Update all widgets to ensure they refresh
+            for widget in self.display_widgets.values():
+                if widget is not None and hasattr(widget, 'draw'):
+                    widget.draw()
 
 
-
-    @function_attributes(short_name=None, tags=['widget', 'GUI', 'display', 'interactive', 'position-like', 'pred', 'prospective'], input_requires=[], output_provides=[], uses=['DecodedTrajectoryMatplotlibPlotter'], used_by=[], creation_date='2026-01-09 02:04', related_items=[])
-    def update_displayed_epoch(self, an_epoch_idx: int = 8):
-        """ updates the GUI to reflect the epoch idx provided:
-
-        """
-        from pyphoplacecellanalysis.External.pyqtgraph.Qt import QtWidgets
-        import matplotlib.pyplot as plt
-
-        # Initialize UI if not already done
-        if self.dock_area is None:
-            self.init_UI()
-
-        prev_epoch_idx: int = deepcopy(self.active_epoch_idx)
-        
-        # Validate epoch index bounds
+    def _validate_epoch_idx(self, an_epoch_idx: int) -> int:
+        """Validate and clamp epoch index."""
         num_epochs = len(ensure_dataframe(self.decoded_result.filter_epochs))
         if an_epoch_idx < 0 or an_epoch_idx >= num_epochs:
             print(f"Warning: epoch_idx {an_epoch_idx} is out of bounds (0-{num_epochs-1}). Clamping to valid range.")
             an_epoch_idx = max(0, min(an_epoch_idx, num_epochs - 1))
+        return an_epoch_idx
+
+
+    def _prepare_epoch_data(self, an_epoch_idx: int) -> Dict[str, Any]:
+        """Extract and prepare data for current epoch."""
+        matching_pos_dfs_list = self.container.predictive_decoding.matching_pos_dfs_list
+        matching_pos_epochs_dfs_list = self.container.predictive_decoding.matching_pos_epochs_dfs_list
+        
+        curr_matching_epochs_df: pd.DataFrame = matching_pos_epochs_dfs_list[an_epoch_idx]
+        curr_matching_positions_df: pd.DataFrame = matching_pos_dfs_list[an_epoch_idx]
+        curr_matching_epochs_df_dict: Dict[int, pd.DataFrame] = curr_matching_epochs_df.pho.partition_df_dict('is_future_present_past')
+        
+        curr_matching_past_future_positions_df_dict: Dict[str, Dict[int, pd.DataFrame]] = {}
+        
+        for a_past_future_name, an_epoch_specific_past_position_dfs in curr_matching_epochs_df_dict.items():
+            a_curr_matching_positions_df = deepcopy(curr_matching_positions_df)
+            an_epoch_specific_past_position_dfs['label'] = an_epoch_specific_past_position_dfs['label'].astype(int)
+            col_name: str = 'past_future_matching_pos_epoch_id'
+            a_curr_matching_positions_df = a_curr_matching_positions_df.time_point_event.adding_epochs_identity_column(epochs_df=an_epoch_specific_past_position_dfs, epoch_id_key_name=col_name, override_time_variable_name='t', epoch_label_column_name='label', no_interval_fill_value=-1, should_replace_existing_column=True, drop_non_epoch_events=True, overlap_behavior=OverlappingIntervalsFallbackBehavior.FALLBACK_TO_SLOW_SEARCH)
+            curr_matching_positions_df_dict: Dict[int, pd.DataFrame] = a_curr_matching_positions_df.pho.partition_df_dict(col_name)
+            curr_matching_past_future_positions_df_dict[a_past_future_name] = curr_matching_positions_df_dict
+        
+        return {
+            'curr_matching_epochs_df': curr_matching_epochs_df,
+            'curr_matching_positions_df': curr_matching_positions_df,
+            'curr_matching_epochs_df_dict': curr_matching_epochs_df_dict,
+            'curr_matching_past_future_positions_df_dict': curr_matching_past_future_positions_df_dict,
+        }
+
+
+    def _get_posterior_data(self, an_epoch_idx: int) -> Tuple[np.ndarray, Optional[List[np.ndarray]], int]:
+        """Extract posterior data for epoch."""
+        p_x_given_n = self.decoded_result.p_x_given_n_list[an_epoch_idx]  # Shape: (n_x_bins, n_y_bins, n_time_bins)
+        
+        epoch_high_prob_pos_masks = getattr(self.container.predictive_decoding, 'epoch_high_prob_pos_masks', None)
+        if epoch_high_prob_pos_masks is not None:
+            print(f'using high_prob mask version!')
+            posterior_2d = epoch_high_prob_pos_masks[an_epoch_idx]
+        else:
+            posterior_2d = np.sum(p_x_given_n, axis=2)
+        
+        time_bin_posteriors = None
+        num_time_bins_to_show = 0
+        if p_x_given_n is not None:
+            num_time_bins = p_x_given_n.shape[2]
+            num_time_bins_to_show = min(10, num_time_bins)
+            time_bin_posteriors = [p_x_given_n[:, :, t_bin_idx] for t_bin_idx in range(num_time_bins_to_show)]
+        
+        return posterior_2d, time_bin_posteriors, num_time_bins_to_show
+
+
+    def _update_posterior_plot(self, widget, posterior_2d: np.ndarray, time_bin_posteriors: Optional[List[np.ndarray]], num_time_bins_to_show: int, an_epoch_idx: int):
+        """Update posterior plot (extracted from nested function)."""
+        import matplotlib.pyplot as plt
+        from matplotlib import gridspec
+        
+        fig = widget.getFigure()
+        fig.clear()
+        
+        if time_bin_posteriors is not None and num_time_bins_to_show > 0:
+            gs = gridspec.GridSpec(2, 1, figure=fig, height_ratios=[9, 1], hspace=0.1)
+            ax_main = fig.add_subplot(gs[0, 0])
+        else:
+            ax_main = fig.add_subplot(111)
+        
+        im = ax_main.imshow(posterior_2d, aspect='equal', origin='lower', extent=self.extent, cmap='viridis', interpolation='nearest')
+        ax_main.set_xlabel('X Position')
+        ax_main.set_ylabel('Y Position')
+        ax_main.set_title(f'Decoded Posterior Heatmap - Epoch {an_epoch_idx}')
+        
+        cbar = plt.colorbar(im, ax=ax_main)
+        cbar.set_label('Probability (sum over time)')
+        
+        if time_bin_posteriors is not None and num_time_bins_to_show > 0:
+            all_time_bin_values = np.concatenate([tb.flatten() for tb in time_bin_posteriors])
+            vmin_shared = np.nanmin(all_time_bin_values)
+            vmax_shared = np.nanmax(all_time_bin_values)
+            
+            gs_tiny = gridspec.GridSpecFromSubplotSpec(1, num_time_bins_to_show, subplot_spec=gs[1, 0], wspace=0.05)
+            
+            for t_bin_idx in range(num_time_bins_to_show):
+                ax_tiny = fig.add_subplot(gs_tiny[0, t_bin_idx])
+                im_tiny = ax_tiny.imshow(time_bin_posteriors[t_bin_idx], aspect='equal', origin='lower', extent=self.extent, cmap='viridis', interpolation='nearest', vmin=vmin_shared, vmax=vmax_shared)
+                ax_tiny.set_xticks([])
+                ax_tiny.set_yticks([])
+                ax_tiny.set_xlabel(f't={t_bin_idx}', fontsize=8)
+        
+        widget.draw()
+
+
+    def _update_past_widget(self, an_epoch_idx: int, epoch_data: Dict[str, Any]):
+        """Update past trajectory display."""
+        self._update_trajectory_widget('past', an_epoch_idx, epoch_data)
+
+
+    def _update_future_widget(self, an_epoch_idx: int, epoch_data: Dict[str, Any]):
+        """Update future trajectory display."""
+        self._update_trajectory_widget('future', an_epoch_idx, epoch_data)
+
+
+    def _update_trajectory_widget(self, category_name: str, an_epoch_idx: int, epoch_data: Dict[str, Any]):
+        """Update trajectory widget for past or future."""
+        curr_matching_past_future_positions_df_dict = epoch_data['curr_matching_past_future_positions_df_dict']
+        
+        if category_name not in curr_matching_past_future_positions_df_dict:
+            return
+        
+        curr_matching_positions_df_dict = curr_matching_past_future_positions_df_dict[category_name]
+        epoch_specific_position_dfs = list(curr_matching_positions_df_dict.values())
+        epoch_ids = np.array(list(curr_matching_positions_df_dict.keys()))
+        
+        curr_num_subplots: int = self.max_subplots_per_category.get(category_name, min(20, len(epoch_ids)))
+        
+        if len(epoch_specific_position_dfs) < curr_num_subplots:
+            num_to_pad = curr_num_subplots - len(epoch_specific_position_dfs)
+            if len(epoch_specific_position_dfs) > 0:
+                template_df = epoch_specific_position_dfs[0]
+                dummy_row = {col: np.nan for col in template_df.columns}
+                empty_df = pd.DataFrame([dummy_row], columns=template_df.columns)
+            else:
+                empty_df = pd.DataFrame([{'t': np.nan, 'x': np.nan, 'y': np.nan, 'binned_x': np.nan, 'binned_y': np.nan}])
+            epoch_specific_position_dfs.extend([empty_df.copy() for _ in range(num_to_pad)])
+            epoch_ids = np.concatenate([epoch_ids, np.full(num_to_pad, -1, dtype=epoch_ids.dtype)])
+        
+        a_decoded_traj_plotter = self.trajectory_displaying_plotter.get(category_name)
+        if a_decoded_traj_plotter is None:
+            return
+        
+        existing_ax = a_decoded_traj_plotter.axs
+        if existing_ax is not None:
+            if isinstance(existing_ax, (list, tuple, np.ndarray)):
+                for ax in existing_ax:
+                    if ax is not None and hasattr(ax, 'clear'):
+                        ax.clear()
+            elif hasattr(existing_ax, 'clear'):
+                existing_ax.clear()
+            if hasattr(a_decoded_traj_plotter, 'fig') and a_decoded_traj_plotter.fig is not None:
+                for ax in a_decoded_traj_plotter.fig.get_axes():
+                    ax.clear()
+        
+        fig, axs, epochs_pages = a_decoded_traj_plotter.plot_decoded_trajectories_2d(curr_position_df=self.curr_position_df, epoch_specific_position_dfs=epoch_specific_position_dfs, epoch_ids=epoch_ids, curr_num_subplots=curr_num_subplots, active_page_index=0, fixed_columns=4, plot_actual_lap_lines=True, use_theoretical_tracks_instead=False, existing_ax=existing_ax, plot_mode='scatter', c='red', cmap='Reds', alpha=0.65)
+        
+        perform_update_title_subtitle(fig=fig, ax=None, title_string=f"{category_name} - an_epoch_idx: {an_epoch_idx}")
+        
+        widget = self.display_widgets.get(category_name)
+        if widget is not None:
+            widget.draw()
+
+
+    def _update_posterior_widget(self, an_epoch_idx: int):
+        """Update decoded posterior display."""
+        widget = self.display_widgets.get('decoded_posterior')
+        if widget is None:
+            return
+        
+        posterior_2d, time_bin_posteriors, num_time_bins_to_show = self._get_posterior_data(an_epoch_idx)
+        
+        try:
+            self._update_posterior_plot(widget, posterior_2d, time_bin_posteriors, num_time_bins_to_show, an_epoch_idx)
+        except Exception as e:
+            print(f"Error updating posterior plot for epoch {an_epoch_idx}: {e}")
+            import traceback
+            traceback.print_exc()
+
+
+    @function_attributes(short_name=None, tags=['widget', 'GUI', 'display', 'interactive', 'position-like', 'pred', 'prospective'], input_requires=[], output_provides=[], uses=['DecodedTrajectoryMatplotlibPlotter'], used_by=[], creation_date='2026-01-09 02:04', related_items=])
+    def update_displayed_epoch(self, an_epoch_idx: int = 8):
+        """Main entry point - validate, prepare data, update all widgets."""
+        # Validate epoch index
+        an_epoch_idx = self._validate_epoch_idx(an_epoch_idx)
         
         # Update slider value if it exists (block signals to avoid recursion)
         if self.epoch_slider is not None:
             self.epoch_slider.blockSignals(True)
             self.epoch_slider.setValue(an_epoch_idx)
             self.epoch_slider.blockSignals(False)
+            if self.epoch_value_label is not None:
+                self.epoch_value_label.setText(f"{an_epoch_idx}")
+        
+        # Prepare epoch data
+        epoch_data = self._prepare_epoch_data(an_epoch_idx)
+        
+        # Update all widgets
+        self._update_past_widget(an_epoch_idx, epoch_data)
+        self._update_posterior_widget(an_epoch_idx)
+        self._update_future_widget(an_epoch_idx, epoch_data)
+        
+        # Update active epoch index
+        self.active_epoch_idx = an_epoch_idx
             if self.epoch_value_label is not None:
                 self.epoch_value_label.setText(f"{an_epoch_idx}")
                 
