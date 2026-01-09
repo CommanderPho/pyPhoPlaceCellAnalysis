@@ -1975,6 +1975,120 @@ class PredictiveDecodingComputationsContainer(ComputedResult):
         # Add post-init logic here
         pass
 
+
+    @function_attributes(short_name=None, tags=['UNFINISHED', 'PENDING', '2025-01-09'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-01-09 03:38', related_items=[])
+    def build_masked_container(self, curr_active_pipeline) -> "PredictiveDecodingComputationsContainer":
+        """ filters a copy of self
+        """
+        from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import DirectionalDecodersContinuouslyDecodedResult
+        from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import DecodedFilterEpochsResult, SingleEpochDecodedResult
+        from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import PositionLikePosteriorScoring
+
+        # an_epoch_name = 'roam'
+        a_t_bin_size: float = 0.025
+        # a_result_decoded: DecodedFilterEpochsResult = container.epochs_decoded_result_cache_dict[a_t_bin_size][an_epoch_name]
+        # a_result_decoded
+
+
+        ## NEW: filtering by whether decoded posterior in each t_bin is "position-like"
+
+        directional_decoders_decode_result: DirectionalDecodersContinuouslyDecodedResult = deepcopy(curr_active_pipeline.global_computation_results.computed_data['DirectionalDecodersDecoded'])
+
+        a_decoder = list(directional_decoders_decode_result.pf1D_Decoder_dict.values())[0]
+
+        for extant_decoded_time_bin_size, a_result_decoded in directional_decoders_decode_result.continuously_decoded_pseudo2D_decoder_dict.items():
+            a_result_decoded: SingleEpochDecodedResult = directional_decoders_decode_result.continuously_decoded_pseudo2D_decoder_dict[extant_decoded_time_bin_size]
+            a_result_decoded: DecodedFilterEpochsResult = DecodedFilterEpochsResult.init_from_single_epoch_result(single_epoch_result=a_result_decoded, decoding_time_bin_size=extant_decoded_time_bin_size) ## convert to a `DecodedFilterEpochsResult` for masking
+
+            ## need to build at `p_x_given_n_dict: Dict[str, NDArray[ND.Shape["N_X_BINS, N_Y_BINS, N_TIME_BINS"], np.floating]] =`
+            # p_x_given_n_dict: Dict[str, NDArray[ND.Shape["N_X_BINS, N_Y_BINS, N_TIME_BINS"], np.floating]] = DecodingLocalityMeasures.perform_build_normalized_outputs(p_x_given_n=a_result_decoded.p_x_given_n, epoch_names=['roam', 'sprinkle'])
+            # filtered_decoded_local_epochs_result, scoring_results = filter_to_position_like_epochs_only(decoded_local_epochs_result=a_result_decoded)
+
+            ## FILTERED VERSION
+
+            # 2025-01-08 - Mask based on position-like bins only _________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
+            filtered_decoded_local_epochs_result, scoring_results = PositionLikePosteriorScoring.filter_to_position_like_epochs_only(decoded_local_epochs_result=a_result_decoded, position_like_score_cutoff=0.42, num_min_position_like_t_bins=3,
+                                                                                                                                        xbin=a_decoder.xbin, ybin=a_decoder.ybin,
+                                                                                                                                     )
+
+            # filtered_decoded_local_epochs_result: DecodedFilterEpochsResult
+            # is_time_bin_active_list, inactive_mask_list, all_time_bin_indicies_list, last_valid_indices_list = mask_index_tuple
+            ## re-assign to `directional_decoders_decode_result.continuously_decoded_pseudo2D_decoder_dict[extant_decoded_time_bin_size]`
+            directional_decoders_decode_result.continuously_decoded_pseudo2D_decoder_dict[extant_decoded_time_bin_size] = filtered_decoded_local_epochs_result.get_result_for_epoch(0) ## get the single epoch, re-assign
+        ## END for extant_decoded_time_bin_size, a_result_decoded in directional_decoder...
+
+
+
+        masked_directional_decoders_decode_result = directional_decoders_decode_result
+
+
+        window_size = 60
+        pos_df: pd.DataFrame = deepcopy(curr_active_pipeline.sess.position.to_dataframe())
+
+        ## INPUTS: directional_decoders_decode_result
+
+        # Create DecodingLocalityMeasures first (required for new interface)
+        masked_locality_measures = DecodingLocalityMeasures.init_from_decode_result(
+            curr_active_pipeline=curr_active_pipeline,
+            directional_decoders_decode_result=masked_directional_decoders_decode_result,
+            extant_decoded_time_bin_size=extant_decoded_time_bin_size,
+            sigma=None  # Will be computed automatically if not provided
+        )
+
+
+        # Create PredictiveDecoding using the new simplified interface
+        masked_predictive_decoding: PredictiveDecoding = PredictiveDecoding.init_from_decode_result(
+            pos_df=pos_df,
+            locality_measures=masked_locality_measures,
+            a_result_decoded=masked_directional_decoders_decode_result.continuously_decoded_pseudo2D_decoder_dict[extant_decoded_time_bin_size],
+            window_size=window_size
+        )
+
+        # Use sigma from locality_measures (computed automatically) or compute from bin sizes if not available
+        if masked_locality_measures.sigma is None:
+            x_step: float = np.nanmean(np.diff(masked_predictive_decoding.xbin))
+            y_step: float = np.nanmean(np.diff(masked_predictive_decoding.ybin))
+            sigma: float = np.nanmax([x_step, y_step]) * 5.0
+            print(f'computed sigma from bin sizes: {sigma}')
+        else:
+            sigma = masked_locality_measures.sigma
+            print(f'using sigma from masked_locality_measures: {sigma}')
+
+        # Compute predictive decoding outputs
+        moving_avg_dict, moving_avg_meas_pos_overlap_dict, gaussian_volume = masked_predictive_decoding.compute(sigma=sigma) ## updates masked_predictive_decoding.moving_avg_dict, masked_predictive_decoding.moving_avg_meas_pos_overlap_dict
+        ## build a container to store the masked results:
+        masked_container: PredictiveDecodingComputationsContainer = PredictiveDecodingComputationsContainer(predictive_decoding=masked_predictive_decoding, is_global=True)
+
+        # # Store the PredictiveDecoding instance in the container
+        # masked_container.predictive_decoding = masked_predictive_decoding
+
+        ## filter the `masked_container.epochs_decoded_result_cache_dict` results:
+        for a_decoding_time_bin_size, a_decoded_results_dict in masked_container.epochs_decoded_result_cache_dict.items():
+
+            for an_decoder_name, a_decoded_local_epochs_result in a_decoded_results_dict.items():
+                # 2025-01-08 - Mask based on position-like bins only _________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
+                filtered_decoded_local_epochs_result, scoring_results = PositionLikePosteriorScoring.filter_to_position_like_epochs_only(decoded_local_epochs_result=a_decoded_local_epochs_result, position_like_score_cutoff=0.42, num_min_position_like_t_bins=3,
+                                                                                                                                        xbin=a_decoder.xbin, ybin=a_decoder.ybin,
+                                                                                                                                     )
+                masked_container.epochs_decoded_result_cache_dict[a_decoding_time_bin_size][an_decoder_name] = filtered_decoded_local_epochs_result ## overwrite with the filtered one
+            ## END for an_decoder_name, a_decoded_local_epochs_resu...
+        ## END for a_decoding_time_...
+
+        epoch_names: List[str] = ['roam', 'sprinkle']
+        for an_epoch_name in epoch_names:
+
+            ## call the main `compute_future_and_past_analysis` for each epoch:
+            if an_epoch_name not in masked_container.debug_computed_dict:
+                masked_container.debug_computed_dict[an_epoch_name] = {}
+            _out = masked_container.compute_future_and_past_analysis(curr_active_pipeline, an_epoch_name=an_epoch_name)
+            epoch_high_prob_pos_masks, epoch_matching_positions, past_future_info_dict, matching_pos_dfs_list, matching_pos_epochs_dfs_list = _out
+            masked_container.debug_computed_dict[an_epoch_name] = {'epoch_high_prob_pos_masks': epoch_high_prob_pos_masks, 'epoch_matching_positions': epoch_matching_positions, 'past_future_info_dict': past_future_info_dict}
+        ## END for an_epoch_name in epoch_names...
+        
+        return masked_container
+
+
+
     # Utility Methods ____________________________________________________________________________________________________ #
 
     @function_attributes(short_name=None, tags=['PENDING', 'IN-PROCESS', '2025-12-20_future_and_past_analysis'], input_requires=[], output_provides=[], uses=['decode_specific_epochs'], used_by=[], creation_date='2025-12-19 14:28', related_items=[])
