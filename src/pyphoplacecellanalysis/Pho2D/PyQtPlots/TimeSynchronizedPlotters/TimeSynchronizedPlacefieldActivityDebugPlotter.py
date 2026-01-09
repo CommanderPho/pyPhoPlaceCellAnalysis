@@ -45,9 +45,6 @@ class TimeSynchronizedPlacefieldActivityDebugPlotter(UserEditableROIMixin, Anima
         return self.active_one_step_decoder.time_window_centers # get time window centers (n_time_window_centers,)
     
 
-    
-
-
     @property
     def last_t(self) -> float:
         """for AnimalTrajectoryPlottingMixin"""
