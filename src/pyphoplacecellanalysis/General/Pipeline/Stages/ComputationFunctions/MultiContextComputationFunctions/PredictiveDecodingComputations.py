@@ -2556,6 +2556,13 @@ from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.ContainerBased.PhoContainerTool
 from pyphoplacecellanalysis.PhoPositionalData.plotting.mixins.decoder_plotting_mixins import DecodedTrajectoryMatplotlibPlotter, DecodedTrajectoryPlotter
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as NavigationToolbar
+import matplotlib.pyplot as plt
+from matplotlib import gridspec
+from pyphoplacecellanalysis.External.pyqtgraph.dockarea import Dock, DockArea
+from pyphoplacecellanalysis.External.pyqtgraph.Qt import QtWidgets, QtCore
+from pyphoplacecellanalysis.Pho2D.matplotlib.MatplotlibTimeSynchronizedWidget import MatplotlibTimeSynchronizedWidget
+
+
 
 @define(slots=False, repr=False, eq=False)
 class PredictiveDecodingDisplayWidget:
@@ -2610,6 +2617,9 @@ class PredictiveDecodingDisplayWidget:
 
     active_epoch_idx: int = field(default=20)
     
+
+    disable_showing_epoch_high_prob_pos_masks: bool = field(default=True)
+
 
     @classmethod
     def init_from_container(cls, container: PredictiveDecodingComputationsContainer, decoding_time_bin_size: float, an_epoch_name: str, active_epoch_idx: int=6) -> "PredictiveDecodingDisplayWidget":
@@ -2720,9 +2730,6 @@ class PredictiveDecodingDisplayWidget:
 
     def _build_dock_area(self):
         """Create window and dock area."""
-        from pyphoplacecellanalysis.External.pyqtgraph.dockarea import DockArea
-        from pyphoplacecellanalysis.External.pyqtgraph.Qt import QtWidgets
-        
         self.dock_window = QtWidgets.QMainWindow()
         self.dock_window.setWindowTitle("Predictive Decoding Display - Past/Future Trajectories")
         self.dock_area = DockArea()
@@ -2731,11 +2738,7 @@ class PredictiveDecodingDisplayWidget:
 
 
     def _build_past_widget(self):
-        """Create past trajectory widget (MatplotlibTimeSynchronizedWidget)."""
-        from pyphoplacecellanalysis.External.pyqtgraph.dockarea import Dock
-        from pyphoplacecellanalysis.External.pyqtgraph.Qt import QtWidgets, QtCore
-        from pyphoplacecellanalysis.Pho2D.matplotlib.MatplotlibTimeSynchronizedWidget import MatplotlibTimeSynchronizedWidget
-        
+        """Create past trajectory widget (MatplotlibTimeSynchronizedWidget)."""        
         dock = Dock("Past Trajectories", size=(600, 700), closable=True)
         self.dock_area.addDock(dock, 'left')
         self.dock_widgets['past'] = dock
@@ -2752,9 +2755,6 @@ class PredictiveDecodingDisplayWidget:
 
     def _build_posterior_widget(self):
         """Create decoded posterior widget (MatplotlibTimeSynchronizedWidget)."""
-        from pyphoplacecellanalysis.External.pyqtgraph.dockarea import Dock
-        from pyphoplacecellanalysis.Pho2D.matplotlib.MatplotlibTimeSynchronizedWidget import MatplotlibTimeSynchronizedWidget
-        
         dock = Dock("Decoded Posterior", size=(600, 700), closable=True)
         prev_dock = self.dock_widgets.get('past')
         if prev_dock is not None:
@@ -2771,9 +2771,6 @@ class PredictiveDecodingDisplayWidget:
 
     def _build_future_widget(self):
         """Create future trajectory widget (MatplotlibTimeSynchronizedWidget)."""
-        from pyphoplacecellanalysis.External.pyqtgraph.dockarea import Dock
-        from pyphoplacecellanalysis.Pho2D.matplotlib.MatplotlibTimeSynchronizedWidget import MatplotlibTimeSynchronizedWidget
-        
         dock = Dock("Future Trajectories", size=(600, 700), closable=True)
         prev_dock = self.dock_widgets.get('decoded_posterior')
         if prev_dock is not None:
@@ -2793,10 +2790,7 @@ class PredictiveDecodingDisplayWidget:
 
 
     def _build_epoch_control(self):
-        """Create slider controls."""
-        from pyphoplacecellanalysis.External.pyqtgraph.dockarea import Dock
-        from pyphoplacecellanalysis.External.pyqtgraph.Qt import QtWidgets, QtCore
-        
+        """Create slider controls."""        
         num_epochs = len(ensure_dataframe(self.decoded_result.filter_epochs))
         if num_epochs > 0:
             bottom_widget = QtWidgets.QWidget()
@@ -2884,16 +2878,17 @@ class PredictiveDecodingDisplayWidget:
         }
 
 
+
     def _get_posterior_data(self, an_epoch_idx: int) -> Tuple[np.ndarray, Optional[List[np.ndarray]], int]:
         """Extract posterior data for epoch."""
         p_x_given_n = self.decoded_result.p_x_given_n_list[an_epoch_idx]  # Shape: (n_x_bins, n_y_bins, n_time_bins)
         
         epoch_high_prob_pos_masks = getattr(self.container.predictive_decoding, 'epoch_high_prob_pos_masks', None)
-        if epoch_high_prob_pos_masks is not None:
+        if (epoch_high_prob_pos_masks is not None) and (not self.disable_showing_epoch_high_prob_pos_masks):
             print(f'using high_prob mask version!')
             posterior_2d = epoch_high_prob_pos_masks[an_epoch_idx]
         else:
-            posterior_2d = np.sum(p_x_given_n, axis=2)
+            posterior_2d = np.sum(p_x_given_n, axis=2) ## collapse over time
         
         time_bin_posteriors = None
         num_time_bins_to_show = 0
@@ -2906,42 +2901,47 @@ class PredictiveDecodingDisplayWidget:
 
 
     def _update_posterior_plot(self, widget, posterior_2d: np.ndarray, time_bin_posteriors: Optional[List[np.ndarray]], num_time_bins_to_show: int, an_epoch_idx: int):
-        """Update posterior plot (extracted from nested function)."""
-        import matplotlib.pyplot as plt
-        from matplotlib import gridspec
-        
-        fig = widget.getFigure()
-        fig.clear()
-        
-        if time_bin_posteriors is not None and num_time_bins_to_show > 0:
-            gs = gridspec.GridSpec(2, 1, figure=fig, height_ratios=[9, 1], hspace=0.1)
-            ax_main = fig.add_subplot(gs[0, 0])
-        else:
-            ax_main = fig.add_subplot(111)
-        
-        im = ax_main.imshow(posterior_2d, aspect='equal', origin='lower', extent=self.extent, cmap='viridis', interpolation='nearest')
-        ax_main.set_xlabel('X Position')
-        ax_main.set_ylabel('Y Position')
-        ax_main.set_title(f'Decoded Posterior Heatmap - Epoch {an_epoch_idx}')
-        
-        cbar = plt.colorbar(im, ax=ax_main)
-        cbar.set_label('Probability (sum over time)')
-        
-        if time_bin_posteriors is not None and num_time_bins_to_show > 0:
-            all_time_bin_values = np.concatenate([tb.flatten() for tb in time_bin_posteriors])
-            vmin_shared = np.nanmin(all_time_bin_values)
-            vmax_shared = np.nanmax(all_time_bin_values)
+        """Update posterior plot (extracted from nested function)."""        
+        # Disable interactive mode to prevent temporary figures from appearing
+        was_interactive = plt.isinteractive()
+        plt.ioff()
+        try:
+            fig = widget.getFigure()
+            fig.clear()
             
-            gs_tiny = gridspec.GridSpecFromSubplotSpec(1, num_time_bins_to_show, subplot_spec=gs[1, 0], wspace=0.05)
+            if time_bin_posteriors is not None and num_time_bins_to_show > 0:
+                gs = gridspec.GridSpec(2, 1, figure=fig, height_ratios=[9, 1], hspace=0.1)
+                ax_main = fig.add_subplot(gs[0, 0])
+            else:
+                ax_main = fig.add_subplot(111)
             
-            for t_bin_idx in range(num_time_bins_to_show):
-                ax_tiny = fig.add_subplot(gs_tiny[0, t_bin_idx])
-                im_tiny = ax_tiny.imshow(time_bin_posteriors[t_bin_idx], aspect='equal', origin='lower', extent=self.extent, cmap='viridis', interpolation='nearest', vmin=vmin_shared, vmax=vmax_shared)
-                ax_tiny.set_xticks([])
-                ax_tiny.set_yticks([])
-                ax_tiny.set_xlabel(f't={t_bin_idx}', fontsize=8)
-        
-        widget.draw()
+            im = ax_main.imshow(posterior_2d, aspect='equal', origin='lower', extent=self.extent, cmap='viridis', interpolation='nearest')
+            ax_main.set_xlabel('X Position')
+            ax_main.set_ylabel('Y Position')
+            ax_main.set_title(f'Decoded Posterior Heatmap - Epoch {an_epoch_idx}')
+            
+            cbar = plt.colorbar(im, ax=ax_main)
+            cbar.set_label('Probability (sum over time)')
+            
+            if time_bin_posteriors is not None and num_time_bins_to_show > 0:
+                all_time_bin_values = np.concatenate([tb.flatten() for tb in time_bin_posteriors])
+                vmin_shared = np.nanmin(all_time_bin_values)
+                vmax_shared = np.nanmax(all_time_bin_values)
+                
+                gs_tiny = gridspec.GridSpecFromSubplotSpec(1, num_time_bins_to_show, subplot_spec=gs[1, 0], wspace=0.05)
+                
+                for t_bin_idx in range(num_time_bins_to_show):
+                    ax_tiny = fig.add_subplot(gs_tiny[0, t_bin_idx])
+                    im_tiny = ax_tiny.imshow(time_bin_posteriors[t_bin_idx], aspect='equal', origin='lower', extent=self.extent, cmap='viridis', interpolation='nearest', vmin=vmin_shared, vmax=vmax_shared)
+                    ax_tiny.set_xticks([])
+                    ax_tiny.set_yticks([])
+                    ax_tiny.set_xlabel(f't={t_bin_idx}', fontsize=8)
+            
+            widget.draw()
+        finally:
+            # Restore previous interactive state
+            if was_interactive:
+                plt.ion()
 
 
     def _update_past_widget(self, an_epoch_idx: int, epoch_data: Dict[str, Any]):
@@ -3019,7 +3019,7 @@ class PredictiveDecodingDisplayWidget:
             traceback.print_exc()
 
 
-    @function_attributes(short_name=None, tags=['widget', 'GUI', 'display', 'interactive', 'position-like', 'pred', 'prospective'], input_requires=[], output_provides=[], uses=['DecodedTrajectoryMatplotlibPlotter'], used_by=[], creation_date='2026-01-09 02:04', related_items=])
+    @function_attributes(short_name=None, tags=['widget', 'GUI', 'display', 'interactive', 'position-like', 'pred', 'prospective'], input_requires=[], output_provides=[], uses=['DecodedTrajectoryMatplotlibPlotter'], used_by=[], creation_date='2026-01-09 02:04', related_items=[])
     def update_displayed_epoch(self, an_epoch_idx: int = 8):
         """Main entry point - validate, prepare data, update all widgets."""
         # Validate epoch index
@@ -3043,8 +3043,8 @@ class PredictiveDecodingDisplayWidget:
         
         # Update active epoch index
         self.active_epoch_idx = an_epoch_idx
-            if self.epoch_value_label is not None:
-                self.epoch_value_label.setText(f"{an_epoch_idx}")
+        if self.epoch_value_label is not None:
+            self.epoch_value_label.setText(f"{an_epoch_idx}")
                 
         assert len(self.container.predictive_decoding.matching_pos_dfs_list) > 0
         matching_pos_dfs_list = self.container.predictive_decoding.matching_pos_dfs_list
@@ -3157,7 +3157,9 @@ class PredictiveDecodingDisplayWidget:
             # self.active_epoch_idx = an_epoch_idx
 
             # Embed the matplotlib figure in the dock widget
-            if needed_init:
+            # Check if canvas widget needs to be created (either plotter is new or canvas doesn't exist)
+            canvas_needs_init = needed_init or (a_past_future_name not in self.dock_canvas_widgets)
+            if canvas_needs_init:
                 dock = self.dock_widgets.get(a_past_future_name)
                 if (dock is not None): # (canvas is None)
                     # Remove existing widgets from dock
@@ -3196,7 +3198,7 @@ class PredictiveDecodingDisplayWidget:
 
             else:
                 ## just redraw - axes are already cleared above before plotting
-                canvas = self.dock_canvas_widgets[a_past_future_name]
+                canvas = self.dock_canvas_widgets.get(a_past_future_name)
                 if canvas is not None:
                     # The axes were already cleared before plot_decoded_trajectories_2d was called
                     # Just trigger a redraw
@@ -3218,7 +3220,7 @@ class PredictiveDecodingDisplayWidget:
         p_x_given_n = self.decoded_result.p_x_given_n_list[an_epoch_idx]  # Shape: (n_x_bins, n_y_bins, n_time_bins)
 
         epoch_high_prob_pos_masks = getattr(self.container.predictive_decoding, 'epoch_high_prob_pos_masks', None)
-        if epoch_high_prob_pos_masks is not None:
+        if (epoch_high_prob_pos_masks is not None) and (not self.disable_showing_epoch_high_prob_pos_masks):
             print(f'using high_prob mask version!')
             posterior_2d = epoch_high_prob_pos_masks[an_epoch_idx]
         else:
@@ -3240,49 +3242,58 @@ class PredictiveDecodingDisplayWidget:
         # Helper function to update the plot
         def _subfn_update_posterior_plot(widget, posterior_2d, time_bin_posteriors, num_time_bins_to_show, an_epoch_idx, extent):
             """Update the posterior plot with new data"""
-            fig = widget.getFigure()
-            fig.clear()
-            from matplotlib import gridspec
-            
-            # Create GridSpec: 2 rows, 1 column, with height ratios [9, 1] for 90%/10% split
-            if time_bin_posteriors is not None and num_time_bins_to_show > 0:
-                gs = gridspec.GridSpec(2, 1, figure=fig, height_ratios=[9, 1], hspace=0.1)
-                ax_main = fig.add_subplot(gs[0, 0])
-            else:
-                # If no time bins available, use single subplot
-                ax_main = fig.add_subplot(111)
-            
-            # Plot main heatmap (make it square)
-            im = ax_main.imshow(posterior_2d, aspect='equal', origin='lower', extent=extent, cmap='viridis', interpolation='nearest')
-            ax_main.set_xlabel('X Position')
-            ax_main.set_ylabel('Y Position')
-            ax_main.set_title(f'Decoded Posterior Heatmap - Epoch {an_epoch_idx}')
-            
-            # Add colorbar for main heatmap
-            cbar = plt.colorbar(im, ax=ax_main)
-            cbar.set_label('Probability (sum over time)')
-            
-            # Create tiny heatmaps row if time bin data is available
-            if time_bin_posteriors is not None and num_time_bins_to_show > 0:
-                # Calculate shared color scale for all tiny heatmaps
-                all_time_bin_values = np.concatenate([tb.flatten() for tb in time_bin_posteriors])
-                vmin_shared = np.nanmin(all_time_bin_values)
-                vmax_shared = np.nanmax(all_time_bin_values)
+            import matplotlib.pyplot as plt
+            # Disable interactive mode to prevent temporary figures from appearing
+            was_interactive = plt.isinteractive()
+            plt.ioff()
+            try:
+                fig = widget.getFigure()
+                fig.clear()
+                from matplotlib import gridspec
                 
-                # Create GridSpec for individual tiny heatmaps within the top row
-                gs_tiny = gridspec.GridSpecFromSubplotSpec(1, num_time_bins_to_show, subplot_spec=gs[1, 0], wspace=0.05)
+                # Create GridSpec: 2 rows, 1 column, with height ratios [9, 1] for 90%/10% split
+                if time_bin_posteriors is not None and num_time_bins_to_show > 0:
+                    gs = gridspec.GridSpec(2, 1, figure=fig, height_ratios=[9, 1], hspace=0.1)
+                    ax_main = fig.add_subplot(gs[0, 0])
+                else:
+                    # If no time bins available, use single subplot
+                    ax_main = fig.add_subplot(111)
                 
-                for t_bin_idx in range(num_time_bins_to_show):
-                    ax_tiny = fig.add_subplot(gs_tiny[0, t_bin_idx])
-                    # Plot tiny heatmap (make them square)
-                    im_tiny = ax_tiny.imshow(time_bin_posteriors[t_bin_idx], aspect='equal', origin='lower', extent=extent, cmap='viridis', interpolation='nearest', vmin=vmin_shared, vmax=vmax_shared)
-                    # Remove ticks and labels to save space
-                    ax_tiny.set_xticks([])
-                    ax_tiny.set_yticks([])
-                    # Add minimal label below
-                    ax_tiny.set_xlabel(f't={t_bin_idx}', fontsize=8)
-            
-            widget.draw()
+                # Plot main heatmap (make it square)
+                im = ax_main.imshow(posterior_2d, aspect='equal', origin='lower', extent=extent, cmap='viridis', interpolation='nearest')
+                ax_main.set_xlabel('X Position')
+                ax_main.set_ylabel('Y Position')
+                ax_main.set_title(f'Decoded Posterior Heatmap - Epoch {an_epoch_idx}')
+                
+                # Add colorbar for main heatmap
+                cbar = plt.colorbar(im, ax=ax_main)
+                cbar.set_label('Probability (sum over time)')
+                
+                # Create tiny heatmaps row if time bin data is available
+                if time_bin_posteriors is not None and num_time_bins_to_show > 0:
+                    # Calculate shared color scale for all tiny heatmaps
+                    all_time_bin_values = np.concatenate([tb.flatten() for tb in time_bin_posteriors])
+                    vmin_shared = np.nanmin(all_time_bin_values)
+                    vmax_shared = np.nanmax(all_time_bin_values)
+                    
+                    # Create GridSpec for individual tiny heatmaps within the top row
+                    gs_tiny = gridspec.GridSpecFromSubplotSpec(1, num_time_bins_to_show, subplot_spec=gs[1, 0], wspace=0.05)
+                    
+                    for t_bin_idx in range(num_time_bins_to_show):
+                        ax_tiny = fig.add_subplot(gs_tiny[0, t_bin_idx])
+                        # Plot tiny heatmap (make them square)
+                        im_tiny = ax_tiny.imshow(time_bin_posteriors[t_bin_idx], aspect='equal', origin='lower', extent=extent, cmap='viridis', interpolation='nearest', vmin=vmin_shared, vmax=vmax_shared)
+                        # Remove ticks and labels to save space
+                        ax_tiny.set_xticks([])
+                        ax_tiny.set_yticks([])
+                        # Add minimal label below
+                        ax_tiny.set_xlabel(f't={t_bin_idx}', fontsize=8)
+                
+                widget.draw()
+            finally:
+                # Restore previous interactive state
+                if was_interactive:
+                    plt.ion()
 
         if needed_init:
             # Create MatplotlibTimeSynchronizedWidget
