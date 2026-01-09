@@ -1816,8 +1816,6 @@ class PredictiveDecodingComputationsContainer(ComputedResult):
         # computed_df_col_name_prefix: str = ''
         computed_df_col_name_prefix: str = f'{an_epoch_name}_'
         
-        
-        
         ## Get the non-local epochs -- where do they encode?
         # container: PredictiveDecodingComputationsContainer = curr_active_pipeline.global_computation_results.computed_data['PredictiveDecoding']
         decoding_locality: DecodingLocalityMeasures = self.decoding_locality
@@ -2009,8 +2007,7 @@ class PredictiveDecodingComputationsContainer(ComputedResult):
             ## Some PBEs that don't qualify as non-local actually might be but they're just paths across the environment.
 
             ## Let's stick within the same block (roam/sprinkle) for now
-            
-
+        
         ## END for i, a_row in enumerate(ensure_dat...
 
 
@@ -2368,6 +2365,11 @@ from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as Navigatio
 class PredictiveDecodingDisplayWidget:
     """ Plots 3 panels side-by-side: Left: Past positions, Mid: Decoded Epoch Posterior, Right: Future positions
     
+    Internally-Uses:
+        epoch_high_prob_pos_masks = getattr(self.container.predictive_decoding, 'epoch_high_prob_pos_masks', None)
+
+    
+    Usage:
     
         from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.PredictiveDecodingComputations import PredictiveDecodingDisplayWidget
 
