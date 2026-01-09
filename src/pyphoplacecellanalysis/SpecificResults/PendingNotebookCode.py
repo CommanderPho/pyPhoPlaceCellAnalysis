@@ -229,7 +229,7 @@ class PositionLikePosteriorScoring:
 
     @function_attributes(short_name=None, tags=['ALL'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-01-09 15:26', related_items=[])
     @classmethod
-    def _main_run_all(cls, containe): 
+    def _main_run_all(cls, container): 
         """
         container: PredictiveDecodingComputationsContainer
         
