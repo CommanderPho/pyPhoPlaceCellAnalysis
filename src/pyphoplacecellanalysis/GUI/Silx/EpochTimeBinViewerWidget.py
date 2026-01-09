@@ -7,6 +7,9 @@ import numpy as np
 import pandas as pd
 from typing import Dict, List, Tuple, Optional, Callable, Union, Any
 from nptyping import NDArray
+from PyQt5 import QtCore, QtGui, QtWidgets, uic
+import pyphoplacecellanalysis.External.pyqtgraph as pg
+from pyphocorehelpers.gui.Qt.ExceptionPrintingSlot import pyqtExceptionPrintingSlot
 import neuropy.utils.type_aliases as types
 from attrs import define, field
 from pyphocorehelpers.programming_helpers import metadata_attributes
@@ -726,6 +729,10 @@ class Epoch3DSceneTimeBinViewer(qt.QWidget):
         viewer.show()
     
     """
+
+    sigEpochIndexChanged = QtCore.pyqtSignal(int)
+    # sigTimeBinIndexChanged = QtCore.pyqtSignal(int)
+
     def __init__(self, decoded_result, xbin_centers=None, ybin_centers=None, locality_measures_df: Optional[pd.DataFrame] = None, text_columns: Optional[List[str]] = None, text_data_provider: Optional[TextDataProviderDatasource] = None):
         super().__init__()
         self.decoded_result = decoded_result
@@ -1813,6 +1820,9 @@ class Epoch3DSceneTimeBinViewer(qt.QWidget):
             self._update_table_for_current_epoch()
             # Highlight matching row based on first time bin of the epoch (since this widget shows all time bins at once)
             self._highlight_matching_row_in_table(0)
+
+        self.sigEpochIndexChanged.emit(self.curr_epoch_idx)
+        
 
 
     def add_peak_contours_overlays(self, peak_prominence_result, edge_color: str = '#ffaaff78', line_width: float = 1.0, z_offset: Optional[float] = None):
