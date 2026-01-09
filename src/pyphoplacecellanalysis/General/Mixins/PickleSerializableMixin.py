@@ -2,6 +2,7 @@ from pathlib import Path
 import pathlib
 from typing import Union
 
+from neuropy.utils.mixins.indexing_helpers import get_dict_subset
 # from neuropy.utils.mixins.dict_representable import DictRepresentable
 # from neuropy.utils.mixins.file_representable import FileRepresentable
 
@@ -83,15 +84,19 @@ class PickleSerializableMixin: # (FileRepresentable, DictRepresentable)
 
     ## FileRepresentable protocol:
     @classmethod
-    def from_file(cls, pkl_path: Union[str, Path]):
+    def from_file(cls, pkl_path: Union[str, Path], enable_auto_dict_to_class: bool=False):
+        """
+            enable_auto_dict_to_class: bool - if True, tries to automatically convert a loaded dict to the class this was called from
+
+        """
         pkl_path = ensure_pathlib_Path(pkl_path).resolve()
         assert pkl_path.exists()
         assert pkl_path.is_file()
         # dict_rep = None
         try:
             # dict_rep = np.load(pkl_path, allow_pickle=True).item()
-            # dict_rep = loadData(pkl_path=pkl_path)
-            return loadData(pkl_path=pkl_path)
+            dict_rep = loadData(pkl_path=pkl_path)
+            # return loadData(pkl_path=pkl_path)
             
             # return dict_rep
         except NotImplementedError:
@@ -100,25 +105,52 @@ class PickleSerializableMixin: # (FileRepresentable, DictRepresentable)
             # pathlib.PosixPath = pathlib.WindowsPath # Bad hack
             pathlib.PosixPath = pathlib.PurePosixPath # Bad hack
             # dict_rep = np.load(pkl_path, allow_pickle=True).item()
-            # dict_rep = loadData(pkl_path=pkl_path)
-            return loadData(pkl_path=pkl_path)
+            dict_rep = loadData(pkl_path=pkl_path)
+            # return loadData(pkl_path=pkl_path)
         except Exception as e:
-            raise        
-        # if dict_rep is not None:
-        #     # Convert to object
-        #     try:
-        #         obj = cls.from_dict(dict_rep)
-        #     # except KeyError as e:
-        #     #     # print(f'f: {f}, dict_rep: {dict_rep}')
-        #     #     # Tries to load using any legacy methods defined in the class
-        #     #     # obj = cls.legacy_from_dict(dict_rep)
-        #     #     # raise e
-        #     #     raise
-        #     except Exception as e:
-        #         raise
-            
-        #     # obj.filename = pkl_path
-        #     return obj
+            raise
+
+        if enable_auto_dict_to_class:
+            return dict_rep ## note this could be an object
+
+
+        if dict_rep is None:
+            return dict_rep # just return None   
+
+        if not isinstance(dict_rep, dict):
+            ## already an object
+            return dict_rep
+        else:
+            # Try to object ______________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
+            obj = None
+            try:
+                obj = cls(**get_dict_subset(dict_rep, subset_excludelist=['_VersionedResultMixin_version']))
+                return obj
+            except Exception as e:
+                obj = None
+                # raise
+
+            # if obj is None:
+            #     try:
+            #         obj = cls.from_dict(dict_rep)
+            #     # except KeyError as e:
+            #     #     # print(f'f: {f}, dict_rep: {dict_rep}')
+            #     #     # Tries to load using any legacy methods defined in the class
+            #     #     # obj = cls.legacy_from_dict(dict_rep)
+            #     #     # raise e
+            #     #     raise
+            #     except Exception as e:
+            #         obj = None
+            #         raise
+
+            if obj is None:
+                return dict_rep ## return the basic dict
+            else:
+                # obj.filename = pkl_path
+                return obj
+        
+
+
         # return dict_rep
 
 
