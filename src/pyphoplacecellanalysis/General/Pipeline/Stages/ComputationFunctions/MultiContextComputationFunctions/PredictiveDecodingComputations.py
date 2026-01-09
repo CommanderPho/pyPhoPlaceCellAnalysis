@@ -2460,6 +2460,17 @@ class PredictiveDecodingDisplayWidget:
 
         a_widget: PredictiveDecodingDisplayWidget = PredictiveDecodingDisplayWidget.init_from_container(container=container, decoding_time_bin_size=0.025, an_epoch_name='roam')
         a_widget
+        
+        
+        
+    ## FILTERED VERSION
+
+        # 2025-01-08 - Mask based on position-like bins only _________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
+        a_masked_result, scoring_results = PositionLikePosteriorScoring.filter_to_position_like_epochs_only(decoded_local_epochs_result=decoded_local_epochs_result, position_like_score_cutoff=0.42, num_min_position_like_t_bins=3,
+                                                                                                                                        xbin=a_decoder.xbin, ybin=a_decoder.ybin,
+                                                                                                                                     )
+
+
     """
     container: PredictiveDecodingComputationsContainer = field(default=None)
     
@@ -2841,6 +2852,8 @@ class PredictiveDecodingDisplayWidget:
 
         ## END for a_past_future_name, an_epoch_specific_past_positi...
 
+        # epoch_high_prob_pos_masks = self.container.predictive_decoding.epoch_high_prob_pos_masks
+        
         # Plot decoded posterior heatmap for 'decoded_posterior' dock
         category_name = 'decoded_posterior'
 
