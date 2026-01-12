@@ -1693,7 +1693,7 @@ class Epoch3DSceneTimeBinViewer(GenericSilxContainer, qt.QWidget):
 
         # mask_included_bins_list = self.plots_data.peak_contours['mask_included_bins_list'][self.params.curr_epoch_idx]
         mask_included_bins_list = self.plots_data.peak_contours['epoch_prom_t_bin_high_prob_pos_mask'][self.params.curr_epoch_idx]
-        
+        mask_included_bins_list = [np.squeeze(mask_included_bins_list[:, :, t_bin_idx])  for t_bin_idx in range(n_time_bins)]
         # epoch_prom_t_bin_high_prob_pos_mask: (n_x_bins, n_y_bins, n_t_bins)
 
 
@@ -1844,6 +1844,84 @@ class Epoch3DSceneTimeBinViewer(GenericSilxContainer, qt.QWidget):
         ## END for t_bin_idx in range(n_tim...
         
         print(f"DEBUG: Added {total_contours_added} contour line items for epoch {self.params.curr_epoch_idx}")
+
+
+    def _add_contours_mask_images_for_current_epoch(self, **kwargs):
+        """Add Silx 3D line items for all contours in the current epoch."""
+        if self.plots_data.peak_prominence_result is None:
+            return
+
+        
+        try:
+            p_x_given_n = self.plots_data.decoded_result.p_x_given_n_list[self.params.curr_epoch_idx]
+        except Exception:
+            return
+
+        n_x_bins, n_y_bins, n_time_bins = p_x_given_n.shape
+
+        # mask_included_bins_list = self.plots_data.peak_contours['mask_included_bins_list'][self.params.curr_epoch_idx]
+        mask_included_bins_list = self.plots_data.peak_contours['epoch_prom_t_bin_high_prob_pos_mask'][self.params.curr_epoch_idx]
+        mask_included_bins_list = [np.squeeze(mask_included_bins_list[:, :, t_bin_idx])  for t_bin_idx in range(n_time_bins)]
+        # epoch_prom_t_bin_high_prob_pos_mask: (n_x_bins, n_y_bins, n_t_bins)
+
+
+        
+        # Calculate a reasonable z_offset based on the data range
+        # Height maps use the posterior values as z, so we need contours above the max value
+        max_posterior_value = np.nanmax(p_x_given_n)
+        # Position contours slightly above the maximum height map value
+        effective_z_offset = max_posterior_value + (max_posterior_value * 0.1) if max_posterior_value > 0 else 0.1
+
+        # Get coordinate arrays for converting pixel coordinates to world coordinates
+        if (self.plots_data.xbin_centers is not None) and (self.plots_data.ybin_centers is not None):
+            x_coords = np.array(self.plots_data.xbin_centers)
+            y_coords = np.array(self.plots_data.ybin_centers)
+        else:
+            # Use bin indices as coordinates
+            x_coords = np.arange(n_x_bins)
+            y_coords = np.arange(n_y_bins)
+        
+        total_contours_added = 0
+        # for t_bin_idx in range(n_time_bins):
+        for t_bin_idx, a_t_bin_masks in enumerate(mask_included_bins_list):
+            # a_t_bin_masks = mask_included_bins_list[t_bin_idx]
+            num_masks: int = len(a_t_bin_masks)
+            translation_triple = self.plots_data.translation_triple_list[t_bin_idx]
+            curr_p_x_given_n = p_x_given_n[:, :, t_bin_idx]
+
+
+            # self.plots.time_bin_groupItems
+            
+            line_item = plot3d_items.ImageItem()
+            line_item.setData(x_coords_translated, y_coords_translated, z_coords, values)
+            # line_item.setVisualization('lines')
+            # line_item.setLineWidth(float(line_width))
+            # line_item.setColor(rgba_color)
+            # Explicitly set visibility
+            if hasattr(line_item, 'setVisible'):
+                line_item.setVisible(True)
+            
+            # Ensure the item is added to the scene
+            if not self.params.use_groupItem:
+                self.plots.scene_widget.addItem(line_item)
+            else:
+                ## add to group item:
+                self.plots.time_bin_groupItems[t_bin_idx].addItem(line_item)
+
+            self.plots.peak_contour_items.append(line_item)
+            
+            line_item.setBoundingBoxVisible(False)
+            if not self.params.use_groupItem:
+                line_item.setTranslation(*translation_triple)
+            
+            line_item.setScale(1.0, 1.0, 1000.0) # Anisotropic scale: emphasize Z (time/height) dimension
+
+            total_contours_added += 1
+
+        ## END for t_bin_idx in range(n_tim...
+        
+        print(f"DEBUG: Added {total_contours_added} contour line items for epoch {self.params.curr_epoch_idx}")
+
 
 
     def add_peak_contours_overlays(self, peak_prominence_result, edge_color: str = '#ffaaff78', line_width: float = 1.0, z_offset: Optional[float] = None):
