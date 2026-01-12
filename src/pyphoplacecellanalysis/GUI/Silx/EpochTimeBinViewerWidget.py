@@ -1666,11 +1666,21 @@ class Epoch3DSceneTimeBinViewer(GenericSilxContainer, qt.QWidget):
 
 
     def _clear_peak_contour_items(self):
-        """Remove all existing peak contour items from the scene widget."""
+        """Remove all existing peak contour items from the scene widget.
+        
+        Handles both items added directly to the scene widget and items added to group items.
+        """
         if not self.plots.peak_contour_items:
             return
         for item in self.plots.peak_contour_items:
             try:
+                # Check if item has a parent (group item)
+                if hasattr(item, 'parent') and item.parent() is not None:
+                    # Remove from parent group item
+                    parent = item.parent()
+                    if hasattr(parent, 'removeItem'):
+                        parent.removeItem(item)
+                # Also try removing from scene widget (works for direct children)
                 if hasattr(self.plots.scene_widget, 'removeItem'):
                     self.plots.scene_widget.removeItem(item)
             except Exception:
@@ -1678,7 +1688,7 @@ class Epoch3DSceneTimeBinViewer(GenericSilxContainer, qt.QWidget):
         self.plots.peak_contour_items = []
 
 
-    def _add_contours_for_current_epoch(self, edge_color: str = '#ffaaff', line_width: float = 1.0, z_offset: float = 0.01):
+    def _add_contours_raster3d_for_current_epoch(self, edge_color: str = '#ffaaff', line_width: float = 1.0, z_offset: float = 0.01):
         """Add Silx 3D line items for all contours in the current epoch."""
         if self.plots_data.peak_prominence_result is None:
             return
@@ -1847,7 +1857,7 @@ class Epoch3DSceneTimeBinViewer(GenericSilxContainer, qt.QWidget):
 
 
     def _add_contours_mask_images_for_current_epoch(self, **kwargs):
-        """Add Silx 3D line items for all contours in the current epoch."""
+        """Add Silx 3D image items for all mask images in the current epoch."""
         if self.plots_data.peak_prominence_result is None:
             return
 
@@ -1867,9 +1877,9 @@ class Epoch3DSceneTimeBinViewer(GenericSilxContainer, qt.QWidget):
 
         
         # Calculate a reasonable z_offset based on the data range
-        # Height maps use the posterior values as z, so we need contours above the max value
+        # Height maps use the posterior values as z, so we need mask images above the max value
         max_posterior_value = np.nanmax(p_x_given_n)
-        # Position contours slightly above the maximum height map value
+        # Position mask images slightly above the maximum height map value
         effective_z_offset = max_posterior_value + (max_posterior_value * 0.1) if max_posterior_value > 0 else 0.1
 
         # Get coordinate arrays for converting pixel coordinates to world coordinates
@@ -1881,46 +1891,55 @@ class Epoch3DSceneTimeBinViewer(GenericSilxContainer, qt.QWidget):
             x_coords = np.arange(n_x_bins)
             y_coords = np.arange(n_y_bins)
         
-        total_contours_added = 0
+        total_images_added = 0
         # for t_bin_idx in range(n_time_bins):
-        for t_bin_idx, a_t_bin_masks in enumerate(mask_included_bins_list):
-            # a_t_bin_masks = mask_included_bins_list[t_bin_idx]
-            num_masks: int = len(a_t_bin_masks)
+        for t_bin_idx, a_t_bin_mask in enumerate(mask_included_bins_list):
+            # a_t_bin_mask is a 2D array (n_x_bins, n_y_bins) from the list comprehension
             translation_triple = self.plots_data.translation_triple_list[t_bin_idx]
-            curr_p_x_given_n = p_x_given_n[:, :, t_bin_idx]
-
+            
+            # Convert boolean mask to float array for ImageItem compatibility
+            mask_image = a_t_bin_mask.astype(float)
 
             # self.plots.time_bin_groupItems
             
-            line_item = plot3d_items.ImageItem()
-            line_item.setData(x_coords_translated, y_coords_translated, z_coords, values)
-            # line_item.setVisualization('lines')
-            # line_item.setLineWidth(float(line_width))
-            # line_item.setColor(rgba_color)
+            image_item = plot3d_items.ImageItem()
+            # Silx ImageItem.setData(image, x, y, z) where:
+            # - image: 2D array of the mask
+            # - x, y: 1D coordinate arrays
+            # - z: scalar z position
+            image_item.setData(mask_image, x_coords, y_coords, effective_z_offset)
+            
             # Explicitly set visibility
-            if hasattr(line_item, 'setVisible'):
-                line_item.setVisible(True)
+            if hasattr(image_item, 'setVisible'):
+                image_item.setVisible(True)
             
             # Ensure the item is added to the scene
             if not self.params.use_groupItem:
-                self.plots.scene_widget.addItem(line_item)
+                self.plots.scene_widget.addItem(image_item)
             else:
                 ## add to group item:
-                self.plots.time_bin_groupItems[t_bin_idx].addItem(line_item)
+                self.plots.time_bin_groupItems[t_bin_idx].addItem(image_item)
 
-            self.plots.peak_contour_items.append(line_item)
+            self.plots.peak_contour_items.append(image_item)
             
-            line_item.setBoundingBoxVisible(False)
+            image_item.setBoundingBoxVisible(False)
             if not self.params.use_groupItem:
-                line_item.setTranslation(*translation_triple)
+                image_item.setTranslation(*translation_triple)
             
-            line_item.setScale(1.0, 1.0, 1000.0) # Anisotropic scale: emphasize Z (time/height) dimension
+            image_item.setScale(1.0, 1.0, 1000.0) # Anisotropic scale: emphasize Z (time/height) dimension
 
-            total_contours_added += 1
+            total_images_added += 1
 
         ## END for t_bin_idx in range(n_tim...
         
-        print(f"DEBUG: Added {total_contours_added} contour line items for epoch {self.params.curr_epoch_idx}")
+        print(f"DEBUG: Added {total_images_added} mask image items for epoch {self.params.curr_epoch_idx}")
+
+
+    def _add_contours_for_current_epoch(self, **kwargs):
+        """Add Silx (some type of items) for all contours in the current epoch."""
+        return self._add_contours_mask_images_for_current_epoch(**kwargs)
+        # return self._add_contours_raster3d_for_current_epoch(**kwargs)
+
 
 
 
@@ -1960,8 +1979,8 @@ class Epoch3DSceneTimeBinViewer(GenericSilxContainer, qt.QWidget):
 
         # Clear any existing contour items and rebuild for current epoch
         self._clear_peak_contour_items()
-        self._add_contours_for_current_epoch(edge_color=edge_color, line_width=line_width, z_offset=z_offset)
-    
+        # self._add_contours_for_current_epoch(edge_color=edge_color, line_width=line_width, z_offset=z_offset)
+        self._add_contours_mask_images_for_current_epoch()
         
 
     # ==================================================================================================================================================================================================================================================================================== #
