@@ -194,14 +194,14 @@ class EpochTimeBinViewer(qt.QWidget):
     @property
     def curr_n_time_bins(self) -> int:
         """Get number of time bins for current epoch"""
-        p_x_given_n = self.decoded_result.p_x_given_n_list[self.curr_epoch_idx]
+        p_x_given_n = self.decoded_result.p_x_given_n_list[self.params.curr_epoch_idx]
         return p_x_given_n.shape[-1]  # Last dimension is time
     
     def _get_time_bin_centers(self) -> Optional[NDArray]:
         """Get time bin centers for current epoch if available"""
         try:
             if hasattr(self.decoded_result, 'time_bin_containers') and self.decoded_result.time_bin_containers is not None:
-                return self.decoded_result.time_bin_containers[self.curr_epoch_idx].centers
+                return self.decoded_result.time_bin_containers[self.params.curr_epoch_idx].centers
             elif hasattr(self.decoded_result, 'time_window_centers'):
                 # Fallback to time_window_centers if available
                 return self.decoded_result.time_window_centers
@@ -478,7 +478,7 @@ class EpochTimeBinViewer(qt.QWidget):
     
     def update_views(self):
         """Update both 2D and 3D views"""
-        p_x_given_n = self.decoded_result.p_x_given_n_list[self.curr_epoch_idx]
+        p_x_given_n = self.decoded_result.p_x_given_n_list[self.params.curr_epoch_idx]
         # Shape: (n_x_bins, n_y_bins, n_time_bins)
         
         # Update 3D volume view with all time bins
@@ -549,7 +549,7 @@ class EpochTimeBinViewer(qt.QWidget):
                 return
             
             # Get current scale to calculate positions
-            p_x_given_n = self.decoded_result.p_x_given_n_list[self.curr_epoch_idx]
+            p_x_given_n = self.decoded_result.p_x_given_n_list[self.params.curr_epoch_idx]
             volume_data = np.transpose(p_x_given_n, (2, 1, 0))
             n_time_bins = volume_data.shape[0]
             
@@ -673,7 +673,7 @@ class EpochTimeBinViewer(qt.QWidget):
     
     def update_2d_slice(self):
         """Update the 2D slice view for current time bin"""
-        p_x_given_n = self.decoded_result.p_x_given_n_list[self.curr_epoch_idx]
+        p_x_given_n = self.decoded_result.p_x_given_n_list[self.params.curr_epoch_idx]
         # Extract 2D slice: (n_x_bins, n_y_bins, n_time_bins) -> (n_x_bins, n_y_bins)
         slice_2d = p_x_given_n[:, :, self.curr_time_bin_idx]
         
@@ -759,10 +759,10 @@ class Epoch3DSceneTimeBinViewer(GenericSilxContainer, qt.QWidget):
         self.text_data_provider = text_data_provider
         
         # Detect point-like data mode (when 't' column exists in locality_measures_df)
-        self.is_point_like_mode = (locality_measures_df is not None and 't' in locality_measures_df.columns)
+        self.params.is_point_like_mode = (locality_measures_df is not None and 't' in locality_measures_df.columns)
         
         # Current epoch index
-        self.curr_epoch_idx = 0
+        self.params.curr_epoch_idx = 0
         
         # Store time bin items for cleanup
         self.time_bin_items = []
@@ -789,7 +789,7 @@ class Epoch3DSceneTimeBinViewer(GenericSilxContainer, qt.QWidget):
         layout.addWidget(self.scene_window)
         
         # Create table tab for point-like mode (delayed to ensure sidebar is available)
-        if self.is_point_like_mode:
+        if self.params.is_point_like_mode:
             # Use QTimer to delay table creation until after window is shown
             qt.QTimer.singleShot(100, self._create_locality_measures_table_tab)
         
@@ -883,7 +883,7 @@ class Epoch3DSceneTimeBinViewer(GenericSilxContainer, qt.QWidget):
             return
 
         try:
-            p_x_given_n = self.decoded_result.p_x_given_n_list[self.curr_epoch_idx]
+            p_x_given_n = self.decoded_result.p_x_given_n_list[self.params.curr_epoch_idx]
         except Exception:
             return
 
@@ -931,7 +931,7 @@ class Epoch3DSceneTimeBinViewer(GenericSilxContainer, qt.QWidget):
 
         total_contours_added = 0
         for t_bin_idx in range(n_time_bins):
-            contours_list = self._extract_contours_for_epoch_timebin(epoch_idx=self.curr_epoch_idx, t_bin_idx=t_bin_idx)
+            contours_list = self._extract_contours_for_epoch_timebin(epoch_idx=self.params.curr_epoch_idx, t_bin_idx=t_bin_idx)
             if len(contours_list) == 0:
                 continue
 
@@ -964,7 +964,7 @@ class Epoch3DSceneTimeBinViewer(GenericSilxContainer, qt.QWidget):
                     print(f"DEBUG: Failed to add contour line item: {e}")
                     continue
         
-        print(f"DEBUG: Added {total_contours_added} contour line items for epoch {self.curr_epoch_idx}")
+        print(f"DEBUG: Added {total_contours_added} contour line items for epoch {self.params.curr_epoch_idx}")
 
 
     def _get_sidebar_tab_widget(self) -> Optional[qt.QTabWidget]:
@@ -1105,8 +1105,8 @@ class Epoch3DSceneTimeBinViewer(GenericSilxContainer, qt.QWidget):
     
     def _create_locality_measures_table_tab(self):
         """Create and add a table tab to the sidebar displaying locality_measures_df."""
-        if not self.is_point_like_mode or self.locality_measures_df is None:
-            print(f"DEBUG: Skipping table creation - is_point_like_mode={self.is_point_like_mode}, df is None={self.locality_measures_df is None}")
+        if not self.params.is_point_like_mode or self.locality_measures_df is None:
+            print(f"DEBUG: Skipping table creation - is_point_like_mode={self.params.is_point_like_mode}, df is None={self.locality_measures_df is None}")
             return
         
         # Get the sidebar tab widget
@@ -1194,7 +1194,7 @@ class Epoch3DSceneTimeBinViewer(GenericSilxContainer, qt.QWidget):
     
     def _create_locality_measures_dock_widget(self):
         """Create a dock widget containing the locality measures table."""
-        if not self.is_point_like_mode or self.locality_measures_df is None:
+        if not self.params.is_point_like_mode or self.locality_measures_df is None:
             return
         
         # Create QTableWidget
@@ -1276,7 +1276,7 @@ class Epoch3DSceneTimeBinViewer(GenericSilxContainer, qt.QWidget):
         Args:
             t_bin_idx: Time bin index within current epoch
         """
-        if self.locality_measures_table is None or not self.is_point_like_mode:
+        if self.locality_measures_table is None or not self.params.is_point_like_mode:
             return
         
         # Find matching row using the same logic as _match_time_bin_to_dataframe_row
@@ -1355,14 +1355,14 @@ class Epoch3DSceneTimeBinViewer(GenericSilxContainer, qt.QWidget):
     @property
     def curr_n_time_bins(self) -> int:
         """Get number of time bins for current epoch"""
-        p_x_given_n = self.decoded_result.p_x_given_n_list[self.curr_epoch_idx]
+        p_x_given_n = self.decoded_result.p_x_given_n_list[self.params.curr_epoch_idx]
         return p_x_given_n.shape[-1]  # Last dimension is time
     
     def _get_time_bin_centers(self) -> Optional[NDArray]:
         """Get time bin centers for current epoch if available"""
         try:
             if hasattr(self.decoded_result, 'time_bin_containers') and self.decoded_result.time_bin_containers is not None:
-                return self.decoded_result.time_bin_containers[self.curr_epoch_idx].centers
+                return self.decoded_result.time_bin_containers[self.params.curr_epoch_idx].centers
             elif hasattr(self.decoded_result, 'time_window_centers'):
                 # Fallback to time_window_centers if available
                 return self.decoded_result.time_window_centers
@@ -1378,7 +1378,7 @@ class Epoch3DSceneTimeBinViewer(GenericSilxContainer, qt.QWidget):
         """
         try:
             if hasattr(self.decoded_result, 'time_bin_containers') and self.decoded_result.time_bin_containers is not None:
-                time_bin_container = self.decoded_result.time_bin_containers[self.curr_epoch_idx]
+                time_bin_container = self.decoded_result.time_bin_containers[self.params.curr_epoch_idx]
                 print(f'time_bin_container: {time_bin_container}')
                 # Check if container has start/stop attributes
                 if hasattr(time_bin_container, 'start') and hasattr(time_bin_container, 'stop'):
@@ -1434,7 +1434,7 @@ class Epoch3DSceneTimeBinViewer(GenericSilxContainer, qt.QWidget):
         Returns:
             Filtered DataFrame containing only rows where 't' is between epoch start and stop
         """
-        if self.locality_measures_df is None or not self.is_point_like_mode:
+        if self.locality_measures_df is None or not self.params.is_point_like_mode:
             return pd.DataFrame()
         
         # Get epoch time range
@@ -1460,7 +1460,7 @@ class Epoch3DSceneTimeBinViewer(GenericSilxContainer, qt.QWidget):
 
     def _update_table_for_current_epoch(self):
         """Update the table to show only rows for the current epoch."""
-        if self.locality_measures_table is None or not self.is_point_like_mode:
+        if self.locality_measures_table is None or not self.params.is_point_like_mode:
             return
         
         # Get filtered dataframe
@@ -1571,7 +1571,7 @@ class Epoch3DSceneTimeBinViewer(GenericSilxContainer, qt.QWidget):
         """
         # Check if text_data_provider is provided (takes precedence)
         if self.text_data_provider is not None:
-            return self.text_data_provider.get_text_label(self.curr_epoch_idx, t_bin_idx)
+            return self.text_data_provider.get_text_label(self.params.curr_epoch_idx, t_bin_idx)
         
         # Fall back to existing text_columns approach
         row = self._match_time_bin_to_dataframe_row(t_bin_idx)
@@ -1811,7 +1811,7 @@ class Epoch3DSceneTimeBinViewer(GenericSilxContainer, qt.QWidget):
 
     def _create_time_bin_items(self):
         """Create and position all time bin height maps for current epoch"""
-        p_x_given_n = self.decoded_result.p_x_given_n_list[self.curr_epoch_idx]
+        p_x_given_n = self.decoded_result.p_x_given_n_list[self.params.curr_epoch_idx]
         # Shape: (n_x_bins, n_y_bins, n_time_bins)
         n_x_bins, n_y_bins, n_time_bins = p_x_given_n.shape
         
@@ -1880,8 +1880,8 @@ class Epoch3DSceneTimeBinViewer(GenericSilxContainer, qt.QWidget):
 
     def on_epoch_changed(self, value):
         """Called when epoch slider changes"""
-        self.curr_epoch_idx = int(value)
-        self.epoch_label.setText(str(self.curr_epoch_idx))
+        self.params.curr_epoch_idx = int(value)
+        self.epoch_label.setText(str(self.params.curr_epoch_idx))
         
         # Clear existing items
         self._clear_time_bin_items()
@@ -1900,12 +1900,12 @@ class Epoch3DSceneTimeBinViewer(GenericSilxContainer, qt.QWidget):
         qt.QTimer.singleShot(100, self._update_text_label_positions)
         
         # Update table for current epoch if in point-like mode
-        if self.is_point_like_mode:
+        if self.params.is_point_like_mode:
             self._update_table_for_current_epoch()
             # Highlight matching row based on first time bin of the epoch (since this widget shows all time bins at once)
             self._highlight_matching_row_in_table(0)
 
-        self.sigEpochIndexChanged.emit(self.curr_epoch_idx)
+        self.sigEpochIndexChanged.emit(self.params.curr_epoch_idx)
         
 
 
