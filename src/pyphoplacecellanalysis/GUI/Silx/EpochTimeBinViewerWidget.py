@@ -1983,26 +1983,35 @@ class Epoch3DSceneTimeBinViewer(GenericSilxContainer, qt.QWidget):
             # Get values for colormap (flattened)
             values_flat = slice_2d.flatten()
             
+            # Create colormap with same parameters as _configure_time_bin_item
+            colormap: Colormap = Colormap(name='viridis', normalization='linear', 
+                vmin=self.params.per_epoch_p_x_given_n_min_list[t_bin_idx], 
+                vmax=self.params.per_epoch_p_x_given_n_max_list[t_bin_idx],
+            )
+            
+            # Convert values to colors using the colormap
+            # Colormap.applyToData() returns RGBA colors
+            colors = colormap.applyToData(values_flat)
+            # Ensure colors are in the right format (N, 4) RGBA array
+            if colors.ndim == 1:
+                # If single color, expand to match number of vertices
+                if len(colors) == 3:
+                    # RGB, add alpha
+                    colors = np.tile(np.append(colors, 1.0), (len(values_flat), 1)).reshape(-1, 4)
+                elif len(colors) == 4:
+                    # RGBA, expand
+                    colors = np.tile(colors, (len(values_flat), 1)).reshape(-1, 4)
+            elif colors.ndim == 2:
+                if colors.shape[1] == 3:
+                    # If RGB (N, 3), add alpha channel
+                    alpha = np.ones((colors.shape[0], 1))
+                    colors = np.column_stack((colors, alpha))
+                # If already (N, 4), use as is
+            
             # Create Mesh item
             mesh_item = plot3d_items.Mesh()
-            # Set mesh data - Mesh API uses position and indices only
-            mesh_item.setData(position=vertices, indices=faces)
-            
-            # Set vertex values for colormap - try setValue() method
-            # This must be called before setting the colormap
-            try:
-                mesh_item.setValue(values_flat)
-            except (AttributeError, TypeError):
-                # If setValue doesn't work, try alternative methods
-                try:
-                    if hasattr(mesh_item, 'setValues'):
-                        mesh_item.setValues(values_flat)
-                    elif hasattr(mesh_item, 'setData') and len(mesh_item.setData.__code__.co_varnames) > 2:
-                        # Try setData with values as third positional argument
-                        mesh_item.setData(vertices, faces, values_flat)
-                except (AttributeError, TypeError):
-                    # If all else fails, colormap might work with default values
-                    pass
+            # Set mesh data with colors - Mesh API uses position, indices, and color
+            mesh_item.setData(position=vertices, indices=faces, color=colors)
             
             # Add mesh to scene
             self.scene_widget.addItem(mesh_item)
