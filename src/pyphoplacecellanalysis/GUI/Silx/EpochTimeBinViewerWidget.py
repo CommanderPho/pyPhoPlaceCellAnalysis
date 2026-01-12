@@ -694,8 +694,14 @@ class EpochTimeBinViewer(qt.QWidget):
         self._add_text_labels_2d()
 
 
+from pyphocorehelpers.DataStructure.general_parameter_containers import VisualizationParameters, RenderPlotsData, RenderPlots # PyqtgraphRenderPlots
+from pyphocorehelpers.gui.PhoUIContainer import PhoUIContainer
+from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.ContainerBased.PhoContainerTool import GenericSilxContainer
+
+
 @metadata_attributes(short_name=None, tags=['Silx', 'gui', '3D', 'scene', 'epoch_idx_slider', 'height-map'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-12-23', related_items=[])
-class Epoch3DSceneTimeBinViewer(qt.QWidget):
+@define(slots=False, eq=False)
+class Epoch3DSceneTimeBinViewer(GenericSilxContainer, qt.QWidget):
     """ Silx 3D scene widget - displays all time bins from the active epoch as adjacent 3D height map surfaces.
     
     This widget uses a SceneWindow to display multiple time bins from the selected epoch
@@ -733,8 +739,18 @@ class Epoch3DSceneTimeBinViewer(qt.QWidget):
     sigEpochIndexChanged = QtCore.pyqtSignal(int)
     # sigTimeBinIndexChanged = QtCore.pyqtSignal(int)
 
-    def __init__(self, decoded_result, xbin_centers=None, ybin_centers=None, locality_measures_df: Optional[pd.DataFrame] = None, text_columns: Optional[List[str]] = None, text_data_provider: Optional[TextDataProviderDatasource] = None):
-        super().__init__()
+    def __init__(self, decoded_result, xbin_centers=None, ybin_centers=None, locality_measures_df: Optional[pd.DataFrame] = None, text_columns: Optional[List[str]] = None, text_data_provider: Optional[TextDataProviderDatasource] = None, **kwargs):
+        # Extract attrs field names from GenericSilxContainer
+        attrs_field_names = {'name', 'plots', 'plot_data', 'ui', 'params'}
+        attrs_kwargs = {k: v for k, v in kwargs.items() if k in attrs_field_names}
+        qt_kwargs = {k: v for k, v in kwargs.items() if k not in attrs_field_names}
+        
+        # Initialize attrs class first
+        GenericSilxContainer.__init__(self, **attrs_kwargs)
+        
+        # Initialize Qt widget
+        qt.QWidget.__init__(self, **qt_kwargs)
+        
         self.decoded_result = decoded_result
         self.xbin_centers = xbin_centers
         self.ybin_centers = ybin_centers
