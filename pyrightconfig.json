@@ -21,12 +21,14 @@
     "**/build",
     "**/.idea",
     "**/site-packages/**",
+    "**/EXTERNAL"
   ],
 
   "ignore": [
     "**/.venv",
     "**/.idea",
-    "**/pyphoplacecellanalysis/External"
+    "**/pyphoplacecellanalysis/External",
+    "**/EXTERNAL"
   ],
 
   "defineConstant": {
@@ -35,10 +37,18 @@
 
 //   "stubPath": "src/stubs",
 //   "venv": "env367",
+  // "cursorpyright.analysis.extraPaths": [],
+  // "cursorpyright.analysis.inlayHints.callArgumentNames": true,
+  // "cursorpyright.analysis.inlayHints.functionReturnTypes": true,
+  // "cursorpyright.analysis.inlayHints.variableTypes": true,
+  // "cursorpyright.analysis.logLevel": "Trace",
+  // "cursorpyright.analysis.stubPath": "",
+  // "cursorpyright.analysis.typeCheckingMode": "basic",
 
   "reportMissingImports": true,
   "reportMissingTypeStubs": false,
   "reportOptionalMemberAccess": "none",
+
 
   "pythonVersion": "3.9",
 //   "pythonPlatform": "Linux",
