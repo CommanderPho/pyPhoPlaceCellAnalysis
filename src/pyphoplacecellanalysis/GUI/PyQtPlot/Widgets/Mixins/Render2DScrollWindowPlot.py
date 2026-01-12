@@ -183,7 +183,7 @@ class Render2DScrollWindowPlotMixin:
         
 
     def update_rasters(self):
-        """ updates all rasters (which are scatter plots) from the self.plot_data.all_spots variable """
+        """ updates all rasters (which are scatter plots) from the self.plots_data.all_spots variable """
         # Update preview_overview_scatter_plot
         self.plots.preview_overview_scatter_plot.setData(self.plots_data.all_spots)
         if self.Includes2DActiveWindowScatter:

@@ -1032,7 +1032,7 @@ class PaperFigureTwo(SerializedAttributesAllowBlockSpecifyingClass):
         if title_modifier:
             title = title_modifier(title)
 
-        # fig, ax, bars, scatter_plots, title_text_obj, footer_text_obj, plot_data = cls.create_bar_plot(x_labels, y_values, scatter_props, active_context, ylabel, title)
+        # fig, ax, bars, scatter_plots, title_text_obj, footer_text_obj, plots_data = cls.create_bar_plot(x_labels, y_values, scatter_props, active_context, ylabel, title)
         text_formatter = FormattedFigureText()
         x = np.arange(len(x_labels))
         width = 0.3

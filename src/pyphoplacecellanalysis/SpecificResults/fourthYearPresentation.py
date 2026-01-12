@@ -329,7 +329,7 @@ def fig_surprise_results(curr_active_pipeline):
         else:
             active_out_figure_paths = []
 
-        graphics_output_dict = MatplotlibRenderPlots(name='fig_surprise_results', figures=(fig), axes=(ax), plot_data={}, context=final_context) # saved_figures=active_out_figure_paths
+        graphics_output_dict = MatplotlibRenderPlots(name='fig_surprise_results', figures=(fig), axes=(ax), plots_data={}, context=final_context) # saved_figures=active_out_figure_paths
         # graphics_output_dict['plot_data'] = {'included_any_context_neuron_ids': included_any_context_neuron_ids, 'sort_indicies': (long_sort_ind, short_sort_ind), 'colors':(long_neurons_colors_array, short_neurons_colors_array)}
 
         return graphics_output_dict

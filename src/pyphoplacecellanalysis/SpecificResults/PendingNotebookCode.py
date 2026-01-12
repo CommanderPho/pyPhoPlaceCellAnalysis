@@ -1474,9 +1474,9 @@ def build_paired_time_synchronized_Bapun_decoder_with_lead_lag_window(curr_activ
             'Lag': _display_dock_items.get('Lag_TimeRangeControl', None)
         }
 
-        _out_container.plot_data.display_configs = _display_configs
+        _out_container.plots_data.display_configs = _display_configs
         if context is not None:
-            _out_container.plot_data.display_context = context
+            _out_container.plots_data.display_context = context
         if included_filter_names is not None:
             _out_container.params.included_filter_names = included_filter_names ## captured
 
@@ -1665,7 +1665,7 @@ def build_paired_time_synchronized_Bapun_decoder_with_lead_lag_window(curr_activ
     _out_container = _subfn_merge_plotters(controlling_widget, is_controlling_widget_external=is_controlling_widget_external, **_out_sync_plotters)
     
     if directional_decoders_decode_result is not None:
-        _out_container.plot_data.directional_decoders_decode_result = directional_decoders_decode_result
+        _out_container.plots_data.directional_decoders_decode_result = directional_decoders_decode_result
 
     if (all_context_filter_epochs_decoder_result is not None) and (controlling_widget is not None):
         ## Add a context likelihood track as well
@@ -2951,9 +2951,9 @@ def build_combined_time_synchronized_Bapun_decoders_window(curr_active_pipeline,
         _out_container.ui.sync_plotters = _out_sync_plotters
         _out_container.ui.controlling_widget = controlling_widget
 
-        _out_container.plot_data.display_configs = _display_configs
+        _out_container.plots_data.display_configs = _display_configs
         if context is not None:
-            _out_container.plot_data.display_context = context
+            _out_container.plots_data.display_context = context
         if included_filter_names is not None:
             _out_container.params.included_filter_names = included_filter_names ## captured
 
@@ -3243,11 +3243,11 @@ def build_combined_time_synchronized_Bapun_decoders_window(curr_active_pipeline,
     # Merge the plotters here: ___________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
     _out_container = _subfn_merge_plotters(controlling_widget, is_controlling_widget_external=is_controlling_widget_external, **_out_sync_plotters)
     if directional_decoders_decode_result is not None:
-        _out_container.plot_data.directional_decoders_decode_result = directional_decoders_decode_result
+        _out_container.plots_data.directional_decoders_decode_result = directional_decoders_decode_result
     
 
     for a_filter_name in included_filter_names:
-        _out_container.plot_data.directional_decoders_decode_result = directional_decoders_decode_result
+        _out_container.plots_data.directional_decoders_decode_result = directional_decoders_decode_result
         # _out_container.plot_data.directional_decoders_decode_result = directional_decoders_decode_result
         # _out_container.plot_data.directional_decoders_decode_result = directional_decoders_decode_result
         

@@ -269,7 +269,7 @@ class DockAreaWrapper(object):
         _out_container.ui.display_sync_connections = _display_sync_connections
         _out_container.ui.display_dock_items = _display_dock_items
         _out_container.ui.sync_plotters = widget_dict
-        _out_container.plot_data.display_configs = _display_configs
+        _out_container.plots_data.display_configs = _display_configs
         # if context is not None:
         #     _out_container.plot_data.display_context = context
         # if included_filter_names is not None:
