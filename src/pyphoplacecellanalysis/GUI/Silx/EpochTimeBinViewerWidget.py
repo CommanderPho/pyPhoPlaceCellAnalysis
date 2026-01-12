@@ -1835,17 +1835,60 @@ class Epoch3DSceneTimeBinViewer(GenericSilxContainer, qt.QWidget):
             self.plots_data.translation_triple_list.append(translation_triple)
 
 
+    def _create_mesh_from_grid(self, X: NDArray, Y: NDArray, values_2d: NDArray) -> Tuple[NDArray, NDArray]:
+        """Create mesh vertices and faces from 2D grid data.
+        
+        Args:
+            X: 2D meshgrid of X coordinates (n_x_bins, n_y_bins)
+            Y: 2D meshgrid of Y coordinates (n_x_bins, n_y_bins)
+            values_2d: 2D array of values to use as z-coordinates (n_x_bins, n_y_bins)
+            
+        Returns:
+            Tuple of (vertices, faces) where:
+                - vertices: (N, 3) array of (x, y, z) coordinates
+                - faces: (M, 3) array of triangle indices
+        """
+        n_x_bins, n_y_bins = X.shape
+        
+        # Create vertices: (x, y, z) where z = values
+        # Flatten X, Y, and values to create vertex list
+        x_flat = X.flatten()
+        y_flat = Y.flatten()
+        z_flat = values_2d.flatten()
+        
+        # Handle NaN values by setting z to 0 (or could use nanmin/nanmax)
+        z_flat = np.nan_to_num(z_flat, nan=0.0)
+        
+        # Stack into (N, 3) vertices array
+        vertices = np.column_stack((x_flat, y_flat, z_flat))
+        
+        # Create triangular faces for grid
+        # For each grid cell (i, j), create two triangles:
+        # Triangle 1: (i,j), (i+1,j), (i,j+1)
+        # Triangle 2: (i+1,j), (i+1,j+1), (i,j+1)
+        faces = []
+        
+        for i in range(n_x_bins - 1):
+            for j in range(n_y_bins - 1):
+                # Calculate linear indices for the four corners of the cell
+                idx_00 = i * n_y_bins + j  # (i, j)
+                idx_10 = (i + 1) * n_y_bins + j  # (i+1, j)
+                idx_01 = i * n_y_bins + (j + 1)  # (i, j+1)
+                idx_11 = (i + 1) * n_y_bins + (j + 1)  # (i+1, j+1)
+                
+                # Triangle 1: (i,j), (i+1,j), (i,j+1)
+                faces.append([idx_00, idx_10, idx_01])
+                
+                # Triangle 2: (i+1,j), (i+1,j+1), (i,j+1)
+                faces.append([idx_10, idx_11, idx_01])
+        
+        faces = np.array(faces, dtype=np.int32)
+        
+        return vertices, faces
 
 
     def _configure_time_bin_item(self, item, t_bin_idx: int, raise_on_error: bool=True):
-        """Configure per-time-bin scatter item appearance and bounding box."""
-        try:
-            # Enable height map visualization
-            item.setHeightMap(True)
-        except Exception as e:
-            if raise_on_error:
-                raise
-
+        """Configure per-time-bin mesh item appearance and bounding box."""
         try:
             # # Get colormap
             # colormap: Colormap = item.getColormap()
@@ -1885,13 +1928,9 @@ class Epoch3DSceneTimeBinViewer(GenericSilxContainer, qt.QWidget):
             if hasattr(item, 'setBoundingBoxVisible'):
                 item.setBoundingBoxVisible(True)
             if hasattr(item, 'setVisualization'):
-                # Use point-based visualization for per-bin items
-                # item.setVisualization('points')
+                # Use solid visualization for mesh items
                 item.setVisualization('solid')
                 
-            # Point/marker appearance (APIs may vary across silx versions)
-            if hasattr(item, 'setPointSize'):
-                item.setPointSize(5.0)
             # Anisotropic scale: emphasize Z (time/height) dimension
             if hasattr(item, 'setScale'):
                 item.setScale(1.0, 1.0, 1000.0)
@@ -1933,17 +1972,29 @@ class Epoch3DSceneTimeBinViewer(GenericSilxContainer, qt.QWidget):
 
         self._build_time_bin_positions()
 
-        # Create a height map surface for each time bin
+        # Create a mesh surface for each time bin
         for t_bin_idx in range(n_time_bins):
             # Extract 2D slice for this time bin
             slice_2d = p_x_given_n[:, :, t_bin_idx]  # (n_x_bins, n_y_bins)
+            
+            # Create mesh from grid data
+            vertices, faces = self._create_mesh_from_grid(X, Y, slice_2d)
+            
+            # Get values for colormap (flattened)
             values_flat = slice_2d.flatten()
             
-            # Create 2D scatter item with height map
-            item = self.scene_widget.add2DScatter(x_flat, y_flat, values_flat)
+            # Create Mesh item
+            mesh_item = plot3d_items.Mesh()
+            mesh_item.setData(position=vertices, indices=faces, values=values_flat)
+            
+            # Add mesh to scene
+            self.scene_widget.addItem(mesh_item)
+            item = mesh_item
 
             # Position horizontally: each bin offset along X axis
-            # x_translation = t_bin_idx * bin_spacing
+            # Get x_translation from translation_triple_list (calculated in _build_time_bin_positions)
+            translation_triple = self.plots_data.translation_triple_list[t_bin_idx]
+            x_translation = translation_triple[0]
 
             # Per-item visualization and bounding box configuration
             self._configure_time_bin_item(item, t_bin_idx=t_bin_idx)
