@@ -600,9 +600,9 @@ class PositionLikePosteriorScoring:
         if num_min_position_like_t_bins:
             epoch_overall_scoring_results_df = scoring_results_df.groupby(['epoch_idx']).agg(num_position_like_t_bins=('is_position_like', 'sum'), score_mean=('score', 'mean')).reset_index()
             is_epoch_idx_included = (epoch_overall_scoring_results_df['num_position_like_t_bins'] > num_min_position_like_t_bins)
-
-            included_epoch_idxs = epoch_overall_scoring_results_df[is_epoch_idx_included]['epoch_idx'].to_numpy()
-            a_masked_filtered_decoded_local_epochs_result = a_masked_filtered_decoded_local_epochs_result.filtered_by_epochs(included_epoch_indicies=included_epoch_idxs)
+            if not np.all(is_epoch_idx_included):
+                included_epoch_idxs = epoch_overall_scoring_results_df[is_epoch_idx_included]['epoch_idx'].to_numpy()
+                a_masked_filtered_decoded_local_epochs_result = a_masked_filtered_decoded_local_epochs_result.filtered_by_epochs(included_epoch_indicies=included_epoch_idxs)
 
         return a_masked_filtered_decoded_local_epochs_result, scoring_results_df
 
