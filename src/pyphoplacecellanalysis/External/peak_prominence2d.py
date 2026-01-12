@@ -362,7 +362,63 @@ class PosteriorPeaksPeakProminence2dResult(ComputedResult):
         return self.filtered_flat_peaks_df, self.flat_peaks_df
 
 
+    def compute_discrete_contour_masks(self, p_x_given_n_list: List[NDArray], slice_level_multipliers: List=[0.5, 0.9], consistant_output_shape: bool=True) -> List[NDArray]:
+        """ 
+        Usage:
+            from pyphoplacecellanalysis.External.peak_prominence2d import PosteriorPeaksPeakProminence2dResult
 
+            mask_included_bins_list = decoded_epoch_t_bins_promenence_result_obj.compute_discrete_contour_masks(p_x_given_n_list=decoded_local_epochs_result.p_x_given_n_list, slice_level_multipliers=[0.9])
+            mask_included_bins_list
+
+        """
+        num_slice_levels: int = len(slice_level_multipliers)
+
+        peak_tips_only_df = self.flat_peaks_df[np.isin(self.flat_peaks_df['slice_level_multiplier'], slice_level_multipliers)].reset_index(drop=True) ## ['summit_slice_area'] > 0.0
+        # p_x_given_n_list = decoded_local_epochs_result.p_x_given_n_list
+        mask_included_bins_list = []
+        for an_epoch_idx, p_x_given_n_dt in enumerate(p_x_given_n_list):
+            # active_df: pd.DataFrame = peak_tips_only_df[peak_tips_only_df['epoch_idx'] == an_epoch_idx]
+            n_t_bins: float = np.shape(p_x_given_n_dt)[-1]
+            
+            all_slice_levels_mask_included_bins = ([None] * num_slice_levels) * n_t_bins
+
+            an_epoch_mask_included_bins_list = []
+
+            for a_rel_t_bin_idx in np.arange(n_t_bins):
+                active_df: pd.DataFrame = peak_tips_only_df[np.logical_and((peak_tips_only_df['epoch_idx'] == an_epoch_idx), (peak_tips_only_df['time_bin_idx'] == a_rel_t_bin_idx))]
+                # if len(active_df) > 0:
+                ## have peaks for this frame
+                a_p_x_given_n = p_x_given_n_dt[:, :, a_rel_t_bin_idx]
+                summit_slice_levels = active_df['summit_slice_level'].to_numpy()
+                active_num_slice_levels: int = len(summit_slice_levels)
+                
+                all_slice_levels_mask_included_bins = ([None] * num_slice_levels)
+                # for slice_idx, a_slice_multiplier in enumerate(slice_level_multipliers):
+                    # a_slice_level = 
+                for slice_idx, a_slice_level in enumerate(summit_slice_levels):
+                    mask_included_bins = (a_p_x_given_n >= a_slice_level)
+                    
+                    if consistant_output_shape or (num_slice_levels > 1):
+                        ## use temporary list for each level
+                        all_slice_levels_mask_included_bins[slice_idx] = mask_included_bins
+                        # all_slice_levels_mask_included_bins.append(mask_included_bins)
+                    else:
+                        ## add directly:
+                        an_epoch_mask_included_bins_list.append(mask_included_bins)
+                ## END for slice_idx, a_slice_level in enumerate(summ...
+                if consistant_output_shape or (num_slice_levels > 1):
+                    an_epoch_mask_included_bins_list.append(all_slice_levels_mask_included_bins)
+ 
+                        
+            ## END for a_rel_t_bin_idx in np.arange(n_t_bi...
+            an_epoch_mask_included_bins_list = np.stack(an_epoch_mask_included_bins_list, axis=-1)
+            mask_included_bins_list.append(an_epoch_mask_included_bins_list)
+
+        ## OUTPUTS: mask_included_bins_list
+        # for a_row in peak_tips_only_df.itertuples(index=True, name='PeakTuple'):
+        #     int(a_row.index)
+            
+        return mask_included_bins_list
 
 
     # For serialization/pickling: ________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
@@ -1780,9 +1836,10 @@ class PeakPromenence:
             from neuropy.utils.mixins.binning_helpers import build_df_discretized_binned_position_columns
             from scipy.ndimage.filters import uniform_filter, gaussian_filter
 
-            # active_compute_single_posterior_slab_fn = cls._compute_single_posterior_slab
-
-            active_compute_single_posterior_slab_fn = cls._compute_single_posterior_slab_efficient
+            if should_use_faster_compute_single_slab_implementation:
+                active_compute_single_posterior_slab_fn = cls._compute_single_posterior_slab_efficient
+            else:
+                active_compute_single_posterior_slab_fn = cls._compute_single_posterior_slab
 
             n_epochs = len(p_x_given_n_list)
 

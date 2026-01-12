@@ -782,7 +782,8 @@ class Epoch3DSceneTimeBinViewer(GenericSilxContainer, qt.QWidget):
 
         # Peak-contour overlays (Silx-specific)
         self.plots_data.peak_prominence_result = None
-        self.peak_contour_items: List[Any] = []
+        # self.plots.peak_contour_items: List[Any] = []
+        self.plots.peak_contour_items = []
         
         # Store table widget for locality measures (point-like mode)
         self.locality_measures_table = None
@@ -853,146 +854,6 @@ class Epoch3DSceneTimeBinViewer(GenericSilxContainer, qt.QWidget):
         return p_x_given_n.shape
 
 
-    def _extract_contours_for_epoch_timebin(self, epoch_idx: int, t_bin_idx: int) -> List[NDArray]:
-        """Extract contour vertex arrays for a given (epoch_idx, t_bin_idx) from peak_prominence_result.
-
-        Returns:
-            List of (N, 2) arrays of (x, y) vertices in world coordinates.
-        """
-        from pyphoplacecellanalysis.External.peak_prominence2d import DecodedEpochIndex, DecodedEpochTimeBinIndex, DecodedEpochTimeBinIndexTuple
-
-        if self.plots_data.peak_prominence_result is None:
-            return []
-
-        try:
-            a_peaks_results: Dict[DecodedEpochTimeBinIndexTuple, Dict] = self.plots_data.peak_prominence_result.results
-        except AttributeError:
-            return []
-
-        a_epoch_t_bin_tuple: DecodedEpochTimeBinIndexTuple = (int(epoch_idx), int(t_bin_idx))
-        if a_epoch_t_bin_tuple not in a_peaks_results:
-            return []
-
-        an_epoch_t_bin_peaks_result: Dict = a_peaks_results[a_epoch_t_bin_tuple]
-        peaks_dict = an_epoch_t_bin_peaks_result.get('peaks', {})
-        if len(peaks_dict) == 0:
-            return []
-
-        shapes_data: List[NDArray] = []
-        for _, peak_info in peaks_dict.items():
-            level_slices = peak_info.get('level_slices', {})
-            for _, slice_info in level_slices.items():
-                contour = slice_info.get('contour', None)
-                if contour is None:
-                    continue
-                vertices_world = getattr(contour, 'vertices', None)
-                if vertices_world is None or len(vertices_world) == 0:
-                    continue
-                shapes_data.append(np.asarray(vertices_world, dtype=float))
-        return shapes_data
-
-
-    def _clear_peak_contour_items(self):
-        """Remove all existing peak contour items from the scene widget."""
-        if not self.peak_contour_items:
-            return
-        for item in self.peak_contour_items:
-            try:
-                if hasattr(self.scene_widget, 'removeItem'):
-                    self.scene_widget.removeItem(item)
-            except Exception:
-                pass
-        self.peak_contour_items = []
-
-
-    def _add_contours_for_current_epoch(self, edge_color: str = '#ffaaff', line_width: float = 1.0, z_offset: float = 0.01):
-        """Add Silx 3D line items for all contours in the current epoch."""
-        if self.plots_data.peak_prominence_result is None:
-            return
-
-        try:
-            p_x_given_n = self.plots_data.decoded_result.p_x_given_n_list[self.params.curr_epoch_idx]
-        except Exception:
-            return
-
-        n_x_bins, n_y_bins, n_time_bins = p_x_given_n.shape
-
-        # Determine spatial bounds from bin centers or indices
-        if self.plots_data.xbin_centers is not None and self.plots_data.ybin_centers is not None:
-            x_coords = np.array(self.plots_data.xbin_centers)
-            y_coords = np.array(self.plots_data.ybin_centers)
-            x_min, x_max = float(x_coords[0]), float(x_coords[-1])
-            y_min, y_max = float(y_coords[0]), float(y_coords[-1])
-            x_extent = x_max - x_min
-        else:
-            x_min, x_max = 0.0, float(n_x_bins - 1)
-            y_min, y_max = 0.0, float(n_y_bins - 1)
-            x_extent = float(n_x_bins - 1)
-
-        spacing_factor = 1.2
-        bin_spacing = x_extent * spacing_factor
-
-        # Parse edge_color hex string into RGBA
-        def _parse_hex_color(hex_color: str) -> Tuple[float, float, float, float]:
-            hex_color = hex_color.lstrip('#')
-            if len(hex_color) == 8:
-                r = int(hex_color[0:2], 16) / 255.0
-                g = int(hex_color[2:4], 16) / 255.0
-                b = int(hex_color[4:6], 16) / 255.0
-                a = int(hex_color[6:8], 16) / 255.0
-            elif len(hex_color) == 6:
-                r = int(hex_color[0:2], 16) / 255.0
-                g = int(hex_color[2:4], 16) / 255.0
-                b = int(hex_color[4:6], 16) / 255.0
-                a = 1.0
-            else:
-                r, g, b, a = 1.0, 0.0, 1.0, 1.0
-            return (r, g, b, a)
-
-        rgba_color = _parse_hex_color(edge_color)
-        
-        # Calculate a reasonable z_offset based on the data range
-        # Height maps use the posterior values as z, so we need contours above the max value
-        max_posterior_value = np.nanmax(p_x_given_n)
-        # Position contours slightly above the maximum height map value
-        effective_z_offset = max_posterior_value + (max_posterior_value * 0.1) if max_posterior_value > 0 else 0.1
-
-        total_contours_added = 0
-        for t_bin_idx in range(n_time_bins):
-            contours_list = self._extract_contours_for_epoch_timebin(epoch_idx=self.params.curr_epoch_idx, t_bin_idx=t_bin_idx)
-            if len(contours_list) == 0:
-                continue
-
-            x_translation = t_bin_idx * bin_spacing
-            for vertices in contours_list:
-                if vertices.shape[1] != 2 or len(vertices) < 2:
-                    continue
-
-                # vertices are in world (x, y) coordinates; apply time-bin translation along X
-                x_coords = vertices[:, 0] + x_translation
-                y_coords = vertices[:, 1]
-                # Use the effective z offset calculated from data range
-                z_coords = np.full_like(x_coords, effective_z_offset, dtype=float)
-
-                try:
-                    values = np.ones_like(x_coords, dtype=float)
-                    line_item = plot3d_items.Scatter3D()
-                    line_item.setData(x_coords, y_coords, z_coords, values)
-                    line_item.setVisualization('lines')
-                    line_item.setLineWidth(float(line_width))
-                    line_item.setColor(rgba_color)
-                    # Explicitly set visibility
-                    if hasattr(line_item, 'setVisible'):
-                        line_item.setVisible(True)
-                    # Ensure the item is added to the scene
-                    self.scene_widget.addItem(line_item)
-                    self.peak_contour_items.append(line_item)
-                    total_contours_added += 1
-                except Exception as e:
-                    print(f"DEBUG: Failed to add contour line item: {e}")
-                    continue
-        
-        print(f"DEBUG: Added {total_contours_added} contour line items for epoch {self.params.curr_epoch_idx}")
 
 
     def _get_sidebar_tab_widget(self) -> Optional[qt.QTabWidget]:
@@ -1618,30 +1479,6 @@ class Epoch3DSceneTimeBinViewer(GenericSilxContainer, qt.QWidget):
         
         return "\n".join(label_parts) if label_parts else None
     
-
-    def _clear_time_bin_items(self):
-        """Remove all time bin items from the scene"""
-        def _perform_remove(an_item):
-            try:
-                if hasattr(self.scene_widget, 'removeItem'):
-                    self.scene_widget.removeItem(an_item)
-            except:
-                pass
-
-
-        for item in self.time_bin_items:
-            if isinstance(item, (Tuple, List)):
-                for an_item in item:
-                    try:
-                        _perform_remove(an_item=an_item)
-                    except:
-                        pass
-            else:
-                try:
-                    _perform_remove(an_item=item)
-                except:
-                    pass
-        self.time_bin_items.clear()
     
     def _clear_text_label_items(self):
         """Remove all text label items (Qt QLabel widgets) from the scene"""
@@ -1758,25 +1595,6 @@ class Epoch3DSceneTimeBinViewer(GenericSilxContainer, qt.QWidget):
 
 
 
-    def add_peak_contours_overlays(self, peak_prominence_result, edge_color: str = '#ffaaff78', line_width: float = 1.0, z_offset: Optional[float] = None):
-        """Adds peak contours as Silx 3D line overlays that update when the epoch slider changes.
-
-        Mirrors the Napari add_peak_contours_layer conceptually but renders into the SceneWindow.
-
-        Args:
-            peak_prominence_result: PosteriorPeaksPeakProminence2dResult containing per-epoch, per-time-bin contours.
-            edge_color: Hex RGBA string for contour color (default '#ffaaff78').
-            line_width: Width of contour lines.
-            z_offset: Constant Z offset above the base plane for the contour lines.
-        """
-        self.plots_data.peak_prominence_result = peak_prominence_result
-
-        # Clear any existing contour items and rebuild for current epoch
-        self._clear_peak_contour_items()
-        self._add_contours_for_current_epoch(edge_color=edge_color, line_width=line_width, z_offset=z_offset)
-    
-    
-
     def _update_text_label_positions(self):
         """Update positions of all text labels after window resize"""
         if not self._label_data:
@@ -1788,6 +1606,262 @@ class Epoch3DSceneTimeBinViewer(GenericSilxContainer, qt.QWidget):
             label_text, t_bin_idx, x_translation, x_min, x_max, y_min, y_max, bin_spacing = label_data
             self._add_text_label_3d(label_text, t_bin_idx, x_translation, x_min, x_max, y_min, y_max, bin_spacing)
 
+
+
+    # ==================================================================================================================================================================================================================================================================================== #
+    # peak_contours Functions                                                                                                                                                                                                                                                              #
+    # ==================================================================================================================================================================================================================================================================================== #
+
+    def _extract_contours_for_epoch_timebin(self, epoch_idx: int, t_bin_idx: int) -> List[NDArray]:
+        """Extract contour vertex arrays for a given (epoch_idx, t_bin_idx) from peak_prominence_result.
+
+        Returns:
+            List of (N, 2) arrays of (x, y) vertices in world coordinates.
+        """
+        from pyphoplacecellanalysis.External.peak_prominence2d import DecodedEpochIndex, DecodedEpochTimeBinIndex, DecodedEpochTimeBinIndexTuple
+
+        if self.plots_data.peak_prominence_result is None:
+            return []
+
+        try:
+            a_peaks_results: Dict[DecodedEpochTimeBinIndexTuple, Dict] = self.plots_data.peak_prominence_result.results
+        except AttributeError:
+            return []
+
+        a_epoch_t_bin_tuple: DecodedEpochTimeBinIndexTuple = (int(epoch_idx), int(t_bin_idx))
+        if a_epoch_t_bin_tuple not in a_peaks_results:
+            return []
+
+        an_epoch_t_bin_peaks_result: Dict = a_peaks_results[a_epoch_t_bin_tuple]
+        peaks_dict = an_epoch_t_bin_peaks_result.get('peaks', {})
+        if len(peaks_dict) == 0:
+            return []
+
+        shapes_data: List[NDArray] = []
+        for _, peak_info in peaks_dict.items():
+            level_slices = peak_info.get('level_slices', {})
+            for _, slice_info in level_slices.items():
+                contour = slice_info.get('contour', None)
+                if contour is None:
+                    continue
+                vertices_world = getattr(contour, 'vertices', None)
+                if vertices_world is None or len(vertices_world) == 0:
+                    continue
+                shapes_data.append(np.asarray(vertices_world, dtype=float))
+        return shapes_data
+
+
+    def _clear_peak_contour_items(self):
+        """Remove all existing peak contour items from the scene widget."""
+        if not self.plots.peak_contour_items:
+            return
+        for item in self.plots.peak_contour_items:
+            try:
+                if hasattr(self.scene_widget, 'removeItem'):
+                    self.scene_widget.removeItem(item)
+            except Exception:
+                pass
+        self.plots.peak_contour_items = []
+
+
+    def _add_contours_for_current_epoch(self, edge_color: str = '#ffaaff', line_width: float = 1.0, z_offset: float = 0.01):
+        """Add Silx 3D line items for all contours in the current epoch."""
+        if self.plots_data.peak_prominence_result is None:
+            return
+
+        # try:
+        #     p_x_given_n = self.plots_data.decoded_result.p_x_given_n_list[self.params.curr_epoch_idx]
+        # except Exception:
+        #     return
+
+        # n_x_bins, n_y_bins, n_time_bins = p_x_given_n.shape
+
+        # # Determine spatial bounds from bin centers or indices
+        # if self.plots_data.xbin_centers is not None and self.plots_data.ybin_centers is not None:
+        #     x_coords = np.array(self.plots_data.xbin_centers)
+        #     y_coords = np.array(self.plots_data.ybin_centers)
+        #     x_min, x_max = float(x_coords[0]), float(x_coords[-1])
+        #     y_min, y_max = float(y_coords[0]), float(y_coords[-1])
+        #     x_extent = x_max - x_min
+        # else:
+        #     x_min, x_max = 0.0, float(n_x_bins - 1)
+        #     y_min, y_max = 0.0, float(n_y_bins - 1)
+        #     x_extent = float(n_x_bins - 1)
+
+        # spacing_factor = 1.2
+        # bin_spacing = x_extent * spacing_factor
+
+        # # Parse edge_color hex string into RGBA
+        # def _parse_hex_color(hex_color: str) -> Tuple[float, float, float, float]:
+        #     hex_color = hex_color.lstrip('#')
+        #     if len(hex_color) == 8:
+        #         r = int(hex_color[0:2], 16) / 255.0
+        #         g = int(hex_color[2:4], 16) / 255.0
+        #         b = int(hex_color[4:6], 16) / 255.0
+        #         a = int(hex_color[6:8], 16) / 255.0
+        #     elif len(hex_color) == 6:
+        #         r = int(hex_color[0:2], 16) / 255.0
+        #         g = int(hex_color[2:4], 16) / 255.0
+        #         b = int(hex_color[4:6], 16) / 255.0
+        #         a = 1.0
+        #     else:
+        #         r, g, b, a = 1.0, 0.0, 1.0, 1.0
+        #     return (r, g, b, a)
+
+        # rgba_color = _parse_hex_color(edge_color)
+        
+        # # Calculate a reasonable z_offset based on the data range
+        # # Height maps use the posterior values as z, so we need contours above the max value
+        # max_posterior_value = np.nanmax(p_x_given_n)
+        # # Position contours slightly above the maximum height map value
+        # effective_z_offset = max_posterior_value + (max_posterior_value * 0.1) if max_posterior_value > 0 else 0.1
+
+        # total_contours_added = 0
+        # for t_bin_idx in range(n_time_bins):
+        #     contours_list = self._extract_contours_for_epoch_timebin(epoch_idx=self.params.curr_epoch_idx, t_bin_idx=t_bin_idx)
+        #     if len(contours_list) == 0:
+        #         continue
+
+        #     x_translation = t_bin_idx * bin_spacing
+        #     for vertices in contours_list:
+        #         if vertices.shape[1] != 2 or len(vertices) < 2:
+        #             continue
+
+        #         # vertices are in world (x, y) coordinates; apply time-bin translation along X
+        #         x_coords = vertices[:, 0] + x_translation
+        #         y_coords = vertices[:, 1]
+        #         # Use the effective z offset calculated from data range
+        #         z_coords = np.full_like(x_coords, effective_z_offset, dtype=float)
+
+        #         try:
+        #             values = np.ones_like(x_coords, dtype=float)
+        #             line_item = plot3d_items.Scatter3D()
+        #             line_item.setData(x_coords, y_coords, z_coords, values)
+        #             line_item.setVisualization('lines')
+        #             line_item.setLineWidth(float(line_width))
+        #             line_item.setColor(rgba_color)
+        #             # Explicitly set visibility
+        #             if hasattr(line_item, 'setVisible'):
+        #                 line_item.setVisible(True)
+        #             # Ensure the item is added to the scene
+        #             self.scene_widget.addItem(line_item)
+        #             self.plots.peak_contour_items.append(line_item)
+        #             total_contours_added += 1
+        #         except Exception as e:
+        #             print(f"DEBUG: Failed to add contour line item: {e}")
+        #             continue
+        
+        # print(f"DEBUG: Added {total_contours_added} contour line items for epoch {self.params.curr_epoch_idx}")
+
+
+        try:
+            p_x_given_n = self.plots_data.decoded_result.p_x_given_n_list[self.params.curr_epoch_idx]
+        except Exception:
+            return
+
+        n_x_bins, n_y_bins, n_time_bins = p_x_given_n.shape
+
+        mask_included_bins_list = self.plots_data.peak_contours['mask_included_bins_list'][self.params.curr_epoch_idx]
+        
+        
+
+        # Parse edge_color hex string into RGBA
+        def _parse_hex_color(hex_color: str) -> Tuple[float, float, float, float]:
+            hex_color = hex_color.lstrip('#')
+            if len(hex_color) == 8:
+                r = int(hex_color[0:2], 16) / 255.0
+                g = int(hex_color[2:4], 16) / 255.0
+                b = int(hex_color[4:6], 16) / 255.0
+                a = int(hex_color[6:8], 16) / 255.0
+            elif len(hex_color) == 6:
+                r = int(hex_color[0:2], 16) / 255.0
+                g = int(hex_color[2:4], 16) / 255.0
+                b = int(hex_color[4:6], 16) / 255.0
+                a = 1.0
+            else:
+                r, g, b, a = 1.0, 0.0, 1.0, 1.0
+            return (r, g, b, a)
+
+        rgba_color = _parse_hex_color(edge_color)
+        
+        # Calculate a reasonable z_offset based on the data range
+        # Height maps use the posterior values as z, so we need contours above the max value
+        max_posterior_value = np.nanmax(p_x_given_n)
+        # Position contours slightly above the maximum height map value
+        effective_z_offset = max_posterior_value + (max_posterior_value * 0.1) if max_posterior_value > 0 else 0.1
+
+        total_contours_added = 0
+        for t_bin_idx in range(n_time_bins):
+            a_t_bin_masks = mask_included_bins_list[t_bin_idx]
+            num_masks: int = len(a_t_bin_masks)
+            translation_triple = self.plots_data.translation_triple_list[t_bin_idx]
+
+            for slice_idx, a_mask in enumerate(a_t_bin_masks):    
+                included_p_x_given_n = p_x_given_n[a_mask, t_bin_idx]
+                
+
+            # contours_list = self._extract_contours_for_epoch_timebin(epoch_idx=self.params.curr_epoch_idx, t_bin_idx=t_bin_idx)
+            # if len(contours_list) == 0:
+                # continue
+
+            # x_translation = t_bin_idx * bin_spacing
+            for vertices in contours_list:
+                if vertices.shape[1] != 2 or len(vertices) < 2:
+                    continue
+
+                # vertices are in world (x, y) coordinates; apply time-bin translation along X
+                x_coords = vertices[:, 0] + translation_triple[0] # x_translation
+                y_coords = vertices[:, 1] + translation_triple[1]
+                # Use the effective z offset calculated from data range
+                z_coords = np.full_like(x_coords, effective_z_offset, dtype=float) + translation_triple[2]
+
+
+                try:
+                    values = np.ones_like(x_coords, dtype=float)
+                    line_item = plot3d_items.Scatter3D()
+                    line_item.setData(x_coords, y_coords, z_coords, values)
+                    line_item.setVisualization('lines')
+                    line_item.setLineWidth(float(line_width))
+                    line_item.setColor(rgba_color)
+                    # Explicitly set visibility
+                    if hasattr(line_item, 'setVisible'):
+                        line_item.setVisible(True)
+                    # Ensure the item is added to the scene
+                    self.scene_widget.addItem(line_item)
+                    self.plots.peak_contour_items.append(line_item)
+                    total_contours_added += 1
+                except Exception as e:
+                    print(f"DEBUG: Failed to add contour line item: {e}")
+                    continue
+        
+        print(f"DEBUG: Added {total_contours_added} contour line items for epoch {self.params.curr_epoch_idx}")
+
+
+    def add_peak_contours_overlays(self, peak_prominence_result, edge_color: str = '#ffaaff78', line_width: float = 1.0, z_offset: Optional[float] = None):
+        """Adds peak contours as Silx 3D line overlays that update when the epoch slider changes.
+
+        Mirrors the Napari add_peak_contours_layer conceptually but renders into the SceneWindow.
+
+        Args:
+            peak_prominence_result: PosteriorPeaksPeakProminence2dResult containing per-epoch, per-time-bin contours.
+            edge_color: Hex RGBA string for contour color (default '#ffaaff78').
+            line_width: Width of contour lines.
+            z_offset: Constant Z offset above the base plane for the contour lines.
+        """
+        from pyphoplacecellanalysis.External.peak_prominence2d import PosteriorPeaksPeakProminence2dResult
+
+        self.params.slice_level_multipliers = [0.9]
+        self.plots_data.peak_contours = {}
+        
+        self.plots_data.peak_prominence_result = peak_prominence_result
+        mask_included_bins_list = peak_prominence_result.compute_discrete_contour_masks(p_x_given_n_list=self.plots_data.decoded_result.p_x_given_n_list, slice_level_multipliers=self.params.slice_level_multipliers)
+        self.plots_data.peak_contours['mask_included_bins_list'] = mask_included_bins_list
+
+        # Clear any existing contour items and rebuild for current epoch
+        self._clear_peak_contour_items()
+        self._add_contours_for_current_epoch(edge_color=edge_color, line_width=line_width, z_offset=z_offset)
+    
+        
 
     # ==================================================================================================================================================================================================================================================================================== #
     # Lifecycle Functions                                                                                                                                                                                                                                                                  #
@@ -1877,7 +1951,7 @@ class Epoch3DSceneTimeBinViewer(GenericSilxContainer, qt.QWidget):
         
         # Create a height map surface for each time bin
         self.plots_data.translation_triple_list = []
-
+        
         for t_bin_idx in range(self.params.max_n_t_bins):
             # Position horizontally: each bin offset along X axis
             x_translation = t_bin_idx * self.plots_data.bin_spacing
@@ -1962,7 +2036,6 @@ class Epoch3DSceneTimeBinViewer(GenericSilxContainer, qt.QWidget):
         ## END if points_item is not None..
 
 
-
     def _create_time_bin_items(self):
         """Create and position all time bin height maps for current epoch"""
         p_x_given_n = self.plots_data.decoded_result.p_x_given_n_list[self.params.curr_epoch_idx]
@@ -2038,6 +2111,30 @@ class Epoch3DSceneTimeBinViewer(GenericSilxContainer, qt.QWidget):
         self._configure_root_data_bounding_box()
 
 
+    def _clear_time_bin_items(self):
+        """Remove all time bin items from the scene"""
+        def _perform_remove(an_item):
+            try:
+                if hasattr(self.scene_widget, 'removeItem'):
+                    self.scene_widget.removeItem(an_item)
+            except:
+                pass
+
+
+        for item in self.time_bin_items:
+            if isinstance(item, (Tuple, List)):
+                for an_item in item:
+                    try:
+                        _perform_remove(an_item=an_item)
+                    except:
+                        pass
+            else:
+                try:
+                    _perform_remove(an_item=item)
+                except:
+                    pass
+        self.time_bin_items.clear()
+        
 
     def on_epoch_changed(self, value):
         """Called when epoch slider changes"""

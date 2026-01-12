@@ -11,7 +11,7 @@ import matplotlib.pyplot as plt # required for _perform_pf_analyze_results_peak_
 
 from pyphocorehelpers.programming_helpers import metadata_attributes
 from pyphocorehelpers.function_helpers import function_attributes
-from pyphoplacecellanalysis.External.peak_prominence2d import compute_prominence_contours # Required for _perform_pf_find_ratemap_peaks_peak_prominence2d_computation
+from pyphoplacecellanalysis.External.peak_prominence2d import PeakPromenence # Required for _perform_pf_find_ratemap_peaks_peak_prominence2d_computation
 
 from pyphoplacecellanalysis.General.Model.ComputationResults import ComputationResult
 from pyphocorehelpers.DataStructure.dynamic_parameters import DynamicParameters
@@ -366,7 +366,7 @@ class PlacefieldDensityAnalysisComputationFunctions(AllFunctionEnumeratingMixin,
     @function_attributes(short_name='ratemap_peaks_prominence2d', tags=['pf', 'peaks', 'promienence', '2d', 'ratemap', 'Eloy'],
                           input_requires=["computation_result.computed_data['pf2D']"],
                           output_provides=["computation_result.computed_data['RatemapPeaksAnalysis']['PeakProminence2D']"],
-                          uses=["compute_prominence_contours", "build_df_discretized_binned_position_columns", "PeakPromenence", "PeakPromenence._find_contours_at_levels", "PeakPromenence._compute_distances_from_peaks_to_boundary", "PeakPromenence._build_filtered_summits_analysis_results"], used_by=[], creation_date='2023-09-12 17:21', related_items=[],
+                          uses=["PeakPromenence.compute_prominence_contours", "build_df_discretized_binned_position_columns", "PeakPromenence", "PeakPromenence._find_contours_at_levels", "PeakPromenence._compute_distances_from_peaks_to_boundary", "PeakPromenence._build_filtered_summits_analysis_results"], used_by=[], creation_date='2023-09-12 17:21', related_items=[],
         validate_computation_test=lambda curr_active_pipeline, computation_filter_name='maze': (curr_active_pipeline.computation_results[computation_filter_name].computed_data['RatemapPeaksAnalysis'], curr_active_pipeline.computation_results[computation_filter_name].computed_data['RatemapPeaksAnalysis']['PeakProminence2D']), is_global=False)
     def _perform_pf_find_ratemap_peaks_peak_prominence2d_computation(computation_result: ComputationResult, step=0.01, peak_height_multiplier_probe_levels=(0.5, 0.9), minimum_included_peak_height = 0.2, uniform_blur_size = 3, gaussian_blur_sigma = 3, debug_print=False):
             """ Uses the peak_prominence2d package to find the peaks and promenences of 2D placefields
@@ -425,7 +425,7 @@ class PlacefieldDensityAnalysisComputationFunctions(AllFunctionEnumeratingMixin,
                 neuron_id = active_pf_2D.neuron_extended_ids[neuron_idx].id #  Inner exception: 'NeuronExtendedIdentity' object has no attribute 'id'
                 neuron_tuning_curve_peak_firing_rate = tuning_curve_peak_firing_rates[neuron_idx]
                 slab = active_tuning_curves[neuron_idx].T
-                _, _, slab, cell_peaks_dict, id_map, prominence_map, parent_map = compute_prominence_contours(xbin_centers=active_pf_2D.xbin_centers, ybin_centers=active_pf_2D.ybin_centers, slab=slab, step=step, min_area=None, min_considered_promenence=0.2, include_edge=True, verbose=False)
+                _, _, slab, cell_peaks_dict, id_map, prominence_map, parent_map = PeakPromenence.compute_prominence_contours(xbin_centers=active_pf_2D.xbin_centers, ybin_centers=active_pf_2D.ybin_centers, slab=slab, step=step, min_area=None, min_considered_promenence=0.2, include_edge=True, verbose=False)
                 #""" Analyze all peaks of a given cell/ratemap """
                 n_peaks = len(cell_peaks_dict)
                 
