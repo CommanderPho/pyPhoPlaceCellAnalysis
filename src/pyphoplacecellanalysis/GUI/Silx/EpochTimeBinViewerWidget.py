@@ -1,6 +1,7 @@
 from silx.gui import qt
 from silx.gui.plot import Plot2D
 from silx.gui.plot3d.ScalarFieldView import ScalarFieldView
+from silx.gui.plot3d.SceneWidget import SceneWidget
 from silx.gui.plot3d.SceneWindow import SceneWindow, items as plot3d_items
 from silx.gui.colors import Colormap
 import numpy as np
@@ -804,16 +805,16 @@ class Epoch3DSceneTimeBinViewer(GenericSilxContainer, qt.QWidget):
         self.setLayout(layout)
         
         # Create SceneWindow for 3D visualization
-        self.scene_window = SceneWindow()
+        self.plots.scene_window = SceneWindow()
         
         # Add SceneWindow to layout
-        layout.addWidget(self.scene_window)
+        layout.addWidget(self.plots.scene_window)
         
         # Store label data for repositioning on resize
         self._label_data = []  # List of (text, t_bin_idx, x_translation, x_min, x_max, y_min, y_max, bin_spacing) tuples
         
         # Install event filter to catch resize events
-        self.scene_window.installEventFilter(self)
+        self.plots.scene_window.installEventFilter(self)
         
         # Create epoch slider
         self.ui.slider_container_layout = qt.QHBoxLayout()
@@ -841,13 +842,22 @@ class Epoch3DSceneTimeBinViewer(GenericSilxContainer, qt.QWidget):
     def _init_Graphics(self):
         """ build graphics items 
         """
-        self.scene_widget = self.scene_window.getSceneWidget()
+        self.plots.scene_widget = self.plots.scene_window.getSceneWidget()
 
-        self.scene_widget.setBackgroundColor((0.8, 0.8, 0.8, 1.))
-        self.scene_widget.setForegroundColor((1., 1., 1., 1.))
-        self.scene_widget.setTextColor((0.1, 0.1, 0.1, 1.))
+        self.plots.scene_widget.setBackgroundColor((0.8, 0.8, 0.8, 1.))
+        self.plots.scene_widget.setForegroundColor((1., 1., 1., 1.))
+        self.plots.scene_widget.setTextColor((0.1, 0.1, 0.1, 1.))
 
 
+    @property
+    def scene_window(self) -> SceneWindow:
+        """The scene_window property."""
+        return self.plots.scene_window
+    
+    @property
+    def scene_widget(self) -> SceneWidget:
+        """The scene_widget property."""
+        return self.plots.scene_widget
 
 
     def _get_epoch_time_bin_shape(self, epoch_idx: int) -> Tuple[int, int, int]:
@@ -882,8 +892,8 @@ class Epoch3DSceneTimeBinViewer(GenericSilxContainer, qt.QWidget):
         
         # Method 1: Try getPlot3DWidget() if available (as per silx docs)
         try:
-            if hasattr(self.scene_window, 'getPlot3DWidget'):
-                plot3d_widget = self.scene_window.getPlot3DWidget()
+            if hasattr(self.plots.scene_window, 'getPlot3DWidget'):
+                plot3d_widget = self.plots.scene_window.getPlot3DWidget()
                 if plot3d_widget:
                     # Try findChild to locate the sidebar QTabWidget
                     sidebar = plot3d_widget.findChild(qt.QTabWidget)
@@ -901,8 +911,8 @@ class Epoch3DSceneTimeBinViewer(GenericSilxContainer, qt.QWidget):
         
         # Method 2: Try direct access if available
         try:
-            if hasattr(self.scene_window, 'getSidebar'):
-                sidebar = self.scene_window.getSidebar()
+            if hasattr(self.plots.scene_window, 'getSidebar'):
+                sidebar = self.plots.scene_window.getSidebar()
                 if isinstance(sidebar, qt.QTabWidget):
                     print("DEBUG: Found sidebar via getSidebar()")
                     return sidebar
@@ -912,7 +922,7 @@ class Epoch3DSceneTimeBinViewer(GenericSilxContainer, qt.QWidget):
         
         # Method 3: Use findChild directly on SceneWindow
         try:
-            sidebar = self.scene_window.findChild(qt.QTabWidget)
+            sidebar = self.plots.scene_window.findChild(qt.QTabWidget)
             if sidebar is not None:
                 # Verify it's the right one by checking tab names
                 tab_count = sidebar.count()
@@ -925,7 +935,7 @@ class Epoch3DSceneTimeBinViewer(GenericSilxContainer, qt.QWidget):
         
         # Method 4: Traverse children to find QTabWidget
         try:
-            result = find_tab_widget(self.scene_window)
+            result = find_tab_widget(self.plots.scene_window)
             if result is not None:
                 tab_count = result.count()
                 # Check tab names to confirm this is the sidebar
@@ -946,8 +956,8 @@ class Epoch3DSceneTimeBinViewer(GenericSilxContainer, qt.QWidget):
         
         # Method 5: Try accessing through centralWidget
         try:
-            if hasattr(self.scene_window, 'centralWidget'):
-                central = self.scene_window.centralWidget()
+            if hasattr(self.plots.scene_window, 'centralWidget'):
+                central = self.plots.scene_window.centralWidget()
                 if central:
                     sidebar = central.findChild(qt.QTabWidget)
                     if sidebar is not None:
@@ -971,7 +981,7 @@ class Epoch3DSceneTimeBinViewer(GenericSilxContainer, qt.QWidget):
                         if isinstance(child, qt.QWidget):
                             collect_widgets(child)
             
-            collect_widgets(self.scene_window)
+            collect_widgets(self.plots.scene_window)
             for widget in all_widgets:
                 if isinstance(widget, qt.QTabWidget):
                     tab_count = widget.count()
@@ -1507,7 +1517,7 @@ class Epoch3DSceneTimeBinViewer(GenericSilxContainer, qt.QWidget):
         """
         try:
             # Create a QLabel for the text
-            label = qt.QLabel(label_text, self.scene_window)
+            label = qt.QLabel(label_text, self.plots.scene_window)
             label.setStyleSheet("""
                 QLabel {
                     background-color: transparent;
@@ -1523,8 +1533,8 @@ class Epoch3DSceneTimeBinViewer(GenericSilxContainer, qt.QWidget):
             label.setWordWrap(False)
             
             # Get scene window dimensions
-            scene_width = self.scene_window.width()
-            scene_height = self.scene_window.height()
+            scene_width = self.plots.scene_window.width()
+            scene_height = self.plots.scene_window.height()
             
             # Get slider height to avoid collision
             slider_height = 60  # Estimated height for slider + labels + spacing
@@ -1581,9 +1591,9 @@ class Epoch3DSceneTimeBinViewer(GenericSilxContainer, qt.QWidget):
     def _configure_root_data_bounding_box(self):
         """Disable bounding box visualization on the root 'Data' node if present."""
         try:
-            if not hasattr(self.scene_widget, 'getItems'):
+            if not hasattr(self.plots.scene_widget, 'getItems'):
                 return
-            for item in self.scene_widget.getItems():
+            for item in self.plots.scene_widget.getItems():
                 try:
                     name = item.getName() if hasattr(item, 'getName') else None
                     if name == 'Data' and hasattr(item, 'setBoundingBoxVisible'):
@@ -1659,8 +1669,8 @@ class Epoch3DSceneTimeBinViewer(GenericSilxContainer, qt.QWidget):
             return
         for item in self.plots.peak_contour_items:
             try:
-                if hasattr(self.scene_widget, 'removeItem'):
-                    self.scene_widget.removeItem(item)
+                if hasattr(self.plots.scene_widget, 'removeItem'):
+                    self.plots.scene_widget.removeItem(item)
             except Exception:
                 pass
         self.plots.peak_contour_items = []
@@ -1860,25 +1870,39 @@ class Epoch3DSceneTimeBinViewer(GenericSilxContainer, qt.QWidget):
                     continue
 
                 # vertices are in world (x, y) coordinates; apply time-bin translation along X
-                x_coords_translated = vertices[:, 0] + translation_triple[0] # x_translation
-                y_coords_translated = vertices[:, 1] + translation_triple[1]
-                # Use the effective z offset calculated from data range
-                z_coords = np.full_like(x_coords_translated, effective_z_offset, dtype=float) + translation_triple[2]
+                # x_coords_translated = vertices[:, 0] + translation_triple[0] # x_translation
+                # y_coords_translated = vertices[:, 1] + translation_triple[1]
+                # # Use the effective z offset calculated from data range
+                # z_coords = np.full_like(x_coords_translated, effective_z_offset, dtype=float) + translation_triple[2]
 
+                x_coords_translated = vertices[:, 0]
+                y_coords_translated = vertices[:, 1]
+                # Use the effective z offset calculated from data range
+                z_coords = np.full_like(x_coords_translated, effective_z_offset, dtype=float)
+
+                # # vertices are in world (x, y) coordinates; apply time-bin translation along X
+                # x_coords_translated = x_coords_translated + translation_triple[0] # x_translation
+                # y_coords_translated = y_coords_translated + translation_triple[1]
+                # z_coords = z_coords + translation_triple[2]
 
                 try:
                     values = np.ones_like(x_coords_translated, dtype=float)
                     line_item = plot3d_items.Scatter3D()
                     line_item.setData(x_coords_translated, y_coords_translated, z_coords, values)
-                    line_item.setVisualization('lines')
-                    line_item.setLineWidth(float(line_width))
-                    line_item.setColor(rgba_color)
+                    # line_item.setVisualization('lines')
+                    # line_item.setLineWidth(float(line_width))
+                    # line_item.setColor(rgba_color)
                     # Explicitly set visibility
                     if hasattr(line_item, 'setVisible'):
                         line_item.setVisible(True)
                     # Ensure the item is added to the scene
-                    self.scene_widget.addItem(line_item)
+                    self.plots.scene_widget.addItem(line_item)
                     self.plots.peak_contour_items.append(line_item)
+                    
+                    line_item.setBoundingBoxVisible(False)
+                    line_item.setTranslation(*translation_triple)
+                    line_item.setScale(1.0, 1.0, 1000.0) # Anisotropic scale: emphasize Z (time/height) dimension
+
                     total_contours_added += 1
                 except Exception as e:
                     print(f"DEBUG: Failed to add contour line item: {e}")
@@ -2130,11 +2154,19 @@ class Epoch3DSceneTimeBinViewer(GenericSilxContainer, qt.QWidget):
             slice_2d = p_x_given_n[:, :, t_bin_idx]  # (n_x_bins, n_y_bins)
             values_flat = slice_2d.flatten()
             
+
+            # Create a group item and add it to the scene
+            # The group children share the group transform
+            group = plot3d_items.GroupItem()  # Create a new group item
+            group.setTranslation(*translation_triple) # Translate the group
+
+
             # Create 2D scatter item with height map
             # mesh_item = self.scene_widget.add2DScatter(x_flat, y_flat, values_flat)
             mesh_item = None
 
-            points_item = self.scene_widget.add2DScatter(x_flat, y_flat, values_flat)
+            # group_item = self.plots.scene_widget.add
+            points_item = self.plots.scene_widget.add2DScatter(x_flat, y_flat, values_flat)
 
             added_items = []
             if mesh_item is not None:
@@ -2145,12 +2177,15 @@ class Epoch3DSceneTimeBinViewer(GenericSilxContainer, qt.QWidget):
             # Per-item visualization and bounding box configuration
             self._configure_time_bin_item(t_bin_idx=t_bin_idx, mesh_item=mesh_item, points_item=points_item)
             
-            if len(added_items) == 1:
-                added_items = added_items[0] ## extract just the single item
+            # if len(added_items) == 1:
+            #     added_items = added_items[0] ## extract just the single item
             
             # Store item for cleanup
-            # self.time_bin_items.append((item, points_item))
-            self.time_bin_items.append(points_item)
+            for an_item in added_items: 
+                self.time_bin_items.append(an_item)
+                
+            # self.time_bin_items.append(points_item)
+            # self.time_bin_items.extend(added_items)
             
             # Add text label below this time bin if available
             if self.plots_data.text_data_provider is not None or self.params.text_columns:
@@ -2170,8 +2205,8 @@ class Epoch3DSceneTimeBinViewer(GenericSilxContainer, qt.QWidget):
         """Remove all time bin items from the scene"""
         def _perform_remove(an_item):
             try:
-                if hasattr(self.scene_widget, 'removeItem'):
-                    self.scene_widget.removeItem(an_item)
+                if hasattr(self.plots.scene_widget, 'removeItem'):
+                    self.plots.scene_widget.removeItem(an_item)
             except:
                 pass
 
@@ -2227,7 +2262,7 @@ class Epoch3DSceneTimeBinViewer(GenericSilxContainer, qt.QWidget):
         try:
             # Check if this is a resize event
             # QEvent.Resize is typically 14 in Qt5/Qt6
-            if obj == self.scene_window:
+            if obj == self.plots.scene_window:
                 event_type = event.type()
                 # Check for resize event (works for both Qt5 and Qt6)
                 if hasattr(qt.QEvent, 'Resize') and event_type == qt.QEvent.Resize:
