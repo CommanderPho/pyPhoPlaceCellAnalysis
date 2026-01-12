@@ -742,7 +742,7 @@ class Epoch3DSceneTimeBinViewer(qt.QWidget):
         self.text_columns = text_columns if text_columns is not None else []
         self.text_data_provider = text_data_provider
         
-        # Detect point-like mode (when 't' column exists in locality_measures_df)
+        # Detect point-like data mode (when 't' column exists in locality_measures_df)
         self.is_point_like_mode = (locality_measures_df is not None and 't' in locality_measures_df.columns)
         
         # Current epoch index
@@ -1702,14 +1702,86 @@ class Epoch3DSceneTimeBinViewer(qt.QWidget):
             pass
 
 
-    def _configure_time_bin_item(self, item):
+    def _build_time_bin_positions(self):
+        """ builds the mapping between time-bin-index and item positions for all items """
+        assert self.decoded_result is not None
+        assert len(self.decoded_result.p_x_given_n_list) > 0
+        
+        p_x_given_n = self.decoded_result.p_x_given_n_list[0] ## get first item to determine shape
+        # Shape: (n_x_bins, n_y_bins, n_time_bins)
+        n_x_bins, n_y_bins, n_time_bins = p_x_given_n.shape
+        
+        # Calculate coordinate arrays
+        if (self.xbin_centers is not None) and (self.ybin_centers is not None):
+            # Use actual bin center values
+            x_coords = np.array(self.xbin_centers)
+            y_coords = np.array(self.ybin_centers)
+            x_min, x_max = float(x_coords[0]), float(x_coords[-1])
+            y_min, y_max = float(y_coords[0]), float(y_coords[-1])
+            x_extent = x_max - x_min
+        else:
+            # Use bin indices
+            x_coords = np.arange(n_x_bins)
+            y_coords = np.arange(n_y_bins)
+            x_min, x_max = 0.0, float(n_x_bins - 1)
+            y_min, y_max = 0.0, float(n_y_bins - 1)
+            x_extent = float(n_x_bins - 1)
+
+        # Create meshgrid for scatter plot coordinates
+        X, Y = np.meshgrid(x_coords, y_coords, indexing='ij')
+        x_flat = X.flatten()
+        y_flat = Y.flatten()
+        
+        # Calculate spacing between adjacent time bins
+        spacing_factor = 1.2  # 20% spacing between bins
+        bin_spacing = x_extent * spacing_factor
+        
+        # Create a height map surface for each time bin
+        for t_bin_idx in range(n_time_bins):
+
+            # Position horizontally: each bin offset along X axis
+            x_translation = t_bin_idx * bin_spacing
+
+            translation_triple = (x_translation, 0.0, 0.0)
+
+
+
+
+    def _configure_time_bin_item(self, item, translation_triple: Optional[Tuple]=None, raise_on_error: bool=True):
         """Configure per-time-bin scatter item appearance and bounding box."""
+        try:
+            # Enable height map visualization
+            item.setHeightMap(True)
+        except Exception as e:
+            if raise_on_error:
+                raise
+
+        try:
+            # Set colormap
+            item.getColormap().setName('viridis')
+        except Exception as e:
+            if raise_on_error:
+                raise
+        
+
+        try:
+            # Position horizontally: each bin offset along X axis
+            assert len(translation_triple) == 3
+            item.setTranslation(*translation_triple)
+
+        except Exception as e:
+            if raise_on_error:
+                raise
+
+
         try:
             if hasattr(item, 'setBoundingBoxVisible'):
                 item.setBoundingBoxVisible(True)
             if hasattr(item, 'setVisualization'):
                 # Use point-based visualization for per-bin items
-                item.setVisualization('points')
+                # item.setVisualization('points')
+                item.setVisualization('solid')
+                
             # Point/marker appearance (APIs may vary across silx versions)
             if hasattr(item, 'setPointSize'):
                 item.setPointSize(5.0)
@@ -1728,7 +1800,7 @@ class Epoch3DSceneTimeBinViewer(qt.QWidget):
         n_x_bins, n_y_bins, n_time_bins = p_x_given_n.shape
         
         # Calculate coordinate arrays
-        if self.xbin_centers is not None and self.ybin_centers is not None:
+        if (self.xbin_centers is not None) and (self.ybin_centers is not None):
             # Use actual bin center values
             x_coords = np.array(self.xbin_centers)
             y_coords = np.array(self.ybin_centers)
@@ -1761,17 +1833,13 @@ class Epoch3DSceneTimeBinViewer(qt.QWidget):
             # Create 2D scatter item with height map
             item = self.scene_widget.add2DScatter(x_flat, y_flat, values_flat)
 
-            # Enable height map visualization
-            item.setHeightMap(True)
-            # Per-item visualization and bounding box configuration
-            self._configure_time_bin_item(item)
-
-            # Set colormap
-            item.getColormap().setName('viridis')
-            
             # Position horizontally: each bin offset along X axis
             x_translation = t_bin_idx * bin_spacing
-            item.setTranslation(x_translation, 0.0, 0.0)
+
+            translation_triple = (x_translation, 0.0, 0.0)
+
+            # Per-item visualization and bounding box configuration
+            self._configure_time_bin_item(item, translation_triple=translation_triple)
             
             # Set scale to maintain proper aspect ratio
             # Horizontal layout is handled by translation; scale is handled in _configure_time_bin_item
