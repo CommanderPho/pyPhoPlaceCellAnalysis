@@ -15,6 +15,9 @@ from attrs import define, field
 from pyphocorehelpers.programming_helpers import metadata_attributes
 from pyphocorehelpers.function_helpers import function_attributes
 from neuropy.core.epoch import Epoch, EpochsAccessor, ensure_dataframe, ensure_Epoch, EpochHelpers
+from pyphocorehelpers.DataStructure.general_parameter_containers import VisualizationParameters, RenderPlotsData, RenderPlots # PyqtgraphRenderPlots
+from pyphocorehelpers.gui.PhoUIContainer import PhoUIContainer
+from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.ContainerBased.PhoContainerTool import GenericSilxContainer
 
 
 @define(slots=False, eq=False, repr=False)
@@ -694,9 +697,6 @@ class EpochTimeBinViewer(qt.QWidget):
         self._add_text_labels_2d()
 
 
-from pyphocorehelpers.DataStructure.general_parameter_containers import VisualizationParameters, RenderPlotsData, RenderPlots # PyqtgraphRenderPlots
-from pyphocorehelpers.gui.PhoUIContainer import PhoUIContainer
-from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.ContainerBased.PhoContainerTool import GenericSilxContainer
 
 
 @metadata_attributes(short_name=None, tags=['Silx', 'gui', '3D', 'scene', 'epoch_idx_slider', 'height-map'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-12-23', related_items=[])
@@ -739,6 +739,13 @@ class Epoch3DSceneTimeBinViewer(GenericSilxContainer, qt.QWidget):
     sigEpochIndexChanged = QtCore.pyqtSignal(int)
     # sigTimeBinIndexChanged = QtCore.pyqtSignal(int)
 
+    @property
+    def curr_n_time_bins(self) -> int:
+        """Get number of time bins for current epoch"""
+        p_x_given_n = self.plots_data.decoded_result.p_x_given_n_list[self.params.curr_epoch_idx]
+        return p_x_given_n.shape[-1]  # Last dimension is time
+
+
     def __init__(self, decoded_result, xbin_centers=None, ybin_centers=None, locality_measures_df: Optional[pd.DataFrame] = None, text_columns: Optional[List[str]] = None, text_data_provider: Optional[TextDataProviderDatasource] = None, **kwargs):
         # Extract attrs field names from GenericSilxContainer
         attrs_field_names = {'name', 'plots', 'plot_data', 'ui', 'params'}
@@ -758,6 +765,9 @@ class Epoch3DSceneTimeBinViewer(GenericSilxContainer, qt.QWidget):
         self.params.text_columns = text_columns if text_columns is not None else []
         self.plots_data.text_data_provider = text_data_provider
         
+        self.params.spacing_factor = 1.2  # 20% spacing between bins
+        self.plots_data.translation_triple_list = []
+
         # Detect point-like data mode (when 't' column exists in locality_measures_df)
         self.params.is_point_like_mode = (self.plots_data.locality_measures_df is not None and 't' in self.plots_data.locality_measures_df.columns)
         
@@ -776,22 +786,25 @@ class Epoch3DSceneTimeBinViewer(GenericSilxContainer, qt.QWidget):
         
         # Store table widget for locality measures (point-like mode)
         self.locality_measures_table = None
+
+        self._init_UI()
         
+        self._init_Graphics()
+
+        # Initialize
+        self.on_epoch_changed(0)
+
+
+    def _init_UI(self):
         # Create UI
         layout = qt.QVBoxLayout()
         self.setLayout(layout)
         
         # Create SceneWindow for 3D visualization
         self.scene_window = SceneWindow()
-        self.scene_widget = self.scene_window.getSceneWidget()
         
         # Add SceneWindow to layout
         layout.addWidget(self.scene_window)
-        
-        # Create table tab for point-like mode (delayed to ensure sidebar is available)
-        if self.params.is_point_like_mode:
-            # Use QTimer to delay table creation until after window is shown
-            qt.QTimer.singleShot(100, self._create_locality_measures_table_tab)
         
         # Store label data for repositioning on resize
         self._label_data = []  # List of (text, t_bin_idx, x_translation, x_min, x_max, y_min, y_max, bin_spacing) tuples
@@ -804,7 +817,7 @@ class Epoch3DSceneTimeBinViewer(GenericSilxContainer, qt.QWidget):
         
         self.ui.epoch_slider = qt.QSlider(qt.Qt.Horizontal)
         self.ui.epoch_slider.setMinimum(0)
-        self.ui.epoch_slider.setMaximum(len(decoded_result.p_x_given_n_list) - 1)
+        self.ui.epoch_slider.setMaximum(len(self.plots_data.decoded_result.p_x_given_n_list) - 1)
         self.ui.epoch_slider.setTickPosition(qt.QSlider.TicksBelow)
         self.ui.epoch_slider.setTickInterval(1)
         self.ui.epoch_slider.valueChanged.connect(self.on_epoch_changed)
@@ -814,9 +827,24 @@ class Epoch3DSceneTimeBinViewer(GenericSilxContainer, qt.QWidget):
         self.epoch_label = self.ui.slider_container_layout.itemAt(self.ui.slider_container_layout.count()-1).widget()
         
         layout.addLayout(self.ui.slider_container_layout)
-        
-        # Initialize
-        self.on_epoch_changed(0)
+
+        # Create table tab for point-like mode (delayed to ensure sidebar is available)
+        if self.params.is_point_like_mode:
+            # Use QTimer to delay table creation until after window is shown
+            qt.QTimer.singleShot(100, self._create_locality_measures_table_tab)
+
+
+
+    def _init_Graphics(self):
+        """ build graphics items 
+        """
+        self.scene_widget = self.scene_window.getSceneWidget()
+
+        self.scene_widget.setBackgroundColor((0.8, 0.8, 0.8, 1.))
+        self.scene_widget.setForegroundColor((1., 1., 1., 1.))
+        self.scene_widget.setTextColor((0.1, 0.1, 0.1, 1.))
+
+
 
 
     def _get_epoch_time_bin_shape(self, epoch_idx: int) -> Tuple[int, int, int]:
@@ -1352,11 +1380,7 @@ class Epoch3DSceneTimeBinViewer(GenericSilxContainer, qt.QWidget):
                         if item:
                             item.setBackground(qt.QBrush())  # Reset to default
     
-    @property
-    def curr_n_time_bins(self) -> int:
-        """Get number of time bins for current epoch"""
-        p_x_given_n = self.plots_data.decoded_result.p_x_given_n_list[self.params.curr_epoch_idx]
-        return p_x_given_n.shape[-1]  # Last dimension is time
+
     
     def _get_time_bin_centers(self) -> Optional[NDArray]:
         """Get time bin centers for current epoch if available"""
@@ -1719,14 +1743,47 @@ class Epoch3DSceneTimeBinViewer(GenericSilxContainer, qt.QWidget):
 
 
     def _build_time_bin_positions(self):
-        """ builds the mapping between time-bin-index and item positions for all items """
+        """ builds the mapping between time-bin-index and item positions for all items 
+
+        Updates: 
+            self.plots_data.translation_triple_list = []
+
+            (self.params.all_epochs_p_x_given_n_min, self.params.all_epochs_p_x_given_n_max)
+
+        """
         assert self.plots_data.decoded_result is not None
         assert len(self.plots_data.decoded_result.p_x_given_n_list) > 0
         
+        ## max positions
+        max_n_t_bins: int = np.nanmax(self.plots_data.decoded_result.nbins)
+
+        self.params.max_n_t_bins = max_n_t_bins
+
+        ## Build min/max for data
+        # per_epoch_p_x_given_n_min_max_tuples_list = [(np.nanmin(p_x_given_n), np.nanmax(p_x_given_n))  for p_x_given_n in self.plots_data.decoded_result.p_x_given_n_list]
+        per_epoch_p_x_given_n_min_list = np.array([np.nanmin(p_x_given_n) for p_x_given_n in self.plots_data.decoded_result.p_x_given_n_list])
+        per_epoch_p_x_given_n_max_list = np.array([np.nanmax(p_x_given_n) for p_x_given_n in self.plots_data.decoded_result.p_x_given_n_list])
+
+        all_epochs_p_x_given_n_min: float = np.nanmin(per_epoch_p_x_given_n_min_list)
+        all_epochs_p_x_given_n_max: float = np.nanmax(per_epoch_p_x_given_n_min_list)
+
+
+        self.params.per_epoch_p_x_given_n_min_list = per_epoch_p_x_given_n_min_list
+        self.params.per_epoch_p_x_given_n_max_list = per_epoch_p_x_given_n_max_list
+
+        self.params.all_epochs_p_x_given_n_min = all_epochs_p_x_given_n_min
+        self.params.all_epochs_p_x_given_n_max = all_epochs_p_x_given_n_max
+
+        # per_epoch_p_x_given_n_min_max_tuples_list)
+
+
         p_x_given_n = self.plots_data.decoded_result.p_x_given_n_list[0] ## get first item to determine shape
         # Shape: (n_x_bins, n_y_bins, n_time_bins)
         n_x_bins, n_y_bins, n_time_bins = p_x_given_n.shape
         
+        self.plots_data.n_x_bins = n_x_bins
+        self.plots_data.n_y_bins = n_y_bins
+
         # Calculate coordinate arrays
         if (self.plots_data.xbin_centers is not None) and (self.plots_data.ybin_centers is not None):
             # Use actual bin center values
@@ -1734,36 +1791,53 @@ class Epoch3DSceneTimeBinViewer(GenericSilxContainer, qt.QWidget):
             y_coords = np.array(self.plots_data.ybin_centers)
             x_min, x_max = float(x_coords[0]), float(x_coords[-1])
             y_min, y_max = float(y_coords[0]), float(y_coords[-1])
-            x_extent = x_max - x_min
+            
         else:
             # Use bin indices
             x_coords = np.arange(n_x_bins)
             y_coords = np.arange(n_y_bins)
             x_min, x_max = 0.0, float(n_x_bins - 1)
             y_min, y_max = 0.0, float(n_y_bins - 1)
-            x_extent = float(n_x_bins - 1)
+            # x_extent = float(n_x_bins - 1)
+
+
+        x_extent: float = x_max - x_min
+        y_extent: float = y_max - y_min
+
+        self.plots_data.x_min = x_min
+        self.plots_data.x_max = x_max
+        self.plots_data.y_min = y_min
+        self.plots_data.y_max = y_max
+        self.plots_data.x_extent = x_extent
+        self.plots_data.y_extent = y_extent
 
         # Create meshgrid for scatter plot coordinates
         X, Y = np.meshgrid(x_coords, y_coords, indexing='ij')
         x_flat = X.flatten()
         y_flat = Y.flatten()
-        
+
+        self.plots_data.X = X
+        self.plots_data.Y = Y
+        self.plots_data.x_flat = x_flat
+        self.plots_data.y_flat = y_flat
+
         # Calculate spacing between adjacent time bins
-        spacing_factor = 1.2  # 20% spacing between bins
-        bin_spacing = x_extent * spacing_factor
+        self.plots_data.bin_spacing = self.plots_data.x_extent * self.params.spacing_factor
         
         # Create a height map surface for each time bin
-        for t_bin_idx in range(n_time_bins):
+        self.plots_data.translation_triple_list = []
 
+        for t_bin_idx in range(self.params.max_n_t_bins):
             # Position horizontally: each bin offset along X axis
-            x_translation = t_bin_idx * bin_spacing
+            x_translation = t_bin_idx * self.plots_data.bin_spacing
 
             translation_triple = (x_translation, 0.0, 0.0)
+            self.plots_data.translation_triple_list.append(translation_triple)
 
 
 
 
-    def _configure_time_bin_item(self, item, translation_triple: Optional[Tuple]=None, raise_on_error: bool=True):
+    def _configure_time_bin_item(self, item, t_bin_idx: int, raise_on_error: bool=True):
         """Configure per-time-bin scatter item appearance and bounding box."""
         try:
             # Enable height map visualization
@@ -1773,15 +1847,32 @@ class Epoch3DSceneTimeBinViewer(GenericSilxContainer, qt.QWidget):
                 raise
 
         try:
-            # Set colormap
-            item.getColormap().setName('viridis')
+            # # Get colormap
+            # colormap: Colormap = item.getColormap()
+            # # Set colormap
+            # colormap.setName('viridis')
+            # colormap.setVRange(self.params.all_epochs_p_x_given_n_min, self.params.all_epochs_p_x_given_n_max) # autoscaleMode='percentile_1_99'
+            # # setAutoscaleMode
+            # colormap: Colormap = Colormap(name='viridis', normalization='linear', vmin=self.params.all_epochs_p_x_given_n_min, vmax=self.params.all_epochs_p_x_given_n_max, autoscaleMode='percentile_1_99')
+            colormap: Colormap = Colormap(name='viridis', normalization='linear', 
+                # vmin=self.params.all_epochs_p_x_given_n_min, vmax=self.params.all_epochs_p_x_given_n_max,
+                vmin=self.params.per_epoch_p_x_given_n_min_list[t_bin_idx], vmax=self.params.per_epoch_p_x_given_n_max_list[t_bin_idx], ## per epoch specific
+                # vmin=0.0, vmax=self.params.all_epochs_p_x_given_n_max,
+                # autoscaleMode='percentile_1_99',
+            )
+
+            item.setColormap(colormap)
+
         except Exception as e:
             if raise_on_error:
                 raise
         
+        # item.setInterpolation('linear')  # 'linear' or 'nearest' interpolation
 
         try:
             # Position horizontally: each bin offset along X axis
+            translation_triple = self.plots_data.translation_triple_list[t_bin_idx] # (x_translation, 0.0, 0.0)
+
             assert len(translation_triple) == 3
             item.setTranslation(*translation_triple)
 
@@ -1839,7 +1930,9 @@ class Epoch3DSceneTimeBinViewer(GenericSilxContainer, qt.QWidget):
         # Calculate spacing between adjacent time bins
         spacing_factor = 1.2  # 20% spacing between bins
         bin_spacing = x_extent * spacing_factor
-        
+
+        self._build_time_bin_positions()
+
         # Create a height map surface for each time bin
         for t_bin_idx in range(n_time_bins):
             # Extract 2D slice for this time bin
@@ -1850,12 +1943,10 @@ class Epoch3DSceneTimeBinViewer(GenericSilxContainer, qt.QWidget):
             item = self.scene_widget.add2DScatter(x_flat, y_flat, values_flat)
 
             # Position horizontally: each bin offset along X axis
-            x_translation = t_bin_idx * bin_spacing
-
-            translation_triple = (x_translation, 0.0, 0.0)
+            # x_translation = t_bin_idx * bin_spacing
 
             # Per-item visualization and bounding box configuration
-            self._configure_time_bin_item(item, translation_triple=translation_triple)
+            self._configure_time_bin_item(item, t_bin_idx=t_bin_idx)
             
             # Set scale to maintain proper aspect ratio
             # Horizontal layout is handled by translation; scale is handled in _configure_time_bin_item
