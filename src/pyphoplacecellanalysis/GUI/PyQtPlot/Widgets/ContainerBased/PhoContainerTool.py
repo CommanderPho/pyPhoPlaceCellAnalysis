@@ -43,7 +43,6 @@ class PhoBaseContainerTool:
     params: VisualizationParameters = field(default=Factory(VisualizationParameters, 'plotter'), repr=keys_only_repr)
 
 
-
 @metadata_attributes(short_name=None, tags=['container', 'generic', 'matplotlib'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-05-12 10:03', related_items=['PhoBaseContainerTool', 'GenericPyQtGraphContainer','GenericSilxContainer'])
 @define(slots=False, eq=False)
 class GenericMatplotlibContainer(PhoBaseContainerTool):
@@ -118,11 +117,6 @@ class GenericMatplotlibContainer(PhoBaseContainerTool):
         
         return _obj
         
-
-
-
-
-
 
 
 @metadata_attributes(short_name=None, tags=['unused', 'container', 'pyqtgraph'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-11-17 20:06', related_items=['PhoBaseContainerTool','GenericMatplotlibContainer', 'GenericSilxContainer'])

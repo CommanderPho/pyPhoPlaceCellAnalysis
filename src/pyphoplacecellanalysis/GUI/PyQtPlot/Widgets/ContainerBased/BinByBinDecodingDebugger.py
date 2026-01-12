@@ -210,7 +210,7 @@ class BinByBinDecodingDebugger(GenericPyQtGraphContainer):
     # ==================================================================================================================== #
     name: str = field(default='binByBinDecodingDebugger')
     plots: PyqtgraphRenderPlots = field(default=Factory(PyqtgraphRenderPlots, 'binByBinDecodingDebugger'))
-    plot_data: RenderPlotsData = field(default=Factory(RenderPlotsData, 'binByBinDecodingDebugger'))
+    plots_data: RenderPlotsData = field(default=Factory(RenderPlotsData, 'binByBinDecodingDebugger'))
     ui: PhoUIContainer = field(default=Factory(PhoUIContainer, 'binByBinDecodingDebugger'))
     params: VisualizationParameters = field(default=Factory(VisualizationParameters, 'binByBinDecodingDebugger'), repr=keys_only_repr)
     
@@ -222,7 +222,7 @@ class BinByBinDecodingDebugger(GenericPyQtGraphContainer):
     @property
     def pf1D_decoder_template_objects(self) -> List[BaseTemplateDebuggingMixin]:
         """The pf1D_decoder_template_objects property."""
-        return self.plot_data.pf1D_decoder_template_objects
+        return self.plots_data.pf1D_decoder_template_objects
     
     @property
     def win(self):
@@ -231,7 +231,7 @@ class BinByBinDecodingDebugger(GenericPyQtGraphContainer):
 
     @property
     def _out_decoded_active_plots_data(self) -> Dict[int, RenderPlotsData]:
-        return self.plot_data._out_decoded_active_plots_data
+        return self.plots_data._out_decoded_active_plots_data
     
 
     @property
@@ -611,7 +611,7 @@ class BinByBinDecodingDebugger(GenericPyQtGraphContainer):
 
             """
             # raise NotImplementedError(f'#TODO 2025-08-22 12:14: - [ ] Not done')
-            _update_output = self.perform_update_time_binned_decoder_debug_plots(win=self.ui.win, decoder_template_objects=self.plot_data.pf1D_decoder_template_objects, plots_container=self.plots, plots_data=self.plot_data,
+            _update_output = self.perform_update_time_binned_decoder_debug_plots(win=self.ui.win, decoder_template_objects=self.plots_data.pf1D_decoder_template_objects, plots_container=self.plots, plots_data=self.plots_data,
                                                                         new_time_bin_edges=new_time_bin_edges, new_p_x_given_n=new_p_x_given_n, new_active_aclu_spike_counts_list=new_active_aclu_spike_counts_list, debug_print=debug_print,
                                                                         **kwargs)
             ## just in case it doesn't modify in place, we need to unpack and assign:
@@ -743,7 +743,7 @@ class BinByBinDecodingDebugger(GenericPyQtGraphContainer):
         plot_data = RenderPlotsData(name=f'epoch[{name_suffix}]', pf1D_decoder_template_objects=out_pf1D_decoder_template_objects, _out_decoded_active_plots_data=_out_decoded_active_plots_data) # , spikes_df=active_global_spikes_df, a_decoder=a_decoder, active_aclus=neuron_IDs, bin_by_bin_data=bin_by_bin_data
         _obj_dict['plot_data'] = plot_data
         bin_by_bin_debugger: BinByBinDecodingDebugger = cls(**_obj_dict)
-        bin_by_bin_debugger.plot_data.pf1D_decoder_template_objects = out_pf1D_decoder_template_objects
+        bin_by_bin_debugger.plots_data.pf1D_decoder_template_objects = out_pf1D_decoder_template_objects
         bin_by_bin_debugger.ui.win = win
         bin_by_bin_debugger.params.on_update_fcn = None        
 
@@ -788,7 +788,7 @@ class BinByBinDecodingDebugger(GenericPyQtGraphContainer):
 
         _obj_dict['plot_data'] = plot_data
         _obj = cls(**_obj_dict)
-        _obj.plot_data.pf1D_decoder_template_objects = pf1D_decoder_template_objects
+        _obj.plots_data.pf1D_decoder_template_objects = pf1D_decoder_template_objects
         _obj.ui.win = win
         _obj.params.on_update_fcn = None
         return _obj 
