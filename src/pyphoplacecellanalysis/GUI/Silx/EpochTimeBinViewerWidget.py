@@ -1220,6 +1220,7 @@ class Epoch3DSceneTimeBinViewer(GenericSilxContainer, qt.QWidget):
         sidebar_tabs.insertTab(tab_index, container, "Locality Measures")
         print(f"DEBUG: Added 'Locality Measures' tab at index {tab_index}. Total tabs: {sidebar_tabs.count()}")
     
+
     def _create_locality_measures_dock_widget(self):
         """Create a dock widget containing the locality measures table."""
         if not self.params.is_point_like_mode or self.plots_data.locality_measures_df is None:
@@ -1620,12 +1621,26 @@ class Epoch3DSceneTimeBinViewer(GenericSilxContainer, qt.QWidget):
 
     def _clear_time_bin_items(self):
         """Remove all time bin items from the scene"""
-        for item in self.time_bin_items:
+        def _perform_remove(an_item):
             try:
                 if hasattr(self.scene_widget, 'removeItem'):
-                    self.scene_widget.removeItem(item)
+                    self.scene_widget.removeItem(an_item)
             except:
                 pass
+
+
+        for item in self.time_bin_items:
+            if isinstance(item, (Tuple, List)):
+                for an_item in item:
+                    try:
+                        _perform_remove(an_item=an_item)
+                    except:
+                        pass
+            else:
+                try:
+                    _perform_remove(an_item=item)
+                except:
+                    pass
         self.time_bin_items.clear()
     
     def _clear_text_label_items(self):
@@ -1742,6 +1757,42 @@ class Epoch3DSceneTimeBinViewer(GenericSilxContainer, qt.QWidget):
             pass
 
 
+
+    def add_peak_contours_overlays(self, peak_prominence_result, edge_color: str = '#ffaaff78', line_width: float = 1.0, z_offset: Optional[float] = None):
+        """Adds peak contours as Silx 3D line overlays that update when the epoch slider changes.
+
+        Mirrors the Napari add_peak_contours_layer conceptually but renders into the SceneWindow.
+
+        Args:
+            peak_prominence_result: PosteriorPeaksPeakProminence2dResult containing per-epoch, per-time-bin contours.
+            edge_color: Hex RGBA string for contour color (default '#ffaaff78').
+            line_width: Width of contour lines.
+            z_offset: Constant Z offset above the base plane for the contour lines.
+        """
+        self.plots_data.peak_prominence_result = peak_prominence_result
+
+        # Clear any existing contour items and rebuild for current epoch
+        self._clear_peak_contour_items()
+        self._add_contours_for_current_epoch(edge_color=edge_color, line_width=line_width, z_offset=z_offset)
+    
+    
+
+    def _update_text_label_positions(self):
+        """Update positions of all text labels after window resize"""
+        if not self._label_data:
+            return
+        
+        # Clear and recreate labels with updated positions
+        self._clear_text_label_items()
+        for label_data in self._label_data:
+            label_text, t_bin_idx, x_translation, x_min, x_max, y_min, y_max, bin_spacing = label_data
+            self._add_text_label_3d(label_text, t_bin_idx, x_translation, x_min, x_max, y_min, y_max, bin_spacing)
+
+
+    # ==================================================================================================================================================================================================================================================================================== #
+    # Lifecycle Functions                                                                                                                                                                                                                                                                  #
+    # ==================================================================================================================================================================================================================================================================================== #
+
     def _build_time_bin_positions(self):
         """ builds the mapping between time-bin-index and item positions for all items 
 
@@ -1835,108 +1886,81 @@ class Epoch3DSceneTimeBinViewer(GenericSilxContainer, qt.QWidget):
             self.plots_data.translation_triple_list.append(translation_triple)
 
 
-    def _create_mesh_from_grid(self, X: NDArray, Y: NDArray, values_2d: NDArray) -> Tuple[NDArray, NDArray]:
-        """Create mesh vertices and faces from 2D grid data.
-        
-        Args:
-            X: 2D meshgrid of X coordinates (n_x_bins, n_y_bins)
-            Y: 2D meshgrid of Y coordinates (n_x_bins, n_y_bins)
-            values_2d: 2D array of values to use as z-coordinates (n_x_bins, n_y_bins)
-            
-        Returns:
-            Tuple of (vertices, faces) where:
-                - vertices: (N, 3) array of (x, y, z) coordinates
-                - faces: (M, 3) array of triangle indices
-        """
-        n_x_bins, n_y_bins = X.shape
-        
-        # Create vertices: (x, y, z) where z = values
-        # Flatten X, Y, and values to create vertex list
-        x_flat = X.flatten()
-        y_flat = Y.flatten()
-        z_flat = values_2d.flatten()
-        
-        # Handle NaN values by setting z to 0 (or could use nanmin/nanmax)
-        z_flat = np.nan_to_num(z_flat, nan=0.0)
-        
-        # Stack into (N, 3) vertices array
-        vertices = np.column_stack((x_flat, y_flat, z_flat))
-        
-        # Create triangular faces for grid
-        # For each grid cell (i, j), create two triangles:
-        # Triangle 1: (i,j), (i+1,j), (i,j+1)
-        # Triangle 2: (i+1,j), (i+1,j+1), (i,j+1)
-        faces = []
-        
-        for i in range(n_x_bins - 1):
-            for j in range(n_y_bins - 1):
-                # Calculate linear indices for the four corners of the cell
-                idx_00 = i * n_y_bins + j  # (i, j)
-                idx_10 = (i + 1) * n_y_bins + j  # (i+1, j)
-                idx_01 = i * n_y_bins + (j + 1)  # (i, j+1)
-                idx_11 = (i + 1) * n_y_bins + (j + 1)  # (i+1, j+1)
-                
-                # Triangle 1: (i,j), (i+1,j), (i,j+1)
-                faces.append([idx_00, idx_10, idx_01])
-                
-                # Triangle 2: (i+1,j), (i+1,j+1), (i,j+1)
-                faces.append([idx_10, idx_11, idx_01])
-        
-        faces = np.array(faces, dtype=np.int32)
-        
-        return vertices, faces
 
 
-    def _configure_time_bin_item(self, item, t_bin_idx: int, raise_on_error: bool=False):
-        """Configure per-time-bin mesh item appearance and bounding box."""
-        try:
-            # # Get colormap
-            # colormap: Colormap = item.getColormap()
-            # # Set colormap
-            # colormap.setName('viridis')
-            # colormap.setVRange(self.params.all_epochs_p_x_given_n_min, self.params.all_epochs_p_x_given_n_max) # autoscaleMode='percentile_1_99'
-            # # setAutoscaleMode
-            # colormap: Colormap = Colormap(name='viridis', normalization='linear', vmin=self.params.all_epochs_p_x_given_n_min, vmax=self.params.all_epochs_p_x_given_n_max, autoscaleMode='percentile_1_99')
-            colormap: Colormap = Colormap(name='viridis', normalization='linear', 
-                # vmin=self.params.all_epochs_p_x_given_n_min, vmax=self.params.all_epochs_p_x_given_n_max,
-                vmin=self.params.per_epoch_p_x_given_n_min_list[t_bin_idx], vmax=self.params.per_epoch_p_x_given_n_max_list[t_bin_idx], ## per epoch specific
-                # vmin=0.0, vmax=self.params.all_epochs_p_x_given_n_max,
-                # autoscaleMode='percentile_1_99',
-            )
-
-            item.setColormap(colormap)
-
-        except Exception as e:
-            if raise_on_error:
-                raise
+    def _configure_time_bin_item(self, t_bin_idx: int, mesh_item=None, points_item=None, raise_on_error: bool=True):
+        """Configure per-time-bin scatter item appearance and bounding box."""
+        # Position horizontally: each bin offset along X axis
+        translation_triple = self.plots_data.translation_triple_list[t_bin_idx] # (x_translation, 0.0, 0.0)
+        assert len(translation_triple) == 3
         
-        # item.setInterpolation('linear')  # 'linear' or 'nearest' interpolation
+        
+        if mesh_item is not None:
+            item = mesh_item
+            try:
+                # # Get colormap
+                # colormap: Colormap = item.getColormap()
+                # # Set colormap
+                # colormap.setName('viridis')
+                # colormap.setVRange(self.params.all_epochs_p_x_given_n_min, self.params.all_epochs_p_x_given_n_max) # autoscaleMode='percentile_1_99'
+                # # setAutoscaleMode
+                # colormap: Colormap = Colormap(name='viridis', normalization='linear', vmin=self.params.all_epochs_p_x_given_n_min, vmax=self.params.all_epochs_p_x_given_n_max, autoscaleMode='percentile_1_99')
+                colormap: Colormap = Colormap(name='viridis', normalization='linear', 
+                    # vmin=self.params.all_epochs_p_x_given_n_min, vmax=self.params.all_epochs_p_x_given_n_max,
+                    vmin=self.params.per_epoch_p_x_given_n_min_list[t_bin_idx], vmax=self.params.per_epoch_p_x_given_n_max_list[t_bin_idx], ## per epoch specific
+                    # vmin=0.0, vmax=self.params.all_epochs_p_x_given_n_max,
+                    # autoscaleMode='percentile_1_99',
+                )
 
-        try:
-            # Position horizontally: each bin offset along X axis
-            translation_triple = self.plots_data.translation_triple_list[t_bin_idx] # (x_translation, 0.0, 0.0)
-
-            assert len(translation_triple) == 3
-            item.setTranslation(*translation_triple)
-
-        except Exception as e:
-            if raise_on_error:
-                raise
-
-
-        try:
-            if hasattr(item, 'setBoundingBoxVisible'):
-                item.setBoundingBoxVisible(True)
-            if hasattr(item, 'setVisualization'):
-                # Use solid visualization for mesh items
+                item.setColormap(colormap)
+                # Enable height map visualization
+                item.setHeightMap(True)
                 item.setVisualization('solid')
-                
-            # Anisotropic scale: emphasize Z (time/height) dimension
-            if hasattr(item, 'setScale'):
+                item.setBoundingBoxVisible(True)
+
+                item.setTranslation(*translation_triple)
+
+                # Anisotropic scale: emphasize Z (time/height) dimension
                 item.setScale(1.0, 1.0, 1000.0)
-        except Exception:
-            # Keep failures non-fatal so the scene still renders
-            pass
+
+            except Exception:
+                # Keep failures non-fatal so the scene still renders
+                print(f'ERROR: item[t_bin_idx]: {t_bin_idx}. Error {e}')
+                if raise_on_error:
+                    raise
+                else:
+                    pass
+
+        if points_item is not None:
+            try:
+                # Point/marker appearance (APIs may vary across silx versions)
+                points_item.setVisualization('points') # setLineWidth
+                points_item.setSymbol('s') # square
+                points_item.setSymbolSize(5.0)
+
+                points_colormap: Colormap = Colormap(name='viridis', normalization='linear', 
+                    # vmin=self.params.all_epochs_p_x_given_n_min, vmax=self.params.all_epochs_p_x_given_n_max,
+                    vmin=self.params.per_epoch_p_x_given_n_min_list[t_bin_idx], vmax=self.params.per_epoch_p_x_given_n_max_list[t_bin_idx], ## per epoch specific
+                    # vmin=0.0, vmax=self.params.all_epochs_p_x_given_n_max,
+                    # autoscaleMode='percentile_1_99',
+                )
+                points_item.setColormap(points_colormap)
+                # Enable height map visualization
+                points_item.setHeightMap(True)
+
+                points_item.setTranslation(*translation_triple)
+
+                # Anisotropic scale: emphasize Z (time/height) dimension
+                points_item.setScale(1.0, 1.0, 1000.0)
+
+            except Exception:
+                # Keep failures non-fatal so the scene still renders
+                print(f'ERROR: points_item[t_bin_idx]: {t_bin_idx}. Error {e}')
+                if raise_on_error:
+                    raise
+
+        ## END if points_item is not None..
+
 
 
     def _create_time_bin_items(self):
@@ -1972,67 +1996,33 @@ class Epoch3DSceneTimeBinViewer(GenericSilxContainer, qt.QWidget):
 
         self._build_time_bin_positions()
 
-        # Create a mesh surface for each time bin
+        # Create a height map surface for each time bin
         for t_bin_idx in range(n_time_bins):
             # Extract 2D slice for this time bin
             slice_2d = p_x_given_n[:, :, t_bin_idx]  # (n_x_bins, n_y_bins)
-            
-            # Create mesh from grid data
-            vertices, faces = self._create_mesh_from_grid(X, Y, slice_2d) # verticies: (2583, 3), faces: (4960, 3)
-            
-            # Get values for colormap (flattened)
             values_flat = slice_2d.flatten()
             
-            # Create colormap with same parameters as _configure_time_bin_item
-            colormap: Colormap = Colormap(name='viridis', normalization='linear', 
-                vmin=self.params.per_epoch_p_x_given_n_min_list[t_bin_idx], 
-                vmax=self.params.per_epoch_p_x_given_n_max_list[t_bin_idx],
-            )
-            
-            # Convert values to colors using the colormap
-            # Colormap.applyToData() returns RGBA colors
-            colors = colormap.applyToData(values_flat) # (2583, 4)
-            # Ensure colors are in the right format (N, 4) RGBA array
-            if colors.ndim == 1:
-                # If single color, expand to match number of vertices
-                if len(colors) == 3:
-                    # RGB, add alpha
-                    colors = np.tile(np.append(colors, 1.0), (len(values_flat), 1)).reshape(-1, 4)
-                elif len(colors) == 4:
-                    # RGBA, expand
-                    colors = np.tile(colors, (len(values_flat), 1)).reshape(-1, 4)
-            elif colors.ndim == 2:
-                if colors.shape[1] == 3:
-                    # If RGB (N, 3), add alpha channel
-                    alpha = np.ones((colors.shape[0], 1))
-                    colors = np.column_stack((colors, alpha))
-                # If already (N, 4), use as is
-            
-            # Create Mesh item
-            mesh_item = plot3d_items.Mesh()
-            # Set mesh data with colors - Mesh API uses position, indices, and color
-            # mesh_item.setData(position=vertices, indices=faces, color=colors)
-            mesh_item.setData(position=vertices, color=colors)
+            # Create 2D scatter item with height map
+            # mesh_item = self.scene_widget.add2DScatter(x_flat, y_flat, values_flat)
+            mesh_item = None
 
-            
-            # Add mesh to scene
-            self.scene_widget.addItem(mesh_item)
-            item = mesh_item
+            points_item = self.scene_widget.add2DScatter(x_flat, y_flat, values_flat)
 
-            # Position horizontally: each bin offset along X axis
-            # Get x_translation from translation_triple_list (calculated in _build_time_bin_positions)
-            translation_triple = self.plots_data.translation_triple_list[t_bin_idx]
-            x_translation = translation_triple[0]
+            added_items = []
+            if mesh_item is not None:
+                added_items.append(mesh_item)
+            if points_item is not None:
+                added_items.append(points_item)
 
             # Per-item visualization and bounding box configuration
-            # This sets the colormap which uses the values set above
-            self._configure_time_bin_item(item, t_bin_idx=t_bin_idx)
+            self._configure_time_bin_item(t_bin_idx=t_bin_idx, mesh_item=mesh_item, points_item=points_item)
             
-            # Set scale to maintain proper aspect ratio
-            # Horizontal layout is handled by translation; scale is handled in _configure_time_bin_item
+            if len(added_items) == 1:
+                added_items = added_items[0] ## extract just the single item
             
             # Store item for cleanup
-            self.time_bin_items.append(item)
+            # self.time_bin_items.append((item, points_item))
+            self.time_bin_items.append(points_item)
             
             # Add text label below this time bin if available
             if self.plots_data.text_data_provider is not None or self.params.text_columns:
@@ -2041,11 +2031,11 @@ class Epoch3DSceneTimeBinViewer(GenericSilxContainer, qt.QWidget):
                     # Store label data for later positioning
                     self._label_data.append((label_text, t_bin_idx, x_translation, x_min, x_max, y_min, y_max, bin_spacing))
                     self._add_text_label_3d(label_text, t_bin_idx, x_translation, x_min, x_max, y_min, y_max, bin_spacing)
+
         ## END for t_bin_idx in range(n_time_bins)...
 
         # After items exist in the scene, configure the root 'Data' node bounding box if present
         self._configure_root_data_bounding_box()
-
 
 
 
@@ -2080,24 +2070,6 @@ class Epoch3DSceneTimeBinViewer(GenericSilxContainer, qt.QWidget):
         
 
 
-    def add_peak_contours_overlays(self, peak_prominence_result, edge_color: str = '#ffaaff78', line_width: float = 1.0, z_offset: Optional[float] = None):
-        """Adds peak contours as Silx 3D line overlays that update when the epoch slider changes.
-
-        Mirrors the Napari add_peak_contours_layer conceptually but renders into the SceneWindow.
-
-        Args:
-            peak_prominence_result: PosteriorPeaksPeakProminence2dResult containing per-epoch, per-time-bin contours.
-            edge_color: Hex RGBA string for contour color (default '#ffaaff78').
-            line_width: Width of contour lines.
-            z_offset: Constant Z offset above the base plane for the contour lines.
-        """
-        self.plots_data.peak_prominence_result = peak_prominence_result
-
-        # Clear any existing contour items and rebuild for current epoch
-        self._clear_peak_contour_items()
-        self._add_contours_for_current_epoch(edge_color=edge_color, line_width=line_width, z_offset=z_offset)
-    
-
     def eventFilter(self, obj, event):
         """Event filter to catch scene window resize events"""
         try:
@@ -2113,15 +2085,3 @@ class Epoch3DSceneTimeBinViewer(GenericSilxContainer, qt.QWidget):
         except:
             pass
         return super().eventFilter(obj, event)
-    
-
-    def _update_text_label_positions(self):
-        """Update positions of all text labels after window resize"""
-        if not self._label_data:
-            return
-        
-        # Clear and recreate labels with updated positions
-        self._clear_text_label_items()
-        for label_data in self._label_data:
-            label_text, t_bin_idx, x_translation, x_min, x_max, y_min, y_max, bin_spacing = label_data
-            self._add_text_label_3d(label_text, t_bin_idx, x_translation, x_min, x_max, y_min, y_max, bin_spacing)
