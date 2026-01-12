@@ -2033,7 +2033,6 @@ class PredictiveDecodingComputationsContainer(ComputedResult):
         # ==================================================================================================================================================================================================================================================================================== #
         # BEGIN FUNCTION BODY                                                                                                                                                                                                                                                                  #
         # ==================================================================================================================================================================================================================================================================================== #
-        container = self
         masked_container: Optional[PredictiveDecodingComputationsContainer] = None
         
         if use_full_recompute_method:
@@ -2075,15 +2074,15 @@ class PredictiveDecodingComputationsContainer(ComputedResult):
             _moving_avg_dict, _moving_avg_meas_pos_overlap_dict, _gaussian_volume = masked_predictive_decoding.compute(sigma=sigma) ## updates masked_predictive_decoding.moving_avg_dict, masked_predictive_decoding.moving_avg_meas_pos_overlap_dict
             masked_container = PredictiveDecodingComputationsContainer(predictive_decoding=masked_predictive_decoding, is_global=True)
 
-            masked_container.pf1D_Decoder_dict = deepcopy(container.pf1D_Decoder_dict)
-            if selected_tbin in (container.epochs_decoded_result_cache_dict or {}):
-                masked_container.epochs_decoded_result_cache_dict[selected_tbin] = deepcopy(container.epochs_decoded_result_cache_dict[selected_tbin])
+            masked_container.pf1D_Decoder_dict = deepcopy(self.pf1D_Decoder_dict)
+            if selected_tbin in (self.epochs_decoded_result_cache_dict or {}):
+                masked_container.epochs_decoded_result_cache_dict[selected_tbin] = deepcopy(self.epochs_decoded_result_cache_dict[selected_tbin])
             masked_container = _subfn_update_internal_results(masked_container=masked_container, selected_tbin=selected_tbin)
 
         else:
             # The faster "cheap" way (notebook-backed): mask a single cached time_bin_size entry in-place (on a deepcopy of self)
             # Notebook reference: Spike3D/NOTEBOOK_RUN_LOGS/cleaned_last_run_history.py (e.g. ~L43, ~L2455, ~L2504) and Spike3D/NOTEBOOK_RUN_LOGS/last_run_history.py (e.g. ~L7553, ~L9965, ~L10014).
-            masked_container = deepcopy(container)
+            masked_container = deepcopy(self)
             cached_tbins: List[float] = list((masked_container.epochs_decoded_result_cache_dict or {}).keys())
             if len(cached_tbins) < 1:
                 return masked_container
