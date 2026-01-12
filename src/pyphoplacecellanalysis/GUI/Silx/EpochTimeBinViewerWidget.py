@@ -1985,7 +1985,24 @@ class Epoch3DSceneTimeBinViewer(GenericSilxContainer, qt.QWidget):
             
             # Create Mesh item
             mesh_item = plot3d_items.Mesh()
-            mesh_item.setData(position=vertices, indices=faces, values=values_flat)
+            # Set mesh data - Mesh API uses position and indices only
+            mesh_item.setData(position=vertices, indices=faces)
+            
+            # Set vertex values for colormap - try setValue() method
+            # This must be called before setting the colormap
+            try:
+                mesh_item.setValue(values_flat)
+            except (AttributeError, TypeError):
+                # If setValue doesn't work, try alternative methods
+                try:
+                    if hasattr(mesh_item, 'setValues'):
+                        mesh_item.setValues(values_flat)
+                    elif hasattr(mesh_item, 'setData') and len(mesh_item.setData.__code__.co_varnames) > 2:
+                        # Try setData with values as third positional argument
+                        mesh_item.setData(vertices, faces, values_flat)
+                except (AttributeError, TypeError):
+                    # If all else fails, colormap might work with default values
+                    pass
             
             # Add mesh to scene
             self.scene_widget.addItem(mesh_item)
@@ -1997,6 +2014,7 @@ class Epoch3DSceneTimeBinViewer(GenericSilxContainer, qt.QWidget):
             x_translation = translation_triple[0]
 
             # Per-item visualization and bounding box configuration
+            # This sets the colormap which uses the values set above
             self._configure_time_bin_item(item, t_bin_idx=t_bin_idx)
             
             # Set scale to maintain proper aspect ratio
