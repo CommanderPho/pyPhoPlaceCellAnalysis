@@ -7,6 +7,7 @@ import numpy as np
 import pandas as pd
 from typing import Dict, List, Tuple, Optional, Callable, Union, Any
 from nptyping import NDArray
+from skimage.measure import find_contours
 from PyQt5 import QtCore, QtGui, QtWidgets, uic
 import pyphoplacecellanalysis.External.pyqtgraph as pg
 from pyphocorehelpers.gui.Qt.ExceptionPrintingSlot import pyqtExceptionPrintingSlot
@@ -1536,12 +1537,12 @@ class Epoch3DSceneTimeBinViewer(GenericSilxContainer, qt.QWidget):
             # Simple approach: distribute labels evenly based on time bin index
             # This avoids issues with 3D-to-2D coordinate mapping and camera transformations
             n_time_bins = self.curr_n_time_bins
+            margin = 50  # pixels on each side
+            usable_width = scene_width - 2 * margin  # Define usable_width before conditional
+            
             if n_time_bins > 0:
                 # Calculate evenly spaced positions across the window width
                 # Leave margins on both sides
-                margin = 50  # pixels on each side
-                usable_width = scene_width - 2 * margin
-                
                 if n_time_bins > 1:
                     # Distribute evenly: first label at margin, last label at (scene_width - margin)
                     # Each label is centered at its position
@@ -1792,6 +1793,15 @@ class Epoch3DSceneTimeBinViewer(GenericSilxContainer, qt.QWidget):
         # Position contours slightly above the maximum height map value
         effective_z_offset = max_posterior_value + (max_posterior_value * 0.1) if max_posterior_value > 0 else 0.1
 
+        # Get coordinate arrays for converting pixel coordinates to world coordinates
+        if (self.plots_data.xbin_centers is not None) and (self.plots_data.ybin_centers is not None):
+            x_coords = np.array(self.plots_data.xbin_centers)
+            y_coords = np.array(self.plots_data.ybin_centers)
+        else:
+            # Use bin indices as coordinates
+            x_coords = np.arange(n_x_bins)
+            y_coords = np.arange(n_y_bins)
+        
         total_contours_added = 0
         # for t_bin_idx in range(n_time_bins):
         for t_bin_idx, a_t_bin_masks in enumerate(mask_included_bins_list):
@@ -1799,22 +1809,45 @@ class Epoch3DSceneTimeBinViewer(GenericSilxContainer, qt.QWidget):
             num_masks: int = len(a_t_bin_masks)
             translation_triple = self.plots_data.translation_triple_list[t_bin_idx]
             curr_p_x_given_n = p_x_given_n[:, :, t_bin_idx]
-            # vertices = np.full_like(curr_p_x_given_n, fill_value=np.nan)
             
             contours_list = []
-            # contours_list = [np.full_like(curr_p_x_given_n, fill_value=np.nan) for _ in np.arange(num_masks)]
             
             for slice_idx, a_mask in enumerate(a_t_bin_masks):
-                if np.count_nonzero(a_mask) > 0:
-                    included_p_x_given_n = curr_p_x_given_n[a_mask]
-                    # vertices[a_mask] = included_p_x_given_n
-                    # contours_list[slice_idx][a_mask] = included_p_x_given_n
-                    # contours_list[slice_idx][a_mask] = included_p_x_given_n
-
-                    a_contour = np.full_like(curr_p_x_given_n, fill_value=np.nan)
-                    a_contour[a_mask] = included_p_x_given_n
-                    contours_list.append(a_contour)
+                if np.count_nonzero(a_mask) == 0:
+                    continue
+                
+                # Extract contour from boolean mask using find_contours
+                # find_contours expects a 2D array and returns contours in (row, col) format
+                # where row corresponds to y-axis and col corresponds to x-axis
+                try:
+                    # Find contours at level 0.5 (midpoint between False=0 and True=1)
+                    contours = find_contours(a_mask.astype(float), level=0.5)
                     
+                    for contour in contours:
+                        # contour is in (row, col) format where:
+                        # - row (first column) corresponds to y-axis (second dimension of array)
+                        # - col (second column) corresponds to x-axis (first dimension of array)
+                        # Convert from pixel coordinates to world coordinates
+                        row_indices = contour[:, 0]  # y-axis pixel coordinates
+                        col_indices = contour[:, 1]  # x-axis pixel coordinates
+                        
+                        # Interpolate to world coordinates
+                        # For x: use col_indices to index into x_coords
+                        # For y: use row_indices to index into y_coords
+                        # Handle fractional indices by interpolating
+                        x_world = np.interp(col_indices, np.arange(len(x_coords)), x_coords)
+                        y_world = np.interp(row_indices, np.arange(len(y_coords)), y_coords)
+                        
+                        # Create (N, 2) array of (x, y) coordinates
+                        vertices = np.column_stack([x_world, y_world])
+                        
+                        # Only add if contour has at least 2 points
+                        if len(vertices) >= 2:
+                            contours_list.append(vertices)
+                            
+                except Exception as e:
+                    print(f"DEBUG: Failed to extract contour from mask: {e}")
+                    continue
 
             ## OUTPUTS: contours_list
             # contours_list = self._extract_contours_for_epoch_timebin(epoch_idx=self.params.curr_epoch_idx, t_bin_idx=t_bin_idx)
@@ -1827,16 +1860,16 @@ class Epoch3DSceneTimeBinViewer(GenericSilxContainer, qt.QWidget):
                     continue
 
                 # vertices are in world (x, y) coordinates; apply time-bin translation along X
-                x_coords = vertices[:, 0] + translation_triple[0] # x_translation
-                y_coords = vertices[:, 1] + translation_triple[1]
+                x_coords_translated = vertices[:, 0] + translation_triple[0] # x_translation
+                y_coords_translated = vertices[:, 1] + translation_triple[1]
                 # Use the effective z offset calculated from data range
-                z_coords = np.full_like(x_coords, effective_z_offset, dtype=float) + translation_triple[2]
+                z_coords = np.full_like(x_coords_translated, effective_z_offset, dtype=float) + translation_triple[2]
 
 
                 try:
-                    values = np.ones_like(x_coords, dtype=float)
+                    values = np.ones_like(x_coords_translated, dtype=float)
                     line_item = plot3d_items.Scatter3D()
-                    line_item.setData(x_coords, y_coords, z_coords, values)
+                    line_item.setData(x_coords_translated, y_coords_translated, z_coords, values)
                     line_item.setVisualization('lines')
                     line_item.setLineWidth(float(line_width))
                     line_item.setColor(rgba_color)
@@ -2089,6 +2122,10 @@ class Epoch3DSceneTimeBinViewer(GenericSilxContainer, qt.QWidget):
 
         # Create a height map surface for each time bin
         for t_bin_idx in range(n_time_bins):
+            # Get translation for this time bin
+            translation_triple = self.plots_data.translation_triple_list[t_bin_idx]
+            x_translation = translation_triple[0]  # Extract x_translation from translation_triple
+            
             # Extract 2D slice for this time bin
             slice_2d = p_x_given_n[:, :, t_bin_idx]  # (n_x_bins, n_y_bins)
             values_flat = slice_2d.flatten()
