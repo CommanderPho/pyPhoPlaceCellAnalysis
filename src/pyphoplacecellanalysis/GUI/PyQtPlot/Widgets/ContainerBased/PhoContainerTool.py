@@ -14,6 +14,8 @@ from pyphocorehelpers.DataStructure.general_parameter_containers import Visualiz
 from pyphocorehelpers.gui.PhoUIContainer import PhoUIContainer
 from pyphocorehelpers.DataStructure.RenderPlots.PyqtgraphRenderPlots import PyqtgraphRenderPlots
 from pyphocorehelpers.DataStructure.RenderPlots.MatplotLibRenderPlots import MatplotlibRenderPlots
+from pyphocorehelpers.DataStructure.RenderPlots.SilxRenderPlots import SilxRenderPlots
+
 
 import pyphoplacecellanalysis.External.pyqtgraph as pg
 
@@ -42,7 +44,7 @@ class PhoBaseContainerTool:
 
 
 
-@metadata_attributes(short_name=None, tags=['container', 'generic', 'matplotlib'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-05-12 10:03', related_items=[])
+@metadata_attributes(short_name=None, tags=['container', 'generic', 'matplotlib'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-05-12 10:03', related_items=['PhoBaseContainerTool', 'GenericPyQtGraphContainer','GenericSilxContainer'])
 @define(slots=False, eq=False)
 class GenericMatplotlibContainer(PhoBaseContainerTool):
     """ a tool in a container:
@@ -123,7 +125,7 @@ class GenericMatplotlibContainer(PhoBaseContainerTool):
 
 
 
-@metadata_attributes(short_name=None, tags=['unused', 'container', 'pyqtgraph'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-11-17 20:06', related_items=[])
+@metadata_attributes(short_name=None, tags=['unused', 'container', 'pyqtgraph'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-11-17 20:06', related_items=['PhoBaseContainerTool','GenericMatplotlibContainer', 'GenericSilxContainer'])
 @define(slots=False, eq=False)
 class GenericPyQtGraphContainer:
     """ GenericPyQtGraphContainer holds related plots, their data, and methods that manipulate them in a straightforward way
@@ -136,6 +138,24 @@ class GenericPyQtGraphContainer:
     plot_data: RenderPlotsData = field(default=Factory(RenderPlotsData, 'plotter'))
     ui: PhoUIContainer = field(default=Factory(PhoUIContainer, 'plotter'))
     params: VisualizationParameters = field(default=Factory(VisualizationParameters, 'plotter'), repr=keys_only_repr)
+
+
+
+@metadata_attributes(short_name=None, tags=['container', 'Silx'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-01-12 07:14', related_items=['PhoBaseContainerTool','GenericMatplotlibContainer', 'GenericPyQtGraphContainer'])
+@define(slots=False, eq=False)
+class GenericSilxContainer:
+    """ GenericPyQtGraphContainer holds related plots, their data, and methods that manipulate them in a straightforward way
+
+    from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.ContainerBased.PhoContainerTool import GenericSilxContainer
+
+    """
+    name: str = field(default='plot')
+    plots: SilxRenderPlots = field(default=Factory(SilxRenderPlots, 'plotter'))
+    plot_data: RenderPlotsData = field(default=Factory(RenderPlotsData, 'plotter'))
+    ui: PhoUIContainer = field(default=Factory(PhoUIContainer, 'plotter'))
+    params: VisualizationParameters = field(default=Factory(VisualizationParameters, 'plotter'), repr=keys_only_repr)
+
+
 
 
 
