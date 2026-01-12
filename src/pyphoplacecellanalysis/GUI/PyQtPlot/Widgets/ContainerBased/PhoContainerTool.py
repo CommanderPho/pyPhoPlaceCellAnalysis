@@ -135,10 +135,17 @@ class GenericPyQtGraphContainer:
     """
     name: str = field(default='plot')
     plots: PyqtgraphRenderPlots = field(default=Factory(PyqtgraphRenderPlots, 'plotter'))
-    plot_data: RenderPlotsData = field(default=Factory(RenderPlotsData, 'plotter'))
+    plots_data: RenderPlotsData = field(default=Factory(RenderPlotsData, 'plotter'))
     ui: PhoUIContainer = field(default=Factory(PhoUIContainer, 'plotter'))
     params: VisualizationParameters = field(default=Factory(VisualizationParameters, 'plotter'), repr=keys_only_repr)
 
+    @property
+    def plot_data(self) -> RenderPlotsData:
+        """The plot_data property."""
+        return self.plots_data
+    @plot_data.setter
+    def plot_data(self, value: RenderPlotsData):
+        self.plots_data = value
 
 
 @metadata_attributes(short_name=None, tags=['container', 'Silx'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-01-12 07:14', related_items=['PhoBaseContainerTool','GenericMatplotlibContainer', 'GenericPyQtGraphContainer'])
