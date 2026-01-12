@@ -151,7 +151,7 @@ class GenericSilxContainer:
     """
     name: str = field(default='plot')
     plots: SilxRenderPlots = field(default=Factory(SilxRenderPlots, 'plotter'))
-    plot_data: RenderPlotsData = field(default=Factory(RenderPlotsData, 'plotter'))
+    plots_data: RenderPlotsData = field(default=Factory(RenderPlotsData, 'plotter'))
     ui: PhoUIContainer = field(default=Factory(PhoUIContainer, 'plotter'))
     params: VisualizationParameters = field(default=Factory(VisualizationParameters, 'plotter'), repr=keys_only_repr)
 

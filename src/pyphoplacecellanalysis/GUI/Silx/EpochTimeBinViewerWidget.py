@@ -165,7 +165,7 @@ class EpochTimeBinViewer(qt.QWidget):
         # Epoch slider
         self.epoch_slider = qt.QSlider(qt.Qt.Horizontal)
         self.epoch_slider.setMinimum(0)
-        self.epoch_slider.setMaximum(len(decoded_result.p_x_given_n_list) - 1)
+        self.ui.epoch_slider.setMaximum(len(self.plot_data.decoded_result.p_x_given_n_list) - 1)
         self.epoch_slider.setTickPosition(qt.QSlider.TicksBelow)
         self.epoch_slider.setTickInterval(1)
         self.epoch_slider.valueChanged.connect(self.on_epoch_changed)
@@ -751,15 +751,15 @@ class Epoch3DSceneTimeBinViewer(GenericSilxContainer, qt.QWidget):
         # Initialize Qt widget
         qt.QWidget.__init__(self, **qt_kwargs)
         
-        self.decoded_result = decoded_result
-        self.xbin_centers = xbin_centers
-        self.ybin_centers = ybin_centers
-        self.locality_measures_df = locality_measures_df
-        self.text_columns = text_columns if text_columns is not None else []
-        self.text_data_provider = text_data_provider
+        self.plots_data.decoded_result = decoded_result
+        self.plots_data.xbin_centers = xbin_centers
+        self.plots_data.ybin_centers = ybin_centers
+        self.plots_data.locality_measures_df = locality_measures_df
+        self.params.text_columns = text_columns if text_columns is not None else []
+        self.plots_data.text_data_provider = text_data_provider
         
         # Detect point-like data mode (when 't' column exists in locality_measures_df)
-        self.params.is_point_like_mode = (locality_measures_df is not None and 't' in locality_measures_df.columns)
+        self.params.is_point_like_mode = (self.plots_data.locality_measures_df is not None and 't' in self.plots_data.locality_measures_df.columns)
         
         # Current epoch index
         self.params.curr_epoch_idx = 0
@@ -771,7 +771,7 @@ class Epoch3DSceneTimeBinViewer(GenericSilxContainer, qt.QWidget):
         self.text_label_items = []
 
         # Peak-contour overlays (Silx-specific)
-        self.peak_prominence_result = None
+        self.plots_data.peak_prominence_result = None
         self.peak_contour_items: List[Any] = []
         
         # Store table widget for locality measures (point-like mode)
@@ -800,20 +800,20 @@ class Epoch3DSceneTimeBinViewer(GenericSilxContainer, qt.QWidget):
         self.scene_window.installEventFilter(self)
         
         # Create epoch slider
-        slider_layout = qt.QHBoxLayout()
+        self.ui.slider_container_layout = qt.QHBoxLayout()
         
-        self.epoch_slider = qt.QSlider(qt.Qt.Horizontal)
-        self.epoch_slider.setMinimum(0)
-        self.epoch_slider.setMaximum(len(decoded_result.p_x_given_n_list) - 1)
-        self.epoch_slider.setTickPosition(qt.QSlider.TicksBelow)
-        self.epoch_slider.setTickInterval(1)
-        self.epoch_slider.valueChanged.connect(self.on_epoch_changed)
-        slider_layout.addWidget(qt.QLabel("Epoch:"))
-        slider_layout.addWidget(self.epoch_slider)
-        slider_layout.addWidget(qt.QLabel("0"))
-        self.epoch_label = slider_layout.itemAt(slider_layout.count()-1).widget()
+        self.ui.epoch_slider = qt.QSlider(qt.Qt.Horizontal)
+        self.ui.epoch_slider.setMinimum(0)
+        self.ui.epoch_slider.setMaximum(len(decoded_result.p_x_given_n_list) - 1)
+        self.ui.epoch_slider.setTickPosition(qt.QSlider.TicksBelow)
+        self.ui.epoch_slider.setTickInterval(1)
+        self.ui.epoch_slider.valueChanged.connect(self.on_epoch_changed)
+        self.ui.slider_container_layout.addWidget(qt.QLabel("Epoch:"))
+        self.ui.slider_container_layout.addWidget(self.ui.epoch_slider)
+        self.ui.slider_container_layout.addWidget(qt.QLabel("0"))
+        self.epoch_label = self.ui.slider_container_layout.itemAt(self.ui.slider_container_layout.count()-1).widget()
         
-        layout.addLayout(slider_layout)
+        layout.addLayout(self.ui.slider_container_layout)
         
         # Initialize
         self.on_epoch_changed(0)
@@ -821,7 +821,7 @@ class Epoch3DSceneTimeBinViewer(GenericSilxContainer, qt.QWidget):
 
     def _get_epoch_time_bin_shape(self, epoch_idx: int) -> Tuple[int, int, int]:
         """Return (n_x_bins, n_y_bins, n_time_bins) for the given epoch."""
-        p_x_given_n = self.decoded_result.p_x_given_n_list[epoch_idx]
+        p_x_given_n = self.plots_data.decoded_result.p_x_given_n_list[epoch_idx]
         return p_x_given_n.shape
 
 
@@ -833,11 +833,11 @@ class Epoch3DSceneTimeBinViewer(GenericSilxContainer, qt.QWidget):
         """
         from pyphoplacecellanalysis.External.peak_prominence2d import DecodedEpochIndex, DecodedEpochTimeBinIndex, DecodedEpochTimeBinIndexTuple
 
-        if self.peak_prominence_result is None:
+        if self.plots_data.peak_prominence_result is None:
             return []
 
         try:
-            a_peaks_results: Dict[DecodedEpochTimeBinIndexTuple, Dict] = self.peak_prominence_result.results
+            a_peaks_results: Dict[DecodedEpochTimeBinIndexTuple, Dict] = self.plots_data.peak_prominence_result.results
         except AttributeError:
             return []
 
@@ -879,20 +879,20 @@ class Epoch3DSceneTimeBinViewer(GenericSilxContainer, qt.QWidget):
 
     def _add_contours_for_current_epoch(self, edge_color: str = '#ffaaff', line_width: float = 1.0, z_offset: float = 0.01):
         """Add Silx 3D line items for all contours in the current epoch."""
-        if self.peak_prominence_result is None:
+        if self.plots_data.peak_prominence_result is None:
             return
 
         try:
-            p_x_given_n = self.decoded_result.p_x_given_n_list[self.params.curr_epoch_idx]
+            p_x_given_n = self.plots_data.decoded_result.p_x_given_n_list[self.params.curr_epoch_idx]
         except Exception:
             return
 
         n_x_bins, n_y_bins, n_time_bins = p_x_given_n.shape
 
         # Determine spatial bounds from bin centers or indices
-        if self.xbin_centers is not None and self.ybin_centers is not None:
-            x_coords = np.array(self.xbin_centers)
-            y_coords = np.array(self.ybin_centers)
+        if self.plots_data.xbin_centers is not None and self.plots_data.ybin_centers is not None:
+            x_coords = np.array(self.plots_data.xbin_centers)
+            y_coords = np.array(self.plots_data.ybin_centers)
             x_min, x_max = float(x_coords[0]), float(x_coords[-1])
             y_min, y_max = float(y_coords[0]), float(y_coords[-1])
             x_extent = x_max - x_min
@@ -1105,8 +1105,8 @@ class Epoch3DSceneTimeBinViewer(GenericSilxContainer, qt.QWidget):
     
     def _create_locality_measures_table_tab(self):
         """Create and add a table tab to the sidebar displaying locality_measures_df."""
-        if not self.params.is_point_like_mode or self.locality_measures_df is None:
-            print(f"DEBUG: Skipping table creation - is_point_like_mode={self.params.is_point_like_mode}, df is None={self.locality_measures_df is None}")
+        if not self.params.is_point_like_mode or self.plots_data.locality_measures_df is None:
+            print(f"DEBUG: Skipping table creation - is_point_like_mode={self.params.is_point_like_mode}, df is None={self.plots_data.locality_measures_df is None}")
             return
         
         # Get the sidebar tab widget
@@ -1194,7 +1194,7 @@ class Epoch3DSceneTimeBinViewer(GenericSilxContainer, qt.QWidget):
     
     def _create_locality_measures_dock_widget(self):
         """Create a dock widget containing the locality measures table."""
-        if not self.params.is_point_like_mode or self.locality_measures_df is None:
+        if not self.params.is_point_like_mode or self.plots_data.locality_measures_df is None:
             return
         
         # Create QTableWidget
@@ -1291,8 +1291,8 @@ class Epoch3DSceneTimeBinViewer(GenericSilxContainer, qt.QWidget):
         t_bin_time = time_bin_centers[t_bin_idx]
         
         # Find matching row in dataframe
-        if 't' in self.locality_measures_df.columns:
-            time_diffs = (self.locality_measures_df['t'] - t_bin_time).abs()
+        if 't' in self.plots_data.locality_measures_df.columns:
+            time_diffs = (self.plots_data.locality_measures_df['t'] - t_bin_time).abs()
             closest_idx = time_diffs.idxmin()
             closest_time_diff = time_diffs.loc[closest_idx]
             
@@ -1301,7 +1301,7 @@ class Epoch3DSceneTimeBinViewer(GenericSilxContainer, qt.QWidget):
             if closest_time_diff <= atol:
                 # Find the row index in the dataframe
                 # Get the position of closest_idx in the dataframe index
-                df_index_pos = self.locality_measures_df.index.get_loc(closest_idx)
+                df_index_pos = self.plots_data.locality_measures_df.index.get_loc(closest_idx)
                 # If get_loc returns a slice or boolean array, get the first position
                 if isinstance(df_index_pos, (slice, np.ndarray)):
                     if isinstance(df_index_pos, slice):
@@ -1355,17 +1355,17 @@ class Epoch3DSceneTimeBinViewer(GenericSilxContainer, qt.QWidget):
     @property
     def curr_n_time_bins(self) -> int:
         """Get number of time bins for current epoch"""
-        p_x_given_n = self.decoded_result.p_x_given_n_list[self.params.curr_epoch_idx]
+        p_x_given_n = self.plots_data.decoded_result.p_x_given_n_list[self.params.curr_epoch_idx]
         return p_x_given_n.shape[-1]  # Last dimension is time
     
     def _get_time_bin_centers(self) -> Optional[NDArray]:
         """Get time bin centers for current epoch if available"""
         try:
-            if hasattr(self.decoded_result, 'time_bin_containers') and self.decoded_result.time_bin_containers is not None:
-                return self.decoded_result.time_bin_containers[self.params.curr_epoch_idx].centers
-            elif hasattr(self.decoded_result, 'time_window_centers'):
+            if hasattr(self.plots_data.decoded_result, 'time_bin_containers') and self.plots_data.decoded_result.time_bin_containers is not None:
+                return self.plots_data.decoded_result.time_bin_containers[self.params.curr_epoch_idx].centers
+            elif hasattr(self.plots_data.decoded_result, 'time_window_centers'):
                 # Fallback to time_window_centers if available
-                return self.decoded_result.time_window_centers
+                return self.plots_data.decoded_result.time_window_centers
         except (AttributeError, IndexError, KeyError):
             pass
         return None
@@ -1377,8 +1377,8 @@ class Epoch3DSceneTimeBinViewer(GenericSilxContainer, qt.QWidget):
             Tuple of (start_time, stop_time) or None if not available
         """
         try:
-            if hasattr(self.decoded_result, 'time_bin_containers') and self.decoded_result.time_bin_containers is not None:
-                time_bin_container = self.decoded_result.time_bin_containers[self.params.curr_epoch_idx]
+            if hasattr(self.plots_data.decoded_result, 'time_bin_containers') and self.plots_data.decoded_result.time_bin_containers is not None:
+                time_bin_container = self.plots_data.decoded_result.time_bin_containers[self.params.curr_epoch_idx]
                 print(f'time_bin_container: {time_bin_container}')
                 # Check if container has start/stop attributes
                 if hasattr(time_bin_container, 'start') and hasattr(time_bin_container, 'stop'):
@@ -1410,8 +1410,8 @@ class Epoch3DSceneTimeBinViewer(GenericSilxContainer, qt.QWidget):
         
         # Fallback: try to get from time_window_centers
         try:
-            if hasattr(self.decoded_result, 'time_window_centers'):
-                centers = self.decoded_result.time_window_centers
+            if hasattr(self.plots_data.decoded_result, 'time_window_centers'):
+                centers = self.plots_data.decoded_result.time_window_centers
                 if len(centers) > 0:
                     if len(centers) > 1:
                         bin_width = centers[1] - centers[0]
@@ -1434,7 +1434,7 @@ class Epoch3DSceneTimeBinViewer(GenericSilxContainer, qt.QWidget):
         Returns:
             Filtered DataFrame containing only rows where 't' is between epoch start and stop
         """
-        if self.locality_measures_df is None or not self.params.is_point_like_mode:
+        if self.plots_data.locality_measures_df is None or not self.params.is_point_like_mode:
             return pd.DataFrame()
         
         # Get epoch time range
@@ -1442,20 +1442,20 @@ class Epoch3DSceneTimeBinViewer(GenericSilxContainer, qt.QWidget):
         print(f'time_range: {time_range}')
         if time_range is None:
             # If we can't get time range, return full dataframe
-            return self.locality_measures_df
+            return self.plots_data.locality_measures_df
         
         start_time, stop_time = time_range
         
         # Filter dataframe: keep rows where 't' is between start_time and stop_time
-        if 't' in self.locality_measures_df.columns:
-            filtered_df = self.locality_measures_df[
-                (self.locality_measures_df['t'] >= start_time) & 
-                (self.locality_measures_df['t'] <= stop_time)
+        if 't' in self.plots_data.locality_measures_df.columns:
+            filtered_df = self.plots_data.locality_measures_df[
+                (self.plots_data.locality_measures_df['t'] >= start_time) & 
+                (self.plots_data.locality_measures_df['t'] <= stop_time)
             ].copy()
             return filtered_df
         
         # If no 't' column, return full dataframe
-        return self.locality_measures_df
+        return self.plots_data.locality_measures_df
     
 
     def _update_table_for_current_epoch(self):
@@ -1511,10 +1511,10 @@ class Epoch3DSceneTimeBinViewer(GenericSilxContainer, qt.QWidget):
         Returns:
             Matching dataframe row (Series) or None if no match found
         """
-        if (self.locality_measures_df is None):
+        if (self.plots_data.locality_measures_df is None):
             return None
 
-        # if self.locality_measures_df is None or ('start' not in self.locality_measures_df.columns) or ('stop' not in self.locality_measures_df.columns):
+        # if self.plot_data.locality_measures_df is None or ('start' not in self.plot_data.locality_measures_df.columns) or ('stop' not in self.plot_data.locality_measures_df.columns):
         #     return None
         
         time_bin_centers = self._get_time_bin_centers()
@@ -1528,30 +1528,30 @@ class Epoch3DSceneTimeBinViewer(GenericSilxContainer, qt.QWidget):
         t_bin_time = time_bin_centers[t_bin_idx]
         
         # Find matching row where start <= t_bin_time <= stop
-        if ('stop' in self.locality_measures_df) and ('stop' in self.locality_measures_df):
+        if ('stop' in self.plots_data.locality_measures_df) and ('stop' in self.plots_data.locality_measures_df):
             ## epoch-style updates
-            matching_rows = self.locality_measures_df[
-                (self.locality_measures_df['start'] <= t_bin_time) & 
-                (t_bin_time <= self.locality_measures_df['stop'])
+            matching_rows = self.plots_data.locality_measures_df[
+                (self.plots_data.locality_measures_df['start'] <= t_bin_time) & 
+                (t_bin_time <= self.plots_data.locality_measures_df['stop'])
             ]
-        elif ('t' in self.locality_measures_df):
+        elif ('t' in self.plots_data.locality_measures_df):
             ## point/position-style updates: find closest match within tolerance
             print(f'debug: point-style data: t_bin_time: {t_bin_time}')
             # Find the index with the closest time value
-            time_diffs = (self.locality_measures_df['t'] - t_bin_time).abs()
+            time_diffs = (self.plots_data.locality_measures_df['t'] - t_bin_time).abs()
             closest_idx = time_diffs.idxmin()
             closest_time_diff = time_diffs.loc[closest_idx]
-            print(f'\tclosest_idx: {closest_idx}, closest_time_diff: {closest_time_diff}, self.locality_measures_df.loc[[closest_idx]]: {self.locality_measures_df.loc[[closest_idx]]}')
+            print(f'\tclosest_idx: {closest_idx}, closest_time_diff: {closest_time_diff}, self.plot_data.locality_measures_df.loc[[closest_idx]]: {self.plots_data.locality_measures_df.loc[[closest_idx]]}')
             # Check if closest match is within tolerance (default 1ms)
             atol = 0.100  # 100 millisecond tolerance, kinda insanely high
             if closest_time_diff <= atol:
-                matching_rows = self.locality_measures_df.loc[[closest_idx]]
+                matching_rows = self.plots_data.locality_measures_df.loc[[closest_idx]]
             else:
                 # No match within tolerance
                 matching_rows = pd.DataFrame()  # Empty DataFrame
 
         else:
-            print(f'WARN: attempting to get time_bin_to_dataframe_row text failed because self.locality_measures_df does not look epoch-like or point-like: self.locality_measures_df.columns: {list(self.locality_measures_df.columns)}')
+            print(f'WARN: attempting to get time_bin_to_dataframe_row text failed because self.plot_data.locality_measures_df does not look epoch-like or point-like: self.plot_data.locality_measures_df.columns: {list(self.plots_data.locality_measures_df.columns)}')
             return None
         
         if len(matching_rows) > 0:
@@ -1570,17 +1570,17 @@ class Epoch3DSceneTimeBinViewer(GenericSilxContainer, qt.QWidget):
             Formatted text string or None if no label available
         """
         # Check if text_data_provider is provided (takes precedence)
-        if self.text_data_provider is not None:
-            return self.text_data_provider.get_text_label(self.params.curr_epoch_idx, t_bin_idx)
+        if self.plots_data.text_data_provider is not None:
+            return self.plots_data.text_data_provider.get_text_label(self.params.curr_epoch_idx, t_bin_idx)
         
         # Fall back to existing text_columns approach
         row = self._match_time_bin_to_dataframe_row(t_bin_idx)
-        if row is None or not self.text_columns:
+        if row is None or not self.params.text_columns:
             return None
         
         # Build label from specified columns
         label_parts = []
-        for col in self.text_columns:
+        for col in self.params.text_columns:
             if col in row.index:
                 value = row[col]
                 # Format the value appropriately
@@ -1720,18 +1720,18 @@ class Epoch3DSceneTimeBinViewer(GenericSilxContainer, qt.QWidget):
 
     def _build_time_bin_positions(self):
         """ builds the mapping between time-bin-index and item positions for all items """
-        assert self.decoded_result is not None
-        assert len(self.decoded_result.p_x_given_n_list) > 0
+        assert self.plots_data.decoded_result is not None
+        assert len(self.plots_data.decoded_result.p_x_given_n_list) > 0
         
-        p_x_given_n = self.decoded_result.p_x_given_n_list[0] ## get first item to determine shape
+        p_x_given_n = self.plots_data.decoded_result.p_x_given_n_list[0] ## get first item to determine shape
         # Shape: (n_x_bins, n_y_bins, n_time_bins)
         n_x_bins, n_y_bins, n_time_bins = p_x_given_n.shape
         
         # Calculate coordinate arrays
-        if (self.xbin_centers is not None) and (self.ybin_centers is not None):
+        if (self.plots_data.xbin_centers is not None) and (self.plots_data.ybin_centers is not None):
             # Use actual bin center values
-            x_coords = np.array(self.xbin_centers)
-            y_coords = np.array(self.ybin_centers)
+            x_coords = np.array(self.plots_data.xbin_centers)
+            y_coords = np.array(self.plots_data.ybin_centers)
             x_min, x_max = float(x_coords[0]), float(x_coords[-1])
             y_min, y_max = float(y_coords[0]), float(y_coords[-1])
             x_extent = x_max - x_min
@@ -1811,15 +1811,15 @@ class Epoch3DSceneTimeBinViewer(GenericSilxContainer, qt.QWidget):
 
     def _create_time_bin_items(self):
         """Create and position all time bin height maps for current epoch"""
-        p_x_given_n = self.decoded_result.p_x_given_n_list[self.params.curr_epoch_idx]
+        p_x_given_n = self.plots_data.decoded_result.p_x_given_n_list[self.params.curr_epoch_idx]
         # Shape: (n_x_bins, n_y_bins, n_time_bins)
         n_x_bins, n_y_bins, n_time_bins = p_x_given_n.shape
         
         # Calculate coordinate arrays
-        if (self.xbin_centers is not None) and (self.ybin_centers is not None):
+        if (self.plots_data.xbin_centers is not None) and (self.plots_data.ybin_centers is not None):
             # Use actual bin center values
-            x_coords = np.array(self.xbin_centers)
-            y_coords = np.array(self.ybin_centers)
+            x_coords = np.array(self.plots_data.xbin_centers)
+            y_coords = np.array(self.plots_data.ybin_centers)
             x_min, x_max = float(x_coords[0]), float(x_coords[-1])
             y_min, y_max = float(y_coords[0]), float(y_coords[-1])
             x_extent = x_max - x_min
@@ -1864,7 +1864,7 @@ class Epoch3DSceneTimeBinViewer(GenericSilxContainer, qt.QWidget):
             self.time_bin_items.append(item)
             
             # Add text label below this time bin if available
-            if self.text_data_provider is not None or self.text_columns:
+            if self.plots_data.text_data_provider is not None or self.params.text_columns:
                 label_text = self._get_text_label_string(t_bin_idx)
                 if label_text is not None:
                     # Store label data for later positioning
@@ -1893,7 +1893,7 @@ class Epoch3DSceneTimeBinViewer(GenericSilxContainer, qt.QWidget):
         self._create_time_bin_items()
 
         # Recreate peak-contour overlays for this epoch if available
-        if self.peak_prominence_result is not None:
+        if self.plots_data.peak_prominence_result is not None:
             self._add_contours_for_current_epoch()
         
         # Update label positions after a short delay to ensure window is sized
@@ -1920,7 +1920,7 @@ class Epoch3DSceneTimeBinViewer(GenericSilxContainer, qt.QWidget):
             line_width: Width of contour lines.
             z_offset: Constant Z offset above the base plane for the contour lines.
         """
-        self.peak_prominence_result = peak_prominence_result
+        self.plots_data.peak_prominence_result = peak_prominence_result
 
         # Clear any existing contour items and rebuild for current epoch
         self._clear_peak_contour_items()
