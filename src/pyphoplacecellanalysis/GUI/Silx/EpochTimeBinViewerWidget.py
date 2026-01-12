@@ -3,6 +3,7 @@ from silx.gui.plot import Plot2D
 from silx.gui.plot3d.ScalarFieldView import ScalarFieldView
 from silx.gui.plot3d.SceneWidget import SceneWidget
 from silx.gui.plot3d.SceneWindow import SceneWindow, items as plot3d_items
+from silx.gui.plot3d.items.scatter import Scatter2D, Scatter3D
 from silx.gui.colors import Colormap
 import numpy as np
 import pandas as pd
@@ -772,7 +773,8 @@ class Epoch3DSceneTimeBinViewer(GenericSilxContainer, qt.QWidget):
 
         # Detect point-like data mode (when 't' column exists in locality_measures_df)
         self.params.is_point_like_mode = (self.plots_data.locality_measures_df is not None and 't' in self.plots_data.locality_measures_df.columns)
-        
+        self.params.use_groupItem = True
+        self.plots.time_bin_groupItems = [] ## initialize to empty
         
         # Current epoch index
         self.params.curr_epoch_idx = 0
@@ -1681,90 +1683,6 @@ class Epoch3DSceneTimeBinViewer(GenericSilxContainer, qt.QWidget):
         if self.plots_data.peak_prominence_result is None:
             return
 
-        # try:
-        #     p_x_given_n = self.plots_data.decoded_result.p_x_given_n_list[self.params.curr_epoch_idx]
-        # except Exception:
-        #     return
-
-        # n_x_bins, n_y_bins, n_time_bins = p_x_given_n.shape
-
-        # # Determine spatial bounds from bin centers or indices
-        # if self.plots_data.xbin_centers is not None and self.plots_data.ybin_centers is not None:
-        #     x_coords = np.array(self.plots_data.xbin_centers)
-        #     y_coords = np.array(self.plots_data.ybin_centers)
-        #     x_min, x_max = float(x_coords[0]), float(x_coords[-1])
-        #     y_min, y_max = float(y_coords[0]), float(y_coords[-1])
-        #     x_extent = x_max - x_min
-        # else:
-        #     x_min, x_max = 0.0, float(n_x_bins - 1)
-        #     y_min, y_max = 0.0, float(n_y_bins - 1)
-        #     x_extent = float(n_x_bins - 1)
-
-        # spacing_factor = 1.2
-        # bin_spacing = x_extent * spacing_factor
-
-        # # Parse edge_color hex string into RGBA
-        # def _parse_hex_color(hex_color: str) -> Tuple[float, float, float, float]:
-        #     hex_color = hex_color.lstrip('#')
-        #     if len(hex_color) == 8:
-        #         r = int(hex_color[0:2], 16) / 255.0
-        #         g = int(hex_color[2:4], 16) / 255.0
-        #         b = int(hex_color[4:6], 16) / 255.0
-        #         a = int(hex_color[6:8], 16) / 255.0
-        #     elif len(hex_color) == 6:
-        #         r = int(hex_color[0:2], 16) / 255.0
-        #         g = int(hex_color[2:4], 16) / 255.0
-        #         b = int(hex_color[4:6], 16) / 255.0
-        #         a = 1.0
-        #     else:
-        #         r, g, b, a = 1.0, 0.0, 1.0, 1.0
-        #     return (r, g, b, a)
-
-        # rgba_color = _parse_hex_color(edge_color)
-        
-        # # Calculate a reasonable z_offset based on the data range
-        # # Height maps use the posterior values as z, so we need contours above the max value
-        # max_posterior_value = np.nanmax(p_x_given_n)
-        # # Position contours slightly above the maximum height map value
-        # effective_z_offset = max_posterior_value + (max_posterior_value * 0.1) if max_posterior_value > 0 else 0.1
-
-        # total_contours_added = 0
-        # for t_bin_idx in range(n_time_bins):
-        #     contours_list = self._extract_contours_for_epoch_timebin(epoch_idx=self.params.curr_epoch_idx, t_bin_idx=t_bin_idx)
-        #     if len(contours_list) == 0:
-        #         continue
-
-        #     x_translation = t_bin_idx * bin_spacing
-        #     for vertices in contours_list:
-        #         if vertices.shape[1] != 2 or len(vertices) < 2:
-        #             continue
-
-        #         # vertices are in world (x, y) coordinates; apply time-bin translation along X
-        #         x_coords = vertices[:, 0] + x_translation
-        #         y_coords = vertices[:, 1]
-        #         # Use the effective z offset calculated from data range
-        #         z_coords = np.full_like(x_coords, effective_z_offset, dtype=float)
-
-        #         try:
-        #             values = np.ones_like(x_coords, dtype=float)
-        #             line_item = plot3d_items.Scatter3D()
-        #             line_item.setData(x_coords, y_coords, z_coords, values)
-        #             line_item.setVisualization('lines')
-        #             line_item.setLineWidth(float(line_width))
-        #             line_item.setColor(rgba_color)
-        #             # Explicitly set visibility
-        #             if hasattr(line_item, 'setVisible'):
-        #                 line_item.setVisible(True)
-        #             # Ensure the item is added to the scene
-        #             self.scene_widget.addItem(line_item)
-        #             self.plots.peak_contour_items.append(line_item)
-        #             total_contours_added += 1
-        #         except Exception as e:
-        #             print(f"DEBUG: Failed to add contour line item: {e}")
-        #             continue
-        
-        # print(f"DEBUG: Added {total_contours_added} contour line items for epoch {self.params.curr_epoch_idx}")
-
 
         try:
             p_x_given_n = self.plots_data.decoded_result.p_x_given_n_list[self.params.curr_epoch_idx]
@@ -1773,8 +1691,13 @@ class Epoch3DSceneTimeBinViewer(GenericSilxContainer, qt.QWidget):
 
         n_x_bins, n_y_bins, n_time_bins = p_x_given_n.shape
 
-        mask_included_bins_list = self.plots_data.peak_contours['mask_included_bins_list'][self.params.curr_epoch_idx]
+        # mask_included_bins_list = self.plots_data.peak_contours['mask_included_bins_list'][self.params.curr_epoch_idx]
+        mask_included_bins_list = self.plots_data.peak_contours['epoch_prom_t_bin_high_prob_pos_mask'][self.params.curr_epoch_idx]
         
+        # epoch_prom_t_bin_high_prob_pos_mask: (n_x_bins, n_y_bins, n_t_bins)
+
+
+
         # [np.sum(a_mask) for t_bin_idx, a_mask in enumerate(mask_included_bins_list)]
         # [np.count_nonzero(a_mask) for t_bin_idx, a_mask in enumerate(mask_included_bins_list)]
 
@@ -1887,6 +1810,9 @@ class Epoch3DSceneTimeBinViewer(GenericSilxContainer, qt.QWidget):
 
                 try:
                     values = np.ones_like(x_coords_translated, dtype=float)
+
+                    # self.plots.time_bin_groupItems
+                    
                     line_item = plot3d_items.Scatter3D()
                     line_item.setData(x_coords_translated, y_coords_translated, z_coords, values)
                     # line_item.setVisualization('lines')
@@ -1895,12 +1821,20 @@ class Epoch3DSceneTimeBinViewer(GenericSilxContainer, qt.QWidget):
                     # Explicitly set visibility
                     if hasattr(line_item, 'setVisible'):
                         line_item.setVisible(True)
+                    
                     # Ensure the item is added to the scene
-                    self.plots.scene_widget.addItem(line_item)
+                    if not self.params.use_groupItem:
+                        self.plots.scene_widget.addItem(line_item)
+                    else:
+                        ## add to group item:
+                        self.plots.time_bin_groupItems[t_bin_idx].addItem(line_item)
+
                     self.plots.peak_contour_items.append(line_item)
                     
                     line_item.setBoundingBoxVisible(False)
-                    line_item.setTranslation(*translation_triple)
+                    if not self.params.use_groupItem:
+                        line_item.setTranslation(*translation_triple)
+                    
                     line_item.setScale(1.0, 1.0, 1000.0) # Anisotropic scale: emphasize Z (time/height) dimension
 
                     total_contours_added += 1
@@ -1927,10 +1861,24 @@ class Epoch3DSceneTimeBinViewer(GenericSilxContainer, qt.QWidget):
 
         self.params.slice_level_multipliers = [0.9]
         self.plots_data.peak_contours = {}
-        
         self.plots_data.peak_prominence_result = peak_prominence_result
-        mask_included_bins_list = peak_prominence_result.compute_discrete_contour_masks(p_x_given_n_list=self.plots_data.decoded_result.p_x_given_n_list, slice_level_multipliers=self.params.slice_level_multipliers)
+
+        active_contour_level: float = 0.9
+        mask_included_bins_list, summit_slice_levels_list, mask_included_p_x_given_n_list_dict, epoch_prom_t_bin_high_prob_pos_masks, epoch_prom_high_prob_pos_masks, *extra_outs = peak_prominence_result.compute_discrete_contour_masks(p_x_given_n_list=self.plots_data.decoded_result.p_x_given_n_list, slice_level_multipliers=self.params.slice_level_multipliers)
+
+        # mask_included_bins_list
+        # summit_slice_levels_list
+        epoch_prom_high_prob_pos_mask = epoch_prom_high_prob_pos_masks[0.9] ## high
+        # np.shape(epoch_prom_high_prob_pos_mask) # (74, 41, 63)
+
         self.plots_data.peak_contours['mask_included_bins_list'] = mask_included_bins_list
+        self.plots_data.peak_contours['epoch_prom_t_bin_high_prob_pos_masks'] = epoch_prom_t_bin_high_prob_pos_masks
+        self.plots_data.peak_contours['epoch_prom_high_prob_pos_masks'] = epoch_prom_high_prob_pos_masks
+
+
+        self.plots_data.peak_contours['epoch_prom_t_bin_high_prob_pos_mask'] = epoch_prom_t_bin_high_prob_pos_masks[active_contour_level] # epoch_prom_t_bin_high_prob_pos_mask: (n_epochs, n_x_bins, n_ybins)
+        self.plots_data.peak_contours['epoch_prom_high_prob_pos_mask'] = epoch_prom_high_prob_pos_masks[active_contour_level] # epoch_prom_high_prob_pos_mask: (n_epochs, n_x_bins, n_ybins)
+
 
         # Clear any existing contour items and rebuild for current epoch
         self._clear_peak_contour_items()
@@ -2037,15 +1985,30 @@ class Epoch3DSceneTimeBinViewer(GenericSilxContainer, qt.QWidget):
 
 
 
-    def _configure_time_bin_item(self, t_bin_idx: int, mesh_item=None, points_item=None, raise_on_error: bool=True):
+    def _configure_time_bin_item(self, t_bin_idx: int, group_item=None, mesh_item=None, points_item=None, raise_on_error: bool=True):
         """Configure per-time-bin scatter item appearance and bounding box."""
         # Position horizontally: each bin offset along X axis
         translation_triple = self.plots_data.translation_triple_list[t_bin_idx] # (x_translation, 0.0, 0.0)
         assert len(translation_triple) == 3
+        has_group_item: bool = (group_item is not None)
         
+        if group_item is not None:
+            try:
+                group_item.setBoundingBoxVisible(True)
+                group_item.setTranslation(*translation_triple)
+                # Anisotropic scale: emphasize Z (time/height) dimension
+                # group_item.setScale(1.0, 1.0, 1000.0)
+
+            except Exception as e:
+                # Keep failures non-fatal so the scene still renders
+                print(f'ERROR: item[t_bin_idx]: {t_bin_idx}. Error {e}')
+                if raise_on_error:
+                    raise
+                else:
+                    pass
+                        
         
         if mesh_item is not None:
-            item = mesh_item
             try:
                 # # Get colormap
                 # colormap: Colormap = item.getColormap()
@@ -2061,18 +2024,19 @@ class Epoch3DSceneTimeBinViewer(GenericSilxContainer, qt.QWidget):
                     # autoscaleMode='percentile_1_99',
                 )
 
-                item.setColormap(colormap)
+                mesh_item.setColormap(colormap)
                 # Enable height map visualization
-                item.setHeightMap(True)
-                item.setVisualization('solid')
-                item.setBoundingBoxVisible(True)
+                mesh_item.setHeightMap(True)
+                mesh_item.setVisualization('solid')
+                mesh_item.setBoundingBoxVisible(not has_group_item)
 
-                item.setTranslation(*translation_triple)
-
+                if group_item is None:
+                    mesh_item.setTranslation(*translation_triple)
+                    
                 # Anisotropic scale: emphasize Z (time/height) dimension
-                item.setScale(1.0, 1.0, 1000.0)
+                mesh_item.setScale(1.0, 1.0, 1000.0)
 
-            except Exception:
+            except Exception as e:
                 # Keep failures non-fatal so the scene still renders
                 print(f'ERROR: item[t_bin_idx]: {t_bin_idx}. Error {e}')
                 if raise_on_error:
@@ -2097,12 +2061,15 @@ class Epoch3DSceneTimeBinViewer(GenericSilxContainer, qt.QWidget):
                 # Enable height map visualization
                 points_item.setHeightMap(True)
 
-                points_item.setTranslation(*translation_triple)
+                points_item.setBoundingBoxVisible(False)
+
+                if group_item is None:
+                    points_item.setTranslation(*translation_triple)
 
                 # Anisotropic scale: emphasize Z (time/height) dimension
                 points_item.setScale(1.0, 1.0, 1000.0)
 
-            except Exception:
+            except Exception as e:
                 # Keep failures non-fatal so the scene still renders
                 print(f'ERROR: points_item[t_bin_idx]: {t_bin_idx}. Error {e}')
                 if raise_on_error:
@@ -2113,6 +2080,8 @@ class Epoch3DSceneTimeBinViewer(GenericSilxContainer, qt.QWidget):
 
     def _create_time_bin_items(self):
         """Create and position all time bin height maps for current epoch"""
+        self.params.use_groupItem = True
+
         p_x_given_n = self.plots_data.decoded_result.p_x_given_n_list[self.params.curr_epoch_idx]
         # Shape: (n_x_bins, n_y_bins, n_time_bins)
         n_x_bins, n_y_bins, n_time_bins = p_x_given_n.shape
@@ -2154,32 +2123,43 @@ class Epoch3DSceneTimeBinViewer(GenericSilxContainer, qt.QWidget):
             slice_2d = p_x_given_n[:, :, t_bin_idx]  # (n_x_bins, n_y_bins)
             values_flat = slice_2d.flatten()
             
-
-            # Create a group item and add it to the scene
-            # The group children share the group transform
-            group = plot3d_items.GroupItem()  # Create a new group item
-            group.setTranslation(*translation_triple) # Translate the group
-
+            if self.params.use_groupItem:
+                # Create a group item and add it to the scene
+                # The group children share the group transform
+                groupItem = plot3d_items.GroupItem()  # Create a new group item
+                # groupItem.setTranslation(*translation_triple) # Translate the group
+            else:
+                groupItem = None
 
             # Create 2D scatter item with height map
             # mesh_item = self.scene_widget.add2DScatter(x_flat, y_flat, values_flat)
             mesh_item = None
+            if (mesh_item is not None) and (groupItem is not None):
+                groupItem.addItem(mesh_item)
 
-            # group_item = self.plots.scene_widget.add
-            points_item = self.plots.scene_widget.add2DScatter(x_flat, y_flat, values_flat)
+            # points_item = self.plots.scene_widget.add2DScatter(x_flat, y_flat, values_flat)
+            points_item: Scatter2D = Scatter2D()
+            points_item.setData(x_flat, y_flat, values_flat)
+            if (points_item is not None) and (groupItem is not None):
+                groupItem.addItem(points_item)
 
             added_items = []
+            if groupItem is not None:
+                added_items.append(groupItem)
             if mesh_item is not None:
                 added_items.append(mesh_item)
             if points_item is not None:
                 added_items.append(points_item)
 
             # Per-item visualization and bounding box configuration
-            self._configure_time_bin_item(t_bin_idx=t_bin_idx, mesh_item=mesh_item, points_item=points_item)
+            self._configure_time_bin_item(t_bin_idx=t_bin_idx, group_item=groupItem, mesh_item=mesh_item, points_item=points_item)
             
             # if len(added_items) == 1:
             #     added_items = added_items[0] ## extract just the single item
-            
+            if groupItem is not None:
+                self.scene_widget.addItem(groupItem)  # Add the group as an item of the scene
+                self.plots.time_bin_groupItems.append(groupItem)
+                
             # Store item for cleanup
             for an_item in added_items: 
                 self.time_bin_items.append(an_item)
@@ -2223,8 +2203,9 @@ class Epoch3DSceneTimeBinViewer(GenericSilxContainer, qt.QWidget):
                     _perform_remove(an_item=item)
                 except:
                     pass
+                
         self.time_bin_items.clear()
-        
+        self.plots.time_bin_groupItems.clear()        
 
     def on_epoch_changed(self, value):
         """Called when epoch slider changes"""

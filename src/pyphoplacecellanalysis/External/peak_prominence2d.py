@@ -376,6 +376,10 @@ class PosteriorPeaksPeakProminence2dResult(ComputedResult):
         peak_tips_only_df = self.flat_peaks_df[np.isin(self.flat_peaks_df['slice_level_multiplier'], slice_level_multipliers)].reset_index(drop=True) ## ['summit_slice_area'] > 0.0
         # p_x_given_n_list = decoded_local_epochs_result.p_x_given_n_list
         mask_included_bins_list = []
+        summit_slice_levels_list = []
+        # summit_slice_levels_df_list = []
+        # mask_included_p_x_given_n_list = {a_multiplier:[] for a_multiplier in slice_level_multipliers}
+
         for an_epoch_idx, p_x_given_n_dt in enumerate(p_x_given_n_list):
             # active_df: pd.DataFrame = peak_tips_only_df[peak_tips_only_df['epoch_idx'] == an_epoch_idx]
             n_t_bins: float = np.shape(p_x_given_n_dt)[-1]
@@ -393,10 +397,11 @@ class PosteriorPeaksPeakProminence2dResult(ComputedResult):
                 active_num_slice_levels: int = len(summit_slice_levels)
                 
                 all_slice_levels_mask_included_bins = ([None] * num_slice_levels)
+                all_slice_levels_summit_slice_levels_curr = ([None] * num_slice_levels)
+
                 for slice_idx, a_slice_multiplier in enumerate(slice_level_multipliers):
-                    # a_slice_level = 
-                # for slice_idx, a_slice_level in enumerate(summit_slice_levels):
-                    a_slice_level = active_df[active_df['slice_level_multiplier'] == a_slice_multiplier]['summit_slice_level'].to_numpy()
+                    a_slice_level_df: pd.DataFrame = active_df[active_df['slice_level_multiplier'] == a_slice_multiplier]
+                    a_slice_level = a_slice_level_df['summit_slice_level'].to_numpy()
                     if len(a_slice_level) > 0:
                         a_slice_level = a_slice_level[0] ## unpack
                         mask_included_bins = (a_p_x_given_n >= a_slice_level)
@@ -405,20 +410,27 @@ class PosteriorPeaksPeakProminence2dResult(ComputedResult):
                         a_slice_level = None
                         mask_included_bins = np.zeros_like(a_p_x_given_n).astype(bool) ## none include
 
-                    if consistant_output_shape or (active_num_slice_levels > 1):
-                        ## use temporary list for each level
-                        all_slice_levels_mask_included_bins[slice_idx] = mask_included_bins
-                        # all_slice_levels_mask_included_bins.append(mask_included_bins)
-                    else:
-                        ## add directly:
-                        an_epoch_mask_included_bins_list.append(mask_included_bins)
+                    ## use temporary list for each level
+                    all_slice_levels_mask_included_bins[slice_idx] = mask_included_bins
+                    # all_slice_levels_mask_included_bins.append(mask_included_bins)
+                    all_slice_levels_summit_slice_levels_curr[slice_idx] = a_slice_level
+
+                    # mask_included_p_x_given_n_list[a_slice_multiplier].append(mask_included_bins)
+
                 ## END for slice_idx, a_slice_level in enumerate(summ...
-                if consistant_output_shape or (active_num_slice_levels > 1):
-                    an_epoch_mask_included_bins_list.append(all_slice_levels_mask_included_bins)
- 
+
+                # for all_slice_levels_mask_included_bins for slice_idx, a_slice_multiplier in enumerate(slice_level_multipliers)
+
+                # if consistant_output_shape or (active_num_slice_levels > 1):
+                an_epoch_mask_included_bins_list.append(all_slice_levels_mask_included_bins)
+                summit_slice_levels_list.append(all_slice_levels_summit_slice_levels_curr)
+                # summit_slice_levels_df_list.append(active_df)
+
                         
             ## END for a_rel_t_bin_idx in np.arange(n_t_bi...
             # an_epoch_mask_included_bins_list = np.stack(an_epoch_mask_included_bins_list, axis=-1)
+            # mask_included_p_x_given_n_list[ ] = [np.stack(an_epoch_mask_included_bins_list, axis=-1) for slice_idx, a_slice_multiplier in enumerate(slice_level_multipliers)]
+
             mask_included_bins_list.append(an_epoch_mask_included_bins_list)
 
         ## END for an_epoch_idx, p_x_given_n_dt in en...
@@ -427,7 +439,32 @@ class PosteriorPeaksPeakProminence2dResult(ComputedResult):
         # for a_row in peak_tips_only_df.itertuples(index=True, name='PeakTuple'):
         #     int(a_row.index)
             
-        return mask_included_bins_list
+        # np.shape(summit_slice_levels_list) # (409, 2) - (n_t, n_slice_multipliers)
+        # # np.vstack(summit_slice_levels_list)
+
+        # pd.DataFrame(summit_slice_levels_list, columns=slice_level_multipliers)
+
+
+        # mask_included_p_x_given_n_list_dict = {a_slice_multiplier:[[np.stack(a_mask[slice_idx], axis=0) for a_rel_t_bin_idx, a_mask in enumerate(p_x_given_n_dt)] for an_epoch_idx, p_x_given_n_dt in enumerate(mask_included_bins_list)] for slice_idx, a_slice_multiplier in enumerate(slice_level_multipliers)}
+        # mask_included_p_x_given_n_list_dict = {a_slice_multiplier:[[np.stack(a_mask[slice_idx], axis=0) for a_mask in p_x_given_n_dt] for p_x_given_n_dt in mask_included_bins_list] for slice_idx, a_slice_multiplier in enumerate(slice_level_multipliers)}        
+        # mask_included_p_x_given_n_list_dict = {a_slice_multiplier:[np.atleast_3d(np.stack([a_mask[slice_idx] for a_mask in p_x_given_n_dt], axis=-1)) for p_x_given_n_dt in mask_included_bins_list] for slice_idx, a_slice_multiplier in enumerate(slice_level_multipliers)}
+        # mask_included_p_x_given_n_list_dict = {a_slice_multiplier:[np.stack([a_mask[slice_idx] for a_rel_t_bin_idx, a_mask in enumerate(p_x_given_n_dt)], axis=-1) for an_epoch_idx, p_x_given_n_dt in enumerate(mask_included_bins_list)] for slice_idx, a_slice_multiplier in enumerate(slice_level_multipliers)}
+        # mask_included_p_x_given_n_list_dict = {a_slice_multiplier:[np.stack([a_mask[slice_idx] for a_mask in p_x_given_n_dt], axis=-1) for p_x_given_n_dt in mask_included_bins_list] for slice_idx, a_slice_multiplier in enumerate(slice_level_multipliers)}
+        mask_included_p_x_given_n_list_dict = {a_slice_multiplier:[np.atleast_3d(np.stack([a_mask[slice_idx] for a_mask in p_x_given_n_dt], axis=-1)) for p_x_given_n_dt in mask_included_bins_list] for slice_idx, a_slice_multiplier in enumerate(slice_level_multipliers)}
+
+        ## get the masks for each time bins within each epoch
+        # epoch_prom_t_bin_high_prob_pos_masks = mask_included_p_x_given_n_list_dict[slice_level_multipliers[-1]]
+        # epoch_prom_t_bin_high_prob_pos_masks = {a_slice_multiplier:np.atleast_3d(a_slice_mask) for a_slice_multiplier, a_slice_mask in mask_included_p_x_given_n_list_dict.items()}
+        epoch_prom_t_bin_high_prob_pos_masks = {a_slice_multiplier:a_slice_mask for a_slice_multiplier, a_slice_mask in mask_included_p_x_given_n_list_dict.items()}
+        # epoch_prom_t_bin_high_prob_pos_masks
+
+        ## Collapse over all epochs:
+        # epoch_prom_high_prob_pos_masks = [np.any(v, -1, keepdims=False) for v in epoch_prom_t_bin_high_prob_pos_masks]
+        # epoch_prom_high_prob_pos_masks = {a_slice_multiplier:np.any(an_epoch_prom_t_bin_high_prob_pos_mask, -1, keepdims=False) for a_slice_multiplier, an_epoch_prom_t_bin_high_prob_pos_mask in epoch_prom_t_bin_high_prob_pos_masks.items()}
+        epoch_prom_high_prob_pos_masks = {a_slice_multiplier:[np.any(np.atleast_3d(a_slice_mask), -1, keepdims=False) for a_slice_mask in a_slice_mask_list] for a_slice_multiplier, a_slice_mask_list in mask_included_p_x_given_n_list_dict.items()} # np.shape(epoch_prom_high_prob_pos_masks) #  (74, 41, 63) - (n_epochs, n_xbins, n_ybins) -- boolean masks indicating whether that bin is included for the epoch (all of its time bins)
+        
+
+        return mask_included_bins_list, summit_slice_levels_list, mask_included_p_x_given_n_list_dict, epoch_prom_t_bin_high_prob_pos_masks, epoch_prom_high_prob_pos_masks
 
 
     # For serialization/pickling: ________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
