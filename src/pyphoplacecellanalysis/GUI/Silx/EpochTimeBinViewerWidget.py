@@ -771,6 +771,7 @@ class Epoch3DSceneTimeBinViewer(GenericSilxContainer, qt.QWidget):
         # Detect point-like data mode (when 't' column exists in locality_measures_df)
         self.params.is_point_like_mode = (self.plots_data.locality_measures_df is not None and 't' in self.plots_data.locality_measures_df.columns)
         
+        
         # Current epoch index
         self.params.curr_epoch_idx = 0
         
@@ -1763,7 +1764,8 @@ class Epoch3DSceneTimeBinViewer(GenericSilxContainer, qt.QWidget):
 
         mask_included_bins_list = self.plots_data.peak_contours['mask_included_bins_list'][self.params.curr_epoch_idx]
         
-        
+        # [np.sum(a_mask) for t_bin_idx, a_mask in enumerate(mask_included_bins_list)]
+        # [np.count_nonzero(a_mask) for t_bin_idx, a_mask in enumerate(mask_included_bins_list)]
 
         # Parse edge_color hex string into RGBA
         def _parse_hex_color(hex_color: str) -> Tuple[float, float, float, float]:
@@ -1791,18 +1793,33 @@ class Epoch3DSceneTimeBinViewer(GenericSilxContainer, qt.QWidget):
         effective_z_offset = max_posterior_value + (max_posterior_value * 0.1) if max_posterior_value > 0 else 0.1
 
         total_contours_added = 0
-        for t_bin_idx in range(n_time_bins):
-            a_t_bin_masks = mask_included_bins_list[t_bin_idx]
+        # for t_bin_idx in range(n_time_bins):
+        for t_bin_idx, a_t_bin_masks in enumerate(mask_included_bins_list):
+            # a_t_bin_masks = mask_included_bins_list[t_bin_idx]
             num_masks: int = len(a_t_bin_masks)
             translation_triple = self.plots_data.translation_triple_list[t_bin_idx]
+            curr_p_x_given_n = p_x_given_n[:, :, t_bin_idx]
+            # vertices = np.full_like(curr_p_x_given_n, fill_value=np.nan)
+            
+            contours_list = []
+            # contours_list = [np.full_like(curr_p_x_given_n, fill_value=np.nan) for _ in np.arange(num_masks)]
+            
+            for slice_idx, a_mask in enumerate(a_t_bin_masks):
+                if np.count_nonzero(a_mask) > 0:
+                    included_p_x_given_n = curr_p_x_given_n[a_mask]
+                    # vertices[a_mask] = included_p_x_given_n
+                    # contours_list[slice_idx][a_mask] = included_p_x_given_n
+                    # contours_list[slice_idx][a_mask] = included_p_x_given_n
 
-            for slice_idx, a_mask in enumerate(a_t_bin_masks):    
-                included_p_x_given_n = p_x_given_n[a_mask, t_bin_idx]
-                
+                    a_contour = np.full_like(curr_p_x_given_n, fill_value=np.nan)
+                    a_contour[a_mask] = included_p_x_given_n
+                    contours_list.append(a_contour)
+                    
 
+            ## OUTPUTS: contours_list
             # contours_list = self._extract_contours_for_epoch_timebin(epoch_idx=self.params.curr_epoch_idx, t_bin_idx=t_bin_idx)
-            # if len(contours_list) == 0:
-                # continue
+            if len(contours_list) == 0:
+                continue
 
             # x_translation = t_bin_idx * bin_spacing
             for vertices in contours_list:
@@ -1833,6 +1850,7 @@ class Epoch3DSceneTimeBinViewer(GenericSilxContainer, qt.QWidget):
                 except Exception as e:
                     print(f"DEBUG: Failed to add contour line item: {e}")
                     continue
+        ## END for t_bin_idx in range(n_tim...
         
         print(f"DEBUG: Added {total_contours_added} contour line items for epoch {self.params.curr_epoch_idx}")
 

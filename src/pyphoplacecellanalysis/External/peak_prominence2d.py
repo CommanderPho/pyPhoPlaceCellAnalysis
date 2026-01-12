@@ -393,12 +393,19 @@ class PosteriorPeaksPeakProminence2dResult(ComputedResult):
                 active_num_slice_levels: int = len(summit_slice_levels)
                 
                 all_slice_levels_mask_included_bins = ([None] * num_slice_levels)
-                # for slice_idx, a_slice_multiplier in enumerate(slice_level_multipliers):
+                for slice_idx, a_slice_multiplier in enumerate(slice_level_multipliers):
                     # a_slice_level = 
-                for slice_idx, a_slice_level in enumerate(summit_slice_levels):
-                    mask_included_bins = (a_p_x_given_n >= a_slice_level)
-                    
-                    if consistant_output_shape or (num_slice_levels > 1):
+                # for slice_idx, a_slice_level in enumerate(summit_slice_levels):
+                    a_slice_level = active_df[active_df['slice_level_multiplier'] == a_slice_multiplier]['summit_slice_level'].to_numpy()
+                    if len(a_slice_level) > 0:
+                        a_slice_level = a_slice_level[0] ## unpack
+                        mask_included_bins = (a_p_x_given_n >= a_slice_level)
+
+                    else:
+                        a_slice_level = None
+                        mask_included_bins = np.zeros_like(a_p_x_given_n).astype(bool) ## none include
+
+                    if consistant_output_shape or (active_num_slice_levels > 1):
                         ## use temporary list for each level
                         all_slice_levels_mask_included_bins[slice_idx] = mask_included_bins
                         # all_slice_levels_mask_included_bins.append(mask_included_bins)
@@ -406,13 +413,15 @@ class PosteriorPeaksPeakProminence2dResult(ComputedResult):
                         ## add directly:
                         an_epoch_mask_included_bins_list.append(mask_included_bins)
                 ## END for slice_idx, a_slice_level in enumerate(summ...
-                if consistant_output_shape or (num_slice_levels > 1):
+                if consistant_output_shape or (active_num_slice_levels > 1):
                     an_epoch_mask_included_bins_list.append(all_slice_levels_mask_included_bins)
  
                         
             ## END for a_rel_t_bin_idx in np.arange(n_t_bi...
-            an_epoch_mask_included_bins_list = np.stack(an_epoch_mask_included_bins_list, axis=-1)
+            # an_epoch_mask_included_bins_list = np.stack(an_epoch_mask_included_bins_list, axis=-1)
             mask_included_bins_list.append(an_epoch_mask_included_bins_list)
+
+        ## END for an_epoch_idx, p_x_given_n_dt in en...
 
         ## OUTPUTS: mask_included_bins_list
         # for a_row in peak_tips_only_df.itertuples(index=True, name='PeakTuple'):
