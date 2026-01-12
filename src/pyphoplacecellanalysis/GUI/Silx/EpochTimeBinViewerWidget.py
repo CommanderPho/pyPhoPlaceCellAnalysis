@@ -1887,7 +1887,7 @@ class Epoch3DSceneTimeBinViewer(GenericSilxContainer, qt.QWidget):
         return vertices, faces
 
 
-    def _configure_time_bin_item(self, item, t_bin_idx: int, raise_on_error: bool=True):
+    def _configure_time_bin_item(self, item, t_bin_idx: int, raise_on_error: bool=False):
         """Configure per-time-bin mesh item appearance and bounding box."""
         try:
             # # Get colormap
@@ -1978,7 +1978,7 @@ class Epoch3DSceneTimeBinViewer(GenericSilxContainer, qt.QWidget):
             slice_2d = p_x_given_n[:, :, t_bin_idx]  # (n_x_bins, n_y_bins)
             
             # Create mesh from grid data
-            vertices, faces = self._create_mesh_from_grid(X, Y, slice_2d)
+            vertices, faces = self._create_mesh_from_grid(X, Y, slice_2d) # verticies: (2583, 3), faces: (4960, 3)
             
             # Get values for colormap (flattened)
             values_flat = slice_2d.flatten()
@@ -1991,7 +1991,7 @@ class Epoch3DSceneTimeBinViewer(GenericSilxContainer, qt.QWidget):
             
             # Convert values to colors using the colormap
             # Colormap.applyToData() returns RGBA colors
-            colors = colormap.applyToData(values_flat)
+            colors = colormap.applyToData(values_flat) # (2583, 4)
             # Ensure colors are in the right format (N, 4) RGBA array
             if colors.ndim == 1:
                 # If single color, expand to match number of vertices
@@ -2011,7 +2011,9 @@ class Epoch3DSceneTimeBinViewer(GenericSilxContainer, qt.QWidget):
             # Create Mesh item
             mesh_item = plot3d_items.Mesh()
             # Set mesh data with colors - Mesh API uses position, indices, and color
-            mesh_item.setData(position=vertices, indices=faces, color=colors)
+            # mesh_item.setData(position=vertices, indices=faces, color=colors)
+            mesh_item.setData(position=vertices, color=colors)
+
             
             # Add mesh to scene
             self.scene_widget.addItem(mesh_item)
