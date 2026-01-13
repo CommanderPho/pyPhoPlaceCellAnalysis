@@ -1080,6 +1080,10 @@ class PeakPromenence:
         return included_computed_contours
 
 
+    # ==================================================================================================================================================================================================================================================================================== #
+    # _compute_single_posterior_slab Functions                                                                                                                                                                                                                                             #
+    # ==================================================================================================================================================================================================================================================================================== #
+
     @function_attributes(short_name=None, tags=['internal', 'parallelizable'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-01-06 06:48', related_items=[])
     @classmethod
     def _compute_single_posterior_slab(cls, epoch_idx: int, t_idx: int, slab: NDArray, xbin_centers: NDArray, ybin_centers: NDArray, step: float, min_considered_promenence: float, peak_height_multiplier_probe_levels: Tuple, debug_print: bool = False, should_return_raw_matplotlib_Path_contours: bool=False):
@@ -1486,12 +1490,12 @@ class PeakPromenence:
 
 
     @classmethod
-    def _build_filtered_summits_analysis_results(cls, xbin, ybin, xbin_labels, ybin_labels, flat_peaks_df, active_eloy_analysis, slice_level_multiplier=0.5, minimum_included_peak_height=0.5, debug_print=False):
+    def _build_filtered_summits_analysis_results(cls, xbin, ybin, xbin_labels, ybin_labels, flat_peaks_df: pd.DataFrame, active_eloy_analysis=None, slice_level_multiplier=0.5, minimum_included_peak_height=0.5, debug_print=False):
         """ builds the filtered summits analysis results dataframe and flat counts matrix 
         
         Usage:
             filtered_summits_analysis_df, pf_peak_counts_map = build_filtered_summits_analysis_results(active_pf_2D.xbin, active_pf_2D.ybin, active_pf_2D.xbin_labels, active_pf_2D.ybin_labels,
-                                                                                            active_peak_prominence_2d_results, active_eloy_analysis, slice_level_multiplier=0.5, minimum_included_peak_height=1.0, debug_print = False)
+                                                                                            active_peak_prominence_2d_results, active_eloy_analysis=active_eloy_analysis, slice_level_multiplier=0.5, minimum_included_peak_height=1.0, debug_print = False)
                                                                                             
         """
         ## Find which position bin each peak falls in and add it to the flat_peaks_df:
@@ -1523,6 +1527,8 @@ class PeakPromenence:
             
         return filtered_summits_analysis_df, pf_peak_counts_map
 
+
+    @function_attributes(short_name=None, tags=['OLD', 'Eloy'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-01-13 01:48', related_items=[])
     @classmethod
     def _compute_distances_from_peaks_to_boundary(cls, active_pf_2D, filtered_flat_peaks_df, debug_print = True):
         """ Computes the distance to boundary by computing the distance to the nearest never-occupied bin
@@ -1741,7 +1747,8 @@ class PeakPromenence:
         return peak_nearest_directional_boundary_bins, peak_nearest_directional_boundary_displacements, peak_nearest_directional_boundary_distances
 
 
-    @function_attributes(short_name=None, tags=['step-size', 'helper'], input_requires=[], output_provides=[], uses=[], used_by=['_perform_find_posterior_peaks_peak_prominence2d_computation'], creation_date='2025-12-23 00:00', related_items=[])
+
+    @function_attributes(short_name=None, tags=['step-size', 'helper', 'new'], input_requires=[], output_provides=[], uses=[], used_by=['_perform_find_posterior_peaks_peak_prominence2d_computation'], creation_date='2025-12-23 00:00', related_items=[])
     @classmethod
     def compute_optimal_step_size(cls, p_x_given_n_list: List[NDArray], resolution_factor: float = 500.0, min_step: float = 1e-6, max_step: float = 0.1, debug_print: bool = False) -> float:
         """Computes an optimal step size for prominence calculation based on the data range in p_x_given_n_list.
@@ -1927,6 +1934,8 @@ class PeakPromenence:
                     a_p_x_given_n = np.squeeze(p_x_given_n[:, :, t_idx])
                     slab = a_p_x_given_n.T  # match compute_prominence_contours convention
                     tasks.append((epoch_idx, t_idx, slab))
+            ## END for epoch_idx in np.arange(n_epochs)...
+
 
             out_results = {}
             out_posteriors_peak_dfs_list = []
@@ -1969,9 +1978,18 @@ class PeakPromenence:
             results_list.sort(key=lambda tup: (tup[0], tup[1]))
 
             for epoch_idx, t_idx, posterior_peaks_df, slab_result_dict in results_list:
+                try:
+                    if isinstance(slab_result_dict, dict):
+                        slab_result: SlabResult = SlabResult(**slab_result_dict)
+                        slab_result_dict = slab_result
+                except Exception as e:
+                    raise e
                 out_results[(epoch_idx, t_idx)] = slab_result_dict
+
                 if not posterior_peaks_df.empty:
                     out_posteriors_peak_dfs_list.append(posterior_peaks_df)
+            ## END for epoch_idx, t_idx, posterior_peaks_df, slab_result_dict in results_list...
+
 
             if len(out_posteriors_peak_dfs_list) == 0:
                 # no peaks found anywhere; return empty structures
@@ -1997,9 +2015,11 @@ class PeakPromenence:
             # Filter the summits, compute peak-counts, etc:
             # We do not currently have an EloyAnalysis-like object for posteriors, so pass None.
             active_eloy_analysis = None
-            filtered_summits_analysis_df, pf_peak_counts_map = PeakPromenence._build_filtered_summits_analysis_results(
-                xbin, ybin, np.arange(1, len(xbin)), np.arange(1, len(ybin)),
-                posterior_peaks_df, active_eloy_analysis,
+            xbin_labels = np.arange(1, len(xbin))
+            ybin_labels = np.arange(1, len(ybin))
+            filtered_summits_analysis_df, pf_peak_counts_map = cls._build_filtered_summits_analysis_results(
+                xbin=xbin, ybin=ybin, xbin_labels=xbin_labels, ybin_labels=ybin_labels,
+                flat_peaks_df=posterior_peaks_df, active_eloy_analysis=active_eloy_analysis,
                 slice_level_multiplier=0.5,
                 minimum_included_peak_height=minimum_included_peak_height,
                 debug_print=debug_print)

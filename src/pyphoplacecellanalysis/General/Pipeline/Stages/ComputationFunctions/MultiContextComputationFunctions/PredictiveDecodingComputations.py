@@ -734,10 +734,12 @@ class DecodingLocalityMeasures(ComputedResult): #PickleSerializableMixin, AttrsB
     def __getstate__(self):
         # Copy the object's state from self.__dict__ which contains all our instance attributes. Always use the dict.copy() method to avoid modifying the original state.
         state = self.__dict__.copy()
-        # # Remove the unpicklable entries.
-        # _non_pickled_fields = ['curr_active_pipeline', 'track_templates']
-        # for a_non_pickleable_field in _non_pickled_fields:
-        #     del state[a_non_pickleable_field]
+        # Remove non-serialized fields
+        _non_pickled_fields = ['_interpolator', 'defer_compute_on_init']
+        for a_non_pickleable_field in _non_pickled_fields:
+            if a_non_pickleable_field in state:
+                del state[a_non_pickleable_field]
+
         return state
 
 
@@ -746,10 +748,11 @@ class DecodingLocalityMeasures(ComputedResult): #PickleSerializableMixin, AttrsB
         # For `VersionedResultMixin`
         self._VersionedResultMixin__setstate__(state)
 
-        # _non_pickled_field_restore_defaults = dict(zip(['curr_active_pipeline', 'track_templates'], [None, None]))
-        # for a_field_name, a_default_restore_value in _non_pickled_field_restore_defaults.items():
-        #     if a_field_name not in state:
-        #         state[a_field_name] = a_default_restore_value
+        # Restore defaults for non-serialized fields
+        _non_pickled_field_restore_defaults = dict(zip(['_interpolator', 'defer_compute_on_init'], [None, False]))
+        for a_field_name, a_default_restore_value in _non_pickled_field_restore_defaults.items():
+            if a_field_name not in state:
+                state[a_field_name] = a_default_restore_value
 
         self.__dict__.update(state)
         # # Call the superclass __init__() (from https://stackoverflow.com/a/48325758)
@@ -1743,12 +1746,12 @@ class PredictiveDecoding(ComputedResult): #PickleSerializableMixin, AttrsBasedCl
             # ==================================================================================================================================================================================================================================================================================== #
 
             is_high_prob_mask: Optional[NDArray[ND.Shape["N_XBINS, N_YBINS, N_TBINS"], Any]] = None
-            if epoch_t_bin_high_prob_masks_dict is not None:
+            if (epoch_t_bin_high_prob_masks_dict is not None):
                 an_epoch_t_bins_custom_high_prob_mask: NDArray[ND.Shape["N_XBINS, N_YBINS, N_TBINS"], Any] = epoch_t_bin_high_prob_masks_dict[a_slice_multiplier][i]
                 Assert.same_shape(an_epoch_t_bins_custom_high_prob_mask, curr_epoch_p_x_given_n)
                 is_high_prob_mask = an_epoch_t_bins_custom_high_prob_mask
 
-            elif epoch_high_prob_masks_dict is None:
+            elif (epoch_high_prob_masks_dict is not None):
                 an_epoch_custom_high_prob_mask: NDArray[ND.Shape["N_XBINS, N_YBINS"], Any] = epoch_high_prob_masks_dict[a_slice_multiplier][i]
                 Assert.same_shape(an_epoch_custom_high_prob_mask, curr_epoch_p_x_given_n[:, :, 0])
                 is_high_prob_mask = np.tile(an_epoch_custom_high_prob_mask, (1, 1, n_flattened_tbins[i]))
@@ -1865,10 +1868,7 @@ class PredictiveDecoding(ComputedResult): #PickleSerializableMixin, AttrsBasedCl
     def __getstate__(self):
         # Copy the object's state from self.__dict__ which contains all our instance attributes. Always use the dict.copy() method to avoid modifying the original state.
         state = self.__dict__.copy()
-        # # Remove the unpicklable entries.
-        # _non_pickled_fields = ['curr_active_pipeline', 'track_templates']
-        # for a_non_pickleable_field in _non_pickled_fields:
-        #     del state[a_non_pickleable_field]
+        # PredictiveDecoding has no non-serialized fields, so no exclusions needed
         return state
 
 
@@ -1876,11 +1876,6 @@ class PredictiveDecoding(ComputedResult): #PickleSerializableMixin, AttrsBasedCl
         # Restore instance attributes (i.e., _mapping and _keys_at_init).
         # For `VersionedResultMixin`
         self._VersionedResultMixin__setstate__(state)
-
-        # _non_pickled_field_restore_defaults = dict(zip(['curr_active_pipeline', 'track_templates'], [None, None]))
-        # for a_field_name, a_default_restore_value in _non_pickled_field_restore_defaults.items():
-        #     if a_field_name not in state:
-        #         state[a_field_name] = a_default_restore_value
 
         self.__dict__.update(state)
         # # Call the superclass __init__() (from https://stackoverflow.com/a/48325758)
@@ -1932,7 +1927,6 @@ class PredictiveDecodingComputationsContainer(ComputedResult):
     
     predictive_decoding: Optional[PredictiveDecoding] = serialized_field(default=None, repr=False)
     
-
     pf1D_Decoder_dict: Dict[types.DecoderName, BasePositionDecoder] = serialized_field(default=Factory(dict), metadata={'field_added': "2025.12.20_0", 'copied_from': 'DirectionalDecodersContinuouslyDecodedResult'})
     epochs_decoded_result_cache_dict: Dict[float, Dict[types.DecoderName, DecodedFilterEpochsResult]] = serialized_field(default=Factory(dict), metadata={'field_added': "2025.12.20_0", 'copied_from': 'DirectionalDecodersContinuouslyDecodedResult'}) # key is the t_bin_size in seconds
     debug_computed_dict: Dict[types.DecoderName, Dict] = non_serialized_field(default=Factory(dict), metadata={'field_added': "2025.12.21_0"})
@@ -2017,6 +2011,8 @@ class PredictiveDecodingComputationsContainer(ComputedResult):
         from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import DirectionalDecodersContinuouslyDecodedResult
         from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import DecodedFilterEpochsResult, SingleEpochDecodedResult
         from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import PositionLikePosteriorScoring
+        from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import BayesianPlacemapPositionDecoder
+
         # from pyphoplacecellanalysis.External.peak_prominence2d import PeakPromenence, PeakCounts, SlabResult, PeakPromenenceMetrics, PosteriorPeaksPeakProminence2dResult
 
         # an_epoch_name = 'roam'
@@ -2125,20 +2121,68 @@ class PredictiveDecodingComputationsContainer(ComputedResult):
         ## REQUIRED OUTPUTS: masked_container
         assert masked_container is not None
 
+
+        # Get this specific result ___________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
+        # decoded_local_epochs_result = masked_container.epochs_decoded_result_cache_dict[a_t_bin_size].get(an_epoch_name, None)
+        epoch_names: List[str] = list(masked_container.epochs_decoded_result_cache_dict[a_t_bin_size].keys())
+        # epoch_names: List[str] = ['roam', 'sprinkle']
+
+
+        # an_epoch_name: str = epoch_names[0]
+        # a_decoded_local_epochs_result = masked_container.epochs_decoded_result_cache_dict[a_t_bin_size].get(an_epoch_name, None)
+        # # a_decoder: BayesianPlacemapPositionDecoder = list(masked_container.pf1D_Decoder_dict.values())[0]
+        # a_decoder: BayesianPlacemapPositionDecoder = masked_container.pf1D_Decoder_dict.get(an_epoch_name, None)
+
+
         if should_compute_peak_prom_analysis:
-            raise NotImplementedError(f'Peak prominence analysis is intentionally disabled in build_masked_container (enable explicitly if needed).')
+            from pyphoplacecellanalysis.External.peak_prominence2d import PeakPromenence, PosteriorPeaksPeakProminence2dResult
+
+            print(f'computeing peak_prom_analysis because `should_compute_peak_prom_analysis == True`...')
+            # raise NotImplementedError(f'Peak prominence analysis is intentionally disabled in build_masked_container (enable explicitly if needed).')
+
+            print(f'\tfor epoch_names: {epoch_names}')
+            for an_epoch_name in epoch_names:
+                if an_epoch_name not in masked_container.debug_computed_dict:
+                    masked_container.debug_computed_dict[an_epoch_name] = {}
+
+                _comp_result_key: str = 'peak_prom_analysis'
+                if _comp_result_key not in masked_container.debug_computed_dict[an_epoch_name]:
+                    masked_container.debug_computed_dict[an_epoch_name][_comp_result_key] = {}
+
+                a_decoded_local_epochs_result = masked_container.epochs_decoded_result_cache_dict[a_t_bin_size].get(an_epoch_name, None)
+                a_decoder: BayesianPlacemapPositionDecoder = masked_container.pf1D_Decoder_dict.get(an_epoch_name, None)
+                # 2025-01-08 - Mask based on position-like bins only _________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
+                a_masked_result, scoring_results = PositionLikePosteriorScoring.filter_to_position_like_epochs_only(decoded_local_epochs_result=a_decoded_local_epochs_result, xbin=a_decoder.xbin, ybin=a_decoder.ybin, position_like_score_cutoff=0.42, num_min_position_like_t_bins=3)
+
+                step: float = PeakPromenence.compute_optimal_step_size(a_masked_result.p_x_given_n_list, resolution_factor=500.0)
+                print(f'\tstep: {step}')
+                masked_container.debug_computed_dict[an_epoch_name][_comp_result_key]['step'] = step
+                
+                decoded_epoch_t_bins_promenence_result_obj: PosteriorPeaksPeakProminence2dResult = PeakPromenence._perform_find_posterior_peaks_peak_prominence2d_computation(p_x_given_n_list=a_masked_result.p_x_given_n_list, 
+                    xbin_centers=masked_container.predictive_decoding.xbin_centers, 
+                    ybin_centers=masked_container.predictive_decoding.ybin_centers,
+                    step=step, minimum_included_peak_height=None, # 1m 42s - 7m 1s
+                    # step=1e-2, minimum_included_peak_height=1e-5, # 47.3s
+                    peak_height_multiplier_probe_levels=(0.25, 0.5, 0.9),
+                    should_use_faster_compute_single_slab_implementation=False,
+                    min_considered_promenence=1e-11,
+                )
+                masked_container.debug_computed_dict[an_epoch_name][_comp_result_key]['decoded_epoch_t_bins_promenence_result_obj'] = decoded_epoch_t_bins_promenence_result_obj
+                print(f'\tcomputation done.')
+
 
         if should_compute_future_and_past_analysis:
             if not use_full_recompute_method:
                 raise ValueError(f'compute_future_and_past_analysis requires use_full_recompute_method=True to ensure predictive_decoding/locality_measures are consistent with the masked results.')
 
-            epoch_names: List[str] = ['roam', 'sprinkle']
+            
             for an_epoch_name in epoch_names:
                 if an_epoch_name not in masked_container.debug_computed_dict:
                     masked_container.debug_computed_dict[an_epoch_name] = {}
                 _out = masked_container.compute_future_and_past_analysis(curr_active_pipeline, an_epoch_name=an_epoch_name)
-                epoch_high_prob_pos_masks, epoch_matching_positions, past_future_info_dict, matching_pos_dfs_list, matching_pos_epochs_dfs_list = _out
-                masked_container.debug_computed_dict[an_epoch_name] = {'epoch_high_prob_pos_masks': epoch_high_prob_pos_masks, 'epoch_matching_positions': epoch_matching_positions, 'past_future_info_dict': past_future_info_dict}
+                # epoch_high_prob_pos_masks, epoch_matching_positions, past_future_info_dict, matching_pos_dfs_list, matching_pos_epochs_dfs_list = _out
+                epoch_high_prob_pos_masks, epoch_t_bins_high_prob_pos_masks, epoch_matching_positions, past_future_info_dict, matching_pos_dfs_list, matching_pos_epochs_dfs_list = _out
+                masked_container.debug_computed_dict[an_epoch_name] = {'epoch_high_prob_pos_masks': epoch_high_prob_pos_masks, 'epoch_t_bins_high_prob_pos_masks': epoch_t_bins_high_prob_pos_masks, 'epoch_matching_positions': epoch_matching_positions, 'past_future_info_dict': past_future_info_dict}
             ## END for an_epoch_name in epoch_names...
 
         return masked_container
@@ -2252,7 +2296,7 @@ class PredictiveDecodingComputationsContainer(ComputedResult):
     #         if an_epoch_name not in masked_container.debug_computed_dict:
     #             masked_container.debug_computed_dict[an_epoch_name] = {}
     #         _out = masked_container.compute_future_and_past_analysis(curr_active_pipeline, an_epoch_name=an_epoch_name)
-    #         epoch_high_prob_pos_masks, epoch_matching_positions, past_future_info_dict, matching_pos_dfs_list, matching_pos_epochs_dfs_list = _out
+    #         epoch_high_prob_pos_masks, epoch_t_bins_high_prob_pos_masks, epoch_matching_positions, past_future_info_dict, matching_pos_dfs_list, matching_pos_epochs_dfs_list = _out
     #         masked_container.debug_computed_dict[an_epoch_name] = {'epoch_high_prob_pos_masks': epoch_high_prob_pos_masks, 'epoch_matching_positions': epoch_matching_positions, 'past_future_info_dict': past_future_info_dict}
     #     ## END for an_epoch_name in epoch_names...
         
@@ -2410,7 +2454,7 @@ class PredictiveDecodingComputationsContainer(ComputedResult):
                 self.predictive_decoding.matching_pos_epochs_dfs_list = matching_pos_epochs_dfs_list
 
 
-        return epoch_high_prob_pos_masks, epoch_matching_positions, past_future_info_dict, matching_pos_dfs_list, matching_pos_epochs_dfs_list #(ratio_past, ratio_future, n_total_past, n_total_future) # , epoch_high_prob_pos_masks
+        return epoch_high_prob_pos_masks, epoch_t_bins_high_prob_pos_masks, epoch_matching_positions, past_future_info_dict, matching_pos_dfs_list, matching_pos_epochs_dfs_list #(ratio_past, ratio_future, n_total_past, n_total_future) # , epoch_high_prob_pos_masks
 
 
 
@@ -2419,10 +2463,11 @@ class PredictiveDecodingComputationsContainer(ComputedResult):
     def __getstate__(self):
         # Copy the object's state from self.__dict__ which contains all our instance attributes. Always use the dict.copy() method to avoid modifying the original state.
         state = self.__dict__.copy()
-        # # Remove the unpicklable entries.
-        # _non_pickled_fields = ['scoring_results_df'] # , 'track_templates'
-        # for a_non_pickleable_field in _non_pickled_fields:
-        #     del state[a_non_pickleable_field]
+        # Remove non-serialized fields
+        _non_pickled_fields = ['debug_computed_dict', 'scoring_results_df']
+        for a_non_pickleable_field in _non_pickled_fields:
+            if a_non_pickleable_field in state:
+                del state[a_non_pickleable_field]
         return state
 
 
@@ -2431,10 +2476,11 @@ class PredictiveDecodingComputationsContainer(ComputedResult):
         # For `VersionedResultMixin`
         self._VersionedResultMixin__setstate__(state)
 
-        # _non_pickled_field_restore_defaults = dict(zip(['curr_active_pipeline', 'track_templates'], [None, None]))
-        # for a_field_name, a_default_restore_value in _non_pickled_field_restore_defaults.items():
-        #     if a_field_name not in state:
-        #         state[a_field_name] = a_default_restore_value
+        # Restore defaults for non-serialized fields
+        _non_pickled_field_restore_defaults = dict(zip(['debug_computed_dict', 'scoring_results_df'], [{}, None]))
+        for a_field_name, a_default_restore_value in _non_pickled_field_restore_defaults.items():
+            if a_field_name not in state:
+                state[a_field_name] = a_default_restore_value
 
         self.__dict__.update(state)
         # # Call the superclass __init__() (from https://stackoverflow.com/a/48325758)
@@ -2662,7 +2708,7 @@ class PredictiveDecodingComputationsGlobalComputationFunctions(AllFunctionEnumer
                 print(f'\ttrying `.compute_future_and_past_analysis(...)` for an_epoch_name: "{an_epoch_name}"...')
                 global_computation_results.computed_data['PredictiveDecoding'].debug_computed_dict[an_epoch_name] = {}
                 _out = global_computation_results.computed_data['PredictiveDecoding'].compute_future_and_past_analysis(owning_pipeline_reference, an_epoch_name=an_epoch_name)
-                epoch_high_prob_pos_masks, epoch_matching_positions, past_future_info_dict, matching_pos_dfs_list, matching_pos_epochs_dfs_list = _out
+                epoch_high_prob_pos_masks, epoch_t_bins_high_prob_pos_masks, epoch_matching_positions, past_future_info_dict, matching_pos_dfs_list, matching_pos_epochs_dfs_list = _out
                 global_computation_results.computed_data['PredictiveDecoding'].debug_computed_dict[an_epoch_name] = {'epoch_high_prob_pos_masks': epoch_high_prob_pos_masks, 'epoch_matching_positions': epoch_matching_positions, 'past_future_info_dict': past_future_info_dict}
             except (ValueError, AttributeError, IndexError, KeyError, TypeError) as e:
                 print(f'\t\tWARN: the last part of `perform_predictive_decoding_analysis(...) failed with error: {e}. Skipping.')

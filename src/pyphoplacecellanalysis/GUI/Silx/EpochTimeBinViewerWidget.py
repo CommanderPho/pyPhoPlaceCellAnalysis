@@ -1974,7 +1974,11 @@ class Epoch3DSceneTimeBinViewer(GenericSilxContainer, qt.QWidget):
             # image_item.setScale(y_scale, x_scale, 1.0) ## confirmed that it's XY-flipped, this one results in the right scale
 
             # active_item_translation = (np.array(item_center_inverse_translation)).tolist()
-            active_item_translation = (np.array(item_data_units_center_inverse_point)).tolist() ## data-units, should work post-scale
+            # active_item_translation = (np.array(item_data_units_center_inverse_point)).tolist() ## data-units, should work post-scale
+        
+            ## offset y so images are above the points items
+            active_item_translation = (np.array(item_data_units_center_inverse_point) + np.array((0.0, self.plots_data.y_extent, 0.0))).tolist() ## data-units, should work post-scale
+
             print(f't_bin_idx: {t_bin_idx}\n\tactive_item_translation: {active_item_translation}')
             # active_item_translation = (np.array(item_center_inverse_translation) + np.array(translation_triple)).tolist()
             # active_item_translation = (np.array(item_center_inverse_translation) + np.array(translation_triple)).tolist()
