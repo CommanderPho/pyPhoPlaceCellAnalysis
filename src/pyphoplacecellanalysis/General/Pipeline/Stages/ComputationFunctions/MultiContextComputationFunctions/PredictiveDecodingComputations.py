@@ -1724,9 +1724,19 @@ class PredictiveDecoding(ComputedResult): #PickleSerializableMixin, AttrsBasedCl
         Returns:
             MatchingPastFuturePositionsResult containing all computed results
         """
-        pos_matches_epoch_mask = np.where([epoch_high_prob_mask[(a_pos.binned_x-1), (a_pos.binned_y-1)] for a_pos in measured_positions_df.itertuples()])[0]
+        relevant_positions_df: pd.DataFrame = measured_positions_df.copy()
+        
+        row_col_indices = np.argwhere(epoch_high_prob_mask)
+        row_col_row_ids = row_col_indices + 1
+        an_epoch_mask_included_binned_x_y_columns_idx_df = pd.DataFrame(row_col_row_ids, columns=["binned_x", "binned_y"])
+        ## allowed positions are much less than the found ones:
+        relevant_positions_df = relevant_positions_df.merge(an_epoch_mask_included_binned_x_y_columns_idx_df, on=["binned_x", "binned_y"], how="inner")
 
-        relevant_positions_df: pd.DataFrame = measured_positions_df.iloc[pos_matches_epoch_mask].copy()
+        ## only after initial filter do we filter by this version:
+        pos_matches_epoch_mask = np.where([epoch_high_prob_mask[(a_pos.binned_x-1), (a_pos.binned_y-1)] for a_pos in relevant_positions_df.itertuples()])[0]
+        relevant_positions_df: pd.DataFrame = relevant_positions_df.iloc[pos_matches_epoch_mask].copy()
+        
+        ## now find relevant ones:
         is_relevant_past_times = (relevant_positions_df['t'] < curr_epoch_start_t)
         is_relevant_future_times = (relevant_positions_df['t'] > curr_epoch_stop_t)
         relevant_positions_df['is_future_present_past'] = 'present'
@@ -1740,13 +1750,14 @@ class PredictiveDecoding(ComputedResult): #PickleSerializableMixin, AttrsBasedCl
         n_relevant_past_times = np.sum(is_relevant_past_times)
         n_relevant_future_times = np.sum(is_relevant_future_times)
 
-        
-
         ## find adjacent epochs from the position time bins (periods where the animal is in the positions)
         measured_positions_df_copy = measured_positions_df.copy()
         measured_positions_df_copy['is_included'] = False
         measured_positions_df_copy.loc[measured_positions_df_copy.index[pos_matches_epoch_mask[is_relevant_past_times]], 'is_included'] = True ## only do past/future, not present
         measured_positions_df_copy.loc[measured_positions_df_copy.index[pos_matches_epoch_mask[is_relevant_future_times]], 'is_included'] = True ## only do past/future, not present
+        
+        ## allowed positions are much less than the found ones:
+        measured_positions_df_copy = deepcopy(measured_positions_df_copy).merge(an_epoch_mask_included_binned_x_y_columns_idx_df, on=["binned_x", "binned_y"], how="inner")        
 
         # a_matching_pos_epochs_df: pd.DataFrame = measured_positions_df_copy.neuropy.detect_epoch_satisfying_condition(is_condition_satisfied = (measured_positions_df_copy['is_included'].to_numpy()), merging_adjacent_max_separation_sec=merging_adjacent_max_separation_sec, minimum_epoch_duration=minimum_epoch_duration)
         a_matching_pos_epochs_df: pd.DataFrame = MatchingPastFuturePositionsResult.compute_matching_pos_epochs_df(measured_positions_df=measured_positions_df_copy, merging_adjacent_max_separation_sec=merging_adjacent_max_separation_sec, minimum_epoch_duration=minimum_epoch_duration)
@@ -1913,7 +1924,7 @@ class PredictiveDecoding(ComputedResult): #PickleSerializableMixin, AttrsBasedCl
             with ThreadPoolExecutor(max_workers=max_workers) as executor:
                 futures = []
                 for i, curr_epoch_p_x_given_n, curr_epoch_time_bin_centers, curr_epoch_tbin_indicies, n_epoch_time_bins in epoch_data_list:
-                    future = executor.submit(cls._process_single_epoch_future_past_analysis, i, curr_epoch_p_x_given_n, curr_epoch_time_bin_centers, curr_epoch_tbin_indicies, gaussian_volume, measured_positions_df, top_v_percent, epoch_t_bin_high_prob_masks_dict, epoch_high_prob_masks_dict, a_slice_multiplier, n_epoch_time_bins, merging_adjacent_max_separation_sec, minimum_epoch_duration, progress_print, n_total_epochs)
+                    future = executor.submit(cls._process_single_epoch_future_past_analysis, i=i, curr_epoch_p_x_given_n=curr_epoch_p_x_given_n, curr_epoch_time_bin_centers=curr_epoch_time_bin_centers, curr_epoch_tbin_indicies=curr_epoch_tbin_indicies, gaussian_volume=gaussian_volume, measured_positions_df=measured_positions_df, top_v_percent=top_v_percent, epoch_t_bin_high_prob_masks_dict=epoch_t_bin_high_prob_masks_dict, epoch_high_prob_masks_dict=epoch_high_prob_masks_dict, a_slice_multiplier=a_slice_multiplier, n_epoch_time_bins=n_epoch_time_bins, merging_adjacent_max_separation_sec=merging_adjacent_max_separation_sec, minimum_epoch_duration=minimum_epoch_duration, progress_print=progress_print, n_total_epochs=n_total_epochs)
                     futures.append(future)
                 
                 for future in as_completed(futures):
@@ -1927,7 +1938,7 @@ class PredictiveDecoding(ComputedResult): #PickleSerializableMixin, AttrsBasedCl
             
             results_list = []
             for i, curr_epoch_p_x_given_n, curr_epoch_time_bin_centers, curr_epoch_tbin_indicies, n_epoch_time_bins in epoch_data_list:
-                result = cls._process_single_epoch_future_past_analysis(i, curr_epoch_p_x_given_n, curr_epoch_time_bin_centers, curr_epoch_tbin_indicies, gaussian_volume, measured_positions_df, top_v_percent, epoch_t_bin_high_prob_masks_dict, epoch_high_prob_masks_dict, a_slice_multiplier, n_epoch_time_bins, merging_adjacent_max_separation_sec, minimum_epoch_duration, progress_print, n_total_epochs)
+                result = cls._process_single_epoch_future_past_analysis(i=i, curr_epoch_p_x_given_n=curr_epoch_p_x_given_n, curr_epoch_time_bin_centers=curr_epoch_time_bin_centers, curr_epoch_tbin_indicies=curr_epoch_tbin_indicies, gaussian_volume=gaussian_volume, measured_positions_df=measured_positions_df, top_v_percent=top_v_percent, epoch_t_bin_high_prob_masks_dict=epoch_t_bin_high_prob_masks_dict, epoch_high_prob_masks_dict=epoch_high_prob_masks_dict, a_slice_multiplier=a_slice_multiplier, n_epoch_time_bins=n_epoch_time_bins, merging_adjacent_max_separation_sec=merging_adjacent_max_separation_sec, minimum_epoch_duration=minimum_epoch_duration, progress_print=progress_print, n_total_epochs=n_total_epochs)
                 results_list.append(result)
         
         # Unpack results and populate output lists
@@ -3269,7 +3280,7 @@ class PredictiveDecodingDisplayWidget:
             self.epoch_slider.setMaximum(max(0, num_epochs - 1))
             self.epoch_slider.setValue(min(self.active_epoch_idx, num_epochs - 1))
             self.epoch_slider.setTickPosition(QtWidgets.QSlider.TickPosition.TicksBelow)
-            self.epoch_slider.setTickInterval(max(1, num_epochs // 20))
+            self.epoch_slider.setTickInterval(1)
             self.epoch_slider.setMinimumWidth(400)
             bottom_layout.addWidget(self.epoch_slider, stretch=1)
             
@@ -3470,7 +3481,8 @@ class PredictiveDecodingDisplayWidget:
                 for ax in a_decoded_traj_plotter.fig.get_axes():
                     ax.clear()
         
-        fig, axs, epochs_pages = a_decoded_traj_plotter.plot_decoded_trajectories_2d(curr_position_df=self.curr_position_df, epoch_specific_position_dfs=epoch_specific_position_dfs, epoch_ids=epoch_ids, curr_num_subplots=curr_num_subplots, active_page_index=0, fixed_columns=4, plot_actual_lap_lines=True, use_theoretical_tracks_instead=False, existing_ax=existing_ax, plot_mode='scatter', c='red', cmap='Reds', alpha=0.65)
+        fig, axs, epochs_pages = a_decoded_traj_plotter.plot_decoded_trajectories_2d(curr_position_df=self.curr_position_df, epoch_specific_position_dfs=epoch_specific_position_dfs, epoch_ids=epoch_ids, curr_num_subplots=curr_num_subplots,
+                                                                                    active_page_index=0, fixed_columns=4, plot_actual_lap_lines=True, use_theoretical_tracks_instead=False, existing_ax=existing_ax, plot_mode='scatter', c='red', cmap='Reds', alpha=0.65, s=5)
         
         # Hide unused axes (where epoch_id == -1, indicating padded/empty data)
         if len(epochs_pages) > 0:
