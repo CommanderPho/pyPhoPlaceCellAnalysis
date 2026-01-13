@@ -4,6 +4,7 @@ from silx.gui.plot3d.ScalarFieldView import ScalarFieldView
 from silx.gui.plot3d.SceneWidget import SceneWidget
 from silx.gui.plot3d.SceneWindow import SceneWindow, items as plot3d_items
 from silx.gui.plot3d.items.scatter import Scatter2D, Scatter3D
+from silx.gui.plot3d.items.image import ImageData
 from silx.gui.colors import Colormap
 import numpy as np
 import pandas as pd
@@ -775,7 +776,9 @@ class Epoch3DSceneTimeBinViewer(GenericSilxContainer, qt.QWidget):
         self.params.is_point_like_mode = (self.plots_data.locality_measures_df is not None and 't' in self.plots_data.locality_measures_df.columns)
         self.params.use_groupItem = True
         self.plots.time_bin_groupItems = [] ## initialize to empty
-        
+        # self.params.scene_projection_mode = 'perspective'
+        self.params.scene_projection_mode = 'orthographic'
+
         # Current epoch index
         self.params.curr_epoch_idx = 0
         
@@ -849,6 +852,7 @@ class Epoch3DSceneTimeBinViewer(GenericSilxContainer, qt.QWidget):
         self.plots.scene_widget.setBackgroundColor((0.8, 0.8, 0.8, 1.))
         self.plots.scene_widget.setForegroundColor((1., 1., 1., 1.))
         self.plots.scene_widget.setTextColor((0.1, 0.1, 0.1, 1.))
+        self.plots.scene_widget.setProjection(self.params.scene_projection_mode)
 
 
     @property
@@ -1858,6 +1862,11 @@ class Epoch3DSceneTimeBinViewer(GenericSilxContainer, qt.QWidget):
 
     def _add_contours_mask_images_for_current_epoch(self, **kwargs):
         """Add Silx 3D image items for all mask images in the current epoch."""
+
+        # override_no_group_for_image_items: bool = True
+        override_no_group_for_image_items: bool = False
+        needs_swap_x_and_y_axes: bool = True
+        
         if self.plots_data.peak_prominence_result is None:
             return
 
@@ -1891,6 +1900,12 @@ class Epoch3DSceneTimeBinViewer(GenericSilxContainer, qt.QWidget):
             x_coords = np.arange(n_x_bins)
             y_coords = np.arange(n_y_bins)
         
+
+        # Set scale to match coordinate system extent
+        x_extent = float(x_coords[-1] - x_coords[0])
+        y_extent = float(y_coords[-1] - y_coords[0])
+
+
         total_images_added = 0
         # for t_bin_idx in range(n_time_bins):
         for t_bin_idx, a_t_bin_mask in enumerate(mask_included_bins_list):
@@ -1898,35 +1913,93 @@ class Epoch3DSceneTimeBinViewer(GenericSilxContainer, qt.QWidget):
             translation_triple = self.plots_data.translation_triple_list[t_bin_idx]
             
             # Convert boolean mask to float array for ImageItem compatibility
-            mask_image = a_t_bin_mask.astype(float)
+            mask_image = a_t_bin_mask.astype(float).T ## transpose
+            mask_image_shape = np.shape(mask_image)
+
+            # Scale image to match coordinate extent (assuming image is n_x_bins x n_y_bins)
+            # ImageData scale is per-pixel, so we need to scale by extent / image_size
+            if mask_image_shape[0] > 1 and mask_image_shape[1] > 1:
+                x_scale = x_extent / (mask_image.shape[0] - 1) if mask_image.shape[0] > 1 else 1.0
+                y_scale = y_extent / (mask_image.shape[1] - 1) if mask_image.shape[1] > 1 else 1.0
+            else:
+                x_scale = x_extent if x_extent > 0 else 1.0
+                y_scale = y_extent if y_extent > 0 else 1.0
+
+            # if needs_swap_x_and_y_axes:
+            #     _x_scale_temp = x_scale
+            #     x_scale = y_scale
+            #     y_scale = _x_scale_temp
+
+            item_data_units_center_point = (x_extent/2.0, y_extent/2.0, 0.0)
+            if needs_swap_x_and_y_axes:
+                item_data_units_center_point = (item_data_units_center_point[1], item_data_units_center_point[0], item_data_units_center_point[2])            
+
+            item_data_units_center_inverse_point  = [(v*-1.0) for v in item_data_units_center_point]
+
+            item_center_point = (x_scale/2.0, y_scale/2.0, 0.0)
+            if needs_swap_x_and_y_axes:
+                item_center_point = (item_center_point[1], item_center_point[0], item_center_point[2])
+            item_center_inverse_translation = [(v*-1.0) for v in item_center_point]  # (-x_scale/2.0, -y_scale/2.0, 0.0)
 
             # self.plots.time_bin_groupItems
             
-            image_item = plot3d_items.ImageItem()
-            # Silx ImageItem.setData(image, x, y, z) where:
+            image_item = ImageData()
+            # Silx ImageData.setData(image) where:
             # - image: 2D array of the mask
-            # - x, y: 1D coordinate arrays
-            # - z: scalar z position
-            image_item.setData(mask_image, x_coords, y_coords, effective_z_offset)
+            image_item.setData(mask_image)
+            # Set imageData properties
+            # image_item.setScale(x_scale, y_scale, 1.0)
             
+            image_item.setInterpolation('nearest')  # 'linear' or 'nearest' interpolation
+            image_item.getColormap().setName('magma')  # Use magma colormap
+            image_item.setRotationCenter(*item_center_point)
+            image_item.setLabel(f"ImageData[t={t_bin_idx}]")
+            # image_item.setScale(y_scale, x_scale, 1.0) ## confirmed that it's XY-flipped, this one results in the right scale
+
+            # active_item_translation = (np.array(item_center_inverse_translation)).tolist()
+            active_item_translation = (np.array(item_data_units_center_inverse_point)).tolist() ## data-units, should work post-scale
+            print(f't_bin_idx: {t_bin_idx}\n\tactive_item_translation: {active_item_translation}')
+            # active_item_translation = (np.array(item_center_inverse_translation) + np.array(translation_triple)).tolist()
+            # active_item_translation = (np.array(item_center_inverse_translation) + np.array(translation_triple)).tolist()
+            
+            # image_item.setTranslation(*item_center_inverse_translation)
+            image_item.setTranslation(*active_item_translation)
+            # image_item.setTranslation(*translation_triple)
+
             # Explicitly set visibility
             if hasattr(image_item, 'setVisible'):
                 image_item.setVisible(True)
-            
+                
             # Ensure the item is added to the scene
-            if not self.params.use_groupItem:
+            if override_no_group_for_image_items or (not self.params.use_groupItem):
                 self.plots.scene_widget.addItem(image_item)
+                # Set origin to match coordinate system (x_min, y_min, z_offset)
+                # ImageData uses origin for positioning the image in world coordinates
+                # x_min = float(x_coords[0])
+                # y_min = float(y_coords[0])
+                # image_item.setOrigin((x_min, y_min, effective_z_offset))
+                # image_item.setTranslation(0., SIZE, 0.)  # Translate the image
+                # image_item.setTranslation(*translation_triple)  # Translate the image
+
+                # Apply translation for positioning along X axis (time bin spacing)
+                # image_item.setTranslation(*translation_triple)
+
             else:
                 ## add to group item:
                 self.plots.time_bin_groupItems[t_bin_idx].addItem(image_item)
+                # Translation is handled by group item
+                # Apply translation for positioning along X axis (time bin spacing)
+                # image_item.setTranslation(*translation_triple)
+
+            if needs_swap_x_and_y_axes:
+                image_item.setScale(y_scale, x_scale, 1.0) ## confirmed that it's XY-flipped, this one results in the right scale
+            else:
+                image_item.setScale(x_scale, y_scale, 1.0)
+
 
             self.plots.peak_contour_items.append(image_item)
             
             image_item.setBoundingBoxVisible(False)
-            if not self.params.use_groupItem:
-                image_item.setTranslation(*translation_triple)
-            
-            image_item.setScale(1.0, 1.0, 1000.0) # Anisotropic scale: emphasize Z (time/height) dimension
 
             total_images_added += 1
 
@@ -1943,7 +2016,7 @@ class Epoch3DSceneTimeBinViewer(GenericSilxContainer, qt.QWidget):
 
 
 
-    def add_peak_contours_overlays(self, peak_prominence_result, edge_color: str = '#ffaaff78', line_width: float = 1.0, z_offset: Optional[float] = None):
+    def add_peak_contours_overlays(self, peak_prominence_result, active_contour_level: float = 0.9, **kwargs):
         """Adds peak contours as Silx 3D line overlays that update when the epoch slider changes.
 
         Mirrors the Napari add_peak_contours_layer conceptually but renders into the SceneWindow.
@@ -1956,16 +2029,20 @@ class Epoch3DSceneTimeBinViewer(GenericSilxContainer, qt.QWidget):
         """
         from pyphoplacecellanalysis.External.peak_prominence2d import PosteriorPeaksPeakProminence2dResult
 
-        self.params.slice_level_multipliers = [0.9]
+        # Clear any existing contour items and rebuild for current epoch
+        self._clear_peak_contour_items()
+        
+        # self.params.slice_level_multipliers = [0.5, 0.9]
+        self.params.slice_level_multipliers = [active_contour_level]
+
         self.plots_data.peak_contours = {}
         self.plots_data.peak_prominence_result = peak_prominence_result
 
-        active_contour_level: float = 0.9
         mask_included_bins_list, summit_slice_levels_list, mask_included_p_x_given_n_list_dict, epoch_prom_t_bin_high_prob_pos_masks, epoch_prom_high_prob_pos_masks, *extra_outs = peak_prominence_result.compute_discrete_contour_masks(p_x_given_n_list=self.plots_data.decoded_result.p_x_given_n_list, slice_level_multipliers=self.params.slice_level_multipliers)
 
         # mask_included_bins_list
         # summit_slice_levels_list
-        epoch_prom_high_prob_pos_mask = epoch_prom_high_prob_pos_masks[0.9] ## high
+        # epoch_prom_high_prob_pos_mask = epoch_prom_high_prob_pos_masks[0.9] ## high
         # np.shape(epoch_prom_high_prob_pos_mask) # (74, 41, 63)
 
         self.plots_data.peak_contours['mask_included_bins_list'] = mask_included_bins_list
@@ -1978,9 +2055,9 @@ class Epoch3DSceneTimeBinViewer(GenericSilxContainer, qt.QWidget):
 
 
         # Clear any existing contour items and rebuild for current epoch
-        self._clear_peak_contour_items()
+        # self._clear_peak_contour_items()
         # self._add_contours_for_current_epoch(edge_color=edge_color, line_width=line_width, z_offset=z_offset)
-        self._add_contours_mask_images_for_current_epoch()
+        self._add_contours_mask_images_for_current_epoch(**kwargs)
         
 
     # ==================================================================================================================================================================================================================================================================================== #
@@ -2095,6 +2172,11 @@ class Epoch3DSceneTimeBinViewer(GenericSilxContainer, qt.QWidget):
                 group_item.setTranslation(*translation_triple)
                 # Anisotropic scale: emphasize Z (time/height) dimension
                 # group_item.setScale(1.0, 1.0, 1000.0)
+                
+                # item_center_point = (x_scale/2.0, y_scale/2.0, 0.0)
+                # group_item.setRotationCenter(*item_center_point)
+                group_item.setLabel(f"GroupItem[t={t_bin_idx}]")
+
 
             except Exception as e:
                 # Keep failures non-fatal so the scene still renders
@@ -2107,6 +2189,7 @@ class Epoch3DSceneTimeBinViewer(GenericSilxContainer, qt.QWidget):
         
         if mesh_item is not None:
             try:
+                mesh_item.setLabel(f"points[t={t_bin_idx}]")
                 # # Get colormap
                 # colormap: Colormap = item.getColormap()
                 # # Set colormap
@@ -2143,6 +2226,8 @@ class Epoch3DSceneTimeBinViewer(GenericSilxContainer, qt.QWidget):
 
         if points_item is not None:
             try:
+                points_item.setLabel(f"points[t={t_bin_idx}]")
+
                 # Point/marker appearance (APIs may vary across silx versions)
                 points_item.setVisualization('points') # setLineWidth
                 points_item.setSymbol('s') # square
