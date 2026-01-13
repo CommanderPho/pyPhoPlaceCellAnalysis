@@ -325,7 +325,8 @@ from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import DecodedFilter
 @metadata_attributes(short_name=None, tags=['BEST', 'posterior', 'position-like', 'diffusivity', 'spread'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-01-08 08:52', related_items=[])
 class PositionLikePosteriorScoring:
     """
-    A utility class for calculating Position-Like Information (PLI) scores 
+    A utility class for calculating Position-Like Information (PLI) scores -- how "position-like" a given decoded 2D posterior probability is.
+    
     using explicit bin edges for physical distance calculations.
 
 
@@ -676,7 +677,10 @@ class PositionLikePosteriorScoring:
 
     @function_attributes(short_name=None, tags=['WORKING', 'filter', 'position-like', 'score', '2D', 'posterior'], input_requires=[], output_provides=[], uses=['cls.compute_and_plot_posterior_stack', 'PositionLikePosteriorScoring', 'DecodingLocalityMeasures'], used_by=['PredictiveDecodingComputationsGlobalComputationFunctions.perform_predictive_decoding_analysis'], creation_date='2026-01-08 13:02', related_items=[])
     @classmethod
-    def filter_to_position_like_epochs_only(cls, decoded_local_epochs_result, xbin: NDArray, ybin: NDArray, position_like_score_cutoff: float = 0.42, num_min_position_like_t_bins: Optional[int] = None) -> DecodedFilterEpochsResult:
+    def filter_to_position_like_epochs_only(cls, decoded_local_epochs_result: DecodedFilterEpochsResult, xbin: NDArray, ybin: NDArray, position_like_score_cutoff: float = 0.42, num_min_position_like_t_bins: Optional[int] = None,
+            normalization_across_epochs_epoch_names: Optional[List]=None,
+
+        ) -> DecodedFilterEpochsResult:
         """
         decoding_time_bin_size = 0.025
         an_epoch_name = 'roam'
@@ -707,8 +711,9 @@ class PositionLikePosteriorScoring:
 
         if (np.ndim(flat_p_x_given_n_list) > 3):
             ## split by epoch
+            assert normalization_across_epochs_epoch_names is not None
             ## need to build at `p_x_given_n_dict: Dict[str, NDArray[ND.Shape["N_X_BINS, N_Y_BINS, N_TIME_BINS"], np.floating]] =`
-            p_x_given_n_dict: Dict[str, NDArray[ND.Shape["N_X_BINS, N_Y_BINS, N_TIME_BINS"], np.floating]] = DecodingLocalityMeasures.perform_build_normalized_outputs(p_x_given_n=flat_p_x_given_n_list, epoch_names=['roam', 'sprinkle'])
+            p_x_given_n_dict: Dict[str, NDArray[ND.Shape["N_X_BINS, N_Y_BINS, N_TIME_BINS"], np.floating]] = DecodingLocalityMeasures.perform_build_normalized_outputs(p_x_given_n=flat_p_x_given_n_list, epoch_names=normalization_across_epochs_epoch_names)
 
             a_scoring_results_df_dict = {}
             for k, v in p_x_given_n_dict.items():
