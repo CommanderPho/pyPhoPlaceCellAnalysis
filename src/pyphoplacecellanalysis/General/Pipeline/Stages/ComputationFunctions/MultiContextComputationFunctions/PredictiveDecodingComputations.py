@@ -3090,7 +3090,7 @@ class PredictiveDecodingDisplayWidget:
     active_epoch_idx: int = field(default=20)
     
     disable_showing_epoch_high_prob_pos_masks: bool = field(default=False)
-    
+    should_use_flipped_images: bool = field(default=False)
     
 
     @classmethod
@@ -3359,6 +3359,8 @@ class PredictiveDecodingDisplayWidget:
 
         posterior_2d, time_bin_posteriors, num_time_bins_to_show = self._get_posterior_data(an_epoch_idx=an_epoch_idx)
         """
+        should_use_flipped_images: bool = self.should_use_flipped_images
+        
         p_x_given_n = self.decoded_result.p_x_given_n_list[an_epoch_idx]  # Shape: (n_x_bins, n_y_bins, n_time_bins)
         
         epoch_high_prob_pos_masks = getattr(self.container.predictive_decoding, 'epoch_high_prob_pos_masks', None)
@@ -3387,7 +3389,23 @@ class PredictiveDecodingDisplayWidget:
                 num_time_bins_to_show = min(10, num_time_bins)
                 time_bin_posteriors = [p_x_given_n[:, :, t_bin_idx] for t_bin_idx in range(num_time_bins_to_show)]
 
-        return posterior_2d, time_bin_posteriors, num_time_bins_to_show
+
+        if not should_use_flipped_images:
+            # Normal Image/Extent:
+            # active_extent = self.extent
+            active_posterior = posterior_2d
+        else:
+            ## Flipped Image/Extent:
+            active_posterior = posterior_2d.T
+            time_bin_posteriors = [p_x_given_n[:, :, t_bin_idx].T for t_bin_idx in range(num_time_bins_to_show)] ## flipped posteriors
+            
+            # # Swap extent: (x_min, x_max, y_min, y_max) -> (y_min, y_max, x_min, x_max)
+            # x_min, x_max, y_min, y_max = self.extent
+            # swapped_extent = (y_min, y_max, x_min, x_max)
+            # active_extent = swapped_extent
+        
+
+        return active_posterior, time_bin_posteriors, num_time_bins_to_show
 
 
     def _update_posterior_plot(self, widget, posterior_2d: np.ndarray, time_bin_posteriors: Optional[List[np.ndarray]], num_time_bins_to_show: int, an_epoch_idx: int):
@@ -3405,7 +3423,10 @@ class PredictiveDecodingDisplayWidget:
             else:
                 ax_main = fig.add_subplot(111)
             
-            im = ax_main.imshow(posterior_2d.T, aspect='equal', origin='lower', extent=self.extent, cmap='viridis', interpolation='none') # , interpolation='nearest'
+            active_posterior = posterior_2d
+            active_extent = self.extent
+
+            im = ax_main.imshow(active_posterior, aspect='equal', origin='lower', extent=active_extent, cmap='viridis', interpolation='none') # , interpolation='nearest'
             ax_main.set_xlabel('X Position')
             ax_main.set_ylabel('Y Position')
             ax_main.set_title(f'Decoded Posterior Heatmap - Epoch {an_epoch_idx}')
@@ -3419,7 +3440,7 @@ class PredictiveDecodingDisplayWidget:
                 
                 for t_bin_idx in range(num_time_bins_to_show):
                     ax_tiny = fig.add_subplot(gs_tiny[0, t_bin_idx])
-                    im_tiny = ax_tiny.imshow(time_bin_posteriors[t_bin_idx].T, aspect='equal', origin='lower', extent=self.extent, cmap='viridis', interpolation='nearest', vmin=vmin_shared, vmax=vmax_shared)
+                    im_tiny = ax_tiny.imshow(time_bin_posteriors[t_bin_idx].T, aspect='equal', origin='lower', extent=active_extent, cmap='viridis', interpolation='nearest', vmin=vmin_shared, vmax=vmax_shared)
                     ax_tiny.set_xticks([])
                     ax_tiny.set_yticks([])
                     ax_tiny.set_xlabel(f't={t_bin_idx}', fontsize=8)
@@ -3482,7 +3503,8 @@ class PredictiveDecodingDisplayWidget:
                     ax.clear()
         
         fig, axs, epochs_pages = a_decoded_traj_plotter.plot_decoded_trajectories_2d(curr_position_df=self.curr_position_df, epoch_specific_position_dfs=epoch_specific_position_dfs, epoch_ids=epoch_ids, curr_num_subplots=curr_num_subplots,
-                                                                                    active_page_index=0, fixed_columns=4, plot_actual_lap_lines=True, use_theoretical_tracks_instead=False, existing_ax=existing_ax, plot_mode='scatter', c='red', cmap='Reds', alpha=0.65, s=5)
+                                                                                    active_page_index=0, fixed_columns=4, plot_actual_lap_lines=True, use_theoretical_tracks_instead=False, existing_ax=existing_ax, plot_mode='scatter', c='red', cmap='Reds', alpha=0.65, s=5,
+                                                                                    )
         
         # Hide unused axes (where epoch_id == -1, indicating padded/empty data)
         if len(epochs_pages) > 0:

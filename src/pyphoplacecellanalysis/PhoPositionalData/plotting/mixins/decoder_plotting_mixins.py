@@ -2153,7 +2153,10 @@ class DecodedTrajectoryMatplotlibPlotter(DecodedTrajectoryPlotter):
         ## Perform the plot:
         curr_artist_dict['prev_heatmaps'], (a_meas_pos_line, a_line), (_meas_pos_out_markers, _out_markers), plots_data = self._perform_add_decoded_posterior_and_trajectory(an_ax, xbin_centers=self.xbin_centers, a_p_x_given_n=a_p_x_given_n,
                                                                             a_time_bin_centers=a_time_bin_centers, a_most_likely_positions=a_most_likely_positions, a_measured_pos_df=a_measured_pos_df, ybin_centers=self.ybin_centers,
-                                                                            include_most_likely_pos_line=include_most_likely_pos_line, time_bin_index=time_bin_index, rotate_to_vertical=self.rotate_to_vertical, should_perform_reshape=True, should_post_hoc_fit_to_image_extent=should_post_hoc_fit_to_image_extent,
+                                                                            include_most_likely_pos_line=include_most_likely_pos_line, time_bin_index=time_bin_index, rotate_to_vertical=self.rotate_to_vertical,
+                                                                            # should_perform_reshape=True,
+                                                                            should_perform_reshape=False,
+                                                                            should_post_hoc_fit_to_image_extent=should_post_hoc_fit_to_image_extent,
                                                                             posterior_masking_value=posterior_masking_value, 
                                                                             time_cmap=deepcopy(self.cmap),
                                                                             debug_print=debug_print) # , allow_time_slider=True
