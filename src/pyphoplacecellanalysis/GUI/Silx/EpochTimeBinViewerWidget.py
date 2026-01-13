@@ -4,7 +4,7 @@ from silx.gui.plot3d.ScalarFieldView import ScalarFieldView
 from silx.gui.plot3d.SceneWidget import SceneWidget
 from silx.gui.plot3d.SceneWindow import SceneWindow, items as plot3d_items
 from silx.gui.plot3d.items.scatter import Scatter2D, Scatter3D
-from silx.gui.plot3d.items.image import ImageData
+from silx.gui.plot3d.items.image import ImageData, ImageRgba
 from silx.gui.colors import Colormap
 import numpy as np
 import pandas as pd
@@ -1943,15 +1943,32 @@ class Epoch3DSceneTimeBinViewer(GenericSilxContainer, qt.QWidget):
 
             # self.plots.time_bin_groupItems
             
-            image_item = ImageData()
-            # Silx ImageData.setData(image) where:
-            # - image: 2D array of the mask
-            image_item.setData(mask_image)
+            self.params.use_image_RGBA_items = True
+            
+            # 
+            if self.params.use_image_RGBA_items:
+                image_item = ImageRgba()
+                RGBA_mask_image = np.zeros(shape=(*np.shape(mask_image), 4), dtype=float) # (63, 41, 4)
+                RGBA_mask_image[:, :, 0] = 1.0 # R
+                RGBA_mask_image[:, :, 1] = 0.0 # G
+                RGBA_mask_image[:, :, 2] = 0.0 # B
+                RGBA_mask_image[(mask_image > 0.0), 3] = 0.9 # A
+                image_item.setData(RGBA_mask_image)      
+
+            else:
+                image_item = ImageData()
+                # Silx ImageData.setData(image) where:
+                # - image: 2D array of the mask
+                image_item.setData(mask_image)
+            
+
             # Set imageData properties
             # image_item.setScale(x_scale, y_scale, 1.0)
             
             image_item.setInterpolation('nearest')  # 'linear' or 'nearest' interpolation
-            image_item.getColormap().setName('magma')  # Use magma colormap
+            if not self.params.use_image_RGBA_items:
+                image_item.getColormap().setName('magma')  # Use magma colormap
+                
             image_item.setRotationCenter(*item_center_point)
             image_item.setLabel(f"ImageData[t={t_bin_idx}]")
             # image_item.setScale(y_scale, x_scale, 1.0) ## confirmed that it's XY-flipped, this one results in the right scale
@@ -2056,8 +2073,9 @@ class Epoch3DSceneTimeBinViewer(GenericSilxContainer, qt.QWidget):
 
         # Clear any existing contour items and rebuild for current epoch
         # self._clear_peak_contour_items()
+        self._add_contours_for_current_epoch(**kwargs)
         # self._add_contours_for_current_epoch(edge_color=edge_color, line_width=line_width, z_offset=z_offset)
-        self._add_contours_mask_images_for_current_epoch(**kwargs)
+        # self._add_contours_mask_images_for_current_epoch(**kwargs)
         
 
     # ==================================================================================================================================================================================================================================================================================== #

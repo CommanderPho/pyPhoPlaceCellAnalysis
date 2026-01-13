@@ -37,6 +37,7 @@ from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.Computa
 
 from pyphocorehelpers.programming_helpers import metadata_attributes
 from pyphocorehelpers.function_helpers import function_attributes
+from pyphocorehelpers.assertion_helpers import Assert
 
 from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import DirectionalLapsResult, DirectionalPseudo2DDecodersResult
 from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import BasePositionDecoder, DecodedFilterEpochsResult, SingleEpochDecodedResult
@@ -1644,8 +1645,13 @@ class PredictiveDecoding(ComputedResult): #PickleSerializableMixin, AttrsBasedCl
     @classmethod
     def compute_specific_future_and_past_analysis(cls, decoded_local_epochs_result: DecodedFilterEpochsResult, measured_positions_df: pd.DataFrame, gaussian_volume: Optional[NDArray]=None,
                                         active_epochs_df: Optional[pd.DataFrame]=None,
-                                        an_epoch_name:str = 'roam', top_v_percent: float = 0.1, 
+                                        an_epoch_name:str = 'roam',
+                                        top_v_percent: float = 0.1, 
+                                        epoch_t_bin_high_prob_masks_dict: Optional[Dict] = None,
+                                        epoch_high_prob_masks_dict: Optional[Dict] = None,
+                                        a_slice_multiplier: float = 0.5,
                                         merging_adjacent_max_separation_sec: float = 0.5, minimum_epoch_duration: float = 0.050, ## for merging detected future/past position dataframes
+                                        progress_print: bool = True,
         ):
         """
 
@@ -1691,10 +1697,16 @@ class PredictiveDecoding(ComputedResult): #PickleSerializableMixin, AttrsBasedCl
         reverse_flattened_time_bin_indicies_list: List[NDArray] = split_array(flattened_time_bin_indicies, sub_element_lengths=decoded_local_epochs_result.nbins)
         # assert len(split_by_epoch_reverse_flattened_time_bin_indicies) == n_epochs
 
+        n_total_epochs: int = len(decoded_local_epochs_result.filter_epochs)
+        if progress_print:
+            print(f'about to iterate n_total_epochs: {n_total_epochs} epochs.')
 
         # a_p_x_given_n = decoding_locality.p_x_given_n_dict[an_epoch_name] ## hmmm, this is global probability - (41, 63, 103948)
         for i, a_row in enumerate(ensure_dataframe(decoded_local_epochs_result.filter_epochs).itertuples(index=False)):
-            
+
+            if progress_print:
+                print(f'\trow[{i}/{n_total_epochs}]')
+
             ## need to know the indices this corresponds to so I can use my gaussian, p_x_given_n, etc
             ## compute the locality:
             # num_timestamps: int = np.shape(decoding_locality.gaussian_volume)[-1]
@@ -1727,18 +1739,32 @@ class PredictiveDecoding(ComputedResult): #PickleSerializableMixin, AttrsBasedCl
             # ==================================================================================================================================================================================================================================================================================== #
             # Special posterior measurement properties (diffusivity, promenence, etc) computed independently with newly decoded fine time bin grainularity posteriors                                                                                                                              #
             # ==================================================================================================================================================================================================================================================================================== #
-            ## for each time bin compute the top 10% of the time bins and use those instead of a fixed "high_val_epsilon" threshold:
-            #TODO 2025-12-24 20:48: - [ ] LAAAAME - this should use the real promenence topologically connected region, not the random top 10% which can be discontinuous...
-            flat = curr_epoch_p_x_given_n.reshape(-1, curr_epoch_p_x_given_n.shape[-1])  # (n_xy, n_time)
-            sorted_flat = np.sort(flat, axis=0)[::-1]
-            cdf = np.cumsum(sorted_flat, axis=0)
-            thresholds = sorted_flat[np.argmax(cdf >= top_v_percent * flat.sum(axis=0), axis=0), np.arange(flat.shape[1])]
-            is_high_prob_mask = curr_epoch_p_x_given_n >= thresholds
-            ## allow future positions to match any position in the epoch to count:
-            any_t_Bin_high_prob_pos_mask = np.any(is_high_prob_mask, axis=-1) ## mask for high prob positions during the epoch
-            epoch_high_prob_pos_masks.append(any_t_Bin_high_prob_pos_mask)
 
+            is_high_prob_mask: Optional[NDArray[ND.Shape["N_XBINS, N_YBINS, N_TBINS"], Any]] = None
+            if epoch_t_bin_high_prob_masks_dict is not None:
+                an_epoch_t_bins_custom_high_prob_mask: NDArray[ND.Shape["N_XBINS, N_YBINS, N_TBINS"], Any] = epoch_t_bin_high_prob_masks_dict[a_slice_multiplier][i]
+                Assert.same_shape(an_epoch_t_bins_custom_high_prob_mask, curr_epoch_p_x_given_n)
+                is_high_prob_mask = an_epoch_t_bins_custom_high_prob_mask
+
+            elif epoch_high_prob_masks_dict is None:
+                an_epoch_custom_high_prob_mask: NDArray[ND.Shape["N_XBINS, N_YBINS"], Any] = epoch_high_prob_masks_dict[a_slice_multiplier][i]
+                Assert.same_shape(an_epoch_custom_high_prob_mask, curr_epoch_p_x_given_n[:, :, 0])
+                is_high_prob_mask = np.tile(an_epoch_custom_high_prob_mask, (1, 1, n_flattened_tbins[i]))
+            else:
+                ## for each time bin compute the top 10% of the time bins and use those instead of a fixed "high_val_epsilon" threshold:
+                #TODO 2025-12-24 20:48: - [ ] LAAAAME - this should use the real promenence topologically connected region, not the random top 10% which can be discontinuous...
+                flat = curr_epoch_p_x_given_n.reshape(-1, curr_epoch_p_x_given_n.shape[-1])  # (n_xy, n_time)
+                sorted_flat = np.sort(flat, axis=0)[::-1]
+                cdf = np.cumsum(sorted_flat, axis=0)
+                thresholds = sorted_flat[np.argmax(cdf >= top_v_percent * flat.sum(axis=0), axis=0), np.arange(flat.shape[1])]
+                is_high_prob_mask = (curr_epoch_p_x_given_n >= thresholds)
+                
+
+            ## allow future positions to match any position in the epoch to count:
+            any_t_Bin_high_prob_pos_mask: NDArray[ND.Shape["N_XBINS, N_YBINS"], Any] = np.any(is_high_prob_mask, axis=-1) ## mask for high prob positions during the epoch
+            epoch_high_prob_pos_masks.append(any_t_Bin_high_prob_pos_mask)
             pos_matches_epoch_mask = np.where([any_t_Bin_high_prob_pos_mask[(a_pos.binned_x-1), (a_pos.binned_y-1)] for a_pos in measured_positions_df.itertuples()])[0]
+
 
             ## 2D approach
             # rows, cols = np.where(any_t_Bin_high_prob_pos_mask)
@@ -1800,6 +1826,7 @@ class PredictiveDecoding(ComputedResult): #PickleSerializableMixin, AttrsBasedCl
         
         ## END for i, a_row in enumerate(ensure_dat...
 
+        
 
         ## OUTPUTS: epoch_matching_positions, epoch_matching_past_future_positions
 
@@ -2758,12 +2785,11 @@ class PredictiveDecodingDisplayWidget:
 
     active_epoch_idx: int = field(default=20)
     
-
-    disable_showing_epoch_high_prob_pos_masks: bool = field(default=True)
+    disable_showing_epoch_high_prob_pos_masks: bool = field(default=False)
 
 
     @classmethod
-    def init_from_container(cls, container: PredictiveDecodingComputationsContainer, decoding_time_bin_size: float, an_epoch_name: str, active_epoch_idx: int=6) -> "PredictiveDecodingDisplayWidget":
+    def init_from_container(cls, container: PredictiveDecodingComputationsContainer, decoding_time_bin_size: float, an_epoch_name: str, active_epoch_idx: int=0, **kwargs) -> "PredictiveDecodingDisplayWidget":
         """
 
         """
@@ -2771,6 +2797,9 @@ class PredictiveDecodingDisplayWidget:
         pf_decoder = container.pf1D_Decoder_dict[an_epoch_name]
         decoded_result: DecodedFilterEpochsResult = decoded_local_epochs_result
         curr_position_df: pd.DataFrame = deepcopy(container.decoding_locality.pos_df)
+
+        # for k, v in kwargs.items():
+        #     disable_showing_epoch_high_prob_pos_masks
 
         # global_session = deepcopy(curr_active_pipeline.sess)
         # a_result2D: DecodedFilterEpochsResult = decoded_local_epochs_result.frame_divided_epochs_results[an_epoch_name]
