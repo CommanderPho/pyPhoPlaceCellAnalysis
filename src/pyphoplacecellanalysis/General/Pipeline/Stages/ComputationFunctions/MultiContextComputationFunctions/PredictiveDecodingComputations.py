@@ -1018,6 +1018,31 @@ class DecodingLocalityMeasures(ComputedResult): #PickleSerializableMixin, AttrsB
         return non_local_PBE_non_moving_rect_item, non_local_PBE_non_moving_epochs_df
 
 
+@define(slots=False, repr=True, eq=False)
+class MatchingPastFuturePositionsResult:
+    """Result container for matching past/future positions detection.
+    
+    Attributes:
+        pos_matches_epoch_mask: Indices of positions that match the epoch mask
+        relevant_positions_df: DataFrame with relevant positions categorized as past/present/future
+        is_relevant_past_times: Boolean mask for past times in relevant_positions_df
+        is_relevant_future_times: Boolean mask for future times in relevant_positions_df
+        n_total_possible_past_times: Total count of possible past times
+        n_total_possible_future_times: Total count of possible future times
+        n_relevant_past_times: Count of relevant past times
+        n_relevant_future_times: Count of relevant future times
+        matching_pos_epochs_df: DataFrame with detected epochs categorized as past/present/future
+    """
+    pos_matches_epoch_mask: NDArray
+    relevant_positions_df: pd.DataFrame
+    is_relevant_past_times: NDArray
+    is_relevant_future_times: NDArray
+    n_total_possible_past_times: int
+    n_total_possible_future_times: int
+    n_relevant_past_times: int
+    n_relevant_future_times: int
+    matching_pos_epochs_df: pd.DataFrame
+
 
 @define(slots=False, repr=False, eq=False)
 class PredictiveDecoding(ComputedResult): #PickleSerializableMixin, AttrsBasedClassHelperMixin):
@@ -1657,6 +1682,53 @@ class PredictiveDecoding(ComputedResult): #PickleSerializableMixin, AttrsBasedCl
         return active_pos_time_bin_centers, padded_pos_overlap_matrix
 
 
+    @staticmethod
+    def detect_matching_past_future_positions(epoch_high_prob_mask: NDArray[ND.Shape["N_XBINS, N_Y_BINS"], Any], measured_positions_df: pd.DataFrame, curr_epoch_start_t: float, curr_epoch_stop_t: float, merging_adjacent_max_separation_sec: float = 0.5, minimum_epoch_duration: float = 0.050) -> MatchingPastFuturePositionsResult:
+        """
+        Detect matching past/future positions for a given epoch high probability mask.
+        
+        Args:
+            epoch_high_prob_mask: 2D boolean mask (N_XBINS, N_Y_BINS) indicating high probability positions during the epoch
+            measured_positions_df: DataFrame with position data including 'binned_x', 'binned_y', 't' columns
+            curr_epoch_start_t: Start time of the current epoch
+            curr_epoch_stop_t: Stop time of the current epoch
+            merging_adjacent_max_separation_sec: Maximum separation in seconds for merging adjacent epochs
+            minimum_epoch_duration: Minimum duration for detected epochs
+            
+        Returns:
+            MatchingPastFuturePositionsResult containing all computed results
+        """
+        pos_matches_epoch_mask = np.where([epoch_high_prob_mask[(a_pos.binned_x-1), (a_pos.binned_y-1)] for a_pos in measured_positions_df.itertuples()])[0]
+
+        relevant_positions_df: pd.DataFrame = measured_positions_df.iloc[pos_matches_epoch_mask].copy()
+        is_relevant_past_times = (relevant_positions_df['t'] < curr_epoch_start_t)
+        is_relevant_future_times = (relevant_positions_df['t'] > curr_epoch_stop_t)
+        relevant_positions_df['is_future_present_past'] = 'present'
+        relevant_positions_df.loc[is_relevant_past_times, 'is_future_present_past'] = 'past'
+        relevant_positions_df.loc[is_relevant_future_times, 'is_future_present_past'] = 'future'
+
+        ## how many timestamps still remain in the past and the future:
+        n_total_possible_past_times = np.sum(measured_positions_df['t'] < curr_epoch_start_t)
+        n_total_possible_future_times = np.sum(measured_positions_df['t'] > curr_epoch_stop_t)
+        
+        n_relevant_past_times = np.sum(is_relevant_past_times)
+        n_relevant_future_times = np.sum(is_relevant_future_times)
+
+        ## find adjacent epochs from the position time bins (periods where the animal is in the positions)
+        measured_positions_df_copy = measured_positions_df.copy()
+        measured_positions_df_copy['is_included'] = False
+        measured_positions_df_copy.loc[measured_positions_df_copy.index[pos_matches_epoch_mask[is_relevant_past_times]], 'is_included'] = True ## only do past/future, not present
+        measured_positions_df_copy.loc[measured_positions_df_copy.index[pos_matches_epoch_mask[is_relevant_future_times]], 'is_included'] = True ## only do past/future, not present
+        a_matching_pos_epochs_df: pd.DataFrame = measured_positions_df_copy.neuropy.detect_epoch_satisfying_condition(is_condition_satisfied = (measured_positions_df_copy['is_included'].to_numpy()), merging_adjacent_max_separation_sec=merging_adjacent_max_separation_sec, minimum_epoch_duration=minimum_epoch_duration)
+        
+        is_pos_epochs_relevant_past_times = (a_matching_pos_epochs_df['start'] < curr_epoch_start_t)
+        is_pos_epochs_relevant_future_times = (a_matching_pos_epochs_df['stop'] > curr_epoch_stop_t)
+        a_matching_pos_epochs_df['is_future_present_past'] = 'present'
+        a_matching_pos_epochs_df.loc[is_pos_epochs_relevant_past_times, 'is_future_present_past'] = 'past'
+        a_matching_pos_epochs_df.loc[is_pos_epochs_relevant_future_times, 'is_future_present_past'] = 'future'
+        
+        return MatchingPastFuturePositionsResult(pos_matches_epoch_mask=pos_matches_epoch_mask, relevant_positions_df=relevant_positions_df, is_relevant_past_times=is_relevant_past_times, is_relevant_future_times=is_relevant_future_times, n_total_possible_past_times=n_total_possible_past_times, n_total_possible_future_times=n_total_possible_future_times, n_relevant_past_times=n_relevant_past_times, n_relevant_future_times=n_relevant_future_times, matching_pos_epochs_df=a_matching_pos_epochs_df)
+
 
     @classmethod
     def compute_specific_future_and_past_analysis(cls, decoded_local_epochs_result: DecodedFilterEpochsResult, measured_positions_df: pd.DataFrame, gaussian_volume: Optional[NDArray]=None,
@@ -1725,6 +1797,7 @@ class PredictiveDecoding(ComputedResult): #PickleSerializableMixin, AttrsBasedCl
         ## custom outputs:
         _out_processed_items_list_dict = {'_out_epoch_flat_mask': [], 
             '_out_processed_masks': [],
+            '_out_epoch_flat_mask_future_past_result': [],
         }
         
         
@@ -1800,62 +1873,19 @@ class PredictiveDecoding(ComputedResult): #PickleSerializableMixin, AttrsBasedCl
             ## allow future positions to match any position in the epoch to count:
             any_t_Bin_high_prob_pos_mask: NDArray[ND.Shape["N_XBINS, N_YBINS"], Any] = np.any(is_high_prob_mask, axis=-1) ## mask for high prob positions during the epoch
             epoch_high_prob_pos_masks.append(any_t_Bin_high_prob_pos_mask)
-            pos_matches_epoch_mask = np.where([any_t_Bin_high_prob_pos_mask[(a_pos.binned_x-1), (a_pos.binned_y-1)] for a_pos in measured_positions_df.itertuples()])[0]
 
+            any_t_bin_result = cls.detect_matching_past_future_positions(epoch_high_prob_mask=any_t_Bin_high_prob_pos_mask, measured_positions_df=measured_positions_df, curr_epoch_start_t=curr_epoch_start_t, curr_epoch_stop_t=curr_epoch_stop_t, merging_adjacent_max_separation_sec=merging_adjacent_max_separation_sec, minimum_epoch_duration=minimum_epoch_duration)
 
-            # merged_epoch_mask
-
-
-            ## 2D approach
-            # rows, cols = np.where(any_t_Bin_high_prob_pos_mask)
-            # indices_2d = np.column_stack((rows, cols))
-            # ## set approach:
-            # indices_2d = set(list(zip(*np.where(any_t_Bin_high_prob_pos_mask)))) ## (row, col) tuples            
-            # valid_mask = [(tuple([int(a_pos.binned_x-1), int(a_pos.binned_y-1)]) in indices_2d) for a_pos in measured_positions_df.itertuples()]
-            # pos_matches_epoch_mask = np.where(valid_mask)[0]
-
-            relevant_positions_df: pd.DataFrame = measured_positions_df.iloc[pos_matches_epoch_mask].copy()
-            is_relevant_past_times = (relevant_positions_df['t'] < curr_epoch_start_t)
-            is_relevant_future_times = (relevant_positions_df['t'] > curr_epoch_stop_t)
-            relevant_positions_df['is_future_present_past'] = 'present'
-            relevant_positions_df.loc[is_relevant_past_times, 'is_future_present_past'] = 'past'
-            relevant_positions_df.loc[is_relevant_future_times, 'is_future_present_past'] = 'future'
-
-            # _out_split = relevant_positions_df.pho.partition_df_dict('is_future_present_past')
-
-            ## how many timestamps still remain in the past and the future:
-            n_total_possible_past_times = np.sum(measured_positions_df['t'] < curr_epoch_start_t)
-            n_total_possible_future_times = np.sum(measured_positions_df['t'] > curr_epoch_stop_t)
+            epoch_matching_past_future_positions.append((any_t_bin_result.pos_matches_epoch_mask[any_t_bin_result.is_relevant_past_times], any_t_bin_result.pos_matches_epoch_mask[any_t_bin_result.is_relevant_future_times], any_t_bin_result.n_total_possible_past_times, any_t_bin_result.n_total_possible_future_times, any_t_bin_result.n_relevant_past_times, any_t_bin_result.n_relevant_future_times)) ## basically split on current
             
-            n_relevant_past_times = np.sum(is_relevant_past_times)
-            n_relevant_future_times = np.sum(is_relevant_future_times)
+            epoch_matching_positions.append(any_t_bin_result.pos_matches_epoch_mask)
+            matching_pos_dfs_list.append(any_t_bin_result.relevant_positions_df)
+            matching_pos_epochs_dfs_list.append(any_t_bin_result.matching_pos_epochs_df)
 
-            # n_total_past_times = (measured_positions_df['t'] < curr_epoch_time_bin_centers[0])
-            # n_total_future_times = (measured_positions_df['t'] > curr_epoch_stop_t)
-            
-            epoch_matching_past_future_positions.append((pos_matches_epoch_mask[is_relevant_past_times], pos_matches_epoch_mask[is_relevant_future_times], n_total_possible_past_times, n_total_possible_future_times, n_relevant_past_times, n_relevant_future_times)) ## basically split on current
-            
-            # relevant_positions_df['is_past'] = (relevant_positions_df['t'] < curr_epoch_stop_t)
 
-            # measured_positions_df[['binned_x', 'binned_y']].to_numpy()
-            epoch_matching_positions.append(pos_matches_epoch_mask)
-            matching_pos_dfs_list.append(relevant_positions_df)
-            # pos_matches_epoch_mask = epoch_matching_positions[i]
-            
-            ## find adjacent epochs from the position time bins (periods where the animal is in the positions)
-            measured_positions_df['is_included'] = False
-            # measured_positions_df.loc[measured_positions_df.index[pos_matches_epoch_mask], 'is_included'] = True
-            measured_positions_df.loc[measured_positions_df.index[pos_matches_epoch_mask[is_relevant_past_times]], 'is_included'] = True ## only do past/future, not present
-            measured_positions_df.loc[measured_positions_df.index[pos_matches_epoch_mask[is_relevant_future_times]], 'is_included'] = True ## only do past/future, not present
-            a_matching_pos_epochs_df: pd.DataFrame = measured_positions_df.neuropy.detect_epoch_satisfying_condition(is_condition_satisfied = (measured_positions_df['is_included'].to_numpy()), merging_adjacent_max_separation_sec=merging_adjacent_max_separation_sec, minimum_epoch_duration=minimum_epoch_duration)
-            
-            is_pos_epochs_relevant_past_times = (a_matching_pos_epochs_df['start'] < curr_epoch_start_t)
-            is_pos_epochs_relevant_future_times = (a_matching_pos_epochs_df['stop'] > curr_epoch_stop_t)
-            a_matching_pos_epochs_df['is_future_present_past'] = 'present'
-            a_matching_pos_epochs_df.loc[is_pos_epochs_relevant_past_times, 'is_future_present_past'] = 'past'
-            a_matching_pos_epochs_df.loc[is_pos_epochs_relevant_future_times, 'is_future_present_past'] = 'future'
-            
-            matching_pos_epochs_dfs_list.append(a_matching_pos_epochs_df)
+            ## compute for `merged_epoch_mask`
+            merged_epoch_mask_result = cls.detect_matching_past_future_positions(epoch_high_prob_mask=merged_epoch_mask, measured_positions_df=measured_positions_df, curr_epoch_start_t=curr_epoch_start_t, curr_epoch_stop_t=curr_epoch_stop_t, merging_adjacent_max_separation_sec=merging_adjacent_max_separation_sec, minimum_epoch_duration=minimum_epoch_duration)
+            _out_processed_items_list_dict['_out_epoch_flat_mask_future_past_result'].append(merged_epoch_mask_result)
 
             # PredictiveDecodingComputationsContainer
             ## Has it been there in the past (duh or we wouldn't have placefields for it)?
@@ -1893,7 +1923,7 @@ class PredictiveDecoding(ComputedResult): #PickleSerializableMixin, AttrsBasedCl
 
         # epoch_high_prob_pos_masks, epoch_matching_positions, past_future_info_dict, matching_pos_dfs_list, matching_pos_epochs_dfs_list
         
-        return epoch_matching_past_future_positions, (epoch_high_prob_pos_masks, epoch_t_bins_high_prob_pos_masks, epoch_matching_positions, past_future_info_dict, matching_pos_dfs_list, matching_pos_epochs_dfs_list), active_epochs_df
+        return epoch_matching_past_future_positions, (epoch_high_prob_pos_masks, epoch_t_bins_high_prob_pos_masks, epoch_matching_positions, past_future_info_dict, matching_pos_dfs_list, matching_pos_epochs_dfs_list, _out_processed_items_list_dict), active_epochs_df
 
 
 
@@ -3309,12 +3339,12 @@ class PredictiveDecodingDisplayWidget:
             else:
                 ax_main = fig.add_subplot(111)
             
-            im = ax_main.imshow(posterior_2d, aspect='equal', origin='lower', extent=self.extent, cmap='viridis', interpolation='nearest')
+            im = ax_main.imshow(posterior_2d.T, aspect='equal', origin='lower', extent=self.extent, cmap='viridis', interpolation='none') # , interpolation='nearest'
             ax_main.set_xlabel('X Position')
             ax_main.set_ylabel('Y Position')
             ax_main.set_title(f'Decoded Posterior Heatmap - Epoch {an_epoch_idx}')
             
-            if time_bin_posteriors is not None and num_time_bins_to_show > 0:
+            if (time_bin_posteriors is not None) and (num_time_bins_to_show > 0):
                 all_time_bin_values = np.concatenate([tb.flatten() for tb in time_bin_posteriors])
                 vmin_shared = np.nanmin(all_time_bin_values)
                 vmax_shared = np.nanmax(all_time_bin_values)
@@ -3323,7 +3353,7 @@ class PredictiveDecodingDisplayWidget:
                 
                 for t_bin_idx in range(num_time_bins_to_show):
                     ax_tiny = fig.add_subplot(gs_tiny[0, t_bin_idx])
-                    im_tiny = ax_tiny.imshow(time_bin_posteriors[t_bin_idx], aspect='equal', origin='lower', extent=self.extent, cmap='viridis', interpolation='nearest', vmin=vmin_shared, vmax=vmax_shared)
+                    im_tiny = ax_tiny.imshow(time_bin_posteriors[t_bin_idx].T, aspect='equal', origin='lower', extent=self.extent, cmap='viridis', interpolation='nearest', vmin=vmin_shared, vmax=vmax_shared)
                     ax_tiny.set_xticks([])
                     ax_tiny.set_yticks([])
                     ax_tiny.set_xlabel(f't={t_bin_idx}', fontsize=8)
@@ -3386,6 +3416,20 @@ class PredictiveDecodingDisplayWidget:
                     ax.clear()
         
         fig, axs, epochs_pages = a_decoded_traj_plotter.plot_decoded_trajectories_2d(curr_position_df=self.curr_position_df, epoch_specific_position_dfs=epoch_specific_position_dfs, epoch_ids=epoch_ids, curr_num_subplots=curr_num_subplots, active_page_index=0, fixed_columns=4, plot_actual_lap_lines=True, use_theoretical_tracks_instead=False, existing_ax=existing_ax, plot_mode='scatter', c='red', cmap='Reds', alpha=0.65)
+        
+        # Hide unused axes (where epoch_id == -1, indicating padded/empty data)
+        if len(epochs_pages) > 0:
+            active_page_epoch_ids = epochs_pages[0]
+            if hasattr(a_decoded_traj_plotter, 'row_column_indicies') and a_decoded_traj_plotter.row_column_indicies is not None:
+                row_column_indicies = a_decoded_traj_plotter.row_column_indicies
+                for linear_idx, epoch_id in enumerate(active_page_epoch_ids):
+                    if epoch_id == -1:
+                        if linear_idx < len(row_column_indicies[0]) and linear_idx < len(row_column_indicies[1]):
+                            curr_row = row_column_indicies[0][linear_idx]
+                            curr_col = row_column_indicies[1][linear_idx]
+                            if axs is not None and isinstance(axs, np.ndarray) and axs.ndim == 2:
+                                if curr_row < axs.shape[0] and curr_col < axs.shape[1]:
+                                    axs[curr_row, curr_col].set_visible(False)
         
         perform_update_title_subtitle(fig=fig, ax=None, title_string=f"{category_name} - an_epoch_idx: {an_epoch_idx}")
         
