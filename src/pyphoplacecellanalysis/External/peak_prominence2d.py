@@ -374,6 +374,8 @@ class PosteriorPeaksPeakProminence2dResult(ComputedResult):
         num_slice_levels: int = len(slice_level_multipliers)
         n_epochs: int = len(p_x_given_n_list)
 
+        available_level_multipliers = np.unique(self.flat_peaks_df['slice_level_multiplier'])
+
         peak_tips_only_df = self.flat_peaks_df[np.isin(self.flat_peaks_df['slice_level_multiplier'], slice_level_multipliers)].reset_index(drop=True) ## ['summit_slice_area'] > 0.0
         ## build summit_slice_level dict
         # Method 4: If there might be duplicate keys and you want to handle them  (e.g., take the first, last, or raise an error)

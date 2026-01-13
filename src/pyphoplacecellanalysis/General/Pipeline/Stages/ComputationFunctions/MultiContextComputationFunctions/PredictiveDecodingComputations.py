@@ -2414,7 +2414,7 @@ class PredictiveDecodingComputationsContainer(ComputedResult):
         decoded_local_epochs_result = self.epochs_decoded_result_cache_dict[decoding_time_bin_size].get(an_epoch_name, None)
         if decoded_local_epochs_result is None:
             ## if we can't find a pre-computed one:    
-            decoded_local_epochs_result: DecodedFilterEpochsResult = a_decoder.decode_specific_epochs(spikes_df=deepcopy(curr_active_pipeline.sess.spikes_df), filter_epochs=non_local_PBE_non_moving_epochs_df, decoding_time_bin_size=decoding_time_bin_size)
+            decoded_local_epochs_result: DecodedFilterEpochsResult = a_decoder.decode_specific_epochs(spikes_df=deepcopy(curr_active_pipeline.sess.spikes_df), filter_epochs=deepcopy(active_epochs_df), decoding_time_bin_size=decoding_time_bin_size)
             self.epochs_decoded_result_cache_dict[decoding_time_bin_size][an_epoch_name] = decoded_local_epochs_result
 
         print(f'done with all decoding.')
@@ -2566,14 +2566,15 @@ class PredictiveDecodingComputationsGlobalComputationFunctions(AllFunctionEnumer
             print(f'WARN: perform_predictive_decoding_analysis(...): include_includelist: {include_includelist} is specified but include_includelist is currently ignored! Continuing with defaults.')
 
         ## Get the needed data:
-
-
+        should_filter_by_active_spikes: bool = ((min_num_spikes_per_bin_to_be_considered_active is not None) and (min_num_spikes_per_bin_to_be_considered_active > 0))
+        should_filter_by_position_like_posterior_bins: bool = ((mask_position_like_time_score_cutoff is not None) and (mask_position_like_time_score_cutoff > 0))
+        
         # ==================================================================================================================================================================================================================================================================================== #
         # MASK low-firing bins before using result                                                                                                                                                                                                                                             #
         # ==================================================================================================================================================================================================================================================================================== #
         # extant_decoded_time_bin_size = 0.250
         
-        if (min_num_spikes_per_bin_to_be_considered_active is not None) and (min_num_spikes_per_bin_to_be_considered_active > 0):
+        if (should_filter_by_active_spikes or should_filter_by_position_like_posterior_bins):
             ## Masked result:
             directional_decoders_decode_result: DirectionalDecodersContinuouslyDecodedResult = deepcopy(owning_pipeline_reference.global_computation_results.computed_data['DirectionalDecodersDecoded'])
             spikes_df: pd.DataFrame = directional_decoders_decode_result.spikes_df
@@ -2585,6 +2586,7 @@ class PredictiveDecodingComputationsGlobalComputationFunctions(AllFunctionEnumer
                 a_result_decoded: SingleEpochDecodedResult = directional_decoders_decode_result.continuously_decoded_pseudo2D_decoder_dict[extant_decoded_time_bin_size]
                 a_result_decoded: DecodedFilterEpochsResult = DecodedFilterEpochsResult.init_from_single_epoch_result(single_epoch_result=a_result_decoded, decoding_time_bin_size=extant_decoded_time_bin_size) ## convert to a `DecodedFilterEpochsResult` for masking
                 
+                # FILTER TO JUST POSITION-LIKE POSTERIORS ____________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
                 if mask_position_like_time_score_cutoff:
                     a_masked_result, scoring_results = PositionLikePosteriorScoring.filter_to_position_like_epochs_only(decoded_local_epochs_result=a_result_decoded, position_like_score_cutoff=mask_position_like_time_score_cutoff, num_min_position_like_t_bins=None,
                                                                                                                                         xbin=a_decoder.xbin, ybin=a_decoder.ybin,
@@ -2592,7 +2594,9 @@ class PredictiveDecodingComputationsGlobalComputationFunctions(AllFunctionEnumer
                 else:
                     a_masked_result = a_result_decoded
 
-                if (min_num_spikes_per_bin_to_be_considered_active is not None) and (min_num_spikes_per_bin_to_be_considered_active > 0):
+
+                # FILTER BY ACTIVE SPIKES ____________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
+                if should_filter_by_active_spikes:
                     ## TODO: I think this works?
                     a_masked_result, mask_index_tuple = a_masked_result.mask_computed_DecodedFilterEpochsResult_by_required_spike_counts_per_time_bin(
                         spikes_df=deepcopy(spikes_df),
@@ -2601,14 +2605,20 @@ class PredictiveDecodingComputationsGlobalComputationFunctions(AllFunctionEnumer
                         masked_bin_fill_mode='dropped',
                         # masked_bin_fill_mode='nan_filled'
                     )
-                    
+                else:
+                    # a_masked_result
+                    pass                    
+
+
                 # a_masked_result: DecodedFilterEpochsResult
                 # is_time_bin_active_list, inactive_mask_list, all_time_bin_indicies_list, last_valid_indices_list = mask_index_tuple
                 ## re-assign to `directional_decoders_decode_result.continuously_decoded_pseudo2D_decoder_dict[extant_decoded_time_bin_size]`
                 directional_decoders_decode_result.continuously_decoded_pseudo2D_decoder_dict[extant_decoded_time_bin_size] = a_masked_result.get_result_for_epoch(0) ## get the single epoch, re-assign
 
+            ## END for extant_decoded_time_bin_size, a_result_decoded in directional_decoders_decode_result.continuousl...
+
         else:
-            directional_decoders_decode_result: DirectionalDecodersContinuouslyDecodedResult = global_computation_results.computed_data['DirectionalDecodersDecoded']
+            directional_decoders_decode_result: DirectionalDecodersContinuouslyDecodedResult = deepcopy(global_computation_results.computed_data['DirectionalDecodersDecoded'])
             spikes_df: pd.DataFrame = deepcopy(directional_decoders_decode_result.spikes_df)
 
 
