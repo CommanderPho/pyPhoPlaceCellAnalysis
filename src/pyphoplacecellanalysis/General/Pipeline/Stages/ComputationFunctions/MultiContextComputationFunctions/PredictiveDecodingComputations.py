@@ -1686,6 +1686,8 @@ class PredictiveDecoding(ComputedResult): #PickleSerializableMixin, AttrsBasedCl
         # MAIN COMPUTATION/METRIC PART OF THIS FUNCTION                                                                                                                                                                                                                                        #
         # ==================================================================================================================================================================================================================================================================================== #
         epoch_high_prob_pos_masks = []
+        epoch_t_bins_high_prob_pos_masks = []
+        
         epoch_matching_positions = []
         epoch_matching_past_future_positions: List[Tuple[pd.DataFrame, pd.DataFrame]] = []
         matching_pos_dfs_list: List[pd.DataFrame] = []
@@ -1760,6 +1762,8 @@ class PredictiveDecoding(ComputedResult): #PickleSerializableMixin, AttrsBasedCl
                 is_high_prob_mask = (curr_epoch_p_x_given_n >= thresholds)
                 
 
+            epoch_t_bins_high_prob_pos_masks.append(is_high_prob_mask)
+            
             ## allow future positions to match any position in the epoch to count:
             any_t_Bin_high_prob_pos_mask: NDArray[ND.Shape["N_XBINS, N_YBINS"], Any] = np.any(is_high_prob_mask, axis=-1) ## mask for high prob positions during the epoch
             epoch_high_prob_pos_masks.append(any_t_Bin_high_prob_pos_mask)
@@ -1853,7 +1857,7 @@ class PredictiveDecoding(ComputedResult): #PickleSerializableMixin, AttrsBasedCl
 
         # epoch_high_prob_pos_masks, epoch_matching_positions, past_future_info_dict, matching_pos_dfs_list, matching_pos_epochs_dfs_list
         
-        return epoch_matching_past_future_positions, (epoch_high_prob_pos_masks, epoch_matching_positions, past_future_info_dict, matching_pos_dfs_list, matching_pos_epochs_dfs_list), active_epochs_df
+        return epoch_matching_past_future_positions, (epoch_high_prob_pos_masks, epoch_t_bins_high_prob_pos_masks, epoch_matching_positions, past_future_info_dict, matching_pos_dfs_list, matching_pos_epochs_dfs_list), active_epochs_df
 
 
 
@@ -2381,7 +2385,7 @@ class PredictiveDecodingComputationsContainer(ComputedResult):
             active_epochs_df=active_epochs_df,
             an_epoch_name=an_epoch_name, top_v_percent=top_v_percent, merging_adjacent_max_separation_sec=merging_adjacent_max_separation_sec, minimum_epoch_duration=minimum_epoch_duration,
         )
-        epoch_high_prob_pos_masks, epoch_matching_positions, past_future_info_dict, matching_pos_dfs_list, matching_pos_epochs_dfs_list = _an_out_tuple
+        epoch_high_prob_pos_masks, epoch_t_bins_high_prob_pos_masks, epoch_matching_positions, past_future_info_dict, matching_pos_dfs_list, matching_pos_epochs_dfs_list = _an_out_tuple
         
         
 
@@ -2399,6 +2403,8 @@ class PredictiveDecodingComputationsContainer(ComputedResult):
                 self.predictive_decoding.locality_measures = decoding_locality
 
                 ## update the other fields
+                self.predictive_decoding.epoch_high_prob_pos_masks = epoch_high_prob_pos_masks
+                self.predictive_decoding.epoch_t_bins_high_prob_pos_masks = epoch_t_bins_high_prob_pos_masks
                 self.predictive_decoding.epoch_matching_past_future_positions = epoch_matching_past_future_positions
                 self.predictive_decoding.matching_pos_dfs_list = matching_pos_dfs_list
                 self.predictive_decoding.matching_pos_epochs_dfs_list = matching_pos_epochs_dfs_list
@@ -3050,23 +3056,38 @@ class PredictiveDecodingDisplayWidget:
 
 
     def _get_posterior_data(self, an_epoch_idx: int) -> Tuple[np.ndarray, Optional[List[np.ndarray]], int]:
-        """Extract posterior data for epoch."""
+        """Extract posterior data for epoch.
+
+        posterior_2d, time_bin_posteriors, num_time_bins_to_show = self._get_posterior_data(an_epoch_idx=an_epoch_idx)
+        """
         p_x_given_n = self.decoded_result.p_x_given_n_list[an_epoch_idx]  # Shape: (n_x_bins, n_y_bins, n_time_bins)
         
         epoch_high_prob_pos_masks = getattr(self.container.predictive_decoding, 'epoch_high_prob_pos_masks', None)
         if (epoch_high_prob_pos_masks is not None) and (not self.disable_showing_epoch_high_prob_pos_masks):
-            print(f'using high_prob mask version!')
+            print(f'using high_prob mask version from .epoch_high_prob_pos_masks!')
             posterior_2d = epoch_high_prob_pos_masks[an_epoch_idx]
         else:
             posterior_2d = np.sum(p_x_given_n, axis=2) ## collapse over time
-        
+
+
         time_bin_posteriors = None
         num_time_bins_to_show = 0
-        if p_x_given_n is not None:
-            num_time_bins = p_x_given_n.shape[2]
+        # epoch_t_bins_high_prob_pos_masks
+        epoch_t_bins_high_prob_pos_masks = getattr(self.container.predictive_decoding, 'epoch_t_bins_high_prob_pos_masks', None)
+        if (epoch_t_bins_high_prob_pos_masks is not None) and (not self.disable_showing_epoch_high_prob_pos_masks):
+            print(f'using high_prob mask version from .epoch_t_bins_high_prob_pos_masks!')
+            time_bin_posteriors = epoch_t_bins_high_prob_pos_masks[an_epoch_idx]
+            num_time_bins = time_bin_posteriors.shape[2]
             num_time_bins_to_show = min(10, num_time_bins)
-            time_bin_posteriors = [p_x_given_n[:, :, t_bin_idx] for t_bin_idx in range(num_time_bins_to_show)]
-        
+            time_bin_posteriors = [time_bin_posteriors[:, :, t_bin_idx] for t_bin_idx in range(num_time_bins_to_show)]
+                    
+        else:
+            ## Use raw posteriors:
+            if p_x_given_n is not None:
+                num_time_bins = p_x_given_n.shape[2]
+                num_time_bins_to_show = min(10, num_time_bins)
+                time_bin_posteriors = [p_x_given_n[:, :, t_bin_idx] for t_bin_idx in range(num_time_bins_to_show)]
+
         return posterior_2d, time_bin_posteriors, num_time_bins_to_show
 
 
@@ -3080,7 +3101,7 @@ class PredictiveDecodingDisplayWidget:
             fig.clear()
             
             if time_bin_posteriors is not None and num_time_bins_to_show > 0:
-                gs = gridspec.GridSpec(2, 1, figure=fig, height_ratios=[9, 1], hspace=0.1)
+                gs = gridspec.GridSpec(2, 1, figure=fig, height_ratios=[7, 2], hspace=0.1)
                 ax_main = fig.add_subplot(gs[0, 0])
             else:
                 ax_main = fig.add_subplot(111)
@@ -3090,15 +3111,12 @@ class PredictiveDecodingDisplayWidget:
             ax_main.set_ylabel('Y Position')
             ax_main.set_title(f'Decoded Posterior Heatmap - Epoch {an_epoch_idx}')
             
-            cbar = plt.colorbar(im, ax=ax_main)
-            cbar.set_label('Probability (sum over time)')
-            
             if time_bin_posteriors is not None and num_time_bins_to_show > 0:
                 all_time_bin_values = np.concatenate([tb.flatten() for tb in time_bin_posteriors])
                 vmin_shared = np.nanmin(all_time_bin_values)
                 vmax_shared = np.nanmax(all_time_bin_values)
                 
-                gs_tiny = gridspec.GridSpecFromSubplotSpec(1, num_time_bins_to_show, subplot_spec=gs[1, 0], wspace=0.05)
+                gs_tiny = gridspec.GridSpecFromSubplotSpec(1, num_time_bins_to_show, subplot_spec=gs[1, 0], wspace=0.01)
                 
                 for t_bin_idx in range(num_time_bins_to_show):
                     ax_tiny = fig.add_subplot(gs_tiny[0, t_bin_idx])
@@ -3182,7 +3200,7 @@ class PredictiveDecodingDisplayWidget:
         posterior_2d, time_bin_posteriors, num_time_bins_to_show = self._get_posterior_data(an_epoch_idx)
         
         try:
-            self._update_posterior_plot(widget, posterior_2d, time_bin_posteriors, num_time_bins_to_show, an_epoch_idx)
+            self._update_posterior_plot(widget, posterior_2d=posterior_2d, time_bin_posteriors=time_bin_posteriors, num_time_bins_to_show=num_time_bins_to_show, an_epoch_idx=an_epoch_idx)
         except Exception as e:
             print(f"Error updating posterior plot for epoch {an_epoch_idx}: {e}")
             import traceback
@@ -3384,28 +3402,9 @@ class PredictiveDecodingDisplayWidget:
 
         # Plot decoded posterior heatmap for 'decoded_posterior' dock
         category_name = 'decoded_posterior'
+        ## get the data:
+        posterior_2d, time_bin_posteriors, num_time_bins_to_show = self._get_posterior_data(an_epoch_idx=an_epoch_idx)
 
-        posterior_2d = None
-        ## do this part either way
-        p_x_given_n = self.decoded_result.p_x_given_n_list[an_epoch_idx]  # Shape: (n_x_bins, n_y_bins, n_time_bins)
-
-        epoch_high_prob_pos_masks = getattr(self.container.predictive_decoding, 'epoch_high_prob_pos_masks', None)
-        if (epoch_high_prob_pos_masks is not None) and (not self.disable_showing_epoch_high_prob_pos_masks):
-            print(f'using high_prob mask version!')
-            posterior_2d = epoch_high_prob_pos_masks[an_epoch_idx]
-        else:
-            ## use posterior:
-            # Sum over time dimension to create 2D heatmap
-            posterior_2d = np.sum(p_x_given_n, axis=2)
-        
-        # Extract time bin posteriors for tiny heatmaps (only if p_x_given_n is available)
-        time_bin_posteriors = None
-        num_time_bins_to_show = 0
-        if p_x_given_n is not None:
-            num_time_bins = p_x_given_n.shape[2]
-            num_time_bins_to_show = min(10, num_time_bins)
-            time_bin_posteriors = [p_x_given_n[:, :, t_bin_idx] for t_bin_idx in range(num_time_bins_to_show)]
-        
         # Check if we need to initialize (create new widget) or update existing one
         needed_init: bool = category_name not in self.dock_canvas_widgets
 
@@ -3421,9 +3420,9 @@ class PredictiveDecodingDisplayWidget:
                 fig.clear()
                 from matplotlib import gridspec
                 
-                # Create GridSpec: 2 rows, 1 column, with height ratios [9, 1] for 90%/10% split
+                # Create GridSpec: 2 rows, 1 column, with height ratios [7, 2] for ~78%/22% split
                 if time_bin_posteriors is not None and num_time_bins_to_show > 0:
-                    gs = gridspec.GridSpec(2, 1, figure=fig, height_ratios=[9, 1], hspace=0.1)
+                    gs = gridspec.GridSpec(2, 1, figure=fig, height_ratios=[7, 2], hspace=0.1)
                     ax_main = fig.add_subplot(gs[0, 0])
                 else:
                     # If no time bins available, use single subplot
@@ -3435,10 +3434,6 @@ class PredictiveDecodingDisplayWidget:
                 ax_main.set_ylabel('Y Position')
                 ax_main.set_title(f'Decoded Posterior Heatmap - Epoch {an_epoch_idx}')
                 
-                # Add colorbar for main heatmap
-                cbar = plt.colorbar(im, ax=ax_main)
-                cbar.set_label('Probability (sum over time)')
-                
                 # Create tiny heatmaps row if time bin data is available
                 if time_bin_posteriors is not None and num_time_bins_to_show > 0:
                     # Calculate shared color scale for all tiny heatmaps
@@ -3447,7 +3442,7 @@ class PredictiveDecodingDisplayWidget:
                     vmax_shared = np.nanmax(all_time_bin_values)
                     
                     # Create GridSpec for individual tiny heatmaps within the top row
-                    gs_tiny = gridspec.GridSpecFromSubplotSpec(1, num_time_bins_to_show, subplot_spec=gs[1, 0], wspace=0.05)
+                    gs_tiny = gridspec.GridSpecFromSubplotSpec(1, num_time_bins_to_show, subplot_spec=gs[1, 0], wspace=0.01)
                     
                     for t_bin_idx in range(num_time_bins_to_show):
                         ax_tiny = fig.add_subplot(gs_tiny[0, t_bin_idx])
@@ -3480,7 +3475,7 @@ class PredictiveDecodingDisplayWidget:
             extent = (self.xbin[0], self.xbin[-1], self.ybin[0], self.ybin[-1])
             
             # Initial plot
-            _subfn_update_posterior_plot(widget, posterior_2d, time_bin_posteriors, num_time_bins_to_show, an_epoch_idx, extent)
+            _subfn_update_posterior_plot(widget, posterior_2d=posterior_2d, time_bin_posteriors=time_bin_posteriors, num_time_bins_to_show=num_time_bins_to_show, an_epoch_idx=an_epoch_idx, extent=extent)
             
             # Embed the widget in the dock
             dock = self.dock_widgets.get(category_name)
@@ -3511,7 +3506,7 @@ class PredictiveDecodingDisplayWidget:
                     extent = (self.xbin[0], self.xbin[-1], self.ybin[0], self.ybin[-1])
                     
                     # Update plot with new data
-                    _subfn_update_posterior_plot(widget, posterior_2d, time_bin_posteriors, num_time_bins_to_show, an_epoch_idx, extent)
+                    _subfn_update_posterior_plot(widget, posterior_2d=posterior_2d, time_bin_posteriors=time_bin_posteriors, num_time_bins_to_show=num_time_bins_to_show, an_epoch_idx=an_epoch_idx, extent=extent)
                 except Exception as e:
                     print(f"Error updating posterior plot for epoch {an_epoch_idx}: {e}")
                     import traceback
