@@ -372,10 +372,24 @@ class PosteriorPeaksPeakProminence2dResult(ComputedResult):
 
         """
         num_slice_levels: int = len(slice_level_multipliers)
+        n_epochs: int = len(p_x_given_n_list)
 
         peak_tips_only_df = self.flat_peaks_df[np.isin(self.flat_peaks_df['slice_level_multiplier'], slice_level_multipliers)].reset_index(drop=True) ## ['summit_slice_area'] > 0.0
+        ## build summit_slice_level dict
+        # Method 4: If there might be duplicate keys and you want to handle them  (e.g., take the first, last, or raise an error)
+        flat_peaks_summit_slice_level_dict: Dict[Tuple, float] = (
+            peak_tips_only_df
+            .drop_duplicates(subset=['epoch_idx', 'time_bin_idx', 'summit_idx', 'slice_level_multiplier'], keep='first')
+            .set_index(['epoch_idx', 'time_bin_idx', 'summit_idx', 'slice_level_multiplier'])
+            ['summit_slice_level']
+            .to_dict()
+        )
+
+        flat_peaks_summit_slice_level_dict
+
+
         # p_x_given_n_list = decoded_local_epochs_result.p_x_given_n_list
-        mask_included_bins_list = []
+        mask_included_bins_list: List[List[NDArray]] = [] # [ND.Shape["N_XBINS, N_YBINS, N_DIM3"], Any]
         summit_slice_levels_list = []
         # summit_slice_levels_df_list = []
         # mask_included_p_x_given_n_list = {a_multiplier:[] for a_multiplier in slice_level_multipliers}
@@ -401,6 +415,7 @@ class PosteriorPeaksPeakProminence2dResult(ComputedResult):
 
                 for slice_idx, a_slice_multiplier in enumerate(slice_level_multipliers):
                     a_slice_level_df: pd.DataFrame = active_df[active_df['slice_level_multiplier'] == a_slice_multiplier]
+                    # a_slice_level: Optional[float] = flat_peaks_summit_slice_level_dict.get((an_epoch_idx, a_rel_t_bin_idx, slice_idx, a_slice_multiplier))
                     a_slice_level = a_slice_level_df['summit_slice_level'].to_numpy()
                     if len(a_slice_level) > 0:
                         a_slice_level = a_slice_level[0] ## unpack
@@ -444,26 +459,14 @@ class PosteriorPeaksPeakProminence2dResult(ComputedResult):
 
         # pd.DataFrame(summit_slice_levels_list, columns=slice_level_multipliers)
 
-
-        # mask_included_p_x_given_n_list_dict = {a_slice_multiplier:[[np.stack(a_mask[slice_idx], axis=0) for a_rel_t_bin_idx, a_mask in enumerate(p_x_given_n_dt)] for an_epoch_idx, p_x_given_n_dt in enumerate(mask_included_bins_list)] for slice_idx, a_slice_multiplier in enumerate(slice_level_multipliers)}
-        # mask_included_p_x_given_n_list_dict = {a_slice_multiplier:[[np.stack(a_mask[slice_idx], axis=0) for a_mask in p_x_given_n_dt] for p_x_given_n_dt in mask_included_bins_list] for slice_idx, a_slice_multiplier in enumerate(slice_level_multipliers)}        
-        # mask_included_p_x_given_n_list_dict = {a_slice_multiplier:[np.atleast_3d(np.stack([a_mask[slice_idx] for a_mask in p_x_given_n_dt], axis=-1)) for p_x_given_n_dt in mask_included_bins_list] for slice_idx, a_slice_multiplier in enumerate(slice_level_multipliers)}
-        # mask_included_p_x_given_n_list_dict = {a_slice_multiplier:[np.stack([a_mask[slice_idx] for a_rel_t_bin_idx, a_mask in enumerate(p_x_given_n_dt)], axis=-1) for an_epoch_idx, p_x_given_n_dt in enumerate(mask_included_bins_list)] for slice_idx, a_slice_multiplier in enumerate(slice_level_multipliers)}
-        # mask_included_p_x_given_n_list_dict = {a_slice_multiplier:[np.stack([a_mask[slice_idx] for a_mask in p_x_given_n_dt], axis=-1) for p_x_given_n_dt in mask_included_bins_list] for slice_idx, a_slice_multiplier in enumerate(slice_level_multipliers)}
         mask_included_p_x_given_n_list_dict = {a_slice_multiplier:[np.atleast_3d(np.stack([a_mask[slice_idx] for a_mask in p_x_given_n_dt], axis=-1)) for p_x_given_n_dt in mask_included_bins_list] for slice_idx, a_slice_multiplier in enumerate(slice_level_multipliers)}
 
         ## get the masks for each time bins within each epoch
-        # epoch_prom_t_bin_high_prob_pos_masks = mask_included_p_x_given_n_list_dict[slice_level_multipliers[-1]]
-        # epoch_prom_t_bin_high_prob_pos_masks = {a_slice_multiplier:np.atleast_3d(a_slice_mask) for a_slice_multiplier, a_slice_mask in mask_included_p_x_given_n_list_dict.items()}
         epoch_prom_t_bin_high_prob_pos_masks = {a_slice_multiplier:a_slice_mask for a_slice_multiplier, a_slice_mask in mask_included_p_x_given_n_list_dict.items()}
-        # epoch_prom_t_bin_high_prob_pos_masks
 
         ## Collapse over all epochs:
-        # epoch_prom_high_prob_pos_masks = [np.any(v, -1, keepdims=False) for v in epoch_prom_t_bin_high_prob_pos_masks]
-        # epoch_prom_high_prob_pos_masks = {a_slice_multiplier:np.any(an_epoch_prom_t_bin_high_prob_pos_mask, -1, keepdims=False) for a_slice_multiplier, an_epoch_prom_t_bin_high_prob_pos_mask in epoch_prom_t_bin_high_prob_pos_masks.items()}
         epoch_prom_high_prob_pos_masks = {a_slice_multiplier:[np.any(np.atleast_3d(a_slice_mask), -1, keepdims=False) for a_slice_mask in a_slice_mask_list] for a_slice_multiplier, a_slice_mask_list in mask_included_p_x_given_n_list_dict.items()} # np.shape(epoch_prom_high_prob_pos_masks) #  (74, 41, 63) - (n_epochs, n_xbins, n_ybins) -- boolean masks indicating whether that bin is included for the epoch (all of its time bins)
         
-
         return mask_included_bins_list, summit_slice_levels_list, mask_included_p_x_given_n_list_dict, epoch_prom_t_bin_high_prob_pos_masks, epoch_prom_high_prob_pos_masks
 
 
