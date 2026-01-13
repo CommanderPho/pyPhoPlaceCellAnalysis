@@ -1043,6 +1043,32 @@ class MatchingPastFuturePositionsResult:
     n_relevant_future_times: int
     matching_pos_epochs_df: pd.DataFrame
 
+    @classmethod
+    def compute_matching_pos_epochs_df(cls, measured_positions_df: pd.DataFrame, merging_adjacent_max_separation_sec: float = 0.5, minimum_epoch_duration: float = 0.050) -> pd.DataFrame:
+        """
+        Compute matching position epochs DataFrame from position matches and time filters.
+        
+        Args:
+            measured_positions_df: DataFrame with position data
+            pos_matches_epoch_mask: Indices of positions that match the epoch mask
+            is_relevant_past_times: Boolean mask for past times in relevant positions
+            is_relevant_future_times: Boolean mask for future times in relevant positions
+            curr_epoch_start_t: Start time of the current epoch
+            curr_epoch_stop_t: Stop time of the current epoch
+            merging_adjacent_max_separation_sec: Maximum separation in seconds for merging adjacent epochs
+            minimum_epoch_duration: Minimum duration for detected epochs
+            
+        Returns:
+            DataFrame with detected epochs categorized as past/present/future
+        """
+        ## find adjacent epochs from the position time bins (periods where the animal is in the positions)
+        measured_positions_df_copy = measured_positions_df.copy()
+        assert 'is_included' in measured_positions_df_copy
+
+        a_matching_pos_epochs_df: pd.DataFrame = measured_positions_df_copy.neuropy.detect_epoch_satisfying_condition(is_condition_satisfied = (measured_positions_df_copy['is_included'].to_numpy()), merging_adjacent_max_separation_sec=merging_adjacent_max_separation_sec, minimum_epoch_duration=minimum_epoch_duration)
+        
+        return a_matching_pos_epochs_df
+
 
 @define(slots=False, repr=False, eq=False)
 class PredictiveDecoding(ComputedResult): #PickleSerializableMixin, AttrsBasedClassHelperMixin):
@@ -1714,22 +1740,88 @@ class PredictiveDecoding(ComputedResult): #PickleSerializableMixin, AttrsBasedCl
         n_relevant_past_times = np.sum(is_relevant_past_times)
         n_relevant_future_times = np.sum(is_relevant_future_times)
 
+        
+
         ## find adjacent epochs from the position time bins (periods where the animal is in the positions)
         measured_positions_df_copy = measured_positions_df.copy()
         measured_positions_df_copy['is_included'] = False
         measured_positions_df_copy.loc[measured_positions_df_copy.index[pos_matches_epoch_mask[is_relevant_past_times]], 'is_included'] = True ## only do past/future, not present
         measured_positions_df_copy.loc[measured_positions_df_copy.index[pos_matches_epoch_mask[is_relevant_future_times]], 'is_included'] = True ## only do past/future, not present
-        a_matching_pos_epochs_df: pd.DataFrame = measured_positions_df_copy.neuropy.detect_epoch_satisfying_condition(is_condition_satisfied = (measured_positions_df_copy['is_included'].to_numpy()), merging_adjacent_max_separation_sec=merging_adjacent_max_separation_sec, minimum_epoch_duration=minimum_epoch_duration)
+
+        # a_matching_pos_epochs_df: pd.DataFrame = measured_positions_df_copy.neuropy.detect_epoch_satisfying_condition(is_condition_satisfied = (measured_positions_df_copy['is_included'].to_numpy()), merging_adjacent_max_separation_sec=merging_adjacent_max_separation_sec, minimum_epoch_duration=minimum_epoch_duration)
+        a_matching_pos_epochs_df: pd.DataFrame = MatchingPastFuturePositionsResult.compute_matching_pos_epochs_df(measured_positions_df=measured_positions_df_copy, merging_adjacent_max_separation_sec=merging_adjacent_max_separation_sec, minimum_epoch_duration=minimum_epoch_duration)
         
         is_pos_epochs_relevant_past_times = (a_matching_pos_epochs_df['start'] < curr_epoch_start_t)
         is_pos_epochs_relevant_future_times = (a_matching_pos_epochs_df['stop'] > curr_epoch_stop_t)
         a_matching_pos_epochs_df['is_future_present_past'] = 'present'
         a_matching_pos_epochs_df.loc[is_pos_epochs_relevant_past_times, 'is_future_present_past'] = 'past'
         a_matching_pos_epochs_df.loc[is_pos_epochs_relevant_future_times, 'is_future_present_past'] = 'future'
-        
+
         return MatchingPastFuturePositionsResult(pos_matches_epoch_mask=pos_matches_epoch_mask, relevant_positions_df=relevant_positions_df, is_relevant_past_times=is_relevant_past_times, is_relevant_future_times=is_relevant_future_times, n_total_possible_past_times=n_total_possible_past_times, n_total_possible_future_times=n_total_possible_future_times, n_relevant_past_times=n_relevant_past_times, n_relevant_future_times=n_relevant_future_times, matching_pos_epochs_df=a_matching_pos_epochs_df)
 
 
+    @staticmethod
+    def _process_single_epoch_future_past_analysis(i: int, curr_epoch_p_x_given_n: NDArray, curr_epoch_time_bin_centers: NDArray, curr_epoch_tbin_indicies: NDArray, gaussian_volume: Optional[NDArray], measured_positions_df: pd.DataFrame, top_v_percent: float, epoch_t_bin_high_prob_masks_dict: Optional[Dict], epoch_high_prob_masks_dict: Optional[Dict], a_slice_multiplier: float, n_epoch_time_bins: int, merging_adjacent_max_separation_sec: float, minimum_epoch_duration: float, progress_print: bool, n_total_epochs: int) -> Tuple[int, Any, Any, Any, Any, Any, Any]:
+        """Process a single epoch for future/past analysis. Returns results in a tuple for parallel processing."""
+        from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import PosteriorMaskPostProcessing
+        
+        if progress_print:
+            print(f'\trow[{i}/{n_total_epochs}]')
+        
+        curr_epoch_start_t: float = curr_epoch_time_bin_centers[0]
+        curr_epoch_stop_t: float = curr_epoch_time_bin_centers[-1]
+        
+        a_gaussian_volume = None
+        if gaussian_volume is not None:
+            a_gaussian_volume = gaussian_volume[..., curr_epoch_tbin_indicies]
+        
+        # ==================================================================================================================================================================================================================================================================================== #
+        # Special posterior measurement properties (diffusivity, promenence, etc) computed independently with newly decoded fine time bin grainularity posteriors                                                                                                                              #
+        # ==================================================================================================================================================================================================================================================================================== #
+        
+        is_high_prob_mask: Optional[NDArray[ND.Shape["N_XBINS, N_YBINS, N_TBINS"], Any]] = None
+        merged_epoch_mask: Optional[NDArray[ND.Shape["N_X_BINS, N_Y_BINS"], Any]] = None
+        processed_masks: Optional[Any] = None
+        
+        if (epoch_t_bin_high_prob_masks_dict is not None):
+            an_epoch_t_bins_custom_high_prob_mask: NDArray[ND.Shape["N_XBINS, N_YBINS, N_TBINS"], Any] = epoch_t_bin_high_prob_masks_dict[a_slice_multiplier][i]
+            Assert.same_shape(an_epoch_t_bins_custom_high_prob_mask, curr_epoch_p_x_given_n)
+            is_high_prob_mask = an_epoch_t_bins_custom_high_prob_mask
+            
+            labeled, n_objects, masks = PosteriorMaskPostProcessing._process_epoch_time_bins_masks(a_mask_t=an_epoch_t_bins_custom_high_prob_mask, max_gap=8, n_interp=1)
+            processed_masks = masks
+            merged_epoch_mask = np.any(masks, axis=-1)
+        
+        elif (epoch_high_prob_masks_dict is not None):
+            an_epoch_custom_high_prob_mask: NDArray[ND.Shape["N_XBINS, N_YBINS"], Any] = epoch_high_prob_masks_dict[a_slice_multiplier][i]
+            Assert.same_shape(an_epoch_custom_high_prob_mask, curr_epoch_p_x_given_n[:, :, 0])
+            is_high_prob_mask = np.tile(an_epoch_custom_high_prob_mask, (1, 1, n_epoch_time_bins))
+        
+        else:
+            ## for each time bin compute the top 10% of the time bins and use those instead of a fixed "high_val_epsilon" threshold:
+            flat = curr_epoch_p_x_given_n.reshape(-1, curr_epoch_p_x_given_n.shape[-1])  # (n_xy, n_time)
+            sorted_flat = np.sort(flat, axis=0)[::-1]
+            cdf = np.cumsum(sorted_flat, axis=0)
+            thresholds = sorted_flat[np.argmax(cdf >= top_v_percent * flat.sum(axis=0), axis=0), np.arange(flat.shape[1])]
+            is_high_prob_mask = (curr_epoch_p_x_given_n >= thresholds)
+        
+        ## allow future positions to match any position in the epoch to count:
+        if is_high_prob_mask is not None:
+            any_t_Bin_high_prob_pos_mask: NDArray[ND.Shape["N_XBINS, N_YBINS"], Any] = np.any(is_high_prob_mask, axis=-1) ## mask for high prob positions during the epoch
+        else:
+            raise ValueError(f"is_high_prob_mask is None for epoch {i}")
+        
+        # Call static method from the same class (PredictiveDecoding)
+        any_t_bin_result = PredictiveDecoding.detect_matching_past_future_positions(epoch_high_prob_mask=any_t_Bin_high_prob_pos_mask, measured_positions_df=measured_positions_df, curr_epoch_start_t=curr_epoch_start_t, curr_epoch_stop_t=curr_epoch_stop_t, merging_adjacent_max_separation_sec=merging_adjacent_max_separation_sec, minimum_epoch_duration=minimum_epoch_duration)
+        
+        ## compute for `merged_epoch_mask` if it exists
+        merged_epoch_mask_result = None
+        if merged_epoch_mask is not None:
+            merged_epoch_mask_result = PredictiveDecoding.detect_matching_past_future_positions(epoch_high_prob_mask=merged_epoch_mask, measured_positions_df=measured_positions_df, curr_epoch_start_t=curr_epoch_start_t, curr_epoch_stop_t=curr_epoch_stop_t, merging_adjacent_max_separation_sec=merging_adjacent_max_separation_sec, minimum_epoch_duration=minimum_epoch_duration)
+        
+        return (i, is_high_prob_mask, any_t_Bin_high_prob_pos_mask, any_t_bin_result, merged_epoch_mask, processed_masks, merged_epoch_mask_result)
+    
+    
     @classmethod
     def compute_specific_future_and_past_analysis(cls, decoded_local_epochs_result: DecodedFilterEpochsResult, measured_positions_df: pd.DataFrame, gaussian_volume: Optional[NDArray]=None,
                                         active_epochs_df: Optional[pd.DataFrame]=None,
@@ -1740,6 +1832,8 @@ class PredictiveDecoding(ComputedResult): #PickleSerializableMixin, AttrsBasedCl
                                         a_slice_multiplier: float = 0.5,
                                         merging_adjacent_max_separation_sec: float = 0.5, minimum_epoch_duration: float = 0.050, ## for merging detected future/past position dataframes
                                         progress_print: bool = True,
+                                        use_parallel: bool = True,
+                                        max_workers: Optional[int] = None,
         ):
         """
 
@@ -1801,100 +1895,61 @@ class PredictiveDecoding(ComputedResult): #PickleSerializableMixin, AttrsBasedCl
         }
         
         
-        # a_p_x_given_n = decoding_locality.p_x_given_n_dict[an_epoch_name] ## hmmm, this is global probability - (41, 63, 103948)
+        # Prepare epoch data for processing
+        epoch_data_list = []
         for i, a_row in enumerate(ensure_dataframe(decoded_local_epochs_result.filter_epochs).itertuples(index=False)):
-
+            curr_epoch_p_x_given_n = decoded_local_epochs_result.p_x_given_n_list[i]
+            curr_epoch_time_bin_centers = decoded_local_epochs_result.time_bin_containers[i].centers
+            curr_epoch_tbin_indicies = reverse_flattened_time_bin_indicies_list[i]
+            n_epoch_time_bins = curr_epoch_p_x_given_n.shape[-1]  # Number of time bins for this epoch
+            epoch_data_list.append((i, curr_epoch_p_x_given_n, curr_epoch_time_bin_centers, curr_epoch_tbin_indicies, n_epoch_time_bins))
+        
+        # Process epochs in parallel or sequentially
+        if use_parallel and n_total_epochs > 1:
             if progress_print:
-                print(f'\trow[{i}/{n_total_epochs}]')
-
-            ## need to know the indices this corresponds to so I can use my gaussian, p_x_given_n, etc
-            ## compute the locality:
-            # num_timestamps: int = np.shape(decoding_locality.gaussian_volume)[-1]
-
-            ## What positions does the epoch decode to?
+                print(f'Processing {n_total_epochs} epochs in parallel (max_workers={max_workers})...')
             
-            ## Does the animal go there in the futre?
-            # an_epoch_pos_df = decoding_locality.pos_df.position.time_sliced(a_row.start, a_row.stop) ## Irreleevant, these are the literal positions during the PBE!
-            # a_timestamp_indicies = an_epoch_pos_df.index.to_numpy() ## These on the other hand ARE relevant to ALL arrays, like the p_x_given_n
-            
-            # is_timebin_included = np.logical_and((a_row.start <= decoding_locality.time_window_centers), (decoding_locality.time_window_centers <= a_row.stop))
-            # print(np.sum(is_timebin_included)) ## shoot, because the time bins are so small :[
-            
-            ## Need correect portion of p_x_given_n for these times
-            curr_epoch_p_x_given_n = decoded_local_epochs_result.p_x_given_n_list[i] # [:, :, is_timebin_included]
-            curr_epoch_time_bin_centers = decoded_local_epochs_result.time_bin_containers[i].centers    
-            # is_high_prob_mask = (curr_epoch_p_x_given_n > high_val_epsilon)
-            curr_epoch_start_t: float = curr_epoch_time_bin_centers[0]
-            curr_epoch_stop_t: float = curr_epoch_time_bin_centers[-1]
-            
-            # print(np.shape(curr_epoch_p_x_given_n))
-            # curr_epoch_p_x_given_n  # np.shape(curr_epoch_p_x_given_n): (n_x_bins, n_y_Bins, n_time_bins)
-            # is_high_prob_mask = curr_epoch_p_x_given_n >= np.sort(curr_epoch_p_x_given_n.ravel())[::-1][np.searchsorted(np.cumsum(np.sort(curr_epoch_p_x_given_n.ravel())[::-1]), 0.1 * curr_epoch_p_x_given_n.sum())]
-            curr_epoch_tbin_indicies: NDArray = reverse_flattened_time_bin_indicies_list[i]
-            a_gaussian_volume = None
-            if gaussian_volume is not None:
-                a_gaussian_volume = gaussian_volume[..., curr_epoch_tbin_indicies]
-            
-
-            # ==================================================================================================================================================================================================================================================================================== #
-            # Special posterior measurement properties (diffusivity, promenence, etc) computed independently with newly decoded fine time bin grainularity posteriors                                                                                                                              #
-            # ==================================================================================================================================================================================================================================================================================== #
-
-            is_high_prob_mask: Optional[NDArray[ND.Shape["N_XBINS, N_YBINS, N_TBINS"], Any]] = None
-            if (epoch_t_bin_high_prob_masks_dict is not None):
-                an_epoch_t_bins_custom_high_prob_mask: NDArray[ND.Shape["N_XBINS, N_YBINS, N_TBINS"], Any] = epoch_t_bin_high_prob_masks_dict[a_slice_multiplier][i]
-                Assert.same_shape(an_epoch_t_bins_custom_high_prob_mask, curr_epoch_p_x_given_n)
-                is_high_prob_mask = an_epoch_t_bins_custom_high_prob_mask
-
-                labeled, n_objects, masks = PosteriorMaskPostProcessing._process_epoch_time_bins_masks(a_mask_t=an_epoch_t_bins_custom_high_prob_mask, max_gap=8, n_interp=1)
-                # _out_processed_masks.append(labeled)
-                _out_processed_items_list_dict['_out_processed_masks'].append(masks)
-                merged_epoch_mask: NDArray[ND.Shape["N_X_BINS, N_Y_BINS"], Any] = np.any(masks, axis=-1)
-                _out_processed_items_list_dict['_out_epoch_flat_mask'].append(merged_epoch_mask)
-
-            elif (epoch_high_prob_masks_dict is not None):
-                an_epoch_custom_high_prob_mask: NDArray[ND.Shape["N_XBINS, N_YBINS"], Any] = epoch_high_prob_masks_dict[a_slice_multiplier][i]
-                Assert.same_shape(an_epoch_custom_high_prob_mask, curr_epoch_p_x_given_n[:, :, 0])
-                is_high_prob_mask = np.tile(an_epoch_custom_high_prob_mask, (1, 1, n_flattened_tbins[i]))
-
-
-            else:
-                ## for each time bin compute the top 10% of the time bins and use those instead of a fixed "high_val_epsilon" threshold:
-                #TODO 2025-12-24 20:48: - [ ] LAAAAME - this should use the real promenence topologically connected region, not the random top 10% which can be discontinuous...
-                flat = curr_epoch_p_x_given_n.reshape(-1, curr_epoch_p_x_given_n.shape[-1])  # (n_xy, n_time)
-                sorted_flat = np.sort(flat, axis=0)[::-1]
-                cdf = np.cumsum(sorted_flat, axis=0)
-                thresholds = sorted_flat[np.argmax(cdf >= top_v_percent * flat.sum(axis=0), axis=0), np.arange(flat.shape[1])]
-                is_high_prob_mask = (curr_epoch_p_x_given_n >= thresholds)
+            results_list = []
+            with ThreadPoolExecutor(max_workers=max_workers) as executor:
+                futures = []
+                for i, curr_epoch_p_x_given_n, curr_epoch_time_bin_centers, curr_epoch_tbin_indicies, n_epoch_time_bins in epoch_data_list:
+                    future = executor.submit(cls._process_single_epoch_future_past_analysis, i, curr_epoch_p_x_given_n, curr_epoch_time_bin_centers, curr_epoch_tbin_indicies, gaussian_volume, measured_positions_df, top_v_percent, epoch_t_bin_high_prob_masks_dict, epoch_high_prob_masks_dict, a_slice_multiplier, n_epoch_time_bins, merging_adjacent_max_separation_sec, minimum_epoch_duration, progress_print, n_total_epochs)
+                    futures.append(future)
                 
-
-            epoch_t_bins_high_prob_pos_masks.append(is_high_prob_mask)
+                for future in as_completed(futures):
+                    results_list.append(future.result())
             
-            ## allow future positions to match any position in the epoch to count:
-            any_t_Bin_high_prob_pos_mask: NDArray[ND.Shape["N_XBINS, N_YBINS"], Any] = np.any(is_high_prob_mask, axis=-1) ## mask for high prob positions during the epoch
+            # Sort results by index to maintain order
+            results_list.sort(key=lambda x: x[0])
+        else:
+            if progress_print and use_parallel:
+                print(f'Sequential processing (use_parallel=False or n_total_epochs <= 1)...')
+            
+            results_list = []
+            for i, curr_epoch_p_x_given_n, curr_epoch_time_bin_centers, curr_epoch_tbin_indicies, n_epoch_time_bins in epoch_data_list:
+                result = cls._process_single_epoch_future_past_analysis(i, curr_epoch_p_x_given_n, curr_epoch_time_bin_centers, curr_epoch_tbin_indicies, gaussian_volume, measured_positions_df, top_v_percent, epoch_t_bin_high_prob_masks_dict, epoch_high_prob_masks_dict, a_slice_multiplier, n_epoch_time_bins, merging_adjacent_max_separation_sec, minimum_epoch_duration, progress_print, n_total_epochs)
+                results_list.append(result)
+        
+        # Unpack results and populate output lists
+        for i, is_high_prob_mask, any_t_Bin_high_prob_pos_mask, any_t_bin_result, merged_epoch_mask, processed_masks, merged_epoch_mask_result in results_list:
+            epoch_t_bins_high_prob_pos_masks.append(is_high_prob_mask)
             epoch_high_prob_pos_masks.append(any_t_Bin_high_prob_pos_mask)
-
-            any_t_bin_result = cls.detect_matching_past_future_positions(epoch_high_prob_mask=any_t_Bin_high_prob_pos_mask, measured_positions_df=measured_positions_df, curr_epoch_start_t=curr_epoch_start_t, curr_epoch_stop_t=curr_epoch_stop_t, merging_adjacent_max_separation_sec=merging_adjacent_max_separation_sec, minimum_epoch_duration=minimum_epoch_duration)
-
-            epoch_matching_past_future_positions.append((any_t_bin_result.pos_matches_epoch_mask[any_t_bin_result.is_relevant_past_times], any_t_bin_result.pos_matches_epoch_mask[any_t_bin_result.is_relevant_future_times], any_t_bin_result.n_total_possible_past_times, any_t_bin_result.n_total_possible_future_times, any_t_bin_result.n_relevant_past_times, any_t_bin_result.n_relevant_future_times)) ## basically split on current
+            
+            epoch_matching_past_future_positions.append((any_t_bin_result.pos_matches_epoch_mask[any_t_bin_result.is_relevant_past_times], any_t_bin_result.pos_matches_epoch_mask[any_t_bin_result.is_relevant_future_times], any_t_bin_result.n_total_possible_past_times, any_t_bin_result.n_total_possible_future_times, any_t_bin_result.n_relevant_past_times, any_t_bin_result.n_relevant_future_times))
             
             epoch_matching_positions.append(any_t_bin_result.pos_matches_epoch_mask)
             matching_pos_dfs_list.append(any_t_bin_result.relevant_positions_df)
             matching_pos_epochs_dfs_list.append(any_t_bin_result.matching_pos_epochs_df)
-
-
-            ## compute for `merged_epoch_mask`
-            merged_epoch_mask_result = cls.detect_matching_past_future_positions(epoch_high_prob_mask=merged_epoch_mask, measured_positions_df=measured_positions_df, curr_epoch_start_t=curr_epoch_start_t, curr_epoch_stop_t=curr_epoch_stop_t, merging_adjacent_max_separation_sec=merging_adjacent_max_separation_sec, minimum_epoch_duration=minimum_epoch_duration)
-            _out_processed_items_list_dict['_out_epoch_flat_mask_future_past_result'].append(merged_epoch_mask_result)
-
-            # PredictiveDecodingComputationsContainer
-            ## Has it been there in the past (duh or we wouldn't have placefields for it)?
-
-            ## Some PBEs that don't qualify as non-local actually might be but they're just paths across the environment.
-
-            ## Let's stick within the same block (roam/sprinkle) for now
+            
+            # Handle processed masks and merged epoch mask results
+            if processed_masks is not None:
+                _out_processed_items_list_dict['_out_processed_masks'].append(processed_masks)
+            if merged_epoch_mask is not None:
+                _out_processed_items_list_dict['_out_epoch_flat_mask'].append(merged_epoch_mask)
+            if merged_epoch_mask_result is not None:
+                _out_processed_items_list_dict['_out_epoch_flat_mask_future_past_result'].append(merged_epoch_mask_result)
         
-        ## END for i, a_row in enumerate(ensure_dat...
+        ## END epoch processing loop
 
         
 
