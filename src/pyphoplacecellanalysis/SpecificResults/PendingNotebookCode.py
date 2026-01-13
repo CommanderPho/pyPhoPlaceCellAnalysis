@@ -120,6 +120,194 @@ from pyphocorehelpers.gui.Qt.color_helpers import ColormapHelpers, ColorFormatCo
 
 
 
+import numpy as np
+from scipy.ndimage import label, generate_binary_structure, binary_opening
+# from skimage.morphology import binary_opening
+from scipy.ndimage import binary_dilation
+from scipy.ndimage import distance_transform_edt
+
+
+@metadata_attributes(short_name=None, tags=['mask', 't-bins', 'posterior'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-01-13 07:17', related_items=[])
+class PosteriorMaskPostProcessing:
+    """ 
+
+    from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import PosteriorMaskPostProcessing
+
+    """
+    # @classmethod
+    # def bridge_blobs(cls, A, B, n_steps: int=3, structure=np.ones((3,3))):
+    #     """ Morphological dilation bridge (fast, robust, approximate)
+    #         Iteratively dilate both blobs until they touch, then assign intermediate steps.
+    #     """
+    #     A_cur = A.copy()
+    #     B_cur = B.copy()
+    #     out = []
+
+    #     for i in range(n_steps):
+    #         alpha = (i + 1) / (n_steps + 1)
+    #         A_cur = binary_dilation(A_cur, structure)
+    #         B_cur = binary_dilation(B_cur, structure)
+
+    #         interp = np.logical_or(
+    #             A_cur if alpha < 0.5 else B_cur,
+    #             A_cur & B_cur
+    #         )
+    #         out.append(interp)
+
+    #     return out
+
+
+    # @classmethod
+    # def generate_intermediates(cls, A, B, n_steps: int=3):
+    #     """ Signed distance field interpolation (geometrically correct)
+        
+    #     """
+    #     def _subfn_signed_distance(mask):
+    #         return (
+    #             distance_transform_edt(mask)
+    #             - distance_transform_edt(~mask)
+    #         )
+
+    #     def _subfn_interpolate_blob(A, B, alpha):
+    #         dA = _subfn_signed_distance(A)
+    #         dB = _subfn_signed_distance(B)
+    #         return ( (1-alpha)*dA + alpha*dB ) > 0
+
+    #     # ==================================================================================================================================================================================================================================================================================== #
+    #     # BEGIN FUNCTION BODY                                                                                                                                                                                                                                                                  #
+    #     # ==================================================================================================================================================================================================================================================================================== #
+    #     intermediates = [
+    #         _subfn_interpolate_blob(A, B, alpha)
+    #         for alpha in np.linspace(0, 1, n_steps+2)[1:-1]
+    #     ]
+    #     return intermediates
+    
+
+
+    # ==============================================================
+    # Geometry utilities
+    # ==============================================================
+
+    @staticmethod
+    def _signed_distance(mask: NDArray) -> NDArray:
+        return (distance_transform_edt(mask) - distance_transform_edt(~mask))
+
+    @classmethod
+    def _interpolate_blob(cls, A: NDArray, B: NDArray, alpha: float) -> NDArray:
+        dA = cls._signed_distance(A)
+        dB = cls._signed_distance(B)
+        return ((1 - alpha) * dA + alpha * dB) > 0
+
+    # ==============================================================
+    # Temporal bridging
+    # ==============================================================
+
+    @classmethod
+    def _can_bridge(cls, A: NDArray, B: NDArray, max_dilation: int = 2) -> bool:
+        return np.any(binary_dilation(A, iterations=max_dilation) & B)
+
+    @classmethod
+    def _bridge_pair(cls, A: NDArray, B: NDArray, n_steps: int) -> List[NDArray]:
+        return [
+            cls._interpolate_blob(A, B, alpha)
+            for alpha in np.linspace(0, 1, (n_steps + 2))[1:-1]
+        ]
+    
+
+    @classmethod
+    def _process_epoch_time_bins_masks(cls, a_mask_t: NDArray[ND.Shape["N_X_BINS, N_Y_BINS, N_TIME_BINS"], Any], max_gap: int = 1, n_interp: int = 1, **kwargs):
+        """
+        a_mask_t: (n_x_bins, n_y_bins, n_t_bins) boolean
+        """
+        # # masks: (n_t_bins, n_x_bins, n_y_bins)
+        # a_mask_t = a_mask_t.astype(bool)
+        # a_mask_t = binary_opening(a_mask_t, structure=np.ones((1,3,3)))
+
+        # # 3D connectivity: (t, x, y)
+        # # connectivity=1 → 6-connected
+        # structure = generate_binary_structure(rank=3, connectivity=1)
+
+        # labeled, n_objects = label(a_mask_t, structure=structure)
+
+        # ## Generate Intermediates if possible:        
+        # if not np.any(binary_dilation(A, iterations=2) & B):
+        #     return None  # do NOT connect
+
+
+        # return labeled, n_objects, a_mask_t
+
+        # ----------------------------------------------------------
+        # Input normalization
+        # ----------------------------------------------------------
+        a_mask_t = a_mask_t.astype(bool)
+
+        n_x_bins, n_y_bins, n_t_bins = a_mask_t.shape
+
+        # ----------------------------------------------------------
+        # Spatial cleanup (per time slice)
+        # ----------------------------------------------------------
+        for t in range(n_t_bins):
+            a_mask_t[..., t] = binary_opening(
+                a_mask_t[..., t],
+                structure=np.ones((3, 3)),
+            )
+
+        # ----------------------------------------------------------
+        # Temporal gap filling
+        # ----------------------------------------------------------
+        filled_slices = []
+        t = 0
+
+        while t < n_t_bins:
+            A = a_mask_t[..., t]
+            filled_slices.append(A)
+
+            # Look ahead up to max_gap steps to find the next non-empty slice
+            gap_filled = False
+            for gap in range(1, max_gap + 1):
+                if (t + gap) >= n_t_bins:
+                    break
+                
+                B = a_mask_t[..., t + gap]
+                
+                # Skip if B is empty
+                if not np.any(B):
+                    continue
+                
+                # If blobs do not overlap, attempt to bridge
+                if not np.any(A & B):
+                    if cls._can_bridge(A, B, max_dilation=max_gap):
+                        # Generate intermediates for the gap
+                        # Total interpolation steps: gap * n_interp (n_interp steps per gap unit)
+                        total_interp_steps = gap * n_interp
+                        intermediates = cls._bridge_pair(A, B, n_steps=total_interp_steps)
+                        filled_slices.extend(intermediates)
+                        gap_filled = True
+                        t += gap  # Skip ahead to B (will be added in next iteration)
+                        break
+                else:
+                    # They overlap, so no bridging needed - move forward normally
+                    break
+            
+            if not gap_filled:
+                t += 1
+
+        # Stack back into (x, y, t_filled)
+        filled_masks = np.stack(filled_slices, axis=-1).astype(bool)
+
+        # ----------------------------------------------------------
+        # 3D connected components (x, y, t)
+        # ----------------------------------------------------------
+        structure = generate_binary_structure(rank=3, connectivity=1)
+        labeled, n_objects = label(filled_masks, structure=structure)
+
+        return labeled, n_objects, filled_masks
+    
+
+
+
+
+
 # ==================================================================================================================================================================================================================================================================================== #
 # 2026-01-08 - 2D Posterior scoring how "position-like" it is                                                                                                                                                                                                                          #
 # ==================================================================================================================================================================================================================================================================================== #
@@ -132,18 +320,6 @@ from collections import deque
 
 
 from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import DecodedFilterEpochsResult
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 @metadata_attributes(short_name=None, tags=['BEST', 'posterior', 'position-like', 'diffusivity', 'spread'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-01-08 08:52', related_items=[])
