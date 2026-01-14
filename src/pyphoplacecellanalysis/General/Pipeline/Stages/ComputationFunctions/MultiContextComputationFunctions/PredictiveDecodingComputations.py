@@ -1056,7 +1056,6 @@ class MatchingPastFuturePositionsResult(ComputedResult):
         self.matching_future_positions_df = self.relevant_positions_df[self.is_relevant_future_times].copy()
 
 
-
     @property
     def epoch_mask_included_binned_x_y_columns_idx_df(self) -> pd.DataFrame:
         """
@@ -1214,6 +1213,45 @@ class MatchingPastFuturePositionsResult(ComputedResult):
         }
 
 
+    # For serialization/pickling: ________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
+    def __getstate__(self):
+        # Copy the object's state from self.__dict__ which contains all our instance attributes. Always use the dict.copy() method to avoid modifying the original state.
+        state = self.__dict__.copy()
+        # PredictiveDecoding has no non-serialized fields, so no exclusions needed
+        return state
+
+
+    def __setstate__(self, state):
+        # Restore instance attributes (i.e., _mapping and _keys_at_init).
+        # For `VersionedResultMixin`
+        self._VersionedResultMixin__setstate__(state)
+
+        self.__dict__.update(state)
+        # # Call the superclass __init__() (from https://stackoverflow.com/a/48325758)
+        # super(WCorrShuffle, self).__init__() # from
+
+    def __repr__(self):
+        """ 2024-01-11 - Renders only the fields and their sizes
+        """
+        from pyphocorehelpers.print_helpers import strip_type_str_to_classname
+        attr_reprs = []
+        for a in self.__attrs_attrs__:
+            attr_type = strip_type_str_to_classname(type(getattr(self, a.name)))
+            if 'shape' in a.metadata:
+                shape = ', '.join(a.metadata['shape'])  # this joins tuple elements with a comma, creating a string without quotes
+                attr_reprs.append(f"{a.name}: {attr_type} | shape ({shape})")  # enclose the shape string with parentheses
+            else:
+                attr_reprs.append(f"{a.name}: {attr_type}")
+        content = ",\n\t".join(attr_reprs)
+        return f"{type(self).__name__}({content}\n)"
+
+
+
+    # HDFMixin Conformances ______________________________________________________________________________________________ #
+    def to_hdf(self, file_path, key: str, **kwargs):
+        """ Saves the object to key in the hdf5 file specified by file_path"""
+        super().to_hdf(file_path, key=key, **kwargs)
+        
 
 
 
@@ -1926,7 +1964,7 @@ class PredictiveDecoding(ComputedResult): #PickleSerializableMixin, AttrsBasedCl
         measured_positions_df_copy.loc[is_relevant_future_times, 'is_included'] = True ## only do past/future, not present        
 
         # a_matching_pos_epochs_df: pd.DataFrame = measured_positions_df_copy.neuropy.detect_epoch_satisfying_condition(is_condition_satisfied = (measured_positions_df_copy['is_included'].to_numpy()), merging_adjacent_max_separation_sec=merging_adjacent_max_separation_sec, minimum_epoch_duration=minimum_epoch_duration)
-        a_matching_pos_epochs_df: pd.DataFrame = cls.compute_matching_pos_epochs_df(measured_positions_df=measured_positions_df_copy, merging_adjacent_max_separation_sec=merging_adjacent_max_separation_sec, minimum_epoch_duration=minimum_epoch_duration)
+        a_matching_pos_epochs_df: pd.DataFrame = MatchingPastFuturePositionsResult.compute_matching_pos_epochs_df(measured_positions_df=measured_positions_df_copy, merging_adjacent_max_separation_sec=merging_adjacent_max_separation_sec, minimum_epoch_duration=minimum_epoch_duration)
         
         is_pos_epochs_relevant_past_times = (a_matching_pos_epochs_df['start'] < curr_epoch_start_t)
         is_pos_epochs_relevant_future_times = (a_matching_pos_epochs_df['stop'] > curr_epoch_stop_t)
@@ -2572,7 +2610,7 @@ class PredictiveDecodingComputationsContainer(ComputedResult):
 
 
 
-    @function_attributes(short_name=None, tags=['temp', 'from-notebook'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-01-13 10:17', related_items=[])
+    @function_attributes(short_name=None, tags=['temp', 'from-notebook', 'prominence2d'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-01-13 10:17', related_items=[])
     def _filter_single_epoch_result(self, curr_active_pipeline, decoding_time_bin_size = 0.025, an_epoch_name = 'roam') -> DecodedFilterEpochsResult:
         """
             decoding_time_bin_size = 0.025
@@ -2580,7 +2618,7 @@ class PredictiveDecodingComputationsContainer(ComputedResult):
             masked_container = container.build_masked_container(curr_active_pipeline=curr_active_pipeline, a_t_bin_size=decoding_time_bin_size,
                 should_filter_directional_decoders_decode_result=True, should_compute_future_and_past_analysis=False, should_compute_peak_prom_analysis=False,
             ) ## 4m 18s now
-            active_epochs_result, custom_results_df_list, decoded_epoch_t_bins_promenence_result_obj = masked_container._filter_single_epoch_result(decoding_time_bin_size=decoding_time_bin_size, an_epoch_name=an_epoch_name)
+            active_epochs_result, custom_results_df_list, decoded_epoch_t_bins_promenence_result_obj = masked_container._filter_single_epoch_result(curr_active_pipeline=curr_active_pipeline, decoding_time_bin_size=decoding_time_bin_size, an_epoch_name=an_epoch_name)
 
         """
         from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import PositionLikePosteriorScoring
@@ -2940,6 +2978,22 @@ class PredictiveDecodingComputationsGlobalComputationFunctions(AllFunctionEnumer
             global_computation_results.computed_data['PredictiveDecoding']
                 ['PredictiveDecoding'].predictive_decoding - PredictiveDecoding instance containing computed results
 
+                
+        Overall Process 2026-01-14:
+        
+        0. Decode whole session with both decoders at a gross time-scale (250ms)
+        1. Determine which of these time-bins decode to non-local places (non-local but position-like posteriors)
+            1a. Assign a locality score to each time bin -- representing how well the predicted position corresponds to the animal's actual current position
+            1b. Assign a "position-like" score (`PositionLikePosteriorScoring`) to each decoded time bin, saying how much the decoded posterior looks like a valid and well-localized position.
+            1c. The epochs of interest are then those contiguous time bins that match this criteria that occur during PBEs -- these are the `target_epochs` (TODO: need name for these epochs)
+        2. Decode `target_epochs` at fine time scale (25ms)
+        3. For each `target_epochs` epoch, search both forward and backward in time to find times when the animal actually visits one of the positions represented in an epoch time bin.
+            4. Find "visit mask" by looking at 25% promenence value (TODO: this doesn't isolate the right peak topographically yeah?)
+            #TODO 2026-01-14 06:33: - [ ] instead of smashing down the 25% contour for all time bins into a single mask per epoch, we could seek forward and back in time for each time bin
+                - computationally much heavier but would allow us to see sequantial position possibilities across sequential epoch t-bins
+            #TODO 2026-01-14 06:35: - [ ] filter by 2D discretized-position angle computed between successive epoch t-bins.
+                - Allow parallel OR anti-parallel matches (reverse replay)
+                - DRAWBACK: for mostly stationary events, the direction doesn't mean much, could artificially exclude stationary events
 
         """
         from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.PredictiveDecodingComputations import PredictiveDecoding, DecodingLocalityMeasures
@@ -4264,3 +4318,308 @@ class PredictiveDecodingDisplayWidget:
 
         ## OUTPUTS: curr_matching_past_future_positions_df_dict 
         self.active_epoch_idx = an_epoch_idx
+
+
+
+
+# ==================================================================================================================================================================================================================================================================================== #
+# PredictiveDecodingDisplayWidgetPg -- alternative implementation                                                                                                                                                                                                                      #
+# ==================================================================================================================================================================================================================================================================================== #
+class PredictiveDecodingDisplayWidgetPg(QtWidgets.QWidget):
+    """Alternative display widget using PyQtGraph for fast/interactive visualization.
+    
+    Displays the decoded posterior heatmap and (optionally) a row of tiny time-bin heatmaps.
+
+
+    from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.PredictiveDecodingComputations import PredictiveDecodingDisplayWidgetPg
+
+
+    """
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        import pyqtgraph as pg
+        from pyphoplacecellanalysis.External.pyqtgraph.Qt import QtWidgets, QtCore
+        
+        self.layout = QtWidgets.QVBoxLayout(self)
+        self.main_plot_widget = pg.PlotWidget()
+        self.layout.addWidget(self.main_plot_widget)
+        self.tiny_plots_container = QtWidgets.QWidget()
+        self.tiny_layout = QtWidgets.QHBoxLayout(self.tiny_plots_container)
+        self.layout.addWidget(self.tiny_plots_container)
+        
+        self.posterior_img = None
+        self.tiny_img_items = []
+        self.active_epoch_idx = None
+        self.lut = None
+        
+    def plot_posterior(self, posterior_2d, xbin, ybin, time_bin_posteriors=None, num_time_bins_to_show=0, an_epoch_idx=None):
+        """Plots the main posterior (2D) in the main area, optionally showing multiple tiny images for time bins."""
+        import numpy as np
+        import pyqtgraph as pg
+
+        self.main_plot_widget.clear()
+        self.posterior_img = pg.ImageItem()
+        
+        # Set image, orientation, and color map
+        self.posterior_img.setImage(posterior_2d.T)
+        tr = pg.QtGui.QTransform()
+        # Proper extents: handle edge cases (empty or single bin)
+        if posterior_2d.shape[0] > 0 and posterior_2d.shape[1] > 0:
+            xscale = (xbin[-1] - xbin[0]) / float(posterior_2d.shape[0]) if posterior_2d.shape[0] > 1 else 1.0
+            yscale = (ybin[-1] - ybin[0]) / float(posterior_2d.shape[1]) if posterior_2d.shape[1] > 1 else 1.0
+            tr.translate(xbin[0], ybin[0])
+            tr.scale(xscale, yscale)
+        else:
+            # Fallback for edge cases
+            tr.translate(xbin[0] if len(xbin) > 0 else 0.0, ybin[0] if len(ybin) > 0 else 0.0)
+        self.posterior_img.setTransform(tr)
+        
+        # Set color levels for main plot
+        if posterior_2d.size > 0:
+            vmin_main = np.nanmin(posterior_2d)
+            vmax_main = np.nanmax(posterior_2d)
+            self.posterior_img.setLevels((vmin_main, vmax_main))
+        
+        self.main_plot_widget.addItem(self.posterior_img)
+        self.main_plot_widget.setTitle(f"Decoded Posterior Heatmap - Epoch {an_epoch_idx}")
+        self.main_plot_widget.setLabel('bottom', 'X Position')
+        self.main_plot_widget.setLabel('left', 'Y Position')
+        self.main_plot_widget.setAspectLocked(False)
+        self.main_plot_widget.autoRange()
+        
+        # Colormap: use 'viridis' via pyqtgraph (if available)
+        try:
+            self.lut = pg.colormap.get('viridis').getLookupTable()
+            self.posterior_img.setLookupTable(self.lut)
+        except Exception:
+            self.lut = None  # Colormap not critical
+            pass
+        
+        # Tiny heatmaps for time bins (optional)
+        # Remove old widgets
+        for i in reversed(range(self.tiny_layout.count())):
+            widget_to_remove = self.tiny_layout.itemAt(i).widget()
+            if widget_to_remove is not None:
+                widget_to_remove.setParent(None)
+        self.tiny_img_items = []
+        
+        if (time_bin_posteriors is not None) and (num_time_bins_to_show > 0):
+            # Shared color range
+            all_time_bin_values = np.concatenate([tb.flatten() for tb in time_bin_posteriors])
+            vmin_shared = np.nanmin(all_time_bin_values)
+            vmax_shared = np.nanmax(all_time_bin_values)
+            
+            for t_bin_idx in range(num_time_bins_to_show):
+                tiny_widget = pg.PlotWidget()
+                tiny_img = pg.ImageItem()
+                tiny_img.setImage(time_bin_posteriors[t_bin_idx].T)
+                # Copy transform/scaling/extents
+                tiny_img.setTransform(tr)
+                tiny_img.setLevels((vmin_shared, vmax_shared))
+                if self.lut is not None:
+                    tiny_img.setLookupTable(self.lut)
+                tiny_widget.addItem(tiny_img)
+                tiny_widget.setMouseEnabled(False, False)
+                tiny_widget.setMenuEnabled(False)
+                tiny_widget.hideAxis('left')
+                tiny_widget.hideAxis('bottom')
+                tiny_widget.setFixedHeight(50)
+                tiny_widget.setFixedWidth(50)
+                # Add a minimal label below using QVBoxLayout
+                tiny_layout_wrapper = QtWidgets.QVBoxLayout()
+                tiny_layout_wrapper.setSpacing(0)
+                container = QtWidgets.QWidget()
+                container.setLayout(tiny_layout_wrapper)
+                tiny_layout_wrapper.addWidget(tiny_widget)
+                label = QtWidgets.QLabel(f"t={t_bin_idx}")
+                label.setAlignment(QtCore.Qt.AlignCenter)
+                label.setStyleSheet("font-size: 8pt")
+                tiny_layout_wrapper.addWidget(label)
+                self.tiny_layout.addWidget(container)
+                self.tiny_img_items.append(tiny_img)
+        self.active_epoch_idx = an_epoch_idx
+
+
+    def clear(self):
+        """Clear all plots and reset the display widget."""
+        self.main_plot_widget.clear()
+        for i in reversed(range(self.tiny_layout.count())):
+            widget_to_remove = self.tiny_layout.itemAt(i).widget()
+            if widget_to_remove is not None:
+                widget_to_remove.setParent(None)
+        self.tiny_img_items = []
+        self.posterior_img = None
+        self.active_epoch_idx = None
+
+
+
+
+
+
+
+
+
+import matplotlib.pyplot as plt
+import numpy as np
+from typing import List
+import pandas as pd
+
+@function_attributes(short_name=None, tags=['plotting', 'temp', 'position_dfs'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-01-13 19:50', related_items=[])
+def plot_position_dfs_to_subplots(position_dfs: List[pd.DataFrame], fixed_columns: int = 2, figsize: tuple = None, plot_mode: str = 'line', epoch_labels: List[str] = None, **plot_kwargs):
+    """
+    Easily render a list of position_df dataframes to separate subplots/axes.
+    
+    Parameters:
+    -----------
+    position_dfs : List[pd.DataFrame]
+        List of position dataframes, each with 'x' and 'y' columns (and optionally 't' for time)
+    fixed_columns : int, default=2
+        Number of columns in the subplot grid
+    figsize : tuple, optional
+        Figure size (width, height) in inches. If None, uses matplotlib default
+    plot_mode : str, default='line'
+        Plotting mode: 'line', 'scatter', or 'time_gradient' (requires 't' column)
+    epoch_labels : List[str], optional
+        Labels for each epoch/subplot. If None, uses 'Epoch 0', 'Epoch 1', etc.
+    **plot_kwargs
+        Additional keyword arguments passed to plot/scatter (e.g., alpha, linewidth, c, etc.)
+    
+    Returns:
+    --------
+    fig : matplotlib.figure.Figure
+        The figure object
+    axs : numpy.ndarray
+        Array of axes objects (may be 1D or 2D depending on grid shape)
+    
+    Usage:
+    ------
+    from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.PredictiveDecodingComputations import plot_position_dfs_to_subplots
+
+    # Simple usage:
+    fig, axs = plot_position_dfs_to_subplots([epoch1_pos_df, epoch2_pos_df, epoch3_pos_df])
+    
+    # With custom labels and styling:
+    fig, axs = plot_position_dfs_to_subplots(
+        position_dfs=[epoch1_pos_df, epoch2_pos_df], 
+        fixed_columns=2,
+        epoch_labels=['Epoch A', 'Epoch B'],
+        plot_mode='line',
+        alpha=0.7,
+        linewidth=2
+    )
+    
+    # Time gradient mode (colors by time):
+    fig, axs = plot_position_dfs_to_subplots(
+        position_dfs=[epoch1_pos_df, epoch2_pos_df],
+        plot_mode='time_gradient',
+        cmap='viridis'
+    )
+    """
+    num_epochs = len(position_dfs)
+    if num_epochs == 0:
+        raise ValueError("position_dfs list cannot be empty")
+    
+    # Calculate grid dimensions
+    needed_rows = int(np.ceil(num_epochs / fixed_columns))
+    linear_plotter_indices = np.arange(num_epochs)
+    row_column_indices = np.unravel_index(linear_plotter_indices, (needed_rows, fixed_columns))
+    
+    # Create figure and axes
+    if figsize is None:
+        figsize = (6 * fixed_columns, 5 * needed_rows)
+    fig, axs = plt.subplots(needed_rows, fixed_columns, figsize=figsize, sharex=True, sharey=True)
+    
+    # Handle 1D vs 2D axes array
+    if needed_rows == 1:
+        axs = axs.reshape(1, -1) if fixed_columns > 1 else axs.reshape(1, 1)
+    elif fixed_columns == 1:
+        axs = axs.reshape(-1, 1)
+    
+    # Default plot kwargs
+    default_kwargs = {'alpha': 0.85} if plot_mode != 'time_gradient' else {'alpha': 0.85, 'linewidth': 2}
+    plot_kwargs = {**default_kwargs, **plot_kwargs}
+    
+    # Plot each position dataframe
+    for a_linear_index in linear_plotter_indices:
+        curr_row = row_column_indices[0][a_linear_index]
+        curr_col = row_column_indices[1][a_linear_index]
+        # curr_pos_df = position_dfs[a_linear_index]
+        curr_pos_df = position_dfs[a_linear_index][0]
+        
+        # Extract x, y coordinates
+        x_vals = curr_pos_df['x'].to_numpy()
+        y_vals = curr_pos_df['y'].to_numpy()
+        
+        # Plot based on mode
+        if plot_mode == 'line':
+            if 'c' not in plot_kwargs:
+                plot_kwargs['c'] = 'k'
+            axs[curr_row, curr_col].plot(x_vals, y_vals, **plot_kwargs)
+        elif plot_mode == 'scatter':
+            if 'c' not in plot_kwargs:
+                plot_kwargs['c'] = 'k'
+            axs[curr_row, curr_col].scatter(x_vals, y_vals, **plot_kwargs)
+        elif plot_mode == 'time_gradient':
+            if 't' not in curr_pos_df.columns:
+                raise ValueError("plot_mode='time_gradient' requires 't' column in position_df")
+            from matplotlib.collections import LineCollection
+            t_vals = curr_pos_df['t'].to_numpy()
+            cmap = plot_kwargs.pop('cmap', 'viridis')
+            norm = plt.Normalize(t_vals.min(), t_vals.max())
+            # Create line segments for gradient coloring
+            points = np.array([x_vals, y_vals]).T.reshape(-1, 1, 2)
+            segments = np.concatenate([points[:-1], points[1:]], axis=1)
+            lc = LineCollection(segments, cmap=cmap, norm=norm)
+            lc.set_array(t_vals)
+            lc.set_linewidth(plot_kwargs.get('linewidth', 2))
+            lc.set_alpha(plot_kwargs.get('alpha', 0.85))
+            axs[curr_row, curr_col].add_collection(lc)
+        else:
+            raise ValueError(f"plot_mode must be 'line', 'scatter', or 'time_gradient', got '{plot_mode}'")
+        
+        # Set label
+        if epoch_labels is not None and a_linear_index < len(epoch_labels):
+            label_text = epoch_labels[a_linear_index]
+        else:
+            label_text = f'Epoch {a_linear_index}'
+        axs[curr_row, curr_col].set_title(label_text)
+        axs[curr_row, curr_col].set_aspect('equal', adjustable='box')
+        axs[curr_row, curr_col].grid(True, alpha=0.3)
+    
+    # Hide unused subplots
+    for a_linear_index in range(num_epochs, needed_rows * fixed_columns):
+        curr_row = row_column_indices[0][a_linear_index] if a_linear_index < len(linear_plotter_indices) else a_linear_index // fixed_columns
+        curr_col = row_column_indices[1][a_linear_index] if a_linear_index < len(linear_plotter_indices) else a_linear_index % fixed_columns
+        if curr_row < needed_rows and curr_col < fixed_columns:
+            axs[curr_row, curr_col].axis('off')
+    
+    plt.tight_layout()
+    return fig, axs
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+def multi_trajectory_color_plotter(position_dfs: List[pd.DataFrame]):
+    """ Takes a list of position dataframes representing separate trajectories in the same environment and plots them in a single axes.
+    It assigns each of them a unique id and color.
+    They can be rendered as lines of solid color, gradients from 0.25 alpha to 0.9 alpha of their assigned color, or something custom.
+
+    Alternatively, we can plot them with a diverging color pallete with -1.0 meaning far past: start of the recording, and +1.0 meaning far-future: end of the recording.
+    
+    
+    """
