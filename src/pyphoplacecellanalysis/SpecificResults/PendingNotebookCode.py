@@ -125,6 +125,7 @@ from scipy.ndimage import label, generate_binary_structure, binary_opening
 # from skimage.morphology import binary_opening
 from scipy.ndimage import binary_dilation
 from scipy.ndimage import distance_transform_edt
+from neuropy.core.position import PositionAccessor, Position, PositionComputedDataMixin
 
 
 @metadata_attributes(short_name=None, tags=['mask', 't-bins', 'posterior'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-01-13 07:17', related_items=[])
@@ -327,6 +328,108 @@ class PosteriorMaskPostProcessing:
         return np.stack([cy, cx], axis=1) # (N, 2)
 
 
+    @classmethod
+    def centroid_df_from_binary_stack(cls, mask_stack: NDArray, time_window_centers: Optional[NDArray]=None):
+        """ 
+        Usage:
+            centroids_dfs: List[pd.DataFrame] = [PosteriorMaskPostProcessing.centroid_df_from_binary_stack(mask_stack=a_t_bin_mask_list, time_window_centers=a_decoded_result.time_window_centers[epoch_idx]) for epoch_idx, a_t_bin_mask_list in enumerate(epoch_t_bins_high_prob_pos_masks)]
+
+
+        """
+        a_centroids = cls.centroids_from_binary_stack(mask_stack=mask_stack)
+        assert len(time_window_centers) == np.shape(a_centroids)[0]
+        centroids_df: pd.DataFrame = pd.DataFrame(a_centroids, columns=['x', 'y'])
+        centroids_df['t'] = time_window_centers
+        centroids_df = PosteriorMaskPostProcessing.add_angular_movement_dir(epoch_centroids=a_centroids, epoch_time_window_centers=time_window_centers)
+        centroids_df = centroids_df.position.adding_segmented_trajectories_columns()
+        return centroids_df ## has ['dir_angle_binned', 'approx_dir_degrees']
+
+
+
+    @classmethod
+    def add_angular_movement_dir(cls, epoch_centroids: NDArray[ND.Shape["N_EPOCH_TIME_BINS, 2"], Any], epoch_time_window_centers: NDArray[ND.Shape["N_EPOCH_TIME_BINS"], Any], n_dir_angular_bins: int = 8, smoothing_num_timesteps: Optional[int]=None) -> pd.DataFrame:
+        """ Computes the angular direction of change between successive posterior-mask blob centroids
+        
+        adds: ['approx_dir_degrees', 'dir_angle_binned', ]
+        
+        centroids_df:
+        
+        array([[31.8846, 10.2692],
+            [25.3333, 3.26667],
+            [17.5714, 2.14286],
+            [23.4516, 56.5806]])
+            
+        """
+        centroids_df: pd.DataFrame = pd.DataFrame(epoch_centroids, columns=['x', 'y'])
+        centroids_df['t'] = epoch_time_window_centers
+        centroids_df = centroids_df.position.compute_higher_order_derivatives()
+
+        if smoothing_num_timesteps:
+            if len(epoch_time_window_centers) < smoothing_num_timesteps:
+                raise ValueError(f'smoothing smoothing_num_timesteps: {smoothing_num_timesteps} is larger than the actual number of timesteps {len(epoch_time_window_centers)}')
+            vel_x_col_name: str = 'velocity_x_smooth'
+            vel_y_col_name: str = 'velocity_y_smooth'
+
+            centroids_df = centroids_df.position.compute_smoothed_position_info(N=smoothing_num_timesteps)
+        else:
+            vel_x_col_name: str = 'velocity_x'
+            vel_y_col_name: str = 'velocity_y'
+            
+
+        centroids_df['approx_dir_degrees'] = ((np.rad2deg(np.arctan2(centroids_df[vel_y_col_name], centroids_df[vel_x_col_name])) + 360) % 360) # arctan2 is required to get the angle right
+        centroids_df = centroids_df.dropna(axis='index', subset=['approx_dir_degrees'])
+        
+        if n_dir_angular_bins is not None:
+            angle_dir_bin_edges = np.linspace(0, 360, (n_dir_angular_bins + 1))
+            n_dir_angular_bins: int = len(angle_dir_bin_edges) - 1
+            # Use pd.cut with the explicit bin edges
+            centroids_df['dir_angle_binned'] = pd.cut(centroids_df['approx_dir_degrees'], bins=angle_dir_bin_edges, labels=False, include_lowest=True)
+            centroids_df = centroids_df.dropna(axis='index', subset=['dir_angle_binned'])
+
+        return centroids_df
+
+
+    @classmethod
+    def _compare_centroid_and_pos_traj_angle(cls, a_pos_df: pd.DataFrame, a_centroids_search_segments_df: pd.DataFrame, centroid_angle_col: str='segment_Vp_deg_safe_mean'):
+        """ find any matching witin 30 degrees of one another
+
+        #TODO 2026-01-14 13:24: - [ ] Allow anti-parallel matching too
+
+        a_pos_df, pos_segment_to_centroid_seq_segment_idx_map = PosteriorMaskPostProcessing._compare_centroid_and_pos_traj_angle(a_pos_df=a_pos_df, a_centroids_search_segments_df=a_centroids_search_segments_df)
+        
+        
+        """
+        a_pos_df = a_pos_df.position.adding_segmented_trajectories_columns(overwrite_existing=True)
+        a_centroids_search_segments_df = a_centroids_search_segments_df.dropna(subset=[centroid_angle_col], inplace=False)
+
+        pos_segment_to_centroid_seq_segment_idx_map = {}
+        
+        segments_compare_col_name: str = 'segment_Vp_deg_mean_safe'
+        # ['segment_Vp_deg_safe_mean', 'segment_Vp_deg_mean', 'segment_dir_angle_binned_mean']    
+
+        # Performed 5 aggregations grouped on column: 'segment_idx'
+        a_pos_df_segments_df = a_pos_df.groupby(['segment_idx']).agg(segment_dir_angle_binned_mean=('segment_dir_angle_binned', 'mean'), segment_Vp_scatteredness_mean=('segment_Vp_scatteredness', 'mean'), segment_Vp_deg_mean=('segment_Vp_deg', 'mean'), approx_head_dir_degrees_mean=('approx_head_dir_degrees', 'mean'), Vp_mean=('Vp', 'mean'), segment_Vp_deg_mean_safe=('segment_Vp_deg', PositionComputedDataMixin.circular_mean_deg)).reset_index()
+
+        for a_pos_traj_segment_row in a_pos_df_segments_df.itertuples(name='segment_tuple'):
+            # ['segment_Vp_deg_mean', ]
+            
+            if len(a_centroids_search_segments_df) > 0:
+                # a_pos_traj_segment_row.segment_Vp_deg_mean_safe # getattr(a_pos_traj_segment_row, segments_compare_col_name) ._asdict()[segments_compare_col_name]
+                # is_segment_close = np.isclose(a_pos_traj_segment_row.segment_Vp_deg_mean_safe, a_centroids_search_segments_df[centroid_angle_col], tol=30.0) # find any matching witin 30 degrees of one another
+                
+                diffs = PositionComputedDataMixin.angular_diff_deg(getattr(a_pos_traj_segment_row, segments_compare_col_name), a_centroids_search_segments_df[centroid_angle_col].to_numpy())
+                is_segment_close = diffs <= 30.0
+
+                pos_segment_to_centroid_seq_segment_idx_map[a_pos_traj_segment_row.segment_idx] = [contour_idx for contour_idx, is_close in enumerate(is_segment_close) if is_close]
+                # a_centroids_search_segments_df[centroid_angle_col]
+            else:
+                pos_segment_to_centroid_seq_segment_idx_map[a_pos_traj_segment_row.segment_idx] = []        
+                        
+            ## Compare the canidate trajectory's angles to the df
+            # a_pos_df_segments_df
+        ## END for a_pos_traj_segment_row in a_pos_df_segments_df.itertuples(name='segm...
+
+        return a_pos_df, pos_segment_to_centroid_seq_segment_idx_map
 
 
 
