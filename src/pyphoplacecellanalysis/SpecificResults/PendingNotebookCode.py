@@ -390,7 +390,7 @@ class PosteriorMaskPostProcessing:
 
     @function_attributes(short_name=None, tags=['working'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-01-14 13:36', related_items=[])
     @classmethod
-    def _compare_centroid_and_pos_traj_angle(cls, a_pos_df: pd.DataFrame, a_centroids_search_segments_df: pd.DataFrame, centroid_angle_col: str='segment_Vp_deg_safe_mean', close_angle_deg: float=30.0, allow_antiparallel_matching: bool=True):
+    def _compare_centroid_and_pos_traj_angle(cls, a_pos_df: pd.DataFrame, a_centroids_search_segments_df: pd.DataFrame, centroid_angle_col: str='segment_Vp_deg_safe_mean', close_angle_deg: float=60.0, allow_antiparallel_matching: bool=True):
         """ find any matching witin close_angle_deg degrees of one another
 
         a_pos_df, pos_segment_to_centroid_seq_segment_idx_map = PosteriorMaskPostProcessing._compare_centroid_and_pos_traj_angle(a_pos_df=a_pos_df, a_centroids_search_segments_df=a_centroids_search_segments_df)
