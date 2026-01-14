@@ -3340,7 +3340,7 @@ from pyphoplacecellanalysis.External.pyqtgraph.Qt import QtWidgets, QtCore
 from pyphoplacecellanalysis.Pho2D.matplotlib.MatplotlibTimeSynchronizedWidget import MatplotlibTimeSynchronizedWidget
 
 
-
+@metadata_attributes(short_name=None, tags=['partially-working', 'matplotlib', '3-pane', 'position'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-01-14 14:42', related_items=[])
 @define(slots=False, repr=False, eq=False)
 class PredictiveDecodingDisplayWidget:
     """ Plots 3 panels side-by-side: Left: Past positions, Mid: Decoded Epoch Posterior, Right: Future positions
@@ -3382,7 +3382,7 @@ class PredictiveDecodingDisplayWidget:
     decoded_result: DecodedFilterEpochsResult = field(default=None)
 
     ## Display Variables
-    trajectory_displaying_plotter: Dict[str, DecodedTrajectoryMatplotlibPlotter] = field(default=Factory(dict))
+    trajectory_displaying_plotter: Dict[types.PastFutureCategory, DecodedTrajectoryMatplotlibPlotter] = field(default=Factory(dict))
     
     ## Dock UI Variables
     dock_area: Any = field(default=None)
@@ -4341,6 +4341,7 @@ class PredictiveDecodingDisplayWidget:
 # ==================================================================================================================================================================================================================================================================================== #
 # PredictiveDecodingDisplayWidgetPg -- alternative implementation                                                                                                                                                                                                                      #
 # ==================================================================================================================================================================================================================================================================================== #
+@metadata_attributes(short_name=None, tags=['BROKEN', 'UNUSED'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-01-14 14:41', related_items=[])
 class PredictiveDecodingDisplayWidgetPg(QtWidgets.QWidget):
     """Alternative display widget using PyQtGraph for fast/interactive visualization.
     
@@ -4480,7 +4481,7 @@ import numpy as np
 from typing import List
 import pandas as pd
 
-@function_attributes(short_name=None, tags=['plotting', 'temp', 'position_dfs'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-01-13 19:50', related_items=[])
+@function_attributes(short_name=None, tags=['non-working','BROKEN', 'UNUSED', 'plotting', 'temp', 'position_dfs'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-01-13 19:50', related_items=[])
 def plot_position_dfs_to_subplots(position_dfs: List[pd.DataFrame], fixed_columns: int = 2, figsize: tuple = None, plot_mode: str = 'line', epoch_labels: List[str] = None, **plot_kwargs):
     """
     Easily render a list of position_df dataframes to separate subplots/axes.
@@ -4629,13 +4630,206 @@ def plot_position_dfs_to_subplots(position_dfs: List[pd.DataFrame], fixed_column
 
 
 
-
-def multi_trajectory_color_plotter(position_dfs: List[pd.DataFrame]):
-    """ Takes a list of position dataframes representing separate trajectories in the same environment and plots them in a single axes.
+@function_attributes(short_name=None, tags=['pyqtgraph', 'trajectory'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-01-14 14:40', related_items=[])
+def multi_trajectory_color_plotter(position_dfs: List[pd.DataFrame], rendering_mode: str = 'solid_colors', fixed_columns: int = 5, return_widget: bool = True, maze_extent: Optional[Tuple[float, float, float, float]] = None):
+    """ Takes a list of position dataframes representing separate trajectories in the same environment and plots them in a grid of tiny subplots.
     It assigns each of them a unique id and color.
     They can be rendered as lines of solid color, gradients from 0.25 alpha to 0.9 alpha of their assigned color, or something custom.
 
     Alternatively, we can plot them with a diverging color pallete with -1.0 meaning far past: start of the recording, and +1.0 meaning far-future: end of the recording.
     
+    Args:
+        position_dfs: List of position dataframes, each with 'x' and 'y' columns. Optional 't' column for time-based modes.
+        rendering_mode: One of 'solid_colors', 'alpha_gradient', or 'time_diverging'. Default is 'solid_colors'.
+        fixed_columns: Number of columns in the grid layout. Default is 5.
+        return_widget: If True, returns (GraphicsLayoutWidget, list of PlotItems). If False, returns only list of PlotItems.
+        maze_extent: Optional tuple of (xmin, xmax, ymin, ymax) to set fixed x/y limits for all subplots. If None, auto-ranges each plot.
     
+    Returns:
+        Tuple of (GraphicsLayoutWidget, list of PlotItems) if return_widget=True, else just list of PlotItems.
+
+    Usage:
+
+        from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.PredictiveDecodingComputations import multi_trajectory_color_plotter
+
+        plot_widget, plot_items = multi_trajectory_color_plotter(position_dfs=dfs_list)
+        
+        # With fixed maze extent:
+        maze_extent = (a_decoder.xbin[0], a_decoder.xbin[-1], a_decoder.ybin[0], a_decoder.ybin[-1])
+        plot_widget, plot_items = multi_trajectory_color_plotter(position_dfs=dfs_list, maze_extent=maze_extent)
+
     """
+    import pyphoplacecellanalysis.External.pyqtgraph as pg
+    import numpy as np
+    
+    # Validate input
+    if not position_dfs or len(position_dfs) == 0:
+        raise ValueError("position_dfs must be a non-empty list")
+    
+    for i, df in enumerate(position_dfs):
+        if 'x' not in df.columns or 'y' not in df.columns:
+            raise ValueError(f"position_dfs[{i}] must have 'x' and 'y' columns")
+    
+    if rendering_mode not in ['solid_colors', 'alpha_gradient', 'time_diverging']:
+        raise ValueError(f"rendering_mode must be one of 'solid_colors', 'alpha_gradient', or 'time_diverging', got '{rendering_mode}'")
+    
+    # Validate maze_extent if provided
+    if maze_extent is not None:
+        if not isinstance(maze_extent, (tuple, list)) or len(maze_extent) != 4:
+            raise ValueError("maze_extent must be a tuple or list of 4 floats: (xmin, xmax, ymin, ymax)")
+        xmin, xmax, ymin, ymax = maze_extent
+        if xmin >= xmax or ymin >= ymax:
+            raise ValueError("maze_extent must have xmin < xmax and ymin < ymax")
+    
+    num_epochs = len(position_dfs)
+    needed_rows = int(np.ceil(num_epochs / fixed_columns))
+    linear_plotter_indices = np.arange(num_epochs)
+    row_column_indices = np.unravel_index(linear_plotter_indices, (needed_rows, fixed_columns))
+    
+    # Create GraphicsLayoutWidget for grid of plots
+    graphics_widget = pg.GraphicsLayoutWidget()
+    plot_items = []
+    
+    # Compute global time range for time_diverging mode if needed
+    global_t_min = None
+    global_t_max = None
+    if rendering_mode == 'time_diverging':
+        all_times = []
+        for df in position_dfs:
+            if 't' in df.columns:
+                valid_t = df['t'].dropna()
+                if len(valid_t) > 0:
+                    all_times.extend(valid_t.tolist())
+        if len(all_times) > 0:
+            global_t_min = min(all_times)
+            global_t_max = max(all_times)
+        if global_t_min is None or global_t_max is None:
+            # Fallback to solid_colors if no time data available
+            rendering_mode = 'solid_colors'
+    
+    # White pen for axes outline
+    white_pen = pg.mkPen('white', width=1)
+    
+    # Create and plot each trajectory in its own tiny subplot
+    for a_linear_index in linear_plotter_indices:
+        curr_row = row_column_indices[0][a_linear_index]
+        curr_col = row_column_indices[1][a_linear_index]
+        pos_df = position_dfs[a_linear_index]
+        
+        # Create a tiny plot in the grid
+        plot_item = graphics_widget.addPlot(row=curr_row, col=curr_col)
+        plot_items.append(plot_item)
+        
+        # Hide labels but show axes with white outline
+        plot_item.hideAxis('bottom')
+        plot_item.hideAxis('left')
+        plot_item.hideAxis('top')
+        plot_item.hideAxis('right')
+        # Show axes but hide tick labels - set white pen for outline
+        plot_item.showAxis('bottom')
+        plot_item.showAxis('left')
+        plot_item.showAxis('top')
+        plot_item.showAxis('right')
+        # Set white pen for all axes to create the box outline
+        plot_item.getAxis('bottom').setPen(white_pen)
+        plot_item.getAxis('left').setPen(white_pen)
+        plot_item.getAxis('top').setPen(white_pen)
+        plot_item.getAxis('right').setPen(white_pen)
+        # Hide tick labels
+        plot_item.getAxis('bottom').setTicks([])
+        plot_item.getAxis('left').setTicks([])
+        plot_item.getAxis('top').setTicks([])
+        plot_item.getAxis('right').setTicks([])
+        plot_item.setMenuEnabled(False)
+        plot_item.setMouseEnabled(False, False)
+        
+        # Extract coordinates
+        x_vals = pos_df['x'].to_numpy()
+        y_vals = pos_df['y'].to_numpy()
+        
+        # Remove NaN values
+        valid_mask = ~(np.isnan(x_vals) | np.isnan(y_vals))
+        x_vals = x_vals[valid_mask]
+        y_vals = y_vals[valid_mask]
+        
+        if len(x_vals) < 2:
+            continue  # Skip trajectories with insufficient points
+        
+        if rendering_mode == 'solid_colors':
+            # Each trajectory gets a unique color
+            traj_color = pg.intColor(a_linear_index, hues=len(position_dfs))
+            pen = pg.mkPen(traj_color, width=1)
+            plot_item.plot(x_vals, y_vals, pen=pen)
+        
+        elif rendering_mode == 'alpha_gradient':
+            # Alpha gradient from 0.25 to 0.9 along the path
+            base_color = pg.intColor(a_linear_index, hues=len(position_dfs))
+            n_points = len(x_vals)
+            for i in range(n_points - 1):
+                # Interpolate alpha from 0.25 to 0.9
+                alpha = 0.25 + (0.9 - 0.25) * (i / max(1, n_points - 1))
+                segment_color = pg.mkColor(base_color)
+                segment_color.setAlphaF(alpha)
+                pen = pg.mkPen(segment_color, width=1)
+                plot_item.plot([x_vals[i], x_vals[i+1]], [y_vals[i], y_vals[i+1]], pen=pen)
+        
+        elif rendering_mode == 'time_diverging':
+            # Diverging color palette based on normalized time (-1.0 to +1.0)
+            if 't' in pos_df.columns:
+                t_vals = pos_df['t'].to_numpy()[valid_mask]
+                if len(t_vals) > 0 and global_t_min is not None and global_t_max is not None:
+                    # Normalize time to [-1.0, 1.0]
+                    t_range = global_t_max - global_t_min
+                    if t_range > 0:
+                        normalized_t = 2.0 * ((t_vals - global_t_min) / t_range) - 1.0
+                    else:
+                        normalized_t = np.zeros_like(t_vals)
+                    
+                    # Use diverging colormap (RdBu-like: blue for -1.0, red for +1.0)
+                    n_segments = len(x_vals) - 1
+                    for i in range(n_segments):
+                        # Interpolate normalized time for this segment
+                        seg_t = (normalized_t[i] + normalized_t[i+1]) / 2.0
+                        # Map from [-1.0, 1.0] to color
+                        # Blue (0, 0, 255) for -1.0, Red (255, 0, 0) for +1.0
+                        if seg_t < 0:
+                            # Blue to white gradient
+                            intensity = abs(seg_t)
+                            r = int(255 * intensity)
+                            g = int(255 * intensity)
+                            b = 255
+                        else:
+                            # White to red gradient
+                            intensity = seg_t
+                            r = 255
+                            g = int(255 * (1 - intensity))
+                            b = int(255 * (1 - intensity))
+                        
+                        seg_color = pg.mkColor(r, g, b, 200)
+                        pen = pg.mkPen(seg_color, width=1)
+                        plot_item.plot([x_vals[i], x_vals[i+1]], [y_vals[i], y_vals[i+1]], pen=pen)
+                else:
+                    # Fallback to solid color if time data is invalid
+                    traj_color = pg.intColor(a_linear_index, hues=len(position_dfs))
+                    pen = pg.mkPen(traj_color, width=1)
+                    plot_item.plot(x_vals, y_vals, pen=pen)
+            else:
+                # Fallback to solid color if no time column
+                traj_color = pg.intColor(a_linear_index, hues=len(position_dfs))
+                pen = pg.mkPen(traj_color, width=1)
+                plot_item.plot(x_vals, y_vals, pen=pen)
+        
+        # Set x/y limits based on maze_extent if provided, otherwise auto-range
+        if maze_extent is not None:
+            xmin, xmax, ymin, ymax = maze_extent
+            plot_item.setXRange(xmin, xmax, padding=0)
+            plot_item.setYRange(ymin, ymax, padding=0)
+        else:
+            # Auto-range each plot to fit its trajectory
+            plot_item.autoRange()
+    
+    # Return based on return_widget parameter
+    if return_widget:
+        return graphics_widget, plot_items
+    else:
+        return plot_items
