@@ -1114,6 +1114,17 @@ class MatchingPastFuturePositionsResult(ComputedResult):
     def extract_final_position_epochs(cls, _out_epoch_flat_mask_future_past_result: List["MatchingPastFuturePositionsResult"]):
         """ ran post-hoc to recompute/extract the valid position epochs 
         """
+        def _subfn_custom_merge_sequential_t_bins_to_epochs(a_df: pd.DataFrame, dt_max: float):
+            """ captures nothing 
+            """
+                # max_merge_duration = (pos_t_bin_sample_size_sec * 1.25)
+
+                a_df['sequence_id'] = (a_df['t'].diff() > dt_max).cumsum()
+                # Performed 5 aggregations grouped on column: 'sequence_id'
+                a_df = a_df.groupby(['sequence_id']).agg(start_first=('start', 'first'), stop_last=('stop', 'last'), t_count=('t', 'count'), t_idxmin=('t', 'idxmin'), t_idxmax=('t', 'idxmax')).reset_index().rename(columns={'start_first': 'start', 'stop_last': 'stop', 't_idxmin': 'start_pos_idx', 't_idxmax': 'stop_pos_idx'})
+                a_df['duration'] = a_df['stop'] - a_df['start']
+                return a_df
+
 
         def _subfn_custom_build_sequential_position_epochs(matching_past_positions_df: pd.DataFrame, col_name: str = 'past_future_matching_pos_epoch_id'):
             """ builds the epochs_df from the positions_df for a single epoch
@@ -1123,19 +1134,9 @@ class MatchingPastFuturePositionsResult(ComputedResult):
                 a_matching_positions_epochs_df
             ```
             """
-
-            def _custom_merge_sequential_t_bins_to_epochs(a_df: pd.DataFrame, dt_max: float):
-                # max_merge_duration = (pos_t_bin_sample_size_sec * 1.25)
-
-                a_df['sequence_id'] = (a_df['t'].diff() > dt_max).cumsum()
-                # Performed 5 aggregations grouped on column: 'sequence_id'
-                a_df = a_df.groupby(['sequence_id']).agg(start_first=('start', 'first'), stop_last=('stop', 'last'), t_count=('t', 'count'), t_idxmin=('t', 'idxmin'), t_idxmax=('t', 'idxmax')).reset_index().rename(columns={'start_first': 'start', 'stop_last': 'stop', 't_idxmin': 'start_pos_idx', 't_idxmax': 'stop_pos_idx'})
-                a_df['duration'] = a_df['stop'] - a_df['start']
-                return a_df
-
             if len(matching_past_positions_df) < 1:
                 print(f'warn: empty df!')
-                return pd.DataFrame({}), pd.DataFrame({})
+                return pd.DataFrame({}), {}
 
             a_matching_positions_epochs_df = deepcopy(matching_past_positions_df)
             assert 't' in a_matching_positions_epochs_df
@@ -1152,7 +1153,7 @@ class MatchingPastFuturePositionsResult(ComputedResult):
 
 
             dt_max: float = (pos_t_bin_sample_size_sec * 2.5)
-            new_pos_epochs: pd.DataFrame = _custom_merge_sequential_t_bins_to_epochs(a_df = a_matching_positions_epochs_df, dt_max = dt_max)
+            new_pos_epochs: pd.DataFrame = _subfn_custom_merge_sequential_t_bins_to_epochs(a_df = a_matching_positions_epochs_df, dt_max = dt_max)
             new_pos_epochs['label'] = new_pos_epochs['sequence_id'].astype(int)
 
 
