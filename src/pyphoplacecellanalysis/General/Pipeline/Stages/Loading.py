@@ -3,7 +3,7 @@ from types import ModuleType
 import dataclasses
 from dataclasses import dataclass
 import attrs
-from attrs import define, field, Factory
+from attrs import define, field, Factory, asdict, has
 from datetime import datetime
 import pathlib
 from pathlib import Path
@@ -145,54 +145,76 @@ def saveData(pkl_path, db, should_append=False, safe_save:bool=True):
 # ==================================================================================================================================================================================================================================================================================== #
 # Split Save Attempts                                                                                                                                                                                                                                                                  #
 # ==================================================================================================================================================================================================================================================================================== #
-@function_attributes(short_name=None, tags=['save', 'pickle', 'split'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-12-11 08:11', related_items=['load_split_pickled_global_computation_results'])
-def safeSaveSplitData(self, override_global_pickle_path: Optional[Path]=None, override_global_pickle_filename:Optional[str]=None, include_includelist=None, continue_after_pickling_errors: bool=True, debug_print:bool=True):
-    """Save out the `global_computation_results` which are not currently saved with the pipeline
+@function_attributes(short_name=None, tags=['save', 'pickle', 'split'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-12-11 08:11', related_items=['loadSplitData', 'load_split_pickled_global_computation_results'])
+def safeSaveSplitData(pkl_path: Union[str, Path], computed_data: Union[Dict[str, Any], Any], include_includelist=None, continue_after_pickling_errors: bool=True, debug_print:bool=True):
+    """Save out data by splitting it into separate pickle files for each key in the dictionary.
+
+    Similar to safeSaveData but saves each item in computed_data as a separate file in a split folder.
 
     Reciprocal:
-        load_pickled_global_computation_results
+        `loadSplitData`
+
+    Args:
+        pkl_path: Path to save to. If a directory, uses default filename "computed_data.pkl". If a file, uses that path directly.
+        computed_data: Dictionary of data to save, or an attrs-based object that will be converted to a dictionary. Each key-value pair will be saved as a separate file.
+        include_includelist: Optional list of keys to include. If None, includes all keys.
+        continue_after_pickling_errors: If True, continues saving other items if one fails. If False, raises on first error.
+        debug_print: If True, prints progress information.
+
+    Returns:
+        tuple: (split_save_folder, split_save_paths, split_save_output_types, failed_keys)
 
     Usage:
-        split_save_folder, split_save_paths, split_save_output_types, failed_keys = curr_active_pipeline.save_split_global_computation_results(debug_print=True)
-        
+
+        from pyphoplacecellanalysis.General.Pipeline.Stages.Loading import safeSaveData, safeSaveSplitData, loadSplitData
+
+        ## Pickle the result:
+        pkl_output_path: Path = curr_active_pipeline.get_output_path().joinpath('2026-01-14_PredictiveDecodingComputationsContainer.pkl')
+        split_save_folder, split_save_paths, split_save_output_types, failed_keys = safeSaveSplitData(pkl_output_path, container, debug_print=True)
+        print(f'split_save_folder: "{split_save_folder.as_posix()}"')
+
+
     #TODO 2023-11-22 18:54: - [ ] One major issue is that the types are lost upon reloading, so I think we'll need to save them somewhere. They can be fixed post-hoc like:
     # Update result with correct type:
-    curr_active_pipeline.global_computation_results.computed_data['RankOrder'] = RankOrderComputationsContainer(**curr_active_pipeline.global_computation_results.computed_data['RankOrder'])
+    # computed_data['RankOrder'] = RankOrderComputationsContainer(**computed_data['RankOrder'])
 
     """
     from pickle import PicklingError
     from pyphocorehelpers.print_helpers import print_filesystem_file_size, print_object_memory_usage
     
-
-    ## Case 1. `override_global_pickle_path` is provided:
-    if override_global_pickle_path is not None:
-        ## override_global_pickle_path is provided:
-        if not isinstance(override_global_pickle_path, Path):
-            override_global_pickle_path = Path(override_global_pickle_path).resolve()
-        # Case 1a: `override_global_pickle_path` is a complete file path
-        if not override_global_pickle_path.is_dir():
-            # a full filepath, just use that directly
-            global_computation_results_pickle_path = override_global_pickle_path.resolve()
+    # Convert attrs objects to dictionaries if needed
+    if not isinstance(computed_data, dict):
+        if has(computed_data):
+            # It's an attrs object, convert to dict
+            if debug_print:
+                print(f'Converting attrs object {type(computed_data).__name__} to dictionary')
+            computed_data = asdict(computed_data)
+        elif hasattr(computed_data, '__dict__'):
+            # It's a regular object with __dict__, convert to dict
+            if debug_print:
+                print(f'Converting object {type(computed_data).__name__} with __dict__ to dictionary')
+            computed_data = computed_data.__dict__
         else:
-            # default case, assumed to be a directory and we'll use the normal filename.
-            active_global_pickle_filename: str = (override_global_pickle_filename or self.global_computation_results_pickle_path or "global_computation_results.pkl")
-            global_computation_results_pickle_path = override_global_pickle_path.joinpath(active_global_pickle_filename).resolve()
-
+            raise TypeError(f"computed_data must be a dictionary, attrs object, or object with __dict__. Got {type(computed_data)}")
+    
+    # Resolve pkl_path
+    if not isinstance(pkl_path, Path):
+        pkl_path = Path(pkl_path).resolve()
+    
+    # Determine the base pickle path
+    if pkl_path.is_dir():
+        # If it's a directory, use a default filename
+        base_pickle_path = pkl_path.joinpath("computed_data.pkl").resolve()
     else:
-        # No override path provided
-        if override_global_pickle_filename is None:
-            # no filename provided either, use default global pickle path:
-            global_computation_results_pickle_path = self.global_computation_results_pickle_path
-        else:
-            # Otherwise use default output path but specified override_global_pickle_filename:
-            global_computation_results_pickle_path = self.get_output_path().joinpath(override_global_pickle_filename).resolve() 
+        # If it's a file, use it directly
+        base_pickle_path = pkl_path.resolve()
 
     if debug_print:
-        print(f'global_computation_results_pickle_path: {global_computation_results_pickle_path}')
+        print(f'base_pickle_path: {base_pickle_path}')
     
     ## In split save, we save each result separately in a folder
-    split_save_folder_name: str = f'{global_computation_results_pickle_path.stem}_split'
-    split_save_folder: Path = global_computation_results_pickle_path.parent.joinpath(split_save_folder_name).resolve()
+    split_save_folder_name: str = f'{base_pickle_path.stem}_split'
+    split_save_folder: Path = base_pickle_path.parent.joinpath(split_save_folder_name).resolve()
     if debug_print:
         print(f'split_save_folder: {split_save_folder}')
     # make if doesn't exist
@@ -200,16 +222,15 @@ def safeSaveSplitData(self, override_global_pickle_path: Optional[Path]=None, ov
     
     if include_includelist is None:
         ## include all keys if none are specified
-        include_includelist = list(self.global_computation_results.computed_data.keys())
-
-    ## only saves out the `global_computation_results` data:
-    global_computed_data = self.global_computation_results.computed_data
+        include_includelist = list(computed_data.keys())
+    
+    ## Save each item in the computed_data dictionary:
     split_save_paths = {}
     split_save_output_types = {}
     failed_keys = []
     skipped_keys = []
-    for k, v in global_computed_data.items():
-        if k in include_includelist:
+    for k, v in computed_data.items():
+        if (include_includelist is not None) and (k in include_includelist):
             curr_split_result_pickle_path = split_save_folder.joinpath(f'Split_{k}.pkl').resolve()
             if debug_print:
                 print(f'k: {k} -- size_MB: {print_object_memory_usage(v, enable_print=False)}')
@@ -217,12 +238,21 @@ def safeSaveSplitData(self, override_global_pickle_path: Optional[Path]=None, ov
             was_save_success = False
             curr_item_type = type(v)
             try:
-                ## try get as dict                
-                v_dict = v.__dict__ #__getstate__()
+                ## try get as dict
+                # Handle different types of values
+                if has(v):
+                    # It's an attrs object, convert to dict
+                    v_dict = asdict(v)
+                elif hasattr(v, '__dict__'):
+                    # It's a regular object with __dict__
+                    v_dict = v.__dict__
+                else:
+                    # Primitive type or value without __dict__, save directly
+                    v_dict = v
                 # saveData(curr_split_result_pickle_path, (v_dict))
                 saveData(curr_split_result_pickle_path, (v_dict, str(curr_item_type.__module__), str(curr_item_type.__name__)))    
                 was_save_success = True
-            except KeyError as e:
+            except (KeyError, AttributeError) as e:
                 print(f'\t{k} encountered {e} while trying to save {k}. Skipping')
                 pass
             except PicklingError as e:
@@ -245,7 +275,7 @@ def safeSaveSplitData(self, override_global_pickle_path: Optional[Path]=None, ov
             skipped_keys.append(k)
             
     if len(failed_keys) > 0:
-        print(f'WARNING: failed_keys: {failed_keys} did not save for global results! They HAVE NOT BEEN SAVED!')
+        print(f'WARNING: failed_keys: {failed_keys} did not save successfully! They HAVE NOT BEEN SAVED!')
     return split_save_folder, split_save_paths, split_save_output_types, failed_keys
 
 
@@ -452,13 +482,13 @@ def safeSaveSplitData(self, override_global_pickle_path: Optional[Path]=None, ov
 global_move_modules_list:Dict={
     'pyphoplacecellanalysis.SpecificResults.PhoDiba2023Paper.SingleBarResult':'pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.LongShortTrackComputations.SingleBarResult',
     'pyphoplacecellanalysis.SpecificResults.PhoDiba2023Paper.InstantaneousSpikeRateGroupsComputation':'pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.LongShortTrackComputations.InstantaneousSpikeRateGroupsComputation',
-    	# 'pyphoplacecellanalysis.General.Configs.DynamicConfigs.*':'pyphoplacecellanalysis.General.Model.Configs.DynamicConfigs.*', # VideoOutputModeConfig, PlottingConfig, InteractivePlaceCellConfig
-	'pyphoplacecellanalysis.General.Configs.DynamicConfigs.VideoOutputModeConfig':'pyphoplacecellanalysis.General.Model.Configs.DynamicConfigs.VideoOutputModeConfig', # VideoOutputModeConfig, PlottingConfig, InteractivePlaceCellConfig
-	'pyphoplacecellanalysis.General.Configs.DynamicConfigs.PlottingConfig':'pyphoplacecellanalysis.General.Model.Configs.DynamicConfigs.PlottingConfig',
-	'pyphoplacecellanalysis.General.Configs.DynamicConfigs.InteractivePlaceCellConfig':'pyphoplacecellanalysis.General.Model.Configs.DynamicConfigs.InteractivePlaceCellConfig',
-	# 'pyphoplacecellanalysis.PhoPositionalData.plotting.mixins.general_plotting_mixins':'pyphoplacecellanalysis.General.Model.Configs.NeuronPlottingParamConfig', # SingleNeuronPlottingExtended, 
-	'pyphoplacecellanalysis.PhoPositionalData.plotting.mixins.general_plotting_mixins.SingleNeuronPlottingExtended':'pyphoplacecellanalysis.General.Model.Configs.NeuronPlottingParamConfig.SingleNeuronPlottingExtended',
-	# 'pyphoplacecellanalysis.PhoPositionalData.plotting.mixins.general_plotting_mixins.':'pyphoplacecellanalysis.General.Model.Configs.NeuronPlottingParamConfig', # SingleNeuronPlottingExtended, 
+        # 'pyphoplacecellanalysis.General.Configs.DynamicConfigs.*':'pyphoplacecellanalysis.General.Model.Configs.DynamicConfigs.*', # VideoOutputModeConfig, PlottingConfig, InteractivePlaceCellConfig
+    'pyphoplacecellanalysis.General.Configs.DynamicConfigs.VideoOutputModeConfig':'pyphoplacecellanalysis.General.Model.Configs.DynamicConfigs.VideoOutputModeConfig', # VideoOutputModeConfig, PlottingConfig, InteractivePlaceCellConfig
+    'pyphoplacecellanalysis.General.Configs.DynamicConfigs.PlottingConfig':'pyphoplacecellanalysis.General.Model.Configs.DynamicConfigs.PlottingConfig',
+    'pyphoplacecellanalysis.General.Configs.DynamicConfigs.InteractivePlaceCellConfig':'pyphoplacecellanalysis.General.Model.Configs.DynamicConfigs.InteractivePlaceCellConfig',
+    # 'pyphoplacecellanalysis.PhoPositionalData.plotting.mixins.general_plotting_mixins':'pyphoplacecellanalysis.General.Model.Configs.NeuronPlottingParamConfig', # SingleNeuronPlottingExtended, 
+    'pyphoplacecellanalysis.PhoPositionalData.plotting.mixins.general_plotting_mixins.SingleNeuronPlottingExtended':'pyphoplacecellanalysis.General.Model.Configs.NeuronPlottingParamConfig.SingleNeuronPlottingExtended',
+    # 'pyphoplacecellanalysis.PhoPositionalData.plotting.mixins.general_plotting_mixins.':'pyphoplacecellanalysis.General.Model.Configs.NeuronPlottingParamConfig', # SingleNeuronPlottingExtended, 
     'pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions.DirectionalMergedDecodersResult':'pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions.DirectionalPseudo2DDecodersResult',
     'pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions.DirectionalDecodersDecodedResult':'pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions.DirectionalDecodersContinuouslyDecodedResult',
     'pyphocorehelpers.indexing_helpers.BinningInfo':'neuropy.utils.mixins.binning_helpers.BinningInfo',
@@ -530,6 +560,159 @@ def loadData(pkl_path, debug_print=False, **kwargs):
                 # raise e
         # return db
     return db
+
+
+@function_attributes(short_name=None, tags=['load', 'pickle', 'split'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-01-14 08:00', related_items=['safeSaveSplitData'])
+def loadSplitData(pkl_path: Union[str, Path], debug_print:bool=True, **kwargs) -> Dict[str, Any]:
+    """Load data from split pickle files created by safeSaveSplitData.
+
+    Reciprocal function to safeSaveSplitData. Loads all Split_*.pkl files from a split folder
+    and reconstructs the original data dictionary.
+
+    Args:
+        pkl_path: Path to the pickle file or directory. If a directory, uses default filename "computed_data.pkl".
+                  If a file, uses that path directly. The split folder is determined by appending "_split" to the base filename.
+        debug_print: If True, prints progress information.
+        **kwargs: Additional arguments passed to loadData for loading individual files.
+
+    Returns:
+        Dictionary mapping keys to loaded values. Values that were saved as tuples with type info
+        (v_dict, module_name, type_name) will be returned as dictionaries.
+
+    Usage:
+        from pyphoplacecellanalysis.General.Pipeline.Stages.Loading import loadSplitData, safeSaveSplitData
+
+        # Save split data
+        split_save_folder, split_save_paths, split_save_output_types, failed_keys = safeSaveSplitData(pkl_path, computed_data, debug_print=True)
+        
+        # Load split data
+        loaded_data = loadSplitData(pkl_path, debug_print=True)
+
+    """
+    # Extract move_modules_list from kwargs with global_move_modules_list default (mirroring loadData)
+    active_move_modules_list: Dict = kwargs.pop('move_modules_list', global_move_modules_list)
+    
+    # Resolve pkl_path with cross-platform path handling
+    try:
+        if not isinstance(pkl_path, Path):
+            pkl_path = Path(pkl_path).resolve()
+        
+        # Determine the base pickle path (mirroring safeSaveSplitData logic)
+        if pkl_path.is_dir():
+            # If it's a directory, use a default filename
+            base_pickle_path = pkl_path.joinpath("computed_data.pkl").resolve()
+        else:
+            # If it's a file, use it directly
+            base_pickle_path = pkl_path.resolve()
+    except NotImplementedError as err:
+        error_message = str(err)
+        if 'WindowsPath' in error_message:  # Check if WindowsPath is missing
+            print("Issue with WindowsPath on Linux for path {}, performing pathlib workaround...".format(pkl_path))
+            win_backup = pathlib.WindowsPath  # Backup the WindowsPath definition
+            try:
+                pathlib.WindowsPath = pathlib.PureWindowsPath
+                if not isinstance(pkl_path, Path):
+                    pkl_path = Path(pkl_path).resolve()
+                if pkl_path.is_dir():
+                    base_pickle_path = pkl_path.joinpath("computed_data.pkl").resolve()
+                else:
+                    base_pickle_path = pkl_path.resolve()
+            finally:
+                pathlib.WindowsPath = win_backup  # Restore the backup WindowsPath definition
+        elif 'PosixPath' in error_message:  # Check if PosixPath is missing
+            # Fixes issue with pickled POSIX_PATH on windows for path.
+            posix_backup = pathlib.PosixPath # backup the PosixPath definition
+            try:
+                pathlib.PosixPath = pathlib.PurePosixPath
+                if not isinstance(pkl_path, Path):
+                    pkl_path = Path(pkl_path).resolve()
+                if pkl_path.is_dir():
+                    base_pickle_path = pkl_path.joinpath("computed_data.pkl").resolve()
+                else:
+                    base_pickle_path = pkl_path.resolve()
+            finally:
+                pathlib.PosixPath = posix_backup # restore the backup posix path definition
+        else:
+            print("Unknown issue with path for path {}, performing pathlib workaround...".format(pkl_path))
+            raise
+
+    if debug_print:
+        print(f'base_pickle_path: {base_pickle_path}')
+    
+    # Determine the split folder (mirroring safeSaveSplitData logic)
+    split_save_folder_name: str = f'{base_pickle_path.stem}_split'
+    split_save_folder: Path = base_pickle_path.parent.joinpath(split_save_folder_name).resolve()
+    
+    if debug_print:
+        print(f'split_save_folder to load from: {split_save_folder}')
+    
+    if not split_save_folder.exists():
+        raise FileNotFoundError(f"Split folder does not exist: {split_save_folder}")
+    if not split_save_folder.is_dir():
+        raise NotADirectoryError(f"Split folder is not a directory: {split_save_folder}")
+    
+    # Find all Split_*.pkl files
+    loaded_data = {}
+    found_split_paths = []
+    successfully_loaded_keys = {}
+    failed_loaded_keys = {}
+    
+    with ProgressMessagePrinter(split_save_folder, action='Loading', contents_description='split pickle files'):
+        for p in split_save_folder.rglob('Split_*.pkl'):
+            if debug_print:
+                print(f'Loading: {p}')
+            found_split_paths.append(p)
+            # Extract the key name by removing "Split_" prefix from the stem
+            curr_result_key: str = p.stem.removeprefix('Split_')
+            
+            # Load the file
+            try:
+                loaded_value = loadData(p, debug_print=False, move_modules_list=active_move_modules_list, **kwargs)
+                
+                # Handle the loaded value format
+                if isinstance(loaded_value, tuple) and len(loaded_value) == 3:
+                    # Saved as (v_dict, module_name, type_name) - extract the dict
+                    loaded_result_dict, curr_item_type_module, curr_item_type_name = loaded_value
+                    if debug_print:
+                        print(f'\tLoaded {curr_result_key}: type={curr_item_type_module}.{curr_item_type_name}')
+                    loaded_data[curr_result_key] = loaded_result_dict
+                elif isinstance(loaded_value, dict):
+                    # Already a dict, use directly
+                    loaded_data[curr_result_key] = loaded_value
+                else:
+                    # Other format, store as-is
+                    loaded_data[curr_result_key] = loaded_value
+                
+                successfully_loaded_keys[curr_result_key] = p
+                
+            except EOFError as e:
+                # occurs when the pickle saving is interrupted and the output file is ruined.
+                # Re-raise immediately as it indicates a corrupted file
+                print(f'EOFError loading {curr_result_key} from "{p}": {e}')
+                print("This indicates a corrupted pickle file. The fragmented pickle file may need to be deleted.")
+                failed_loaded_keys[curr_result_key] = p
+                if debug_print:
+                    import traceback
+                    traceback.print_exc()
+                # Continue loading other files, but log this error
+                # Note: We don't re-raise here to allow loading of other files, but this is a serious error
+            
+            except Exception as e:
+                # Other exceptions - log and continue
+                print(f'Error loading {curr_result_key} from "{p}": {e}')
+                failed_loaded_keys[curr_result_key] = p
+                if debug_print:
+                    import traceback
+                    traceback.print_exc()
+    
+    if debug_print:
+        print(f'Successfully loaded {len(successfully_loaded_keys)} keys: {list(successfully_loaded_keys.keys())}')
+        if len(failed_loaded_keys) > 0:
+            print(f'Failed to load {len(failed_loaded_keys)} keys: {list(failed_loaded_keys.keys())}')
+    
+    return loaded_data
+
+
 
 def delete_fragmented_pickle_file(pkl_path: Path, debug_print:bool=True):
     assert pkl_path.exists()
