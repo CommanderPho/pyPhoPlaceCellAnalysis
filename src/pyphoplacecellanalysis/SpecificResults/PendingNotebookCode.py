@@ -345,7 +345,7 @@ class PosteriorMaskPostProcessing:
         return centroids_df ## has ['dir_angle_binned', 'approx_dir_degrees']
 
 
-
+    @function_attributes(short_name=None, tags=[''], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-01-14 10:40', related_items=[])
     @classmethod
     def add_angular_movement_dir(cls, epoch_centroids: NDArray[ND.Shape["N_EPOCH_TIME_BINS, 2"], Any], epoch_time_window_centers: NDArray[ND.Shape["N_EPOCH_TIME_BINS"], Any], n_dir_angular_bins: int = 8, smoothing_num_timesteps: Optional[int]=None) -> pd.DataFrame:
         """ Computes the angular direction of change between successive posterior-mask blob centroids
@@ -388,12 +388,10 @@ class PosteriorMaskPostProcessing:
 
         return centroids_df
 
-
+    @function_attributes(short_name=None, tags=['working'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-01-14 13:36', related_items=[])
     @classmethod
-    def _compare_centroid_and_pos_traj_angle(cls, a_pos_df: pd.DataFrame, a_centroids_search_segments_df: pd.DataFrame, centroid_angle_col: str='segment_Vp_deg_safe_mean'):
-        """ find any matching witin 30 degrees of one another
-
-        #TODO 2026-01-14 13:24: - [ ] Allow anti-parallel matching too
+    def _compare_centroid_and_pos_traj_angle(cls, a_pos_df: pd.DataFrame, a_centroids_search_segments_df: pd.DataFrame, centroid_angle_col: str='segment_Vp_deg_safe_mean', close_angle_deg: float=30.0, allow_antiparallel_matching: bool=True):
+        """ find any matching witin close_angle_deg degrees of one another
 
         a_pos_df, pos_segment_to_centroid_seq_segment_idx_map = PosteriorMaskPostProcessing._compare_centroid_and_pos_traj_angle(a_pos_df=a_pos_df, a_centroids_search_segments_df=a_centroids_search_segments_df)
         
@@ -418,7 +416,12 @@ class PosteriorMaskPostProcessing:
                 # is_segment_close = np.isclose(a_pos_traj_segment_row.segment_Vp_deg_mean_safe, a_centroids_search_segments_df[centroid_angle_col], tol=30.0) # find any matching witin 30 degrees of one another
                 
                 diffs = PositionComputedDataMixin.angular_diff_deg(getattr(a_pos_traj_segment_row, segments_compare_col_name), a_centroids_search_segments_df[centroid_angle_col].to_numpy())
-                is_segment_close = diffs <= 30.0
+                is_segment_close = diffs <= close_angle_deg
+                
+                if allow_antiparallel_matching:
+                    # Also check if angles are within close_angle_deg of being 180 degrees apart (anti-parallel)
+                    is_antiparallel = np.abs(diffs - 180.0) <= close_angle_deg
+                    is_segment_close = is_segment_close | is_antiparallel
 
                 pos_segment_to_centroid_seq_segment_idx_map[a_pos_traj_segment_row.segment_idx] = [contour_idx for contour_idx, is_close in enumerate(is_segment_close) if is_close]
                 # a_centroids_search_segments_df[centroid_angle_col]
