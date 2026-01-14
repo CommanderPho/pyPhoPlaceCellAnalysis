@@ -214,6 +214,7 @@ class PosteriorMaskPostProcessing:
         ]
     
 
+    @function_attributes(short_name=None, tags=['main'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-01-13 00:00', related_items=[])
     @classmethod
     def _process_epoch_time_bins_masks(cls, a_mask_t: NDArray[ND.Shape["N_X_BINS, N_Y_BINS, N_TIME_BINS"], Any], max_gap: int = 1, n_interp: int = 1, **kwargs):
         """
@@ -303,6 +304,28 @@ class PosteriorMaskPostProcessing:
 
         return labeled, n_objects, filled_masks
     
+
+    @function_attributes(short_name=None, tags=['centroid'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-01-14 08:12', related_items=[])
+    @classmethod
+    def centroids_from_binary_stack(cls, mask_stack: NDArray):
+        # mask_stack: (H, W, N)
+
+        H, W, N = mask_stack.shape
+
+        y_idx = np.arange(H)[:, None, None]
+        x_idx = np.arange(W)[None, :, None]
+
+        mass = mask_stack.sum(axis=(0, 1))
+
+        cy = np.full(N, np.nan)
+        cx = np.full(N, np.nan)
+
+        valid = mass > 0
+        cy[valid] = (mask_stack[..., valid] * y_idx).sum(axis=(0, 1)) / mass[valid]
+        cx[valid] = (mask_stack[..., valid] * x_idx).sum(axis=(0, 1)) / mass[valid]
+
+        return np.stack([cy, cx], axis=1) # (N, 2)
+
 
 
 
