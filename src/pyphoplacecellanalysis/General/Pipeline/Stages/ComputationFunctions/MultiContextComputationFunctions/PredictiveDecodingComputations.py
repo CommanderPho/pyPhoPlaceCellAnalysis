@@ -1114,6 +1114,8 @@ class MatchingPastFuturePositionsResult(ComputedResult):
     def extract_final_position_epochs(cls, _out_epoch_flat_mask_future_past_result: List["MatchingPastFuturePositionsResult"]):
         """ ran post-hoc to recompute/extract the valid position epochs 
         """
+        from neuropy.core.position import PositionAccessor, Position, PositionComputedDataMixin
+
         def _subfn_custom_merge_sequential_t_bins_to_epochs(a_df: pd.DataFrame, dt_max: float):
             """ captures nothing 
             """
@@ -1156,8 +1158,13 @@ class MatchingPastFuturePositionsResult(ComputedResult):
             a_curr_matching_positions_df = deepcopy(a_matching_positions_epochs_df)
             # a_curr_matching_positions_df['label'] = a_curr_matching_positions_df['label'].astype(int)
             # new_pos_epochs['label'] = new_pos_epochs['label'].astype(int)
+
             a_curr_matching_positions_df = a_curr_matching_positions_df.time_point_event.adding_epochs_identity_column(epochs_df=new_pos_epochs, epoch_id_key_name=col_name, override_time_variable_name='t', epoch_label_column_name='label', no_interval_fill_value=-1, should_replace_existing_column=True, drop_non_epoch_events=True, overlap_behavior=OverlappingIntervalsFallbackBehavior.FALLBACK_TO_SLOW_SEARCH)
-            a_curr_matching_positions_df = a_curr_matching_positions_df.adding_segmented_trajectories_columns() ## adds the # all_segment_transfer_col_names = ['segment_idx', 'Vp']
+
+            ## Segment trajectories
+            
+            a_curr_matching_positions_df[all_segment_transfer_col_names] = a_curr_matching_positions_df.position.segment_trajectories()[all_segment_transfer_col_names] ## add to original df
+
             curr_matching_positions_df_dict: Dict[types.epoch_index, pd.DataFrame] = a_curr_matching_positions_df.pho.partition_df_dict(col_name)
 
             return new_pos_epochs, curr_matching_positions_df_dict
