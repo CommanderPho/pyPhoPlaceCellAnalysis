@@ -1117,13 +1117,13 @@ class MatchingPastFuturePositionsResult(ComputedResult):
         def _subfn_custom_merge_sequential_t_bins_to_epochs(a_df: pd.DataFrame, dt_max: float):
             """ captures nothing 
             """
-                # max_merge_duration = (pos_t_bin_sample_size_sec * 1.25)
+            # max_merge_duration = (pos_t_bin_sample_size_sec * 1.25)
 
-                a_df['sequence_id'] = (a_df['t'].diff() > dt_max).cumsum()
-                # Performed 5 aggregations grouped on column: 'sequence_id'
-                a_df = a_df.groupby(['sequence_id']).agg(start_first=('start', 'first'), stop_last=('stop', 'last'), t_count=('t', 'count'), t_idxmin=('t', 'idxmin'), t_idxmax=('t', 'idxmax')).reset_index().rename(columns={'start_first': 'start', 'stop_last': 'stop', 't_idxmin': 'start_pos_idx', 't_idxmax': 'stop_pos_idx'})
-                a_df['duration'] = a_df['stop'] - a_df['start']
-                return a_df
+            a_df['sequence_id'] = (a_df['t'].diff() > dt_max).cumsum()
+            # Performed 5 aggregations grouped on column: 'sequence_id'
+            a_df = a_df.groupby(['sequence_id']).agg(start_first=('start', 'first'), stop_last=('stop', 'last'), t_count=('t', 'count'), t_idxmin=('t', 'idxmin'), t_idxmax=('t', 'idxmax')).reset_index().rename(columns={'start_first': 'start', 'stop_last': 'stop', 't_idxmin': 'start_pos_idx', 't_idxmax': 'stop_pos_idx'})
+            a_df['duration'] = a_df['stop'] - a_df['start']
+            return a_df
 
 
         def _subfn_custom_build_sequential_position_epochs(matching_past_positions_df: pd.DataFrame, col_name: str = 'past_future_matching_pos_epoch_id'):
@@ -1142,27 +1142,22 @@ class MatchingPastFuturePositionsResult(ComputedResult):
             assert 't' in a_matching_positions_epochs_df
 
             pos_t_bin_sample_size_sec: float = np.nanmin(np.abs(np.diff(a_matching_positions_epochs_df['t']))) # 0.008333336005307501
-            pos_t_bin_sample_size_sec
-
+            
             a_matching_positions_epochs_df['start'] = a_matching_positions_epochs_df['t']
             a_matching_positions_epochs_df['stop'] = a_matching_positions_epochs_df['start'].shift(-1) # + a_matching_positions_epochs_df['dt']
             a_matching_positions_epochs_df = a_matching_positions_epochs_df.iloc[:-1] ## drop the last row with the NaN
             a_matching_positions_epochs_df['duration'] = a_matching_positions_epochs_df['stop'] - a_matching_positions_epochs_df['start']
             a_matching_positions_epochs_df['label'] = a_matching_positions_epochs_df.index.astype(int)
-            a_matching_positions_epochs_df
-
-
+            
             dt_max: float = (pos_t_bin_sample_size_sec * 2.5)
             new_pos_epochs: pd.DataFrame = _subfn_custom_merge_sequential_t_bins_to_epochs(a_df = a_matching_positions_epochs_df, dt_max = dt_max)
             new_pos_epochs['label'] = new_pos_epochs['sequence_id'].astype(int)
 
-
             a_curr_matching_positions_df = deepcopy(a_matching_positions_epochs_df)
             # a_curr_matching_positions_df['label'] = a_curr_matching_positions_df['label'].astype(int)
             # new_pos_epochs['label'] = new_pos_epochs['label'].astype(int)
-
-            
             a_curr_matching_positions_df = a_curr_matching_positions_df.time_point_event.adding_epochs_identity_column(epochs_df=new_pos_epochs, epoch_id_key_name=col_name, override_time_variable_name='t', epoch_label_column_name='label', no_interval_fill_value=-1, should_replace_existing_column=True, drop_non_epoch_events=True, overlap_behavior=OverlappingIntervalsFallbackBehavior.FALLBACK_TO_SLOW_SEARCH)
+            a_curr_matching_positions_df = a_curr_matching_positions_df.adding_segmented_trajectories_columns() ## adds the # all_segment_transfer_col_names = ['segment_idx', 'Vp']
             curr_matching_positions_df_dict: Dict[types.epoch_index, pd.DataFrame] = a_curr_matching_positions_df.pho.partition_df_dict(col_name)
 
             return new_pos_epochs, curr_matching_positions_df_dict
