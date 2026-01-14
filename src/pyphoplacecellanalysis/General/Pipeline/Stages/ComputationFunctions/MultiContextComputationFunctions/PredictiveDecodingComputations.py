@@ -1116,7 +1116,7 @@ class MatchingPastFuturePositionsResult(ComputedResult):
         """ ran post-hoc to recompute/extract the valid position epochs 
         """
 
-        def _custom_build_sequential_position_epochs(matching_past_positions_df: pd.DataFrame):
+        def _subfn_custom_build_sequential_position_epochs(matching_past_positions_df: pd.DataFrame):
             """ builds the epochs_df from the positions_df for a single epoch
 
             Informal replacement for ```
@@ -1172,14 +1172,14 @@ class MatchingPastFuturePositionsResult(ComputedResult):
         # BEGIN FUNCTION BODY                                                                                                                                                                                                                                                                  #
         # ==================================================================================================================================================================================================================================================================================== #
 
-        # new_pos_epochs, curr_matching_positions_df_dict = _custom_build_sequential_position_epochs(matching_past_positions_df=matching_past_positions_df)
+        # new_pos_epochs, curr_matching_positions_df_dict = _subfn_custom_build_sequential_position_epochs(matching_past_positions_df=matching_past_positions_df)
         # # new_pos_epochs
         # curr_matching_positions_df_dict
 
-        _out_added_original_positions_df_dict = {'past': [], 'future': []}
-        _out_added_epochs_df = {'past': [], 'future': []}
-        _out_added_pos_dfs = {'past': [], 'future': []}
-        _out_num_epochs_added = []
+        _out_added_original_positions_df_dict: Dict[str, List[pd.DataFrame]] = {'past': [], 'future': []}
+        _out_added_epochs_df: Dict[str, List[pd.DataFrame]] = {'past': [], 'future': []}
+        _out_added_pos_dfs: Dict[str, List[Dict[int, pd.DataFrame]]] = {'past': [], 'future': []}
+        _out_num_epochs_added: List[List[int]] = []
 
         for an_epoch_idx, an_epoch_past_future_result in enumerate(_out_epoch_flat_mask_future_past_result):
             # an_epoch_past_future_result: MatchingPastFuturePositionsResult = _out_epoch_flat_mask_future_past_result[an_epoch_idx]
@@ -1189,25 +1189,29 @@ class MatchingPastFuturePositionsResult(ComputedResult):
             matching_future_positions_df = an_epoch_past_future_result.filter_positions_to_epoch_mask_included_bins(a_pos_df=an_epoch_past_future_result.matching_future_positions_df.copy())
 
             a_past_future_positions_df_dict = {'past': matching_past_positions_df, 'future': matching_future_positions_df, }
-            _temp_num_new_epochs_list = []
+            _temp_num_new_epochs_list: List[int] = []
 
             for a_past_future_label, a_matching_pos_df in a_past_future_positions_df_dict.items():
 
-                _out_added_original_positions_df_dict[a_past_future_label] = a_matching_pos_df
+                _out_added_original_positions_df_dict[a_past_future_label].append(a_matching_pos_df)
                 ## perform the build
-                new_pos_epochs, curr_matching_positions_df_dict = _custom_build_sequential_position_epochs(matching_past_positions_df=a_matching_pos_df)
+                new_pos_epochs, curr_matching_positions_df_dict = _subfn_custom_build_sequential_position_epochs(matching_past_positions_df=a_matching_pos_df)
                 num_new_epochs: int = len(new_pos_epochs)
                 _temp_num_new_epochs_list.append(num_new_epochs)
                 ## add to output arrays:
-                _out_added_epochs_df[a_past_future_name].append(new_pos_epochs)
-                _out_added_pos_dfs[a_past_future_name].append(curr_matching_positions_df_dict)
+                _out_added_epochs_df[a_past_future_label].append(new_pos_epochs)
+                _out_added_pos_dfs[a_past_future_label].append(curr_matching_positions_df_dict)
 
             _out_num_epochs_added.append(_temp_num_new_epochs_list)
 
 
-        _out_num_epochs_added: pd.DataFrame = pd.DataFrame(_out_num_epochs_added, columns=['past', 'future'])
-        _out_num_epochs_added
-
+        _out_num_epochs_added_df: pd.DataFrame = pd.DataFrame(_out_num_epochs_added, columns=['past', 'future'])
+        return {
+            'added_original_positions_df_dict': _out_added_original_positions_df_dict,
+            'added_epochs_df': _out_added_epochs_df,
+            'added_pos_dfs': _out_added_pos_dfs,
+            'num_epochs_added': _out_num_epochs_added_df,
+        }
 
 
 
