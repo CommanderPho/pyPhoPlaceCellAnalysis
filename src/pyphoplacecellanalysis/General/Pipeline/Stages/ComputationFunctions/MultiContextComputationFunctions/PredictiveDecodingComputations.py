@@ -1023,6 +1023,7 @@ class MatchingPastFuturePositionsResult:
     """Result container for matching past/future positions detection.
     
     Attributes:
+        epoch_high_prob_mask: 2D boolean mask (N_XBINS, N_Y_BINS) indicating high probability positions during the epoch
         pos_matches_epoch_mask: Indices of positions that match the epoch mask
         relevant_positions_df: DataFrame with relevant positions categorized as past/present/future
         is_relevant_past_times: Boolean mask for past times in relevant_positions_df
@@ -1033,6 +1034,7 @@ class MatchingPastFuturePositionsResult:
         n_relevant_future_times: Count of relevant future times
         matching_pos_epochs_df: DataFrame with detected epochs categorized as past/present/future
     """
+    epoch_high_prob_mask: NDArray[ND.Shape["N_XBINS, N_Y_BINS"], Any]
     pos_matches_epoch_mask: NDArray
     relevant_positions_df: pd.DataFrame
     is_relevant_past_times: NDArray
@@ -1042,6 +1044,29 @@ class MatchingPastFuturePositionsResult:
     n_relevant_past_times: int
     n_relevant_future_times: int
     matching_pos_epochs_df: pd.DataFrame
+
+    matching_past_positions_df: pd.DataFrame = field(default=None)
+    matching_future_positions_df: pd.DataFrame = field(default=None)
+
+
+    @property
+    def epoch_mask_included_binned_x_y_columns_idx_df(self) -> pd.DataFrame:
+        """
+        DataFrame containing the unique binned_x, binned_y position pairs that are included in the epoch mask.
+        
+        This property computes the equivalent of `an_epoch_mask_included_binned_x_y_columns_idx_df` from 
+        detect_matching_past_future_positions (lines 1764-1766). It extracts the unique spatial positions
+        (binned_x, binned_y) that match the epoch's high-probability mask.
+        
+        Returns:
+            DataFrame with columns ["binned_x", "binned_y"] containing unique position pairs in the epoch mask.
+            Sorted by binned_x then binned_y for consistency.
+        """
+        # Compute from stored epoch_high_prob_mask (exact equivalent of original computation)
+        row_col_indices = np.argwhere(self.epoch_high_prob_mask)
+        row_col_row_ids = row_col_indices + 1
+        an_epoch_mask_included_binned_x_y_columns_idx_df = pd.DataFrame(row_col_row_ids, columns=["binned_x", "binned_y"])
+        return an_epoch_mask_included_binned_x_y_columns_idx_df.sort_values(by=["binned_x", "binned_y"]).reset_index(drop=True)
 
     @classmethod
     def compute_matching_pos_epochs_df(cls, measured_positions_df: pd.DataFrame, merging_adjacent_max_separation_sec: float = 0.5, minimum_epoch_duration: float = 0.050) -> pd.DataFrame:
@@ -1068,6 +1093,21 @@ class MatchingPastFuturePositionsResult:
         a_matching_pos_epochs_df: pd.DataFrame = measured_positions_df_copy.neuropy.detect_epoch_satisfying_condition(is_condition_satisfied = (measured_positions_df_copy['is_included'].to_numpy()), merging_adjacent_max_separation_sec=merging_adjacent_max_separation_sec, minimum_epoch_duration=minimum_epoch_duration)
         
         return a_matching_pos_epochs_df
+
+
+    def filter_positions_to_epoch_mask_included_bins(self, a_pos_df: pd.DataFrame) -> pd.DataFrame:
+        """ filter to the epoch's bins """
+        ## allowed positions are much less than the found ones:
+        return a_pos_df.merge(self.epoch_mask_included_binned_x_y_columns_idx_df, on=["binned_x", "binned_y"], how="inner")
+
+
+    def __attrs_post_init__(self):
+        # Add post-init logic here
+        # Instead of building the tuple, create clean dataframes:
+        self.matching_past_positions_df = self.relevant_positions_df[self.is_relevant_past_times].copy()
+        self.matching_future_positions_df = self.relevant_positions_df[self.is_relevant_future_times].copy()
+
+
 
 
 @define(slots=False, repr=False, eq=False)
@@ -1119,8 +1159,24 @@ class PredictiveDecoding(ComputedResult): #PickleSerializableMixin, AttrsBasedCl
     ## past/future to present comparisons:
     moving_avg_meas_pos_overlap_dict: Dict[str, NDArray[ND.Shape["N_X_BINS, N_Y_BINS, N_TIME_BINS"], np.floating]] = serialized_field(default=Factory(dict))
 
-    epoch_matching_past_future_positions: List[Tuple[pd.DataFrame, pd.DataFrame]] = serialized_field(default=Factory(list), metadata={'date_added': '2025.12.22_0'})
+    # epoch_matching_past_future_positions: List of tuples, one per epoch. Each tuple contains 6 elements:
+    #   [0]: NDArray - Indices of past positions matching the epoch's high-probability mask
+    #   [1]: NDArray - Indices of future positions matching the epoch's high-probability mask
+    #   [2]: int - Total count of possible past time points (all positions before epoch start)
+    #   [3]: int - Total count of possible future time points (all positions after epoch stop)
+    #   [4]: int - Count of relevant past times (past positions that match the epoch mask)
+    #   [5]: int - Count of relevant future times (future positions that match the epoch mask)
+    epoch_matching_past_future_positions: List[Tuple[NDArray, NDArray, int, int, int, int]] = serialized_field(default=Factory(list), metadata={'date_added': '2025.12.22_0'})
+    # matching_pos_dfs_list: List of DataFrames, one per epoch. Each DataFrame contains all measured positions that:
+    #   - Match the epoch's high-probability spatial mask (binned_x, binned_y in the mask)
+    #   - Are categorized as 'past', 'present', or 'future' relative to the epoch time window
+    #   Columns include: 'binned_x', 'binned_y', 't', 'x', 'y', 'is_future_present_past'
     matching_pos_dfs_list: List[pd.DataFrame] = serialized_field(default=Factory(list), metadata={'date_added': '2025.12.22_0'})
+    # matching_pos_epochs_dfs_list: List of DataFrames, one per epoch. Each DataFrame contains detected continuous epochs
+    #   (time periods) where the animal was in positions matching the epoch's high-probability mask.
+    #   Epochs are detected by merging adjacent matching positions with gaps <= merging_adjacent_max_separation_sec
+    #   and filtering by minimum_epoch_duration. Each row represents a continuous time period.
+    #   Columns include: 'start', 'stop', 'duration', 'is_future_present_past' (categorized as 'past', 'present', or 'future')
     matching_pos_epochs_dfs_list: List[pd.DataFrame] = serialized_field(default=Factory(list), metadata={'date_added': '2025.12.22_0'})
 
     
@@ -1708,8 +1764,8 @@ class PredictiveDecoding(ComputedResult): #PickleSerializableMixin, AttrsBasedCl
         return active_pos_time_bin_centers, padded_pos_overlap_matrix
 
 
-    @staticmethod
-    def detect_matching_past_future_positions(epoch_high_prob_mask: NDArray[ND.Shape["N_XBINS, N_Y_BINS"], Any], measured_positions_df: pd.DataFrame, curr_epoch_start_t: float, curr_epoch_stop_t: float, merging_adjacent_max_separation_sec: float = 0.5, minimum_epoch_duration: float = 0.050) -> MatchingPastFuturePositionsResult:
+    @classmethod
+    def detect_matching_past_future_positions(cls, epoch_high_prob_mask: NDArray[ND.Shape["N_XBINS, N_Y_BINS"], Any], measured_positions_df: pd.DataFrame, curr_epoch_start_t: float, curr_epoch_stop_t: float, merging_adjacent_max_separation_sec: float = 0.5, minimum_epoch_duration: float = 0.050) -> MatchingPastFuturePositionsResult:
         """
         Detect matching past/future positions for a given epoch high probability mask.
         
@@ -1751,13 +1807,12 @@ class PredictiveDecoding(ComputedResult): #PickleSerializableMixin, AttrsBasedCl
         n_relevant_future_times = np.sum(is_relevant_future_times)
 
         ## find adjacent epochs from the position time bins (periods where the animal is in the positions)
-        measured_positions_df_copy = measured_positions_df.copy()
+        ## use relevant_positions_df directly since it's already filtered to epoch mask positions
+        measured_positions_df_copy = relevant_positions_df.copy()
         measured_positions_df_copy['is_included'] = False
-        measured_positions_df_copy.loc[measured_positions_df_copy.index[pos_matches_epoch_mask[is_relevant_past_times]], 'is_included'] = True ## only do past/future, not present
-        measured_positions_df_copy.loc[measured_positions_df_copy.index[pos_matches_epoch_mask[is_relevant_future_times]], 'is_included'] = True ## only do past/future, not present
-        
-        ## allowed positions are much less than the found ones:
-        measured_positions_df_copy = deepcopy(measured_positions_df_copy).merge(an_epoch_mask_included_binned_x_y_columns_idx_df, on=["binned_x", "binned_y"], how="inner")        
+        ## mark past and future positions as included (not present)
+        measured_positions_df_copy.loc[is_relevant_past_times, 'is_included'] = True ## only do past/future, not present
+        measured_positions_df_copy.loc[is_relevant_future_times, 'is_included'] = True ## only do past/future, not present        
 
         # a_matching_pos_epochs_df: pd.DataFrame = measured_positions_df_copy.neuropy.detect_epoch_satisfying_condition(is_condition_satisfied = (measured_positions_df_copy['is_included'].to_numpy()), merging_adjacent_max_separation_sec=merging_adjacent_max_separation_sec, minimum_epoch_duration=minimum_epoch_duration)
         a_matching_pos_epochs_df: pd.DataFrame = MatchingPastFuturePositionsResult.compute_matching_pos_epochs_df(measured_positions_df=measured_positions_df_copy, merging_adjacent_max_separation_sec=merging_adjacent_max_separation_sec, minimum_epoch_duration=minimum_epoch_duration)
@@ -1768,11 +1823,13 @@ class PredictiveDecoding(ComputedResult): #PickleSerializableMixin, AttrsBasedCl
         a_matching_pos_epochs_df.loc[is_pos_epochs_relevant_past_times, 'is_future_present_past'] = 'past'
         a_matching_pos_epochs_df.loc[is_pos_epochs_relevant_future_times, 'is_future_present_past'] = 'future'
 
-        return MatchingPastFuturePositionsResult(pos_matches_epoch_mask=pos_matches_epoch_mask, relevant_positions_df=relevant_positions_df, is_relevant_past_times=is_relevant_past_times, is_relevant_future_times=is_relevant_future_times, n_total_possible_past_times=n_total_possible_past_times, n_total_possible_future_times=n_total_possible_future_times, n_relevant_past_times=n_relevant_past_times, n_relevant_future_times=n_relevant_future_times, matching_pos_epochs_df=a_matching_pos_epochs_df)
+        return MatchingPastFuturePositionsResult(epoch_high_prob_mask=epoch_high_prob_mask, pos_matches_epoch_mask=pos_matches_epoch_mask, relevant_positions_df=relevant_positions_df, is_relevant_past_times=is_relevant_past_times, is_relevant_future_times=is_relevant_future_times,
+                    n_total_possible_past_times=n_total_possible_past_times, n_total_possible_future_times=n_total_possible_future_times, n_relevant_past_times=n_relevant_past_times, n_relevant_future_times=n_relevant_future_times,
+                    matching_pos_epochs_df=a_matching_pos_epochs_df)
 
 
-    @staticmethod
-    def _process_single_epoch_future_past_analysis(i: int, curr_epoch_p_x_given_n: NDArray, curr_epoch_time_bin_centers: NDArray, curr_epoch_tbin_indicies: NDArray, gaussian_volume: Optional[NDArray], measured_positions_df: pd.DataFrame, top_v_percent: float, epoch_t_bin_high_prob_masks_dict: Optional[Dict], epoch_high_prob_masks_dict: Optional[Dict], a_slice_multiplier: float, n_epoch_time_bins: int, merging_adjacent_max_separation_sec: float, minimum_epoch_duration: float, progress_print: bool, n_total_epochs: int) -> Tuple[int, Any, Any, Any, Any, Any, Any]:
+    @classmethod
+    def _process_single_epoch_future_past_analysis(cls, i: int, curr_epoch_p_x_given_n: NDArray, curr_epoch_time_bin_centers: NDArray, curr_epoch_tbin_indicies: NDArray, gaussian_volume: Optional[NDArray], measured_positions_df: pd.DataFrame, top_v_percent: float, epoch_t_bin_high_prob_masks_dict: Optional[Dict], epoch_high_prob_masks_dict: Optional[Dict], a_slice_multiplier: float, n_epoch_time_bins: int, merging_adjacent_max_separation_sec: float, minimum_epoch_duration: float, progress_print: bool, n_total_epochs: int) -> Tuple[int, Any, Any, Any, Any, Any, Any]:
         """Process a single epoch for future/past analysis. Returns results in a tuple for parallel processing."""
         from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import PosteriorMaskPostProcessing
         
@@ -1847,8 +1904,52 @@ class PredictiveDecoding(ComputedResult): #PickleSerializableMixin, AttrsBasedCl
                                         max_workers: Optional[int] = None,
         ):
         """
-
-        non_local_PBE_non_moving_epochs_df: pd.DataFrame = decoding_locality.get_non_moving_PBE_non_local_epochs(curr_active_pipeline.sess, merging_adjacent_max_separation_sec=merging_adjacent_max_separation_sec)
+        Compute future and past position analysis for decoded epochs.
+        
+        For each epoch, this function:
+        1. Identifies high-probability spatial positions from the decoded posterior
+        2. Finds measured positions that match these high-probability locations
+        3. Categorizes matching positions as 'past', 'present', or 'future' relative to the epoch time window
+        4. Detects continuous time periods (epochs) where the animal was in matching positions
+        
+        Args:
+            decoded_local_epochs_result: Result containing decoded posteriors and epoch information
+            measured_positions_df: DataFrame with measured position data (must include 'binned_x', 'binned_y', 't', 'x', 'y' columns)
+            gaussian_volume: Optional 3D array of gaussian volumes for visualization
+            active_epochs_df: Optional DataFrame to which computed metrics will be added as columns
+            an_epoch_name: Prefix for column names added to active_epochs_df (default: 'roam')
+            top_v_percent: Top percentage threshold for identifying high-probability positions (default: 0.1 = top 10%)
+            epoch_t_bin_high_prob_masks_dict: Optional dict of pre-computed per-time-bin high-probability masks
+            epoch_high_prob_masks_dict: Optional dict of pre-computed epoch-level high-probability masks
+            a_slice_multiplier: Multiplier for mask selection from dicts (default: 0.5)
+            merging_adjacent_max_separation_sec: Max gap in seconds for merging adjacent matching position epochs (default: 0.5)
+            minimum_epoch_duration: Minimum duration in seconds for detected position epochs (default: 0.050)
+            progress_print: Whether to print progress messages (default: True)
+            use_parallel: Whether to process epochs in parallel (default: True)
+            max_workers: Maximum number of parallel workers (None = auto)
+            
+        Returns:
+            Tuple of:
+            - epoch_matching_past_future_positions: List[Tuple[NDArray, NDArray, int, int, int, int]]
+                One tuple per epoch containing:
+                [0]: Past position indices matching the epoch mask
+                [1]: Future position indices matching the epoch mask
+                [2]: Total possible past time points
+                [3]: Total possible future time points
+                [4]: Count of relevant past times
+                [5]: Count of relevant future times
+            - Tuple containing:
+                - epoch_high_prob_pos_masks: List of 2D boolean masks (one per epoch) indicating high-probability positions
+                - epoch_t_bins_high_prob_pos_masks: List of 3D boolean masks (one per epoch) with per-time-bin high-probability positions
+                - epoch_matching_positions: List of position index arrays matching each epoch
+                - past_future_info_dict: Dict with computed ratios and counts (ratio_past, ratio_future, etc.)
+                - matching_pos_dfs_list: List[pd.DataFrame] - One DataFrame per epoch with all matching positions categorized as past/present/future
+                - matching_pos_epochs_dfs_list: List[pd.DataFrame] - One DataFrame per epoch with detected continuous time periods where animal was in matching positions
+                - _out_processed_items_list_dict: Dict with additional processed mask outputs
+            - active_epochs_df: DataFrame with computed metrics added as columns (if provided)
+        
+        Example usage:
+            non_local_PBE_non_moving_epochs_df: pd.DataFrame = decoding_locality.get_non_moving_PBE_non_local_epochs(curr_active_pipeline.sess, merging_adjacent_max_separation_sec=merging_adjacent_max_separation_sec)
         # non_local_PBE_non_moving_epochs_df: pd.DataFrame = container.decoding_locality.non_local_PBE_non_moving_epochs_df
 
         measured_positions_df: pd.DataFrame = decoding_locality.pos_df
@@ -1884,8 +1985,27 @@ class PredictiveDecoding(ComputedResult): #PickleSerializableMixin, AttrsBasedCl
         epoch_t_bins_high_prob_pos_masks = []
         
         epoch_matching_positions = []
-        epoch_matching_past_future_positions: List[Tuple[pd.DataFrame, pd.DataFrame]] = []
+        # epoch_matching_past_future_positions: List of tuples, one per epoch. Each tuple contains 6 elements:
+        #   [0]: NDArray - Indices of past positions that match the epoch's high-probability mask (from pos_matches_epoch_mask filtered by is_relevant_past_times)
+        #   [1]: NDArray - Indices of future positions that match the epoch's high-probability mask (from pos_matches_epoch_mask filtered by is_relevant_future_times)
+        #   [2]: int - Total count of possible past time points (all positions before epoch start)
+        #   [3]: int - Total count of possible future time points (all positions after epoch stop)
+        #   [4]: int - Count of relevant past times (past positions that match the epoch mask)
+        #   [5]: int - Count of relevant future times (future positions that match the epoch mask)
+        # Used to compute ratios like ratio_past = len([0]) / n_epoch_time_bins and ratio_future = len([1]) / n_epoch_time_bins
+        epoch_matching_past_future_positions: List[Tuple[NDArray, NDArray, int, int, int, int]] = []
+        # matching_pos_dfs_list: List of DataFrames, one per epoch. Each DataFrame contains all measured positions that:
+        #   - Match the epoch's high-probability spatial mask (binned_x, binned_y in the mask)
+        #   - Are categorized as 'past', 'present', or 'future' relative to the epoch time window
+        #   Columns include: 'binned_x', 'binned_y', 't', 'x', 'y', 'is_future_present_past'
+        #   This provides individual position-level matching information for each epoch
         matching_pos_dfs_list: List[pd.DataFrame] = []
+        # matching_pos_epochs_dfs_list: List of DataFrames, one per epoch. Each DataFrame contains detected continuous epochs
+        #   (time periods) where the animal was in positions matching the epoch's high-probability mask.
+        #   Epochs are detected by merging adjacent matching positions with gaps <= merging_adjacent_max_separation_sec
+        #   and filtering by minimum_epoch_duration. Each row represents a continuous time period.
+        #   Columns include: 'start', 'stop', 'duration', 'is_future_present_past' (categorized as 'past', 'present', or 'future')
+        #   This provides epoch-level (continuous period) matching information, as opposed to individual position matches
         matching_pos_epochs_dfs_list: List[pd.DataFrame] = []
 
         # [array([0, 1, 2, 3, 4]), array([0, 1]), array([0, 1, 2, 3, 4, 5, 6, 7]), array([ 0,  1,  2,  3,  4,  5,  6,  7,  8,  9, 10]),
@@ -1946,10 +2066,13 @@ class PredictiveDecoding(ComputedResult): #PickleSerializableMixin, AttrsBasedCl
             epoch_t_bins_high_prob_pos_masks.append(is_high_prob_mask)
             epoch_high_prob_pos_masks.append(any_t_Bin_high_prob_pos_mask)
             
+            # Build epoch_matching_past_future_positions tuple: (past_indices, future_indices, n_total_past, n_total_future, n_relevant_past, n_relevant_future)
             epoch_matching_past_future_positions.append((any_t_bin_result.pos_matches_epoch_mask[any_t_bin_result.is_relevant_past_times], any_t_bin_result.pos_matches_epoch_mask[any_t_bin_result.is_relevant_future_times], any_t_bin_result.n_total_possible_past_times, any_t_bin_result.n_total_possible_future_times, any_t_bin_result.n_relevant_past_times, any_t_bin_result.n_relevant_future_times))
             
             epoch_matching_positions.append(any_t_bin_result.pos_matches_epoch_mask)
+            # Append DataFrame with all matching positions (past/present/future) for this epoch
             matching_pos_dfs_list.append(any_t_bin_result.relevant_positions_df)
+            # Append DataFrame with detected continuous epochs where animal was in matching positions
             matching_pos_epochs_dfs_list.append(any_t_bin_result.matching_pos_epochs_df)
             
             # Handle processed masks and merged epoch mask results
@@ -1965,7 +2088,8 @@ class PredictiveDecoding(ComputedResult): #PickleSerializableMixin, AttrsBasedCl
         
 
         ## OUTPUTS: epoch_matching_positions, epoch_matching_past_future_positions
-
+        # Compute ratios: number of matching past/future positions per epoch time bin
+        # epoch_matching_past_future_positions[i][0] = past position indices, epoch_matching_past_future_positions[i][1] = future position indices
         ratio_past = np.array([len(epoch_matching_past_future_positions[i][0])/ len(decoded_local_epochs_result.time_bin_containers[i].centers) for i, a_row in enumerate(ensure_dataframe(decoded_local_epochs_result.filter_epochs).itertuples(index=False))])
         ratio_future = np.array([len(epoch_matching_past_future_positions[i][1])/ len(decoded_local_epochs_result.time_bin_containers[i].centers) for i, a_row in enumerate(ensure_dataframe(decoded_local_epochs_result.filter_epochs).itertuples(index=False))])
 
