@@ -18,7 +18,7 @@ import pandas as pd
 from datetime import datetime, timedelta
 
 from attrs import define, field, asdict, evolve
-import neuropy.utils.type_aliases as types
+import neuropy.utils.type_aliases as types # import neuropy.utils.type_aliases as types
 from neuropy.utils.misc import build_shuffled_ids, shuffle_ids # used in _SHELL_analyze_leave_one_out_decoding_results
 from neuropy.utils.mixins.binning_helpers import find_minimum_time_bin_duration
 from neuropy.core.epoch import EpochHelpers, ensure_dataframe, find_data_indicies_from_epoch_times
@@ -34,6 +34,7 @@ from neuropy.utils.misc import split_array
 
 from pyphocorehelpers.mixins.member_enumerating import AllFunctionEnumeratingMixin
 from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.ComputationFunctionRegistryHolder import ComputationFunctionRegistryHolder
+import pyphoplacecellanalysis.General.type_aliases as types
 
 from pyphocorehelpers.programming_helpers import metadata_attributes
 from pyphocorehelpers.function_helpers import function_attributes
@@ -91,7 +92,6 @@ import nptyping as ND
 from nptyping import NDArray
 from scipy.interpolate import interp1d
 
-import neuropy.utils.type_aliases as types
 from neuropy.utils.misc import build_shuffled_ids, shuffle_ids # used in _SHELL_analyze_leave_one_out_decoding_results
 from neuropy.utils.mixins.binning_helpers import find_minimum_time_bin_duration
 
@@ -1115,7 +1115,7 @@ class MatchingPastFuturePositionsResult(ComputedResult):
         """ ran post-hoc to recompute/extract the valid position epochs 
         """
 
-        def _subfn_custom_build_sequential_position_epochs(matching_past_positions_df: pd.DataFrame):
+        def _subfn_custom_build_sequential_position_epochs(matching_past_positions_df: pd.DataFrame, col_name: str = 'past_future_matching_pos_epoch_id'):
             """ builds the epochs_df from the positions_df for a single epoch
 
             Informal replacement for ```
@@ -1160,9 +1160,9 @@ class MatchingPastFuturePositionsResult(ComputedResult):
             # a_curr_matching_positions_df['label'] = a_curr_matching_positions_df['label'].astype(int)
             # new_pos_epochs['label'] = new_pos_epochs['label'].astype(int)
 
-            col_name: str = 'past_future_matching_pos_epoch_id'
+            
             a_curr_matching_positions_df = a_curr_matching_positions_df.time_point_event.adding_epochs_identity_column(epochs_df=new_pos_epochs, epoch_id_key_name=col_name, override_time_variable_name='t', epoch_label_column_name='label', no_interval_fill_value=-1, should_replace_existing_column=True, drop_non_epoch_events=True, overlap_behavior=OverlappingIntervalsFallbackBehavior.FALLBACK_TO_SLOW_SEARCH)
-            curr_matching_positions_df_dict: Dict[int, pd.DataFrame] = a_curr_matching_positions_df.pho.partition_df_dict(col_name)
+            curr_matching_positions_df_dict: Dict[types.epoch_index, pd.DataFrame] = a_curr_matching_positions_df.pho.partition_df_dict(col_name)
 
             return new_pos_epochs, curr_matching_positions_df_dict
 
@@ -1175,9 +1175,9 @@ class MatchingPastFuturePositionsResult(ComputedResult):
         # # new_pos_epochs
         # curr_matching_positions_df_dict
 
-        _out_added_original_positions_df_dict: Dict[str, List[pd.DataFrame]] = {'past': [], 'future': []}
-        _out_added_epochs_df: Dict[str, List[pd.DataFrame]] = {'past': [], 'future': []}
-        _out_added_pos_dfs: Dict[str, List[Dict[int, pd.DataFrame]]] = {'past': [], 'future': []}
+        _out_added_original_positions_df_dict: Dict[types.PastFutureCategory, List[pd.DataFrame]] = {'past': [], 'future': []}
+        _out_added_epochs_df_dict: Dict[types.PastFutureCategory, List[pd.DataFrame]] = {'past': [], 'future': []}
+        _out_added_pos_dfs_dict: Dict[types.PastFutureCategory, List[Dict[types.epoch_index, pd.DataFrame]]] = {'past': [], 'future': []}
         _out_num_epochs_added: List[List[int]] = []
 
         for an_epoch_idx, an_epoch_past_future_result in enumerate(_out_epoch_flat_mask_future_past_result):
@@ -1194,21 +1194,30 @@ class MatchingPastFuturePositionsResult(ComputedResult):
 
                 _out_added_original_positions_df_dict[a_past_future_label].append(a_matching_pos_df)
                 ## perform the build
-                new_pos_epochs, curr_matching_positions_df_dict = _subfn_custom_build_sequential_position_epochs(matching_past_positions_df=a_matching_pos_df)
+                new_pos_epochs, curr_matching_positions_df_dict = _subfn_custom_build_sequential_position_epochs(matching_past_positions_df=a_matching_pos_df) # curr_matching_positions_df_dict: types.epoch_index
                 num_new_epochs: int = len(new_pos_epochs)
                 _temp_num_new_epochs_list.append(num_new_epochs)
                 ## add to output arrays:
-                _out_added_epochs_df[a_past_future_label].append(new_pos_epochs)
-                _out_added_pos_dfs[a_past_future_label].append(curr_matching_positions_df_dict)
+                _out_added_epochs_df_dict[a_past_future_label].append(new_pos_epochs)
+                _out_added_pos_dfs_dict[a_past_future_label].append(curr_matching_positions_df_dict)
 
             _out_num_epochs_added.append(_temp_num_new_epochs_list)
 
 
         _out_num_epochs_added_df: pd.DataFrame = pd.DataFrame(_out_num_epochs_added, columns=['past', 'future'])
+
+        """ Unpacking:
+            added_original_positions_df_dict: Dict[types.PastFutureCategory, List[pd.DataFrame]] = _out_dict['added_original_positions_df_dict']
+            added_epochs_df_dict: Dict[types.PastFutureCategory, List[pd.DataFrame]] = _out_dict['added_epochs_df_dict']
+            added_pos_dfs_dict: Dict[types.PastFutureCategory, List[Dict[types.epoch_index, pd.DataFrame]]] = _out_dict['added_pos_dfs_dict']
+            num_epochs_added: pd.DataFrame = _out_dict['num_epochs_added']
+            num_epochs_added
+
+        """
         return {
             'added_original_positions_df_dict': _out_added_original_positions_df_dict,
-            'added_epochs_df': _out_added_epochs_df,
-            'added_pos_dfs': _out_added_pos_dfs,
+            'added_epochs_df_dict': _out_added_epochs_df_dict,
+            'added_pos_dfs_dict': _out_added_pos_dfs_dict,
             'num_epochs_added': _out_num_epochs_added_df,
         }
 
@@ -1943,6 +1952,10 @@ class PredictiveDecoding(ComputedResult): #PickleSerializableMixin, AttrsBasedCl
         ## now find relevant ones:
         is_relevant_past_times = (relevant_positions_df['t'] < curr_epoch_start_t)
         is_relevant_future_times = (relevant_positions_df['t'] > curr_epoch_stop_t)
+        
+        ## #TODO 2026-01-14 08:05: - [ ] find timestamps instead of saving indicies
+        # is_relevant_past_times
+
         relevant_positions_df['is_future_present_past'] = 'present'
         relevant_positions_df.loc[is_relevant_past_times, 'is_future_present_past'] = 'past'
         relevant_positions_df.loc[is_relevant_future_times, 'is_future_present_past'] = 'future'
@@ -1972,7 +1985,7 @@ class PredictiveDecoding(ComputedResult): #PickleSerializableMixin, AttrsBasedCl
         a_matching_pos_epochs_df.loc[is_pos_epochs_relevant_past_times, 'is_future_present_past'] = 'past'
         a_matching_pos_epochs_df.loc[is_pos_epochs_relevant_future_times, 'is_future_present_past'] = 'future'
 
-        return cls(epoch_high_prob_mask=epoch_high_prob_mask, pos_matches_epoch_mask=pos_matches_epoch_mask, relevant_positions_df=relevant_positions_df, is_relevant_past_times=is_relevant_past_times, is_relevant_future_times=is_relevant_future_times,
+        return MatchingPastFuturePositionsResult(epoch_high_prob_mask=epoch_high_prob_mask, pos_matches_epoch_mask=pos_matches_epoch_mask, relevant_positions_df=relevant_positions_df, is_relevant_past_times=is_relevant_past_times, is_relevant_future_times=is_relevant_future_times,
                     n_total_possible_past_times=n_total_possible_past_times, n_total_possible_future_times=n_total_possible_future_times, n_relevant_past_times=n_relevant_past_times, n_relevant_future_times=n_relevant_future_times,
                     matching_pos_epochs_df=a_matching_pos_epochs_df)
 
@@ -2329,7 +2342,7 @@ class PredictiveDecodingComputationsContainer(ComputedResult):
     
     predictive_decoding: Optional[PredictiveDecoding] = serialized_field(default=None, repr=False)
     
-    pf1D_Decoder_dict: Dict[types.DecoderName, BasePositionDecoder] = serialized_field(default=Factory(dict), metadata={'field_added': "2025.12.20_0", 'copied_from': 'DirectionalDecodersContinuouslyDecodedResult'})
+    pf1D_Decoder_dict: Dict[str, BasePositionDecoder] = serialized_field(default=Factory(dict), metadata={'field_added': "2025.12.20_0", 'copied_from': 'DirectionalDecodersContinuouslyDecodedResult'})
     epochs_decoded_result_cache_dict: Dict[float, Dict[types.DecoderName, DecodedFilterEpochsResult]] = serialized_field(default=Factory(dict), metadata={'field_added': "2025.12.20_0", 'copied_from': 'DirectionalDecodersContinuouslyDecodedResult'}) # key is the t_bin_size in seconds
     debug_computed_dict: Dict[types.DecoderName, Dict] = non_serialized_field(default=Factory(dict), metadata={'field_added': "2025.12.21_0"})
 
@@ -2610,7 +2623,7 @@ class PredictiveDecodingComputationsContainer(ComputedResult):
 
 
 
-    @function_attributes(short_name=None, tags=['temp', 'from-notebook', 'prominence2d'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-01-13 10:17', related_items=[])
+    @function_attributes(short_name=None, tags=['temp', 'from-notebook', 'prominence2d', 'locality'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-01-13 10:17', related_items=[])
     def _filter_single_epoch_result(self, curr_active_pipeline, decoding_time_bin_size = 0.025, an_epoch_name = 'roam') -> DecodedFilterEpochsResult:
         """
             decoding_time_bin_size = 0.025
