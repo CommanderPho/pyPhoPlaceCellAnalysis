@@ -1,9 +1,9 @@
-from typing import Any, Callable, List, Dict, Optional, Union
+from typing import Any, Callable, List, Dict, Optional, Union, Tuple, get_type_hints, get_origin, get_args
 from types import ModuleType
 import dataclasses
 from dataclasses import dataclass
 import attrs
-from attrs import define, field, Factory
+from attrs import define, field, Factory, asdict, has, fields
 from datetime import datetime
 import pathlib
 from pathlib import Path
@@ -145,54 +145,218 @@ def saveData(pkl_path, db, should_append=False, safe_save:bool=True):
 # ==================================================================================================================================================================================================================================================================================== #
 # Split Save Attempts                                                                                                                                                                                                                                                                  #
 # ==================================================================================================================================================================================================================================================================================== #
-@function_attributes(short_name=None, tags=['save', 'pickle', 'split'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-12-11 08:11', related_items=['load_split_pickled_global_computation_results'])
-def safeSaveSplitData(self, override_global_pickle_path: Optional[Path]=None, override_global_pickle_filename:Optional[str]=None, include_includelist=None, continue_after_pickling_errors: bool=True, debug_print:bool=True):
-    """Save out the `global_computation_results` which are not currently saved with the pipeline
+
+def _is_picklable(obj: Any) -> bool:
+    """Test if an object can be pickled.
+    
+    Args:
+        obj: The object to test
+        
+    Returns:
+        True if the object can be pickled, False otherwise
+    """
+    try:
+        pickle.dumps(obj, protocol=pickle.HIGHEST_PROTOCOL)
+        return True
+    except (pickle.PicklingError, TypeError, AttributeError):
+        return False
+
+
+def _convert_unpicklable_to_dict(obj: Any, visited: Optional[set] = None, max_depth: int = 50, current_depth: int = 0) -> Any:
+    """Recursively convert only unpicklable objects to dicts, preserving picklable nested objects.
+    
+    This function processes nested structures (dicts, lists, tuples) and converts only
+    objects that fail to pickle, while preserving the original types of picklable objects.
+    
+    Args:
+        obj: The object to process
+        visited: Set of object IDs already visited (to prevent circular references)
+        max_depth: Maximum recursion depth to prevent infinite loops
+        current_depth: Current recursion depth
+        
+    Returns:
+        The object with unpicklable parts converted to dicts, picklable parts preserved
+    """
+    if visited is None:
+        visited = set()
+    
+    if current_depth >= max_depth:
+        return obj
+    
+    # Handle None
+    if obj is None:
+        return obj
+    
+    # Handle primitive types (always picklable)
+    if isinstance(obj, (str, int, float, bool, bytes)):
+        return obj
+    
+    # Check for circular references
+    obj_id = id(obj)
+    if obj_id in visited:
+        return obj
+    visited.add(obj_id)
+    
+    try:
+        # First, test if the object itself is picklable
+        if _is_picklable(obj):
+            # Object is picklable, but we may need to process nested structures
+            # For containers, we still need to check nested elements
+            if isinstance(obj, dict):
+                result = {}
+                for k, v in obj.items():
+                    result[k] = _convert_unpicklable_to_dict(v, visited, max_depth, current_depth + 1)
+                visited.remove(obj_id)  # Remove before returning
+                return result
+            elif isinstance(obj, (list, tuple)):
+                processed_items = [_convert_unpicklable_to_dict(item, visited, max_depth, current_depth + 1) for item in obj]
+                visited.remove(obj_id)  # Remove before returning
+                return type(obj)(processed_items)
+            else:
+                # Picklable non-container object - return as-is
+                visited.remove(obj_id)  # Remove before returning
+                return obj
+        else:
+            # Object is not picklable, convert to dict
+            if has(obj):
+                # It's an attrs object, manually extract fields to avoid recursive conversion by asdict()
+                # Use attrs.fields() to get field definitions, then extract values manually
+                attrs_fields = fields(type(obj))
+                result = {}
+                for attr_field in attrs_fields:
+                    field_name = attr_field.name
+                    try:
+                        field_value = getattr(obj, field_name, None)
+                        # Process the field value to preserve picklable nested objects
+                        result[field_name] = _convert_unpicklable_to_dict(field_value, visited, max_depth, current_depth + 1)
+                    except AttributeError:
+                        # Skip if field doesn't exist
+                        pass
+                visited.remove(obj_id)  # Remove before returning
+                return result
+            elif hasattr(obj, '__dict__'):
+                # It's a regular object with __dict__
+                obj_dict = obj.__dict__.copy()
+                # Recursively process the dict values to preserve picklable nested objects
+                result = {}
+                for k, v in obj_dict.items():
+                    result[k] = _convert_unpicklable_to_dict(v, visited, max_depth, current_depth + 1)
+                visited.remove(obj_id)  # Remove before returning
+                return result
+            else:
+                # Can't convert, return as-is (might fail later, but that's handled by caller)
+                visited.remove(obj_id)  # Remove before returning
+                return obj
+    except (TypeError, AttributeError, RecursionError) as e:
+        # If we encounter an error during processing, return the object as-is
+        visited.discard(obj_id)  # Remove if present
+        return obj
+
+
+def _try_pickle_or_convert_to_dict(obj: Any, debug_print: bool = False) -> Any:
+    """Try to pickle an object, only convert to dict if pickling fails.
+    
+    This function attempts to pickle the object directly. If successful, returns
+    the object as-is. If pickling fails, converts to dict while preserving picklable
+    nested objects.
+    
+    Args:
+        obj: The object to process
+        debug_print: If True, prints debug information
+        
+    Returns:
+        The object (if picklable) or a dict representation (if not picklable)
+    """
+    # Test if the object is picklable
+    if _is_picklable(obj):
+        if debug_print:
+            print(f'Object {type(obj).__name__} is picklable, preserving original type')
+        return obj
+    else:
+        # Object is not picklable, convert to dict
+        if debug_print:
+            print(f'Object {type(obj).__name__} is not picklable, converting to dict (preserving picklable nested objects)')
+        return _convert_unpicklable_to_dict(obj)
+
+
+@function_attributes(short_name=None, tags=['save', 'pickle', 'split'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-12-11 08:11', related_items=['loadSplitData', 'load_split_pickled_global_computation_results'])
+def safeSaveSplitData(pkl_path: Union[str, Path], computed_data: Union[Dict[str, Any], Any], include_includelist=None, continue_after_pickling_errors: bool=True, debug_print:bool=True):
+    """Save out data by splitting it into separate pickle files for each key in the dictionary.
+
+    Similar to safeSaveData but saves each item in computed_data as a separate file in a split folder.
 
     Reciprocal:
-        load_pickled_global_computation_results
+        `loadSplitData`
+
+    Args:
+        pkl_path: Path to save to. If a directory, uses default filename "computed_data.pkl". If a file, uses that path directly.
+        computed_data: Dictionary of data to save, or an attrs-based object that will be converted to a dictionary. Each key-value pair will be saved as a separate file.
+        include_includelist: Optional list of keys to include. If None, includes all keys.
+        continue_after_pickling_errors: If True, continues saving other items if one fails. If False, raises on first error.
+        debug_print: If True, prints progress information.
+
+    Returns:
+        tuple: (split_save_folder, split_save_paths, split_save_output_types, failed_keys)
 
     Usage:
-        split_save_folder, split_save_paths, split_save_output_types, failed_keys = curr_active_pipeline.save_split_global_computation_results(debug_print=True)
-        
+
+        from pyphoplacecellanalysis.General.Pipeline.Stages.Loading import safeSaveData, safeSaveSplitData, loadSplitData
+
+        ## Pickle the result:
+        pkl_output_path: Path = curr_active_pipeline.get_output_path().joinpath('2026-01-14_PredictiveDecodingComputationsContainer.pkl')
+        split_save_folder, split_save_paths, split_save_output_types, failed_keys = safeSaveSplitData(pkl_output_path, container, debug_print=True)
+        print(f'split_save_folder: "{split_save_folder.as_posix()}"')
+
+
     #TODO 2023-11-22 18:54: - [ ] One major issue is that the types are lost upon reloading, so I think we'll need to save them somewhere. They can be fixed post-hoc like:
     # Update result with correct type:
-    curr_active_pipeline.global_computation_results.computed_data['RankOrder'] = RankOrderComputationsContainer(**curr_active_pipeline.global_computation_results.computed_data['RankOrder'])
+    # computed_data['RankOrder'] = RankOrderComputationsContainer(**computed_data['RankOrder'])
 
     """
     from pickle import PicklingError
     from pyphocorehelpers.print_helpers import print_filesystem_file_size, print_object_memory_usage
     
-
-    ## Case 1. `override_global_pickle_path` is provided:
-    if override_global_pickle_path is not None:
-        ## override_global_pickle_path is provided:
-        if not isinstance(override_global_pickle_path, Path):
-            override_global_pickle_path = Path(override_global_pickle_path).resolve()
-        # Case 1a: `override_global_pickle_path` is a complete file path
-        if not override_global_pickle_path.is_dir():
-            # a full filepath, just use that directly
-            global_computation_results_pickle_path = override_global_pickle_path.resolve()
+    # Convert non-dict objects to dictionaries if needed, preserving picklable nested objects
+    if not isinstance(computed_data, dict):
+        if has(computed_data):
+            # It's an attrs object, convert to dict but preserve picklable nested objects
+            if debug_print:
+                print(f'Converting attrs object {type(computed_data).__name__} to dictionary (preserving picklable nested objects)')
+            computed_data = _convert_unpicklable_to_dict(computed_data)
+        elif hasattr(computed_data, '__dict__'):
+            # It's a regular object with __dict__, convert to dict but preserve picklable nested objects
+            if debug_print:
+                print(f'Converting object {type(computed_data).__name__} with __dict__ to dictionary (preserving picklable nested objects)')
+            computed_data = _convert_unpicklable_to_dict(computed_data)
         else:
-            # default case, assumed to be a directory and we'll use the normal filename.
-            active_global_pickle_filename: str = (override_global_pickle_filename or self.global_computation_results_pickle_path or "global_computation_results.pkl")
-            global_computation_results_pickle_path = override_global_pickle_path.joinpath(active_global_pickle_filename).resolve()
-
+            raise TypeError(f"computed_data must be a dictionary, attrs object, or object with __dict__. Got {type(computed_data)}")
     else:
-        # No override path provided
-        if override_global_pickle_filename is None:
-            # no filename provided either, use default global pickle path:
-            global_computation_results_pickle_path = self.global_computation_results_pickle_path
-        else:
-            # Otherwise use default output path but specified override_global_pickle_filename:
-            global_computation_results_pickle_path = self.get_output_path().joinpath(override_global_pickle_filename).resolve() 
+        # It's already a dict, but we should process nested values to preserve picklable objects
+        if debug_print:
+            print(f'Processing dictionary (preserving picklable nested objects)')
+        processed_dict = {}
+        for k, v in computed_data.items():
+            processed_dict[k] = _convert_unpicklable_to_dict(v)
+        computed_data = processed_dict
+    
+    # Resolve pkl_path
+    if not isinstance(pkl_path, Path):
+        pkl_path = Path(pkl_path).resolve()
+    
+    # Determine the base pickle path
+    if pkl_path.is_dir():
+        # If it's a directory, use a default filename
+        base_pickle_path = pkl_path.joinpath("computed_data.pkl").resolve()
+    else:
+        # If it's a file, use it directly
+        base_pickle_path = pkl_path.resolve()
 
     if debug_print:
-        print(f'global_computation_results_pickle_path: {global_computation_results_pickle_path}')
+        print(f'base_pickle_path: {base_pickle_path}')
     
     ## In split save, we save each result separately in a folder
-    split_save_folder_name: str = f'{global_computation_results_pickle_path.stem}_split'
-    split_save_folder: Path = global_computation_results_pickle_path.parent.joinpath(split_save_folder_name).resolve()
+    split_save_folder_name: str = f'{base_pickle_path.stem}_split'
+    split_save_folder: Path = base_pickle_path.parent.joinpath(split_save_folder_name).resolve()
     if debug_print:
         print(f'split_save_folder: {split_save_folder}')
     # make if doesn't exist
@@ -200,16 +364,15 @@ def safeSaveSplitData(self, override_global_pickle_path: Optional[Path]=None, ov
     
     if include_includelist is None:
         ## include all keys if none are specified
-        include_includelist = list(self.global_computation_results.computed_data.keys())
-
-    ## only saves out the `global_computation_results` data:
-    global_computed_data = self.global_computation_results.computed_data
+        include_includelist = list(computed_data.keys())
+    
+    ## Save each item in the computed_data dictionary:
     split_save_paths = {}
     split_save_output_types = {}
     failed_keys = []
     skipped_keys = []
-    for k, v in global_computed_data.items():
-        if k in include_includelist:
+    for k, v in computed_data.items():
+        if (include_includelist is not None) and (k in include_includelist):
             curr_split_result_pickle_path = split_save_folder.joinpath(f'Split_{k}.pkl').resolve()
             if debug_print:
                 print(f'k: {k} -- size_MB: {print_object_memory_usage(v, enable_print=False)}')
@@ -217,12 +380,13 @@ def safeSaveSplitData(self, override_global_pickle_path: Optional[Path]=None, ov
             was_save_success = False
             curr_item_type = type(v)
             try:
-                ## try get as dict                
-                v_dict = v.__dict__ #__getstate__()
-                # saveData(curr_split_result_pickle_path, (v_dict))
-                saveData(curr_split_result_pickle_path, (v_dict, str(curr_item_type.__module__), str(curr_item_type.__name__)))    
+                # Try to pickle the value directly first, only convert to dict if pickling fails
+                # This preserves original types for picklable objects
+                processed_value = _try_pickle_or_convert_to_dict(v, debug_print=debug_print)
+                # saveData(curr_split_result_pickle_path, (processed_value))
+                saveData(curr_split_result_pickle_path, (processed_value, str(curr_item_type.__module__), str(curr_item_type.__name__)))    
                 was_save_success = True
-            except KeyError as e:
+            except (KeyError, AttributeError) as e:
                 print(f'\t{k} encountered {e} while trying to save {k}. Skipping')
                 pass
             except PicklingError as e:
@@ -245,7 +409,7 @@ def safeSaveSplitData(self, override_global_pickle_path: Optional[Path]=None, ov
             skipped_keys.append(k)
             
     if len(failed_keys) > 0:
-        print(f'WARNING: failed_keys: {failed_keys} did not save for global results! They HAVE NOT BEEN SAVED!')
+        print(f'WARNING: failed_keys: {failed_keys} did not save successfully! They HAVE NOT BEEN SAVED!')
     return split_save_folder, split_save_paths, split_save_output_types, failed_keys
 
 
@@ -452,13 +616,13 @@ def safeSaveSplitData(self, override_global_pickle_path: Optional[Path]=None, ov
 global_move_modules_list:Dict={
     'pyphoplacecellanalysis.SpecificResults.PhoDiba2023Paper.SingleBarResult':'pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.LongShortTrackComputations.SingleBarResult',
     'pyphoplacecellanalysis.SpecificResults.PhoDiba2023Paper.InstantaneousSpikeRateGroupsComputation':'pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.LongShortTrackComputations.InstantaneousSpikeRateGroupsComputation',
-    	# 'pyphoplacecellanalysis.General.Configs.DynamicConfigs.*':'pyphoplacecellanalysis.General.Model.Configs.DynamicConfigs.*', # VideoOutputModeConfig, PlottingConfig, InteractivePlaceCellConfig
-	'pyphoplacecellanalysis.General.Configs.DynamicConfigs.VideoOutputModeConfig':'pyphoplacecellanalysis.General.Model.Configs.DynamicConfigs.VideoOutputModeConfig', # VideoOutputModeConfig, PlottingConfig, InteractivePlaceCellConfig
-	'pyphoplacecellanalysis.General.Configs.DynamicConfigs.PlottingConfig':'pyphoplacecellanalysis.General.Model.Configs.DynamicConfigs.PlottingConfig',
-	'pyphoplacecellanalysis.General.Configs.DynamicConfigs.InteractivePlaceCellConfig':'pyphoplacecellanalysis.General.Model.Configs.DynamicConfigs.InteractivePlaceCellConfig',
-	# 'pyphoplacecellanalysis.PhoPositionalData.plotting.mixins.general_plotting_mixins':'pyphoplacecellanalysis.General.Model.Configs.NeuronPlottingParamConfig', # SingleNeuronPlottingExtended, 
-	'pyphoplacecellanalysis.PhoPositionalData.plotting.mixins.general_plotting_mixins.SingleNeuronPlottingExtended':'pyphoplacecellanalysis.General.Model.Configs.NeuronPlottingParamConfig.SingleNeuronPlottingExtended',
-	# 'pyphoplacecellanalysis.PhoPositionalData.plotting.mixins.general_plotting_mixins.':'pyphoplacecellanalysis.General.Model.Configs.NeuronPlottingParamConfig', # SingleNeuronPlottingExtended, 
+        # 'pyphoplacecellanalysis.General.Configs.DynamicConfigs.*':'pyphoplacecellanalysis.General.Model.Configs.DynamicConfigs.*', # VideoOutputModeConfig, PlottingConfig, InteractivePlaceCellConfig
+    'pyphoplacecellanalysis.General.Configs.DynamicConfigs.VideoOutputModeConfig':'pyphoplacecellanalysis.General.Model.Configs.DynamicConfigs.VideoOutputModeConfig', # VideoOutputModeConfig, PlottingConfig, InteractivePlaceCellConfig
+    'pyphoplacecellanalysis.General.Configs.DynamicConfigs.PlottingConfig':'pyphoplacecellanalysis.General.Model.Configs.DynamicConfigs.PlottingConfig',
+    'pyphoplacecellanalysis.General.Configs.DynamicConfigs.InteractivePlaceCellConfig':'pyphoplacecellanalysis.General.Model.Configs.DynamicConfigs.InteractivePlaceCellConfig',
+    # 'pyphoplacecellanalysis.PhoPositionalData.plotting.mixins.general_plotting_mixins':'pyphoplacecellanalysis.General.Model.Configs.NeuronPlottingParamConfig', # SingleNeuronPlottingExtended, 
+    'pyphoplacecellanalysis.PhoPositionalData.plotting.mixins.general_plotting_mixins.SingleNeuronPlottingExtended':'pyphoplacecellanalysis.General.Model.Configs.NeuronPlottingParamConfig.SingleNeuronPlottingExtended',
+    # 'pyphoplacecellanalysis.PhoPositionalData.plotting.mixins.general_plotting_mixins.':'pyphoplacecellanalysis.General.Model.Configs.NeuronPlottingParamConfig', # SingleNeuronPlottingExtended, 
     'pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions.DirectionalMergedDecodersResult':'pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions.DirectionalPseudo2DDecodersResult',
     'pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions.DirectionalDecodersDecodedResult':'pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions.DirectionalDecodersContinuouslyDecodedResult',
     'pyphocorehelpers.indexing_helpers.BinningInfo':'neuropy.utils.mixins.binning_helpers.BinningInfo',
@@ -530,6 +694,545 @@ def loadData(pkl_path, debug_print=False, **kwargs):
                 # raise e
         # return db
     return db
+
+
+@function_attributes(short_name=None, tags=['load', 'pickle', 'split'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-01-14 08:00', related_items=['safeSaveSplitData'])
+def loadSplitData(pkl_path: Union[str, Path], debug_print:bool=True, target_cls: Optional[type] = None, raise_on_exception: bool=True, **kwargs) -> Union[Dict[str, Any], Any]:
+    """Load data from split pickle files created by safeSaveSplitData.
+
+    Reciprocal function to safeSaveSplitData. Loads all Split_*.pkl files from a split folder
+    and reconstructs the original data dictionary.
+
+    Args:
+        pkl_path: Path to the pickle file or directory. If a directory, uses default filename "computed_data.pkl".
+                  If a file, uses that path directly. The split folder is determined by appending "_split" to the base filename.
+        debug_print: If True, prints progress information.
+        target_cls: Optional class to automatically rebuild the loaded data into. If provided and the loaded data is a dict,
+                    it will be automatically rebuilt into an instance of this class with all nested objects also rebuilt.
+        raise_on_exception: If True (default), raises exceptions during auto-rebuild. If False, catches exceptions and
+                           returns the dict instead, useful for debugging.
+        **kwargs: Additional arguments passed to loadData for loading individual files.
+
+    Returns:
+        Dictionary mapping keys to loaded values, or an instance of target_cls if target_cls is provided.
+        Values that were saved as tuples with type info (v_dict, module_name, type_name) will be returned as dictionaries.
+
+    Usage:
+
+        # A file saved with: _________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
+        from pyphoplacecellanalysis.General.Pipeline.Stages.Loading import safeSaveData, safeSaveSplitData
+
+        ## Pickle the result:
+        pkl_output_path: Path = curr_active_pipeline.get_output_path().joinpath('2026-01-14_PredictiveDecodingComputationsContainer.pkl')
+        split_save_folder, split_save_paths, split_save_output_types, failed_keys = safeSaveSplitData(pkl_output_path, container, debug_print=True)
+        print(f'split_save_folder: "{split_save_folder.as_posix()}"')
+
+        # Can be reciprocally loaded with: ___________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
+        from pyphoplacecellanalysis.General.Pipeline.Stages.Loading import loadSplitData, safeSaveSplitData
+
+        # Save split data
+        split_save_folder, split_save_paths, split_save_output_types, failed_keys = safeSaveSplitData(pkl_path, computed_data, debug_print=True)
+        
+        # Load split data
+        loaded_data = loadSplitData(pkl_path, debug_print=True)
+
+    Concrete Examples:
+
+        from pyphoplacecellanalysis.General.Pipeline.Stages.Loading import loadSplitData
+        from neuropy.utils.mixins.indexing_helpers import get_dict_subset
+        from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.PredictiveDecodingComputations import PredictiveDecodingComputationsContainer, PredictiveDecoding, DecodingLocalityMeasures
+
+        # Load split data (old manual approach)
+        split_save_folder: Path = curr_active_pipeline.get_output_path().joinpath('2026-01-14_PredictiveDecodingComputationsContainer_split')
+        container = loadSplitData(split_save_folder, debug_print=True)
+        if isinstance(container, dict):
+            container: PredictiveDecodingComputationsContainer = PredictiveDecodingComputationsContainer(**get_dict_subset(container, subset_excludelist=['_VersionedResultMixin_version']))
+        
+        # Load split data with auto-rebuild (new convenient approach)
+        container = loadSplitData(split_save_folder, debug_print=True, target_cls=PredictiveDecodingComputationsContainer)
+        # Nested objects (predictive_decoding, locality_measures, etc.) are automatically rebuilt
+            
+    Example 2:
+
+        split_save_folder: Path = curr_active_pipeline.get_output_path().joinpath('2026-01-14_PredictiveDecodingComputationsContainer_masked')
+        # Old approach
+        masked_container = loadSplitData(split_save_folder, debug_print=True)
+        if isinstance(masked_container, dict):
+            masked_container: PredictiveDecodingComputationsContainer = PredictiveDecodingComputationsContainer(**get_dict_subset(masked_container, subset_excludelist=['_VersionedResultMixin_version']))
+        
+        # New approach with auto-rebuild
+        masked_container = loadSplitData(split_save_folder, debug_print=True, target_cls=PredictiveDecodingComputationsContainer)
+        # All nested objects are automatically rebuilt
+
+        type(masked_container)
+
+
+
+    """
+    # Extract move_modules_list from kwargs with global_move_modules_list default (mirroring loadData)
+    active_move_modules_list: Dict = kwargs.pop('move_modules_list', global_move_modules_list)
+    
+    # Resolve pkl_path with cross-platform path handling
+    try:
+        if not isinstance(pkl_path, Path):
+            pkl_path = Path(pkl_path).resolve()
+        
+        # Determine the base pickle path (mirroring safeSaveSplitData logic)
+        if pkl_path.is_dir():
+            # If it's a directory, use a default filename
+            base_pickle_path = pkl_path.joinpath("computed_data.pkl").resolve()
+        else:
+            # If it's a file, use it directly
+            base_pickle_path = pkl_path.resolve()
+    except NotImplementedError as err:
+        error_message = str(err)
+        if 'WindowsPath' in error_message:  # Check if WindowsPath is missing
+            print("Issue with WindowsPath on Linux for path {}, performing pathlib workaround...".format(pkl_path))
+            win_backup = pathlib.WindowsPath  # Backup the WindowsPath definition
+            try:
+                pathlib.WindowsPath = pathlib.PureWindowsPath
+                if not isinstance(pkl_path, Path):
+                    pkl_path = Path(pkl_path).resolve()
+                if pkl_path.is_dir():
+                    base_pickle_path = pkl_path.joinpath("computed_data.pkl").resolve()
+                else:
+                    base_pickle_path = pkl_path.resolve()
+            finally:
+                pathlib.WindowsPath = win_backup  # Restore the backup WindowsPath definition
+        elif 'PosixPath' in error_message:  # Check if PosixPath is missing
+            # Fixes issue with pickled POSIX_PATH on windows for path.
+            posix_backup = pathlib.PosixPath # backup the PosixPath definition
+            try:
+                pathlib.PosixPath = pathlib.PurePosixPath
+                if not isinstance(pkl_path, Path):
+                    pkl_path = Path(pkl_path).resolve()
+                if pkl_path.is_dir():
+                    base_pickle_path = pkl_path.joinpath("computed_data.pkl").resolve()
+                else:
+                    base_pickle_path = pkl_path.resolve()
+            finally:
+                pathlib.PosixPath = posix_backup # restore the backup posix path definition
+        else:
+            print("Unknown issue with path for path {}, performing pathlib workaround...".format(pkl_path))
+            raise
+
+    if debug_print:
+        print(f'base_pickle_path: {base_pickle_path}')
+    
+    # Check if pkl_path is already a split folder (exists and is a directory)
+    # If not, fall back to adding the _split suffix like usual
+    if pkl_path.exists() and pkl_path.is_dir():
+        # User passed the direct split folder path
+        split_save_folder = pkl_path
+        if debug_print:
+            print(f'Using provided split folder path: {split_save_folder}')
+    else:
+        # Determine the split folder (mirroring safeSaveSplitData logic)
+        split_save_folder_name: str = f'{base_pickle_path.stem}_split'
+        split_save_folder: Path = base_pickle_path.parent.joinpath(split_save_folder_name).resolve()
+        if debug_print:
+            print(f'split_save_folder to load from: {split_save_folder}')
+    
+    if not split_save_folder.exists():
+        raise FileNotFoundError(f"Split folder does not exist: {split_save_folder}")
+    if not split_save_folder.is_dir():
+        raise NotADirectoryError(f"Split folder is not a directory: {split_save_folder}")
+    
+    # Find all Split_*.pkl files
+    loaded_data = {}
+    found_split_paths = []
+    successfully_loaded_keys = {}
+    failed_loaded_keys = {}
+    
+    with ProgressMessagePrinter(split_save_folder, action='Loading', contents_description='split pickle files'):
+        for p in split_save_folder.rglob('Split_*.pkl'):
+            if debug_print:
+                print(f'Loading: {p}')
+            found_split_paths.append(p)
+            # Extract the key name by removing "Split_" prefix from the stem
+            curr_result_key: str = p.stem.removeprefix('Split_')
+            
+            # Load the file
+            try:
+                loaded_value = loadData(p, debug_print=False, move_modules_list=active_move_modules_list, **kwargs)
+                
+                # Handle the loaded value format
+                if isinstance(loaded_value, tuple) and len(loaded_value) == 3:
+                    # Saved as (v_dict, module_name, type_name) - extract the dict
+                    loaded_result_dict, curr_item_type_module, curr_item_type_name = loaded_value
+                    if debug_print:
+                        print(f'\tLoaded {curr_result_key}: type={curr_item_type_module}.{curr_item_type_name}')
+                    loaded_data[curr_result_key] = loaded_result_dict
+                elif isinstance(loaded_value, dict):
+                    # Already a dict, use directly
+                    loaded_data[curr_result_key] = loaded_value
+                else:
+                    # Other format, store as-is
+                    loaded_data[curr_result_key] = loaded_value
+                
+                successfully_loaded_keys[curr_result_key] = p
+                
+            except EOFError as e:
+                # occurs when the pickle saving is interrupted and the output file is ruined.
+                # Re-raise immediately as it indicates a corrupted file
+                print(f'EOFError loading {curr_result_key} from "{p}": {e}')
+                print("This indicates a corrupted pickle file. The fragmented pickle file may need to be deleted.")
+                failed_loaded_keys[curr_result_key] = p
+                if debug_print:
+                    import traceback
+                    traceback.print_exc()
+                # Continue loading other files, but log this error
+                # Note: We don't re-raise here to allow loading of other files, but this is a serious error
+            
+            except Exception as e:
+                # Other exceptions - log and continue
+                print(f'Error loading {curr_result_key} from "{p}": {e}')
+                failed_loaded_keys[curr_result_key] = p
+                if debug_print:
+                    import traceback
+                    traceback.print_exc()
+    
+    if debug_print:
+        print(f'Successfully loaded {len(successfully_loaded_keys)} keys: {list(successfully_loaded_keys.keys())}')
+        if len(failed_loaded_keys) > 0:
+            print(f'Failed to load {len(failed_loaded_keys)} keys: {list(failed_loaded_keys.keys())}')
+    
+    # If target_cls is provided, automatically rebuild the loaded data
+    if target_cls is not None and isinstance(loaded_data, dict):
+        if debug_print:
+            print(f'Auto-rebuilding loaded data into {target_cls.__name__}...')
+        try:
+            rebuilt_obj = _helper_rebuild_obj_from_class_if_needed(target_cls, loaded_data)
+            if debug_print:
+                print(f'Successfully rebuilt into {target_cls.__name__}')
+            return rebuilt_obj
+        except Exception as e:
+            if debug_print:
+                print(f'Warning: Failed to auto-rebuild into {target_cls.__name__}: {e}')
+                import traceback
+                traceback.print_exc()
+            # Return the dict if rebuilding fails, or raise if raise_on_exception is True
+            if raise_on_exception:
+                raise
+            return loaded_data
+    
+    return loaded_data
+
+
+
+def _is_attrs_class(cls_or_type: Any) -> bool:
+    """Check if a type is an attrs class.
+    
+    Args:
+        cls_or_type: A class or type to check
+        
+    Returns:
+        True if the type is an attrs class, False otherwise
+    """
+    if not isinstance(cls_or_type, type):
+        return False
+    try:
+        return has(cls_or_type)
+    except (TypeError, AttributeError):
+        return False
+
+
+def _extract_actual_type(annotated_type: Any) -> Tuple[Any, bool]:
+    """Extract the actual type from Optional, Dict, List, and other generic types.
+    
+    Args:
+        annotated_type: A type annotation (may be Optional[T], Dict[K, V], List[T], etc.)
+        
+    Returns:
+        Tuple of (actual_type, is_container) where:
+        - actual_type: The inner type to check/rebuild
+        - is_container: True if this is a container type (Dict, List, etc.) that needs special handling
+    """
+    origin = get_origin(annotated_type)
+    args = get_args(annotated_type)
+    
+    if origin is None:
+        # Not a generic type, return as-is
+        return annotated_type, False
+    
+    # Handle Optional[T] -> T
+    if origin is Union and len(args) == 2 and type(None) in args:
+        # Extract the non-None type
+        non_none_type = next(arg for arg in args if arg is not type(None))
+        return _extract_actual_type(non_none_type)
+    
+    # Handle Dict[K, V] -> V (the value type)
+    if origin is dict or origin is Dict:
+        if len(args) >= 2:
+            value_type = args[1]
+            return _extract_actual_type(value_type), True
+        return Any, True
+    
+    # Handle List[T] -> T (the element type)
+    if origin is list or origin is List:
+        if len(args) >= 1:
+            element_type = args[0]
+            return _extract_actual_type(element_type), True
+        return Any, True
+    
+    # Handle Tuple[T, ...] -> T
+    if origin is tuple or origin is Tuple:
+        if len(args) >= 1:
+            element_type = args[0]
+            return _extract_actual_type(element_type), True
+        return Any, True
+    
+    # For other generic types, try to extract the first argument
+    if args:
+        return _extract_actual_type(args[0]), True
+    
+    return annotated_type, False
+
+
+def _rebuild_nested_objects_from_dict(target_obj: Any, visited: Optional[set] = None, max_depth: int = 50, current_depth: int = 0) -> Any:
+    """Recursively rebuild nested objects from dicts based on type annotations.
+    
+    This function processes all fields of an attrs object and rebuilds nested objects
+    that are stored as dicts back into their proper types.
+    
+    Args:
+        target_obj: The object to process (must be an attrs instance)
+        visited: Set of object IDs already visited (to prevent circular references)
+        max_depth: Maximum recursion depth
+        current_depth: Current recursion depth
+        
+    Returns:
+        The object with nested dicts rebuilt into proper types
+    """
+    if visited is None:
+        visited = set()
+    
+    if current_depth >= max_depth:
+        return target_obj
+    
+    # Only process attrs objects
+    if not _is_attrs_class(type(target_obj)):
+        return target_obj
+    
+    # Prevent circular references
+    obj_id = id(target_obj)
+    if obj_id in visited:
+        return target_obj
+    visited.add(obj_id)
+    
+    try:
+        # Get type hints for the class
+        type_hints = get_type_hints(type(target_obj))
+    except (TypeError, AttributeError, NameError):
+        # If we can't get type hints, return as-is
+        return target_obj
+    
+    try:
+        # Get attrs fields
+        attrs_fields = fields(type(target_obj))
+    except (TypeError, AttributeError):
+        return target_obj
+    
+    # Process each field
+    for attr_field in attrs_fields:
+        field_name = attr_field.name
+        if not hasattr(target_obj, field_name):
+            continue
+        
+        field_value = getattr(target_obj, field_name)
+        
+        # Skip None values
+        if field_value is None:
+            continue
+        
+        # Get the type annotation for this field
+        field_type = type_hints.get(field_name, None)
+        if field_type is None:
+            continue
+        
+        # Extract the actual type (handling Optional, Dict, List, etc.)
+        actual_type, is_container = _extract_actual_type(field_type)
+        
+        if is_container:
+            # Handle container types (Dict, List, etc.)
+            origin = get_origin(field_type)
+            args = get_args(field_type)
+            
+            if (origin is dict or origin is Dict) and isinstance(field_value, dict):
+                # Dict[K, V] - rebuild values
+                if len(args) >= 2:
+                    value_type = args[1]
+                    value_actual_type, _ = _extract_actual_type(value_type)
+                    if _is_attrs_class(value_actual_type):
+                        rebuilt_dict = {}
+                        for k, v in field_value.items():
+                            if isinstance(v, dict):
+                                rebuilt_dict[k] = _helper_rebuild_obj_from_class_if_needed(value_actual_type, v)
+                                # Recursively rebuild nested objects in the rebuilt value
+                                rebuilt_dict[k] = _rebuild_nested_objects_from_dict(rebuilt_dict[k], visited, max_depth, current_depth + 1)
+                            else:
+                                rebuilt_dict[k] = v
+                        setattr(target_obj, field_name, rebuilt_dict)
+                # Also handle nested Dict types (e.g., Dict[str, Dict[str, T]])
+                elif len(args) >= 2:
+                    value_type = args[1]
+                    if get_origin(value_type) is dict or get_origin(value_type) is Dict:
+                        # Nested dict - recursively process
+                        rebuilt_dict = {}
+                        for k, v in field_value.items():
+                            if isinstance(v, dict):
+                                rebuilt_dict[k] = _rebuild_nested_dict_values(v, value_type, visited, max_depth, current_depth + 1)
+                            else:
+                                rebuilt_dict[k] = v
+                        setattr(target_obj, field_name, rebuilt_dict)
+            
+            elif (origin is list or origin is List) and isinstance(field_value, list):
+                # List[T] - rebuild elements
+                if len(args) >= 1:
+                    element_type = args[0]
+                    element_actual_type, _ = _extract_actual_type(element_type)
+                    if _is_attrs_class(element_actual_type):
+                        rebuilt_list = []
+                        for item in field_value:
+                            if isinstance(item, dict):
+                                rebuilt_item = _helper_rebuild_obj_from_class_if_needed(element_actual_type, item)
+                                rebuilt_item = _rebuild_nested_objects_from_dict(rebuilt_item, visited, max_depth, current_depth + 1)
+                                rebuilt_list.append(rebuilt_item)
+                            else:
+                                rebuilt_list.append(item)
+                        setattr(target_obj, field_name, rebuilt_list)
+        else:
+            # Handle direct type (not a container)
+            if isinstance(field_value, dict) and _is_attrs_class(actual_type):
+                # Rebuild the nested object
+                rebuilt_obj = _helper_rebuild_obj_from_class_if_needed(actual_type, field_value)
+                # Recursively rebuild nested objects in the rebuilt object
+                rebuilt_obj = _rebuild_nested_objects_from_dict(rebuilt_obj, visited, max_depth, current_depth + 1)
+                setattr(target_obj, field_name, rebuilt_obj)
+    
+    return target_obj
+
+
+def _rebuild_nested_dict_values(nested_dict: Dict, dict_type: Any, visited: set, max_depth: int, current_depth: int) -> Dict:
+    """Helper to rebuild nested dict values recursively."""
+    args = get_args(dict_type)
+    if len(args) >= 2:
+        value_type = args[1]
+        value_actual_type, is_container = _extract_actual_type(value_type)
+        
+        rebuilt = {}
+        for k, v in nested_dict.items():
+            if isinstance(v, dict):
+                if is_container:
+                    rebuilt[k] = _rebuild_nested_dict_values(v, value_type, visited, max_depth, current_depth + 1)
+                elif _is_attrs_class(value_actual_type):
+                    rebuilt_obj = _helper_rebuild_obj_from_class_if_needed(value_actual_type, v)
+                    rebuilt_obj = _rebuild_nested_objects_from_dict(rebuilt_obj, visited, max_depth, current_depth + 1)
+                    rebuilt[k] = rebuilt_obj
+                else:
+                    rebuilt[k] = v
+            else:
+                rebuilt[k] = v
+        return rebuilt
+    return nested_dict
+
+
+@function_attributes(short_name=None, tags=['loading', 'split', 'helper', 'class'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-01-14 22:13', related_items=[])
+def _helper_rebuild_obj_from_class_if_needed(target_cls, a_possible_dict):
+    """ tries to rebuild the `a_possible_dict` instance/object as an instance of the class `target_cls`
+        Useful for rebuilding object instances from loaded dicts
+        
+
+    Example:
+        ## for an object `PredictiveDecodingComputationsContainer`
+
+        from pyphoplacecellanalysis.General.Pipeline.Stages.Loading import _helper_rebuild_obj_from_class_if_needed
+
+        # _helper_build_class
+        ## Example: to rebuild a `PredictiveDecodingComputationsContainer` type object `a_masked_container`
+        from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.PredictiveDecodingComputations import PredictiveDecoding, DecodingLocalityMeasures, PredictiveDecodingComputationsContainer
+
+        ## INPUTS: a_masked_container = masked_container
+
+        if isinstance(a_masked_container, dict):
+            # a_masked_container: PredictiveDecodingComputationsContainer = PredictiveDecodingComputationsContainer(**get_dict_subset(a_masked_container, subset_excludelist=['_VersionedResultMixin_version']))
+            a_masked_container: PredictiveDecodingComputationsContainer = _helper_rebuild_obj_from_class_if_needed(PredictiveDecodingComputationsContainer, a_masked_container)
+            
+        if isinstance(a_masked_container.predictive_decoding, dict):
+            # a_masked_container.predictive_decoding = PredictiveDecoding(**get_dict_subset(a_masked_container.predictive_decoding, subset_excludelist=['_VersionedResultMixin_version']))
+            a_masked_container.predictive_decoding = _helper_rebuild_obj_from_class_if_needed(PredictiveDecoding, a_masked_container.predictive_decoding)
+            print(f'updated a_masked_container.predictive_decoding')
+
+        if isinstance(a_masked_container.predictive_decoding.locality_measures, dict):
+            # a_masked_container.predictive_decoding.locality_measures = DecodingLocalityMeasures(**get_dict_subset(a_masked_container.predictive_decoding.locality_measures, subset_excludelist=['_VersionedResultMixin_version', '_interpolator', 'locality_measures_df']))
+            a_masked_container.predictive_decoding.locality_measures = _helper_rebuild_obj_from_class_if_needed(DecodingLocalityMeasures, a_masked_container.predictive_decoding.locality_measures)
+            print(f'updated a_masked_container.predictive_decoding.locality_measures')
+
+
+        for a_t_bin_size, v in a_masked_container.epochs_decoded_result_cache_dict.items():
+            for an_epoch_name, a_masked_result in v.items():
+                a_masked_result = _helper_rebuild_obj_from_class_if_needed(DecodedFilterEpochsResult, a_masked_result)
+                # if isinstance(a_masked_result, dict):
+                #     a_masked_result: DecodedFilterEpochsResult = DecodedFilterEpochsResult(**get_dict_subset(a_masked_result, subset_excludelist=['_VersionedResultMixin_version'])) ## does this actually update the type of the embedded objects (in the dict)?
+
+
+
+        
+    """
+    from neuropy.utils.mixins.indexing_helpers import get_dict_subset, pop_dict_subset
+    
+    # Pop specific keys
+    if not isinstance(a_possible_dict, dict):
+        _cls_kwargs_dict = a_possible_dict.to_dict()
+    else:
+        _cls_kwargs_dict = a_possible_dict.copy()  # Make a copy to avoid modifying the original
+
+    # Get valid field names from the attrs class to filter the dict
+    valid_field_names = set()
+    if _is_attrs_class(target_cls):
+        try:
+            attrs_fields = fields(target_cls)
+            valid_field_names = {f.name for f in attrs_fields}
+        except (TypeError, AttributeError):
+            # If we can't get fields, we'll try to construct with all keys and catch errors
+            pass
+    
+    # Filter dict to only include valid field names (if we have them)
+    if valid_field_names:
+        # Separate valid and invalid keys
+        valid_kwargs = {k: v for k, v in _cls_kwargs_dict.items() if k in valid_field_names}
+        invalid_kwargs = {k: v for k, v in _cls_kwargs_dict.items() if k not in valid_field_names}
+    else:
+        # If we can't determine valid fields, use all keys and hope for the best
+        valid_kwargs = _cls_kwargs_dict
+        invalid_kwargs = {}
+
+    _ignore_re_add_subset = ['_VersionedResultMixin_version']
+    _potential_subset_includelist = ['neuron_extended_ids', '_VersionedResultMixin_version', '_interpolator', 'locality_measures_df', 'time_bin_size', 'spikes_df', 'time_binning_container']
+    subset_includelist = [a_col for a_col in _potential_subset_includelist if a_col in valid_kwargs] ## only exclude real columns
+    popped_subset = pop_dict_subset(valid_kwargs, subset_includelist=subset_includelist)
+    ## INPUTS: active_peak_prominence_2d_results
+    an_obj = target_cls(**valid_kwargs)
+    ## add the invalid properties from popped_subset (these are known safe attributes)
+    for k, v in popped_subset.items():
+        if k not in _ignore_re_add_subset:
+            setattr(an_obj, k, v)
+    ## add the invalid kwargs that are in our known safe list (but weren't valid field names)
+    for k, v in invalid_kwargs.items():
+        if k in _potential_subset_includelist and k not in _ignore_re_add_subset:
+            try:
+                setattr(an_obj, k, v)
+            except (AttributeError, TypeError):
+                # Skip if we can't set it (might be a read-only property)
+                pass
+
+    # Automatically rebuild nested objects from dicts based on type annotations
+    an_obj = _rebuild_nested_objects_from_dict(an_obj)
+
+    return an_obj
+
+
+
 
 def delete_fragmented_pickle_file(pkl_path: Path, debug_print:bool=True):
     assert pkl_path.exists()

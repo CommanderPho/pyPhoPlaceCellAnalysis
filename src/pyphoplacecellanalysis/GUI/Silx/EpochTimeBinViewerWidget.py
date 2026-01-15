@@ -1,3 +1,4 @@
+from copy import deepcopy
 from silx.gui import qt
 from silx.gui.plot import Plot2D
 from silx.gui.plot3d.ScalarFieldView import ScalarFieldView
@@ -737,6 +738,15 @@ class Epoch3DSceneTimeBinViewer(GenericSilxContainer, qt.QWidget):
                                            locality_measures_df=measures_df,
                                            text_columns=['measure1', 'measure2'])
         viewer.show()
+        
+        # Enable 3D mask stack visualization:
+        # First, add peak contours (required for mask stack):
+        viewer.add_peak_contours_overlays(peak_prominence_result, active_contour_level=0.9)
+        # Then enable the 3D mask stack:
+        viewer.setShowEpochMaskStack3D(True)
+        # Or set directly:
+        viewer.params.show_epoch_mask_stack_3d = True
+        viewer.on_epoch_changed(viewer.params.curr_epoch_idx)
     
     """
 
@@ -774,8 +784,10 @@ class Epoch3DSceneTimeBinViewer(GenericSilxContainer, qt.QWidget):
 
         # Detect point-like data mode (when 't' column exists in locality_measures_df)
         self.params.is_point_like_mode = (self.plots_data.locality_measures_df is not None and 't' in self.plots_data.locality_measures_df.columns)
+        self.params.show_epoch_mask_stack_3d = False
         self.params.use_groupItem = True
         self.plots.time_bin_groupItems = [] ## initialize to empty
+        self.plots.epoch_mask_stack_item = None
         # self.params.scene_projection_mode = 'perspective'
         self.params.scene_projection_mode = 'orthographic'
 
@@ -872,6 +884,145 @@ class Epoch3DSceneTimeBinViewer(GenericSilxContainer, qt.QWidget):
         return p_x_given_n.shape
 
 
+    def _build_epoch_mask_stack_volume(self, epoch_idx: int) -> Optional[np.ndarray]:
+        """Build a 3D mask volume for the given epoch from peak_contours.
+
+        Uses self.plots_data.peak_contours['epoch_prom_t_bin_high_prob_pos_mask'],
+        which can be either:
+        - A numpy array of shape (n_epochs, n_x_bins, n_y_bins, n_time_bins), or
+        - A list of arrays, one per epoch, each with shape (n_x_bins, n_y_bins, n_time_bins).
+
+        Returns:
+            volume: float32 array of shape (n_t_bins, n_y_bins, n_x_bins) == (z, y, x)
+                    suitable for use with ScalarField3D, or None if unavailable.
+        """
+        try:
+            peak_contours = self.plots_data.peak_contours
+        except AttributeError:
+            return None
+
+        if peak_contours is None or 'epoch_prom_t_bin_high_prob_pos_mask' not in peak_contours:
+            return None
+
+        epoch_masks = peak_contours['epoch_prom_t_bin_high_prob_pos_mask']
+        if epoch_masks is None:
+            return None
+
+        # Handle both list and array formats
+        if isinstance(epoch_masks, list):
+            # List format: one array per epoch
+            if epoch_idx >= len(epoch_masks):
+                return None
+            epoch_volume = epoch_masks[epoch_idx]
+        else:
+            # Array format: single 4D array
+            epoch_masks = np.asarray(epoch_masks)
+            if epoch_idx >= epoch_masks.shape[0]:
+                return None
+            epoch_volume = epoch_masks[epoch_idx]  # (n_x_bins, n_y_bins, n_time_bins)
+
+        if epoch_volume is None:
+            return None
+
+        epoch_volume = np.asarray(epoch_volume, dtype=np.float32)
+        if not np.any(epoch_volume):
+            return None
+
+        # Reorder axes to (z, y, x) == (time, y, x) for ScalarField3D
+        if epoch_volume.ndim != 3:
+            return None
+        volume_zyx = np.transpose(epoch_volume, (2, 1, 0))
+        return volume_zyx
+
+
+    def setShowEpochMaskStack3D(self, enabled: bool):
+        """Enable or disable the 3D mask stack visualization.
+        
+        Args:
+            enabled: If True, show the 3D mask stack; if False, hide it.
+        """
+        self.params.show_epoch_mask_stack_3d = enabled
+        # Rebuild scene for current epoch to apply changes
+        self.on_epoch_changed(self.params.curr_epoch_idx)
+
+
+    def _create_epoch_mask_stack_item(self):
+        """Create and position a 3D ScalarField3D item for the epoch mask stack.
+        
+        The stack is aligned in XY with t_bin_idx=0 and translated downward along Y
+        by -y_extent to position it below the time bin surfaces.
+        
+        Coordinate convention:
+        - Volume data is in (z, y, x) format where:
+          - z axis = time bins (n_t_bins)
+          - y axis = spatial Y dimension (n_y_bins)
+          - x axis = spatial X dimension (n_x_bins)
+        - The volume is positioned to align with the t_bin_idx=0 time bin surface
+          in XY coordinates, then offset downward by -y_extent along the Y axis.
+        """
+        if not self.params.show_epoch_mask_stack_3d:
+            return
+        
+        # Build the 3D volume for current epoch
+        volume_zyx = self._build_epoch_mask_stack_volume(self.params.curr_epoch_idx)
+        if volume_zyx is None:
+            return
+        
+        # Get coordinate extents for alignment
+        x_min = self.plots_data.x_min
+        x_max = self.plots_data.x_max
+        y_min = self.plots_data.y_min
+        y_max = self.plots_data.y_max
+        x_extent = self.plots_data.x_extent
+        y_extent = self.plots_data.y_extent
+        
+        # Create ScalarField3D item
+        volume_item = plot3d_items.ScalarField3D()
+        volume_item.setData(volume_zyx)
+        
+        # Set scale to match coordinate system
+        # volume_zyx shape: (n_t_bins, n_y_bins, n_x_bins) == (z, y, x)
+        n_z, n_y, n_x = volume_zyx.shape
+        
+        # Calculate scale factors to map volume indices to world coordinates
+        # Scale is per-voxel, so we need: extent / (size - 1) for non-singleton dimensions
+        if n_x > 1:
+            x_scale = x_extent / (n_x - 1)
+        else:
+            x_scale = x_extent if x_extent > 0 else 1.0
+        
+        if n_y > 1:
+            y_scale = y_extent / (n_y - 1)
+        else:
+            y_scale = y_extent if y_extent > 0 else 1.0
+        
+        # For Z (time) dimension, use a reasonable scale based on time bin spacing
+        # Use the same spacing as between time bins in the horizontal layout
+        z_extent = self.plots_data.bin_spacing if hasattr(self.plots_data, 'bin_spacing') else y_extent
+        if n_z > 1:
+            z_scale = z_extent / (n_z - 1)
+        else:
+            z_scale = z_extent if z_extent > 0 else 1.0
+        
+        volume_item.setScale(x_scale, y_scale, z_scale)
+        
+        # Position the volume to align with t_bin_idx=0 in XY
+        # Translate to start at (x_min, y_min) in XY, and offset downward along Y
+        # The Y offset positions it below the time bin surfaces
+        y_offset = -y_extent  # Translate downward by full Y extent
+        volume_item.setTranslation(x_min, y_min + y_offset, 0.0)
+        
+        # Add isosurface at 0.5 threshold (midpoint for binary masks)
+        volume_item.addIsosurface(0.5, '#FF000080')  # Red, semi-transparent
+        
+        # Set label for identification in parameter tree
+        volume_item.setLabel(f"EpochMaskStack[epoch={self.params.curr_epoch_idx}]")
+        
+        # Add to scene
+        self.plots.scene_widget.addItem(volume_item)
+        self.plots.epoch_mask_stack_item = volume_item
+        
+        print(f"DEBUG: Created 3D mask stack item for epoch {self.params.curr_epoch_idx}, shape {volume_zyx.shape}")
 
 
     def _get_sidebar_tab_widget(self) -> Optional[qt.QTabWidget]:
@@ -1974,7 +2125,11 @@ class Epoch3DSceneTimeBinViewer(GenericSilxContainer, qt.QWidget):
             # image_item.setScale(y_scale, x_scale, 1.0) ## confirmed that it's XY-flipped, this one results in the right scale
 
             # active_item_translation = (np.array(item_center_inverse_translation)).tolist()
-            active_item_translation = (np.array(item_data_units_center_inverse_point)).tolist() ## data-units, should work post-scale
+            # active_item_translation = (np.array(item_data_units_center_inverse_point)).tolist() ## data-units, should work post-scale
+        
+            ## offset y so images are above the points items
+            active_item_translation = (np.array(item_data_units_center_inverse_point) + np.array((0.0, self.plots_data.y_extent, 0.0))).tolist() ## data-units, should work post-scale
+
             print(f't_bin_idx: {t_bin_idx}\n\tactive_item_translation: {active_item_translation}')
             # active_item_translation = (np.array(item_center_inverse_translation) + np.array(translation_triple)).tolist()
             # active_item_translation = (np.array(item_center_inverse_translation) + np.array(translation_triple)).tolist()
@@ -2053,9 +2208,11 @@ class Epoch3DSceneTimeBinViewer(GenericSilxContainer, qt.QWidget):
         self.params.slice_level_multipliers = [active_contour_level]
 
         self.plots_data.peak_contours = {}
-        self.plots_data.peak_prominence_result = peak_prominence_result
+        self.plots_data.peak_prominence_result = deepcopy(peak_prominence_result)
 
-        mask_included_bins_list, summit_slice_levels_list, mask_included_p_x_given_n_list_dict, epoch_prom_t_bin_high_prob_pos_masks, epoch_prom_high_prob_pos_masks, *extra_outs = peak_prominence_result.compute_discrete_contour_masks(p_x_given_n_list=self.plots_data.decoded_result.p_x_given_n_list, slice_level_multipliers=self.params.slice_level_multipliers)
+        mask_included_bins_list, summit_slice_levels_list, mask_included_p_x_given_n_list_dict, epoch_prom_t_bin_high_prob_pos_masks, epoch_prom_high_prob_pos_masks, *extra_outs = self.plots_data.peak_prominence_result.compute_discrete_contour_masks(p_x_given_n_list=self.plots_data.decoded_result.p_x_given_n_list,
+                                                                                                                                                                                                                                                          slice_level_multipliers=self.params.slice_level_multipliers,
+                                                                                                                                                                                                                                                          )
 
         # mask_included_bins_list
         # summit_slice_levels_list
@@ -2405,7 +2562,16 @@ class Epoch3DSceneTimeBinViewer(GenericSilxContainer, qt.QWidget):
                     pass
                 
         self.time_bin_items.clear()
-        self.plots.time_bin_groupItems.clear()        
+        self.plots.time_bin_groupItems.clear()
+        
+        # Clear 3D mask stack item if present
+        if self.plots.epoch_mask_stack_item is not None:
+            try:
+                if hasattr(self.plots.scene_widget, 'removeItem'):
+                    self.plots.scene_widget.removeItem(self.plots.epoch_mask_stack_item)
+            except:
+                pass
+            self.plots.epoch_mask_stack_item = None        
 
     def on_epoch_changed(self, value):
         """Called when epoch slider changes"""
@@ -2424,6 +2590,10 @@ class Epoch3DSceneTimeBinViewer(GenericSilxContainer, qt.QWidget):
         # Recreate peak-contour overlays for this epoch if available
         if self.plots_data.peak_prominence_result is not None:
             self._add_contours_for_current_epoch()
+        
+        # Create 3D mask stack item if enabled
+        if self.params.show_epoch_mask_stack_3d:
+            self._create_epoch_mask_stack_item()
         
         # Update label positions after a short delay to ensure window is sized
         qt.QTimer.singleShot(100, self._update_text_label_positions)

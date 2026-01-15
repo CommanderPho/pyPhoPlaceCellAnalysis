@@ -372,10 +372,26 @@ class PosteriorPeaksPeakProminence2dResult(ComputedResult):
 
         """
         num_slice_levels: int = len(slice_level_multipliers)
+        n_epochs: int = len(p_x_given_n_list)
+
+        available_level_multipliers = np.unique(self.flat_peaks_df['slice_level_multiplier'])
 
         peak_tips_only_df = self.flat_peaks_df[np.isin(self.flat_peaks_df['slice_level_multiplier'], slice_level_multipliers)].reset_index(drop=True) ## ['summit_slice_area'] > 0.0
+        ## build summit_slice_level dict
+        # Method 4: If there might be duplicate keys and you want to handle them  (e.g., take the first, last, or raise an error)
+        flat_peaks_summit_slice_level_dict: Dict[Tuple, float] = (
+            peak_tips_only_df
+            .drop_duplicates(subset=['epoch_idx', 'time_bin_idx', 'summit_idx', 'slice_level_multiplier'], keep='first')
+            .set_index(['epoch_idx', 'time_bin_idx', 'summit_idx', 'slice_level_multiplier'])
+            ['summit_slice_level']
+            .to_dict()
+        )
+
+        flat_peaks_summit_slice_level_dict
+
+
         # p_x_given_n_list = decoded_local_epochs_result.p_x_given_n_list
-        mask_included_bins_list = []
+        mask_included_bins_list: List[List[NDArray]] = [] # [ND.Shape["N_XBINS, N_YBINS, N_DIM3"], Any]
         summit_slice_levels_list = []
         # summit_slice_levels_df_list = []
         # mask_included_p_x_given_n_list = {a_multiplier:[] for a_multiplier in slice_level_multipliers}
@@ -401,6 +417,7 @@ class PosteriorPeaksPeakProminence2dResult(ComputedResult):
 
                 for slice_idx, a_slice_multiplier in enumerate(slice_level_multipliers):
                     a_slice_level_df: pd.DataFrame = active_df[active_df['slice_level_multiplier'] == a_slice_multiplier]
+                    # a_slice_level: Optional[float] = flat_peaks_summit_slice_level_dict.get((an_epoch_idx, a_rel_t_bin_idx, slice_idx, a_slice_multiplier))
                     a_slice_level = a_slice_level_df['summit_slice_level'].to_numpy()
                     if len(a_slice_level) > 0:
                         a_slice_level = a_slice_level[0] ## unpack
@@ -444,26 +461,14 @@ class PosteriorPeaksPeakProminence2dResult(ComputedResult):
 
         # pd.DataFrame(summit_slice_levels_list, columns=slice_level_multipliers)
 
-
-        # mask_included_p_x_given_n_list_dict = {a_slice_multiplier:[[np.stack(a_mask[slice_idx], axis=0) for a_rel_t_bin_idx, a_mask in enumerate(p_x_given_n_dt)] for an_epoch_idx, p_x_given_n_dt in enumerate(mask_included_bins_list)] for slice_idx, a_slice_multiplier in enumerate(slice_level_multipliers)}
-        # mask_included_p_x_given_n_list_dict = {a_slice_multiplier:[[np.stack(a_mask[slice_idx], axis=0) for a_mask in p_x_given_n_dt] for p_x_given_n_dt in mask_included_bins_list] for slice_idx, a_slice_multiplier in enumerate(slice_level_multipliers)}        
-        # mask_included_p_x_given_n_list_dict = {a_slice_multiplier:[np.atleast_3d(np.stack([a_mask[slice_idx] for a_mask in p_x_given_n_dt], axis=-1)) for p_x_given_n_dt in mask_included_bins_list] for slice_idx, a_slice_multiplier in enumerate(slice_level_multipliers)}
-        # mask_included_p_x_given_n_list_dict = {a_slice_multiplier:[np.stack([a_mask[slice_idx] for a_rel_t_bin_idx, a_mask in enumerate(p_x_given_n_dt)], axis=-1) for an_epoch_idx, p_x_given_n_dt in enumerate(mask_included_bins_list)] for slice_idx, a_slice_multiplier in enumerate(slice_level_multipliers)}
-        # mask_included_p_x_given_n_list_dict = {a_slice_multiplier:[np.stack([a_mask[slice_idx] for a_mask in p_x_given_n_dt], axis=-1) for p_x_given_n_dt in mask_included_bins_list] for slice_idx, a_slice_multiplier in enumerate(slice_level_multipliers)}
         mask_included_p_x_given_n_list_dict = {a_slice_multiplier:[np.atleast_3d(np.stack([a_mask[slice_idx] for a_mask in p_x_given_n_dt], axis=-1)) for p_x_given_n_dt in mask_included_bins_list] for slice_idx, a_slice_multiplier in enumerate(slice_level_multipliers)}
 
         ## get the masks for each time bins within each epoch
-        # epoch_prom_t_bin_high_prob_pos_masks = mask_included_p_x_given_n_list_dict[slice_level_multipliers[-1]]
-        # epoch_prom_t_bin_high_prob_pos_masks = {a_slice_multiplier:np.atleast_3d(a_slice_mask) for a_slice_multiplier, a_slice_mask in mask_included_p_x_given_n_list_dict.items()}
         epoch_prom_t_bin_high_prob_pos_masks = {a_slice_multiplier:a_slice_mask for a_slice_multiplier, a_slice_mask in mask_included_p_x_given_n_list_dict.items()}
-        # epoch_prom_t_bin_high_prob_pos_masks
 
         ## Collapse over all epochs:
-        # epoch_prom_high_prob_pos_masks = [np.any(v, -1, keepdims=False) for v in epoch_prom_t_bin_high_prob_pos_masks]
-        # epoch_prom_high_prob_pos_masks = {a_slice_multiplier:np.any(an_epoch_prom_t_bin_high_prob_pos_mask, -1, keepdims=False) for a_slice_multiplier, an_epoch_prom_t_bin_high_prob_pos_mask in epoch_prom_t_bin_high_prob_pos_masks.items()}
         epoch_prom_high_prob_pos_masks = {a_slice_multiplier:[np.any(np.atleast_3d(a_slice_mask), -1, keepdims=False) for a_slice_mask in a_slice_mask_list] for a_slice_multiplier, a_slice_mask_list in mask_included_p_x_given_n_list_dict.items()} # np.shape(epoch_prom_high_prob_pos_masks) #  (74, 41, 63) - (n_epochs, n_xbins, n_ybins) -- boolean masks indicating whether that bin is included for the epoch (all of its time bins)
         
-
         return mask_included_bins_list, summit_slice_levels_list, mask_included_p_x_given_n_list_dict, epoch_prom_t_bin_high_prob_pos_masks, epoch_prom_high_prob_pos_masks
 
 
@@ -1077,6 +1082,10 @@ class PeakPromenence:
         return included_computed_contours
 
 
+    # ==================================================================================================================================================================================================================================================================================== #
+    # _compute_single_posterior_slab Functions                                                                                                                                                                                                                                             #
+    # ==================================================================================================================================================================================================================================================================================== #
+
     @function_attributes(short_name=None, tags=['internal', 'parallelizable'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-01-06 06:48', related_items=[])
     @classmethod
     def _compute_single_posterior_slab(cls, epoch_idx: int, t_idx: int, slab: NDArray, xbin_centers: NDArray, ybin_centers: NDArray, step: float, min_considered_promenence: float, peak_height_multiplier_probe_levels: Tuple, debug_print: bool = False, should_return_raw_matplotlib_Path_contours: bool=False):
@@ -1483,12 +1492,12 @@ class PeakPromenence:
 
 
     @classmethod
-    def _build_filtered_summits_analysis_results(cls, xbin, ybin, xbin_labels, ybin_labels, flat_peaks_df, active_eloy_analysis, slice_level_multiplier=0.5, minimum_included_peak_height=0.5, debug_print=False):
+    def _build_filtered_summits_analysis_results(cls, xbin, ybin, xbin_labels, ybin_labels, flat_peaks_df: pd.DataFrame, active_eloy_analysis=None, slice_level_multiplier=0.5, minimum_included_peak_height=0.5, debug_print=False):
         """ builds the filtered summits analysis results dataframe and flat counts matrix 
         
         Usage:
             filtered_summits_analysis_df, pf_peak_counts_map = build_filtered_summits_analysis_results(active_pf_2D.xbin, active_pf_2D.ybin, active_pf_2D.xbin_labels, active_pf_2D.ybin_labels,
-                                                                                            active_peak_prominence_2d_results, active_eloy_analysis, slice_level_multiplier=0.5, minimum_included_peak_height=1.0, debug_print = False)
+                                                                                            active_peak_prominence_2d_results, active_eloy_analysis=active_eloy_analysis, slice_level_multiplier=0.5, minimum_included_peak_height=1.0, debug_print = False)
                                                                                             
         """
         ## Find which position bin each peak falls in and add it to the flat_peaks_df:
@@ -1520,6 +1529,8 @@ class PeakPromenence:
             
         return filtered_summits_analysis_df, pf_peak_counts_map
 
+
+    @function_attributes(short_name=None, tags=['OLD', 'Eloy'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-01-13 01:48', related_items=[])
     @classmethod
     def _compute_distances_from_peaks_to_boundary(cls, active_pf_2D, filtered_flat_peaks_df, debug_print = True):
         """ Computes the distance to boundary by computing the distance to the nearest never-occupied bin
@@ -1738,7 +1749,8 @@ class PeakPromenence:
         return peak_nearest_directional_boundary_bins, peak_nearest_directional_boundary_displacements, peak_nearest_directional_boundary_distances
 
 
-    @function_attributes(short_name=None, tags=['step-size', 'helper'], input_requires=[], output_provides=[], uses=[], used_by=['_perform_find_posterior_peaks_peak_prominence2d_computation'], creation_date='2025-12-23 00:00', related_items=[])
+
+    @function_attributes(short_name=None, tags=['step-size', 'helper', 'new'], input_requires=[], output_provides=[], uses=[], used_by=['_perform_find_posterior_peaks_peak_prominence2d_computation'], creation_date='2025-12-23 00:00', related_items=[])
     @classmethod
     def compute_optimal_step_size(cls, p_x_given_n_list: List[NDArray], resolution_factor: float = 500.0, min_step: float = 1e-6, max_step: float = 0.1, debug_print: bool = False) -> float:
         """Computes an optimal step size for prominence calculation based on the data range in p_x_given_n_list.
@@ -1924,6 +1936,8 @@ class PeakPromenence:
                     a_p_x_given_n = np.squeeze(p_x_given_n[:, :, t_idx])
                     slab = a_p_x_given_n.T  # match compute_prominence_contours convention
                     tasks.append((epoch_idx, t_idx, slab))
+            ## END for epoch_idx in np.arange(n_epochs)...
+
 
             out_results = {}
             out_posteriors_peak_dfs_list = []
@@ -1966,9 +1980,18 @@ class PeakPromenence:
             results_list.sort(key=lambda tup: (tup[0], tup[1]))
 
             for epoch_idx, t_idx, posterior_peaks_df, slab_result_dict in results_list:
+                try:
+                    if isinstance(slab_result_dict, dict):
+                        slab_result: SlabResult = SlabResult(**slab_result_dict)
+                        slab_result_dict = slab_result
+                except Exception as e:
+                    raise e
                 out_results[(epoch_idx, t_idx)] = slab_result_dict
+
                 if not posterior_peaks_df.empty:
                     out_posteriors_peak_dfs_list.append(posterior_peaks_df)
+            ## END for epoch_idx, t_idx, posterior_peaks_df, slab_result_dict in results_list...
+
 
             if len(out_posteriors_peak_dfs_list) == 0:
                 # no peaks found anywhere; return empty structures
@@ -1994,9 +2017,11 @@ class PeakPromenence:
             # Filter the summits, compute peak-counts, etc:
             # We do not currently have an EloyAnalysis-like object for posteriors, so pass None.
             active_eloy_analysis = None
-            filtered_summits_analysis_df, pf_peak_counts_map = PeakPromenence._build_filtered_summits_analysis_results(
-                xbin, ybin, np.arange(1, len(xbin)), np.arange(1, len(ybin)),
-                posterior_peaks_df, active_eloy_analysis,
+            xbin_labels = np.arange(1, len(xbin))
+            ybin_labels = np.arange(1, len(ybin))
+            filtered_summits_analysis_df, pf_peak_counts_map = cls._build_filtered_summits_analysis_results(
+                xbin=xbin, ybin=ybin, xbin_labels=xbin_labels, ybin_labels=ybin_labels,
+                flat_peaks_df=posterior_peaks_df, active_eloy_analysis=active_eloy_analysis,
                 slice_level_multiplier=0.5,
                 minimum_included_peak_height=minimum_included_peak_height,
                 debug_print=debug_print)

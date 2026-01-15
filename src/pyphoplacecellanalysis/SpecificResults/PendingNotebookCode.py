@@ -120,6 +120,423 @@ from pyphocorehelpers.gui.Qt.color_helpers import ColormapHelpers, ColorFormatCo
 
 
 
+import numpy as np
+from scipy.ndimage import label, generate_binary_structure, binary_opening
+# from skimage.morphology import binary_opening
+from scipy.ndimage import binary_dilation
+from scipy.ndimage import distance_transform_edt
+from neuropy.core.position import PositionAccessor, Position, PositionComputedDataMixin
+
+
+@metadata_attributes(short_name=None, tags=['mask', 't-bins', 'posterior'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-01-13 07:17', related_items=[])
+class PosteriorMaskPostProcessing:
+    """ 
+
+    from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import PosteriorMaskPostProcessing
+
+    """
+    # @classmethod
+    # def bridge_blobs(cls, A, B, n_steps: int=3, structure=np.ones((3,3))):
+    #     """ Morphological dilation bridge (fast, robust, approximate)
+    #         Iteratively dilate both blobs until they touch, then assign intermediate steps.
+    #     """
+    #     A_cur = A.copy()
+    #     B_cur = B.copy()
+    #     out = []
+
+    #     for i in range(n_steps):
+    #         alpha = (i + 1) / (n_steps + 1)
+    #         A_cur = binary_dilation(A_cur, structure)
+    #         B_cur = binary_dilation(B_cur, structure)
+
+    #         interp = np.logical_or(
+    #             A_cur if alpha < 0.5 else B_cur,
+    #             A_cur & B_cur
+    #         )
+    #         out.append(interp)
+
+    #     return out
+
+
+    # @classmethod
+    # def generate_intermediates(cls, A, B, n_steps: int=3):
+    #     """ Signed distance field interpolation (geometrically correct)
+        
+    #     """
+    #     def _subfn_signed_distance(mask):
+    #         return (
+    #             distance_transform_edt(mask)
+    #             - distance_transform_edt(~mask)
+    #         )
+
+    #     def _subfn_interpolate_blob(A, B, alpha):
+    #         dA = _subfn_signed_distance(A)
+    #         dB = _subfn_signed_distance(B)
+    #         return ( (1-alpha)*dA + alpha*dB ) > 0
+
+    #     # ==================================================================================================================================================================================================================================================================================== #
+    #     # BEGIN FUNCTION BODY                                                                                                                                                                                                                                                                  #
+    #     # ==================================================================================================================================================================================================================================================================================== #
+    #     intermediates = [
+    #         _subfn_interpolate_blob(A, B, alpha)
+    #         for alpha in np.linspace(0, 1, n_steps+2)[1:-1]
+    #     ]
+    #     return intermediates
+    
+
+
+    # ==============================================================
+    # Geometry utilities
+    # ==============================================================
+
+    @staticmethod
+    def _signed_distance(mask: NDArray) -> NDArray:
+        return (distance_transform_edt(mask) - distance_transform_edt(~mask))
+
+    @classmethod
+    def _interpolate_blob(cls, A: NDArray, B: NDArray, alpha: float) -> NDArray:
+        dA = cls._signed_distance(A)
+        dB = cls._signed_distance(B)
+        return ((1 - alpha) * dA + alpha * dB) > 0
+
+    # ==============================================================
+    # Temporal bridging
+    # ==============================================================
+
+    @classmethod
+    def _can_bridge(cls, A: NDArray, B: NDArray, max_dilation: int = 2) -> bool:
+        return np.any(binary_dilation(A, iterations=max_dilation) & B)
+
+    @classmethod
+    def _bridge_pair(cls, A: NDArray, B: NDArray, n_steps: int) -> List[NDArray]:
+        return [
+            cls._interpolate_blob(A, B, alpha)
+            for alpha in np.linspace(0, 1, (n_steps + 2))[1:-1]
+        ]
+    
+
+    @function_attributes(short_name=None, tags=['main'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-01-13 00:00', related_items=[])
+    @classmethod
+    def _process_epoch_time_bins_masks(cls, a_mask_t: NDArray[ND.Shape["N_X_BINS, N_Y_BINS, N_TIME_BINS"], Any], max_gap: int = 1, n_interp: int = 1, **kwargs):
+        """
+        a_mask_t: (n_x_bins, n_y_bins, n_t_bins) boolean
+        """
+        # # masks: (n_t_bins, n_x_bins, n_y_bins)
+        # a_mask_t = a_mask_t.astype(bool)
+        # a_mask_t = binary_opening(a_mask_t, structure=np.ones((1,3,3)))
+
+        # # 3D connectivity: (t, x, y)
+        # # connectivity=1 → 6-connected
+        # structure = generate_binary_structure(rank=3, connectivity=1)
+
+        # labeled, n_objects = label(a_mask_t, structure=structure)
+
+        # ## Generate Intermediates if possible:        
+        # if not np.any(binary_dilation(A, iterations=2) & B):
+        #     return None  # do NOT connect
+
+
+        # return labeled, n_objects, a_mask_t
+
+        # ----------------------------------------------------------
+        # Input normalization
+        # ----------------------------------------------------------
+        a_mask_t = a_mask_t.astype(bool)
+
+        n_x_bins, n_y_bins, n_t_bins = a_mask_t.shape
+
+        # ----------------------------------------------------------
+        # Spatial cleanup (per time slice)
+        # ----------------------------------------------------------
+        for t in range(n_t_bins):
+            a_mask_t[..., t] = binary_opening(
+                a_mask_t[..., t],
+                structure=np.ones((3, 3)),
+            )
+
+        # ----------------------------------------------------------
+        # Temporal gap filling
+        # ----------------------------------------------------------
+        filled_slices = []
+        t = 0
+
+        while t < n_t_bins:
+            A = a_mask_t[..., t]
+            filled_slices.append(A)
+
+            # Look ahead up to max_gap steps to find the next non-empty slice
+            gap_filled = False
+            for gap in range(1, max_gap + 1):
+                if (t + gap) >= n_t_bins:
+                    break
+                
+                B = a_mask_t[..., t + gap]
+                
+                # Skip if B is empty
+                if not np.any(B):
+                    continue
+                
+                # If blobs do not overlap, attempt to bridge
+                if not np.any(A & B):
+                    if cls._can_bridge(A, B, max_dilation=max_gap):
+                        # Generate intermediates for the gap
+                        # Total interpolation steps: gap * n_interp (n_interp steps per gap unit)
+                        total_interp_steps = gap * n_interp
+                        intermediates = cls._bridge_pair(A, B, n_steps=total_interp_steps)
+                        filled_slices.extend(intermediates)
+                        gap_filled = True
+                        t += gap  # Skip ahead to B (will be added in next iteration)
+                        break
+                else:
+                    # They overlap, so no bridging needed - move forward normally
+                    break
+            
+            if not gap_filled:
+                t += 1
+
+        # Stack back into (x, y, t_filled)
+        filled_masks = np.stack(filled_slices, axis=-1).astype(bool)
+
+        # ----------------------------------------------------------
+        # 3D connected components (x, y, t)
+        # ----------------------------------------------------------
+        structure = generate_binary_structure(rank=3, connectivity=1)
+        labeled, n_objects = label(filled_masks, structure=structure)
+
+        return labeled, n_objects, filled_masks
+    
+
+    @function_attributes(short_name=None, tags=['centroid'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-01-14 08:12', related_items=[])
+    @classmethod
+    def centroids_from_binary_stack(cls, mask_stack: NDArray):
+        # mask_stack: (H, W, N)
+
+        H, W, N = mask_stack.shape
+
+        y_idx = np.arange(H)[:, None, None]
+        x_idx = np.arange(W)[None, :, None]
+
+        mass = mask_stack.sum(axis=(0, 1))
+
+        cy = np.full(N, np.nan)
+        cx = np.full(N, np.nan)
+
+        valid = mass > 0
+        cy[valid] = (mask_stack[..., valid] * y_idx).sum(axis=(0, 1)) / mass[valid]
+        cx[valid] = (mask_stack[..., valid] * x_idx).sum(axis=(0, 1)) / mass[valid]
+
+        return np.stack([cy, cx], axis=1) # (N, 2)
+
+
+    @classmethod
+    def centroid_df_from_binary_stack(cls, mask_stack: NDArray, time_window_centers: Optional[NDArray]=None):
+        """ 
+        Usage:
+            centroids_dfs: List[pd.DataFrame] = [PosteriorMaskPostProcessing.centroid_df_from_binary_stack(mask_stack=a_t_bin_mask_list, time_window_centers=a_decoded_result.time_window_centers[epoch_idx]) for epoch_idx, a_t_bin_mask_list in enumerate(epoch_t_bins_high_prob_pos_masks)]
+
+
+        """
+        a_centroids = cls.centroids_from_binary_stack(mask_stack=mask_stack)
+        assert len(time_window_centers) == np.shape(a_centroids)[0]
+        centroids_df: pd.DataFrame = pd.DataFrame(a_centroids, columns=['x', 'y'])
+        centroids_df['t'] = time_window_centers
+        centroids_df = PosteriorMaskPostProcessing.add_angular_movement_dir(epoch_centroids=a_centroids, epoch_time_window_centers=time_window_centers)
+        centroids_df = centroids_df.position.adding_segmented_trajectories_columns()
+        return centroids_df ## has ['dir_angle_binned', 'approx_dir_degrees']
+
+
+    @function_attributes(short_name=None, tags=[''], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-01-14 10:40', related_items=[])
+    @classmethod
+    def add_angular_movement_dir(cls, epoch_centroids: NDArray[ND.Shape["N_EPOCH_TIME_BINS, 2"], Any], epoch_time_window_centers: NDArray[ND.Shape["N_EPOCH_TIME_BINS"], Any], n_dir_angular_bins: int = 8, smoothing_num_timesteps: Optional[int]=None) -> pd.DataFrame:
+        """ Computes the angular direction of change between successive posterior-mask blob centroids
+        
+        adds: ['approx_dir_degrees', 'dir_angle_binned', ]
+        
+        centroids_df:
+        
+        array([[31.8846, 10.2692],
+            [25.3333, 3.26667],
+            [17.5714, 2.14286],
+            [23.4516, 56.5806]])
+            
+        """
+        centroids_df: pd.DataFrame = pd.DataFrame(epoch_centroids, columns=['x', 'y'])
+        centroids_df['t'] = epoch_time_window_centers
+        centroids_df = centroids_df.position.compute_higher_order_derivatives()
+
+        if smoothing_num_timesteps:
+            if len(epoch_time_window_centers) < smoothing_num_timesteps:
+                raise ValueError(f'smoothing smoothing_num_timesteps: {smoothing_num_timesteps} is larger than the actual number of timesteps {len(epoch_time_window_centers)}')
+            vel_x_col_name: str = 'velocity_x_smooth'
+            vel_y_col_name: str = 'velocity_y_smooth'
+
+            centroids_df = centroids_df.position.compute_smoothed_position_info(N=smoothing_num_timesteps)
+        else:
+            vel_x_col_name: str = 'velocity_x'
+            vel_y_col_name: str = 'velocity_y'
+            
+
+        centroids_df['approx_dir_degrees'] = ((np.rad2deg(np.arctan2(centroids_df[vel_y_col_name], centroids_df[vel_x_col_name])) + 360) % 360) # arctan2 is required to get the angle right
+        centroids_df = centroids_df.dropna(axis='index', subset=['approx_dir_degrees'])
+        
+        if n_dir_angular_bins is not None:
+            angle_dir_bin_edges = np.linspace(0, 360, (n_dir_angular_bins + 1))
+            n_dir_angular_bins: int = len(angle_dir_bin_edges) - 1
+            # Use pd.cut with the explicit bin edges
+            centroids_df['dir_angle_binned'] = pd.cut(centroids_df['approx_dir_degrees'], bins=angle_dir_bin_edges, labels=False, include_lowest=True)
+            centroids_df = centroids_df.dropna(axis='index', subset=['dir_angle_binned'])
+
+        return centroids_df
+
+
+    @function_attributes(short_name=None, tags=['working'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-01-14 13:36', related_items=[])
+    @classmethod
+    def _compare_centroid_and_pos_traj_angle(cls, a_pos_df: pd.DataFrame, a_centroids_search_segments_df: pd.DataFrame, centroid_angle_col: str='segment_Vp_deg_safe_mean', segments_compare_col_name: str = 'segment_Vp_deg_mean_safe', close_angle_deg: float=60.0, allow_antiparallel_matching: bool=True, disable_segmentation: bool = True):
+        """ find any matching witin close_angle_deg degrees of one another
+
+        a_pos_df, pos_segment_to_centroid_seq_segment_idx_map = PosteriorMaskPostProcessing._compare_centroid_and_pos_traj_angle(a_pos_df=a_pos_df, a_centroids_search_segments_df=a_centroids_search_segments_df)
+        
+        Adds columns:
+            ['centroid_pos_traj_matching_angle_idx'] to `a_pos_df`
+        
+        """
+        a_pos_df = a_pos_df.position.adding_segmented_trajectories_columns(overwrite_existing=True, disable_segmentation=disable_segmentation)
+        a_centroids_search_segments_df = a_centroids_search_segments_df.dropna(subset=[centroid_angle_col], inplace=False)
+
+        a_pos_df['centroid_pos_traj_matching_angle_idx'] = -1 ## None of the positions match to start
+        
+        pos_segment_to_centroid_seq_segment_idx_map = {}
+        
+        # Find the segments for this dataframe of positions __________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
+        # ['segment_Vp_deg_safe_mean', 'segment_Vp_deg_mean', 'segment_dir_angle_binned_mean']    
+
+        # Performed 5 aggregations grouped on column: 'segment_idx'
+        a_pos_df_segments_df = a_pos_df.groupby(['segment_idx']).agg(segment_dir_angle_binned_mean=('segment_dir_angle_binned', 'mean'), segment_Vp_scatteredness_mean=('segment_Vp_scatteredness', 'mean'), segment_Vp_deg_mean=('segment_Vp_deg', 'mean'), approx_head_dir_degrees_mean=('approx_head_dir_degrees', 'mean'), Vp_mean=('Vp', 'mean'), segment_Vp_deg_mean_safe=('segment_Vp_deg', PositionComputedDataMixin.circular_mean_deg)).reset_index()
+
+        for a_pos_traj_segment_row in a_pos_df_segments_df.itertuples(name='segment_tuple'):
+            # ['segment_Vp_deg_mean', ]
+            
+            if len(a_centroids_search_segments_df) > 0:
+                # a_pos_traj_segment_row.segment_Vp_deg_mean_safe # getattr(a_pos_traj_segment_row, segments_compare_col_name) ._asdict()[segments_compare_col_name]
+                # is_segment_close = np.isclose(a_pos_traj_segment_row.segment_Vp_deg_mean_safe, a_centroids_search_segments_df[centroid_angle_col], tol=30.0) # find any matching witin 30 degrees of one another
+                
+                diffs = PositionComputedDataMixin.angular_diff_deg(getattr(a_pos_traj_segment_row, segments_compare_col_name), a_centroids_search_segments_df[centroid_angle_col].to_numpy())
+                is_segment_close = diffs <= close_angle_deg
+                
+                if allow_antiparallel_matching:
+                    # Also check if angles are within close_angle_deg of being 180 degrees apart (anti-parallel)
+                    is_antiparallel = np.abs(diffs - 180.0) <= close_angle_deg
+                    is_segment_close = is_segment_close | is_antiparallel
+
+                pos_segment_to_centroid_seq_segment_idx_map[a_pos_traj_segment_row.segment_idx] = [contour_idx for contour_idx, is_close in enumerate(is_segment_close) if is_close]
+
+                ## set index:
+                matching_centroid_indices = np.where(is_segment_close)[0]
+                if len(matching_centroid_indices) > 0:
+                    # Set position rows in this segment to the index of the matching centroid segment (use first match if multiple)
+                    matching_idx = matching_centroid_indices[0]
+                    a_pos_df.loc[a_pos_df['segment_idx'] == a_pos_traj_segment_row.segment_idx, 'centroid_pos_traj_matching_angle_idx'] = matching_idx
+                                
+
+                # a_centroids_search_segments_df[centroid_angle_col]
+            else:
+                ## no matching segments
+                pos_segment_to_centroid_seq_segment_idx_map[a_pos_traj_segment_row.segment_idx] = []        
+                        
+            ## Compare the canidate trajectory's angles to the df
+            # a_pos_df_segments_df
+        ## END for a_pos_traj_segment_row in a_pos_df_segments_df.itertuples(name='segm...
+
+        return a_pos_df, pos_segment_to_centroid_seq_segment_idx_map
+
+
+    @function_attributes(short_name=None, tags=['main'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-01-14 16:53', related_items=[])
+    @classmethod
+    def compute_posterior_mask_position_sequence_alignments(cls, epoch_t_bins_high_prob_pos_masks):
+        """
+
+            ## INPUTS: masked_container
+            
+            measured_positions_df: pd.DataFrame = deepcopy(masked_container.decoding_locality.measured_positions_df)
+            # measured_positions_df
+
+            gaussian_volume = masked_container.predictive_decoding.gaussian_volume ## the volume for all time bins
+
+            # Usage from Container:
+            a_t_bin_size: float = 0.025
+            # a_decoder_name: str = 'roam'
+            a_decoder_name: str = 'sprinkle'
+            slice_level_multipliers = [0.25, 0.5, 0.9]
+
+            a_decoder = masked_container.pf1D_Decoder_dict[a_decoder_name]
+            a_decoded_result = masked_container.epochs_decoded_result_cache_dict[a_t_bin_size][a_decoder_name] # DecodedFilterEpochsResult
+            a_decoded_filter_epochs_df: pd.DataFrame = a_decoded_result.filter_epochs
+            # a_decoded_result.active_filter_epochs
+
+            ## INPUTS: decoded_epoch_t_bins_promenence_result_obj
+
+            mask_included_bins_list, summit_slice_levels_list, mask_included_p_x_given_n_list_dict, epoch_prom_t_bin_high_prob_pos_masks_dict, epoch_prom_high_prob_pos_masks_dict, *extra_outs = decoded_epoch_t_bins_promenence_result_obj.compute_discrete_contour_masks(p_x_given_n_list=a_decoded_result.p_x_given_n_list, slice_level_multipliers=slice_level_multipliers)
+
+            epoch_matching_past_future_positions, _an_out_tuple, a_decoded_filter_epochs_df = PredictiveDecoding.compute_specific_future_and_past_analysis(decoded_local_epochs_result=a_decoded_result,
+                    measured_positions_df=measured_positions_df, gaussian_volume=gaussian_volume,
+                    active_epochs_df=a_decoded_filter_epochs_df,
+                    an_epoch_name=a_decoder_name, top_v_percent=None,
+                    epoch_t_bin_high_prob_masks_dict=epoch_prom_t_bin_high_prob_pos_masks_dict,
+                    epoch_high_prob_masks_dict=epoch_prom_high_prob_pos_masks_dict,
+                    a_slice_multiplier=slice_level_multipliers[0],
+                    progress_print=True,
+                    merging_adjacent_max_separation_sec = 1e-9,
+                    minimum_epoch_duration = 0.05,
+                    # merging_adjacent_max_separation_sec=merging_adjacent_max_separation_sec, minimum_epoch_duration=minimum_epoch_duration,
+            )
+            epoch_high_prob_pos_masks, epoch_t_bins_high_prob_pos_masks, epoch_matching_positions, past_future_info_dict, matching_pos_dfs_list, matching_pos_epochs_dfs_list, _out_processed_items_list_dict = _an_out_tuple
+            _out_epoch_flat_mask_future_past_result: List[MatchingPastFuturePositionsResult] = _out_processed_items_list_dict['_out_epoch_flat_mask_future_past_result']
+
+        """
+        centroids: List[NDArray[ND.Shape["N_EPOCH_TIME_BINS, 2"], Any]] = [cls.centroids_from_binary_stack(a_t_bin_mask_list) for epoch_idx, a_t_bin_mask_list in enumerate(epoch_t_bins_high_prob_pos_masks)]
+        centroids_dfs: List[pd.DataFrame] = [cls.centroid_df_from_binary_stack(mask_stack=a_t_bin_mask_list, time_window_centers=a_decoded_result.time_window_centers[epoch_idx]) for epoch_idx, a_t_bin_mask_list in enumerate(epoch_t_bins_high_prob_pos_masks)]
+
+        a_past_future_name: types.PastFutureCategory = 'future'
+        segment_idx_col_name: str = 'segment_idx'
+        all_segment_transfer_col_names = ['segment_idx', 'Vp', 'segment_Vp_deg', 'segment_Vp_scatteredness']
+
+        epoch_pos_segment_to_centroid_seq_segment_idx_map_dict = []
+
+        for an_epoch_idx, added_pos_df_list in enumerate(added_pos_dfs_dict[a_past_future_name]):
+            # added_pos_df = added_pos_dfs_dict[a_past_future_name][an_epoch_idx]
+            # len(added_pos_df_list)
+            num_found_pos_traj_dfs: int = len(added_pos_df_list)
+            print(f'an_epoch_idx: {an_epoch_idx} - num_found_pos_traj_dfs: {num_found_pos_traj_dfs}, type: {type(added_pos_df_list)}')
+            a_centroids_df: pd.DataFrame = centroids_dfs[an_epoch_idx]
+            a_centroids_df = a_centroids_df.position.adding_segmented_trajectories_columns(overwrite_existing=True)
+            # Performed 5 aggregations grouped on column: 'segment_idx'
+            a_centroids_segments_df = a_centroids_df.groupby(['segment_idx']).agg(segment_dir_angle_binned_mean=('segment_dir_angle_binned', 'mean'), segment_Vp_scatteredness_mean=('segment_Vp_scatteredness', 'mean'), segment_Vp_deg_mean=('segment_Vp_deg', 'mean'), approx_head_dir_degrees_mean=('approx_dir_degrees', 'mean'), Vp_mean=('Vp', 'mean'), segment_Vp_deg_safe_mean=('segment_Vp_deg', PositionComputedDataMixin.circular_mean_deg)).reset_index()
+            a_centroids_search_segments_df = a_centroids_segments_df.dropna(subset=['segment_dir_angle_binned_mean'], inplace=False)
+            # # ['segment_Vp_deg_safe_mean', 'segment_Vp_deg_mean', 'segment_dir_angle_binned_mean']    
+            # a_centroids_search_segments_df['segment_dir_angle_binned_mean']
+            pos_segment_to_centroid_seq_segment_idx_map = {} ## empty by default 
+            
+            # for a_potential_found_pos_traj_idx, a_pos_df in enumerate(added_pos_df_list):
+            if isinstance(added_pos_df_list, dict):
+                for a_potential_found_pos_traj_idx, a_pos_df in added_pos_df_list.items():
+                    # print(type(a_pos_df))
+                    if len(a_pos_df) > 0:
+                        a_pos_df, pos_segment_to_centroid_seq_segment_idx_map = cls._compare_centroid_and_pos_traj_angle(a_pos_df=a_pos_df, a_centroids_search_segments_df=a_centroids_search_segments_df)
+            else:
+                assert isinstance(added_pos_df_list, pd.DataFrame)
+                a_pos_df = added_pos_df_list
+                if len(a_pos_df) > 0:
+                    a_pos_df, pos_segment_to_centroid_seq_segment_idx_map = cls,_compare_centroid_and_pos_traj_angle(a_pos_df=a_pos_df, a_centroids_search_segments_df=a_centroids_search_segments_df)
+
+            epoch_pos_segment_to_centroid_seq_segment_idx_map_dict.append(pos_segment_to_centroid_seq_segment_idx_map)
+            
+        ## END for an_epoch_idx, added_pos_df_list in enumerate(added_pos_dfs_dict[a_past_futu...
+
+        ## OUTPUTS: epoch_pos_segment_to_centroid_seq_segment_idx_map_dict
+        return epoch_pos_segment_to_centroid_seq_segment_idx_map_dict
+
+
+
 # ==================================================================================================================================================================================================================================================================================== #
 # 2026-01-08 - 2D Posterior scoring how "position-like" it is                                                                                                                                                                                                                          #
 # ==================================================================================================================================================================================================================================================================================== #
@@ -134,22 +551,11 @@ from collections import deque
 from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import DecodedFilterEpochsResult
 
 
-
-
-
-
-
-
-
-
-
-
-
-
 @metadata_attributes(short_name=None, tags=['BEST', 'posterior', 'position-like', 'diffusivity', 'spread'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-01-08 08:52', related_items=[])
 class PositionLikePosteriorScoring:
     """
-    A utility class for calculating Position-Like Information (PLI) scores 
+    A utility class for calculating Position-Like Information (PLI) scores -- how "position-like" a given decoded 2D posterior probability is.
+    
     using explicit bin edges for physical distance calculations.
 
 
@@ -500,7 +906,10 @@ class PositionLikePosteriorScoring:
 
     @function_attributes(short_name=None, tags=['WORKING', 'filter', 'position-like', 'score', '2D', 'posterior'], input_requires=[], output_provides=[], uses=['cls.compute_and_plot_posterior_stack', 'PositionLikePosteriorScoring', 'DecodingLocalityMeasures'], used_by=['PredictiveDecodingComputationsGlobalComputationFunctions.perform_predictive_decoding_analysis'], creation_date='2026-01-08 13:02', related_items=[])
     @classmethod
-    def filter_to_position_like_epochs_only(cls, decoded_local_epochs_result, xbin: NDArray, ybin: NDArray, position_like_score_cutoff: float = 0.42, num_min_position_like_t_bins: Optional[int] = None) -> DecodedFilterEpochsResult:
+    def filter_to_position_like_epochs_only(cls, decoded_local_epochs_result: DecodedFilterEpochsResult, xbin: NDArray, ybin: NDArray, position_like_score_cutoff: float = 0.42, num_min_position_like_t_bins: Optional[int] = None,
+            normalization_across_epochs_epoch_names: Optional[List]=None,
+
+        ) -> DecodedFilterEpochsResult:
         """
         decoding_time_bin_size = 0.025
         an_epoch_name = 'roam'
@@ -531,8 +940,13 @@ class PositionLikePosteriorScoring:
 
         if (np.ndim(flat_p_x_given_n_list) > 3):
             ## split by epoch
+            # assert (normalization_across_epochs_epoch_names is not None), f"we must have the epoch_names to build the dictionary when passed a pseudo3D posterior"
+            if (normalization_across_epochs_epoch_names is None):
+                print(f'ERROR: we must have the epoch_names to build the dictionary when passed a pseudo3D posterior. Used to be an assert. Overriding on 2026-01-15 to make work.')
+                normalization_across_epochs_epoch_names = ['roam', 'sprinkle']                
+
             ## need to build at `p_x_given_n_dict: Dict[str, NDArray[ND.Shape["N_X_BINS, N_Y_BINS, N_TIME_BINS"], np.floating]] =`
-            p_x_given_n_dict: Dict[str, NDArray[ND.Shape["N_X_BINS, N_Y_BINS, N_TIME_BINS"], np.floating]] = DecodingLocalityMeasures.perform_build_normalized_outputs(p_x_given_n=flat_p_x_given_n_list, epoch_names=['roam', 'sprinkle'])
+            p_x_given_n_dict: Dict[str, NDArray[ND.Shape["N_X_BINS, N_Y_BINS, N_TIME_BINS"], np.floating]] = DecodingLocalityMeasures.perform_build_normalized_outputs(p_x_given_n=flat_p_x_given_n_list, epoch_names=normalization_across_epochs_epoch_names)
 
             a_scoring_results_df_dict = {}
             for k, v in p_x_given_n_dict.items():

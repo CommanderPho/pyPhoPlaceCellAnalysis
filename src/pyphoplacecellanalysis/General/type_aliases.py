@@ -33,6 +33,11 @@ DataTimeGrain = Literal['per_epoch', 'per_time_bin'] # 'data_grain'
 PrePostDeltaCategory = Literal['pre_delta', 'post_delta'] # 'pre_post_delta_category'
 
 
+epoch_index: TypeAlias = int # an integer index into a list of epochs
+time_bin_index: TypeAlias = int # an integer index into a list of time bins
+
+PastFutureCategory = Literal['past', 'future'] # 'past_futuret_category'
+
 
 GenericResultTupleIndexType: TypeAlias = IdentifyingContext # an template/stand-in variable that aims to abstract away the unique-hashable index of a single result computed with a given set of parameters. Not yet fully implemented 2025-03-09 17:50 
 
