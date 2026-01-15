@@ -1309,10 +1309,21 @@ class MatchingPastFuturePositionsResult(ComputedResult):
             DataFrame with detected epochs categorized as past/present/future
         """
         ## find adjacent epochs from the position time bins (periods where the animal is in the positions)
-        measured_positions_df_copy = measured_positions_df.copy()
-        assert 'is_included' in measured_positions_df_copy
+        # measured_positions_df_copy = measured_positions_df.copy()
+        # assert 'is_included' in measured_positions_df_copy
 
-        a_matching_pos_epochs_df: pd.DataFrame = measured_positions_df_copy.neuropy.detect_epoch_satisfying_condition(is_condition_satisfied = (measured_positions_df_copy['is_included'].to_numpy()), merging_adjacent_max_separation_sec=merging_adjacent_max_separation_sec, minimum_epoch_duration=minimum_epoch_duration)
+        # a_matching_pos_epochs_df: pd.DataFrame = measured_positions_df_copy.neuropy.detect_epoch_satisfying_condition(is_condition_satisfied = (measured_positions_df_copy['is_included'].to_numpy()), merging_adjacent_max_separation_sec=merging_adjacent_max_separation_sec, minimum_epoch_duration=minimum_epoch_duration)        
+        a_matching_pos_epochs_df, curr_matching_positions_df_dict = cls._custom_build_sequential_position_epochs(matching_past_positions_df=measured_positions_df[measured_positions_df['is_included']]) ## filter inline here to only get the 'is_included' ones.
+
+        ## Copied from `.neuropy.detect_epoch_satisfying_condition(...)``
+        if merging_adjacent_max_separation_sec is not None:
+            a_matching_pos_epochs_df = a_matching_pos_epochs_df.epochs.get_valid_df().epochs.merge_adjacent_epochs_within(max_merge_duration=merging_adjacent_max_separation_sec) ## Loses other columns!
+        if minimum_epoch_duration is not None:
+            a_matching_pos_epochs_df = a_matching_pos_epochs_df.epochs.get_epochs_longer_than(minimum_duration=minimum_epoch_duration)
+        if merging_adjacent_max_separation_sec is not None:
+            a_matching_pos_epochs_df = a_matching_pos_epochs_df.epochs.get_valid_df().epochs.merge_adjacent_epochs_within(max_merge_duration=merging_adjacent_max_separation_sec) ## Loses other columns!
+            
+        a_matching_pos_epochs_df = a_matching_pos_epochs_df.epochs.rebuild_labels_column()
         
         ## #TODO 2026-01-14 18:09: - [ ] Add the relevant epoch idx to the `measured_positions_df`
         return a_matching_pos_epochs_df
@@ -1324,6 +1335,7 @@ class MatchingPastFuturePositionsResult(ComputedResult):
         return a_pos_df.merge(self.epoch_mask_included_binned_x_y_columns_idx_df, on=["binned_x", "binned_y"], how="inner")
 
 
+    @function_attributes(short_name=None, tags=['FIXED', 'WORKING'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-01-15 09:50', related_items=[])
     @classmethod
     def _custom_build_sequential_position_epochs(cls, matching_past_positions_df: pd.DataFrame, col_name: str = 'past_future_matching_pos_epoch_id', EPSILON_GAP_SIZE_SEC: float = 1e-9) -> Tuple[pd.DataFrame, Dict[types.epoch_index, pd.DataFrame]]:
         """ builds the epochs_df from the positions_df for a single epoch by merging consecutive time bins into epochs.
@@ -2182,7 +2194,6 @@ class PredictiveDecoding(ComputedResult): #PickleSerializableMixin, AttrsBasedCl
         relevant_future_times: NDArray = relevant_positions_df[is_relevant_future_times]['t'].to_numpy()        
         ## can use these later via `epoch_time_to_index_map = relevant_positions_df.epochs.find_epoch_times_to_data_indicies_map(epoch_times=[epoch_start_time, ])` or something similar
         
-
         relevant_positions_df['is_future_present_past'] = 'present'
         relevant_positions_df.loc[is_relevant_past_times, 'is_future_present_past'] = 'past'
         relevant_positions_df.loc[is_relevant_future_times, 'is_future_present_past'] = 'future'
@@ -2213,11 +2224,6 @@ class PredictiveDecoding(ComputedResult): #PickleSerializableMixin, AttrsBasedCl
         a_matching_pos_epochs_df['is_future_present_past'] = 'present'
         a_matching_pos_epochs_df.loc[is_pos_epochs_relevant_past_times, 'is_future_present_past'] = 'past'
         a_matching_pos_epochs_df.loc[is_pos_epochs_relevant_future_times, 'is_future_present_past'] = 'future'
-
-        # return MatchingPastFuturePositionsResult(epoch_high_prob_mask=epoch_high_prob_mask, pos_matches_epoch_mask=pos_matches_epoch_mask, relevant_positions_df=relevant_positions_df, is_relevant_past_times=is_relevant_past_times, is_relevant_future_times=is_relevant_future_times,
-        #             n_total_possible_past_times=n_total_possible_past_times, n_total_possible_future_times=n_total_possible_future_times, n_relevant_past_times=n_relevant_past_times, n_relevant_future_times=n_relevant_future_times,
-        #             matching_pos_epochs_df=a_matching_pos_epochs_df)
-
 
         ## INPUTS: a_matching_pos_epochs_df, relevant_positions_df
         ## add the final detected a_matching_pos_epochs_df indicies to the decoded positions as the column ['matching_found_relevant_pos_epoch']:
