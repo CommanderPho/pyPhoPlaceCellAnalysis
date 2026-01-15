@@ -5132,13 +5132,21 @@ def multi_trajectory_color_plotter(position_dfs: List[pd.DataFrame], rendering_m
                 overlay_xmin, overlay_xmax = xmin, xmax
                 overlay_ymin, overlay_ymax = ymin, ymax
             
+            # Set image axis order to row-major (like BinByBinDecodingDebugger pattern)
+            pg.setConfigOptions(imageAxisOrder='row-major')
+            
             # Create ImageItem for the overlay mask with low alpha
             # Use setImage with rect parameter instead of transform (like BinByBinDecodingDebugger pattern)
+            # Note: overlay_mask is expected to be [rows, cols] = [y_size, x_size] in spatial coordinates
             overlay_img = pg.ImageItem(image=overlay_mask, levels=(0, 1), opacity=0.2)
             # rect format: [x, y, width, height] where (x, y) is bottom-left corner
+            # Account for pixel centering: adjust by half pixel to align edges properly
+            pixel_width = (overlay_xmax - overlay_xmin) / overlay_mask.shape[1] if overlay_mask.shape[1] > 0 else 1.0
+            pixel_height = (overlay_ymax - overlay_ymin) / overlay_mask.shape[0] if overlay_mask.shape[0] > 0 else 1.0
             overlay_width = overlay_xmax - overlay_xmin
             overlay_height = overlay_ymax - overlay_ymin
-            image_bounds_extent = [overlay_xmin, overlay_ymin, overlay_width, overlay_height]
+            # Adjust rect to account for pixel centering (subtract half pixel from position, add half pixel to size)
+            image_bounds_extent = [overlay_xmin - pixel_width/2, overlay_ymin - pixel_height/2, overlay_width + pixel_width, overlay_height + pixel_height]
             overlay_img.setImage(overlay_mask, rect=image_bounds_extent, autoLevels=False)
             plot_item.addItem(overlay_img)
     
