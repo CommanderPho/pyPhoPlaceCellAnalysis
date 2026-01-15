@@ -1016,6 +1016,8 @@ class DecodingLocalityMeasures(ComputedResult): #PickleSerializableMixin, AttrsB
         return non_local_PBE_non_moving_rect_item, non_local_PBE_non_moving_epochs_df
 
 
+from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import PosteriorMaskPostProcessing ## used by `MatchingPastFuturePositionsResult`
+
 @define(slots=False, repr=False, eq=False)
 class MatchingPastFuturePositionsResult(ComputedResult):
     """Result container for matching past/future positions in a single decoded epoch (with potentially several time bins).
@@ -1031,29 +1033,182 @@ class MatchingPastFuturePositionsResult(ComputedResult):
         n_relevant_past_times: Count of relevant past times
         n_relevant_future_times: Count of relevant future times
         matching_pos_epochs_df: DataFrame with detected epochs categorized as past/present/future
-    """
-    _VersionedResultMixin_version: str = "2026.01.13_0" # to be updated in your IMPLEMENTOR to indicate its version
+        
+        #TODO 2026-01-14 17:05: - [ ] Refactor to what the class should logically have:
+             a_past_future_result - represents a single epoch_idx's values
 
+            Currently work around by doing `MatchingPastFuturePositionsResult.extract_final_position_epochs(...)`
+                _out_epoch_flat_mask_future_past_result: List[MatchingPastFuturePositionsResult] = _out_epoch_flat_mask_future_past_result
+                _out_dict = MatchingPastFuturePositionsResult.extract_final_position_epochs(_out_epoch_flat_mask_future_past_result=_out_epoch_flat_mask_future_past_result)
+
+        #TODO 2026-01-14 17:05: - [ ] Should have
+        the posterior masks - [X] in `epoch_high_prob_mask`, note doesn't have `epoch_t_bins_high_prob_mask`
+        the epoch time tims, maybe a SingleEpochDecodedResult or what not
+        the list of found past and future position epochs
+        the list of found past and future position_dfs 
+
+    """
+    _VersionedResultMixin_version: str = "2026.01.14_0" # to be updated in your IMPLEMENTOR to indicate its version
+
+    decoded_epoch_result: SingleEpochDecodedResult = serialized_field(repr=False, metadata={'field_added':"2026.01.14_0"})
     epoch_high_prob_mask: NDArray[ND.Shape["N_XBINS, N_Y_BINS"], Any] = serialized_field(repr=False)
+    epoch_t_bins_high_prob_pos_mask: NDArray[ND.Shape["N_XBINS, N_Y_BINS, N_EPOCH_TIME_BINS"], Any] = serialized_field(repr=False, metadata={'field_added':"2026.01.14_0"})
+    
+    relevant_past_times: NDArray = serialized_field(repr=False, metadata={'field_added':"2026.01.14_0"})
+    relevant_future_times: NDArray = serialized_field(repr=False, metadata={'field_added':"2026.01.14_0"})
+
+    # Computed mask properties ___________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
+    centroids: NDArray[ND.Shape["N_EPOCH_TIME_BINS, 2"], Any] = serialized_field(default=None, is_computable=True, repr=False, metadata={'field_added':"2026.01.14_0"})
+    centroids_df: pd.DataFrame = serialized_field(default=None, is_computable=True, repr=False, metadata={'field_added':"2026.01.14_0"})
+    a_centroids_search_segments_df: Optional[pd.DataFrame] = non_serialized_field(default=None, is_computable=True, repr=False, metadata={'field_added':"2026.01.14_0"})
+
+    epoch_id_key_name: str = serialized_attribute_field(default='matching_found_relevant_pos_epoch', is_computable=False, repr=False, metadata={'field_added':"2026.01.14_0"})
+
+    # OLD/COMPATIBILITY FIELDS ___________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
     pos_matches_epoch_mask: NDArray = serialized_field(repr=False)
-    relevant_positions_df: pd.DataFrame = serialized_field(repr=False)
+    relevant_positions_df: pd.DataFrame = serialized_field(repr=False) ## !IMPORTANT: `relevant_positions_df`: the df of all potentially relevant positions, with a 'matching_found_relevant_pos_epoch' column corresponding to the the found *epochs* (not some aren't in an epoch and have a value of -1 for this column)
+    
     is_relevant_past_times: NDArray = serialized_field(repr=False)
     is_relevant_future_times: NDArray = serialized_field(repr=False)
     n_total_possible_past_times: int = serialized_field()
     n_total_possible_future_times: int = serialized_field()
     n_relevant_past_times: int = serialized_field()
     n_relevant_future_times: int = serialized_field()
-    matching_pos_epochs_df: pd.DataFrame = serialized_field(repr=False)
+    matching_pos_epochs_df: pd.DataFrame = serialized_field(repr=False) ## !IMPORTANT: `matching_pos_epochs_df`: the df of found *epochs* corresponding to the position sequences in `relevant_positions_df`
 
+    # Computed fields ____________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
     matching_past_positions_df: pd.DataFrame = serialized_field(default=None, is_computable=True, repr=False)
     matching_future_positions_df: pd.DataFrame = serialized_field(default=None, is_computable=True, repr=False)
+    pos_segment_to_centroid_seq_segment_idx_map: Optional[Dict] = non_serialized_field(default=Factory(dict), is_computable=True, repr=False, metadata={'field_added':"2026.01.14_0"})
+
+    @property
+    def matching_past_position_df_list(self) -> List[pd.DataFrame]:
+        """The matching_past_position_df_list property."""
+        # epoch_only_relevant_positions_df = self._recompute_relevant_pos_epoch_position_df_index_column(a_matching_pos_epochs_df=self.matching_pos_epochs_df, relevant_positions_df=self.relevant_positions_df,
+        #                                                                                                     drop_non_epoch_events=True, epoch_id_key_name=epoch_id_key_name) ## drop those that aren't in the epochs
+        epoch_only_relevant_positions_df = self._recompute_relevant_pos_epoch_position_df_index_column(a_matching_pos_epochs_df=self.matching_past_positions_df, relevant_positions_df=self.relevant_positions_df, drop_non_epoch_events=True, epoch_id_key_name=self.epoch_id_key_name) ## drop those that aren't in the epochs
+        unique_values, partitioned_dfs_list = epoch_only_relevant_positions_df.pho.partition_df(partitionColumn=self.epoch_id_key_name)
+        # return self.matching_past_positions_df.pho.partition_dict('')
+        return partitioned_dfs_list
+    
+    @property
+    def matching_future_position_df_list(self) -> List[pd.DataFrame]:
+        """The matching_future_position_df_list property."""
+        epoch_only_relevant_positions_df = self._recompute_relevant_pos_epoch_position_df_index_column(a_matching_pos_epochs_df=self.matching_future_positions_df, relevant_positions_df=self.relevant_positions_df, drop_non_epoch_events=True, epoch_id_key_name=self.epoch_id_key_name) ## drop those that aren't in the epochs
+        unique_values, partitioned_dfs_list = epoch_only_relevant_positions_df.pho.partition_df(partitionColumn=self.epoch_id_key_name)
+        return partitioned_dfs_list
 
 
     def __attrs_post_init__(self):
         # Add post-init logic here
         # Instead of building the tuple, create clean dataframes:
-        self.matching_past_positions_df = self.relevant_positions_df[self.is_relevant_past_times].copy()
-        self.matching_future_positions_df = self.relevant_positions_df[self.is_relevant_future_times].copy()
+        # self.matching_past_positions_df = self.relevant_positions_df[self.is_relevant_past_times].copy()
+        # self.matching_future_positions_df = self.relevant_positions_df[self.is_relevant_future_times].copy()
+        self._recompute_all_pos_dfs()
+        self._recompute_high_prob_mask_centroids()
+        
+
+    def _recompute_high_prob_mask_centroids(self):
+        """ recomputes the centroid masks for comparing position sequences to high-prob sweep sequences
+            Needs to be ran on update:
+                self.epoch_t_bins_high_prob_pos_mask, self.relevant_future_times
+        """
+        from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import PosteriorMaskPostProcessing ## used by `MatchingPastFuturePositionsResult`
+        
+        self.centroids = PosteriorMaskPostProcessing.centroids_from_binary_stack(self.epoch_t_bins_high_prob_pos_mask)
+        self.centroids_df = PosteriorMaskPostProcessing.centroid_df_from_binary_stack(mask_stack=self.epoch_t_bins_high_prob_pos_mask, time_window_centers=self.decoded_epoch_result.time_window_centers)
+        self.centroids_df = self.centroids_df.position.adding_segmented_trajectories_columns(overwrite_existing=True)
+        # Performed 5 aggregations grouped on column: 'segment_idx'
+        a_centroids_segments_df = self.centroids_df.groupby(['segment_idx']).agg(segment_dir_angle_binned_mean=('segment_dir_angle_binned', 'mean'), segment_Vp_scatteredness_mean=('segment_Vp_scatteredness', 'mean'), segment_Vp_deg_mean=('segment_Vp_deg', 'mean'), approx_head_dir_degrees_mean=('approx_dir_degrees', 'mean'), Vp_mean=('Vp', 'mean'), segment_Vp_deg_safe_mean=('segment_Vp_deg', PositionComputedDataMixin.circular_mean_deg)).reset_index()
+        self.a_centroids_search_segments_df = a_centroids_segments_df.dropna(subset=['segment_dir_angle_binned_mean'], inplace=False)
+
+
+    def _recompute_all_pos_dfs(self):
+        """ Needs to be ran on update:
+            self.relevant_past_times, self.relevant_future_times
+        """
+        if 'centroid_pos_traj_matching_angle_idx' not in self.relevant_positions_df:
+            self.relevant_positions_df['centroid_pos_traj_matching_angle_idx'] = -1 ## initialize it
+
+        ## re-index:
+        self.relevant_positions_df = self._recompute_relevant_pos_epoch_position_df_index_column(a_matching_pos_epochs_df=self.matching_pos_epochs_df, relevant_positions_df=self.relevant_positions_df, drop_non_epoch_events=False, epoch_id_key_name=self.epoch_id_key_name) ## drop those that aren't in the epochs
+
+        if self.relevant_past_times is not None:
+            self.matching_past_positions_df = self.relevant_positions_df.epochs.matching_epoch_times_slice(epoch_times=self.relevant_past_times).copy()
+        # self.matching_past_positions_df = self.relevant_positions_df[self.is_relevant_past_times].copy() # OLD
+
+        if self.relevant_future_times is not None:
+            self.matching_future_positions_df = self.relevant_positions_df.epochs.matching_epoch_times_slice(epoch_times=self.relevant_future_times).copy()
+        # self.matching_future_positions_df = self.relevant_positions_df[self.is_relevant_future_times].copy() ## OLD
+
+    @classmethod
+    def _recompute_relevant_pos_epoch_position_df_index_column(cls, a_matching_pos_epochs_df: pd.DataFrame, relevant_positions_df: pd.DataFrame, epoch_id_key_name='matching_found_relevant_pos_epoch', drop_non_epoch_events: bool = True) -> pd.DataFrame:
+        """ add the final detected a_matching_pos_epochs_df indicies to the decoded positions as the column ['matching_found_relevant_pos_epoch'] and return the modified `relevant_positions_df`
+        
+        Usage:
+            ## INPUTS: a_matching_pos_epochs_df, relevant_positions_df
+            ## add the final detected a_matching_pos_epochs_df indicies to the decoded positions as the column ['matching_found_relevant_pos_epoch']:
+            epoch_id_key_name: str = 'matching_found_relevant_pos_epoch'
+            relevant_positions_df = MatchingPastFuturePositionsResult._recompute_relevant_pos_epoch_position_df_index_column(a_matching_pos_epochs_df=a_matching_pos_epochs_df, relevant_positions_df=relevant_positions_df,
+                                                                                                                            drop_non_epoch_events=False, epoch_id_key_name=epoch_id_key_name) ## don't drop yet so we have all the events for the object creation
+
+            ## to drop post-hoc - TODO need to change to -1 if that's the `no_interval_fill_value=-1`
+            relevant_positions_df = relevant_positions_df.dropna(how='any', subset=[epoch_id_key_name], inplace=False)
+            
+            
+            epoch_times = relevant_positions_df['t'].to_numpy()
+            time_to_idx_map = EpochHelpers.find_epoch_times_to_data_indicies_map(a_matching_pos_epochs_df, epoch_times)
+        
+        """
+        ## INPUTS: a_matching_pos_epochs_df, relevant_positions_df
+        ## 
+        if 'label' not in a_matching_pos_epochs_df.columns:
+            a_matching_pos_epochs_df['label'] = a_matching_pos_epochs_df.index.astype(int)
+        else:
+            a_matching_pos_epochs_df['label'] = a_matching_pos_epochs_df['label'].astype(int)
+            
+        relevant_positions_df = relevant_positions_df.time_point_event.adding_epochs_identity_column(epochs_df=a_matching_pos_epochs_df, epoch_id_key_name=epoch_id_key_name, override_time_variable_name='t',
+                                                            # epoch_label_column_name='label', no_interval_fill_value=np.nan,
+                                                            epoch_label_column_name='label', no_interval_fill_value=-1,
+                                                            should_replace_existing_column=True, drop_non_epoch_events=drop_non_epoch_events,
+                                                            overlap_behavior=OverlappingIntervalsFallbackBehavior.FALLBACK_TO_SLOW_SEARCH)
+        return relevant_positions_df
+    
+    def recompute_relevant_position_active_mask_centroid_traj_angle(self):
+        #TODO 2026-01-14 17:53: - [ ] `PosteriorMaskPostProcessing` post processing positions to see which are aligned with the posterior:
+        if self.a_centroids_search_segments_df is None:
+            self._recompute_high_prob_mask_centroids()
+        if self.a_centroids_search_segments_df is not None:
+            ## compute the matching position/angles:
+            epoch_only_relevant_positions_df = self._recompute_relevant_pos_epoch_position_df_index_column(a_matching_pos_epochs_df=self.matching_pos_epochs_df, relevant_positions_df=self.relevant_positions_df, drop_non_epoch_events=True, epoch_id_key_name=self.epoch_id_key_name) ## drop those that aren't in the epochs
+            epoch_only_relevant_positions_df = epoch_only_relevant_positions_df.position.adding_segmented_trajectories_columns(overwrite_existing=True)
+
+            epoch_only_relevant_positions_df, pos_segment_to_centroid_seq_segment_idx_map = PosteriorMaskPostProcessing._compare_centroid_and_pos_traj_angle(a_pos_df=epoch_only_relevant_positions_df, a_centroids_search_segments_df=self.a_centroids_search_segments_df)
+            
+            if pos_segment_to_centroid_seq_segment_idx_map is not None:
+                self.pos_segment_to_centroid_seq_segment_idx_map = pos_segment_to_centroid_seq_segment_idx_map
+
+            # Assign the 'centroid_pos_traj_matching_angle_idx' column returned in the `epoch_only_relevant_positions_df` to the `self.matching_pos_epochs_df` __________________________________________________________________________________________________________________________________ #
+            # Aggregate centroid_pos_traj_matching_angle_idx by epoch and add to matching_pos_epochs_df
+            # For each epoch, take the first non-negative value (or -1 if all are -1)
+            epoch_centroid_idx_df = epoch_only_relevant_positions_df.groupby(self.epoch_id_key_name)['centroid_pos_traj_matching_angle_idx'].apply(lambda x: x[x >= 0].iloc[0] if (x >= 0).any() else -1).reset_index(name='centroid_pos_traj_matching_angle_idx')
+            # Merge into matching_pos_epochs_df using 'label' column (which corresponds to epoch index)
+            if 'label' not in self.matching_pos_epochs_df.columns:
+                self.matching_pos_epochs_df['label'] = self.matching_pos_epochs_df.index.astype(int)
+            # Drop the column if it already exists to avoid merge conflicts
+            if 'centroid_pos_traj_matching_angle_idx' in self.matching_pos_epochs_df.columns:
+                self.matching_pos_epochs_df = self.matching_pos_epochs_df.drop(columns=['centroid_pos_traj_matching_angle_idx'])
+            self.matching_pos_epochs_df = self.matching_pos_epochs_df.merge(epoch_centroid_idx_df, left_on='label', right_on=self.epoch_id_key_name, how='left')
+            # Fill NaN values with -1 for epochs that don't have matching positions
+            self.matching_pos_epochs_df['centroid_pos_traj_matching_angle_idx'] = self.matching_pos_epochs_df['centroid_pos_traj_matching_angle_idx'].fillna(-1)
+            # Drop the temporary merge key column if it was added
+            if self.epoch_id_key_name in self.matching_pos_epochs_df.columns and self.epoch_id_key_name != 'label':
+                self.matching_pos_epochs_df = self.matching_pos_epochs_df.drop(columns=[self.epoch_id_key_name])
+
+
+            return epoch_only_relevant_positions_df, pos_segment_to_centroid_seq_segment_idx_map
+    else:
+        return None, None
 
 
     @property
@@ -1099,6 +1254,7 @@ class MatchingPastFuturePositionsResult(ComputedResult):
 
         a_matching_pos_epochs_df: pd.DataFrame = measured_positions_df_copy.neuropy.detect_epoch_satisfying_condition(is_condition_satisfied = (measured_positions_df_copy['is_included'].to_numpy()), merging_adjacent_max_separation_sec=merging_adjacent_max_separation_sec, minimum_epoch_duration=minimum_epoch_duration)
         
+        ## #TODO 2026-01-14 18:09: - [ ] Add the relevant epoch idx to the `measured_positions_df`
         return a_matching_pos_epochs_df
 
 
@@ -1163,7 +1319,7 @@ class MatchingPastFuturePositionsResult(ComputedResult):
 
             ## Segment trajectories
             
-            a_curr_matching_positions_df[all_segment_transfer_col_names] = a_curr_matching_positions_df.position.segment_trajectories()[all_segment_transfer_col_names] ## add to original df
+            a_curr_matching_positions_df= a_curr_matching_positions_df.position.adding_segmented_trajectories_columns() ## add to original df
 
             curr_matching_positions_df_dict: Dict[types.epoch_index, pd.DataFrame] = a_curr_matching_positions_df.pho.partition_df_dict(col_name)
 
@@ -1925,7 +2081,9 @@ class PredictiveDecoding(ComputedResult): #PickleSerializableMixin, AttrsBasedCl
 
 
     @classmethod
-    def detect_matching_past_future_positions(cls, epoch_high_prob_mask: NDArray[ND.Shape["N_XBINS, N_Y_BINS"], Any], measured_positions_df: pd.DataFrame, curr_epoch_start_t: float, curr_epoch_stop_t: float, merging_adjacent_max_separation_sec: float = 0.5, minimum_epoch_duration: float = 0.050) -> MatchingPastFuturePositionsResult:
+    def detect_matching_past_future_positions(cls, epoch_high_prob_mask: NDArray[ND.Shape["N_X_BINS, N_Y_BINS"], Any], measured_positions_df: pd.DataFrame, curr_epoch_start_t: float, curr_epoch_stop_t: float, merging_adjacent_max_separation_sec: float = 0.5, minimum_epoch_duration: float = 0.050,
+                                               epoch_t_bins_high_prob_pos_mask: Optional[NDArray[ND.Shape["N_X_BINS, N_Y_BINS"], Any]]=None, decoded_epoch_result=None, **kwargs, ## passthrough-only properties
+                                               ) -> MatchingPastFuturePositionsResult:
         """
         Detect matching past/future positions for a given epoch high probability mask.
         
@@ -1940,10 +2098,14 @@ class PredictiveDecoding(ComputedResult): #PickleSerializableMixin, AttrsBasedCl
         Returns:
             MatchingPastFuturePositionsResult containing all computed results
         """
+        from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import PosteriorMaskPostProcessing
+        
         relevant_positions_df: pd.DataFrame = measured_positions_df.copy()
         
+
+        # find relevant positions: Search through all measured positions (for all time) and find bins that match with a position decoded in this mask) ________________________________________________________________________________________________________________________________________________________________ #
         row_col_indices = np.argwhere(epoch_high_prob_mask)
-        row_col_row_ids = row_col_indices + 1
+        row_col_row_ids = row_col_indices + 1 # 0-index to 1-index
         an_epoch_mask_included_binned_x_y_columns_idx_df = pd.DataFrame(row_col_row_ids, columns=["binned_x", "binned_y"])
         ## allowed positions are much less than the found ones:
         relevant_positions_df = relevant_positions_df.merge(an_epoch_mask_included_binned_x_y_columns_idx_df, on=["binned_x", "binned_y"], how="inner")
@@ -1952,12 +2114,18 @@ class PredictiveDecoding(ComputedResult): #PickleSerializableMixin, AttrsBasedCl
         pos_matches_epoch_mask = np.where([epoch_high_prob_mask[(a_pos.binned_x-1), (a_pos.binned_y-1)] for a_pos in relevant_positions_df.itertuples()])[0]
         relevant_positions_df: pd.DataFrame = relevant_positions_df.iloc[pos_matches_epoch_mask].copy()
         
-        ## now find relevant ones:
+
+        # Now divide the found positions into past/future categories _________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
+
         is_relevant_past_times = (relevant_positions_df['t'] < curr_epoch_start_t)
         is_relevant_future_times = (relevant_positions_df['t'] > curr_epoch_stop_t)
+
+        ## 2026-01-14 08:05: - [X] find timestamps instead of saving indicies
+        ## get the concrete timestamps of the relevant past/future times for use later:
+        relevant_past_times: NDArray = relevant_positions_df[is_relevant_past_times]['t'].to_numpy()
+        relevant_future_times: NDArray = relevant_positions_df[is_relevant_future_times]['t'].to_numpy()        
+        ## can use these later via `epoch_time_to_index_map = relevant_positions_df.epochs.find_epoch_times_to_data_indicies_map(epoch_times=[epoch_start_time, ])` or something similar
         
-        ## #TODO 2026-01-14 08:05: - [ ] find timestamps instead of saving indicies
-        # is_relevant_past_times
 
         relevant_positions_df['is_future_present_past'] = 'present'
         relevant_positions_df.loc[is_relevant_past_times, 'is_future_present_past'] = 'past'
@@ -1972,7 +2140,8 @@ class PredictiveDecoding(ComputedResult): #PickleSerializableMixin, AttrsBasedCl
 
         ## find adjacent epochs from the position time bins (periods where the animal is in the positions)
         ## use relevant_positions_df directly since it's already filtered to epoch mask positions
-        measured_positions_df_copy = relevant_positions_df.copy()
+        # measured_positions_df_copy = relevant_positions_df.copy()
+        measured_positions_df_copy = measured_positions_df.copy() # Do the full dataframe due to how the consequtive epoch detection function works better with a full df:
         # measured_positions_df_copy = relevant_positions_df
         measured_positions_df_copy['is_included'] = False
         ## mark past and future positions as included (not present)
@@ -1982,19 +2151,56 @@ class PredictiveDecoding(ComputedResult): #PickleSerializableMixin, AttrsBasedCl
         # a_matching_pos_epochs_df: pd.DataFrame = measured_positions_df_copy.neuropy.detect_epoch_satisfying_condition(is_condition_satisfied = (measured_positions_df_copy['is_included'].to_numpy()), merging_adjacent_max_separation_sec=merging_adjacent_max_separation_sec, minimum_epoch_duration=minimum_epoch_duration)
         a_matching_pos_epochs_df: pd.DataFrame = MatchingPastFuturePositionsResult.compute_matching_pos_epochs_df(measured_positions_df=measured_positions_df_copy, merging_adjacent_max_separation_sec=merging_adjacent_max_separation_sec, minimum_epoch_duration=minimum_epoch_duration)
         
+        ## found all matching events, now see whether these events are in the path or the future:
         is_pos_epochs_relevant_past_times = (a_matching_pos_epochs_df['start'] < curr_epoch_start_t)
         is_pos_epochs_relevant_future_times = (a_matching_pos_epochs_df['stop'] > curr_epoch_stop_t)
         a_matching_pos_epochs_df['is_future_present_past'] = 'present'
         a_matching_pos_epochs_df.loc[is_pos_epochs_relevant_past_times, 'is_future_present_past'] = 'past'
         a_matching_pos_epochs_df.loc[is_pos_epochs_relevant_future_times, 'is_future_present_past'] = 'future'
 
-        return MatchingPastFuturePositionsResult(epoch_high_prob_mask=epoch_high_prob_mask, pos_matches_epoch_mask=pos_matches_epoch_mask, relevant_positions_df=relevant_positions_df, is_relevant_past_times=is_relevant_past_times, is_relevant_future_times=is_relevant_future_times,
+        # return MatchingPastFuturePositionsResult(epoch_high_prob_mask=epoch_high_prob_mask, pos_matches_epoch_mask=pos_matches_epoch_mask, relevant_positions_df=relevant_positions_df, is_relevant_past_times=is_relevant_past_times, is_relevant_future_times=is_relevant_future_times,
+        #             n_total_possible_past_times=n_total_possible_past_times, n_total_possible_future_times=n_total_possible_future_times, n_relevant_past_times=n_relevant_past_times, n_relevant_future_times=n_relevant_future_times,
+        #             matching_pos_epochs_df=a_matching_pos_epochs_df)
+
+
+        ## INPUTS: a_matching_pos_epochs_df, relevant_positions_df
+        ## add the final detected a_matching_pos_epochs_df indicies to the decoded positions as the column ['matching_found_relevant_pos_epoch']:
+        epoch_id_key_name: str = 'matching_found_relevant_pos_epoch'
+        relevant_positions_df = MatchingPastFuturePositionsResult._recompute_relevant_pos_epoch_position_df_index_column(a_matching_pos_epochs_df=a_matching_pos_epochs_df, relevant_positions_df=relevant_positions_df,
+                                                                                                                          drop_non_epoch_events=False, epoch_id_key_name=epoch_id_key_name) ## don't drop yet so we have all the events for the object creation
+
+        # ## to drop post-hoc
+        # relevant_positions_df = relevant_positions_df.dropna(how='any', subset=[epoch_id_key_name], inplace=False)
+
+
+        _out_obj: MatchingPastFuturePositionsResult = MatchingPastFuturePositionsResult(decoded_epoch_result=decoded_epoch_result,
+                                                 epoch_high_prob_mask=epoch_high_prob_mask, epoch_t_bins_high_prob_pos_mask=epoch_t_bins_high_prob_pos_mask,
+                                                 relevant_past_times=relevant_past_times, relevant_future_times=relevant_future_times,
+                                                 pos_matches_epoch_mask=pos_matches_epoch_mask, relevant_positions_df=relevant_positions_df, is_relevant_past_times=is_relevant_past_times, is_relevant_future_times=is_relevant_future_times,
                     n_total_possible_past_times=n_total_possible_past_times, n_total_possible_future_times=n_total_possible_future_times, n_relevant_past_times=n_relevant_past_times, n_relevant_future_times=n_relevant_future_times,
                     matching_pos_epochs_df=a_matching_pos_epochs_df)
+    
+
+
+        #TODO 2026-01-14 17:53: - [ ] `PosteriorMaskPostProcessing` post processing positions to see which are aligned with the posterior:
+        if _out_obj.a_centroids_search_segments_df is None:
+            _out_obj._recompute_high_prob_mask_centroids()
+        if _out_obj.a_centroids_search_segments_df is not None:
+            epoch_id_key_name: str = 'matching_found_relevant_pos_epoch'
+            epoch_only_relevant_positions_df = MatchingPastFuturePositionsResult._recompute_relevant_pos_epoch_position_df_index_column(a_matching_pos_epochs_df=_out_obj.matching_pos_epochs_df, relevant_positions_df=_out_obj.relevant_positions_df,
+                                                                                                                        drop_non_epoch_events=True, epoch_id_key_name=epoch_id_key_name) ## drop those that aren't in the epochs
+            
+
+            epoch_only_relevant_positions_df, pos_segment_to_centroid_seq_segment_idx_map = PosteriorMaskPostProcessing._compare_centroid_and_pos_traj_angle(a_pos_df=epoch_only_relevant_positions_df, 
+                                                                                                                                                             a_centroids_search_segments_df=_out_obj.a_centroids_search_segments_df)
+        
+
+        return _out_obj
+    
 
 
     @classmethod
-    def _process_single_epoch_future_past_analysis(cls, i: int, curr_epoch_p_x_given_n: NDArray, curr_epoch_time_bin_centers: NDArray, curr_epoch_tbin_indicies: NDArray, gaussian_volume: Optional[NDArray], measured_positions_df: pd.DataFrame, top_v_percent: float, epoch_t_bin_high_prob_masks_dict: Optional[Dict], epoch_high_prob_masks_dict: Optional[Dict], a_slice_multiplier: float, n_epoch_time_bins: int, merging_adjacent_max_separation_sec: float, minimum_epoch_duration: float, progress_print: bool, n_total_epochs: int) -> Tuple[int, Any, Any, Any, Any, Any, Any]:
+    def _process_single_epoch_future_past_analysis(cls, i: int, curr_epoch_p_x_given_n: NDArray, curr_epoch_time_bin_centers: NDArray, curr_epoch_tbin_indicies: NDArray, gaussian_volume: Optional[NDArray], measured_positions_df: pd.DataFrame, top_v_percent: float, epoch_t_bin_high_prob_masks_dict: Optional[Dict], epoch_high_prob_masks_dict: Optional[Dict], a_slice_multiplier: float, n_epoch_time_bins: int, merging_adjacent_max_separation_sec: float, minimum_epoch_duration: float, progress_print: bool, n_total_epochs: int, **kwargs) -> Tuple[int, Any, Any, Any, Any, Any, Any]:
         """Process a single epoch for future/past analysis. Returns results in a tuple for parallel processing."""
         from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import PosteriorMaskPostProcessing
         
@@ -2012,12 +2218,12 @@ class PredictiveDecoding(ComputedResult): #PickleSerializableMixin, AttrsBasedCl
         # Special posterior measurement properties (diffusivity, promenence, etc) computed independently with newly decoded fine time bin grainularity posteriors                                                                                                                              #
         # ==================================================================================================================================================================================================================================================================================== #
         
-        is_high_prob_mask: Optional[NDArray[ND.Shape["N_XBINS, N_YBINS, N_TBINS"], Any]] = None
+        is_high_prob_mask: Optional[NDArray[ND.Shape["N_X_BINS, N_Y_BINS, N_TBINS"], Any]] = None
         merged_epoch_mask: Optional[NDArray[ND.Shape["N_X_BINS, N_Y_BINS"], Any]] = None
         processed_masks: Optional[Any] = None
         
         if (epoch_t_bin_high_prob_masks_dict is not None):
-            an_epoch_t_bins_custom_high_prob_mask: NDArray[ND.Shape["N_XBINS, N_YBINS, N_TBINS"], Any] = epoch_t_bin_high_prob_masks_dict[a_slice_multiplier][i]
+            an_epoch_t_bins_custom_high_prob_mask: NDArray[ND.Shape["N_X_BINS, N_Y_BINS, N_TBINS"], Any] = epoch_t_bin_high_prob_masks_dict[a_slice_multiplier][i]
             Assert.same_shape(an_epoch_t_bins_custom_high_prob_mask, curr_epoch_p_x_given_n)
             is_high_prob_mask = an_epoch_t_bins_custom_high_prob_mask
             
@@ -2026,7 +2232,7 @@ class PredictiveDecoding(ComputedResult): #PickleSerializableMixin, AttrsBasedCl
             merged_epoch_mask = np.any(masks, axis=-1)
         
         elif (epoch_high_prob_masks_dict is not None):
-            an_epoch_custom_high_prob_mask: NDArray[ND.Shape["N_XBINS, N_YBINS"], Any] = epoch_high_prob_masks_dict[a_slice_multiplier][i]
+            an_epoch_custom_high_prob_mask: NDArray[ND.Shape["N_X_BINS, N_Y_BINS"], Any] = epoch_high_prob_masks_dict[a_slice_multiplier][i]
             Assert.same_shape(an_epoch_custom_high_prob_mask, curr_epoch_p_x_given_n[:, :, 0])
             is_high_prob_mask = np.tile(an_epoch_custom_high_prob_mask, (1, 1, n_epoch_time_bins))
         
@@ -2040,21 +2246,22 @@ class PredictiveDecoding(ComputedResult): #PickleSerializableMixin, AttrsBasedCl
         
         ## allow future positions to match any position in the epoch to count:
         if is_high_prob_mask is not None:
-            any_t_Bin_high_prob_pos_mask: NDArray[ND.Shape["N_XBINS, N_YBINS"], Any] = np.any(is_high_prob_mask, axis=-1) ## mask for high prob positions during the epoch
+            any_t_Bin_high_prob_pos_mask: NDArray[ND.Shape["N_X_BINS, N_Y_BINS"], Any] = np.any(is_high_prob_mask, axis=-1) ## mask for high prob positions during the epoch
         else:
             raise ValueError(f"is_high_prob_mask is None for epoch {i}")
         
         # Call static method from the same class (PredictiveDecoding)
-        any_t_bin_result = PredictiveDecoding.detect_matching_past_future_positions(epoch_high_prob_mask=any_t_Bin_high_prob_pos_mask, measured_positions_df=measured_positions_df, curr_epoch_start_t=curr_epoch_start_t, curr_epoch_stop_t=curr_epoch_stop_t, merging_adjacent_max_separation_sec=merging_adjacent_max_separation_sec, minimum_epoch_duration=minimum_epoch_duration)
+        any_t_bin_result = PredictiveDecoding.detect_matching_past_future_positions(epoch_high_prob_mask=any_t_Bin_high_prob_pos_mask, epoch_t_bins_high_prob_pos_mask=is_high_prob_mask, measured_positions_df=measured_positions_df, curr_epoch_start_t=curr_epoch_start_t, curr_epoch_stop_t=curr_epoch_stop_t, merging_adjacent_max_separation_sec=merging_adjacent_max_separation_sec, minimum_epoch_duration=minimum_epoch_duration, **kwargs)
         
         ## compute for `merged_epoch_mask` if it exists
         merged_epoch_mask_result = None
         if merged_epoch_mask is not None:
-            merged_epoch_mask_result = PredictiveDecoding.detect_matching_past_future_positions(epoch_high_prob_mask=merged_epoch_mask, measured_positions_df=measured_positions_df, curr_epoch_start_t=curr_epoch_start_t, curr_epoch_stop_t=curr_epoch_stop_t, merging_adjacent_max_separation_sec=merging_adjacent_max_separation_sec, minimum_epoch_duration=minimum_epoch_duration)
+            merged_epoch_mask_result = PredictiveDecoding.detect_matching_past_future_positions(epoch_high_prob_mask=merged_epoch_mask, epoch_t_bins_high_prob_pos_mask=is_high_prob_mask, measured_positions_df=measured_positions_df, curr_epoch_start_t=curr_epoch_start_t, curr_epoch_stop_t=curr_epoch_stop_t, merging_adjacent_max_separation_sec=merging_adjacent_max_separation_sec, minimum_epoch_duration=minimum_epoch_duration, **kwargs)
         
         return (i, is_high_prob_mask, any_t_Bin_high_prob_pos_mask, any_t_bin_result, merged_epoch_mask, processed_masks, merged_epoch_mask_result)
     
-    
+
+    @function_attributes(short_name=None, tags=['MAIN', 'past-future', 'position'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-01-14 17:08', related_items=[])
     @classmethod
     def compute_specific_future_and_past_analysis(cls, decoded_local_epochs_result: DecodedFilterEpochsResult, measured_positions_df: pd.DataFrame, gaussian_volume: Optional[NDArray]=None,
                                         active_epochs_df: Optional[pd.DataFrame]=None,
@@ -2194,6 +2401,9 @@ class PredictiveDecoding(ComputedResult): #PickleSerializableMixin, AttrsBasedCl
         # Prepare epoch data for processing
         epoch_data_list = []
         for i, a_row in enumerate(ensure_dataframe(decoded_local_epochs_result.filter_epochs).itertuples(index=False)):
+            
+            a_decoded_epoch_result: SingleEpochDecodedResult = decoded_local_epochs_result.get_result_for_epoch(active_epoch_idx=i)
+            
             curr_epoch_p_x_given_n = decoded_local_epochs_result.p_x_given_n_list[i]
             curr_epoch_time_bin_centers = decoded_local_epochs_result.time_bin_containers[i].centers
             curr_epoch_tbin_indicies = reverse_flattened_time_bin_indicies_list[i]
@@ -2228,6 +2438,7 @@ class PredictiveDecoding(ComputedResult): #PickleSerializableMixin, AttrsBasedCl
         
         # Unpack results and populate output lists
         for i, is_high_prob_mask, any_t_Bin_high_prob_pos_mask, any_t_bin_result, merged_epoch_mask, processed_masks, merged_epoch_mask_result in results_list:
+            #TODO 2026-01-14 17:27: - [ ] These look reversed... are they?
             epoch_t_bins_high_prob_pos_masks.append(is_high_prob_mask)
             epoch_high_prob_pos_masks.append(any_t_Bin_high_prob_pos_mask)
             
@@ -3394,7 +3605,7 @@ class PredictiveDecodingDisplayWidget:
 
     active_epoch_idx: int = field(default=20)
     
-    disable_showing_epoch_high_prob_pos_masks: bool = field(default=False)
+    disable_showing_epoch_high_prob_pos_masks: bool = field(default=True)
     should_use_flipped_images: bool = field(default=False)
     
 

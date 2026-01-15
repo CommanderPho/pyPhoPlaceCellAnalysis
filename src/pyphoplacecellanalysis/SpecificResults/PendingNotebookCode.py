@@ -388,21 +388,26 @@ class PosteriorMaskPostProcessing:
 
         return centroids_df
 
+
     @function_attributes(short_name=None, tags=['working'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-01-14 13:36', related_items=[])
     @classmethod
-    def _compare_centroid_and_pos_traj_angle(cls, a_pos_df: pd.DataFrame, a_centroids_search_segments_df: pd.DataFrame, centroid_angle_col: str='segment_Vp_deg_safe_mean', close_angle_deg: float=60.0, allow_antiparallel_matching: bool=True):
+    def _compare_centroid_and_pos_traj_angle(cls, a_pos_df: pd.DataFrame, a_centroids_search_segments_df: pd.DataFrame, centroid_angle_col: str='segment_Vp_deg_safe_mean', segments_compare_col_name: str = 'segment_Vp_deg_mean_safe', close_angle_deg: float=60.0, allow_antiparallel_matching: bool=True):
         """ find any matching witin close_angle_deg degrees of one another
 
         a_pos_df, pos_segment_to_centroid_seq_segment_idx_map = PosteriorMaskPostProcessing._compare_centroid_and_pos_traj_angle(a_pos_df=a_pos_df, a_centroids_search_segments_df=a_centroids_search_segments_df)
         
+        Adds columns:
+            ['centroid_pos_traj_matching_angle_idx'] to `a_pos_df`
         
         """
         a_pos_df = a_pos_df.position.adding_segmented_trajectories_columns(overwrite_existing=True)
         a_centroids_search_segments_df = a_centroids_search_segments_df.dropna(subset=[centroid_angle_col], inplace=False)
 
+        a_pos_df['centroid_pos_traj_matching_angle_idx'] = -1 ## None of the positions match to start
+        
         pos_segment_to_centroid_seq_segment_idx_map = {}
         
-        segments_compare_col_name: str = 'segment_Vp_deg_mean_safe'
+        # Find the segments for this dataframe of positions __________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
         # ['segment_Vp_deg_safe_mean', 'segment_Vp_deg_mean', 'segment_dir_angle_binned_mean']    
 
         # Performed 5 aggregations grouped on column: 'segment_idx'
@@ -424,8 +429,18 @@ class PosteriorMaskPostProcessing:
                     is_segment_close = is_segment_close | is_antiparallel
 
                 pos_segment_to_centroid_seq_segment_idx_map[a_pos_traj_segment_row.segment_idx] = [contour_idx for contour_idx, is_close in enumerate(is_segment_close) if is_close]
+
+                ## set index:
+                matching_centroid_indices = np.where(is_segment_close)[0]
+                if len(matching_centroid_indices) > 0:
+                    # Set position rows in this segment to the index of the matching centroid segment (use first match if multiple)
+                    matching_idx = matching_centroid_indices[0]
+                    a_pos_df.loc[a_pos_df['segment_idx'] == a_pos_traj_segment_row.segment_idx, 'centroid_pos_traj_matching_angle_idx'] = matching_idx
+                                
+
                 # a_centroids_search_segments_df[centroid_angle_col]
             else:
+                ## no matching segments
                 pos_segment_to_centroid_seq_segment_idx_map[a_pos_traj_segment_row.segment_idx] = []        
                         
             ## Compare the canidate trajectory's angles to the df
@@ -434,6 +449,91 @@ class PosteriorMaskPostProcessing:
 
         return a_pos_df, pos_segment_to_centroid_seq_segment_idx_map
 
+
+    @function_attributes(short_name=None, tags=['main'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-01-14 16:53', related_items=[])
+    @classmethod
+    def compute_posterior_mask_position_sequence_alignments(cls, epoch_t_bins_high_prob_pos_masks):
+        """
+
+            ## INPUTS: masked_container
+            
+            measured_positions_df: pd.DataFrame = deepcopy(masked_container.decoding_locality.measured_positions_df)
+            # measured_positions_df
+
+            gaussian_volume = masked_container.predictive_decoding.gaussian_volume ## the volume for all time bins
+
+            # Usage from Container:
+            a_t_bin_size: float = 0.025
+            # a_decoder_name: str = 'roam'
+            a_decoder_name: str = 'sprinkle'
+            slice_level_multipliers = [0.25, 0.5, 0.9]
+
+            a_decoder = masked_container.pf1D_Decoder_dict[a_decoder_name]
+            a_decoded_result = masked_container.epochs_decoded_result_cache_dict[a_t_bin_size][a_decoder_name] # DecodedFilterEpochsResult
+            a_decoded_filter_epochs_df: pd.DataFrame = a_decoded_result.filter_epochs
+            # a_decoded_result.active_filter_epochs
+
+            ## INPUTS: decoded_epoch_t_bins_promenence_result_obj
+
+            mask_included_bins_list, summit_slice_levels_list, mask_included_p_x_given_n_list_dict, epoch_prom_t_bin_high_prob_pos_masks_dict, epoch_prom_high_prob_pos_masks_dict, *extra_outs = decoded_epoch_t_bins_promenence_result_obj.compute_discrete_contour_masks(p_x_given_n_list=a_decoded_result.p_x_given_n_list, slice_level_multipliers=slice_level_multipliers)
+
+            epoch_matching_past_future_positions, _an_out_tuple, a_decoded_filter_epochs_df = PredictiveDecoding.compute_specific_future_and_past_analysis(decoded_local_epochs_result=a_decoded_result,
+                    measured_positions_df=measured_positions_df, gaussian_volume=gaussian_volume,
+                    active_epochs_df=a_decoded_filter_epochs_df,
+                    an_epoch_name=a_decoder_name, top_v_percent=None,
+                    epoch_t_bin_high_prob_masks_dict=epoch_prom_t_bin_high_prob_pos_masks_dict,
+                    epoch_high_prob_masks_dict=epoch_prom_high_prob_pos_masks_dict,
+                    a_slice_multiplier=slice_level_multipliers[0],
+                    progress_print=True,
+                    merging_adjacent_max_separation_sec = 1e-9,
+                    minimum_epoch_duration = 0.05,
+                    # merging_adjacent_max_separation_sec=merging_adjacent_max_separation_sec, minimum_epoch_duration=minimum_epoch_duration,
+            )
+            epoch_high_prob_pos_masks, epoch_t_bins_high_prob_pos_masks, epoch_matching_positions, past_future_info_dict, matching_pos_dfs_list, matching_pos_epochs_dfs_list, _out_processed_items_list_dict = _an_out_tuple
+            _out_epoch_flat_mask_future_past_result: List[MatchingPastFuturePositionsResult] = _out_processed_items_list_dict['_out_epoch_flat_mask_future_past_result']
+
+        """
+        centroids: List[NDArray[ND.Shape["N_EPOCH_TIME_BINS, 2"], Any]] = [cls.centroids_from_binary_stack(a_t_bin_mask_list) for epoch_idx, a_t_bin_mask_list in enumerate(epoch_t_bins_high_prob_pos_masks)]
+        centroids_dfs: List[pd.DataFrame] = [cls.centroid_df_from_binary_stack(mask_stack=a_t_bin_mask_list, time_window_centers=a_decoded_result.time_window_centers[epoch_idx]) for epoch_idx, a_t_bin_mask_list in enumerate(epoch_t_bins_high_prob_pos_masks)]
+
+        a_past_future_name: types.PastFutureCategory = 'future'
+        segment_idx_col_name: str = 'segment_idx'
+        all_segment_transfer_col_names = ['segment_idx', 'Vp', 'segment_Vp_deg', 'segment_Vp_scatteredness']
+
+        epoch_pos_segment_to_centroid_seq_segment_idx_map_dict = []
+
+        for an_epoch_idx, added_pos_df_list in enumerate(added_pos_dfs_dict[a_past_future_name]):
+            # added_pos_df = added_pos_dfs_dict[a_past_future_name][an_epoch_idx]
+            # len(added_pos_df_list)
+            num_found_pos_traj_dfs: int = len(added_pos_df_list)
+            print(f'an_epoch_idx: {an_epoch_idx} - num_found_pos_traj_dfs: {num_found_pos_traj_dfs}, type: {type(added_pos_df_list)}')
+            a_centroids_df: pd.DataFrame = centroids_dfs[an_epoch_idx]
+            a_centroids_df = a_centroids_df.position.adding_segmented_trajectories_columns(overwrite_existing=True)
+            # Performed 5 aggregations grouped on column: 'segment_idx'
+            a_centroids_segments_df = a_centroids_df.groupby(['segment_idx']).agg(segment_dir_angle_binned_mean=('segment_dir_angle_binned', 'mean'), segment_Vp_scatteredness_mean=('segment_Vp_scatteredness', 'mean'), segment_Vp_deg_mean=('segment_Vp_deg', 'mean'), approx_head_dir_degrees_mean=('approx_dir_degrees', 'mean'), Vp_mean=('Vp', 'mean'), segment_Vp_deg_safe_mean=('segment_Vp_deg', PositionComputedDataMixin.circular_mean_deg)).reset_index()
+            a_centroids_search_segments_df = a_centroids_segments_df.dropna(subset=['segment_dir_angle_binned_mean'], inplace=False)
+            # # ['segment_Vp_deg_safe_mean', 'segment_Vp_deg_mean', 'segment_dir_angle_binned_mean']    
+            # a_centroids_search_segments_df['segment_dir_angle_binned_mean']
+            pos_segment_to_centroid_seq_segment_idx_map = {} ## empty by default 
+            
+            # for a_potential_found_pos_traj_idx, a_pos_df in enumerate(added_pos_df_list):
+            if isinstance(added_pos_df_list, dict):
+                for a_potential_found_pos_traj_idx, a_pos_df in added_pos_df_list.items():
+                    # print(type(a_pos_df))
+                    if len(a_pos_df) > 0:
+                        a_pos_df, pos_segment_to_centroid_seq_segment_idx_map = cls._compare_centroid_and_pos_traj_angle(a_pos_df=a_pos_df, a_centroids_search_segments_df=a_centroids_search_segments_df)
+            else:
+                assert isinstance(added_pos_df_list, pd.DataFrame)
+                a_pos_df = added_pos_df_list
+                if len(a_pos_df) > 0:
+                    a_pos_df, pos_segment_to_centroid_seq_segment_idx_map = cls,_compare_centroid_and_pos_traj_angle(a_pos_df=a_pos_df, a_centroids_search_segments_df=a_centroids_search_segments_df)
+
+            epoch_pos_segment_to_centroid_seq_segment_idx_map_dict.append(pos_segment_to_centroid_seq_segment_idx_map)
+            
+        ## END for an_epoch_idx, added_pos_df_list in enumerate(added_pos_dfs_dict[a_past_futu...
+
+        ## OUTPUTS: epoch_pos_segment_to_centroid_seq_segment_idx_map_dict
+        return epoch_pos_segment_to_centroid_seq_segment_idx_map_dict
 
 
 
