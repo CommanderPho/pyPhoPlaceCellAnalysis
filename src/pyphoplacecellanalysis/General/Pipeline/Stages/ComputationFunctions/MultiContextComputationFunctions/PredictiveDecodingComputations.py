@@ -1438,10 +1438,11 @@ class MatchingPastFuturePositionsResult(ComputedResult):
         
         self.centroids = PosteriorMaskPostProcessing.centroids_from_binary_stack(self.epoch_t_bins_high_prob_pos_mask)
         self.centroids_df = PosteriorMaskPostProcessing.centroid_df_from_binary_stack(mask_stack=self.epoch_t_bins_high_prob_pos_mask, time_window_centers=self.decoded_epoch_result.time_window_centers)
-        self.centroids_df = self.centroids_df.position.adding_segmented_trajectories_columns(overwrite_existing=True)
+        self.centroids_df = self.centroids_df.position.adding_segmented_trajectories_columns(overwrite_existing=True, disable_segmentation=False)
         # Performed 5 aggregations grouped on column: 'segment_idx'
         a_centroids_segments_df = self.centroids_df.groupby(['segment_idx']).agg(segment_dir_angle_binned_mean=('segment_dir_angle_binned', 'mean'), segment_Vp_scatteredness_mean=('segment_Vp_scatteredness', 'mean'), segment_Vp_deg_mean=('segment_Vp_deg', 'mean'), approx_head_dir_degrees_mean=('approx_dir_degrees', 'mean'), Vp_mean=('Vp', 'mean'), segment_Vp_deg_safe_mean=('segment_Vp_deg', PositionComputedDataMixin.circular_mean_deg)).reset_index()
         self.a_centroids_search_segments_df = a_centroids_segments_df.dropna(subset=['segment_dir_angle_binned_mean'], inplace=False)
+
 
 
     def _recompute_all_pos_dfs(self):
@@ -1462,6 +1463,13 @@ class MatchingPastFuturePositionsResult(ComputedResult):
         if 'centroid_pos_traj_matching_angle_idx' not in self.relevant_positions_df.columns:
             self.relevant_positions_df['centroid_pos_traj_matching_angle_idx'] = -1
 
+
+        # recompute pos_epochs _______________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
+        
+        ## NOTE: some have negative duration, they overlap, and all sorts of other confusing things...
+        # self.matching_pos_epochs_df, curr_matching_positions_df_dict = MatchingPastFuturePositionsResult._custom_build_sequential_position_epochs(matching_past_positions_df=self.relevant_positions_df) # curr_matching_positions_df_dict: types.epoch_index
+        self.matching_pos_epochs_df, curr_matching_positions_df_dict = MatchingPastFuturePositionsResult.compute_matching_pos_epochs_df(matching_past_positions_df=self.relevant_positions_df, disable_segmentation=True) 
+
         ## re-index:
         self.relevant_positions_df = self._recompute_relevant_pos_epoch_position_df_index_column(a_matching_pos_epochs_df=self.matching_pos_epochs_df, relevant_positions_df=self.relevant_positions_df, drop_non_epoch_events=False, epoch_id_key_name=self.epoch_id_key_name) ## drop those that aren't in the epochs
 
@@ -1479,6 +1487,7 @@ class MatchingPastFuturePositionsResult(ComputedResult):
             self.matching_future_positions_df = self.relevant_positions_df[(self.relevant_positions_df['is_future_present_past'] == 'future')].copy()
 
         # self.matching_future_positions_df = self.relevant_positions_df[self.is_relevant_future_times].copy() ## OLD
+
 
     @classmethod
     def _recompute_relevant_pos_epoch_position_df_index_column(cls, a_matching_pos_epochs_df: pd.DataFrame, relevant_positions_df: pd.DataFrame, epoch_id_key_name='matching_found_relevant_pos_epoch', drop_non_epoch_events: bool = True) -> pd.DataFrame:
@@ -1594,8 +1603,9 @@ class MatchingPastFuturePositionsResult(ComputedResult):
         an_epoch_mask_included_binned_x_y_columns_idx_df = pd.DataFrame(row_col_row_ids, columns=["binned_x", "binned_y"])
         return an_epoch_mask_included_binned_x_y_columns_idx_df.sort_values(by=["binned_x", "binned_y"]).reset_index(drop=True)
 
+
     @classmethod
-    def compute_matching_pos_epochs_df(cls, measured_positions_df: pd.DataFrame, merging_adjacent_max_separation_sec: float = 0.5, minimum_epoch_duration: float = 0.050) -> pd.DataFrame:
+    def compute_matching_pos_epochs_df(cls, measured_positions_df: pd.DataFrame, merging_adjacent_max_separation_sec: float = 0.5, minimum_epoch_duration: float = 0.050, disable_segmentation=True, **kwargs) -> pd.DataFrame:
         """
         Compute matching position epochs DataFrame from position matches and time filters.
         
@@ -1606,13 +1616,16 @@ class MatchingPastFuturePositionsResult(ComputedResult):
             
         Returns:
             DataFrame with detected epochs categorized as past/present/future
+
+            a_matching_pos_epochs_df, curr_matching_positions_df_dict = cls.compute_matching_pos_epochs_df(matching_past_positions_df=measured_positions_df, disable_segmentation=disable_segmentation, **kwargs)
+            
         """
         ## find adjacent epochs from the position time bins (periods where the animal is in the positions)
         # measured_positions_df_copy = measured_positions_df.copy()
         # assert 'is_included' in measured_positions_df_copy
 
         # a_matching_pos_epochs_df: pd.DataFrame = measured_positions_df_copy.neuropy.detect_epoch_satisfying_condition(is_condition_satisfied = (measured_positions_df_copy['is_included'].to_numpy()), merging_adjacent_max_separation_sec=merging_adjacent_max_separation_sec, minimum_epoch_duration=minimum_epoch_duration)        
-        a_matching_pos_epochs_df, curr_matching_positions_df_dict = cls._custom_build_sequential_position_epochs(matching_past_positions_df=measured_positions_df) ## dataframe is already filtered to past/future positions before being passed
+        a_matching_pos_epochs_df, curr_matching_positions_df_dict = cls._custom_build_sequential_position_epochs(matching_past_positions_df=measured_positions_df, disable_segmentation=disable_segmentation, **kwargs) ## dataframe is already filtered to past/future positions before being passed
 
         ## Copied from `.neuropy.detect_epoch_satisfying_condition(...)``
         if merging_adjacent_max_separation_sec is not None:
@@ -1636,7 +1649,7 @@ class MatchingPastFuturePositionsResult(ComputedResult):
 
     @function_attributes(short_name=None, tags=['FIXED', 'WORKING'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-01-15 09:50', related_items=[])
     @classmethod
-    def _custom_build_sequential_position_epochs(cls, matching_past_positions_df: pd.DataFrame, col_name: str = 'past_future_matching_pos_epoch_id', EPSILON_GAP_SIZE_SEC: float = 1e-9, disable_segmentation: bool = False) -> Tuple[pd.DataFrame, Dict[types.epoch_index, pd.DataFrame]]:
+    def _custom_build_sequential_position_epochs(cls, matching_past_positions_df: pd.DataFrame, col_name: str = 'past_future_matching_pos_epoch_id', EPSILON_GAP_SIZE_SEC: float = 1e-9, disable_segmentation: bool = True) -> Tuple[pd.DataFrame, Dict[types.epoch_index, pd.DataFrame]]:
         """ builds the epochs_df from the positions_df for a single epoch by merging consecutive time bins into epochs.
 
         Identifies consecutive sequences of time bins (gaps <= dt_max) and returns epochs spanning each sequence.
@@ -1679,7 +1692,7 @@ class MatchingPastFuturePositionsResult(ComputedResult):
 
     @function_attributes(short_name=None, tags=['WORKAROUND', 'interim', 'temporary'], input_requires=[], output_provides=[], uses=['cls._custom_build_sequential_position_epochs'], used_by=[], creation_date='2026-01-14 19:38', related_items=[])
     @classmethod
-    def extract_final_position_epochs(cls, _out_epoch_flat_mask_future_past_result: List["MatchingPastFuturePositionsResult"]):
+    def extract_final_position_epochs(cls, _out_epoch_flat_mask_future_past_result: List["MatchingPastFuturePositionsResult"], disable_segmentation=True, **kwargs):
         """ ran post-hoc to recompute/extract the valid position epochs 
         """
         # new_pos_epochs, curr_matching_positions_df_dict = _subfn_custom_build_sequential_position_epochs(matching_past_positions_df=matching_past_positions_df)
@@ -1705,7 +1718,9 @@ class MatchingPastFuturePositionsResult(ComputedResult):
 
                 _out_added_original_positions_df_dict[a_past_future_label].append(a_matching_pos_df)
                 ## perform the build
-                new_pos_epochs, curr_matching_positions_df_dict = cls._custom_build_sequential_position_epochs(matching_past_positions_df=a_matching_pos_df) # curr_matching_positions_df_dict: types.epoch_index
+                # new_pos_epochs, curr_matching_positions_df_dict = cls._custom_build_sequential_position_epochs(matching_past_positions_df=a_matching_pos_df) # curr_matching_positions_df_dict: types.epoch_index
+                new_pos_epochs, curr_matching_positions_df_dict = cls.compute_matching_pos_epochs_df(matching_past_positions_df=a_matching_pos_df, disable_segmentation=disable_segmentation, **kwargs) # curr_matching_positions_df_dict: types.epoch_index
+
                 num_new_epochs: int = len(new_pos_epochs)
                 _temp_num_new_epochs_list.append(num_new_epochs)
                 ## add to output arrays:
@@ -2528,7 +2543,7 @@ class PredictiveDecoding(ComputedResult): #PickleSerializableMixin, AttrsBasedCl
         # Filter once before passing to function (only copy the filtered subset, not the entire dataframe)
         filtered_positions_df = measured_positions_df[is_included_mask].copy()
 
-        a_matching_pos_epochs_df: pd.DataFrame = MatchingPastFuturePositionsResult.compute_matching_pos_epochs_df(measured_positions_df=filtered_positions_df, merging_adjacent_max_separation_sec=merging_adjacent_max_separation_sec, minimum_epoch_duration=minimum_epoch_duration)
+        a_matching_pos_epochs_df: pd.DataFrame = MatchingPastFuturePositionsResult.compute_matching_pos_epochs_df(measured_positions_df=filtered_positions_df, merging_adjacent_max_separation_sec=merging_adjacent_max_separation_sec, minimum_epoch_duration=minimum_epoch_duration, disable_segmentation=should_defer_extended_computations)
         
         ## found all matching events, now see whether these events are in the path or the future:
         is_pos_epochs_relevant_past_times = (a_matching_pos_epochs_df['start'] < curr_epoch_start_t)
@@ -2626,12 +2641,14 @@ class PredictiveDecoding(ComputedResult): #PickleSerializableMixin, AttrsBasedCl
             raise ValueError(f"is_high_prob_mask is None for epoch {i}")
         
         # Call static method from the same class (PredictiveDecoding)
-        any_t_bin_result = PredictiveDecoding.detect_matching_past_future_positions(epoch_high_prob_mask=any_t_Bin_high_prob_pos_mask, epoch_t_bins_high_prob_pos_mask=is_high_prob_mask, measured_positions_df=measured_positions_df, curr_epoch_start_t=curr_epoch_start_t, curr_epoch_stop_t=curr_epoch_stop_t, merging_adjacent_max_separation_sec=merging_adjacent_max_separation_sec, minimum_epoch_duration=minimum_epoch_duration, decoded_epoch_result=decoded_epoch_result, **kwargs)
+        any_t_bin_result = PredictiveDecoding.detect_matching_past_future_positions(epoch_high_prob_mask=any_t_Bin_high_prob_pos_mask, epoch_t_bins_high_prob_pos_mask=is_high_prob_mask, measured_positions_df=measured_positions_df, curr_epoch_start_t=curr_epoch_start_t, curr_epoch_stop_t=curr_epoch_stop_t, merging_adjacent_max_separation_sec=merging_adjacent_max_separation_sec, minimum_epoch_duration=minimum_epoch_duration,
+                                                                                     decoded_epoch_result=decoded_epoch_result, **kwargs)
         
         ## compute for `merged_epoch_mask` if it exists
         merged_epoch_mask_result = None
         if merged_epoch_mask is not None:
-            merged_epoch_mask_result = PredictiveDecoding.detect_matching_past_future_positions(epoch_high_prob_mask=merged_epoch_mask, epoch_t_bins_high_prob_pos_mask=is_high_prob_mask, measured_positions_df=measured_positions_df, curr_epoch_start_t=curr_epoch_start_t, curr_epoch_stop_t=curr_epoch_stop_t, merging_adjacent_max_separation_sec=merging_adjacent_max_separation_sec, minimum_epoch_duration=minimum_epoch_duration, decoded_epoch_result=decoded_epoch_result, **kwargs)
+            merged_epoch_mask_result = PredictiveDecoding.detect_matching_past_future_positions(epoch_high_prob_mask=merged_epoch_mask, epoch_t_bins_high_prob_pos_mask=is_high_prob_mask, measured_positions_df=measured_positions_df, curr_epoch_start_t=curr_epoch_start_t, curr_epoch_stop_t=curr_epoch_stop_t, merging_adjacent_max_separation_sec=merging_adjacent_max_separation_sec, minimum_epoch_duration=minimum_epoch_duration,
+                                                                                                 decoded_epoch_result=decoded_epoch_result, **kwargs)
                                                                 
         
         return (i, is_high_prob_mask, any_t_Bin_high_prob_pos_mask, any_t_bin_result, merged_epoch_mask, processed_masks, merged_epoch_mask_result)
@@ -3814,7 +3831,7 @@ class PredictiveDecodingComputationsGlobalComputationFunctions(AllFunctionEnumer
                         global_computation_results.computed_data['PredictiveDecoding'].debug_computed_dict[an_epoch_name] = {}
                     # active_epochs_df
                     # _out = global_computation_results.computed_data['PredictiveDecoding'].compute_future_and_past_analysis(owning_pipeline_reference, an_epoch_name=an_epoch_name)
-                    _out = global_computation_results.computed_data['PredictiveDecoding'].compute_future_and_past_analysis(owning_pipeline_reference, an_epoch_name=an_epoch_name) ## #TODO 2026-01-15 02:06: - [ ] This is what's wasting all the memory ## `, should_defer_extended_computations=should_defer_extended_computations`
+                    _out = global_computation_results.computed_data['PredictiveDecoding'].compute_future_and_past_analysis(owning_pipeline_reference, an_epoch_name=an_epoch_name, disable_segmentation=True) ## #TODO 2026-01-15 02:06: - [ ] This is what's wasting all the memory ## `, should_defer_extended_computations=should_defer_extended_computations`
                     epoch_high_prob_pos_masks, epoch_t_bins_high_prob_pos_masks, epoch_matching_positions, past_future_info_dict, matching_pos_dfs_list, matching_pos_epochs_dfs_list, _out_processed_items_list_dict = _out
                     global_computation_results.computed_data['PredictiveDecoding'].debug_computed_dict[an_epoch_name].update({'epoch_high_prob_pos_masks': epoch_high_prob_pos_masks, 'epoch_t_bins_high_prob_pos_masks': epoch_t_bins_high_prob_pos_masks, 'epoch_matching_positions': epoch_matching_positions, 'past_future_info_dict': past_future_info_dict})
                 except (ValueError, AttributeError, IndexError, KeyError, TypeError) as e:
