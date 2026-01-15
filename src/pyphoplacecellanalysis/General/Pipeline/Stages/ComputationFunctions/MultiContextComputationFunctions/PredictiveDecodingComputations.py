@@ -97,6 +97,302 @@ from neuropy.utils.misc import build_shuffled_ids, shuffle_ids # used in _SHELL_
 from neuropy.utils.mixins.binning_helpers import find_minimum_time_bin_duration
 
 
+@define(slots=False, repr=False, eq=False)
+class EventEpochsDebugger:
+    """High-performance visualizer for debugging position filtering steps and event epochs.
+    
+    Provides utilities to visualize temporal sequences, detect contiguous epochs, and identify gaps
+    between epochs at different filtering stages.
+    
+    Usage:
+        from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.PredictiveDecodingComputations import EventEpochsDebugger
+        
+        fig = EventEpochsDebugger.visualize_filtering_stages(
+            measured_positions_df=measured_positions_df,
+            relevant_positions_df_after_merge=relevant_positions_df_after_merge,
+            relevant_positions_df_final=relevant_positions_df_final,
+            epoch_high_prob_mask=epoch_high_prob_mask,
+            curr_epoch_start_t=curr_epoch_start_t,
+            curr_epoch_stop_t=curr_epoch_stop_t,
+            max_points_per_plot=5000
+        )
+        import matplotlib.pyplot as plt
+        plt.show()
+    """
+    
+    @staticmethod
+    def downsample_positions_df(positions_df: pd.DataFrame, max_points: int, preserve_epoch_boundaries: bool = True) -> pd.DataFrame:
+        """Downsample position dataframe while preserving epoch boundaries and time structure.
+        
+        Args:
+            positions_df: DataFrame with 't' column and other position data
+            max_points: Maximum number of points to keep
+            preserve_epoch_boundaries: If True, ensure epoch boundaries are preserved in downsampled data
+            
+        Returns:
+            Downsampled DataFrame
+        """
+        if len(positions_df) <= max_points:
+            return positions_df.copy()
+        
+        if not preserve_epoch_boundaries:
+            # Simple uniform downsampling
+            step = len(positions_df) // max_points
+            return positions_df.iloc[::step].copy()
+        
+        # Downsample while preserving epoch boundaries
+        # Sort by time first
+        df_sorted = positions_df.sort_values('t').reset_index(drop=True)
+        
+        # Detect gaps to preserve epoch boundaries
+        t_values = df_sorted['t'].values
+        dt = np.diff(t_values)
+        if len(dt) > 0:
+            # Use median dt as threshold for gaps (epoch boundaries)
+            median_dt = np.nanmedian(dt)
+            gap_threshold = median_dt * 10.0  # Gaps larger than 10x median are likely epoch boundaries
+            is_gap = dt > gap_threshold
+            gap_indices = np.where(is_gap)[0]
+        else:
+            gap_indices = np.array([], dtype=int)
+        
+        # Calculate sampling step
+        step = max(1, len(df_sorted) // max_points)
+        
+        # Sample uniformly but always include gap boundaries
+        sampled_indices = set(range(0, len(df_sorted), step))
+        
+        # Add gap boundary indices (and adjacent points)
+        for gap_idx in gap_indices:
+            sampled_indices.add(gap_idx)
+            if gap_idx + 1 < len(df_sorted):
+                sampled_indices.add(gap_idx + 1)
+            if gap_idx > 0:
+                sampled_indices.add(gap_idx - 1)
+        
+        # Always include first and last points
+        sampled_indices.add(0)
+        sampled_indices.add(len(df_sorted) - 1)
+        
+        # Convert to sorted list and sample
+        sampled_indices = sorted(sampled_indices)
+        return df_sorted.iloc[sampled_indices].copy()
+
+
+    @staticmethod
+    def detect_epochs_and_gaps(positions_df: pd.DataFrame, merging_adjacent_max_separation_sec: float = 0.5) -> Tuple[pd.DataFrame, NDArray]:
+        """Detect contiguous epochs and gaps from time points in position dataframe.
+        
+        Args:
+            positions_df: DataFrame with 't' column
+            merging_adjacent_max_separation_sec: Maximum separation in seconds for merging adjacent epochs
+            
+        Returns:
+            Tuple of (epochs_df, gap_mask) where:
+                - epochs_df: DataFrame with 'start', 'stop', 'duration' columns for each epoch
+                - gap_mask: Boolean array indicating which time points are in gaps (False) vs epochs (True)
+        """
+        if len(positions_df) == 0:
+            return pd.DataFrame(columns=['start', 'stop', 'duration']), np.array([], dtype=bool)
+        
+        df_sorted = positions_df.sort_values('t').reset_index(drop=True)
+        t_values = df_sorted['t'].values
+        
+        if len(t_values) < 2:
+            # Single point - treat as one epoch
+            epochs_df = pd.DataFrame({
+                'start': [t_values[0]],
+                'stop': [t_values[0]],
+                'duration': [0.0]
+            })
+            gap_mask = np.array([True])
+            return epochs_df, gap_mask
+        
+        # Compute time differences
+        dt = np.diff(t_values)
+        median_dt = np.nanmedian(dt) if len(dt) > 0 else 0.0
+        gap_threshold = max(merging_adjacent_max_separation_sec, median_dt * 2.0)
+        
+        # Find gaps (where dt > threshold)
+        is_gap = dt > gap_threshold
+        gap_start_indices = np.where(is_gap)[0]
+        
+        # Build epochs from consecutive points
+        epoch_starts = []
+        epoch_stops = []
+        
+        if len(gap_start_indices) == 0:
+            # Single contiguous epoch
+            epoch_starts = [t_values[0]]
+            epoch_stops = [t_values[-1]]
+        else:
+            # First epoch starts at beginning
+            epoch_starts.append(t_values[0])
+            epoch_stops.append(t_values[gap_start_indices[0]])
+            
+            # Middle epochs
+            for i in range(len(gap_start_indices) - 1):
+                epoch_starts.append(t_values[gap_start_indices[i] + 1])
+                epoch_stops.append(t_values[gap_start_indices[i + 1]])
+            
+            # Last epoch
+            epoch_starts.append(t_values[gap_start_indices[-1] + 1])
+            epoch_stops.append(t_values[-1])
+        
+        # Create epochs DataFrame
+        epochs_df = pd.DataFrame({
+            'start': epoch_starts,
+            'stop': epoch_stops,
+            'duration': [stop - start for start, stop in zip(epoch_starts, epoch_stops)]
+        })
+        
+        # Create gap mask: True for points in epochs, False for points in gaps
+        gap_mask = np.ones(len(df_sorted), dtype=bool)
+        for gap_idx in gap_start_indices:
+            # Mark gap point (the point after the gap start)
+            if gap_idx + 1 < len(gap_mask):
+                gap_mask[gap_idx + 1] = False
+        
+        return epochs_df, gap_mask
+
+
+    @staticmethod
+    def visualize_filtering_stages(measured_positions_df: pd.DataFrame, relevant_positions_df_after_merge: pd.DataFrame, relevant_positions_df_final: pd.DataFrame, epoch_high_prob_mask: NDArray, curr_epoch_start_t: float, curr_epoch_stop_t: float, max_points_per_plot: int = 5000, figsize: Tuple[int, int] = (16, 10), ax: Optional[Any] = None, merging_adjacent_max_separation_sec: float = 0.5):
+        """High-performance visualizer for debugging position filtering steps.
+        
+        Shows temporal sequences at each filtering stage, highlighting contiguous epochs and gaps.
+        
+        Args:
+            measured_positions_df: Initial position dataframe (Stage 0)
+            relevant_positions_df_after_merge: Positions after merge with epoch mask bins (Stage 1)
+            relevant_positions_df_final: Final filtered positions (Stage 2)
+            epoch_high_prob_mask: 2D boolean mask for epoch positions
+            curr_epoch_start_t: Start time of current epoch
+            curr_epoch_stop_t: Stop time of current epoch
+            max_points_per_plot: Maximum points to plot per stage (for performance)
+            figsize: Figure size tuple
+            ax: Optional existing axes (if None, creates new figure)
+            merging_adjacent_max_separation_sec: Maximum separation for epoch detection
+            
+        Returns:
+            matplotlib Figure object
+        """
+        import matplotlib.pyplot as plt
+        from matplotlib.patches import Rectangle
+        
+        # Prepare data for each stage
+        stages = [
+            ('Stage 0: Initial', measured_positions_df, 'blue'),
+            ('Stage 1: After Merge', relevant_positions_df_after_merge, 'green'),
+            ('Stage 2: Final Filter', relevant_positions_df_final, 'orange'),
+        ]
+        
+        # Create figure and subplots
+        if ax is None:
+            fig, axes = plt.subplots(len(stages), 1, figsize=figsize, sharex=True)
+            if len(stages) == 1:
+                axes = [axes]
+        else:
+            fig = ax.figure
+            axes = [ax]
+        
+        # Get time range for all stages
+        all_times = []
+        for _, df, _ in stages:
+            if len(df) > 0:
+                all_times.extend(df['t'].values)
+        
+        if len(all_times) == 0:
+            # Empty data - return empty figure
+            return fig
+        
+        t_min = np.min(all_times)
+        t_max = np.max(all_times)
+        t_range = t_max - t_min
+        t_margin = t_range * 0.02 if t_range > 0 else 1.0
+        
+        # Plot each stage
+        for stage_idx, (stage_name, stage_df, stage_color) in enumerate(stages):
+            if stage_idx >= len(axes):
+                break
+                
+            ax_stage = axes[stage_idx]
+            
+            if len(stage_df) == 0:
+                ax_stage.text(0.5, 0.5, f'{stage_name}: No data', transform=ax_stage.transAxes, ha='center', va='center')
+                ax_stage.set_ylabel(stage_name)
+                continue
+            
+            # Downsample for performance
+            stage_df_downsampled = EventEpochsDebugger.downsample_positions_df(stage_df, max_points_per_plot, preserve_epoch_boundaries=True)
+            
+            # Detect epochs and gaps
+            epochs_df, gap_mask = EventEpochsDebugger.detect_epochs_and_gaps(stage_df_downsampled, merging_adjacent_max_separation_sec=merging_adjacent_max_separation_sec)
+            
+            # Sort by time for plotting
+            stage_df_sorted = stage_df_downsampled.sort_values('t').reset_index(drop=True)
+            t_values = stage_df_sorted['t'].values
+            
+            # Plot epochs as highlighted regions
+            y_pos = 0.5
+            y_height = 0.3
+            
+            for _, epoch_row in epochs_df.iterrows():
+                epoch_start = epoch_row['start']
+                epoch_stop = epoch_row['stop']
+                ax_stage.axvspan(epoch_start, epoch_stop, alpha=0.2, color=stage_color, label='Epoch' if epoch_row.name == 0 else '')
+            
+            # Plot points
+            # Separate points in epochs vs gaps
+            in_epoch_mask = gap_mask[:len(stage_df_sorted)]
+            if len(in_epoch_mask) < len(stage_df_sorted):
+                # Extend mask if needed
+                in_epoch_mask = np.pad(in_epoch_mask, (0, len(stage_df_sorted) - len(in_epoch_mask)), constant_values=True)
+            
+            epoch_times = t_values[in_epoch_mask] if len(in_epoch_mask) > 0 else np.array([])
+            gap_times = t_values[~in_epoch_mask] if len(in_epoch_mask) > 0 else np.array([])
+            
+            # Plot epoch points
+            if len(epoch_times) > 0:
+                ax_stage.scatter(epoch_times, np.full(len(epoch_times), y_pos), c=stage_color, s=1, alpha=0.6, label='In Epoch' if len(gap_times) > 0 else None)
+            
+            # Plot gap points (if any)
+            if len(gap_times) > 0:
+                ax_stage.scatter(gap_times, np.full(len(gap_times), y_pos), c='red', s=1, alpha=0.3, label='Gap')
+            
+            # Add vertical lines for epoch boundaries
+            ax_stage.axvline(curr_epoch_start_t, color='purple', linestyle='--', alpha=0.7, linewidth=1, label='Epoch Start' if stage_idx == 0 else '')
+            ax_stage.axvline(curr_epoch_stop_t, color='purple', linestyle='--', alpha=0.7, linewidth=1, label='Epoch Stop' if stage_idx == 0 else '')
+            
+            # Statistics text
+            n_total = len(stage_df)
+            n_downsampled = len(stage_df_downsampled)
+            n_epochs = len(epochs_df)
+            total_epoch_duration = epochs_df['duration'].sum() if len(epochs_df) > 0 else 0.0
+            total_time_span = t_max - t_min if t_max > t_min else 0.0
+            coverage = (total_epoch_duration / total_time_span * 100) if total_time_span > 0 else 0.0
+            
+            stats_text = f'n={n_total} (shown: {n_downsampled}) | Epochs: {n_epochs} | Coverage: {coverage:.1f}%'
+            ax_stage.text(0.02, 0.95, stats_text, transform=ax_stage.transAxes, fontsize=9, verticalalignment='top', bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.5))
+            
+            # Formatting
+            ax_stage.set_ylabel(stage_name, fontsize=10)
+            ax_stage.set_ylim(0, 1)
+            ax_stage.set_xlim(t_min - t_margin, t_max + t_margin)
+            ax_stage.grid(True, alpha=0.3)
+            if stage_idx == 0:
+                ax_stage.legend(loc='upper right', fontsize=8)
+        
+        # Set x-axis label on bottom subplot
+        axes[-1].set_xlabel('Time (s)', fontsize=10)
+        
+        # Title
+        fig.suptitle('Position Filtering Stages: Temporal Sequences and Epochs', fontsize=12, fontweight='bold')
+        
+        plt.tight_layout()
+        
+        return fig
+
 
 @define(slots=False, repr=False, eq=False)
 class DecodingLocalityMeasures(ComputedResult): #PickleSerializableMixin, AttrsBasedClassHelperMixin):
@@ -2176,11 +2472,26 @@ class PredictiveDecoding(ComputedResult): #PickleSerializableMixin, AttrsBasedCl
         an_epoch_mask_included_binned_x_y_columns_idx_df = pd.DataFrame(row_col_row_ids, columns=["binned_x", "binned_y"])
         ## allowed positions are much less than the found ones:
         relevant_positions_df = relevant_positions_df.merge(an_epoch_mask_included_binned_x_y_columns_idx_df, on=["binned_x", "binned_y"], how="inner")
+        relevant_positions_df_after_merge = relevant_positions_df.copy()  # Save state after merge for visualization
 
         ## only after initial filter do we filter by this version:
         pos_matches_epoch_mask = np.where([epoch_high_prob_mask[(a_pos.binned_x-1), (a_pos.binned_y-1)] for a_pos in relevant_positions_df.itertuples()])[0]
         relevant_positions_df: pd.DataFrame = relevant_positions_df.iloc[pos_matches_epoch_mask].copy()
         
+        # DEBUG: Visualize filtering stages (uncomment to enable)
+        # from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.PredictiveDecodingComputations import EventEpochsDebugger
+        # fig = EventEpochsDebugger.visualize_filtering_stages(
+        #     measured_positions_df=measured_positions_df,
+        #     relevant_positions_df_after_merge=relevant_positions_df_after_merge,
+        #     relevant_positions_df_final=relevant_positions_df,
+        #     epoch_high_prob_mask=epoch_high_prob_mask,
+        #     curr_epoch_start_t=curr_epoch_start_t,
+        #     curr_epoch_stop_t=curr_epoch_stop_t,
+        #     max_points_per_plot=5000,
+        #     merging_adjacent_max_separation_sec=merging_adjacent_max_separation_sec
+        # )
+        # import matplotlib.pyplot as plt
+        # plt.show()
 
         # Now divide the found positions into past/future categories _________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
 
