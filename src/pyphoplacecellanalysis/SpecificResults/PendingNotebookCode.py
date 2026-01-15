@@ -526,7 +526,7 @@ class PosteriorMaskPostProcessing:
                 assert isinstance(added_pos_df_list, pd.DataFrame)
                 a_pos_df = added_pos_df_list
                 if len(a_pos_df) > 0:
-                    a_pos_df, pos_segment_to_centroid_seq_segment_idx_map = cls,_compare_centroid_and_pos_traj_angle(a_pos_df=a_pos_df, a_centroids_search_segments_df=a_centroids_search_segments_df)
+                    a_pos_df, pos_segment_to_centroid_seq_segment_idx_map = cls._compare_centroid_and_pos_traj_angle(a_pos_df=a_pos_df, a_centroids_search_segments_df=a_centroids_search_segments_df)
 
             epoch_pos_segment_to_centroid_seq_segment_idx_map_dict.append(pos_segment_to_centroid_seq_segment_idx_map)
             
