@@ -145,6 +145,140 @@ def saveData(pkl_path, db, should_append=False, safe_save:bool=True):
 # ==================================================================================================================================================================================================================================================================================== #
 # Split Save Attempts                                                                                                                                                                                                                                                                  #
 # ==================================================================================================================================================================================================================================================================================== #
+
+def _is_picklable(obj: Any) -> bool:
+    """Test if an object can be pickled.
+    
+    Args:
+        obj: The object to test
+        
+    Returns:
+        True if the object can be pickled, False otherwise
+    """
+    try:
+        pickle.dumps(obj, protocol=pickle.HIGHEST_PROTOCOL)
+        return True
+    except (pickle.PicklingError, TypeError, AttributeError):
+        return False
+
+
+def _convert_unpicklable_to_dict(obj: Any, visited: Optional[set] = None, max_depth: int = 50, current_depth: int = 0) -> Any:
+    """Recursively convert only unpicklable objects to dicts, preserving picklable nested objects.
+    
+    This function processes nested structures (dicts, lists, tuples) and converts only
+    objects that fail to pickle, while preserving the original types of picklable objects.
+    
+    Args:
+        obj: The object to process
+        visited: Set of object IDs already visited (to prevent circular references)
+        max_depth: Maximum recursion depth to prevent infinite loops
+        current_depth: Current recursion depth
+        
+    Returns:
+        The object with unpicklable parts converted to dicts, picklable parts preserved
+    """
+    if visited is None:
+        visited = set()
+    
+    if current_depth >= max_depth:
+        return obj
+    
+    # Handle None
+    if obj is None:
+        return obj
+    
+    # Handle primitive types (always picklable)
+    if isinstance(obj, (str, int, float, bool, bytes)):
+        return obj
+    
+    # Check for circular references
+    obj_id = id(obj)
+    if obj_id in visited:
+        return obj
+    visited.add(obj_id)
+    
+    try:
+        # First, test if the object itself is picklable
+        if _is_picklable(obj):
+            # Object is picklable, but we may need to process nested structures
+            # For containers, we still need to check nested elements
+            if isinstance(obj, dict):
+                result = {}
+                for k, v in obj.items():
+                    result[k] = _convert_unpicklable_to_dict(v, visited, max_depth, current_depth + 1)
+                visited.remove(obj_id)  # Remove before returning
+                return result
+            elif isinstance(obj, (list, tuple)):
+                processed_items = [_convert_unpicklable_to_dict(item, visited, max_depth, current_depth + 1) for item in obj]
+                visited.remove(obj_id)  # Remove before returning
+                return type(obj)(processed_items)
+            else:
+                # Picklable non-container object - return as-is
+                visited.remove(obj_id)  # Remove before returning
+                return obj
+        else:
+            # Object is not picklable, convert to dict
+            if has(obj):
+                # It's an attrs object, manually extract fields to avoid recursive conversion by asdict()
+                # Use attrs.fields() to get field definitions, then extract values manually
+                attrs_fields = fields(type(obj))
+                result = {}
+                for attr_field in attrs_fields:
+                    field_name = attr_field.name
+                    try:
+                        field_value = getattr(obj, field_name, None)
+                        # Process the field value to preserve picklable nested objects
+                        result[field_name] = _convert_unpicklable_to_dict(field_value, visited, max_depth, current_depth + 1)
+                    except AttributeError:
+                        # Skip if field doesn't exist
+                        pass
+                visited.remove(obj_id)  # Remove before returning
+                return result
+            elif hasattr(obj, '__dict__'):
+                # It's a regular object with __dict__
+                obj_dict = obj.__dict__.copy()
+                # Recursively process the dict values to preserve picklable nested objects
+                result = {}
+                for k, v in obj_dict.items():
+                    result[k] = _convert_unpicklable_to_dict(v, visited, max_depth, current_depth + 1)
+                visited.remove(obj_id)  # Remove before returning
+                return result
+            else:
+                # Can't convert, return as-is (might fail later, but that's handled by caller)
+                visited.remove(obj_id)  # Remove before returning
+                return obj
+    except (TypeError, AttributeError, RecursionError) as e:
+        # If we encounter an error during processing, return the object as-is
+        visited.discard(obj_id)  # Remove if present
+        return obj
+
+
+def _try_pickle_or_convert_to_dict(obj: Any, debug_print: bool = False) -> Any:
+    """Try to pickle an object, only convert to dict if pickling fails.
+    
+    This function attempts to pickle the object directly. If successful, returns
+    the object as-is. If pickling fails, converts to dict while preserving picklable
+    nested objects.
+    
+    Args:
+        obj: The object to process
+        debug_print: If True, prints debug information
+        
+    Returns:
+        The object (if picklable) or a dict representation (if not picklable)
+    """
+    # Test if the object is picklable
+    if _is_picklable(obj):
+        if debug_print:
+            print(f'Object {type(obj).__name__} is picklable, preserving original type')
+        return obj
+    else:
+        # Object is not picklable, convert to dict
+        if debug_print:
+            print(f'Object {type(obj).__name__} is not picklable, converting to dict (preserving picklable nested objects)')
+        return _convert_unpicklable_to_dict(obj)
+
+
 @function_attributes(short_name=None, tags=['save', 'pickle', 'split'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-12-11 08:11', related_items=['loadSplitData', 'load_split_pickled_global_computation_results'])
 def safeSaveSplitData(pkl_path: Union[str, Path], computed_data: Union[Dict[str, Any], Any], include_includelist=None, continue_after_pickling_errors: bool=True, debug_print:bool=True):
     """Save out data by splitting it into separate pickle files for each key in the dictionary.
@@ -182,20 +316,28 @@ def safeSaveSplitData(pkl_path: Union[str, Path], computed_data: Union[Dict[str,
     from pickle import PicklingError
     from pyphocorehelpers.print_helpers import print_filesystem_file_size, print_object_memory_usage
     
-    # Convert attrs objects to dictionaries if needed
+    # Convert non-dict objects to dictionaries if needed, preserving picklable nested objects
     if not isinstance(computed_data, dict):
         if has(computed_data):
-            # It's an attrs object, convert to dict
+            # It's an attrs object, convert to dict but preserve picklable nested objects
             if debug_print:
-                print(f'Converting attrs object {type(computed_data).__name__} to dictionary')
-            computed_data = asdict(computed_data)
+                print(f'Converting attrs object {type(computed_data).__name__} to dictionary (preserving picklable nested objects)')
+            computed_data = _convert_unpicklable_to_dict(computed_data)
         elif hasattr(computed_data, '__dict__'):
-            # It's a regular object with __dict__, convert to dict
+            # It's a regular object with __dict__, convert to dict but preserve picklable nested objects
             if debug_print:
-                print(f'Converting object {type(computed_data).__name__} with __dict__ to dictionary')
-            computed_data = computed_data.__dict__
+                print(f'Converting object {type(computed_data).__name__} with __dict__ to dictionary (preserving picklable nested objects)')
+            computed_data = _convert_unpicklable_to_dict(computed_data)
         else:
             raise TypeError(f"computed_data must be a dictionary, attrs object, or object with __dict__. Got {type(computed_data)}")
+    else:
+        # It's already a dict, but we should process nested values to preserve picklable objects
+        if debug_print:
+            print(f'Processing dictionary (preserving picklable nested objects)')
+        processed_dict = {}
+        for k, v in computed_data.items():
+            processed_dict[k] = _convert_unpicklable_to_dict(v)
+        computed_data = processed_dict
     
     # Resolve pkl_path
     if not isinstance(pkl_path, Path):
@@ -238,19 +380,11 @@ def safeSaveSplitData(pkl_path: Union[str, Path], computed_data: Union[Dict[str,
             was_save_success = False
             curr_item_type = type(v)
             try:
-                ## try get as dict
-                # Handle different types of values
-                if has(v):
-                    # It's an attrs object, convert to dict
-                    v_dict = asdict(v)
-                elif hasattr(v, '__dict__'):
-                    # It's a regular object with __dict__
-                    v_dict = v.__dict__
-                else:
-                    # Primitive type or value without __dict__, save directly
-                    v_dict = v
-                # saveData(curr_split_result_pickle_path, (v_dict))
-                saveData(curr_split_result_pickle_path, (v_dict, str(curr_item_type.__module__), str(curr_item_type.__name__)))    
+                # Try to pickle the value directly first, only convert to dict if pickling fails
+                # This preserves original types for picklable objects
+                processed_value = _try_pickle_or_convert_to_dict(v, debug_print=debug_print)
+                # saveData(curr_split_result_pickle_path, (processed_value))
+                saveData(curr_split_result_pickle_path, (processed_value, str(curr_item_type.__module__), str(curr_item_type.__name__)))    
                 was_save_success = True
             except (KeyError, AttributeError) as e:
                 print(f'\t{k} encountered {e} while trying to save {k}. Skipping')
@@ -563,7 +697,7 @@ def loadData(pkl_path, debug_print=False, **kwargs):
 
 
 @function_attributes(short_name=None, tags=['load', 'pickle', 'split'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-01-14 08:00', related_items=['safeSaveSplitData'])
-def loadSplitData(pkl_path: Union[str, Path], debug_print:bool=True, target_cls: Optional[type] = None, **kwargs) -> Union[Dict[str, Any], Any]:
+def loadSplitData(pkl_path: Union[str, Path], debug_print:bool=True, target_cls: Optional[type] = None, raise_on_exception: bool=True, **kwargs) -> Union[Dict[str, Any], Any]:
     """Load data from split pickle files created by safeSaveSplitData.
 
     Reciprocal function to safeSaveSplitData. Loads all Split_*.pkl files from a split folder
@@ -575,6 +709,8 @@ def loadSplitData(pkl_path: Union[str, Path], debug_print:bool=True, target_cls:
         debug_print: If True, prints progress information.
         target_cls: Optional class to automatically rebuild the loaded data into. If provided and the loaded data is a dict,
                     it will be automatically rebuilt into an instance of this class with all nested objects also rebuilt.
+        raise_on_exception: If True (default), raises exceptions during auto-rebuild. If False, catches exceptions and
+                           returns the dict instead, useful for debugging.
         **kwargs: Additional arguments passed to loadData for loading individual files.
 
     Returns:
@@ -775,7 +911,9 @@ def loadSplitData(pkl_path: Union[str, Path], debug_print:bool=True, target_cls:
                 print(f'Warning: Failed to auto-rebuild into {target_cls.__name__}: {e}')
                 import traceback
                 traceback.print_exc()
-            # Return the dict if rebuilding fails
+            # Return the dict if rebuilding fails, or raise if raise_on_exception is True
+            if raise_on_exception:
+                raise
             return loaded_data
     
     return loaded_data
@@ -1047,18 +1185,46 @@ def _helper_rebuild_obj_from_class_if_needed(target_cls, a_possible_dict):
     if not isinstance(a_possible_dict, dict):
         _cls_kwargs_dict = a_possible_dict.to_dict()
     else:
-        _cls_kwargs_dict = a_possible_dict
+        _cls_kwargs_dict = a_possible_dict.copy()  # Make a copy to avoid modifying the original
+
+    # Get valid field names from the attrs class to filter the dict
+    valid_field_names = set()
+    if _is_attrs_class(target_cls):
+        try:
+            attrs_fields = fields(target_cls)
+            valid_field_names = {f.name for f in attrs_fields}
+        except (TypeError, AttributeError):
+            # If we can't get fields, we'll try to construct with all keys and catch errors
+            pass
+    
+    # Filter dict to only include valid field names (if we have them)
+    if valid_field_names:
+        # Separate valid and invalid keys
+        valid_kwargs = {k: v for k, v in _cls_kwargs_dict.items() if k in valid_field_names}
+        invalid_kwargs = {k: v for k, v in _cls_kwargs_dict.items() if k not in valid_field_names}
+    else:
+        # If we can't determine valid fields, use all keys and hope for the best
+        valid_kwargs = _cls_kwargs_dict
+        invalid_kwargs = {}
 
     _ignore_re_add_subset = ['_VersionedResultMixin_version']
     _potential_subset_includelist = ['neuron_extended_ids', '_VersionedResultMixin_version', '_interpolator', 'locality_measures_df', 'time_bin_size', 'spikes_df', 'time_binning_container']
-    subset_includelist = [a_col for a_col in _potential_subset_includelist if a_col in _cls_kwargs_dict] ## only exclude real columns
-    popped_subset = pop_dict_subset(_cls_kwargs_dict, subset_includelist=subset_includelist)
+    subset_includelist = [a_col for a_col in _potential_subset_includelist if a_col in valid_kwargs] ## only exclude real columns
+    popped_subset = pop_dict_subset(valid_kwargs, subset_includelist=subset_includelist)
     ## INPUTS: active_peak_prominence_2d_results
-    an_obj = target_cls(**_cls_kwargs_dict)
-    ## add the invalid properties
+    an_obj = target_cls(**valid_kwargs)
+    ## add the invalid properties from popped_subset (these are known safe attributes)
     for k, v in popped_subset.items():
         if k not in _ignore_re_add_subset:
             setattr(an_obj, k, v)
+    ## add the invalid kwargs that are in our known safe list (but weren't valid field names)
+    for k, v in invalid_kwargs.items():
+        if k in _potential_subset_includelist and k not in _ignore_re_add_subset:
+            try:
+                setattr(an_obj, k, v)
+            except (AttributeError, TypeError):
+                # Skip if we can't set it (might be a read-only property)
+                pass
 
     # Automatically rebuild nested objects from dicts based on type annotations
     an_obj = _rebuild_nested_objects_from_dict(an_obj)
