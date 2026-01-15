@@ -1325,56 +1325,40 @@ class MatchingPastFuturePositionsResult(ComputedResult):
 
 
     @classmethod
-    def _custom_merge_sequential_t_bins_to_epochs(cls, a_df: pd.DataFrame, dt_max: float):
-        """ captures nothing 
-        """
-        # max_merge_duration = (pos_t_bin_sample_size_sec * 1.25)
+    def _custom_build_sequential_position_epochs(cls, matching_past_positions_df: pd.DataFrame, col_name: str = 'past_future_matching_pos_epoch_id', EPSILON_GAP_SIZE_SEC: float = 1e-9) -> Tuple[pd.DataFrame, Dict[types.epoch_index, pd.DataFrame]]:
+        """ builds the epochs_df from the positions_df for a single epoch by merging consecutive time bins into epochs.
 
-        a_df['sequence_id'] = (a_df['t'].diff() > dt_max).cumsum()
-        # Performed 5 aggregations grouped on column: 'sequence_id'
-        a_df = a_df.groupby(['sequence_id']).agg(start_first=('start', 'first'), stop_last=('stop', 'last'), t_count=('t', 'count'), t_idxmin=('t', 'idxmin'), t_idxmax=('t', 'idxmax')).reset_index().rename(columns={'start_first': 'start', 'stop_last': 'stop', 't_idxmin': 'start_pos_idx', 't_idxmax': 'stop_pos_idx'})
-        a_df['duration'] = a_df['stop'] - a_df['start']
-        return a_df
-
-
-    @classmethod
-    def _custom_build_sequential_position_epochs(cls, matching_past_positions_df: pd.DataFrame, col_name: str = 'past_future_matching_pos_epoch_id', EPSILON_GAP_SIZE_SEC: float = 1e-9):
-        """ builds the epochs_df from the positions_df for a single epoch
-
-        Informal replacement for ```
-            a_matching_positions_epochs_df = a_matching_positions_epochs_df.epochs.merge_adjacent_epochs_within(max_merge_duration=(pos_t_bin_sample_size_sec * 1.25))
-            a_matching_positions_epochs_df
-        ```
+        Identifies consecutive sequences of time bins (gaps <= dt_max) and returns epochs spanning each sequence.
         """
         if len(matching_past_positions_df) < 1:
             print(f'warn: empty df!')
             return pd.DataFrame({}), {}
 
-        a_matching_positions_epochs_df = deepcopy(matching_past_positions_df)
-        assert 't' in a_matching_positions_epochs_df
+        df = matching_past_positions_df.copy()
+        assert 't' in df
 
-        pos_t_bin_sample_size_sec: float = np.nanmin(np.abs(np.diff(a_matching_positions_epochs_df['t']))) # 0.008333336005307501
-        
-        a_matching_positions_epochs_df['start'] = a_matching_positions_epochs_df['t']
-        a_matching_positions_epochs_df['stop'] = a_matching_positions_epochs_df['start'].shift(-1) # + a_matching_positions_epochs_df['dt']
-        a_matching_positions_epochs_df = a_matching_positions_epochs_df.iloc[:-1] ## drop the last row with the NaN
-        a_matching_positions_epochs_df['stop'] = a_matching_positions_epochs_df['stop'] - EPSILON_GAP_SIZE_SEC
-        a_matching_positions_epochs_df['duration'] = a_matching_positions_epochs_df['stop'] - a_matching_positions_epochs_df['start']
-        a_matching_positions_epochs_df['label'] = a_matching_positions_epochs_df.index.astype(int)
-        
-        dt_max: float = (pos_t_bin_sample_size_sec * 2.5)
-        new_pos_epochs: pd.DataFrame = cls._custom_merge_sequential_t_bins_to_epochs(a_df = a_matching_positions_epochs_df, dt_max = dt_max)
+        # Compute bin size from minimum consecutive gap
+        t_sorted = np.sort(df['t'].values)
+        pos_t_bin_sample_size_sec: float = np.nanmin(np.abs(np.diff(t_sorted)))
+        dt_max: float = pos_t_bin_sample_size_sec * 2.5
+
+        # Identify sequences FIRST by detecting gaps > dt_max
+        df = df.sort_values('t').reset_index(drop=True)
+        df['sequence_id'] = (df['t'].diff() > dt_max).cumsum()
+
+        # Build epochs by aggregating each sequence - use first/last 't' values
+        new_pos_epochs: pd.DataFrame = df.groupby('sequence_id').agg(start=('t', 'first'), stop=('t', 'last'), t_count=('t', 'count'), start_pos_idx=('t', 'idxmin'), stop_pos_idx=('t', 'idxmax')).reset_index()
+        # Extend stop by bin_size (last 't' is start of last bin, not end)
+        new_pos_epochs['stop'] = new_pos_epochs['stop'] + pos_t_bin_sample_size_sec - EPSILON_GAP_SIZE_SEC
+        new_pos_epochs['duration'] = new_pos_epochs['stop'] - new_pos_epochs['start']
         new_pos_epochs['label'] = new_pos_epochs['sequence_id'].astype(int)
 
-        a_curr_matching_positions_df = deepcopy(a_matching_positions_epochs_df)
-        # a_curr_matching_positions_df['label'] = a_curr_matching_positions_df['label'].astype(int)
-        # new_pos_epochs['label'] = new_pos_epochs['label'].astype(int)
-
+        # Assign sequence_id back to positions for partitioning
+        a_curr_matching_positions_df = df.copy()
         a_curr_matching_positions_df = a_curr_matching_positions_df.time_point_event.adding_epochs_identity_column(epochs_df=new_pos_epochs, epoch_id_key_name=col_name, override_time_variable_name='t', epoch_label_column_name='label', no_interval_fill_value=-1, should_replace_existing_column=True, drop_non_epoch_events=True, overlap_behavior=OverlappingIntervalsFallbackBehavior.FALLBACK_TO_SLOW_SEARCH)
 
         ## Segment trajectories
-        
-        a_curr_matching_positions_df= a_curr_matching_positions_df.position.adding_segmented_trajectories_columns() ## add to original df
+        a_curr_matching_positions_df = a_curr_matching_positions_df.position.adding_segmented_trajectories_columns()
 
         curr_matching_positions_df_dict: Dict[types.epoch_index, pd.DataFrame] = a_curr_matching_positions_df.pho.partition_df_dict(col_name)
 
