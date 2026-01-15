@@ -3847,10 +3847,10 @@ class PredictiveDecodingComputationsGlobalComputationFunctions(AllFunctionEnumer
                     # active_epochs_df
                     # _out = global_computation_results.computed_data['PredictiveDecoding'].compute_future_and_past_analysis(owning_pipeline_reference, an_epoch_name=an_epoch_name)
                     _out = global_computation_results.computed_data['PredictiveDecoding'].compute_future_and_past_analysis(owning_pipeline_reference, an_epoch_name=an_epoch_name, disable_segmentation=True) ## #TODO 2026-01-15 02:06: - [ ] This is what's wasting all the memory ## `, should_defer_extended_computations=should_defer_extended_computations`
-                    epoch_high_prob_pos_masks, epoch_t_bins_high_prob_pos_masks, epoch_matching_positions, past_future_info_dict, matching_pos_dfs_list, matching_pos_epochs_dfs_list, _out_processed_items_list_dict = _out
+                    epoch_high_prob_pos_masks, epoch_t_bins_high_prob_pos_masks, epoch_matching_positions, past_future_info_dict, matching_pos_dfs_list, matching_pos_epochs_dfs_list, _out_processed_items_list_dict = _out ## too many to unpack?
                     global_computation_results.computed_data['PredictiveDecoding'].debug_computed_dict[an_epoch_name].update({'epoch_high_prob_pos_masks': epoch_high_prob_pos_masks, 'epoch_t_bins_high_prob_pos_masks': epoch_t_bins_high_prob_pos_masks, 'epoch_matching_positions': epoch_matching_positions, 'past_future_info_dict': past_future_info_dict})
                 except (ValueError, AttributeError, IndexError, KeyError, TypeError) as e:
-                    print(f'\t\tWARN: the last part of `perform_predictive_decoding_analysis(...) failed with error: {e}. Skipping.')
+                    print(f'\t\tWARN: the `should_perform_first_pass_compute_future_and_past_analysis` part of `perform_predictive_decoding_analysis(...) failed with error: {e}. Skipping.')
                     pass
                 except Exception as e:
                     raise
@@ -3875,7 +3875,7 @@ class PredictiveDecodingComputationsGlobalComputationFunctions(AllFunctionEnumer
                     active_epochs_result, custom_results_df_list, decoded_epoch_t_bins_promenence_result_obj = masked_container._filter_single_epoch_result(curr_active_pipeline=owning_pipeline_reference, decoding_time_bin_size=time_bin_size, an_epoch_name=an_epoch_name)
                     masked_container.debug_computed_dict[an_epoch_name].update({'active_epochs_result': active_epochs_result, 'custom_results_df_list': custom_results_df_list, 'decoded_epoch_t_bins_promenence_result_obj': decoded_epoch_t_bins_promenence_result_obj})
                 except (ValueError, AttributeError, IndexError, KeyError, TypeError) as e:
-                    print(f'\t\tWARN: the last part of `perform_predictive_decoding_analysis(...) failed with error: {e}. Skipping.')
+                    print(f'\t\tWARN: the `enable_filter_and_final_result_processing` part of `perform_predictive_decoding_analysis(...) failed with error: {e}. Skipping.')
                     pass
                 except Exception as e:
                     raise
