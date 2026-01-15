@@ -1468,7 +1468,7 @@ class MatchingPastFuturePositionsResult(ComputedResult):
         
         ## NOTE: some have negative duration, they overlap, and all sorts of other confusing things...
         # self.matching_pos_epochs_df, curr_matching_positions_df_dict = MatchingPastFuturePositionsResult._custom_build_sequential_position_epochs(matching_past_positions_df=self.relevant_positions_df) # curr_matching_positions_df_dict: types.epoch_index
-        self.matching_pos_epochs_df, curr_matching_positions_df_dict = MatchingPastFuturePositionsResult.compute_matching_pos_epochs_df(matching_past_positions_df=self.relevant_positions_df, disable_segmentation=True) 
+        self.matching_pos_epochs_df = self.compute_matching_pos_epochs_df(self.relevant_positions_df, disable_segmentation=True) 
 
         ## re-index:
         self.relevant_positions_df = self._recompute_relevant_pos_epoch_position_df_index_column(a_matching_pos_epochs_df=self.matching_pos_epochs_df, relevant_positions_df=self.relevant_positions_df, drop_non_epoch_events=False, epoch_id_key_name=self.epoch_id_key_name) ## drop those that aren't in the epochs
@@ -1617,7 +1617,7 @@ class MatchingPastFuturePositionsResult(ComputedResult):
         Returns:
             DataFrame with detected epochs categorized as past/present/future
 
-            a_matching_pos_epochs_df, curr_matching_positions_df_dict = cls.compute_matching_pos_epochs_df(matching_past_positions_df=measured_positions_df, disable_segmentation=disable_segmentation, **kwargs)
+            a_matching_pos_epochs_df, curr_matching_positions_df_dict = cls.compute_matching_pos_epochs_df(measured_positions_df, disable_segmentation=disable_segmentation, **kwargs)
             
         """
         ## find adjacent epochs from the position time bins (periods where the animal is in the positions)
@@ -1719,7 +1719,7 @@ class MatchingPastFuturePositionsResult(ComputedResult):
                 _out_added_original_positions_df_dict[a_past_future_label].append(a_matching_pos_df)
                 ## perform the build
                 # new_pos_epochs, curr_matching_positions_df_dict = cls._custom_build_sequential_position_epochs(matching_past_positions_df=a_matching_pos_df) # curr_matching_positions_df_dict: types.epoch_index
-                new_pos_epochs, curr_matching_positions_df_dict = cls.compute_matching_pos_epochs_df(matching_past_positions_df=a_matching_pos_df, disable_segmentation=disable_segmentation, **kwargs) # curr_matching_positions_df_dict: types.epoch_index
+                new_pos_epochs, curr_matching_positions_df_dict = cls.compute_matching_pos_epochs_df(a_matching_pos_df, disable_segmentation=disable_segmentation, **kwargs) # curr_matching_positions_df_dict: types.epoch_index
 
                 num_new_epochs: int = len(new_pos_epochs)
                 _temp_num_new_epochs_list.append(num_new_epochs)
