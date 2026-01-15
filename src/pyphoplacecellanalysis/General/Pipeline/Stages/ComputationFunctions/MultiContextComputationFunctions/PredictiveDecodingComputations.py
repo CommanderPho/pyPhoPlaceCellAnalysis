@@ -5133,18 +5133,13 @@ def multi_trajectory_color_plotter(position_dfs: List[pd.DataFrame], rendering_m
                 overlay_ymin, overlay_ymax = ymin, ymax
             
             # Create ImageItem for the overlay mask with low alpha
-            overlay_img = pg.ImageItem(overlay_mask, opacity=0.2)
-            # Set the transform to map image coordinates to plot coordinates
-            # ImageItem uses (x, y) where x is columns and y is rows
-            # We need to flip vertically (pyqtgraph's ImageItem has origin at top-left, but we want bottom-left)
-            # and scale to the correct extent
-            # Transform order: translate first, then scale (like the existing code pattern)
-            scale_x = (overlay_xmax - overlay_xmin) / overlay_mask.shape[1] if overlay_mask.shape[1] > 0 else 1.0
-            scale_y = -(overlay_ymax - overlay_ymin) / overlay_mask.shape[0] if overlay_mask.shape[0] > 0 else 1.0  # Negative to flip vertically
-            tr = pg.QtGui.QTransform()
-            tr.translate(overlay_xmin, overlay_ymax)  # Position top-left corner at (xmin, ymax)
-            tr.scale(scale_x, scale_y)  # Scale (negative y-scale flips vertically)
-            overlay_img.setTransform(tr)
+            # Use setImage with rect parameter instead of transform (like BinByBinDecodingDebugger pattern)
+            overlay_img = pg.ImageItem(image=overlay_mask, levels=(0, 1), opacity=0.2)
+            # rect format: [x, y, width, height] where (x, y) is bottom-left corner
+            overlay_width = overlay_xmax - overlay_xmin
+            overlay_height = overlay_ymax - overlay_ymin
+            image_bounds_extent = [overlay_xmin, overlay_ymin, overlay_width, overlay_height]
+            overlay_img.setImage(overlay_mask, rect=image_bounds_extent, autoLevels=False)
             plot_item.addItem(overlay_img)
     
     # Return based on return_widget parameter
