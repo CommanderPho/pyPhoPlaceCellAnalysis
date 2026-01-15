@@ -2678,7 +2678,7 @@ class PredictiveDecodingComputationsContainer(ComputedResult):
     @function_attributes(short_name=None, tags=['UNFINISHED', 'PENDING', '2025-01-09'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-01-09 03:38', related_items=[])
     def build_masked_container(self, curr_active_pipeline, a_t_bin_size: float = 0.025, use_full_recompute_method: bool=False, should_filter_directional_decoders_decode_result: bool = False, should_compute_future_and_past_analysis: bool=False,
             should_compute_peak_prom_analysis: bool = False,
-            window_size = 60,
+            window_size = 60, **kwargs,
         ) -> "PredictiveDecodingComputationsContainer":
         """ filters a copy of self
         """
@@ -2869,8 +2869,7 @@ class PredictiveDecodingComputationsContainer(ComputedResult):
                 if an_epoch_name not in masked_container.debug_computed_dict:
                     masked_container.debug_computed_dict[an_epoch_name] = {}
                 _out = masked_container.compute_future_and_past_analysis(curr_active_pipeline, an_epoch_name=an_epoch_name, decoding_time_bin_size=a_t_bin_size, 
-                                                                        ## TODO: pass 
-                                                                        enable_updating_instance_states=True,
+                                                                            enable_updating_instance_states=True, **kwargs,
                                                                          )
                 # epoch_high_prob_pos_masks, epoch_matching_positions, past_future_info_dict, matching_pos_dfs_list, matching_pos_epochs_dfs_list = _out
                 epoch_high_prob_pos_masks, epoch_t_bins_high_prob_pos_masks, epoch_matching_positions, past_future_info_dict, matching_pos_dfs_list, matching_pos_epochs_dfs_list = _out
@@ -3044,7 +3043,7 @@ class PredictiveDecodingComputationsContainer(ComputedResult):
     def compute_future_and_past_analysis(self, curr_active_pipeline, an_epoch_name:str = 'roam', decoding_time_bin_size=0.025, top_v_percent: float = 0.1, 
                                         merging_adjacent_max_separation_sec: float = 0.5, minimum_epoch_duration: float = 0.050, ## for merging detected future/past position dataframes
                                         enable_updating_instance_states: bool=True,
-                                        override_included_analysis_epochs: Optional[pd.DataFrame]=None,
+                                        override_included_analysis_epochs: Optional[pd.DataFrame]=None, **kwargs,
                                         ):
         """ computes the times that 
         
@@ -3132,6 +3131,7 @@ class PredictiveDecodingComputationsContainer(ComputedResult):
         epoch_matching_past_future_positions, _an_out_tuple, active_epochs_df = PredictiveDecoding.compute_specific_future_and_past_analysis(decoded_local_epochs_result=decoded_local_epochs_result, measured_positions_df=measured_positions_df, gaussian_volume=gaussian_volume,
             active_epochs_df=active_epochs_df,
             an_epoch_name=an_epoch_name, top_v_percent=top_v_percent, merging_adjacent_max_separation_sec=merging_adjacent_max_separation_sec, minimum_epoch_duration=minimum_epoch_duration,
+            **kwargs, # use_parallel=True, max_workers=2, 
         )
         epoch_high_prob_pos_masks, epoch_t_bins_high_prob_pos_masks, epoch_matching_positions, past_future_info_dict, matching_pos_dfs_list, matching_pos_epochs_dfs_list = _an_out_tuple
         
