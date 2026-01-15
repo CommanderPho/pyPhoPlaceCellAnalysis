@@ -1110,10 +1110,19 @@ class MatchingPastFuturePositionsResult(ComputedResult):
         # self.matching_future_positions_df = self.relevant_positions_df[self.is_relevant_future_times].copy()
         
         if not self.should_defer_extended_computations:
-            self._recompute_all_pos_dfs()
-            if (self.epoch_t_bins_high_prob_pos_mask) is not None and (self.decoded_epoch_result is not None):
-                self._recompute_high_prob_mask_centroids()
-            self.recompute_relevant_position_active_mask_centroid_traj_angle()
+            self.recompute_all()
+
+
+    # ==================================================================================================================================================================================================================================================================================== #
+    # Computation Functions                                                                                                                                                                                                                                                                #
+    # ==================================================================================================================================================================================================================================================================================== #
+
+    def recompute_all(self):
+        """ performs all recomputations like it would at init if `self.should_defer_extended_computations` were not False """    
+        self._recompute_all_pos_dfs()
+        if (self.epoch_t_bins_high_prob_pos_mask) is not None and (self.decoded_epoch_result is not None):
+            self._recompute_high_prob_mask_centroids()
+        self.recompute_relevant_position_active_mask_centroid_traj_angle()
 
 
 
