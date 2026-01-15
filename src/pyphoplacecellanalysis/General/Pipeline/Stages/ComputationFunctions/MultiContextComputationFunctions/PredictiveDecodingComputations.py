@@ -4911,7 +4911,7 @@ def plot_position_dfs_to_subplots(position_dfs: List[pd.DataFrame], fixed_column
 
 
 @function_attributes(short_name=None, tags=['pyqtgraph', 'trajectory'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-01-14 14:40', related_items=[])
-def multi_trajectory_color_plotter(position_dfs: List[pd.DataFrame], rendering_mode: str = 'solid_colors', fixed_columns: int = 5, return_widget: bool = True, maze_extent: Optional[Tuple[float, float, float, float]] = None):
+def multi_trajectory_color_plotter(position_dfs: List[pd.DataFrame], rendering_mode: str = 'solid_colors', fixed_columns: int = 5, return_widget: bool = True, maze_extent: Optional[Tuple[float, float, float, float]] = None, overlay_mask: Optional[NDArray] = None):
     """ Takes a list of position dataframes representing separate trajectories in the same environment and plots them in a grid of tiny subplots.
     It assigns each of them a unique id and color.
     They can be rendered as lines of solid color, gradients from 0.25 alpha to 0.9 alpha of their assigned color, or something custom.
@@ -4924,6 +4924,7 @@ def multi_trajectory_color_plotter(position_dfs: List[pd.DataFrame], rendering_m
         fixed_columns: Number of columns in the grid layout. Default is 5.
         return_widget: If True, returns (GraphicsLayoutWidget, list of PlotItems). If False, returns only list of PlotItems.
         maze_extent: Optional tuple of (xmin, xmax, ymin, ymax) to set fixed x/y limits for all subplots. If None, auto-ranges each plot.
+        overlay_mask: Optional 2D numpy array to render as a low-alpha overlay on each subplot. Extents are set to maze_extent if provided, otherwise viewport edges.
     
     Returns:
         Tuple of (GraphicsLayoutWidget, list of PlotItems) if return_widget=True, else just list of PlotItems.
@@ -4960,6 +4961,13 @@ def multi_trajectory_color_plotter(position_dfs: List[pd.DataFrame], rendering_m
         xmin, xmax, ymin, ymax = maze_extent
         if xmin >= xmax or ymin >= ymax:
             raise ValueError("maze_extent must have xmin < xmax and ymin < ymax")
+    
+    # Validate overlay_mask if provided
+    if overlay_mask is not None:
+        if not isinstance(overlay_mask, np.ndarray):
+            raise ValueError("overlay_mask must be a numpy array")
+        if overlay_mask.ndim != 2:
+            raise ValueError("overlay_mask must be a 2D array")
     
     num_epochs = len(position_dfs)
     needed_rows = int(np.ceil(num_epochs / fixed_columns))
@@ -5110,6 +5118,32 @@ def multi_trajectory_color_plotter(position_dfs: List[pd.DataFrame], rendering_m
         else:
             # Auto-range each plot to fit its trajectory
             plot_item.autoRange()
+            # Get the viewport bounds after auto-ranging
+            view_range = plot_item.viewRange()
+            xmin, xmax = view_range[0]
+            ymin, ymax = view_range[1]
+        
+        # Add overlay_mask if provided
+        if overlay_mask is not None:
+            # Determine extents: use maze_extent if provided, otherwise use viewport
+            if maze_extent is not None:
+                overlay_xmin, overlay_xmax, overlay_ymin, overlay_ymax = maze_extent
+            else:
+                overlay_xmin, overlay_xmax = xmin, xmax
+                overlay_ymin, overlay_ymax = ymin, ymax
+            
+            # Create ImageItem for the overlay mask with low alpha
+            overlay_img = pg.ImageItem(overlay_mask, opacity=0.2)
+            # Set the transform to map image coordinates to plot coordinates
+            # ImageItem uses (x, y) where x is columns and y is rows
+            # We need to flip vertically (pyqtgraph's ImageItem has origin at top-left, but we want bottom-left)
+            # and scale to the correct extent
+            scale_x = (overlay_xmax - overlay_xmin) / overlay_mask.shape[1]
+            scale_y = -(overlay_ymax - overlay_ymin) / overlay_mask.shape[0]  # Negative to flip vertically
+            translate_x = overlay_xmin
+            translate_y = overlay_ymax  # Start from top (ymax) since we're flipping
+            overlay_img.setTransform(pg.QtGui.QTransform().scale(scale_x, scale_y).translate(translate_x, translate_y))
+            plot_item.addItem(overlay_img)
     
     # Return based on return_widget parameter
     if return_widget:
